@@ -39,7 +39,7 @@ uint32_t HubMarkNoticeImages(uint8_t* base, uint32_t sp) {
     Store(base, frame + 80, Load(base, notice + 0));
     for (;;) {
       r3 = data_tables::Entry56(base, table, entry);
-      const uint32_t bits = Load(base, kHubData) + 408;
+      const uint32_t bits = Globals::hub_data(base).image_bits_address();
       const int32_t image = int32_t(Load(base, r3 + 16));
       if (image >= 0) {
         const uint32_t word = bits + 4 * uint32_t(image >> 5);
@@ -58,40 +58,49 @@ uint32_t HubMarkNoticeImages(uint8_t* base, uint32_t sp) {
 uint32_t HubCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8218E078 Type2Hub::Create");
   const uint32_t frame = Frame(base, sp, 128);
-  Store(base, machine + kMachineLoaded, 0);
-  const uint32_t pages = uint32_t(Alloc(calls, frame, 0x8218E0A4, 28));
-  Store(base, kHubPages, pages);
-  Store(base, pages + 4, 0);
-  Store(base, pages + 0, 0);
-  Store(base, pages + 8, 0);
-  Store(base, pages + 20, kNone);
-  Store(base, pages + 12, kNone);
-  Store(base, pages + 24, 0);
-  const uint32_t menu = uint32_t(Alloc(calls, frame, 0x8218E0E0, 68));
-  Store(base, kHubMenu, menu);
-  Store(base, menu + 12, 0);
-  Store(base, menu + 20, 1);
-  Store(base, menu + 0, 0);
-  Store(base, menu + 4, 0);
-  Store(base, menu + 16, 7);
-  for (const uint32_t at : {8u, 40u, 48u, 52u, 36u, 64u, 24u, 28u, 32u}) {
-    Store(base, menu + at, 0);
-  }
+  schema::Type2Hub(base, machine).set_loaded(0);
+  const schema::PageObject pages = schema::PageObject(base, uint32_t(Alloc(calls, frame, 0x8218E0A4, 28)));
+  Globals::set_hub_pages(base, pages.address);
+  pages.set_next_page(0);
+  pages.set_page(0);
+  pages.set_previous_page(0);
+  pages.set_unknown_20(kNone);
+  pages.set_step(kNone);
+  pages.set_step_started(0);
+  const schema::FrontEndMenu menu = schema::FrontEndMenu(base, uint32_t(Alloc(calls, frame, 0x8218E0E0, 68)));
+  Globals::set_hub_menu(base, menu.address);
+  menu.set_first_item(0);
+  menu.set_wraps(1);
+  menu.set_cursor(0);
+  menu.set_previous(0);
+  menu.set_last_item(7);
+  menu.set_moved(0);
+  menu.set_wrapped(0);
+  menu.set_visible_row(0);
+  menu.set_previous_row(0);
+  menu.set_side(0);
+  menu.set_player(0);
+  menu.set_up_down_locked(0);
+  menu.set_left_right_steps(0);
+  menu.set_shoulders_step(0);
   // The data: 68 bytes asked for, as the original (VirtualAlloc gives a
   // page), its words up to +447 used.
-  const uint32_t data = uint32_t(Alloc(calls, frame, 0x8218E140, 68));
-  Store(base, kHubData, data);
-  for (const uint32_t at : {0u, 4u, 8u, 16u, 20u}) {
-    Store(base, data + at, 0);
-  }
-  Store(base, data + 424, kNone);
-  Store(base, data + 436, kNone);
-  for (const uint32_t at : {216u, 404u, 408u, 412u}) {
-    Store(base, data + at, 0);
-  }
-  Store(base, Load(base, kHubData) + 20, 0);
+  const schema::Type2HubData data = schema::Type2HubData(base, uint32_t(Alloc(calls, frame, 0x8218E140, 68)));
+  Globals::set_hub_data(base, data.address);
+  data.set_set_up(0);
+  data.set_quitting(0);
+  data.set_stand_model(0);
+  data.set_busy_shown(0);
+  data.set_unknown_20(0);
+  data.set_record_string(kNone);
+  data.set_notice_entry(kNone);
+  data.set_image_count(0);
+  data.set_image2_count(0);
+  data.set_image_bits(0);
+  data.set_image_bits2(0);
+  Globals::hub_data(base).set_unknown_20(0);
   const uint32_t r3 = HubMarkNoticeImages(base, frame);
-  Store(base, machine + kMachineState, Load(base, machine + kMachineReenter) != 0 ? 1 : 9);
+  schema::Type2Hub(base, machine).set_state(schema::Type2Hub(base, machine).reenter() != 0 ? 1 : 9);
   return r3;
 }
 
@@ -99,15 +108,21 @@ uint64_t HubFreeImages(uint8_t* base, uint32_t data, uint32_t sp, const Calls& c
   ITC_NATIVE_RUNNING("sub_8218DE88 Type2Hub::FreeImages");
   const uint32_t frame = Frame(base, sp, 112);
   uint64_t r3 = data;
+  const schema::Type2HubData hub(base, data);
   static constexpr struct {
-    uint32_t list, lr;
-  } kLists[2] = {{32, 0x8218DED8}, {220, 0x8218DF24}};
+    uint32_t (schema::Type2HubData::*images)() const;
+    uint32_t (schema::Type2HubData::*count)() const;
+    void (schema::Type2HubData::*set_count)(uint32_t) const;
+    uint32_t lr;
+  } kLists[2] = {{&schema::Type2HubData::images_address, &schema::Type2HubData::image_count,
+                  &schema::Type2HubData::set_image_count, 0x8218DED8},
+                 {&schema::Type2HubData::images2_address, &schema::Type2HubData::image2_count,
+                  &schema::Type2HubData::set_image2_count, 0x8218DF24}};
   for (const auto& list : kLists) {
-    const uint32_t at = data + list.list;
-    while (Load(base, at + 184) != 0) {
-      const uint32_t count = Load(base, at + 184) - 1;
-      Store(base, at + 184, count);
-      const uint32_t record = Load(base, at + 4 * count);
+    while ((hub.*list.count)() != 0) {
+      const uint32_t count = (hub.*list.count)() - 1;
+      (hub.*list.set_count)(count);
+      const uint32_t record = Load(base, (hub.*list.images)() + 4 * count);
       HubFreeImage(base, record, frame, calls);
       r3 = calls.Call(kVirtualFree, frame, list.lr, record, 0, kMemRelease);
     }
@@ -118,18 +133,18 @@ uint64_t HubFreeImages(uint8_t* base, uint32_t data, uint32_t sp, const Calls& c
 uint64_t HubDestroy(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8218E1A8 Type2Hub::Destroy");
   const uint32_t frame = Frame(base, sp, 128);
-  Store(base, Load(base, kHubData) + 20, 0);
-  if (Load(base, Load(base, kHubData) + 4) != 0) {
-    Store(base, machine + kMachineState, 14);
+  Globals::hub_data(base).set_unknown_20(0);
+  if (Globals::hub_data(base).quitting() != 0) {
+    schema::Type2Hub(base, machine).set_state(14);
   }
-  HubFreeImages(base, Load(base, kHubData), frame, calls);
-  calls.Call(kVirtualFree, frame, 0x8218E204, Load(base, kHubPages), 0, kMemRelease);
-  calls.Call(kVirtualFree, frame, 0x8218E218, Load(base, kHubMenu), 0, kMemRelease);
+  HubFreeImages(base, Globals::hub_data(base).address, frame, calls);
+  calls.Call(kVirtualFree, frame, 0x8218E204, Globals::hub_pages(base).address, 0, kMemRelease);
+  calls.Call(kVirtualFree, frame, 0x8218E218, Globals::hub_menu(base).address, 0, kMemRelease);
   const uint64_t r3 =
-      calls.Call(kVirtualFree, frame, 0x8218E228, Load(base, kHubData), 0, kMemRelease);
-  Store(base, kHubPages, 0);
-  Store(base, kHubMenu, 0);
-  Store(base, kHubData, 0);
+      calls.Call(kVirtualFree, frame, 0x8218E228, Globals::hub_data(base).address, 0, kMemRelease);
+  Globals::set_hub_pages(base, 0);
+  Globals::set_hub_menu(base, 0);
+  Globals::set_hub_data(base, 0);
   return r3;
 }
 
@@ -137,26 +152,34 @@ uint64_t HubLoadNoticeImage(uint8_t* base, uint32_t data, uint32_t index, uint32
                             const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8218DF38 Type2Hub::LoadNoticeImage");
   const uint32_t frame = Frame(base, sp, 144);
+  const schema::Type2HubData hub(base, data);
   static constexpr struct {
-    uint32_t asset, list, alloc, memset, record, load;
-  } kImages[2] = {{22696, 32, 0x8218DF70, 0x8218DF80, 0x8218DF94, 0x8218DFE0},
-                  {22741, 220, 0x8218E004, 0x8218E014, 0x8218E028, 0x8218E070}};
+    uint32_t asset;
+    uint32_t (schema::Type2HubData::*images)() const;
+    uint32_t (schema::Type2HubData::*count)() const;
+    void (schema::Type2HubData::*set_count)(uint32_t) const;
+    uint32_t alloc, memset, record, load;
+  } kImages[2] = {{22696, &schema::Type2HubData::images_address, &schema::Type2HubData::image_count,
+                   &schema::Type2HubData::set_image_count, 0x8218DF70, 0x8218DF80, 0x8218DF94,
+                   0x8218DFE0},
+                  {22741, &schema::Type2HubData::images2_address,
+                   &schema::Type2HubData::image2_count, &schema::Type2HubData::set_image2_count,
+                   0x8218E004, 0x8218E014, 0x8218E028, 0x8218E070}};
   uint64_t r3 = 0;
   for (const auto& image : kImages) {
     const uint32_t asset = image.asset + index;
     const uint32_t size = archive::AssetSize(base, asset);
     const uint32_t buffer = uint32_t(Alloc(calls, frame, image.alloc, size));
     calls.Call(kXMemSet, frame, image.memset, buffer, 0, size);
-    const uint32_t record = uint32_t(Alloc(calls, frame, image.record, 16));
-    Store(base, record + 4, index);
-    Store(base, record + 0, 0);
-    Store(base, record + 8, 0);
-    Store(base, record + 12, 0);
-    const uint32_t list = data + image.list;
-    const uint32_t count = Load(base, list + 184);
-    Store(base, list + 184, count + 1);
-    Store(base, list + 4 * count, record);
-    const uint64_t args[8] = {asset, buffer, kHubImageLoaded, record, 0, 0, 0, 0};
+    const schema::Type2HubImage record = schema::Type2HubImage(base, uint32_t(Alloc(calls, frame, image.record, 16)));
+    record.set_index(index);
+    record.set_loaded(0);
+    record.set_texture(0);
+    record.set_xpr(0);
+    const uint32_t count = (hub.*image.count)();
+    (hub.*image.set_count)(count + 1);
+    Store(base, (hub.*image.images)() + 4 * count, record.address);
+    const uint64_t args[8] = {asset, buffer, kHubImageLoaded, record.address, 0, 0, 0, 0};
     r3 = calls.CallArgs(kArchiveLoad, frame, image.load, args);
   }
   return r3;
@@ -165,14 +188,14 @@ uint64_t HubLoadNoticeImage(uint8_t* base, uint32_t data, uint32_t index, uint32
 uint32_t HubLoadNoticeImages(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8218E240 Type2Hub::LoadNoticeImages");
   const uint32_t frame = Frame(base, sp, 112);
-  uint32_t data = Load(base, kHubData);
+  schema::Type2HubData data = Globals::hub_data(base);
   for (uint32_t i = 0; i < 46; i++) {
-    if ((Load(base, data + 408 + 4 * (i >> 5)) & (1u << (i & 31))) != 0) {
-      HubLoadNoticeImage(base, data, i, frame, calls);
-      data = Load(base, kHubData);
+    if ((Load(base, data.image_bits_address() + 4 * (i >> 5)) & (1u << (i & 31))) != 0) {
+      HubLoadNoticeImage(base, data.address, i, frame, calls);
+      data.address = Globals::hub_data(base).address;
     }
   }
-  return data;
+  return data.address;
 }
 
 uint32_t HubOpenMovie(uint8_t* base, uint32_t sp, const Calls& calls) {
@@ -207,19 +230,19 @@ uint64_t HubImageLoaded(uint8_t* base, uint32_t buffer, uint32_t record, uint32_
                         const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8218D8E8 Type2Hub::ImageLoaded");
   const uint32_t frame = Frame(base, sp, 144);
+  const schema::Type2HubImage image(base, record);
   const uint32_t xpr = uint32_t(Alloc(calls, frame, 0x8218D918, 24));
-  Store(base, record + 12, xpr);
+  image.set_xpr(xpr);
   calls.Call(kXprCreate, frame, 0x8218D924, xpr, buffer);
   const uint32_t texture = uint32_t(Alloc(calls, frame, 0x8218D938, 12));
-  Store(base, record + 8, texture);
-  const uint64_t level = calls.Call(kXprGetTexture, frame, 0x8218D94C, Load(base, record + 12), 0);
-  Store(base, Load(base, record + 8) + 0, uint32_t(level));
-  calls.Call(kGetLevelDesc, frame, 0x8218D968, Load(base, Load(base, record + 8) + 0), 0,
-             frame + 80);
-  Store(base, Load(base, record + 8) + 4, Load(base, frame + 104));
-  Store(base, Load(base, record + 8) + 8, Load(base, frame + 108));
+  image.set_texture(texture);
+  const uint64_t level = calls.Call(kXprGetTexture, frame, 0x8218D94C, image.xpr(), 0);
+  image.texture().set_texture(uint32_t(level));
+  calls.Call(kGetLevelDesc, frame, 0x8218D968, image.texture().texture(), 0, frame + 80);
+  image.texture().set_width(Load(base, frame + 104));
+  image.texture().set_height(Load(base, frame + 108));
   const uint64_t r3 = calls.Call(kVirtualFree, frame, 0x8218D994, buffer, 0, kMemRelease);
-  Store(base, record + 0, 1);
+  image.set_loaded(1);
   return r3;
 }
 

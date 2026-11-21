@@ -115,30 +115,15 @@ uint64_t MapperPressed(uint8_t* base, uint32_t mapper, uint32_t action, uint32_t
 
 // --- The screens' globals ---
 
-// The pause menu: the screen (4 bytes, its movie), the data (160), the
-// page object (28), the menu list (72).
-constexpr uint32_t kPauseScreen = 0x826D84D0;
-constexpr uint32_t kPauseData = 0x826D84D4;
-constexpr uint32_t kPausePages = 0x826D84D8;
-constexpr uint32_t kPauseList = 0x826D84DC;
-// Kind 4's pause menu (never seen in play): the same with 80 bytes of data.
+// The pause menu's, the confirm dialog's, the career results' and the menu
+// after the race's globals (0x826D84D0 to 0x826D851C) are
+// schema::RaceScreensGlobals (itc_recomp/schema/race-screens.toml).
+// Kind 4's pause menu (never seen in play): the screen (4 bytes, its movie),
+// 80 bytes of data, the page object (28), the menu list (72).
 constexpr uint32_t kPause4Screen = 0x826D84E0;
 constexpr uint32_t kPause4Data = 0x826D84E4;
 constexpr uint32_t kPause4Pages = 0x826D84E8;
 constexpr uint32_t kPause4List = 0x826D84EC;
-// The confirm dialog: the menu list (72), the page object (28), the data
-// (40).
-constexpr uint32_t kDialogList = 0x826D84F4;
-constexpr uint32_t kDialogPages = 0x826D84F8;
-constexpr uint32_t kDialogData = 0x826D84FC;
-// The career's results (212 bytes).
-constexpr uint32_t kCareerResults = 0x826D8500;
-// The menu after the race: the screen (4), the data (24), the page object
-// (28), the menu list (72).
-constexpr uint32_t kAfterScreen = 0x826D8510;
-constexpr uint32_t kAfterData = 0x826D8514;
-constexpr uint32_t kAfterPages = 0x826D8518;
-constexpr uint32_t kAfterList = 0x826D851C;
 // The screens never seen in play: kind 6's screen after the race (360
 // bytes, and a word beside it), the results of kinds 1 and 2 (52), those
 // of kinds 4 and 6 (40).

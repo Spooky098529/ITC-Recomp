@@ -12,6 +12,7 @@
 #include "guest.h"
 
 #include "base/log.h"
+#include "schema/ui_movies.h"
 #include "c_runtime/exit.h"
 
 #include <cstdint>
@@ -39,20 +40,27 @@ inline uint32_t Key(uint32_t list, uint32_t i) {
   ITC_NATIVE_RUNNING("sub_825A6518 Key");
   return list + 32 * i + 16;
 }
+// An animation's entry `index` (8 bytes each from its +64).
+inline uint32_t AnimationEntry(const schema::UiMovieAnimation& animation, uint32_t index) {
+  return guest::LoadU32(animation.base, animation.entries_address() + 8 * index);
+}
 // sub_825A6528: an animation's node track list i (from index [+32]).
 inline uint32_t NodeTrackList(uint8_t* base, uint32_t animation, uint32_t i) {
   ITC_NATIVE_RUNNING("sub_825A6528 NodeTrackList");
-  return Entry(base, animation, 64, 32, i);
+  const schema::UiMovieAnimation a(base, animation);
+  return AnimationEntry(a, a.first_node_track_list() + i);
 }
 // sub_825A6540: an animation's key list i (from index [+40]).
 inline uint32_t KeyList(uint8_t* base, uint32_t animation, uint32_t i) {
   ITC_NATIVE_RUNNING("sub_825A6540 KeyList");
-  return Entry(base, animation, 64, 40, i);
+  const schema::UiMovieAnimation a(base, animation);
+  return AnimationEntry(a, a.first_key_list() + i);
 }
 // sub_825A6558: an animation's sub-animation i (from index [+48]).
 inline uint32_t SubAnimation(uint8_t* base, uint32_t animation, uint32_t i) {
   ITC_NATIVE_RUNNING("sub_825A6558 SubAnimation");
-  return Entry(base, animation, 64, 48, i);
+  const schema::UiMovieAnimation a(base, animation);
+  return AnimationEntry(a, a.first_sub_animation() + i);
 }
 
 // sub_8259D600: the offset of a primitive's vertex `vertex` when it has
@@ -86,11 +94,9 @@ inline uint32_t SceneAnimation(uint8_t* base, uint32_t scene, uint32_t i) {
 constexpr uint32_t kTagTrm = 0x54524D00;  // "TRM\0", a chunk list's end
 constexpr uint32_t kTagSce = 0x53434500;  // "SCE\0", a scene
 
-// The globals UiMovie::SetRenderer fills: the renderer object the library
-// hands its chunks to (its vtable's slot 4), and the command list it records
-// into.
-constexpr uint32_t kRenderer = 0x82970C18;
-constexpr uint32_t kCommandList = 0x82970C1C;
+// The globals UiMovie::SetRenderer fills (the renderer object the library
+// hands its chunks to, its vtable's slot 4, and the command list it records
+// into) are schema::UiMoviesGlobals' renderer and command_list.
 
 // sub_8259D5C8: from the chunk at `chunk` (not itself tested), walks the
 // chunks (+4 the offset to the next, +0 its tag) to the first tagged `tag`;
@@ -358,9 +364,8 @@ uint32_t RecordStateReset(uint8_t* base, uint32_t list);
 
 // --- The tracks' properties (track_properties.cpp) ---
 
-// The 64 12-byte descriptors (+0 the node offset, +4 the type: 0 float, 1
-// and 2 integer, byte +8 set/add, byte +9 indirect).
-constexpr uint32_t kTrackProperties = 0x82970C28;
+// The 64 12-byte descriptors (schema::UiMovieTrackProperty) are
+// schema::UiMoviesGlobals' track_properties.
 
 // sub_8259FE68 UiMovie::TrackProperty: r3 = the property id; returns its
 // descriptor's address (id x 12 on the table, the full 64 bits). The first

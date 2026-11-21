@@ -74,10 +74,9 @@ InitResult RunInit(uint8_t* base, uint32_t address, uint32_t object, uint32_t fr
 // nothing done, where a block isn't the layer's pages, and the adapters
 // run the originals. ---
 
-// The mode type (0x826032DC) and the controller pages' two blocks.
-constexpr uint32_t kModeType = 0x826032DC;
-constexpr uint32_t kControllerData = 0x826D8490;  // 68 bytes
-constexpr uint32_t kControllerPage = 0x826D848C;  // 28 bytes (the page object)
+// The mode type (0x826032DC) and the controller pages' two blocks
+// (0x826D848C the page object, 0x826D8490 the menu): the schema's
+// Type6Type7ModesGlobals (schema/type6_type7_modes.h).
 
 // sub_82178DE8 GarageStage::SetPlates: [holder +0] +6092 = value.
 uint64_t GarageStageSetPlates(uint8_t* base, uint64_t r3, uint32_t value);
@@ -121,8 +120,7 @@ uint64_t ControllerOptionsOpen(uint8_t* base, uint64_t r3);
 // ring (`dispatcher` +204).
 uint64_t ControllerOptionsLeave(uint8_t* base, uint64_t r3, uint32_t dispatcher);
 // The settings the controller pages edit ([0x826D8494], the options'
-// settings block).
-constexpr uint32_t kControllerSettings = 0x826D8494;
+// settings block): Type6Type7ModesGlobals::controller_settings.
 // sub_821BB290 ControllerOptions::StepSliders: the menu's side (+36) -1 or 1
 // steps the slider at the cursor (0 to 2: the settings' +272 to +280, -10 to
 // 10); 1 when one changed, else 0.
@@ -233,7 +231,7 @@ extern const ModeLayout kType7Layout;
 constexpr uint32_t kNextModeFrame = 144;  // NextMode's stwu
 constexpr uint32_t kLeavingFrame = 128;   // Leaving's
 constexpr uint32_t kModeDelegateVtable = 0x82010FA0;
-constexpr uint32_t kLeavingFlag = 0x826364EC;  // 0 once NextMode leaves
+// [0x826364EC] (Type6Type7ModesGlobals::leaving_flag): 0 once NextMode leaves.
 
 // sub_822363B8 Type6Mode::NextMode, sub_82246800 Type7Mode::NextMode: Draw
 // and Update queued in the mode's ring, GameMessages::Dispatch(mode + 36,
@@ -366,7 +364,7 @@ uint64_t ControllerOptionsDraw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t
 // --- The stand scene's teardown and the garage camera's presets
 // (garage.cpp) ---
 
-constexpr uint32_t kStandHolder = 0x826D83E0;  // [it] the stand's holder (three slots)
+// [0x826D83E0] the stand's holder (three slots): Type6Type7ModesGlobals::stand_holder.
 constexpr uint32_t kPresetsAsset = 22600;
 constexpr uint32_t kOnPresetsLoaded = 0x8217FBE8;
 

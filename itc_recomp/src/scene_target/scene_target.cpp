@@ -9,6 +9,7 @@
 
 #include "base/log.h"
 #include "command_list/command_list.h"
+#include "schema/scene_target.h"
 
 #include <initializer_list>
 
@@ -16,8 +17,9 @@ namespace scene_target {
 
 namespace {
 
-constexpr uint32_t kOne = 0x82000A30;   // 1.0
-constexpr uint32_t kZero = 0x82000A34;  // 0.0
+using G = schema::SceneTargetGlobals;
+using Rect = schema::TexturedRect;
+using Surface = schema::View;  // the surfaces' addresses only
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -73,22 +75,25 @@ uint32_t Header(uint8_t* base, uint32_t list) {
   return s;
 }
 
-// Command 23 with render targets 0-3 all the scene target's `color` field,
-// then command 24 with its `depth` field (each loaded after its slot, as the
-// original does).
-uint32_t Targets(uint8_t* base, uint32_t scene, uint32_t list, uint32_t color, uint32_t depth) {
+// Command 23 with render targets 0-3 all the scene target's color surface,
+// then command 24 with its depth surface (the 1024 x 576 pair, or with
+// `tile` the tile-sized pair; each loaded after its slot, as the original
+// does).
+uint32_t Targets(uint8_t* base, uint32_t scene_address, uint32_t list, bool tile) {
+  const schema::SceneTarget scene(base, scene_address);
   Slot3(base, list, 23, 4, 0);
   for (uint32_t target = 0; target < 4; target++) {
     const uint32_t s = Slot(base, list);
     Store(base, s + 0, target);
-    Store(base, s + 4, Load(base, scene + color));
+    Store(base, s + 4,
+          tile ? scene.tile_color<Surface>().address : scene.color<Surface>().address);
   }
   const uint32_t s = Slot(base, list);
   Store(base, s + 4, 1);
   Store(base, s + 0, 24);
   Store(base, s + 8, 0);
   const uint32_t last = Slot(base, list);
-  Store(base, last, Load(base, scene + depth));
+  Store(base, last, tile ? scene.tile_depth<Surface>().address : scene.depth<Surface>().address);
   return last;
 }
 
@@ -99,7 +104,7 @@ std::optional<uint32_t> RecordTargets(uint8_t* base, uint32_t scene, uint32_t li
   if (!Room(base, list, 7)) {
     return std::nullopt;
   }
-  return Targets(base, scene, list, 4, 0);
+  return Targets(base, scene, list, false);
 }
 
 std::optional<uint32_t> RecordTileTargets(uint8_t* base, uint32_t scene, uint32_t list) {
@@ -107,17 +112,19 @@ std::optional<uint32_t> RecordTileTargets(uint8_t* base, uint32_t scene, uint32_
   if (!Room(base, list, 7)) {
     return std::nullopt;
   }
-  return Targets(base, scene, list, 12, 8);
+  return Targets(base, scene, list, true);
 }
 
 std::optional<uint32_t> RecordBoundTargets(uint8_t* base, uint32_t list) {
   ITC_NATIVE_RUNNING("sub_8209B058 SceneTarget::RecordBoundTargets");
-  return RecordTargets(base, Load(base, kSceneTarget), list);
+  return RecordTargets(base, G::scene_target<schema::View>(base).address, list);
 }
 
-std::optional<uint32_t> TexturedRectRecordFlat(uint8_t* base, uint32_t rect, uint32_t frame) {
+std::optional<uint32_t> TexturedRectRecordFlat(uint8_t* base, uint32_t rect_address,
+                                               uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_8217AA98 TexturedRect::RecordFlat");
-  const uint32_t list = Load(base, kRectLists + 4);
+  const Rect rect(base, rect_address);
+  const uint32_t list = G::rect_list(base);
   // The header, the texture (2), the render states (6), the samplers (3),
   // 13 and its item, 5, the vertices (6), 15, a slot left as it is and 36.
   if (!Ready(base, list, 24)) {
@@ -129,10 +136,10 @@ std::optional<uint32_t> TexturedRectRecordFlat(uint8_t* base, uint32_t rect, uin
   {
     const uint32_t s = Slot(base, list);
     Store(base, s + 0, 0);
-    Store(base, s + 4, Load(base, rect + 112));
+    Store(base, s + 4, rect.texture());
   }
   Slot3(base, list, 1, 5, 0);
-  const bool blend = Load(base, rect + 116) != 0;
+  const bool blend = rect.blend() != 0;
   Slot2(base, list, 56, 6);
   Slot2(base, list, 96, 0);
   Slot2(base, list, 60, blend ? 1 : 0);
@@ -147,14 +154,14 @@ std::optional<uint32_t> TexturedRectRecordFlat(uint8_t* base, uint32_t rect, uin
   const uint32_t vertex = command_list::AllocateVertices(base, list, 4, false);
 
   // 1.0 four times in the frame (never read), as the original's loop.
-  const float one = guest::LoadFloat(base, kOne);
+  const float one = G::one(base);
   for (uint32_t i = 0; i < 4; i++) {
     guest::StoreFloat(base, frame + 124 + 16 * i, one);
   }
-  const uint32_t x = Load(base, rect + 80), y = Load(base, rect + 84);
+  const uint32_t x = uint32_t(rect.x()), y = uint32_t(rect.y());
   const int64_t left = int32_t(x), top = int32_t(y);
-  const int64_t right = int32_t(x + Load(base, rect + 88));
-  const int64_t bottom = int32_t(y + Load(base, rect + 92));
+  const int64_t right = int32_t(x + rect.width());
+  const int64_t bottom = int32_t(y + rect.height());
   // The integers' conversions, through the frame as the original's.
   Store64(base, frame + 80, uint64_t(left));
   Store64(base, frame + 88, uint64_t(top));
@@ -163,9 +170,7 @@ std::optional<uint32_t> TexturedRectRecordFlat(uint8_t* base, uint32_t rect, uin
   const float fx[2] = {float(double(left)), float(double(right))};
   const float fy[2] = {float(double(top)), float(double(bottom))};
   // Texture coordinates copied as floats (lfs, stfs).
-  auto coordinate = [&](uint32_t offset) {
-    return float(double(guest::LoadFloat(base, rect + offset)));
-  };
+  auto coordinate = [](float value) { return float(double(value)); };
   for (uint32_t corner = 0; corner < 4; corner++) {
     const uint32_t v = vertex + 24 * corner;
     const uint32_t right_side = corner & 1, bottom_side = corner >> 1;
@@ -173,8 +178,8 @@ std::optional<uint32_t> TexturedRectRecordFlat(uint8_t* base, uint32_t rect, uin
     guest::StoreFloat(base, v + 4, fy[bottom_side]);
     guest::StoreFloat(base, v + 8, one);
     Store(base, v + 12, 0xFFFFFFFFu);
-    guest::StoreFloat(base, v + 16, coordinate(right_side ? 104 : 96));
-    guest::StoreFloat(base, v + 20, coordinate(bottom_side ? 108 : 100));
+    guest::StoreFloat(base, v + 16, coordinate(right_side ? rect.u1() : rect.u0()));
+    guest::StoreFloat(base, v + 20, coordinate(bottom_side ? rect.v1() : rect.v0()));
   }
   Slot3(base, list, 15, 1, 0);
   Slot(base, list);
@@ -252,35 +257,38 @@ void Resolve(uint8_t* base, uint32_t list, uint32_t what, uint32_t texture, uint
 // +12, +28, +44 and +60 overwritten by it), +64 = +68 = 0, +72 = 2, the
 // position 0, 0 and the size, the texture coordinates 0.0, 0.0 to `u1`,
 // `v1` (words), the texture, +116 = 0 (blending off); +76 not written.
-void ScreenRect(uint8_t* base, uint32_t rect, uint32_t width, uint32_t height, uint32_t u1,
-                uint32_t v1, uint32_t texture, uint32_t zero) {
+void ScreenRect(uint8_t* base, uint32_t rect_address, uint32_t width, uint32_t height,
+                uint32_t u1, uint32_t v1, uint32_t texture, uint32_t zero) {
+  const Rect rect(base, rect_address);
   for (uint32_t row = 0; row < 4; row++) {
     for (uint32_t column = 0; column < 4; column++) {
-      Store(base, rect + 16 * row + 4 * column, row == column ? 0x3F800000u : 0);
+      Store(base, rect.matrix_address() + 16 * row + 4 * column, row == column ? 0x3F800000u : 0);
     }
   }
-  Store(base, rect + 64, 0);
-  Store(base, rect + 68, 0);
-  Store(base, rect + 72, 2);
-  Store(base, rect + 80, 0);
-  Store(base, rect + 84, 0);
-  Store(base, rect + 88, width);
-  Store(base, rect + 92, height);
-  Store(base, rect + 96, zero);
-  Store(base, rect + 100, zero);
-  Store(base, rect + 104, u1);
-  Store(base, rect + 108, v1);
-  Store(base, rect + 112, texture);
-  Store(base, rect + 116, 0);
+  rect.set_kind(0);
+  rect.set_unknown_68(0);
+  rect.set_unknown_72(2);
+  rect.set_x(0);
+  rect.set_y(0);
+  rect.set_width(width);
+  rect.set_height(height);
+  // The texture coordinates stored as words (stw), as the original's.
+  Store(base, rect.u0_address(), zero);
+  Store(base, rect.v0_address(), zero);
+  Store(base, rect.u1_address(), u1);
+  Store(base, rect.v1_address(), v1);
+  rect.set_texture(texture);
+  rect.set_blend(0);
 }
 
 }  // namespace
 
-bool RecordPasses(uint8_t* base, uint32_t frame, uint32_t scene, uint32_t list, uint32_t bucket5,
-                  uint32_t bucket6, uint32_t bucket7, const PassCalls& calls) {
+bool RecordPasses(uint8_t* base, uint32_t frame, uint32_t scene_address, uint32_t list,
+                  uint32_t bucket5, uint32_t bucket6, uint32_t bucket7, const PassCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8209B3D0 SceneTarget::RecordPasses");
+  const schema::SceneTarget scene(base, scene_address);
   // The mode's passes.
-  const uint32_t mode = Load(base, scene + 28);
+  const uint32_t mode = scene.mode();
   const uint32_t bits = mode == 0 ? 7 : mode == 1 ? 4 : mode == 3 ? 1 : mode == 4 ? 8 : 0;
   // Every slot the scene's list takes, and the rectangles' (24 each, which
   // may be on the same list): declined when they wouldn't all fit.
@@ -307,32 +315,33 @@ bool RecordPasses(uint8_t* base, uint32_t frame, uint32_t scene, uint32_t list, 
   Store(base, frame + kRecordPassesFrame + 36, bucket5);
   Store(base, frame + kRecordPassesFrame + 44, bucket6);
   Store(base, frame + 80, bits);
-  const uint32_t one = Load(base, kOne), zero = Load(base, kZero);
+  const uint32_t one = Load(base, G::one_address()), zero = Load(base, G::zero_address());
 
   if (bits & 8) {
     // The menus' predicated tiling.
     command_list::OpenChunk(base, list);
     const uint32_t chunk = Header(base, list);
-    RecordTileTargets(base, scene, list);  // room checked above
+    RecordTileTargets(base, scene_address, list);  // room checked above
     Slot3(base, list, 32, 1, 0);  // BeginTiling
     {
       const uint32_t s = Slot(base, list);
       Store(base, s + 0, 0);
-      Store(base, s + 4, Load(base, Load(base, 0x8260034C) + 12));
-      Store(base, s + 8, Load(base, 0x8260034C) + 16);
+      // The tiling block's tile count (+12) and tiles (+16).
+      Store(base, s + 4, Load(base, G::display_tiling(base) + 12));
+      Store(base, s + 8, G::display_tiling(base) + 16);
     }
     Clear(base, list, zero);
     Slot3(base, list, 36, 0, 0);
     const uint32_t second = Header(base, list);
     Slot3(base, list, 33, 1, 0);  // EndTiling into the texture
-    Slot2(base, list, 771, Load(base, scene + 24));
+    Slot2(base, list, 771, scene.texture());
     RestoreTargets(base, list);
     Slot3(base, list, 36, 0, 0);
     command_list::CloseChunk(base, list);
     calls.submit(chunk, 108, 0x8209B634, 0x8209B644, 0x8209B660);
     calls.submit(second, 594, 0x8209B674, 0x8209B684, 0x8209B6A0);
     const uint32_t rect = frame + 96;
-    ScreenRect(base, rect, 1280, 720, one, one, Load(base, scene + 24), zero);
+    ScreenRect(base, rect, 1280, 720, one, one, scene.texture(), zero);
     calls.rect(rect, 594, 0x8209B738);
   }
   if (bits & 1) {
@@ -350,9 +359,9 @@ bool RecordPasses(uint8_t* base, uint32_t frame, uint32_t scene, uint32_t list, 
     command_list::OpenChunk(base, list);
     const uint32_t chunk = Header(base, list);
     if (bits & 2) {
-      Resolve(base, list, 2, Load(base, scene + 24), zero);
+      Resolve(base, list, 2, scene.texture(), zero);
     }
-    RecordTargets(base, scene, list);  // room checked above
+    RecordTargets(base, scene_address, list);  // room checked above
     Clear(base, list, zero);
     ZOff(base, list);
     Slot3(base, list, 36, 0, 0);
@@ -360,7 +369,7 @@ bool RecordPasses(uint8_t* base, uint32_t frame, uint32_t scene, uint32_t list, 
     calls.submit(chunk, bucket5, 0x8209B9B0, 0x8209B9C0, 0x8209B9E0);
     if (bits & 2) {
       const uint32_t rect = frame + 224;
-      ScreenRect(base, rect, 1024, 576, one, one, Load(base, scene + 24), zero);
+      ScreenRect(base, rect, 1024, 576, one, one, scene.texture(), zero);
       calls.rect(rect, bucket5, 0x8209BA80);
     }
   }
@@ -369,15 +378,15 @@ bool RecordPasses(uint8_t* base, uint32_t frame, uint32_t scene, uint32_t list, 
     // the screen.
     command_list::OpenChunk(base, list);
     const uint32_t chunk = Header(base, list);
-    Resolve(base, list, 3, Load(base, scene + 24), zero);
+    Resolve(base, list, 3, scene.texture(), zero);
     RestoreTargets(base, list);
     ZOff(base, list);
     Slot3(base, list, 36, 0, 0);
     command_list::CloseChunk(base, list);
     calls.submit(chunk, bucket6, 0x8209BBD4, 0x8209BBE4, 0x8209BC04);
     const uint32_t rect = frame + 352;
-    const uint32_t scale = Load(base, 0x82001070);  // 0.8
-    ScreenRect(base, rect, 1280, 720, scale, scale, Load(base, scene + 24), zero);
+    const uint32_t scale = Load(base, G::four_fifths_address());  // 0.8
+    ScreenRect(base, rect, 1280, 720, scale, scale, scene.texture(), zero);
     calls.rect(rect, bucket6, 0x8209BCA4);
   }
   return true;

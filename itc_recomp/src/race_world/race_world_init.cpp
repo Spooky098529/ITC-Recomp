@@ -12,6 +12,8 @@
 
 #include "race_world/race_world.h"
 
+#include "schema/race_world.h"
+
 #include "base/log.h"
 #include "game_modes/game_modes.h"
 #include "guest.h"
@@ -315,12 +317,12 @@ constexpr Step kSteps[] = {
 
 uint32_t Init(uint8_t* base, uint32_t world, uint32_t frame, bool* replaced) {
   ITC_NATIVE_RUNNING("sub_82174D28 RaceWorld::Init");
-  guest::StoreU32(base, world + 9604, 1);
-  guest::StoreU32(base, world + 9608, 0);
+  schema::RaceWorld(base, world).set_state(1);
+  schema::RaceWorld(base, world).set_two_humans(0);
   const uint32_t race = guest::LoadU32(base, kRaceData);
   if (int32_t(guest::LoadU32(base, race + 0xA3AF0)) == 6 &&
       int32_t(vehicle_accessors::StagesWord76(base, race + 0x59620, 0xFFFFFFFF)) >= 2) {
-    guest::StoreU32(base, world + 9608, 1);
+    schema::RaceWorld(base, world).set_two_humans(1);
   }
   auto at = [&](const Value& v) {
     switch (v.base) {

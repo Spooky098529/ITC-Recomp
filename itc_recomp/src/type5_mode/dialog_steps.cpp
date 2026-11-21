@@ -8,6 +8,8 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/menu_helpers.h"
+#include "schema/type5_mode.h"
 #include "ui_movies/game.h"
 
 namespace type5_mode {
@@ -16,6 +18,7 @@ namespace {
 
 using guest::LoadU32;
 using guest::StoreU32;
+using G = schema::Type5ModeGlobals;
 
 // The original's frame below `sp`, its back chain written.
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
@@ -49,7 +52,7 @@ uint64_t OpenConfirmStep(uint8_t* base, uint32_t started, uint32_t sp, const Cal
     // The highlights' table {1, 2} at the frame's +80, the cursor's entry.
     StoreU32(base, frame + 80, 1);
     StoreU32(base, frame + 84, 2);
-    const uint32_t cursor = LoadU32(base, LoadU32(base, kMenu) + 0);
+    const uint32_t cursor = G::menu(base).cursor();
     const uint32_t named = LoadU32(base, frame + 80 + (cursor << 2));
     calls.CallArgs(kPlayNamed, frame, 0x822262A0, {movie, named, 0, 0, 0, 0, 2, frame + 80});
     calls.Call(kLoopLast, frame, 0x822262A8, movie);
@@ -69,7 +72,7 @@ uint64_t CloseConfirmStep(uint8_t* base, uint32_t started, uint32_t sp, const Ca
   const uint32_t done = Done(calls.Call(kRun, frame, 0x82226330, movie, 0));
   if (done != 0) {
     calls.Call(kFinishAll, frame, 0x82226344, movie);
-    StoreU32(base, LoadU32(base, kData) + 4, 9);
+    G::data(base).set_queued_state(9);
   }
   return done;
 }
@@ -111,7 +114,7 @@ uint64_t SimpleStep(uint8_t* base, uint32_t started, Simple which, uint32_t sp,
   }
   const uint32_t done = Done(calls.Call(kRun, frame, s.lr[2], movie, 0));
   if (s.close && done != 0) {
-    StoreU32(base, LoadU32(base, kData) + 4, 9);
+    G::data(base).set_queued_state(9);
   }
   return done;
 }
@@ -124,11 +127,11 @@ uint64_t MoveCursorStep(uint8_t* base, uint32_t started, uint32_t sp, const Call
     // The highlights' table {1, 2} at the frame's +80 (+84 stored first).
     StoreU32(base, frame + 84, 2);
     StoreU32(base, frame + 80, 1);
-    const uint32_t previous = LoadU32(base, LoadU32(base, kMenu) + 4);
+    const uint32_t previous = G::menu(base).previous();
     calls.CallArgs(kFinishNamed, frame, 0x82226680,
                    {movie, LoadU32(base, frame + 80 + (previous << 2)), 0, 0, 0, 0, 2,
                     frame + 80});
-    const uint32_t cursor = LoadU32(base, LoadU32(base, kMenu) + 0);
+    const uint32_t cursor = G::menu(base).cursor();
     calls.CallArgs(kPlayNamed, frame, 0x822266AC,
                    {movie, LoadU32(base, frame + 80 + (cursor << 2)), 0, 0, 0, 0, 0, frame + 80});
     calls.Call(kLoopLast, frame, 0x822266B4, movie);

@@ -24,9 +24,9 @@ using namespace car_physics::ops;
 
 namespace {
 
-constexpr uint32_t kColorScale = 0x82002200;   // the node's colors' scale
-constexpr uint32_t kDegrees = 0x82002948;      // degrees to radians
-constexpr uint32_t kNearZero = 0x82002A44;     // the rotation's and scale's threshold
+using G = schema::UiMoviesGlobals;
+using Context = schema::UiMovieDrawContext;
+using Quad = schema::UiMovieDrawQuad;
 
 // fctiwz, as the translation does it: NaN gives INT_MIN, INT_MAX and above
 // INT_MAX, below INT_MIN INT_MIN.
@@ -69,6 +69,7 @@ bool BeyondThreshold(double x, double zero, double threshold) {
 
 uint32_t ApplyTransform(uint8_t* base, uint32_t context, uint32_t node, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_8259E6C8 UiMovie::ApplyTransform");
+  const Context c(base, context);
   uint32_t r3 = context;
   // The clip: the node's rectangle offset by the context's +32 and +36 (as
   // integers), kept or intersected with the context's (sub_8259D730,
@@ -76,49 +77,48 @@ uint32_t ApplyTransform(uint8_t* base, uint32_t context, uint32_t node, uint32_t
   const uint32_t n40 = guest::LoadU32(base, node + 40);
   if (n40 != 0 || guest::LoadU32(base, node + 44) != 0 || guest::LoadU32(base, node + 48) != 0 ||
       guest::LoadU32(base, node + 52) != 0) {
-    const uint32_t x = uint32_t(Fctiwz(Lfs(base, context + 32)));
+    const uint32_t x = uint32_t(Fctiwz(Lfs(base, c.matrix_address() + 32)));
     const uint32_t n48 = guest::LoadU32(base, node + 48);
-    const uint32_t y = uint32_t(Fctiwz(Lfs(base, context + 36)));
+    const uint32_t y = uint32_t(Fctiwz(Lfs(base, c.matrix_address() + 36)));
     const uint32_t n44 = guest::LoadU32(base, node + 44);
     const uint32_t n52 = guest::LoadU32(base, node + 52);
-    const uint32_t clip = context + 64;
     const uint32_t rect[4] = {x + n40, y + n44, x + n48, y + n52};
-    r3 = clip;
-    if (guest::LoadU32(base, clip + 0) == 0 && guest::LoadU32(base, clip + 4) == 0 &&
-        guest::LoadU32(base, clip + 8) == 0 && guest::LoadU32(base, clip + 12) == 0) {
-      for (uint32_t i = 0; i < 4; i++) {
-        guest::StoreU32(base, clip + 4 * i, rect[i]);
-      }
+    r3 = c.clip_left_address();
+    if (c.clip_left() == 0 && c.clip_top() == 0 && c.clip_right() == 0 && c.clip_bottom() == 0) {
+      c.set_clip_left(rect[0]);
+      c.set_clip_top(rect[1]);
+      c.set_clip_right(rect[2]);
+      c.set_clip_bottom(rect[3]);
     } else {
       ITC_NATIVE_RUNNING("sub_8259D730 (merged into UiMovie::ApplyTransform)");
       // +0 and +12 the larger, +4 and +8 the smaller (signed), as read.
-      const int32_t a0 = int32_t(guest::LoadU32(base, clip + 0));
-      guest::StoreU32(base, clip + 0, uint32_t(a0 > int32_t(rect[0]) ? a0 : int32_t(rect[0])));
-      const int32_t a1 = int32_t(guest::LoadU32(base, clip + 4));
-      guest::StoreU32(base, clip + 4, uint32_t(a1 < int32_t(rect[1]) ? a1 : int32_t(rect[1])));
-      const int32_t a2 = int32_t(guest::LoadU32(base, clip + 8));
-      guest::StoreU32(base, clip + 8, uint32_t(a2 < int32_t(rect[2]) ? a2 : int32_t(rect[2])));
-      const int32_t a3 = int32_t(guest::LoadU32(base, clip + 12));
-      guest::StoreU32(base, clip + 12, uint32_t(a3 > int32_t(rect[3]) ? a3 : int32_t(rect[3])));
+      const int32_t a0 = int32_t(c.clip_left());
+      c.set_clip_left(uint32_t(a0 > int32_t(rect[0]) ? a0 : int32_t(rect[0])));
+      const int32_t a1 = int32_t(c.clip_top());
+      c.set_clip_top(uint32_t(a1 < int32_t(rect[1]) ? a1 : int32_t(rect[1])));
+      const int32_t a2 = int32_t(c.clip_right());
+      c.set_clip_right(uint32_t(a2 < int32_t(rect[2]) ? a2 : int32_t(rect[2])));
+      const int32_t a3 = int32_t(c.clip_bottom());
+      c.set_clip_bottom(uint32_t(a3 > int32_t(rect[3]) ? a3 : int32_t(rect[3])));
     }
   }
   // The color: r, g, b times the node's integers times the scale, alpha
   // times the node's float.
   {
-    const double r = Lfs(base, context + 80);
-    const double g = Lfs(base, context + 84);
-    const double b = Lfs(base, context + 88);
-    const double a = Lfs(base, context + 92);
+    const double r = double(c.red());
+    const double g = double(c.green());
+    const double b = double(c.blue());
+    const double a = double(c.alpha());
     const double nr = IntToFloat(int32_t(guest::LoadU32(base, node + 56)));
-    const double scale = Lfs(base, kColorScale);
-    Stfs(base, context + 80, Fmuls(Fmuls(nr, r), scale));
+    const double scale = double(G::color_scale(base));
+    c.set_red(float(Fmuls(Fmuls(nr, r), scale)));
     const double ng = IntToFloat(int32_t(guest::LoadU32(base, node + 60)));
-    Stfs(base, context + 84, Fmuls(Fmuls(ng, g), scale));
+    c.set_green(float(Fmuls(Fmuls(ng, g), scale)));
     const double nb = IntToFloat(int32_t(guest::LoadU32(base, node + 64)));
-    Stfs(base, context + 88, Fmuls(Fmuls(nb, b), scale));
-    Stfs(base, context + 92, Fmuls(Lfs(base, node + 68), a));
+    c.set_blue(float(Fmuls(Fmuls(nb, b), scale)));
+    c.set_alpha(float(Fmuls(Lfs(base, node + 68), a)));
   }
-  const double zero = Lfs(base, kZero);
+  const double zero = double(G::zero(base));
   const uint32_t local = frame + 176;
   // Translated by the position plus the pivot.
   {
@@ -137,13 +137,13 @@ uint32_t ApplyTransform(uint8_t* base, uint32_t context, uint32_t node, uint32_t
     }
   }
   // Turned by the rotation (degrees).
-  const double threshold = Lfs(base, kNearZero);
+  const double threshold = double(G::near_zero(base));
   {
     const double angle = Lfs(base, node + 36);
     if (BeyondThreshold(angle, zero, threshold)) {
       const uint32_t turn = frame + 240;
       Identity(base, turn);
-      Stfs(base, frame + 80, Fmuls(angle, Lfs(base, kDegrees)));
+      Stfs(base, frame + 80, Fmuls(angle, double(G::degrees(base))));
       matrix_math::RotateZ(base, turn, turn, frame + 80, frame - 80);
       MultiplyInto(base, context, turn, 0x8259EA08);
       r3 = context;
@@ -161,9 +161,9 @@ uint32_t ApplyTransform(uint8_t* base, uint32_t context, uint32_t node, uint32_t
       CopyWord(base, node + 32, local + 20);
       MultiplyInto(base, context, local, 0x8259EAD8);
       r3 = context;
-      const double one = Lfs(base, kOne);
+      const double one = double(G::one(base));
       if (!(Lfs(base, node + 28) == one) || !(Lfs(base, node + 32) == one)) {
-        guest::StoreU32(base, context + 108, 1);
+        c.set_scaled(1);
       }
     }
   }
@@ -186,33 +186,38 @@ uint32_t ApplyTransform(uint8_t* base, uint32_t context, uint32_t node, uint32_t
 uint32_t CopyDrawContext(uint8_t* base, uint32_t context, uint32_t parent) {
   ITC_NATIVE_RUNNING("sub_8259D9F8 DrawContext::Copy");
   // The w column set to 1.0 first (then overwritten by the copy), as read.
-  const double one = Lfs(base, kOne);
-  Stfs(base, context + 12, one);
-  Stfs(base, context + 28, one);
-  Stfs(base, context + 44, one);
-  Stfs(base, context + 60, one);
-  matrix_math::Copy(base, context, parent);
-  interpolation::BlendState_OnCopy(base, context, parent, 0x8259DA30);
-  for (uint32_t at = 64; at < 112; at += 4) {  // the clip, the color, +96..+108
-    guest::StoreU32(base, context + at, guest::LoadU32(base, parent + at));
+  const Context to(base, context), from(base, parent);
+  const float one = G::one(base);
+  to.set_matrix_3(one);
+  to.set_matrix_7(one);
+  to.set_matrix_11(one);
+  to.set_matrix_15(one);
+  matrix_math::Copy(base, to.matrix_address(), from.matrix_address());
+  interpolation::BlendState_OnCopy(base, to.matrix_address(), from.matrix_address(), 0x8259DA30);
+  // The clip, the color, +96..+108, word by word.
+  for (uint32_t at = 0; at < 48; at += 4) {
+    guest::StoreU32(base, to.clip_left_address() + at,
+                    guest::LoadU32(base, from.clip_left_address() + at));
   }
   return context;
 }
 
 uint32_t CopyQueuedText(uint8_t* base, uint32_t to, uint32_t from) {
   ITC_NATIVE_RUNNING("sub_8259E620 TextItem::CopyQueued");
-  guest::StoreU32(base, to + 0, guest::LoadU32(base, from + 0));
-  matrix_math::Copy(base, to + 16, from + 16);
-  interpolation::BlendState_OnCopy(base, to + 16, from + 16, 0x8259E650);
-  CopyWord(base, from + 80, to + 80);  // lfs then stfs: its bits
-  for (uint32_t at = 84; at < 116; at += 4) {  // the color and the clip
-    guest::StoreU32(base, to + at, guest::LoadU32(base, from + at));
+  const schema::UiMovieQueuedText t(base, to), f(base, from);
+  t.set_node(f.node());
+  matrix_math::Copy(base, t.matrix_address(), f.matrix_address());
+  interpolation::BlendState_OnCopy(base, t.matrix_address(), f.matrix_address(), 0x8259E650);
+  CopyWord(base, f.depth_address(), t.depth_address());  // lfs then stfs: its bits
+  for (uint32_t at = 0; at < 32; at += 4) {  // the color and the clip
+    guest::StoreU32(base, t.red_address() + at, guest::LoadU32(base, f.red_address() + at));
   }
   return to;
 }
 
 bool TextListFull(uint8_t* base, uint32_t list) {
-  return guest::LoadU32(base, list + 8) >= guest::LoadU32(base, list + 4);
+  const schema::UiMovieDrawTextList l(base, list);
+  return l.count() >= l.capacity();
 }
 
 bool AppendText(uint8_t* base, uint32_t list, uint32_t item, uint32_t* r3) {
@@ -220,9 +225,10 @@ bool AppendText(uint8_t* base, uint32_t list, uint32_t item, uint32_t* r3) {
   if (TextListFull(base, list)) {
     return false;  // the grow (sub_8259EC58, never seen in play): the original
   }
-  const uint32_t count = guest::LoadU32(base, list + 8);
-  const uint32_t slot = (count << 7) + guest::LoadU32(base, list + 0);
-  guest::StoreU32(base, list + 8, count + 1);
+  const schema::UiMovieDrawTextList l(base, list);
+  const uint32_t count = l.count();
+  const uint32_t slot = (count << 7) + l.items().address;
+  l.set_count(count + 1);
   *r3 = CopyQueuedText(base, slot, item);
   return true;
 }
@@ -230,45 +236,43 @@ bool AppendText(uint8_t* base, uint32_t list, uint32_t item, uint32_t* r3) {
 bool QueueText(uint8_t* base, uint32_t context, uint32_t node, uint32_t layer, uint32_t frame,
                uint32_t* r3) {
   ITC_NATIVE_RUNNING("sub_8259F770 UiMovie::QueueText");
-  const uint32_t list = guest::LoadU32(base, context + 100);
+  const Context c(base, context);
+  const uint32_t list = c.text_list().address;
   if (list != 0 && TextListFull(base, list)) {
     return false;
   }
   *r3 = ApplyTransform(base, context, node, frame - 352);
-  if (guest::LoadU32(base, context + 100) == 0) {
+  if (c.text_list().address == 0) {
     return true;
   }
-  const uint32_t item = frame + 96;
-  MakeTextItem(base, item);
-  guest::StoreU32(base, item + 0, node);
-  matrix_math::Copy(base, item + 16, context);
-  interpolation::BlendState_OnCopy(base, item + 16, context, 0x8259F7B4);
+  const schema::UiMovieQueuedText item(base, frame + 96);
+  MakeTextItem(base, item.address);
+  item.set_node(node);
+  matrix_math::Copy(base, item.matrix_address(), c.matrix_address());
+  interpolation::BlendState_OnCopy(base, item.matrix_address(), c.matrix_address(), 0x8259F7B4);
   uint32_t color[4], clip[4];
   for (uint32_t i = 0; i < 4; i++) {
-    color[i] = guest::LoadU32(base, context + 80 + 4 * i);
+    color[i] = guest::LoadU32(base, c.red_address() + 4 * i);
   }
   for (uint32_t i = 0; i < 4; i++) {
-    clip[i] = guest::LoadU32(base, context + 64 + 4 * i);
+    clip[i] = guest::LoadU32(base, c.clip_left_address() + 4 * i);
   }
   // The layer as an unsigned 32-bit integer (std then lfd, fcfid, frsp).
   const double depth = double(float(double(int64_t(uint64_t(layer)))));
-  Stfs(base, item + 80, Fmuls(depth, Lfs(base, 0x82071520)));
+  item.set_depth(float(Fmuls(depth, double(G::layer_depth(base)))));
   for (uint32_t i = 0; i < 4; i++) {
-    guest::StoreU32(base, item + 84 + 4 * i, color[i]);
+    guest::StoreU32(base, item.red_address() + 4 * i, color[i]);
   }
   for (uint32_t i = 0; i < 4; i++) {
-    guest::StoreU32(base, item + 100 + 4 * i, clip[i]);
+    guest::StoreU32(base, item.clip_0_address() + 4 * i, clip[i]);
   }
   uint32_t appended = 0;
-  AppendText(base, guest::LoadU32(base, context + 100), item, &appended);
-  *r3 = ClearTextItem(base, item);
+  AppendText(base, c.text_list().address, item.address, &appended);
+  *r3 = ClearTextItem(base, item.address);
   return true;
 }
 
 namespace {
-
-constexpr uint32_t kColorToInteger = 0x82000C44;  // the vertex colors' scale
-constexpr uint32_t kLayerDepth = 0x82071520;      // the layer to the depth
 
 // fctidz, as the translation does it: NaN gives INT64_MIN, above INT64_MAX
 // INT64_MAX, else truncated (out of range INT64_MIN).
@@ -290,8 +294,8 @@ double UnsignedToFloat(uint32_t n) {
 // The texture the context's table (at [[context + 96]]) holds at the index
 // in `entry`.
 uint32_t TextureAt(uint8_t* base, uint32_t context, uint32_t entry) {
-  const uint32_t index = guest::LoadU32(base, entry) << 2;
-  const uint32_t table = guest::LoadU32(base, guest::LoadU32(base, context + 96));
+  const uint32_t index = schema::UiMovieTextureEntry(base, entry).texture() << 2;
+  const uint32_t table = Context(base, context).textures().data();
   return guest::LoadU32(base, table + index);
 }
 
@@ -299,31 +303,33 @@ uint32_t TextureAt(uint8_t* base, uint32_t context, uint32_t entry) {
 // integers, sorted) from the context's (+64..+76; +72 isn't checked for
 // "none", as read).
 void QuadClip(uint8_t* base, uint32_t context, uint32_t quad) {
-  const uint32_t c64 = guest::LoadU32(base, context + 64);
-  if (c64 == 0 && guest::LoadU32(base, context + 68) == 0 &&
-      guest::LoadU32(base, context + 76) == 0) {
-    guest::StoreU32(base, quad + 100, 0);
-    for (uint32_t at = 104; at < 112; at += 2) {
-      guest::StoreU16(base, quad + at, 0);
-    }
+  const Context c(base, context);
+  const Quad q(base, quad);
+  const uint32_t c64 = c.clip_left();
+  if (c64 == 0 && c.clip_top() == 0 && c.clip_bottom() == 0) {
+    q.set_clipped(0);
+    q.set_clip_left(0);
+    q.set_clip_top(0);
+    q.set_clip_right(0);
+    q.set_clip_bottom(0);
     return;
   }
   const int16_t left = int16_t(c64);
-  const int16_t right = int16_t(guest::LoadU32(base, context + 72));
-  const int16_t top = int16_t(guest::LoadU32(base, context + 68));
-  const int16_t bottom = int16_t(guest::LoadU32(base, context + 76));
-  guest::StoreU16(base, quad + 104, uint16_t(left));
-  guest::StoreU32(base, quad + 100, 1);
-  guest::StoreU16(base, quad + 108, uint16_t(right));
-  guest::StoreU16(base, quad + 106, uint16_t(top));
-  guest::StoreU16(base, quad + 110, uint16_t(bottom));
+  const int16_t right = int16_t(c.clip_right());
+  const int16_t top = int16_t(c.clip_top());
+  const int16_t bottom = int16_t(c.clip_bottom());
+  q.set_clip_left(uint16_t(left));
+  q.set_clipped(1);
+  q.set_clip_right(uint16_t(right));
+  q.set_clip_top(uint16_t(top));
+  q.set_clip_bottom(uint16_t(bottom));
   if (left > right) {
-    guest::StoreU16(base, quad + 104, uint16_t(right));
-    guest::StoreU16(base, quad + 108, uint16_t(left));
+    q.set_clip_left(uint16_t(right));
+    q.set_clip_right(uint16_t(left));
   }
   if (top > bottom) {
-    guest::StoreU16(base, quad + 106, uint16_t(bottom));
-    guest::StoreU16(base, quad + 110, uint16_t(top));
+    q.set_clip_top(uint16_t(bottom));
+    q.set_clip_bottom(uint16_t(top));
   }
 }
 
@@ -342,7 +348,7 @@ void SwapEntries(uint8_t* base, uint32_t a, uint32_t b) {
 
 // The vertices' w (+12 of each of the 16 positions from `positions`) = 1.0.
 void SetWs(uint8_t* base, uint32_t positions) {
-  const uint32_t one = guest::LoadU32(base, kOne);
+  const uint32_t one = guest::LoadU32(base, G::one_address());
   for (uint32_t i = 0; i < 16; i++) {
     guest::StoreU32(base, positions + 12 + 16 * i, one);
   }
@@ -360,23 +366,26 @@ uint32_t PictureTextureOf(uint8_t* base, uint32_t context, uint32_t picture) {
 QuadCall BuildPicture(uint8_t* base, uint32_t context, uint32_t picture, uint32_t layer,
                       uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_8259ED40 UiMovie::DrawPicture");
-  const uint32_t quad = frame + 112;
+  const Quad q(base, frame + 112);
+  const uint32_t quad = q.address;
   const uint32_t positions = frame + 240, colors = frame + 496, coords = frame + 752;
-  const uint32_t one = guest::LoadU32(base, kOne), zero = guest::LoadU32(base, kZero);
+  const uint32_t one = guest::LoadU32(base, G::one_address());
+  const uint32_t zero = guest::LoadU32(base, G::zero_address());
   SetWs(base, positions);
   MakeQuad(base, quad);
   ApplyTransform(base, context, picture, frame - 352);
-  guest::StoreU32(base, quad + 80, 4);
-  guest::StoreU32(base, quad + 88, positions);
-  guest::StoreU32(base, quad + 92, colors);
-  guest::StoreU32(base, quad + 96, coords);
+  q.set_vertex_count(4);
+  q.set_positions(positions);
+  q.set_colors(colors);
+  q.set_coords(coords);
   const uint32_t texture = PictureTextureOf(base, context, picture);
-  guest::StoreU32(base, quad + 84, guest::LoadU32(base, texture));
+  q.set_texture(guest::LoadU32(base, texture));
   // The colors, each vertex the context's, as integers.
-  const double scale = Lfs(base, kColorToInteger);
+  const Context ctx(base, context);
+  const double scale = double(G::color_to_integer(base));
   for (uint32_t v = 0; v < 64; v += 16) {
     for (uint32_t c = 0; c < 16; c += 4) {
-      const double value = Fmuls(Lfs(base, context + 80 + c), scale);
+      const double value = Fmuls(Lfs(base, ctx.red_address() + c), scale);
       guest::StoreU32(base, colors + v + c, uint32_t(uint64_t(Fctidz(value))));
     }
   }
@@ -434,34 +443,37 @@ QuadCall BuildPicture(uint8_t* base, uint32_t context, uint32_t picture, uint32_
     SwapEntries(base, coords + 16, coords + 48);
   }
   QuadClip(base, context, quad);
-  guest::StoreU32(base, quad + 68, 0);
-  guest::StoreU32(base, quad + 72, 0);
-  guest::StoreU32(base, quad + 112, guest::LoadU32(base, context + 108));
-  const double depth = Fmuls(UnsignedToFloat(layer), Lfs(base, kLayerDepth));
+  q.set_blend_mode(0);
+  q.set_unknown_72(0);
+  q.set_texture_stage(ctx.scaled());
+  const double depth = Fmuls(UnsignedToFloat(layer), double(G::layer_depth(base)));
   return {quad, guest::LoadU32(base, picture + 72), depth};
 }
 
 QuadCall BuildPrimitive(uint8_t* base, uint32_t context, uint32_t primitive, uint32_t layer,
                         uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_8259F348 UiMovie::DrawPrimitive");
-  const uint32_t quad = frame + 96;
+  const Quad q(base, frame + 96);
+  const uint32_t quad = q.address;
+  const Context ctx(base, context);
   const uint32_t positions = frame + 272, colors = frame + 528, coords = frame + 784;
-  const uint32_t one = guest::LoadU32(base, kOne), zero = guest::LoadU32(base, kZero);
+  const uint32_t one = guest::LoadU32(base, G::one_address());
+  const uint32_t zero = guest::LoadU32(base, G::zero_address());
   SetWs(base, positions);
   MakeQuad(base, quad);
   ApplyTransform(base, context, primitive, frame - 352);
-  guest::StoreU32(base, quad + 88, positions);
-  guest::StoreU32(base, quad + 80, guest::LoadU32(base, primitive + 116));
-  guest::StoreU32(base, quad + 92, colors);
-  guest::StoreU32(base, quad + 96, coords);
+  q.set_positions(positions);
+  q.set_vertex_count(guest::LoadU32(base, primitive + 116));
+  q.set_colors(colors);
+  q.set_coords(coords);
   uint32_t texture = 0;
   if (guest::LoadU32(base, primitive + 112) != 0) {
     texture = TextureAt(base, context,
                         PrimitiveTexture(primitive, guest::LoadU32(base, primitive + 104)));
   }
-  guest::StoreU32(base, quad + 84, texture != 0 ? guest::LoadU32(base, texture) : 0);
-  const double to_integer = Lfs(base, kColorToInteger);
-  const double scale = Lfs(base, kColorScale);
+  q.set_texture(texture != 0 ? guest::LoadU32(base, texture) : 0);
+  const double to_integer = double(G::color_to_integer(base));
+  const double scale = double(G::color_scale(base));
   for (uint32_t i = 0; i < guest::LoadU32(base, primitive + 116); i++) {
     const uint32_t vertex = PrimitiveVertex(base, primitive, i);
     const uint32_t p = positions + 16 * i, c = colors + 16 * i, t = coords + 16 * i;
@@ -483,13 +495,13 @@ QuadCall BuildPrimitive(uint8_t* base, uint32_t context, uint32_t primitive, uin
     }
     // The vertex's color (integers, then its float alpha) times the
     // context's, squared with +100 set, as integers.
-    const double alpha = Fmuls(Lfs(base, vertex + 20), Lfs(base, context + 92));
+    const double alpha = Fmuls(Lfs(base, vertex + 20), double(ctx.alpha()));
     double r = Fmuls(Fmuls(IntToFloat(int32_t(guest::LoadU32(base, vertex + 8))), scale),
-                     Lfs(base, context + 80));
+                     double(ctx.red()));
     double g = Fmuls(Fmuls(IntToFloat(int32_t(guest::LoadU32(base, vertex + 12))), scale),
-                     Lfs(base, context + 84));
+                     double(ctx.green()));
     double b = Fmuls(Fmuls(IntToFloat(int32_t(guest::LoadU32(base, vertex + 16))), scale),
-                     Lfs(base, context + 88));
+                     double(ctx.blue()));
     if (guest::LoadU32(base, primitive + 100) != 0) {
       r = Fmuls(r, r);
       g = Fmuls(g, g);
@@ -501,10 +513,10 @@ QuadCall BuildPrimitive(uint8_t* base, uint32_t context, uint32_t primitive, uin
     guest::StoreU32(base, c + 12, uint32_t(uint64_t(Fctidz(Fmuls(alpha, to_integer)))));
   }
   QuadClip(base, context, quad);
-  guest::StoreU32(base, quad + 72, 0);
-  guest::StoreU32(base, quad + 68, guest::LoadU32(base, primitive + 100));
-  guest::StoreU32(base, quad + 112, guest::LoadU32(base, context + 108));
-  const double depth = Fmuls(UnsignedToFloat(layer), Lfs(base, kLayerDepth));
+  q.set_unknown_72(0);
+  q.set_blend_mode(guest::LoadU32(base, primitive + 100));
+  q.set_texture_stage(ctx.scaled());
+  const double depth = Fmuls(UnsignedToFloat(layer), double(G::layer_depth(base)));
   return {quad, guest::LoadU32(base, primitive + 72), depth};
 }
 
@@ -521,8 +533,8 @@ uint32_t DrawNode(uint8_t* base, uint32_t context, uint32_t scene, uint32_t node
   if (i < int32_t(first)) {
     return r3;
   }
-  const double threshold = Lfs(base, kNearZero);
-  const double zero = Lfs(base, kZero);
+  const double threshold = double(G::near_zero(base));
+  const double zero = double(G::zero(base));
   do {
     const uint32_t child = Child(base, scene, uint32_t(i));
     r3 = child;

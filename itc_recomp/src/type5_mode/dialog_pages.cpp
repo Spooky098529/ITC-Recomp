@@ -8,6 +8,8 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/menu_helpers.h"
+#include "schema/type5_mode.h"
 
 namespace type5_mode {
 
@@ -15,6 +17,7 @@ namespace {
 
 using guest::LoadU32;
 using guest::StoreU32;
+using G = schema::Type5ModeGlobals;
 
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   const uint32_t frame = sp - bytes;
@@ -41,24 +44,25 @@ void Post(uint8_t* base, uint32_t dispatcher, uint32_t id, bool id_last = false)
   }
 }
 
-// The page object's +8 = its page unless that is `unless`; returns it.
-uint32_t KeepPage(uint8_t* base, uint32_t unless) {
-  const uint32_t pages = LoadU32(base, kPages);
-  const uint32_t before = LoadU32(base, pages + 0);
+// The page object's page before = its page unless that is `unless`;
+// returns it.
+schema::PageObject KeepPage(uint8_t* base, uint32_t unless) {
+  const auto pages = G::pages(base);
+  const uint32_t before = pages.page();
   if (before != unless) {
-    StoreU32(base, pages + 8, before);
+    pages.set_previous_page(before);
   }
   return pages;
 }
 
-// The confirm page's close: +12 the close step 1, +16 none, +4 page 0, +0
-// -1 (the step running).
+// The confirm page's close: the close step 1, none queued, the next page 0,
+// the page -1 (the step running).
 void CloseConfirm(uint8_t* base) {
-  const uint32_t pages = KeepPage(base, 0);
-  StoreU32(base, pages + 12, 1);
-  StoreU32(base, pages + 16, 0xFFFFFFFFu);
-  StoreU32(base, pages + 4, 0);
-  StoreU32(base, pages + 0, 0xFFFFFFFFu);
+  const auto pages = KeepPage(base, 0);
+  pages.set_step(1);
+  pages.set_queued_step(0xFFFFFFFFu);
+  pages.set_next_page(0);
+  pages.set_page(0xFFFFFFFFu);
 }
 
 }  // namespace
@@ -66,29 +70,29 @@ void CloseConfirm(uint8_t* base) {
 uint64_t ConfirmPage(uint8_t* base, uint32_t dispatcher, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82225D10 Type5Dialog::ConfirmPage");
   const uint32_t frame = Frame(base, sp, 144);
-  calls.Call(kMenuStep, frame, 0x82225D2C, LoadU32(base, kMenu));
-  uint64_t answer = calls.Call(kMenuPressed, frame, 0x82225D38, LoadU32(base, kMenu), 159);
+  calls.Call(kMenuStep, frame, 0x82225D2C, G::menu(base).address);
+  uint64_t answer = calls.Call(kMenuPressed, frame, 0x82225D38, G::menu(base).address, 159);
   if (int32_t(answer) != 0) {
     answer = calls.Call(kMenuSoundPlay, frame, 0x82225D5C, 0);
     CloseConfirm(base);
-    const bool yes = LoadU32(base, LoadU32(base, kMenu) + 0) == 0;
+    const bool yes = G::menu(base).cursor() == 0;
     Post(base, dispatcher, yes ? 14 : 15, true);
   }
-  answer = calls.Call(kMenuPressed, frame, 0x82225DE8, LoadU32(base, kMenu), 158);
+  answer = calls.Call(kMenuPressed, frame, 0x82225DE8, G::menu(base).address, 158);
   if (int32_t(answer) != 0) {
     answer = calls.Call(kMenuSoundPlay, frame, 0x82225DF8, 2);
     CloseConfirm(base);
     Post(base, dispatcher, 17);
   }
-  if (LoadU32(base, LoadU32(base, kMenu) + 8) != 0) {
+  if (G::menu(base).moved() != 0) {
     answer = calls.Call(kMenuSoundPlay, frame, 0x82225E7C, 4);
-    const uint32_t pages = KeepPage(base, 0);
-    StoreU32(base, pages + 16, 0xFFFFFFFFu);
-    StoreU32(base, pages + 4, 0);
-    StoreU32(base, pages + 0, 0xFFFFFFFFu);
-    StoreU32(base, pages + 12, 8);
+    const auto pages = KeepPage(base, 0);
+    pages.set_queued_step(0xFFFFFFFFu);
+    pages.set_next_page(0);
+    pages.set_page(0xFFFFFFFFu);
+    pages.set_step(8);
   }
-  if (LoadU32(base, LoadU32(base, kData) + 12) != 0) {
+  if (G::data(base).interrupted() != 0) {
     CloseConfirm(base);
     Post(base, dispatcher, 20);
   }
@@ -109,25 +113,25 @@ uint64_t NoticePage(uint8_t* base, uint32_t dispatcher, bool second, uint32_t sp
   const uint32_t page = second ? 3 : 1;
   const uint32_t step = second ? 7 : 3;
   const uint32_t frame = Frame(base, sp, 144);
-  // The close: +12 the close step, +16 none, +4 the page, +0 -1.
+  // The close: the close step, none queued, the next page, the page -1.
   auto close = [&] {
-    const uint32_t pages = KeepPage(base, page);
-    StoreU32(base, pages + 12, step);
-    StoreU32(base, pages + 16, 0xFFFFFFFFu);
-    StoreU32(base, pages + 4, page);
-    StoreU32(base, pages + 0, 0xFFFFFFFFu);
+    const auto pages = KeepPage(base, page);
+    pages.set_step(step);
+    pages.set_queued_step(0xFFFFFFFFu);
+    pages.set_next_page(page);
+    pages.set_page(0xFFFFFFFFu);
   };
-  calls.Call(kMenuStep, frame, lr[0], LoadU32(base, kMenu));
-  uint64_t answer = calls.Call(kMenuPressed, frame, lr[1], LoadU32(base, kMenu), 159);
+  calls.Call(kMenuStep, frame, lr[0], G::menu(base).address);
+  uint64_t answer = calls.Call(kMenuPressed, frame, lr[1], G::menu(base).address, 159);
   if (int32_t(answer) == 0) {
-    answer = calls.Call(kMenuPressed, frame, lr[2], LoadU32(base, kMenu), 158);
+    answer = calls.Call(kMenuPressed, frame, lr[2], G::menu(base).address, 158);
   }
   if (int32_t(answer) != 0) {
     answer = calls.Call(kMenuSoundPlay, frame, lr[3], 0);
     close();
     Post(base, dispatcher, 16);
   }
-  if (LoadU32(base, LoadU32(base, kData) + 12) != 0) {
+  if (G::data(base).interrupted() != 0) {
     close();
     Post(base, dispatcher, 20);
   }

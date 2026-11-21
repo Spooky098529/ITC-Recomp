@@ -469,7 +469,7 @@ uint64_t PauseMenuOpen(uint8_t* base, uint32_t screen, uint64_t kind, uint64_t f
   G::pause_data(base).set_first_day(uint32_t(flag));
   const uint32_t movie =
       guest::LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
-  guest::StoreU32(base, screen, movie);
+  schema::PauseMenuScreen(base, screen).set_movie(movie);
   calls.Call(kResetPose, frame, 0x8220FAD8, movie);
   PauseMenuLoadData(base, frame, calls);
   calls.Call(kPagesGo, frame, 0x8220FAF4, G::pause_pages(base).address, 0, 1, 2);

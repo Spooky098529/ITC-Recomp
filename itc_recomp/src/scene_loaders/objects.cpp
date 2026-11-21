@@ -18,18 +18,25 @@
 #include "scene_loaders/loads.h"
 #include "scene_loaders/pools.h"
 #include "scene_models/scene_models.h"
+#include "schema/scene_loaders.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
+#include <bit>
 #include <cstdlib>
+#include <initializer_list>
 #include <unordered_set>
 
 namespace scene_loaders {
 
 namespace {
 
+using G = schema::SceneLoadersGlobals;
+
 constexpr uint32_t kPhysical = 0xA0000000u;
-constexpr uint32_t kZero = 0x82000A34;  // 0.0
-constexpr uint32_t kOne = 0x82000A30;   // 1.0
+
+// A load slot's buffer and state (LoadSlot's +16 and +20; car-models.md's).
+constexpr uint32_t kSlotBuffer = 16;
+constexpr uint32_t kSlotState = 20;
 
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
@@ -66,7 +73,6 @@ void Position(uint8_t* base, uint32_t at, uint32_t zero, uint32_t one) {
 }
 
 constexpr uint32_t kParts = 216;
-constexpr uint32_t kPartModels = 5184;  // in the loads
 
 // Whether `count` part models' Model::Release runs natively, all of them
 // (the pending frees take every block they put off).
@@ -110,7 +116,7 @@ std::optional<uint32_t> CarModelReset(uint8_t* base, uint32_t car_model) {
   if (!CarModelResettable(base, car_model)) {
     return std::nullopt;
   }
-  Store(base, car_model + kCarModelSet, Load(base, kFirstSet));
+  Store(base, car_model + kCarModelSet, G::first_set(base).address);
   scene_models::CarRecordReset(base, car_model + kCarModelRecord);
   Require(CarModelLoadsReset(base, car_model + kCarModelLoads).has_value(),
           "CarModelLoads::Reset");
@@ -118,8 +124,8 @@ std::optional<uint32_t> CarModelReset(uint8_t* base, uint32_t car_model) {
     Identity(base, car_model + 6720 + 64 * i);
   }
   // The original loads both constants after the tires' matrices.
-  const uint32_t one = Load(base, kOne);
-  const uint32_t zero = Load(base, kZero);
+  const uint32_t one = G::one(base);
+  const uint32_t zero = G::zero(base);
   for (uint32_t i = 0; i < 4; i++) {
     Position(base, car_model + 6976 + 16 * i, zero, one);
   }
@@ -145,13 +151,14 @@ bool CarPartsLoadsConstruct(uint8_t* base, uint32_t loads) {
   if (!models::CanAllocatePointers(base, models::kTextureProviderSlots)) {
     return false;
   }
+  const schema::CarPartsLoads l(base, loads);
   for (uint32_t i = 0; i < kParts; i++) {
-    Require(models::PartModelConstruct(base, loads + kPartModels + models::kPartModelBytes * i),
+    Require(models::PartModelConstruct(base, l.part_models_address() + models::kPartModelBytes * i),
             "PartModel::PartModel");
   }
-  const uint32_t one = Load(base, kOne);
+  const uint32_t one = G::one(base);
   for (uint32_t i = 0; i < 30; i++) {
-    Store(base, loads + 105436 + 16 * i, one);
+    Store(base, l.points_address() + 16 * i + 12, one);
   }
   return true;
 }
@@ -162,33 +169,35 @@ bool CarPartsConstruct(uint8_t* base, uint32_t parts, uint32_t list) {
       !FreshReleasable(base)) {
     return false;
   }
+  const schema::CarParts p(base, parts);
   PoolNodeConstruct(base, parts, list);
-  Store(base, parts + 20, 0xFFFFFFFFu);
-  Store(base, parts + 0, kCarPartsVtable);
-  Store(base, parts + 16, 0);
-  Require(CarPartsLoadsConstruct(base, parts + kCarPartsLoads), "CarPartsLoads::CarPartsLoads");
-  Store(base, parts + 24, 0);
+  p.set_index(0xFFFFFFFFu);
+  p.set_vtable(kCarPartsVtable);
+  p.set_state(0);
+  Require(CarPartsLoadsConstruct(base, p.loads_address()), "CarPartsLoads::CarPartsLoads");
+  p.set_car_model(0);
   for (uint32_t i = 0; i < kParts; i++) {
-    const uint32_t model = parts + kPartsModels + kPartModelBytes * i;
-    car_models::LoadSlotReset(base, parts + kCarPartsLoads + kSlotBytes * i);
+    const uint32_t model = p.part_models_address() + kPartModelBytes * i;
+    car_models::LoadSlotReset(base, p.slots_address() + kSlotBytes * i);
     Require(models::ModelRelease(base, model).has_value(), "Model::Release");
     models::PartModelClear(base, model);
   }
-  scene_models::PartsRecordReset(base, parts + 28);
-  Store(base, parts + kPartsSet, Load(base, kFirstSet));
+  scene_models::PartsRecordReset(base, p.record_address());
+  p.set_first_set(G::first_set(base).address);
   return true;
 }
 
 std::optional<uint32_t> CarPartsRelease(uint8_t* base, uint32_t parts) {
   ITC_NATIVE_RUNNING("sub_820D6D00 CarParts::Release");
-  if (!SlotsReleasable(base, parts + kCarPartsLoads, kParts) ||
-      !ModelsReleasable(base, parts + kPartsModels, kParts)) {
+  const schema::CarParts p(base, parts);
+  if (!SlotsReleasable(base, p.slots_address(), kParts) ||
+      !ModelsReleasable(base, p.part_models_address(), kParts)) {
     return std::nullopt;
   }
   uint32_t model = 0;
   for (uint32_t i = 0; i < kParts; i++) {
-    model = parts + kPartsModels + kPartModelBytes * i;
-    Require(car_models::LoadSlotReleaseBuffer(base, parts + kCarPartsLoads + kSlotBytes * i)
+    model = p.part_models_address() + kPartModelBytes * i;
+    Require(car_models::LoadSlotReleaseBuffer(base, p.slots_address() + kSlotBytes * i)
                 .has_value(),
             "LoadSlot::ReleaseBuffer");
     Require(models::ModelRelease(base, model).has_value(), "Model::Release");
@@ -199,7 +208,7 @@ std::optional<uint32_t> CarPartsRelease(uint8_t* base, uint32_t parts) {
 
 std::optional<uint32_t> CarPartsLoadsDestruct(uint8_t* base, uint32_t loads) {
   ITC_NATIVE_RUNNING("sub_820D6FE8 CarPartsLoads::~CarPartsLoads");
-  const uint32_t first = loads + kPartModels;
+  const uint32_t first = schema::CarPartsLoads(base, loads).part_models_address();
   for (uint32_t i = 0; i < kParts; i++) {
     if (!models::ModelMembersDestructible(base, first + models::kPartModelBytes * i)) {
       return std::nullopt;
@@ -220,8 +229,21 @@ std::optional<uint32_t> CarPartsLoadsDestruct(uint8_t* base, uint32_t loads) {
 
 namespace {
 
-// Whether every slot in `slots` (offsets in `object`) is released natively,
+// Whether every slot in `slots` (their addresses) is released natively,
 // each freeing pages no other frees.
+bool AllReleasableAt(uint8_t* base, std::initializer_list<uint32_t> slots) {
+  std::unordered_set<uint32_t> pages;
+  for (uint32_t slot : slots) {
+    uint32_t freed = 0;
+    if (!car_models::LoadSlotReleasable(base, slot, &freed) ||
+        (freed != 0 && !pages.insert(freed).second)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// The same, the slots as offsets in `object`.
 template <size_t N>
 bool AllReleasable(uint8_t* base, uint32_t object, const uint32_t (&slots)[N]) {
   std::unordered_set<uint32_t> pages;
@@ -239,12 +261,13 @@ bool AllReleasable(uint8_t* base, uint32_t object, const uint32_t (&slots)[N]) {
 // position (0, 0, 0, 1) copied from the original's frame as doublewords,
 // +3504).
 void CockpitNode(uint8_t* base, uint32_t cockpit, uint32_t zero, uint32_t one) {
-  Store(base, cockpit + 3472, 0);
-  Store(base, cockpit + 3488, zero);
-  Store(base, cockpit + 3492, zero);
-  Store(base, cockpit + 3496, zero);
-  Store(base, cockpit + 3500, one);
-  Store(base, cockpit + 3504, 0);
+  const schema::Cockpit c(base, cockpit);
+  c.set_accessory_node(0);
+  Store(base, c.accessory_point_address() + 0, zero);
+  Store(base, c.accessory_point_address() + 4, zero);
+  Store(base, c.accessory_point_address() + 8, zero);
+  c.set_accessory_point_w(std::bit_cast<float>(one));
+  c.set_texture(0);
 }
 
 // The six parts' slots and models in the cockpit (+536 + 24i, +688 + 464i)
@@ -263,16 +286,17 @@ void ResetParts(uint8_t* base, uint32_t slots, uint32_t models_at) {
 // providers): with `release`, each slot's buffer released first; the slot
 // reset, XPR::Release, the provider's slot 2 (ClearAll), the checks made.
 void ResetXprs(uint8_t* base, uint32_t cockpit, bool release) {
+  const schema::Cockpit c(base, cockpit);
   for (uint32_t i = 0; i < 2; i++) {
-    const uint32_t slot = cockpit + 400 + kSlotBytes * i;
+    const uint32_t slot = c.xpr_slots_address() + kSlotBytes * i;
     if (release) {
       Require(car_models::LoadSlotReleaseBuffer(base, slot).has_value(),
               "LoadSlot::ReleaseBuffer");
     }
     car_models::LoadSlotReset(base, slot);
-    Require(models::XprRelease(base, cockpit + 448 + kSlotBytes * i).has_value(),
+    Require(models::XprRelease(base, c.xprs_address() + kSlotBytes * i).has_value(),
             "XPR::Release");
-    scenery_lists::TextureProviderClearAll(base, cockpit + 496 + 20 * i);
+    scenery_lists::TextureProviderClearAll(base, c.providers_address() + 20 * i);
   }
 }
 
@@ -285,23 +309,24 @@ bool CockpitConstruct(uint8_t* base, uint32_t cockpit, uint32_t list) {
       !models::PendingFreesHaveRoom(base, 2)) {
     return false;
   }
+  const schema::Cockpit c(base, cockpit);
   PoolNodeConstruct(base, cockpit, list);
-  Store(base, cockpit + 20, 0xFFFFFFFFu);
-  Store(base, cockpit + 0, kCockpitVtable);
-  Store(base, cockpit + 16, 0);
-  Require(CockpitLoadsConstruct(base, cockpit + kCockpitLoads), "CockpitLoads::CockpitLoads");
-  const uint32_t one = Load(base, kOne);
-  Store(base, cockpit + 3500, one);
-  const uint32_t set = Load(base, kFirstSet);
-  Store(base, cockpit + 24, 0);
-  Store(base, cockpit + 3508, set);
-  Require(model_animation::SkeletonFreeNodeValues(base, cockpit + 208),
+  c.set_index(0xFFFFFFFFu);
+  c.set_vtable(kCockpitVtable);
+  c.set_state(0);
+  Require(CockpitLoadsConstruct(base, c.loads_address()), "CockpitLoads::CockpitLoads");
+  const uint32_t one = G::one(base);
+  c.set_accessory_point_w(std::bit_cast<float>(one));
+  const uint32_t set = G::first_set(base).address;
+  c.set_car_model(0);
+  c.set_first_set(set);
+  Require(model_animation::SkeletonFreeNodeValues(base, c.skeleton_address()),
           "Skeleton::FreeNodeValues");
-  scene_models::CockpitRecordReset(base, cockpit + 28);
-  CockpitNode(base, cockpit, Load(base, kZero), one);
-  car_models::LoadSlotReset(base, cockpit + kCockpitLoads);
+  scene_models::CockpitRecordReset(base, c.record_address());
+  CockpitNode(base, cockpit, G::zero(base), one);
+  car_models::LoadSlotReset(base, c.node_file_slot_address());
   ResetXprs(base, cockpit, false);
-  ResetParts(base, cockpit + 536, cockpit + 688);
+  ResetParts(base, c.part_slots_address(), c.part_models_address());
   return true;
 }
 
@@ -310,11 +335,16 @@ namespace {
 // Cockpit::Release's checks (nothing changed), with `extra` nodes more for
 // what follows it.
 bool CockpitReleasable(uint8_t* base, uint32_t cockpit, uint64_t extra) {
-  static constexpr uint32_t kSlots[] = {176, 400, 424, 536, 560, 584, 608, 632, 656};
-  const uint32_t values = Load(base, cockpit + 208 + 176);
-  return AllReleasable(base, cockpit, kSlots) &&
+  const schema::Cockpit c(base, cockpit);
+  const uint32_t parts = c.part_slots_address();
+  // The skeleton's node values (Skeleton's +176).
+  const uint32_t values = Load(base, c.skeleton_address() + 176);
+  return AllReleasableAt(base, {c.node_file_slot_address(), c.xpr_slots_address(),
+                                c.xpr_slots_address() + kSlotBytes, parts, parts + kSlotBytes,
+                                parts + 2 * kSlotBytes, parts + 3 * kSlotBytes,
+                                parts + 4 * kSlotBytes, parts + 5 * kSlotBytes}) &&
          (values == 0 || memory::IsHeapBlock(values)) &&
-         ProvidersClearAll(base, cockpit + kCockpitLoads, kCarModelMembers) &&
+         ProvidersClearAll(base, c.loads_address(), kCarModelMembers) &&
          4 + extra <= 0x3FFFFFFFu && models::PendingFreesHaveRoom(base, uint32_t(4 + extra));
 }
 
@@ -325,23 +355,24 @@ std::optional<uint32_t> CockpitRelease(uint8_t* base, uint32_t cockpit) {
   if (!CockpitReleasable(base, cockpit, 0)) {
     return std::nullopt;
   }
-  Require(car_models::LoadSlotReleaseBuffer(base, cockpit + kCockpitLoads).has_value(),
+  const schema::Cockpit c(base, cockpit);
+  Require(car_models::LoadSlotReleaseBuffer(base, c.node_file_slot_address()).has_value(),
           "LoadSlot::ReleaseBuffer");
-  car_models::LoadSlotReset(base, cockpit + kCockpitLoads);
-  Require(model_animation::SkeletonFreeNodeValues(base, cockpit + 208),
+  car_models::LoadSlotReset(base, c.node_file_slot_address());
+  Require(model_animation::SkeletonFreeNodeValues(base, c.skeleton_address()),
           "Skeleton::FreeNodeValues");
   ResetXprs(base, cockpit, true);
-  Store(base, cockpit + 3508, 0);
-  Store(base, cockpit + 24, 0);
-  scene_models::CockpitRecordReset(base, cockpit + 28);
-  const uint32_t zero = Load(base, kZero);
-  CockpitNode(base, cockpit, zero, Load(base, kOne));
+  c.set_first_set(0);
+  c.set_car_model(0);
+  scene_models::CockpitRecordReset(base, c.record_address());
+  const uint32_t zero = G::zero(base);
+  CockpitNode(base, cockpit, zero, G::one(base));
   for (uint32_t i = 0; i < 6; i++) {
-    const uint32_t slot = cockpit + 536 + kSlotBytes * i;
+    const uint32_t slot = c.part_slots_address() + kSlotBytes * i;
     Require(car_models::LoadSlotReleaseBuffer(base, slot).has_value(), "LoadSlot::ReleaseBuffer");
     car_models::LoadSlotReset(base, slot);
   }
-  return cockpit + 536 + kSlotBytes * 5;
+  return c.part_slots_address() + kSlotBytes * 5;
 }
 
 bool InteriorConstruct(uint8_t* base, uint32_t interior, uint32_t list) {
@@ -350,43 +381,45 @@ bool InteriorConstruct(uint8_t* base, uint32_t interior, uint32_t list) {
       !models::PendingFreesHaveRoom(base, 2)) {
     return false;
   }
+  const schema::Interior in(base, interior);
   PoolNodeConstruct(base, interior, list);
-  Store(base, interior + 16, 0);
-  Store(base, interior + 0, kInteriorVtable);
-  Store(base, interior + 20, 0xFFFFFFFFu);
+  in.set_state(0);
+  in.set_vtable(kInteriorVtable);
+  in.set_index(0xFFFFFFFFu);
   for (uint32_t i = 0; i < 6; i++) {
-    Require(models::PartModelConstruct(base, interior + 304 + kPartModelBytes * i),
+    Require(models::PartModelConstruct(base, in.part_models_address() + kPartModelBytes * i),
             "PartModel::PartModel");
   }
-  Store(base, interior + 24, 0);
-  ResetParts(base, interior + 160, interior + 304);
-  scene_models::InteriorRecordReset(base, interior + 28);
-  const uint32_t set = Load(base, kFirstSet);
-  Store(base, interior + 3088, 0);
-  Store(base, interior + 3092, set);
+  in.set_car_model(0);
+  ResetParts(base, in.part_slots_address(), in.part_models_address());
+  scene_models::InteriorRecordReset(base, in.record_address());
+  const uint32_t set = G::first_set(base).address;
+  in.set_cockpit(0);
+  in.set_first_set(set);
   return true;
 }
 
 std::optional<uint32_t> InteriorOnPartLoaded(uint8_t* base, uint32_t request, uint32_t interior,
                                              const PartLoadedCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820D7578 Interior::OnPartLoaded");
+  const schema::Interior in(base, interior);
   for (uint32_t i = 0; i < 6; i++) {
-    if (Load(base, interior + 164 + kSlotBytes * i) != request) {
+    if (Load(base, in.part_slot_request_address() + kSlotBytes * i) != request) {
       continue;
     }
-    const uint32_t slot = interior + 160 + kSlotBytes * i;
+    const uint32_t slot = in.part_slots_address() + kSlotBytes * i;
     uint32_t freed = 0;
     if (!car_models::LoadSlotReleasable(base, slot, &freed)) {
       return std::nullopt;
     }
-    const uint32_t model = interior + 304 + kPartModelBytes * i;
-    const uint32_t file = Load(base, slot + 16);
+    const uint32_t model = in.part_models_address() + kPartModelBytes * i;
+    const uint32_t file = Load(base, slot + kSlotBuffer);
     if (!models::ModelLoad(base, model, file, 0, calls.model_load)) {
       calls.load(calls.user, model, file);
     }
     const auto r3 = car_models::LoadSlotReleaseBuffer(base, slot);
     Require(r3.has_value(), "LoadSlot::ReleaseBuffer");
-    Store(base, slot + 20, 3);
+    Store(base, slot + kSlotState, 3);
     return r3;
   }
   return request;
@@ -400,14 +433,16 @@ namespace {
 // models'), or nullopt where a provider's slot 2 isn't ClearAll; nothing
 // changed.
 std::optional<uint64_t> WheelsResetNodes(uint8_t* base, uint32_t wheels) {
-  const uint32_t loads = wheels + kWheelsLoads;
+  const schema::WheelsLoads l(base, wheels + kWheelsLoads);
   uint64_t nodes = 4;
-  for (uint32_t offset : {kWheelsTires, kWheelsTires + 464, kWheelsRims, kWheelsRims + 464,
-                          kWheelsCalipers, kWheelsCalipers + 464}) {
-    nodes += models::ModelReleaseNodes(base, loads + offset);
+  for (uint32_t model : {l.tires_address(), l.tires_address() + 464, l.rims_address(),
+                         l.rims_address() + 464, l.calipers_address(),
+                         l.calipers_address() + 464}) {
+    nodes += models::ModelReleaseNodes(base, model);
   }
   for (uint32_t i = 0; i < 2; i++) {
-    if (Load(base, Load(base, loads + kWheelsProviders + 20 * i) + 8) !=
+    // The provider's vtable's slot 2 (models.md's TextureProviderVtable).
+    if (Load(base, Load(base, l.providers_address() + 20 * i) + 8) !=
         kTextureProviderClearAll) {
       return std::nullopt;
     }
@@ -431,7 +466,7 @@ std::optional<uint32_t> WheelsReset(uint8_t* base, uint32_t wheels) {
     return std::nullopt;
   }
   Store(base, wheels + 24, 0);
-  Store(base, wheels + 3268, Load(base, kFirstSet));
+  Store(base, wheels + 3268, G::first_set(base).address);
   scene_models::WheelsRecordReset(base, wheels + 28);
   const auto r3 = WheelsLoadsReset(base, loads);
   Require(r3.has_value(), "WheelsLoads::Reset");
@@ -466,7 +501,7 @@ std::optional<uint32_t> TrafficReset(uint8_t* base, uint32_t traffic) {
   if (!nodes || !Room(base, *nodes)) {
     return std::nullopt;
   }
-  Store(base, traffic + 7392, Load(base, kFirstSet));
+  Store(base, traffic + 7392, G::first_set(base).address);
   scene_models::CarRecordReset(base, traffic + 32);
   Store(base, traffic + 7056, 0xFFFFFFFFu);
   car_models::LoadSlotReset(base, traffic + 3744);
@@ -489,16 +524,17 @@ std::optional<uint32_t> TrafficReset(uint8_t* base, uint32_t traffic) {
 
 std::optional<uint32_t> Pool4Reset(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_820D6948 Pool4Object::Reset");
-  const uint32_t model = object + 112;
+  const schema::Pool4Object o(base, object);
+  const uint32_t model = o.model_address();
   if (!ModelsReleasable(base, model, 1)) {
     return std::nullopt;
   }
-  Store(base, object + 24, 0);
-  scene_models::Pool4RecordReset(base, object + 28);
-  car_models::LoadSlotReset(base, object + 80);
+  o.set_car_model(0);
+  scene_models::Pool4RecordReset(base, o.record_address());
+  car_models::LoadSlotReset(base, o.slot_address());
   Require(models::ModelRelease(base, model).has_value(), "Model::Release");
   models::PartModelClear(base, model);
-  Store(base, object + 576, Load(base, kFirstSet));
+  o.set_first_set(G::first_set(base).address);
   return model;
 }
 
@@ -509,15 +545,16 @@ namespace {
 // The pool node's part of a constructor: PoolNode::PoolNode, then +16 = 0,
 // the vtable, +20 = -1 (the originals' order).
 void ConstructNode(uint8_t* base, uint32_t object, uint32_t list, uint32_t vtable) {
+  const schema::PoolNode node(base, object);
   PoolNodeConstruct(base, object, list);
-  Store(base, object + 16, 0);
-  Store(base, object + 0, vtable);
-  Store(base, object + 20, 0xFFFFFFFFu);
+  node.set_state(0);
+  node.set_vtable(vtable);
+  node.set_index(0xFFFFFFFFu);
 }
 
 // The end of every destructor: the base vtable, PoolNode::~PoolNode.
 void DestructNode(uint8_t* base, uint32_t object) {
-  Store(base, object + 0, kPoolObjectVtable);
+  schema::PoolNode(base, object).set_vtable(kPoolObjectVtable);
   PoolNodeDestruct(base, object);
 }
 
@@ -537,7 +574,8 @@ bool Pool4Construct(uint8_t* base, uint32_t object, uint32_t list) {
     return false;
   }
   ConstructNode(base, object, list, kPool4Vtable);
-  Require(models::PartModelConstruct(base, object + 112), "PartModel::PartModel");
+  Require(models::PartModelConstruct(base, schema::Pool4Object(base, object).model_address()),
+          "PartModel::PartModel");
   Require(Pool4Reset(base, object).has_value(), "Pool4Object::Reset");
   return true;
 }
@@ -548,16 +586,18 @@ namespace {
 // for what follows it: the slot's buffer, then room for Model::Release's
 // nodes and Pool4Object::Reset's (a released model's two).
 bool Pool4Releasable(uint8_t* base, uint32_t object, uint64_t extra) {
+  const schema::Pool4Object o(base, object);
   uint32_t freed = 0;
-  return car_models::LoadSlotReleasable(base, object + 80, &freed) &&
-         Room(base, models::ModelReleaseNodes(base, object + 112) + kFreshNodes + extra);
+  return car_models::LoadSlotReleasable(base, o.slot_address(), &freed) &&
+         Room(base, models::ModelReleaseNodes(base, o.model_address()) + kFreshNodes + extra);
 }
 
 // Pool4Object::Release's work, its checks made.
 uint32_t Pool4ReleaseWork(uint8_t* base, uint32_t object) {
-  Require(car_models::LoadSlotReleaseBuffer(base, object + 80).has_value(),
+  const schema::Pool4Object o(base, object);
+  Require(car_models::LoadSlotReleaseBuffer(base, o.slot_address()).has_value(),
           "LoadSlot::ReleaseBuffer");
-  Require(models::ModelRelease(base, object + 112).has_value(), "Model::Release");
+  Require(models::ModelRelease(base, o.model_address()).has_value(), "Model::Release");
   const auto r3 = Pool4Reset(base, object);
   Require(r3.has_value(), "Pool4Object::Reset");
   return *r3;
@@ -577,13 +617,15 @@ bool Pool4Destruct(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_820D6AD0 Pool4Object::~Pool4Object");
   // The model's members aren't touched by its release; ~Model releases a
   // released model again (two nodes).
-  if (!models::ModelMembersDestructible(base, object + 112) ||
+  const schema::Pool4Object o(base, object);
+  if (!models::ModelMembersDestructible(base, o.model_address()) ||
       !Pool4Releasable(base, object, kFreshNodes)) {
     return false;
   }
-  Store(base, object + 0, kPool4Vtable);
+  o.set_vtable(kPool4Vtable);
   Pool4ReleaseWork(base, object);
-  Require(models::PartModelDestruct(base, object + 112).has_value(), "PartModel::~PartModel");
+  Require(models::PartModelDestruct(base, o.model_address()).has_value(),
+          "PartModel::~PartModel");
   DestructNode(base, object);
   return true;
 }
@@ -689,7 +731,7 @@ bool CarModelConstruct(uint8_t* base, uint32_t car_model, uint32_t list) {
   scene_models::CarRecordSetW(base, car_model + kCarModelRecord);
   Require(CarModelLoadsConstruct(base, car_model + kCarModelLoads),
           "CarModelLoads::CarModelLoads");
-  const uint32_t one = Load(base, kOne);
+  const uint32_t one = G::one(base);
   for (uint32_t i = 0; i < 4; i++) {
     MatrixW(base, car_model + 6720 + 64 * i, one);
   }
@@ -733,7 +775,8 @@ bool CarPartsDestruct(uint8_t* base, uint32_t parts) {
   ITC_NATIVE_RUNNING("sub_820D7038 CarParts::~CarParts");
   // The release's checks, then ~CarPartsLoads' on the released models (their
   // members untouched, two nodes each).
-  const uint32_t first = parts + kPartsModels;
+  const schema::CarParts p(base, parts);
+  const uint32_t first = p.part_models_address();
   uint64_t nodes = 0;
   for (uint32_t i = 0; i < kParts; i++) {
     const uint32_t model = first + kPartModelBytes * i;
@@ -742,13 +785,13 @@ bool CarPartsDestruct(uint8_t* base, uint32_t parts) {
     }
     nodes += models::ModelReleaseNodes(base, model);
   }
-  if (!SlotsReleasable(base, parts + kCarPartsLoads, kParts) ||
+  if (!SlotsReleasable(base, p.slots_address(), kParts) ||
       !Room(base, nodes + kFreshNodes * kParts)) {
     return false;
   }
-  Store(base, parts + 0, kCarPartsVtable);
+  p.set_vtable(kCarPartsVtable);
   Require(CarPartsRelease(base, parts).has_value(), "CarParts::Release");
-  Require(CarPartsLoadsDestruct(base, parts + kCarPartsLoads).has_value(),
+  Require(CarPartsLoadsDestruct(base, p.loads_address()).has_value(),
           "CarPartsLoads::~CarPartsLoads");
   DestructNode(base, parts);
   return true;
@@ -763,15 +806,16 @@ bool CockpitDestruct(uint8_t* base, uint32_t cockpit) {
   ITC_NATIVE_RUNNING("sub_820D64D0 Cockpit::~Cockpit");
   // The release doesn't release the six part models: ~CockpitLoads' nodes
   // are theirs now, and the XPRs' four.
-  const uint32_t loads = cockpit + kCockpitLoads;
+  const schema::Cockpit c(base, cockpit);
+  const uint32_t loads = c.loads_address();
   uint64_t nodes = 4;
   for (uint32_t i = 0; i < 6; i++) {
-    nodes += models::ModelReleaseNodes(base, loads + kCockpitLoadsParts + kPartModelBytes * i);
+    nodes += models::ModelReleaseNodes(base, c.part_models_address() + kPartModelBytes * i);
   }
   if (!CockpitLoadsMembersDestructible(base, loads) || !CockpitReleasable(base, cockpit, nodes)) {
     return false;
   }
-  Store(base, cockpit + 0, kCockpitVtable);
+  c.set_vtable(kCockpitVtable);
   Require(CockpitRelease(base, cockpit).has_value(), "Cockpit::Release");
   Require(CockpitLoadsDestruct(base, loads).has_value(), "CockpitLoads::~CockpitLoads");
   DestructNode(base, cockpit);
@@ -798,7 +842,7 @@ bool TrafficConstruct(uint8_t* base, uint32_t traffic, uint32_t list) {
   ConstructNode(base, traffic, list, kTrafficVtable);
   scene_models::CarRecordSetW(base, traffic + 32);
   Require(TrafficLoadsConstruct(base, traffic + kTrafficLoads), "TrafficLoads::TrafficLoads");
-  const uint32_t one = Load(base, kOne);
+  const uint32_t one = G::one(base);
   for (uint32_t i = 0; i < 4; i++) {
     Store(base, traffic + 7072 + 16 * i + 12, one);
   }
@@ -871,56 +915,55 @@ bool TrafficDeletingDestruct(uint8_t* base, uint32_t traffic, uint32_t flags) {
 
 namespace {
 
-constexpr uint32_t kInteriorSlots = 160;
-constexpr uint32_t kInteriorModels = 304;
-
 // Interior::Release's checks (nothing changed), with `extra` nodes more for
 // what follows it: the six slots' buffers, the pending frees' room for the
 // models' release, and the accessories' release by the model set (set a's
 // three as ReleaseAll's check, the entries distinct).
 bool InteriorReleasable(uint8_t* base, uint32_t interior, uint64_t extra) {
+  const schema::Interior in(base, interior);
   uint64_t nodes = extra;
   for (uint32_t i = 0; i < 6; i++) {
-    nodes += models::ModelReleaseNodes(base, interior + kInteriorModels + kPartModelBytes * i);
+    nodes += models::ModelReleaseNodes(base, in.part_models_address() + kPartModelBytes * i);
   }
-  if (!SlotsReleasable(base, interior + kInteriorSlots, 6) || !Room(base, nodes)) {
+  if (!SlotsReleasable(base, in.part_slots_address(), 6) || !Room(base, nodes)) {
     return false;
   }
-  const uint32_t set = Load(base, Load(base, interior + 3092) + 8);
+  const uint32_t set = in.first_set().model_set();
   const uint32_t accessories = scene_models::Accessories(base);
   if (set == 0) {
     return accessories::SetReleasable(base, accessories);
   }
   if (set == 1) {
-    return accessories::SetReleaseNative(base, accessories, int32_t(Load(base, interior + 140)));
+    return accessories::SetReleaseNative(base, accessories, int32_t(in.accessory()));
   }
   return true;
 }
 
 // Interior::Release's work, its checks made.
 uint32_t InteriorReleaseWork(uint8_t* base, uint32_t interior) {
+  const schema::Interior in(base, interior);
   uint32_t r3 = 0;
   for (uint32_t i = 0; i < 6; i++) {
-    const uint32_t model = interior + kInteriorModels + kPartModelBytes * i;
-    Require(car_models::LoadSlotReleaseBuffer(base, interior + kInteriorSlots + kSlotBytes * i)
+    const uint32_t model = in.part_models_address() + kPartModelBytes * i;
+    Require(car_models::LoadSlotReleaseBuffer(base, in.part_slots_address() + kSlotBytes * i)
                 .has_value(),
             "LoadSlot::ReleaseBuffer");
     Require(models::ModelRelease(base, model).has_value(), "Model::Release");
     models::PartModelClear(base, model);
     r3 = model;
   }
-  const uint32_t set = Load(base, Load(base, interior + 3092) + 8);
+  const uint32_t set = in.first_set().model_set();
   if (set == 0) {
     for (int32_t i = 0; i < 3; i++) {
       const uint32_t accessories = scene_models::Accessories(base);
       r3 = accessories::SetRelease(base, accessories, i).value_or(accessories);
     }
   } else if (set == 1) {
-    const int32_t index = int32_t(Load(base, interior + 140));
+    const int32_t index = int32_t(in.accessory());
     const uint32_t accessories = scene_models::Accessories(base);
     r3 = accessories::SetRelease(base, accessories, index).value_or(accessories);
   }
-  Store(base, interior + 3088, 0);
+  in.set_cockpit(0);
   return r3;
 }
 
@@ -938,19 +981,20 @@ bool InteriorDestruct(uint8_t* base, uint32_t interior) {
   ITC_NATIVE_RUNNING("sub_820D76D8 Interior::~Interior");
   // The release's checks, then ~PartModel's on the released models (their
   // members untouched, two nodes each).
+  const schema::Interior in(base, interior);
   for (uint32_t i = 0; i < 6; i++) {
     if (!models::ModelMembersDestructible(base,
-                                          interior + kInteriorModels + kPartModelBytes * i)) {
+                                          in.part_models_address() + kPartModelBytes * i)) {
       return false;
     }
   }
   if (!InteriorReleasable(base, interior, 6 * kFreshNodes)) {
     return false;
   }
-  Store(base, interior + 0, kInteriorVtable);
+  in.set_vtable(kInteriorVtable);
   InteriorReleaseWork(base, interior);
   for (uint32_t i = 6; i-- > 0;) {
-    Require(models::PartModelDestruct(base, interior + kInteriorModels + kPartModelBytes * i)
+    Require(models::PartModelDestruct(base, in.part_models_address() + kPartModelBytes * i)
                 .has_value(),
             "PartModel::~PartModel");
   }
@@ -965,7 +1009,9 @@ bool InteriorDeletingDestruct(uint8_t* base, uint32_t interior, uint32_t flags) 
 
 std::optional<uint32_t> ReleaseA(uint8_t* base, uint32_t set, uint32_t pool, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_820C4488 ScenePools::ReleaseA");
-  const uint32_t object = vehicle_accessors::ListAt(base, pool * 12 + set + 56, index);
+  const uint32_t object =
+      vehicle_accessors::ListAt(base, schema::ScenePools(base, set).pools_address() + pool * 12,
+                                index);
   std::optional<uint32_t> r3 = object;
   switch (pool) {
     case 0:
@@ -995,7 +1041,7 @@ std::optional<uint32_t> ReleaseA(uint8_t* base, uint32_t set, uint32_t pool, uin
   if (!r3) {
     return std::nullopt;
   }
-  Store(base, object + 16, 0);
+  schema::PoolNode(base, object).set_state(0);
   return r3;
 }
 

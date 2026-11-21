@@ -5,6 +5,8 @@
 #include <cstdint>
 
 #include "guest.h"
+#include "schema/menu_helpers.h"
+#include "schema/todays_result.h"
 #include "todays_result/todays_result.h"
 #include "ui_movies/game.h"
 
@@ -17,6 +19,9 @@ inline void Store(uint8_t* base, uint32_t address, uint32_t value) {
 
 constexpr uint32_t kNone = 0xFFFFFFFFu;
 constexpr uint32_t kMemRelease = 0x8000;
+
+using G = schema::TodaysResultGlobals;
+using Pages = schema::PageObject;
 
 // The original's frame below `sp`, its back chain written.
 inline uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
@@ -48,11 +53,30 @@ inline void Post(uint8_t* base, uint32_t dispatcher, uint32_t id) {
   PostRing(base, dispatcher + 204, id);
 }
 
+// A screen's new menu set up as both Creates do: every word 0 but the last
+// item (+16), 4, in the originals' order.
+inline void InitMenu(const schema::FrontEndMenu& menu) {
+  menu.set_first_item(0);
+  menu.set_wraps(0);
+  menu.set_cursor(0);
+  menu.set_previous(0);
+  menu.set_last_item(4);
+  menu.set_moved(0);
+  menu.set_wrapped(0);
+  menu.set_visible_row(0);
+  menu.set_previous_row(0);
+  menu.set_side(0);
+  menu.set_player(0);
+  menu.set_up_down_locked(0);
+  menu.set_left_right_steps(0);
+  menu.set_shoulders_step(0);
+}
+
 // The page object's +8 = its page unless that is `unless`.
-inline void KeepPage(uint8_t* base, uint32_t pages, uint32_t unless) {
-  const uint32_t page = Load(base, pages + 0);
+inline void KeepPage(const Pages& pages, uint32_t unless) {
+  const uint32_t page = pages.page();
   if (page != unless) {
-    Store(base, pages + 8, page);
+    pages.set_previous_page(page);
   }
 }
 

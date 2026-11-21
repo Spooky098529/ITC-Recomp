@@ -6,6 +6,8 @@
 #include "base/log.h"
 #include "tuning_pages/tuning_pages.h"
 #include "guest.h"
+#include "schema/menu_helpers.h"
+#include "schema/tuning_machine.h"
 #include "ui_movies/game.h"
 
 namespace tuning_machine {
@@ -16,9 +18,9 @@ constexpr uint32_t kNone = 0xFFFFFFFFu;
 constexpr uint32_t kMemCommit = 4096;
 constexpr uint32_t kReadWrite = 4;
 constexpr uint32_t kMemRelease = 0x8000;
-// The float words the originals load (lfs) and store (stfs) unchanged.
-constexpr uint32_t kZeroFloat = 0x82000A34;  // 0.0
-constexpr uint32_t kOneFloat = 0x82000A30;   // 1.0
+
+using G = schema::TuningMachineGlobals;
+using Screen = schema::TuningMachineScreen;
 
 inline uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 inline void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -42,11 +44,11 @@ inline uint32_t FindPair(uint8_t* base, uint32_t id, uint32_t key) {
 // Posts the message (id, 0, 0) on `mode`'s ring (+204: its count +600,
 // start +604, 50 slots of 12 bytes), as the handlers do inline.
 void Post(uint8_t* base, uint32_t mode, uint32_t id) {
-  const uint32_t ring = mode + 204;
-  const uint32_t count = Load(base, ring + 600) + 1;
-  const uint32_t start = Load(base, ring + 604);
-  Store(base, ring + 600, count);
-  const uint32_t slot = ring + 12 * ((start + count - 1) % 50);
+  const schema::TuningMachineMode m(base, mode);
+  const uint32_t count = m.message_count() + 1;
+  const uint32_t start = m.message_start();
+  m.set_message_count(count);
+  const uint32_t slot = m.messages_address() + 12 * ((start + count - 1) % 50);
   Store(base, slot + 0, id);
   Store(base, slot + 4, 0);
   Store(base, slot + 8, 0);
@@ -54,20 +56,28 @@ void Post(uint8_t* base, uint32_t mode, uint32_t id) {
 
 // A front-end menu's first words, as Create writes them (+44, +56 and +60
 // not written).
-void ResetMenu(uint8_t* base, uint32_t menu) {
-  Store(base, menu + 12, 0);
-  Store(base, menu + 16, 6);
-  Store(base, menu + 20, 1);
-  for (const uint32_t field : {0u, 4u, 8u, 40u, 48u, 52u, 36u, 64u, 24u, 28u, 32u}) {
-    Store(base, menu + field, 0);
-  }
+void ResetMenu(const schema::FrontEndMenu& menu) {
+  menu.set_first_item(0);
+  menu.set_last_item(6);
+  menu.set_wraps(1);
+  menu.set_cursor(0);
+  menu.set_previous(0);
+  menu.set_moved(0);
+  menu.set_wrapped(0);
+  menu.set_visible_row(0);
+  menu.set_previous_row(0);
+  menu.set_side(0);
+  menu.set_player(0);
+  menu.set_up_down_locked(0);
+  menu.set_left_right_steps(0);
+  menu.set_shoulders_step(0);
 }
 
 }  // namespace
 
 void ZeroRecord16(uint8_t* base, uint32_t record) {
   ITC_NATIVE_RUNNING("sub_821FE540 TuningMachine::ZeroRecord16");
-  const uint32_t zero = Load(base, kZeroFloat);
+  const uint32_t zero = G::float_zero(base);
   Store(base, record + 8, zero);
   Store(base, record + 0, 0);
   Store(base, record + 12, zero);
@@ -88,62 +98,74 @@ void ResetImages(uint8_t* base, uint32_t images) {
 
 uint64_t Create(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821CE4C8 TuningMachine::Create");
-  const uint32_t s = uint32_t(r3);
+  const Screen sc(base, uint32_t(r3));
   const uint32_t frame = Frame(base, sp, 144);
   // The screen kept in the caller's parameter area (read back before the
   // menus are written).
-  Store(base, sp + 20, s);
-  Store(base, s + 9608, 0);
-  Store(base, s + 9652, 0);
-  Store(base, s + 9656, 0);
-  for (uint32_t b = 9660; b <= 9668; b++) {
-    guest::StoreU8(base, s + b, 0);
+  Store(base, sp + 20, sc.address);
+  sc.set_movies_loaded(0);
+  sc.set_screen_state(0);
+  sc.set_category(0);
+  sc.set_item(0);
+  sc.set_level(0);
+  sc.set_type(0);
+  sc.set_bonnet_choice(0);
+  sc.set_option(0);
+  sc.set_confirm_cursor(0);
+  sc.set_unknown_9666(0);
+  sc.set_keep_cursor(0);
+  sc.set_discard_cursor(0);
+  sc.set_item_count(0);
+  sc.set_level_count(0);
+  sc.set_type_count(0);
+  sc.set_color_rows(0);
+  sc.set_option_count(0);
+  sc.set_history_depth(0);
+  sc.set_refresh(1);
+  sc.set_bonnet_color_set(0);
+  sc.set_pages_enabled(1);
+  sc.set_unknown_9684(17);
+  sc.set_open_mask(kNone);
+  sc.set_unknown_9692(kNone);
+  sc.set_unknown_9696(kNone);
+  sc.set_unknown_9700(kNone);
+  sc.set_unknown_9704(kNone);
+  sc.set_menu_category(0);
+  sc.set_menu_choice(0);
+  sc.set_unknown_9748(0);
+  sc.set_unknown_9752(0);
+  sc.set_stand_action(kNone);
+  sc.set_busy_shown(0);
+  sc.set_busy_movie(kNone);
+  sc.set_busy_animation_a(kNone);
+  sc.set_busy_animation_b(kNone);
+  sc.set_busy_animation_c(kNone);
+  sc.set_queue(0);
+  sc.set_category_menu(0);
+  for (uint32_t w = sc.wheel_part_cursor_address(); w <= sc.second_wheels_step_address(); w += 4) {
+    Store(base, w, 0);
   }
-  for (uint32_t b = 9676; b <= 9680; b++) {
-    guest::StoreU8(base, s + b, 0);
+  for (uint32_t w = sc.paint_row_address(); w <= sc.unknown_30472_address(); w += 4) {
+    Store(base, w, 0);
   }
-  guest::StoreU8(base, s + 10008, 0);
-  Store(base, s + 9708, 1);
-  Store(base, s + 9712, 0);
-  Store(base, s + 9728, 1);
-  Store(base, s + 9684, 17);
-  for (uint32_t w = 9688; w <= 9704; w += 4) {
-    Store(base, s + w, kNone);
+  for (uint32_t w = sc.light_kit_group_address(); w <= sc.unknown_30576_address(); w += 4) {
+    Store(base, w, 0);
   }
-  for (uint32_t w = 9740; w <= 9752; w += 4) {
-    Store(base, s + w, 0);
+  for (uint32_t w = sc.editor_page_address(); w <= sc.order_position_address(); w += 4) {
+    Store(base, w, 0);
   }
-  Store(base, s + 10012, kNone);
-  Store(base, s + 10016, 0);
-  for (uint32_t w = 10020; w <= 10032; w += 4) {
-    Store(base, s + w, kNone);
-  }
-  Store(base, s + 10036, 0);
-  Store(base, s + 10040, 0);
-  for (uint32_t w = 25196; w <= 25244; w += 4) {
-    Store(base, s + w, 0);
-  }
-  for (uint32_t w = 30440; w <= 30472; w += 4) {
-    Store(base, s + w, 0);
-  }
-  for (uint32_t w = 30492; w <= 30576; w += 4) {
-    Store(base, s + w, 0);
-  }
-  for (uint32_t w = 30724; w <= 30756; w += 4) {
-    Store(base, s + w, 0);
-  }
-  Store(base, s + 30764, 0);
-  Store(base, s + 30768, 0);
-  Store(base, s + 9672, 0);
-  for (uint32_t w = 30772; w <= 30792; w += 4) {
-    Store(base, s + w, 0);
+  sc.set_picked_image(0);
+  sc.set_image_group(0);
+  sc.set_remove_cursor(0);
+  for (uint32_t w = sc.unknown_30772_address(); w <= sc.order_last_position_address(); w += 4) {
+    Store(base, w, 0);
   }
   // The vinyl layers' ids: two passes of 0, 1, 2 (the second word list
   // runs on, the third is written again).
   {
-    uint32_t r10 = s + 31192;
+    uint32_t r10 = sc.saved_vinyl_layer_ids_address();
     for (uint32_t pass = 0; pass < 2; pass++) {
-      uint32_t r9 = s + 31216;
+      uint32_t r9 = sc.order_list_address();
       for (uint32_t j = 0; j < 3; j++) {
         Store(base, r10 - 24, j);
         Store(base, r10, j);
@@ -155,9 +177,9 @@ uint64_t Create(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   }
   // The stickers' ids: eight passes of 0 to 4.
   {
-    uint32_t r10 = s + 33320;
+    uint32_t r10 = sc.sticker_ids_address();
     for (uint32_t pass = 0; pass < 8; pass++) {
-      uint32_t r9 = s + 33480;
+      uint32_t r9 = sc.sticker_order_address();
       for (uint32_t k = 0; k < 5; k++) {
         Store(base, r10 - 1120, k);
         Store(base, r10, k);
@@ -167,14 +189,14 @@ uint64_t Create(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
       }
     }
   }
-  const uint32_t zero = Load(base, kZeroFloat);
-  const uint32_t one = Load(base, kOneFloat);
-  Store(base, s + 30832, 0);
-  Store(base, s + 30836, 0);
-  Store(base, s + 30848, 0);
-  Store(base, s + 30852, 0);
-  Store(base, s + 30840, zero);
-  Store(base, s + 30844, one);
+  const uint32_t zero = G::float_zero(base);
+  const uint32_t one = G::float_one(base);
+  sc.set_edit_x(0);
+  sc.set_edit_y(0);
+  sc.set_edit_flip(0);
+  sc.set_unknown_30852(0);
+  Store(base, sc.edit_angle_address(), zero);
+  Store(base, sc.edit_scale_address(), one);
   // The decal records: 24 bytes each, +8 0.0 and +12 1.0.
   const auto record = [&](uint32_t at) {
     Store(base, at + 8, zero);
@@ -185,46 +207,46 @@ uint64_t Create(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
     Store(base, at + 20, 0);
   };
   for (uint32_t j = 0; j < 6; j++) {
-    record(s + 30880 + 24 * j);
-    record(s + 31024 + 24 * j);
+    record(sc.vinyl_layers_address() + 24 * j);
+    record(sc.saved_vinyl_layers_address() + 24 * j);
   }
   for (uint32_t j = 0; j < 40; j++) {
-    record(s + 31240 + 24 * j);
-    record(s + 32360 + 24 * j);
+    record(sc.saved_stickers_address() + 24 * j);
+    record(sc.stickers_address() + 24 * j);
   }
-  for (uint32_t w = 33540; w <= 33580; w += 4) {
-    Store(base, s + w, 0);
+  for (uint32_t w = sc.interior_mode_address(); w <= sc.interior_mode_address() + 40; w += 4) {
+    Store(base, w, 0);
   }
-  Store(base, s + 25120, 0);
-  Store(base, s + 20768, 0);
-  Store(base, s + 20772, 0);
-  Store(base, s + 20776, 0);
-  Store(base, s + 20780, zero);
-  Store(base, s + 36824, 0);
-  ZeroRecord16(base, s + 30800);
-  ZeroRecord16(base, s + 30816);
+  sc.set_last_price(0);
+  sc.set_stat_displacement(0);
+  sc.set_stat_weight(0);
+  sc.set_stat_power(0);
+  Store(base, sc.stat_torque_address(), zero);
+  sc.set_paint_kept(0);
+  ZeroRecord16(base, sc.page0_origin_x_address());
+  ZeroRecord16(base, sc.page1_origin_x_address());
   for (uint32_t k = 0; k < 63; k++) {
-    Store(base, s + 9756 + 4 * k, 0);
+    Store(base, sc.state_history_address() + 4 * k, 0);
   }
-  Store(base, s + kQueue,
-        uint32_t(calls.Call(kVirtualAlloc, frame, 0x821CE8D8, 0, 28, kMemCommit, kReadWrite)));
-  Store(base, s + kMenu,
-        uint32_t(calls.Call(kVirtualAlloc, frame, 0x821CE8F4, 0, 68, kMemCommit, kReadWrite)));
-  Store(base, s + kMenu2,
-        uint32_t(calls.Call(kVirtualAlloc, frame, 0x821CE910, 0, 68, kMemCommit, kReadWrite)));
-  ResetImages(base, s + kImages);
+  sc.set_queue(
+      uint32_t(calls.Call(kVirtualAlloc, frame, 0x821CE8D8, 0, 28, kMemCommit, kReadWrite)));
+  sc.set_category_menu(
+      uint32_t(calls.Call(kVirtualAlloc, frame, 0x821CE8F4, 0, 68, kMemCommit, kReadWrite)));
+  sc.set_second_menu(
+      uint32_t(calls.Call(kVirtualAlloc, frame, 0x821CE910, 0, 68, kMemCommit, kReadWrite)));
+  ResetImages(base, sc.decal_images_address());
   // The queue: TUNING SHOP MAIN (3); +16 not written.
-  const uint32_t queue = Load(base, s + kQueue);
-  const uint32_t screen = Load(base, sp + 20);
-  Store(base, queue + 4, 3);
-  Store(base, queue + 0, 3);
-  Store(base, queue + 8, 3);
-  Store(base, queue + 20, kNone);
-  Store(base, queue + 12, kNone);
-  Store(base, queue + 24, 0);
-  ResetMenu(base, Load(base, screen + kMenu));
-  ResetMenu(base, Load(base, screen + kMenu2));
-  Store(base, screen + kMachineState, Load(base, screen + kMachineReenter) != 0 ? 1 : 9);
+  const schema::PageObject queue = sc.queue();
+  const Screen screen(base, Load(base, sp + 20));
+  queue.set_next_page(3);
+  queue.set_page(3);
+  queue.set_previous_page(3);
+  queue.set_unknown_20(kNone);
+  queue.set_step(kNone);
+  queue.set_step_started(0);
+  ResetMenu(screen.category_menu());
+  ResetMenu(screen.second_menu());
+  screen.set_state(screen.reenter() != 0 ? 1 : 9);
   return r3 + kImages;
 }
 
@@ -234,15 +256,15 @@ uint64_t OpenMovies(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& ca
   calls.Call(kMoviesOpen, frame, 0x821CBDD0, kShopMovie, 22547);
   calls.Call(kMoviesOpen, frame, 0x821CBDDC, kVinylMovie, 22548);
   const uint64_t r3 = calls.Call(kMoviesOpen, frame, 0x821CBDE8, kStickerMovie, 22549);
-  Store(base, screen + kMachineLoaded, 0);
+  Screen(base, screen).set_movies_loaded(0);
   return r3;
 }
 
 uint64_t WaitForMovies(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821CE9E8 TuningMachine::WaitForMovies");
-  const uint32_t s = uint32_t(r3);
+  const Screen sc(base, uint32_t(r3));
   Frame(base, sp, 112);
-  if (Load(base, s + kMachineLoaded) == 0) {
+  if (sc.movies_loaded() == 0) {
     bool all = true;
     for (const uint32_t id : {kShopMovie, kVinylMovie, kStickerMovie}) {
       r3 = ui_movies::IsLoaded(base, id);
@@ -252,13 +274,13 @@ uint64_t WaitForMovies(uint8_t* base, uint64_t r3, uint32_t sp) {
       }
     }
     if (all) {
-      Store(base, s + kMachineLoaded, 1);
+      sc.set_movies_loaded(1);
     }
   }
-  if (Load(base, s + kMachineLoaded) != 0) {
-    const uint32_t reenter = Load(base, s + kMachineReenter);
-    Store(base, s + 9708, 1);
-    Store(base, s + kMachineState, reenter != 0 ? 9 : 4);
+  if (sc.movies_loaded() != 0) {
+    const uint32_t reenter = sc.reenter();
+    sc.set_refresh(1);
+    sc.set_state(reenter != 0 ? 9 : 4);
   }
   return r3;
 }
@@ -266,9 +288,9 @@ uint64_t WaitForMovies(uint8_t* base, uint64_t r3, uint32_t sp) {
 uint64_t OnDialogClosed(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp,
                         const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821D8898 TuningMachine::OnDialogClosed");
-  const uint32_t s = uint32_t(r3);
+  const Screen sc(base, uint32_t(r3));
   const uint32_t frame = Frame(base, sp, 128);
-  if (Load(base, s + 9652) == 11) {
+  if (sc.screen_state() == 11) {
     const uint32_t movie = Load(base, FindPair(base, kDialogMovie, frame + 80));
     calls.CallArgs(kSetText, frame, 0x821D88E8, {movie, kNone, 0, 15, 0, 0, 0, 0});
     calls.CallArgs(kSetText, frame, 0x821D88FC, {movie, 1, 3, 2, 0, 0, 0, 0});
@@ -276,46 +298,46 @@ uint64_t OnDialogClosed(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp,
     Store(base, movie + 40960, 0);
     Post(base, mode, 34);
   }
-  Store(base, s + 9728, 1);
+  sc.set_pages_enabled(1);
   return r3;
 }
 
 uint64_t Unload(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821D69A0 TuningMachine::Unload");
-  const uint32_t s = uint32_t(r3);
+  const Screen sc(base, uint32_t(r3));
   const uint32_t frame = Frame(base, sp, 112);
-  if (Load(base, s + kMachineLoaded) != 0) {
+  if (sc.movies_loaded() != 0) {
     const uint32_t movie = Load(base, FindPair(base, kShopMovie, frame + 80));
     r3 = calls.Call(kFinishAll, frame, 0x821D69E0, movie);
   }
-  if (Load(base, s + kMachineDelete) != 0) {
+  if (sc.delete_movies() != 0) {
     calls.Call(kMoviesDelete, frame, 0x821D69F4, kShopMovie);
     calls.Call(kMoviesDelete, frame, 0x821D69FC, kVinylMovie);
     r3 = calls.Call(kMoviesDelete, frame, 0x821D6A04, kStickerMovie);
-    Store(base, s + kMachineLoaded, 0);
+    sc.set_movies_loaded(0);
   }
   return r3;
 }
 
 void Close(uint8_t* base, uint32_t machine, uint32_t mode) {
   ITC_NATIVE_RUNNING("sub_821D6A78 TuningMachine::Close");
-  Store(base, machine + kMachineState, 7);
+  Screen(base, machine).set_state(7);
   Post(base, mode, 4);
 }
 
 uint64_t Destroy(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls,
                  const UnloadAllNative* unload) {
   ITC_NATIVE_RUNNING("sub_821CBD40 TuningMachine::Destroy");
-  const uint32_t s = uint32_t(r3);
+  const Screen sc(base, uint32_t(r3));
   const uint32_t frame = Frame(base, sp, 112);
   if (unload != nullptr) {
     tuning_pages::UnloadAll(base, *unload->call, r3 + kImages, frame, unload->native_free);
   } else {
     calls.Call(kUnloadAll, frame, 0x821CBD60, r3 + kImages);
   }
-  calls.Call(kVirtualFree, frame, 0x821CBD78, Load(base, s + kQueue), 0, kMemRelease);
-  calls.Call(kVirtualFree, frame, 0x821CBD88, Load(base, s + kMenu), 0, kMemRelease);
-  return calls.Call(kVirtualFree, frame, 0x821CBD98, Load(base, s + kMenu2), 0, kMemRelease);
+  calls.Call(kVirtualFree, frame, 0x821CBD78, sc.queue().address, 0, kMemRelease);
+  calls.Call(kVirtualFree, frame, 0x821CBD88, sc.category_menu().address, 0, kMemRelease);
+  return calls.Call(kVirtualFree, frame, 0x821CBD98, sc.second_menu().address, 0, kMemRelease);
 }
 
 uint32_t SavePlaceholders14(uint8_t* base, uint32_t images, uint32_t sp) {

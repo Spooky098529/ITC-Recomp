@@ -7,6 +7,7 @@
 #pragma once
 
 #include "guest.h"
+#include "schema/system_services.h"
 
 #include <cstdint>
 
@@ -16,9 +17,8 @@ namespace user {
 // no listener, but not 0 (see src/hooks/notify.cpp).
 constexpr uint32_t kNoListener = 0x4E4F4C53;
 
-// The system link socket's handle (sub_82148958 keeps it here; read only by
-// the system link code's sends and receives) and the one it gets.
-constexpr uint32_t kSystemLinkSocket = 0x826C6AA0;
+// The handle the system link socket gets (sub_82148958 keeps it at
+// 0x826C6AA0, read only by the system link code's sends and receives).
 constexpr uint32_t kInvalidSocket = 0xFFFFFFFF;
 
 // XNetGetTitleXnAddr's answer: XNET_GET_XNADDR_STATIC.
@@ -30,7 +30,7 @@ constexpr uint32_t kWsaStarted = 0;
 
 // sub_82148958: the system link socket not made.
 inline void SystemLinkSocketNotMade(uint8_t* base) {
-  guest::StoreU32(base, kSystemLinkSocket, kInvalidSocket);
+  schema::SystemServicesGlobals::set_system_link_socket(base, kInvalidSocket);
 }
 
 // XNetGetTitleXnAddr (sub_82459D50) into the 36-byte XNADDR at `address`:

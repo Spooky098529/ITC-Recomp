@@ -104,7 +104,11 @@ order), its adapters in `src/hooks/strings_and_font.cpp`, behind
 `strings_and_font` (`src/harnesses/strings_and_font.cpp`). The string
 table's allocation and frees go through the allocation layer
 (`docs/native-memory.md`), so those two run natively only while
-`--native_heap` does.
+`--native_heap` does. Since E5's step 2 (2026-11-21) the objects' fields
+and the area's image words are named in `itc_recomp/schema/strings-and-font.toml`
+(`Font`, `FontDrawParams`, `FontPage`, `FontGlyphTable`, `FontGlyphRecord`,
+`FontText`, `FontGlyphQuad`, `FontVertex`, `Strings`, `StringsLoadedFlag`),
+and the hand ports read them through its views (`schema/strings_and_font.h`).
 
 Status:
 

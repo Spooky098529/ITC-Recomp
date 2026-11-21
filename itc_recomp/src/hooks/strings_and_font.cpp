@@ -33,6 +33,7 @@
 #include "hooks/strings_and_font.h"
 #include "strings_and_font/strings_and_font.h"
 #include "lifted/sdk.h"
+#include "schema/strings_and_font.h"
 
 ITC_FLAG_BOOL(native_strings_and_font, true, "ITC",
               "Run the string table and the font (docs/functions/strings-and-font.md: "
@@ -246,17 +247,17 @@ bool DrawPass(lifted::Regs& ctx, uint8_t* base, uint32_t font, uint32_t text) {
   }
   if (result.chunk != 0) {
     guest_call::InFrame(ctx, base, 192, 0x8210A3F0, [&](uint32_t) {
-      const uint32_t params = guest::LoadU32(base, font + 16);
-      const uint32_t queue = guest::LoadU32(base, font + 8);
+      const schema::FontDrawParams params = schema::Font(base, font).params();
+      const uint32_t queue = schema::Font(base, font).render_queue<schema::View>().address;
       ctx.fpscr.disableFlushMode();
-      ctx.f1.f64 = double(guest::LoadFloat(base, 0x82000A34));
+      ctx.f1.f64 = double(schema::StringsAndFontGlobals::zero(base));
       ctx.r3.u64 = queue;
       ctx.r4.u64 = result.chunk;
-      ctx.r5.s64 = int64_t(int32_t(guest::LoadU32(base, params + 116))) + 1;
+      ctx.r5.s64 = int64_t(int32_t(params.layer())) + 1;
       lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, queue) + 16));
     });
   }
-  guest::StoreU32(base, kDrawGlobals + 48, 0);
+  schema::StringsAndFontGlobals::set_chunk(base, 0);
   return true;
 }
 
@@ -305,7 +306,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82109EF0) {
 // Font::Draw: r3 = the font, r4 = the draw parameters, r5 = the text.
 ITC_NATIVE_ENTRY_ALWAYS(8210A400) {
   ITC_STRINGS_AND_FONT_FALLBACK(8210A400)
-  if (guest::LoadU32(base, ctx.r4.u32 + 112) != 0 || SlotDiagnostics()) {
+  if (schema::FontDrawParams(base, ctx.r4.u32).second_pass() != 0 || SlotDiagnostics()) {
     lifted::original::c8210A400(ctx, base);
     return;
   }
@@ -328,7 +329,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8210A758) {
     lifted::original::c8210A758(ctx, base);
     return;
   }
-  if (guest::LoadU32(base, ctx.r4.u32 + 112) != 0 || SlotDiagnostics()) {
+  if (schema::FontDrawParams(base, ctx.r4.u32).second_pass() != 0 || SlotDiagnostics()) {
     lifted::original::c8210A758(ctx, base);
     return;
   }

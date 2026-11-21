@@ -1,6 +1,7 @@
 #include "sprites/sprites.h"
 
 #include "guest.h"
+#include "schema/sprites.h"
 
 #include "command_list/command_list.h"
 
@@ -13,12 +14,12 @@ namespace sprites {
 
 namespace {
 
-constexpr uint32_t kOne = 0x82000A30;  // the float 1.0 the game stores as w
+using G = schema::SpritesGlobals;
 
-// The word an `lfs` then `stfs` of `address` stores (through a double, as
-// the original's registers hold floats).
-uint32_t FloatThroughDouble(uint8_t* base, uint32_t address) {
-  float value = std::bit_cast<float>(guest::LoadU32(base, address));
+// The word an `lfs` then `stfs` of the 1.0 the game stores as w stores
+// (through a double, as the original's registers hold floats).
+uint32_t OneThroughDouble(uint8_t* base) {
+  float value = std::bit_cast<float>(G::one_word(base));
   volatile double through = value;
   return std::bit_cast<uint32_t>(float(through));
 }
@@ -26,7 +27,7 @@ uint32_t FloatThroughDouble(uint8_t* base, uint32_t address) {
 }  // namespace
 
 void ResetSprites(uint8_t* base, uint32_t sprite, uint32_t corners) {
-  const uint32_t w = FloatThroughDouble(base, kOne);
+  const uint32_t w = OneThroughDouble(base);
   for (uint32_t row = 0; row < 4; row++) {
     guest::StoreU32(base, sprite + 16 * row + 12, w);
   }
@@ -146,7 +147,7 @@ std::optional<uint32_t> RecordScreenRect(uint8_t* base, uint32_t list, uint32_t 
   // The floats go through registers (lfs, stfs) in the original, but the
   // translated code stores their words unchanged (a signaling NaN stays one,
   // seen in the harness), so they're copied as words.
-  const uint32_t one = guest::LoadU32(base, kOne);
+  const uint32_t one = G::one_word(base);
   const int32_t x = int32_t(guest::LoadU32(base, rect + 80));
   const int32_t y = int32_t(guest::LoadU32(base, rect + 84));
   const int32_t width = int32_t(guest::LoadU32(base, rect + 88));

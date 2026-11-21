@@ -68,6 +68,16 @@ not seen in play) aren't mapped. Constant: `[0x82000A34]` 0.0. The word
 at recordings + 0x2225B0 (0 at `InputRecordings::Create`) is set to 1
 by both restores; its readers weren't found by its offset.
 
+The schema (E5 step 2, `itc_recomp/schema/replay-snapshots.toml`, 2026-11-21)
+names the objects: `ReplaySnapshot` (the block), `ReplayRecord` (Record5232),
+`ReplayBodyState` (BodyState), `ReplayVehiclePhysics` (Member1136, each
+field named after the vehicle's field it packs), `ReplayCollisionState`
+(Member4080) and `ReplayShapeState` (Part464); the hand ports reach the
+record side through these views, the vehicle's side by offsets still. The
+measure files the placed box `Part464::Save` and `Restore` take apart from
+collision.md's `BoxShape` (`ReplayPlacedBox` for now) and joins the six
+record copies' r4 into one type (`ReplayCopySource`, a bytes field).
+
 Status:
 
 - **Native**: plain C++ in `itc_recomp/src/` that doesn't use the

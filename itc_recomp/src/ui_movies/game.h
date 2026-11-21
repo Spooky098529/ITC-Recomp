@@ -98,7 +98,6 @@ bool CopyTextItem(uint8_t* base, uint32_t to, uint32_t from);
 // chains.
 constexpr uint32_t kMovieQueue = 0x90B4;
 constexpr uint32_t kMovieLooping = 0x9640;
-constexpr uint32_t kMovieLoaded = 0x9FD0;
 
 // sub_8211A9E8: a movie's +0..+24 and loaded flag (+0x9FD0) cleared, and
 // both lists set up empty (link k: next k + 1, slot k; the free chain from
@@ -131,7 +130,6 @@ uint32_t IsNamedActive(uint8_t* base, uint32_t movie, uint32_t index);
 // A list's 40-byte slot as its ten words, and the slot of the last
 // animation started (+0x9FD8: +0 index, +4 sub-scene, +8 named index).
 using Slot = std::array<uint32_t, 10>;
-constexpr uint32_t kMovieLastStarted = 0x9FD8;
 Slot LoadSlot(uint8_t* base, uint32_t address);
 void StoreSlot(uint8_t* base, uint32_t address, const Slot& slot);
 // AnimationList::Insert (sub_8211B4D0) at the end of the list (its count,
@@ -252,7 +250,6 @@ uint32_t IsLoaded(uint8_t* base, uint32_t id);
 // buffer, +4 scrolling, +8 the scroll counter, +20 the characters shown,
 // +24 passed to the formatting. An id not in the map reads the word at
 // 0x826C5CD8 as the record, as the originals do.
-constexpr uint32_t kMovieTexts = 0x9BCC;
 // sub_8211B720 (UiMovie::TextString): the text's buffer, or the empty string
 // at 0x82008434 when the record is 0.
 uint32_t TextString(uint8_t* base, uint32_t movie, uint32_t id);
@@ -369,16 +366,12 @@ std::optional<uint32_t> WordsAppend(uint8_t* base, uint32_t vector, uint32_t wor
 
 // A movie's named animations: 1,024 entries of 36 bytes from +176 (a
 // std::string, then +28 the scene and +32 the animation), the count at
-// +0x90B0 (176 + 0x9000). A movie's texts: the map at +0x9BCC (kMovieTexts)
+// +0x90B0 (176 + 0x9000). A movie's texts: the map at +0x9BCC
 // of 28-byte records (+0 a 4 KB buffer from VirtualAlloc), their count at
 // +0x9FCC. Its text list at +40 (+0 the items, 128 bytes each after a
 // 16-byte count; +4 the capacity, +8 the count) and draw context at +64.
-constexpr uint32_t kMovieNamed = 176;
 constexpr uint32_t kNamedBytes = 36;
 constexpr uint32_t kNamedCount = 1024;
-constexpr uint32_t kMovieNamedUsed = kMovieNamed + 0x9000;
-constexpr uint32_t kMovieTextCount = 0x9FCC;
-constexpr uint32_t kMovieTextList = 40;
 
 // sub_8211E1C0 (UiMovie::UiMovie): the textures (MakeWords on +28), the text
 // list (sub_8211B018: capacity 512, 512 items made with MakeTextItem after
@@ -525,7 +518,7 @@ std::optional<uint32_t> ClearNodeText(uint8_t* base, uint32_t movie, uint32_t no
 // cleared (its buffer's 4 KB, memset) with +20 = 0, string `id` (16-bit)
 // formatted into the buffer (Strings::FormatV from its 128-byte frame below
 // `stack`, with `calls` for FormatV's guest calls), then the record stored
-// for the node's id (TextMapSetKey). Returns movie + kMovieTexts (the r3
+// for the node's id (TextMapSetKey). Returns movie + 0x9BCC (the r3
 // TextMap::Set leaves); nullopt, with nothing done but the varargs' stores
 // (the original makes them again), where GetText would run the original.
 std::optional<uint32_t> SetText(uint8_t* base, const strings_and_font::FormatCalls& calls,

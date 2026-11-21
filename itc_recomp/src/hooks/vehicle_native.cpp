@@ -12,6 +12,7 @@
 #include "base/log.h"
 #include "car_physics/float_ops.h"
 #include "hooks/heap.h"
+#include "schema/vehicle.h"
 #include "vehicle/vehicle.h"
 #include "lifted/sdk.h"
 
@@ -141,7 +142,7 @@ ITC_REGS_STEP(VehicleApplyInput) {
     return;
   }
   ctx.r3.u64 = vehicle;
-  ctx.f1.f64 = double(guest::LoadFloat(base, vh::kStepSeconds));
+  ctx.f1.f64 = double(schema::VehicleGlobals::step_seconds(base));
 }
 
 ITC_REGS_STEP(VehicleSlipWheelValue) {

@@ -36,7 +36,7 @@ constexpr uint32_t kSetCar = 0x8217FD58;       // GarageStage::SetCar
 constexpr uint32_t kCarInit = 0x820CD5D8;      // Car::Init
 constexpr uint32_t kCarRefresh = 0x820C4998;   // Car::Refresh
 
-uint32_t Data(uint8_t* base) { return Load(base, kHubData); }
+schema::Type2HubData Data(uint8_t* base) { return Globals::hub_data(base); }
 uint32_t Holder(uint8_t* base) { return Load(base, Load(base, kStandHolder)); }
 
 }  // namespace
@@ -63,7 +63,7 @@ uint64_t HubUpdate(uint8_t* base, uint32_t sp, const Calls& calls) {
                    {150, 50 + 15 * k, 0, kItemFormat, Load(base, kItemNames + 4 * k), 0, 0, 0});
   }
   calls.Call(kEmpty, frame, 0x82190888, 135,
-             uint64_t(Load(base, Load(base, kHubMenu) + 0)) * 15 + 50, 0, kCursorFormat);
+             uint64_t(Globals::hub_menu(base).cursor()) * 15 + 50, 0, kCursorFormat);
   const uint32_t movie = FindMovie(base, kHubMovie, frame + 80);
   Store(base, frame + 144, kHubTransitions[12]);
   for (uint32_t i = 0; i < 12; i++) {
@@ -72,32 +72,32 @@ uint64_t HubUpdate(uint8_t* base, uint32_t sp, const Calls& calls) {
   // The running transition: its handler from the table on the page
   // object's +24; a nonzero answer (or none below -1) starts the queued one
   // or, with none, the page becomes +4.
-  uint32_t pages = Load(base, kHubPages);
-  const uint32_t running = Load(base, pages + 12);
+  schema::PageObject pages = Globals::hub_pages(base);
+  const uint32_t running = pages.step();
   bool finished = false;
   if (running == kNone) {
-    if (Load(base, pages + 0) != 3) {
+    if (pages.page() != 3) {
       calls.Call(kRun, frame, 0x821909E8, movie, 0);
     }
   } else if (int32_t(running) >= 0) {
     const uint64_t r3 =
-        calls.Call(Load(base, frame + 96 + (running << 2)), frame, 0x82190974, pages + 24);
-    pages = Load(base, kHubPages);
+        calls.Call(Load(base, frame + 96 + (running << 2)), frame, 0x82190974, pages.step_started_address());
+    pages.address = Globals::hub_pages(base).address;
     finished = uint32_t(r3) != 0;
   } else {
     finished = true;
   }
   if (finished) {
-    const uint32_t queued = Load(base, pages + 16);
+    const uint32_t queued = pages.queued_step();
     if (queued == kNone) {
-      Store(base, pages + 0, Load(base, pages + 4));
-      Store(base, pages + 12, kNone);
+      pages.set_page(pages.next_page());
+      pages.set_step(kNone);
     } else {
-      Store(base, pages + 16, kNone);
-      Store(base, pages + 20, 0);
-      Store(base, pages + 12, queued);
+      pages.set_queued_step(kNone);
+      pages.set_unknown_20(0);
+      pages.set_step(queued);
     }
-    Store(base, pages + 24, 0);
+    pages.set_step_started(0);
   }
   // The stand: the busy marker shown while it's busy; unless the page is
   // 3, the stand drawn once its model is made, else the selected garage
@@ -105,18 +105,18 @@ uint64_t HubUpdate(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t holder = Holder(base);
   uint64_t r3 = calls.Call(kIsBusy, frame, 0x821909FC, holder);
   if (uint32_t(r3) != 0) {
-    if (Load(base, Data(base) + 16) == 0) {
+    if (Data(base).busy_shown() == 0) {
       r3 = HubShowBusy(base, frame, calls);
-      Store(base, Data(base) + 16, 1);
+      Data(base).set_busy_shown(1);
     }
-  } else if (Load(base, Data(base) + 16) != 0) {
+  } else if (Data(base).busy_shown() != 0) {
     r3 = HubHideBusy(base, frame, calls);
-    Store(base, Data(base) + 16, 0);
+    Data(base).set_busy_shown(0);
   }
-  if (Load(base, Load(base, kHubPages) + 0) == 3) {
+  if (Globals::hub_pages(base).page() == 3) {
     return r3;
   }
-  if (Load(base, Data(base) + 8) != 0) {
+  if (Data(base).stand_model() != 0) {
     return calls.Call(kStageDraw, frame, 0x82190A70, holder, 0, 1);
   }
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
@@ -124,8 +124,8 @@ uint64_t HubUpdate(uint8_t* base, uint32_t sp, const Calls& calls) {
   calls.Call(kMemcpy, frame, 0x82190AC8, car, SelectedGarageCar(base, save) + 212, 1968);
   const uint64_t block = calls.Call(kBlockOf, frame, 0x82190AD0, Load(base, car + 12));
   r3 = calls.Call(kReloadModel, frame, 0x82190ADC, holder, block);
-  Store(base, Data(base) + 8, uint32_t(r3));
-  if (Load(base, Data(base) + 8) == 0) {
+  Data(base).set_stand_model(uint32_t(r3));
+  if (Data(base).stand_model() == 0) {
     return r3;
   }
   HubPutCarOnStand(base, car, frame, calls);

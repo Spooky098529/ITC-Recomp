@@ -14,7 +14,9 @@
 #include "models/texture_provider.h"
 #include "models/xpr.h"
 #include "scenery_lists/scenery_lists.h"
+#include "schema/scene_loaders.h"
 
+#include <array>
 #include <cstdlib>
 
 namespace scene_loaders {
@@ -204,22 +206,23 @@ bool WheelsLoadsConstruct(uint8_t* base, uint32_t loads) {
   if (!models::CanAllocatePointers(base, models::kTextureProviderSlots)) {
     return false;
   }
-  for (uint32_t first : {kWheelsTires, kWheelsRims}) {
+  const schema::WheelsLoads l(base, loads);
+  for (uint32_t first : {l.tires_address(), l.rims_address()}) {
     for (uint32_t i = 0; i < 2; i++) {
-      Require(models::PartModelConstruct(base, loads + first + models::kPartModelBytes * i),
+      Require(models::PartModelConstruct(base, first + models::kPartModelBytes * i),
               "PartModel::PartModel");
     }
   }
   for (uint32_t i = 0; i < 2; i++) {
-    models::XprConstruct(base, loads + kWheelsXprs + 24 * i);
+    models::XprConstruct(base, l.xprs_address() + 24 * i);
   }
   for (uint32_t i = 0; i < 2; i++) {
-    Require(models::TextureProviderConstruct(base, loads + kWheelsProviders + 20 * i, -1)
+    Require(models::TextureProviderConstruct(base, l.providers_address() + 20 * i, -1)
                 .has_value(),
             "TextureProvider::TextureProvider");
   }
   for (uint32_t i = 0; i < 2; i++) {
-    Require(models::PartModelConstruct(base, loads + kWheelsCalipers + models::kPartModelBytes * i),
+    Require(models::PartModelConstruct(base, l.calipers_address() + models::kPartModelBytes * i),
             "PartModel::PartModel");
   }
   return true;
@@ -228,8 +231,10 @@ bool WheelsLoadsConstruct(uint8_t* base, uint32_t loads) {
 namespace {
 
 // The wheels' six part models, front then rear of each kind.
-constexpr uint32_t kWheelsModels[] = {kWheelsTires, kWheelsTires + 464, kWheelsRims,
-                                      kWheelsRims + 464, kWheelsCalipers, kWheelsCalipers + 464};
+std::array<uint32_t, 6> WheelsModels(const schema::WheelsLoads& l) {
+  return {l.tires_address(), l.tires_address() + 464, l.rims_address(),
+          l.rims_address() + 464, l.calipers_address(), l.calipers_address() + 464};
+}
 
 // Model::Release and PartModel::Clear on a part model, the checks made.
 void ReleaseModel(uint8_t* base, uint32_t model) {
@@ -241,12 +246,13 @@ void ReleaseModel(uint8_t* base, uint32_t model) {
 
 std::optional<uint32_t> WheelsLoadsReset(uint8_t* base, uint32_t loads) {
   ITC_NATIVE_RUNNING("sub_820D8AA8 WheelsLoads::Reset");
+  const schema::WheelsLoads l(base, loads);
   uint64_t nodes = 4;  // the XPRs'
-  for (uint32_t offset : kWheelsModels) {
-    nodes += models::ModelReleaseNodes(base, loads + offset);
+  for (uint32_t model : WheelsModels(l)) {
+    nodes += models::ModelReleaseNodes(base, model);
   }
   for (uint32_t i = 0; i < 2; i++) {
-    const uint32_t vtable = guest::LoadU32(base, loads + kWheelsProviders + 20 * i);
+    const uint32_t vtable = guest::LoadU32(base, l.providers_address() + 20 * i);
     if (guest::LoadU32(base, vtable + 8) != kTextureProviderClearAll) {
       return std::nullopt;
     }
@@ -256,65 +262,69 @@ std::optional<uint32_t> WheelsLoadsReset(uint8_t* base, uint32_t loads) {
   }
   uint32_t r3 = 0;
   for (uint32_t i = 0; i < 2; i++) {
-    car_models::LoadSlotReset(base, loads + 24 * i);
-    ReleaseModel(base, loads + kWheelsTires + models::kPartModelBytes * i);
-    car_models::LoadSlotReset(base, loads + 976 + 24 * i);
-    ReleaseModel(base, loads + kWheelsRims + models::kPartModelBytes * i);
-    car_models::LoadSlotReset(base, loads + 1952 + 24 * i);
-    Require(models::XprRelease(base, loads + kWheelsXprs + 24 * i).has_value(), "XPR::Release");
-    scenery_lists::TextureProviderClearAll(base, loads + kWheelsProviders + 20 * i);
-    car_models::LoadSlotReset(base, loads + 2088 + 24 * i);
-    r3 = loads + kWheelsCalipers + models::kPartModelBytes * i;
+    car_models::LoadSlotReset(base, l.tire_slots_address() + 24 * i);
+    ReleaseModel(base, l.tires_address() + models::kPartModelBytes * i);
+    car_models::LoadSlotReset(base, l.rim_slots_address() + 24 * i);
+    ReleaseModel(base, l.rims_address() + models::kPartModelBytes * i);
+    car_models::LoadSlotReset(base, l.xpr_slots_address() + 24 * i);
+    Require(models::XprRelease(base, l.xprs_address() + 24 * i).has_value(), "XPR::Release");
+    scenery_lists::TextureProviderClearAll(base, l.providers_address() + 20 * i);
+    car_models::LoadSlotReset(base, l.caliper_slots_address() + 24 * i);
+    r3 = l.calipers_address() + models::kPartModelBytes * i;
     ReleaseModel(base, r3);
   }
   return r3;
 }
 
 bool WheelsLoadsMembersDestructible(uint8_t* base, uint32_t loads) {
-  for (uint32_t offset : kWheelsModels) {
-    if (!models::ModelMembersDestructible(base, loads + offset)) {
+  const schema::WheelsLoads l(base, loads);
+  for (uint32_t model : WheelsModels(l)) {
+    if (!models::ModelMembersDestructible(base, model)) {
       return false;
     }
   }
-  return ProviderDestructible(base, loads + kWheelsProviders) &&
-         ProviderDestructible(base, loads + kWheelsProviders + 20);
+  return ProviderDestructible(base, l.providers_address()) &&
+         ProviderDestructible(base, l.providers_address() + 20);
 }
 
 std::optional<uint32_t> WheelsLoadsDestruct(uint8_t* base, uint32_t loads) {
   ITC_NATIVE_RUNNING("sub_820D9010 WheelsLoads::~WheelsLoads");
+  const schema::WheelsLoads l(base, loads);
   uint64_t nodes = 4;
-  for (uint32_t offset : kWheelsModels) {
-    if (!models::ModelMembersDestructible(base, loads + offset)) {
+  for (uint32_t model : WheelsModels(l)) {
+    if (!models::ModelMembersDestructible(base, model)) {
       return std::nullopt;
     }
-    nodes += models::ModelReleaseNodes(base, loads + offset);
+    nodes += models::ModelReleaseNodes(base, model);
   }
-  if (!Room(base, nodes) || !ProviderDestructible(base, loads + kWheelsProviders) ||
-      !ProviderDestructible(base, loads + kWheelsProviders + 20)) {
+  if (!Room(base, nodes) || !ProviderDestructible(base, l.providers_address()) ||
+      !ProviderDestructible(base, l.providers_address() + 20)) {
     return std::nullopt;
   }
-  auto destroy = [&](uint32_t offset) {
-    const auto r3 = models::PartModelDestruct(base, loads + offset);
+  auto destroy = [&](uint32_t model) {
+    const auto r3 = models::PartModelDestruct(base, model);
     Require(r3.has_value(), "PartModel::~PartModel");
     return *r3;
   };
-  destroy(kWheelsCalipers + 464);
-  destroy(kWheelsCalipers);
+  destroy(l.calipers_address() + 464);
+  destroy(l.calipers_address());
   for (uint32_t i = 2; i-- > 0;) {
-    Require(models::TextureProviderDestruct(base, loads + kWheelsProviders + 20 * i).has_value(),
+    Require(models::TextureProviderDestruct(base, l.providers_address() + 20 * i).has_value(),
             "TextureProvider::~TextureProvider");
   }
   for (uint32_t i = 2; i-- > 0;) {
-    Require(models::XprDestruct(base, loads + kWheelsXprs + 24 * i).has_value(), "XPR::~XPR");
+    Require(models::XprDestruct(base, l.xprs_address() + 24 * i).has_value(), "XPR::~XPR");
   }
-  destroy(kWheelsRims + 464);
-  destroy(kWheelsRims);
-  destroy(kWheelsTires + 464);
-  return destroy(kWheelsTires);
+  destroy(l.rims_address() + 464);
+  destroy(l.rims_address());
+  destroy(l.tires_address() + 464);
+  return destroy(l.tires_address());
 }
 
 bool CarModelLoadsResettable(uint8_t* base, uint32_t loads) {
-  const uint32_t values = guest::LoadU32(base, loads + kCarModelLoadsSkeleton + 176);
+  // The skeleton's node values (Skeleton's +176).
+  const uint32_t values =
+      guest::LoadU32(base, schema::CarModelLoads(base, loads).skeleton_address() + 176);
   if (values != 0 && !memory::IsHeapBlock(values)) {
     return false;
   }
@@ -326,27 +336,32 @@ std::optional<uint32_t> CarModelLoadsReset(uint8_t* base, uint32_t loads) {
   if (!CarModelLoadsResettable(base, loads)) {
     return std::nullopt;
   }
-  car_models::LoadSlotReset(base, loads);
-  Require(model_animation::SkeletonFreeNodeValues(base, loads + kCarModelLoadsSkeleton),
+  const schema::CarModelLoads l(base, loads);
+  car_models::LoadSlotReset(base, l.node_file_slot_address());
+  Require(model_animation::SkeletonFreeNodeValues(base, l.skeleton_address()),
           "Skeleton::FreeNodeValues");
   for (uint32_t i = 0; i < 2; i++) {
-    car_models::LoadSlotReset(base, loads + 224 + 24 * i);
-    Require(models::XprRelease(base, loads + kCarModelLoadsXprs[i]).has_value(), "XPR::Release");
-    scenery_lists::TextureProviderClearAll(base, loads + kCarModelLoadsProviders[i]);
+    car_models::LoadSlotReset(base, l.xpr_slots_address() + 24 * i);
+    Require(models::XprRelease(base, l.xprs_address() + 24 * i).has_value(), "XPR::Release");
+    scenery_lists::TextureProviderClearAll(base, l.providers_address() + 20 * i);
   }
-  guest::StoreU32(base, loads + 360, 0);
+  l.set_decals_state(0);
+  // Each layer's and sticker's two 24-byte LoadSlots, 48 bytes a record.
   for (uint32_t i = 0; i < 3; i++) {
-    car_models::LoadSlotReset(base, loads + 364 + 48 * i);
-    car_models::LoadSlotReset(base, loads + 388 + 48 * i);
+    car_models::LoadSlotReset(base, l.layer_slots_address() + 48 * i);
+    car_models::LoadSlotReset(base, l.layer_slots_address() + 24 + 48 * i);
   }
   for (uint32_t i = 0; i < 6; i++) {
-    car_models::LoadSlotReset(base, loads + 652 + 48 * i);
-    car_models::LoadSlotReset(base, loads + 676 + 48 * i);
+    car_models::LoadSlotReset(base, l.sticker_slots_address() + 48 * i);
+    car_models::LoadSlotReset(base, l.sticker_slots_address() + 24 + 48 * i);
   }
-  for (uint32_t offset : {2956u, 2960u, 2972u, 2976u, 2980u, 2984u}) {
-    guest::StoreU32(base, loads + offset, 0);
-  }
-  return loads + 676 + 48 * 5;
+  l.set_vinyl_sheet(0);
+  l.set_vinyl_sheet_data(0);
+  l.set_plate_first(0);
+  l.set_plate_first_data(0);
+  l.set_plate_second(0);
+  l.set_plate_second_data(0);
+  return l.sticker_slots_address() + 24 + 48 * 5;
 }
 
 }  // namespace scene_loaders

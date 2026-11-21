@@ -18,6 +18,8 @@
 #include "hooks/models.h"
 #include "hooks/scene_models.h"
 #include "scene/scene.h"
+#include "schema/car_draw.h"
+#include "schema/scene.h"
 
 #include <optional>
 #include "lifted/sdk.h"
@@ -104,7 +106,7 @@ ITC_REGS_STEP(SceneStartTeardownA) {
 ITC_REGS_STEP(SceneStartTeardown) {
   // ReleaseAll runs only when the scene exists.
   const uint32_t set = guest::LoadU32(base, accessories::kSet);
-  if (guest::LoadU32(base, scene::kScene) != 0 &&
+  if (schema::SceneGlobals::scene(base).address != 0 &&
       (set == 0 || !ITC_FLAG(native_accessories) || !AccessoriesNativeLoads() ||
        !ModelsNativeLifetime() || !accessories::SetReleasable(base, set))) {
     lifted::original::c820C4D88(ctx, base);

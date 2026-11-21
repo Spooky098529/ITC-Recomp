@@ -6,6 +6,7 @@
 #include "texture_compression/dxt_color.h"
 
 #include "base/log.h"
+#include "schema/texture_compression.h"
 #include "texture_compression/steps.h"
 
 #include "base/float_mode.h"
@@ -19,33 +20,34 @@
 namespace texture_compression {
 
 using namespace steps;
+using G = schema::TextureCompressionGlobals;
 
 namespace {
 
 // The game's constants (lfs from .rdata).
-constexpr uint32_t kOne = 0x82000A30;   // 1.0
-constexpr uint32_t kZero = 0x82000A34;  // 0.0
-constexpr uint32_t kHalf = 0x82001BE4;  // probably 0.5
+constexpr uint32_t kOne = G::one_address();  // 1.0
+constexpr uint32_t kZero = G::zero_address();  // 0.0
+constexpr uint32_t kHalf = G::half_address();  // probably 0.5
 // PackR5G6B5's scales (probably 31 for red and blue, 63 for green).
-constexpr uint32_t kScale5 = 0x8203B7A0;
-constexpr uint32_t kScale6 = 0x8203B7A4;
+constexpr uint32_t kScale5 = G::scale_5_address();
+constexpr uint32_t kScale6 = G::scale_6_address();
 // FitEndpoints': the low end's start (the color weights the encoder scales
 // the pixels by, in .data: 0.2970, 1.0, 0.1008 in play, so the top of each
 // scaled channel), the smallest squared extent (FLT_MIN in play), the
 // smallest squared length (f15, 2^-12), the squared corrections to stop at
 // (f16, 2^-16), the corrections' factor (f17, -1.0) and the weights' factor
 // (f19, 0.125).
-constexpr uint32_t kLowStart = 0x82649B10;
-constexpr uint32_t kExtentMin = 0x82018FE0;
-constexpr uint32_t kLengthMin = 0x8203EAAC;
-constexpr uint32_t kStopMin = 0x8203EAA8;
-constexpr uint32_t kCorrection = 0x82001BE0;
-constexpr uint32_t kWeightScale = 0x82002A88;
+constexpr uint32_t kLowStart = G::color_weights_address();
+constexpr uint32_t kExtentMin = G::extent_min_address();
+constexpr uint32_t kLengthMin = G::color_length_min_address();
+constexpr uint32_t kStopMin = G::color_stop_min_address();
+constexpr uint32_t kCorrection = G::minus_one_address();
+constexpr uint32_t kWeightScale = G::eighth_address();
 // The weights of the low and high ends for each step.
-constexpr uint32_t kLowWeights3 = 0x8203EADC;
-constexpr uint32_t kHighWeights3 = 0x8203EAD0;
-constexpr uint32_t kLowWeights4 = 0x8203EAC0;
-constexpr uint32_t kHighWeights4 = 0x8203EAB0;
+constexpr uint32_t kLowWeights3 = G::color_low_weights_3_address();
+constexpr uint32_t kHighWeights3 = G::color_high_weights_3_address();
+constexpr uint32_t kLowWeights4 = G::color_low_weights_4_address();
+constexpr uint32_t kHighWeights4 = G::color_high_weights_4_address();
 
 // The clamp to 0-1 PackR5G6B5 does (blt, then bgt: a NaN kept).
 double Clamp(double v, double zero, double one) {
@@ -332,18 +334,18 @@ using Fpscr = ::base::FloatMode;
 // 3 colors use kHalf), the error diffusion's weights (right, below left,
 // below, below right: probably 7/16, 3/16, 5/16, 1/16, as the alpha half's)
 // and the step to palette index tables (words).
-constexpr uint32_t kAlphaReference = 0x8263B7E8;
-constexpr uint32_t kInverseWeights = 0x82649B20;
-constexpr uint32_t kStep5 = 0x8203B7A8;
-constexpr uint32_t kStep6 = 0x8203B7AC;
-constexpr uint32_t kThird = 0x82002A38;
-constexpr uint32_t kTwoThirds = 0x82038450;
-constexpr uint32_t kWeightRight = 0x8203EB04;
-constexpr uint32_t kWeightBelowLeft = 0x8203B78C;
-constexpr uint32_t kWeightBelow = 0x8203B790;
-constexpr uint32_t kWeightBelowRight = 0x820093A0;
-constexpr uint32_t kIndices3 = 0x8203EAF8;
-constexpr uint32_t kIndices4 = 0x8203EAE8;
+constexpr uint32_t kAlphaReference = G::alpha_reference_address();
+constexpr uint32_t kInverseWeights = G::inverse_color_weights_address();
+constexpr uint32_t kStep5 = G::step_5_address();
+constexpr uint32_t kStep6 = G::step_6_address();
+constexpr uint32_t kThird = G::third_address();
+constexpr uint32_t kTwoThirds = G::two_thirds_address();
+constexpr uint32_t kWeightRight = G::weight_right_address();
+constexpr uint32_t kWeightBelowLeft = G::weight_below_left_address();
+constexpr uint32_t kWeightBelow = G::weight_below_address();
+constexpr uint32_t kWeightBelowRight = G::weight_below_right_address();
+constexpr uint32_t kIndices3 = G::color_indices_3_address();
+constexpr uint32_t kIndices4 = G::color_indices_4_address();
 // Where the original keeps its palette in its frame (r1 + 176, 16 bytes an
 // entry), for a table word past the palette.
 constexpr uint32_t kPaletteInFrame = 176;

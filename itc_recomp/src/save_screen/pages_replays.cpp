@@ -23,10 +23,10 @@ uint64_t Page12(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
   if (f.CallInt(kMenuListAccepted, 0x821A3A28, List(base)) != 0) {
     f.Call(kMenuSoundPlay, 0x821A3A48, 0);
     const bool first = f.CallInt(kMenuListSelection, 0x821A3A50, List(base)) == 0;
-    const uint32_t data = Data(base);
-    switch (int32_t(Load(base, data + 12))) {
+    const auto data = Data(base);
+    switch (int32_t(data.message())) {
       case 12:
-        Store(base, data + 4, first ? 1 : 0);
+        data.set_answer(first ? 1 : 0);
         Go(base, 16, 2, kNone);
         break;
       case 6:
@@ -56,9 +56,9 @@ uint64_t Page12(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
         if (first) {
           Go(base, 14, 2, 4);
           Message(base, 7, 2);
-          f.Call(kReplaysLoad, 0x821A3BD8, Load(base, Data(base) + 40));
+          f.Call(kReplaysLoad, 0x821A3BD8, Data(base).replay_index());
         } else {
-          Store(base, data + 4, 3);
+          data.set_answer(3);
           Go(base, 16, 2, kNone);
         }
         break;
@@ -77,8 +77,8 @@ uint64_t Page12(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
 uint64_t Page13(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821A3C60 SaveScreen::Page13");
   Fn f(base, sp, 96, calls, mode);
-  Store(base, Data(base) + 24, Load(base, Data(base) + 24) + 1);
-  if (int32_t(Load(base, Data(base) + 24)) >= 45 && int32_t(Load(base, Data(base) + 12)) == 2) {
+  Data(base).set_wait(Data(base).wait() + 1);
+  if (int32_t(Data(base).wait()) >= 45 && int32_t(Data(base).message()) == 2) {
     ToDevicePage(f, 0x821A3DD4);
     return f.r3;
   }
@@ -86,7 +86,7 @@ uint64_t Page13(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
     return f.r3;
   }
   f.Call(kMenuSoundPlay, 0x821A3CBC, 0);
-  switch (int32_t(Load(base, Data(base) + 12))) {
+  switch (int32_t(Data(base).message())) {
     case 2:
       ToDevicePage(f, 0x821A3DD4);
       break;
@@ -113,12 +113,12 @@ uint64_t Page14(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821A67E8 SaveScreen::Page14");
   Fn f(base, sp, 96, calls, mode);
   const int32_t state = f.CallInt(kSlotState, 0x821A6800, 0);
-  const int32_t message = int32_t(Load(base, Data(base) + 12));
+  const int32_t message = int32_t(Data(base).message());
   if (message != 0 && message != 7) {
     return f.r3;
   }
-  Store(base, Data(base) + 24, Load(base, Data(base) + 24) + 1);
-  if (int32_t(Load(base, Data(base) + 24)) < 90) {
+  Data(base).set_wait(Data(base).wait() + 1);
+  if (int32_t(Data(base).wait()) < 90) {
     return f.r3;
   }
   if (state == 1) {
@@ -136,12 +136,12 @@ uint64_t Page14(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
       Message(base, 9, 1);
       f.Call(kRequest980, 0x821A6AD8, 0);
     } else if (built == 7) {
-      if (int32_t(Load(base, Load(base, kSaveBuffers) + 20)) == 0) {
+      if (int32_t(Load(base, G::save_buffers(base) + 20)) == 0) {
         Go(base, 13, 2, 4);
         Message(base, 4, 1);
       } else {
-        const uint32_t data = Data(base);
-        Store(base, data + 4, int32_t(Load(base, data + 8)) != 0 ? 1 : 2);
+        const auto data = Data(base);
+        data.set_answer(int32_t(data.kind2_flag()) != 0 ? 1 : 2);
         Go(base, 16, 2, kNone);
       }
     }
@@ -150,7 +150,7 @@ uint64_t Page14(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
   // The message 7: a replay's load.
   if (state == 2) {
     if (f.CallInt(kWord992, 0x821A6858, 0) == 4) {
-      const int32_t word = f.CallInt(kReplayWord84, 0x821A686C, Load(base, Data(base) + 40));
+      const int32_t word = f.CallInt(kReplayWord84, 0x821A686C, Data(base).replay_index());
       Go(base, 13, 2, 4);
       Message(base, word == 0 ? 9 : 11, 1);
     }
@@ -159,11 +159,11 @@ uint64_t Page14(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
     if (uint32_t(f.Call(kSlotPending, 0x821A68A4, 0)) != 0) {
       return f.r3;
     }
-    f.Call(kReplayCopyFrom, 0x821A68C4, Load(base, kKeptReplay),
-           Load(base, Load(base, kSaveBuffers) + 4));
+    f.Call(kReplayCopyFrom, 0x821A68C4, G::kept_replay(base),
+           Load(base, G::save_buffers(base) + 4));
     Go(base, 13, 2, 4);
     Message(base, 8, 1);
-    Store(base, Data(base) + 4, 1);
+    Data(base).set_answer(1);
   }
   return f.r3;
 }
@@ -175,7 +175,7 @@ uint64_t Page15(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
     return f.r3;
   }
   if (uint32_t(f.Call(kSlotDevice, 0x821A3E0C, 0)) != 0) {
-    Store(base, Data(base) + 24, 0);
+    Data(base).set_wait(0);
     Go(base, 14, 2, 4);
     Message(base, 0, 2);
   } else {
@@ -213,7 +213,7 @@ uint64_t Page24(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
     player = 3;
   }
   if (player >= 0) {
-    Store(base, Data(base) + 52, uint32_t(player));
+    Data(base).set_controller_pick(uint32_t(player));
     Go(base, 25, 2, kNone);
   }
   return f.r3;

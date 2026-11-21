@@ -6,6 +6,7 @@
 #include "threads/threads.h"
 
 #include "guest.h"
+#include "schema/video_output.h"
 
 #include "base/log.h"
 
@@ -18,6 +19,8 @@
 namespace graphics::video_output {
 
 namespace {
+
+using Globals = schema::VideoOutputGlobals;
 
 // One device lock a video output (the game makes one; the harness its own
 // on a scratch one), found by the video output's address. Entries are never
@@ -111,20 +114,27 @@ void ReleaseThreadOwnership(uint8_t* base, uint32_t device) {
 
 uint32_t Construct(uint8_t* base, uint32_t video_output) {
   ITC_NATIVE_RUNNING("sub_8258DB18 VideoOutput::VideoOutput");
-  guest::StoreU32(base, video_output + 0, kVtable);
+  const schema::VideoOutput vo(base, video_output);
+  vo.set_vtable(kVtable);
   // In place of Semaphore::Init on +224 (whose 40 bytes are left as they are).
   Register(video_output, true);
-  for (uint32_t offset : {140u, 144u, 148u, 268u, 272u, 276u, 280u, 284u, 288u}) {
-    guest::StoreU32(base, video_output + offset, 0);
-  }
-  guest::StoreU8(base, video_output + 264, 0);
-  guest::StoreU8(base, video_output + 265, 0);
-  guest::StoreU8(base, video_output + 266, 0);
-  guest::StoreU8(base, video_output + 267, 255);
-  guest::StoreU32(base, video_output + 296, 0);
-  guest::StoreU32(base, video_output + 300, 0);
-  guest::StoreU32(base, kVblankCount, 0);
-  guest::StoreU8(base, video_output + 292, 0);
+  vo.set_device(0u);
+  vo.set_unknown_144(0);
+  vo.set_unknown_148(0);
+  vo.set_front_buffer_index(0);
+  vo.set_front_buffer_0(0);
+  vo.set_front_buffer_1(0);
+  vo.set_unknown_280(0);
+  vo.set_unknown_284(0);
+  vo.set_unknown_288(0);
+  vo.set_unknown_264(0);
+  vo.set_unknown_265(0);
+  vo.set_unknown_266(0);
+  vo.set_unknown_267(255);
+  vo.set_display_width(0);
+  vo.set_display_height(0);
+  Globals::set_vblank_count(base, 0);
+  vo.set_unknown_292(0);
   return video_output;
 }
 
@@ -133,14 +143,16 @@ uint32_t LockDevice(uint8_t* base, uint32_t video_output) {
   Lock& lock = LockOf(video_output);
   lock.semaphore.acquire();
   lock.held.fetch_add(1, std::memory_order_relaxed);
-  AcquireThreadOwnership(base, guest::LoadU32(base, video_output + kDevice));
-  return guest::LoadU32(base, video_output + kDevice);
+  const schema::VideoOutput vo(base, video_output);
+  AcquireThreadOwnership(base, vo.device<schema::View>().address);
+  return vo.device<schema::View>().address;
 }
 
 void UnlockDevice(uint8_t* base, uint32_t video_output, uint32_t local) {
   ITC_NATIVE_RUNNING("sub_8258D908 VideoOutput::UnlockDevice");
-  ReleaseThreadOwnership(base, guest::LoadU32(base, local));
-  guest::StoreU32(base, local, 0);
+  const schema::VideoOutputDeviceHolder holder(base, local);
+  ReleaseThreadOwnership(base, holder.device<schema::View>().address);
+  holder.set_device(0u);
   Lock& lock = LockOf(video_output);
   if (lock.held.fetch_sub(1, std::memory_order_relaxed) <= 0) {
     // The game's semaphore would count up to 2; a binary semaphore can't.
@@ -161,12 +173,13 @@ uint32_t ResolveFrontBuffer(uint8_t* base, uint32_t video_output, uint32_t sp,
   ITC_NATIVE_RUNNING("sub_8258D998 VideoOutput::ResolveFrontBuffer");
   const uint32_t frame = sp - 112;
   guest::StoreU32(base, frame, sp);
-  const uint32_t front = guest::LoadU32(base, video_output + 268);
-  const uint32_t device = guest::LoadU32(base, video_output + kDevice);
+  const schema::VideoOutput vo(base, video_output);
+  const uint32_t front = vo.front_buffer_index();
+  const uint32_t device = vo.device<schema::View>().address;
   guest::StoreU32(base, frame + 100, 0);
   guest::StoreU32(base, frame + 92, 0);
-  const double z = double(guest::LoadFloat(base, 0x82000A34));
-  const uint32_t texture = guest::LoadU32(base, video_output + 4 * (68 + front));
+  const double z = double(Globals::resolve_z(base));
+  const uint32_t texture = guest::LoadU32(base, vo.front_buffer_0_address() + 4 * front);
   return uint32_t(call(0x822AFA58, frame, 0x8258D9E8, {device, 0, 0, texture, 0, 0, 0, 0}, z));
 }
 

@@ -14,83 +14,12 @@
 
 namespace texture_compression {
 
-// The codecs' fields (ImageCodec::ImageCodec sub_823EA800, DxtCodec::DxtCodec
-// sub_823F5FA0).
-namespace codec {
-constexpr uint32_t kVtable = 0;
-constexpr uint32_t kFormat = 4;      // the description's, without bit 8
-constexpr uint32_t kKind = 8;        // channels: 1 unsigned, 2 mixed signed, 3 signed, 4 float
-constexpr uint32_t kHasBits = 12;    // bits per pixel isn't 0 (not a block format)
-constexpr uint32_t kSrgb = 16;       // sRGB (in for a decode, out for an encode)
-constexpr uint32_t kSrgbBoth = 20;   // both sides sRGB (ImageCodec::Prepare)
-constexpr uint32_t kColorKey = 24;   // the color key (0: none)
-constexpr uint32_t kPaletteSet = 28;  // 0 (ImageCodec::Create's LoadPalette test)
-constexpr uint32_t kData = 32;
-constexpr uint32_t kColorKeyFloats = 36;  // red, green, blue, alpha
-constexpr uint32_t kRounding = 52;   // the rounding (or dither) table
-constexpr uint32_t kPalette = 56;    // operator new (ImageCodec::LoadPalette)
-constexpr uint32_t kBoxLeft = 60;    // the box: left, top, right, bottom, front, back
-constexpr uint32_t kBoxTop = 64;
-constexpr uint32_t kBoxRight = 68;
-constexpr uint32_t kBoxBottom = 72;
-constexpr uint32_t kBoxFront = 76;
-constexpr uint32_t kBoxBack = 80;
-constexpr uint32_t kConvertFrom = 84;  // the other side's channel kind (ConvertRange)
-constexpr uint32_t kRow = 88;          // operator new (ImageCodec::Prepare)
-constexpr uint32_t kErrorRow = 92;     // operator new (error diffusion)
-constexpr uint32_t kRowPitch = 96;
-constexpr uint32_t kSlicePitch = 100;
-constexpr uint32_t kWidth = 104;       // the box's width
-constexpr uint32_t kHeight = 108;
-constexpr uint32_t kDepth = 112;
-constexpr uint32_t kRowBytes = 116;    // width x bytes per pixel
-constexpr uint32_t kBytesPerPixel = 120;
-constexpr uint32_t kYuvBuffer = 128;   // YuvCodec's two pixels (operator new)
-// The DXT codec's.
-constexpr uint32_t kBlockBytes = 136;
-constexpr uint32_t kDecodeBlock = 140;  // a function: r3 = 16 float4s, r4 = the block
-constexpr uint32_t kEncodeBlock = 144;  // a function: r3 = the block, r4 = 16 float4s, r5 = dither
-constexpr uint32_t kExtentX0 = 148;     // the surface: 0, 0, width, height, 0, depth
-constexpr uint32_t kExtentY0 = 152;
-constexpr uint32_t kExtentX1 = 156;
-constexpr uint32_t kExtentY1 = 160;
-constexpr uint32_t kBlockExtent = 172;  // the extent rounded out to blocks (6 words)
-constexpr uint32_t kBlockLeft = 196;    // the box rounded out to blocks (pixels)
-constexpr uint32_t kBlockTop = 200;
-constexpr uint32_t kBlockRight = 204;
-constexpr uint32_t kBlockBottom = 208;
-constexpr uint32_t kFront = 212;
-constexpr uint32_t kBack = 216;
-constexpr uint32_t kBlockColumns = 220;
-constexpr uint32_t kBlockRows = 224;
-constexpr uint32_t kSlices = 228;
-constexpr uint32_t kDxt232 = 232;         // -1 from DxtCodec::DxtCodec
-constexpr uint32_t kDxt236 = 236;         // -1 from DxtCodec::DxtCodec
-constexpr uint32_t kDxtUnknown240 = 240;  // operator delete'd by ~DxtCodec; nothing seen sets it
-constexpr uint32_t kCacheCount = 244;     // block rows held
-constexpr uint32_t kCache = 248;          // 8 bytes a block row: the rows-in mask, the 16 x 16 float4s
-constexpr uint32_t kDither = 252;
-}  // namespace codec
+// The codecs' fields (ImageCodec, DxtCodec, their vtables and the DXT
+// codec's block cache entries) and the image description the codecs are made
+// from (ImageDescription, 84 bytes on XGCompressSurface's stack; Blitter::Init
+// sets its +64 to +72 from the filter) are in itc_recomp/schema/
+// texture-compression.toml (schema/texture_compression.h).
 
-// The image description the codecs are made from (84 bytes, on
-// XGCompressSurface's stack; Blitter::Init sets +64 to +72 from the filter).
-namespace description {
-constexpr uint32_t kData = 0;
-constexpr uint32_t kFormat = 4;
-constexpr uint32_t kRowPitch = 8;
-constexpr uint32_t kSlicePitch = 12;
-constexpr uint32_t kExtent = 16;     // 0, 0, width, height, 0, depth
-constexpr uint32_t kBox = 40;        // left, top, right, bottom, front, back
-constexpr uint32_t kDither = 64;
-constexpr uint32_t kDiffusion = 68;
-constexpr uint32_t kSrgb = 72;
-constexpr uint32_t kColorKey = 76;
-constexpr uint32_t kPalette = 80;    // never read by Create's paths
-constexpr uint32_t kBytes = 84;
-}  // namespace description
-
-constexpr uint32_t kImageCodecVtable = 0x8203B778;
-constexpr uint32_t kDxtCodecVtable = 0x8203B9E8;
 // The functions the codecs reach that the plain C++ knows.
 constexpr uint32_t kDxt45EncodeBlock = 0x82422A68;
 constexpr uint32_t kApplyColorKey = 0x823EADB0;

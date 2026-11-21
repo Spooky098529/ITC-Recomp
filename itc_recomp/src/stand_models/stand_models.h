@@ -37,8 +37,8 @@ namespace stand_models {
 using GuestCall = std::function<uint64_t(uint32_t function, std::initializer_list<uint64_t> args,
                                          uint32_t frame, uint32_t lr)>;
 
-constexpr uint32_t kScene = 0x826C2E44;   // [it] the second set (the car scene)
-constexpr uint32_t kHolder = 0x826D83E0;  // [it] the stand's holder
+// The car scene [0x826C2E44] and the stand's holder [0x826D83E0]:
+// schema::StandModelsGlobals (src/schema/stand_models.h).
 
 // The stage's scene model: ScenePools::GetB(scene, 7, the stage's +8).
 uint32_t StageModel(uint8_t* base, uint32_t holder);
@@ -51,7 +51,7 @@ uint32_t StageModel(uint8_t* base, uint32_t holder);
 // (SceneModelRecord::SceneModelRecord, Reset), its +16 = `block`; the
 // stage's +8 = ScenePools::ClaimB(scene, 7); ScenePools::SetUpB(scene, 7,
 // it, the record) through `call`; the model's +4296 and the stage's +6056 =
-// `word`, the stage's +16 = 1, [kHolder]'s +20 = 1. Returns r3 as the
+// `word`, the stage's +16 = 1, [0x826D83E0]'s +20 = 1. Returns r3 as the
 // original leaves it (`r3`, or SetUpB's).
 uint64_t MakeModel(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t block,
                    uint32_t word, uint32_t stack);
@@ -220,7 +220,7 @@ uint64_t SetTireGrade(uint8_t* base, const GuestCall& call, uint32_t holder, uin
                       uint32_t grade, uint32_t stack);
 // sub_821CCA38 TuningScreen::SetTireGrade: the table {0, 1, 1, 2, 2} at frame
 // + 80 (its 112-byte frame below `stack`); for `which` 0 to 2,
-// GarageStage::SetTireGrade([[kHolder]], which, the table's word `index`,
+// GarageStage::SetTireGrade([[0x826D83E0]], which, the table's word `index`,
 // read unchecked) (its r3); else `r3` (r3 at entry) left.
 uint64_t TuningScreenSetTireGrade(uint8_t* base, const GuestCall& call, uint64_t r3,
                                   uint32_t which, uint32_t index, uint32_t stack);
@@ -258,7 +258,7 @@ uint64_t SetColorPiece(uint8_t* base, const GuestCall& call, load_poll::Calls* p
 uint64_t SetColor(uint8_t* base, const GuestCall& call, load_poll::Calls* poll, uint64_t r3,
                   uint32_t which, double f1, double f2, double f3, uint32_t stack);
 
-// sub_821CC890 TuningScreen::StepSecondWheels: with the holder [[kHolder]]
+// sub_821CC890 TuningScreen::StepSecondWheels: with the holder [[0x826D83E0]]
 // (loaded again for each call): not pending and the screen's +25244 1:
 // AddSecondWheels, +25244 = 2 (its r3); else (Pending asked again) not
 // pending and +25244 2: ApplyWheelPaint, +25244 = 0 (its r3); else r3 the
@@ -316,7 +316,7 @@ uint64_t SetWheel(uint8_t* base, const GuestCall& call, uint32_t holder, uint64_
 // object at frame + 80 (Car::Init, memcpy of the screen's selected garage
 // car's 1,884 bytes, as TuningScreen::SetUpCarData finds it, the flags +3888
 // |= 1, Car::Refresh; memcpy and Refresh through `call` where their plain
-// C++ declines), then SetWheel([[kHolder]], r4, r5, the car) (its r3; `*f1`
+// C++ declines), then SetWheel([[0x826D83E0]], r4, r5, the car) (its r3; `*f1`
 // its).
 uint64_t PreviewWheel(uint8_t* base, const GuestCall& call, uint32_t screen, uint64_t r4,
                       uint32_t which, uint32_t stack, std::optional<double>* f1);

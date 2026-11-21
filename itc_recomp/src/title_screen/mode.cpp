@@ -2,23 +2,19 @@
 // over its block (docs/functions/title-screen.md): see title_screen.h.
 
 #include "base/log.h"
+#include "schema/game_modes.h"
 #include "title_screen/internal.h"
 
 namespace title_screen {
 
 namespace {
 
-// The mode's fields: the delegate's holder (+4) and the delegate (+8: its
-// vtable, the mode, the function, the adjustment), the dispatcher (+36: the
-// handlers, the count +200), the message ring (+240: 50 entries of 12
-// bytes, the count +840, the start +844) and the block (+848).
-constexpr uint32_t kDispatcher = 36;
-constexpr uint32_t kRing = 240;
-constexpr uint32_t kBlock = 848;
-// The block's words: FindShown's index and the next mode's 8-byte answer.
-constexpr uint32_t kShown = 48200;
-constexpr uint32_t kNextAnswer = 48212;
-// The machines in the block.
+using Mode = schema::ModeType4;
+using Interface32 = schema::ModeType4Interface32;
+using Block = schema::Type4Block;
+
+// The machines in the block (MachineOf's and Init's offsets: Type4Block's
+// options, controller_options, save_screen, title_load and title_screen).
 constexpr uint32_t kOptionsAt = 0;
 constexpr uint32_t kControllerOptionsAt = 9640;
 constexpr uint32_t kSaveScreenAt = 19280;
@@ -40,52 +36,63 @@ constexpr uint32_t kStringsLoad = 0x8210A8D0;
 constexpr uint32_t kOptionsInit = 0x821CA458;
 constexpr uint32_t kControllerOptionsInit = 0x821C8A60;
 constexpr uint32_t kSaveScreenInit = 0x821A7470;
-constexpr uint32_t kStringTable = 0x826C5C34;
-constexpr uint32_t kOptionsSettings = 0x826D8478;
 
-// Posts the message (id, 0, 0) on the ring at `ring` (its count +600,
-// start +604, 50 slots of 12 bytes).
-void PostRing(uint8_t* base, uint32_t ring, uint32_t id) {
-  const uint32_t count = Load(base, ring + 600) + 1;
-  const uint32_t start = Load(base, ring + 604);
-  Store(base, ring + 600, count);
-  const uint32_t slot = ring + 12 * ((start + count - 1) % 50);
-  Store(base, slot + 0, id);
-  Store(base, slot + 4, 0);
-  Store(base, slot + 8, 0);
+// Posts the message (id, 0, 0) on the ring of `v` (the mode, or its +32
+// interface): its count, start, 50 slots of 12 bytes.
+template <typename V>
+void PostRing(uint8_t* base, const V& v, uint32_t id) {
+  const uint32_t count = v.ring_count() + 1;
+  const uint32_t start = v.ring_start();
+  v.set_ring_count(count);
+  const schema::ModeMessage slot(base, v.ring_address() + 12 * ((start + count - 1) % 50));
+  slot.set_id(id);
+  slot.set_arg0(0);
+  slot.set_arg1(0);
 }
 
 // The 8-byte word at `at`, as the originals copy it.
 uint64_t Load64(uint8_t* base, uint32_t at) {
   return (uint64_t(Load(base, at)) << 32) | Load(base, at + 4);
 }
-void Store64(uint8_t* base, uint32_t at, uint64_t value) {
-  Store(base, at, uint32_t(value >> 32));
-  Store(base, at + 4, uint32_t(value));
-}
 
-// The mode's delegate (+8, its holder +4) to `function`: the function and
-// adjustment from the frame's doubleword at `slot` (function, 0) written
-// first, as the originals build them there. The holder 0 when the
-// delegate's address wraps to 0 (never: kept as the originals test it).
-void SetDelegate(uint8_t* base, uint32_t mode, uint32_t slot, uint32_t function) {
-  Store(base, slot + 4, 0);
-  Store(base, slot, function);
-  const uint32_t delegate = mode + 8;
+// The mode's delegate (+8, its holder +4) from the frame's doubleword at
+// `slot` (function, adjustment). The holder 0 when the delegate's address
+// wraps to 0 (never: kept as the originals test it).
+void InstallDelegate(uint8_t* base, uint32_t mode, uint32_t slot) {
+  const Mode m(base, mode);
+  const uint32_t delegate = m.delegate_vtable_address();
   uint32_t holder = 0;
   if (delegate != 0) {
     holder = delegate;
-    Store(base, delegate + 4, mode);
-    Store64(base, delegate + 8, Load64(base, slot));
-    Store(base, delegate + 0, kDelegateVtable);
+    m.set_delegate_object(mode);
+    const uint64_t function = Load64(base, slot);
+    m.set_delegate_function(uint32_t(function >> 32));
+    m.set_delegate_adjustment(uint32_t(function));
+    m.set_delegate_vtable(kDelegateVtable);
   }
-  Store(base, mode + 4, holder);
+  m.set_delegate_ptr(holder);
+}
+
+// The mode's delegate to `function`: the function and adjustment from the
+// frame's doubleword at `slot` (function, 0) written first, as the
+// originals build them there.
+void SetDelegate(uint8_t* base, uint32_t mode, uint32_t slot, uint32_t function) {
+  Store(base, slot + 4, 0);
+  Store(base, slot, function);
+  InstallDelegate(base, mode, slot);
 }
 
 // The answer (r3) cleared: +4 and its first byte.
 void ClearAnswer(uint8_t* base, uint32_t answer) {
   Store(base, answer + 4, 0);
   guest::StoreU8(base, answer, 0);
+}
+
+// The state of the machine the block's `shown` names.
+int32_t ShownState(uint8_t* base, const Mode& m) {
+  const Block block = m.block();
+  const uint32_t machine = uint32_t(MachineOf(block.address, block.shown()));
+  return int32_t(Machine(base, machine).state());
 }
 
 }  // namespace
@@ -104,10 +111,9 @@ uint64_t MachineOf(uint64_t block, uint64_t index) {
 
 uint32_t AllLoaded(uint8_t* base, uint32_t block) {
   ITC_NATIVE_RUNNING("sub_82224BC0 ModeType4::AllLoaded");
-  if (Load(base, block + kTitleScreenAt + kMachineLoaded) == 0 ||
-      Load(base, block + kTitleLoadAt + kMachineLoaded) == 0 ||
-      Load(base, block + kOptionsAt + kMachineLoaded) == 0 ||
-      Load(base, block + kSaveScreenAt + kMachineLoaded) == 0) {
+  const Block b(base, block);
+  if (b.title_screen_loaded() == 0 || b.title_load_loaded() == 0 || b.options_loaded() == 0 ||
+      b.save_screen_loaded() == 0) {
     return 0;
   }
   return 1;
@@ -122,9 +128,9 @@ uint64_t FindShown(uint8_t* base, uint64_t block, uint32_t sp) {
     if (uint32_t(r3) == 0) {
       continue;
     }
-    const int32_t state = int32_t(Load(base, uint32_t(r3) + kMachineState));
+    const int32_t state = int32_t(Machine(base, uint32_t(r3)).state());
     if (state == 5 || state == 4) {
-      Store(base, uint32_t(block) + kShown, index);
+      Block(base, uint32_t(block)).set_shown(index);
     }
   }
   return r3;
@@ -133,93 +139,85 @@ uint64_t FindShown(uint8_t* base, uint64_t block, uint32_t sp) {
 uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82224C70 ModeType4::Init");
   const uint32_t frame = Frame(base, sp, 112);
-  auto block = [&] { return Load(base, mode + kBlock); };
+  const Mode m(base, mode);
+  auto block = [&] { return m.block(); };
   calls.Call(kScreenStart, frame, 0x82224C8C, mode);
-  calls.Call(kStringsLoad, frame, 0x82224C9C, Load(base, kStringTable), 3);
+  calls.Call(kStringsLoad, frame, 0x82224C9C, G::string_table(base), 3);
   const uint64_t allocated = calls.Call(kVirtualAlloc, frame, 0x82224CB4, 0, 48220, 4096, 4);
-  Store(base, mode + kBlock, uint32_t(allocated));
+  m.set_block(uint32_t(allocated));
   calls.Call(kOptionsInit, frame, 0x82224CBC, allocated);
-  calls.Call(kControllerOptionsInit, frame, 0x82224CC8, uint64_t(block()) + kControllerOptionsAt);
+  calls.Call(kControllerOptionsInit, frame, 0x82224CC8,
+             uint64_t(block().controller_options_address()));
   bool replaced = false;
-  LoadInit(base, block() + kTitleLoadAt, frame - kLoadInitFrame, &replaced);
-  ScreenInit(base, block() + kTitleScreenAt, frame - kScreenInitFrame, &replaced);
+  LoadInit(base, block().title_load_address(), frame - kLoadInitFrame, &replaced);
+  ScreenInit(base, block().title_screen_address(), frame - kScreenInitFrame, &replaced);
   const uint64_t r3 =
-      calls.Call(kSaveScreenInit, frame, 0x82224CF4, uint64_t(block()) + kSaveScreenAt);
-  const uint32_t dispatcher = mode + kDispatcher;
+      calls.Call(kSaveScreenInit, frame, 0x82224CF4, uint64_t(block().save_screen_address()));
   for (const uint32_t offset :
        {kOptionsAt, kControllerOptionsAt, kTitleLoadAt, kTitleScreenAt, kSaveScreenAt}) {
-    const uint32_t count = Load(base, dispatcher + 200);
-    Store(base, dispatcher + 200, count + 1);
-    Store(base, dispatcher + (count << 2), block() + offset);
+    const uint32_t count = m.handler_count();
+    m.set_handler_count(count + 1);
+    Store(base, m.handlers_address() + (count << 2), block().address + offset);
   }
-  // The machines' +9612 (open at once) and +9616 (delete the movie when
-  // unloaded): the controller options' the other way round.
+  // The machines' reenter (open at once) and delete_movie (delete the movie
+  // when unloaded): the controller options' the other way round.
   Store(base, frame + 84, 0);
   Store(base, frame + 80, kSlot8Thunk);
-  for (const uint32_t offset : {kTitleLoadAt, kTitleScreenAt, kOptionsAt}) {
-    Store(base, block() + offset + kMachineReenter, 1);
-    Store(base, block() + offset + kMachineDelete, 0);
-  }
-  Store(base, block() + kControllerOptionsAt + kMachineReenter, 0);
-  Store(base, block() + kControllerOptionsAt + kMachineDelete, 1);
-  Store(base, block() + kSaveScreenAt + kMachineReenter, 1);
-  Store(base, block() + kSaveScreenAt + kMachineDelete, 0);
+  block().set_title_load_reenter(1);
+  block().set_title_load_delete_movie(0);
+  block().set_title_screen_reenter(1);
+  block().set_title_screen_delete_movie(0);
+  block().set_options_reenter(1);
+  block().set_options_delete_movie(0);
+  block().set_controller_options_reenter(0);
+  block().set_controller_options_delete_movie(1);
+  block().set_save_screen_reenter(1);
+  block().set_save_screen_delete_movie(0);
   // The delegate: Restart through Mode::Slot8Thunk (its doubleword already
   // in the frame).
-  const uint32_t delegate = mode + 8;
-  uint32_t holder = 0;
-  if (delegate != 0) {
-    holder = delegate;
-    Store(base, delegate + 4, mode);
-    Store64(base, delegate + 8, Load64(base, frame + 80));
-    Store(base, delegate + 0, kDelegateVtable);
-  }
-  Store(base, mode + 4, holder);
+  InstallDelegate(base, mode, frame + 80);
   return r3;
 }
 
 void Restart(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82225098 ModeType4::Restart");
   const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t block = Load(base, mode + kBlock);
+  const Mode m(base, mode);
+  const uint32_t block = m.block().address;
   ClearAnswer(base, answer);
   if (AllLoaded(base, block) == 1) {
     SetDelegate(base, mode, frame + 80, kNextModeThunk);
-    const uint32_t entered = Load(base, kEntered);
+    const uint32_t entered = G::entered(base);
     if (entered < 2) {
-      PostRing(base, mode + kRing, 8);
+      PostRing(base, m, 8);
     } else if (entered == 2) {
-      PostRing(base, mode + kRing, 6);
+      PostRing(base, m, 6);
     }
   }
-  PostRing(base, mode + kRing, 1);
-  calls.Call(kDispatch, frame, 0x822251B8, mode + kDispatcher);
+  PostRing(base, m, 1);
+  calls.Call(kDispatch, frame, 0x822251B8, m.handlers_address());
 }
 
 void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82225390 ModeType4::NextMode");
   const uint32_t frame = Frame(base, sp, 144);
+  const Mode m(base, mode);
   ClearAnswer(base, answer);
-  FindShown(base, Load(base, mode + kBlock), frame);
-  auto shown_state = [&] {
-    const uint32_t block = Load(base, mode + kBlock);
-    const uint32_t machine = uint32_t(MachineOf(block, Load(base, block + kShown)));
-    return int32_t(Load(base, machine + kMachineState));
-  };
-  if (shown_state() == 8) {
+  FindShown(base, m.block().address, frame);
+  if (ShownState(base, m) == 8) {
     SetDelegate(base, mode, frame + 80, kSlot11Thunk);
   }
-  if (shown_state() == 10) {
-    PostRing(base, mode + kRing, 4);
+  if (ShownState(base, m) == 10) {
+    PostRing(base, m, 4);
   }
-  if (Load(base, kPadBlocked0) == 0 && Load(base, kPadBlocked1) == 0) {
-    PostRing(base, mode + kRing, 1);
+  if (G::pad_blocked0(base) == 0 && G::pad_blocked1(base) == 0) {
+    PostRing(base, m, 1);
   }
-  PostRing(base, mode + kRing, 0);
-  calls.Call(kDispatch, frame, 0x82225538, mode + kDispatcher);
-  const uint32_t block = Load(base, mode + kBlock);
+  PostRing(base, m, 0);
+  calls.Call(kDispatch, frame, 0x82225538, m.handlers_address());
+  const Block block = m.block();
   uint32_t type = 0;
-  switch (shown_state()) {
+  switch (ShownState(base, m)) {
     case 11: type = 1; break;
     case 13: type = 2; break;
     case 15: type = 12; break;
@@ -236,17 +234,19 @@ void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const 
   guest::StoreU8(base, frame + 80, 1);
   const uint64_t next = Load64(base, frame + 80);
   Store(base, frame + 84, 0);
-  Store64(base, block + kNextAnswer, next);
+  block.set_next_answer(uint32_t(next >> 32));
+  block.set_next_type(uint32_t(next));
   SetDelegate(base, mode, frame + 80, kSlot12Thunk);
 }
 
 void LeaveScreen(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822252C8 ModeType4::LeaveScreen");
   const uint32_t frame = Frame(base, sp, 128);
+  const Mode m(base, mode);
   ClearAnswer(base, answer);
-  FindShown(base, Load(base, mode + kBlock), frame);
-  PostRing(base, mode + kRing, 3);
-  calls.Call(kDispatch, frame, 0x82225344, mode + kDispatcher);
+  FindShown(base, m.block().address, frame);
+  PostRing(base, m, 3);
+  calls.Call(kDispatch, frame, 0x82225344, m.handlers_address());
   SetDelegate(base, mode, frame + 80, kSlot10Thunk);
 }
 
@@ -254,22 +254,23 @@ void WaitForLeave(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp,
                   const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822251D0 ModeType4::WaitForLeave");
   const uint32_t frame = Frame(base, sp, 112);
+  const Mode m(base, mode);
   ClearAnswer(base, answer);
-  FindShown(base, Load(base, mode + kBlock), frame);
-  const uint32_t block = Load(base, mode + kBlock);
-  const uint32_t machine = uint32_t(MachineOf(block, Load(base, block + kShown)));
-  if (int32_t(Load(base, machine + kMachineLoaded)) == 1) {
+  FindShown(base, m.block().address, frame);
+  const Block block = m.block();
+  const uint32_t machine = uint32_t(MachineOf(block.address, block.shown()));
+  if (int32_t(Machine(base, machine).loaded()) == 1) {
     SetDelegate(base, mode, frame + 80, kNextModeThunk);
   }
-  PostRing(base, mode + kRing, 1);
-  calls.Call(kDispatch, frame, 0x822252AC, mode + kDispatcher);
+  PostRing(base, m, 1);
+  calls.Call(kDispatch, frame, 0x822252AC, m.handlers_address());
 }
 
 void NextModeAnswer(uint8_t* base, uint32_t answer, uint32_t mode) {
   ITC_NATIVE_RUNNING("sub_82224B98 ModeType4::NextModeAnswer");
-  const uint32_t at = Load(base, mode + kBlock) + kNextAnswer;
-  const uint32_t first = Load(base, at);
-  const uint32_t second = Load(base, at + 4);
+  const Block block = Mode(base, mode).block();
+  const uint32_t first = block.next_answer();
+  const uint32_t second = block.next_type();
   Store(base, answer + 0, first);
   Store(base, answer + 4, second);
 }
@@ -277,16 +278,17 @@ void NextModeAnswer(uint8_t* base, uint32_t answer, uint32_t mode) {
 void Leaving(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82225698 ModeType4::Leaving");
   const uint32_t frame = Frame(base, sp, 128);
+  const Mode m(base, mode);
   ClearAnswer(base, answer);
-  PostRing(base, mode + kRing, 4);
-  calls.Call(kDispatch, frame, 0x8222570C, mode + kDispatcher);
-  const uint32_t block = Load(base, mode + kBlock);
+  PostRing(base, m, 4);
+  calls.Call(kDispatch, frame, 0x8222570C, m.handlers_address());
+  const uint32_t block = m.block().address;
   for (uint32_t index = 0; index < 47; index++) {
     const uint32_t machine = uint32_t(MachineOf(block, index));
     if (machine == 0) {
       continue;
     }
-    const int32_t state = int32_t(Load(base, machine + kMachineState));
+    const int32_t state = int32_t(Machine(base, machine).state());
     if (state != 6 && state != 11 && state != 14 && state != 12 && state != 20) {
       return;
     }
@@ -297,15 +299,17 @@ void Leaving(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const C
 uint32_t Interrupt(uint8_t* base, uint32_t object, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82224E20 ModeType4::Interrupt");
   Frame(base, sp, 96);
-  const uint32_t block = Load(base, object + 816);
+  const Interface32 o(base, object);
+  const uint32_t block = o.block().address;
   if (AllLoaded(base, block) == 0) {
     return 0;
   }
-  if (int32_t(Load(base, block + kSaveScreenAt + kMachineState)) != 5 &&
-      Load(base, Load(base, kOptionsSettings) + 712) != 0) {
+  // The options' settings +712 (Settings, options-screen's).
+  if (int32_t(Block(base, block).save_screen_state()) != 5 &&
+      Load(base, G::options_settings(base) + 712) != 0) {
     return 1;
   }
-  PostRing(base, object + 208, 17);
+  PostRing(base, o, 17);
   return 0;
 }
 
@@ -314,19 +318,23 @@ void ForceExit(uint8_t* base, uint32_t object, uint32_t number, uint32_t sp) {
   if (number >= 4) {
     return;
   }
-  PostRing(base, object + 208, 4);
+  const Interface32 o(base, object);
+  PostRing(base, o, 4);
   // The doubleword built below the stack pointer (sp - 32), as the original.
   const uint32_t slot = sp - 32;
   const uint32_t mode = object - 32;
   SetDelegate(base, mode, slot, kSlot12Thunk);
   Store(base, slot + 4, number < 2 ? 4 : 12);
   guest::StoreU8(base, slot, 1);
-  Store64(base, Load(base, object + 816) + kNextAnswer, Load64(base, slot));
+  const Block block = o.block();
+  const uint64_t next = Load64(base, slot);
+  block.set_next_answer(uint32_t(next >> 32));
+  block.set_next_type(uint32_t(next));
 }
 
 void Resume(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82225048 ModeType4::Resume");
-  PostRing(base, object + 208, 18);
+  PostRing(base, Interface32(base, object), 18);
 }
 
 }  // namespace title_screen

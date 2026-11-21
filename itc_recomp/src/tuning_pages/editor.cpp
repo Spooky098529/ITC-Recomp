@@ -36,7 +36,7 @@ uint32_t AllLoaded(uint8_t* base, uint32_t images) {
   ITC_NATIVE_RUNNING("sub_821FE5D8 DecalImages::AllLoaded");
   uint32_t loaded = 1;
   for (uint32_t i = 0; i < 200; i++) {
-    if (int32_t(Load(base, images + 36 * i + 8)) == 1) {
+    if (int32_t(DecalEntryAt(base, images, i).state()) == 1) {
       loaded = 0;
     }
   }
@@ -49,11 +49,12 @@ void KeepListTextures(uint8_t* base, uint32_t screen) {
     return;
   }
   const uint32_t images = screen + 10048;
+  // Entries 12 to 20 (the first list's window) into kept 6 to 14.
   for (uint32_t j = 0; j < 9; j++) {
-    const uint32_t entry = images + 432 + 36 * j;
-    const uint32_t kept = images + 7236 + 48 + 8 * j;
-    Store(base, kept, Load(base, entry + 28));
-    Store(base, kept + 4, Load(base, entry + 32));
+    const schema::DecalImageEntry entry = DecalEntryAt(base, images, 12 + j);
+    const schema::DecalImageKept kept = DecalKeptAt(base, images, 6 + j);
+    kept.set_texture_header(entry.texture_header());
+    kept.set_texture_data(entry.texture_data());
   }
 }
 

@@ -1,0 +1,178 @@
+# The schema of docs/functions/scenery-lists.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The course set's lists of models (six 528-byte ModelLists in the course
+# set, course-scenery.toml's CourseSet; the +3180 one with 96 bytes more, the
+# point list), the scenery models in them (448 bytes, vtable 0x82006764), and
+# what the model draws read (the render queue's slot 4, the recorded object
+# constants). src/scenery_lists/.
+
+# A list of models (528 bytes: the count, then a List64 from +4,
+# track-zones.md's layout) and, for the course set's +3180 list, the point
+# list (624 bytes: ModelList::LoadPoints' 20 point groups and the draw's
+# state after it). The measure splits the point list (PointList::Draw's
+# view) from the list.
+[ModelList]
+measures = ["ModelList", "PointList"]
+size = 624
+origin = "embedded"
+fields = [
+  { name = "count", offset = 0, type = "u32", note = "the models, from the container's little-endian first word" },
+  { name = "nodes", offset = 4, type = "bytes", count = 256, note = "the List64's 64 nodes (4 bytes each: +0 the next node, +2 the data slot; halfwords)" },
+  { name = "node0_next", offset = 4, type = "u16", note = "node 0's next (the nodes' stores, from ModelList::Init and Load)" },
+  { name = "node0_slot", offset = 6, type = "u16", note = "node 0's data slot" },
+  { name = "node63_next", offset = 256, type = "u16", note = "the List64's +252: node 63's next, -1 when made empty" },
+  { name = "free_head", offset = 260, type = "u16", note = "the List64's +256: the free list's head node" },
+  { name = "list_258", offset = 262, type = "u16", note = "the List64's +258: -1 when made empty (not read here)" },
+  { name = "head", offset = 264, type = "u16", note = "the List64's +260: the first node (-1 empty)" },
+  { name = "list_262", offset = 266, type = "u16", note = "the List64's +262: -1 when made empty (not read here; probably the tail)" },
+  { name = "list_count", offset = 268, type = "u16", note = "the List64's +264: its count (List64::Insert's position at the end)" },
+  { name = "slots", offset = 272, type = "bytes", count = 256, note = "the List64's +268: the 64 data slots, each a model (SceneryModel)" },
+  { name = "point_groups", offset = 528, type = "bytes", count = 80, note = "the point list's: 20 pointers to point groups (0x82617750 + 256 x i, ModelList::LoadPoints; each 64-byte groups of four 16-byte points)" },
+  { name = "point_group_0", offset = 528, type = "u32", note = "the point list's first group pointer (0x82617750)" },
+  { name = "point_group_1", offset = 532, type = "u32", note = "the second (0x82617850)" },
+  { name = "animations", offset = 608, type = "ptr", to = "AnimationSet", note = "the point list's: the course set's texture animations (+1060), set by Scenery::DrawSetLists; 0 from LoadPoints" },
+  { name = "texture_provider", offset = 612, type = "u32", note = "the point list's: the scenery manager's texture provider, set by Scenery::DrawSetLists; 0 from LoadPoints" },
+  { name = "first_group", offset = 616, type = "s32", note = "the point list's: the first group drawn with the first model (groups to 2; from the race's table at [0x826D82E8]); 0 from LoadPoints" },
+  { name = "point_group_count", offset = 620, type = "u32", note = "the point list's: 20 (LoadPoints)" },
+]
+
+# The container ModelList::Load reads its models from (a data file: the
+# course set's first file's entry; game_data's DataFile).
+[SceneryListContainer]
+measure = "ModelList::Load.r4"
+size = 4
+origin = "file"
+fields = [
+  { name = "count_le", offset = 0, type = "u32", note = "the entries' count, little-endian (byte-swapped by the original)" },
+  { name = "count_le_low", offset = 0, type = "u8", note = "its first byte, the count's low byte (the original's lbz in the swap)" },
+]
+
+# A scenery model (448 bytes, vtable 0x82006764, made by ModelList::Load:
+# a Model, models.toml, with the draw state from +432).
+[SceneryModel]
+measure = "SceneryModel"
+size = 448
+origin = "allocated"
+vtable = 0x82006764
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "SceneryModelVtable", note = "0x82006764" },
+  { name = "shader_pairs", offset = 24, type = "ptr", to = "ModelShaderPair", note = "the model's own shader pairs (16 bytes a pair, by the material's +96)" },
+  { name = "header", offset = 28, type = "u32", note = "the Model's header block: 0 (not loaded) draws nothing" },
+  { name = "shapes", offset = 40, type = "ptr", to = "ModelShape", note = "544 bytes a shape" },
+  { name = "texture_provider", offset = 48, type = "ptr", to = "TextureProvider", note = "the scenery manager's provider (+228), or the point list's +612" },
+  { name = "float4_values", offset = 320, type = "u32", note = "the Model's float4 table (16 bytes an entry): the textures' colors by the material's +208" },
+  { name = "sampler_state_24", offset = 432, type = "u32", note = "the samplers' state 24 and the shapes' state 28 value: 1 by ResetDrawState" },
+  { name = "animations", offset = 436, type = "ptr", to = "AnimationSet", note = "the texture animations (the course set's +1060) or 0 (ResetDrawState)" },
+  { name = "unknown_440", offset = 440, type = "u32", note = "0 by ResetDrawState; not read here" },
+]
+
+# The scenery models' vtable 0x82006764.
+[SceneryModelVtable]
+measure = "SceneryModel.+0"
+size = 8
+origin = "image"
+fields = [
+  { name = "destroy", offset = 0, type = "fn", note = "slot 0, the deleting destructor sub_820F1208 (r4 = 1 from ModelList::Release)" },
+  { name = "draw_hook", offset = 4, type = "fn", note = "slot 1, the per-draw hook (empty, sub_82106540)" },
+]
+
+# The render queue's vtable as the draws reach it through [0x8296B91C] (the
+# scene's +64; the measure files the queue as a scene, so its vtable as
+# "Scene.+0"). device-shaders.toml's RenderQueueVtable is the same table.
+[SceneryRenderQueueVtable]
+measure = "Scene.+0"
+size = 20
+origin = "image"
+fields = [
+  { name = "add", offset = 16, type = "fn", note = "slot 4: an entry handed to the queue (r4 the entry, r5 the sort key, f1 the depth)" },
+]
+
+# The object constants Recorder::RecordObject records (its header slot,
+# then c0-c3 = world x view-projection, c4-c7 the world, c8 the camera).
+[RecordedObjectConstants]
+measure = "Recorder::RecordObject.ret"
+size = 160
+origin = "allocated"
+fields = [
+  { name = "depth", offset = 72, type = "f32", note = "c3's z (the slots from +16): the draw's depth for the render queue (negated for group 0 and the depth draws)" },
+]
+
+# The texture provider's slot storage (its +8, the vector's first slot):
+# a texture a word.
+[TextureProviderSlots]
+measure = "TextureProvider.+8"
+size = 4
+origin = "allocated"
+fields = [
+  { name = "texture", offset = 0, type = "u32", note = "slot 0's texture (the slots follow, 4 bytes each, to the vector's end +12)" },
+]
+
+# A shape's streams as SceneryModel::RecordShape reads them: the shape's
+# +256 on (models.toml's ModelShape); the measure files it as "Scenery.+0"
+# (a measure fault).
+[SceneryShapeStreams]
+measure = "Scenery.+0"
+size = 28
+origin = "embedded"
+fields = [
+  { name = "second_kind", offset = 20, type = "u32", note = "the shape's +276: the second stream's kind (6: two streams)" },
+  { name = "second_stride", offset = 24, type = "u32", note = "the shape's +280: the second stream's stride" },
+]
+
+# The material animation's track set (the model's +364, a TrackSet,
+# model-animation.toml), as sub_825A1148 reads it (never seen in play).
+[SceneryMaterialTrackSet]
+measure = "sub_825A1148.r3"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "section", offset = 0, type = "u32", note = "the part file's section (0: no animation)" },
+  { name = "values", offset = 16, type = "u32", note = "32 bytes a track: four floats and +20 the mask of those set" },
+]
+
+[globals]
+race_data = { address = 0x826C5B2C, type = "u32", note = "the race data (a pointer): +4 the course, +20 flags, +24 the +2124 list's entries' flags, +0x59620 the stages, +0x59AE4 flags, +0xA3AF0 the race kind, +0xA3AF4 the race mode" }
+depth_declaration = { address = 0x8296B8CC, type = "u32", note = "the depth draws' vertex declaration (VertexDeclarations::ForDepth)" }
+depth_declaration_type11 = { address = 0x8296B8D0, type = "u32", note = "the depth draws' vertex declaration for stream type 11" }
+record_list = { address = 0x8296B918, type = "u32", note = "the scene's command list (scene + 8), the recorders'" }
+render_queue = { address = 0x8296B91C, type = "u32", note = "the scene's render queue (scene + 64), its slot 4 the draws'" }
+depth_key = { address = 0x8296B8FC, type = "u32", note = "the depth-only draws' sort key (Model::DrawShapeDepth)" }
+group1_key = { address = 0x8296B900, type = "u32", note = "group 1's sort key" }
+scenery_depth_key = { address = 0x8296B908, type = "u32", note = "the depth pass's sort key (SceneryModel::DrawShape's depth entry)" }
+group0_key = { address = 0x8296B90C, type = "u32", note = "group 0's sort key" }
+point_groups = { address = 0x82617750, type = "bytes", count = 5120, note = "the point list's 20 groups of 256 bytes (ModelList::LoadPoints)" }
+one = { address = 0x82000A30, type = "f32", note = "1.0" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0" }
+minus_one = { address = 0x82001BE0, type = "f32", note = "-1.0" }
+visible_right = { address = 0x82002B90, type = "f32", note = "the visibility test's upper bound" }
+visible_left = { address = 0x8206CDC4, type = "f32", note = "the visibility test's lower bound" }
+point_low = { address = 0x82006808, type = "f32", note = "the lowest point y drawn (-1000.0)" }
+point_turn = { address = 0x82002948, type = "f32", note = "a point's w to an angle" }
+point_turn2 = { address = 0x82002A50, type = "f32", note = "the points' second turn" }
+point_range_near = { address = 0x82002814, type = "f32", note = "the points' range, near" }
+point_range_far = { address = 0x82006804, type = "f32", note = "the points' range, far" }
+view = { address = 0x8265ECA0, type = "bytes", count = 64, note = "the view matrix (pixel c0-c3 of the scene lights)" }
+camera_position = { address = 0x8265ECE0, type = "bytes", count = 16, note = "the camera's position (vertex c8, pixel c4)" }
+projector_origin = { address = 0x8265ED00, type = "bytes", count = 16, note = "the headlight projectors' origin (x, y, z)" }
+depth_constant = { address = 0x8265ED10, type = "bytes", count = 16, note = "the depth draws' pixel c43" }
+range_after = { address = 0x8265ED20, type = "bytes", count = 16, note = "vertex c86 put back after a draw" }
+pixel_c76_after = { address = 0x8265ED30, type = "bytes", count = 16, note = "pixel c76 put back after a draw" }
+blend_states = { address = 0x82008E6C, type = "bytes", count = 64, note = "the scenery's render state 3 by blend index" }
+model_blend_states = { address = 0x8265EEB4, type = "bytes", count = 64, note = "Model::RecordShape's render state 3 by blend index" }
+car_blend_states = { address = 0x826018A4, type = "bytes", count = 64, note = "Model::RecordMaterials' render state 3 by blend index" }
+cull_swap = { address = 0x826C5100, type = "u32", note = "the cull modes 2 and 6 swapped when set" }
+render_state_48_off = { address = 0x826C5104, type = "u32", note = "render state 48 0 when set (else 1)" }
+sampler6_texture = { address = 0x8296B8F0, type = "u32", note = "sampler 6's texture, or 0 (the provider's slot 6)" }
+light_directions = { address = 0x8296B950, type = "bytes", count = 48, note = "3 directional lights' vectors (normalized into c5-c7)" }
+projector_rows_a = { address = 0x8296B980, type = "bytes", count = 48, note = "12 floats of the projectors" }
+projector_rows_b = { address = 0x8296B9B0, type = "bytes", count = 48, note = "12 floats of the projectors" }
+headlight_eyes = { address = 0x8296B9E0, type = "bytes", count = 128, note = "the 8 headlight slots' eyes (Scenery::RecordHeadlightProjectors)" }
+headlight_shapes = { address = 0x8296BA60, type = "bytes", count = 128, note = "the 8 slots' beam shapes" }
+headlight_colors_a = { address = 0x8296BAE0, type = "bytes", count = 128, note = "the 8 slots' first colors" }
+headlight_colors_b = { address = 0x8296BB60, type = "bytes", count = 128, note = "the 8 slots' second colors" }
+headlight_directions = { address = 0x8296BBE0, type = "bytes", count = 128, note = "the 8 slots' directions (normalized)" }
+headlight_extras = { address = 0x8296BC60, type = "bytes", count = 128, note = "the 8 slots' scene +5424 vectors" }

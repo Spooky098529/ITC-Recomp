@@ -1,0 +1,212 @@
+# The schema of docs/functions/vehicle.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The vehicle code above the car physics (src/vehicle/): the vehicle's status
+# record, the engine's power curve, the camera curves, the route position and
+# what the vehicle code is passed. The vehicle itself is car-physics.toml's.
+# Vectors (16 bytes) are bytes fields where the code passes their addresses to
+# the vector library.
+
+# The vehicle's status record (108 bytes at the vehicle's +6160; reset by
+# VehicleStatus::Reset, updated by VehicleStatus::Update and Vehicle::Tick).
+[VehicleStatus]
+measure = "VehicleStatus"
+size = 108
+origin = "embedded"
+fields = [
+  { name = "speed_kmh", offset = 0, type = "f32", note = "the speed in km/h (Vehicle::Tick: the vehicle's +48 x 3.6)" },
+  { name = "route_section", offset = 4, type = "u16", note = "the car's route position (the vehicle's +5236); -1 at the reset" },
+  { name = "route_slice", offset = 6, type = "u16", note = "(the vehicle's +5238); -1 at the reset" },
+  { name = "wrong_way", offset = 8, type = "u32", note = "probably wrong way: set past 135 degrees off the slice's direction, cleared under 120" },
+  { name = "unknown_12", offset = 12, type = "u32", note = "0 at the reset" },
+  { name = "heading", offset = 16, type = "bytes", count = 16, note = "the body's x axis, flat (y 0.0), normalized" },
+  { name = "heading_y", offset = 20, type = "f32", note = "the heading's y, set to 0.0" },
+  { name = "direction", offset = 32, type = "bytes", count = 16, note = "the slice's direction, normalized" },
+  { name = "slice_point", offset = 48, type = "bytes", count = 16, note = "the car's point on the slice" },
+  { name = "across", offset = 64, type = "f32", note = "the signed distance across from the slice" },
+  { name = "along", offset = 68, type = "f32", note = "how far along the slice (0.0 for a zero-length slice)" },
+  { name = "landing_ticks", offset = 72, type = "u32", note = "the vehicle's +6232, from TrackCollision::Tick" },
+  { name = "unknown_76", offset = 76, type = "f32", note = "the vehicle's +6236, from TrackCollision::Tick; 0.0 at the reset" },
+  { name = "unknown_80", offset = 80, type = "u32", note = "the vehicle's +6240, from TrackCollision::Tick; 0 at the reset" },
+  { name = "trip_km", offset = 84, type = "f32", note = "probably the trip (km), with the update's flag" },
+  { name = "total_km", offset = 88, type = "f32", note = "probably the total (km)" },
+  { name = "water_temperature", offset = 92, type = "f32", note = "probably; 80.0 at the reset" },
+  { name = "oil_temperature", offset = 96, type = "f32", note = "probably; 80.0 at the reset" },
+  { name = "engine_output", offset = 100, type = "f32", note = "1.0 at the reset; from Vehicle::EngineTorque, +104 and the oil's temperature (meaning not known)" },
+  { name = "torque_scale", offset = 104, type = "f32", note = "the car data's +1420 (the power curve's +1048)" },
+]
+
+# The engine's power curve (1,064 bytes; on VehicleStatus::Reset's stack and
+# the tuning screens').
+[PowerCurve]
+measure = "PowerCurve"
+size = 1064
+origin = "embedded"
+fields = [
+  { name = "back_2_torque", offset = -28, type = "f32", note = "PowerCurve::Build's read of entry i - 2's torque for a point below 0.01, met at i = 0 (before the curve)" },
+  { name = "back_1_torque", offset = -12, type = "f32", note = "entry i - 1's torque, the same way" },
+  { name = "entries", offset = 0, type = "bytes", count = 512, note = "32 entries of 16 bytes: +0 the rpm ((i + 1) x 400), +4 the torque, +8 the power, +12 cleared" },
+  { name = "shifted", offset = 512, type = "bytes", count = 512, note = "32 entries after the peak's shift (the same fields)" },
+  { name = "peak_index", offset = 1024, type = "u32", note = "the peak power's entry" },
+  { name = "count", offset = 1028, type = "u32", note = "the points counted (at 0.01 or more)" },
+  { name = "peak_below", offset = 1032, type = "s32", note = "how far the peak may move down (100 rpm steps, at least -20)" },
+  { name = "peak_above", offset = 1036, type = "s32", note = "how far up (at most 20)" },
+  { name = "low_rpm", offset = 1040, type = "f32", note = "800.0" },
+  { name = "high_rpm", offset = 1044, type = "f32", note = "the car data's +1280" },
+  { name = "torque_scale", offset = 1048, type = "f32", note = "the car data's +1420" },
+  { name = "peak_rpm", offset = 1052, type = "f32", note = "the shifted peak's rpm" },
+  { name = "most_power", offset = 1056, type = "f32", note = "the largest power after the shift" },
+  { name = "most_power_rpm", offset = 1060, type = "f32" },
+]
+
+# The engine's record PowerCurve::FromEngine is given (the car data's +1268).
+[PowerCurveEngine]
+measure = "PowerCurve::FromEngine.r4"
+size = 156
+origin = "embedded"
+fields = [
+  { name = "high_rpm", offset = 12, type = "f32", note = "the car data's +1280: the curve's +1044" },
+  { name = "torque_points", offset = 24, type = "bytes", count = 132, note = "the torque curve (PowerCurvePoints, the car data's +1292)" },
+]
+
+# The 33 floats PowerCurve::Build is given (the car data's +1292): 32 torque
+# points and the torque's scale.
+[PowerCurvePoints]
+measure = "PowerCurve::Build.r4"
+size = 132
+origin = "embedded"
+fields = [
+  { name = "points", offset = 0, type = "bytes", count = 128, note = "32 floats, the torque at (i + 1) x 400 rpm (relative)" },
+  { name = "torque_scale", offset = 128, type = "f32", note = "the car data's +1420" },
+]
+
+# A camera curve (CameraCurve::Load, from the camera modes; the name is a guess).
+[VehicleCameraCurve]
+measure = "CameraCurve"
+size = 724
+origin = "embedded"
+fields = [
+  { name = "values", offset = 0, type = "bytes", count = 360, note = "90 floats from 0x82600EE8 + 360 x the index" },
+  { name = "cleared", offset = 360, type = "bytes", count = 360, note = "90 floats set to 0.0" },
+  { name = "unknown_720", offset = 720, type = "u32", note = "Load's r5" },
+]
+
+# A route position: a section of the course's route and a slice in it (also
+# met as one word, AiPath::NoteFixedSections' result). race-states.toml's
+# RoutePosition is the same object (to merge there: field names kept alike).
+[VehicleRoutePosition]
+measure = "RoutePosition"
+measures = ["AiPath::NoteFixedSections.ret"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "word", offset = 0, type = "u32", note = "section and slice read or written as one word" },
+  { name = "section", offset = 0, type = "u16", note = "signed" },
+  { name = "slice", offset = 2, type = "u16", note = "signed" },
+]
+
+# The rigid body's position RigidBody::Position returns (a vector).
+[VehicleBodyPosition]
+measure = "RigidBody::Position.ret"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "x", offset = 0, type = "f32" },
+  { name = "xy", offset = 0, type = "u64", note = "x and y copied as one doubleword" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "z", offset = 8, type = "f32" },
+  { name = "zw", offset = 8, type = "u64", note = "z and w copied as one doubleword" },
+  { name = "w", offset = 12, type = "f32" },
+]
+
+# A row Matrix::FromRows copies (16 bytes, as words: their bits).
+[VehicleMatrixRow]
+measures = ["Matrix::FromRows.r4", "Matrix::FromRows.r5", "Matrix::FromRows.r6", "Matrix::FromRows.r7"]
+size = 16
+origin = "embedded"
+fields = [
+  { name = "x_bits", offset = 0, type = "u32" },
+  { name = "y_bits", offset = 4, type = "u32" },
+  { name = "z_bits", offset = 8, type = "u32" },
+  { name = "w_bits", offset = 12, type = "u32" },
+]
+
+# The track position TrackPosition::Copy copies from (collision-world.toml's
+# TrackPosition; a stack copy of the vehicle's +5232 in Vehicle::PlaceOnRoute).
+[VehicleTrackPositionSource]
+measure = "TrackPosition::Copy.r4"
+size = 84
+origin = "embedded"
+fields = [
+  { name = "section", offset = 0, type = "u16", note = "the mesh section" },
+  { name = "slice", offset = 2, type = "u16" },
+  { name = "route_section", offset = 4, type = "u16" },
+  { name = "route_slice", offset = 6, type = "u16" },
+  { name = "point_xy", offset = 16, type = "u64", note = "the point (+16 to +31) as doublewords" },
+  { name = "point_zw", offset = 24, type = "u64" },
+  { name = "vector2_xy", offset = 32, type = "u64", note = "the three vectors after it (+32 to +79), probably the normal and others" },
+  { name = "vector2_zw", offset = 40, type = "u64" },
+  { name = "vector3_xy", offset = 48, type = "u64" },
+  { name = "vector3_zw", offset = 56, type = "u64" },
+  { name = "vector4_xy", offset = 64, type = "u64" },
+  { name = "vector4_zw", offset = 72, type = "u64" },
+  { name = "half_80", offset = 80, type = "u16", note = "copied (meaning: collision-world.toml's)" },
+  { name = "half_82", offset = 82, type = "u16" },
+]
+
+# The car input record Vehicle::ApplyInput applies (ai-drivers.toml's CarInput).
+[VehicleCarInput]
+measure = "Vehicle::ApplyInput.r4"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "flags", offset = 0, type = "u32", note = "0x02000000 digital steering, 0x20000000 the digital brake, 0x08000000 the digital throttle, 0x80000000 the handbrake ramp, 0x200 reverse, 0x1 and 0x2 the gear changes, 0x2000, 0x10000 the nitrous' toggle" },
+  { name = "throttle", offset = 4, type = "u16", note = "signed, out of 32,767" },
+  { name = "brake", offset = 6, type = "u16", note = "signed, out of 32,767" },
+  { name = "steering", offset = 8, type = "u16", note = "signed, out of 32,767" },
+  { name = "handbrake", offset = 10, type = "u16", note = "32,767 for the handbrake" },
+  { name = "throttle_rate", offset = 14, type = "u8", note = "signed: the throttle's curve" },
+  { name = "brake_rate", offset = 15, type = "u8", note = "signed: the brake's curve" },
+  { name = "steering_rate", offset = 16, type = "u8", note = "signed: the pad's or wheel's steering rate" },
+  { name = "kind", offset = 17, type = "u8", note = "0 the pad, 1 a wheel, 2 an AI driver" },
+]
+
+# The car object VehicleStatus::Update reads (the race's car record: the
+# Racers measure's fields at +1656 and on).
+[VehicleCarObject]
+measure = "VehicleStatus::Update.r5"
+size = 1668
+origin = "embedded"
+fields = [
+  { name = "engine_stage", offset = 1656, type = "u32" },
+  { name = "engine_part", offset = 1664, type = "u32" },
+]
+
+# The point sub_820FA8F8 writes (the route offset under Vehicle::PlaceOnRoute,
+# never seen in play).
+[VehicleRoutePoint]
+measure = "sub_820FA8F8.r3"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "x", offset = 0, type = "f32" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "z", offset = 8, type = "f32" },
+]
+
+[globals]
+vehicles = { address = 0x826C2E34, type = "u32", note = "the seven 6,272-byte vehicles' block (a pointer)" }
+slip_threshold = { address = 0x826C2E38, type = "f32", note = "Vehicle::SlipWheelValue's threshold (its f1 / 3.6, set once)" }
+slip_flag = { address = 0x826C2E3C, type = "u32", note = "bit 0x1: the threshold set" }
+route = { address = 0x826C5B10, type = "u32", note = "the course's route (a pointer; +12 its section table)" }
+input_records = { address = 0x826C5B30, type = "bytes", count = 28, note = "the racers' car input records (a pointer a racer, by the racer's low byte)" }
+step_seconds = { address = 0x82601838, type = "f32", note = "1/60, in .data (the physics step)" }
+camera_curves = { address = 0x82600EE8, type = "bytes", count = 1440, note = "four camera curves of 90 floats, .data" }
+grip_scale = { address = 0x82601488, type = "f32", note = "the surface grip's scale, .data" }
+grip_pairs_a = { address = 0x826014A0, type = "bytes", count = 32, note = "the tire types' first factor pairs (8 bytes a type), .data" }
+grip_pairs_b = { address = 0x82601560, type = "bytes", count = 32, note = "the second factor pairs, .data" }
+grip_records = { address = 0x82601580, type = "bytes", count = 144, note = "nine floats a tire type (by surface, probably), .data" }
+last_row = { address = 0x826382D0, type = "bytes", count = 16, note = "the constant fourth row of Vehicle::PlaceOnRoute's matrix" }

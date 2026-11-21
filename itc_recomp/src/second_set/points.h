@@ -8,11 +8,13 @@
 
 #pragma once
 
+#include "schema/second_set.h"
+
 #include <cstdint>
 
 namespace second_set {
 
-constexpr uint32_t kPointRecordBytes = 240;
+constexpr uint32_t kPointRecordBytes = schema::SecondSetPointRecord::kSize;
 constexpr uint32_t kClearFrameBytes = 208;
 constexpr uint32_t kConstructFrameBytes = 96;
 constexpr uint32_t kFindShapeFrameBytes = 208;

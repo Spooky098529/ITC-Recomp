@@ -14,6 +14,7 @@
 #include "base/log.h"
 #include "car_list/car_list.h"
 #include "guest.h"
+#include "schema/type67_screens.h"
 #include "menu_sounds/menu_sounds.h"
 #include "race_screens/race_screens.h"
 #include "save_data/save_data.h"
@@ -26,6 +27,8 @@ namespace {
 
 using guest::LoadU32;
 using guest::StoreU32;
+using Inner = schema::ListPartInner;
+using Part = schema::ListPart;
 
 constexpr uint32_t kFinishNamed = 0x8211DF20;
 constexpr uint32_t kListUpdate = 0x8220C1E0;
@@ -91,17 +94,17 @@ void Delete(uint64_t object, uint64_t flags, uint32_t frame, uint32_t lr, const 
 // no step queued (+20 -1): +16 = -1, +4 = +8; else +24 = 0, +16 = +20,
 // +20 = -1; then +28 = 0.
 void MoveOn(uint8_t* base, uint32_t inner) {
-  const uint32_t queued = LoadU32(base, inner + 20);
+  const uint32_t queued = Inner(base, inner).queued_step();
   if (queued == 0xFFFFFFFFu) {
-    const uint32_t after = LoadU32(base, inner + 8);
-    StoreU32(base, inner + 16, 0xFFFFFFFFu);
-    StoreU32(base, inner + 4, after);
+    const uint32_t after = Inner(base, inner).next_page();
+    Inner(base, inner).set_step(0xFFFFFFFFu);
+    Inner(base, inner).set_page(after);
   } else {
-    StoreU32(base, inner + 24, 0);
-    StoreU32(base, inner + 16, queued);
-    StoreU32(base, inner + 20, 0xFFFFFFFFu);
+    Inner(base, inner).set_unknown_24(0);
+    Inner(base, inner).set_step(queued);
+    Inner(base, inner).set_queued_step(0xFFFFFFFFu);
   }
-  StoreU32(base, inner + 28, 0);
+  Inner(base, inner).set_step_started(0);
 }
 
 }  // namespace
@@ -110,13 +113,13 @@ void MoveOn(uint8_t* base, uint32_t inner) {
 
 uint64_t ListPartBaseDestruct(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_82252420 ListPartBase::~ListPartBase");
-  StoreU32(base, uint32_t(r3), kListPartBaseVtable);
+  Part(base, uint32_t(r3)).set_vtable(kListPartBaseVtable);
   return r3;
 }
 
 uint64_t ListPartInnerBaseDestruct(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_82252600 ListPartInnerBase::~ListPartInnerBase");
-  StoreU32(base, uint32_t(r3), kListPartInnerBaseVtable);
+  Inner(base, uint32_t(r3)).set_vtable(kListPartInnerBaseVtable);
   return r3;
 }
 
@@ -124,7 +127,7 @@ uint64_t ListPartBaseDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags
                                       const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82252610 ListPartBase::DeletingDestructor");
   const uint32_t frame = Frame(base, sp, 96);
-  StoreU32(base, uint32_t(r3), kListPartBaseVtable);
+  Part(base, uint32_t(r3)).set_vtable(kListPartBaseVtable);
   if ((flags & 1) != 0) {
     Delete(r3, flags, frame, 0x8225263C, calls);
   }
@@ -135,7 +138,7 @@ uint64_t ListPartInnerBaseDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t 
                                            uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82252658 ListPartInnerBase::DeletingDestructor");
   const uint32_t frame = Frame(base, sp, 96);
-  StoreU32(base, uint32_t(r3), kListPartInnerBaseVtable);
+  Inner(base, uint32_t(r3)).set_vtable(kListPartInnerBaseVtable);
   if ((flags & 1) != 0) {
     Delete(r3, flags, frame, 0x82252684, calls);
   }
@@ -145,7 +148,7 @@ uint64_t ListPartInnerBaseDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t 
 uint64_t ListPartInnerDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822526F8 ListPartInner::~ListPartInner");
   const uint32_t frame = Frame(base, sp, 96);
-  StoreU32(base, uint32_t(r3), kListPartInnerVtable);
+  Inner(base, uint32_t(r3)).set_vtable(kListPartInnerVtable);
   ReleaseList(base, r3 + 40, frame, 0x82252720, calls);
   return ListPartInnerBaseDestruct(base, r3);
 }
@@ -164,7 +167,7 @@ uint64_t ListPartInnerDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flag
 uint64_t ListPartDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82252968 ListPart::~ListPart");
   const uint32_t frame = Frame(base, sp, 96);
-  StoreU32(base, uint32_t(r3), kListPartVtable);
+  Part(base, uint32_t(r3)).set_vtable(kListPartVtable);
   ListPartInnerDestruct(base, r3 + 20, frame, calls);
   return ListPartBaseDestruct(base, r3);
 }
@@ -185,9 +188,9 @@ uint64_t ListPartDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, ui
 uint64_t ListPartOpen(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82252430 ListPartBase::Open");
   const uint32_t part = uint32_t(r3), frame = Frame(base, sp, 96);
-  const uint32_t inner = LoadU32(base, part + 16);
+  const uint32_t inner = Part(base, part).inner().address;
   if (inner != 0) {
-    InnerSlot(base, inner, 4, LoadU32(base, part + 12), std::nullopt, frame, 0x82252468, calls);
+    InnerSlot(base, inner, 4, Part(base, part).movie(), std::nullopt, frame, 0x82252468, calls);
   }
   return Slot(base, r3, 36, std::nullopt, frame, 0x8225247C, calls);
 }
@@ -195,16 +198,16 @@ uint64_t ListPartOpen(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& call
 uint64_t ListPartPick(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82252490 ListPartBase::Pick");
   const uint32_t part = uint32_t(r3), frame = Frame(base, sp, 96);
-  const uint32_t inner = LoadU32(base, part + 16);
+  const uint32_t inner = Part(base, part).inner().address;
   if (inner == 0) {
     return 1;
   }
   const uint64_t answer =
-      InnerSlot(base, inner, 8, LoadU32(base, part + 12), r4, frame, 0x822524D0, calls);
+      InnerSlot(base, inner, 8, Part(base, part).movie(), r4, frame, 0x822524D0, calls);
   if (int32_t(uint32_t(answer)) != 0) {
-    const uint32_t now = LoadU32(base, part + 16);
-    StoreU32(base, part + 4, LoadU32(base, now + 32));
-    StoreU32(base, part + 8, LoadU32(base, now + 36));
+    const uint32_t now = Part(base, part).inner().address;
+    Part(base, part).set_yes(Inner(base, now).yes());
+    Part(base, part).set_back(Inner(base, now).back());
   }
   return answer;
 }
@@ -213,17 +216,17 @@ uint64_t ListPartInput(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, uin
                        const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82252500 ListPartBase::Input");
   const uint32_t part = uint32_t(r3);
-  const uint32_t inner = LoadU32(base, part + 16);
+  const uint32_t inner = Part(base, part).inner().address;
   if (inner == 0) {
     return r3;
   }
-  return InnerSlot(base, inner, 12, LoadU32(base, part + 12), r4, sp, lr, calls);
+  return InnerSlot(base, inner, 12, Part(base, part).movie(), r4, sp, lr, calls);
 }
 
 uint64_t ListPartClose(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82252530 ListPartBase::Close");
   const uint32_t part = uint32_t(r3), frame = Frame(base, sp, 96);
-  const uint32_t inner = LoadU32(base, part + 16);
+  const uint32_t inner = Part(base, part).inner().address;
   if (inner != 0) {
     InnerSlot(base, inner, 20, std::nullopt, std::nullopt, frame, 0x82252564, calls);
   }
@@ -233,7 +236,7 @@ uint64_t ListPartClose(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& cal
 uint64_t ListPartIsIdle(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
                         const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82252590 ListPartBase::IsIdle");
-  const uint32_t inner = LoadU32(base, uint32_t(r3) + 16);
+  const uint32_t inner = Part(base, uint32_t(r3)).inner().address;
   if (inner == 0) {
     return 1;
   }
@@ -243,7 +246,7 @@ uint64_t ListPartIsIdle(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
 uint64_t ListPartCanLeave(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
                           const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822525B8 ListPartBase::CanLeave");
-  const uint32_t inner = LoadU32(base, uint32_t(r3) + 16);
+  const uint32_t inner = Part(base, uint32_t(r3)).inner().address;
   if (inner == 0) {
     return 1;
   }
@@ -256,17 +259,17 @@ uint64_t ListPartInnerOpen(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
                            const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82252A88 ListPartInner::Open");
   const uint32_t inner = uint32_t(r3), frame = Frame(base, sp, 144);
-  StoreU32(base, inner + 8, 0);
-  StoreU32(base, inner + 4, 0);
-  StoreU32(base, inner + 12, 0);
-  StoreU32(base, inner + 24, 0xFFFFFFFFu);
-  StoreU32(base, inner + 16, 0xFFFFFFFFu);
-  StoreU32(base, inner + 28, 0);
-  StoreU32(base, inner + 16, 0);
-  StoreU32(base, inner + 20, 0xFFFFFFFFu);
-  StoreU32(base, inner + 8, 0);
+  Inner(base, inner).set_next_page(0);
+  Inner(base, inner).set_page(0);
+  Inner(base, inner).set_previous_page(0);
+  Inner(base, inner).set_unknown_24(0xFFFFFFFFu);
+  Inner(base, inner).set_step(0xFFFFFFFFu);
+  Inner(base, inner).set_step_started(0);
+  Inner(base, inner).set_step(0);
+  Inner(base, inner).set_queued_step(0xFFFFFFFFu);
+  Inner(base, inner).set_next_page(0);
   const uint32_t movie = MovieAt(base, frame + 96, uint32_t(r4));
-  StoreU32(base, inner + 4, 0xFFFFFFFFu);
+  Inner(base, inner).set_page(0xFFFFFFFFu);
   calls.call(kResetPose, frame, 0x82252AFC, movie, frame + 96);
   calls.set_text(frame, 0x82252B10, movie, 0xFFFFFFFFu, 0, 10);
   calls.set_text(frame, 0x82252B24, movie, 1, 3, 0);
@@ -284,15 +287,15 @@ uint64_t ListPartInnerOpen(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   const uint32_t selection = LoadU32(base, save + kOptionsWord) == 0 ? 1 : 0;
   race_screens::ListSetSelection(base, uint32_t(list), selection);
-  StoreU32(base, inner + 112, 0);
-  StoreU32(base, inner + 116, 0);
+  Inner(base, inner).set_prompt_state(0);
+  Inner(base, inner).set_leave_asked(0);
   return list;
 }
 
 uint64_t ListPartInnerPick(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t r5, uint32_t sp,
                            uint32_t lr, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82252A00 ListPartInner::Pick");
-  const uint32_t page = LoadU32(base, uint32_t(r3) + 4);
+  const uint32_t page = Inner(base, uint32_t(r3)).page();
   if (page == 0xFFFFFFFFu) {
     return 0;
   }
@@ -304,7 +307,7 @@ uint64_t ListPartInnerInput(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp
                             const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82252DF0 ListPartInner::Input");
   const uint32_t inner = uint32_t(r3), frame = Frame(base, sp, 128);
-  const uint32_t step = LoadU32(base, inner + 16);
+  const uint32_t step = Inner(base, inner).step();
   const uint32_t movie = MovieAt(base, frame + 80, uint32_t(r4));
   if (step == 0xFFFFFFFFu) {
     return calls.call(kRun, frame, 0x82252E94, movie, 0);
@@ -332,13 +335,13 @@ uint64_t ListPartInnerClose(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr
 uint64_t ListPartInnerCanLeave(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_822528C8 ListPartInner::CanLeave");
   const uint32_t inner = uint32_t(r3);
-  StoreU32(base, inner + 116, 1);
-  const int32_t state = int32_t(LoadU32(base, inner + 112));
+  Inner(base, inner).set_leave_asked(1);
+  const int32_t state = int32_t(Inner(base, inner).prompt_state());
   if (state == 3) {
     return 1;
   }
   if (state != 2 && state != 4) {
-    StoreU32(base, inner + 112, 4);
+    Inner(base, inner).set_prompt_state(4);
   }
   return 0;
 }
@@ -350,37 +353,37 @@ uint64_t ListPartInnerPage0(uint8_t* base, uint64_t r3, uint32_t sp, const Calls
   const uint32_t inner = uint32_t(r3), frame = Frame(base, sp, 128);
   // The page left for a step (the page before kept unless it's `same`).
   auto leave = [&](uint32_t same, uint32_t step, uint32_t after) {
-    const uint32_t page = LoadU32(base, inner + 4);
+    const uint32_t page = Inner(base, inner).page();
     if (page != same) {
-      StoreU32(base, inner + 12, page);
+      Inner(base, inner).set_previous_page(page);
     }
-    StoreU32(base, inner + 8, after);
-    StoreU32(base, inner + 16, step);
-    StoreU32(base, inner + 4, 0xFFFFFFFFu);
-    StoreU32(base, inner + 20, 0xFFFFFFFFu);
+    Inner(base, inner).set_next_page(after);
+    Inner(base, inner).set_step(step);
+    Inner(base, inner).set_page(0xFFFFFFFFu);
+    Inner(base, inner).set_queued_step(0xFFFFFFFFu);
   };
-  if (int32_t(LoadU32(base, inner + 112)) == 4) {
-    const uint32_t page = LoadU32(base, inner + 4);
+  if (int32_t(Inner(base, inner).prompt_state()) == 4) {
+    const uint32_t page = Inner(base, inner).page();
     if (page != 2) {
-      StoreU32(base, inner + 12, page);
+      Inner(base, inner).set_previous_page(page);
     }
-    StoreU32(base, inner + 16, 1);
-    StoreU32(base, inner + 20, 0xFFFFFFFFu);
-    StoreU32(base, inner + 8, 2);
-    StoreU32(base, inner + 4, 0xFFFFFFFFu);
+    Inner(base, inner).set_step(1);
+    Inner(base, inner).set_queued_step(0xFFFFFFFFu);
+    Inner(base, inner).set_next_page(2);
+    Inner(base, inner).set_page(0xFFFFFFFFu);
   }
   const uint64_t list = r3 + 40;
   calls.call(kListUpdate, frame, 0x822527CC, list, 0);
-  if (LoadU32(base, inner + 64) != 0) {
+  if (Inner(base, inner).menu_move() != 0) {
     PlaySound(base, 4, frame, calls);
-    const uint32_t page = LoadU32(base, inner + 4);
+    const uint32_t page = Inner(base, inner).page();
     if (page != 0) {
-      StoreU32(base, inner + 12, page);
+      Inner(base, inner).set_previous_page(page);
     }
-    StoreU32(base, inner + 16, 2);
-    StoreU32(base, inner + 8, 0);
-    StoreU32(base, inner + 4, 0xFFFFFFFFu);
-    StoreU32(base, inner + 20, 0xFFFFFFFFu);
+    Inner(base, inner).set_step(2);
+    Inner(base, inner).set_next_page(0);
+    Inner(base, inner).set_page(0xFFFFFFFFu);
+    Inner(base, inner).set_queued_step(0xFFFFFFFFu);
     return 0;
   }
   if (int32_t(uint32_t(calls.call(kListAccepted, frame, 0x82252808, list, 0))) != 0) {
@@ -398,17 +401,17 @@ uint64_t ListPartInnerPage0(uint8_t* base, uint64_t r3, uint32_t sp, const Calls
 uint64_t ListPartInnerPage1(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_82252878 ListPartInner::Page1");
   const uint32_t inner = uint32_t(r3);
-  const bool stay = int32_t(LoadU32(base, inner + 116)) == 0;
-  StoreU32(base, inner + 36, stay ? 0 : 1);
-  StoreU32(base, inner + 32, stay ? 1 : 0);
+  const bool stay = int32_t(Inner(base, inner).leave_asked()) == 0;
+  Inner(base, inner).set_back(stay ? 0 : 1);
+  Inner(base, inner).set_yes(stay ? 1 : 0);
   return 1;
 }
 
 uint64_t ListPartInnerPage2(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_822528A8 ListPartInner::Page2");
   const uint32_t inner = uint32_t(r3);
-  StoreU32(base, inner + 32, 0);
-  StoreU32(base, inner + 36, 1);
+  Inner(base, inner).set_yes(0);
+  Inner(base, inner).set_back(1);
   return 1;
 }
 
@@ -419,10 +422,10 @@ uint64_t ListPartInnerStep0(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp
   ITC_NATIVE_RUNNING("sub_82252BB8 ListPartInner::Step0");
   const uint32_t inner = uint32_t(r3), frame = Frame(base, sp, 128);
   const uint32_t movie = MovieAt(base, frame + 80, uint32_t(r4));
-  if (int32_t(LoadU32(base, inner + 28)) == 0) {
+  if (int32_t(Inner(base, inner).step_started()) == 0) {
     ui_movies::PlayNamed(base, movie, 5, 0, 0, 0, 0);
-    StoreU32(base, inner + 28, 1);
-    StoreU32(base, inner + 112, 0);
+    Inner(base, inner).set_step_started(1);
+    Inner(base, inner).set_prompt_state(0);
     PlaySound(base, 5, frame, calls);
   }
   const uint64_t done = uint32_t(calls.call(kRun, frame, 0x82252C30, movie, 0)) == 0 ? 1 : 0;
@@ -431,8 +434,8 @@ uint64_t ListPartInnerStep0(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp
     ui_movies::PlayNamed(base, movie, LoadU32(base, kListPartNamed + (selection << 2)), 1, 0, 0,
                          0);
     ui_movies::LoopLast(base, movie);
-    if (int32_t(LoadU32(base, inner + 112)) != 4) {
-      StoreU32(base, inner + 112, 1);
+    if (int32_t(Inner(base, inner).prompt_state()) != 4) {
+      Inner(base, inner).set_prompt_state(1);
     }
   }
   return done;
@@ -443,16 +446,16 @@ uint64_t ListPartInnerStep1(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp
   ITC_NATIVE_RUNNING("sub_82252C98 ListPartInner::Step1");
   const uint32_t inner = uint32_t(r3), frame = Frame(base, sp, 128);
   const uint32_t movie = MovieAt(base, frame + 80, uint32_t(r4));
-  if (int32_t(LoadU32(base, inner + 28)) == 0) {
+  if (int32_t(Inner(base, inner).step_started()) == 0) {
     ui_movies::PlayNamed(base, movie, 6, 0, 0, 0, 0);
-    StoreU32(base, inner + 28, 1);
-    StoreU32(base, inner + 112, 2);
+    Inner(base, inner).set_step_started(1);
+    Inner(base, inner).set_prompt_state(2);
     PlaySound(base, 5, frame, calls);
   }
   const uint64_t done = uint32_t(calls.call(kRun, frame, 0x82252D10, movie, 0)) == 0 ? 1 : 0;
   if (done != 0) {
     calls.call(kFinishAll, frame, 0x82252D24, movie, 0);
-    StoreU32(base, inner + 112, 3);
+    Inner(base, inner).set_prompt_state(3);
   }
   return done;
 }
@@ -462,7 +465,7 @@ uint64_t ListPartInnerStep2(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp
   ITC_NATIVE_RUNNING("sub_82252D38 ListPartInner::Step2");
   const uint32_t inner = uint32_t(r3), frame = Frame(base, sp, 128);
   const uint32_t movie = MovieAt(base, frame + 80, uint32_t(r4));
-  if (int32_t(LoadU32(base, inner + 28)) == 0) {
+  if (int32_t(Inner(base, inner).step_started()) == 0) {
     const uint32_t list = inner + 40;
     // MenuList::GetPreviousSelection (sub_8220BC28): +20.
     const uint32_t previous = LoadU32(base, list + 20);
@@ -472,7 +475,7 @@ uint64_t ListPartInnerStep2(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp
     ui_movies::PlayNamed(base, movie, LoadU32(base, kListPartNamed + (selection << 2)), 1, 0, 0,
                          0);
     ui_movies::LoopLast(base, movie);
-    StoreU32(base, inner + 28, 1);
+    Inner(base, inner).set_step_started(1);
   }
   calls.call(kRun, frame, 0x82252DE0, movie, 0);
   return 1;

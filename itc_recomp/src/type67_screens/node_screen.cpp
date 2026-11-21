@@ -20,6 +20,7 @@
 #include "base/log.h"
 #include "car_list/car_list.h"
 #include "guest.h"
+#include "schema/type67_screens.h"
 #include "mode_tick/mode_tick.h"
 #include "race_screens/race_screens.h"
 #include "save_data/save_data.h"
@@ -34,8 +35,10 @@ namespace type67_screens {
 namespace {
 
 using guest::LoadU16;
+using G = schema::Type67ScreensGlobals;
 using guest::LoadU32;
 using guest::StoreU32;
+using NS = schema::NodeScreen;
 using namespace pages;
 
 constexpr uint32_t kFinishNamed = 0x8211DF20, kLoopNamed = 0x8211DDE0,
@@ -49,7 +52,7 @@ constexpr uint32_t kCourseRecords = 0x1D52C;
 
 // The screen's movie: [+10100] at the frame's +80, then UiMovies::Find.
 uint32_t NodeMovieOf(uint8_t* base, uint32_t screen, uint32_t frame) {
-  StoreU32(base, frame + 80, LoadU32(base, screen + 10100));
+  StoreU32(base, frame + 80, NS(base, screen).movie());
   return LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
 }
 
@@ -90,31 +93,31 @@ uint64_t NodeScreenShow(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 128);
   NodeScreenRefresh(base, r3, frame, calls);
   const uint32_t movie = NodeMovieOf(base, screen, frame);
-  const uint32_t sub_scene = LoadU32(base, screen + 10276);
+  const uint32_t sub_scene = NS(base, screen).sub_scene();
   calls.set_r4(sub_scene);
   if (int32_t(sub_scene) >= 0) {
-    const uint32_t title = LoadU32(base, screen + 10404);
+    const uint32_t title = NS(base, screen).title_child();
     if (int32_t(title) >= 0) calls.set_text(frame, 0x82259CF8, movie, sub_scene, title, 322);
-    const uint32_t first = LoadU32(base, screen + 10408);
+    const uint32_t first = NS(base, screen).text_child_a();
     if (int32_t(first) >= 0) {
-      const uint32_t at = LoadU32(base, screen + 10276);
+      const uint32_t at = NS(base, screen).sub_scene();
       calls.set_r4(at);
       calls.set_text(frame, 0x82259D14, movie, at, first, 0);
     }
-    const uint32_t second = LoadU32(base, screen + 10412);
+    const uint32_t second = NS(base, screen).text_child_b();
     if (int32_t(second) >= 0) {
-      const uint32_t at = LoadU32(base, screen + 10276);
+      const uint32_t at = NS(base, screen).sub_scene();
       calls.set_r4(at);
       calls.set_text(frame, 0x82259D30, movie, at, second, 1);
     }
   }
   // Page 2 after step 0.
-  const uint32_t page = LoadU32(base, screen + 10104);
-  if (page != 2) StoreU32(base, screen + 10112, page);
-  StoreU32(base, screen + 10120, kNone);
-  StoreU32(base, screen + 10104, kNone);
-  StoreU32(base, screen + 10116, 0);
-  StoreU32(base, screen + 10108, 2);
+  const uint32_t page = NS(base, screen).page();
+  if (page != 2) NS(base, screen).set_previous_page(page);
+  NS(base, screen).set_queued_step(kNone);
+  NS(base, screen).set_page(kNone);
+  NS(base, screen).set_step(0);
+  NS(base, screen).set_next_page(2);
   // Slot 15 (Type6NodeScreen::SetUpMenus) with the handler's r4.
   return Slot(base, r3, 60, r4, frame, 0x82259D74, calls);
 }
@@ -126,7 +129,7 @@ uint64_t NodeScreenDraw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
   static constexpr uint32_t kEntries[6] = {kEmpty,     kEmpty, 0x82259D80,
                                            kEmpty,     0x822590E8, 0x82259328};
   BuildTable(base, frame, kNodePageGuard, kNodePages, kEntries, 6);
-  const uint32_t page = LoadU32(base, uint32_t(r3) + 10104);
+  const uint32_t page = NS(base, uint32_t(r3)).page();
   if (page == kNone) return r3;
   const uint32_t entry = kNodePages + (page << 3);
   const uint32_t target = LoadU32(base, entry);
@@ -137,8 +140,8 @@ uint64_t NodeScreenDraw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
 uint64_t NodeScreenUpdate(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8225A2C0 NodeScreen::Update");
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 144);
-  const uint32_t id = LoadU32(base, screen + 10100);
-  const uint32_t step = LoadU32(base, screen + 10116);
+  const uint32_t id = NS(base, screen).movie();
+  const uint32_t step = NS(base, screen).step();
   if (int32_t(id) < 0) return r3;
   const uint32_t movie = NodeMovieOf(base, screen, frame);
   if (step == kNone) return calls.call(kRun, frame, 0x8225A3D0, movie, 0);
@@ -151,19 +154,18 @@ uint64_t NodeScreenUpdate(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& 
   const uint64_t done =
       CallEntry(base, target, self, frame + 80, std::nullopt, frame, 0x8225A38C, calls);
   if (int32_t(uint32_t(done)) == 0) return done;
-  // The page block (+10104): the queued step (+16) or the page after.
-  const uint32_t pages = screen + 10104;
-  const uint32_t queued = LoadU32(base, pages + 16);
+  // The page block: the queued step or the page after.
+  const uint32_t queued = NS(base, screen).queued_step();
   if (queued == kNone) {
-    const uint32_t after = LoadU32(base, pages + 4);
-    StoreU32(base, pages + 12, kNone);
-    StoreU32(base, pages + 0, after);
+    const uint32_t after = NS(base, screen).next_page();
+    NS(base, screen).set_step(kNone);
+    NS(base, screen).set_page(after);
   } else {
-    StoreU32(base, pages + 20, 0);
-    StoreU32(base, pages + 12, queued);
-    StoreU32(base, pages + 16, kNone);
+    NS(base, screen).set_unknown_10124(0);
+    NS(base, screen).set_step(queued);
+    NS(base, screen).set_queued_step(kNone);
   }
-  StoreU32(base, pages + 24, 0);
+  NS(base, screen).set_step_started(0);
   return done;
 }
 
@@ -175,56 +177,56 @@ uint64_t NodeScreenPage2(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& c
   const uint64_t list = r3 + 10132;
   Call1(calls, race_screens::kListUpdate, list, frame, 0x82259D9C);
   uint64_t result = 0;
-  if (LoadU32(base, screen + 10156) != 0 ||
-      LoadU32(base, screen + 10136) - LoadU32(base, screen + 10140) != 0) {
+  if (NS(base, screen).course_list_move() != 0 ||
+      NS(base, screen).course_list_scroll() - NS(base, screen).course_list_scroll_before() != 0) {
     // The list moved: the pairs saved, the item loaded, page 2 after step 2.
     PlaySound(base, 4, frame, calls);
-    const uint32_t a = LoadU32(base, screen + 428), b = LoadU32(base, screen + 436),
-                   c = LoadU32(base, screen + 444);
-    StoreU32(base, screen + 432, a);
-    StoreU32(base, screen + 440, b);
-    StoreU32(base, screen + 448, c);
+    const uint32_t a = NS(base, screen).table_item(), b = NS(base, screen).table_second(),
+                   c = NS(base, screen).table_third();
+    NS(base, screen).set_table_item_before(a);
+    NS(base, screen).set_table_second_before(b);
+    NS(base, screen).set_table_third_before(c);
     NodeScreenLoadItem(base, r3, frame, calls);
-    const uint32_t page = LoadU32(base, screen + 10104);
-    if (page != 2) StoreU32(base, screen + 10112, page);
-    StoreU32(base, screen + 10116, 2);
-    StoreU32(base, screen + 10120, kNone);
-    StoreU32(base, screen + 10108, 2);
-    StoreU32(base, screen + 10104, kNone);
+    const uint32_t page = NS(base, screen).page();
+    if (page != 2) NS(base, screen).set_previous_page(page);
+    NS(base, screen).set_step(2);
+    NS(base, screen).set_queued_step(kNone);
+    NS(base, screen).set_next_page(2);
+    NS(base, screen).set_page(kNone);
   } else if (int32_t(uint32_t(Call1(calls, race_screens::kListAccepted, list, frame,
                                     0x82259DC0))) != 0 ||
              int32_t(uint32_t(Call1(calls, race_screens::kListCancelled, list, frame,
                                     0x82259DD0))) != 0) {
     // Accepted or cancelled: page 4 after step 1 (the leaving).
     result = PlaySound(base, 2, frame, calls);
-    const uint32_t page = LoadU32(base, screen + 10104);
-    if (page != 4) StoreU32(base, screen + 10112, page);
-    StoreU32(base, screen + 10120, kNone);
-    StoreU32(base, screen + 10116, 1);
-    StoreU32(base, screen + 10108, 4);
-    StoreU32(base, screen + 10104, kNone);
+    const uint32_t page = NS(base, screen).page();
+    if (page != 4) NS(base, screen).set_previous_page(page);
+    NS(base, screen).set_queued_step(kNone);
+    NS(base, screen).set_step(1);
+    NS(base, screen).set_next_page(4);
+    NS(base, screen).set_page(kNone);
     return result;
   } else {
     result = Call1(calls, race_screens::kListUpdate, r3 + 10204, frame, 0x82259DE0);
-    if (LoadU32(base, screen + 10228) == 0) return result;
+    if (NS(base, screen).toggle_move() == 0) return result;
     PlaySound(base, 4, frame, calls);
     NodeScreenOnToggleMoved(base, r3, frame, calls);
   }
   const uint32_t traffic = race_screens::ListSelection(base, screen + 10204);
   const uint32_t selection = race_screens::ListSelection(base, screen + 10132);
-  const uint64_t course = uint64_t(LoadU32(base, screen + 10136)) + uint64_t(selection);
+  const uint64_t course = uint64_t(NS(base, screen).course_list_scroll()) + uint64_t(selection);
   return NodeScreenShowRecords(base, r3, course, traffic, frame, calls);
 }
 
 uint64_t NodeScreenPage4(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_822590E8 NodeScreen::Page4");
-  if ((LoadU32(base, kFadeCountA) | LoadU32(base, kFadeCountB)) != 0) return r3;
+  if ((G::fade_out_count(base) | G::fade_in_count(base)) != 0) return r3;
   const uint32_t screen = uint32_t(r3);
-  const uint32_t page = LoadU32(base, screen + 10104);
-  if (page != 5) StoreU32(base, screen + 10112, page);
-  StoreU32(base, screen + 10116, kNone);
-  StoreU32(base, screen + 10104, 5);
-  StoreU32(base, screen + 10120, kNone);
+  const uint32_t page = NS(base, screen).page();
+  if (page != 5) NS(base, screen).set_previous_page(page);
+  NS(base, screen).set_step(kNone);
+  NS(base, screen).set_page(5);
+  NS(base, screen).set_queued_step(kNone);
   return r3;
 }
 
@@ -234,7 +236,7 @@ uint64_t NodeScreenPage5(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
   const uint32_t frame = Frame(base, sp, 96);
   // Slot 6 (Type6NodeScreen::Back) with the page's r4 (the dispatcher).
   const uint64_t result = Slot(base, r3, 24, r4, frame, 0x8225934C, calls);
-  StoreU32(base, uint32_t(r3) + 10064, 9);
+  NS(base, uint32_t(r3)).set_state(9);
   return result;
 }
 
@@ -244,29 +246,29 @@ uint64_t NodeScreenStep0(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& c
   ITC_NATIVE_RUNNING("sub_82259EC0 NodeScreen::Step0");
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 128);
   const uint32_t movie = NodeMovieOf(base, screen, frame);
-  if (LoadU32(base, screen + 10128) == 0) {
-    uint32_t named = LoadU32(base, screen + 10284);
+  if (NS(base, screen).step_started() == 0) {
+    uint32_t named = NS(base, screen).open_anim();
     if (int32_t(named) >= 0) Play(calls, movie, named, 0, frame, 0x82259F1C);
-    named = LoadU32(base, screen + 10300);
+    named = NS(base, screen).open_anim_b();
     if (int32_t(named) >= 0) Play(calls, movie, named, 1, frame, 0x82259F40);
     PlayLoop(base, calls, screen, movie, 10292, frame, 0x82259F64, 0x82259F70);
     PlayLoop(base, calls, screen, movie, 10296, frame, 0x82259F94, 0x82259FA0);
-    named = LoadU32(base, screen + 10320);
+    named = NS(base, screen).open_anim_c();
     if (int32_t(named) >= 0) Play(calls, movie, named, 1, frame, 0x82259FC4);
-    named = LoadU32(base, screen + 10392);
+    named = NS(base, screen).records_anim();
     if (int32_t(named) >= 0 && ui_movies::IsNamedActive(base, movie, named) == 0) {
       PlayLoop(base, calls, screen, movie, 10392, frame, 0x82259FFC, 0x8225A008);
     }
     // Slot 22 (Type6NodeScreen::ShowMarks) with r4 = +10136.
-    Slot(base, r3, 88, LoadU32(base, screen + 10136), frame, 0x8225A020, calls);
+    Slot(base, r3, 88, NS(base, screen).course_list_scroll(), frame, 0x8225A020, calls);
     mode_tick::ScreenFadesFadeIn(base, 10, 0, 0, 0, 0);
     calls.set_r4(0);
     // Slot 21 (Type6NodeScreen::SetScrollText), r4 as FadeIn left it.
     Slot(base, r3, 84, std::nullopt, frame, 0x8225A04C, calls);
-    StoreU32(base, screen + 10128, 1);
+    NS(base, screen).set_step_started(1);
   }
   uint64_t done = uint32_t(calls.call(kRun, frame, 0x8225A060, movie, 0)) == 0 ? 1 : 0;
-  if (int32_t(LoadU32(base, screen + 10284)) < 0 && int32_t(LoadU32(base, screen + 10300)) < 0) {
+  if (int32_t(NS(base, screen).open_anim()) < 0 && int32_t(NS(base, screen).open_anim_b()) < 0) {
     done = 1;
   }
   if (done == 0) return 0;
@@ -285,12 +287,12 @@ uint64_t NodeScreenStep1(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& c
   const uint32_t movie = NodeMovieOf(base, screen, frame);
   // The leaving step's quirk: +10128 is never set here, so this runs on
   // every call.
-  if (LoadU32(base, screen + 10128) == 0) {
-    const uint32_t named = LoadU32(base, screen + 10288);
+  if (NS(base, screen).step_started() == 0) {
+    const uint32_t named = NS(base, screen).leave_anim();
     if (int32_t(named) >= 0) Play(calls, movie, named, 0, frame, 0x822596E4);
   }
   uint64_t done = uint32_t(calls.call(kRun, frame, 0x822596F0, movie, 0)) == 0 ? 1 : 0;
-  if (int32_t(LoadU32(base, screen + 10288)) < 0) done = 1;
+  if (int32_t(NS(base, screen).leave_anim()) < 0) done = 1;
   if (done != 0) {
     Call1(calls, kFinishAll, movie, frame, 0x82259718);
     // ScreenFades::FadeOut(30, 0, 0, 0, 0): 30 given, not [0x82001BF0].
@@ -309,7 +311,7 @@ uint64_t NodeScreenStep2(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& c
   // MenuList::GetPreviousSelection (sub_8220BC28): +20.
   const uint32_t p = LoadU32(base, list + 20);
   const int32_t moved = int32_t(s - p);
-  const uint32_t wrapped = LoadU32(base, screen + 10164);
+  const uint32_t wrapped = NS(base, screen).course_list_wrapped();
   const int32_t scrolled = int32_t(LoadU32(base, list + 4) - LoadU32(base, list + 8));
   // The items' named animations, [+10352 + 4i].
   const uint32_t was = ((p + 2588) << 2) + screen;
@@ -318,37 +320,37 @@ uint64_t NodeScreenStep2(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& c
   const uint32_t is = ((s + 2588) << 2) + screen;
   Finish(calls, movie, LoadU32(base, is), frame, 0x822597E8);
   calls.call(kUnloopNamed, frame, 0x822597F4, movie, LoadU32(base, is));
-  Finish(calls, movie, LoadU32(base, screen + 10336), frame, 0x82259800);
-  Finish(calls, movie, LoadU32(base, screen + 10340), frame, 0x8225980C);
+  Finish(calls, movie, NS(base, screen).item_up_anim(), frame, 0x82259800);
+  Finish(calls, movie, NS(base, screen).item_down_anim(), frame, 0x8225980C);
   PairedNodeTableRefresh(base, r3, frame, calls);
   // Slot 2 (Type6NodeScreen::SetText) with r4 = +10136.
-  Slot(base, r3, 8, LoadU32(base, screen + 10136), frame, 0x8225982C, calls);
+  Slot(base, r3, 8, NS(base, screen).course_list_scroll(), frame, 0x8225982C, calls);
   Play(calls, movie, LoadU32(base, is), 1, frame, 0x82259848);
   calls.call(kLoopNamed, frame, 0x82259854, movie, LoadU32(base, is));
   if (wrapped == 0) {
     if (moved > 0) {
-      Play(calls, movie, LoadU32(base, screen + 10340), 1, frame, 0x8225988C);
+      Play(calls, movie, NS(base, screen).item_down_anim(), 1, frame, 0x8225988C);
     } else if (moved < 0) {
-      Play(calls, movie, LoadU32(base, screen + 10336), 1, frame, 0x8225988C);
+      Play(calls, movie, NS(base, screen).item_up_anim(), 1, frame, 0x8225988C);
     }
   } else {
     // The cursor's child +16 = the selection × 40 as a float (the product
     // left in the frame's +80 as a 64-bit integer, the conversion's spill).
-    const uint32_t node = ui_movies::FindNode(base, movie, kNone, LoadU32(base, screen + 10280));
+    const uint32_t node = ui_movies::FindNode(base, movie, kNone, NS(base, screen).cursor_node());
     const int64_t product = int64_t(int32_t(s * 40));
     StoreU32(base, frame + 80, uint32_t(uint64_t(product) >> 32));
     StoreU32(base, frame + 84, uint32_t(uint64_t(product)));
-    const uint32_t child = ui_movies::Child(base, node, LoadU32(base, screen + 10548));
+    const uint32_t child = ui_movies::Child(base, node, NS(base, screen).cursor_child());
     StoreU32(base, child + 16, std::bit_cast<uint32_t>(float(double(product))));
   }
   if (scrolled != 0) {
-    Finish(calls, movie, LoadU32(base, screen + 10344), frame, 0x822598D8);
-    Finish(calls, movie, LoadU32(base, screen + 10348), frame, 0x822598E4);
+    Finish(calls, movie, NS(base, screen).scroll_down_anim(), frame, 0x822598D8);
+    Finish(calls, movie, NS(base, screen).scroll_up_anim(), frame, 0x822598E4);
     Play(calls, movie, LoadU32(base, screen + (scrolled < 0 ? 10348 : 10344)), 1, frame,
          0x82259914);
   }
   // Slot 22 (Type6NodeScreen::ShowMarks) with r4 = +10136.
-  Slot(base, r3, 88, LoadU32(base, screen + 10136), frame, 0x8225992C, calls);
+  Slot(base, r3, 88, NS(base, screen).course_list_scroll(), frame, 0x8225992C, calls);
   calls.call(kRun, frame, 0x82259938, movie, 0);
   return 1;
 }
@@ -371,7 +373,8 @@ uint64_t NodeScreenShowSelection(uint8_t* base, uint64_t r3, uint32_t sp, const 
   const uint32_t toggle = screen + 10204;
   NodeScreenSetArrows(base, r3, race_screens::ListSelection(base, toggle), 1, frame);
   const uint32_t which = race_screens::ListSelection(base, toggle);
-  const uint32_t named = LoadU32(base, screen + (which == 0 ? 10324 : 10328));
+  const uint32_t named =
+      (which == 0 ? NS(base, screen).toggle_anim_a() : NS(base, screen).toggle_anim_b());
   if (int32_t(named) < 0) return which;
   Play(calls, movie, named, 1, frame, 0x82259B5C);
   return calls.call(kLoopNamed, frame, 0x82259B68, movie, named);
@@ -406,15 +409,20 @@ uint64_t NodeScreenSetArrows(uint8_t* base, uint64_t r3, uint32_t which, uint32_
                              uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82259368 NodeScreen::SetArrows");
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 128);
-  const uint32_t child = LoadU32(base, screen + (int32_t(which) == 0 ? 10396 : 10400));
+  const uint32_t child =
+      (int32_t(which) == 0 ? NS(base, screen).arrow_child_a() : NS(base, screen).arrow_child_b());
   if (int32_t(child) < 0) return r3;
-  const uint32_t sub_scene = LoadU32(base, screen + 10276);
+  const uint32_t sub_scene = NS(base, screen).sub_scene();
   if (int32_t(sub_scene) < 0) return r3;
   const uint32_t movie = NodeMovieOf(base, screen, frame);
-  const uint32_t field = int32_t(on) != 0 ? 10536 : 10540;
-  if (int32_t(LoadU32(base, screen + field)) < 0) return movie;
+  // The arrow's frame word, read for each use.
+  auto frame_word = [&] {
+    return int32_t(on) != 0 ? NS(base, screen).arrow_on_frame()
+                            : NS(base, screen).arrow_off_frame();
+  };
+  if (int32_t(frame_word()) < 0) return movie;
   const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
-  StoreU32(base, node + 108, LoadU32(base, screen + field));
+  StoreU32(base, node + 108, frame_word());
   return node;
 }
 
@@ -428,7 +436,7 @@ uint64_t NodeScreenRefresh(uint8_t* base, uint64_t r3, uint32_t sp, const Calls&
   Slot(base, r3, 4, std::nullopt, frame, 0x822599FC, calls);
   const uint32_t traffic = race_screens::ListSelection(base, screen + 10204);
   const uint32_t selection = race_screens::ListSelection(base, screen + 10132);
-  const uint64_t course = uint64_t(LoadU32(base, screen + 10136)) + uint64_t(selection);
+  const uint64_t course = uint64_t(NS(base, screen).course_list_scroll()) + uint64_t(selection);
   NodeScreenShowRecords(base, r3, course, traffic, frame, calls);
   NodeScreenSetArrows(base, r3, 0, 0, frame);
   NodeScreenSetArrows(base, r3, 1, 0, frame);
@@ -481,24 +489,24 @@ uint64_t NodeScreenShowRecords(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t
   }
   // UiMovie::SetNodeTexture(m, -1, +10544, the course): the lookup, then the
   // texture.
-  const uint32_t node = ui_movies::FindNode(base, movie, kNone, LoadU32(base, screen + 10544));
+  const uint32_t node = ui_movies::FindNode(base, movie, kNone, NS(base, screen).course_node());
   return ui_movies::SetNodeTexture(base, node, course);
 }
 
 uint64_t NodeScreenLoadItem(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82259050 NodeScreen::LoadItem");
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 128);
-  const uint32_t scroll = LoadU32(base, screen + 10136);
+  const uint32_t scroll = NS(base, screen).course_list_scroll();
   const uint32_t selection = race_screens::ListSelection(base, screen + 10132);
   // Slot 4 (ItemInfo) with r4 = the item, r5 = the frame's +80.
   const uint64_t result = Slot5(base, r3, 16, uint64_t(selection) + uint64_t(scroll), frame + 80,
                                 frame, 0x82259094, calls);
   const uint32_t a = LoadU32(base, frame + 84), b = LoadU32(base, frame + 88),
                  c = LoadU32(base, frame + 80), d = LoadU32(base, frame + 92);
-  StoreU32(base, screen + 428, a);
-  StoreU32(base, screen + 436, b);
-  StoreU32(base, screen + 444, c);
-  StoreU32(base, screen + 452, d);
+  NS(base, screen).set_table_item(a);
+  NS(base, screen).set_table_second(b);
+  NS(base, screen).set_table_third(c);
+  NS(base, screen).set_table_fourth(d);
   return result;
 }
 
@@ -507,7 +515,7 @@ uint64_t NodeScreenLoadItem(uint8_t* base, uint64_t r3, uint32_t sp, const Calls
 uint64_t NodeScreenDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82259948 NodeScreen::~NodeScreen");
   const uint32_t frame = Frame(base, sp, 96);
-  StoreU32(base, uint32_t(r3), kNodeScreenVtable);
+  NS(base, uint32_t(r3)).set_vtable(kNodeScreenVtable);
   ReleaseList(base, r3 + 10204, frame, 0x82259970, calls);
   ReleaseList(base, r3 + 10132, frame, 0x82259978, calls);
   return NodeTableDestruct(base, r3);

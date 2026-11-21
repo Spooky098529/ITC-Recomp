@@ -24,6 +24,7 @@
 #include "hooks/direct_slots.h"
 #include "hooks/heap.h"
 #include "hooks/screen_objects.h"
+#include "schema/screen_objects.h"
 #include "screen_objects/screen_objects.h"
 #include "screen_objects/uv_trees.h"
 #include "lifted/sdk.h"
@@ -82,7 +83,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82130198) {
     return;
   }
   so::MapConstruct(base, ctx.r3.u32);
-  ctx.r3.u64 = guest::LoadU32(base, ctx.r3.u32 + so::kHead);
+  ctx.r3.u64 = schema::ScreenObjectUvMap(base, ctx.r3.u32).head().address;
 }
 
 // --- ScreenObject ---
@@ -107,7 +108,7 @@ namespace {
 // The video output: [0x8266D088]'s slot 7, then that one's slot 3, with
 // the original's return addresses.
 uint32_t VideoOutputCall(lifted::Regs& ctx, uint8_t* base, uint32_t first, uint32_t second) {
-  ctx.r3.u64 = guest::LoadU32(base, 0x8266D088);
+  ctx.r3.u64 = schema::ScreenObjectsGlobals::video_app(base);
   ctx.lr = first;
   // Slot 7's plain C++ where it's the game's (hooks::DirectSlotCall).
   const uint32_t slot7 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);

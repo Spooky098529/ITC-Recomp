@@ -35,15 +35,22 @@ constexpr uint32_t kMenu4Strings[2] = {0x820106D8, 0x820106C4};
 // The page object to `page` through `transition`: +8 the old page unless
 // it's `page` already, +12, +16 -1, +4, +0 -1.
 void Through(uint8_t* base, uint32_t transition, uint32_t page) {
-  const uint32_t pages = Load(base, kPages);
-  const uint32_t old = Load(base, pages + 0);
+  const auto pages = G::pages(base);
+  const uint32_t old = pages.page();
   if (old != page) {
-    Store(base, pages + 8, old);
+    pages.set_previous_page(old);
   }
-  Store(base, pages + 12, transition);
-  Store(base, pages + 16, kNone);
-  Store(base, pages + 4, page);
-  Store(base, pages + 0, kNone);
+  pages.set_step(transition);
+  pages.set_queued_step(kNone);
+  pages.set_next_page(page);
+  pages.set_page(kNone);
+}
+
+// The title's +4 from the list's selection: the selection first, then the
+// title's pointer, as the original.
+void SetMainItem(uint8_t* base) {
+  const uint32_t selection = race_screens::ListSelection(base, ListAddress(base));
+  Words(base).set_main_item(selection);
 }
 
 }  // namespace
@@ -55,8 +62,8 @@ uint64_t MainMenu(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls,
   for (uint32_t k = 0; k < 7; k++) {
     Store(base, frame + 80 + 4 * k, kMainStrings[k]);
   }
-  calls.Call(kListUpdate, frame, 0x822227C4, Load(base, kList));
-  const uint32_t list = Load(base, kList);
+  calls.Call(kListUpdate, frame, 0x822227C4, ListAddress(base));
+  const uint32_t list = ListAddress(base);
   uint32_t sound = 0;
   if (Load(base, list + 24) != 0) {
     Through(base, 7, 2);
@@ -66,7 +73,7 @@ uint64_t MainMenu(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls,
     if (uint32_t(accepted) == 0) {
       return accepted;
     }
-    const uint32_t s = race_screens::ListSelection(base, Load(base, kList));
+    const uint32_t s = race_screens::ListSelection(base, ListAddress(base));
     if (s >= 7) {
       return s;
     }
@@ -82,24 +89,24 @@ uint64_t MainMenu(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls,
     switch (s) {
       case 0:
         Through(base, 11, 3);
-        Store(base, Load(base, kPages) + 16, 12);
-        Store(base, Words(base) + 4, race_screens::ListSelection(base, Load(base, kList)));
+        G::pages(base).set_queued_step(12);
+        SetMainItem(base);
         break;
       case 3:
       case 6:
         Through(base, 8, 5);
-        Store(base, Words(base) + 4, race_screens::ListSelection(base, Load(base, kList)));
+        SetMainItem(base);
         break;
       case 4: {
-        Store(base, Words(base) + 4, race_screens::ListSelection(base, Load(base, kList)));
-        const uint32_t pages = Load(base, kPages);
-        const uint32_t old = Load(base, pages + 0);
+        SetMainItem(base);
+        const auto pages = G::pages(base);
+        const uint32_t old = pages.page();
         if (old != kNone) {
-          Store(base, pages + 8, old);
+          pages.set_previous_page(old);
         }
-        Store(base, pages + 0, kNone);
-        Store(base, pages + 12, kNone);
-        Store(base, pages + 16, kNone);
+        pages.set_page(kNone);
+        pages.set_step(kNone);
+        pages.set_queued_step(kNone);
         Post(base, mode, 15);
         break;
       }
@@ -115,7 +122,7 @@ uint64_t MainMenu(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls,
         break;
     }
     if (leave) {
-      Store(base, Words(base) + 4, race_screens::ListSelection(base, Load(base, kList)));
+      SetMainItem(base);
       Through(base, 8, 5);
     }
   }
@@ -128,25 +135,25 @@ uint64_t CareerMenu(uint8_t* base, uint32_t sp, const Calls& calls) {
   for (uint32_t k = 0; k < 3; k++) {
     Store(base, frame + 80 + 4 * k, kCareerStrings[k]);
   }
-  calls.Call(kListUpdate, frame, 0x82221B58, Load(base, kList));
-  const uint32_t list = Load(base, kList);
+  calls.Call(kListUpdate, frame, 0x82221B58, ListAddress(base));
+  const uint32_t list = ListAddress(base);
   uint32_t sound = 0;
   if (Load(base, list + 24) != 0) {
     Through(base, 13, 3);
     sound = 4;
   } else if (uint32_t(calls.Call(kListAccepted, frame, 0x82221B94, list)) == 0) {
-    const uint64_t cancelled = calls.Call(kListCancelled, frame, 0x82221CA0, Load(base, kList));
+    const uint64_t cancelled = calls.Call(kListCancelled, frame, 0x82221CA0, ListAddress(base));
     if (uint32_t(cancelled) == 0) {
       return cancelled;
     }
     Through(base, 14, 2);
     sound = 2;
   } else {
-    const uint32_t s = race_screens::ListSelection(base, Load(base, kList));
+    const uint32_t s = race_screens::ListSelection(base, ListAddress(base));
     if (s >= 3) {
       return s;
     }
-    if (s != 0 && Load(base, Words(base) + 8) == 0) {
+    if (s != 0 && Words(base).can_continue() == 0) {
       sound = 3;
     } else if (s == 0) {
       const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
@@ -178,16 +185,16 @@ uint64_t Menu4(uint8_t* base, uint32_t sp, const Calls& calls) {
   for (uint32_t k = 0; k < 2; k++) {
     Store(base, frame + 80 + 4 * k, kMenu4Strings[k]);
   }
-  calls.Call(kMenuStep, frame, 0x82222400, Load(base, kMenu));
-  uint64_t r3 = calls.Call(kMenuPressed, frame, 0x8222240C, Load(base, kMenu), 159);
+  calls.Call(kMenuStep, frame, 0x82222400, G::menu(base).address);
+  uint64_t r3 = calls.Call(kMenuPressed, frame, 0x8222240C, G::menu(base).address, 159);
   if (uint32_t(r3) != 0) {
     Through(base, 8, 5);
     return r3;
   }
-  r3 = calls.Call(kMenuPressed, frame, 0x82222444, Load(base, kMenu), 158);
+  r3 = calls.Call(kMenuPressed, frame, 0x82222444, G::menu(base).address, 158);
   if (uint32_t(r3) != 0) {
     Through(base, 16, 2);
-  } else if (Load(base, Load(base, kMenu) + 8) != 0) {
+  } else if (G::menu(base).moved() != 0) {
     Through(base, 17, 4);
   }
   return r3;

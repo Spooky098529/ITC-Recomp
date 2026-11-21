@@ -20,6 +20,7 @@
 #include "base/flags.h"
 #include "hooks/c_runtime.h"
 #include "hooks/heap.h"
+#include "schema/std_string.h"
 #include "std_string/std_string.h"
 
 ITC_FLAG_BOOL(native_std_string, true, "ITC",
@@ -54,8 +55,9 @@ ITC_NATIVE_ENTRY_ALWAYS(82091328) {
   
   const uint32_t string = ctx.r3.u32;
   const bool built = (ctx.r4.u32 & 0xFF) != 0;
-  const bool frees = built && guest::LoadU32(base, string + kCapacity) >= kInPlace;
-  const uint32_t block = guest::LoadU32(base, string + kText);
+  const schema::StdString s(base, string);
+  const bool frees = built && s.capacity() >= kInPlace;
+  const uint32_t block = s.block();
   if (!NativeLifetime() || !Tidy(base, string, built, ctx.r5.u32)) {
     lifted::original::c82091328(ctx, base);
     return;

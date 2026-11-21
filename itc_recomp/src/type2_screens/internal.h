@@ -7,10 +7,14 @@
 #include <cstdint>
 
 #include "guest.h"
+#include "schema/menu_helpers.h"
+#include "schema/type2_screens.h"
 #include "type2_screens/type2_screens.h"
 #include "ui_movies/game.h"
 
 namespace type2_screens {
+
+using Globals = schema::Type2ScreensGlobals;
 
 inline uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 inline void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -37,16 +41,17 @@ inline uint32_t FindMovie(uint8_t* base, uint32_t id, uint32_t key) {
 // The page object's moves the handlers make inline: to `page` after
 // `transition` then `queued` (-1 for none), +8 the page before unless it
 // was `page`.
-inline void PagesGo(uint8_t* base, uint32_t pages, uint32_t page, uint32_t transition,
+inline void PagesGo(uint8_t* base, uint32_t pages_address, uint32_t page, uint32_t transition,
                     uint32_t queued) {
-  const uint32_t before = Load(base, pages + 0);
+  const schema::PageObject pages(base, pages_address);
+  const uint32_t before = pages.page();
   if (before != page) {
-    Store(base, pages + 8, before);
+    pages.set_previous_page(before);
   }
-  Store(base, pages + 12, transition);
-  Store(base, pages + 16, queued);
-  Store(base, pages + 4, page);
-  Store(base, pages + 0, 0xFFFFFFFFu);
+  pages.set_step(transition);
+  pages.set_queued_step(queued);
+  pages.set_next_page(page);
+  pages.set_page(0xFFFFFFFFu);
 }
 
 // Player 0's selected garage car: the garage (save + 6120) walked by its

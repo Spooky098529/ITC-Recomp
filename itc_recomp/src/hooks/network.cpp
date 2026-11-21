@@ -9,6 +9,7 @@
 #include "hooks/native_entry.h"
 #include "guest_call.h"
 
+#include "schema/system_services.h"
 #include "user/network.h"
 #include "user/user.h"
 
@@ -56,31 +57,22 @@ ITC_NATIVE_ENTRY_ALWAYS(82459D40) {
 // (the bounds are 0-4 users, so one user never triggers them).
 namespace {
 
-constexpr uint32_t kProfileOverlapped = 0x826C6080;  // 997 while a read is pending
-constexpr uint32_t kProfileResults = 0x826C6AD0;
-constexpr uint32_t kProfileRequested = 0x826C7938;  // set by the controller assignments
-constexpr uint32_t kProfileWasRead = 0x826C793C;
-constexpr uint32_t kSignInPolled = 0x826C7950;
-constexpr uint32_t kSignedInMask = 0x826C7954;
-constexpr uint32_t kSignedInCount = 0x826C7958;
-constexpr uint32_t kLiveMask = 0x826C795C;
-constexpr uint32_t kSignInChecked = 0x826C796C;
-constexpr uint32_t kUsersPolled = 0x826C7998;
-constexpr uint32_t kFirstUser = 0x82618B84;
-constexpr uint32_t kPlayerControllers = 0x826BABA4;  // the user on player 1's controller
-constexpr uint32_t kUserTable = 0x826C7670;          // +12 count, +14 names, +144 XUIDs
+using G = schema::SystemServicesGlobals;
+
 constexpr uint32_t kNameSlotBytes = 32;
-// Where the gamercard region (profile setting 3) is copied after a read.
-constexpr uint32_t kRegionCopies[] = {0x826C77AC, 0x826C77B0, 0x826C77B4, 0x826C77B8,
-                                      0x826C6728, 0x826C7288};
+
+// The user table (0x826C7670): the users' names and XUIDs, the regions.
+schema::NetUserTable UserTable(uint8_t* base) {
+  return schema::NetUserTable(base, G::user_table_address());
+}
 
 // The sign-in poll: user 0 signed in locally (src/user/user.h), none on Live.
 // True the first time (the users' names and XUIDs are written then).
 bool PollUsers(uint8_t* base) {
-  if (guest::LoadU32(base, kUsersPolled)) {
+  if (G::users_polled(base)) {
     return false;
   }
-  guest::StoreU32(base, kUsersPolled, 1);
+  G::set_users_polled(base, 1);
   uint32_t mask = 0, count = 0, first = 0xFFFFFFFF;
   for (uint32_t i = 0; i < user::kUserSlots; i++) {
     if (user::SigninState(i) != user::kNotSignedIn) {
@@ -89,88 +81,92 @@ bool PollUsers(uint8_t* base) {
       first = std::min(first, i);
     }
   }
-  guest::StoreU32(base, kSignedInMask, mask);
-  guest::StoreU32(base, kSignedInCount, count);
-  guest::StoreU32(base, kLiveMask, 0);
-  guest::StoreU32(base, kFirstUser, first);
-  guest::StoreU32(base, kSignInPolled, 1);
-  guest::StoreU32(base, kSignInChecked, 1);
+  G::set_signed_in_mask(base, mask);
+  G::set_signed_in_count(base, count);
+  G::set_live_mask(base, 0);
+  G::set_first_user(base, first);
+  G::set_sign_in_polled(base, 1);
+  G::set_sign_in_checked(base, 1);
   return true;
 }
 
 // The signed-in users' names (UTF-16) and XUIDs, in order, after their count.
 void WriteUserTable(uint8_t* base) {
+  const schema::NetUserTable table = UserTable(base);
   uint8_t count = 0;
   for (uint32_t i = 0; i < user::kUserSlots; i++) {
     for (uint32_t b = 0; b < kNameSlotBytes; b++) {
-      guest::StoreU8(base, kUserTable + 14 + kNameSlotBytes * i + b, 0);
+      guest::StoreU8(base, table.names_address() + kNameSlotBytes * i + b, 0);
     }
   }
   for (uint32_t i = 0; i < user::kUserSlots; i++) {
     if (user::SigninState(i) == user::kNotSignedIn) {
       continue;
     }
-    const uint32_t name = kUserTable + 14 + kNameSlotBytes * count;
+    const uint32_t name = table.names_address() + kNameSlotBytes * count;
     for (uint32_t c = 0; c < user::kName.size(); c++) {
       guest::StoreU16(base, name + 2 * c, uint8_t(user::kName[c]));
     }
-    const uint32_t xuid = kUserTable + 144 + 8 * count;
+    const uint32_t xuid = table.xuids_address() + 8 * count;
     guest::StoreU32(base, xuid, uint32_t(user::kXuid >> 32));
     guest::StoreU32(base, xuid + 4, uint32_t(user::kXuid));
     count++;
   }
-  guest::StoreU8(base, kUserTable + 12, count);
+  table.set_count(count);
 }
 
 // After a read, the gamercard region from its results; 0 while they're
 // missing (asked again then).
 void CopyRegion(uint8_t* base) {
-  guest::StoreU32(base, kProfileWasRead, 0);
-  if (!guest::LoadU32(base, kSignedInCount)) {
+  G::set_profile_was_read(base, 0);
+  if (!G::signed_in_count(base)) {
     return;
   }
-  const uint32_t results = guest::LoadU32(base, guest::LoadU32(base, kProfileResults) + 4);
-  if (!results) {
-    guest::StoreU32(base, kProfileRequested, 1);
+  const schema::SysProfileSettings results = G::profile_results(base).settings();
+  if (!results.address) {
+    G::set_profile_requested(base, 1);
     return;
   }
-  const uint32_t region =
-      guest::LoadU32(base, results + 120) ? guest::LoadU32(base, results + 152) : 0;
-  for (uint32_t address : kRegionCopies) {
-    guest::StoreU32(base, address, region);
-  }
+  const uint32_t region = results.region_source() ? results.region_value() : 0;
+  const schema::NetUserTable table = UserTable(base);
+  table.set_region_slot0(region);
+  table.set_region_slot1(region);
+  table.set_region_slot2(region);
+  table.set_region_slot3(region);
+  G::set_region_copy_6728(base, region);
+  G::set_region_copy_7288(base, region);
 }
 
 // The user whose profile is read: player 1's controller's if signed in, else
 // the first signed-in user.
 uint32_t ProfileUser(uint8_t* base) {
-  const uint32_t player = guest::LoadU32(base, kPlayerControllers);
-  if (player < 32 && (guest::LoadU32(base, kSignedInMask) >> player & 1)) {
+  const uint32_t player = G::player_controller(base);
+  if (player < 32 && (G::signed_in_mask(base) >> player & 1)) {
     return player;
   }
-  return guest::LoadU32(base, kFirstUser);
+  return G::first_user(base);
 }
 
 }  // namespace
 
 ITC_NATIVE_ENTRY_ALWAYS(8214E268) {
   
-  if (guest::LoadU32(base, kProfileOverlapped) != 997) {
-    if (guest::LoadU32(base, kProfileWasRead)) {
+  if (G::profile_overlapped(base) != 997) {
+    if (G::profile_was_read(base)) {
       CopyRegion(base);
     }
     const bool first = PollUsers(base);
     if (first) {
       WriteUserTable(base);
     }
-    if (first || guest::LoadU32(base, kProfileRequested) == 1) {
+    if (first || G::profile_requested(base) == 1) {
       const uint32_t profile_user = ProfileUser(base);
       InFrame(ctx, base, 512, 0x8214E4A8, [&](uint32_t) {
         ctx.r3.u64 = profile_user;
         lifted::Enter(ctx, base, lifted::e82149178);  // the game's profile read
       });
-      guest::StoreU32(base, kProfileRequested, 0);
-      guest::StoreU32(base, kProfileWasRead, 1);
+      G::set_profile_requested(base, 0);
+      G::set_profile_was_read(base, 1);
     }
   }
 }

@@ -5,6 +5,8 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/game_modes.h"
+#include "schema/type5_mode.h"
 
 namespace type5_mode {
 
@@ -12,6 +14,9 @@ namespace {
 
 using guest::LoadU32;
 using guest::StoreU32;
+using G = schema::Type5ModeGlobals;
+using Mode = schema::ModeType5;
+using Block = schema::Type5ModeBlock;
 
 // The delegate's vtable (ModeDelegate::Invoke) and the thunks.
 constexpr uint32_t kDelegateVtable = 0x82010FA0;
@@ -32,10 +37,6 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
 uint64_t Load64(uint8_t* base, uint32_t at) {
   return (uint64_t(LoadU32(base, at)) << 32) | LoadU32(base, at + 4);
 }
-void Store64(uint8_t* base, uint32_t at, uint64_t value) {
-  StoreU32(base, at, uint32_t(value >> 32));
-  StoreU32(base, at + 4, uint32_t(value));
-}
 
 // The mode's delegate (+8, its holder +4) from the doubleword at `slot`
 // (the function, 0, written there first as the originals build it). The
@@ -44,15 +45,27 @@ void Store64(uint8_t* base, uint32_t at, uint64_t value) {
 void SetDelegate(uint8_t* base, uint32_t mode, uint32_t slot, uint32_t function) {
   StoreU32(base, slot + 4, 0);
   StoreU32(base, slot, function);
+  const Mode m(base, mode);
   const uint32_t delegate = mode + 8;
   uint32_t holder = 0;
   if (delegate != 0) {
     holder = delegate;
-    StoreU32(base, delegate + 4, mode);
-    Store64(base, delegate + 8, Load64(base, slot));
-    StoreU32(base, delegate + 0, kDelegateVtable);
+    m.set_delegate_object(mode);
+    // The function and the adjustment, copied as one doubleword (the high
+    // word stored first).
+    const uint64_t pair = Load64(base, slot);
+    m.set_delegate_function(uint32_t(pair >> 32));
+    m.set_delegate_adjustment(uint32_t(pair));
+    m.set_delegate_vtable(kDelegateVtable);
   }
-  StoreU32(base, mode + 4, holder);
+  m.set_delegate_ptr(holder);
+}
+
+// The block's next-mode answer stored as the originals copy it: two words,
+// the high one first.
+void StoreAnswer(const Block& block, uint64_t value) {
+  block.set_answer_word0(uint32_t(value >> 32));
+  block.set_answer_next_type(uint32_t(value));
 }
 
 // The answer (r3) cleared: +4 and its first byte.
@@ -61,52 +74,54 @@ void ClearAnswer(uint8_t* base, uint32_t answer) {
   guest::StoreU8(base, answer, 0);
 }
 
-// Posts the message (id, 0, 0) on the ring at `ring` (its count +600, start
-// +604, 50 slots of 12 bytes), as the originals do inline.
-void PostRing(uint8_t* base, uint32_t ring, uint32_t id) {
-  const uint32_t count = LoadU32(base, ring + 600) + 1;
-  const uint32_t end = LoadU32(base, ring + 604) + count - 1;
-  StoreU32(base, ring + 600, count);
-  const uint32_t slot = ring + 12 * (end - (end / 50) * 50);
-  StoreU32(base, slot + 0, id);
-  StoreU32(base, slot + 4, 0);
-  StoreU32(base, slot + 8, 0);
+// Posts the message (id, 0, 0) on the mode's ring (50 slots of 12 bytes),
+// as the originals do inline.
+void PostRing(uint8_t* base, uint32_t mode, uint32_t id) {
+  const Mode m(base, mode);
+  const uint32_t count = m.ring_count() + 1;
+  const uint32_t end = m.ring_start() + count - 1;
+  m.set_ring_count(count);
+  const schema::ModeMessage slot(base, m.ring_address() + 12 * (end - (end / 50) * 50));
+  slot.set_id(id);
+  slot.set_arg0(0);
+  slot.set_arg1(0);
 }
 
 // The machine for an id: 3 the car settings (the block), 16 the dialog, 21
 // the parking area; any other 0 (whose words NextMode reads as they are).
-uint32_t MachineOf(uint32_t block, uint32_t id) {
+// Each is a StateMachine (its state at +9604).
+schema::StateMachine MachineOf(const Block& block, uint32_t id) {
   switch (id) {
     case 3:
-      return block + kCarSettingsAt;
+      return schema::StateMachine(block.base, block.car_settings_address());
     case 16:
-      return block + kDialogAt;
+      return schema::StateMachine(block.base, block.dialog_address());
     case 21:
-      return block + kLocationAt;
+      return schema::StateMachine(block.base, block.location_screen_address());
     default:
-      return 0;
+      return schema::StateMachine(block.base, 0);
   }
 }
 
 // The three machines' movies loaded (each loaded word 1).
-bool AllLoaded(uint8_t* base, uint32_t block) {
-  return int32_t(LoadU32(base, block + kLocationAt + kMachineLoaded)) == 1 &&
-         int32_t(LoadU32(base, block + kCarSettingsAt + kMachineLoaded)) == 1 &&
-         int32_t(LoadU32(base, block + kDialogAt + kMachineLoaded)) == 1;
+bool AllLoaded(const Block& block) {
+  return int32_t(block.location_loaded()) == 1 && int32_t(block.car_settings_loaded()) == 1 &&
+         int32_t(block.dialog_loaded()) == 1;
 }
 
 }  // namespace
 
 void FindShown(uint8_t* base, uint32_t block) {
   ITC_NATIVE_RUNNING("sub_8222FD08 ModeType5::FindShown");
+  const Block b(base, block);
   for (uint32_t id = 0; id < 47; id++) {
-    const uint32_t machine = MachineOf(block, id);
-    if (machine == 0) {
+    const auto machine = MachineOf(b, id);
+    if (machine.address == 0) {
       continue;
     }
-    const int32_t state = int32_t(LoadU32(base, machine + kMachineState));
+    const int32_t state = int32_t(machine.state());
     if (state == 5 || state == 4) {
-      StoreU32(base, block + kShown, id);
+      b.set_shown(id);
     }
   }
 }
@@ -114,35 +129,40 @@ void FindShown(uint8_t* base, uint32_t block) {
 uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8222FD68 ModeType5::Init");
   const uint32_t frame = Frame(base, sp, 128);
-  auto block = [&] { return LoadU32(base, mode + kBlock); };
+  const Mode m(base, mode);
+  auto block = [&] { return m.block(); };
   calls.Call(kScreenStart, frame, 0x8222FD7C, mode);
   const uint64_t strings =
-      calls.Call(kStringsLoad, frame, 0x8222FD8C, LoadU32(base, kStringTable), 0x7FFB);
+      calls.Call(kStringsLoad, frame, 0x8222FD8C, G::string_table(base), 0x7FFB);
   calls.Call(kArchiveWaitIdle, frame, 0x8222FD90, strings, 0x7FFB);
   const uint64_t allocated =
-      calls.Call(kVirtualAlloc, frame, 0x8222FDA4, 0, kBlockBytes, 4096, 4);
-  StoreU32(base, mode + kBlock, uint32_t(allocated));
-  calls.Call(kLocationInitStates, frame, 0x8222FDB4, uint32_t(allocated) + kLocationAt);
-  calls.Call(kCarSettingsInitType5, frame, 0x8222FDBC, block());
+      calls.Call(kVirtualAlloc, frame, 0x8222FDA4, 0, Block::kSize, 4096, 4);
+  m.set_block(uint32_t(allocated));
+  calls.Call(kLocationInitStates, frame, 0x8222FDB4,
+             Block(base, uint32_t(allocated)).location_screen_address());
+  calls.Call(kCarSettingsInitType5, frame, 0x8222FDBC, block().address);
   bool replaced = false;
-  DialogInit(base, block() + kDialogAt, frame - kDialogInitFrame, &replaced);
+  DialogInit(base, block().dialog_address(), frame - kDialogInitFrame, &replaced);
   // The three machines added to the dispatcher in the order +9640, +0,
   // +19280.
-  const uint32_t dispatcher = mode + kDispatcher;
-  for (const uint32_t offset : {kLocationAt, kCarSettingsAt, kDialogAt}) {
-    const uint32_t count = LoadU32(base, dispatcher + 200);
-    StoreU32(base, dispatcher + 200, count + 1);
-    StoreU32(base, dispatcher + (count << 2), block() + offset);
+  for (int i = 0; i < 3; i++) {
+    const uint32_t count = m.handler_count();
+    m.set_handler_count(count + 1);
+    const Block b = block();
+    const uint32_t machine = i == 0   ? b.location_screen_address()
+                             : i == 1 ? b.car_settings_address()
+                                      : b.dialog_address();
+    StoreU32(base, m.handlers_address() + (count << 2), machine);
   }
-  StoreU32(base, block() + kFirstShown, 21);
-  StoreU32(base, block() + kShown, 21);
-  StoreU32(base, block() + kLocationAt + kMachineReenter, 1);
-  StoreU32(base, block() + kLocationAt + kMachineDelete, 0);
-  StoreU32(base, block() + kCarSettingsAt + kMachineReenter, 1);
-  StoreU32(base, block() + kCarSettingsAt + kMachineDelete, 0);
-  StoreU32(base, block() + kDialogAt + kMachineReenter, 1);
-  StoreU32(base, block() + kDialogAt + kMachineDelete, 0);
-  calls.CallArgs(kFadeIn, frame, 0x8222FE78, {LoadU32(base, kFadesIn), 0, 0, 0, 0, 0, 0, 0});
+  block().set_first_shown(21);
+  block().set_shown(21);
+  block().set_location_reenter(1);
+  block().set_location_delete_movie(0);
+  block().set_car_settings_reenter(1);
+  block().set_car_settings_delete_movie(0);
+  block().set_dialog_reenter(1);
+  block().set_dialog_delete_movie(0);
+  calls.CallArgs(kFadeIn, frame, 0x8222FE78, {G::fade_in_passes(base), 0, 0, 0, 0, 0, 0, 0});
   const uint64_t r3 = calls.Call(kLoadingShow, frame, 0x8222FE88, 1, 0, ~uint64_t(0));
   // The delegate: WaitForLoads through Mode::Slot8Thunk.
   SetDelegate(base, mode, frame + 80, kSlot8Thunk);
@@ -155,7 +175,7 @@ void WaitForLoads(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp,
   const uint32_t frame = Frame(base, sp, 128);
   ClearAnswer(base, answer);
   calls.Call(kLoadingRun, frame, 0x82230078, ~uint64_t(0));
-  if (AllLoaded(base, LoadU32(base, mode + kBlock))) {
+  if (AllLoaded(Mode(base, mode).block())) {
     // Bank 1's cue 3, the two words in the frame.
     StoreU32(base, frame + 80, 3);
     StoreU32(base, frame + 88, 1);
@@ -163,33 +183,33 @@ void WaitForLoads(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp,
     calls.Call(kLoadingFinish, frame, 0x822300C4, ~uint64_t(0));
     SetDelegate(base, mode, frame + 88, kNextModeThunk);
   }
-  PostRing(base, mode + kRing, 1);
-  calls.Call(kDispatch, frame, 0x82230158, mode + kDispatcher, mode);
+  PostRing(base, mode, 1);
+  calls.Call(kDispatch, frame, 0x82230158, Mode(base, mode).handlers_address(), mode);
 }
 
 void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82230458 ModeType5::NextMode");
   const uint32_t frame = Frame(base, sp, 160);
   ClearAnswer(base, answer);
-  FindShown(base, LoadU32(base, mode + kBlock));
+  FindShown(base, Mode(base, mode).block().address);
   {
-    const uint32_t block = LoadU32(base, mode + kBlock);
-    const uint32_t machine = MachineOf(block, LoadU32(base, block + kShown));
-    if (int32_t(LoadU32(base, machine + kMachineState)) == 8) {
+    const Block block = Mode(base, mode).block();
+    const auto machine = MachineOf(block, block.shown());
+    if (int32_t(machine.state()) == 8) {
       SetDelegate(base, mode, frame + 80, kSlot12Thunk);
     }
   }
-  if (int32_t(LoadU32(base, LoadU32(base, mode + kBlock) + kLocationAt + kMachineState)) == 10) {
-    PostRing(base, mode + kRing, 4);
+  if (int32_t(Mode(base, mode).block().location_state()) == 10) {
+    PostRing(base, mode, 4);
   }
-  PostRing(base, mode + kRing, 1);
-  PostRing(base, mode + kRing, 0);
-  calls.Call(kDispatch, frame, 0x822305F4, mode + kDispatcher, 0);
+  PostRing(base, mode, 1);
+  PostRing(base, mode, 0);
+  calls.Call(kDispatch, frame, 0x822305F4, Mode(base, mode).handlers_address(), 0);
   // The answer (byte 1, the next mode) built over the frame's doubleword
   // at +80 (its other three bytes as they are: the Slot12Thunk word's when
   // the state 8 branch ran this call, else the stack's).
-  const uint32_t block = LoadU32(base, mode + kBlock);
-  const int32_t state = int32_t(LoadU32(base, block + kLocationAt + kMachineState));
+  const Block block = Mode(base, mode).block();
+  const int32_t state = int32_t(block.location_state());
   if (state == 11) {
     StoreU32(base, frame + 84, 1);
   } else if (state == 13) {
@@ -200,7 +220,7 @@ void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const 
   guest::StoreU8(base, frame + 80, 1);
   const uint64_t next = Load64(base, frame + 80);
   StoreU32(base, frame + 84, 0);
-  Store64(base, block + kNextAnswer, next);
+  StoreAnswer(block, next);
   SetDelegate(base, mode, frame + 80, kSlot14Thunk);
 }
 
@@ -208,9 +228,9 @@ void LeaveScreen(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, con
   ITC_NATIVE_RUNNING("sub_82230260 ModeType5::LeaveScreen");
   const uint32_t frame = Frame(base, sp, 128);
   ClearAnswer(base, answer);
-  FindShown(base, LoadU32(base, mode + kBlock));
-  PostRing(base, mode + kRing, 3);
-  calls.Call(kDispatch, frame, 0x822302DC, mode + kDispatcher, mode);
+  FindShown(base, Mode(base, mode).block().address);
+  PostRing(base, mode, 3);
+  calls.Call(kDispatch, frame, 0x822302DC, Mode(base, mode).handlers_address(), mode);
   SetDelegate(base, mode, frame + 80, kSlot11Thunk);
 }
 
@@ -219,29 +239,29 @@ void WaitForShown(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp,
   ITC_NATIVE_RUNNING("sub_82230168 ModeType5::WaitForShown");
   const uint32_t frame = Frame(base, sp, 112);
   ClearAnswer(base, answer);
-  FindShown(base, LoadU32(base, mode + kBlock));
-  if (AllLoaded(base, LoadU32(base, mode + kBlock))) {
+  FindShown(base, Mode(base, mode).block().address);
+  if (AllLoaded(Mode(base, mode).block())) {
     SetDelegate(base, mode, frame + 80, kNextModeThunk);
   }
-  PostRing(base, mode + kRing, 1);
-  calls.Call(kDispatch, frame, 0x82230248, mode + kDispatcher, mode);
+  PostRing(base, mode, 1);
+  calls.Call(kDispatch, frame, 0x82230248, Mode(base, mode).handlers_address(), mode);
 }
 
 void Leaving(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82230328 ModeType5::Leaving");
   const uint32_t frame = Frame(base, sp, 128);
   ClearAnswer(base, answer);
-  PostRing(base, mode + kRing, 4);
-  calls.Call(kDispatch, frame, 0x8223039C, mode + kDispatcher, mode);
+  PostRing(base, mode, 4);
+  calls.Call(kDispatch, frame, 0x8223039C, Mode(base, mode).handlers_address(), mode);
   // The machines' check over the ids 0 to 2, as the original's (none of
   // which is a machine: the check always passes).
-  const uint32_t block = LoadU32(base, mode + kBlock);
+  const Block block = Mode(base, mode).block();
   for (uint32_t id = 0; id < 3; id++) {
-    const uint32_t machine = MachineOf(block, id);
-    if (machine == 0) {
+    const auto machine = MachineOf(block, id);
+    if (machine.address == 0) {
       continue;
     }
-    const int32_t state = int32_t(LoadU32(base, machine + kMachineState));
+    const int32_t state = int32_t(machine.state());
     if (state != 6 && state != 11 && state != 14 && state != 12 && state != 20) {
       return;
     }
@@ -251,14 +271,15 @@ void Leaving(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const C
 
 uint32_t Interrupt(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_8222FED0 ModeType5::Interrupt");
-  const uint32_t block = LoadU32(base, object + 816);
-  if (!AllLoaded(base, block)) {
+  // `object` is the mode's +32 interface.
+  const Block block = Mode(base, object - 32).block();
+  if (!AllLoaded(block)) {
     return 0;
   }
-  if (int32_t(LoadU32(base, block + kDialogAt + kMachineState)) == 9) {
+  if (int32_t(block.dialog_state()) == 9) {
     return 1;
   }
-  PostRing(base, object + 208, 18);
+  PostRing(base, object - 32, 18);
   return 0;
 }
 
@@ -274,20 +295,23 @@ void ForceExit(uint8_t* base, uint32_t object, uint32_t number, uint32_t sp) {
   guest::StoreU8(base, slot, 1);
   const uint64_t next = Load64(base, slot);
   if (number < 2) {
-    StoreU32(base, kEntered, 1);
+    G::set_leaving_flag(base, 1);
   }
-  Store64(base, LoadU32(base, object + 816) + kNextAnswer, next);
+  StoreAnswer(Mode(base, object - 32).block(), next);
 }
 
 void Resume(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_8222FC38 ModeType5::Resume");
-  StoreU32(base, LoadU32(base, kLocationScreen) + 900, 1);
+  // The parking area's screen's restart word (location-screen.toml's
+  // LocationScreen +900).
+  StoreU32(base, G::location_screen<schema::View>(base).address + 900, 1);
 }
 
 uint64_t Slot14Thunk(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, uint32_t lr,
                      const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8222FC50 Mode::Slot14Thunk");
-  const uint32_t target = LoadU32(base, LoadU32(base, uint32_t(r4)) + 56);
+  const uint32_t target =
+      schema::Type5SlotObject(base, uint32_t(r4)).vtable().leaving();
   if (target == 0x82230328) {
     Leaving(base, uint32_t(r3), uint32_t(r4), sp, calls);
     return r3;

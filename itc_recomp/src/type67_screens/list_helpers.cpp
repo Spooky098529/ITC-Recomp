@@ -12,6 +12,7 @@
 #include "base/log.h"
 #include "car_list/car_list.h"
 #include "guest.h"
+#include "schema/type67_screens.h"
 #include "race_screens/race_screens.h"
 #include "ui_movies/game.h"
 
@@ -21,6 +22,9 @@ namespace {
 
 using guest::LoadU32;
 using guest::StoreU32;
+using CLS = schema::ColorListScreen;
+using LS = schema::ListScreen;
+using NLS = schema::NodeListScreen;
 
 constexpr uint32_t kFinishNamed = 0x8211DF20, kPlayNamed = 0x8211DAC8, kLoopNamed = 0x8211DDE0;
 constexpr uint32_t kClearText = 0x8211C470, kScrollText = 0x8211C570,
@@ -35,7 +39,7 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
 // The screen's movie: [+9680] at the frame's +80, then UiMovies::Find.
 // `found` the address Find answers (the r3 it leaves).
 uint32_t MovieOf(uint8_t* base, uint32_t screen, uint32_t frame, uint32_t* found) {
-  StoreU32(base, frame + 80, LoadU32(base, screen + 9680));
+  StoreU32(base, frame + 80, LS(base, screen).movie());
   *found = ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80);
   return LoadU32(base, *found);
 }
@@ -71,7 +75,7 @@ uint64_t Restart(const Calls& calls, uint32_t frame, uint32_t lr0, uint32_t lr1,
 
 uint64_t ListScreenDestruct(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_82251EB8 ListScreen::~ListScreen");
-  StoreU32(base, uint32_t(r3), kListScreenVtable);
+  LS(base, uint32_t(r3)).set_vtable(kListScreenVtable);
   return r3;
 }
 
@@ -79,7 +83,7 @@ uint64_t ListScreenDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, 
                                     const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82252248 ListScreen::DeletingDestructor");
   const uint32_t frame = Frame(base, sp, 96);
-  StoreU32(base, uint32_t(r3), kListScreenVtable);
+  LS(base, uint32_t(r3)).set_vtable(kListScreenVtable);
   if ((flags & 1) != 0) {
     const uint64_t args[6] = {r3, flags, 0, 0, 0, 0};
     calls.call_set(car_list::kOperatorDelete, args, 2, frame, 0x82252274);
@@ -101,7 +105,7 @@ uint64_t NodeListScreenLoadItem(uint8_t* base, uint64_t r3, uint64_t r4, uint32_
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 112);
   const uint32_t info = frame + 80;
   uint64_t result = Slot5(base, r3, 100, r4, info, frame, 0x82257088, calls);
-  if (LoadU32(base, screen + 9672) != 0) {
+  if (NLS(base, screen).node_table().address != 0) {
     result = NodeTableSetPairs(base, r3 + 10360, info);
   }
   for (uint32_t i = 0; i < 2; i++) {
@@ -124,7 +128,7 @@ uint64_t ColorListScreenLoadItem(uint8_t* base, uint64_t r3, uint64_t r4, uint64
   if (index >= 0 && index < int32_t(LoadU32(base, info + 8))) {
     value = LoadU32(base, (uint32_t(r5) << 2) + (frame + 100));
   }
-  StoreU32(base, screen + 10908, value);
+  CLS(base, screen).set_table_color_child(value);
   return result;
 }
 
@@ -141,39 +145,40 @@ uint64_t ListScreenShowSelection(uint8_t* base, uint64_t r3, uint64_t r4, uint32
   // MenuList::GetPreviousSelection (sub_8220BC28): +20.
   const uint32_t previous = LoadU32(base, list + 20);
   uint64_t result = previous;
-  const uint32_t named = LoadU32(base, screen + 9900);
+  const uint32_t named = LS(base, screen).selection_anim();
   if (int32_t(named) >= 0) {
     result = Restart(calls, frame, 0x82251914, 0x82251930, movie, named);
   }
-  if (int32_t(LoadU32(base, screen + 9724)) >= 0) {
+  if (int32_t(LS(base, screen).selection_sub_scene()) >= 0) {
     if (int32_t(previous) >= 0) {
-      const uint32_t child = LoadU32(base, screen + 9764);
+      const uint32_t child = LS(base, screen).previous_child();
       if (int32_t(child) >= 0) {
-        result = SetNodeWord(base, movie, LoadU32(base, screen + 9724), child, previous);
+        result = SetNodeWord(base, movie, LS(base, screen).selection_sub_scene(), child, previous);
       }
     }
-    const uint32_t child = LoadU32(base, screen + 9768);
+    const uint32_t child = LS(base, screen).selection_child();
     if (int32_t(child) >= 0) {
-      result = SetNodeWord(base, movie, LoadU32(base, screen + 9724), child, selection);
+      result = SetNodeWord(base, movie, LS(base, screen).selection_sub_scene(), child, selection);
     }
-    for (int32_t i = 0; i < int32_t(LoadU32(base, screen + 9784)); i++) {
-      const uint32_t first = LoadU32(base, screen + 9772);
+    for (int32_t i = 0; i < int32_t(LS(base, screen).children_count()); i++) {
+      const uint32_t first = LS(base, screen).previous_children();
       if (first != 0 && int32_t(previous) >= 0) {
         const uint32_t node = LoadU32(base, uint32_t(4 * i) + first);
         if (int32_t(node) >= 0) {
-          result = SetNodeWord(base, movie, LoadU32(base, screen + 9724), node, previous);
+          result = SetNodeWord(base, movie, LS(base, screen).selection_sub_scene(), node, previous);
         }
       }
-      const uint32_t second = LoadU32(base, screen + 9776);
+      const uint32_t second = LS(base, screen).selection_children();
       if (second != 0) {
         const uint32_t node = LoadU32(base, uint32_t(4 * i) + second);
         if (int32_t(node) >= 0) {
-          result = SetNodeWord(base, movie, LoadU32(base, screen + 9724), node, selection);
+          result =
+              SetNodeWord(base, movie, LS(base, screen).selection_sub_scene(), node, selection);
         }
       }
     }
   }
-  const uint32_t last = LoadU32(base, screen + 9760);
+  const uint32_t last = LS(base, screen).selection_node();
   if (int32_t(last) >= 0) {
     result = SetNodeWord(base, movie, kNone, last, selection);
   }
@@ -214,25 +219,25 @@ uint64_t ListScreenSetScrollText(uint8_t* base, uint64_t r3, uint64_t r4, uint64
   ITC_NATIVE_RUNNING("sub_82251D00 ListScreen::SetScrollText");
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 128);
   const uint32_t id = uint32_t(r4);
-  if (id == LoadU32(base, screen + 10140)) return r3;
+  if (id == LS(base, screen).scroll_text()) return r3;
   uint32_t found = 0;
   const uint32_t movie = MovieOf(base, screen, frame, &found);
   uint64_t result = found;
-  const uint32_t sub_scene = LoadU32(base, screen + 9740);
+  const uint32_t sub_scene = LS(base, screen).scroll_sub_scene();
   if (int32_t(sub_scene) >= 0) {
-    const uint32_t child = LoadU32(base, screen + 9816);
+    const uint32_t child = LS(base, screen).scroll_child();
     if (int32_t(child) >= 0 && int32_t(id) >= 0) {
       const uint64_t reset[6] = {movie, sub_scene, child, 0, 0, 0};
       calls.call_set(kResetTextScroll, reset, 3, frame, 0x82251D68);
-      const uint32_t text_sub = LoadU32(base, screen + 9740);
+      const uint32_t text_sub = LS(base, screen).scroll_sub_scene();
       calls.set_r4(text_sub);
-      calls.set_text(frame, 0x82251D7C, movie, text_sub, LoadU32(base, screen + 9816), id);
-      const uint64_t scroll[6] = {movie, LoadU32(base, screen + 9740),
-                                  LoadU32(base, screen + 9816), uint32_t(r5), 0, 0};
+      calls.set_text(frame, 0x82251D7C, movie, text_sub, LS(base, screen).scroll_child(), id);
+      const uint64_t scroll[6] = {movie, LS(base, screen).scroll_sub_scene(),
+                                  LS(base, screen).scroll_child(), uint32_t(r5), 0, 0};
       result = calls.call_set(kScrollText, scroll, 4, frame, 0x82251D90);
     }
   }
-  StoreU32(base, screen + 10140, id);
+  LS(base, screen).set_scroll_text(id);
   return result;
 }
 
@@ -242,16 +247,16 @@ uint64_t ListScreenClearScrollText(uint8_t* base, uint64_t r3, uint32_t sp, cons
   uint32_t found = 0;
   const uint32_t movie = MovieOf(base, screen, frame, &found);
   uint64_t result = found;
-  const uint32_t sub_scene = LoadU32(base, screen + 9740);
+  const uint32_t sub_scene = LS(base, screen).scroll_sub_scene();
   if (int32_t(sub_scene) >= 0) {
-    const uint32_t child = LoadU32(base, screen + 9816);
+    const uint32_t child = LS(base, screen).scroll_child();
     if (int32_t(child) >= 0) {
       const uint64_t args[6] = {movie, sub_scene, child, 0, 0, 0};
       result = calls.call_set(kClearText, args, 3, frame, 0x82251DEC);
     }
   }
-  StoreU32(base, screen + 10136, 0);
-  StoreU32(base, screen + 10140, kNone);
+  LS(base, screen).set_scroll_text_shown(0);
+  LS(base, screen).set_scroll_text(kNone);
   return result;
 }
 
@@ -259,16 +264,21 @@ uint64_t ListScreenSetArrows(uint8_t* base, uint64_t r3, uint32_t which, uint32_
                              uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82251E10 ListScreen::SetArrows");
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 128);
-  const uint32_t child = LoadU32(base, screen + (int32_t(which) == 0 ? 9752 : 9756));
+  const uint32_t child =
+      (int32_t(which) == 0 ? LS(base, screen).arrow_child_a() : LS(base, screen).arrow_child_b());
   if (int32_t(child) < 0) return r3;
-  const uint32_t sub_scene = LoadU32(base, screen + 9728);
+  const uint32_t sub_scene = LS(base, screen).text_sub_scene();
   if (int32_t(sub_scene) < 0) return r3;
   uint32_t found = 0;
   const uint32_t movie = MovieOf(base, screen, frame, &found);
-  const uint32_t field = int32_t(on) != 0 ? 9800 : 9804;
-  if (int32_t(LoadU32(base, screen + field)) < 0) return movie;
+  // The arrow's frame word, read for each use.
+  auto frame_word = [&] {
+    return int32_t(on) != 0 ? LS(base, screen).arrow_on_frame()
+                            : LS(base, screen).arrow_off_frame();
+  };
+  if (int32_t(frame_word()) < 0) return movie;
   const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
-  StoreU32(base, node + 108, LoadU32(base, screen + field));
+  StoreU32(base, node + 108, frame_word());
   return node;
 }
 
@@ -311,7 +321,8 @@ uint64_t ListScreenShowToggle(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t 
   const uint32_t list = uint32_t(r4);
   ListScreenSetArrows(base, r3, race_screens::ListSelection(base, list), 1, frame);
   const uint32_t selection = race_screens::ListSelection(base, list);
-  const uint32_t named = LoadU32(base, screen + (int32_t(selection) == 0 ? 9892 : 9896));
+  const uint32_t named = (int32_t(selection) == 0 ? LS(base, screen).toggle_anim_a()
+                                                  : LS(base, screen).toggle_anim_b());
   if (int32_t(named) < 0) return selection;
   Restart(calls, frame, 0x82252214, 0x82252230, movie, named);
   return calls.call(kLoopNamed, frame, 0x8225223C, movie, named);
@@ -325,12 +336,13 @@ uint64_t ListScreenSetIcons(uint8_t* base, uint64_t r3, uint32_t sp) {
   // UiMovie::SetNodeTexture (sub_8211A708): the lookup, then the texture.
   static constexpr uint32_t kTextures[4] = {0, 0, 1, 1};
   for (uint32_t k = 0; k < 4; k++) {
-    const uint32_t node = ui_movies::FindNode(base, movie, LoadU32(base, screen + 9732),
-                                              LoadU32(base, screen + 9812) + k);
+    const uint32_t node = ui_movies::FindNode(base, movie, LS(base, screen).icon_sub_scene(),
+                                              LS(base, screen).icon_child() + k);
     ui_movies::SetNodeTexture(base, node, kTextures[k]);
   }
-  SetShown(base, movie, LoadU32(base, screen + 9732), LoadU32(base, screen + 9812) + 4, 0);
-  return SetShown(base, movie, LoadU32(base, screen + 9732), LoadU32(base, screen + 9812) + 5, 0);
+  SetShown(base, movie, LS(base, screen).icon_sub_scene(), LS(base, screen).icon_child() + 4, 0);
+  return SetShown(base, movie, LS(base, screen).icon_sub_scene(), LS(base, screen).icon_child() + 5,
+                  0);
 }
 
 uint64_t ListScreenSetUpMovie(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
@@ -340,16 +352,16 @@ uint64_t ListScreenSetUpMovie(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
   const uint32_t movie = MovieOf(base, screen, frame, &found);
   // r4 as Find leaves it (the id's word).
   calls.call(kResetPose, frame, 0x82251F04, movie, frame + 80);
-  const uint32_t table = LoadU32(base, screen + 9672);
+  const uint32_t table = LS(base, screen).node_table().address;
   if (table != 0) {
     // Slot 1 with r4 as ResetPose left it.
     Slot(base, table, 4, std::nullopt, frame, 0x82251F24, calls);
   }
-  const uint32_t sub_scene = LoadU32(base, screen + 9724);
+  const uint32_t sub_scene = LS(base, screen).selection_sub_scene();
   if (int32_t(sub_scene) >= 0) {
-    const uint32_t child = LoadU32(base, screen + 9748);
+    const uint32_t child = LS(base, screen).shown_child();
     if (int32_t(child) >= 0) {
-      SetShown(base, movie, sub_scene, child, LoadU32(base, screen + 9788) != 0 ? 1 : 0);
+      SetShown(base, movie, sub_scene, child, LS(base, screen).shown_child_on() != 0 ? 1 : 0);
     }
   }
   ListScreenSetArrows(base, r3, 0, 0, frame);
@@ -368,27 +380,27 @@ uint64_t ListScreenShow(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
   const uint32_t movie = MovieOf(base, screen, frame, &found);
   // r4 the sub-scene as the original loads it (slot 22 is called with the
   // r4 the last of these leaves).
-  const uint32_t sub_scene = LoadU32(base, screen + 9728);
+  const uint32_t sub_scene = LS(base, screen).text_sub_scene();
   calls.set_r4(sub_scene);
   if (int32_t(sub_scene) >= 0) {
-    const uint32_t title = LoadU32(base, screen + 9712);
+    const uint32_t title = LS(base, screen).title_child();
     if (int32_t(title) >= 0) {
       calls.set_text(frame, 0x82251FF0, movie, sub_scene, title, 322);
     }
-    const uint32_t first = LoadU32(base, screen + 9716);
+    const uint32_t first = LS(base, screen).text_child_a();
     if (first != 0) {
-      const uint32_t at = LoadU32(base, screen + 9728);
+      const uint32_t at = LS(base, screen).text_sub_scene();
       calls.set_r4(at);
       calls.set_text(frame, 0x8225200C, movie, at, first, 0);
     }
-    const uint32_t second = LoadU32(base, screen + 9720);
+    const uint32_t second = LS(base, screen).text_child_b();
     if (second != 0) {
-      const uint32_t at = LoadU32(base, screen + 9728);
+      const uint32_t at = LS(base, screen).text_sub_scene();
       calls.set_r4(at);
       calls.set_text(frame, 0x82252028, movie, at, second, 1);
     }
   }
-  StoreU32(base, screen + 9696, 0);
+  LS(base, screen).set_part_input(0);
   Slot(base, r3, 88, std::nullopt, frame, 0x82252044, calls);
   return Slot(base, r3, 56, r4, frame, 0x8225205C, calls);
 }
@@ -405,32 +417,31 @@ uint64_t ListScreenUpdate(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
                           const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822517B8 ListScreen::Update");
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 112);
-  if (int32_t(LoadU32(base, screen + 9680)) < 0) return r3;
+  if (int32_t(LS(base, screen).movie()) < 0) return r3;
   uint32_t found = 0;
   const uint32_t movie = MovieOf(base, screen, frame, &found);
-  if (LoadU32(base, screen + 9656) != kNone) {
+  if (LS(base, screen).step() != kNone) {
     // r4 as Find leaves it (the id's word).
     const uint64_t done = Slot(base, r3, 96, frame + 80, frame, 0x8225181C, calls);
     if (int32_t(uint32_t(done)) != 0) {
-      // The page block (+9644): the queued step (+16) or the page after.
-      const uint32_t pages = screen + 9644;
-      const uint32_t queued = LoadU32(base, pages + 16);
+      // The page block: the queued step or the page after.
+      const uint32_t queued = LS(base, screen).queued_step();
       if (queued == kNone) {
-        const uint32_t after = LoadU32(base, pages + 4);
-        StoreU32(base, pages + 12, kNone);
-        StoreU32(base, pages + 0, after);
+        const uint32_t after = LS(base, screen).next_page();
+        LS(base, screen).set_step(kNone);
+        LS(base, screen).set_page(after);
       } else {
-        StoreU32(base, pages + 20, 0);
-        StoreU32(base, pages + 12, queued);
-        StoreU32(base, pages + 16, kNone);
+        LS(base, screen).set_unknown_9664(0);
+        LS(base, screen).set_step(queued);
+        LS(base, screen).set_queued_step(kNone);
       }
-      StoreU32(base, pages + 24, 0);
+      LS(base, screen).set_step_started(0);
     }
     return done;
   }
   uint64_t result = calls.call(kRun, frame, 0x82251864, movie, 0);
-  if (LoadU32(base, screen + 9696) != 0) {
-    const uint32_t part = LoadU32(base, screen + 9676);
+  if (LS(base, screen).part_input() != 0) {
+    const uint32_t part = LS(base, screen).list_part().address;
     if (part != 0) {
       result = Slot(base, part, 12, r4, frame, 0x82251894, calls);
     }
@@ -449,7 +460,7 @@ uint64_t ListScreenTail(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t slot, 
       break;
     default:
       ITC_NATIVE_RUNNING("sub_822517A0 ListScreen::Open");
-      StoreU32(base, uint32_t(r3) + 9608, 4);
+      LS(base, uint32_t(r3)).set_state(4);
       break;
   }
   return Slot(base, r3, slot, r4, sp, lr, calls);

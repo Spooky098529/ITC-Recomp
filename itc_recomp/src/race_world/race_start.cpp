@@ -4,6 +4,8 @@
 
 #include "race_world/race_world.h"
 
+#include "schema/race_world.h"
+
 #include "ai_drivers/ai_drivers.h"
 #include "base/log.h"
 #include "car_physics/float_ops.h"
@@ -15,6 +17,9 @@
 #include "vehicle_accessors/vehicle_accessors.h"
 
 namespace race_world {
+
+using M = schema::RaceManager;
+using G = schema::RaceWorldGlobals;
 
 using namespace car_physics::ops;
 namespace va = vehicle_accessors;
@@ -39,7 +44,7 @@ void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
 uint32_t Manager(uint8_t* base) {
-  return Load(base, kManager);
+  return G::racers_manager(base).address;
 }
 uint32_t RaceData(uint8_t* base) {
   return Load(base, kRaceData);
@@ -53,7 +58,7 @@ uint32_t Mod2(uint32_t n) {
   return uint32_t(int32_t(n) % 2);
 }
 uint32_t RacerCount(uint8_t* base) {
-  return Load(base, Manager(base) + 2364);
+  return M(base, Manager(base)).racer_count();
 }
 
 // Stages::Copy of the current stage into `out`; its original where the
@@ -100,7 +105,7 @@ void Settle(uint8_t* base, uint32_t frame, uint32_t ticks, Settled which, uint32
   for (uint32_t tick = ticks; tick != 0; tick--) {
     calls.update_drivers(frame, update_lr);
     for (int32_t i = 0; i < int32_t(RacerCount(base)); i++) {
-      const uint32_t entry = Load(base, Manager(base) + 2308 + 4 * uint32_t(i));
+      const uint32_t entry = Load(base, M(base, Manager(base)).racers_address() + 4 * uint32_t(i));
       const uint32_t vehicle = va::VehicleGet(base, Load(base, entry + 20));
       if (which == Settled::kRollingInStage && (Load(base, entry) & 0x400) == 0) {
         continue;
@@ -167,7 +172,7 @@ void OnLoaded(uint8_t* base, uint32_t frame, const StartCalls& calls) {
   }
   AddRacers(base, Manager(base), RaceData(base) + 48, frame - 2000);
   for (int32_t i = 0; i < int32_t(RacerCount(base)); i++) {
-    const uint32_t entry = Load(base, Manager(base) + 2308 + 4 * uint32_t(i));
+    const uint32_t entry = Load(base, M(base, Manager(base)).racers_address() + 4 * uint32_t(i));
     const uint32_t vehicle = va::VehicleGet(base, Load(base, entry + 20));
     const uint32_t car = Load(base, entry + 24) * 3936 + RaceData(base) + 48;
     double f1 = 0.0;
@@ -176,8 +181,8 @@ void OnLoaded(uint8_t* base, uint32_t frame, const StartCalls& calls) {
   if (int32_t(RacerCount(base)) > 0) {
     const double across = Lfs(base, kZero);
     for (int32_t i = 0; i < int32_t(RacerCount(base)); i++) {
-      const uint32_t slot = 2308 + 4 * uint32_t(i);
-      const uint32_t entry = Load(base, Manager(base) + slot);
+      const uint32_t slot = 4 * uint32_t(i);
+      const uint32_t entry = Load(base, M(base, Manager(base)).racers_address() + slot);
       const uint32_t vehicle = va::VehicleGet(base, Load(base, entry + 20));
       const uint32_t record = Load(base, entry + 24);
       const uint32_t car = record * 3936 + RaceData(base);
@@ -190,13 +195,13 @@ void OnLoaded(uint8_t* base, uint32_t frame, const StartCalls& calls) {
       guest::StoreU8(base, vehicle + 2384, rest ? 1 : 0);
       const int32_t kind = int32_t(Load(base, RaceData(base) + kKindOffset));
       const uint32_t lane = kind == 0 || kind == 1 ? 0xFFFFFFFFu : Mod2(uint32_t(i));
-      track_route::ClampPosition(base, frame + 80, Load(base, Load(base, Manager(base) + slot) + 8));
+      track_route::ClampPosition(base, frame + 80, Load(base, Load(base, M(base, Manager(base)).racers_address() + slot) + 8));
       PlaceOnRoute(base, vehicle, frame + 80, Lfs(base, car + 3956), across, lane, frame, calls);
     }
   }
   Settle(base, frame, 30, Settled::kAll, 128, 96, false, 0x82173CE8, 0x82173D20, calls);
   for (int32_t i = 0; i < int32_t(RacerCount(base)); i++) {
-    const uint32_t entry = Load(base, Manager(base) + 2308 + 4 * uint32_t(i));
+    const uint32_t entry = Load(base, M(base, Manager(base)).racers_address() + 4 * uint32_t(i));
     const uint32_t vehicle = va::VehicleGet(base, Load(base, entry + 20));
     const uint32_t car = Load(base, entry + 24) * 3936 + RaceData(base);
     Stfs(base, vehicle + 6244, Lfs(base, car + 3968));
@@ -247,7 +252,7 @@ void Place(uint8_t* base, uint32_t object, uint32_t settle, uint32_t back, uint3
   if (int32_t(RacerCount(base)) > 0) {
     const double zero = Lfs(base, kZero);
     for (int32_t i = 0; i < int32_t(RacerCount(base)); i++) {
-      const uint32_t entry = Load(base, Manager(base) + 2308 + 4 * uint32_t(i));
+      const uint32_t entry = Load(base, M(base, Manager(base)).racers_address() + 4 * uint32_t(i));
       const uint32_t vehicle = va::VehicleGet(base, Load(base, entry + 20));
       const uint32_t number = Load(base, entry + 24);
       const uint32_t car = number * 3936 + RaceData(base);
@@ -355,7 +360,7 @@ void PlaceRolling(uint8_t* base, uint32_t object, uint32_t settle, uint32_t fram
     const double zero = Lfs(base, kZero);
     int32_t placed = 0, ahead = 10, behind = -10;
     for (int32_t i = 0; i < int32_t(RacerCount(base)); i++) {
-      uint32_t entry = Load(base, Manager(base) + 2308 + 4 * uint32_t(i));
+      uint32_t entry = Load(base, M(base, Manager(base)).racers_address() + 4 * uint32_t(i));
       const uint32_t vehicle = va::VehicleGet(base, Load(base, entry + 20));
       const uint32_t number = Load(base, entry + 24);
       const uint32_t car = number * 3936 + RaceData(base);

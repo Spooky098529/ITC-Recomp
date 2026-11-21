@@ -18,20 +18,13 @@ constexpr uint32_t kStats = 48;            // the stats record, 6,044 bytes
 constexpr uint32_t kStatsBytes = 6044;
 constexpr uint32_t kProgressBytes = 0x1D52C;  // what Progress::Clear clears
 constexpr uint32_t kUnlocks = 0x1ACE4;     // BitSet400
-// The play time's frame counter (Progress::SetDefaults copies it to +6088).
-constexpr uint32_t kPlayTimeFrames = 0x826C5B90;
-// The float the set-ups store (0.0, at 0x82000A34 in the xex).
-constexpr uint32_t kZeroFloat = 0x82000A34;
-
-// The default tables (static, in the xex's data).
-constexpr uint32_t kTable50A8 = 0x826C50A8;
-constexpr uint32_t kTable3044 = 0x826C3044;
-constexpr uint32_t kTable3E34 = 0x826C3E34;
-constexpr uint32_t kTable3C24 = 0x826C3C24;
-constexpr uint32_t kTable50E4 = 0x826C50E4;
+// The image words the code uses (the play time's frame counter, the float
+// 0.0, the default tables, the controllers, the title's list) are
+// schema::SaveDataGlobals' (itc_recomp/schema/save-data.toml); the address
+// constants below that stay are kept for the harness (src/harnesses/).
 
 // sub_821056C0 Stats::Stats: r3 = the stats record (save data + 48). The
-// float at kZeroFloat to +4892, 0 to +4896; 15 pairs {float, 0} at +4960 +
+// float 0.0 (0x82000A34) to +4892, 0 to +4896; 15 pairs {float, 0} at +4960 +
 // 48i; nine pairs at +5880 + 8i.
 void StatsConstruct(uint8_t* base, uint32_t stats);
 // sub_821136D8 Stats::ResetRecords: 15 records of 48 bytes from `records` +

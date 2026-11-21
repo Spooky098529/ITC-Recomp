@@ -14,7 +14,11 @@ by the B7 loop's mapping agent, 2026-10-23, from the UI movies' lead.
   the allocator, `sub_820912B0`) and go back with operator delete (both
   in `heap.md`, shared; Native behind adapters since the C runtime heap's
   migration), and text is copied with `memcpy_s` (`sub_825A7270`,
-  `c-runtime.md`, shared; Overridden).
+  `c-runtime.md`, shared; Overridden). The schema's `StdString`
+  (`itc_recomp/schema/std-string.toml`, E5 step 2: `text`, `block`,
+  `length`, `capacity`), with `StdStringLogicError` (`_Xlen`'s and
+  `_Xran`'s exception, `sub_82091968`), `StdStringCString` and
+  `StdStringMatchWord` (the wildcard search's arguments).
 - **Growth** (`_Grow`, `_Copy`): a new capacity of the length asked for
   with its low four bits set, or 1.5 times the old one when that's more,
   a new block of capacity + 1, the old text copied over and the old block

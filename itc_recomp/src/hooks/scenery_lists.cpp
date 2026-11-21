@@ -19,6 +19,7 @@
 #include "base/flags.h"
 #include "hooks/guest_call.h"
 #include "hooks/models.h"
+#include "schema/scenery_lists.h"
 #include "scenery_lists/scenery_lists.h"
 
 #include <array>
@@ -80,7 +81,7 @@ struct ReleaseContext {
     ctx.r3.u64 = model;
     if (destroy) {
       ctx.r4.s64 = 1;
-      lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, model)));
+      lifted::CallFromContext(ctx, base, schema::SceneryModel(base, model).vtable().destroy());
     } else {
       lifted::Enter(ctx, base, game::Model::Release);
     }
@@ -329,13 +330,14 @@ ITC_REGS_STEP(SceneryListsDrawShapeDepth) {
   }
   const uint64_t lr = ctx.lr;
   guest_call::InFrame(ctx, base, kFrame, 0x82596E60, [&](uint32_t) {
-    const uint32_t queue = guest::LoadU32(base, scenery_lists::kRenderQueue);
+    const uint32_t queue = schema::SceneryListsGlobals::render_queue(base);
     ctx.fpscr.disableFlushMode();
     ctx.f1.f64 = draw->depth;
     ctx.r4.u64 = draw->entry;
     ctx.r3.u64 = queue;
     ctx.r5.u64 = draw->key;
-    lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, queue) + 16));
+    lifted::CallFromContext(
+        ctx, base, schema::SceneryRenderQueueVtable(base, guest::LoadU32(base, queue)).add());
   });
   ctx.lr = lr;
 }
@@ -374,13 +376,14 @@ struct DrawContext {
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = frame;
     ctx.lr = lr;
-    const uint32_t queue = guest::LoadU32(base, scenery_lists::kRenderQueue);
+    const uint32_t queue = schema::SceneryListsGlobals::render_queue(base);
     ctx.fpscr.disableFlushMode();
     ctx.f1.f64 = depth;
     ctx.r4.u64 = entry;
     ctx.r3.u64 = queue;
     ctx.r5.u64 = key;
-    const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, queue) + 16);
+    const uint32_t function =
+        schema::SceneryRenderQueueVtable(base, guest::LoadU32(base, queue)).add();
     lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();

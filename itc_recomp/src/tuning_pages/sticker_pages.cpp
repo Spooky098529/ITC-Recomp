@@ -11,6 +11,8 @@
 #include "base/log.h"
 #include "debug/pause_menu_log.h"
 #include "guest.h"
+#include "schema/menu_helpers.h"
+#include "schema/sticker_editor.h"
 #include "mode_tick/mode_tick.h"
 #include "native/buffers.h"
 #include "strings_and_font/steps.h"
@@ -40,10 +42,8 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
 
 constexpr uint32_t kAll = 0xFFFFFFFFu;  // sub-scene -1: the scene itself
 constexpr uint32_t kStickerMovie = 14;
-constexpr uint32_t kTable = 0x8200B630;    // T: 61 words, 1 the sticker on the slot's second node
-constexpr uint32_t kLayouts = 0x8200B728;  // 16 bytes a car id and area
-constexpr uint32_t kHalf = 0x82001BE4;     // 0.5f
-constexpr uint32_t kFirstNodeScale = 0x8200C548;
+// The image words and tables (T, G, the layouts, the bounds, the constants).
+using G = schema::StickerEditorGlobals;
 
 // The screen's fields.
 constexpr uint32_t kArea = 30724;
@@ -117,7 +117,7 @@ uint32_t SetShown(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t ch
 
 // T[id] is 1 (id below 61, signed; the word read at 0x8200B630 + 4 × id).
 bool OnSecondNode(uint8_t* base, uint32_t id) {
-  return int32_t(id) < 61 && int32_t(Load(base, kTable + (id << 2))) == 1;
+  return int32_t(id) < 61 && int32_t(Load(base, G::second_node_address() + (id << 2))) == 1;
 }
 
 // A doubleword at `at` (an int sign-extended through the stack for fcfid).
@@ -127,13 +127,20 @@ void StoreDoubleword(uint8_t* base, uint32_t at, int64_t value) {
 }
 
 constexpr uint32_t kStageCommand = 0x82180108;  // GarageStage::Command(holder, command)
-constexpr uint32_t kStandHolder = 0x826D83E0;   // the stand scene's holder's word
 constexpr uint32_t kUnloopNamed = 0x8211DE30;   // UiMovie::UnloopNamed(movie, named)
 constexpr uint32_t kUnloop = 0x8211DE28;        // UiMovie::Unloop(movie, sub, index)
-constexpr uint32_t kGroups = 0x8200B5E8;        // G: 6 records of 12 bytes (+0 first id, +4 last)
+// G's record g (G::groups(): 6 records of 12 bytes, +0 the first id, +4 the last).
+schema::StickerGroup Group(uint8_t* base, uint32_t g) {
+  return schema::StickerGroup(base, g * 12 + G::groups_address());
+}
+
+// The sticker menu [+10044].
+schema::FrontEndMenu Menu(uint8_t* base, uint32_t s) {
+  return schema::FrontEndMenu(base, Load(base, s + 10044));
+}
 
 // The sticker menu [+10044]'s cursor.
-uint32_t Cursor(uint8_t* base, uint32_t s) { return Load(base, Load(base, s + 10044)); }
+uint32_t Cursor(uint8_t* base, uint32_t s) { return Menu(base, s).cursor(); }
 
 // id(j): the placed sticker of slot j in the area: s + 33320 + 20a + 4j.
 uint32_t PlacedId(uint8_t* base, uint32_t s, uint32_t j) {
@@ -206,13 +213,11 @@ constexpr uint32_t kMenuPressed = 0x821864C8;    // Menu::Pressed(menu, action)
 constexpr uint32_t kMenuSoundPlay = 0x821103F0;  // MenuSound::Play(cue)
 constexpr uint32_t kCameraCommand = 0x821808F0;  // GarageStage::CameraCommand(holder, command)
 constexpr uint32_t kMemcpy = 0x825A7410;
-constexpr uint32_t kResetAngle = 0x82000A34;  // 0.0f
-constexpr uint32_t kResetScale = 0x82000A30;  // 1.0f
 constexpr uint32_t kSlot = 30732;             // l
 constexpr uint32_t kDecal = 30832;            // D
 
 // The stand holder [[0x826D83E0]].
-uint32_t Holder(uint8_t* base) { return Load(base, Load(base, kStandHolder)); }
+uint32_t Holder(uint8_t* base) { return Load(base, G::stand_holder(base).address); }
 
 // The page's reads of the player's mapper entry, each skipped while its +4
 // is 1; the last read's r3 kept.
@@ -282,8 +287,8 @@ void ResetDecal(uint8_t* base, uint32_t s) {
   Store(base, s + kDecal + 4, 0);
   Store(base, s + kDecal + 16, 0);
   Store(base, s + kDecal + 20, 0);
-  CopyFloat(base, kResetAngle, s + kDecal + 8);
-  CopyFloat(base, kResetScale, s + kDecal + 12);
+  CopyFloat(base, G::zero_address(), s + kDecal + 8);
+  CopyFloat(base, G::one_address(), s + kDecal + 12);
 }
 
 // The pages' start: Menu::Step on the sticker menu, then UpdateSoloHold
@@ -307,7 +312,7 @@ void StepButtons(uint8_t* base, uint32_t s, uint32_t at) {
   if (int32_t(Load(base, s + at)) < 5) {
     Store(base, s + at, 5);
   }
-  const int32_t side = int32_t(Load(base, Load(base, s + 10044) + 36));
+  const int32_t side = Menu(base, s).side();
   int32_t v = int32_t(Load(base, s + at));
   v = side == -1 ? v - 1 : v + 1;
   Store(base, s + at, uint32_t(v));
@@ -334,10 +339,10 @@ void PickRow(uint8_t* base, uint32_t s, uint32_t at) {
 // B on the two-button pages: the word at `at` 6, m+0 = 5, m+4 = the cursor.
 void BackToButton(uint8_t* base, uint32_t s, uint32_t at) {
   Store(base, s + at, 6);
-  const uint32_t menu = Load(base, s + 10044);
-  const uint32_t k = Load(base, menu + 0);
-  Store(base, menu + 0, 5);
-  Store(base, menu + 4, k);
+  const schema::FrontEndMenu menu = Menu(base, s);
+  const uint32_t k = menu.cursor();
+  menu.set_cursor(5);
+  menu.set_previous(k);
 }
 
 // UpdateSoloHold answering 1: ShowSlotNode(s, id(j), j, l) for j 0 to 4.
@@ -377,7 +382,7 @@ uint32_t ScanGroup(uint8_t* base, uint32_t s, uint32_t i, uint32_t last) {
       break;
     }
     i += 1;
-    last = Load(base, Load(base, s + 30768) * 12 + kGroups + 4);
+    last = uint32_t(Group(base, Load(base, s + 30768)).last_id());
   }
   return i;
 }
@@ -389,9 +394,9 @@ uint32_t ScanBack(uint8_t* base, uint32_t s) {
     if (int32_t(g) < 0) {
       Store(base, s + 30768, 5);
     }
-    const uint32_t i = Load(base, Load(base, s + 30768) * 12 + kGroups);
+    const uint32_t i = uint32_t(Group(base, Load(base, s + 30768)).first_id());
     const uint32_t found =
-        ScanGroup(base, s, i, Load(base, Load(base, s + 30768) * 12 + kGroups + 4));
+        ScanGroup(base, s, i, uint32_t(Group(base, Load(base, s + 30768)).last_id()));
     if (Owned(base, s, found)) {
       return found;
     }
@@ -405,8 +410,8 @@ uint32_t ScanForward(uint8_t* base, uint32_t s) {
     const uint32_t n = group + 1;
     const uint32_t g = n - uint32_t(int32_t(n) / 6) * 6;
     Store(base, s + 30768, g);
-    const uint32_t found = ScanGroup(base, s, Load(base, g * 12 + kGroups),
-                                     Load(base, g * 12 + kGroups + 4));
+    const uint32_t found = ScanGroup(base, s, uint32_t(Group(base, g).first_id()),
+                                     uint32_t(Group(base, g).last_id()));
     if (Owned(base, s, found)) {
       return found;
     }
@@ -433,21 +438,18 @@ constexpr StickerEditCalls kScaleCalls = {
     {0x821FA048, 0x821FA074, 0x821FA0A0, 0x821FA0CC}, 0x821FA0F8, 0x821FA11C, 0x821FA16C,
     0x821FA190, 0x821FA1A4};
 
-constexpr uint32_t kStickerBounds = 0x8200C2A8;  // 16 bytes an area: x min, x max, y min, y max
-constexpr uint32_t kAngleMax = 0x8200C54C;       // 359.0f
-constexpr uint32_t kScaleStep = 0x8200222C;
-constexpr uint32_t kScaleMin = 0x82001FBC;
-constexpr uint32_t kScaleMax = 0x820021E8;
 
 // One step of D: `move` 0 up, 1 down, 2 left, 3 right (the position, inside
 // the area's bounds), or 0 left (minus), 1 right (plus) for the angle (1.0,
 // wrapped between 0.0 and 359.0) and the scale (clamped).
 void StepSticker(uint8_t* base, uint32_t s, StickerEdit edit, uint32_t move) {
   if (edit == StickerEdit::kMove) {
-    const uint32_t bounds = (Load(base, s + kArea) << 4) + kStickerBounds;
+    const schema::StickerMoveBounds bounds(base,
+                                           (Load(base, s + kArea) << 4) + G::move_bounds_address());
     const uint32_t at = s + kDecal + (move < 2 ? 4 : 0);
     const bool minus = move % 2 == 0;
-    const int32_t limit = int32_t(Load(base, bounds + (move < 2 ? 8 : 0) + (minus ? 0 : 4)));
+    const int32_t limit = move < 2 ? (minus ? bounds.y_min() : bounds.y_max())
+                                   : (minus ? bounds.x_min() : bounds.x_max());
     const int32_t value = int32_t(Load(base, at));
     if (minus ? limit < value : limit > value) {
       Store(base, at, uint32_t(value) + (minus ? 0xFFFFFFFFu : 1u));
@@ -458,15 +460,15 @@ void StepSticker(uint8_t* base, uint32_t s, StickerEdit edit, uint32_t move) {
   const bool angle = edit == StickerEdit::kRotate;
   const uint32_t at = s + kDecal + (angle ? 8 : 12);
   const double old = fs::Lfs(base, at);
-  const double step = fs::Lfs(base, angle ? kResetScale : kScaleStep);
+  const double step = fs::Lfs(base, angle ? G::one_address() : G::scale_step_address());
   const double value = fs::Single(plus ? old + step : old - step);
   fs::Stfs(base, at, value);
   if (angle) {
-    if (plus ? value > fs::Lfs(base, kAngleMax) : value < fs::Lfs(base, kResetAngle)) {
-      fs::Stfs(base, at, fs::Lfs(base, plus ? kResetAngle : kAngleMax));
+    if (plus ? value > fs::Lfs(base, G::angle_max_address()) : value < fs::Lfs(base, G::zero_address())) {
+      fs::Stfs(base, at, fs::Lfs(base, plus ? G::zero_address() : G::angle_max_address()));
     }
   } else {
-    const double limit = fs::Lfs(base, plus ? kScaleMax : kScaleMin);
+    const double limit = fs::Lfs(base, plus ? G::scale_max_address() : G::scale_min_address());
     if (plus ? value > limit : value < limit) {
       fs::Stfs(base, at, limit);
     }
@@ -588,9 +590,12 @@ uint32_t PlaceStickerNode(uint8_t* base, uint32_t screen, uint32_t id, uint32_t 
   // The selected garage car's layout for the area, copied into the frame.
   const uint32_t car = tuning_screen::SelectedGarageCar(base, screen);
   const uint32_t area = Load(base, screen + kArea);
-  const uint32_t layout = (((Load(base, car + 224) << 3) + area) << 4) + kLayouts;
-  const uint32_t words[4] = {Load(base, layout), Load(base, layout + 4), Load(base, layout + 8),
-                             Load(base, layout + 12)};
+  const schema::StickerLayout layout(base,
+                                     (((Load(base, car + 224) << 3) + area) << 4) +
+                                         G::layouts_address());
+  const uint32_t words[4] = {uint32_t(layout.x()), uint32_t(layout.y()),
+                             Load(base, layout.size_address()),
+                             Load(base, layout.position_scale_address())};
   for (uint32_t k = 0; k < 4; k++) {
     Store(base, frame + 112 + 4 * k, words[k]);
   }
@@ -614,7 +619,7 @@ uint32_t PlaceStickerNode(uint8_t* base, uint32_t screen, uint32_t id, uint32_t 
     StoreDoubleword(base, frame + 88, ox);
   }
   StoreDoubleword(base, frame + 96, y);
-  const double half = fs::Lfs(base, kHalf);
+  const double half = fs::Lfs(base, G::half_address());
   Store(base, node + 20, uint32_t(fs::Fctiwz(fs::Single(fs::Lfs(base, looked + 100) * half))));
   Store(base, node + 24, uint32_t(fs::Fctiwz(fs::Single(fs::Lfs(base, looked + 104) * half))));
   fs::Stfs(base, node + 36, fs::Lfs(base, record + 8));
@@ -623,7 +628,7 @@ uint32_t PlaceStickerNode(uint8_t* base, uint32_t screen, uint32_t id, uint32_t 
     fs::Stfs(base, node + 28, fs::Single(size * fs::Lfs(base, record + 12)));
     fs::Stfs(base, node + 32, fs::Single(size * fs::Lfs(base, record + 12)));
   } else {
-    const double factor = fs::Lfs(base, kFirstNodeScale);
+    const double factor = fs::Lfs(base, G::first_node_scale_address());
     fs::Stfs(base, node + 28,
              fs::Single(fs::Single(size * fs::Lfs(base, record + 12)) * factor));
     fs::Stfs(base, node + 32,
@@ -715,7 +720,7 @@ uint64_t AnimateStickerAreas(uint8_t* base, const tuning_screen::GuestCall& call
   const uint32_t k = Cursor(base, s);
   Movie m{base, call, Load(base, entry), frame};
   uint64_t r3 =
-      call(kStageCommand, {Load(base, Load(base, kStandHolder)), uint64_t(int64_t(int32_t(k)) + 42)},
+      call(kStageCommand, {Load(base, G::stand_holder(base).address), uint64_t(int64_t(int32_t(k)) + 42)},
            frame, 0x821FA558);
   for (uint32_t i = 6; i < 14; i++) {
     r3 = m.Stop(i, 0x821FA56C, 0x821FA578);
@@ -892,7 +897,7 @@ uint64_t ShowStickerPicker(uint8_t* base, const tuning_screen::GuestCall& call, 
   // +30768: the first group whose last id isn't below the cursor, else 5.
   Store(base, s + 30768, 5);
   for (uint32_t g = 0; g < 6; g++) {
-    if (int32_t(cursor) <= int32_t(Load(base, kGroups + 12 * g + 4))) {
+    if (int32_t(cursor) <= Group(base, g).last_id()) {
       Store(base, s + 30768, g);
       break;
     }
@@ -909,13 +914,13 @@ uint64_t InputStickerAreas(uint8_t* base, const tuning_screen::GuestCall& call, 
   const uint32_t s = uint32_t(screen);
   const uint32_t frame = Frame(base, sp, 96);
   call(kMenuStep, {Load(base, s + 10044)}, frame, 0x821FBD5C);
-  const uint32_t menu = Load(base, s + 10044);
-  if (int32_t(Load(base, menu + 8)) != 0) {
+  const schema::FrontEndMenu menu = Menu(base, s);
+  if (int32_t(menu.moved()) != 0) {
     const uint64_t r3 = call(kMenuSoundPlay, {4}, frame, 0x821FBD74);
     Queue(base, s, Load(base, s + 9652), 33);
     return r3;
   }
-  uint64_t r3 = call(kMenuPressed, {menu, 159}, frame, 0x821FBDB0);
+  uint64_t r3 = call(kMenuPressed, {menu.address, 159}, frame, 0x821FBDB0);
   if (int32_t(r3) != 0) {
     // A: rows 6 and 7 refused without the garage car's id.
     const int32_t k = int32_t(Cursor(base, s));
@@ -968,20 +973,20 @@ uint64_t InputStickerSlots(uint8_t* base, const tuning_screen::GuestCall& call, 
   const uint32_t s = uint32_t(screen);
   const uint32_t frame = Frame(base, sp, 112);
   StepAndSolo(base, call, s, frame, 0x821F9068, false, flags.native_slots);
-  const uint32_t menu = Load(base, s + 10044);
-  if (int32_t(Load(base, menu + 8)) != 0) {
+  const schema::FrontEndMenu menu = Menu(base, s);
+  if (int32_t(menu.moved()) != 0) {
     const uint64_t r3 = call(kMenuSoundPlay, {4}, frame, 0x821F90D0);
     Queue(base, s, Load(base, s + 9652), 35);
     return r3;
   }
-  if (int32_t(Load(base, menu + 0)) == 5 && int32_t(Load(base, menu + 36)) != 0) {
+  if (int32_t(menu.cursor()) == 5 && menu.side() != 0) {
     // The two buttons (l 5 and 6) swapped.
     const uint64_t r3 = call(kMenuSoundPlay, {4}, frame, 0x821F90F4);
     StepButtons(base, s, kSlot);
     Queue(base, s, Load(base, s + 9652), 35);
     return r3;
   }
-  uint64_t r3 = call(kMenuPressed, {menu, 159}, frame, 0x821F915C);
+  uint64_t r3 = call(kMenuPressed, {menu.address, 159}, frame, 0x821F915C);
   if (int32_t(r3) != 0) {
     if (int32_t(Load(base, s + kSolo)) != 0) {
       return r3;
@@ -1025,13 +1030,13 @@ uint64_t InputStickerOperate(uint8_t* base, const tuning_screen::GuestCall& call
   const uint32_t s = uint32_t(screen);
   const uint32_t frame = Frame(base, sp, 112);
   StepAndSolo(base, call, s, frame, 0x821F9340, true, flags.native_slots);
-  const uint32_t menu = Load(base, s + 10044);
-  if (int32_t(Load(base, menu + 8)) != 0) {
+  const schema::FrontEndMenu menu = Menu(base, s);
+  if (int32_t(menu.moved()) != 0) {
     const uint64_t r3 = call(kMenuSoundPlay, {4}, frame, 0x821F93A4);
     Queue(base, s, Load(base, s + 9652), 37);
     return r3;
   }
-  uint64_t r3 = call(kMenuPressed, {menu, 159}, frame, 0x821F93E0);
+  uint64_t r3 = call(kMenuPressed, {menu.address, 159}, frame, 0x821F93E0);
   if (int32_t(r3) != 0) {
     if (int32_t(Load(base, s + kSolo)) != 0) {
       return r3;
@@ -1089,19 +1094,19 @@ uint64_t InputStickerEdit(uint8_t* base, const tuning_screen::GuestCall& call, u
   const uint32_t s = uint32_t(screen);
   const uint32_t frame = Frame(base, sp, 112);
   StepAndSolo(base, call, s, frame, 0x821F9620, true, flags.native_slots);
-  const uint32_t menu = Load(base, s + 10044);
-  if (int32_t(Load(base, menu + 8)) != 0) {
+  const schema::FrontEndMenu menu = Menu(base, s);
+  if (int32_t(menu.moved()) != 0) {
     const uint64_t r3 = call(kMenuSoundPlay, {4}, frame, 0x821F9680);
     Queue(base, s, Load(base, s + 9652), 39);
     return r3;
   }
-  if (int32_t(Load(base, menu + 0)) == 5 && int32_t(Load(base, menu + 36)) != 0) {
+  if (int32_t(menu.cursor()) == 5 && menu.side() != 0) {
     const uint64_t r3 = call(kMenuSoundPlay, {4}, frame, 0x821F96A4);
     StepButtons(base, s, 30748);
     Queue(base, s, Load(base, s + 9652), 39);
     return r3;
   }
-  uint64_t r3 = call(kMenuPressed, {menu, 159}, frame, 0x821F970C);
+  uint64_t r3 = call(kMenuPressed, {menu.address, 159}, frame, 0x821F970C);
   if (int32_t(r3) != 0) {
     if (int32_t(Load(base, s + kSolo)) != 0) {
       return r3;
@@ -1214,20 +1219,20 @@ uint64_t InputStickerOrder(uint8_t* base, const tuning_screen::GuestCall& call, 
                    frame);
     }
   }
-  const uint32_t menu = Load(base, s + 10044);
-  if (int32_t(Load(base, menu + 8)) != 0) {
+  const schema::FrontEndMenu menu = Menu(base, s);
+  if (int32_t(menu.moved()) != 0) {
     // Moved: L[previous] = L[k], L[k] = the moving slot.
     const uint64_t r3 = call(kMenuSoundPlay, {4}, frame, 0x821FC00C);
-    uint32_t m = Load(base, s + 10044);
-    const uint32_t k = Load(base, m + 0), previous = Load(base, m + 4);
+    schema::FrontEndMenu m = Menu(base, s);
+    const uint32_t k = m.cursor(), previous = m.previous();
     Store(base, OrderAt(s, previous), Load(base, OrderAt(s, k)));
-    m = Load(base, s + 10044);
+    m = Menu(base, s);
     const uint32_t moving = Load(base, s + 30756);
-    Store(base, OrderAt(s, Load(base, m + 0)), moving);
+    Store(base, OrderAt(s, m.cursor()), moving);
     Queue(base, s, Load(base, s + 9652), 41);
     return r3;
   }
-  uint64_t r3 = call(kMenuPressed, {menu, 159}, frame, 0x821FC084);
+  uint64_t r3 = call(kMenuPressed, {menu.address, 159}, frame, 0x821FC084);
   if (int32_t(r3) != 0) {
     if (int32_t(Load(base, s + kSolo)) != 0) {
       return r3;
@@ -1312,26 +1317,26 @@ uint64_t InputStickerPicker(uint8_t* base, const tuning_screen::GuestCall& call,
     // The group before or after: the cursor on its first owned sticker.
     const uint32_t i = back ? ScanBack(base, s) : ScanForward(base, s);
     call(kMenuSoundPlay, {4}, frame, 0x821FC4C8);
-    uint32_t m = Load(base, s + 10044);
-    const uint32_t k = Load(base, m + 0);
-    Store(base, m + 0, i);
-    Store(base, m + 4, k);
-    m = Load(base, s + 10044);
-    Store(base, m + 24, 1);
-    Store(base, m + 28, 1);
-    Store(base, m + 32, 0);
+    schema::FrontEndMenu m = Menu(base, s);
+    const uint32_t k = m.cursor();
+    m.set_cursor(i);
+    m.set_previous(k);
+    m = Menu(base, s);
+    m.set_up_down_locked(1);
+    m.set_left_right_steps(1);
+    m.set_shoulders_step(0);
     Store(base, wait, 2);
     return ShowStickerPicker(base, call, s, 1, frame);
   }
-  const uint32_t menu = Load(base, s + 10044);
-  if (int32_t(Load(base, menu + 8)) != 0) {
+  const schema::FrontEndMenu menu = Menu(base, s);
+  if (int32_t(menu.moved()) != 0) {
     r3 = call(kMenuSoundPlay, {4}, frame, 0x821FC62C);
     const uint32_t state = Load(base, s + 9652);
     Store(base, wait, 2);
     Queue(base, s, state, 44);
     return r3;
   }
-  r3 = call(kMenuPressed, {menu, 159}, frame, 0x821FC670);
+  r3 = call(kMenuPressed, {menu.address, 159}, frame, 0x821FC670);
   if (int32_t(r3) != 0) {
     if (int32_t(Load(base, s + kSolo)) != 0) {
       return r3;

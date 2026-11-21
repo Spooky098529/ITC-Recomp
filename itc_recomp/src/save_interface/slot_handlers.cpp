@@ -8,6 +8,7 @@
 #include "hooks/last_error.h"
 #include "save_interface/save_interface.h"
 #include "saves/slot_steps.h"
+#include "schema/save_interface.h"
 
 namespace save_interface {
 
@@ -137,9 +138,9 @@ void DevicesOnEvent(uint8_t* base, uint32_t devices, uint32_t loop, uint32_t eve
   site.r30 = devices;
   site.r31 = loop;
   site.lr = 0x820A4840;
-  call(16, devices + 4, site);
+  call(16, schema::SaveDevices(base, devices).tick_key_address(), site);
   site.lr = 0x820A4858;
-  call(12, devices + 8, site);
+  call(12, schema::SaveDevices(base, devices).listener_key_address(), site);
 }
 
 uint32_t FrameworkDeviceList(uint8_t* base, uint32_t object) {
@@ -260,10 +261,10 @@ int32_t PollFile(uint8_t* base, uint32_t slot, int32_t error, int32_t full, uint
 // The machines' claim on the save devices' +72: true when this slot holds
 // it.
 bool Claim(uint8_t* base, uint32_t devices, uint32_t slot) {
-  if (Load(base, devices + 72) == 0) {
-    Store(base, devices + 72, slot);
+  if (schema::SaveDevices(base, devices).busy_slot() == 0) {
+    schema::SaveDevices(base, devices).set_busy_slot(slot);
   }
-  return Load(base, devices + 72) == slot;
+  return schema::SaveDevices(base, devices).busy_slot() == slot;
 }
 
 }  // namespace
@@ -354,7 +355,7 @@ uint32_t SlotCheckStep(uint8_t* base, uint32_t devices, uint32_t slot, const Cal
         }
       }
       Store(base, slot + 128, 0);
-      Store(base, devices + 72, 0);
+      schema::SaveDevices(base, devices).set_busy_slot(0);
       return 3;
     }
     case 3: {
@@ -390,7 +391,7 @@ uint32_t SlotSaveStep(uint8_t* base, uint32_t devices, uint32_t slot, const Call
   }
   const auto site = [&](uint32_t lr) { return From(at, sp, lr, devices, 7, slot); };
   // The end of a step that failed or finished: the state given back.
-  const auto release = [&] { Store(base, devices + 72, 0); };
+  const auto release = [&] { schema::SaveDevices(base, devices).set_busy_slot(0); };
   // A file step's error: +952 (1 failed, 2 no room), then the close.
   const auto to_close = [&](uint32_t error) {
     Store(base, slot + 952, error);
@@ -508,7 +509,7 @@ uint32_t SlotLoadStep(uint8_t* base, uint32_t devices, uint32_t slot, const Call
   const auto site = [&](uint32_t lr) { return From(at, sp, lr, 8, devices, slot); };
   const auto failed = [&] {
     Store(base, slot + 992, 4);
-    Store(base, devices + 72, 0);
+    schema::SaveDevices(base, devices).set_busy_slot(0);
     return 2u;
   };
   const auto to_close = [&] {
@@ -526,7 +527,7 @@ uint32_t SlotLoadStep(uint8_t* base, uint32_t devices, uint32_t slot, const Call
       }
       if (r3 == -2) {
         Store(base, slot + 948, 0);
-        Store(base, devices + 72, 0);
+        schema::SaveDevices(base, devices).set_busy_slot(0);
         return 3;
       }
       if (r3 == -5 || r3 == -99) {
@@ -564,7 +565,7 @@ uint32_t SlotLoadStep(uint8_t* base, uint32_t devices, uint32_t slot, const Call
       }
       Store(base, slot + 948, 0);
       if (int32_t(Load(base, slot + 952)) == 0) {
-        Store(base, devices + 72, 0);
+        schema::SaveDevices(base, devices).set_busy_slot(0);
         return 3;
       }
       return failed();
@@ -583,7 +584,7 @@ uint32_t SlotDeleteStep(uint8_t* base, uint32_t devices, uint32_t slot, const Ca
   }
   const auto failed = [&] {
     Store(base, slot + 992, 5);
-    Store(base, devices + 72, 0);
+    schema::SaveDevices(base, devices).set_busy_slot(0);
     return 2u;
   };
   switch (Load(base, slot + 948)) {
@@ -596,7 +597,7 @@ uint32_t SlotDeleteStep(uint8_t* base, uint32_t devices, uint32_t slot, const Ca
       }
       if (r3 == -2) {
         Store(base, slot + 948, 0);
-        Store(base, devices + 72, 0);
+        schema::SaveDevices(base, devices).set_busy_slot(0);
         return 3;
       }
       if (r3 == -12) {
@@ -615,7 +616,7 @@ uint32_t SlotDeleteStep(uint8_t* base, uint32_t devices, uint32_t slot, const Ca
       }
       Store(base, slot + 948, 0);
       if (int32_t(Load(base, slot + 952)) == 0) {
-        Store(base, devices + 72, 0);
+        schema::SaveDevices(base, devices).set_busy_slot(0);
         return 3;
       }
       return failed();
@@ -630,7 +631,7 @@ uint64_t DevicesUpdate(uint8_t* base, uint64_t self, uint64_t r4, const CallSite
   ITC_NATIVE_RUNNING("sub_820A4610 SaveDevices::Update");
   const uint32_t devices = uint32_t(self);
   const uint32_t sp = WritePrologue(base, at, 144, 27);
-  if (Load(base, devices + 56) == 0) {
+  if (schema::SaveDevices(base, devices).listener() == 0) {
     return self;
   }
   // The registers the original holds at each call: r27 to r30 as it sets
@@ -650,7 +651,7 @@ uint64_t DevicesUpdate(uint8_t* base, uint64_t self, uint64_t r4, const CallSite
   const auto method = [&](uint32_t object, uint32_t offset) {
     return Load(base, Load(base, object) + offset);
   };
-  const uint32_t source = Load(base, devices + 12);
+  const uint32_t source = schema::SaveDevices(base, devices).device_list();
   const uint32_t list_function = method(source, 4);
   const uint64_t list64 = list_function == 0x820908D8
                               ? FrameworkDeviceList(base, source)
@@ -659,7 +660,7 @@ uint64_t DevicesUpdate(uint8_t* base, uint64_t self, uint64_t r4, const CallSite
   r29 = 0;
   r30 = list64;
   r28 = 0;
-  if (int32_t(Load(base, devices + 48)) > 0) {
+  if (int32_t(schema::SaveDevices(base, devices).slot_count()) > 0) {
     r27 = 0;
     do {
       const uint32_t index = uint32_t(r28);
@@ -667,36 +668,36 @@ uint64_t DevicesUpdate(uint8_t* base, uint64_t self, uint64_t r4, const CallSite
       const uint32_t user = function == kUsersSignedIn
                                 ? uint32_t(UsersSignedIn(base, list, index))
                                 : uint32_t(call(function, list, index, site(0x820A4674)));
-      const uint32_t slot = Load(base, devices + 44) + uint32_t(r27);
+      const uint32_t slot = schema::SaveDevices(base, devices).slots<schema::View>().address + uint32_t(r27);
       r28++;
       r27 += 1000;
       Store(base, slot + 956, user);
-    } while (int32_t(r28) < int32_t(Load(base, devices + 48)));
+    } while (int32_t(r28) < int32_t(schema::SaveDevices(base, devices).slot_count()));
   }
   // XNotifyGetNext (r1 + 80 and + 84 its outputs) left out: no notification
   // is sent; its answer, 0, is what r3 holds next.
   uint64_t r3 = 0;
   r28 = r29;
-  if (int32_t(Load(base, devices + 48)) <= 0) {
+  if (int32_t(schema::SaveDevices(base, devices).slot_count()) <= 0) {
     return r3;
   }
   r30 = r29;
   do {
     const uint32_t index = uint32_t(r28);
     const uint32_t offset = uint32_t(r30);
-    const int32_t user = int32_t(Load(base, Load(base, devices + 44) + offset + 956));
+    const int32_t user = int32_t(Load(base, schema::SaveDevices(base, devices).slots<schema::View>().address + offset + 956));
     if (user < 0 || user > 3) {
       const uint32_t function = method(devices, 28);
       r3 = function == kSlotState ? SlotState(base, devices, index)
                                   : call(function, devices, index, site(0x820A4758));
       if (uint32_t(r3) < 5) {
         for (uint32_t at_word : {36u, 988u, 984u, 960u, 964u, 968u, 972u}) {
-          Store(base, Load(base, devices + 44) + offset + at_word, uint32_t(r29));
+          Store(base, schema::SaveDevices(base, devices).slots<schema::View>().address + offset + at_word, uint32_t(r29));
         }
       }
     }
-    const uint32_t slot = Load(base, devices + 44) + offset;
-    const uint32_t function = Load(base, (Load(base, slot + 988) + 19) * 4 + devices);
+    const uint32_t slot = schema::SaveDevices(base, devices).slots<schema::View>().address + offset;
+    const uint32_t function = Load(base, schema::SaveDevices(base, devices).wait_for_user_address() + Load(base, slot + 988) * 4);
     const CallSite handler_site = site(0x820A47D8);
     switch (function) {
       case kSlotWaitForUser: r3 = SlotWaitForUser(base, slot); break;
@@ -713,11 +714,11 @@ uint64_t DevicesUpdate(uint8_t* base, uint64_t self, uint64_t r4, const CallSite
       case kSlotDeleteStep: r3 = SlotDeleteStep(base, devices, slot, handler_site, kernel); break;
       default: r3 = call(function, devices, slot, handler_site); break;
     }
-    const uint32_t stored = Load(base, devices + 44) + offset;
+    const uint32_t stored = schema::SaveDevices(base, devices).slots<schema::View>().address + offset;
     r28++;
     r30 += 1000;
     Store(base, stored + 988, uint32_t(r3));
-  } while (int32_t(r28) < int32_t(Load(base, devices + 48)));
+  } while (int32_t(r28) < int32_t(schema::SaveDevices(base, devices).slot_count()));
   return r3;
 }
 

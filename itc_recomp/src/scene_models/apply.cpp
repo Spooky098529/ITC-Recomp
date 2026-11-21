@@ -6,6 +6,10 @@
 #include "base/log.h"
 #include "guest.h"
 #include "native/buffers.h"
+#include "schema/car_draw.h"
+#include "schema/car_models.h"
+#include "schema/load_poll.h"
+#include "schema/scene_models.h"
 #include "scene_models/scene_models.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -74,7 +78,9 @@ uint64_t SceneInteriorApply(uint8_t* base, const ApplyCall& call, uint32_t inter
 
 std::optional<uint64_t> SceneModelApplyRecord(uint8_t* base, const ApplyCall& call,
                                               uint32_t model, uint32_t stack) {
-  if (Load(base, Load(base, model + 5116) + 4) != 0) {
+  const schema::SceneModel m(base, model);
+  // The scene's +4: 0 the front end.
+  if (Load(base, m.scene().address + 4) != 0) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_820DA758 SceneModel::ApplyRecord");
@@ -83,51 +89,56 @@ std::optional<uint64_t> SceneModelApplyRecord(uint8_t* base, const ApplyCall& ca
   if (int32_t(uint32_t(r3)) == 0) {
     return r3;
   }
-  if (int32_t(Load(base, model + 48)) == 5) {
-    Store(base, model + 3828, 0);
-    Store(base, model + 3824, 1);
+  if (int32_t(m.block()) == 5) {
+    m.set_interior_gauge1_kind(0);
+    m.set_interior_gauge1_present(1);
   }
-  const uint32_t car = Load(base, Load(base, model + 5048) + 24);
-  call(kSetRecord, {car, model + 48}, frame, 0x820DA7B0);
-  ScenePartsApply(base, call, Load(base, model + 5060), model + 3744, frame);
-  r3 = SceneInteriorApply(base, call, Load(base, model + 5068), model + 3804, frame);
-  if (int32_t(Load(base, model + 32)) != 2) {
+  // The car model's +24: the first set's car model.
+  const uint32_t car = Load(base, m.car_model().address + 24);
+  call(kSetRecord, {car, m.car_record_address()}, frame, 0x820DA7B0);
+  ScenePartsApply(base, call, m.parts().address, m.parts_record_address(), frame);
+  r3 = SceneInteriorApply(base, call, m.interior(), m.interior_record_address(), frame);
+  if (int32_t(m.kind()) != 2) {
     return r3;
   }
   // Kind 2: the cockpit is rebuilt only on the race's path (the scene's +4
   // 1), which isn't this one; r3 the scene, as the original loads it.
-  return uint64_t(Load(base, model + 5116));
+  return uint64_t(m.scene().address);
 }
 
 uint64_t SceneModelReloadDecals(uint8_t* base, const ApplyCall& call, uint32_t model,
                                 uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820D9D48 SceneModel::ReloadDecals");
   const uint32_t frame = Frame(base, stack, 96);
-  if (Load(base, model + 5036) == 0 || int32_t(Load(base, model + 32)) == 3) {
+  const schema::SceneModel m(base, model);
+  if (m.ready() == 0 || int32_t(m.kind()) == 3) {
     return model;
   }
-  Store(base, model + 5036, 0);
-  Store(base, model + 5056, 0);
-  call(kSetRecord, {Load(base, Load(base, model + 5048) + 24), model + 48}, frame, 0x820D9D90);
-  return call(kReloadDecals, {Load(base, Load(base, model + 5048) + 24)}, frame, 0x820D9D9C);
+  m.set_ready(0);
+  m.set_decals_reloaded(0);
+  // The car model's +24 (the first set's car model), read for each call.
+  call(kSetRecord, {Load(base, m.car_model().address + 24), m.car_record_address()}, frame,
+       0x820D9D90);
+  return call(kReloadDecals, {Load(base, m.car_model().address + 24)}, frame, 0x820D9D9C);
 }
 
 uint64_t SceneModelAddSecondWheels(uint8_t* base, const ApplyCall& call, uint32_t model,
                                    uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820D9E00 SceneModel::AddSecondWheels");
   const uint32_t frame = Frame(base, stack, 112);
-  if (Load(base, model + 5032) != 0) {
+  const schema::SceneModel m(base, model);
+  if (m.second_wheels_claimed() != 0) {
     return 0;
   }
-  Store(base, model + 5032, 1);
-  Store(base, model + 5112, 0);
-  const int32_t index = vehicle_accessors::ScenePoolsClaimB(base, Load(base, model + 5116), 5);
+  m.set_second_wheels_claimed(1);
+  m.set_second_wheels_ready(0);
+  const int32_t index = vehicle_accessors::ScenePoolsClaimB(base, m.scene().address, 5);
   const uint32_t wheels =
-      vehicle_accessors::ScenePoolsGetB(base, Load(base, model + 5116), 5, uint32_t(index));
-  Store(base, model + 5108, wheels);
-  SetCarModel(base, wheels, Load(base, model + 5048));
-  call(kSetUpB, {Load(base, model + 5116), 5, uint64_t(int64_t(index)), model + 4068}, frame,
-       0x820D9E80);
+      vehicle_accessors::ScenePoolsGetB(base, m.scene().address, 5, uint32_t(index));
+  m.set_second_wheels(wheels);
+  SetCarModel(base, wheels, m.car_model().address);
+  call(kSetUpB, {m.scene().address, 5, uint64_t(int64_t(index)), m.wheels_record_address()},
+       frame, 0x820D9E80);
   return 1;
 }
 

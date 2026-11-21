@@ -43,14 +43,11 @@ double Lfd(uint8_t* base, uint32_t address) {
   return std::bit_cast<double>((uint64_t(Load(base, address)) << 32) | Load(base, address + 4));
 }
 
-constexpr uint32_t kHolderAt = 0x826D83E0;     // [[it]]: the stand's holder
 constexpr uint32_t kPounds = 0x82009F00;       // a double: the weight's unit
 constexpr uint32_t kTorqueUnit = 0x82009F08;   // a double: child 12's
 
 }  // namespace
 
-uint32_t Context::Word(uint32_t offset) const { return Load(base, screen + offset); }
-uint32_t Context::Byte(uint32_t offset) const { return guest::LoadU8(base, screen + offset); }
 
 uint32_t Context::Node(uint32_t sub_scene, uint32_t child) const {
   return ui_movies::FindNode(base, movie, sub_scene, child);
@@ -92,9 +89,9 @@ void Context::HelpScroll() const { Call(kScrollText, {movie, 10, 0, 1}, kHelpScr
 // Block 1: every state's header, to the switch.
 void Context::Header() {
   Call(kSetChildNameText, {movie, 9, 6, self + 20792}, 0x821E3B14);
-  Call(kSetNumberText, {movie, 9, 9, Word(25116)}, 0x821E3B28);
-  Text(9, 13, 8, Word(25092), 0x821E3B40);
-  Texture(9, 11, Word(25096));
+  Call(kSetNumberText, {movie, 9, 9, TS(base, screen).money()}, 0x821E3B28);
+  Text(9, 13, 8, TS(base, screen).day(), 0x821E3B40);
+  Texture(9, 11, TS(base, screen).weekday());
   Shown(8, 1, 1);
   Shown(8, 2, 0);
   Shown(8, 10, 0);
@@ -106,20 +103,21 @@ void Context::Header() {
   SetCarStats(base, stand.calls, screen, frame, &stats_f1);
   *f1 = stats_f1;
   // Sub-scene 18's stats (SetCarStats' texts again, as the original).
-  Text(18, 7, 8, Word(20768), 0x821E3BD0);
+  Text(18, 7, 8, TS(base, screen).stat_displacement(), 0x821E3BD0);
   // +20772 made a float through the frame's +80 (std, lfd, fcfid, frsp),
   // scaled by the double at 0x82009F00 (fmul, frsp), back to an int (fctiwz,
   // stfiwx at +80); r10 the frame's +80 (the stfiwx's address, set).
-  const int64_t weight = int32_t(Word(20772));
+  const int64_t weight = int32_t(TS(base, screen).stat_weight());
   Store64(base, frame + 80, uint64_t(weight));
   const double single = steps::Single(double(weight));
   const double pounds = steps::Single(single * Lfd(base, kPounds));
   Store(base, frame + 80, uint32_t(steps::Fctiwz(pounds)));
   Text(18, 8, 8, Load(base, frame + 80), 0x821E3C18, frame + 80);
-  Text(18, 11, 8, Word(20776), 0x821E3C30);
+  Text(18, 11, 8, TS(base, screen).stat_peak_power(), 0x821E3C30);
   // +20780 times the double at 0x82009F08 (frsp into f1), passed as a
   // double in r7 (through the frame's +48) and in f1.
-  const double unit = steps::Single(steps::Lfs(base, screen + 20780) * Lfd(base, kTorqueUnit));
+  const double unit = steps::Single(steps::Lfs(base, TS(base, screen).stat_torque_address()) *
+                                    Lfd(base, kTorqueUnit));
   const uint64_t bits = std::bit_cast<uint64_t>(unit);
   Store64(base, frame + 48, bits);
   *f1 = unit;
@@ -154,7 +152,7 @@ void Context::Header() {
                             Category() == 4 && Item() == 6;
     // f1 the light value on the flag 0 path, left on the other.
     double lights_f1 = 0.0;
-    stand_models::SetLightsOn(base, Load(base, Load(base, kHolderAt)), headlights ? 1 : 0,
+    stand_models::SetLightsOn(base, schema::TuningScreenGlobals::stand_holder(base).stage_block_0(), headlights ? 1 : 0,
                               frame, &lights_f1);
     if (!headlights) {
       *f1 = lights_f1;
@@ -164,47 +162,52 @@ void Context::Header() {
 
 // Block 2: state 3, the categories' page.
 void Context::State3() {
-  Texture(3, 1, Word(9716) != 0 ? 0 : uint64_t(Word(kCategory)) + 1);
+  Texture(
+      3, 1,
+      TS(base, screen).command_first_run() != 0 ? 0 : uint64_t(TS(base, screen).category()) + 1);
   Texture(3, 2, 0);
   Shown(kAll, 25, 0);
   Shown(kAll, 26, 0);
   Shown(kAll, 19, 0);
   ResetHelp(0x821E3EB8);
-  Help(uint64_t(Word(kCategory)) + 596);
+  Help(uint64_t(TS(base, screen).category()) + 596);
 }
 
 // Block 3: state 4, the category's items.
 void Context::State4() {
-  if (Word(9716) != 0) {
+  if (TS(base, screen).command_first_run() != 0) {
     Texture(3, 1, 0);
   } else {
     // By the category (unsigned): none for 7 and above.
     static constexpr int32_t kFirst[7] = {8, 12, -1, 17, 20, 30, 38};
-    const uint32_t category = Word(kCategory);
+    const uint32_t category = TS(base, screen).category();
     if (category < 7) {
       Texture(3, 1, category == 2 ? 3 : uint64_t(Item()) + uint64_t(kFirst[category]));
     }
   }
-  Texture(3, 2, uint64_t(Word(kCategory)) + 1);
+  Texture(3, 2, uint64_t(TS(base, screen).category()) + 1);
   // The aero's item list (only the aero: the other categories leave at the
   // first time), once the scene's animations 2, 1 and 2 have stopped.
-  if (Word(9716) == 0 && TimeIs(kAll, 2, kAtEnd) && Category() == 4 && TimeIs(kAll, 1, kAtEnd) &&
-      TimeIs(kAll, 2, kAtEnd)) {
+  if (TS(base, screen).command_first_run() == 0 && TimeIs(kAll, 2, kAtEnd) && Category() == 4 &&
+      TimeIs(kAll, 1, kAtEnd) && TimeIs(kAll, 2, kAtEnd)) {
     for (uint32_t n = 5; n < 15; n++) {
       Shown(27, n, 0);
       Color(27, n, 0);
     }
-    for (int32_t row = 0; row < int32_t(Byte(9676)); row++) {
+    for (int32_t row = 0; row < int32_t(uint32_t(TS(base, screen).item_count())); row++) {
       if (row >= 8) {
         continue;
       }
       const uint32_t n = uint32_t(row) + 5;
       Shown(27, n, 1);
       // The rows' item: the item byte - +25100 + the row (64 bits), unchecked.
-      Text(27, n, uint64_t(Item()) - uint64_t(Word(25100)) + uint64_t(row) + 203, 0, 0x821E4070);
+      Text(27, n,
+           uint64_t(Item()) - uint64_t(TS(base, screen).list_scroll_row()) + uint64_t(row) + 203, 0,
+           0x821E4070);
       uint32_t available = 1;
       if (Category() == 4) {
-        const uint64_t k = uint64_t(Item()) - uint64_t(Word(25100)) + uint64_t(row) + 6282;
+        const uint64_t k =
+            uint64_t(Item()) - uint64_t(TS(base, screen).list_scroll_row()) + uint64_t(row) + 6282;
         available = Load(base, uint32_t(k << 2) + screen);
       }
       if (int32_t(available) == 0) {
@@ -214,7 +217,7 @@ void Context::State4() {
   }
   // The scroll arrows (25 and 26) by the aero's first row +25100.
   if (Category() == 4) {
-    const uint64_t d = uint64_t(Item()) - uint64_t(Word(25100));
+    const uint64_t d = uint64_t(Item()) - uint64_t(TS(base, screen).list_scroll_row());
     if (int32_t(d) == 0) {
       Shown(kAll, 25, 1);
       Shown(kAll, 26, 0);
@@ -229,7 +232,7 @@ void Context::State4() {
   Shown(kAll, 19, 0);
   ResetHelp(0x821E415C);
   const uint64_t item = Item();
-  switch (Word(kCategory)) {
+  switch (TS(base, screen).category()) {
     case 0: Help(item + 603); break;
     case 1: Help(item + 607); break;
     case 3: Help(item + 612); break;
@@ -258,7 +261,7 @@ uint64_t Refresh(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t s
   c.Header();
   // The switch on the state - 3 (unsigned, 0 to 55) through the table at
   // 0x8200A908.
-  const uint32_t state = c.Word(kState);
+  const uint32_t state = TS(c.base, c.screen).state();
   const uint32_t index = state - 3;
   if (index > 55) {
     return 0;

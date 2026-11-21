@@ -8,6 +8,7 @@
 #include "guest_call.h"
 
 #include "base/log.h"
+#include "schema/system_services.h"
 
 #include <cstdlib>
 #include "lifted/sdk.h"
@@ -16,17 +17,17 @@ using guest_call::InFrame;
 
 namespace {
 
-// The heap xstart makes (sub_822997B0's handle).
-constexpr uint32_t kHeap = 0x8297149C;
+// The heap xstart makes (sub_822997B0's handle, at 0x8297149C).
+using G = schema::SystemServicesGlobals;
 // Its size: the image header's default heap size (field 0x20401) when there
 // is one, else 1 MB. default.xex has none.
 constexpr uint32_t kHeapBytes = 0x100000;
 
-// sub_82297C08's work: makes the heap once (sub_822997B0, kept at kHeap)
+// sub_82297C08's work: makes the heap once (sub_822997B0, kept at G::heap)
 // with a 48-byte attributes block (its size, then zeros), in a frame like
 // the original's. True when the heap exists.
 bool MakeHeap(lifted::Regs& ctx, uint8_t* base) {
-  if (!guest::LoadU32(base, kHeap)) {
+  if (!G::heap(base)) {
     InFrame(ctx, base, 160, 0x82297CB0, [&](uint32_t frame) {
       const uint32_t attributes = frame + 80;
       for (uint32_t i = 0; i < 48; i += 4) {
@@ -40,10 +41,10 @@ bool MakeHeap(lifted::Regs& ctx, uint8_t* base) {
       ctx.r7.u64 = 0;
       ctx.r8.u64 = attributes;
       lifted::Enter(ctx, base, lifted::e822997B0);
-      guest::StoreU32(base, kHeap, ctx.r3.u32);
+      G::set_heap(base, ctx.r3.u32);
     });
   }
-  return guest::LoadU32(base, kHeap) != 0;
+  return G::heap(base) != 0;
 }
 
 }  // namespace

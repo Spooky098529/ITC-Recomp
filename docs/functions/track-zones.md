@@ -36,7 +36,9 @@ the data. Read by the B7 loop's mapping agent, 2026-10-24, from its
 lead (found by the collision world's mapping agent). The names are ours;
 what the zones are for is guessed from the HUD's use (rows say so).
 Fields: `../known-data.md` (`0x828161EC`, "track zone", "route range",
-`0x82603274`, `0x82011AF0`, `0x8200D838`).
+`0x82603274`, `0x82011AF0`, `0x8200D838`). The schema (E5's step 2):
+`itc_recomp/schema/track-zones.toml` (`TrackZones`, `TrackZone`,
+`TrackZoneRangeList`, `RouteRange`, `List64`, `List128`).
 
 Shared with other files, without rows here: `Vehicle::Get`
 (`sub_820C0468`), `Vehicle::Identity` (`sub_820C0168`, the car's track

@@ -11,12 +11,15 @@
 #include "strings_and_font/strings_and_font.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 #include "save_interface/save_interface.h"
+#include "schema/save_interface.h"
 
 #include <cstring>
 
 namespace save_interface {
 
 namespace {
+
+using G = schema::SaveInterfaceGlobals;
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -53,7 +56,7 @@ auto OnPlayersSlot(uint8_t* base, uint32_t player, Call call) -> decltype(call(0
 }  // namespace
 
 uint32_t ControllerOf(uint8_t* base, uint32_t player) {
-  return Load(base, kControllers + (player << 2));
+  return Load(base, G::controllers_address() + (player << 2));
 }
 
 std::optional<uint32_t> SlotOfController(uint8_t* base, uint32_t controller) {
@@ -116,33 +119,36 @@ std::optional<uint64_t> PlayerPending(uint8_t* base, uint32_t player) {
 
 std::optional<uint32_t> SaveBuffersCreate(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_8228F6B0 SaveBuffers::Create");
-  if (Load(base, kSaveBuffers) != 0) {
+  if (G::save_buffers(base).address != 0) {
     return std::nullopt;
   }
   // VirtualAlloc(0, size, MEM_COMMIT, PAGE_READWRITE) each.
-  const uint32_t header = memory::AllocPages(24, 4096);
-  Store(base, kSaveBuffers, header);
-  for (uint32_t offset = 0; offset < 24; offset += 4) {
-    Store(base, header + offset, 0);
-  }
+  const schema::SaveBuffers header(base, memory::AllocPages(schema::SaveBuffers::kSize, 4096));
+  G::set_save_buffers(base, header);
+  header.set_game_data(0);
+  header.set_replay(0);
+  header.set_replay_record(0u);
+  header.set_records(0u);
+  header.set_entries(0u);
+  header.set_count(0);
   const uint32_t game_data = memory::AllocPages(kGameDataBytes, 4096);
-  Store(base, Load(base, kSaveBuffers) + 0, game_data);
+  G::save_buffers(base).set_game_data(game_data);
   const uint32_t replay = memory::AllocPages(kReplayBytes, 4096);
-  Store(base, Load(base, kSaveBuffers) + 4, replay);
+  G::save_buffers(base).set_replay(replay);
   const uint32_t record = memory::AllocPages(kReplayRecordBytes, 4096);
-  Store(base, Load(base, kSaveBuffers) + 8, record);
+  G::save_buffers(base).set_replay_record(record);
   return record;
 }
 
 std::optional<uint32_t> SaveBuffersFreeReplayList(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_8228F7E8 SaveBuffers::FreeReplayList");
-  const uint32_t records = Load(base, Load(base, kSaveBuffers) + 12);
+  const uint32_t records = G::save_buffers(base).records().address;
   if (records == 0) {
     return std::nullopt;
   }
   // VirtualFree(records, 0, MEM_RELEASE).
   const uint32_t r3 = memory::FreePages(records) ? 1 : 0;
-  Store(base, Load(base, kSaveBuffers) + 12, 0);
+  G::save_buffers(base).set_records(0u);
   return r3;
 }
 
@@ -150,12 +156,13 @@ bool SaveBuffersDestroyNative(uint8_t* base) {
   if (!hooks::NativeHeapActive()) {
     return false;
   }
-  const uint32_t header = Load(base, kSaveBuffers);
-  if (!memory::IsPages(header)) {
+  const schema::SaveBuffers header = G::save_buffers(base);
+  if (!memory::IsPages(header.address)) {
     return false;
   }
-  for (uint32_t offset : {0u, 4u, 8u, 12u}) {
-    const uint32_t buffer = Load(base, header + offset);
+  for (uint32_t at : {header.game_data_address(), header.replay_address(),
+                      header.replay_record_address(), header.records_address()}) {
+    const uint32_t buffer = Load(base, at);
     if (buffer != 0 && !memory::IsPages(buffer)) {
       return false;
     }
@@ -166,22 +173,24 @@ bool SaveBuffersDestroyNative(uint8_t* base) {
 uint32_t SaveBuffersDestroy(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_8228F8F8 SaveBuffers::Destroy");
   SaveBuffersFreeReplayList(base);
-  for (uint32_t offset : {0u, 4u, 8u}) {
-    const uint32_t buffer = Load(base, Load(base, kSaveBuffers) + offset);
+  using Field = uint32_t (schema::SaveBuffers::*)() const;
+  for (Field field : {&schema::SaveBuffers::game_data_address, &schema::SaveBuffers::replay_address,
+                      &schema::SaveBuffers::replay_record_address}) {
+    const uint32_t buffer = Load(base, (G::save_buffers(base).*field)());
     if (buffer != 0) {
       memory::FreePages(buffer);  // VirtualFree(buffer, 0, MEM_RELEASE)
-      Store(base, Load(base, kSaveBuffers) + offset, 0);
+      Store(base, (G::save_buffers(base).*field)(), 0);
     }
   }
-  const uint32_t r3 = memory::FreePages(Load(base, kSaveBuffers)) ? 1 : 0;
-  Store(base, kSaveBuffers, 0);
+  const uint32_t r3 = memory::FreePages(G::save_buffers(base).address) ? 1 : 0;
+  G::set_save_buffers(base, 0u);
   return r3;
 }
 
 std::optional<uint32_t> ReplaysSort(uint8_t* base, uint32_t records, uint32_t temp) {
   ITC_NATIVE_RUNNING("sub_8228F840 Replays::Sort");
-  uint32_t header = Load(base, kSaveBuffers);
-  int32_t count = int32_t(Load(base, header + 20));
+  schema::SaveBuffers header = G::save_buffers(base);
+  int32_t count = int32_t(header.count());
   std::optional<uint32_t> r3;
   if (!(count - 1 > 0)) {
     return r3;
@@ -190,16 +199,17 @@ std::optional<uint32_t> ReplaysSort(uint8_t* base, uint32_t records, uint32_t te
     const uint32_t first = records + 36 * uint32_t(i - 1);
     for (int32_t j = i; j < count; j++) {
       const uint32_t other = records + 36 * uint32_t(j);
-      if (int32_t(Load(base, first + 28)) > int32_t(Load(base, other + 28))) {
+      if (int32_t(schema::SaveReplayRecord(base, first).number()) >
+          int32_t(schema::SaveReplayRecord(base, other).number())) {
         Copy(base, temp, first, 36);
         Copy(base, first, other, 36);
         Copy(base, other, temp, 36);
         r3 = other;
-        header = Load(base, kSaveBuffers);
+        header = G::save_buffers(base);
       }
-      count = int32_t(Load(base, header + 20));
+      count = int32_t(header.count());
     }
-    count = int32_t(Load(base, header + 20));
+    count = int32_t(header.count());
     if (!(i < count - 1)) {
       return r3;
     }
@@ -212,7 +222,7 @@ void PlayTimeAdd(uint8_t* base, uint32_t out, uint32_t stats) {
   const uint32_t hours = Load(base, stats + 6032);
   const uint32_t minutes = guest::LoadU8(base, stats + 6036);
   const uint32_t seconds = guest::LoadU8(base, stats + 6037);
-  const uint32_t now = Load(base, kPlayTimeFrames);
+  const uint32_t now = G::play_time_frames(base);
   const uint32_t last = Load(base, stats + 6040);
   Store(base, stats + 6040, now);
   const uint32_t d = now - last;
@@ -287,8 +297,8 @@ std::optional<uint64_t> GameDataLoad(uint8_t* base, uint32_t player) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_8228FBC0 GameData::Load");
-  Clear(base, Load(base, Load(base, kSaveBuffers) + 0), kGameDataBytes);
-  const uint32_t buffer = Load(base, Load(base, kSaveBuffers) + 0);
+  Clear(base, G::save_buffers(base).game_data(), kGameDataBytes);
+  const uint32_t buffer = G::save_buffers(base).game_data();
   return InterfaceLoad(base, *slot,
                        Request{kLoadDisplayName, kGameDataFile, kGameDataPath, buffer,
                                kGameDataBytes, 0, 0});
@@ -426,9 +436,9 @@ bool ReplaysBuildListNative(uint8_t* base) {
   if (!hooks::NativeHeapActive() || !native::Buffers_NativeMemcpy()) {
     return false;
   }
-  const uint32_t header = Load(base, kSaveBuffers);
-  for (uint32_t offset : {12u, 16u}) {
-    const uint32_t list = Load(base, header + offset);
+  const schema::SaveBuffers header = G::save_buffers(base);
+  for (uint32_t at : {header.records_address(), header.entries_address()}) {
+    const uint32_t list = Load(base, at);
     if (list != 0 && !memory::IsPages(list)) {
       return false;
     }
@@ -447,12 +457,12 @@ std::optional<uint32_t> ReplaysBuildList(
   if (*counted != 7) {
     return *counted;
   }
-  uint32_t header = Load(base, kSaveBuffers);
-  if (const uint32_t records = Load(base, header + 12); records != 0) {
+  schema::SaveBuffers header = G::save_buffers(base);
+  if (const uint32_t records = header.records().address; records != 0) {
     memory::FreePages(records);  // VirtualFree(records, 0, MEM_RELEASE)
-    header = Load(base, kSaveBuffers);
+    header = G::save_buffers(base);
   }
-  if (const uint32_t entries = Load(base, header + 16); entries != 0) {
+  if (const uint32_t entries = header.entries().address; entries != 0) {
     memory::FreePages(entries);
   }
   uint32_t count = Load(base, frame + 80);
@@ -460,21 +470,21 @@ std::optional<uint32_t> ReplaysBuildList(
   // VirtualAlloc(0, size, MEM_COMMIT, PAGE_READWRITE) each.
   if (int32_t(count) < 99 && add_empty != 0) {
     count++;
-    Store(base, Load(base, kSaveBuffers) + 12, memory::AllocPages(count * 36, 4096));
-    Store(base, Load(base, kSaveBuffers) + 16, memory::AllocPages(count * 304, 4096));
-    Store(base, Load(base, Load(base, kSaveBuffers) + 12) + 28, 0);
-    Store(base, Load(base, Load(base, kSaveBuffers) + 16) + 300, 0);
-    header = Load(base, kSaveBuffers);
-    records = Load(base, header + 12) + 36;
-    entries = Load(base, header + 16) + 304;
+    G::save_buffers(base).set_records(memory::AllocPages(count * schema::SaveReplayRecord::kSize, 4096));
+    G::save_buffers(base).set_entries(memory::AllocPages(count * schema::SaveReplayEntry::kSize, 4096));
+    G::save_buffers(base).records().set_number(0);
+    G::save_buffers(base).entries().set_number(0);
+    header = G::save_buffers(base);
+    records = header.records().address + schema::SaveReplayRecord::kSize;
+    entries = header.entries().address + schema::SaveReplayEntry::kSize;
   } else {
-    Store(base, Load(base, kSaveBuffers) + 12, memory::AllocPages(count * 36, 4096));
-    Store(base, Load(base, kSaveBuffers) + 16, memory::AllocPages(count * 304, 4096));
-    header = Load(base, kSaveBuffers);
-    records = Load(base, header + 12);
-    entries = Load(base, header + 16);
+    G::save_buffers(base).set_records(memory::AllocPages(count * schema::SaveReplayRecord::kSize, 4096));
+    G::save_buffers(base).set_entries(memory::AllocPages(count * schema::SaveReplayEntry::kSize, 4096));
+    header = G::save_buffers(base);
+    records = header.records().address;
+    entries = header.entries().address;
   }
-  Store(base, header + 20, count);
+  header.set_count(count);
   const auto saves = [&] { return *InterfaceSaveCount(base, *ReplaySlot(base)); };
   if (saves() != 0) {
     uint32_t index = 0;
@@ -493,7 +503,7 @@ std::optional<uint32_t> ReplaysBuildList(
       index++;
     } while (index < saves());
   }
-  ReplaysSort(base, Load(base, Load(base, kSaveBuffers) + 12), frame - 176 + 80);
+  ReplaysSort(base, G::save_buffers(base).records().address, frame - 176 + 80);
   return 7;
 }
 

@@ -7,6 +7,7 @@
 #include "car_physics/float_ops.h"
 #include "debug/frame_state_diff.h"
 #include "graphics/resources.h"
+#include "schema/ui_movies_game.h"
 #include "ui_movies/ui_movies.h"
 
 #include <simde/x86/sse2.h>
@@ -21,7 +22,6 @@ using namespace car_physics::ops;
 namespace {
 
 constexpr uint32_t kOne = 0x82000A30;         // 1.0
-constexpr uint32_t kZero = 0x82000A34;        // 0.0
 constexpr uint32_t kScale = 0x82001070;       // the scale matrix's
 constexpr uint32_t kAlphaScale = 0x82000C44;  // the alpha's to an integer
 
@@ -70,14 +70,14 @@ void EffectBegin(uint8_t* base, uint32_t frame) {
 }
 
 double EffectQuad(uint8_t* base, uint32_t frame, uint32_t primitive, uint32_t texture) {
-  const uint32_t quad = frame + kEffectQuad;
+  const schema::UiMovieQuad quad(base, frame + kEffectQuad);
   graphics::TextureLevelDesc(base, texture, 0, frame + kDesc);
-  guest::StoreU32(base, quad + 84, texture);
-  guest::StoreU32(base, quad + 88, frame + kPositions);
-  guest::StoreU32(base, quad + 92, frame + kColors);
-  guest::StoreU32(base, quad + 96, frame + kCoords);
-  guest::StoreU32(base, quad + 80, guest::LoadU32(base, primitive + 116));
-  const double zero = Lfs(base, kZero);
+  quad.set_texture(texture);
+  quad.set_positions(frame + kPositions);
+  quad.set_colors(frame + kColors);
+  quad.set_coords(frame + kCoords);
+  quad.set_vertex_count(guest::LoadU32(base, primitive + 116));
+  const double zero = Lfs(base, schema::UiMoviesGameGlobals::zero_address());
   if (guest::LoadU32(base, primitive + 116) != 0) {
     const uint32_t width = guest::LoadU32(base, frame + kDesc + 24);
     const uint32_t height = guest::LoadU32(base, frame + kDesc + 28);
@@ -112,14 +112,15 @@ double EffectQuad(uint8_t* base, uint32_t frame, uint32_t primitive, uint32_t te
       guest::StoreU32(base, c + 8, guest::LoadU32(base, primitive + 64));
       guest::StoreU32(base, c + 12,
                       uint32_t(Fctiwz(Fmuls(Lfs(base, primitive + 68), alpha_scale))));
-      guest::StoreU32(base, quad + 100, 0);
-      for (uint32_t offset = 104; offset < 112; offset += 2) {
-        guest::StoreU16(base, quad + offset, 0);
-      }
+      quad.set_clipped(0);
+      quad.set_clip_0(0);
+      quad.set_clip_1(0);
+      quad.set_clip_2(0);
+      quad.set_clip_3(0);
     } while (k < guest::LoadU32(base, primitive + 116));
   }
-  guest::StoreU32(base, quad + 72, 0);
-  guest::StoreU32(base, quad + 68, 4);
+  quad.set_unknown_72(0);
+  quad.set_blend_mode(4);
   return zero;
 }
 

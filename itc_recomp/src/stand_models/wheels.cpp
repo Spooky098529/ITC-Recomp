@@ -11,6 +11,7 @@
 #include "guest.h"
 #include "native/buffers.h"
 #include "race_setup/race_setup.h"
+#include "schema/stand_models.h"
 #include "strings_and_font/steps.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -19,6 +20,7 @@ namespace stand_models {
 namespace {
 
 using namespace car_scene_draw::ops;
+using Globals = schema::StandModelsGlobals;
 
 constexpr uint32_t kSetupVehicle = 0x820CD5C8;
 constexpr uint32_t kWheelsSetRecord = 0x820D8EC0;
@@ -90,11 +92,19 @@ void CopyFloat(uint8_t* base, uint32_t from, uint32_t to) { Store(base, to, Load
 // record), through the frame's scratch doubleword.
 template <typename Wheel>
 void Colors(uint8_t* base, uint32_t to, const Wheel& wheel, double scale, uint32_t scratch) {
-  for (const uint32_t from : {8u, 20u, 24u}) {
-    const uint32_t at = to + (from == 8 ? 0 : from == 20 ? 16 : 32);
-    Stfs(base, at, Convert(base, guest::LoadU16(base, wheel() + from), scratch));
-    Stfs(base, at + 4, Fmuls(Convert(base, guest::LoadU8(base, wheel() + from + 2), scratch), scale));
-    Stfs(base, at + 8, Fmuls(Convert(base, guest::LoadU8(base, wheel() + from + 3), scratch), scale));
+  using W = schema::StandWheelSource;
+  // The three colors' fields: hue, saturation, value.
+  static constexpr uint16_t (W::*kHue[3])() const = {&W::color0_hue, &W::color1_hue,
+                                                     &W::color2_hue};
+  static constexpr uint8_t (W::*kSaturation[3])() const = {
+      &W::color0_saturation, &W::color1_saturation, &W::color2_saturation};
+  static constexpr uint8_t (W::*kValue[3])() const = {&W::color0_value, &W::color1_value,
+                                                      &W::color2_value};
+  for (uint32_t c = 0; c < 3; c++) {
+    const uint32_t at = to + 16 * c;
+    Stfs(base, at, Convert(base, (W(base, wheel()).*kHue[c])(), scratch));
+    Stfs(base, at + 4, Fmuls(Convert(base, (W(base, wheel()).*kSaturation[c])(), scratch), scale));
+    Stfs(base, at + 8, Fmuls(Convert(base, (W(base, wheel()).*kValue[c])(), scratch), scale));
   }
 }
 
@@ -131,16 +141,17 @@ uint64_t FitAxles(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_
     r3 = call(kSetupVehicle, {car, data}, frame, 0x82178BC8);
     *f1 = std::nullopt;  // as the guest call left it
   }
-  const auto stage = [&] { return Load(base, holder); };
-  Stfs(base, stage() + 6176, Lfs(base, frame + 416));
+  // The stage loaded again for each store, as the original.
+  const auto stage = [&] { return schema::GarageStage(base, Load(base, holder)); };
+  stage().set_front_axle_x(float(Lfs(base, frame + 416)));
   const double one = Lfs(base, kOne);
-  Stfs(base, stage() + 6180, Lfs(base, frame + 420));
-  Stfs(base, stage() + 6184, Lfs(base, frame + 424));
-  Stfs(base, stage() + 6188, one);
-  Stfs(base, stage() + 6192, Lfs(base, frame + 688));
-  Stfs(base, stage() + 6196, Lfs(base, frame + 692));
-  Stfs(base, stage() + 6200, Lfs(base, frame + 696));
-  Stfs(base, stage() + 6204, one);
+  stage().set_front_axle_y(float(Lfs(base, frame + 420)));
+  stage().set_front_axle_z(float(Lfs(base, frame + 424)));
+  stage().set_front_axle_w(float(one));
+  stage().set_rear_axle_x(float(Lfs(base, frame + 688)));
+  stage().set_rear_axle_y(float(Lfs(base, frame + 692)));
+  stage().set_rear_axle_z(float(Lfs(base, frame + 696)));
+  stage().set_rear_axle_w(float(one));
   return r3;
 }
 
@@ -219,13 +230,14 @@ uint64_t SetWheel(uint8_t* base, const GuestCall& call, uint32_t holder, uint64_
   if (rear) {
     Colors(base, rec + 128, wheel, scale, scratch);
   }
+  using W = schema::StandWheelSource;
   if (front) {
-    CopyFloat(base, wheel() + 16, rec + 4060);
-    CopyFloat(base, wheel() + 28, rec + 4056);
+    CopyFloat(base, W(base, wheel()).f16_address(), rec + 4060);
+    CopyFloat(base, W(base, wheel()).f28_address(), rec + 4056);
   }
   if (rear) {
-    CopyFloat(base, wheel() + 16, rec + 4076);
-    CopyFloat(base, wheel() + 28, rec + 4072);
+    CopyFloat(base, W(base, wheel()).f16_address(), rec + 4076);
+    CopyFloat(base, W(base, wheel()).f28_address(), rec + 4072);
   }
   using strings_and_font::steps::Fctiwz;
   if (front) {
@@ -260,7 +272,7 @@ uint64_t PreviewWheel(uint8_t* base, const GuestCall& call, uint32_t screen, uin
   if (!car_specs::CarRefresh(base, car, &refreshed)) {
     call(kRefresh, {car}, frame, 0x821DFAFC);
   }
-  const uint32_t holder = Load(base, Load(base, kHolder));
+  const uint32_t holder = Load(base, Globals::stand_holder(base).address);
   return SetWheel(base, call, holder, r4, which, car, frame, f1);
 }
 

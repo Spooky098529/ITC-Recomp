@@ -3,6 +3,8 @@
 
 #include "race_world/race_world.h"
 
+#include "schema/race_world.h"
+
 #include "ai_drivers/ai_drivers.h"
 #include "base/log.h"
 #include "car_physics/float_ops.h"
@@ -19,6 +21,8 @@
 #include <cstdint>
 
 namespace race_world {
+
+using M = schema::RaceManager;
 
 using namespace car_physics::ops;
 namespace va = vehicle_accessors;
@@ -106,15 +110,15 @@ uint64_t ListRacers(uint8_t* base, uint32_t manager, uint32_t frame, bool heap,
   // The player's entry: the first flagged 0x4, or none (0: its +20 read at
   // 20, as the original).
   uint32_t player = 0;
-  if (int32_t(Load(base, manager + 2368)) > 0) {
+  if (int32_t(M(base, manager).entry_count()) > 0) {
     for (int32_t i = 0;;) {
-      const uint32_t entry = manager + 4 + 28 * uint32_t(i);
+      const uint32_t entry = M(base, manager).entries_address() + 28 * uint32_t(i);
       if ((Load(base, entry) & 0x4) != 0) {
         player = entry;
         break;
       }
       i++;
-      if (!(i < int32_t(Load(base, manager + 2368)))) {
+      if (!(i < int32_t(M(base, manager).entry_count()))) {
         break;
       }
     }
@@ -127,22 +131,22 @@ uint64_t ListRacers(uint8_t* base, uint32_t manager, uint32_t frame, bool heap,
   // Vehicle::Identity's 64-bit r3 (Vehicle::Get's from the zero-extended
   // index), the original's r3 when no entry sets another.
   uint64_t r3 = (array == 0 ? 0 : uint64_t(index) * 6272 + array) + 5232;
-  const int32_t count = int32_t(Load(base, manager + 2368));
+  const int32_t count = int32_t(M(base, manager).entry_count());
   const uint32_t position = Load(base, identity + 4);
   Store(base, frame + 84, position);
   const uint32_t player_section = guest::LoadU16(base, frame + 84);
   const uint32_t player_record = SectionRecord(base, Load(base, kRoute), player_section);
-  Store(base, manager + 2364, 0);
+  M(base, manager).set_racer_count(0);
   Store(base, frame + 1748, 0);
-  Store(base, manager + 2372, 0);
+  M(base, manager).set_opponents_with_vehicle(0);
   Store(base, frame + 1752, 0);
   Store(base, frame + 1744, 0);
   if (count > 0) {
     const double one = Lfs(base, kOne);
     const double far_key = Lfs(base, kFarKey);
     const double zero = Lfs(base, kZero);
-    for (int32_t i = 0; i < int32_t(Load(base, manager + 2368)); i++) {
-      const uint32_t entry = manager + 4 + 28 * uint32_t(i);
+    for (int32_t i = 0; i < int32_t(M(base, manager).entry_count()); i++) {
+      const uint32_t entry = M(base, manager).entries_address() + 28 * uint32_t(i);
       const uint32_t flags = Load(base, entry);
       bool lose = (flags & 0x20) != 0 || (flags & 0x80) != 0;
       double key = 0.0;
@@ -176,7 +180,7 @@ uint64_t ListRacers(uint8_t* base, uint32_t manager, uint32_t frame, bool heap,
       // The entry loses its vehicle.
       const uint32_t which = Load(base, entry + 20);
       r3 = which;
-      if (int32_t(which) == -1 || int32_t(Load(base, manager + ((which + 584) << 2))) <= 0) {
+      if (int32_t(which) == -1 || int32_t(Load(base, M(base, manager).vehicle_slots_address() + (which << 2))) <= 0) {
         continue;
       }
       Store(base, entry, flags & ~0x40u);
@@ -187,7 +191,7 @@ uint64_t ListRacers(uint8_t* base, uint32_t manager, uint32_t frame, bool heap,
       } else {
         r3 = original(0x820C20E0, frame, car);
       }
-      Store(base, manager + ((Load(base, entry + 20) + 584) << 2), 0);
+      Store(base, M(base, manager).vehicle_slots_address() + (Load(base, entry + 20) << 2), 0);
       Store(base, entry + 20, 0xFFFFFFFFu);
     }
   }
@@ -197,24 +201,24 @@ uint64_t ListRacers(uint8_t* base, uint32_t manager, uint32_t frame, bool heap,
     if (int32_t(Load(base, entry + 20)) == -1) {
       continue;
     }
-    Store(base, manager + ((Load(base, manager + 2364) + 577) << 2), entry);
-    const uint32_t listed = Load(base, manager + 2364);
-    const uint32_t racers = Load(base, manager + 2372);
-    Store(base, manager + 2364, listed + 1);
-    Store(base, manager + 2372, racers + 1);
+    Store(base, M(base, manager).racers_address() + (M(base, manager).racer_count() << 2), entry);
+    const uint32_t listed = M(base, manager).racer_count();
+    const uint32_t racers = M(base, manager).opponents_with_vehicle();
+    M(base, manager).set_racer_count(listed + 1);
+    M(base, manager).set_opponents_with_vehicle(racers + 1);
   }
   // The traffic entries in use.
-  Store(base, manager + 2376, 0);
+  M(base, manager).set_traffic_with_vehicle(0);
   for (uint32_t t = 0; t < 3; t++) {
-    const uint32_t entry = manager + 2160 + 28 * t;
+    const uint32_t entry = M(base, manager).traffic_entries_address() + 28 * t;
     if (Load(base, entry) == 0) {
       continue;
     }
-    Store(base, manager + ((Load(base, manager + 2364) + 577) << 2), entry);
-    const uint32_t listed = Load(base, manager + 2364);
-    const uint32_t traffic = Load(base, manager + 2376);
-    Store(base, manager + 2364, listed + 1);
-    Store(base, manager + 2376, traffic + 1);
+    Store(base, M(base, manager).racers_address() + (M(base, manager).racer_count() << 2), entry);
+    const uint32_t listed = M(base, manager).racer_count();
+    const uint32_t traffic = M(base, manager).traffic_with_vehicle();
+    M(base, manager).set_racer_count(listed + 1);
+    M(base, manager).set_traffic_with_vehicle(traffic + 1);
   }
   return r3;
 }
@@ -222,7 +226,7 @@ uint64_t ListRacers(uint8_t* base, uint32_t manager, uint32_t frame, bool heap,
 void AddRacers(uint8_t* base, uint32_t manager, uint32_t records, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_82173050 RaceManager::AddRacers");
   const double slice_length = Lfs(base, Load(base, kRoute) + 8);
-  BuildNeighbors(base, manager + 2392, frame - 336);
+  BuildNeighbors(base, M(base, manager).neighbors_address(), frame - 336);
   const uint32_t count_at = records + 0x595E0;
   // The player's record: the first flagged 0x1, or none (0: its position
   // read at 3904, as the original).
@@ -260,8 +264,8 @@ void AddRacers(uint8_t* base, uint32_t manager, uint32_t records, uint32_t frame
       const uint32_t flags = Load(base, record + 3888);
       if ((flags & 0x83) == 0) {
         if ((flags & 0x4) != 0) {
-          Store(base, manager + ((Load(base, manager + 2384) + 561) << 2), uint32_t(i));
-          Store(base, manager + 2384, Load(base, manager + 2384) + 1);
+          Store(base, M(base, manager).traffic_models_address() + (M(base, manager).traffic_model_count() << 2), uint32_t(i));
+          M(base, manager).set_traffic_model_count(M(base, manager).traffic_model_count() + 1);
         }
         continue;
       }
@@ -295,9 +299,9 @@ void AddRacers(uint8_t* base, uint32_t manager, uint32_t records, uint32_t frame
           further += 30;
         }
       }
-      const uint32_t entry = manager + 4 + 28 * Load(base, manager + 2368);
+      const uint32_t entry = M(base, manager).entries_address() + 28 * M(base, manager).entry_count();
       Store(base, entry + 24, uint32_t(i));
-      Store(base, entry + 4, Load(base, manager + 2368));
+      Store(base, entry + 4, M(base, manager).entry_count());
       CopyPosition(base, start, entry + 8);
       Store(base, entry, 1);
       const uint32_t again = Load(base, record + 3888);
@@ -309,7 +313,7 @@ void AddRacers(uint8_t* base, uint32_t manager, uint32_t records, uint32_t frame
       if ((Load(base, record + 3888) & 0x100) != 0) {
         Store(base, entry, Load(base, entry) | 0x20);
       }
-      Store(base, manager + 2368, Load(base, manager + 2368) + 1);
+      M(base, manager).set_entry_count(M(base, manager).entry_count() + 1);
     }
   }
   // The entries on the player's branches sorted by distance (the list at
@@ -318,14 +322,14 @@ void AddRacers(uint8_t* base, uint32_t manager, uint32_t records, uint32_t frame
   Store(base, frame + 84, position);
   const uint32_t player_section = guest::LoadU16(base, frame + 84);
   const uint32_t player_record = SectionRecord(base, Load(base, kRoute), player_section);
-  const int32_t entries = int32_t(Load(base, manager + 2368));
+  const int32_t entries = int32_t(M(base, manager).entry_count());
   Store(base, frame + 1812, 0);
   Store(base, frame + 1816, 0);
   Store(base, frame + 1808, 0);
   if (entries > 0) {
     const double zero = Lfs(base, kZero);
-    for (int32_t i = 0; i < int32_t(Load(base, manager + 2368)); i++) {
-      const uint32_t entry = manager + 4 + 28 * uint32_t(i);
+    for (int32_t i = 0; i < int32_t(M(base, manager).entry_count()); i++) {
+      const uint32_t entry = M(base, manager).entries_address() + 28 * uint32_t(i);
       const uint32_t flags = Load(base, entry);
       if ((flags & 0x20) != 0) {
         continue;
@@ -348,38 +352,38 @@ void AddRacers(uint8_t* base, uint32_t manager, uint32_t records, uint32_t frame
     }
   }
   // The nearest four within [0x8200996C] get a vehicle and a driver.
-  Store(base, manager + 2372, 0);
+  M(base, manager).set_opponents_with_vehicle(0);
   for (uint32_t node = entries > 0 ? Load(base, frame + 1808) : 0; node != 0;
        node = Load(base, node + 12)) {
     const uint32_t entry = Load(base, node);
-    if (Load(base, manager + 2372) < 4 && Lfs(base, node + 4) < Lfs(base, kNearest)) {
+    if (M(base, manager).opponents_with_vehicle() < 4 && Lfs(base, node + 4) < Lfs(base, kNearest)) {
       Store(base, entry, Load(base, entry) | 0x40);
       const uint32_t index_at = entry + 20;
-      Store(base, index_at, Load(base, manager + 2364));
-      Store(base, manager + ((Load(base, manager + 2364) + 577) << 2), entry);
-      Store(base, manager + ((Load(base, manager + 2364) + 584) << 2), 1);
+      Store(base, index_at, M(base, manager).racer_count());
+      Store(base, M(base, manager).racers_address() + (M(base, manager).racer_count() << 2), entry);
+      Store(base, M(base, manager).vehicle_slots_address() + (M(base, manager).racer_count() << 2), 1);
       GiveInput(base, frame + 144, Load(base, index_at));
       Store(base, frame + 84, 1);
       const uint32_t id =
           Load(base, entry + 24) * 3936 + Load(base, kRaceData) + 3960;
       racer_controllers::Setup(base, index_at, id, frame + 84, frame);
-      const uint32_t racers = Load(base, manager + 2372);
-      const uint32_t listed = Load(base, manager + 2364);
-      Store(base, manager + 2372, racers + 1);
-      Store(base, manager + 2364, listed + 1);
+      const uint32_t racers = M(base, manager).opponents_with_vehicle();
+      const uint32_t listed = M(base, manager).racer_count();
+      M(base, manager).set_opponents_with_vehicle(racers + 1);
+      M(base, manager).set_racer_count(listed + 1);
     } else {
       Store(base, entry, Load(base, entry) & ~0x40u);
     }
   }
   // The traffic: up to three entries (+2160) spread before the player.
   uint32_t traffic = Load(base, records + 0x595E8);
-  Store(base, manager + 2380, traffic);
+  M(base, manager).set_traffic_allowed(traffic);
   if (traffic > 3) {
-    Store(base, manager + 2380, 3);
+    M(base, manager).set_traffic_allowed(3);
   }
-  traffic = Load(base, manager + 2380);
-  Store(base, manager + 2376, 0);
-  if (traffic == 0 || Load(base, manager + 2384) == 0 ||
+  traffic = M(base, manager).traffic_allowed();
+  M(base, manager).set_traffic_with_vehicle(0);
+  if (traffic == 0 || M(base, manager).traffic_model_count() == 0 ||
       (Load(base, Load(base, kRaceData) + 0x59AE4) & 0x2000) != 0) {
     return;
   }
@@ -405,7 +409,7 @@ void AddRacers(uint8_t* base, uint32_t manager, uint32_t records, uint32_t frame
   uint32_t offset = step, counter = 0;
   uint64_t model = 0;
   for (uint32_t t = 0; int32_t(t) < int32_t(traffic); t++) {
-    const uint32_t entry = manager + 2160 + 28 * t;
+    const uint32_t entry = M(base, manager).traffic_entries_address() + 28 * t;
     const uint32_t start = Load(base, frame + 84);
     const uint32_t old = Load(base, entry + 16);
     if (half == 0) {
@@ -426,22 +430,22 @@ void AddRacers(uint8_t* base, uint32_t manager, uint32_t records, uint32_t frame
     const uint32_t branch =
         guest::LoadU8(base, SectionRecord(base, file, guest::LoadU16(base, frame + 80)) + 3);
     model = PickModel(base, number, branch, frame);
-    const uint32_t record = Load(base, manager + ((uint32_t(model) + 561) << 2));
+    const uint32_t record = Load(base, M(base, manager).traffic_models_address() + (uint32_t(model) << 2));
     Store(base, entry + 4, uint32_t(model));
     Store(base, entry + 0, 66);
     Store(base, entry + 24, record);
     Store(base, entry + 16, number);
-    Store(base, entry + 20, Load(base, manager + 2364));
+    Store(base, entry + 20, M(base, manager).racer_count());
     for (int32_t n = int32_t(number); n > 42;) {
       n = int32_t(Load(base, entry + 16)) - 42;
       Store(base, entry + 16, uint32_t(n));
     }
-    Store(base, manager + ((Load(base, manager + 2364) + 577) << 2), entry);
-    Store(base, manager + ((Load(base, manager + 2364) + 584) << 2), 1);
-    const uint32_t listed = Load(base, manager + 2364);
-    const uint32_t counted = Load(base, manager + 2376);
-    Store(base, manager + 2364, listed + 1);
-    Store(base, manager + 2376, counted + 1);
+    Store(base, M(base, manager).racers_address() + (M(base, manager).racer_count() << 2), entry);
+    Store(base, M(base, manager).vehicle_slots_address() + (M(base, manager).racer_count() << 2), 1);
+    const uint32_t listed = M(base, manager).racer_count();
+    const uint32_t counted = M(base, manager).traffic_with_vehicle();
+    M(base, manager).set_racer_count(listed + 1);
+    M(base, manager).set_traffic_with_vehicle(counted + 1);
     GiveInput(base, frame + 176, Load(base, entry + 20));
     racer_controllers::Setup(base, entry + 20, frame + 96, frame + 88, frame);
     const uint32_t placed = Load(base, frame + 80);

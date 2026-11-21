@@ -4,6 +4,7 @@
 // Archive::Load through the caller's LoadCall.
 
 #include "type67_modes/type67_modes.h"
+#include "type67_modes/views.h"
 
 #include "archive/archive.h"
 #include "base/log.h"
@@ -22,6 +23,7 @@ namespace {
 
 using guest::LoadU32;
 using guest::StoreU32;
+using G = schema::Type6Type7ModesGlobals;
 
 // Whether a slot's blocks are all the layer's pages (StandSlot::Free frees
 // its block and its camera's presets).
@@ -29,17 +31,17 @@ bool SlotIsPages(uint8_t* base, uint32_t slot) {
   if (!memory::IsPages(slot)) {
     return false;
   }
-  const uint32_t block = LoadU32(base, slot);
+  const uint32_t block = schema::StandSlot(base, slot).stage<schema::View>().address;
   if (block == 0) {
     return true;
   }
   if (!memory::IsPages(block)) {
     return false;
   }
-  const uint32_t camera = block + 112;
-  const uint32_t count = LoadU32(base, camera + 4392);
+  const schema::GarageCamera camera(base, block + 112);
+  const uint32_t count = camera.preset_count();
   for (uint32_t i = 0; i < count; i++) {
-    if (!memory::IsPages(LoadU32(base, camera + 296 + 4 * i))) {
+    if (!memory::IsPages(LoadU32(base, camera.presets_address() + 4 * i))) {
       return false;
     }
   }
@@ -66,9 +68,10 @@ int64_t GarageCameraInit(uint8_t* base, uint32_t camera, uint32_t sp, const Load
   ITC_NATIVE_RUNNING("sub_82180918 GarageCamera::Init");
   const uint32_t frame = sp - kGarageCameraInitFrame;
   GarageCameraReset(base, camera, frame - kGarageCameraResetFrame);
-  StoreU32(base, camera + 4392, 0);
-  StoreU32(base, camera + 292, 0x82619428);
-  StoreU32(base, camera + 0, 0);
+  const schema::GarageCamera cam(base, camera);
+  cam.set_preset_count(0);
+  cam.set_preset_table(0x82619428);
+  cam.set_set_up(0);
   return GarageCameraLoadPresets(base, camera, load);
 }
 
@@ -118,11 +121,12 @@ void GarageStageInit(uint8_t* base, uint32_t stage, uint32_t index, uint32_t sp,
 bool StandSlotInit(uint8_t* base, uint32_t slot, uint32_t index, uint32_t sp,
                    const LoadCall& load) {
   ITC_NATIVE_RUNNING("sub_82180AA0 StandSlot::Init");
-  if (LoadU32(base, slot) != 0) {
+  const schema::StandSlot s(base, slot);
+  if (s.stage<schema::View>().address != 0) {
     return false;
   }
   const uint32_t stage = memory::AllocPages(kGarageStageBytes, 4096);
-  StoreU32(base, slot, stage);
+  s.set_stage(stage);
   GarageStageInit(base, stage, index, sp - kStandSlotInitFrame, load);
   return true;
 }
@@ -134,18 +138,18 @@ uint64_t StandSceneCreate(uint8_t* base, uint32_t cars, uint32_t sp, const LoadC
   StoreU32(base, frame, sp);
   calls.viewports_init(frame);
   const uint64_t created = calls.scene_create(frame);
-  if (LoadU32(base, kStandHolder) != 0) {
+  if (G::stand_holder<schema::View>(base).address != 0) {
     return created;
   }
   const uint32_t holder = memory::AllocPages(24, 4096);
-  StoreU32(base, kStandHolder, holder);
+  G::set_stand_holder(base, holder);
   StoreU32(base, holder + 12, 0);
-  StoreU32(base, LoadU32(base, kStandHolder) + 16, 0);
-  StoreU32(base, LoadU32(base, kStandHolder) + 20, 0);
+  StoreU32(base, G::stand_holder<schema::View>(base).address + 16, 0);
+  StoreU32(base, G::stand_holder<schema::View>(base).address + 20, 0);
   for (uint32_t i = 0; i < 3; i++) {
     const uint32_t slot = memory::AllocPages(4, 4096);
-    StoreU32(base, 4 * i + LoadU32(base, kStandHolder), slot);
-    StandSlotInit(base, LoadU32(base, 4 * i + LoadU32(base, kStandHolder)), i, frame, load);
+    StoreU32(base, 4 * i + G::stand_holder<schema::View>(base).address, slot);
+    StandSlotInit(base, LoadU32(base, 4 * i + G::stand_holder<schema::View>(base).address), i, frame, load);
   }
   const uint32_t record = frame + 80;
   scene::SetUpConstruct(base, record);
@@ -162,7 +166,7 @@ uint64_t StandSceneCreate(uint8_t* base, uint32_t cars, uint32_t sp, const LoadC
 }
 
 std::optional<uint64_t> StandSceneRelease(uint8_t* base) {
-  const uint32_t holder = LoadU32(base, kStandHolder);
+  const uint32_t holder = G::stand_holder<schema::View>(base).address;
   if (!memory::IsPages(holder)) {
     return std::nullopt;
   }
@@ -176,19 +180,19 @@ std::optional<uint64_t> StandSceneRelease(uint8_t* base) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_82180738 StandScene::Release");
-  uint32_t r3 = LoadU32(base, kStandHolder);
+  uint32_t r3 = G::stand_holder<schema::View>(base).address;
   for (uint32_t offset = 0; offset < 12; offset += 4) {
     const uint32_t slot = LoadU32(base, offset + r3);
     if (slot == 0) {
       continue;
     }
     StandSlotFree(base, slot);
-    memory::FreePages(LoadU32(base, offset + LoadU32(base, kStandHolder)));
-    StoreU32(base, offset + LoadU32(base, kStandHolder), 0);
-    r3 = LoadU32(base, kStandHolder);
+    memory::FreePages(LoadU32(base, offset + G::stand_holder<schema::View>(base).address));
+    StoreU32(base, offset + G::stand_holder<schema::View>(base).address, 0);
+    r3 = G::stand_holder<schema::View>(base).address;
   }
   const uint64_t freed = memory::FreePages(r3) ? 1 : 0;
-  StoreU32(base, kStandHolder, 0);
+  G::set_stand_holder(base, 0u);
   return freed;
 }
 
@@ -198,11 +202,11 @@ uint64_t StandScenePollTeardown(uint8_t* base, uint32_t sp, const Calls& calls) 
   constexpr uint32_t kStartTeardown = 0x820C4D88;
   const uint32_t frame = sp - kPollTeardownFrame;
   StoreU32(base, frame, sp);  // the back chain, for the guest calls
-  uint32_t h = LoadU32(base, kStandHolder);
+  uint32_t h = G::stand_holder<schema::View>(base).address;
   const uint32_t scene = LoadU32(base, scene::kScene);
   if (LoadU32(base, h + 12) != 0) {
     StoreU32(base, h + 16, LoadU32(base, h + 16) - 1);
-    h = LoadU32(base, kStandHolder);
+    h = G::stand_holder<schema::View>(base).address;
     if (int32_t(LoadU32(base, h + 16)) > 0) {
       calls.call(kCarSceneUpdate, frame, 0x82179BC4, scene, 0);
       return 0;
@@ -215,7 +219,7 @@ uint64_t StandScenePollTeardown(uint8_t* base, uint32_t sp, const Calls& calls) 
       [&](uint32_t function, uint32_t at, uint32_t lr, uint32_t r3, uint32_t r4) {
         return calls.call(function, at, lr, r3, r4);
       });
-  h = LoadU32(base, kStandHolder);
+  h = G::stand_holder<schema::View>(base).address;
   if (done == 0 && LoadU32(base, h + 20) != 0) {
     for (uint32_t offset = 0; offset < 12; offset += 4) {
       const uint32_t stage = LoadU32(base, LoadU32(base, h + offset));
@@ -228,12 +232,12 @@ uint64_t StandScenePollTeardown(uint8_t* base, uint32_t sp, const Calls& calls) 
       StoreU32(base, model + 4296, 0);
       calls.call(kCarSceneUpdate, frame, 0x82179B64, model, 0);
       calls.call(kCarSceneDraw, frame, 0x82179B70, current, 0);
-      h = LoadU32(base, kStandHolder);
+      h = G::stand_holder<schema::View>(base).address;
     }
     return 0;
   }
   StoreU32(base, h + 12, 1);
-  StoreU32(base, LoadU32(base, kStandHolder) + 16, 10);
+  StoreU32(base, G::stand_holder<schema::View>(base).address + 16, 10);
   calls.call(kStartTeardown, frame, 0x82179BA0, done, 0);  // r3 as LoadsDone left it
   return 0;
 }

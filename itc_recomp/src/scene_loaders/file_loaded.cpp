@@ -17,6 +17,7 @@
 #include "models/xpr.h"
 #include "native/buffers.h"
 #include "scene_loaders/pools.h"
+#include "schema/scene_loaders.h"
 
 #include <bit>
 #include <cstdlib>
@@ -30,13 +31,11 @@ void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
 
-constexpr uint32_t kCockpitNames = 0x826018C8;  // the cars' names, by block
-constexpr uint32_t kTrafficNames = 0x82601980;  // the traffic cars' names
-constexpr uint32_t kTwoStrings = 0x82004FE8;    // "%s%s"
-constexpr uint32_t kNumbered = 0x82004FA4;      // "%s%s%d"
-constexpr uint32_t kInteOn = 0x82005008;        // "_inte_on"
-constexpr uint32_t kInteOnNumbered = 0x82004FFC;  // "_inte_on_0"
-constexpr uint32_t kTrafficSuffix = 0x820050AC;  // "_ex_0"
+using G = schema::SceneLoadersGlobals;
+
+// A load slot's buffer and state (LoadSlot's +16 and +20; car-models.md's).
+constexpr uint32_t kSlotBuffer = 16;
+constexpr uint32_t kSlotState = 20;
 
 // sprintf into the frame's +80, called with r5 to r7 = `args` (64-bit, as
 // the registers hold them; r8 to r10, which the calls don't set, as 0: only
@@ -74,9 +73,6 @@ void Move8(uint8_t* base, uint32_t from, uint32_t to) {
   Store(base, to + 4, lo);
 }
 
-constexpr uint32_t kQuarterTurn = 0x82002A50;  // -pi / 2
-constexpr uint32_t kTenth = 0x82001FBC;        // 0.1
-constexpr uint32_t kAccessoryNode = 0x82004FDC;  // "acce_null"
 
 // strcmp(a, b) == 0 as the original's inline loop: byte by byte until a's
 // terminator or a difference.
@@ -102,7 +98,7 @@ void QuarterTurn(uint8_t* base, uint32_t at, uint32_t to, uint32_t angle, uint32
   for (uint32_t w = 0; w < 8; w++) {
     Move8(base, at + 8 * w, to + 8 * w);
   }
-  CopyWord(base, kQuarterTurn, angle);
+  CopyWord(base, G::quarter_turn_address(), angle);
   matrix_math::RotateY(base, to, to, angle, frame - 80);
 }
 
@@ -125,13 +121,13 @@ void BindAndPose(uint8_t* base, uint32_t skeleton, uint32_t file, uint32_t frame
 // A part model's file arrived: Model::Load (its original where the plain
 // C++ declines), LoadSlot::ReleaseBuffer, the state 3. ReleaseBuffer's r3.
 uint32_t PartArrived(uint8_t* base, uint32_t slot, uint32_t model, const FileLoadedCalls& calls) {
-  const uint32_t file = Load(base, slot + 16);
+  const uint32_t file = Load(base, slot + kSlotBuffer);
   if (!models::ModelLoad(base, model, file, 0, calls.model_load)) {
     calls.model_load_original(model, file);
   }
   const auto r3 = car_models::LoadSlotReleaseBuffer(base, slot);
   Require(r3.has_value(), "LoadSlot::ReleaseBuffer");
-  Store(base, slot + 20, 3);
+  Store(base, slot + kSlotState, 3);
   return *r3;
 }
 
@@ -149,38 +145,44 @@ uint64_t XprArrived(uint8_t* base, uint32_t xpr, uint32_t file, uint32_t provide
 
 std::optional<uint32_t> CockpitBindTextures(uint8_t* base, uint32_t cockpit, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820D6108 Cockpit::BindTextures");
+  const schema::Cockpit c(base, cockpit);
   for (uint32_t i = 0; i < 6; i++) {
-    if (Loading(base, cockpit + 556 + 24 * i)) {
+    if (Loading(base, c.part_slot_state_address() + 24 * i)) {
       return 0;
     }
   }
   for (uint32_t i = 0; i < 2; i++) {
-    if (Loading(base, cockpit + 420 + 24 * i)) {
+    if (Loading(base, c.xpr_slot_state_address() + 24 * i)) {
       return 0;
     }
   }
-  if (Loading(base, cockpit + 196)) {
+  if (Loading(base, c.node_file_state_address())) {
     return 0;
   }
   const uint32_t frame = stack - kCockpitBindFrameBytes;
-  const uint32_t number = Load(base, cockpit + 48);
-  const int32_t block = int32_t(Load(base, Load(base, cockpit + 24) + 32));
-  const uint32_t name = Load(base, (uint32_t(block) << 2) + kCockpitNames);
+  const uint32_t number = c.texture_number();
+  // The car model's +32, the block (car-models.md's CarModel).
+  const int32_t block = int32_t(Load(base, Load(base, c.car_model_address()) + 32));
+  const uint32_t name = Load(base, (uint32_t(block) << 2) + G::cockpit_names_address());
   const bool printed =
-      number == 0 ? Print(base, frame, kTwoStrings, {name, Constant(kInteOn), number})
-                  : Print(base, frame, kNumbered, {name, Constant(kInteOnNumbered), number});
+      number == 0
+          ? Print(base, frame, G::two_strings_address(),
+                  {name, Constant(G::inte_on_address()), number})
+          : Print(base, frame, G::numbered_address(),
+                  {name, Constant(G::inte_on_numbered_address()), number});
   if (!printed) {
     return std::nullopt;
   }
-  const uint32_t xpr = cockpit + 448;
+  const uint32_t xpr = c.xprs_address();
   int32_t index = -1;
   if (block < 18) {
     index = XprFindByName(base, xpr, frame + 80);
-    Store(base, cockpit + 3504, uint32_t(models::XprGetTexture(base, xpr, uint32_t(index))));
+    c.set_texture(uint32_t(models::XprGetTexture(base, xpr, uint32_t(index))));
   }
   for (uint32_t i = 0; i < 6; i++) {
-    const uint32_t part = cockpit + 688 + 464 * i;
-    Store(base, part + 48, cockpit + 496);
+    // The part model's +48 (its provider) and +452 (material-passes.md's PartModel).
+    const uint32_t part = c.part_models_address() + 464 * i;
+    Store(base, part + 48, c.providers_address());
     if (block < 18) {
       Store(base, part + 452, uint32_t(models::XprGetTexture(base, xpr, uint32_t(index))));
     }
@@ -203,8 +205,9 @@ std::optional<uint32_t> TrafficBindTextures(uint8_t* base, uint32_t traffic, uin
     if (int32_t(number) <= 0 || int32_t(Load(base, traffic + 7056)) == -1) {
       continue;
     }
-    const uint32_t name = Load(base, (Load(base, traffic + 32) << 2) + kTrafficNames);
-    if (!Print(base, frame, kNumbered, {name, Constant(kTrafficSuffix), number})) {
+    const uint32_t name = Load(base, (Load(base, traffic + 32) << 2) + G::traffic_names_address());
+    if (!Print(base, frame, G::numbered_address(),
+               {name, Constant(G::traffic_suffix_address()), number})) {
       return std::nullopt;
     }
     const int32_t index = XprFindByName(base, xpr, frame + 80);
@@ -219,10 +222,11 @@ std::optional<uint32_t> TrafficBindTextures(uint8_t* base, uint32_t traffic, uin
 }
 
 bool CockpitFileLoadedNative(uint8_t* base, uint32_t request, uint32_t cockpit) {
+  const schema::Cockpit c(base, cockpit);
   for (uint32_t i = 0; i < 6; i++) {
-    if (Load(base, cockpit + 540 + 24 * i) == request) {
+    if (Load(base, c.part_slot_request_address() + 24 * i) == request) {
       uint32_t freed = 0;
-      return car_models::LoadSlotReleasable(base, cockpit + 536 + 24 * i, &freed);
+      return car_models::LoadSlotReleasable(base, c.part_slots_address() + 24 * i, &freed);
     }
   }
   return true;
@@ -232,50 +236,52 @@ uint64_t CockpitFileLoaded(uint8_t* base, uint32_t request, uint32_t buffer, uin
                            uint32_t stack, const FileLoadedCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820D6528 Cockpit::OnFileLoaded");
   const uint32_t f = stack - kCockpitLoadedFrameBytes;
+  const schema::Cockpit c(base, cockpit);
   for (uint32_t i = 0; i < 6; i++) {
-    if (Load(base, cockpit + 540 + 24 * i) == request) {
-      return PartArrived(base, cockpit + 536 + 24 * i, cockpit + 688 + 464 * i, calls);
+    if (Load(base, c.part_slot_request_address() + 24 * i) == request) {
+      return PartArrived(base, c.part_slots_address() + 24 * i,
+                         c.part_models_address() + 464 * i, calls);
     }
   }
   for (uint32_t i = 0; i < 2; i++) {
-    if (Load(base, cockpit + 404 + 24 * i) == request) {
-      const uint64_t r3 =
-          XprArrived(base, cockpit + 448 + 24 * i, buffer, cockpit + 496 + 20 * i, calls);
-      Store(base, cockpit + 420 + 24 * i, 3);
+    if (Load(base, c.xpr_slot_request_address() + 24 * i) == request) {
+      const uint64_t r3 = XprArrived(base, c.xprs_address() + 24 * i, buffer,
+                                     c.providers_address() + 20 * i, calls);
+      Store(base, c.xpr_slot_state_address() + 24 * i, 3);
       return r3;
     }
   }
-  if (Load(base, cockpit + 180) != request) {
+  if (c.node_file_request() != request) {
     return request;
   }
-  const uint32_t skeleton = cockpit + 208;
-  BindAndPose(base, skeleton, Load(base, cockpit + 192), f, calls);
-  Store(base, cockpit + 196, 3);
+  const uint32_t skeleton = c.skeleton_address();
+  BindAndPose(base, skeleton, c.node_file_buffer(), f, calls);
+  c.set_node_file_state(3);
   const int32_t nodes = int32_t(model_animation::SkeletonNodeCount(base, skeleton));
   uint64_t r3 = uint32_t(nodes);
   if (nodes > 0) {
-    const uint32_t names = Load(base, cockpit + 292);
+    const uint32_t names = c.skeleton_node_names().address;
     for (uint32_t n = 0; n < uint32_t(nodes); n++) {
-      if (SameName(base, kAccessoryNode, names + 160 * n)) {
-        Store(base, cockpit + 3472, Load(base, cockpit + 356) + 64 * n);
+      if (SameName(base, G::accessory_node_name_address(), names + 160 * n)) {
+        c.set_accessory_node(c.skeleton_node_matrices<schema::View>().address + 64 * n);
       }
     }
     r3 = 0;
   }
-  const uint32_t node = Load(base, cockpit + 3472);
+  const uint32_t node = c.accessory_node<schema::View>().address;
   if (node == 0) {
     return r3;
   }
   const uint32_t turn = f + 160;
   QuarterTurn(base, f + 96, turn, f + 80, f);
-  const uint32_t point = cockpit + 3488;
+  const uint32_t point = c.accessory_point_address();
   Move8(base, node + 48, point);
   Move8(base, node + 56, point + 8);
   const double x = Lfs(base, point + 0);
   const double y = Lfs(base, point + 4);
   const double z = Lfs(base, point + 8);
-  CopyWord(base, kOne, cockpit + 3500);
-  const double tenth = Lfs(base, kTenth);
+  CopyWord(base, G::one_address(), c.accessory_point_w_address());
+  const double tenth = Lfs(base, G::tenth_address());
   Stfs(base, point + 0, Fmuls(x, tenth));
   Stfs(base, point + 4, Fmuls(y, tenth));
   Stfs(base, point + 8, Fmuls(z, tenth));
@@ -297,18 +303,18 @@ bool TrafficFileLoadedNative(uint8_t* base, uint32_t request, uint32_t traffic) 
 std::optional<uint64_t> TrafficFileLoaded(uint8_t* base, uint32_t request, uint32_t traffic,
                                           uint32_t stack, const FileLoadedCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820D8430 TrafficCar::OnFileLoaded");
-  constexpr uint32_t kSuffix = 0x820050B8;
   const uint32_t f = stack - kTrafficLoadedFrameBytes;
   // sprintf's call: r5 the name, r6 the suffix (r7 to r10, which the call
   // doesn't set, as 0: only dead frame words differ).
-  const uint32_t name = Load(base, (Load(base, traffic + 32) << 2) + kTrafficNames);
-  const uint64_t args[6] = {name, Constant(kSuffix), 0, 0, 0, 0};
+  const uint32_t name = Load(base, (Load(base, traffic + 32) << 2) + G::traffic_names_address());
+  const uint64_t args[6] = {name, Constant(G::traffic_file_suffix_address()), 0, 0, 0, 0};
   for (uint32_t i = 0; i < 6; i++) {
     Store(base, f + 32 + 8 * i, uint32_t(args[i] >> 32));
     Store(base, f + 36 + 8 * i, uint32_t(args[i]));
   }
   int32_t written;
-  if (!c_runtime::Sprintf(base, f + 240, kTwoStrings, f + 32, f - 144 - 1328, &written)) {
+  if (!c_runtime::Sprintf(base, f + 240, G::two_strings_address(), f + 32, f - 144 - 1328,
+                          &written)) {
     return std::nullopt;
   }
   if (Load(base, traffic + 3748) != request) {
@@ -338,7 +344,9 @@ std::optional<uint64_t> TrafficFileLoaded(uint8_t* base, uint32_t request, uint3
   const uint32_t skeleton = traffic + 3776;
   BindAndPose(base, skeleton, entry(1), f, calls);
   const int32_t nodes = int32_t(model_animation::SkeletonNodeCount(base, skeleton));
-  static constexpr uint32_t kTireNames[4] = {0x82004FAC, 0x82004FB4, 0x82004FBC, 0x82004FC4};
+  static constexpr uint32_t kTireNames[4] = {
+      G::tire_names_address(), G::tire_names_address() + 8, G::tire_names_address() + 16,
+      G::tire_names_address() + 24};
   static constexpr uint32_t kTireReturns[4] = {0x820D85EC, 0x820D8630, 0x820D8674, 0x820D86B8};
   if (nodes > 0) {
     for (uint32_t n = 0; n < uint32_t(nodes); n++) {
@@ -363,17 +371,17 @@ std::optional<uint64_t> TrafficFileLoaded(uint8_t* base, uint32_t request, uint3
     Move8(base, traffic + 7136 + 64 * k + 48, at);
     Move8(base, traffic + 7136 + 64 * k + 56, at + 8);
     if (k < 3) {
-      CopyWord(base, kOne, at + 12);
+      CopyWord(base, G::one_address(), at + 12);
     }
   }
-  const double tenth = Lfs(base, kTenth);
+  const double tenth = Lfs(base, G::tenth_address());
   for (uint32_t k = 0; k < 4; k++) {
     for (uint32_t w = 0; w < 3; w++) {
       const uint32_t at = traffic + 7072 + 16 * k + 4 * w;
       Stfs(base, at, Fmuls(Lfs(base, at), tenth));
     }
   }
-  CopyWord(base, kOne, traffic + 7132);
+  CopyWord(base, G::one_address(), traffic + 7132);
   for (uint32_t k = 0; k < 4; k++) {
     const uint32_t at = traffic + 7072 + 16 * k;
     matrix_math::Vec4Transform(base, at, turn, at);

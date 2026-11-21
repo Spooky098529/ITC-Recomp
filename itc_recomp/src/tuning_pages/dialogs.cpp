@@ -19,6 +19,8 @@ namespace tuning_pages {
 
 namespace {
 
+using G = schema::TuningPagesGlobals;
+
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
@@ -40,12 +42,6 @@ double IntToFloat(uint8_t* base, uint32_t at, int32_t value) {
   return double(float(double(int64_t(word))));
 }
 
-constexpr uint32_t kZero = 0x82000A34;        // 0.0
-constexpr uint32_t kOne = 0x82000A30;         // 1.0
-constexpr uint32_t kMinusOne = 0x82001BE0;    // probably -1.0
-constexpr uint32_t kMirror = 0x82002244;      // StoreStickers' mirrored angle's offset
-constexpr uint32_t kStoreScale = 0x82002948;  // the angle's scale
-constexpr uint32_t kLoadScale = 0x8200294C;   // LoadStickers' angle scale
 constexpr uint32_t kMemcpy = 0x825A7410;
 constexpr uint32_t kPickNext = 0x821159B0;        // Career::PickNext (its adapter)
 constexpr uint32_t kHolderPointer = 0x826D83E0;   // the garage stage's holder
@@ -177,16 +173,15 @@ void GroupThreeDefaults(uint8_t* base, uint32_t s) {
 
 void SwapKept(uint8_t* base, uint64_t images, uint64_t k, uint64_t i) {
   ITC_NATIVE_RUNNING("sub_821FE798 DecalImages::SwapKept");
-  const uint32_t kept = uint32_t(k << 3) + uint32_t(images);
-  const uint32_t entry = uint32_t(i * 36 + images);
-  const uint32_t data = uint32_t((k + 905) << 3) + uint32_t(images);
-  const uint32_t kept_header = Load(base, kept + 7236);
-  const uint32_t header = Load(base, entry + 28);
-  const uint32_t pixels = Load(base, entry + 32);
-  Store(base, entry + 28, kept_header);
-  Store(base, entry + 32, Load(base, data));
-  Store(base, kept + 7236, header);
-  Store(base, data, pixels);
+  const schema::DecalImageKept kept = DecalKeptAt(base, images, uint32_t(k));
+  const schema::DecalImageEntry entry = DecalEntryAt(base, images, i);
+  const uint32_t kept_header = kept.texture_header();
+  const uint32_t header = entry.texture_header();
+  const uint32_t pixels = entry.texture_data();
+  entry.set_texture_header(kept_header);
+  entry.set_texture_data(kept.texture_data());
+  kept.set_texture_header(header);
+  kept.set_texture_data(pixels);
 }
 
 uint32_t GarageDecal(uint8_t* base, uint32_t screen, uint32_t area, uint64_t slot) {
@@ -240,12 +235,12 @@ uint64_t LoadStickers(uint8_t* base, const tuning_screen::GuestCall& call, uint6
   const uint32_t s = uint32_t(screen);
   const uint32_t frame = sp - 176;
   Store(base, frame, sp);
-  const double offset = Lfs(base, kMirror);
-  const double scale = Lfs(base, kLoadScale);
-  const double minus = Lfs(base, kMinusOne);
-  const uint32_t one = Load(base, kOne);
-  const double zero = Lfs(base, kZero);
-  const uint32_t zero_word = Load(base, kZero);
+  const double offset = double(G::mirror_angle(base));
+  const double scale = double(G::load_scale(base));
+  const double minus = double(G::minus_one(base));
+  const uint32_t one = Load(base, G::one_address());
+  const double zero = double(G::zero(base));
+  const uint32_t zero_word = Load(base, G::zero_address());
   uint32_t ids = s + 32200;
   uint32_t r = s + 31240;  // the record (the original's r31 its +8)
   uint64_t r3 = screen;
@@ -309,9 +304,9 @@ uint64_t StoreStickers(uint8_t* base, uint64_t screen, uint32_t sp) {
   const uint32_t s = uint32_t(screen);
   const uint32_t frame = sp - 112;
   Store(base, frame, sp);
-  const double scale = Lfs(base, kStoreScale);
-  const double minus = Lfs(base, kMinusOne);
-  const double offset = Lfs(base, kMirror);
+  const double scale = double(G::store_scale(base));
+  const double minus = double(G::minus_one(base));
+  const double offset = double(G::mirror_angle(base));
   uint32_t record = s + 31240;
   uint32_t ids = s + 32200;
   uint32_t g = 0;
@@ -368,9 +363,9 @@ uint64_t OnStickerDialogYes(uint8_t* base, const tuning_screen::GuestCall& call,
     }
     Store(base, q + 4, 39);
     Store(base, q + 0, 0xFFFFFFFFu);
-    const double zero = Lfs(base, kZero);
+    const double zero = double(G::zero(base));
     Store(base, q + 16, 34);
-    const double one = Lfs(base, kOne);
+    const double one = double(G::one(base));
     Store(base, q + 12, 53);
     uint32_t a = Load(base, s + 30724);
     uint32_t k = Load(base, s + 30732);
@@ -768,8 +763,8 @@ uint64_t OnDialogYes(uint8_t* base, const tuning_screen::GuestCall& call, uint64
         }
         if (category() == 5 && item() == 6) {
           const uint32_t layer = Load(base, s + 30732);
-          const double zero = Lfs(base, kZero);
-          const double one = Lfs(base, kOne);
+          const double zero = double(G::zero(base));
+          const double one = double(G::one(base));
           Store(base, s + (Load(base, s + 30724) * 3 + layer + 7798) * 4, 0xFFFFFFFFu);
           const uint32_t page = Load(base, s + 30724);
           const uint32_t r = (page * 3 + Load(base, s + 30732)) * 24 + s;

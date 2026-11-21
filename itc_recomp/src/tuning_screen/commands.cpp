@@ -26,7 +26,6 @@ namespace tuning_screen {
 namespace {
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-uint32_t Byte(uint8_t* base, uint32_t address) { return guest::LoadU8(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
@@ -63,17 +62,17 @@ int64_t Times40(uint32_t x) { return int32_t(x * 40u); }
 
 // The animation's flags after a +9716 set-up: +9720 = 0 when set, +9716 = 0.
 void ClearFlags(uint8_t* base, uint32_t screen) {
-  if (Load(base, screen + 9720) != 0) {
-    Store(base, screen + 9720, 0);
+  if (TS(base, screen).command_end_after_setup() != 0) {
+    TS(base, screen).set_command_end_after_setup(0);
   }
-  Store(base, screen + 9716, 0);
+  TS(base, screen).set_command_first_run(0);
 }
 
 // The queue's step with +9724, then +9724 = 0.
 void StepWith9724(uint8_t* base, uint32_t screen) {
-  if (Load(base, screen + 9724) != 0) {
+  if (TS(base, screen).command_end_now() != 0) {
     Advance(base, screen);
-    Store(base, screen + 9724, 0);
+    TS(base, screen).set_command_end_now(0);
   }
 }
 
@@ -101,44 +100,44 @@ uint64_t Command5(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_
   ITC_NATIVE_RUNNING("sub_821D4180 TuningScreen::Command5");
   const uint32_t frame = Frame(base, sp, 128);
   const uint32_t entry = MovieEntry(base, frame, kMovieId);
-  const int32_t category = int32_t(Load(base, screen + kCategory));
+  const int32_t category = int32_t(TS(base, screen).category());
   const uint32_t movie = Load(base, entry);
   uint64_t r3 = entry;
-  auto type2 = [&] { return uint64_t(Byte(base, screen + kType2)); };
-  auto pick = [&] { return int64_t(Byte(base, screen + kType2)); };
-  if (category == 1 && Byte(base, screen + kItem) == 3) {
-    if (Load(base, screen + 9716) != 0) {
+  auto type2 = [&] { return uint64_t(uint32_t(TS(base, screen).bonnet_choice())); };
+  auto pick = [&] { return int64_t(uint32_t(TS(base, screen).bonnet_choice())); };
+  if (category == 1 && uint32_t(TS(base, screen).item()) == 3) {
+    if (TS(base, screen).command_first_run() != 0) {
       SceneRestart(call, frame, movie, 28, 0x821D41E8, 0x821D4208);
       ClearFlags(base, screen);
     }
     const uint32_t node = ui_movies::FindNode(base, movie, 32, 1);
-    Store(base, node + 16, Scaled(base, frame, pick()));
+    Store(base, UiNode(base, node).y_address(), Scaled(base, frame, pick()));
     r3 = Restarted(call, frame, movie, [&] { return type2() + 734; }, 1, 0x821D4264, 0x821D4284,
                    0x821D44F0);
-  } else if (category == 4 && Byte(base, screen + kItem) == 4) {
+  } else if (category == 4 && uint32_t(TS(base, screen).item()) == 4) {
     // The bonnet: the current choice's picture marked when [+36368] is the
     // type byte.
-    if (Load(base, screen + 9716) != 0) {
+    if (TS(base, screen).command_first_run() != 0) {
       SceneRestart(call, frame, movie, 32, 0x821D42C8, 0x821D42E8);
       const uint32_t picture = ui_movies::Child(base, ui_movies::FindNode(base, movie, 30, 0), 2);
       const int64_t choice = int32_t(GetCurrentChoice(base, screen));
-      Store(base, picture + 16, Scaled(base, frame, choice));
-      const uint32_t type = Byte(base, screen + kType);
-      const bool same = int32_t(Load(base, screen + 36368)) == int32_t(type);
-      Store(base, picture + 80, same ? 1 : 0);
+      Store(base, UiNode(base, picture).y_address(), Scaled(base, frame, choice));
+      const uint32_t type = uint32_t(TS(base, screen).type());
+      const bool same = int32_t(TS(base, screen).aero4_type()) == int32_t(type);
+      UiNode(base, picture).set_visible(same ? 1 : 0);
       ClearFlags(base, screen);
     }
     const uint32_t mark = ui_movies::Child(base, ui_movies::FindNode(base, movie, 30, 1), 0);
-    Store(base, mark + 16, Scaled(base, frame, pick()));
+    Store(base, UiNode(base, mark).y_address(), Scaled(base, frame, pick()));
     Restarted(call, frame, movie, [&] { return type2() + 571; }, 1, 0x821D43AC, 0x821D43CC,
               0x821D43DC);
     r3 = Restarted(call, frame, movie, [&] { return type2() + 632; }, 0, 0x821D43EC, 0x821D440C,
                    0x821D44F0);
-  } else if (category == 6 && Byte(base, screen + kItem) == 0) {
-    if (Load(base, screen + 9716) != 0) {
+  } else if (category == 6 && uint32_t(TS(base, screen).item()) == 0) {
+    if (TS(base, screen).command_first_run() != 0) {
       SceneRestart(call, frame, movie, 36, 0x821D4448, 0x821D4468);
       const uint32_t node = ui_movies::FindNode(base, movie, 32, 1);
-      Store(base, node + 16, Scaled(base, frame, pick()));
+      Store(base, UiNode(base, node).y_address(), Scaled(base, frame, pick()));
       ClearFlags(base, screen);
     }
     r3 = Restarted(call, frame, movie, [&] { return type2() + 771; }, 1, 0x821D44C0, 0x821D44E0,
@@ -152,24 +151,26 @@ uint64_t Command11(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   ITC_NATIVE_RUNNING("sub_821E9730 TuningScreen::Command11");
   const uint32_t frame = Frame(base, sp, 128);
   const uint32_t movie = Load(base, MovieEntry(base, frame, kMovieId));
-  if (Load(base, screen + 9716) != 0) {
-    if (Load(base, screen + 9720) != 0) {
+  if (TS(base, screen).command_first_run() != 0) {
+    if (TS(base, screen).command_end_after_setup() != 0) {
       PlayNamed(call, frame, 0x821E9798, movie, 980, 0);
       FinishNamed(call, frame, 0x821E97A4, movie, 980);
       Advance(base, screen);
-      Store(base, screen + 9720, 0);
+      TS(base, screen).set_command_end_after_setup(0);
     } else {
       FinishNamed(call, frame, 0x821E97E0, movie, 980);
       PlayNamed(call, frame, 0x821E97FC, movie, 980, 1);
       FinishNamed(call, frame, 0x821E9808, movie, 1009);
       PlayNamed(call, frame, 0x821E9824, movie, 1009, 0);
     }
-    Store(base, screen + 9716, 0);
+    TS(base, screen).set_command_first_run(0);
   }
   const uint32_t node = ui_movies::FindNode(base, movie, 36, 0);
-  Store(base, node + 16, AsFloat(base, frame, Times40(Load(base, screen + 30492))));
-  Restarted(call, frame, movie, [&] { return uint64_t(Load(base, screen + 30492)) + 887; }, 1,
-            0x821E986C, 0x821E988C, 0x821E989C);
+  Store(base, UiNode(base, node).y_address(),
+        AsFloat(base, frame, Times40(TS(base, screen).light_kit_group())));
+  Restarted(
+      call, frame, movie, [&] { return uint64_t(TS(base, screen).light_kit_group()) + 887; }, 1,
+      0x821E986C, 0x821E988C, 0x821E989C);
   call(kResetTextScroll, {movie, 10, 0}, frame, 0x821E98AC);
   SetText(call, frame, 0x821E98C0, movie, 10, 0, 642, 0);
   const uint64_t r3 = call(kScrollText, {movie, 10, 0, 1}, frame, 0x821E98D4);
@@ -181,16 +182,17 @@ uint64_t Command12(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   ITC_NATIVE_RUNNING("sub_821E9CA0 TuningScreen::Command12");
   const uint32_t frame = Frame(base, sp, 128);
   const uint32_t movie = Load(base, MovieEntry(base, frame, kMovieId));
-  if (Load(base, screen + 9716) != 0) {
+  if (TS(base, screen).command_first_run() != 0) {
     FinishNamed(call, frame, 0x821E9CE8, movie, 983);
     PlayNamed(call, frame, 0x821E9D04, movie, 983, 1);
     ClearFlags(base, screen);
   }
   const uint32_t node = ui_movies::FindNode(base, movie, 37, 0);
-  Store(base, node + 16, AsFloat(base, frame, Times40(Load(base, screen + 30500))));
-  const uint64_t r3 =
-      Restarted(call, frame, movie, [&] { return uint64_t(Load(base, screen + 30500)) + 926; }, 1,
-                0x821E9D5C, 0x821E9D7C, 0x821E9D8C);
+  Store(base, UiNode(base, node).y_address(),
+        AsFloat(base, frame, Times40(TS(base, screen).light_kit_kind())));
+  const uint64_t r3 = Restarted(
+      call, frame, movie, [&] { return uint64_t(TS(base, screen).light_kit_kind()) + 926; }, 1,
+      0x821E9D5C, 0x821E9D7C, 0x821E9D8C);
   StepWith9724(base, screen);
   return r3;
 }
@@ -201,17 +203,17 @@ uint64_t Command54(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   const uint32_t entry = MovieEntry(base, frame, kMovieId);
   const uint32_t movie = Load(base, entry);
   uint64_t r3 = entry;
-  if (Load(base, screen + 9716) != 0) {
-    if (Load(base, screen + 9720) != 0) {
+  if (TS(base, screen).command_first_run() != 0) {
+    if (TS(base, screen).command_end_after_setup() != 0) {
       PlayNamed(call, frame, 0x821EB950, movie, 1001, 0);
       r3 = FinishNamed(call, frame, 0x821EB95C, movie, 1001);
       Advance(base, screen);
-      Store(base, screen + 9720, 0);
+      TS(base, screen).set_command_end_after_setup(0);
     } else {
       FinishNamed(call, frame, 0x821EB998, movie, 1001);
       r3 = PlayNamed(call, frame, 0x821EB9B4, movie, 1001, 0);
     }
-    Store(base, screen + 9716, 0);
+    TS(base, screen).set_command_first_run(0);
   }
   StepWith9724(base, screen);
   return r3;
@@ -222,24 +224,26 @@ uint64_t Command55(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   const uint32_t frame = Frame(base, sp, 144);
   const uint32_t movie = Load(base, MovieEntry(base, frame, kMovieId));
   const uint32_t far = steps::Bits(steps::Lfs(base, kEighty));
-  if (Load(base, screen + 9716) != 0) {
+  if (TS(base, screen).command_first_run() != 0) {
     FinishNamed(call, frame, 0x821EBE1C, movie, 1002);
     PlayNamed(call, frame, 0x821EBE38, movie, 1002, 0);
     const uint32_t picture = ui_movies::Child(base, ui_movies::FindNode(base, movie, 28, 0), 2);
-    Store(base, picture + 80, 1);
+    UiNode(base, picture).set_visible(1);
     if (int32_t(GetCurrentChoice(base, screen)) == 3) {
-      Store(base, picture + 16, far);
+      Store(base, UiNode(base, picture).y_address(), far);
     } else {
-      Store(base, picture + 16, AsFloat(base, frame, Times40(GetCurrentChoice(base, screen))));
+      Store(base, UiNode(base, picture).y_address(),
+            AsFloat(base, frame, Times40(GetCurrentChoice(base, screen))));
     }
     ClearFlags(base, screen);
   }
   // The pick [+33548]: 3 puts the mark at 80.0 and plays 430 and 491, else
   // 428 + pick and 489 + pick (the word read again for each).
   const uint32_t mark = ui_movies::Child(base, ui_movies::FindNode(base, movie, 28, 1), 0);
-  const uint32_t at = screen + 33548;
+  const uint32_t at = TS(base, screen).interior_pick_address();
   const bool three = int32_t(Load(base, at)) == 3;
-  Store(base, mark + 16, three ? far : AsFloat(base, frame, Times40(Load(base, at))));
+  Store(base, UiNode(base, mark).y_address(),
+        three ? far : AsFloat(base, frame, Times40(Load(base, at))));
   auto word = [&] { return uint64_t(Load(base, at)); };
   if (int32_t(Load(base, at)) == 3) {
     Restarted(call, frame, movie, [] { return uint64_t(430); }, 1, 0x821EBF14, 0x821EBF30,
@@ -264,12 +268,12 @@ uint64_t Command56(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   ITC_NATIVE_RUNNING("sub_821EC6A0 TuningScreen::Command56");
   const uint32_t frame = Frame(base, sp, 128);
   const uint32_t movie = Load(base, MovieEntry(base, frame, kMovieId));
-  const uint32_t at = screen + 33556;
-  if (Load(base, screen + 9716) != 0) {
+  const uint32_t at = TS(base, screen).unknown_33556_address();
+  if (TS(base, screen).command_first_run() != 0) {
     FinishNamed(call, frame, 0x821EC6F0, movie, 999);
     PlayNamed(call, frame, 0x821EC70C, movie, 999, 0);
     const uint32_t node = ui_movies::FindNode(base, movie, 32, 1);
-    Store(base, node + 16, AsFloat(base, frame, Times40(Load(base, at))));
+    Store(base, UiNode(base, node).y_address(), AsFloat(base, frame, Times40(Load(base, at))));
     ClearFlags(base, screen);
   }
   const uint64_t r3 =
@@ -284,7 +288,8 @@ uint64_t Command57(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   ITC_NATIVE_RUNNING("sub_821ECC68 TuningScreen::Command57");
   const uint32_t frame = Frame(base, sp, 176);
   const uint32_t movie = Load(base, MovieEntry(base, frame, kMovieId));
-  const uint32_t page = screen + 33564;  // the page: 4 the list's, else its rows
+  const uint32_t page =
+      TS(base, screen).interior_page_mode_address();  // the page: 4 the list's, else its rows
   const double none = steps::Lfs(base, kNotPlaying);
   uint64_t r3 = movie;
   // UiMovie::NamedAnimationTime: f1 set, r3 the movie (left).
@@ -297,7 +302,7 @@ uint64_t Command57(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   };
   // With neither 1005 nor 144 playing and +9720 0, the page's animation
   // (79 for the page 4, else 74 + the page) restarted and looped.
-  if (time(1005) == none && time(144) == none && Load(base, screen + 9720) == 0) {
+  if (time(1005) == none && time(144) == none && TS(base, screen).command_end_after_setup() == 0) {
     if (int32_t(Load(base, page)) == 4) {
       r3 = Restarted(call, frame, movie, [] { return uint64_t(79); }, 1, 0x821ECCF8, 0x821ECD14,
                      0x821ECD54);
@@ -306,21 +311,21 @@ uint64_t Command57(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
                      0x821ECD24, 0x821ECD44, 0x821ECD54);
     }
   }
-  if (Load(base, screen + 9716) != 0) {
-    if (Load(base, screen + 9720) != 0) {
+  if (TS(base, screen).command_first_run() != 0) {
+    if (TS(base, screen).command_end_after_setup() != 0) {
       FinishNamed(call, frame, 0x821ECD80, movie, 144);
       PlayNamed(call, frame, 0x821ECD9C, movie, 144, 0);
       FinishNamed(call, frame, 0x821ECDA8, movie, 1011);
       r3 = PlayNamed(call, frame, 0x821ECDC4, movie, 1011, 0);
       Advance(base, screen);
       if (int32_t(Load(base, page)) == 4) {
-        Store(base, screen + 9720, 0);
+        TS(base, screen).set_command_end_after_setup(0);
       }
     } else {
       FinishNamed(call, frame, 0x821ECE10, movie, 1005);
       r3 = PlayNamed(call, frame, 0x821ECE2C, movie, 1005, 0);
     }
-    Store(base, screen + 9716, 0);
+    TS(base, screen).set_command_first_run(0);
   }
   // The meter's point [+33572] 0 to 4: one animation played, the next
   // restarted and looped.
@@ -335,7 +340,7 @@ uint64_t Command57(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
       {133, 131, {0x821ECEC0, 0x821ECEDC, 0x821ECEE8, 0x821ECF04}},
       {138, 136, {0x821ECE68, 0x821ECE84, 0x821ECE90, 0x821ECEAC}},
   };
-  const uint32_t point = Load(base, screen + 33572);
+  const uint32_t point = TS(base, screen).interior_pair_index();
   if (point < 5) {
     const Pair& p = kPairs[point];
     FinishNamed(call, frame, p.lr[0], movie, p.first);
@@ -354,9 +359,9 @@ uint64_t Command57(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
       call(kSetNodeText, {movie, text, 379, i + 1, 0, 0, 0, 0}, frame, 0x821ED060);
       const uint32_t mark = ui_movies::Child(base, row, 5);
       const bool flag = int32_t(GetChoiceFlag(base, screen, i)) != 0;
-      Store(base, mark + 80, flag ? 1 : 0);
+      UiNode(base, mark).set_visible(flag ? 1 : 0);
       const uint32_t picture = ui_movies::Child(base, row, 6);
-      Store(base, picture + 108, Load(base, page) * 5 + i);
+      UiNode(base, picture).set_texture_entry(Load(base, page) * 5 + i);
       r3 = picture;
     }
   }
@@ -368,14 +373,14 @@ uint64_t Command58(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   ITC_NATIVE_RUNNING("sub_821EDB70 TuningScreen::Command58");
   const uint32_t frame = Frame(base, sp, 128);
   const uint32_t movie = Load(base, MovieEntry(base, frame, kMovieId));
-  if (Load(base, screen + 9716) != 0) {
+  if (TS(base, screen).command_first_run() != 0) {
     FinishNamed(call, frame, 0x821EDBB8, movie, 143);
     PlayNamed(call, frame, 0x821EDBD4, movie, 143, 1);
     FinishNamed(call, frame, 0x821EDBE0, movie, 1012);
     PlayNamed(call, frame, 0x821EDBFC, movie, 1012, 0);
     ClearFlags(base, screen);
   }
-  const uint32_t at = screen + 33576;
+  const uint32_t at = TS(base, screen).interior_slot_address();
   const uint64_t r3 =
       Restarted(call, frame, movie, [&] { return uint64_t(Load(base, at)) + 111; }, 1, 0x821EDC28,
                 0x821EDC48, 0x821EDC58);
@@ -393,18 +398,18 @@ template <typename More>
 void EditorSetUp(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t frame,
                  uint32_t movie, uint64_t named, uint32_t finish_lr, uint32_t play_lr,
                  const More& more) {
-  if (Load(base, screen + 9716) == 0) {
+  if (TS(base, screen).command_first_run() == 0) {
     return;
   }
-  if (Load(base, screen + 9720) != 0) {
+  if (TS(base, screen).command_end_after_setup() != 0) {
     Advance(base, screen);
-    Store(base, screen + 9720, 0);
+    TS(base, screen).set_command_end_after_setup(0);
   } else {
     FinishNamed(call, frame, finish_lr, movie, named);
     PlayNamed(call, frame, play_lr, movie, named, 1);
     more();
   }
-  Store(base, screen + 9716, 0);
+  TS(base, screen).set_command_first_run(0);
 }
 
 // Help text (2, 0) of movie 13 given string `id` and scrolled
@@ -438,9 +443,11 @@ uint64_t Command17(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   EditorSetUp(base, call, screen, frame, movie, 221, 0x82200190, 0x822001AC, [] {});
   const uint32_t node = ui_movies::FindNode(base, movie, 10, 0);
   // lwa: the word sign-extended.
-  Store(base, node + 16, Scaled(base, frame, int32_t(Load(base, screen + 30740))));
-  return Restarted(call, frame, movie, [&] { return uint64_t(Load(base, screen + 30740)) + 49; },
-                   1, 0x822001F8, 0x82200218, 0x82200228);
+  Store(base, UiNode(base, node).y_address(),
+        Scaled(base, frame, int32_t(TS(base, screen).operation_cursor())));
+  return Restarted(
+      call, frame, movie, [&] { return uint64_t(TS(base, screen).operation_cursor()) + 49; }, 1,
+      0x822001F8, 0x82200218, 0x82200228);
 }
 
 uint64_t Command19(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp) {
@@ -450,12 +457,12 @@ uint64_t Command19(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   EditorSetUp(base, call, screen, frame, movie, 236, 0x82201CE8, 0x82201D04, [&] {
     // By the set +30724: 4 × [+30732] + 201 (0) or + 175 (1), the word read
     // again for each call.
-    const int32_t set = int32_t(Load(base, screen + 30724));
+    const int32_t set = int32_t(TS(base, screen).editor_page());
     if (set != 0 && set != 1) {
       return;
     }
     const uint64_t add = set == 0 ? 201 : 175;
-    auto named = [&] { return uint64_t(uint32_t(Load(base, screen + 30732) << 2)) + add; };
+    auto named = [&] { return uint64_t(uint32_t(TS(base, screen).layer_cursor() << 2)) + add; };
     FinishNamed(call, frame, set == 0 ? 0x82201D24 : 0x82201D50, movie, named());
     PlayNamed(call, frame, 0x82201D74, movie, named(), 1);
   });
@@ -467,7 +474,7 @@ uint64_t Command20(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   ITC_NATIVE_RUNNING("sub_82201FA0 TuningScreen::Command20");
   const uint32_t frame = Frame(base, sp, 128);
   const uint32_t entry = MovieEntry(base, frame, 13);
-  const int32_t set = int32_t(Load(base, screen + 30724));
+  const int32_t set = int32_t(TS(base, screen).editor_page());
   const uint32_t movie = Load(base, entry);
   uint64_t first, second;
   uint32_t lr[2];
@@ -499,7 +506,7 @@ uint64_t Command21(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t s
   // The work list's words +31228 + 4i (the original's (i + 7807) << 2).
   const auto list = [&](uint32_t i) { return s + uint32_t((i + 7807) << 2); };
   const uint32_t movie = Load(base, MovieEntry(base, frame, 13));
-  int32_t n = int32_t(word(30732) - word(30756));
+  int32_t n = int32_t(TS(base, s).layer_cursor() - TS(base, s).order_position());
   // One move of the layer: the two records and textures swapped, the decal
   // images' entries a and a - 1 exchanged with movie 13's slots, Command20.
   const auto move = [&](uint64_t first, uint64_t second, const uint32_t lr[2], uint32_t up) {
@@ -510,10 +517,10 @@ uint64_t Command21(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t s
       call(0x821FD518, {r3, first, second}, frame, lr[0]);
       call(0x82207F38, {r3}, frame, lr[1]);
     }
-    const int32_t set = int32_t(word(30724));
+    const int32_t set = int32_t(TS(base, s).editor_page());
     if (set == 0 || set == 1) {
-      const uint32_t c = word(30756);
-      const uint32_t images = s + 10048;
+      const uint32_t c = TS(base, s).order_position();
+      const uint32_t images = TS(base, s).decal_images_address();
       const uint32_t shift = (set == 0 ? 5 : 26) + up;
       const uint32_t e1 = images + 36 * (c + shift + 1);
       const uint32_t e2 = images + 36 * (c + shift);
@@ -532,49 +539,52 @@ uint64_t Command21(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t s
         Store(base, Load(base, Load(base, Load(base, entry) + 28) + slot + 4 * k), value);
       }
     }
-    Command20(base, call, s, frame, word(9644), word(9648));
+    Command20(base, call, s, frame, TS(base, s).vinyl_animation_a(),
+              TS(base, s).vinyl_animation_b());
   };
   if (n > 0) {
     static constexpr uint32_t kLr[2] = {0x82208878, 0x82208880};
     do {
-      const uint32_t c = word(30756);
+      const uint32_t c = TS(base, s).order_position();
       n--;
       const uint32_t moved = Load(base, list(c));
-      Store(base, s + 30756, c + 1);
+      TS(base, s).set_order_position(c + 1);
       const uint32_t other = Load(base, list(c + 1));
       Store(base, list(c + 1), moved);
-      Store(base, list(word(30756) - 1), other);
-      const uint32_t a = word(30756);
-      Store(base, s + 9644, Load(base, list(a)));
-      Store(base, s + 9648, Load(base, list(a - 1)));
+      Store(base, list(TS(base, s).order_position() - 1), other);
+      const uint32_t a = TS(base, s).order_position();
+      TS(base, s).set_vinyl_animation_a(Load(base, list(a)));
+      TS(base, s).set_vinyl_animation_b(Load(base, list(a - 1)));
       move(uint64_t(a), uint64_t(a) - 1, kLr, 0);
     } while (n != 0);
   } else if (n < 0) {
     static constexpr uint32_t kLr[2] = {0x82208A8C, 0x82208A94};
     uint32_t count = uint32_t(-int64_t(n));
     do {
-      const uint32_t c = word(30756);
+      const uint32_t c = TS(base, s).order_position();
       const uint32_t moved = Load(base, list(c));
-      Store(base, s + 30756, c - 1);
+      TS(base, s).set_order_position(c - 1);
       const uint32_t other = Load(base, list(c - 1));
       Store(base, list(c - 1), moved);
-      Store(base, list(word(30756) + 1), other);
-      const uint32_t a = word(30756);
-      Store(base, s + 9644, Load(base, list(a + 1)));
-      Store(base, s + 9648, Load(base, list(a)));
+      Store(base, list(TS(base, s).order_position() + 1), other);
+      const uint32_t a = TS(base, s).order_position();
+      TS(base, s).set_vinyl_animation_a(Load(base, list(a + 1)));
+      TS(base, s).set_vinyl_animation_b(Load(base, list(a)));
       move(uint64_t(a) + 1, uint64_t(a), kLr, 1);
       count--;
     } while (count != 0);
   }
   // The layer's row: 4 x layer + 202 (set 0) or 4 x (layer + 44) (set 1)
   // finished and played chained.
-  const int32_t set = int32_t(word(30724));
+  const int32_t set = int32_t(TS(base, s).editor_page());
   if (set == 0) {
-    FinishNamed(call, frame, 0x82208C48, movie, uint64_t(uint32_t(word(30732) << 2)) + 202);
-    PlayNamed(call, frame, 0x82208C98, movie, uint64_t(uint32_t(word(30732) << 2)) + 202, 1);
+    FinishNamed(call, frame, 0x82208C48, movie,
+                uint64_t(uint32_t(TS(base, s).layer_cursor() << 2)) + 202);
+    PlayNamed(call, frame, 0x82208C98, movie,
+              uint64_t(uint32_t(TS(base, s).layer_cursor() << 2)) + 202, 1);
   } else if (set == 1) {
-    FinishNamed(call, frame, 0x82208C74, movie, uint32_t((word(30732) + 44) << 2));
-    PlayNamed(call, frame, 0x82208C98, movie, uint32_t((word(30732) + 44) << 2), 1);
+    FinishNamed(call, frame, 0x82208C74, movie, uint32_t((TS(base, s).layer_cursor() + 44) << 2));
+    PlayNamed(call, frame, 0x82208C98, movie, uint32_t((TS(base, s).layer_cursor() + 44) << 2), 1);
   }
   const uint64_t answer = LayOutItems(base, s, frame);
   Advance(base, s);
@@ -598,7 +608,7 @@ uint64_t Command32Done(uint8_t* base, uint32_t screen, uint32_t sp) {
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t entry = MovieEntry(base, frame, 14);
   const uint32_t movie = Load(base, entry);
-  if (Load(base, screen + 33508) == 0) {
+  if (TS(base, screen).no_car_id() == 0) {
     return entry;
   }
   // UiMovie::SetNodeColor (sub_8211A5B8): the node's color; r3 the node.
@@ -618,7 +628,7 @@ uint64_t Command42(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
     FinishNamed(call, frame, 0x821F7654, movie, named - 1);
     FinishNamed(call, frame, 0x821F7660, movie, named);
   }
-  const uint32_t position = screen + 30756;
+  const uint32_t position = TS(base, screen).order_position_address();
   auto index = [&] { return Load(base, position); };
   auto times4 = [](uint32_t x) { return uint64_t(uint32_t(x << 2)); };
   const uint32_t at = index();
@@ -639,7 +649,7 @@ uint64_t Command42(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   Store(base, SlotAt(screen, index()), target);
   // UiMovie::HideNode (sub_8211AC48): the node's +80 = 0; r3 the node.
   const uint32_t node = ui_movies::FindNode(base, movie, 30, index() * 5 + 12);
-  Store(base, node + 80, 0);
+  UiNode(base, node).set_visible(0);
   const uint32_t now = index();
   if (int32_t(now) != int32_t(Load(base, SlotAt(screen, now)))) {
     Advance(base, screen);
@@ -653,8 +663,8 @@ uint64_t Command52(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t d
   const uint32_t screen = uint32_t(r3);
   const uint32_t frame = Frame(base, sp, 144);
   const uint32_t movie = Load(base, MovieEntry(base, frame, 14));
-  const int32_t state = int32_t(Load(base, screen + kState));
-  Store(base, screen + 9728, 0);
+  const int32_t state = int32_t(TS(base, screen).state());
+  TS(base, screen).set_pages_enabled(0);
   uint32_t title = 0;
   switch (state) {
     case 50: title = 18; break;
@@ -669,7 +679,7 @@ uint64_t Command52(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t d
   }
   // UiMovie::ShowNode (sub_8211AC00): the node's +80 = 1; r3 the node.
   const uint32_t node = ui_movies::FindNode(base, movie, 1, 1);
-  Store(base, node + 80, 1);
+  UiNode(base, node).set_visible(1);
   return node;
 }
 
@@ -726,7 +736,7 @@ uint64_t Command10(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   ITC_NATIVE_RUNNING("sub_821F35C0 TuningScreen::Command10");
   const uint32_t frame = Frame(base, sp, 144);
   const uint32_t movie = Load(base, MovieEntry(base, frame, kMovieId));
-  if (Load(base, screen + 9716) != 0) {
+  if (TS(base, screen).command_first_run() != 0) {
     FinishNamed(call, frame, 0x821F3610, movie, 979);
     PlayNamed(call, frame, 0x821F362C, movie, 979, 1);
     FinishNamed(call, frame, 0x821F3638, movie, 1009);
@@ -736,7 +746,7 @@ uint64_t Command10(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   // The pair's alphas (node (21, 5)'s children 4 and 5) by +30456.
   {
     const uint32_t node = ui_movies::FindNode(base, movie, 21, 5);
-    const bool second = Load(base, screen + 30456) != 0;
+    const bool second = TS(base, screen).paint_choice() != 0;
     Store(base, ui_movies::Child(base, node, 4) + 68, Load(base, second ? kDim : kOne));
     Store(base, ui_movies::Child(base, node, 5) + 68, Load(base, second ? kOne : kDim));
   }
@@ -744,7 +754,7 @@ uint64_t Command10(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   SliderPair(base, movie, frame, screen, 21, 2, 10, 30444, 30476, kHue);
   SliderPair(base, movie, frame, screen, 21, 3, 10, 30448, 30480, kByte);
   SliderPair(base, movie, frame, screen, 21, 4, 10, 30452, 30484, kByte);
-  const int32_t kind = int32_t(Load(base, screen + 30440));
+  const int32_t kind = int32_t(TS(base, screen).paint_row());
   if (kind == 0) {
     const uint32_t row = ui_movies::Child(base, ui_movies::FindNode(base, movie, 21, 1), 1);
     Store(base, row + 68, Load(base, kZero));
@@ -762,7 +772,7 @@ uint64_t Command10(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
       Store(base, ui_movies::Child(base, ui_movies::Child(base, node, 3), 0) + 68,
             Load(base, kZero));
     }
-    if (Load(base, screen + 30460) == 0) {
+    if (TS(base, screen).paint_buttons() == 0) {
       Looped(call, frame, movie, 178, 0x821F3924, 0x821F3940, 0x821F39D0);
     } else {
       Looped(call, frame, movie, 179, 0x821F3950, 0x821F396C, 0x821F39D0);
@@ -780,7 +790,7 @@ uint64_t Command13(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   ITC_NATIVE_RUNNING("sub_821EA460 TuningScreen::Command13");
   const uint32_t frame = Frame(base, sp, 144);
   const uint32_t movie = Load(base, MovieEntry(base, frame, kMovieId));
-  if (Load(base, screen + 9716) != 0) {
+  if (TS(base, screen).command_first_run() != 0) {
     FinishNamed(call, frame, 0x821EA4B0, movie, 985);
     PlayNamed(call, frame, 0x821EA4CC, movie, 985, 1);
     FinishNamed(call, frame, 0x821EA4D8, movie, 228);
@@ -798,19 +808,20 @@ uint64_t Command13(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
     const uint32_t field = 30512 + 4 * k;
     SliderPair(base, movie, frame, screen, 23, 2 + k, 6, field, field, kBarLong, kBarLength);
   }
-  const auto word = [&](uint32_t offset) { return uint64_t(Load(base, screen + offset)); };
-  switch (Load(base, screen + 30508)) {
+  switch (TS(base, screen).kit0_row()) {
     case 0: Looped(call, frame, movie, 304, 0x821EA814, 0x821EA830, 0x821EA83C); break;
     case 1: Looped(call, frame, movie, 305, 0x821EA7E4, 0x821EA800, 0x821EA83C); break;
     case 2: Looped(call, frame, movie, 306, 0x821EA7B4, 0x821EA7D0, 0x821EA83C); break;
     case 3:
       Looped(call, frame, movie, 307, 0x821EA744, 0x821EA760, 0x821EA76C);
-      Restarted(call, frame, movie, [&] { return word(30524) + 294; }, 1, 0x821EA77C, 0x821EA79C,
-                0x821EA83C);
+      Restarted(
+          call, frame, movie, [&] { return uint64_t(TS(base, screen).kit0_value_3()) + 294; }, 1,
+          0x821EA77C, 0x821EA79C, 0x821EA83C);
       break;
     case 4:
-      Restarted(call, frame, movie, [&] { return word(30528) + 219; }, 1, 0x821EA70C, 0x821EA72C,
-                0x821EA83C);
+      Restarted(
+          call, frame, movie, [&] { return uint64_t(TS(base, screen).kit0_cursor_b()) + 219; }, 1,
+          0x821EA70C, 0x821EA72C, 0x821EA83C);
       break;
     default: break;
   }
@@ -823,7 +834,7 @@ uint64_t Command14(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   ITC_NATIVE_RUNNING("sub_821EAFA0 TuningScreen::Command14");
   const uint32_t frame = Frame(base, sp, 144);
   const uint32_t movie = Load(base, MovieEntry(base, frame, kMovieId));
-  if (Load(base, screen + 9716) != 0) {
+  if (TS(base, screen).command_first_run() != 0) {
     FinishNamed(call, frame, 0x821EAFF0, movie, 987);
     PlayNamed(call, frame, 0x821EB00C, movie, 987, 1);
     FinishNamed(call, frame, 0x821EB018, movie, 320);
@@ -834,21 +845,23 @@ uint64_t Command14(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   }
   // The bar's slider (node (24, 3)'s children 6 and 7), the row's number.
   SliderPair(base, movie, frame, screen, 24, 3, 6, 30552, 30552, kBarLong, kBarLength);
-  const auto word = [&](uint32_t offset) { return uint64_t(Load(base, screen + offset)); };
-  call(kSetNodeText, {movie, ui_movies::FindNode(base, movie, 24, 14), 450, word(30548) + 1, 0, 0,
-                      0, 0},
+  call(kSetNodeText,
+       {movie, ui_movies::FindNode(base, movie, 24, 14), 450,
+        uint64_t(TS(base, screen).kit1_value_0()) + 1, 0, 0, 0, 0},
        frame, 0x821EB114);
-  switch (Load(base, screen + 30544)) {
+  switch (TS(base, screen).kit1_row()) {
     case 0: Looped(call, frame, movie, 384, 0x821EB218, 0x821EB234, 0x821EB240); break;
     case 1: Looped(call, frame, movie, 385, 0x821EB1E8, 0x821EB204, 0x821EB240); break;
     case 2:
       Looped(call, frame, movie, 386, 0x821EB178, 0x821EB194, 0x821EB1A0);
-      Restarted(call, frame, movie, [&] { return word(30556) + 366; }, 1, 0x821EB1B0, 0x821EB1D0,
-                0x821EB240);
+      Restarted(
+          call, frame, movie, [&] { return uint64_t(TS(base, screen).kit1_value_2()) + 366; }, 1,
+          0x821EB1B0, 0x821EB1D0, 0x821EB240);
       break;
     case 3:
-      Restarted(call, frame, movie, [&] { return word(30560) + 309; }, 1, 0x821EB140, 0x821EB160,
-                0x821EB240);
+      Restarted(
+          call, frame, movie, [&] { return uint64_t(TS(base, screen).kit1_cursor_b()) + 309; }, 1,
+          0x821EB140, 0x821EB160, 0x821EB240);
       break;
     default: break;
   }

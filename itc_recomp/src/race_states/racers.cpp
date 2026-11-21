@@ -24,8 +24,6 @@ using Machine = schema::RaceStates;
 
 namespace {
 
-constexpr uint32_t kRecordBytes = 3936;  // a racer record
-
 uint32_t Stages(uint8_t* base) {
   return G::race_data(base).stages_address();
 }
@@ -57,7 +55,7 @@ bool OtherInStage(uint8_t* base, uint32_t entry) {
 // section's record (its unsigned halfword x 4 in the table) + 124 + 84 x
 // the signed slice.
 uint32_t SliceCenter(uint8_t* base, uint32_t position) {
-  const uint32_t file = Load(base, race_world::kRoute);
+  const uint32_t file = G::route(base);
   const uint32_t record =
       Load(base, Load(base, file + 12) + (uint32_t(guest::LoadU16(base, position)) << 2));
   return uint32_t(int64_t(S16(base, position + 2)) * 84) + record + 124;
@@ -85,7 +83,7 @@ uint32_t RacersNear(uint8_t* base, uint32_t frame) {
     }
     const uint32_t vehicle = va::VehicleGet(base, Load(base, entry + 20));
     const uint32_t identity = va::VehicleIdentity(vehicle);
-    const uint32_t file = Load(base, race_world::kRoute);
+    const uint32_t file = G::route(base);
     const uint32_t record =
         Load(base, Load(base, file + 12) + (uint32_t(guest::LoadU16(base, identity + 4)) << 2));
     if (player_section == S16(base, identity + 4)) {
@@ -139,7 +137,7 @@ uint32_t RacersClose(uint8_t* base, uint32_t frame) {
       guest::StoreFloat(base, result + k, dot);
     }
     const double distance = double(vl::Sqrtf(Lfs(base, frame + 112)));
-    if (distance > Lfs(base, kClose)) {
+    if (distance > Lfs(base, G::close_distance_address())) {
       return 0;
     }
   }
@@ -186,8 +184,8 @@ void CountdownTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_
   const schema::RaceData data = G::race_data(base);
   data.set_flags(data.flags() & ~0x1000u);
   // The original loads the pointer twice here (the store's, the load's).
-  const uint32_t flags = FlagsAddress(base);
-  Store(base, flags, G::race_data(base).flags() & ~0x2000u);
+  const schema::RaceData store_to = G::race_data(base);
+  store_to.set_flags(G::race_data(base).flags() & ~0x2000u);
   ai_drivers::ResetAll(base, frame - 128);
 }
 

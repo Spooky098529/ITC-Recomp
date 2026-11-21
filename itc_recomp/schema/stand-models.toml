@@ -1,0 +1,294 @@
+# The schema of docs/functions/stand-models.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The front end's car stand (docs/known-data.md "garage stage", "traffic
+# body", "scene model record"; src/stand_models/): the garage stage, the
+# first set's traffic body (the measure's "TrafficCar", which also files
+# the stand's scene model and other pool objects ScenePools::GetB returns),
+# the wheel GarageStage::SetWheel reads its colors from, and a car spec copy.
+#
+# Left to other files (the measure's names to add there, not described here):
+# - "ScenePools::SetUpB.ret" (+4296 the draw word, +4880) is the new scene
+#   model: scene-models.toml's SceneModel.
+# - "new<68>@Type12Screen1::Create#2", "#3" and "#4" are front-end menus
+#   (Menu's 68-byte layout, stored by the menu's set-up): menu-helpers.toml's
+#   FrontEndMenu.
+# - The stand's holder blocks (`[0x826D83E0]`'s +0 to +8, each a 4-byte page
+#   holding the stage at +0) are filed under GarageStage at +0 by the measure.
+
+# The garage stage (6,208 bytes, VirtualAlloc'd by StandSlot::Init,
+# GarageStage::Init; docs/known-data.md "garage stage"). The measure also
+# files its sub-objects' accesses at their own offsets (measure faults):
+# GarageStage::ResetPose's r3 is stage + 32, GarageLights::Init and SetMode's
+# and GarageStage::SetLights' r3 the lights at + 4512, and a holder block's
+# +0 (the stage pointer) is filed at +0; the camera at + 112 is filed here at
+# the stage's offsets (GarageStage::ApplyPreset, Draw), which is right.
+[GarageStage]
+measures = ["GarageStage", "GarageLights"]
+size = 6208
+origin = "allocated"
+fields = [
+  { name = "index", offset = 0, type = "u32", note = "the stage's index (0 to 2, GarageStage::Init). Measure fault: a holder block's +0, the stage pointer, is filed here" },
+  { name = "pending_block", offset = 4, type = "u32", note = "-1 when nothing is pending (GarageStage::IsBusy), else the model block GarageStage::ReloadModel remakes the scene model for" },
+  { name = "model_index", offset = 8, type = "u32", note = "the car's scene model's index in pool 7 of the car scene (-1 none)" },
+  { name = "unknown_12", offset = 12, type = "f32", note = "0.0 from GarageStage::Init" },
+  { name = "model_claimed", offset = 16, type = "u32", note = "set while it holds a claimed model (GarageStage::MakeModel sets 1; ReloadModel releases it first)" },
+  { name = "joined_records", offset = 16, type = "bytes", count = 96, note = "measure fault: GarageLights::Init and SetMode's eleven 96-byte light records and SetLights' reads (r3 the lights, stage + 4512: its +16 to +111), and ResetPose's vectors (r3 stage + 32), filed at the stage's own offsets" },
+  { name = "bonnet", offset = 32, type = "f32", note = "a value opened and closed by animation types 2 and 3 (probably the bonnet), copied to the scene model's +4928" },
+  { name = "open_x", offset = 48, type = "f32", note = "+48 to +63 copied to the scene model's +4944 and +4960 (+52, +56 and +96 opened and closed by animation types 4 and 5, probably the doors)" },
+  { name = "open_y", offset = 52, type = "f32" },
+  { name = "open_z", offset = 56, type = "f32" },
+  { name = "angle_x", offset = 80, type = "f32", note = "+80 to +95 the car's angles (from a preset's +48, GarageStage::ApplyPreset)" },
+  { name = "yaw", offset = 84, type = "f32", note = "the car's yaw, turned 0.5 degrees a call (GarageStage::Draw)" },
+  { name = "angle_z", offset = 88, type = "f32" },
+  { name = "doors", offset = 96, type = "u32", note = "the doors' word (animation types 4 and 5; 0 from ResetPose)" },
+  { name = "camera", offset = 112, type = "bytes", count = 4400, note = "the garage camera (docs/known-data.md \"garage camera\"; GarageCamera::Init, Update). Also covers the lights' records +304 to +399 and +1072 to +1087 the measure files at the stage's offsets (GarageLights::Init, SetLights)" },
+  { name = "camera_set_up", offset = 112, type = "u32", note = "the camera's +0: 0 until the presets are loaded (GarageStage::Draw does nothing until then)" },
+  { name = "camera_elevation", offset = 212, type = "f32", note = "the camera's +100 (a preset's +4)" },
+  { name = "camera_zoom", offset = 220, type = "f32", note = "the camera's +108: 640 / tan(field of view)" },
+  { name = "camera_orbit_angle", offset = 288, type = "f32", note = "the camera's +176" },
+  { name = "camera_distance", offset = 292, type = "f32", note = "the camera's +180 (a preset's +8)" },
+  { name = "camera_fov", offset = 336, type = "f32", note = "the camera's +224, degrees (a preset's +12)" },
+  { name = "camera_preset_table", offset = 404, type = "u32", note = "the camera's +292: the presets' index table (0x82619428, 290 slots a car)" },
+  { name = "camera_preset_count", offset = 4504, type = "u32", note = "the camera's +4392" },
+  { name = "lights", offset = 4512, type = "bytes", count = 1088, note = "the lights (GarageLights::Init, SetMode, GarageStage::SetLights): +16 + 96i eleven records (+32 + 96i three lights, +304 + 96i four spots), +1072 the 16 bytes for 0x8265ED00" },
+  { name = "animations", offset = 5600, type = "bytes", count = 448, note = "16 entries of 28 bytes (+0 the type, +4 the steps, +8 a word, +12 the value's address, +16 the scene model's index, +20 done, +24 a float)" },
+  { name = "animation_count", offset = 6048, type = "u32" },
+  { name = "reflection", offset = 6052, type = "u32", note = "the reflection drawn (two passes); 1 from Init" },
+  { name = "draw_word", offset = 6056, type = "u32", note = "the scene model's draw word (its +4296)" },
+  { name = "dark", offset = 6060, type = "u32", note = "the light kit switched off every frame (GarageStage::SetDark)" },
+  { name = "unknown_6064", offset = 6064, type = "u32", note = "+6064 to +6084 0 from Init" },
+  { name = "unknown_6068", offset = 6068, type = "u32" },
+  { name = "unknown_6072", offset = 6072, type = "u32" },
+  { name = "unknown_6076", offset = 6076, type = "u32" },
+  { name = "unknown_6080", offset = 6080, type = "u32" },
+  { name = "unknown_6084", offset = 6084, type = "u32" },
+  { name = "waiting_preset", offset = 6088, type = "u32", note = "a camera preset waiting (-1 none)" },
+  { name = "plates_shown", offset = 6092, type = "u32", note = "the number plates shown (1 from Init; GarageStage::SetPlates)" },
+  { name = "front_axle_height", offset = 6096, type = "f32", note = "the car data's +1736 (GarageStage::FitCar)" },
+  { name = "rear_axle_height", offset = 6100, type = "f32", note = "the car data's +1756" },
+  { name = "front_wheel_height", offset = 6104, type = "f32", note = "the front axle record's +52" },
+  { name = "rear_wheel_height", offset = 6108, type = "f32", note = "the rear axle record's +52" },
+  { name = "front_camber", offset = 6112, type = "f32", note = "the front axle record's +208 (probably)" },
+  { name = "rear_camber", offset = 6116, type = "f32" },
+  { name = "front_toe", offset = 6120, type = "f32", note = "the front axle record's +212 (probably)" },
+  { name = "rear_toe", offset = 6124, type = "f32" },
+  { name = "front_camber_offset", offset = 6128, type = "f32", note = "sin(+208 x [0x82002948]) x +52" },
+  { name = "rear_camber_offset", offset = 6132, type = "f32" },
+  { name = "front_height", offset = 6136, type = "f32", note = "+6104 - +6096 (probably the front height)" },
+  { name = "rear_height", offset = 6140, type = "f32", note = "+6108 - +6100" },
+  { name = "mean_height", offset = 6144, type = "f32", note = "GarageStage::PoseCar" },
+  { name = "pitch", offset = 6148, type = "f32", note = "GarageStage::PoseCar" },
+  { name = "wheelbase", offset = 6152, type = "f32", note = "the car data's +4" },
+  { name = "front_track", offset = 6156, type = "f32", note = "the car data's +8 (probably)" },
+  { name = "rear_track", offset = 6160, type = "f32", note = "the car data's +12 (probably)" },
+  { name = "front_axle_x", offset = 6176, type = "f32", note = "+6176 to +6188 the front axle record's +0 to +8 and 1.0 (GarageStage::FitCar, FitAxles)" },
+  { name = "front_axle_y", offset = 6180, type = "f32" },
+  { name = "front_axle_z", offset = 6184, type = "f32", note = "probably the front half track" },
+  { name = "front_axle_w", offset = 6188, type = "f32" },
+  { name = "rear_axle_x", offset = 6192, type = "f32", note = "+6192 to +6204 the rear axle record's +0 to +8 and 1.0" },
+  { name = "rear_axle_y", offset = 6196, type = "f32" },
+  { name = "rear_axle_z", offset = 6200, type = "f32", note = "probably the rear half track" },
+  { name = "rear_axle_w", offset = 6204, type = "f32" },
+  { name = "front_axle_xy", offset = 6176, type = "u64", note = "GarageStage::Init's doubleword copies" },
+  { name = "front_axle_zw", offset = 6184, type = "u64" },
+  { name = "rear_axle_xy", offset = 6192, type = "u64" },
+  { name = "rear_axle_zw", offset = 6200, type = "u64" },
+]
+
+# The first set's traffic body (pool 6, 7,408 bytes, vtable 0x820050B4;
+# TrafficCar::TrafficCar, Load; docs/known-data.md "traffic body"). The
+# measure joins it with every pool object ScenePools::GetB returns: above
+# all the stand's scene model (pool 7 of the second set, scene-models.toml's
+# SceneModel: its +32 the 4,244-byte record, car-makers.toml's
+# SceneModelRecord, so a `model_` field at +n is the record's +n - 32), and
+# a few second set objects' words (the `joined_` fields). Where both use an
+# offset, the field is named for the traffic body and the note gives the
+# stand model's word.
+[TrafficCar]
+measure = "TrafficCar"
+size = 16780
+origin = "allocated"
+vtable = 0x820050B4
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x820050B4 (0x82004F90 in the destructor's end)" },
+  { name = "state", offset = 16, type = "u32", note = "the pool node's (0 when made)" },
+  { name = "index", offset = 20, type = "u32", note = "-1 when made. Measure fault: also SceneCockpit, SceneTraffic and SceneWheels::Release's pool index" },
+  { name = "joined_owner", offset = 24, type = "u32", note = "measure fault: the second set's pool objects' +24 (SceneCockpit, SceneParts, ScenePool4, SceneWheels::SetUp; SceneModel::ApplyRecord, Build)" },
+  { name = "joined_cockpit_28", offset = 28, type = "u32", note = "measure fault: SceneCockpit::SetUp's store" },
+  { name = "car_number", offset = 32, type = "u32", note = "the car record's +0: the traffic car's number, which picks its name at [0x82601980 + 4 x it]. Measure fault: also SceneCockpit::SetUp's store" },
+  { name = "model_block", offset = 48, type = "u32", note = "measure fault: the stand's scene model's car record +0, the model block (GarageAnims, GarageStage::ApplyPreset, SetAeroSet)" },
+  { name = "model_paint0_xy", offset = 64, type = "u64", note = "measure fault: the stand model's record +32 to +79, three 16-byte hue, saturation, value rows, copied as doublewords by GarageStage::SetColor0 to SetColor5" },
+  { name = "model_paint0_zw", offset = 72, type = "u64" },
+  { name = "model_paint1_xy", offset = 80, type = "u64" },
+  { name = "model_paint1_zw", offset = 88, type = "u64" },
+  { name = "model_paint2_xy", offset = 96, type = "u64" },
+  { name = "model_paint2_zw", offset = 104, type = "u64" },
+  { name = "model_front_wheel_paint0_hue", offset = 112, type = "f32", note = "measure fault: the stand model's record +80 to +120, the front wheels' colors (GarageStage::SetWheel)" },
+  { name = "model_front_wheel_paint0_saturation", offset = 116, type = "f32" },
+  { name = "model_front_wheel_paint0_value", offset = 120, type = "f32" },
+  { name = "model_front_wheel_paint1_hue", offset = 128, type = "f32" },
+  { name = "model_front_wheel_paint1_saturation", offset = 132, type = "f32" },
+  { name = "model_front_wheel_paint1_value", offset = 136, type = "f32" },
+  { name = "model_front_wheel_paint2_hue", offset = 144, type = "f32" },
+  { name = "model_front_wheel_paint2_saturation", offset = 148, type = "f32" },
+  { name = "model_front_wheel_paint2_value", offset = 152, type = "f32" },
+  { name = "model_rear_wheel_paint0_hue", offset = 160, type = "f32", note = "measure fault: the stand model's record +128 to +168, the rear wheels' colors" },
+  { name = "model_rear_wheel_paint0_saturation", offset = 164, type = "f32" },
+  { name = "model_rear_wheel_paint0_value", offset = 168, type = "f32" },
+  { name = "model_rear_wheel_paint1_hue", offset = 176, type = "f32" },
+  { name = "model_rear_wheel_paint1_saturation", offset = 180, type = "f32" },
+  { name = "model_rear_wheel_paint1_value", offset = 184, type = "f32" },
+  { name = "texture_name_count", offset = 192, type = "u32", note = "the car record's +160: a count or choice passed to the texture name's format (TrafficCar::BindTextures). The stand model: its record +160, the rear wheels' third hue (SetWheel, a float)" },
+  { name = "model_rear_wheel_paint2_saturation", offset = 196, type = "f32" },
+  { name = "model_rear_wheel_paint2_value", offset = 200, type = "f32" },
+  { name = "unknown_412", offset = 412, type = "u32", note = "measure fault: SceneTraffic::Draw's read (not read)" },
+  { name = "unknown_556", offset = 556, type = "u32", note = "sub_820D6328's read (not read)" },
+  { name = "unknown_576", offset = 576, type = "u32", note = "sub_820D6B48's read (not read)" },
+  { name = "unknown_732", offset = 732, type = "u32", note = "measure fault: GarageStage::PoseCar's store (not read)" },
+  { name = "unknown_3088", offset = 3088, type = "u32", note = "measure fault: SceneInterior::SetUp's store" },
+  { name = "unknown_3264", offset = 3264, type = "u32", note = "measure fault: SceneWheels::SetUp's store" },
+  { name = "unknown_3504", offset = 3504, type = "u32", note = "measure fault: SceneCockpit::Finish's read" },
+  { name = "texture_word0", offset = 3728, type = "u32", note = "+3728 to +3740 a 16 x 16 A8R8G8B8 texture's words (Texture::Create; TrafficLoads at +3728). The stand model: record +3696, the aero word (GarageStage::SetAero)" },
+  { name = "texture_word1", offset = 3732, type = "u32", note = "the stand model: record +3700 (GarageStage::SetAero2)" },
+  { name = "texture_word2", offset = 3736, type = "u32", note = "the stand model: record +3704, the door kind (GarageStage::SetDoorKind, read by GarageAnims' doors)" },
+  { name = "texture_word3", offset = 3740, type = "u32", note = "the stand model: record +3708, the decal word (GarageStage::SetDecalWord)" },
+  { name = "file_slot", offset = 3744, type = "u32", note = "the file's slot (+3748 the request). The stand model: record +3712, the parts record's +0 (GarageStage::SetParts, SetAeroSet, SetPart)" },
+  { name = "model_parts_aero2", offset = 3752, type = "u32", note = "measure fault: the stand model's record +3720" },
+  { name = "model_parts_aero1", offset = 3756, type = "u32", note = "measure fault: the stand model's record +3724" },
+  { name = "file_buffer", offset = 3760, type = "u32", note = "the file's buffer (a container: entry 0 an XPR2, 1 the node file, 2-7 the six parts). The stand model: record +3728, parts_aero3" },
+  { name = "file_state", offset = 3764, type = "u32", note = "the file's state (TrafficCar::BindTextures). The stand model: record +3732, parts_bonnet" },
+  { name = "model_parts_aero_kit", offset = 3768, type = "u32", note = "measure fault: the stand model's record +3736 (SetAeroSet: the set + 1 when its flag 8, else 0)" },
+  { name = "skeleton", offset = 3776, type = "u32", note = "the skeleton (+3860 its node names, +3924 its matrices). Measure fault: SceneModel::BeamColor's read of a scene model's +3776 (record +3744)" },
+  { name = "model_parts_aero9", offset = 3784, type = "u32", note = "measure fault: the stand model's record +3752" },
+  { name = "model_parts_class", offset = 3800, type = "u32", note = "measure fault: the stand model's record +3768 (GarageStage::SetCarClass)" },
+  { name = "model_interior_class", offset = 3808, type = "u32", note = "measure fault: the stand model's record +3776, 0 to 2 (GarageStage::SetInteriorClass)" },
+  { name = "model_interior_item2", offset = 3896, type = "u32", note = "measure fault: the stand model's record +3864 (GarageStage::SetInteriorWord kind 5)" },
+  { name = "model_interior_item1", offset = 3900, type = "u32", note = "measure fault: the stand model's record +3868 (SetInteriorWord kind 4, SetInteriorPair)" },
+  { name = "model_interior_item0", offset = 3904, type = "u32", note = "measure fault: the stand model's record +3872 (SetInteriorPair)" },
+  { name = "model_interior_seats", offset = 3908, type = "u32", note = "measure fault: the stand model's record +3876 (SetInteriorWord kind 1, SetInteriorLevel)" },
+  { name = "model_interior_has_seats", offset = 3912, type = "u32", note = "measure fault: the stand model's record +3880 (SetInteriorLevel)" },
+  { name = "model_accessory", offset = 3916, type = "u32", note = "measure fault: the stand model's record +3884 (GarageStage::SetAccessory)" },
+  { name = "model_accessory_variant", offset = 3920, type = "u32", note = "measure fault: the stand model's record +3888" },
+  { name = "texture_provider", offset = 4064, type = "u32", note = "a texture provider (TrafficCar::Reset; another at +4084)" },
+  { name = "model_wheels_word", offset = 4076, type = "u32", note = "measure fault: the stand model's record +4044, the wheels' +8 (GarageStage::SetWheelWord)" },
+  { name = "model_front_tire_grade", offset = 4080, type = "u32", note = "measure fault: the stand model's record +4048 (GarageStage::SetTireGrade)" },
+  { name = "model_front_wheel", offset = 4084, type = "u32", note = "measure fault: the stand model's record +4052, the wheel number - 1 (GarageStage::SetWheel)" },
+  { name = "model_front_wheel_f28", offset = 4088, type = "f32", note = "measure fault: the stand model's record +4056" },
+  { name = "model_front_wheel_f16", offset = 4092, type = "f32", note = "measure fault: the stand model's record +4060" },
+  { name = "model_rear_tire_grade", offset = 4096, type = "u32", note = "measure fault: the stand model's record +4064" },
+  { name = "model_rear_wheel", offset = 4100, type = "u32", note = "measure fault: the stand model's record +4068" },
+  { name = "slots", offset = 4104, type = "bytes", count = 144, note = "six 24-byte slots (+4104 + 24i, not loaded by the file callback). The stand model: record +4072 to +4215, the wheels' and light kit's words below" },
+  { name = "model_rear_wheel_f28", offset = 4104, type = "f32", note = "measure fault: the stand model's record +4072" },
+  { name = "model_rear_wheel_f16", offset = 4108, type = "f32", note = "measure fault: the stand model's record +4076" },
+  { name = "model_front_size", offset = 4112, type = "u32", note = "measure fault: the stand model's record +4080, the front tire copy's +80 truncated" },
+  { name = "model_front_size_pair", offset = 4112, type = "u64", note = "measure fault: the record's +4080 and +4084 passed to SceneWheels::SetSizes" },
+  { name = "model_front_size_a", offset = 4116, type = "f32", note = "measure fault: the stand model's record +4084" },
+  { name = "model_front_size_b", offset = 4120, type = "f32", note = "measure fault: the stand model's record +4088" },
+  { name = "slot0_state", offset = 4124, type = "u32", note = "slot 0's state (TrafficCar::SetPaint). The stand model: record +4092, the rear tire copy's +80 truncated" },
+  { name = "model_rear_size_pair", offset = 4124, type = "u64", note = "measure fault: the record's +4092 and +4096 passed to SceneWheels::SetSizes" },
+  { name = "model_rear_size_a", offset = 4128, type = "f32", note = "measure fault: the stand model's record +4096" },
+  { name = "model_rear_size_b", offset = 4132, type = "f32", note = "measure fault: the stand model's record +4100" },
+  { name = "model_wheel_extra", offset = 4136, type = "u32", note = "measure fault: the stand model's record +4104, the wheels' +68 (GarageStage::SetWheelExtras)" },
+  { name = "model_wheel_size_a", offset = 4140, type = "u32", note = "measure fault: the stand model's record +4108, the wheels' +72 (SceneWheels::SetSizes' a)" },
+  { name = "model_wheel_size_b", offset = 4144, type = "u32", note = "measure fault: the stand model's record +4112, the wheels' +76 (SetSizes' b)" },
+  { name = "model_caliper_texture", offset = 4156, type = "u32", note = "measure fault: the stand model's record +4124, the wheels' +88 (SetWheelExtras)" },
+  { name = "model_light_kit0_b", offset = 4224, type = "u32", note = "measure fault: the stand model's record +4192 to +4240, the light kit's 52 bytes (GarageStage::SetLightKit, ClearLightKit)" },
+  { name = "model_light_kit0_a", offset = 4228, type = "u32" },
+  { name = "model_light_kit0_f8", offset = 4232, type = "f32" },
+  { name = "model_light_kit0_f12", offset = 4236, type = "f32" },
+  { name = "model_light_kit0_f16", offset = 4240, type = "f32" },
+  { name = "model_light_kit1_a", offset = 4244, type = "u32" },
+  { name = "model_light_kit1_f8", offset = 4248, type = "f32" },
+  { name = "model_light_kit1_f12", offset = 4252, type = "f32" },
+  { name = "model_light_kit1_f16", offset = 4256, type = "f32" },
+  { name = "model_light_kit2_a", offset = 4260, type = "u32" },
+  { name = "model_light_kit2_f8", offset = 4264, type = "f32" },
+  { name = "model_light_kit2_f12", offset = 4268, type = "f32" },
+  { name = "model_light_kit2_f16", offset = 4272, type = "f32" },
+  { name = "part_models", offset = 4256, type = "bytes", count = 2784, note = "the six part models (+4256 + 464i)" },
+  { name = "model_draw_block_head", offset = 4288, type = "u64", note = "measure fault: a scene model's draw block +0 (SceneModel::Beam, BeamShape, BeamColor)" },
+  { name = "model_draw_word", offset = 4296, type = "u32", note = "measure fault: the stand model's draw word (the draw block's +8; GarageStage::Draw, MakeModel, ReloadModel, SetDrawWord, StandScene::PollTeardown). The traffic body: a part model's word" },
+  { name = "unknown_4304", offset = 4304, type = "u32", note = "part model 0's +48 (TrafficCar::BindTextures)" },
+  { name = "unknown_4692", offset = 4692, type = "u32", note = "part model 0's +436 (TrafficCar::BindTextures)" },
+  { name = "unknown_4716", offset = 4716, type = "u32", note = "part model 0's +460 (TrafficCar::BindTextures)" },
+  { name = "model_bonnet", offset = 4928, type = "f32", note = "measure fault: the stand model's draw block +640, the stage's +32 (GarageStage::Draw)" },
+  { name = "model_open0_xy", offset = 4944, type = "u64", note = "measure fault: the stand model's +4944 and +4960, the stage's +48 to +63 twice (GarageStage::Draw)" },
+  { name = "model_open0_zw", offset = 4952, type = "u64" },
+  { name = "model_open1_xy", offset = 4960, type = "u64" },
+  { name = "model_open1_zw", offset = 4968, type = "u64" },
+  { name = "model_lights_on", offset = 4976, type = "u32", note = "measure fault: the stand model's lights on (GarageStage::SetLightsOn)" },
+  { name = "model_light_value", offset = 4980, type = "f32", note = "measure fault: 0.0 when on, else SceneParts::LightValue" },
+  { name = "model_word5016", offset = 5016, type = "u32", note = "measure fault: GarageStage::SetWord5016's word" },
+  { name = "model_second_wheels_claimed", offset = 5032, type = "u32", note = "measure fault: the stand model's SceneModel::AddSecondWheels ran" },
+  { name = "model_parts", offset = 5060, type = "u32", note = "measure fault: the stand model's pool 1 object (SceneParts)" },
+  { name = "model_wheels", offset = 5100, type = "u32", note = "measure fault: the stand model's pool 5 object (SceneWheels)" },
+  { name = "texture2_word0", offset = 7040, type = "u32", note = "+7040 to +7052 a second texture's words (CarModel::MakePlate)" },
+  { name = "texture2_word1", offset = 7044, type = "u32" },
+  { name = "texture2_word2", offset = 7048, type = "u32" },
+  { name = "texture2_word3", offset = 7052, type = "u32" },
+  { name = "xpr_record", offset = 7056, type = "u32", note = "the XPR record named by the first formatted name (-1 none)" },
+  { name = "xpr_record2", offset = 7060, type = "u32", note = "another (TrafficCar::BindTextures)" },
+  { name = "tire_position0_w", offset = 7084, type = "f32", note = "+7072 + 16i the four tires' positions (their w 1.0 from the constructor)" },
+  { name = "tire_matrix0_row0_w", offset = 7148, type = "f32", note = "+7136 + 64i the tires' matrices (each row's w 1.0 from the constructor)" },
+  { name = "tire_matrix0_row1_w", offset = 7164, type = "f32" },
+  { name = "tire_matrix0_row2_w", offset = 7180, type = "f32" },
+  { name = "tire_matrix0_row3_w", offset = 7196, type = "f32" },
+  { name = "first_set", offset = 7392, type = "ptr", to = "ScenePools", note = "the first set ([0x826C2E40])" },
+  { name = "unknown_11452", offset = 11452, type = "u32", note = "measure fault: sub_820E3658's store (another pool object)" },
+  { name = "unknown_11656", offset = 11656, type = "u32", note = "measure fault: SceneCockpit::SetUp's store" },
+  { name = "unknown_11664", offset = 11664, type = "u32", note = "measure fault: SceneCockpit::Finish's store" },
+  { name = "unknown_16776", offset = 16776, type = "u32", note = "measure fault: sub_820E7378's store (a SceneWheels' +16776)" },
+]
+
+# The wheel GarageStage::SetWheel reads (Params::GetWheel's 48-byte record,
+# car-specs.toml's CarWheelRecord), joined by the measure with the car spec
+# whose +8380 is the stock wheel in the same layout (the `stock_` fields).
+# Its three colors: a hue halfword, a saturation and a value byte (/255).
+[StandWheelSource]
+measure = "Params::GetWheel.ret"
+size = 8412
+origin = "file"
+fields = [
+  { name = "color0_hue", offset = 8, type = "u16", note = "into the record's +80 (front) or +128 (rear) as floats" },
+  { name = "color0_saturation", offset = 10, type = "u8" },
+  { name = "color0_value", offset = 11, type = "u8" },
+  { name = "f16", offset = 16, type = "f32", note = "into the record's +4060 (front) or +4076 (rear)" },
+  { name = "color1_hue", offset = 20, type = "u16" },
+  { name = "color1_saturation", offset = 22, type = "u8" },
+  { name = "color1_value", offset = 23, type = "u8" },
+  { name = "color2_hue", offset = 24, type = "u16" },
+  { name = "color2_saturation", offset = 26, type = "u8" },
+  { name = "color2_value", offset = 27, type = "u8" },
+  { name = "f28", offset = 28, type = "f32", note = "into the record's +4056 (front) or +4072 (rear)" },
+  { name = "stock_color0_hue", offset = 8388, type = "u16", note = "measure fault: the car spec's stock wheel (+8380), its +8 to +28" },
+  { name = "stock_color0_saturation", offset = 8390, type = "u8" },
+  { name = "stock_color0_value", offset = 8391, type = "u8" },
+  { name = "stock_f16", offset = 8396, type = "f32" },
+  { name = "stock_color1_hue", offset = 8400, type = "u16" },
+  { name = "stock_color1_saturation", offset = 8402, type = "u8" },
+  { name = "stock_color1_value", offset = 8403, type = "u8" },
+  { name = "stock_color2_hue", offset = 8404, type = "u16" },
+  { name = "stock_color2_saturation", offset = 8406, type = "u8" },
+  { name = "stock_color2_value", offset = 8407, type = "u8" },
+  { name = "stock_f28", offset = 8408, type = "f32" },
+]
+
+# A copy of a car's spec (8,448 bytes VirtualAlloc'd by sub_82274DA8, the Xbox
+# Live mode's, not seen in play: Params::GetCarSpec's 8,432 bytes memcpy'd,
+# then the car id), added to one of two lists by its byte +771 or freed.
+[StandModelsSpecCopy]
+measures = ["new<8448>@sub_82274DA8", "new<8448>@sub_82274DA8#2"]
+size = 8448
+origin = "allocated"
+fields = [
+  { name = "unknown_771", offset = 771, type = "u8", note = "the spec's byte +771: 0 or 1 picks the list, else the copy is freed" },
+  { name = "car_id", offset = 8432, type = "u32" },
+]
+
+[globals]
+scene = { address = 0x826C2E44, type = "ptr", to = "CarScene", note = "the car scene (the second set of scene pools)" }
+stand_holder = { address = 0x826D83E0, type = "ptr", note = "the stand scene's holder (StandScene::Create): +0 to +8 three 4-byte blocks, each holding a garage stage at +0; +20 a stand model was made" }

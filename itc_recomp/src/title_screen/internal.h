@@ -5,6 +5,8 @@
 #include <cstdint>
 
 #include "guest.h"
+#include "schema/menu_helpers.h"
+#include "schema/title_screen.h"
 #include "title_screen/title_screen.h"
 #include "ui_movies/game.h"
 
@@ -14,6 +16,12 @@ inline uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(ba
 inline void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
+
+using G = schema::TitleScreenGlobals;
+using Machine = schema::Type4Machine;
+// A transition's started word (the page object's +24, the title load
+// block's +16), as the transitions get it (r3).
+using Started = schema::TitleTransitionStarted;
 
 constexpr uint32_t kNone = 0xFFFFFFFFu;
 constexpr uint32_t kMemRelease = 0x8000;
@@ -32,7 +40,31 @@ inline uint32_t FindMovie(uint8_t* base, uint32_t id, uint32_t key) {
   return Load(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, key));
 }
 
-inline uint32_t Words(uint8_t* base) { return Load(base, kWords); }
+// The title's words ([0x82814E34], loaded at each call).
+inline schema::TitleScreenData Words(uint8_t* base) { return G::data(base); }
+
+// The menu list's address ([0x82814E30]; race-screens' MenuList, its fields
+// still offsets here).
+inline uint32_t ListAddress(uint8_t* base) { return G::list<schema::View>(base).address; }
+
+// Menu4's menu reset (TitleScreen::Create, SetUpMenu4): first item 0, last
+// 1, wrapping, the rest cleared, in the originals' order.
+inline void ResetMenu(const schema::FrontEndMenu& menu) {
+  menu.set_first_item(0);
+  menu.set_last_item(1);
+  menu.set_wraps(1);
+  menu.set_cursor(0);
+  menu.set_previous(0);
+  menu.set_moved(0);
+  menu.set_wrapped(0);
+  menu.set_visible_row(0);
+  menu.set_previous_row(0);
+  menu.set_side(0);
+  menu.set_player(0);
+  menu.set_up_down_locked(0);
+  menu.set_left_right_steps(0);
+  menu.set_shoulders_step(0);
+}
 
 // Posts the message (id, 0, 0) on `mode`'s ring (+204: its count +600,
 // start +604, 50 slots of 12 bytes), as the handlers do inline.

@@ -31,12 +31,12 @@ uint64_t Done(uint64_t run) { return uint32_t(run) == 0 ? 1 : 0; }
 
 // The list's selection's row (its animation: selection + 5).
 uint64_t Row(uint8_t* base) {
-  return uint64_t(race_screens::ListSelection(base, Load(base, kList))) + 5;
+  return uint64_t(race_screens::ListSelection(base, List(base))) + 5;
 }
 
 // The replays' 36-byte records (the save layer's header +12) and their count
 // (+20).
-uint32_t Records(uint8_t* base) { return Load(base, Load(base, kSaveBuffers) + 12); }
+uint32_t Records(uint8_t* base) { return Load(base, G::save_buffers(base).address + 12); }
 
 // The cursor node (sub-scene 3, child 2, its child 0)'s +16 = n × 40 as a
 // float, through the original's frame doubleword at `slot` (the integer
@@ -81,11 +81,11 @@ uint64_t FadeOut(uint8_t* base, uint32_t started, uint32_t sp, const Calls& call
     Finish(calls, frame, 0x82289C38, movie, 49);
     Finish(calls, frame, 0x82289C44, movie, 43);
     Finish(calls, frame, 0x82289C50, movie, 0);
-    calls.Call(kFadeOut, frame, 0x82289C6C, Load(base, kFadesOut), 0, 0, 0);
+    calls.Call(kFadeOut, frame, 0x82289C6C, G::fades_out(base), 0, 0, 0);
     Store(base, started, 1);
   }
   RunMovie(calls, frame, 0x82289C80, movie);
-  return (Load(base, kFadeCount0) | Load(base, kFadeCount1)) == 0 ? 1 : 0;
+  return (G::fade_count0(base) | G::fade_count1(base)) == 0 ? 1 : 0;
 }
 
 uint64_t FadeInList(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls) {
@@ -94,7 +94,7 @@ uint64_t FadeInList(uint8_t* base, uint32_t started, uint32_t sp, const Calls& c
   const uint32_t movie = FindMovie(base, frame + 80);
   if (Load(base, started) == 0) {
     Play(calls, frame, 0x82289D1C, movie, 50);
-    calls.Call(kFadeIn, frame, 0x82289D38, Load(base, kFadesIn), 0, 0, 0);
+    calls.Call(kFadeIn, frame, 0x82289D38, G::fades_in(base), 0, 0, 0);
     Store(base, started, 1);
   }
   return Done(RunMovie(calls, frame, 0x82289D4C, movie));
@@ -143,9 +143,9 @@ uint64_t MoveCursor(uint8_t* base, uint32_t started, uint32_t sp, const Calls& c
   const uint32_t frame = Frame(base, sp, 176);
   const uint32_t movie = FindMovie(base, frame + 80);
   if (Load(base, started) == 0) {
-    const uint32_t selection = race_screens::ListSelection(base, Load(base, kList));
-    const uint32_t before = Load(base, Load(base, kList) + 20);  // MenuList's previous selection
-    const uint32_t list = Load(base, kList);
+    const uint32_t selection = race_screens::ListSelection(base, List(base));
+    const uint32_t before = Load(base, List(base) + 20);  // MenuList's previous selection
+    const uint32_t list = List(base);
     const uint32_t scroll = Load(base, list + 4);
     const uint32_t scrolled = scroll - Load(base, list + 8);
     const uint32_t wrapped = Load(base, list + 32);
@@ -160,7 +160,7 @@ uint64_t MoveCursor(uint8_t* base, uint32_t started, uint32_t sp, const Calls& c
     if (wrapped != 0) {
       StoreCursor(base, frame + 80, movie, selection);
     } else {
-      const int32_t direction = int32_t(Load(base, Load(base, kList) + 24));
+      const int32_t direction = int32_t(Load(base, List(base) + 24));
       const uint32_t list_node = ui_movies::FindNode(base, movie, 3, 2);
       if (direction < 0) {
         calls.Call(kSetNodeText, frame, 0x8228A7A8, movie, ui_movies::Child(base, list_node, 15),
@@ -188,7 +188,7 @@ uint64_t BuildList(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8228A560 ReplayTheater::BuildList");
   const uint32_t frame = Frame(base, sp, 144);
   const uint32_t movie = FindMovie(base, frame + 96);
-  const uint32_t header = Load(base, kSaveBuffers);
+  const uint32_t header = G::save_buffers(base).address;
   const uint32_t count = Load(base, header + 20);
   const uint32_t records = Load(base, header + 12);
   const uint32_t shown = int32_t(count) < 9 ? count : 9;
@@ -196,8 +196,8 @@ uint64_t BuildList(uint8_t* base, uint32_t sp, const Calls& calls) {
   Store(base, frame + 84, 159);
   Store(base, frame + 92, 158);
   calls.CallArgs(kListInit, frame, 0x8228A5DC,
-                 {Load(base, kList), count, shown, 1, 154, 153, 155, 156});
-  const uint32_t selection = race_screens::ListSelection(base, Load(base, kList));
+                 {List(base), count, shown, 1, 154, 153, 155, 156});
+  const uint32_t selection = race_screens::ListSelection(base, List(base));
   StoreCursor(base, frame + 96, movie, selection);
   ShowListPage(base, frame, calls);
   ShowRecord(base, selection * 36 + records, frame, calls);
@@ -208,11 +208,11 @@ uint64_t BuildList(uint8_t* base, uint32_t sp, const Calls& calls) {
 uint64_t ShowListPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82289F48 ReplayTheater::ShowListPage");
   const uint32_t frame = Frame(base, sp, 176);
-  const uint32_t header = Load(base, kSaveBuffers);
+  const uint32_t header = G::save_buffers(base).address;
   const uint32_t records = Load(base, header + 12);
   const uint32_t movie = FindMovie(base, frame + 80);
   const int32_t count = int32_t(Load(base, header + 20));
-  const uint32_t scroll = Load(base, Load(base, kList) + 4);
+  const uint32_t scroll = Load(base, List(base) + 4);
   const int32_t shown = count < 9 ? count : 9;
   const uint32_t list_node = ui_movies::FindNode(base, movie, 3, 2);
   for (uint32_t i = 0; i < 9; i++) {

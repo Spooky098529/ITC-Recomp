@@ -7,6 +7,7 @@
 
 #include "base/float_mode.h"
 #include "type67_modes/type67_modes.h"
+#include "type67_modes/views.h"
 
 #include "base/log.h"
 #include "c_runtime/strings.h"
@@ -34,6 +35,7 @@ namespace {
 
 using guest::LoadU32;
 using guest::StoreU32;
+using G = schema::Type6Type7ModesGlobals;
 
 // The movie with id `id`: the id at the frame's +80, then UiMovies::Find.
 uint32_t MovieAt(uint8_t* base, uint32_t frame, uint32_t id) {
@@ -294,10 +296,10 @@ uint64_t Screen0FadeOutStep(uint8_t* base, bool type7, uint32_t screen, uint32_t
   }
   const uint32_t frame = sp - 112;
   const uint32_t movie = MovieAt(base, frame, 22);
-  const uint32_t page = LoadU32(base, screen + (type7 ? 9648 : 9644));
-  if (LoadU32(base, page + 24) == 0) {
+  const schema::PageObject page = Screen0View(base, screen, type7).pages();
+  if (page.step_started() == 0) {
     mode_tick::ScreenFadesFadeOut(base, LoadU32(base, 0x82001BF0), 0, 0, 0, 0);
-    StoreU32(base, page + 24, 1);
+    page.set_step_started(1);
   }
   calls.call(kRun, frame, type7 ? 0x822447D4 : 0x82234364, movie, 0);
   const bool done = (LoadU32(base, mode_tick::kFadeOutCounts) |
@@ -321,11 +323,11 @@ uint64_t PlayNamed(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t mov
 }
 
 // The menu (type 6 +9648, type 7 +9652) and the page state (+9644, +9648).
-uint32_t MenuOf(uint8_t* base, bool type7, uint32_t screen) {
-  return LoadU32(base, screen + (type7 ? 9652 : 9648));
+schema::FrontEndMenu MenuOf(uint8_t* base, bool type7, uint32_t screen) {
+  return Screen0View(base, screen, type7).menu();
 }
-uint32_t PageStateOf(uint8_t* base, bool type7, uint32_t screen) {
-  return LoadU32(base, screen + (type7 ? 9648 : 9644));
+schema::PageObject PageStateOf(uint8_t* base, bool type7, uint32_t screen) {
+  return Screen0View(base, screen, type7).pages();
 }
 
 uint64_t ShowPageOf(uint8_t* base, bool type7, uint32_t page, uint32_t sp) {
@@ -344,7 +346,7 @@ uint64_t Screen0PlayItem(uint8_t* base, bool type7, uint32_t screen, uint32_t sp
   const uint32_t frame = sp - 112;
   StoreU32(base, frame, sp);  // the back chain (stwu)
   const uint32_t movie = MovieAt(base, frame, 22);
-  const uint64_t named = uint64_t(LoadU32(base, MenuOf(base, type7, screen))) + 5;
+  const uint64_t named = uint64_t(MenuOf(base, type7, screen).cursor()) + 5;
   if (type7) {
     calls.call(kFinishNamed, frame, 0x82244864, movie, named);
     calls.call(kUnloopNamed, frame, 0x82244870, movie, named);
@@ -362,9 +364,9 @@ uint64_t Screen0OpeningStep(uint8_t* base, bool type7, uint32_t screen, uint32_t
   }
   const uint32_t frame = sp - 128;
   const uint32_t movie = MovieAt(base, frame, 22);
-  const uint32_t page = PageStateOf(base, type7, screen);
-  auto item = [&] { return LoadU32(base, MenuOf(base, type7, screen)); };
-  if (LoadU32(base, page + 24) == 0) {
+  const schema::PageObject page = PageStateOf(base, type7, screen);
+  auto item = [&] { return MenuOf(base, type7, screen).cursor(); };
+  if (page.step_started() == 0) {
     if (type7) {
       calls.call(kFinishAll, frame, 0x82244EB4, movie, 0);
       calls.call(kFinishNamed, frame, 0x82244EC0, movie, 48);
@@ -385,7 +387,7 @@ uint64_t Screen0OpeningStep(uint8_t* base, bool type7, uint32_t screen, uint32_t
     if (type7) {
       Screen0PlayItem(base, true, screen, frame, calls);
     }
-    StoreU32(base, page + 24, 1);
+    page.set_step_started(1);
   }
   const uint64_t run = calls.call(kRun, frame, type7 ? 0x82244F74 : 0x82234D04, movie, 0);
   const bool done = uint32_t(run) == 0;
@@ -418,7 +420,7 @@ uint64_t Screen0BackStep(uint8_t* base, bool type7, uint32_t screen, uint32_t sp
   }
   calls.call(kFinishNamed, frame, type7 ? 0x822450FC : 0x82234E8C, movie, 15);
   calls.call(kFinishNamed, frame, type7 ? 0x82245108 : 0x82234E98, movie, 16);
-  const uint32_t item = LoadU32(base, MenuOf(base, type7, screen));
+  const uint32_t item = MenuOf(base, type7, screen).cursor();
   Screen0PlaceCursor(base, type7, item, frame);
   if (type7) {
     Screen0ShowHelp(base, true, item, frame, format);
@@ -440,9 +442,9 @@ uint64_t Screen0CursorStep(uint8_t* base, bool type7, uint32_t screen, uint32_t 
   }
   const uint32_t frame = sp - 144;
   const uint32_t movie = MovieAt(base, frame, 22);
-  const uint32_t menu = MenuOf(base, type7, screen);
-  const uint32_t old = LoadU32(base, menu + 4);
-  const uint32_t now = LoadU32(base, menu + 0);
+  const schema::FrontEndMenu menu = MenuOf(base, type7, screen);
+  const uint32_t old = menu.previous();
+  const uint32_t now = menu.cursor();
   const uint64_t named = uint64_t(old) + 5;
   const int32_t moved = int32_t(now - old);
   calls.call(kFinishNamed, frame, type7 ? 0x8224500C : 0x82234D9C, movie, named);
@@ -484,17 +486,17 @@ uint64_t Type6Screen0QuitPage(uint8_t* base, uint64_t r3, uint32_t sp) {
 uint64_t Type6Screen0ChosenPage(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
                                 const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82234190 Type6Screen0::ChosenPage");
-  const uint32_t screen = uint32_t(r3);
+  const schema::Type6Screen0 screen(base, uint32_t(r3));
   const uint32_t frame = sp - 112;
-  const uint32_t item = LoadU32(base, LoadU32(base, screen + 9648));
+  const uint32_t item = screen.menu().cursor();
   if (item > 4) {
     return r3;
   }
   if (item == 4) {
-    StoreU32(base, screen + 9604, 10);
+    screen.set_state(10);
     return r3;
   }
-  StoreU32(base, screen + 9604, 9);
+  screen.set_state(9);
   // r6 as the post leaves it (the ring's start plus its count, 64-bit),
   // passed on to the slot below.
   const uint64_t r6 = uint64_t(LoadU32(base, dispatcher + 204 + 604)) +
@@ -524,18 +526,17 @@ uint64_t Screen0PowerGraphPage(uint8_t* base, bool type7, uint64_t r3, uint64_t 
     ITC_NATIVE_RUNNING("sub_82234B80 Type6Screen0::PowerGraphPage");
   }
   constexpr uint32_t kDrawCarPowerGraph = 0x82250700;
-  const uint32_t screen = uint32_t(r3);
+  const Screen0View screen(base, uint32_t(r3), type7);
   const uint32_t frame = sp - 96;
-  const uint32_t d = type7 ? 4 : 0;
   uint64_t r4_out = r4;
-  if (LoadU32(base, LoadU32(base, screen + 9640 + d) + 72) == 2) {
-    const uint32_t p = LoadU32(base, screen + 9644 + d);
-    const uint32_t page = LoadU32(base, p);
-    if (page != 0) StoreU32(base, p + 8, page);
-    StoreU32(base, p + 12, kMinusOne);
-    StoreU32(base, p + 0, 0);
-    StoreU32(base, p + 16, kMinusOne);
-    StoreU32(base, LoadU32(base, screen + 9640 + d) + 72, kMinusOne);
+  if (screen.words().pick() == 2) {
+    const schema::PageObject p = screen.pages();
+    const uint32_t page = p.page();
+    if (page != 0) p.set_previous_page(page);
+    p.set_step(kMinusOne);
+    p.set_page(0);
+    p.set_queued_step(kMinusOne);
+    screen.words().set_pick(kMinusOne);
     ShowPageOf(base, type7, 0, frame);
     r4_out = 0;
   }
@@ -547,17 +548,17 @@ uint64_t Screen0PowerGraphPage(uint8_t* base, bool type7, uint64_t r3, uint64_t 
 uint64_t Type7Screen0ChosenPage(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
                                 const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82244610 Type7Screen0::ChosenPage");
-  const uint32_t screen = uint32_t(r3);
+  const schema::Type7Screen0 screen(base, uint32_t(r3));
   const uint32_t frame = sp - 112;
-  const uint32_t item = LoadU32(base, LoadU32(base, screen + 9652));
+  const uint32_t item = screen.menu().cursor();
   if (item == 3) {
-    StoreU32(base, screen + 9608, 10);
+    screen.set_state(10);
     return r3;
   }
   if (item > 3) {
     return r3;
   }
-  StoreU32(base, screen + 9608, 9);
+  screen.set_state(9);
   // r6 as the post leaves it (the ring's start plus its count, 64-bit),
   // passed on to the slot below.
   const uint64_t r6 = uint64_t(LoadU32(base, dispatcher + 204 + 604)) +
@@ -589,7 +590,7 @@ uint64_t Screen0OpenMovie(uint8_t* base, bool type7, uint32_t sp, const Calls& c
   const uint32_t lr = type7 ? 0x82243E9C : 0x82233904;
   calls.open(22, type7 ? 22569 : 22564, frame, lr);
   const uint32_t block = car_makers::BlockOf(0);
-  const uint32_t holder = LoadU32(base, LoadU32(base, kStandHolder));
+  const uint32_t holder = LoadU32(base, G::stand_holder<schema::View>(base).address);
   // GarageStage::MakeModel by its plain C++ (its adapter went, B7 loop,
   // 2026-11-13), ScenePools::SetUpB under it through call_set.
   const stand_models::GuestCall call = [&](uint32_t function,
@@ -603,7 +604,7 @@ uint64_t Screen0OpenMovie(uint8_t* base, bool type7, uint32_t sp, const Calls& c
     return calls.call_set(function, regs, set, r1, call_lr);
   };
   stand_models::MakeModel(base, call, holder, block, 1, frame);
-  return calls.call(kCommand, frame, lr + 0x30, LoadU32(base, LoadU32(base, kStandHolder)), 14);
+  return calls.call(kCommand, frame, lr + 0x30, LoadU32(base, G::stand_holder<schema::View>(base).address), 14);
 }
 
 uint64_t Screen0SetUpCar(uint8_t* base, bool type7, uint64_t r4, uint32_t sp, const Calls& calls) {
@@ -653,25 +654,25 @@ uint64_t Screen0SetUpCar(uint8_t* base, bool type7, uint64_t r4, uint32_t sp, co
 uint64_t Type6Screen0OnDialogClosed(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
                                     const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82234768 Type6Screen0::OnDialogClosed");
-  const uint32_t screen = uint32_t(r3);
+  const schema::Type6Screen0 screen(base, uint32_t(r3));
   const uint32_t frame = sp - 96;
-  const uint32_t asked = LoadU32(base, screen + 9664);
+  const uint32_t asked = screen.confirm_asked();
   if (asked != 4 && asked != 5) {
     return r3;
   }
-  StoreU32(base, screen + 9664, 0xFFFFFFFF);
-  const uint32_t pick = LoadU32(base, LoadU32(base, screen + 9640) + 72);
+  screen.set_confirm_asked(0xFFFFFFFF);
+  const uint32_t pick = screen.words().pick();
   if (pick >= 3) {
     return r3;
   }
-  const uint32_t p = LoadU32(base, screen + 9644);
-  auto clear_pick = [&] { StoreU32(base, LoadU32(base, screen + 9640) + 72, 0xFFFFFFFF); };
+  const schema::PageObject p = screen.pages();
+  auto clear_pick = [&] { screen.words().set_pick(0xFFFFFFFF); };
   auto page0 = [&] {
-    const uint32_t page = LoadU32(base, p);
-    if (page != 0) StoreU32(base, p + 8, page);
-    StoreU32(base, p + 0, 0);
-    StoreU32(base, p + 12, 0xFFFFFFFF);
-    StoreU32(base, p + 16, 0xFFFFFFFF);
+    const uint32_t page = p.page();
+    if (page != 0) p.set_previous_page(page);
+    p.set_page(0);
+    p.set_step(0xFFFFFFFF);
+    p.set_queued_step(0xFFFFFFFF);
     clear_pick();
     return Type6Screen0ShowPage(base, 0, frame);
   };
@@ -681,15 +682,15 @@ uint64_t Type6Screen0OnDialogClosed(uint8_t* base, uint64_t r3, uint64_t r4, uin
     }
     // Yes to the first confirm: the second one (ConfirmAgain, a guest call
     // to its override).
-    const uint32_t page = LoadU32(base, p);
-    if (page != 0xFFFFFFFF) StoreU32(base, p + 8, page);
-    StoreU32(base, p + 0, 0xFFFFFFFF);
-    StoreU32(base, p + 12, 0xFFFFFFFF);
-    StoreU32(base, p + 16, 0xFFFFFFFF);
+    const uint32_t page = p.page();
+    if (page != 0xFFFFFFFF) p.set_previous_page(page);
+    p.set_page(0xFFFFFFFF);
+    p.set_step(0xFFFFFFFF);
+    p.set_queued_step(0xFFFFFFFF);
     clear_pick();
     calls.call(0x822340B0, frame, 0x82234810, r3, r4);
-    StoreU32(base, screen + 9656, 0);
-    StoreU32(base, screen + 9664, 5);
+    screen.set_unknown_9656(0);
+    screen.set_confirm_asked(5);
     return Type6Screen0ShowPage(base, 2, frame);
   }
   if (pick == 2) {
@@ -697,21 +698,21 @@ uint64_t Type6Screen0OnDialogClosed(uint8_t* base, uint64_t r3, uint64_t r4, uin
   }
   if (pick == 0) {
     // Yes to the second: the fade out step, then page 3.
-    const uint32_t page = LoadU32(base, p);
-    if (page != 3) StoreU32(base, p + 8, page);
-    StoreU32(base, p + 16, 0xFFFFFFFF);
-    StoreU32(base, p + 0, 0xFFFFFFFF);
-    StoreU32(base, p + 12, 3);
-    StoreU32(base, p + 4, 3);
+    const uint32_t page = p.page();
+    if (page != 3) p.set_previous_page(page);
+    p.set_queued_step(0xFFFFFFFF);
+    p.set_page(0xFFFFFFFF);
+    p.set_step(3);
+    p.set_next_page(3);
     clear_pick();
     return r3;
   }
   // No to the second: page 2, message 29 (the save screen).
-  const uint32_t page = LoadU32(base, p);
-  if (page != 2) StoreU32(base, p + 8, page);
-  StoreU32(base, p + 12, 0xFFFFFFFF);
-  StoreU32(base, p + 16, 0xFFFFFFFF);
-  StoreU32(base, p + 0, 2);
+  const uint32_t page = p.page();
+  if (page != 2) p.set_previous_page(page);
+  p.set_step(0xFFFFFFFF);
+  p.set_queued_step(0xFFFFFFFF);
+  p.set_page(2);
   clear_pick();
   Post(base, uint32_t(r4), 29);
   return Type6Screen0ShowPage(base, 3, frame);
@@ -719,27 +720,27 @@ uint64_t Type6Screen0OnDialogClosed(uint8_t* base, uint64_t r3, uint64_t r4, uin
 
 uint64_t Type7Screen0OnDialogClosed(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82244B60 Type7Screen0::OnDialogClosed");
-  const uint32_t screen = uint32_t(r3);
-  const uint32_t pick = LoadU32(base, LoadU32(base, screen + 9644) + 72);
+  const schema::Type7Screen0 screen(base, uint32_t(r3));
+  const uint32_t pick = screen.words().pick();
   if (pick >= 3) {
     return r3;
   }
-  const uint32_t p = LoadU32(base, screen + 9648);
-  const uint32_t page = LoadU32(base, p);
+  const schema::PageObject p = screen.pages();
+  const uint32_t page = p.page();
   if (pick == 1) {
-    if (page != 2) StoreU32(base, p + 8, page);
-    StoreU32(base, p + 16, 0xFFFFFFFF);
-    StoreU32(base, p + 12, 3);
-    StoreU32(base, p + 4, 2);
-    StoreU32(base, p + 0, 0xFFFFFFFF);
-    StoreU32(base, LoadU32(base, screen + 9644) + 72, 0xFFFFFFFF);
+    if (page != 2) p.set_previous_page(page);
+    p.set_queued_step(0xFFFFFFFF);
+    p.set_step(3);
+    p.set_next_page(2);
+    p.set_page(0xFFFFFFFF);
+    screen.words().set_pick(0xFFFFFFFF);
     return r3;
   }
-  if (page != 0) StoreU32(base, p + 8, page);
-  StoreU32(base, p + 12, 0xFFFFFFFF);
-  StoreU32(base, p + 0, 0);
-  StoreU32(base, p + 16, 0xFFFFFFFF);
-  StoreU32(base, LoadU32(base, screen + 9644) + 72, 0xFFFFFFFF);
+  if (page != 0) p.set_previous_page(page);
+  p.set_step(0xFFFFFFFF);
+  p.set_page(0);
+  p.set_queued_step(0xFFFFFFFF);
+  screen.words().set_pick(0xFFFFFFFF);
   return Type7Screen0ShowPage(base, 0, sp);  // a tail call
 }
 
@@ -752,8 +753,8 @@ uint64_t ControllerOptionsUpdate(uint8_t* base, uint32_t sp, const Calls& calls)
                                           0x821BFD08, 0x821BFD98, 0x821C5F80, 0x821BFF20,
                                           0x821BFFA0, 0x821C0030, 0x821C60D0, 0x821C01B8};
   StoreU32(base, frame + 124, kSteps[11]);
-  const uint32_t page = LoadU32(base, kControllerPage);
-  const uint32_t step = LoadU32(base, page + 12);
+  const schema::PageObject page = G::controller_page(base);
+  const uint32_t step = page.step();
   for (uint32_t i = 0; i < 11; i++) {
     StoreU32(base, frame + 80 + 4 * i, kSteps[i]);
   }
@@ -763,25 +764,25 @@ uint64_t ControllerOptionsUpdate(uint8_t* base, uint32_t sp, const Calls& calls)
   if (step == 0xFFFFFFFF) {
     return r3;
   }
-  uint32_t p = page;
+  schema::PageObject p = page;
   if (int32_t(step) >= 0) {
     const uint32_t target = LoadU32(base, frame + 80 + (step << 2));
-    r3 = calls.call(target, frame, 0x821C8080, uint64_t(page) + 24, kR4);
-    p = LoadU32(base, kControllerPage);
+    r3 = calls.call(target, frame, 0x821C8080, uint64_t(page.step_started_address()), kR4);
+    p = G::controller_page(base);
     if (int32_t(r3) == 0) {
       return r3;
     }
   }
-  const uint32_t next = LoadU32(base, p + 16);
+  const uint32_t next = p.queued_step();
   if (next != 0xFFFFFFFF) {
-    StoreU32(base, p + 16, 0xFFFFFFFF);
-    StoreU32(base, p + 20, 0);
-    StoreU32(base, p + 12, next);
+    p.set_queued_step(0xFFFFFFFF);
+    p.set_unknown_20(0);
+    p.set_step(next);
   } else {
-    StoreU32(base, p + 0, LoadU32(base, p + 4));
-    StoreU32(base, p + 12, 0xFFFFFFFF);
+    p.set_page(p.next_page());
+    p.set_step(0xFFFFFFFF);
   }
-  StoreU32(base, p + 24, 0);
+  p.set_step_started(0);
   return r3;
 }
 
@@ -789,52 +790,53 @@ uint64_t Type7Screen0MenuPage(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t 
                               const Calls& calls, const strings_and_font::FormatCalls* format) {
   ITC_NATIVE_RUNNING("sub_82244BF8 Type7Screen0::MenuPage");
   constexpr uint32_t kConfirm = 0x82244528;  // Type7Screen0::Confirm (the original)
-  const uint32_t screen = uint32_t(r3), dispatcher = uint32_t(r4);
+  const schema::Type7Screen0 screen(base, uint32_t(r3));
+  const uint32_t dispatcher = uint32_t(r4);
   const uint32_t frame = sp - 112;
   const bool slots = calls.native_action_slots;
-  menu_helpers::Step(base, LoadU32(base, screen + 9652), frame, slots, Menus(calls));
+  menu_helpers::Step(base, screen.menu().address, frame, slots, Menus(calls));
   // The page state's step: +8 = +0 unless +0 is `keep`, +0 = -1, +4 =
   // `after`, +16 = -1, +12 = `step` (the originals' shared tail).
   auto to_step = [&](uint32_t keep, uint32_t step, uint32_t after) {
-    const uint32_t p = LoadU32(base, screen + 9648);
-    const uint32_t page = LoadU32(base, p);
-    if (page != keep) StoreU32(base, p + 8, page);
-    StoreU32(base, p + 0, 0xFFFFFFFF);
-    StoreU32(base, p + 4, after);
-    StoreU32(base, p + 16, 0xFFFFFFFF);
-    StoreU32(base, p + 12, step);
+    const schema::PageObject p = screen.pages();
+    const uint32_t page = p.page();
+    if (page != keep) p.set_previous_page(page);
+    p.set_page(0xFFFFFFFF);
+    p.set_next_page(after);
+    p.set_queued_step(0xFFFFFFFF);
+    p.set_step(step);
   };
   // The page state shown at once: +12 = +16 = -1, then ShowPage.
   auto show = [&](uint32_t page) {
-    const uint32_t p = LoadU32(base, screen + 9648);
-    StoreU32(base, p + 12, 0xFFFFFFFF);
-    StoreU32(base, p + 16, 0xFFFFFFFF);
+    const schema::PageObject p = screen.pages();
+    p.set_step(0xFFFFFFFF);
+    p.set_queued_step(0xFFFFFFFF);
     return Type7Screen0ShowPage(base, page, frame);
   };
-  if (LoadU32(base, LoadU32(base, screen + 9652) + 8) != 0) {
+  if (screen.menu().moved() != 0) {
     const uint64_t answer = menu_sounds::PlayMenuSound(base, 4, frame, Sounds(calls));
     to_step(0, 2, 0);
     return answer;
   }
-  if (int32_t(menu_helpers::Pressed(base, LoadU32(base, screen + 9652), 163, frame, slots,
+  if (int32_t(menu_helpers::Pressed(base, screen.menu().address, 163, frame, slots,
                                     Menus(calls))) != 0) {
     menu_sounds::PlayMenuSound(base, 0, frame, Sounds(calls));
     // lwz, then addi: the tab word.
     power_graph::SetFromCar(base, kType7Car, LoadU32(base, kType7Car + 1972) + 3, frame,
                             SetFromCarCalls(calls));
     Post(base, dispatcher, 18);
-    const uint32_t p = LoadU32(base, screen + 9648);
-    const uint32_t page = LoadU32(base, p);
-    if (int32_t(page) != 1) StoreU32(base, p + 8, page);
-    StoreU32(base, p + 0, 1);
+    const schema::PageObject p = screen.pages();
+    const uint32_t page = p.page();
+    if (int32_t(page) != 1) p.set_previous_page(page);
+    p.set_page(1);
     return show(1);
   }
-  if (int32_t(menu_helpers::Pressed(base, LoadU32(base, screen + 9652), 159, frame, slots,
+  if (int32_t(menu_helpers::Pressed(base, screen.menu().address, 159, frame, slots,
                                     Menus(calls))) != 0) {
     const uint64_t answer = menu_sounds::PlayMenuSound(base, 0, frame, Sounds(calls));
-    const uint32_t menu = LoadU32(base, screen + 9652);
-    StoreU32(base, screen + 9656, LoadU32(base, menu));
-    const uint32_t item = LoadU32(base, menu);
+    const schema::FrontEndMenu menu = screen.menu();
+    screen.set_item_picked(menu.cursor());
+    const uint32_t item = menu.cursor();
     if (item < 3) {
       to_step(2, 3, 2);
       return answer;
@@ -847,22 +849,22 @@ uint64_t Type7Screen0MenuPage(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t 
     } else {
       calls.call(kConfirm, frame, 0x82244D44, r3, r4);  // the original
     }
-    const uint32_t p = LoadU32(base, screen + 9648);
-    const uint32_t page = LoadU32(base, p);
-    if (int32_t(page) != -1) StoreU32(base, p + 8, page);
-    StoreU32(base, p + 0, 0xFFFFFFFF);
+    const schema::PageObject p = screen.pages();
+    const uint32_t page = p.page();
+    if (int32_t(page) != -1) p.set_previous_page(page);
+    p.set_page(0xFFFFFFFF);
     return show(2);
   }
-  const uint64_t answer = menu_helpers::Pressed(base, LoadU32(base, screen + 9652), 158, frame,
+  const uint64_t answer = menu_helpers::Pressed(base, screen.menu().address, 158, frame,
                                                 slots, Menus(calls));
   if (int32_t(answer) == 0) {
     return answer;
   }
   const uint64_t played = menu_sounds::PlayMenuSound(base, 2, frame, Sounds(calls));
-  const uint32_t menu = LoadU32(base, screen + 9652);
-  const uint32_t item = LoadU32(base, menu);
-  StoreU32(base, menu + 0, 3);
-  StoreU32(base, menu + 4, item);
+  const schema::FrontEndMenu menu = screen.menu();
+  const uint32_t item = menu.cursor();
+  menu.set_cursor(3);
+  menu.set_previous(item);
   to_step(0, 1, 0);
   return played;
 }
@@ -871,33 +873,34 @@ uint64_t Type6Screen0MenuPage(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t 
                               const Calls& calls, const strings_and_font::FormatCalls* format) {
   ITC_NATIVE_RUNNING("sub_82234958 Type6Screen0::MenuPage");
   constexpr uint32_t kConfirm = 0x82233FC8;  // Type6Screen0::Confirm (the original)
-  const uint32_t screen = uint32_t(r3), dispatcher = uint32_t(r4);
+  const schema::Type6Screen0 screen(base, uint32_t(r3));
+  const uint32_t dispatcher = uint32_t(r4);
   const uint32_t frame = sp - 112;
   const bool slots = calls.native_action_slots;
-  auto menu = [&] { return LoadU32(base, screen + 9648); };
+  auto menu = [&] { return screen.menu().address; };
   // The page state's step: +8 = +0 unless +0 is `keep`, +0 = -1, +4 =
   // `after`, +16 = -1, +12 = `step` (the original's shared tail).
   auto to_step = [&](uint32_t keep, uint32_t step, uint32_t after) {
-    const uint32_t p = LoadU32(base, screen + 9644);
-    const uint32_t page = LoadU32(base, p);
-    if (page != keep) StoreU32(base, p + 8, page);
-    StoreU32(base, p + 0, kMinusOne);
-    StoreU32(base, p + 4, after);
-    StoreU32(base, p + 16, kMinusOne);
-    StoreU32(base, p + 12, step);
+    const schema::PageObject p = screen.pages();
+    const uint32_t page = p.page();
+    if (page != keep) p.set_previous_page(page);
+    p.set_page(kMinusOne);
+    p.set_next_page(after);
+    p.set_queued_step(kMinusOne);
+    p.set_step(step);
   };
   // A page shown at once: +8 = +0 unless +0 is `page`, +0 = `page`, +12 =
   // +16 = -1.
   auto to_page = [&](uint32_t page_now) {
-    const uint32_t p = LoadU32(base, screen + 9644);
-    const uint32_t page = LoadU32(base, p);
-    if (page != page_now) StoreU32(base, p + 8, page);
-    StoreU32(base, p + 0, page_now);
-    StoreU32(base, p + 12, kMinusOne);
-    StoreU32(base, p + 16, kMinusOne);
+    const schema::PageObject p = screen.pages();
+    const uint32_t page = p.page();
+    if (page != page_now) p.set_previous_page(page);
+    p.set_page(page_now);
+    p.set_step(kMinusOne);
+    p.set_queued_step(kMinusOne);
   };
   menu_helpers::Step(base, menu(), frame, slots, Menus(calls));
-  if (LoadU32(base, menu() + 8) != 0) {
+  if (screen.menu().moved() != 0) {
     const uint64_t answer = menu_sounds::PlayMenuSound(base, 4, frame, Sounds(calls));
     to_step(0, 2, 0);
     return answer;
@@ -913,9 +916,9 @@ uint64_t Type6Screen0MenuPage(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t 
   }
   if (int32_t(menu_helpers::Pressed(base, menu(), 159, frame, slots, Menus(calls))) != 0) {
     const uint64_t answer = menu_sounds::PlayMenuSound(base, 0, frame, Sounds(calls));
-    const uint32_t m = menu();
-    StoreU32(base, screen + 9652, LoadU32(base, m));
-    const uint32_t item = LoadU32(base, m);
+    const schema::FrontEndMenu m = screen.menu();
+    screen.set_item_picked(m.cursor());
+    const uint32_t item = m.cursor();
     if (item < 4) {
       to_step(3, 3, 3);
       return answer;
@@ -929,8 +932,8 @@ uint64_t Type6Screen0MenuPage(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t 
       calls.call(kConfirm, frame, 0x82234AA4, r3, r4);  // the original
     }
     to_page(kMinusOne);
-    StoreU32(base, screen + 9656, 0);
-    StoreU32(base, screen + 9664, 4);
+    screen.set_unknown_9656(0);
+    screen.set_confirm_asked(4);
     return Type6Screen0ShowPage(base, 2, frame);
   }
   const uint64_t answer = menu_helpers::Pressed(base, menu(), 158, frame, slots, Menus(calls));
@@ -938,10 +941,10 @@ uint64_t Type6Screen0MenuPage(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t 
     return answer;
   }
   const uint64_t played = menu_sounds::PlayMenuSound(base, 2, frame, Sounds(calls));
-  const uint32_t m = menu();
-  const uint32_t item = LoadU32(base, m);
-  StoreU32(base, m + 0, 4);
-  StoreU32(base, m + 4, item);
+  const schema::FrontEndMenu m = screen.menu();
+  const uint32_t item = m.cursor();
+  m.set_cursor(4);
+  m.set_previous(item);
   to_step(0, 1, 0);
   return played;
 }
@@ -1005,13 +1008,12 @@ uint64_t Screen0Show(uint8_t* base, bool type7, uint64_t r3, uint32_t sp, const 
   } else {
     ITC_NATIVE_RUNNING("sub_82233C80 Type6Screen0::Show");
   }
-  const uint32_t screen = uint32_t(r3);
-  const uint32_t d = type7 ? 4 : 0;
+  const Screen0View screen(base, uint32_t(r3), type7);
   const uint32_t frame = sp - kShowFrame;
   StoreU32(base, frame, sp);  // the back chain, for the guest calls
   const uint32_t car = type7 ? kType7Car : kType6Car;
   StoreU32(base, car + 1968, 0);
-  StoreU32(base, LoadU32(base, screen + 9640 + d), 0);
+  screen.words().set_loading_shown(0);
   if (LoadU32(base, car + 1972) == 0xFFFFFFFF) {
     const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
     calls.call(kGarageCarReset, frame, type7 ? 0x82244224 : 0x82233CCC, car, 0);
@@ -1044,18 +1046,18 @@ uint64_t Screen0Show(uint8_t* base, bool type7, uint64_t r3, uint32_t sp, const 
     StoreU32(base, car + 1980, word);
   }
   // The menu: the previous item = the cursor, the cursor = the item picked.
-  const uint32_t menu = LoadU32(base, screen + 9648 + d);
-  const uint32_t cursor = LoadU32(base, menu);
-  StoreU32(base, menu + 0, LoadU32(base, screen + 9652 + d));
-  StoreU32(base, menu + 4, cursor);
+  const schema::FrontEndMenu menu = screen.menu();
+  const uint32_t cursor = menu.cursor();
+  menu.set_cursor(screen.item_picked());
+  menu.set_previous(cursor);
   const uint64_t answer = Screen0ShowCarInfo(base, type7, frame, calls, format);
-  const uint32_t p = LoadU32(base, screen + 9644 + d);
-  const uint32_t page = LoadU32(base, p);
-  if (page != 0) StoreU32(base, p + 8, page);
-  StoreU32(base, p + 12, 0);
-  StoreU32(base, p + 4, 0);
-  StoreU32(base, p + 16, 0xFFFFFFFF);
-  StoreU32(base, p + 0, 0xFFFFFFFF);
+  const schema::PageObject p = screen.pages();
+  const uint32_t page = p.page();
+  if (page != 0) p.set_previous_page(page);
+  p.set_step(0);
+  p.set_next_page(0);
+  p.set_queued_step(0xFFFFFFFF);
+  p.set_page(0xFFFFFFFF);
   return answer;
 }
 
@@ -1069,8 +1071,8 @@ uint64_t Screen0Update(uint8_t* base, bool type7, uint64_t r3, uint64_t sp, cons
   constexpr uint32_t kFinishNamed = 0x8211DF20, kPlayNamed = 0x8211DAC8, kLoopNamed = 0x8211DDE0;
   constexpr uint32_t kIsBusy = 0x82179BE0, kReloadModel = 0x8217F880, kSetCar = 0x8217FD58;
   constexpr uint32_t kDraw = 0x8217FE60, kRefresh = 0x820C4998;
-  constexpr uint32_t kType6Steps = 0x826367C8;
-  constexpr uint32_t kType7Steps = 0x82815E3C, kType7Guard = 0x82815E5C;
+  constexpr uint32_t kType6Steps = G::type6_steps_address();
+  constexpr uint32_t kType7Steps = G::type7_steps_address();
   // The return addresses: type 6's, type 7's.
   struct Lrs {
     uint32_t step, run, busy, finish45, play45, finish44, play44, loop44, finish44b, finish46,
@@ -1084,8 +1086,7 @@ uint64_t Screen0Update(uint8_t* base, bool type7, uint64_t r3, uint64_t sp, cons
        0x822453C4, 0x822453E8, 0x822453F4, 0x82245410, 0x8224543C, 0x82245460, 0x82245474,
        0x82245484, 0x822454B0}};
   const Lrs& lr = kLrs[type7 ? 1 : 0];
-  const uint32_t screen = uint32_t(r3);
-  const uint32_t d = type7 ? 4 : 0;
+  const Screen0View screen(base, uint32_t(r3), type7);
   const uint32_t frame = uint32_t(sp) - (type7 ? kType7UpdateFrame : kType6UpdateFrame);
   const uint64_t high = sp & 0xFFFFFFFF00000000ull;  // r1's upper word, in addi's results
   StoreU32(base, frame, uint32_t(sp));  // the back chain, for the guest calls
@@ -1094,14 +1095,14 @@ uint64_t Screen0Update(uint8_t* base, bool type7, uint64_t r3, uint64_t sp, cons
   uint32_t step;
   if (type7) {
     // The step table, built on the first call from words in the frame.
-    const uint32_t guard = LoadU32(base, kType7Guard);
-    step = LoadU32(base, LoadU32(base, screen + 9648) + 12);
+    const uint32_t guard = G::type7_steps_guard(base);
+    step = screen.pages().step();
     if ((guard & 1) == 0) {
       StoreU32(base, frame + 84, 0);
       StoreU32(base, frame + 108, 0);
       StoreU32(base, frame + 92, 0);
       StoreU32(base, frame + 100, 0);
-      StoreU32(base, kType7Guard, guard | 1);
+      G::set_type7_steps_guard(base, guard | 1);
       StoreU32(base, frame + 80, 0x82244E70);   // the opening
       StoreU32(base, frame + 104, 0x822450A8);  // back pressed
       StoreU32(base, frame + 88, 0x82244FC0);   // the cursor moved
@@ -1112,7 +1113,7 @@ uint64_t Screen0Update(uint8_t* base, bool type7, uint64_t r3, uint64_t sp, cons
       }
     }
   } else {
-    step = LoadU32(base, LoadU32(base, screen + 9644) + 12);
+    step = screen.pages().step();
   }
   if (step != kMinusOne) {
     if (type7) {
@@ -1123,19 +1124,19 @@ uint64_t Screen0Update(uint8_t* base, bool type7, uint64_t r3, uint64_t sp, cons
       answer = calls.call(LoadU32(base, kType6Steps + (step << 2)), frame, lr.step, r3,
                           (high | frame) + 80);
     }
-    const uint32_t p = LoadU32(base, screen + 9644 + d);
+    const schema::PageObject p = screen.pages();
     if (int32_t(uint32_t(answer)) != 0) {
-      const uint32_t next = LoadU32(base, p + 16);
+      const uint32_t next = p.queued_step();
       if (next == kMinusOne) {
-        const uint32_t after = LoadU32(base, p + 4);
-        StoreU32(base, p + 12, kMinusOne);
-        StoreU32(base, p + 0, after);
+        const uint32_t after = p.next_page();
+        p.set_step(kMinusOne);
+        p.set_page(after);
       } else {
-        StoreU32(base, p + 20, 0);
-        StoreU32(base, p + 12, next);
-        StoreU32(base, p + 16, kMinusOne);
+        p.set_unknown_20(0);
+        p.set_step(next);
+        p.set_queued_step(kMinusOne);
       }
-      StoreU32(base, p + 24, 0);
+      p.set_step_started(0);
     }
   } else {
     answer = calls.call(kRun, frame, lr.run, movie, 0);
@@ -1144,7 +1145,7 @@ uint64_t Screen0Update(uint8_t* base, bool type7, uint64_t r3, uint64_t sp, cons
   if (LoadU32(base, car + 1972) == kMinusOne) {
     return answer;
   }
-  const uint32_t holder = LoadU32(base, LoadU32(base, kStandHolder));
+  const uint32_t holder = LoadU32(base, G::stand_holder<schema::View>(base).address);
   const uint64_t busy = calls.call(kIsBusy, frame, lr.busy, holder, 0);
   auto named = [&](uint32_t function, uint32_t id, uint32_t at) {
     calls.call(function, frame, at, movie, id);
@@ -1153,24 +1154,24 @@ uint64_t Screen0Update(uint8_t* base, bool type7, uint64_t r3, uint64_t sp, cons
     const uint64_t args[6] = {movie, id, 1, 0, 0, 0};
     calls.call_set(kPlayNamed, args, 6, frame, at);
   };
-  const uint32_t loading = LoadU32(base, screen + 9640 + d);
-  const uint32_t shown = LoadU32(base, loading);
+  const schema::Type67Screen0Words loading = screen.words();
+  const uint32_t shown = loading.loading_shown();
   if (int32_t(uint32_t(busy)) != 0) {
     if (shown == 0) {
-      if (!type7) StoreU32(base, loading, 1);
+      if (!type7) loading.set_loading_shown(1);
       named(kFinishNamed, 45, lr.finish45);
       play(45, lr.play45);
       named(kFinishNamed, 44, lr.finish44);
       play(44, lr.play44);
       named(kLoopNamed, 44, lr.loop44);
-      if (type7) StoreU32(base, LoadU32(base, screen + 9644), 1);
+      if (type7) screen.words().set_loading_shown(1);
     }
   } else if (shown == 1) {
-    if (!type7) StoreU32(base, loading, 0);
+    if (!type7) loading.set_loading_shown(0);
     named(kFinishNamed, 44, lr.finish44b);
     named(kFinishNamed, 46, lr.finish46);
     play(46, lr.play46);
-    if (type7) StoreU32(base, LoadU32(base, screen + 9644), 0);
+    if (type7) screen.words().set_loading_shown(0);
   }
   if (LoadU32(base, car + 1968) != 0) {
     const uint64_t args[6] = {holder, 0, 1, 0, 0, 0};
@@ -1178,7 +1179,7 @@ uint64_t Screen0Update(uint8_t* base, bool type7, uint64_t r3, uint64_t sp, cons
   }
   const uint32_t block = car_makers::BlockOf(LoadU32(base, car + 12));
   const uint64_t reloaded =
-      calls.call(kReloadModel, frame, lr.reload, LoadU32(base, LoadU32(base, kStandHolder)),
+      calls.call(kReloadModel, frame, lr.reload, LoadU32(base, G::stand_holder<schema::View>(base).address),
                  uint64_t(int64_t(int32_t(block))));
   StoreU32(base, car + 1968, uint32_t(reloaded));
   if (int32_t(uint32_t(reloaded)) != 1) {

@@ -1,0 +1,198 @@
+# The schema of docs/functions/strings-and-font.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The game's texts: the string table at [0x826C5C34] and the bitmap font at
+# [0x826C5C00], both made once at boot (src/strings_and_font/,
+# src/app_start_up/text_init.cpp for Font::Font).
+# The font's +8 is the render queue (device-shaders.md's RenderQueue; the
+# measure's "Font.+8" and "Font.+8.+0" are RenderQueue and its vtable).
+
+# The bitmap font (16,592 bytes, Font::Init's VirtualAlloc).
+[Font]
+measure = "Font"
+size = 16592
+origin = "allocated"
+# 19 functions; areas: data-load.md, strings-and-font.md
+fields = [
+  { name = "video_output", offset = 0, type = "ptr", note = "the device's state object (Font::Font's video output)" },
+  { name = "command_list", offset = 4, type = "ptr", to = "CommandList" },
+  { name = "render_queue", offset = 8, type = "ptr", to = "RenderQueue" },
+  { name = "pages_asked", offset = 12, type = "u32", note = "the mask of pages asked for (Font::Load)" },
+  { name = "params", offset = 16, type = "ptr", to = "FontDrawParams", note = "the draw parameters while drawing (Font::SetParams)" },
+  { name = "pages", offset = 20, type = "bytes", count = 16, note = "the four pages' pointers (FontPage, 28 bytes each; +4i)" },
+  { name = "page", offset = 36, type = "ptr", to = "FontPage", note = "the page drawn with (the parameters' +60)" },
+  { name = "page_files", offset = 40, type = "bytes", count = 16, note = "the four pages' files (+4i; assets 22655-22658, the ids at 0x82007C5C)" },
+  { name = "start_x", offset = 56, type = "f32", note = "the text's start point" },
+  { name = "start_y", offset = 60, type = "f32" },
+  { name = "second_pass_positions", offset = 64, type = "bytes", count = 16384, note = "each character's x, y (floats, 8 bytes a character) for the second pass (never in play)" },
+  { name = "letter_spacing", offset = 16448, type = "f32" },
+  { name = "line_spacing", offset = 16452, type = "f32" },
+  { name = "colors", offset = 16528, type = "bytes", count = 30, note = "ten r, g, b colors for the characters 0xFFFF down to 0xFFF6" },
+  { name = "vertex_declaration", offset = 16560, type = "ptr", to = "VertexDeclaration" },
+  { name = "vertex_shader", offset = 16564, type = "ptr", to = "VertexShader" },
+  { name = "pixel_shaders", offset = 16568, type = "bytes", count = 16, note = "one per texture channel (PixelShader, +4i)" },
+]
+
+# A text's draw parameters (built on UiMovie::DrawTexts' stack, kept at the
+# font's +16 while drawing).
+[FontDrawParams]
+measures = ["Font.+16", "Font::SetParams.r4"]
+size = 124
+origin = "file"
+# 11 functions; areas: strings-and-font.md
+fields = [
+  { name = "x", offset = 0, type = "s32" },
+  { name = "y", offset = 4, type = "s32" },
+  { name = "origin_x", offset = 8, type = "s32", note = "probably the point the scale is about" },
+  { name = "origin_y", offset = 12, type = "s32" },
+  { name = "angle", offset = 16, type = "f32", note = "degrees (rotated text never in play)" },
+  { name = "red", offset = 20, type = "u8" },
+  { name = "green", offset = 21, type = "u8" },
+  { name = "blue", offset = 22, type = "u8" },
+  { name = "alpha", offset = 24, type = "f32", note = "0 to 1" },
+  { name = "scale_x", offset = 28, type = "f32" },
+  { name = "scale_y", offset = 32, type = "f32" },
+  { name = "glyph_scale_x", offset = 36, type = "f32" },
+  { name = "glyph_scale_y", offset = 40, type = "f32" },
+  { name = "clip_x", offset = 44, type = "u32", note = "the clip rectangle (all 0 for none)" },
+  { name = "clip_y", offset = 48, type = "u32" },
+  { name = "clip_width", offset = 52, type = "u32" },
+  { name = "clip_height", offset = 56, type = "u32" },
+  { name = "page", offset = 60, type = "u32", note = "the font page" },
+  { name = "box_width", offset = 68, type = "u32" },
+  { name = "box_height", offset = 72, type = "u32" },
+  { name = "align_x", offset = 76, type = "u32", note = "0 left, 1 center, 2 right, 3 justified" },
+  { name = "align_y", offset = 80, type = "u32", note = "0 top, 1 middle, 2 bottom, 3 justified" },
+  { name = "letter_spacing", offset = 84, type = "s32" },
+  { name = "line_spacing", offset = 88, type = "s32" },
+  { name = "unknown_92", offset = 92, type = "u8", note = "probably the second pass's color" },
+  { name = "unknown_93", offset = 93, type = "u8" },
+  { name = "unknown_94", offset = 94, type = "u8" },
+  { name = "second_offset_x", offset = 96, type = "f32", note = "the second pass's offset" },
+  { name = "second_offset_y", offset = 100, type = "f32" },
+  { name = "unknown_104", offset = 104, type = "f32" },
+  { name = "second_page", offset = 108, type = "u32" },
+  { name = "second_pass", offset = 112, type = "u32", note = "the second pass on (never in play)" },
+  { name = "layer", offset = 116, type = "u32" },
+  { name = "text_id", offset = 120, type = "u32" },
+]
+
+# A font page (28 bytes, Font::Load's operator new; Font::OnPageLoaded's r6).
+[FontPage]
+measures = ["Font.+36", "new<28>@Font::Load", "Font::OnPageLoaded.r6"]
+size = 28
+origin = "allocated"
+fields = [
+  { name = "glyph_table", offset = 0, type = "ptr", to = "FontGlyphTable", note = "the page file's entry 0" },
+  { name = "records", offset = 4, type = "ptr", to = "FontGlyphRecord", note = "the glyph table's +4: 4 bytes per UTF-16 code" },
+  { name = "xpr", offset = 8, type = "ptr", to = "XPR", note = "the page file's entry 1" },
+  { name = "texture", offset = 12, type = "ptr", note = "the XPR's texture (four glyph sheets, one per channel)" },
+  { name = "texture_width", offset = 16, type = "u32" },
+  { name = "texture_height", offset = 20, type = "u32" },
+  { name = "loaded", offset = 24, type = "u32" },
+]
+
+# The glyph table's header (a font page file's entry 0).
+[FontGlyphTable]
+measure = "Font.+36.+0"
+size = 4
+origin = "file"
+fields = [
+  { name = "cell_width", offset = 0, type = "u16" },
+  { name = "cell_height", offset = 2, type = "u16" },
+]
+
+# A glyph record (4 bytes per UTF-16 code, from the glyph table's +4).
+[FontGlyphRecord]
+measure = "Font.+36.+4"
+size = 4
+origin = "file"
+fields = [
+  { name = "cell", offset = 0, type = "u16", note = "the cell's index in the sheet" },
+  { name = "advance_and_channel", offset = 2, type = "u16", note = "the advance x 4 plus the texture channel 0-3" },
+]
+
+# A UTF-16 text (a string of the table, a text drawn), read a unit at a time.
+[FontText]
+measures = ["Font::BuildVertices.r4", "Font::CountGlyphs.r5", "Font::LineGlyphs.r4", "Font::LineWidth.r4", "Strings::Get.ret"]
+size = 4
+origin = "file"
+fields = [
+  { name = "unit", offset = 0, type = "u16" },
+  { name = "next_unit", offset = 2, type = "u16" },
+]
+
+# A glyph's six vertices (two triangles, 24 bytes each: FontVertex).
+[FontGlyphQuad]
+measure = "Font::ClipGlyph.r4"
+size = 144
+origin = "file"
+fields = [
+  { name = "vertices", offset = 0, type = "bytes", count = 144, note = "six FontVertex" },
+]
+
+# A glyph vertex (the font's vertex declaration: position float3, color,
+# texture coordinate float2).
+[FontVertex]
+measure = "Font::OutCode.r4"
+size = 24
+origin = "file"
+fields = [
+  { name = "x", offset = 0, type = "f32" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "z", offset = 8, type = "f32" },
+  { name = "color", offset = 12, type = "u32" },
+  { name = "u", offset = 16, type = "f32" },
+  { name = "v", offset = 20, type = "f32" },
+]
+
+# The string table (4,304 bytes, Strings::Init's VirtualAlloc).
+[Strings]
+measure = "Strings"
+size = 4304
+origin = "allocated"
+# 4 functions; areas: files-and-saves.md, strings-and-font.md
+fields = [
+  { name = "files", offset = 0, type = "bytes", count = 68, note = "the 17 string files (+4i; assets 22638-22654, the ids at 0x82007DD0)" },
+  { name = "loaded_flags", offset = 68, type = "bytes", count = 68, note = "each file's loaded flag (+4i; StringsLoadedFlag)" },
+  { name = "files_asked", offset = 136, type = "u32", note = "the mask of files asked for" },
+  { name = "load_counts", offset = 4236, type = "bytes", count = 68, note = "each file's count of loads (+4i)" },
+]
+
+# A string file's loaded flag (the string table's +68 + 4i, Strings::OnLoaded's r6).
+[StringsLoadedFlag]
+measure = "Strings::OnLoaded.r6"
+size = 4
+origin = "file"
+fields = [
+  { name = "loaded", offset = 0, type = "u32" },
+]
+
+[globals]
+font = { address = 0x826C5C00, type = "ptr", to = "Font" }
+strings = { address = 0x826C5C34, type = "ptr", to = "Strings" }
+shader_entries = { address = 0x826C5C04, type = "bytes", count = 48, note = "the four pixel shaders' sources, 12 bytes each: the HLSL, its length, 0 (sub_825D9590)" }
+pixel_shader_sources = { address = 0x8260333C, type = "bytes", count = 16, note = "the four pixel shaders' HLSL pointers" }
+glyph_counts = { address = 0x826C5BCC, type = "bytes", count = 16, note = "Font::DrawPass: the glyphs per texture channel (+4i)" }
+write_pointers = { address = 0x826C5BDC, type = "bytes", count = 16, note = "the channels' vertex write pointers (+4i)" }
+vertex_starts = { address = 0x826C5BEC, type = "bytes", count = 16, note = "the channels' vertices' starts (+4i)" }
+chunk = { address = 0x826C5BFC, type = "u32", note = "the chunk's first slot while drawing (0 between texts)" }
+font_page_ids = { address = 0x82007C5C, type = "bytes", count = 16, note = "the four pages' asset ids" }
+string_file_ids = { address = 0x82007DD0, type = "bytes", count = 68, note = "the 17 files' asset ids" }
+string_bounds = { address = 0x82007E18, type = "bytes", count = 72, note = "the 18 string id bounds (signed words)" }
+minus_format = { address = 0x82007E8C, type = "bytes", count = 8, note = "L\"-%s\"" }
+plain_format = { address = 0x82007E94, type = "bytes", count = 6, note = "L\"%d\"" }
+grouped_format = { address = 0x82007E9C, type = "bytes", count = 12, note = "L\",%03d\"" }
+int_format = { address = 0x82007EA8, type = "bytes", count = 12, note = "L\"%%%dd\"" }
+float_format = { address = 0x82007EB4, type = "bytes", count = 14, note = "L\"%%.%df\"" }
+zeroed_format = { address = 0x82007EC4, type = "bytes", count = 14, note = "L\"%%0%dd\"" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0" }
+one = { address = 0x82000A30, type = "f32", note = "1.0" }
+half = { address = 0x82001BE4, type = "f32", note = "0.5" }
+thousandth = { address = 0x820029D8, type = "f32", note = "0.001" }
+full_alpha = { address = 0x82000C44, type = "f32", note = "255.0" }
+one_double = { address = 0x82002250, type = "f64", note = "1.0 (read as two words, lfd)" }
+turn = { address = 0x82007C78, type = "f64", note = "1/360 (read as two words, lfd)" }

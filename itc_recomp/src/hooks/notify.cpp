@@ -14,6 +14,7 @@
 #include "guest_call.h"
 #include "base/flags.h"
 #include "hooks/save_interface.h"
+#include "schema/system_services.h"
 #include "user/network.h"
 #include "lifted/sdk.h"
 
@@ -56,12 +57,13 @@ ITC_NATIVE_ENTRY_ALWAYS(822952B8) {
 ITC_NATIVE_ENTRY_ALWAYS(82099828) {
   
   const uint32_t app = ctx.r3.u32;
-  if (g_users_built || !guest::LoadU32(base, app + 240)) {
+  const schema::SysUsers users(base, app);
+  if (g_users_built || !users.listener()) {
     ctx.r3.u64 = 0;
     return;
   }
   g_users_built = true;
-  guest::StoreU32(base, app + 244, 1);
+  users.set_users_changed(1);
   InFrame(ctx, base, 112, 0x820998A0, [&](uint32_t) {
     ctx.r3.u64 = app;
     lifted::Enter(ctx, base, lifted::e82099600);

@@ -11,6 +11,7 @@
 #include "c_runtime/math.h"
 #include "graphics/video_output.h"
 #include "guest.h"
+#include "schema/screen_objects.h"
 #include "screen_objects/uv_trees.h"
 
 #include <bit>
@@ -39,16 +40,7 @@ double LoadSingle(uint8_t* base, uint32_t address) {
 uint32_t SingleBits(double value) { return std::bit_cast<uint32_t>(float(value)); }
 double Round(double value) { return double(float(value)); }
 
-// AddRingPoint's constants.
-constexpr uint32_t kThousand = 0x82008808;  // the double 1000.0
-constexpr uint32_t kHalfDouble = 0x820022B8;
-constexpr uint32_t kThousandth = 0x82002B98;  // the double 0.001
-// BuildRings' and SetSpeed's floats.
-constexpr uint32_t kHalf = 0x82001BE4;
-constexpr uint32_t kDegree = 0x82002948;  // pi / 180
-constexpr uint32_t kRingStep = 0x82008810;  // 0.035
-constexpr uint32_t kOne = 0x82000A30;
-constexpr uint32_t kZero = 0x82000A34;
+using G = schema::ScreenObjectsGlobals;
 
 // AddRingPoint's frame (272 bytes) and its temporaries in it.
 constexpr uint32_t kAddFrame = 272;
@@ -63,13 +55,14 @@ constexpr uint32_t kRingsFrame = 272;
 std::optional<uint32_t> AddRingPoint(uint8_t* base, uint32_t object, double x, double y,
                                      double u, double v, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_82132778 ScreenObject::AddRingPoint");
-  const uint32_t map = object + kUvMap;
-  if (!CanAllocate(base) || Load(base, map + kSize) >= kMapMaxSize) {
+  const uint32_t map = schema::ScreenObject(base, object).uv_map_address();
+  const schema::ScreenObjectUvMap m(base, map);
+  if (!CanAllocate(base) || m.size() >= kMapMaxSize) {
     return std::nullopt;
   }
-  const double thousand = LoadDouble(base, kThousand);
-  const double half = LoadDouble(base, kHalfDouble);
-  const double thousandth = LoadDouble(base, kThousandth);
+  const double thousand = LoadDouble(base, G::thousand_address());
+  const double half = LoadDouble(base, G::half_double_address());
+  const double thousandth = LoadDouble(base, G::thousandth_address());
   const double key_x = c_runtime::Floor(std::fma(x, thousand, half)) * thousandth;
   const double key_y = c_runtime::Floor(std::fma(y, thousand, half)) * thousandth;
   const auto found = MapFind(base, map, key_x);
@@ -83,7 +76,7 @@ std::optional<uint32_t> AddRingPoint(uint8_t* base, uint32_t object, double x, d
     Store(base, value + 8, SingleBits(u));
     Store(base, value + 12, SingleBits(v));
   };
-  if (found->node == Load(base, map + kHead)) {
+  if (found->node == m.head().address) {
     // x's column isn't there: one holding (y, u, v), copied twice into the
     // pair the map copies again, the three destroyed after.
     const uint32_t column_a = frame + kColumnA;
@@ -117,12 +110,13 @@ std::optional<uint32_t> AddRingPoint(uint8_t* base, uint32_t object, double x, d
     return r3;
   }
   // x's column: (y, u, v) added unless y is there.
-  const uint32_t column = found->node + kMapColumn;
+  const uint32_t column = schema::ScreenObjectUvMapNode(base, found->node).column_address();
+  const schema::ScreenObjectUvColumn c(base, column);
   const auto at = ColumnFind(base, column, key_y);
-  if (!at || Load(base, column + kSize) >= kColumnMaxSize) {
+  if (!at || c.size() >= kColumnMaxSize) {
     return std::nullopt;
   }
-  if (at->node != Load(base, column + kHead)) {
+  if (at->node != c.head().address) {
     return frame + 80;  // Find's iterator out
   }
   store_value();
@@ -135,31 +129,31 @@ std::optional<uint32_t> AddRingPoint(uint8_t* base, uint32_t object, double x, d
 
 std::optional<uint32_t> BuildRings(uint8_t* base, uint32_t object, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_821329B8 ScreenObject::BuildRings");
-  const uint32_t map = object + kUvMap;
-  if (!CanAllocate(base) || Load(base, map + kSize) != 0) {
+  const schema::ScreenObject obj(base, object);
+  if (!CanAllocate(base) || schema::ScreenObjectUvMap(base, obj.uv_map_address()).size() != 0) {
     return std::nullopt;
   }
   uint32_t r3 = 0;
   const uint32_t frame = stack - kRingsFrame;
-  const double half = LoadSingle(base, kHalf);
-  const double degree = LoadSingle(base, kDegree);
-  const double step = LoadSingle(base, kRingStep);
+  const double half = LoadSingle(base, G::half_address());
+  const double degree = LoadSingle(base, G::degree_address());
+  const double step = LoadSingle(base, G::ring_step_address());
   // One point: its vertex appended, then AddRingPoint.
   const auto point = [&](double angle, double radius) {
     const double u = Round(std::fma(Round(c_runtime::Cos(angle)), radius, half));
     const double v = Round(std::fma(Round(c_runtime::Sin(angle)), radius, half));
-    const double width = Round(double(int64_t(Load(base, object + 8))));
-    const double height = Round(double(int64_t(Load(base, object + 12))));
+    const double width = Round(double(int64_t(obj.width())));
+    const double height = Round(double(int64_t(obj.height())));
     const double px = Round(width * u);
     const double py = Round(height * v);
-    const uint32_t count = Load(base, object + kRingCount);
-    const uint32_t vertex = object + kRingVertices + count * 20;
+    const uint32_t count = obj.ring_vertex_count();
+    const uint32_t vertex = obj.ring_vertices_address() + count * 20;
     Store(base, vertex + 0, SingleBits(px));
     Store(base, vertex + 4, SingleBits(py));
     Store(base, vertex + 8, 0xFFFFFFFF);
     Store(base, vertex + 12, SingleBits(u));
     Store(base, vertex + 16, SingleBits(v));
-    Store(base, object + kRingCount, count + 1);
+    obj.set_ring_vertex_count(count + 1);
     const auto added = AddRingPoint(base, object, px, py, u, v, frame);
     if (!added) {
       ITC_LOG_ERROR("ScreenObject::BuildRings: AddRingPoint refused a point after its checks");
@@ -181,18 +175,19 @@ std::optional<uint32_t> BuildRings(uint8_t* base, uint32_t object, uint32_t stac
 
 bool SetSpeed(uint8_t* base, uint32_t object, double strength) {
   ITC_NATIVE_RUNNING("sub_8212FCC8 ScreenObject::SetSpeed");
-  if (guest::LoadU8(base, object + 24) != 0) {
+  const schema::ScreenObject obj(base, object);
+  if (obj.running() != 0) {
     return false;
   }
-  const double low = LoadSingle(base, kZero);
-  const double high = LoadSingle(base, kOne);
-  guest::StoreU8(base, object + 27, 1);
+  const double low = LoadSingle(base, G::zero_address());
+  const double high = LoadSingle(base, G::one_address());
+  obj.set_speed_set(1);
   if (strength > high) {
     strength = high;
   } else if (strength < low) {
     strength = low;
   }
-  Store(base, object + 76, SingleBits(strength));
+  Store(base, obj.strength_address(), SingleBits(strength));
   return true;
 }
 
@@ -201,10 +196,11 @@ uint32_t Release(uint8_t* base, uint32_t object, uint32_t frame, const ReleaseCa
   namespace vo = graphics::video_output;
   const uint32_t local = frame + 80;
   Store(base, local, vo::LockDevice(base, calls.video_output(0)));
-  calls.release(Load(base, object + 0));
-  Store(base, object + 0, 0);
-  calls.release(Load(base, object + 4));
-  Store(base, object + 4, 0);
+  const schema::ScreenObject obj(base, object);
+  calls.release(obj.vertex_declaration());
+  obj.set_vertex_declaration(0);
+  calls.release(obj.texture());
+  obj.set_texture(0);
   const uint32_t video_output = calls.video_output(1);
   vo::UnlockDevice(base, video_output, local);
   return video_output;
@@ -213,9 +209,10 @@ uint32_t Release(uint8_t* base, uint32_t object, uint32_t frame, const ReleaseCa
 uint32_t Destroy(uint8_t* base, uint32_t object, uint32_t frame, const ReleaseCalls& calls) {
   ITC_NATIVE_RUNNING("sub_82132FC8 ScreenObject::~ScreenObject");
   Release(base, object, frame - 128, calls);
-  const auto head = MapDestroy(base, object + kUvMap);
+  const uint32_t map = schema::ScreenObject(base, object).uv_map_address();
+  const auto head = MapDestroy(base, map);
   if (!head) {
-    ITC_LOG_ERROR("ScreenObject::~ScreenObject: the map at {:08X} not destroyed", object + kUvMap);
+    ITC_LOG_ERROR("ScreenObject::~ScreenObject: the map at {:08X} not destroyed", map);
     std::abort();
   }
   return *head;

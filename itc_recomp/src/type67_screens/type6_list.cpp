@@ -19,6 +19,8 @@
 #include "car_list/car_list.h"
 #include "car_specs/car_specs.h"
 #include "guest.h"
+#include "schema/car_list.h"
+#include "schema/type67_screens.h"
 #include "menu_sounds/menu_sounds.h"
 #include "mode_tick/mode_tick.h"
 #include "native/buffers.h"
@@ -35,11 +37,15 @@ namespace type67_screens {
 namespace {
 
 using guest::LoadU32;
+using G = schema::Type67ScreensGlobals;
 using guest::StoreU32;
+using LS = schema::ListScreen;
+using NS = schema::NodeScreen;
+using PS = schema::PanelScreen;
+using Pair = schema::GroupPair;
+using T6LS = schema::Type6ListScreen;
 
 constexpr uint32_t kListInit = 0x8220BAC0;
-// The passes word ScreenFades::FadeOut is given.
-constexpr uint32_t kFadeOutPasses = 0x82001BF0;
 // The item texts' string ids (7 a row) and the item infos (16 bytes each).
 constexpr uint32_t kItemTexts = 0x826366FC;
 constexpr uint32_t kItemInfos = 0x82636720;
@@ -61,7 +67,7 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
 
 // The screen's movie: [+9680] at the frame's +80, then UiMovies::Find.
 uint32_t MovieOf(uint8_t* base, uint32_t screen, uint32_t frame) {
-  StoreU32(base, frame + 80, LoadU32(base, screen + 9680));
+  StoreU32(base, frame + 80, LS(base, screen).movie());
   return LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
 }
 
@@ -167,7 +173,7 @@ uint64_t Type6ListScreenBack(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t s
   ITC_NATIVE_RUNNING("sub_822337B0 Type6ListScreen::Back");
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t dispatcher = uint32_t(r4);
-  StoreU32(base, uint32_t(r3) + 9608, 9);
+  T6LS(base, uint32_t(r3)).set_state(9);
   // r6 as the post leaves it (the ring's start plus its count before, 64-bit),
   // passed on to the slot below.
   const uint64_t r6 = uint64_t(LoadU32(base, dispatcher + 204 + 604)) +
@@ -202,7 +208,7 @@ uint64_t Type6ListScreenSetUpRace(uint8_t* base, uint64_t r3, uint32_t sp, const
   // cases each answer their own index), else the frame word the original
   // reads unset (its +80).
   const uint32_t index =
-      LoadU32(base, screen + 10220) + race_screens::ListSelection(base, screen + 10216);
+      T6LS(base, screen).course_list_scroll() + race_screens::ListSelection(base, screen + 10216);
   const uint32_t route = index <= 7 ? index : LoadU32(base, frame + 80);
   if (!rs::StagesSetRoute(base, data() + rs::kStageList, route, 48, 0xFFFFFFFFu,
                           frame - rs::kRouteFrameBytes)) {
@@ -217,8 +223,8 @@ uint64_t Type6ListScreenSetUpRace(uint8_t* base, uint64_t r3, uint32_t sp, const
     const int32_t kind = int32_t(race_screens::ListSelection(base, screen + 10144));
     vehicle_accessors::RaceDataSetWord59618(base, kind == 1 ? 2 : kind == 2 ? 1 : 3);
   }
-  const uint32_t answer =
-      uint32_t(Slot(base, LoadU32(base, screen + 9676), 20, std::nullopt, frame, 0x82233620, calls));
+  const uint32_t answer = uint32_t(Slot(base, T6LS(base, screen).list_part().address, 20,
+                                        std::nullopt, frame, 0x82233620, calls));
   // The player's racer record at the frame's +96: the type 6 car.
   const uint32_t record = frame + 96;
   rs::RacerRecordInit(base, record);
@@ -250,14 +256,14 @@ uint64_t Type6ListScreenSetUpRace(uint8_t* base, uint64_t r3, uint32_t sp, const
     const uint64_t args[6] = {1, 0, 0, 0, 0, 0};
     result = calls.call_set(kPlaceRacers, args, 1, frame, 0x822336B0);
   }
-  StoreU32(base, screen + 9608, 10);
+  T6LS(base, screen).set_state(10);
   return result;
 }
 
 uint64_t Type6ListScreenDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822332D8 Type6ListScreen::~Type6ListScreen");
   const uint32_t frame = Frame(base, sp, 96);
-  StoreU32(base, uint32_t(r3), kType6ListScreenVtable);
+  T6LS(base, uint32_t(r3)).set_vtable(kType6ListScreenVtable);
   ListPartDestruct(base, r3 + 10824, frame, calls);
   return TitledListScreenDestruct(base, r3, frame, calls);
 }
@@ -288,7 +294,7 @@ uint64_t PanelScreenSetAnswer(uint8_t* base, uint64_t r3, uint32_t answer) {
       ITC_NATIVE_RUNNING("sub_822306D0 PanelScreen::OnBack");
       break;
   }
-  StoreU32(base, uint32_t(r3) + 9660, answer);
+  PS(base, uint32_t(r3)).set_dialog_answer(answer);
   return r3;
 }
 
@@ -298,35 +304,35 @@ uint64_t PanelScreenOnDialogClosed(uint8_t* base, uint64_t r3, uint32_t sp, cons
   const uint32_t screen = uint32_t(r3);
   uint32_t dialog = 0;
   uint64_t result = r3;
-  if (LoadU32(base, screen + 9660) == 0) {
+  if (PS(base, screen).dialog_answer() == 0) {
     // ScreenFades::FadeOut([0x82001BF0], 0, 0, 0, 0): its plain C++, r4 left
     // 0 as the original sets it; FadeOut's r3 (the passes).
-    const uint32_t passes = LoadU32(base, kFadeOutPasses);
+    const uint32_t passes = G::fade_out_passes(base);
     mode_tick::ScreenFadesFadeOut(base, passes, 0, 0, 0, 0);
     calls.set_r4(0);
     result = passes;
     dialog = 2;
   }
-  StoreU32(base, screen + 9656, dialog);
+  PS(base, screen).set_quit_dialog(dialog);
   return result;
 }
 
 uint64_t PanelScreenSuspend(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
                             const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82248DE0 PanelScreen::Suspend");
-  return Slot(base, LoadU32(base, uint32_t(r3) + 9648), 28, std::nullopt, sp, lr, calls);
+  return Slot(base, PS(base, uint32_t(r3)).group_pair().address, 28, std::nullopt, sp, lr, calls);
 }
 
 uint64_t PanelScreenOpenEmpty(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
                               const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822404D8 PanelScreen::OpenEmpty");
   const uint32_t screen = uint32_t(r3);
-  if (LoadU32(base, screen + 9612) == 0) {
-    StoreU32(base, screen + 9608, 1);
+  if (PS(base, screen).movie_loaded() == 0) {
+    PS(base, screen).set_state(1);
     return r3;
   }
-  const uint32_t list = LoadU32(base, screen + 9644);
-  StoreU32(base, screen + 9608, 4);
+  const uint32_t list = PS(base, screen).car_list().address;
+  PS(base, screen).set_state(4);
   return Slot(base, list, 52, 0, sp, lr, calls);
 }
 
@@ -349,7 +355,7 @@ uint64_t GroupPairDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, u
                                    const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8224ACE0 GroupPair::DeletingDestructor");
   const uint32_t frame = Frame(base, sp, 96);
-  StoreU32(base, uint32_t(r3), kGroupPairBaseVtable);
+  Pair(base, uint32_t(r3)).set_vtable(kGroupPairBaseVtable);
   if ((flags & 1) != 0) {
     const uint64_t args[6] = {r3, flags, 0, 0, 0, 0};
     calls.call_set(car_list::kOperatorDelete, args, 2, frame, 0x8224AD0C);
@@ -359,7 +365,7 @@ uint64_t GroupPairDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, u
 
 uint64_t NodeScreenOpen(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_82259318 NodeScreen::Open");
-  StoreU32(base, uint32_t(r3) + 10064, 4);
+  NS(base, uint32_t(r3)).set_state(4);
   return r3;
 }
 

@@ -13,18 +13,10 @@ namespace {
 
 constexpr uint32_t kNone = 0xFFFFFFFFu;
 
-// The screen data's lists (build_screen.h): the shown groups' pointers and
-// their count, the build list shown (its 16-bit links, head +1604, slots
-// +1612 on) and its count (a halfword).
-constexpr uint32_t kShownGroups = 0x318C4;
-constexpr uint32_t kShownCount = 0x319A4;
-constexpr uint32_t kBuilds = 0x319A8;
-constexpr uint32_t kBuildCount = 0x31FF0;
-
 int32_t S(uint32_t value) { return int32_t(value); }
 
-uint32_t Screen(uint8_t* base) { return Load(base, kBuildScreen); }
-uint32_t List(uint8_t* base) { return Load(base, kBuildList); }
+schema::BuildScreenData Screen(uint8_t* base) { return Globals::build_screen(base); }
+uint32_t List(uint8_t* base) { return Globals::build_list(base).address; }
 
 // A halfword link or slot, sign-extended (lha).
 uint32_t Half(uint8_t* base, uint32_t address) {
@@ -34,17 +26,17 @@ uint32_t Half(uint8_t* base, uint32_t address) {
 // The build at `position` of the screen's build list: the head's node
 // walked `position` links (as a count down to 0), its slot's pointer.
 uint32_t BuildAt(uint8_t* base, uint32_t position) {
-  const uint32_t list = Screen(base) + kBuilds;
-  uint32_t node = list + (Half(base, list + 1604) << 2);
+  const schema::BuildSlotList list(base, Screen(base).build_list_address());
+  uint32_t node = list.address + (uint32_t(int32_t(int16_t(list.head()))) << 2);
   for (uint32_t n = position; n != 0; n--) {
-    node = list + (Half(base, node) << 2);
+    node = list.address + (Half(base, node) << 2);
   }
-  return Load(base, list + ((Half(base, node + 2) + 403) << 2));
+  return Load(base, list.slots_address() + (Half(base, node + 2) << 2));
 }
 
 // The shown group at `index`.
 uint32_t GroupAt(uint8_t* base, uint32_t index) {
-  return Load(base, Screen(base) + kShownGroups + 4 * index);
+  return Load(base, Screen(base).shown_groups_address() + 4 * index);
 }
 
 // The player's action mapper entry (0x826BAB80 + 8 × [0x826BABA4]).
@@ -85,8 +77,10 @@ uint32_t Jump(uint8_t* base, uint32_t sp, uint32_t back, uint32_t forward, bool 
   const uint32_t selection = race_screens::ListSelection(base, List(base));
   const uint32_t scroll = Load(base, List(base) + 4);
   const uint32_t position = scroll + selection;
-  const uint32_t count = groups ? Load(base, Screen(base) + kShownCount)
-                                : Half(base, Screen(base) + kBuildCount);
+  const uint32_t count =
+      groups ? Screen(base).shown_group_count()
+             : uint32_t(int32_t(int16_t(
+                   schema::BuildSlotList(base, Screen(base).build_list_address()).count())));
   auto found = [&](uint32_t index) -> uint32_t {
     const uint64_t named = named_fixed ? named_base : uint64_t(selection) + named_base;
     calls.Call(kFinishNamed, frame, lrs.finish, movie, named);
@@ -123,22 +117,22 @@ uint32_t Jump(uint8_t* base, uint32_t sp, uint32_t back, uint32_t forward, bool 
   return 0;
 }
 
-// The hits: groups marked (+32 set) or whose +28 is 0; builds whose +32
-// isn't their +36, or whose kind (+8) isn't 2.
+// The hits: groups marked or not all owned; builds whose flags aren't
+// their saved flags, or whose state isn't 2.
 auto MarkedGroup(uint8_t* base) {
-  return [base](uint32_t i) { return Load(base, GroupAt(base, i) + 32) != 0; };
+  return [base](uint32_t i) { return schema::BuildGroup(base, GroupAt(base, i)).mark() != 0; };
 }
 auto Group28Clear(uint8_t* base) {
-  return [base](uint32_t i) { return Load(base, GroupAt(base, i) + 28) == 0; };
+  return [base](uint32_t i) { return schema::BuildGroup(base, GroupAt(base, i)).all_owned() == 0; };
 }
 auto ChangedBuild(uint8_t* base) {
   return [base](uint32_t i) {
-    const uint32_t mark = Load(base, BuildAt(base, i) + 32);
-    return mark != Load(base, BuildAt(base, i) + 36);
+    const uint32_t mark = schema::BuildRecord(base, BuildAt(base, i)).flags();
+    return mark != schema::BuildRecord(base, BuildAt(base, i)).saved_flags();
   };
 }
 auto KindNot2(uint8_t* base) {
-  return [base](uint32_t i) { return S(Load(base, BuildAt(base, i) + 8)) != 2; };
+  return [base](uint32_t i) { return S(schema::BuildRecord(base, BuildAt(base, i)).state()) != 2; };
 }
 
 // The pages' shared moves: MenuSound::Play from the page's frame.
@@ -167,19 +161,19 @@ template <typename JumpA, typename JumpB, typename OnAccept>
 uint64_t LevelPageRun(uint8_t* base, uint32_t sp, const LevelPage& p, JumpA jump_a,
                       JumpB jump_b, OnAccept on_accept, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 112);
-  ListCall(calls, kListUpdate, Load(base, kBuildList), frame, p.update);
-  ListCall(calls, kListUpdate, Load(base, kBuildGroupList), frame, p.group_update);
+  ListCall(calls, kListUpdate, Globals::build_list(base).address, frame, p.update);
+  ListCall(calls, kListUpdate, Globals::build_group_list(base).address, frame, p.group_update);
   if (!Still(base, List(base)) || jump_a(frame) != 0 || jump_b(frame) != 0) {
-    PagesGo(base, Load(base, kBuildPages), p.level, p.moving, kNone);
+    PagesGo(base, Globals::build_pages(base).address, p.level, p.moving, kNone);
     return Sound(calls, frame, p.sound_lr, 4);
   }
-  if (Load(base, Load(base, kBuildGroupList) + 24) != 0) {
-    PagesGo(base, Load(base, kBuildPages), p.level, p.group_moving, kNone);
+  if (Load(base, Globals::build_group_list(base).address + 24) != 0) {
+    PagesGo(base, Globals::build_pages(base).address, p.level, p.group_moving, kNone);
     return Sound(calls, frame, p.sound_lr, 4);
   }
   uint64_t r3 = ListCall(calls, kListAccepted, List(base), frame, p.accepted_lr);
   if (uint32_t(r3) != 0) {
-    PagesGo(base, Load(base, kBuildPages), p.level + 1, p.accepted, p.queued);
+    PagesGo(base, Globals::build_pages(base).address, p.level + 1, p.accepted, p.queued);
     on_accept(frame);
     return Sound(calls, frame, p.sound_lr, 0);
   }
@@ -187,7 +181,7 @@ uint64_t LevelPageRun(uint8_t* base, uint32_t sp, const LevelPage& p, JumpA jump
   if (uint32_t(r3) == 0) {
     return r3;
   }
-  PagesGo(base, Load(base, kBuildPages), kNone, p.back, kNone);
+  PagesGo(base, Globals::build_pages(base).address, kNone, p.back, kNone);
   return Sound(calls, frame, p.sound_lr, 2);
 }
 
@@ -239,26 +233,26 @@ uint64_t BuildGroupsPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   ListCall(calls, kListUpdate, List(base), frame, 0x8219EEDC);
   if (!Still(base, List(base)) || BuildJumpGroupA(base, frame, calls) != 0 ||
       BuildJumpGroupB(base, frame, calls) != 0) {
-    PagesGo(base, Load(base, kBuildPages), 0, 3, kNone);
+    PagesGo(base, Globals::build_pages(base).address, 0, 3, kNone);
     return Sound(calls, frame, 0x8219F030, 4);
   }
   uint64_t r3 = ListCall(calls, kListAccepted, List(base), frame, 0x8219EF1C);
   if (uint32_t(r3) != 0) {
     r3 = Sound(calls, frame, 0x8219EF2C, 0);
-    PagesGo(base, Load(base, kBuildPages), 1, 6, 7);
+    PagesGo(base, Globals::build_pages(base).address, 1, 6, 7);
     return r3;
   }
   r3 = ListCall(calls, kListCancelled, List(base), frame, 0x8219EF70);
   if (uint32_t(r3) != 0) {
     r3 = Sound(calls, frame, 0x8219EF80, 2);
-    PagesGo(base, Load(base, kBuildPages), 4, 5, kNone);
+    PagesGo(base, Globals::build_pages(base).address, 4, 5, kNone);
     return r3;
   }
   if (Load(base, List(base) + 28) == 0) {
     return r3;
   }
   r3 = Sound(calls, frame, 0x8219EFD0, 4);
-  PagesGo(base, Load(base, kBuildPages), 0, 4, kNone);
+  PagesGo(base, Globals::build_pages(base).address, 0, 4, kNone);
   return r3;
 }
 
@@ -280,11 +274,11 @@ uint64_t BuildBuildPage(uint8_t* base, uint32_t sp, const Calls& calls) {
       [&](uint32_t frame) { return BuildJumpStandA(base, frame, calls); },
       [&](uint32_t frame) { return BuildJumpStandB(base, frame, calls); },
       [&](uint32_t) {
-        // The selected build seen: its +36 = its +32.
+        // The selected build seen: its saved flags = its flags.
         const uint32_t list = List(base);
         const uint32_t position = race_screens::ListSelection(base, list) + Load(base, list + 4);
-        const uint32_t build = BuildAt(base, position);
-        Store(base, build + 36, Load(base, build + 32));
+        const schema::BuildRecord build(base, BuildAt(base, position));
+        build.set_saved_flags(build.flags());
       },
       calls);
 }

@@ -111,7 +111,7 @@ uint32_t FollowRoute(uint8_t* base, uint32_t out, uint32_t progress, uint32_t in
       Store(base, frame + 96 + k, Load(base, from + k));
     }
   }
-  const uint32_t e = index * kEntryBytes + progress;  // + 2188: the entry
+  const uint32_t e = index * kEntryBytes;  // entry `index`'s offset from entry 0
   const double zero = Lfs(base, kZero);
   const auto nonzero = [&](uint32_t at) {
     const int64_t v = S16(base, at);
@@ -119,24 +119,27 @@ uint32_t FollowRoute(uint8_t* base, uint32_t out, uint32_t progress, uint32_t in
     return double(float(double(v))) != zero;
   };
   if (nonzero(frame + 102) || nonzero(frame + 106)) {
-    Store(base, e + 3156, 1);
+    Store(base, p.e0_input_seen_address() + e, 1);
   }
   if (guest::LoadU8(base, vehicle + 2424) != 0) {
-    Store(base, e + 2968, Load(base, e + 2968) + 1);
+    const uint32_t ticks = p.e0_vehicle_byte_ticks_address() + e;
+    Store(base, ticks, Load(base, ticks) + 1);
   }
-  race_setup::RunningMeanAdd(base, e + 2980, double(Vehicle_GetSpeedKmh(base, vehicle)), 1);
+  race_setup::RunningMeanAdd(base, p.e0_mean_speed_address() + e,
+                             double(Vehicle_GetSpeedKmh(base, vehicle)), 1);
   {
-    double top = Lfs(base, e + 2988);
+    double top = Lfs(base, p.e0_top_speed_address() + e);
     const double kmh = double(Vehicle_GetSpeedKmh(base, vehicle));
     if (top < kmh) {
       top = double(Vehicle_GetSpeedKmh(base, vehicle));
     }
-    Stfs(base, e + 2988, top);
+    Stfs(base, p.e0_top_speed_address() + e, top);
   }
   {
     const double per_frame = double(va::VehicleDistancePerFrame(base, vehicle));
     const double km = Lfs(base, G::km_address());
-    Stfs(base, e + 3004, Fmadds(per_frame, km, Lfs(base, e + 3004)));
+    const uint32_t driven = p.e0_distance_km_address() + e;
+    Stfs(base, driven, Fmadds(per_frame, km, Lfs(base, driven)));
   }
   bool along = true;  // r26
   Store(base, frame + 80, Load(base, va::VehicleIdentity(vehicle) + 4));
@@ -254,19 +257,19 @@ uint32_t FollowRoute(uint8_t* base, uint32_t out, uint32_t progress, uint32_t in
     const double ahead = Lfs(base, vehicle + 6228);
     const uint32_t at = Load(base, frame + 80);
     Store(base, frame + 84, start);
-    Stfs(base, e + 3012, ahead);
+    Stfs(base, p.e0_route_distance_address() + e, ahead);
     const uint32_t first = guest::LoadU16(base, slot.sections_address());
     const int32_t n = int32_t(slot.section_count());
     guest::StoreU16(base, frame + 84, uint16_t(first));
     const double path = track_route::PathDistance(base, G::route_address(), Load(base, frame + 84),
                                                   at, slot.sections_address(), n, frame - 288);
-    const double distance = Fadds(path, Lfs(base, e + 3012));
-    Stfs(base, e + 3012, distance);
+    const double distance = Fadds(path, Lfs(base, p.e0_route_distance_address() + e));
+    Stfs(base, p.e0_route_distance_address() + e, distance);
     if (distance < zero) {
-      Stfs(base, e + 3012, zero);
+      Stfs(base, p.e0_route_distance_address() + e, zero);
     }
   } else {
-    Stfs(base, e + 3012, zero);
+    Stfs(base, p.e0_route_distance_address() + e, zero);
   }
   return Out(base, out, 0, 0);
 }
@@ -298,15 +301,16 @@ void RaceTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t fra
     if (Progress(base, p).entry_checks() & 0x4) {
       const uint32_t lap =
           Progress(base, p).lap_records_on() != 0 ? Progress(base, p).e0_lap_record() : 0;
-      const uint32_t record = lap * 76;
-      if (Load(base, record + p + 2268) != 0) {
+      const uint32_t record = lap * kLapRecordBytes;
+      if (Load(base, Progress(base, p).e0_lap_time_count_address() + record) != 0) {
         for (uint32_t k = 0;;) {
-          const uint32_t time = Load(base, p + record + 2208 + 4 * k);
+          const uint32_t time =
+              Load(base, Progress(base, p).e0_lap_times_address() + record + 4 * k);
           Store(base, frame + 80, time);
           Store(base, frame + 20, time);
           p = progress();
           k++;
-          if (!(k < Load(base, record + p + 2268))) {
+          if (!(k < Load(base, Progress(base, p).e0_lap_time_count_address() + record))) {
             break;
           }
         }

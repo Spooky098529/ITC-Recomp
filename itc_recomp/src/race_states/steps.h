@@ -8,6 +8,7 @@
 #include "guest.h"
 #include "race_world/race_world.h"
 #include "schema/game_modes.h"
+#include "schema/minimap.h"
 #include "schema/race_states.h"
 
 #include <bit>
@@ -16,9 +17,9 @@
 
 namespace race_states::steps {
 
-constexpr uint32_t kEntries = 2188;  // the results entries, 972 bytes each
-constexpr uint32_t kEntryBytes = 972;
-constexpr uint32_t kSlotBytes = 536;
+constexpr uint32_t kEntryBytes = 972;  // a results entry (the progress's +2188 + 972 i)
+constexpr uint32_t kLapRecordBytes = 76;  // a results entry's lap record (+20 + 76 i)
+constexpr uint32_t kRecordBytes = 3936;  // a racer record (the race data's +48 + 3936 i)
 
 inline uint32_t Load(uint8_t* base, uint32_t address) {
   return guest::LoadU32(base, address);
@@ -107,10 +108,6 @@ inline void Post(uint8_t* base, uint32_t dispatcher, uint32_t message) {
   entry.set_arg1(0);
 }
 
-// The race data's flags (+0x59AE4 of [0x826C5B2C]).
-inline uint32_t FlagsAddress(uint8_t* base) {
-  return schema::RaceStatesGlobals::race_data(base).flags_address();
-}
 // The race data's kind (+0xA3AF0).
 inline uint32_t Kind(uint8_t* base) {
   return schema::RaceStatesGlobals::race_data(base).kind();

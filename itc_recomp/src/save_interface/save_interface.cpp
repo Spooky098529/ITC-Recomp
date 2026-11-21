@@ -7,10 +7,13 @@
 #include "c_runtime/strings.h"
 #include "framework/framework.h"
 #include "guest.h"
+#include "schema/save_interface.h"
 
 namespace save_interface {
 
 namespace {
+
+using G = schema::SaveInterfaceGlobals;
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -31,7 +34,7 @@ void CopyBytes(uint8_t* base, uint32_t destination, uint32_t source) {
 // The interface's save devices, through its +12 (nullopt where a target
 // isn't ours).
 std::optional<uint32_t> Devices(uint8_t* base) {
-  const uint32_t interface = Load(base, kInterfaceGlobal);
+  const uint32_t interface = G::interface<schema::View>(base).address;
   if (VirtualTarget(base, interface, 12) != kAppDevices) {
     return std::nullopt;
   }
@@ -49,7 +52,7 @@ std::optional<uint32_t> DevicesWith(uint8_t* base, uint32_t offset, uint32_t tar
 
 // The interface's users, through its +8.
 std::optional<uint32_t> Users(uint8_t* base) {
-  const uint32_t interface = Load(base, kInterfaceGlobal);
+  const uint32_t interface = G::interface<schema::View>(base).address;
   if (VirtualTarget(base, interface, 8) != kAppUsers) {
     return std::nullopt;
   }
@@ -68,14 +71,16 @@ std::optional<uint64_t> RequestCommon(uint8_t* base, uint32_t devices, uint32_t 
     return 0;
   }
   const uint32_t offset = slot * 1000;
-  CopyDisplayName(base, Load(base, devices + 44) + offset + 504, request.display_name);
-  CopyBytes(base, Load(base, devices + 44) + offset + 760, request.file_name);
-  CopyBytes(base, Load(base, devices + 44) + offset + 802, request.path);
-  Store(base, Load(base, devices + 44) + offset + 932, request.data);
-  Store(base, Load(base, devices + 44) + offset + 936, request.size);
-  Store(base, Load(base, devices + 44) + offset + 940, thumbnail);
-  Store(base, Load(base, devices + 44) + offset + 944, thumbnail_size);
-  Store(base, Load(base, devices + 44) + offset + word, 1);
+  const schema::SaveDevices d(base, devices);
+  const auto slots = [&] { return d.slots<schema::View>().address; };
+  CopyDisplayName(base, slots() + offset + 504, request.display_name);
+  CopyBytes(base, slots() + offset + 760, request.file_name);
+  CopyBytes(base, slots() + offset + 802, request.path);
+  Store(base, slots() + offset + 932, request.data);
+  Store(base, slots() + offset + 936, request.size);
+  Store(base, slots() + offset + 940, thumbnail);
+  Store(base, slots() + offset + 944, thumbnail_size);
+  Store(base, slots() + offset + word, 1);
   return 1;
 }
 
@@ -110,14 +115,15 @@ uint32_t FrameworkUsers(uint8_t* base, uint32_t object) {
 
 uint32_t UsersCount(uint8_t* base, uint32_t users) {
   ITC_NATIVE_RUNNING("sub_82490B08 word +216");
-  return Load(base, users + 216);
+  return schema::SignedInUsers(base, users).count();
 }
 
 uint64_t UsersSignedIn(uint8_t* base, uint32_t users, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_820996D8 Users::SignedIn");
-  if (index < Load(base, users + 216)) {
-    const uint32_t user = Load(base, users + ((index + 50) << 2));
-    if (Load(base, uint32_t(users + uint64_t(user) * 40 + 8)) != 0) {
+  const schema::SignedInUsers u(base, users);
+  if (index < u.count()) {
+    const uint32_t user = Load(base, u.order_address() + (index << 2));
+    if (Load(base, uint32_t(u.users_address() + uint64_t(user) * 40 + 8)) != 0) {
       return user;
     }
   }
@@ -125,7 +131,7 @@ uint64_t UsersSignedIn(uint8_t* base, uint32_t users, uint32_t index) {
 }
 
 uint32_t SlotAddress(uint8_t* base, uint32_t devices, uint32_t slot) {
-  return Load(base, devices + 44) + slot * 1000;
+  return schema::SaveDevices(base, devices).slots<schema::View>().address + slot * 1000;
 }
 
 void SlotRequestDevice(uint8_t* base, uint32_t devices, uint32_t slot) {
@@ -171,7 +177,7 @@ uint64_t SlotPending(uint8_t* base, uint32_t devices, uint32_t slot) {
 
 void SetRootName(uint8_t* base, uint32_t devices, uint32_t name) {
   ITC_NATIVE_RUNNING("sub_820A5580 SaveDevices::SetRootName");
-  CopyBytes(base, devices + 16, name);
+  CopyBytes(base, schema::SaveDevices(base, devices).root_name_address(), name);
 }
 
 std::optional<uint64_t> SlotRequestSave(uint8_t* base, uint32_t devices, uint32_t slot,
@@ -216,9 +222,9 @@ std::optional<uint32_t> Init(uint8_t* base, uint32_t interface) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_8209FFB8 SaveInterface::Init");
-  Store(base, kInterfaceGlobal, interface);
+  G::set_interface(base, interface);
   const uint32_t devices = *AppDevices(base, interface);
-  SetRootName(base, devices, kRootName);
+  SetRootName(base, devices, G::root_name_address());
   return devices;
 }
 

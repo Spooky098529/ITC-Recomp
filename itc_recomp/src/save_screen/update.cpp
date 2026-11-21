@@ -32,17 +32,17 @@ uint64_t Update(uint8_t* base, uint32_t sp, const Calls& calls) {
   for (uint32_t i = 0; i < 7; i++) {
     Store(base, f.frame + 96 + 4 * i, kSteps[i]);
   }
-  uint32_t pages = Pages(base);
-  const int32_t step = int32_t(Load(base, pages + 12));
+  auto pages = Pages(base);
+  const int32_t step = int32_t(pages.step());
   if (step == -1) {
-    if (int32_t(Load(base, Data(base) + 16)) != -1) {
+    if (int32_t(Data(base).dialog_state()) != -1) {
       f.Call(kRun, 0x821A65F0, movie, 0);
     }
     return f.r3;
   }
   if (step >= 0) {
     const uint32_t function = Load(base, f.frame + 96 + 4 * uint32_t(step));
-    const uint64_t args[8] = {pages + 24,
+    const uint64_t args[8] = {pages.step_started_address(),
                               Extended(kSteps[0]),
                               Extended(kSteps[1]),
                               Extended(kSteps[2]),
@@ -56,16 +56,16 @@ uint64_t Update(uint8_t* base, uint32_t sp, const Calls& calls) {
       return f.r3;
     }
   }
-  const uint32_t queued = Load(base, pages + 16);
+  const uint32_t queued = pages.queued_step();
   if (int32_t(queued) == -1) {
-    Store(base, pages + 0, Load(base, pages + 4));
-    Store(base, pages + 12, kNone);
+    pages.set_page(pages.next_page());
+    pages.set_step(kNone);
   } else {
-    Store(base, pages + 16, kNone);
-    Store(base, pages + 20, 0);
-    Store(base, pages + 12, queued);
+    pages.set_queued_step(kNone);
+    pages.set_unknown_20(0);
+    pages.set_step(queued);
   }
-  Store(base, pages + 24, 0);
+  pages.set_step_started(0);
   return f.r3;
 }
 
@@ -74,21 +74,21 @@ uint64_t Draw(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp, const
   Fn f(base, sp, 368, calls, Extended(0x821A2C98));
   Store(base, sp + 20, machine);
   Store(base, sp + 28, mode);
-  uint32_t pages = Pages(base);
-  const int32_t page = int32_t(Load(base, pages + 0));
-  const bool stepping = page == -1 && int32_t(Load(base, pages + 12)) != -1;
-  if (!stepping && int32_t(Load(base, Data(base) + 28)) != 0 && page != 26 && page != 4 &&
+  auto pages = Pages(base);
+  const int32_t page = int32_t(pages.page());
+  const bool stepping = page == -1 && int32_t(pages.step()) != -1;
+  if (!stepping && int32_t(Data(base).cancel()) != 0 && page != 26 && page != 4 &&
       page != 9 && page != 16 && page != 21 && page != 25) {
-    const uint32_t kind = Load(base, Data(base) + 36);
+    const uint32_t kind = Data(base).kind();
     if (kind == 0) {
       Go(base, 4, 2, kNone);
     } else if (kind == 1) {
       Go(base, 9, 2, kNone);
     } else if (kind < 6) {
-      Store(base, Data(base) + 4, 0);
+      Data(base).set_answer(0);
       Go(base, 16, 2, kNone);
     } else if (kind == 6) {
-      if (int32_t(Load(base, Data(base) + 16)) == -1) {
+      if (int32_t(Data(base).dialog_state()) == -1) {
         Jump(base, 21);
       } else {
         Go(base, 21, 2, kNone);
@@ -98,7 +98,7 @@ uint64_t Draw(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp, const
     }
   }
   pages = Pages(base);
-  const int32_t shown = int32_t(Load(base, pages + 0));
+  const int32_t shown = int32_t(pages.page());
   Store(base, f.frame + 80, 0x821A0000);
   for (uint32_t i = 0; i < 27; i++) {
     Store(base, f.frame + 96 + 4 * i, kPageTable[i]);
@@ -111,11 +111,11 @@ uint64_t Draw(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp, const
                               Extended(kPageTable[25]),    f.frame + 96};
     f.r3 = calls.CallArgs(function, f.frame, 0x821A6DD0, args);
   }
-  const uint32_t next = Load(base, Data(base) + 32);
+  const uint32_t next = Data(base).next_state();
   if (int32_t(next) != 21) {
-    Store(base, Load(base, sp + 20) + kMachineState, next);
-    Store(base, Data(base) + 32, 21);
-    if (Load(base, Data(base) + 36) < 2) {
+    Machine(base, Load(base, sp + 20)).set_state(next);
+    Data(base).set_next_state(21);
+    if (Data(base).kind() < 2) {
       f.Call(kSaveBuffersDestroy, 0x821A6E0C, f.r3);
     }
   }

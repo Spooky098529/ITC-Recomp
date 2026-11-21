@@ -10,6 +10,7 @@
 #include "guest.h"
 #include "load_poll/load_poll.h"
 #include "native/buffers.h"
+#include "schema/stand_models.h"
 #include "scene_models/apply.h"
 #include "scene_models/scene_models.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -19,6 +20,7 @@ namespace stand_models {
 namespace {
 
 using namespace car_scene_draw::ops;
+using Globals = schema::StandModelsGlobals;
 
 constexpr uint32_t kSetUpB = 0x820C5B28;
 constexpr uint32_t kApplyRecord = 0x820DA758;
@@ -65,8 +67,9 @@ uint64_t ApplyRecord(uint8_t* base, const GuestCall& call, uint32_t model, uint3
 }  // namespace
 
 uint32_t StageModel(uint8_t* base, uint32_t holder) {
-  const uint32_t stage = Load(base, holder);
-  return vehicle_accessors::ScenePoolsGetB(base, Load(base, kScene), 7, Load(base, stage + 8));
+  const schema::GarageStage stage(base, Load(base, holder));
+  return vehicle_accessors::ScenePoolsGetB(base, Globals::scene<schema::View>(base).address, 7,
+                                           stage.model_index());
 }
 
 uint64_t MakeModel(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t block,
@@ -74,8 +77,11 @@ uint64_t MakeModel(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t b
   ITC_NATIVE_RUNNING("sub_8217FCB0 GarageStage::MakeModel");
   const uint32_t frame = Frame(base, stack, 4384);
   const uint32_t holder = uint32_t(r3);
-  const uint32_t scene = Load(base, kScene);
-  if (Load(base, Load(base, holder) + 16) != 0) {
+  // The holder block's +0 (the stage) loaded again for each access, as the
+  // original.
+  const auto stage = [&] { return schema::GarageStage(base, Load(base, holder)); };
+  const uint32_t scene = Globals::scene<schema::View>(base).address;
+  if (stage().model_claimed() != 0) {
     return r3;
   }
   const uint32_t record = frame + 80;
@@ -83,14 +89,14 @@ uint64_t MakeModel(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t b
   scene_models::SceneModelRecordReset(base, record);
   Store(base, frame + 96, block);
   const int32_t index = vehicle_accessors::ScenePoolsClaimB(base, scene, 7);
-  Store(base, Load(base, holder) + 8, uint32_t(index));
-  const uint32_t at = Load(base, Load(base, holder) + 8);
+  stage().set_model_index(uint32_t(index));
+  const uint32_t at = stage().model_index();
   const uint32_t model =
       uint32_t(call(kSetUpB, {scene, 7, at, record}, frame, 0x8217FD2C));
   Store(base, model + 4296, word);
-  Store(base, Load(base, holder) + 6056, word);
-  Store(base, Load(base, holder) + 16, 1);
-  Store(base, Load(base, kHolder) + 20, 1);
+  stage().set_draw_word(word);
+  stage().set_model_claimed(1);
+  Store(base, Globals::stand_holder(base).address + 20, 1);
   return model;
 }
 
@@ -518,7 +524,8 @@ uint64_t TuningScreenSetTireGrade(uint8_t* base, const GuestCall& call, uint64_t
   // The table read unchecked, as the original (the index's low 30 bits
   // times 4, wrapping).
   const uint32_t grade = Load(base, frame + 80 + (index << 2));
-  return SetTireGrade(base, call, Load(base, Load(base, kHolder)), which, grade, frame);
+  return SetTireGrade(base, call, Load(base, Globals::stand_holder(base).address), which, grade,
+                      frame);
 }
 
 uint32_t SecondWheelsPending(uint8_t* base, uint32_t holder, uint32_t stack) {
@@ -610,7 +617,7 @@ uint64_t StepSecondWheels(uint8_t* base, const GuestCall& call, load_poll::Calls
                           uint32_t screen, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_821CC890 TuningScreen::StepSecondWheels");
   const uint32_t frame = Frame(base, stack, 112);
-  const auto holder = [&] { return Load(base, Load(base, kHolder)); };
+  const auto holder = [&] { return Load(base, Globals::stand_holder(base).address); };
   if (SecondWheelsPending(base, holder(), frame) == 0 &&
       int32_t(Load(base, screen + 25244)) == 1) {
     const uint64_t r3 = AddSecondWheels(base, call, holder(), frame);

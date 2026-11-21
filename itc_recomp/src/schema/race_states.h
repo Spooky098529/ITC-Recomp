@@ -326,6 +326,8 @@ struct RaceData : View {
   uint32_t current_stage() const { return guest::LoadU32(base, address + 366916); }
   void set_current_stage(uint32_t v) const { guest::StoreU32(base, address + 366916, v); }
   uint32_t current_stage_address() const { return address + 366916; }
+  // the stage list's course record (+812, 408 bytes; CourseTimeList)
+  uint32_t stages_course_record_address() const { return address + 366924; }
   // the stage list's course record (+812)'s count (+48; CourseTimeList)
   uint16_t stages_course_record_count() const { return guest::LoadU16(base, address + 366972); }
   void set_stages_course_record_count(uint16_t v) const { guest::StoreU16(base, address + 366972, v); }
@@ -558,10 +560,30 @@ struct RaceProgress : View {
   uint32_t e0_time() const { return guest::LoadU32(base, address + 2204); }
   void set_e0_time(uint32_t v) const { guest::StoreU32(base, address + 2204, v); }
   uint32_t e0_time_address() const { return address + 2204; }
+  // entry 0's first lap record (76 bytes; copied as the course record's best, RaceStates::OnRaceEnd)
+  uint32_t e0_first_lap_record_address() const { return address + 2208; }
+  // entry 0's first lap record (76 bytes each from E +20, the one at E +832 when +6096 is set): its 15 lap times (packed times)
+  uint32_t e0_lap_times_address() const { return address + 2208; }
+  // entry 0's first lap record's +60: the lap times' count (RaceProgress::CheckLap)
+  uint32_t e0_lap_time_count() const { return guest::LoadU32(base, address + 2268); }
+  void set_e0_lap_time_count(uint32_t v) const { guest::StoreU32(base, address + 2268, v); }
+  uint32_t e0_lap_time_count_address() const { return address + 2268; }
   // entry 0's +84: its first lap record's +64 (RaceStates::OnRaceEnd)
   uint32_t e0_lap_record_64() const { return guest::LoadU32(base, address + 2272); }
   void set_e0_lap_record_64(uint32_t v) const { guest::StoreU32(base, address + 2272, v); }
   uint32_t e0_lap_record_64_address() const { return address + 2272; }
+  // entry 0's first lap record's +68: its track hits (at most 999, RaceProgress::CountHits)
+  uint32_t e0_lap_track_hits() const { return guest::LoadU32(base, address + 2276); }
+  void set_e0_lap_track_hits(uint32_t v) const { guest::StoreU32(base, address + 2276, v); }
+  uint32_t e0_lap_track_hits_address() const { return address + 2276; }
+  // entry 0's first lap record's +72: its car hits (at most 999)
+  uint32_t e0_lap_car_hits() const { return guest::LoadU32(base, address + 2280); }
+  void set_e0_lap_car_hits(uint32_t v) const { guest::StoreU32(base, address + 2280, v); }
+  uint32_t e0_lap_car_hits_address() const { return address + 2280; }
+  // entry 0's +780: ticks with its vehicle's byte +2424 set (RaceProgress::FollowRoute)
+  uint32_t e0_vehicle_byte_ticks() const { return guest::LoadU32(base, address + 2968); }
+  void set_e0_vehicle_byte_ticks(uint32_t v) const { guest::StoreU32(base, address + 2968, v); }
+  uint32_t e0_vehicle_byte_ticks_address() const { return address + 2968; }
   // entry 0's SP (+784; probably spirit points, 0 is out)
   uint32_t e0_sp() const { return guest::LoadU32(base, address + 2972); }
   void set_e0_sp(uint32_t v) const { guest::StoreU32(base, address + 2972, v); }
@@ -578,6 +600,14 @@ struct RaceProgress : View {
   uint32_t e0_mean_count() const { return guest::LoadU32(base, address + 2984); }
   void set_e0_mean_count(uint32_t v) const { guest::StoreU32(base, address + 2984, v); }
   uint32_t e0_mean_count_address() const { return address + 2984; }
+  // entry 0's +800: its top speed in km/h (RaceProgress::FollowRoute)
+  float e0_top_speed() const { return guest::LoadFloat(base, address + 2988); }
+  void set_e0_top_speed(float v) const { guest::StoreFloat(base, address + 2988, v); }
+  uint32_t e0_top_speed_address() const { return address + 2988; }
+  // entry 0's +804: 1 after a hit of at least [0x82009814] (RaceProgress::CountHits)
+  uint32_t e0_strong_hit() const { return guest::LoadU32(base, address + 2992); }
+  void set_e0_strong_hit(uint32_t v) const { guest::StoreU32(base, address + 2992, v); }
+  uint32_t e0_strong_hit_address() const { return address + 2992; }
   // entry 0's track hits (+808)
   uint32_t e0_track_hits() const { return guest::LoadU32(base, address + 2996); }
   void set_e0_track_hits(uint32_t v) const { guest::StoreU32(base, address + 2996, v); }
@@ -586,6 +616,10 @@ struct RaceProgress : View {
   uint32_t e0_car_hits() const { return guest::LoadU32(base, address + 3000); }
   void set_e0_car_hits(uint32_t v) const { guest::StoreU32(base, address + 3000, v); }
   uint32_t e0_car_hits_address() const { return address + 3000; }
+  // entry 0's +816: the distance driven in km (RaceProgress::FollowRoute)
+  float e0_distance_km() const { return guest::LoadFloat(base, address + 3004); }
+  void set_e0_distance_km(float v) const { guest::StoreFloat(base, address + 3004, v); }
+  uint32_t e0_distance_km_address() const { return address + 3004; }
   // entry 0's distance along the stage's route (+824, the place's key)
   float e0_route_distance() const { return guest::LoadFloat(base, address + 3012); }
   void set_e0_route_distance(float v) const { guest::StoreFloat(base, address + 3012, v); }
@@ -594,6 +628,10 @@ struct RaceProgress : View {
   uint32_t e0_lap_record() const { return guest::LoadU32(base, address + 3020); }
   void set_e0_lap_record(uint32_t v) const { guest::StoreU32(base, address + 3020, v); }
   uint32_t e0_lap_record_address() const { return address + 3020; }
+  // entry 0's +968: 1 once its input record's halfword +6 or +10 was nonzero (RaceProgress::FollowRoute)
+  uint32_t e0_input_seen() const { return guest::LoadU32(base, address + 3156); }
+  void set_e0_input_seen(uint32_t v) const { guest::StoreU32(base, address + 3156, v); }
+  uint32_t e0_input_seen_address() const { return address + 3156; }
   // entry 1's distance along the route (RaceManager::StreamTwoPlayers)
   float e1_route_distance() const { return guest::LoadFloat(base, address + 3984); }
   void set_e1_route_distance(float v) const { guest::StoreFloat(base, address + 3984, v); }

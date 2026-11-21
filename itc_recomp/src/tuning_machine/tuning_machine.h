@@ -30,7 +30,10 @@ namespace tuning_machine {
 
 using Calls = race_hud_object::Calls;
 
-// The machine's (the screen's) words.
+// The machine's (the screen's) words. The hand ports name them by
+// schema::TuningMachineScreen (schema/tuning_machine.h); these offsets stay
+// for src/harnesses/tuning_machine.cpp (not built), and kImages for the
+// decal images' address.
 constexpr uint32_t kMachineState = 9604;
 constexpr uint32_t kMachineLoaded = 9608;
 constexpr uint32_t kMachineReenter = 9612;

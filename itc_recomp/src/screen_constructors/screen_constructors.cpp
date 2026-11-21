@@ -7,6 +7,7 @@
 #include "base/log.h"
 #include "boot_mode/boot_mode.h"
 #include "guest.h"
+#include "schema/screen_constructors.h"
 
 namespace screen_constructors {
 
@@ -180,10 +181,6 @@ void PanelScreen(uint8_t* base, uint32_t screen, uint32_t sp, const New& new_pan
   Store(base, screen + 11724, 46);
 }
 
-// Type7ListScreen's items' records (28 bytes; +0 a count, +12 and +16 bit
-// numbers).
-constexpr uint32_t kType7Records = 0x826370A0;
-constexpr uint32_t kType7RecordBytes = 28;
 // The empty base many classes share (as ListNode's in archive.md).
 constexpr uint32_t kEmptyBaseVtable = 0x82010B5C;
 
@@ -193,8 +190,9 @@ constexpr uint32_t kEmptyBaseVtable = 0x82010B5C;
 
 void NodeBase(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82258FB0 NodeBase::NodeBase");
-  Store(base, object + 4, 0);
-  Store(base, object + 0, kEmptyBaseVtable);
+  const schema::NodeBase node(base, object);
+  node.set_unknown_4(0);
+  node.set_vtable(kEmptyBaseVtable);
 }
 
 void PanelGroupBase(uint8_t* base, uint32_t group) {
@@ -528,9 +526,10 @@ void Type7ListScreen(uint8_t* base, uint32_t screen) {
   Store(base, screen + 9804, 1);
   Store(base, screen + 9768, 3);
   Store(base, screen + 9748, 0);
-  Store(base, table + 296, 6);
+  Store(base, schema::ListColorNodeTable(base, table).children_address(), 6);
   for (uint32_t i = 1; i < 4; i++) {
-    Store(base, Load(base, screen + 9672) + 296 + 4 * i, 6 + i);  // +300 to +308: 7 to 9
+    const schema::ListColorNodeTable t(base, Load(base, screen + 9672));
+    Store(base, t.children_address() + 4 * i, 6 + i);  // +300 to +308: 7 to 9
   }
   Store(base, screen + 9784, 2);
   Store(base, screen + 9788, 1);
@@ -540,13 +539,15 @@ void Type7ListScreen(uint8_t* base, uint32_t screen) {
     const uint32_t item = screen + 10448 + 4 * i;
     Store(base, item, 48 + i);
     Store(base, item + 140, 1 + i);
-    const uint32_t record = kType7Records + kType7RecordBytes * i;
-    const int32_t count = int32_t(Load(base, record));
+    const schema::Type7ListRecord record(
+        base, schema::ScreenConstructorsGlobals::type7_list_records_address() +
+                  schema::Type7ListRecord::kSize * i);
+    const int32_t count = record.count();
     uint32_t mask = 0;
     if (count >= 2) {
-      mask = Bit(Load(base, record + 16)) | Bit(Load(base, record + 12));
+      mask = Bit(record.bit_b()) | Bit(record.bit_a());
     } else if (count != 0) {
-      mask = Bit(Load(base, record + 12));
+      mask = Bit(record.bit_a());
     }
     Store(base, item + 296, mask);
   }
@@ -618,23 +619,25 @@ void Type6ListScreen(uint8_t* base, uint32_t screen) {
     Store(base, screen + 9936 + 4 * i, 10 + i);  // +9936 to +9964: 10 to 17
   }
   // The node table's words, each through [+9672] read again.
-  auto table = [&](uint32_t offset, uint32_t value) {
-    Store(base, Load(base, screen + 9672) + offset, value);
-  };
-  table(8, 10);
-  table(12, 9);
+  auto table = [&] { return schema::ListNodeTable(base, Load(base, screen + 9672)); };
+  table().set_node_set_a(10);
+  table().set_node_set_b(9);
   for (uint32_t i = 0; i < 4; i++) {
-    table(296 + 4 * i, 6 + i);  // +296 to +308: 6 to 9
+    const auto t = table();
+    Store(base, t.children_address() + 4 * i, 6 + i);  // +296 to +308: 6 to 9
   }
   for (uint32_t i = 0; i < 27; i++) {
-    table(156 + 4 * i, 1 + i);  // +156 to +260: 1 to 27
-    table(16 + 4 * i, 46 + i);  // +16 to +120: 46 to 72
+    const auto t = table();
+    Store(base, t.item_nodes_address() + 4 * i, 1 + i);  // +156 to +260: 1 to 27
+    const auto u = table();
+    Store(base, u.item_anims_address() + 4 * i, 46 + i);  // +16 to +120: 46 to 72
   }
   for (uint32_t i = 0; i < 8; i++) {
-    table(124 + 4 * i, 77 + i);  // +124 to +152: 77 to 84
+    const auto t = table();
+    Store(base, t.more_anims_address() + 4 * i, 77 + i);  // +124 to +152: 77 to 84
   }
-  table(420, 6);
-  table(424, 55);
+  table().set_node_base_a(6);
+  table().set_node_base_b(55);
 }
 
 uint32_t NodeScreen(uint8_t* base, uint32_t screen, uint32_t sp) {

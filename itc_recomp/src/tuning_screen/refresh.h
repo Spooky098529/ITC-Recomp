@@ -13,6 +13,7 @@
 
 #pragma once
 
+#include "schema/tuning_screen.h"
 #include "tuning_screen/tuning_screen.h"
 
 #include <cstdint>
@@ -41,11 +42,10 @@ struct Context {
   uint32_t movie;    // r30: movie 2
   std::optional<double>* f1;
 
-  uint32_t Word(uint32_t offset) const;
-  uint32_t Byte(uint32_t offset) const;
-  int32_t State() const { return int32_t(Word(kState)); }
-  int32_t Category() const { return int32_t(Word(kCategory)); }
-  uint32_t Item() const { return Byte(kItem); }
+  schema::TuningScreen Screen() const { return schema::TuningScreen(base, screen); }
+  int32_t State() const { return int32_t(Screen().state()); }
+  int32_t Category() const { return int32_t(Screen().category()); }
+  uint32_t Item() const { return uint32_t(Screen().item()); }
 
   // UiMovie::FindNode (sub_8211A578) and Child, the node.
   uint32_t Node(uint32_t sub_scene, uint32_t child) const;

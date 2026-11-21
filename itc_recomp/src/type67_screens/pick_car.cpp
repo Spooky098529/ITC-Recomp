@@ -7,6 +7,8 @@
 #include "c_runtime/strings.h"
 #include "career/career.h"
 #include "guest.h"
+#include "schema/car_list.h"
+#include "schema/type67_screens.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 namespace type67_screens {
@@ -17,6 +19,7 @@ using guest::LoadU16;
 using guest::LoadU32;
 using guest::StoreU16;
 using guest::StoreU32;
+using T67PS = schema::Type67PanelScreen;
 
 constexpr uint32_t kGarageCarReset = 0x82110448;
 constexpr uint32_t kMemcpy = 0x825A7410;
@@ -32,7 +35,7 @@ uint64_t PickCar(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, const Cal
   // The car list's slot 18 (+72): its selection record (the list + 208).
   auto selection = [&](uint32_t lr) {
     return uint32_t(
-        Slot(base, LoadU32(base, screen + 9644), 72, std::nullopt, frame, lr, calls));
+        Slot(base, T67PS(base, screen).car_list().address, 72, std::nullopt, frame, lr, calls));
   };
   if (int32_t(LoadU32(base, selection(0x82240630 - delta) + 28)) == 2) {
     // The garage: the save data's car at the selection's step.
@@ -73,12 +76,12 @@ uint64_t PickCar(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, const Cal
   }
   StoreU32(base, car + 1972, LoadU32(base, selection(0x822407B0 - delta) + 28));
   const uint32_t a = selection(0x822407CC - delta);
-  const uint64_t last = Slot(base, LoadU32(base, screen + 9644), 72, std::nullopt, frame,
+  const uint64_t last = Slot(base, T67PS(base, screen).car_list().address, 72, std::nullopt, frame,
                              0x822407E8 - delta, calls);
   const uint32_t b = uint32_t(last);
   StoreU32(base, car + 1980, uint32_t(int32_t(int16_t(LoadU16(base, car + 0)))));
   StoreU32(base, car + 1976, LoadU32(base, b + 32) + LoadU32(base, a + 36));
-  StoreU32(base, screen + 9608, 9);
+  T67PS(base, screen).set_state(9);
   Post(base, uint32_t(r4), message);
   return last;
 }

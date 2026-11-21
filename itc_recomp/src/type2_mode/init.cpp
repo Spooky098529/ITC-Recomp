@@ -9,6 +9,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/type2_mode.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 namespace type2_mode {
@@ -17,6 +18,8 @@ namespace {
 
 using guest::LoadU32;
 using guest::StoreU32;
+using G = schema::Type2ModeGlobals;
+using Machine = schema::Type2ScreenMachine;
 
 // The machines in the order the Init sets them up: their Init, their
 // offset in the block and the call's return address.
@@ -50,8 +53,6 @@ constexpr uint32_t kAdded[] = {0,       9640,    19792,   56624,   0x102D8, 0x12
 constexpr uint32_t kOpened[] = {0x12880, 0x14E28, 0x173D0, 0x19978, 0x1BF20,
                                 0x23018, 0x1E4C8, 0x20A70, 0x255C0};
 
-constexpr uint32_t kStringTable = 0x826C5C34;
-constexpr uint32_t kFadesPasses = 0x82001BEC;
 constexpr uint32_t kScreenFadesFadeIn = 0x8209D038;
 
 }  // namespace
@@ -61,26 +62,27 @@ uint64_t Init(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls) {
   const uint32_t frame = sp - kInitFrame;
   StoreU32(base, frame, sp);
   StoreU32(base, sp + 20, mode);
-  auto block = [&] { return LoadU32(base, mode + kBlock); };
+  const schema::ModeType2 m(base, mode);
+  auto block = [&] { return m.block().address; };
   calls.Call(kScreenStart, frame, 0x82197290, mode);
   const uint64_t strings =
-      calls.Call(kStringsLoad, frame, 0x821972A4, LoadU32(base, kStringTable), 0x100BB);
+      calls.Call(kStringsLoad, frame, 0x821972A4, G::string_table(base), 0x100BB);
   calls.Call(kArchiveWaitIdle, frame, 0x821972A8, strings, 0x100BB);
   calls.Call(kStandSceneCreate, frame, 0x821972B0, 3);
-  const uint64_t allocated = calls.Call(kVirtualAlloc, frame, 0x821972C8, 0, kBlockBytes, 4096, 4);
-  StoreU32(base, mode + kBlock, uint32_t(allocated));
-  for (const Member& m : kMembers) {
+  const uint64_t allocated =
+      calls.Call(kVirtualAlloc, frame, 0x821972C8, 0, schema::Type2ModeBlock::kSize, 4096, 4);
+  m.set_block(uint32_t(allocated));
+  for (const Member& member : kMembers) {
     // The first from VirtualAlloc's 64-bit r3, the others from the block's
     // word.
-    const uint64_t object = m.offset == 0 ? allocated : uint64_t(block()) + m.offset;
-    calls.Call(m.init, frame, m.lr, object);
+    const uint64_t object = member.offset == 0 ? allocated : uint64_t(block()) + member.offset;
+    calls.Call(member.init, frame, member.lr, object);
   }
-  calls.Call(kScreenFadesFadeIn, frame, 0x821973E0, LoadU32(base, kFadesPasses), 0, 0, 0);
-  const uint32_t dispatcher = mode + kDispatcher;
+  calls.Call(kScreenFadesFadeIn, frame, 0x821973E0, G::fade_in_passes(base), 0, 0, 0);
   for (const uint32_t offset : kAdded) {
-    const uint32_t count = LoadU32(base, dispatcher + 200);
-    StoreU32(base, dispatcher + 200, count + 1);
-    StoreU32(base, dispatcher + (count << 2), block() + offset);
+    const uint32_t count = m.handler_count();
+    m.set_handler_count(count + 1);
+    StoreU32(base, m.handlers_address() + (count << 2), block() + offset);
   }
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   int32_t day = int32_t(LoadU32(base, save + 6100));
@@ -91,25 +93,25 @@ uint64_t Init(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls) {
   if (day == 0) {
     calls.Call(kCareerNextDay, frame, 0x82197598, save);
   }
-  uint32_t before = LoadU32(base, kModeBefore);
+  uint32_t before = G::mode_before(base);
   if (before != 4) {
     const int32_t again = int32_t(LoadU32(base, save + 6100));
     if (again <= 999 && again == 1) {
       calls.Call(kCareerNextDay, frame, 0x821975C4, save);
-      before = LoadU32(base, kModeBefore);
+      before = G::mode_before(base);
     }
   }
   uint32_t first = 0;
   if (garage_count <= 0) {
     first = 4;
   } else if (before == 1) {
-    const uint32_t race_mode = LoadU32(base, LoadU32(base, kRaceData) + 0xA3AF4);
+    const uint32_t race_mode = LoadU32(base, G::race_data(base) + 0xA3AF4);
     if (race_mode == 0 || race_mode == 1) {
       first = 3;
     }
   }
-  StoreU32(base, block() + kFirstShown, first);
-  StoreU32(base, block() + kShown, first);
+  m.block().set_first_shown(first);
+  m.block().set_shown(first);
   // The frame's words the first four machines' +9612 and +9616 are copied
   // from (+100 the spec sheet's offset, not read).
   StoreU32(base, frame + 80, 0);
@@ -119,35 +121,38 @@ uint64_t Init(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls) {
   StoreU32(base, frame + 84, 1);
   StoreU32(base, frame + 92, 1);
   StoreU32(base, frame + 104, 1);
-  StoreU32(base, block() + 9612, 1);
-  StoreU32(base, block() + 9616, LoadU32(base, frame + 80));
-  StoreU32(base, block() + 19252, LoadU32(base, frame + 84));
-  StoreU32(base, block() + 19256, LoadU32(base, frame + 88));
-  StoreU32(base, block() + 29404, LoadU32(base, frame + 92));
-  StoreU32(base, block() + 29408, LoadU32(base, frame + 96));
-  StoreU32(base, block() + 56624 + 9612, LoadU32(base, frame + 104));
-  StoreU32(base, block() + 56624 + 9616, 0);
-  StoreU32(base, block() + 0x102D8 + 9616, 0);
-  StoreU32(base, block() + 0x102D8 + 9612, 1);
+  // Each machine's words through a view at block() + its offset (the
+  // block's word read again for each store, as the original does).
+  auto machine = [&](uint32_t offset) { return Machine(base, block() + offset); };
+  m.block().set_hub_reenter(1);
+  m.block().set_hub_delete_movie(LoadU32(base, frame + 80));
+  machine(9640).set_reenter(LoadU32(base, frame + 84));
+  machine(9640).set_delete_movie(LoadU32(base, frame + 88));
+  machine(19792).set_reenter(LoadU32(base, frame + 92));
+  machine(19792).set_delete_movie(LoadU32(base, frame + 96));
+  machine(56624).set_reenter(LoadU32(base, frame + 104));
+  machine(56624).set_delete_movie(0);
+  machine(0x102D8).set_delete_movie(0);
+  machine(0x102D8).set_reenter(1);
   for (const uint32_t offset : kOpened) {
-    StoreU32(base, block() + offset + 9612, 1);
-    StoreU32(base, block() + offset + 9616, 0);
+    machine(offset).set_reenter(1);
+    machine(offset).set_delete_movie(0);
   }
   const uint64_t r3 = calls.Call(kLoadingShow, frame, 0x8219779C, 1, 0, ~uint64_t(0));
   // The delegate: WaitForLoads through Mode::Slot9Thunk.
   StoreU32(base, frame + 108, 0);
   StoreU32(base, frame + 104, kSlot9Thunk);
-  const uint32_t delegate = mode + 8;
+  const uint32_t delegate = m.delegate_vtable_address();
   uint32_t holder = 0;
   if (delegate != 0) {
     holder = delegate;
     const uint32_t function = LoadU32(base, frame + 104), adjustment = LoadU32(base, frame + 108);
-    StoreU32(base, delegate + 4, mode);
-    StoreU32(base, delegate + 8, function);
-    StoreU32(base, delegate + 12, adjustment);
-    StoreU32(base, delegate + 0, kDelegateVtable);
+    m.set_delegate_object(mode);
+    m.set_delegate_function(function);
+    m.set_delegate_adjustment(adjustment);
+    m.set_delegate_vtable(kDelegateVtable);
   }
-  StoreU32(base, mode + 4, holder);
+  m.set_delegate_ptr(holder);
   return r3;
 }
 

@@ -26,17 +26,13 @@ namespace type2_screens {
 
 using Calls = race_hud_object::Calls;
 
-// The machines' words.
+// The machines' words: the views of schema/type2_screens.h (Type2Hub,
+// SpecSheet, BuildScreen, PlateEditor). Screen::LeaveToHub's machine, any
+// of the four, keeps its state word as an offset.
 constexpr uint32_t kMachineState = 9604;
-constexpr uint32_t kMachineLoaded = 9608;
-constexpr uint32_t kMachineReenter = 9612;
-constexpr uint32_t kMachineDelete = 9616;
 
-// The license plate editor's globals: the page object (28 bytes), the menu
-// list (72) and the data (76).
-constexpr uint32_t kPlatePages = 0x826D8430;
-constexpr uint32_t kPlateList = 0x826D8434;
-constexpr uint32_t kPlateData = 0x826D8438;
+// The license plate editor's globals (the page object, the menu list and
+// the data): schema::Type2ScreensGlobals' plate_*. Its movie:
 constexpr uint32_t kPlateMovie = 26;
 
 // The callees by address.
@@ -66,19 +62,10 @@ constexpr uint32_t kEmpty = 0x82106540;  // the empty shared function
 constexpr uint32_t kMemset = 0x825A71D0;
 constexpr uint32_t kMenuListRelease = 0x8220BBB0;
 
-// The spec sheet's globals: the page object (28 bytes), the menu (68) and
-// the data (1,968).
-constexpr uint32_t kSheetPages = 0x826D8464;
-constexpr uint32_t kSheetMenu = 0x826D8468;
-constexpr uint32_t kSheetData = 0x826D846C;
+// The spec sheet's globals (the page object, the menu and the data) and the
+// build screen's (the transition machine, the two menu lists and the screen
+// data): schema::Type2ScreensGlobals' sheet_* and build_*. Their movies:
 constexpr uint32_t kSheetMovie = 9;
-// The build screen's globals (build_screen.h's): the transition machine
-// (28 bytes), the two menu lists (72 each) and the screen data (0x3266C).
-constexpr uint32_t kBuildPages = 0x826D843C;
-constexpr uint32_t kBuildList = 0x826D8440;
-constexpr uint32_t kBuildGroupList = 0x826D8444;
-constexpr uint32_t kBuildScreen = 0x826D8448;
-constexpr uint32_t kBuildScreenBytes = 0x3266C;
 constexpr uint32_t kBuildMovie = 6;
 
 // Posts the message (id, 0, 0) on `mode`'s ring (+204: its count +600,
@@ -352,13 +339,9 @@ uint64_t BuildUpdatePage(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp,
 
 // --- The hub's handlers and helpers (hub.cpp) ---
 //
-// The hub's globals: the page object (28 bytes), the menu (68), the data
-// (asked for 68 bytes, used up to +447: VirtualAlloc gives a page) and the
-// load counter; its movie 0.
-constexpr uint32_t kHubPages = 0x826D8410;
-constexpr uint32_t kHubMenu = 0x826D8414;
-constexpr uint32_t kHubData = 0x826D8418;
-constexpr uint32_t kHubCounter = 0x826D841C;
+// The hub's globals (the page object, the menu, the data (asked for 68
+// bytes, used up to +447: VirtualAlloc gives a page) and the load counter):
+// schema::Type2ScreensGlobals' hub_*. Its movie:
 constexpr uint32_t kHubMovie = 0;
 constexpr uint32_t kSetChildNameText = 0x8211D930;
 constexpr uint32_t kSetNumberText = 0x8211C740;
@@ -574,8 +557,8 @@ constexpr uint32_t kRevealText = 0x8211D880;
 constexpr uint32_t kPlayTimeAdd = 0x821109B8;
 constexpr uint32_t kPlayTimeUpdate = 0x82112838;
 constexpr uint32_t kSheetCarData = 0x8218D708;
-// The player's record's screen (sub_8220B408's: +8 the record).
-constexpr uint32_t kRecordScreen = 0x826D84CC;
+// The player's record's screen (sub_8220B408's: +8 the record):
+// schema::Type2ScreensGlobals::record_screen.
 
 // sub_8218DA48 Type2Hub::FillPlayerRecord: into [0x826D84CC] + 8 from a copy
 // of player 0's save +48 (6,044 bytes, memcpy into the frame's +96): three

@@ -1,0 +1,226 @@
+# The schema of docs/functions/single-commands.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# Left out of this file, though the measure files them here (reported to the
+# lead):
+# - the device met through its functions' registers (device-state.md's
+#   Device): BeginVertices.r3, BeginIndexedVertices.r3, EndVertices.r3,
+#   sub_8229FC40.r3 (Device::Clear's worker), sub_822ADC08.r3,
+#   sub_822ADE30.r3, sub_822ADEF0.r3, sub_822AE070.r3, sub_822AE1D0.r3 (the
+#   draw's packet writers, r3 the device);
+# - Device.+12180 (the bound index buffer: graphics-resources.md's
+#   BufferHeader, which lacks its +8), sub_8229FC40.r3.+12200 (the bound depth
+#   surface: device-state.md's DeviceSurface), Device.+11552 and
+#   Device::PatchVertexShader.r5 (the bound vertex declaration: app-start-up.md's
+#   VertexDeclaration, whose 12-byte elements from +52 aren't described yet),
+#   Device.+12432 (Device::LoadShaders' read of a shader at device +12432:
+#   +64 and +76 look like shader-objects.md's VertexShader's fetch words);
+# - sub_825A1810.r3 and .r3.+4 (the primitive drawer and its declaration
+#   block: model-animation.md's PrimitiveDrawer and PrimitiveDrawerDeclaration).
+# The drawer's state (0x82970BBC) and the replay's globals are
+# device-shaders.md's (RenderQueueState's drawer_state, its [globals]); the
+# measure files the state's accesses as [82970BC0].
+
+# A single-command slot (16 bytes: [id, arguments]; the command's data in the
+# slots after, from +16), r3 of every handler of the table 0x8265ED48. Each
+# handler reads its own layout: the state and binding commands (1-4, 8-12, 20,
+# 22-24) a count at +4 and that many 16-byte entries from +16 (1-4, 8-12, 20
+# from an entry's +0, 22-24 from its +4); the others their arguments by
+# offset (Resolve 25, Clear 26 and DrawIndexedPrimitiveUP 27 reach into the
+# slots after). Fields are named by the commands that read them.
+[Single]
+measure = "Single"
+size = 72
+origin = "gpu"
+fields = [
+  { name = "id", offset = 0, type = "u32", note = "the command id (0-36), the walker's (ChunkChain::RunSingles)" },
+  { name = "argument0", offset = 4, type = "u32", note = "the entry count (1-4, 8-12, 20, 22-24); the data's slot count (21, 25-27, returned); the vertex count (5) or index count (6); the primitive type (13, 17, 18, 19); the shader, 0 vertex 1 pixel (7); the object (28, a SingleCallbackObject)" },
+  { name = "argument1", offset = 8, type = "u32", note = "the vertex shader's index (13); the start vertex (17); the base vertex and start index as halfwords (18); the constants' type 0-4 (7); 32-bit indices when not 0 (6)" },
+  { name = "vertex_count", offset = 8, type = "u16", note = "DrawPrimitiveUP's (19) vertex count" },
+  { name = "vertex_stride", offset = 10, type = "u16", note = "DrawPrimitiveUP's (19) stride in bytes" },
+  { name = "argument2", offset = 12, type = "u32", note = "the pixel shader's index (13); the primitive count (17, 18); the vertices' address (19)" },
+  { name = "first_register", offset = 12, type = "u8", note = "SetShaderConstants' (7) first register" },
+  { name = "register_count", offset = 13, type = "u8", note = "SetShaderConstants' (7) register count (returned)" },
+  { name = "data", offset = 16, type = "u32", note = "the data's first word: entry 0's +0 (1-4, 8-12, 20); SetShaderConstants' bit mask (type 4); Resolve's bits picking its optional arguments (25); DrawIndexedPrimitiveUP's primitive type (27)" },
+  { name = "data_4", offset = 20, type = "u32", note = "entry 0's +4 (1-4, 11, 22-24: the object, index or value); SetShaderConstants' bit count (type 4); Resolve's and Clear's flags (25, 26); DrawIndexedPrimitiveUP's packet word (27)" },
+  { name = "data_8", offset = 24, type = "u32", note = "entry 0's +8 (2, 11: the value, the offset); entry 0's flag (22) and surface (23); Resolve's source rectangle, 16 bytes (25); DrawIndexedPrimitiveUP's vertex count (27)" },
+  { name = "data_12", offset = 28, type = "u32", note = "entry 0's +12 (11: the stride); DrawIndexedPrimitiveUP's index count (27)" },
+  { name = "index_format", offset = 32, type = "u32", note = "DrawIndexedPrimitiveUP's index format (27: 1 for 16-bit)" },
+  { name = "stride", offset = 36, type = "u32", note = "DrawIndexedPrimitiveUP's stride (27)" },
+  { name = "texture_or_color", offset = 40, type = "u32", note = "Resolve's destination texture (25); Clear's color (26); DrawIndexedPrimitiveUP's index source (27)" },
+  { name = "z_or_point", offset = 44, type = "u32", note = "Clear's Z, a float (26); Resolve's destination point, 8 bytes (25); DrawIndexedPrimitiveUP's vertex source (27)" },
+  { name = "clear_stencil", offset = 48, type = "u32", note = "Clear's stencil (26)" },
+  { name = "resolve_level", offset = 52, type = "u32", note = "Resolve's level (25)" },
+  { name = "resolve_slice", offset = 56, type = "u32", note = "Resolve's slice (25)" },
+  { name = "resolve_color_0", offset = 60, type = "u8", note = "Resolve's clear color: the bytes +60 to +63 as floats x 1/255 (25)" },
+  { name = "resolve_color_1", offset = 61, type = "u8" },
+  { name = "resolve_color_2", offset = 62, type = "u8" },
+  { name = "resolve_color_3", offset = 63, type = "u8" },
+  { name = "resolve_z", offset = 64, type = "f32", note = "Resolve's clear Z (25)" },
+  { name = "resolve_stencil", offset = 68, type = "u32", note = "Resolve's stencil (25); its parameters follow at +72 (with bit 4 of +16)" },
+]
+
+[SingleCallbackVtable]
+measure = "Single.+4.+0"
+size = 4
+origin = "image"
+fields = [
+  { name = "call", offset = 0, type = "fn", note = "slot 0: r3 the object, r4 the device" },
+]
+
+# Command 28's object (the slot's +4): its vtable slot 0 is called with the
+# device. In play the movie (movies.md's Movie, Movie::RenderFrame its slot 0).
+[SingleCallbackObject]
+measure = "Single.+4"
+size = 4
+origin = "gpu"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "SingleCallbackVtable" },
+]
+
+[SingleReleaseVtable]
+measure = "Single.+20.+0"
+size = 16
+origin = "image"
+fields = [
+  { name = "slot1", offset = 4, type = "fn", note = "called first" },
+  { name = "slot2", offset = 8, type = "fn", note = "called second; its low byte 0 (with the entry's flag 1) releases the entry" },
+  { name = "slot3", offset = 12, type = "fn", note = "called after the entry is pushed on the release list (read in generated/, 2026-11-21; the row leaves it out)" },
+]
+
+# Command 22's entry objects (each at the slot + 20 + 16i): vtable slot 1, then
+# slot 2, whose low byte 0 with the entry's flag 1 puts the entry on the
+# release list and then calls slot 3.
+[SingleReleaseObject]
+measure = "Single.+20"
+size = 4
+origin = "gpu"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "SingleReleaseVtable" },
+]
+
+# sub_820911F8's r3 (it returns +4): command 21's slot (its data's slot
+# count) and, through other vtables, XAudio's reference-counted objects.
+[SingleCountObject]
+measure = "sub_820911F8.r3"
+size = 8
+origin = "gpu"
+fields = [
+  { name = "count", offset = 4, type = "u32", note = "the slot count (command 21) or a reference count (xaudio.md, xaudio-objects.md)" },
+]
+
+# The vertex shader's bool constant values (sub_822A8418's r5: command 7's
+# data, the slot + 16, or the bit mask's words in its frame).
+[SingleShaderBoolValues]
+measure = "sub_822A8418.r5"
+size = 4
+origin = "gpu"
+fields = [
+  { name = "value", offset = 0, type = "u32", note = "the first constant (0 or not)" },
+]
+
+# The loop constants (sub_822A84C8's and sub_822A8518's r5: command 7's data):
+# 4-word records, of which the setters read each word's low byte.
+[SingleShaderLoopConstants]
+measures = ["sub_822A84C8.r5", "sub_822A8518.r5"]
+size = 12
+origin = "gpu"
+fields = [
+  { name = "count_low", offset = 3, type = "u8", note = "word 0's low byte (probably the loop count)" },
+  { name = "start_low", offset = 7, type = "u8", note = "word 1's low byte (probably the start)" },
+  { name = "step_low", offset = 11, type = "u8", note = "word 2's low byte (probably the step)" },
+]
+
+# A shader microcode header as sub_822AEAA0 (from sub_822AEBF0, the vertex
+# shader patch's copy) and its helpers sub_822AE918 and sub_822AE9E8 read it
+# (r4; r7 the other shader's). Not read in detail: names from the code's use.
+[SingleShaderHeader]
+measures = ["sub_822AEAA0.r4", "sub_822AEAA0.r7"]
+size = 32
+origin = "gpu"
+fields = [
+  { name = "kind_byte", offset = 0, type = "u8", note = "its low 3 bits: 7 skips the copy" },
+  { name = "kind", offset = 0, type = "u16", note = "read whole by sub_822AE918 and sub_822AE9E8" },
+  { name = "flags", offset = 16, type = "u32", note = "bit 18 (r4) or 17 (r7) skips; bits 5-9 a count, bits 0-4 another" },
+  { name = "table_base", offset = 24, type = "u32", note = "with +28 + 10, the words' index (x 4 from the header)" },
+  { name = "table_skip", offset = 28, type = "u32" },
+]
+
+# sub_822AEAA0's r6: a word whose bits 8-11 it sets (probably a register
+# count).
+[SingleShaderCountWord]
+measure = "sub_822AEAA0.r6"
+size = 4
+origin = "gpu"
+fields = [
+  { name = "word", offset = 0, type = "u32", note = "bits 8-11 replaced (rlwimi)" },
+]
+
+# sub_822AE9E8's r6: a word it reads (not read in detail).
+[SingleShaderPatchWord]
+measure = "sub_822AE9E8.r6"
+size = 4
+origin = "gpu"
+fields = [
+  { name = "word", offset = 0, type = "u32" },
+]
+
+# The command buffer's words at the write position (pre-increment: +4 is the
+# first word written): Device::ReserveWords' and
+# Device::WriteDefaultDrawRegisters' returns, and what the measure calls
+# device +12960 (Device::WriteSegmentTail's ten words; the +4 reads in the
+# packet writers are the same write position, a measure split). Possibly
+# command-buffer.md's CommandWritePosition.
+[CommandPacketWords]
+measures = ["Device.+12960", "Device::ReserveWords.ret", "Device::WriteDefaultDrawRegisters.ret"]
+size = 40
+origin = "gpu"
+fields = [
+  { name = "word_0", offset = 0, type = "u32", note = "the last word written before (the write position itself)" },
+  { name = "word_1", offset = 4, type = "u32", note = "the first word written" },
+  { name = "word_2", offset = 8, type = "u32" },
+  { name = "word_3", offset = 12, type = "u32" },
+  { name = "word_4", offset = 16, type = "u32" },
+  { name = "word_5", offset = 20, type = "u32" },
+  { name = "word_6", offset = 24, type = "u32" },
+  { name = "word_7", offset = 28, type = "u32" },
+  { name = "word_8", offset = 32, type = "u32" },
+  { name = "word_9", offset = 36, type = "u32" },
+]
+
+# CommandChain::NewBlock's return (sub_8229EB10, command-buffer.md): a new
+# 4,224-byte chain block (the same object as command-buffer.md's
+# CommandChainBlock: its first word the content end).
+[CommandNewBlock]
+measure = "CommandChain::NewBlock.ret"
+size = 16
+origin = "gpu"
+fields = [
+  { name = "content_end", offset = 0, type = "u32", note = "0xC0000000 + the physical address where the content ends" },
+  { name = "word_1", offset = 4, type = "u32" },
+  { name = "word_2", offset = 8, type = "u32" },
+  { name = "word_3", offset = 12, type = "u32" },
+]
+
+# Device::AllocateFromCommandBuffer's return (sub_8229E308): space in the
+# command buffer's data space, where Device::Resolve and Device::Clear's worker
+# (sub_8229FC40) write their quads' vertices (floats).
+[CommandDataSpace]
+measure = "Device::AllocateFromCommandBuffer.ret"
+size = 84
+origin = "gpu"
+fields = [
+  { name = "vertices", offset = 0, type = "bytes", count = 84, note = "the vertices, 4-byte floats (Resolve 6 words, the Clear worker 21)" },
+]
+
+# BeginIndexedVertices' r10: where it returns the index space (0 on failure).
+[InlineIndexSpaceOut]
+measure = "BeginIndexedVertices.r10"
+size = 4
+origin = "gpu"
+fields = [
+  { name = "space", offset = 0, type = "ptr", to = "CommandDataSpace", note = "the index space in the command buffer's data space" },
+]

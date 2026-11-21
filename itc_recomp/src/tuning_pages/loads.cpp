@@ -37,18 +37,18 @@ constexpr uint32_t kTextureFree = 0x820ECFC8;   // Texture::Free(header_in, data
 // addresses. The second AssetSize's r3.
 uint64_t LoadEntry(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t e, uint32_t size,
                    uint32_t frame, uint32_t alloc_lr, uint32_t load_lr) {
-  const uint32_t entry = uint32_t(e);
+  const schema::DecalImageEntry entry(base, uint32_t(e));
   const uint64_t pages = call(kVirtualAlloc, {0, size, kMemCommit, 4}, frame, alloc_lr);
-  const uint32_t id = Load(base, entry + 0);
-  Store(base, entry + 12, uint32_t(pages));
+  const uint32_t id = entry.asset_id();
+  entry.set_file(uint32_t(pages));
   const uint64_t serial = call(kArchiveLoad, {id, pages, kOnImageLoaded, e, 0, 0}, frame, load_lr);
-  const uint32_t again = Load(base, entry + 0);
-  Store(base, entry + 4, uint32_t(serial));
-  Store(base, entry + 8, 1);
-  Store(base, entry + 24, 1);
+  const uint32_t again = entry.asset_id();
+  entry.set_handle(uint32_t(serial));
+  entry.set_state(1);
+  entry.set_requested(1);
   const uint32_t asked = archive::AssetSize(base, again);
-  Store(base, entry + 16, asked);
-  Store(base, entry + 20, 0);
+  entry.set_file_size(asked);
+  entry.set_to_make(0);
   return asked;
 }
 
@@ -69,8 +69,8 @@ uint64_t RequestImage(uint8_t* base, const tuning_screen::GuestCall& call, uint6
   ITC_NATIVE_RUNNING("sub_821FE830 DecalImages::Request");
   const uint32_t frame = Frame(base, sp, 96);
   const uint64_t e = i * 36 + images;
-  const uint32_t entry = uint32_t(e);
-  const int32_t state = int32_t(Load(base, entry + 8));
+  const schema::DecalImageEntry entry(base, uint32_t(e));
+  const int32_t state = int32_t(entry.state());
   if (state == 1 || state == 2) {
     return images;
   }
@@ -78,7 +78,7 @@ uint64_t RequestImage(uint8_t* base, const tuning_screen::GuestCall& call, uint6
   // negative) keep their old id.
   const uint32_t n = uint32_t(i), wanted = uint32_t(id);
   auto swap = [&](uint32_t none, uint32_t stand_in) {
-    Store(base, entry + 0, wanted == none ? stand_in : wanted);
+    entry.set_asset_id(wanted == none ? stand_in : wanted);
   };
   if (n <= 20) {
     swap(162, 22601);
@@ -89,7 +89,7 @@ uint64_t RequestImage(uint8_t* base, const tuning_screen::GuestCall& call, uint6
   } else if (n - 80 <= 28) {
     swap(382, 22604);
   }
-  const uint32_t size = archive::AssetSize(base, Load(base, entry + 0));
+  const uint32_t size = archive::AssetSize(base, entry.asset_id());
   return LoadEntry(base, call, e, size, frame, 0x821FE8FC, 0x821FE920);
 }
 
@@ -98,7 +98,7 @@ uint64_t LoadImage(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t
   ITC_NATIVE_RUNNING("sub_821F6D40 DecalImages::Load");
   const uint32_t frame = Frame(base, sp, 96);
   const uint64_t e = i * 36 + images;
-  Store(base, uint32_t(e) + 0, uint32_t(id));
+  schema::DecalImageEntry(base, uint32_t(e)).set_asset_id(uint32_t(id));
   const uint32_t size = archive::AssetSize(base, uint32_t(id));
   return LoadEntry(base, call, e, size, frame, 0x821F6D78, 0x821F6D9C);
 }
@@ -144,11 +144,12 @@ uint64_t LoadDecalImages(uint8_t* base, const tuning_screen::GuestCall& call, ui
 
 void OnImageLoaded(uint8_t* base, uint32_t handle, uint32_t e) {
   ITC_NATIVE_RUNNING("sub_821FE608 DecalImages::OnLoaded");
-  if (int32_t(handle) != int32_t(Load(base, e + 4))) {
+  const schema::DecalImageEntry entry(base, e);
+  if (int32_t(handle) != int32_t(entry.handle())) {
     return;
   }
-  Store(base, e + 8, 2);
-  Store(base, e + 20, 1);
+  entry.set_state(2);
+  entry.set_to_make(1);
 }
 
 uint64_t ReloadImage(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t images,
@@ -156,11 +157,11 @@ uint64_t ReloadImage(uint8_t* base, const tuning_screen::GuestCall& call, uint64
   ITC_NATIVE_RUNNING("sub_821FE960 DecalImages::Reload");
   const uint32_t frame = Frame(base, sp, 96);
   const uint32_t n = uint32_t(i), wanted = uint32_t(id);
-  const uint32_t at = uint32_t(i * 36) + uint32_t(images);
+  const schema::DecalImageEntry at = DecalEntryAt(base, images, i);
   // A "none" id swapped for the group's stand-in (Request's swap); entries
   // above 108 (or negative) keep their old id.
   auto swap = [&](uint32_t none, uint32_t stand_in) {
-    Store(base, at, wanted == none ? stand_in : wanted);
+    at.set_asset_id(wanted == none ? stand_in : wanted);
   };
   if (n <= 20) {
     swap(162, 22601);
@@ -173,18 +174,18 @@ uint64_t ReloadImage(uint8_t* base, const tuning_screen::GuestCall& call, uint64
   }
   // The file into the entry's buffer as it is (no new pages, no state check).
   const uint64_t e = i * 36 + images;
-  const uint32_t entry = uint32_t(e);
-  const uint32_t buffer = Load(base, entry + 12);
-  const uint32_t asset = Load(base, entry + 0);
+  const schema::DecalImageEntry entry(base, uint32_t(e));
+  const uint32_t buffer = entry.file();
+  const uint32_t asset = entry.asset_id();
   const uint64_t serial =
       call(kArchiveLoad, {asset, buffer, kOnImageLoaded, e, 0, 0}, frame, 0x821FEA2C);
-  const uint32_t again = Load(base, entry + 0);
-  Store(base, entry + 4, uint32_t(serial));
-  Store(base, entry + 8, 1);
-  Store(base, entry + 24, 1);
+  const uint32_t again = entry.asset_id();
+  entry.set_handle(uint32_t(serial));
+  entry.set_state(1);
+  entry.set_requested(1);
   const uint32_t asked = archive::AssetSize(base, again);
-  Store(base, entry + 16, asked);
-  Store(base, entry + 20, 0);
+  entry.set_file_size(asked);
+  entry.set_to_make(0);
   return asked;
 }
 
@@ -240,24 +241,28 @@ uint64_t ScrollImages(uint8_t* base, const tuning_screen::GuestCall& call, uint6
     FreeTexture(base, images, i, GuestTextureFree(base, call, frame, 0x821FED5C, native_free));
     into = i + n - 1;
     if (int32_t(uint32_t(i)) < int32_t(uint32_t(into))) {
-      uint64_t at = i * 36 + images + 28;
+      // Each entry's texture from the next one's (data, then header).
+      uint64_t j = i;
       for (uint32_t c = uint32_t(into - i); c != 0; c--) {
-        const uint32_t a = uint32_t(at);
-        Store(base, a + 4, Load(base, a + 40));
-        Store(base, a + 0, Load(base, a + 36));
-        at += 36;
+        const schema::DecalImageEntry to = DecalEntryAt(base, images, j);
+        const schema::DecalImageEntry from = DecalEntryAt(base, images, j + 1);
+        to.set_texture_data(from.texture_data());
+        to.set_texture_header(from.texture_header());
+        j++;
       }
     }
   } else if (way == 0) {
     const uint64_t last = i + n - 1;
     FreeTexture(base, images, last, GuestTextureFree(base, call, frame, 0x821FEDBC, native_free));
     if (int32_t(uint32_t(last)) > int32_t(uint32_t(i))) {
-      uint64_t at = last * 36 + images + 28;
+      // Each entry's texture from the one before (data, then header).
+      uint64_t j = last;
       for (uint32_t c = uint32_t(last - i); c != 0; c--) {
-        const uint32_t a = uint32_t(at);
-        Store(base, a + 4, Load(base, a - 32));
-        Store(base, a + 0, Load(base, a - 36));
-        at -= 36;
+        const schema::DecalImageEntry to = DecalEntryAt(base, images, j);
+        const schema::DecalImageEntry from = DecalEntryAt(base, images, j - 1);
+        to.set_texture_data(from.texture_data());
+        to.set_texture_header(from.texture_header());
+        j--;
       }
     }
     into = i;
@@ -269,19 +274,20 @@ uint64_t ScrollImages(uint8_t* base, const tuning_screen::GuestCall& call, uint6
 
 uint64_t FreeKept(uint8_t* base, uint64_t images, uint64_t k, const TextureFreeFn& free) {
   ITC_NATIVE_RUNNING("sub_821FE740 DecalImages::FreeKept");
+  const schema::DecalImageKept slot = DecalKeptAt(base, images, uint32_t(k));
+  // r3 as the original's: the slot's address in all 64 bits.
   const uint64_t kept = uint64_t(uint32_t(k) << 3) + images + 7236;
-  const uint32_t header = Load(base, uint32_t(kept));
+  const uint32_t header = slot.texture_header();
   bool held = false;
   for (uint32_t e = 0; e < 200; e++) {
-    if (Load(base, uint32_t(images) + 28 + 36 * e) == header) {
+    if (DecalEntryAt(base, images, e).texture_header() == header) {
       held = true;
     }
   }
   if (held) {
     return kept;
   }
-  const uint32_t data = uint32_t(uint64_t(uint32_t(k + 905) << 3) + images);
-  return free(uint32_t(kept), data);
+  return free(slot.texture_header_address(), slot.texture_data_address());
 }
 
 }  // namespace tuning_pages

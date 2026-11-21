@@ -17,6 +17,8 @@ namespace tuning_pages {
 
 namespace {
 
+using G = schema::TuningPagesGlobals;
+
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
@@ -130,13 +132,6 @@ namespace steps = strings_and_font::steps;
 
 double Fmuls(double a, double b) { return double(float(a * b)); }
 
-constexpr uint32_t kOne = 0x82000A30;        // 1.0
-constexpr uint32_t kByteScale = 0x82002200;  // probably 1/255
-constexpr uint32_t k255 = 0x82000C44;        // probably 255.0
-constexpr uint32_t kBarShort = 0x82002C30;   // the bars' two scales
-constexpr uint32_t kBarLong = 0x8200B5CC;
-constexpr uint32_t kBarLength = 0x820021FC;
-
 // std of a sign-extended word at `at` (the doubleword the original makes
 // floats through), then lfd, fcfid and frsp: the single.
 double ThroughFrame(uint8_t* base, uint32_t at, uint32_t word) {
@@ -148,15 +143,16 @@ double ThroughFrame(uint8_t* base, uint32_t at, uint32_t word) {
 
 // A primitive's vertex `i`'s color (+8, +12, +16).
 void VertexColor(uint8_t* base, uint32_t vertex, uint32_t r, uint32_t g, uint32_t b) {
-  Store(base, vertex + 8, r);
-  Store(base, vertex + 12, g);
-  Store(base, vertex + 16, b);
+  const schema::UiMovieVertex v(base, vertex);
+  v.set_red(r);
+  v.set_green(g);
+  v.set_blue(b);
 }
 
 // The RGB answer at frame + 112 scaled by 255.0 and truncated, each through
 // frame + 80 (fctiwz, stfiwx, lwz).
 void ColorInts(uint8_t* base, uint32_t frame, uint32_t out[3]) {
-  const double scale = Lfs(base, k255);
+  const double scale = double(G::byte_max(base));
   for (uint32_t k = 0; k < 3; k++) {
     const double c = Fmuls(Lfs(base, frame + 112 + 4 * k), scale);
     Store(base, frame + 80, uint32_t(steps::Fctiwz(c)));
@@ -179,11 +175,11 @@ void Vertices(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child,
 // again for each: float(word) × the short scale (2, 3) or the long one (4,
 // 5), × the length.
 void Bar(uint8_t* base, uint32_t frame, uint32_t screen, uint32_t field, const uint32_t (&v)[6]) {
-  const double length = Lfs(base, kBarLength);
+  const double length = double(G::bar_length(base));
   for (uint32_t i = 2; i < 6; i++) {
-    const double scale = Lfs(base, i < 4 ? kBarShort : kBarLong);
+    const double scale = (i < 4 ? double(G::bar_short(base)) : double(G::bar_long(base)));
     const double x = ThroughFrame(base, frame + 80, Load(base, screen + field));
-    Stfs(base, v[i], Fmuls(Fmuls(x, scale), length));
+    schema::UiMovieVertex(base, v[i]).set_x(float(Fmuls(Fmuls(x, scale), length)));
   }
 }
 
@@ -193,10 +189,10 @@ uint32_t SetPaintGradients(uint8_t* base, uint32_t screen, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821E9488 TuningScreen::SetPaintGradients");
   const uint32_t frame = Frame(base, sp, 208);
   const uint32_t movie = Load(base, tuning_screen::MovieEntry(base, frame, 2));
-  const uint32_t one = Load(base, kOne);
+  const uint32_t one = Load(base, G::one_address());
   Store(base, frame + 108, one);
   Store(base, frame + 100, one);
-  const double scale = Lfs(base, kByteScale);
+  const double scale = double(G::byte_scale(base));
   // The value bar: h, s 1.0, v × the scale.
   const double v = ThroughFrame(base, frame + 80, Load(base, screen + 30452));
   const double h = ThroughFrame(base, frame + 88, Load(base, screen + 30444));

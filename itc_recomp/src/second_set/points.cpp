@@ -8,6 +8,7 @@
 #include "guest.h"
 #include "native/buffers.h"
 #include "scene_loaders/pools.h"
+#include "schema/second_set.h"
 
 #include <bit>
 #include <cstdlib>
@@ -56,43 +57,47 @@ void CopyString(uint8_t* base, uint32_t to, uint32_t name) {
 
 void PointRecordSetNode(uint8_t* base, uint32_t record, uint32_t name) {
   ITC_NATIVE_RUNNING("sub_820CE8D8 PointRecord::SetNode");
-  CopyString(base, record + 160, name);
+  CopyString(base, schema::SecondSetPointRecord(base, record).node_name_address(), name);
 }
 
 void PointRecordSetShape(uint8_t* base, uint32_t record, uint32_t name) {
   ITC_NATIVE_RUNNING("sub_820CE900 PointRecord::SetShape");
-  CopyString(base, record + 192, name);
+  CopyString(base, schema::SecondSetPointRecord(base, record).shape_name_address(), name);
 }
 
 uint32_t PointRecordClear(uint8_t* base, uint32_t record, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820CEA08 PointRecord::Clear");
   const uint32_t f = stack - kClearFrameBytes;
+  const schema::SecondSetPointRecord r(base, record);
   Store(base, f, stack);  // stwu's back chain
-  Store(base, record + 224, 0xFFFFFFFFu);
-  Store(base, record + 228, 0xFFFFFFFFu);
-  Store(base, record + 0, 0);
-  Store(base, record + 4, 0);
-  Store(base, record + 8, 0);
+  r.set_node_index(0xFFFFFFFFu);
+  r.set_shape_index(0xFFFFFFFFu);
+  r.set_skeleton(0);
+  r.set_model(0);
+  r.set_shape(0);
   Identity(base, f + 96);
-  Memcpy(base, record + 16, f + 96, 64, 0x820CEA8C);
+  Memcpy(base, r.matrix_address(), f + 96, 64, 0x820CEA8C);
   Identity(base, f + 96);
-  Memcpy(base, record + 80, f + 96, 64, 0x820CEAD0);
+  Memcpy(base, r.inverse_address(), f + 96, 64, 0x820CEAD0);
   for (const uint32_t at : {80u, 84u, 88u}) {
     CopyWord(base, kZero, f + at);
   }
   CopyWord(base, kOne, f + 92);
   for (uint32_t w = 0; w < 4; w++) {
-    Store(base, record + 144 + 4 * w, Load(base, f + 80 + 4 * w));
+    Store(base, r.position_address() + 4 * w, Load(base, f + 80 + 4 * w));
   }
-  base[record + 160] = 0;
-  base[record + 192] = 0;
-  return record + 80;
+  r.set_node_name_0(0);
+  r.set_shape_name_0(0);
+  return r.inverse_address();
 }
 
 uint32_t PointRecordConstruct(uint8_t* base, uint32_t record, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820D0270 PointRecord::PointRecord");
-  for (uint32_t at = 28; at <= 156; at += 16) {
-    CopyWord(base, kOne, record + at);
+  // The w's of the nine rows from the matrix's: the matrix's four, the
+  // inverse's four and the position's.
+  const schema::SecondSetPointRecord r(base, record);
+  for (uint32_t row = 0; row < 9; row++) {
+    CopyWord(base, kOne, r.matrix_row0_w_address() + 16 * row);
   }
   PointRecordClear(base, record, stack - kConstructFrameBytes);
   return record;
@@ -101,24 +106,27 @@ uint32_t PointRecordConstruct(uint8_t* base, uint32_t record, uint32_t stack) {
 uint32_t ModelPointFindShape(uint8_t* base, uint32_t record, uint32_t model, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820CEB30 ModelPoint::FindShape");
   const uint32_t f = stack - kFindShapeFrameBytes;
-  Store(base, record + 228, 0xFFFFFFFFu);
-  Store(base, record + 0, 0);
-  Store(base, record + 4, 0);
-  Store(base, record + 8, 0);
+  const schema::SecondSetPointRecord r(base, record);
+  const schema::SecondSetFindModel m(base, model);
+  r.set_shape_index(0xFFFFFFFFu);
+  r.set_skeleton(0);
+  r.set_model(0);
+  r.set_shape(0);
   Identity(base, f + 80);
-  Memcpy(base, record + 16, f + 80, 64, 0x820CEBA4);
-  const int32_t nodes = int32_t(Load(base, model + 408));
+  Memcpy(base, r.matrix_address(), f + 80, 64, 0x820CEBA4);
+  const int32_t nodes = int32_t(m.node_count());
   for (int32_t n = 0; n < nodes; n++) {
-    const uint32_t node = uint32_t(n) * 192 + Load(base, model + 36);
-    const uint32_t index = Load(base, node + 40);
+    const schema::SecondSetModelNode node(
+        base, uint32_t(n) * schema::SecondSetModelNode::kSize + m.nodes().address);
+    const uint32_t index = node.shape();
     if (int32_t(index) == -1) {
       continue;
     }
-    const uint32_t shape = index * 544 + Load(base, model + 40);
-    if (scene_loaders::NameMatches(base, shape, record + 192) != 0) {
-      Store(base, record + 4, model);
-      Store(base, record + 8, shape);
-      Store(base, record + 228, Load(base, node + 40));
+    const uint32_t shape = index * 544 + m.shapes<schema::View>().address;
+    if (scene_loaders::NameMatches(base, shape, r.shape_name_address()) != 0) {
+      r.set_model(model);
+      r.set_shape(shape);
+      r.set_shape_index(node.shape());
       return 1;
     }
   }

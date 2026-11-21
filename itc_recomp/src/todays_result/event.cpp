@@ -13,14 +13,18 @@ namespace todays_result {
 
 namespace {
 
-uint32_t Pages(uint8_t* base) { return Load(base, kEventPages); }
-uint32_t Data(uint8_t* base) { return Load(base, kEventData); }
+using Machine = schema::TodaysEventMachine;
+using Data_ = schema::TodaysEventData;
+using List = schema::TodaysEventImageList;
+using Image = schema::TodaysEventImage;
+
+Pages EventPages(uint8_t* base) { return G::event_pages(base); }
+Data_ Data(uint8_t* base) { return G::event_data(base); }
 
 // The image lists: list A at the data's +4 (count +188), list B at +192
 // (count +376).
-constexpr uint32_t kListA = 4;
-constexpr uint32_t kListB = 192;
-constexpr uint32_t kListCount = 184;  // from the list
+List ListA(uint8_t* base, uint32_t data) { return List(base, Data_(base, data).images_a_address()); }
+List ListB(uint8_t* base, uint32_t data) { return List(base, Data_(base, data).images_b_address()); }
 
 // Whether bit `index` of the words at `bits` is set (a negative index none).
 bool BitSet(uint8_t* base, uint32_t bits, int32_t index) {
@@ -30,10 +34,10 @@ bool BitSet(uint8_t* base, uint32_t bits, int32_t index) {
   return (Load(base, bits + 4 * uint32_t(index >> 5)) & (1u << (index & 31))) != 0;
 }
 
-uint32_t ImagesLoaded(uint8_t* base, uint32_t list) {
-  const uint32_t count = Load(base, list + kListCount);
+uint32_t ImagesLoaded(uint8_t* base, const List& list) {
+  const uint32_t count = list.count();
   for (uint32_t k = 0; k < count; k++) {
-    if (Load(base, Load(base, list + 4 * k)) == 0) {
+    if (Image(base, Load(base, list.records_address() + 4 * k)).loaded() == 0) {
       return 0;
     }
   }
@@ -43,20 +47,20 @@ uint32_t ImagesLoaded(uint8_t* base, uint32_t list) {
 // The movie's +28 object's +36 and +32 put back from the data's +400 and
 // +404 (Unload's and Leave's).
 void PutBackImages(uint8_t* base, uint32_t movie) {
-  Store(base, Load(base, movie + 28) + 36, Load(base, Data(base) + 400));
-  Store(base, Load(base, movie + 28) + 32, Load(base, Data(base) + 404));
+  Store(base, Load(base, movie + 28) + 36, Data(base).movie_object_36());
+  Store(base, Load(base, movie + 28) + 32, Data(base).movie_object_32());
 }
 
 }  // namespace
 
 uint32_t ImagesLoadedA(uint8_t* base, uint32_t data) {
   ITC_NATIVE_RUNNING("sub_8225C0A0 TodaysEvent::ImagesLoadedA");
-  return ImagesLoaded(base, data + kListA);
+  return ImagesLoaded(base, ListA(base, data));
 }
 
 uint32_t ImagesLoadedB(uint8_t* base, uint32_t data) {
   ITC_NATIVE_RUNNING("sub_8225C0E8 TodaysEvent::ImagesLoadedB");
-  return ImagesLoaded(base, data + kListB);
+  return ImagesLoaded(base, ListB(base, data));
 }
 
 uint64_t MarkImages(uint8_t* base, uint32_t sp) {
@@ -73,7 +77,7 @@ uint64_t MarkImages(uint8_t* base, uint32_t sp) {
     while (true) {
       const uint32_t record = data_tables::Entry56(base, table, entry);
       r3 = record;
-      const uint32_t bits = Data(base) + 380;
+      const uint32_t bits = Data(base).image_bits_0_address();
       const int32_t image = int32_t(Load(base, record + 16));
       if (image >= 0) {
         const uint32_t word = bits + 4 * uint32_t(image >> 5);
@@ -92,40 +96,39 @@ uint64_t MarkImages(uint8_t* base, uint32_t sp) {
 uint64_t EventCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8225BE50 TodaysEvent::Create");
   const uint32_t frame = Frame(base, sp, 112);
-  Store(base, machine + kMachineLoaded, 0);
-  const uint32_t pages = uint32_t(calls.Call(kVirtualAlloc, frame, 0x8225BE7C, 0, 28, 0x1000, 4));
-  Store(base, kEventPages, pages);
-  Store(base, pages + 4, 0);
-  Store(base, pages + 0, 0);
-  Store(base, pages + 8, 0);
-  Store(base, pages + 20, kNone);
-  Store(base, pages + 12, kNone);
-  Store(base, pages + 24, 0);
+  const Machine m(base, machine);
+  m.set_loaded(0);
+  const uint32_t pages_at =
+      uint32_t(calls.Call(kVirtualAlloc, frame, 0x8225BE7C, 0, 28, 0x1000, 4));
+  G::set_event_pages(base, pages_at);
+  const Pages pages(base, pages_at);
+  pages.set_next_page(0);
+  pages.set_page(0);
+  pages.set_previous_page(0);
+  pages.set_unknown_20(kNone);
+  pages.set_step(kNone);
+  pages.set_step_started(0);
   const uint32_t menu = uint32_t(calls.Call(kVirtualAlloc, frame, 0x8225BEB8, 0, 68, 0x1000, 4));
-  Store(base, kEventMenu, menu);
-  for (const uint32_t field : {12u, 20u, 0u, 4u}) {
-    Store(base, menu + field, 0);
-  }
-  Store(base, menu + 16, 4);
-  for (const uint32_t field : {8u, 40u, 48u, 52u, 36u, 64u, 24u, 28u, 32u}) {
-    Store(base, menu + field, 0);
-  }
-  const uint32_t data = uint32_t(calls.Call(kVirtualAlloc, frame, 0x8225BF14, 0, 68, 0x1000, 4));
-  Store(base, kEventData, data);
-  Store(base, data + 0, 0);
-  Store(base, data + 396, kNone);
-  Store(base, data + 188, 0);
-  Store(base, data + 376, 0);
-  Store(base, data + 380, 0);
-  Store(base, data + 384, 0);
+  G::set_event_menu(base, menu);
+  InitMenu(schema::FrontEndMenu(base, menu));
+  const uint32_t data_at =
+      uint32_t(calls.Call(kVirtualAlloc, frame, 0x8225BF14, 0, 68, 0x1000, 4));
+  G::set_event_data(base, data_at);
+  const Data_ data(base, data_at);
+  data.set_ready(0);
+  data.set_unlock_entry(kNone);
+  data.set_image_count_a(0);
+  data.set_image_count_b(0);
+  data.set_image_bits_0(0);
+  data.set_image_bits_1(0);
   const uint32_t kind = Kind(base, frame);
   if (kind == 0) {
-    Store(base, machine + kMachineLoaded, 1);
-    Store(base, machine + kMachineState, 9);
+    m.set_loaded(1);
+    m.set_state(9);
     return kind;
   }
   const uint64_t r3 = MarkImages(base, frame);
-  Store(base, machine + kMachineState, Load(base, machine + kMachineReenter) != 0 ? 1 : 9);
+  m.set_state(m.reenter() != 0 ? 1 : 9);
   return r3;
 }
 
@@ -135,11 +138,13 @@ uint64_t LoadImagePair(uint8_t* base, uint32_t data, uint32_t index, uint32_t sp
   const uint32_t frame = Frame(base, sp, 144);
   uint64_t r3 = 0;
   struct Pair {
-    uint32_t asset, list, lrs[5];
+    uint32_t asset;
+    bool b;
+    uint32_t lrs[5];
   };
   static constexpr Pair kPairs[2] = {
-      {kImageAssetA, kListA, {0x8225BD30, 0x8225BD48, 0x8225BD58, 0x8225BD6C, 0x8225BDB8}},
-      {kImageAssetB, kListB, {0x8225BDC4, 0x8225BDDC, 0x8225BDEC, 0x8225BE00, 0x8225BE48}},
+      {kImageAssetA, false, {0x8225BD30, 0x8225BD48, 0x8225BD58, 0x8225BD6C, 0x8225BDB8}},
+      {kImageAssetB, true, {0x8225BDC4, 0x8225BDDC, 0x8225BDEC, 0x8225BE00, 0x8225BE48}},
   };
   for (const Pair& pair : kPairs) {
     const uint32_t asset = pair.asset + index;
@@ -149,14 +154,15 @@ uint64_t LoadImagePair(uint8_t* base, uint32_t data, uint32_t index, uint32_t sp
     calls.Call(kXMemSet, frame, pair.lrs[2], buffer, 0, size);
     const uint32_t record =
         uint32_t(calls.Call(kVirtualAlloc, frame, pair.lrs[3], 0, 16, 0x1000, 4));
-    Store(base, record + 4, index);
-    Store(base, record + 0, 0);
-    Store(base, record + 8, 0);
-    Store(base, record + 12, 0);
-    const uint32_t list = data + pair.list;
-    const uint32_t count = Load(base, list + kListCount);
-    Store(base, list + kListCount, count + 1);
-    Store(base, list + (count << 2), record);
+    const Image image(base, record);
+    image.set_image_index(index);
+    image.set_loaded(0);
+    image.set_texture(0);
+    image.set_xpr(0);
+    const List list = pair.b ? ListB(base, data) : ListA(base, data);
+    const uint32_t count = list.count();
+    list.set_count(count + 1);
+    Store(base, list.records_address() + (count << 2), record);
     const uint64_t args[8] = {asset, buffer, kImageLoaded, record, 0, 0, 0, 0};
     r3 = calls.CallArgs(kArchiveLoad, frame, pair.lrs[4], args);
   }
@@ -166,11 +172,11 @@ uint64_t LoadImagePair(uint8_t* base, uint32_t data, uint32_t index, uint32_t sp
 uint64_t LoadImages(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8225C008 TodaysEvent::LoadImages");
   const uint32_t frame = Frame(base, sp, 112);
-  uint32_t data = Data(base);
+  uint32_t data = Data(base).address;
   for (uint32_t image = 0; image < kImages; image++) {
-    if (BitSet(base, data + 380, int32_t(image))) {
+    if (BitSet(base, Data_(base, data).image_bits_0_address(), int32_t(image))) {
       LoadImagePair(base, data, image, frame, calls);
-      data = Data(base);
+      data = Data(base).address;
     }
   }
   return data;
@@ -187,21 +193,22 @@ uint64_t EventWaitForMovie(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8225C160 TodaysEvent::WaitForMovie");
   const uint32_t machine = uint32_t(r3);
   Frame(base, sp, 96);
-  if (Load(base, machine + kMachineLoaded) == 0) {
+  const Machine m(base, machine);
+  if (m.loaded() == 0) {
     r3 = ui_movies::IsLoaded(base, kEventMovie);
     if (uint32_t(r3) != 0) {
-      const uint32_t data = Data(base);
+      const uint32_t data = Data(base).address;
       r3 = ImagesLoadedA(base, data);
       if (uint32_t(r3) != 0) {
         r3 = ImagesLoadedB(base, data);
         if (uint32_t(r3) != 0) {
-          Store(base, machine + kMachineLoaded, 1);
+          m.set_loaded(1);
         }
       }
     }
   }
-  if (Load(base, machine + kMachineLoaded) != 0) {
-    Store(base, machine + kMachineState, Load(base, machine + kMachineReenter) != 0 ? 9 : 4);
+  if (m.loaded() != 0) {
+    m.set_state(m.reenter() != 0 ? 9 : 4);
   }
   return r3;
 }
@@ -209,14 +216,14 @@ uint64_t EventWaitForMovie(uint8_t* base, uint64_t r3, uint32_t sp) {
 uint32_t NextUnlockEntry(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8225BB70 TodaysEvent::NextUnlockEntry");
   Frame(base, sp, 96);
-  const uint32_t data = Data(base);
-  const uint32_t entry = Load(base, data + 396);
+  const Data_ data = Data(base);
+  const uint32_t entry = data.unlock_entry();
   if (entry != kNone) {
-    const uint32_t record = data_tables::Entry56(base, Load(base, data + 392), entry);
+    const uint32_t record = data_tables::Entry56(base, data.unlock_table(), entry);
     const uint32_t next = Load(base, record + 8);
     if (next != 0) {
-      const uint32_t at = Data(base) + 396;
-      Store(base, at, next + Load(base, at));
+      const Data_ d = Data(base);
+      d.set_unlock_entry(next + d.unlock_entry());
       return 0;
     }
   }
@@ -226,10 +233,10 @@ uint32_t NextUnlockEntry(uint8_t* base, uint32_t sp) {
     const uint32_t unlock = unlocks + 12 * k;
     if (Load(base, unlock + 0) == 0) {
       Store(base, unlock + 0, 1);
-      const uint32_t shown = Data(base) + 388;
-      Store(base, shown + 0, Load(base, unlock + 0));
-      Store(base, shown + 4, Load(base, unlock + 4));
-      Store(base, shown + 8, Load(base, unlock + 8));
+      const Data_ shown = Data(base);
+      shown.set_unlock_word(Load(base, unlock + 0));
+      shown.set_unlock_table(Load(base, unlock + 4));
+      shown.set_unlock_entry(Load(base, unlock + 8));
       return 1;
     }
   }
@@ -254,7 +261,7 @@ uint64_t SetUpTexts(uint8_t* base, uint32_t sp, const Calls& calls) {
   Store(base, ui_movies::FindNode(base, movie, 10, 7) + 80, 0);
   const uint32_t last = ui_movies::FindNode(base, movie, 10, 9);
   Store(base, last + 80, 0);
-  Store(base, Data(base) + 0, 1);
+  Data(base).set_ready(1);
   return last;
 }
 
@@ -266,22 +273,22 @@ uint64_t EventStart(uint8_t* base, uint32_t sp, const Calls& calls) {
   Store(base, frame + 84, 1);
   calls.Call(kSoundPlay, frame, 0x8225C9BC, frame + 84, frame + 80);
   const uint32_t movie = FindMovie(base, frame + 84, kEventMovie);
-  Store(base, Data(base) + 400, Load(base, Load(base, movie + 28) + 36));
-  Store(base, Data(base) + 404, Load(base, Load(base, movie + 28) + 32));
+  Data(base).set_movie_object_36(Load(base, Load(base, movie + 28) + 36));
+  Data(base).set_movie_object_32(Load(base, Load(base, movie + 28) + 32));
   SetUpTexts(base, frame, calls);
   const uint32_t answer = NextUnlockEntry(base, frame);
   if (answer == 2) {
     return answer;
   }
-  const uint32_t pages = Pages(base);
-  const uint32_t page = Load(base, pages + 0);
+  const Pages pages = EventPages(base);
+  const uint32_t page = pages.page();
   if (page != 0) {
-    Store(base, pages + 8, page);
+    pages.set_previous_page(page);
   }
-  Store(base, pages + 12, 0);
-  Store(base, pages + 4, 0);
-  Store(base, pages + 16, kNone);
-  Store(base, pages + 0, kNone);
+  pages.set_step(0);
+  pages.set_next_page(0);
+  pages.set_queued_step(kNone);
+  pages.set_page(kNone);
   return answer;
 }
 
@@ -295,9 +302,10 @@ uint64_t EventUnload(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& 
     r3 = calls.Call(kFinishAll, frame, 0x8225C234, movie);
     PutBackImages(base, movie);
   }
-  if (Load(base, machine + kMachineDelete) != 0) {
+  const Machine m(base, machine);
+  if (m.delete_movie() != 0) {
     r3 = calls.Call(kMoviesDelete, frame, 0x8225C26C, kEventMovie);
-    Store(base, machine + kMachineLoaded, 0);
+    m.set_loaded(0);
   }
   return r3;
 }
@@ -309,20 +317,20 @@ uint64_t EventUnloaded(uint8_t* base, uint32_t machine, uint32_t dispatcher, uin
   // The sound manager's IsCuePlaying (slot 14) for &bank 1, &cue 2, and when
   // it answers a nonzero byte its StopCue (slot 13), as the original calls
   // them.
-  uint32_t manager = Load(base, kSoundManager);
+  uint32_t manager = G::sound_manager(base);
   Store(base, frame + 80, 2);
   Store(base, frame + 84, 1);
   uint64_t r3 = calls.Call(Load(base, Load(base, manager) + 56), frame, 0x8225C2BC, manager,
                            frame + 84, frame + 80);
   if ((r3 & 0xFF) != 0) {
-    manager = Load(base, kSoundManager);
+    manager = G::sound_manager(base);
     Store(base, frame + 88, 2);
     Store(base, frame + 92, 1);
     r3 = calls.Call(Load(base, Load(base, manager) + 52), frame, 0x8225C2E8, manager,
                     frame + 92, frame + 88);
   }
   Post(base, dispatcher, 6);
-  Store(base, machine + kMachineState, 9);
+  Machine(base, machine).set_state(9);
   return r3;
 }
 
@@ -330,7 +338,7 @@ uint64_t EventLeave(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32
                     const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8225C348 TodaysEvent::Leave");
   const uint32_t frame = Frame(base, sp, 112);
-  Store(base, machine + kMachineState, 7);
+  Machine(base, machine).set_state(7);
   const uint32_t movie = FindMovie(base, frame + 80, kEventMovie);
   if (movie != 0) {
     calls.Call(kFinishAll, frame, 0x8225C398, movie);
@@ -346,16 +354,17 @@ uint64_t FreeImages(uint8_t* base, uint32_t data, uint32_t sp, const Calls& call
   const uint32_t frame = Frame(base, sp, 112);
   uint64_t r3 = data;
   struct Lrs {
-    uint32_t list, free_image, free;
+    bool b;
+    uint32_t free_image, free;
   };
-  static constexpr Lrs kLists[2] = {{kListA, 0x8225BC9C, 0x8225BCB0},
-                                    {kListB, 0x8225BCE8, 0x8225BCFC}};
+  static constexpr Lrs kLists[2] = {{false, 0x8225BC9C, 0x8225BCB0},
+                                    {true, 0x8225BCE8, 0x8225BCFC}};
   for (const Lrs& l : kLists) {
-    const uint32_t list = data + l.list;
-    while (Load(base, list + kListCount) != 0) {
-      const uint32_t count = Load(base, list + kListCount) - 1;
-      Store(base, list + kListCount, count);
-      const uint32_t record = Load(base, list + (count << 2));
+    const List list = l.b ? ListB(base, data) : ListA(base, data);
+    while (list.count() != 0) {
+      const uint32_t count = list.count() - 1;
+      list.set_count(count);
+      const uint32_t record = Load(base, list.records_address() + (count << 2));
       calls.Call(kFreeImage, frame, l.free_image, record);
       r3 = calls.Call(kVirtualFree, frame, l.free, record, 0, kMemRelease);
     }
@@ -366,17 +375,17 @@ uint64_t FreeImages(uint8_t* base, uint32_t data, uint32_t sp, const Calls& call
 uint64_t EventDestroy(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8225BF78 TodaysEvent::Destroy");
   const uint32_t frame = Frame(base, sp, 128);
-  if (Load(base, Data(base) + 408) != 0) {
-    Store(base, machine + kMachineState, 20);
+  if (Data(base).movies_queued() != 0) {
+    Machine(base, machine).set_state(20);
   }
-  FreeImages(base, Data(base), frame, calls);
-  calls.Call(kVirtualFree, frame, 0x8225BFC8, Load(base, kEventPages), 0, kMemRelease);
-  calls.Call(kVirtualFree, frame, 0x8225BFDC, Load(base, kEventMenu), 0, kMemRelease);
+  FreeImages(base, Data(base).address, frame, calls);
+  calls.Call(kVirtualFree, frame, 0x8225BFC8, G::event_pages(base).address, 0, kMemRelease);
+  calls.Call(kVirtualFree, frame, 0x8225BFDC, G::event_menu(base).address, 0, kMemRelease);
   const uint64_t r3 =
-      calls.Call(kVirtualFree, frame, 0x8225BFEC, Load(base, kEventData), 0, kMemRelease);
-  Store(base, kEventPages, 0);
-  Store(base, kEventMenu, 0);
-  Store(base, kEventData, 0);
+      calls.Call(kVirtualFree, frame, 0x8225BFEC, G::event_data(base).address, 0, kMemRelease);
+  G::set_event_pages(base, 0u);
+  G::set_event_menu(base, 0u);
+  G::set_event_data(base, 0u);
   return r3;
 }
 
@@ -394,8 +403,7 @@ constexpr uint32_t kEventTransitionTable[6] = {0x8225CB18, 0x8225C770, 0x8225CC8
                                                0x8218F150, 0x8225CD50, 0x8218F220};
 constexpr uint64_t kAll = ~uint64_t(0);
 
-uint32_t EventPages(uint8_t* base) { return Load(base, kEventPages); }
-uint32_t EventData(uint8_t* base) { return Load(base, kEventData); }
+schema::TodaysEventData EventData(uint8_t* base) { return G::event_data(base); }
 
 // UiMovie::Play(movie, a, b) with r6 to r9 0, as the originals pass them.
 void Play(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t movie, uint64_t a,
@@ -407,7 +415,7 @@ uint64_t RunMovie(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t movi
   return calls.Call(kRun, frame, lr, movie, 0);
 }
 uint64_t FadesDone(uint8_t* base) {
-  return (Load(base, kFadeCount0) | Load(base, kFadeCount1)) == 0 ? 1 : 0;
+  return (G::fade_count_0(base) | G::fade_count_1(base)) == 0 ? 1 : 0;
 }
 
 }  // namespace
@@ -418,7 +426,7 @@ uint64_t EventDraw(uint8_t* base, uint64_t machine, uint64_t dispatcher, uint32_
   const uint32_t frame = Frame(base, sp, 96);
   Store(base, frame + 80, kEventPageTable[0]);
   Store(base, frame + 84, kEventPageTable[1]);
-  const uint32_t page = Load(base, EventPages(base) + 0);
+  const uint32_t page = EventPages(base).page();
   if (page == kNone) {
     return dispatcher;
   }
@@ -431,41 +439,42 @@ uint64_t EventUpdate(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8225CDE8 TodaysEvent::Update");
   const uint32_t frame = Frame(base, sp, 144);
   const uint32_t movie = FindMovie(base, frame + 80, kEventMovie);
-  const uint32_t pages = EventPages(base);
+  const Pages pages = EventPages(base);
   Store(base, frame + 116, kEventTransitionTable[5]);
   for (uint32_t k = 0; k < 5; k++) {
     Store(base, frame + 96 + 4 * k, kEventTransitionTable[k]);
   }
-  const uint32_t running = Load(base, pages + 12);
+  const uint32_t running = pages.step();
   if (running == kNone) {
     return RunMovie(calls, frame, 0x8225CF14, movie);
   }
   uint64_t r3 = movie;
-  uint32_t p = pages;
+  Pages p = pages;
   if (int32_t(running) >= 0) {
     // No bounds check: the word at the table's index.
-    r3 = calls.Call(Load(base, frame + 96 + (running << 2)), frame, 0x8225CEAC, pages + 24);
+    r3 = calls.Call(Load(base, frame + 96 + (running << 2)), frame, 0x8225CEAC,
+                    pages.step_started_address());
     p = EventPages(base);
     if (uint32_t(r3) == 0) {
       return r3;
     }
   }
-  const uint32_t queued = Load(base, p + 16);
+  const uint32_t queued = p.queued_step();
   if (queued == kNone) {
     if (int32_t(running) >= 0) {
-      Store(base, p + 0, Load(base, p + 4));
-      Store(base, p + 12, queued);
+      p.set_page(p.next_page());
+      p.set_step(queued);
     } else {
-      const uint32_t next = Load(base, p + 4);
-      Store(base, p + 12, kNone);
-      Store(base, p + 0, next);
+      const uint32_t next = p.next_page();
+      p.set_step(kNone);
+      p.set_page(next);
     }
   } else {
-    Store(base, p + 16, kNone);
-    Store(base, p + 20, 0);
-    Store(base, p + 12, queued);
+    p.set_queued_step(kNone);
+    p.set_unknown_20(0);
+    p.set_step(queued);
   }
-  Store(base, p + 24, 0);
+  p.set_step_started(0);
   return r3;
 }
 
@@ -473,7 +482,7 @@ uint64_t EventPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8225C428 TodaysEvent::EventPage");
   const uint32_t frame = Frame(base, sp, 112);
   const uint64_t pressed =
-      calls.Call(kMenuPressed, frame, 0x8225C44C, Load(base, kEventMenu), kAccept);
+      calls.Call(kMenuPressed, frame, 0x8225C44C, G::event_menu(base).address, kAccept);
   if (uint32_t(pressed) == 0) {
     return pressed;
   }
@@ -490,27 +499,27 @@ uint64_t EventPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   if (answer >= 3) {
     return answer;
   }
-  const uint32_t pages = EventPages(base);
-  const uint32_t page = Load(base, pages + 0);
+  const Pages pages = EventPages(base);
+  const uint32_t page = pages.page();
   if (answer == 2) {
     if (page != 1) {
-      Store(base, pages + 8, page);
+      pages.set_previous_page(page);
     }
-    Store(base, pages + 12, 1);
-    Store(base, pages + 16, kNone);
-    Store(base, pages + 4, 1);
-    Store(base, pages + 0, kNone);
+    pages.set_step(1);
+    pages.set_queued_step(kNone);
+    pages.set_next_page(1);
+    pages.set_page(kNone);
     return answer;
   }
   if (page != 0) {
-    Store(base, pages + 8, page);
+    pages.set_previous_page(page);
   }
   // 0: the entry's next page through Transition11, then NextPage; 1: the
   // next unlock through Transition9, then NextUnlock.
-  Store(base, pages + 12, answer == 0 ? 5 : 3);
-  Store(base, pages + 16, answer == 0 ? 4 : 2);
-  Store(base, pages + 4, 0);
-  Store(base, pages + 0, kNone);
+  pages.set_step(answer == 0 ? 5 : 3);
+  pages.set_queued_step(answer == 0 ? 4 : 2);
+  pages.set_next_page(0);
+  pages.set_page(kNone);
   return answer;
 }
 
@@ -519,19 +528,20 @@ uint64_t QueueEventMovies(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 96);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   const uint32_t queued = save + kQueuedMovie;
+  const uint32_t ids = G::boot_movie_ids_address();
   for (uint32_t k = 0; k < 5; k++) {
-    Store(base, kBootMovies + 4 * k, 11);
+    Store(base, ids + 4 * k, 11);
   }
-  Store(base, kBootMovies + 20, 13);
-  Store(base, kBootMovies + 28, 0);
-  Store(base, kBootMovies + 24, 1);
+  G::set_boot_next_type(base, 13);
+  G::set_boot_movie_index(base, 0);
+  G::set_boot_skippable(base, 1);
   const uint32_t movie = Load(base, queued);
-  Store(base, kBootMovies + 0, movie);
+  Store(base, ids + 0, movie);
   if (int32_t(movie) == 6) {
-    Store(base, kBootMovies + 4, 7);
+    Store(base, ids + 4, 7);
   }
   Store(base, queued, kNone);
-  Store(base, kBootMovies + 20, 9);
+  G::set_boot_next_type(base, 9);
   // Progress::CheckUnlocks: its plain C++ where Condition::Test's copies fit,
   // else the original through the guest.
   if (career::CheckUnlocksNative(base, frame)) {
@@ -547,11 +557,11 @@ uint64_t EndPage(uint8_t* base, uint32_t dispatcher, uint32_t machine, uint32_t 
   const uint32_t kind = Kind(base, frame);
   if (kind == 1) {
     Post(base, dispatcher, 7);
-    Store(base, EventData(base) + 408, 0);
+    EventData(base).set_movies_queued(0);
     return kind;
   }
-  Store(base, machine + kMachineState, 10);
-  Store(base, EventData(base) + 408, 1);
+  Machine(base, machine).set_state(10);
+  EventData(base).set_movies_queued(1);
   return QueueEventMovies(base, frame, calls);
 }
 
@@ -562,18 +572,18 @@ uint64_t ShowImages(uint8_t* base, uint32_t index, uint32_t sp) {
   const uint32_t pair = ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80);
   const uint32_t movie = Load(base, pair);
   // The texture record of the list's first record for the image, 0 none.
-  auto texture = [&](uint32_t list) {
-    const uint32_t count = Load(base, list + 184);
+  auto texture = [&](const List& list) {
+    const uint32_t count = list.count();
     for (uint32_t k = 0; k < count; k++) {
-      const uint32_t record = Load(base, list + 4 * k);
-      if (Load(base, record + 4) == index) {
-        return Load(base, record + 8);
+      const Image record(base, Load(base, list.records_address() + 4 * k));
+      if (record.image_index() == index) {
+        return record.texture();
       }
     }
     return 0u;
   };
-  Store(base, Load(base, movie + 28) + 36, texture(EventData(base) + 4));
-  Store(base, Load(base, movie + 28) + 32, texture(EventData(base) + 192));
+  Store(base, Load(base, movie + 28) + 36, texture(List(base, EventData(base).images_a_address())));
+  Store(base, Load(base, movie + 28) + 32, texture(List(base, EventData(base).images_b_address())));
   return pair;
 }
 
@@ -581,14 +591,13 @@ uint64_t ShowUnlock(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8225CA50 TodaysEvent::ShowUnlock");
   const uint32_t frame = Frame(base, sp, 128);
   const uint32_t movie = FindMovie(base, frame + 80, kEventMovie);
-  const uint32_t data = EventData(base);
-  const uint32_t record =
-      data_tables::Entry56(base, Load(base, data + 392), Load(base, data + 396));
+  const schema::TodaysEventData data = EventData(base);
+  const uint32_t record = data_tables::Entry56(base, data.unlock_table(), data.unlock_entry());
   // SetText's varargs 0 (the user's call of 2026-10-30).
   const uint64_t title[8] = {movie, 0, 1, uint64_t(Load(base, record + 12)) + 4650, 0, 0, 0, 0};
   calls.CallArgs(kSetText, frame, 0x8225CAAC, title);
   const uint64_t body[8] = {
-      movie, 0, 2, uint64_t(Load(base, EventData(base) + 396)) + 6683, 0, 0, 0, 0};
+      movie, 0, 2, uint64_t(EventData(base).unlock_entry()) + 6683, 0, 0, 0, 0};
   calls.CallArgs(kSetText, frame, 0x8225CAC8, body);
   ShowImages(base, Load(base, record + 16), frame);
   const uint64_t more = calls.Call(kHasMoreText, frame, 0x8225CAE0, movie, 0, 2);
@@ -609,7 +618,7 @@ uint64_t EventIntro(uint8_t* base, uint32_t started, uint32_t sp, const Calls& c
     calls.Call(kLoopLast, frame, 0x8225CBC8, movie);
     calls.Call(kPlayNamed, frame, 0x8225CBE4, movie, 2);
     calls.Call(kLoopNamed, frame, 0x8225CBF0, movie, 2);
-    calls.Call(kFadeIn, frame, 0x8225CC0C, Load(base, kFadesIn), 0, 0, 0);
+    calls.Call(kFadeIn, frame, 0x8225CC0C, G::fade_in_passes(base), 0, 0, 0);
     ShowUnlock(base, frame, calls);
     Store(base, started, 1);
   }

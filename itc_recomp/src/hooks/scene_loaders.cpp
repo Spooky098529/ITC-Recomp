@@ -21,6 +21,7 @@
 #include "scene_loaders/model_point.h"
 #include "scene_loaders/objects.h"
 #include "scene_loaders/pools.h"
+#include "schema/scene_loaders.h"
 #include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, native_material_passes);
@@ -128,7 +129,7 @@ ITC_REGS_STEP(SceneLoadersPool4SetRecord) {
     lifted::original::c820D6A60(ctx, base);
     return;
   }
-  ctx.r3.u64 = ctx.r3.u32 + 28;
+  ctx.r3.u64 = schema::Pool4Object(base, ctx.r3.u32).record_address();
 }
 
 ITC_REGS_STEP(SceneLoadersPartsSlotOf) {
@@ -466,7 +467,7 @@ ITC_REGS_STEP(SceneLoadersCarModelLoadsDestruct) {
     return;
   }
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = ctx.r3.u32 + sl::kCarModelLoadsSkeleton;
+  ctx.r3.u64 = schema::CarModelLoads(base, ctx.r3.u32).skeleton_address();
 }
 
 // The resets that free: the plain C++, or the original where it refuses.

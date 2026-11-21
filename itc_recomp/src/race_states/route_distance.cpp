@@ -20,12 +20,15 @@ using namespace car_physics::ops;
 using namespace steps;
 namespace va = vehicle_accessors;
 
+using G = schema::RaceStatesGlobals;
+using Machine = schema::RaceStates;
+using Progress = schema::RaceProgress;
+using Slot = schema::RaceProgressSlot;
+
 namespace {
 
-constexpr uint32_t kPath = 6636;      // the route's sections walked (halfwords)
-constexpr uint32_t kPathLast = 7148;  // the last's index while walking, then the count
-constexpr uint32_t kLength = 7156;    // the race's length
-constexpr uint32_t kLaps = 7164;      // the laps' distances (4 floats)
+// The progress's path (+6636, halfwords) holds the route's sections walked,
+// its count (+7148) the last's index while walking, then the count.
 // RouteDistance's frame: the link lists (0, 1, 2, -1 at +128; 6, 7, 8, 9,
 // -1 at +144), the course route's copy at +176 (its pairs, then from +20 its
 // words: the start and the sections after it, -1 at the end), CourseRoutes::
@@ -35,8 +38,8 @@ constexpr uint32_t kForward = 128, kSide = 144, kCopy = 176, kGetOut = 368;
 // StartRoute's frame: the copy at +96, CourseRoutes::Get's out at +288.
 constexpr uint32_t kStartCopy = 96, kStartGetOut = 288;
 
-uint32_t PathAt(uint32_t progress, uint32_t i) {
-  return progress + ((i + 3318) << 1);
+uint32_t PathAt(uint8_t* base, uint32_t progress, uint32_t i) {
+  return Progress(base, progress).path_address() + (i << 1);
 }
 
 // A section's record by its number (the originals' rlwinm by 2 into bits
@@ -101,7 +104,7 @@ bool FindByte(uint8_t* base, uint32_t record, uint32_t list, uint32_t wanted, in
 // the position word `a` to `b`; its frame below RouteDistance's.
 double Along(uint8_t* base, uint32_t progress, uint32_t a, uint32_t b, int32_t length,
              uint32_t frame) {
-  return track_route::PathDistance(base, race_world::kRoute, a, b, progress + kPath, length,
+  return track_route::PathDistance(base, G::route_address(), a, b, Progress(base, progress).path_address(), length,
                                    frame - 288);
 }
 
@@ -114,9 +117,9 @@ void Measure(uint8_t* base, uint32_t progress, uint32_t frame, uint32_t last_at,
   const uint32_t copy = frame + kCopy;
   va::PairsLast(base, frame + last_at, copy);
   va::PairCopy(base, frame + first_at, copy);
-  Stfs(base, progress + kLength,
+  Stfs(base, Progress(base, progress).race_length_address(),
        Along(base, progress, Load(base, frame + first_at), Load(base, frame + last_at),
-             int32_t(Load(base, progress + kPathLast)), frame));
+             int32_t(Progress(base, progress).path_count()), frame));
   for (uint32_t i = 1; i < 5; i++) {
     va::PairsAt(base, frame + lap_at, copy, i);
     const uint32_t lap = Load(base, frame + lap_at);
@@ -125,9 +128,9 @@ void Measure(uint8_t* base, uint32_t progress, uint32_t frame, uint32_t last_at,
       return;
     }
     va::PairCopy(base, frame + again_at, copy);
-    Stfs(base, progress + kLaps + 4 * (i - 1),
+    Stfs(base, Progress(base, progress).lap_distances_address() + 4 * i,
          Along(base, progress, Load(base, frame + again_at), lap,
-               int32_t(Load(base, progress + kPathLast)), frame));
+               int32_t(Progress(base, progress).path_count()), frame));
   }
 }
 
@@ -152,8 +155,8 @@ void RouteDistance(uint8_t* base, uint32_t progress, uint32_t index, uint32_t fr
   bool done = false;
   const int32_t kind = int32_t(index);
   const auto begin = [&] {
-    Store(base, progress + kPathLast, 0);
-    guest::StoreU16(base, progress + kPath, uint16_t(start));
+    Progress(base, progress).set_path_count(0);
+    guest::StoreU16(base, Progress(base, progress).path_address(), uint16_t(start));
   };
 
   if (kind == 8 || kind == 9 || kind == 10) {
@@ -161,11 +164,11 @@ void RouteDistance(uint8_t* base, uint32_t progress, uint32_t index, uint32_t fr
     // forward link back to its start; 9 and 10 keep the start alone.
     begin();
     if (kind != 8) {
-      Store(base, progress + kPathLast, 1);
+      Progress(base, progress).set_path_count(1);
     } else {
       while (!done) {
-        const uint32_t at = Load(base, progress + kPathLast);
-        const uint32_t record = Record(base, guest::LoadU16(base, PathAt(progress, at)));
+        const uint32_t at = Progress(base, progress).path_count();
+        const uint32_t record = Record(base, guest::LoadU16(base, PathAt(base, progress, at)));
         for (uint32_t i = 0;; i++) {
           const int32_t link_index = int32_t(Load(base, frame + kForward + 4 * i));
           if (link_index == -1) {
@@ -178,19 +181,19 @@ void RouteDistance(uint8_t* base, uint32_t progress, uint32_t index, uint32_t fr
           if (link == last) {
             done = true;
           }
-          Store(base, progress + kPathLast, at + 1);
-          guest::StoreU16(base, PathAt(progress, at + 1), uint16_t(link));
+          Progress(base, progress).set_path_count(at + 1);
+          guest::StoreU16(base, PathAt(base, progress, at + 1), uint16_t(link));
           break;
         }
       }
-      Store(base, progress + kPathLast, Load(base, progress + kPathLast) + 1);
+      Progress(base, progress).set_path_count(Progress(base, progress).path_count() + 1);
     }
     const uint32_t copy_at = copy;
     va::PairsLast(base, frame + 124, copy_at);
     va::PairCopy(base, frame + 84, copy_at);
-    Stfs(base, progress + kLength,
+    Stfs(base, Progress(base, progress).race_length_address(),
          Along(base, progress, Load(base, frame + 84), Load(base, frame + 124),
-               int32_t(Load(base, progress + kPathLast)), frame));
+               int32_t(Progress(base, progress).path_count()), frame));
     for (uint32_t i = 1; i < 5; i++) {
       va::PairsAt(base, frame + 124, copy, i);
       const uint32_t lap = Load(base, frame + 124);
@@ -202,8 +205,8 @@ void RouteDistance(uint8_t* base, uint32_t progress, uint32_t index, uint32_t fr
       // The whole path, but only the start's section when the lap is on it
       // at another slice than the last position's.
       int32_t length;
-      if (section != S16(base, progress + kPath)) {
-        length = int32_t(Load(base, progress + kPathLast));
+      if (section != S16(base, Progress(base, progress).path_address())) {
+        length = int32_t(Progress(base, progress).path_count());
       } else {
         va::PairsLast(base, frame + 84, copy);
         if (section != S16(base, frame + 84)) {
@@ -211,12 +214,12 @@ void RouteDistance(uint8_t* base, uint32_t progress, uint32_t index, uint32_t fr
         } else {
           va::PairsLast(base, frame + 168, copy);
           length = S16(base, frame + 82) == S16(base, frame + 170)
-                       ? int32_t(Load(base, progress + kPathLast))
+                       ? int32_t(Progress(base, progress).path_count())
                        : 1;
         }
       }
       va::PairCopy(base, frame + 164, copy);
-      Stfs(base, progress + kLaps + 4 * (i - 1),
+      Stfs(base, Progress(base, progress).lap_distances_address() + 4 * i,
            Along(base, progress, Load(base, frame + 164), lap, length, frame));
     }
     return;
@@ -235,8 +238,8 @@ void RouteDistance(uint8_t* base, uint32_t progress, uint32_t index, uint32_t fr
     int32_t place = 0;
     while (!done) {
       const int32_t next = place + 1;
-      const uint32_t at = Load(base, progress + kPathLast);
-      const uint32_t record = Record(base, guest::LoadU16(base, PathAt(progress, at)));
+      const uint32_t at = Progress(base, progress).path_count();
+      const uint32_t record = Record(base, guest::LoadU16(base, PathAt(base, progress, at)));
       int32_t pick = next < 14 ? next : 13;
       int32_t link = 0;
       for (;;) {
@@ -254,10 +257,10 @@ void RouteDistance(uint8_t* base, uint32_t progress, uint32_t index, uint32_t fr
       if (pick == next) {
         place = pick;
       }
-      Store(base, progress + kPathLast, at + 1);
-      guest::StoreU16(base, PathAt(progress, at + 1), uint16_t(link));
+      Progress(base, progress).set_path_count(at + 1);
+      guest::StoreU16(base, PathAt(base, progress, at + 1), uint16_t(link));
     }
-    Store(base, progress + kPathLast, Load(base, progress + kPathLast) + 1);
+    Progress(base, progress).set_path_count(Progress(base, progress).path_count() + 1);
     Measure(base, progress, frame, 124, 84, 124, 84);
     return;
   }
@@ -269,9 +272,9 @@ void RouteDistance(uint8_t* base, uint32_t progress, uint32_t index, uint32_t fr
     // and it is appended after.
     begin();
     while (!done) {
-      const uint32_t at = Load(base, progress + kPathLast);
+      const uint32_t at = Progress(base, progress).path_count();
       const int32_t wanted = int32_t(Load(base, frame + 200 + 4 * at));
-      const uint32_t record = Record(base, guest::LoadU16(base, PathAt(progress, at)));
+      const uint32_t record = Record(base, guest::LoadU16(base, PathAt(base, progress, at)));
       bool forward = false;
       for (uint32_t i = 0;; i++) {
         const int32_t link_index = int32_t(Load(base, frame + kForward + 4 * i));
@@ -283,8 +286,8 @@ void RouteDistance(uint8_t* base, uint32_t progress, uint32_t index, uint32_t fr
           if (link == last) {
             done = true;
           }
-          Store(base, progress + kPathLast, at + 1);
-          guest::StoreU16(base, PathAt(progress, at + 1), uint16_t(wanted));
+          Progress(base, progress).set_path_count(at + 1);
+          guest::StoreU16(base, PathAt(base, progress, at + 1), uint16_t(wanted));
           forward = true;
           break;
         }
@@ -313,19 +316,19 @@ void RouteDistance(uint8_t* base, uint32_t progress, uint32_t index, uint32_t fr
             if (link == last) {
               done = true;
             }
-            guest::StoreU16(base, PathAt(progress, Load(base, progress + kPathLast)),
+            guest::StoreU16(base, PathAt(base, progress, Progress(base, progress).path_count()),
                             uint16_t(side));
-            const uint32_t now = Load(base, progress + kPathLast);
-            Store(base, progress + kPathLast, now + 1);
+            const uint32_t now = Progress(base, progress).path_count();
+            Progress(base, progress).set_path_count(now + 1);
             Store(base, frame + 196 + 4 * now, uint32_t(side));
-            guest::StoreU16(base, PathAt(progress, now + 1), uint16_t(wanted));
+            guest::StoreU16(base, PathAt(base, progress, now + 1), uint16_t(wanted));
             replaced = true;
             break;
           }
         }
       }
     }
-    Store(base, progress + kPathLast, Load(base, progress + kPathLast) + 1);
+    Progress(base, progress).set_path_count(Progress(base, progress).path_count() + 1);
     Measure(base, progress, frame, 124, 84, 124, 84);
     return;
   }
@@ -340,30 +343,30 @@ void RouteDistance(uint8_t* base, uint32_t progress, uint32_t index, uint32_t fr
   const uint32_t row = frame + 96 + uint32_t(uint64_t(index) * 3);
   begin();
   while (!done) {
-    const uint32_t at = Load(base, progress + kPathLast);
-    const uint32_t record = Record(base, guest::LoadU16(base, PathAt(progress, at)));
+    const uint32_t at = Progress(base, progress).path_count();
+    const uint32_t record = Record(base, guest::LoadU16(base, PathAt(base, progress, at)));
     int32_t link = 0;
     if (FindRow3(base, record, frame + kForward, row, &link)) {
       if (link == last) {
         done = true;
       }
-      Store(base, progress + kPathLast, at + 1);
-      guest::StoreU16(base, PathAt(progress, at + 1), uint16_t(link));
+      Progress(base, progress).set_path_count(at + 1);
+      guest::StoreU16(base, PathAt(base, progress, at + 1), uint16_t(link));
     } else if (FindRow3(base, record, frame + kSide, row, &link)) {
       if (link == last) {
         done = true;
       }
-      const uint32_t now = Load(base, progress + kPathLast) + 1;
-      Store(base, progress + kPathLast, now);
-      guest::StoreU16(base, PathAt(progress, now), uint16_t(link));
+      const uint32_t now = Progress(base, progress).path_count() + 1;
+      Progress(base, progress).set_path_count(now);
+      guest::StoreU16(base, PathAt(base, progress, now), uint16_t(link));
     }
   }
-  Store(base, progress + kPathLast, Load(base, progress + kPathLast) + 1);
+  Progress(base, progress).set_path_count(Progress(base, progress).path_count() + 1);
   Measure(base, progress, frame, 80, 84, 84, 124);
 }
 
 bool StartRouteNative(uint8_t* base, uint32_t machine, uint32_t frame) {
-  const uint32_t index = Load(base, Load(base, machine + 9624) + 6076);
+  const uint32_t index = Machine(base, machine).progress().route_course();
   return race_setup::RouteCopiesNative(frame, kStartGetOut, index, kStartCopy) &&
          RouteDistanceNative(index, frame - kRouteDistanceFrame);
 }
@@ -375,7 +378,8 @@ namespace {
 // `position`; false when none.
 bool FirstRacer(uint8_t* base, uint32_t progress, uint32_t* position) {
   for (uint32_t i = 0; i < 4; i++) {
-    const uint32_t entry = Load(base, progress + 48 + kSlotBytes * i);
+    const uint32_t entry =
+        Slot(base, Progress(base, progress).slots_address() + Slot::kSize * i).entry().address;
     if (entry != 0 && (Load(base, entry) & 0x4) != 0) {
       const uint32_t vehicle = va::VehicleGet(base, Load(base, entry + 20));
       *position = va::VehicleIdentity(vehicle) + 4;
@@ -388,16 +392,18 @@ bool FirstRacer(uint8_t* base, uint32_t progress, uint32_t* position) {
 // Each results entry's slot start (+572, +574 = the start's halfwords
 // +7152, +7154), the count +2184 read again each pass.
 void SetStarts(uint8_t* base, uint32_t progress) {
-  if (int32_t(Load(base, progress + 2184)) <= 0) {
+  const Progress p(base, progress);
+  if (int32_t(p.results_count()) <= 0) {
     return;
   }
-  uint32_t at = progress + 572;
+  uint32_t at = p.slots_address();
   for (int32_t i = 0;;) {
-    guest::StoreU16(base, at + 0, guest::LoadU16(base, progress + 7152));
-    guest::StoreU16(base, at + 2, guest::LoadU16(base, progress + 7154));
+    const Slot s(base, at);
+    s.set_start_section(p.start_section());
+    s.set_start_slice(p.start_slice());
     i++;
-    at += kSlotBytes;
-    if (!(i < int32_t(Load(base, progress + 2184)))) {
+    at += Slot::kSize;
+    if (!(i < int32_t(p.results_count()))) {
       return;
     }
   }
@@ -418,50 +424,50 @@ void Append(uint8_t* base, uint32_t list, uint32_t count, uint32_t from) {
 
 void StartRoute(uint8_t* base, uint32_t machine, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_821635D0 RaceProgress::StartRoute");
-  const auto progress = [&] { return Load(base, machine + 9624); };
+  const auto progress = [&] { return Machine(base, machine).progress().address; };
   const uint32_t first = progress();
-  const int32_t type = int32_t(Load(base, first + 6100));
+  const int32_t type = int32_t(Progress(base, first).stage_type());
   if (type != 3 && type != 1) {
     // The start the first racer's position; each slot's list and the race's
     // get it.
     uint32_t position = 0;
     if (FirstRacer(base, first, &position)) {
       const uint32_t p = progress();
-      Store(base, p + 7152, Load(base, position));
+      Progress(base, p).set_start(Load(base, position));
       SetStarts(base, p);
     }
     for (uint32_t i = 0; i < 4; i++) {
-      const uint32_t p = progress();
-      if (Load(base, p + kSlotBytes * i + 48) == 0) {
+      const Progress p(base, progress());
+      const Slot slot(base, p.slots_address() + Slot::kSize * i);
+      if (slot.entry().address == 0) {
         continue;
       }
-      Store(base, frame + 80, Load(base, p + 7152));
-      const uint32_t slot = p + kSlotBytes * i + 40;
-      Append(base, slot + 12, slot + 524, frame + 80);
+      Store(base, frame + 80, p.start());
+      Append(base, slot.sections_address(), slot.section_count_address(), frame + 80);
     }
-    const uint32_t p = progress();
-    Store(base, frame + 80, Load(base, p + 7152));
-    Append(base, p + 6120, p + 6632, frame + 80);
-    if (int32_t(Load(base, progress() + 6100)) == 1) {
+    const Progress p(base, progress());
+    Store(base, frame + 80, p.start());
+    Append(base, p.sections_passed_address(), p.sections_passed_count_address(), frame + 80);
+    if (int32_t(Progress(base, progress()).stage_type()) == 1) {
       const uint32_t q = progress();
-      RouteDistance(base, q, Load(base, q + 6076), frame - kRouteDistanceFrame);
+      RouteDistance(base, q, Progress(base, q).route_course(), frame - kRouteDistanceFrame);
     }
     return;
   }
   // Types 1 and 3: the start the course route's first position; the path
   // walked and measured; each slot's list and the race's get the path up to
   // the first racer's section (or a section beside it).
-  race_setup::CopyCourseRoute(base, frame, kStartGetOut, Load(base, first + 6076), 0x8216375C,
-                              kStartCopy);
+  race_setup::CopyCourseRoute(base, frame, kStartGetOut, Progress(base, first).route_course(),
+                              0x8216375C, kStartCopy);
   va::PairCopy(base, frame + 80, frame + kStartCopy);
   {
     const uint32_t p = progress();
-    Store(base, p + 7152, Load(base, frame + 80));
+    Progress(base, p).set_start(Load(base, frame + 80));
     SetStarts(base, p);
   }
   {
     const uint32_t p = progress();
-    RouteDistance(base, p, Load(base, p + 6076), frame - kRouteDistanceFrame);
+    RouteDistance(base, p, Progress(base, p).route_course(), frame - kRouteDistanceFrame);
   }
   int32_t section = -1;
   {
@@ -471,8 +477,8 @@ void StartRoute(uint8_t* base, uint32_t machine, uint32_t frame) {
       section = int16_t(guest::LoadU16(base, frame + 80));
     }
   }
-  const uint32_t p = progress();
-  const int32_t count = int32_t(Load(base, p + kPathLast));
+  const Progress p(base, progress());
+  const int32_t count = int32_t(p.path_count());
   if (count <= 0) {
     return;
   }
@@ -481,24 +487,28 @@ void StartRoute(uint8_t* base, uint32_t machine, uint32_t frame) {
     if (found >= count) {
       return;
     }
-    const int32_t listed = S16(base, p + kPath + 2 * uint32_t(found));
+    const int32_t listed = S16(base, p.path_address() + 2 * uint32_t(found));
     if (section == listed ||
         SectionsBeside(base, uint32_t(section), uint32_t(listed), frame) != 0) {
       break;
     }
   }
-  uint32_t offset = kPath;
+  uint32_t offset = 0;  // from the path's start
   for (int32_t left = found + 1; left != 0; left--, offset += 2) {
     for (uint32_t i = 0; i < 4; i++) {
-      if (Load(base, progress() + kSlotBytes * i + 48) == 0) {
+      if (Slot(base, Progress(base, progress()).slots_address() + Slot::kSize * i)
+              .entry()
+              .address == 0) {
         continue;
       }
-      const uint32_t q = progress();
-      const uint32_t slot = q + kSlotBytes * i + 40;
-      Append(base, slot + 12, slot + 524, q + offset);
+      const Progress q(base, progress());
+      const Slot slot(base, q.slots_address() + Slot::kSize * i);
+      Append(base, slot.sections_address(), slot.section_count_address(),
+             q.path_address() + offset);
     }
-    const uint32_t q = progress();
-    Append(base, q + 6120, q + 6632, q + offset);
+    const Progress q(base, progress());
+    Append(base, q.sections_passed_address(), q.sections_passed_count_address(),
+           q.path_address() + offset);
   }
 }
 

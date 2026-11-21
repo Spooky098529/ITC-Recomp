@@ -25,6 +25,7 @@
 #include "hooks/strings_and_font.h"
 #include "memory/c_runtime_heap.h"
 #include "hooks/ui_movies_game.h"
+#include "schema/ui_movies_game.h"
 #include "strings_and_font/strings_and_font.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
@@ -506,7 +507,8 @@ ITC_REGS_STEP(DrawTexts) {
   NATIVE_OR_ORIGINAL(8211CD90);
   const uint32_t movie = ctx.r3.u32, list = ctx.r4.u32;
   const bool draw_only = ctx.r5.u32 != 0;
-  if (guest::LoadU32(base, list + 8) == 0) {
+  const schema::UiMovieDrawTextList texts(base, list);
+  if (texts.count() == 0) {
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -530,7 +532,7 @@ ITC_REGS_STEP(DrawTexts) {
       lifted::Enter(ctx, base, game::Text::Draw);
       ctx.fpscr.disableFlushMode();
       ctx.r3.u64 = ui_movies::ClearTextItem(base, item);
-    } while (guest::LoadU32(base, list + 8) != 0);
+    } while (texts.count() != 0);
   });
   ctx.lr = lr;
 }
@@ -558,14 +560,15 @@ void FinishIn(lifted::Regs& ctx, uint8_t* base, uint32_t movie, uint32_t frame_b
     if (!found) {
       return;
     }
-    ctx.r3.u64 = guest::LoadU32(base, found->slot + 12);
-    ctx.r4.u64 = guest::LoadU32(base, found->slot + 16);
+    const schema::UiMovieAnimationSlot slot(base, found->slot);
+    ctx.r3.u64 = slot.scene();
+    ctx.r4.u64 = slot.animation();
     ctx.r6.u64 = 0;
     ctx.fpscr.disableFlushMode();
     ctx.f1.f64 = double(std::bit_cast<float>(found->time));
     ctx.lr = apply_return;
     lifted::Enter(ctx, base, game::UiMovie::ApplyAnimation);
-    const uint32_t queue = movie + ui_movies::kMovieQueue;
+    const uint32_t queue = schema::UiMovie(base, movie).queue_address();
     ui_movies::RemoveAt(base, queue, found->position);
     ctx.r3.u64 = queue;
   });
@@ -602,29 +605,30 @@ ITC_NATIVE_ENTRY_ALWAYS(8211D280) {
   NATIVE_OR_ORIGINAL(8211D280);
   ITC_NATIVE_RUNNING("sub_8211D280 UiMovie::Draw");
   const uint32_t movie = ctx.r3.u32;
+  const schema::UiMovie m(base, movie);
   const uint64_t lr = ctx.lr;
   guest_call::InFrame(ctx, base, 112, 0x8211D2A4, [&](uint32_t) {
     ctx.r3.u64 = movie;
-    ctx.r4.u64 = guest::LoadU32(base, movie + ui_movies::kMovieSaved);
-    ctx.r5.u64 = guest::LoadU32(base, movie + ui_movies::kMovieLive);
+    ctx.r4.u64 = m.saved_scene();
+    ctx.r5.u64 = m.live_scene();
     ctx.r6.u64 = 0;
     ctx.r7.u64 = 0;
     ctx.lr = 0x8211D2A4;
     lifted::Enter(ctx, base, game::UiMovie::RestorePose);
-    ctx.r3.u64 = movie + 64;
-    ctx.r4.u64 = guest::LoadU32(base, movie + ui_movies::kMovieLive);
-    ctx.r5.u64 = movie + ui_movies::kMovieTextures;
-    ctx.r6.u64 = movie + 40;
+    ctx.r3.u64 = m.draw_context_address();
+    ctx.r4.u64 = m.live_scene();
+    ctx.r5.u64 = m.textures_address();
+    ctx.r6.u64 = m.text_items_address();
     ctx.r7.s64 = -1;
     ctx.lr = 0x8211D2C4;
     lifted::Enter(ctx, base, game::UiMovie::Draw_8259FA00);
     ctx.r3.u64 = movie;
-    ctx.r4.u64 = movie + 40;
+    ctx.r4.u64 = m.text_items_address();
     ctx.r5.u64 = 0;
     ctx.lr = 0x8211D2D4;
     lifted::Enter(ctx, base, game::UiMovie::DrawTexts);
     for (uint32_t k = 0; k < 2; k++) {
-      ctx.r3.u64 = movie + 64;
+      ctx.r3.u64 = m.draw_context_address();
       ctx.r4.u64 = k == 0 ? 678 : 148;
       ctx.lr = k == 0 ? 0x8211D2E0 : 0x8211D2EC;
       lifted::Enter(ctx, base, lifted::entry::e8259DAC0);
@@ -658,11 +662,11 @@ ITC_NATIVE_ENTRY_ALWAYS(8211DFF8) {
   NATIVE_UNWATCHED_OR_ORIGINAL(8211DFF8);
   ITC_NATIVE_RUNNING("sub_8211DFF8 UiMovie::FinishAll");
   const uint32_t movie = ctx.r3.u32;
-  const uint32_t queue = movie + ui_movies::kMovieQueue;
-  const uint32_t looping = movie + ui_movies::kMovieLooping;
+  const uint32_t queue = schema::UiMovie(base, movie).queue_address();
+  const uint32_t looping = schema::UiMovie(base, movie).looping_address();
   const uint64_t lr = ctx.lr;
   auto count = [&](uint32_t list) {
-    return uint32_t(int32_t(int16_t(guest::LoadU16(base, list + 136))));
+    return uint32_t(int32_t(int16_t(schema::UiMovieAnimationList(base, list).count())));
   };
   guest_call::InFrame(ctx, base, 176, 0x8211E05C, [&](uint32_t frame) {
     const uint32_t copy = frame + 80;
@@ -695,8 +699,9 @@ ITC_NATIVE_ENTRY_ALWAYS(8211DFF8) {
     if (n != 0) {
       do {
         copy_first(queue, 0x8211E0F0);
-        ctx.r3.u64 = guest::LoadU32(base, copy + 12);
-        ctx.r4.u64 = guest::LoadU32(base, copy + 16);
+        const schema::UiMovieAnimationSlot slot(base, copy);
+        ctx.r3.u64 = slot.scene();
+        ctx.r4.u64 = slot.animation();
         ctx.r6.u64 = 0;
         ctx.fpscr.disableFlushMode();
         ctx.f1.f64 = double(std::bit_cast<float>(ui_movies::FinishTime(base, copy)));
@@ -743,15 +748,17 @@ ITC_NATIVE_ENTRY_ALWAYS(8211B0E8) {
 ITC_NATIVE_ENTRY_ALWAYS(8211C168) {
   
   NATIVE_HEAP_OR_ORIGINAL(8211C168,
-                          ui_movies::PairsSet(base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32),
-                                              guest::LoadU32(base, ctx.r5.u32)));
+                          ui_movies::PairsSet(base, ctx.r3.u32,
+                                              schema::UiMovieWord(base, ctx.r4.u32).value(),
+                                              schema::UiMovieWord(base, ctx.r5.u32).value()));
 }
 
 // sub_8211AE68: r3 = a vector of words, r4 = the word's address.
 ITC_NATIVE_ENTRY_ALWAYS(8211AE68) {
   
   NATIVE_HEAP_OR_ORIGINAL(8211AE68,
-                          ui_movies::WordsAppend(base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32)));
+                          ui_movies::WordsAppend(base, ctx.r3.u32,
+                                                 schema::UiMovieWord(base, ctx.r4.u32).value()));
 }
 
 // UiMovie::UiMovie: r3 = movie; returned.
@@ -1093,8 +1100,8 @@ uint32_t CallFrom(lifted::Regs& ctx, uint8_t* base, uint32_t sp, uint32_t bytes,
 uint32_t SetPair(lifted::Regs& ctx, uint8_t* base, uint32_t sp, uint32_t back,
                  uint32_t key_address, uint32_t value_address) {
   if (const auto r3 = ui_movies::PairsSet(base, ui_movies::kMovieTable,
-                                          guest::LoadU32(base, key_address),
-                                          guest::LoadU32(base, value_address))) {
+                                          schema::UiMovieWord(base, key_address).value(),
+                                          schema::UiMovieWord(base, value_address).value())) {
     return *r3;
   }
   return CallFrom(ctx, base, sp, 128, back, ITC_REGS_FN(lifted::original::c8211C168), ui_movies::kMovieTable,
@@ -1280,7 +1287,7 @@ ui_movies::OnLoadedCalls OnLoadedCalls(lifted::Regs& ctx, uint8_t* base, uint32_
     call(0x8211E740, ITC_REGS_FN(lifted::original::c822A5B78), texture, 0, desc);
   };
   calls.append = [call, base](uint32_t vector, uint32_t word_address) {
-    if (!ui_movies::WordsAppend(base, vector, guest::LoadU32(base, word_address))) {
+    if (!ui_movies::WordsAppend(base, vector, schema::UiMovieWord(base, word_address).value())) {
       call(0x8211E75C, ITC_REGS_FN(lifted::original::c8211AE68), vector, word_address);
     }
   };

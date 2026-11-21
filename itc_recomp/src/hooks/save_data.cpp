@@ -12,6 +12,7 @@
 #include "hooks/app_start_up.h"
 #include "hooks/heap.h"
 #include "save_data/save_data.h"
+#include "schema/save_data.h"
 #include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_save_data, true, "ITC",
@@ -83,7 +84,7 @@ ITC_REGS_STEP(SaveDataCourseRecordsReset) {
 
 ITC_REGS_STEP(SaveDataCourseRecordsOf) {
   const uint64_t records = ctx.r3.u64;
-  ctx.r10.u64 = guest::LoadU32(base, ctx.r4.u32 + 4);
+  ctx.r10.u64 = schema::CourseRecordKey(base, ctx.r4.u32).traffic();
   ctx.r3.u64 = sd::CourseRecordsOf(base, records, ctx.r4.u32);
   // (r11 = r3 - 20, a leftover for recompiled callers: none now)
 }

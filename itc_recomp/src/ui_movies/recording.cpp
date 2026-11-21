@@ -4,6 +4,7 @@
 #include "ui_movies/ui_movies.h"
 
 #include "command_list/command_list.h"
+#include "schema/ui_movies.h"
 
 #include <initializer_list>
 #include <vector>
@@ -81,9 +82,10 @@ bool ChunksFit(uint8_t* base, uint32_t list, std::initializer_list<std::vector<u
 }
 
 std::optional<uint32_t> RecordQuad(uint8_t* base, uint32_t list, uint32_t quad, bool textured) {
-  const uint32_t clipped = guest::LoadU32(base, quad + 100);
-  const uint32_t mode = guest::LoadU32(base, quad + 68);
-  const uint32_t vertices = guest::LoadU32(base, quad + 80);
+  const schema::UiMovieDrawQuad q(base, quad);
+  const uint32_t clipped = q.clipped();
+  const uint32_t mode = q.blend_mode();
+  const uint32_t vertices = q.vertex_count();
   {
     // The allocations, in order: the header, the clip (2), the texture
     // (2, textured only), the blend states, the texture stage (3), 13, 6,
@@ -102,16 +104,17 @@ std::optional<uint32_t> RecordQuad(uint8_t* base, uint32_t list, uint32_t quad, 
     // halfwords (+104..+110).
     Slot2(base, slot(), 31, 1);
     const uint32_t s = slot();
-    for (uint32_t i = 0; i < 4; i++) {
-      guest::StoreU16(base, s + 2 * i, guest::LoadU16(base, quad + 104 + 2 * i));
-    }
+    guest::StoreU16(base, s + 0, q.clip_left());
+    guest::StoreU16(base, s + 2, q.clip_top());
+    guest::StoreU16(base, s + 4, q.clip_right());
+    guest::StoreU16(base, s + 6, q.clip_bottom());
   } else {
     Slot3(base, slot(), 1, 1, 0);
     Slot2(base, slot(), 200, 0);
   }
   if (textured) {
     Slot3(base, slot(), 4, 1, 0);
-    Slot2(base, slot(), 0, guest::LoadU32(base, quad + 84));
+    Slot2(base, slot(), 0, q.texture());
   }
   if (mode < 5) {
     bool first = true;
@@ -124,37 +127,36 @@ std::optional<uint32_t> RecordQuad(uint8_t* base, uint32_t list, uint32_t quad, 
       }
     }
   }
-  const uint32_t stage = guest::LoadU32(base, quad + 112) != 0 ? 1 : 0;
+  const uint32_t stage = q.texture_stage() != 0 ? 1 : 0;
   Slot3(base, slot(), 2, 2, 0);
   Slot3(base, slot(), 0, 20, stage);
   Slot3(base, slot(), 0, 16, stage);
   Slot3(base, slot(), 13, 1, 0);
   Slot3(base, slot(), 6, 1, textured ? 2 : 0);
-  Slot3(base, slot(), 5, guest::LoadU32(base, quad + 80), 0);
+  Slot3(base, slot(), 5, q.vertex_count(), 0);
 
   // The vertices (24 bytes): position from +88's (16 bytes each), the color
   // from +92's (the word +12's low byte, then bytes +3, +7, +11), texture
   // coordinates from +96's (textured only; +16 and +20 left as they were
   // otherwise). The floats go through registers in the original (lfs,
-  // stfs), which the translated code stores unchanged: copied as words.
-  const uint32_t v = command_list::AllocateVertices(base, list, guest::LoadU32(base, quad + 80),
-                                                    false);
-  for (uint32_t i = 0; i < guest::LoadU32(base, quad + 80); i++) {
-    const uint32_t at = v + 24 * i;
-    const uint32_t position = guest::LoadU32(base, quad + 88) + 16 * i;
-    const uint32_t color = guest::LoadU32(base, quad + 92) + 16 * i;
+  // stfs), which the translated code stores unchanged: copied as floats, bit
+  // for bit (no arithmetic).
+  const uint32_t v = command_list::AllocateVertices(base, list, q.vertex_count(), false);
+  for (uint32_t i = 0; i < q.vertex_count(); i++) {
+    // Vertex i as the block's first (24 bytes each).
+    const schema::CommandListVertices at(base, v + 24 * i);
+    const schema::UiMovieQuadPosition position(base, q.positions().address + 16 * i);
+    const schema::UiMovieQuadColor color(base, q.colors().address + 16 * i);
     if (textured) {
-      const uint32_t uv = guest::LoadU32(base, quad + 96) + 16 * i;
-      guest::StoreU32(base, at + 16, guest::LoadU32(base, uv + 0));
-      guest::StoreU32(base, at + 20, guest::LoadU32(base, uv + 4));
+      const schema::UiMovieQuadCoord uv(base, q.coords().address + 16 * i);
+      at.set_v0_u(uv.u());
+      at.set_v0_v(uv.v());
     }
-    guest::StoreU32(base, at + 0, guest::LoadU32(base, position + 0));
-    guest::StoreU32(base, at + 4, guest::LoadU32(base, position + 4));
-    guest::StoreU32(base, at + 8, guest::LoadU32(base, position + 8));
-    guest::StoreU32(base, at + 12, (guest::LoadU32(base, color + 12) << 24) |
-                                       (uint32_t(guest::LoadU8(base, color + 3)) << 16) |
-                                       (uint32_t(guest::LoadU8(base, color + 7)) << 8) |
-                                       guest::LoadU8(base, color + 11));
+    at.set_v0_x(position.x());
+    at.set_v0_y(position.y());
+    at.set_v0_z(position.z());
+    at.set_v0_color((color.alpha() << 24) | (uint32_t(color.red_low()) << 16) |
+                    (uint32_t(color.green_low()) << 8) | color.blue_low());
   }
   Slot3(base, slot(), 15, 1, 0);
   slot();  // allocated and left as it was, as the original does

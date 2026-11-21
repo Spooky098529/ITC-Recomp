@@ -16,6 +16,9 @@
 #include "models/part_model.h"
 #include "models/texture_provider.h"
 #include "models/xpr.h"
+#include "schema/car_draw.h"
+#include "schema/scene.h"
+#include "schema/scene_loaders.h"
 #include "scene_loaders/loads.h"
 #include "scene_loaders/pools.h"
 #include "scenery_lists/scenery_lists.h"
@@ -29,6 +32,8 @@
 namespace scene {
 
 namespace {
+
+using Globals = schema::SceneGlobals;
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -60,7 +65,7 @@ void SetUpConstruct(uint8_t* base, uint32_t record) {
 
 std::optional<uint32_t> FreePagesIn(uint8_t* base, uint32_t at) {
   ITC_NATIVE_RUNNING("sub_820D09A0 FreePagesIn");
-  const uint32_t pages = Load(base, at);
+  const uint32_t pages = schema::ScenePagesWord(base, at).pages();
   if (pages == 0 || !memory::IsPages(pages)) {
     return std::nullopt;
   }
@@ -70,18 +75,18 @@ std::optional<uint32_t> FreePagesIn(uint8_t* base, uint32_t at) {
 
 void StartTeardownA(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_820C3C80 ScenePools::StartTeardownA");
-  Store(base, Load(base, kFirstSet) + 4, 4);
-  Store(base, Load(base, kFirstSet) + 0, 2);
+  Store(base, Globals::first_set(base).address + 4, 4);
+  Store(base, Globals::first_set(base).address + 0, 2);
 }
 
 std::optional<uint64_t> StartTeardown(uint8_t* base,
                                       const std::function<uint64_t(uint32_t set)>& release_all) {
   ITC_NATIVE_RUNNING("sub_820C4D88 CarScene::StartTeardown");
-  if (Load(base, kScene) == 0) {
+  if (Globals::scene(base).address == 0) {
     return std::nullopt;
   }
-  Store(base, Load(base, kScene) + 0, 4);
-  Store(base, Load(base, kScene) + 48, 2);
+  Store(base, Globals::scene(base).address + 0, 4);
+  Store(base, Globals::scene(base).address + 48, 2);
   StartTeardownA(base);
   return release_all(Load(base, 0x826C5510));  // sub_820F0E50: the accessories' set
 }
@@ -316,7 +321,7 @@ std::optional<uint32_t> AssetsReset(uint8_t* base, uint32_t assets) {
   }
   for (uint32_t i = 0; i < 19; i++) {
     car_models::LoadSlotReset(base, assets + 3136 + 24 * i);
-    Store(base, assets + 3592 + 4 * i, 0);
+    Store(base, schema::SceneAssets(base, assets).plate_tga_pixels_address() + 4 * i, 0);
   }
   for (uint32_t i = 0; i < 4; i++) {
     car_models::LoadSlotReset(base, assets + 4608 + 24 * i);
@@ -402,7 +407,7 @@ bool CarSceneConstruct(uint8_t* base, uint32_t scene) {
   for (uint32_t i = 0; i < 8; i++) {
     vehicle_accessors::ListInit(base, scene + 4944 + 12 * i);
   }
-  const uint32_t one = Load(base, 0x82000A30);  // 1.0, stored as lfs and stfs leave it
+  const uint32_t one = Globals::one(base);  // 1.0, stored as lfs and stfs leave it
   for (uint32_t i = 0; i < 5; i++) {
     Store(base, scene + 5180 + 16 * i, one);
   }
@@ -457,7 +462,7 @@ std::optional<uint32_t> CarSceneDestruct(uint8_t* base, uint32_t scene, uint32_t
 // --- The first set's update ---
 
 bool UpdateANative(uint8_t* base) {
-  const uint32_t set = Load(base, kFirstSet);
+  const uint32_t set = Globals::first_set(base).address;
   if (set == 0 || int32_t(Load(base, set + 4)) != 4 || Load(base, set + 0) != 0) {
     return true;
   }
@@ -469,7 +474,7 @@ bool UpdateANative(uint8_t* base) {
 std::optional<uint32_t> UpdateA(uint8_t* base, uint32_t sp, const DestroyCall& destroy,
                                 const TextureFreeCall& texture_free) {
   ITC_NATIVE_RUNNING("sub_820C3DA0 ScenePools::UpdateA");
-  uint32_t set = Load(base, kFirstSet);
+  uint32_t set = Globals::first_set(base).address;
   if (set == 0) {
     return std::nullopt;
   }
@@ -512,7 +517,7 @@ std::optional<uint32_t> UpdateA(uint8_t* base, uint32_t sp, const DestroyCall& d
   DestroyA(base, set, frame, [&](uint32_t object, uint32_t destroy_frame) {
     destroy(object, 0, destroy_frame);
   });
-  set = Load(base, kFirstSet);
+  set = Globals::first_set(base).address;
   const int32_t n = count();
   for (int32_t i = 0; i < n; i++) {
     const uint32_t at = 20 * uint32_t(i);
@@ -526,9 +531,9 @@ std::optional<uint32_t> UpdateA(uint8_t* base, uint32_t sp, const DestroyCall& d
     clear(at);
   }
   Require(FreePagesIn(base, set + 52).has_value(), "FreePagesIn");
-  const uint32_t pages = Load(base, kFirstSet);
+  const uint32_t pages = Globals::first_set(base).address;
   Require(memory::IsPages(pages) && memory::FreePages(pages), "VirtualFree");
-  Store(base, kFirstSet, 0);
+  Globals::set_first_set(base, uint32_t{0});
   return 1;
 }
 
@@ -639,29 +644,29 @@ uint64_t Create(uint8_t* base, uint32_t sp) {
   const uint32_t frame = sp - 128;
   Store(base, frame, sp);
   const uint32_t pages = memory::AllocPages(kSceneBytes, 4096);
-  Store(base, kScene, pages);
+  Globals::set_scene(base, pages);
   uint32_t scene = pages;
   if (pages != 0) {
     Require(CarSceneConstruct(base, pages), "CarScene::CarScene");
-    scene = Load(base, kScene);
+    scene = Globals::scene(base).address;
   }
   Store(base, scene + 0, 0);
-  Store(base, 0x82601854, 167);
-  Store(base, 0x82601858, 270);
+  Globals::set_queue_key_a(base, 167);
+  Globals::set_queue_key_b(base, 270);
   scene_loaders::MakeA(base);
-  Store(base, Load(base, kScene) + 5040, Load(base, kFirstSet));
-  InitLighting(base, Load(base, kScene) + 5248, frame);
-  Require(AssetsReset(base, Load(base, kScene) + kAssets).has_value(), "SceneAssets::Reset");
-  Store(base, Load(base, kScene) + 5044, 0);
-  Store(base, Load(base, kScene) + 5048, 0);
-  Store(base, Load(base, kScene) + 5052, 0);
+  Store(base, Globals::scene(base).address + 5040, Globals::first_set(base).address);
+  InitLighting(base, Globals::scene(base).address + 5248, frame);
+  Require(AssetsReset(base, Globals::scene(base).address + kAssets).has_value(), "SceneAssets::Reset");
+  Store(base, Globals::scene(base).address + 5044, 0);
+  Store(base, Globals::scene(base).address + 5048, 0);
+  Store(base, Globals::scene(base).address + 5052, 0);
   material_passes::PaintPaletteInit(base, frame);
   accessories::SetCreate(base);
-  const uint32_t x = Load(base, 0x82002FE8);
+  const uint32_t x = Globals::accessories_scale(base);
   Store(base, frame + 80, x);
   Store(base, frame + 84, x);
   Store(base, frame + 88, x);
-  Store(base, frame + 92, Load(base, 0x82000A30));  // 1.0
+  Store(base, frame + 92, Globals::one(base));  // 1.0
   const uint32_t set = Load(base, accessories::kSet);  // sub_820F0E50
   accessories::SetScale(base, set, frame + 80);
   return set;
@@ -839,7 +844,7 @@ std::optional<uint64_t> FileLoaded(uint8_t* base, uint32_t request, uint32_t dat
       Store(base, slot + 20, 3);
       if (branch->slot == 880) {
         const int32_t shapes = int32_t(Load(base, assets + 828));
-        const double one = double(std::bit_cast<float>(Load(base, 0x82000A30)));
+        const double one = double(std::bit_cast<float>(Globals::one(base)));
         for (int32_t i = 0; i < shapes; i++) {
           r3 = material_passes::ScaleBlended(base, model, uint32_t(i), one, frame);
         }
@@ -909,29 +914,29 @@ uint64_t Update(uint8_t* base, uint32_t sp, uint64_t r3, const UpdateCalls& call
   ITC_NATIVE_RUNNING("sub_820C9608 CarScene::Update");
   const uint32_t frame = sp - 96;
   Store(base, frame, sp);  // the back chain, for the guest calls
-  const uint32_t scene = Load(base, kScene);
+  const uint32_t scene = Globals::scene(base).address;
   r3 = scene;
   if (scene != 0) {
     if (int32_t(Load(base, scene + 0)) != 4) {
       r3 = calls.update_models(scene, frame);
-      Store(base, 0x8260185C, 3);
+      Globals::set_scene_ticks(base, 3);
     } else if (Load(base, scene + 48) != 0) {
       Store(base, scene + 48, Load(base, scene + 48) - 1);
     } else {
       DestroyB(base, scene, frame, calls.finish, calls.destroy, calls.free_object);
-      uint32_t current = Load(base, kScene);
+      uint32_t current = Globals::scene(base).address;
       if (Load(base, current + 40) == 0) {
         Store(base, current + 5056, 0);
-        current = Load(base, kScene);
+        current = Globals::scene(base).address;
       }
       calls.release(current + kAssets, frame);
-      calls.destruct(Load(base, kScene), frame);
-      r3 = calls.free_scene(Load(base, kScene), frame);
-      Store(base, kScene, 0);
+      calls.destruct(Globals::scene(base).address, frame);
+      r3 = calls.free_scene(Globals::scene(base).address, frame);
+      Globals::set_scene(base, uint32_t{0});
     }
   }
   r3 = calls.update_a(r3, frame);
-  if (Load(base, kScene) == 0) {
+  if (Globals::scene(base).address == 0) {
     const uint32_t set = Load(base, 0x826C5510);  // sub_820F0E50: the accessories' set
     r3 = set;
     if (set != 0) {

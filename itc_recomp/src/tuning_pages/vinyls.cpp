@@ -17,6 +17,8 @@ namespace tuning_pages {
 
 namespace {
 
+using G = schema::TuningPagesGlobals;
+
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
@@ -39,10 +41,6 @@ double IntToFloat(uint8_t* base, uint32_t at, int32_t value) {
   return double(float(double(int64_t(word))));
 }
 
-constexpr uint32_t kMinusOne = 0x82001BE0;     // probably -1.0
-constexpr uint32_t kZero = 0x82000A34;         // 0.0
-constexpr uint32_t kStoreScale = 0x82002948;   // StoreVinyls' scale for +16
-constexpr uint32_t kLoadScale = 0x8200294C;    // LoadVinyls'
 constexpr uint32_t kMemcpy = 0x825A7410;
 
 }  // namespace
@@ -54,8 +52,8 @@ void StoreVinyls(uint8_t* base, uint64_t screen, uint32_t sp) {
   Store(base, sp - 16, 0);
   Store(base, sp - 12, 1);
   Store(base, sp - 8, 2);
-  const double scale = Lfs(base, kStoreScale);
-  const double minus = Lfs(base, kMinusOne);
+  const double scale = double(G::store_scale(base));
+  const double minus = double(G::minus_one(base));
   for (uint32_t k = 0; k < 3; k++) {
     const uint32_t n = Load(base, sp - 16 + 4 * k);
     const uint32_t from = uint32_t(uint64_t(n) * 24 + screen);
@@ -97,9 +95,9 @@ uint64_t LoadVinyls(uint8_t* base, const tuning_screen::GuestCall& call, uint64_
   Store(base, frame + 88, 2);
   Store(base, frame + 80, 0);
   Store(base, frame + 84, 1);
-  const double minus = Lfs(base, kMinusOne);
-  const double zero = Lfs(base, kZero);
-  const double scale = Lfs(base, kLoadScale);
+  const double minus = double(G::minus_one(base));
+  const double zero = double(G::zero(base));
+  const double scale = double(G::load_scale(base));
   for (uint32_t k = 0; k < 3; k++) {
     const uint32_t n = Load(base, frame + 80 + 4 * k);
     const uint32_t r = (n << 5) + c + 96;  // the record (r10 + 96)

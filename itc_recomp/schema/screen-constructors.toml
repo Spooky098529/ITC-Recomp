@@ -1,0 +1,100 @@
+# The schema of docs/functions/screen-constructors.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The type 6 and 7 modes' screen constructors (src/screen_constructors/;
+# docs/known-data.md, "type 6 screens", "type 7 screens", "type 6 and 7
+# list, panel and node screens"). Most of what they build is described
+# elsewhere: the screens and their node tables by type67-screens, the panel
+# set, its base, the panel groups and the four panels by car-list.toml.
+# The measure gives this area the panels' constructors' types (PanelCBase,
+# PanelDBase, Panel6D, Panel7D, PanelE, PanelEBase, PanelFBase, Panel6F,
+# Panel7F, PanelGroup6B, PanelGroup7B): they are car-list.toml's CarPanel,
+# ColorPanel, RowPanel, TabPanel and PanelGroupBase, so they go there (the
+# lead's to add: this area's report), not here.
+
+# The empty base many classes share (vtable 0x82010B5C: the panel groups'
+# base, PanelDBase's, PanelFBase's, Type7Screen0's; as ListNode's in
+# archive.md). Built by NodeBase::NodeBase (sub_82258FB0).
+[NodeBase]
+measure = "NodeBase"
+size = 8
+origin = "embedded"
+vtable = 0x82010B5C
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32", note = "0 in the constructor; the classes above it keep their group or movie there" },
+]
+
+# A list screen's node table as the list screens' constructors reach it
+# through their +9672: the type 6 list's PairedNodeTable (460 bytes, at the
+# screen's +10360; PairedNodeTable::PairedNodeTable sub_82247C60 over
+# NodeTable::NodeTable sub_82247BE8). The same object as type67-screens'
+# PairedNodeTable (to merge there once it's described).
+[ListNodeTable]
+measure = "Type6ListScreen.+9672"
+size = 460
+origin = "embedded"
+vtable = 0x82010FF8
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82010FF0 NodeTable's, 0x82010FF8 PairedNodeTable's" },
+  { name = "movie", offset = 4, type = "u32", note = "the UI movie (25 for the type 6 list)" },
+  { name = "node_set_a", offset = 8, type = "u32" },
+  { name = "node_set_b", offset = 12, type = "u32" },
+  { name = "item_anims", offset = 16, type = "bytes", count = 108, note = "27 items' named animations" },
+  { name = "more_anims", offset = 124, type = "bytes", count = 32, note = "eight more (the third pair's)" },
+  { name = "item_nodes", offset = 156, type = "bytes", count = 108, note = "27 items' nodes" },
+  { name = "nodes", offset = 264, type = "bytes", count = 32, note = "eight nodes" },
+  { name = "children", offset = 296, type = "bytes", count = 16, note = "four children's indexes" },
+  { name = "item_masks", offset = 312, type = "bytes", count = 108, note = "27 items' masks" },
+  { name = "node_base_a", offset = 420, type = "u32" },
+  { name = "node_base_b", offset = 424, type = "u32" },
+  { name = "pairs", offset = 428, type = "bytes", count = 32, note = "four pairs (now, before)" },
+]
+
+# The type 7 list's ColorNodeTable (584 bytes, at the screen's +10432;
+# ColorNodeTable::ColorNodeTable sub_82247D08): a node table with mark bits,
+# a color child, two node grids and two colors. The same object as
+# type67-screens' ColorNodeTable (to merge there once it's described).
+[ListColorNodeTable]
+measure = "Type7ListScreen.+9672"
+size = 584
+origin = "embedded"
+vtable = 0x82011000
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "movie", offset = 4, type = "u32", note = "the UI movie (the list screen's +9680)" },
+  { name = "node_set_a", offset = 8, type = "u32" },
+  { name = "node_set_b", offset = 12, type = "u32" },
+  { name = "item_anims", offset = 16, type = "bytes", count = 108, note = "27 items' named animations" },
+  { name = "more_anims", offset = 124, type = "bytes", count = 32, note = "eight more (the third pair's)" },
+  { name = "item_nodes", offset = 156, type = "bytes", count = 108, note = "27 items' nodes" },
+  { name = "nodes", offset = 264, type = "bytes", count = 32, note = "eight nodes" },
+  { name = "children", offset = 296, type = "bytes", count = 16, note = "four children's indexes" },
+  { name = "item_masks", offset = 312, type = "bytes", count = 108, note = "27 items' masks (type 7: from the records at 0x826370A0)" },
+  { name = "node_base_a", offset = 420, type = "u32" },
+  { name = "node_base_b", offset = 424, type = "u32" },
+  { name = "pairs", offset = 428, type = "bytes", count = 32, note = "four pairs (now, before)" },
+  { name = "marks", offset = 460, type = "bytes", count = 16, note = "two more pairs: mark bits" },
+  { name = "color_child", offset = 476, type = "u32" },
+  { name = "grid_a", offset = 480, type = "bytes", count = 36, note = "a 3-column node grid" },
+  { name = "grid_b", offset = 516, type = "bytes", count = 36, note = "another" },
+  { name = "color_a", offset = 552, type = "bytes", count = 16, note = "four words (255 in the constructor)" },
+  { name = "color_b", offset = 568, type = "bytes", count = 16, note = "four words (205, 235, 67, 255)" },
+]
+
+# The type 7 list's items' records (15 of 28 bytes at 0x826370A0, .data):
+# Type7ListScreen::Type7ListScreen makes each item's mask from one.
+[Type7ListRecord]
+size = 28
+origin = "image"
+fields = [
+  { name = "count", offset = 0, type = "s32", note = "0, 1, or 2 and more" },
+  { name = "bit_a", offset = 12, type = "u32", note = "a bit number (in the mask from a count of 1 up)" },
+  { name = "bit_b", offset = 16, type = "u32", note = "a bit number (in the mask from a count of 2 up)" },
+]
+
+[globals]
+type7_list_records = { address = 0x826370A0, type = "bytes", count = 420, note = "15 Type7ListRecords" }

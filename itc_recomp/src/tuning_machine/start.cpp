@@ -16,6 +16,8 @@
 #include "car_makers/car_makers.h"
 #include "guest.h"
 #include "mode_tick/mode_tick.h"
+#include "schema/menu_helpers.h"
+#include "schema/tuning_machine.h"
 #include "tuning_screen/tuning_screen.h"
 #include "ui_movies/game.h"
 #include "vehicle/vehicle.h"
@@ -35,9 +37,7 @@ void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
 
-constexpr uint32_t kTwo = 0x820021E8;          // the axles' factor (2.0 probably)
-constexpr uint32_t kTorqueScale = 0x8200ADA0;  // the torque shown
-constexpr uint32_t kFadePasses = 0x82001BEC;   // the fade in's passes (a word)
+using G = schema::TuningMachineGlobals;
 
 }  // namespace
 
@@ -45,27 +45,28 @@ uint64_t Start(uint8_t* base, const tuning_screen::StandCalls& stand, const Call
                uint64_t r3, uint64_t r1, std::optional<double>* f1) {
   ITC_NATIVE_RUNNING("sub_821E7368 TuningMachine::Start");
   const uint32_t s = uint32_t(r3);
+  const schema::TuningMachineScreen sc(base, s);
   const uint32_t sp = uint32_t(r1);
   const uint32_t frame = sp - kStartFrame;
   Store(base, frame, sp);  // the back chain, as stwu
   // The screen's words, in the original's order.
-  Store(base, s + 25116, 9999999);
-  Store(base, s + 25100, 0);
-  Store(base, s + 25104, 0);
-  Store(base, s + 9708, 1);
-  guest::StoreU8(base, s + 25124, 0xFF);
-  Store(base, s + 9712, 0);
-  Store(base, s + 9716, 1);
-  Store(base, s + 9720, 0);
-  Store(base, s + 9724, 0);
-  Store(base, s + 9732, 0);
-  Store(base, s + 9728, 1);
-  Store(base, s + 25072, 1);
-  Store(base, s + 25076, 0);
-  Store(base, s + 25080, 4);
-  Store(base, s + 9656, 0);  // the category: power
-  Store(base, s + 9652, 3);  // TUNING SHOP MAIN
-  Store(base, s + tuning_screen::kSaveData, vehicle_accessors::SaveDataOf(base, 0));
+  sc.set_money(9999999);
+  sc.set_list_row(0);
+  sc.set_list_previous_row(0);
+  sc.set_refresh(1);
+  sc.set_unknown_25124(0xFF);
+  sc.set_bonnet_color_set(0);
+  sc.set_command_first_run(1);
+  sc.set_command_end_after_setup(0);
+  sc.set_command_end_now(0);
+  sc.set_rewrite_car(0);
+  sc.set_pages_enabled(1);
+  sc.set_camera_preset(1);
+  sc.set_previewed_slot(0);
+  sc.set_unknown_25080(4);
+  sc.set_category(0);      // power
+  sc.set_screen_state(3);  // TUNING SHOP MAIN
+  sc.set_save_data(vehicle_accessors::SaveDataOf(base, 0));
   // The car data (its f1 as FromGarageCar leaves it), a power curve on the
   // frame (+96; FromEngine's tail call Build's frame below this one).
   double data_f1 = 0.0;
@@ -76,68 +77,68 @@ uint64_t Start(uint8_t* base, const tuning_screen::StandCalls& stand, const Call
   vehicle::PowerCurveShiftPeak(base, curve, 0, frame);
   // The stats (as SetCarStats): the displacement, the weight, the power
   // (words by fctiwz, stfiwx) and the torque shown (a float).
-  const int32_t displacement = steps::Fctiwz(steps::Lfs(base, s + 20200));
+  const int32_t displacement = steps::Fctiwz(steps::Lfs(base, sc.car_displacement_address()));
   const int32_t power = steps::Fctiwz(steps::Lfs(base, curve + 1056));
   const double torque = steps::Lfs(base, curve + 1048);
-  const double two = steps::Lfs(base, kTwo);
-  Store(base, s + 20768, uint32_t(displacement));
-  const double rear = steps::Lfs(base, s + 19584);
-  const double shown = steps::Single(torque * steps::Lfs(base, kTorqueScale));
-  const double front = steps::Lfs(base, s + 19312);
+  const double two = steps::Lfs(base, G::axle_factor_address());
+  sc.set_stat_displacement(uint32_t(displacement));
+  const double rear = steps::Lfs(base, sc.car_rear_weight_address());
+  const double shown = steps::Single(torque * steps::Lfs(base, G::torque_scale_address()));
+  const double front = steps::Lfs(base, sc.car_front_weight_address());
   const double axles = steps::Single(rear + front);
-  const double body = steps::Lfs(base, s + 18912);
-  Store(base, s + 20780, std::bit_cast<uint32_t>(float(shown)));
+  const double body = steps::Lfs(base, sc.car_body_weight_address());
+  Store(base, sc.stat_torque_address(), std::bit_cast<uint32_t>(float(shown)));
   const double weight = steps::Single(std::fma(axles, two, body));
-  Store(base, s + 20772, uint32_t(steps::Fctiwz(weight)));
-  Store(base, s + 20776, uint32_t(power));
-  SavePlaceholders(base, s + kImages, frame);
+  sc.set_stat_weight(uint32_t(steps::Fctiwz(weight)));
+  sc.set_stat_power(uint32_t(power));
+  SavePlaceholders(base, sc.decal_images_address(), frame);
   SetUp(base, r3, (r1 & 0xFFFFFFFF00000000ull) | frame, true, calls);
   // The busy icon: movie 2's nodes 172, 171 and 173 (its id also at the
   // frame's +80, UiMovies::Find's key), the movie's pose reset.
-  Store(base, s + 10016, 0);
-  Store(base, s + 10020, kShopMovie);
-  Store(base, s + 10024, 172);
-  Store(base, s + 10028, 171);
-  Store(base, s + 10032, 173);
+  sc.set_busy_shown(0);
+  sc.set_busy_movie(kShopMovie);
+  sc.set_busy_animation_a(172);
+  sc.set_busy_animation_b(171);
+  sc.set_busy_animation_c(173);
   const uint32_t movie = Load(base, tuning_screen::MovieEntry(base, frame, kShopMovie));
   ui_movies::ResetPose(base, movie);
   tuning_screen::Refresh(base, stand, r3, frame, f1);
   // The command queue at its state; the category menu (6 rows, 8 lines).
-  const uint32_t state = Load(base, s + 9652);
-  uint32_t queue = Load(base, s + kQueue);
-  Store(base, queue + 4, state);
-  Store(base, queue + 0, state);
-  Store(base, queue + 8, state);
-  Store(base, queue + 20, 0xFFFFFFFFu);
-  Store(base, queue + 12, 0xFFFFFFFFu);
-  Store(base, queue + 24, 0);
-  const uint32_t category = Load(base, s + 9656);
-  const uint32_t menu = Load(base, s + kMenu);
-  Store(base, menu + 12, 0);
-  Store(base, menu + 16, 6);
-  Store(base, menu + 20, 1);
-  Store(base, menu + 8, 0);
-  Store(base, menu + 0, category);
-  Store(base, menu + 4, category);
-  Store(base, menu + 44, 0);
-  Store(base, menu + 56, 0);
-  Store(base, menu + 60, 8);
-  Store(base, menu + 36, 0);
-  Store(base, menu + 64, 0);
-  Store(base, menu + 24, 0);
-  Store(base, menu + 28, 0);
+  const uint32_t state = sc.screen_state();
+  schema::PageObject queue = sc.queue();
+  queue.set_next_page(state);
+  queue.set_page(state);
+  queue.set_previous_page(state);
+  queue.set_unknown_20(0xFFFFFFFFu);
+  queue.set_step(0xFFFFFFFFu);
+  queue.set_step_started(0);
+  const uint32_t category = sc.category();
+  const schema::FrontEndMenu menu = sc.category_menu();
+  menu.set_first_item(0);
+  menu.set_last_item(6);
+  menu.set_wraps(1);
+  menu.set_moved(0);
+  menu.set_cursor(category);
+  menu.set_previous(category);
+  menu.set_list_wrapped(0);
+  menu.set_first_row(0);
+  menu.set_rows_shown(8);
+  menu.set_side(0);
+  menu.set_player(0);
+  menu.set_up_down_locked(0);
+  menu.set_left_right_steps(0);
   // Command 0 queued (both read again).
-  queue = Load(base, s + kQueue);
-  const uint32_t page = Load(base, s + 9652);
-  const uint32_t current = Load(base, queue + 0);
+  queue = sc.queue();
+  const uint32_t page = sc.screen_state();
+  const uint32_t current = queue.page();
   if (int32_t(page) != int32_t(current)) {
-    Store(base, queue + 8, current);
+    queue.set_previous_page(current);
   }
-  Store(base, queue + 12, 0);
-  Store(base, queue + 16, 0xFFFFFFFFu);
-  Store(base, queue + 4, page);
-  Store(base, queue + 0, 0xFFFFFFFFu);
-  const uint32_t passes = Load(base, kFadePasses);
+  queue.set_step(0);
+  queue.set_queued_step(0xFFFFFFFFu);
+  queue.set_next_page(page);
+  queue.set_page(0xFFFFFFFFu);
+  const uint32_t passes = G::fade_in_passes(base);
   mode_tick::ScreenFadesFadeIn(base, passes, 0, 0, 0, 0);
   return passes;  // FadeIn leaves r3 (lwz: zero-extended)
 }

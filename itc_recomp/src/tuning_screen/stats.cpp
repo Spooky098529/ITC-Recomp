@@ -78,24 +78,24 @@ uint64_t SetCarStats(uint8_t* base, const front_end_car_draw::Calls& calls, uint
   car_makers::TuningScreenSetUpCarData(base, calls, s, frame, &data_f1);
   const uint32_t curve = frame + 96;
   // FromEngine tail-calls PowerCurve::Build, whose frame is below this one.
-  vehicle::PowerCurveFromEngine(base, curve, s + 20180, frame - 112);
+  vehicle::PowerCurveFromEngine(base, curve, TS(base, s).car_data_address() + 1268, frame - 112);
   vehicle::PowerCurveShiftPeak(base, curve, 0, frame);
 
-  const int64_t displacement = Fctiwz(Lfs(base, s + 20200));
-  const uint32_t drive = Load(base, s + 20788);
+  const int64_t displacement = Fctiwz(Lfs(base, TS(base, s).car_data_address() + 1288));
+  const uint32_t drive = TS(base, s).spec_byte_130();
   const int64_t power = Fctiwz(Lfs(base, curve + 1056));
   const double torque = Lfs(base, curve + 1048);
-  Store(base, s + 20768, uint32_t(displacement));
+  TS(base, s).set_stat_displacement(uint32_t(displacement));
   const double two = Lfs(base, kTwo);
-  const double rear = Lfs(base, s + 19584);
+  const double rear = Lfs(base, TS(base, s).car_data_address() + 672);
   const double shown = double(float(torque * Lfs(base, kTorqueScale)));
-  const double front = Lfs(base, s + 19312);
+  const double front = Lfs(base, TS(base, s).car_data_address() + 400);
   const double axles = double(float(rear + front));
-  const double body = Lfs(base, s + 18912);
-  Store(base, s + 20780, std::bit_cast<uint32_t>(float(shown)));
+  const double body = Lfs(base, TS(base, s).car_data_address());
+  TS(base, s).set_stat_torque(float(shown));
   const double weight = double(float(std::fma(axles, two, body)));
-  Store(base, s + 20772, uint32_t(Fctiwz(weight)));
-  Store(base, s + 20776, uint32_t(power));
+  TS(base, s).set_stat_weight(uint32_t(Fctiwz(weight)));
+  TS(base, s).set_stat_peak_power(uint32_t(power));
 
   uint64_t r3 = 0;
   auto text = [&](uint32_t lr, uint32_t child, uint32_t id, uint64_t argument,
@@ -106,19 +106,20 @@ uint64_t SetCarStats(uint8_t* base, const front_end_car_draw::Calls& calls, uint
   if (drive < 5) {
     text(0x821DF894, 5, 421 + drive, 0);
   }
-  const uint32_t aspiration = Load(base, s + 20784);
+  const uint32_t aspiration = TS(base, s).spec_byte_69();
   if (aspiration < 2) {
     text(0x821DF8C0, 6, 426 + aspiration, 0);
   }
-  text(0x821DF8D8, 7, 8, Load(base, s + 20768));
-  const int64_t w = int32_t(Load(base, s + 20772));
+  text(0x821DF8D8, 7, 8, TS(base, s).stat_displacement());
+  const int64_t w = int32_t(TS(base, s).stat_weight());
   Store64(base, frame + 80, uint64_t(w));
   const double single = double(float(double(w)));
   const double pounds = double(float(single * Lfd(base, kPounds)));
   Store(base, frame + 80, uint32_t(Fctiwz(pounds)));
   text(0x821DF920, 8, 8, Load(base, frame + 80));
-  text(0x821DF938, 11, 8, Load(base, s + 20776));
-  const double unit = double(float(Lfs(base, s + 20780) * Lfd(base, kTorqueUnit)));
+  text(0x821DF938, 11, 8, TS(base, s).stat_peak_power());
+  const double unit =
+      double(float(Lfs(base, TS(base, s).stat_torque_address()) * Lfd(base, kTorqueUnit)));
   Store64(base, frame + 48, std::bit_cast<uint64_t>(unit));
   text(0x821DF968, 12, 436, Load64(base, frame + 48), &unit);
   text(0x821DF97C, 9, 438, 0);

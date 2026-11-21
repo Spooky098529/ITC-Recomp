@@ -5,6 +5,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/type2_mode.h"
 
 namespace type2_mode {
 
@@ -53,14 +54,14 @@ uint64_t MachineOf(uint64_t block, uint64_t index) {
 
 uint32_t AllLoaded(uint8_t* base, uint32_t block) {
   ITC_NATIVE_RUNNING("sub_82197130 ModeType2::AllLoaded");
-  // The +9608 words of the hub, the race menu, the tuning screen, the car
-  // settings, the car dealer, the garage screen, the build screen, the
-  // options, the spec sheet, the user info and the plate editor, then the
-  // block's own.
-  static constexpr uint32_t kLoaded[] = {9608,    19248,   29400,   0x19958, 0x1BF00, 0x255A0,
-                                         0x1E4A8, 0x14E08, 0x102B8, 0x12860, 0x22FF8, kBlockLoaded};
-  for (const uint32_t at : kLoaded) {
-    if (guest::LoadU32(base, block + at) == 0) {
+  // The loaded words (+9608) of the hub, the race menu, the tuning screen,
+  // the car settings, the car dealer, the garage screen, the build screen,
+  // the options, the spec sheet, the user info, the plate editor and the
+  // save screen (the block's +0x27B48).
+  static constexpr uint32_t kMachines[] = {0,       9640,    19792,   0x173D0, 0x19978, 0x23018,
+                                           0x1BF20, 0x12880, 56624,   0x102D8, 0x20A70, 0x255C0};
+  for (const uint32_t at : kMachines) {
+    if (schema::Type2ScreenMachine(base, block + at).loaded() == 0) {
       return 0;
     }
   }
@@ -76,9 +77,9 @@ uint64_t FindShown(uint8_t* base, uint64_t block, uint32_t sp) {
     if (uint32_t(r3) == 0) {
       continue;
     }
-    const int32_t state = int32_t(guest::LoadU32(base, uint32_t(r3) + 9604));
+    const int32_t state = int32_t(schema::Type2ScreenMachine(base, uint32_t(r3)).state());
     if (state == 5 || state == 4) {
-      guest::StoreU32(base, uint32_t(block) + kShown, i);
+      schema::Type2ModeBlock(base, uint32_t(block)).set_shown(i);
     }
   }
   return r3;

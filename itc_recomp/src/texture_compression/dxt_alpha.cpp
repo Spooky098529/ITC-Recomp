@@ -5,6 +5,7 @@
 #include "texture_compression/dxt_alpha.h"
 
 #include "base/log.h"
+#include "schema/texture_compression.h"
 #include "texture_compression/steps.h"
 
 #include <cstring>
@@ -12,33 +13,35 @@
 namespace texture_compression {
 
 using namespace steps;
+using G = schema::TextureCompressionGlobals;
 
 namespace {
 
 // The game's constants (lfs from .rdata).
-constexpr uint32_t kOne = 0x82000A30;          // 1.0
-constexpr uint32_t kZero = 0x82000A34;         // 0.0
-constexpr uint32_t kHalf = 0x82001BE4;         // probably 0.5
-constexpr uint32_t k255 = 0x82000C44;          // probably 255.0
-constexpr uint32_t kInv255 = 0x82002200;       // probably 1/255
-constexpr uint32_t kInv5 = 0x82002208;         // probably 1/5
-constexpr uint32_t kInv7 = 0x8203B7B0;         // probably 1/7
-constexpr uint32_t kRangeMin = 0x82008058;     // FitEndpoints' smallest range
-constexpr uint32_t kGradientMin = 0x8201607C;  // FitEndpoints' squared step to stop
+constexpr uint32_t kOne = G::one_address();  // 1.0
+constexpr uint32_t kZero = G::zero_address();  // 0.0
+constexpr uint32_t kHalf = G::half_address();  // probably 0.5
+constexpr uint32_t k255 = G::scale_255_address();  // probably 255.0
+constexpr uint32_t kInv255 = G::inverse_255_address();  // probably 1/255
+constexpr uint32_t kInv5 = G::inverse_5_address();  // probably 1/5
+constexpr uint32_t kInv7 = G::inverse_7_address();  // probably 1/7
+constexpr uint32_t kRangeMin = G::alpha_range_min_address();  // FitEndpoints' smallest range
+// FitEndpoints' squared step to stop.
+constexpr uint32_t kGradientMin = G::alpha_gradient_min_address();
 // The error diffusion's weights: right, below left, below, below right
 // (probably 7/16, 3/16, 5/16, 1/16).
-constexpr uint32_t kWeightRight = 0x8203EB04;
-constexpr uint32_t kWeightBelowLeft = 0x8203B78C;
-constexpr uint32_t kWeightBelow = 0x8203B790;
-constexpr uint32_t kWeightBelowRight = 0x820093A0;
+constexpr uint32_t kWeightRight = G::weight_right_address();
+constexpr uint32_t kWeightBelowLeft = G::weight_below_left_address();
+constexpr uint32_t kWeightBelow = G::weight_below_address();
+constexpr uint32_t kWeightBelowRight = G::weight_below_right_address();
 // FitEndpoints' weights of the low and high ends for each step.
-constexpr uint32_t kLowWeights6 = 0x8203EA90;
-constexpr uint32_t kHighWeights6 = 0x8203EA78;
-constexpr uint32_t kLowWeights8 = 0x8203EA58;
-constexpr uint32_t kHighWeights8 = 0x8203EA38;
+constexpr uint32_t kLowWeights6 = G::alpha_low_weights_6_address();
+constexpr uint32_t kHighWeights6 = G::alpha_high_weights_6_address();
+constexpr uint32_t kLowWeights8 = G::alpha_low_weights_8_address();
+constexpr uint32_t kHighWeights8 = G::alpha_high_weights_8_address();
 // EncodeBlock's step to index tables (words), ordered from the low end.
-constexpr uint32_t kIndices6 = 0x8203EB28;
-constexpr uint32_t kIndices8 = 0x8203EB08;
+constexpr uint32_t kIndices6 = G::alpha_indices_6_address();
+constexpr uint32_t kIndices8 = G::alpha_indices_8_address();
 
 }  // namespace
 

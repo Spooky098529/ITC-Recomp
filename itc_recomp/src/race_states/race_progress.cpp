@@ -33,10 +33,10 @@ std::optional<uint32_t> ProgressCreate(uint8_t* base) {
   }
   const uint32_t p = *block;
   if (p != 0) {
+    const Progress progress(base, p);
     for (uint32_t k = 0; k < 4; k++) {
-      const uint32_t at = p + kEntries + 792 + kEntryBytes * k;
-      CopyWord(base, kZero, at);
-      Store(base, at + 4, 0);
+      CopyWord(base, kZero, progress.e0_mean_speed_address() + kEntryBytes * k);
+      Store(base, progress.e0_mean_count_address() + kEntryBytes * k, 0);
     }
   }
   G::set_progress(base, p);
@@ -117,12 +117,14 @@ void ReleaseRacers(uint8_t* base, uint32_t progress, uint32_t sp, bool heap,
 
 uint32_t CountTime(uint8_t* base, uint32_t out, uint32_t progress, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_82162E08 RaceProgress::CountTime");
-  const uint32_t e = index * kEntryBytes + progress;
-  const uint32_t ticks = Load(base, e + 2200) + 1;
-  Store(base, e + 2200, ticks);
-  Store(base, e + 2204, ai_drivers::TimeFromTicks(ticks));
-  Store(base, out, 0);
-  Store(base, out + 4, 0);
+  const Progress p(base, progress);
+  const uint32_t e = index * kEntryBytes;  // entry `index`'s offset from entry 0
+  const uint32_t ticks = Load(base, p.e0_ticks_address() + e) + 1;
+  Store(base, p.e0_ticks_address() + e, ticks);
+  Store(base, p.e0_time_address() + e, ai_drivers::TimeFromTicks(ticks));
+  const schema::RaceCheckResult r(base, out);
+  r.set_end(0);
+  r.set_reason(0);
   return out;
 }
 
@@ -154,8 +156,9 @@ void Rank(uint8_t* base, uint32_t progress, uint32_t frame) {
   const Progress p(base, progress);
   if (int32_t(p.results_count()) > 0) {
     for (int32_t i = 0; i < int32_t(p.results_count()); i++) {
-      const uint32_t e = progress + kEntries + kEntryBytes * uint32_t(i);
-      race_world::SortedListInsert(base, list, e, Lfs(base, e + 824));
+      const uint32_t at = kEntryBytes * uint32_t(i);
+      race_world::SortedListInsert(base, list, p.e0_record_index_address() + at,
+                                   Lfs(base, p.e0_route_distance_address() + at));
     }
   }
   uint32_t place = p.results_count() - 1;

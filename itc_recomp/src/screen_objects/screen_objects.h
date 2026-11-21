@@ -18,9 +18,8 @@
 
 namespace screen_objects {
 
-constexpr uint32_t kUvMap = 76124;        // the UvMap
-constexpr uint32_t kRingVertices = 76136;  // 20-byte vertices
-constexpr uint32_t kRingCount = 127976;    // their count
+// The object's fields are the schema's (itc_recomp/schema/screen-objects.toml,
+// ScreenObject).
 constexpr uint32_t kRingPoints = 20 * 36 * 2;
 
 // ScreenObject::AddRingPoint (sub_82132778): the point's keys (x and y

@@ -24,18 +24,11 @@ struct Position {
   uint16_t slice;
 };
 
-// The route ([0x826C5B10]; its +12 the sections table, track-route.md) and
-// the slices counted along a range's path (RouteRange::OnPath).
-constexpr uint32_t kRoute = 0x826C5B10;
+// The slices counted along a range's path (RouteRange::OnPath; also
+// schema::TrackZonesGlobals::slice_count). The objects' fields (the owner,
+// the zones, the route ranges, the lists) are the schema's views
+// (itc_recomp/schema/track-zones.toml, schema/track_zones.h).
 constexpr uint32_t kSliceCount = 0x82603274;
-
-// A zone's fields: its 16-slot range list (+4; the ranges at +80, 1,064
-// bytes apart), its index, its vehicle and whether the car is inside.
-constexpr uint32_t kZoneRanges = 4;
-constexpr uint32_t kZoneIndex = 17104;
-constexpr uint32_t kZoneVehicle = 17108;
-constexpr uint32_t kZoneInside = 17112;
-constexpr uint32_t kRangeBytes = 1064;
 
 // --- The fixed-size lists (List16::, List64::, List128::) ---
 // One layout for every size N: N nodes of two halfwords (the next node, -1
@@ -113,20 +106,11 @@ struct SetupCalls;
 
 // --- The zones' owner (TrackZones::, [0x828161EC]) ---
 
-// The owner (0x828161EC), its size, its list of the zones (128 slots at +0)
-// and the zones (+1036, 17,116 bytes apart; zone i's vtable 0x82011AF0 +
-// 12 x i).
-constexpr uint32_t kOwner = 0x828161EC;
-constexpr uint32_t kOwnerBytes = 0x124C34;
-constexpr uint32_t kZonesAt = 1036;
-constexpr uint32_t kZoneBytes = 17116;
-constexpr uint32_t kZoneVtables = 0x82011AF0;
-// The race data ([0x826C5B2C]: +0x59614 a word, +0x59620 the stage list,
-// +0xA3AF0 the mode), 0x826C7824 (a word) and the race ([0x826D82F4]: +2308
-// the racers' records).
-constexpr uint32_t kRaceData = 0x826C5B2C;
-constexpr uint32_t kRace = 0x826D82F4;
-constexpr uint32_t kPlayerFlag = 0x826C7824;
+// The owner ([0x828161EC], schema::TrackZones): its list of the zones (128
+// slots at +0) and the zones (+1036, 17,116 bytes apart; zone i's vtable
+// 0x82011AF0 + 12 x i). It reads the race data ([0x826C5B2C]: +0x59614 a
+// word, +0x59620 the stage list, +0xA3AF0 the mode), 0x826C7824 (a word)
+// and the race ([0x826D82F4]: +2308 the racers' records).
 
 // The calls into code that takes the guest context, made by the adapters:
 // the guest function `function` (a zone's vtable slot) with r3 (and r4

@@ -19,6 +19,7 @@
 #include "base/log.h"
 #include "car_list/car_list.h"
 #include "guest.h"
+#include "schema/type67_screens.h"
 #include "mode_tick/mode_tick.h"
 #include "race_screens/race_screens.h"
 #include "ui_movies/game.h"
@@ -31,14 +32,15 @@ namespace type67_screens {
 namespace {
 
 using guest::LoadU32;
+using G = schema::Type67ScreensGlobals;
 using guest::StoreU32;
+using CLS = schema::ColorListScreen;
+using Part = schema::ListPart;
 using namespace pages;
 
 constexpr uint32_t kFinishNamed = 0x8211DF20, kLoopNamed = 0x8211DDE0,
                    kUnloopNamed = 0x8211DE30;
 constexpr uint32_t kNone = 0xFFFFFFFFu;
-// The screen fades' passes word FadeIn is given.
-constexpr uint32_t kFadeInPasses = 0x82001BEC;
 
 // The screen's word [screen + 4 × (index + i)] (a node table's entry, the
 // index formed as the originals do).
@@ -100,13 +102,14 @@ uint64_t ListMoved(uint8_t* base, uint64_t r3, uint32_t list_at, uint32_t index,
   // MenuList::GetPreviousSelection (sub_8220BC28): +20.
   const uint32_t p = LoadU32(base, list + 20);
   const int32_t d = int32_t(s - p);
-  if (LoadU32(base, screen + 9668) == 0) {
+  if (CLS(base, screen).step_started() == 0) {
     if (table) {
       ColorNodeTableRefresh(base, r3 + 10432, 0, frame, calls);
       ColorNodeTableMarkSelected(base, r3 + 10432, s, frame);
     }
     if (d != 0) {
-      if (int32_t(p) >= 0) FinishIf(calls, movie, Entry(base, screen, index, p), frame, lr.finish_old);
+      if (int32_t(p) >= 0)
+        FinishIf(calls, movie, Entry(base, screen, index, p), frame, lr.finish_old);
       if (int32_t(s) >= 0) {
         const uint32_t named = Entry(base, screen, index, s);
         if (int32_t(named) >= 0) {
@@ -128,7 +131,7 @@ uint64_t ListMoved(uint8_t* base, uint64_t r3, uint32_t list_at, uint32_t index,
         if (times > 1) Finish(calls, movie, arrow, frame, lr.finish_last);
       }
     }
-    StoreU32(base, screen + 9668, 1);
+    CLS(base, screen).set_step_started(1);
   }
   calls.call(kRun, frame, lr.run, movie, 0);
   return 1;
@@ -149,7 +152,7 @@ uint64_t UpdateToggle(uint8_t* base, uint64_t r3, uint32_t frame, uint32_t lr_up
                       const Calls& calls) {
   const uint64_t toggle = r3 + 10288;
   const uint64_t result = Call1(calls, race_screens::kListUpdate, toggle, frame, lr_update);
-  if (LoadU32(base, uint32_t(r3) + 10312) == 0) return result;
+  if (CLS(base, uint32_t(r3)).toggle_move() == 0) return result;
   PlaySound(base, 4, frame, calls);
   return ListScreenOnToggleMoved(base, r3, toggle, frame, calls);
 }
@@ -183,12 +186,12 @@ uint64_t PlaceCursor(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t node_at,
 uint64_t ColorListScreenReset(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_82255200 ColorListScreen::Reset");
   const uint32_t screen = uint32_t(r3);
-  const uint32_t page = LoadU32(base, screen + 9644);
-  if (page != 2) StoreU32(base, screen + 9652, page);
-  StoreU32(base, screen + 9660, kNone);
-  StoreU32(base, screen + 9656, 1);
-  StoreU32(base, screen + 9648, 2);
-  StoreU32(base, screen + 9644, kNone);
+  const uint32_t page = CLS(base, screen).page();
+  if (page != 2) CLS(base, screen).set_previous_page(page);
+  CLS(base, screen).set_queued_step(kNone);
+  CLS(base, screen).set_step(1);
+  CLS(base, screen).set_next_page(2);
+  CLS(base, screen).set_page(kNone);
   // A tail call.
   return ColorNodeTableClear(base, r3 + 10432);
 }
@@ -201,7 +204,7 @@ uint64_t ColorListScreenDraw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t s
                                             0x82255658, 0x82256508, 0x822565A0, 0x822557F0,
                                             kEmpty,     0x822562E0, 0x82255818};
   BuildTable(base, frame, kColorPageGuard, kColorPages, kEntries, 11);
-  const uint32_t page = LoadU32(base, uint32_t(r3) + 9644);
+  const uint32_t page = CLS(base, uint32_t(r3)).page();
   if (page == kNone) return r3;
   const uint32_t entry = kColorPages + (page << 3);
   const uint32_t target = LoadU32(base, entry);
@@ -213,7 +216,7 @@ uint64_t ColorListScreenUpdate(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t
                                const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82256E08 ColorListScreen::Update");
   const uint32_t frame = Frame(base, sp, 240);
-  const uint32_t step = LoadU32(base, uint32_t(r3) + 9656);
+  const uint32_t step = CLS(base, uint32_t(r3)).step();
   static constexpr uint32_t kEntries[11] = {0x82258578, 0x82255890, 0x82256740, 0x82255B58,
                                             0x82256908, 0x82255C88, 0x82255CD0, 0x82256AC0,
                                             0x82256030, 0x82255C88, 0x82255EB0};
@@ -234,7 +237,7 @@ uint64_t ColorListScreenPage2(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 144);
   const uint64_t first = r3 + 10360;
   Call1(calls, race_screens::kListUpdate, first, frame, 0x822552D4);
-  if (LoadU32(base, screen + 10384) != 0) {
+  if (CLS(base, screen).kind_list_move() != 0) {
     // The first list moved: step 10, then page 2.
     PlaySound(base, 4, frame, calls);
     ToStepThenPage(base, screen, 2, 10);
@@ -248,12 +251,12 @@ uint64_t ColorListScreenPage2(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
     // To the item list: its scroll and selection 0, the first item's info.
     PlaySound(base, 0, frame, calls);
     const uint32_t items = screen + 10144;
-    StoreU32(base, screen + 10148, 0);
+    CLS(base, screen).set_course_list_scroll(0);
     race_screens::ListSetSelection(base, items, 0);
     calls.set_r4(0);
     LoadInfo(base, r3, 0, frame, 0x82255394, calls);
-    const uint32_t scroll = LoadU32(base, screen + 10148);
-    StoreU32(base, screen + 10908, kNone);
+    const uint32_t scroll = CLS(base, screen).course_list_scroll();
+    CLS(base, screen).set_table_color_child(kNone);
     const uint32_t selection = race_screens::ListSelection(base, items);
     // Slot 26 (SetDetails) with r4 = the item.
     const uint64_t result =
@@ -276,14 +279,14 @@ uint64_t ColorListScreenPage3(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
   const uint32_t colors = screen + 10216, items = screen + 10144;
   const uint32_t color = race_screens::ListSelection(base, colors);
   Call1(calls, race_screens::kListUpdate, items, frame, 0x822554BC);
-  const uint32_t scroll = LoadU32(base, screen + 10148);
+  const uint32_t scroll = CLS(base, screen).course_list_scroll();
   const uint64_t item = uint64_t(scroll) + uint64_t(race_screens::ListSelection(base, items));
   if (Moved(base, items)) {
     // The item list moved: the item's info and details, step 7, page 3.
     PlaySound(base, 4, frame, calls);
     ColorNodeTableSavePairs(base, r3 + 10432);
     LoadInfo(base, r3, item, frame, 0x822555F8, calls);
-    StoreU32(base, screen + 10908, kNone);
+    CLS(base, screen).set_table_color_child(kNone);
     const uint64_t result = Slot(base, r3, 104, item, frame, 0x82255624, calls);
     ToStepThenPage(base, screen, 3, 7);
     return result;
@@ -292,7 +295,7 @@ uint64_t ColorListScreenPage3(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
       0) {
     // To the color list: its scroll and selection 0, step 4, page 4.
     PlaySound(base, 0, frame, calls);
-    StoreU32(base, screen + 10220, 0);
+    CLS(base, screen).set_color_list_scroll(0);
     race_screens::ListSetSelection(base, colors, 0);
     calls.set_r4(0);
     ToStepThenPage(base, screen, 4, 4);
@@ -318,7 +321,7 @@ uint64_t ColorListScreenPage4(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
     // The color list moved: the item loaded with the color, step 8, page 4.
     PlaySound(base, 4, frame, calls);
     const uint32_t color = race_screens::ListSelection(base, colors);
-    const uint32_t scroll = LoadU32(base, screen + 10148);
+    const uint32_t scroll = CLS(base, screen).course_list_scroll();
     const uint64_t item = uint64_t(scroll) + uint64_t(race_screens::ListSelection(base, items));
     const uint64_t result = ColorListScreenLoadItem(base, r3, item, color, frame, calls);
     ToStepThenPage(base, screen, 4, 8);
@@ -335,10 +338,10 @@ uint64_t ColorListScreenPage4(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
     // Back to the item list: step 6, page 3, the item's info again.
     PlaySound(base, 2, frame, calls);
     ToStepThenPage(base, screen, 3, 6);
-    const uint32_t scroll = LoadU32(base, screen + 10148);
+    const uint32_t scroll = CLS(base, screen).course_list_scroll();
     const uint64_t item = uint64_t(race_screens::ListSelection(base, items)) + uint64_t(scroll);
     const uint64_t result = LoadInfo(base, r3, item, frame, 0x82255740, calls);
-    StoreU32(base, screen + 10908, kNone);
+    CLS(base, screen).set_table_color_child(kNone);
     return result;
   }
   return UpdateToggle(base, r3, frame, 0x82255760, calls);
@@ -347,16 +350,16 @@ uint64_t ColorListScreenPage4(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
 uint64_t ColorListScreenPage5(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82256508 ColorListScreen::Page5");
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 96);
-  const uint32_t part = LoadU32(base, screen + 9676);
+  const uint32_t part = CLS(base, screen).list_part().address;
   if (part != 0) {
     // Slot 1 (ListPartBase::Open) with r4 as the page was given it.
     Slot(base, part, 4, std::nullopt, frame, 0x82256538, calls);
-    StoreU32(base, screen + 9696, 1);
+    CLS(base, screen).set_part_input(1);
   }
   uint64_t result =
-      ListScreenSetScrollText(base, r3, LoadU32(base, screen + 11036), 1, frame, calls);
+      ListScreenSetScrollText(base, r3, CLS(base, screen).text_part(), 1, frame, calls);
   ToPage(base, screen, 6);
-  if (LoadU32(base, screen + 9708) != 0) {
+  if (CLS(base, screen).part_nodes() != 0) {
     result = ColorListScreenShowPartNodes(base, r3, 1, frame, calls);
   }
   return result;
@@ -366,7 +369,7 @@ uint64_t ColorListScreenPage6(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t 
                               const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822565A0 ColorListScreen::Page6");
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 112);
-  const uint32_t part = LoadU32(base, screen + 9676);
+  const uint32_t part = CLS(base, screen).list_part().address;
   if (part == 0) {
     ToPage(base, screen, 10);
     return 0;
@@ -374,29 +377,30 @@ uint64_t ColorListScreenPage6(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t 
   // Slot 2 (ListPartBase::Pick) with the page's r4.
   const uint64_t picked = Slot(base, part, 8, r4, frame, 0x822565D4, calls);
   if (int32_t(uint32_t(picked)) == 0) return picked;
-  const uint32_t now = LoadU32(base, screen + 9676);
-  if (LoadU32(base, now + 4) != 0) {
+  const uint32_t now = CLS(base, screen).list_part().address;
+  if (Part(base, now).yes() != 0) {
     // Yes: page 7 with the part's nodes, else the leaving (page 9 after
     // step 0) with the screen fades' fade-out; the race set.
-    if (LoadU32(base, screen + 9708) != 0) {
+    if (CLS(base, screen).part_nodes() != 0) {
       ToPage(base, screen, 7);
     } else {
       ToStepThenPage(base, screen, 9, 0);
       FadeOut(base, calls);
     }
-    StoreU32(base, screen + 9696, 0);
-    StoreU32(base, screen + 9688, 1);
+    CLS(base, screen).set_part_input(0);
+    CLS(base, screen).set_race_set(1);
     // Slot 4 (ListPartBase::Close), r4 as the calls before left it.
-    return Slot(base, LoadU32(base, screen + 9676), 16, std::nullopt, frame, 0x82256684, calls);
+    return Slot(base, CLS(base, screen).list_part().address, 16, std::nullopt, frame, 0x82256684,
+                calls);
   }
-  if (LoadU32(base, now + 8) == 0) return picked;
+  if (Part(base, now).back() == 0) return picked;
   // Back: page 4.
   ToPage(base, screen, 4);
-  StoreU32(base, screen + 9696, 0);
-  Slot(base, LoadU32(base, screen + 9676), 16, std::nullopt, frame, 0x822566D4, calls);
+  CLS(base, screen).set_part_input(0);
+  Slot(base, CLS(base, screen).list_part().address, 16, std::nullopt, frame, 0x822566D4, calls);
   uint64_t result =
-      ListScreenSetScrollText(base, r3, LoadU32(base, screen + 11032), 1, frame, calls);
-  if (LoadU32(base, screen + 9708) != 0) {
+      ListScreenSetScrollText(base, r3, CLS(base, screen).text_colors(), 1, frame, calls);
+  if (CLS(base, screen).part_nodes() != 0) {
     result = ColorListScreenShowPartNodes(base, r3, 0, frame, calls);
   }
   return result;
@@ -411,7 +415,7 @@ uint64_t ColorListScreenPage7(uint8_t* base, uint64_t r3) {
 uint64_t ColorListScreenPage9(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822562E0 ColorListScreen::Page9");
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 96);
-  if ((LoadU32(base, kFadeCountA) | LoadU32(base, kFadeCountB)) != 0) return r3;
+  if ((G::fade_out_count(base) | G::fade_in_count(base)) != 0) return r3;
   ToPage(base, screen, 10);
   const uint32_t movie = MovieOf(base, screen, frame);
   return Call1(calls, kFinishAll, movie, frame, 0x8225634C);
@@ -439,10 +443,12 @@ uint64_t ColorListScreenShowPartNodes(uint8_t* base, uint64_t r3, uint64_t hide,
   // for each call as the original does.
   const uint32_t toggle = screen + 10288;
   auto toggle_node = [&] {
-    return LoadU32(base, screen + (race_screens::ListSelection(base, toggle) == 0 ? 9892 : 9896));
+    return (race_screens::ListSelection(base, toggle) == 0 ? CLS(base, screen).toggle_anim_a()
+                                                           : CLS(base, screen).toggle_anim_b());
   };
   uint64_t result = race_screens::ListSelection(base, toggle);
-  if (int32_t(LoadU32(base, screen + (uint32_t(result) == 0 ? 9892 : 9896))) >= 0) {
+  if (int32_t((uint32_t(result) == 0 ? CLS(base, screen).toggle_anim_a()
+                                     : CLS(base, screen).toggle_anim_b())) >= 0) {
     if (hiding) {
       result = calls.call(kFinishNamed, frame, 0x822563E8, movie, toggle_node());
     } else {
@@ -465,9 +471,9 @@ uint64_t ColorListScreenShowPartNodes(uint8_t* base, uint64_t r3, uint64_t hide,
     }
   }
   // UiMovie::HideNode or ShowNode(m, +9728, +9824): the node's +80.
-  const uint32_t child = LoadU32(base, screen + 9824);
+  const uint32_t child = CLS(base, screen).part_child();
   if (int32_t(child) < 0) return result;
-  const uint32_t node = ui_movies::FindNode(base, movie, LoadU32(base, screen + 9728), child);
+  const uint32_t node = ui_movies::FindNode(base, movie, CLS(base, screen).text_sub_scene(), child);
   StoreU32(base, node + 80, hiding ? 0 : 1);
   return node;
 }
@@ -480,12 +486,12 @@ uint64_t ColorListScreenStep0(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
   const uint32_t movie = MovieOf(base, screen, frame);
   // The leaving step's quirk: +9668 is never set here, so this runs on
   // every call.
-  if (LoadU32(base, screen + 9668) == 0) {
-    const uint32_t named = LoadU32(base, screen + 9836);
+  if (CLS(base, screen).step_started() == 0) {
+    const uint32_t named = CLS(base, screen).leave_anim();
     if (int32_t(named) >= 0) Play(calls, movie, named, 0, frame, 0x822585DC);
   }
   uint64_t done = RunDone(calls, movie, frame, 0x822585E8);
-  if (int32_t(LoadU32(base, screen + 9836)) < 0) done = 1;
+  if (int32_t(CLS(base, screen).leave_anim()) < 0) done = 1;
   if (done != 0) {
     Call1(calls, kFinishAll, movie, frame, 0x82258610);
     FadeOut(base, calls);
@@ -497,25 +503,26 @@ uint64_t ColorListScreenStep1(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
   ITC_NATIVE_RUNNING("sub_82255890 ColorListScreen::Step1");
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 128);
   const uint32_t movie = MovieOf(base, screen, frame);
-  if (LoadU32(base, screen + 9668) == 0) {
+  if (CLS(base, screen).step_started() == 0) {
     Replay(base, calls, screen, movie, 9864, frame, 0x822558DC, 0x822558F8, 0);
     Replay(base, calls, screen, movie, 9888, frame, 0x8225590C, 0x82255928, 0);
     Replay(base, calls, screen, movie, 9832, frame, 0x8225593C, 0x82255958, 0);
     Replay(base, calls, screen, movie, 9856, frame, 0x8225596C, 0x82255988, 0x82255994);
     Replay(base, calls, screen, movie, 9860, frame, 0x822559A8, 0x822559C4, 0x822559D0);
-    mode_tick::ScreenFadesFadeIn(base, LoadU32(base, kFadeInPasses), 0, 0, 0, 0);
+    mode_tick::ScreenFadesFadeIn(base, G::fade_in_passes(base), 0, 0, 0, 0);
     calls.set_r4(0);
     // The first list's ten nodes, +9976 on.
     for (uint32_t i = 0; i < 10; i++) {
-      FinishIf(calls, movie, LoadU32(base, screen + 9976 + 4 * i), frame, 0x82255A08);
+      FinishIf(calls, movie, LoadU32(base, CLS(base, screen).first_anims_address() + 4 * i), frame,
+               0x82255A08);
     }
     ListScreenClearScrollText(base, r3, frame, calls);
     const uint32_t selection = race_screens::ListSelection(base, screen + 10360);
     ListScreenSetScrollText(base, r3, Entry(base, screen, 2754, selection), 1, frame, calls);
-    StoreU32(base, screen + 9668, 1);
+    CLS(base, screen).set_step_started(1);
   }
   uint64_t done = RunDone(calls, movie, frame, 0x82255A54);
-  if (int32_t(LoadU32(base, screen + 9832)) < 0 && int32_t(LoadU32(base, screen + 9864)) < 0) {
+  if (int32_t(CLS(base, screen).open_anim()) < 0 && int32_t(CLS(base, screen).open_anim_b()) < 0) {
     done = 1;
   }
   if (done == 0) return 0;
@@ -531,34 +538,34 @@ uint64_t ColorListScreenStep2(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
   ITC_NATIVE_RUNNING("sub_82256740 ColorListScreen::Step2");
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 128);
   const uint32_t movie = MovieOf(base, screen, frame);
-  if (LoadU32(base, screen + 9668) == 0) {
+  if (CLS(base, screen).step_started() == 0) {
     // The color node table's slot 1 (ColorNodeTable::Reset), r4 left.
     Slot(base, r3 + 10432, 4, std::nullopt, frame, 0x8225678C, calls);
     // Slot 2 (SetItemText) with r4 = +10148.
-    Slot(base, r3, 8, LoadU32(base, screen + 10148), frame, 0x822567A4, calls);
+    Slot(base, r3, 8, CLS(base, screen).course_list_scroll(), frame, 0x822567A4, calls);
     Replay(base, calls, screen, movie, 9884, frame, 0, 0x822567C8, 0x822567D4);
     Replay(base, calls, screen, movie, 9872, frame, 0, 0x822567F8, 0x82256804);
-    const uint32_t named = LoadU32(base, screen + 9840);
+    const uint32_t named = CLS(base, screen).first_to_items_anim();
     if (int32_t(named) >= 0) Play(calls, movie, named, 0, frame, 0x82256828);
     ColorListScreenPlaceItemCursor(base, r3, race_screens::ListSelection(base, screen + 10144),
                                    frame);
-    const uint32_t sub_scene = LoadU32(base, screen + 9736);
+    const uint32_t sub_scene = CLS(base, screen).color_cursor_node();
     if (int32_t(sub_scene) >= 0) {
-      const uint32_t child = LoadU32(base, screen + 9808);
+      const uint32_t child = CLS(base, screen).color_cursor_child();
       if (int32_t(child) >= 0) SetShown(base, movie, sub_scene, child, 0);
     }
     // Slot 27 (ShowMarks) with r4 = +10148.
-    Slot(base, r3, 108, LoadU32(base, screen + 10148), frame, 0x82256874, calls);
-    ListScreenSetScrollText(base, r3, LoadU32(base, screen + 11028), 1, frame, calls);
-    StoreU32(base, screen + 9668, 1);
+    Slot(base, r3, 108, CLS(base, screen).course_list_scroll(), frame, 0x82256874, calls);
+    ListScreenSetScrollText(base, r3, CLS(base, screen).text_item_moved(), 1, frame, calls);
+    CLS(base, screen).set_step_started(1);
   }
   uint64_t done = RunDone(calls, movie, frame, 0x82256898);
-  const uint32_t named = LoadU32(base, screen + 9840);
+  const uint32_t named = CLS(base, screen).first_to_items_anim();
   if (int32_t(named) < 0) done = 1;
   if (done == 0) return 0;
   FinishIf(calls, movie, named, frame, 0x822568C8);
   ListScreenLoopNode(base, r3, r3 + 10144, 9936, frame, calls);
-  if (LoadU32(base, screen + 9672) != 0) {
+  if (CLS(base, screen).node_table().address != 0) {
     ColorNodeTableRefresh(base, r3 + 10432, 0, frame, calls);
     ColorNodeTableMarkSelected(base, r3 + 10432, kNone, frame);
   }
@@ -569,22 +576,22 @@ uint64_t ColorListScreenStep3(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
   ITC_NATIVE_RUNNING("sub_82255B58 ColorListScreen::Step3");
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 128);
   const uint32_t movie = MovieOf(base, screen, frame);
-  if (LoadU32(base, screen + 9668) == 0) {
-    FinishIf(calls, movie, LoadU32(base, screen + 9872), frame, 0x82255BA4);
+  if (CLS(base, screen).step_started() == 0) {
+    FinishIf(calls, movie, CLS(base, screen).items_loop(), frame, 0x82255BA4);
     const uint32_t item = race_screens::ListSelection(base, screen + 10144);
     FinishIf(calls, movie, Entry(base, screen, 2484, item), frame, 0x82255BC8);
-    FinishIf(calls, movie, LoadU32(base, screen + 9884), frame, 0x82255BDC);
-    const uint32_t named = LoadU32(base, screen + 9844);
+    FinishIf(calls, movie, CLS(base, screen).shown_loop_d(), frame, 0x82255BDC);
+    const uint32_t named = CLS(base, screen).items_to_first_anim();
     if (int32_t(named) >= 0) Play(calls, movie, named, 0, frame, 0x82255C00);
     const uint32_t selection = race_screens::ListSelection(base, screen + 10360);
     ListScreenSetScrollText(base, r3, Entry(base, screen, 2754, selection), 1, frame, calls);
-    StoreU32(base, screen + 9668, 1);
+    CLS(base, screen).set_step_started(1);
   }
   uint64_t done = RunDone(calls, movie, frame, 0x82255C38);
-  if (int32_t(LoadU32(base, screen + 9844)) < 0) done = 1;
+  if (int32_t(CLS(base, screen).items_to_first_anim()) < 0) done = 1;
   if (done == 0) return 0;
   ListScreenLoopNode(base, r3, r3 + 10360, 9976, frame, calls);
-  FinishIf(calls, movie, LoadU32(base, screen + 9844), frame, 0x82255C78);
+  FinishIf(calls, movie, CLS(base, screen).items_to_first_anim(), frame, 0x82255C78);
   return done;
 }
 
@@ -592,32 +599,32 @@ uint64_t ColorListScreenStep4(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
   ITC_NATIVE_RUNNING("sub_82256908 ColorListScreen::Step4");
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 128);
   const uint32_t movie = MovieOf(base, screen, frame);
-  if (LoadU32(base, screen + 9668) == 0) {
+  if (CLS(base, screen).step_started() == 0) {
     ColorNodeTableRefresh(base, r3 + 10432, 0, frame, calls);
     ColorNodeTableMarkSelected(base, r3 + 10432,
                                race_screens::ListSelection(base, screen + 10216), frame);
     const uint32_t item = race_screens::ListSelection(base, screen + 10144);
     // Slot 3 (ClearItemText) with r4 = the item.
     Slot(base, r3, 12, item, frame, 0x8225698C, calls);
-    FinishIf(calls, movie, LoadU32(base, screen + 9872), frame, 0x822569A0);
+    FinishIf(calls, movie, CLS(base, screen).items_loop(), frame, 0x822569A0);
     FinishIf(calls, movie, Entry(base, screen, 2484, item), frame, 0x822569BC);
     FinishIf(calls, movie, Entry(base, screen, 2524, item), frame, 0x822569D8);
     uint32_t named = Entry(base, screen, 2514, item);
     if (int32_t(named) >= 0) Play(calls, movie, named, 1, frame, 0x82256A04);
-    named = LoadU32(base, screen + 9848);
+    named = CLS(base, screen).items_to_colors_anim();
     if (int32_t(named) >= 0) Play(calls, movie, named, 0, frame, 0x82256A28);
     ColorListScreenPlaceColorCursor(base, r3, race_screens::ListSelection(base, screen + 10216),
                                     frame);
-    ListScreenSetScrollText(base, r3, LoadU32(base, screen + 11032), 1, frame, calls);
-    StoreU32(base, screen + 9668, 1);
+    ListScreenSetScrollText(base, r3, CLS(base, screen).text_colors(), 1, frame, calls);
+    CLS(base, screen).set_step_started(1);
   }
   uint64_t done = RunDone(calls, movie, frame, 0x82256A60);
-  const uint32_t named = LoadU32(base, screen + 9848);
+  const uint32_t named = CLS(base, screen).items_to_colors_anim();
   if (int32_t(named) < 0) done = 1;
   if (done == 0) return 0;
   FinishIf(calls, movie, named, frame, 0x82256A90);
-  const uint32_t child = LoadU32(base, screen + 9808);
-  if (int32_t(child) >= 0) SetShown(base, movie, LoadU32(base, screen + 9736), child, 1);
+  const uint32_t child = CLS(base, screen).color_cursor_child();
+  if (int32_t(child) >= 0) SetShown(base, movie, CLS(base, screen).color_cursor_node(), child, 1);
   ListScreenLoopNode(base, r3, r3 + 10216, 10016, frame, calls);
   return done;
 }
@@ -633,9 +640,9 @@ uint64_t ColorListScreenStep6(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
   ITC_NATIVE_RUNNING("sub_82255CD0 ColorListScreen::Step6");
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 128);
   const uint32_t movie = MovieOf(base, screen, frame);
-  if (LoadU32(base, screen + 9668) == 0) {
+  if (CLS(base, screen).step_started() == 0) {
     // Slot 2 (SetItemText) with r4 = +10148.
-    Slot(base, r3, 8, LoadU32(base, screen + 10148), frame, 0x82255D20, calls);
+    Slot(base, r3, 8, CLS(base, screen).course_list_scroll(), frame, 0x82255D20, calls);
     ColorNodeTableRefresh(base, r3 + 10432, 0, frame, calls);
     ColorNodeTableMarkSelected(base, r3 + 10432, kNone, frame);
     const uint32_t color = race_screens::ListSelection(base, screen + 10216);
@@ -645,22 +652,22 @@ uint64_t ColorListScreenStep6(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
     uint32_t named = Entry(base, screen, 2524, item);
     if (int32_t(named) >= 0) Play(calls, movie, named, 1, frame, 0x82255DC8);
     FinishIf(calls, movie, Entry(base, screen, 2514, item), frame, 0x82255DE4);
-    named = LoadU32(base, screen + 9852);
+    named = CLS(base, screen).colors_to_items_anim();
     if (int32_t(named) >= 0) Play(calls, movie, named, 0, frame, 0x82255E08);
-    const uint32_t child = LoadU32(base, screen + 9808);
-    if (int32_t(child) >= 0) SetShown(base, movie, LoadU32(base, screen + 9736), child, 0);
+    const uint32_t child = CLS(base, screen).color_cursor_child();
+    if (int32_t(child) >= 0) SetShown(base, movie, CLS(base, screen).color_cursor_node(), child, 0);
     // Slot 27 (ShowMarks) with r4 = +10148.
-    Slot(base, r3, 108, LoadU32(base, screen + 10148), frame, 0x82255E38, calls);
-    ListScreenSetScrollText(base, r3, LoadU32(base, screen + 11028), 1, frame, calls);
-    StoreU32(base, screen + 9668, 1);
+    Slot(base, r3, 108, CLS(base, screen).course_list_scroll(), frame, 0x82255E38, calls);
+    ListScreenSetScrollText(base, r3, CLS(base, screen).text_item_moved(), 1, frame, calls);
+    CLS(base, screen).set_step_started(1);
   }
   // Done by +9844, not the +9852 played.
   uint64_t done = RunDone(calls, movie, frame, 0x82255E5C);
-  if (int32_t(LoadU32(base, screen + 9844)) < 0) done = 1;
+  if (int32_t(CLS(base, screen).items_to_first_anim()) < 0) done = 1;
   if (done == 0) return 0;
   ListScreenLoopNode(base, r3, r3 + 10144, 9936, frame, calls);
-  if (int32_t(LoadU32(base, screen + 9844)) >= 0) {
-    Finish(calls, movie, LoadU32(base, screen + 9852), frame, 0x82255EA0);
+  if (int32_t(CLS(base, screen).items_to_first_anim()) >= 0) {
+    Finish(calls, movie, CLS(base, screen).colors_to_items_anim(), frame, 0x82255EA0);
   }
   return done;
 }
@@ -674,42 +681,42 @@ uint64_t ColorListScreenStep7(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
   // MenuList::GetPreviousSelection (sub_8220BC28): +20.
   const uint32_t p = LoadU32(base, items + 20);
   const int32_t scrolled = int32_t(LoadU32(base, items + 4) - LoadU32(base, items + 8));
-  const uint32_t cursor = LoadU32(base, screen + 10176);
+  const uint32_t cursor = CLS(base, screen).course_list_wrapped();
   const int32_t moved = int32_t(s - p);
   ColorNodeTableRefresh(base, r3 + 10432, 0, frame, calls);
   ColorNodeTableMarkSelected(base, r3 + 10432, kNone, frame);
   // Slot 2 (SetItemText) with r4 = +10148.
-  Slot(base, r3, 8, LoadU32(base, screen + 10148), frame, 0x82256B54, calls);
+  Slot(base, r3, 8, CLS(base, screen).course_list_scroll(), frame, 0x82256B54, calls);
   const uint32_t was = ((p + 2484) << 2) + screen;
   Finish(calls, movie, LoadU32(base, was), frame, 0x82256B68);
   calls.call(kUnloopNamed, frame, 0x82256B74, movie, LoadU32(base, was));
   const uint32_t is = ((s + 2484) << 2) + screen;
   Finish(calls, movie, LoadU32(base, is), frame, 0x82256B88);
   calls.call(kUnloopNamed, frame, 0x82256B94, movie, LoadU32(base, is));
-  Finish(calls, movie, LoadU32(base, screen + 9904), frame, 0x82256BA0);
-  Finish(calls, movie, LoadU32(base, screen + 9908), frame, 0x82256BAC);
+  Finish(calls, movie, CLS(base, screen).item_up_anim(), frame, 0x82256BA0);
+  Finish(calls, movie, CLS(base, screen).item_down_anim(), frame, 0x82256BAC);
   Play(calls, movie, LoadU32(base, is), 1, frame, 0x82256BC8);
   calls.call(kLoopNamed, frame, 0x82256BD4, movie, LoadU32(base, is));
   if (cursor == 0) {
     if (moved > 0) {
-      Play(calls, movie, LoadU32(base, screen + 9908), 1, frame, 0x82256C0C);
+      Play(calls, movie, CLS(base, screen).item_down_anim(), 1, frame, 0x82256C0C);
     } else if (moved < 0) {
-      Play(calls, movie, LoadU32(base, screen + 9904), 1, frame, 0x82256C0C);
+      Play(calls, movie, CLS(base, screen).item_up_anim(), 1, frame, 0x82256C0C);
     }
   } else {
     ColorListScreenPlaceItemCursor(base, r3, s, frame);
   }
   if (scrolled != 0) {
-    Finish(calls, movie, LoadU32(base, screen + 9928), frame, 0x82256C30);
-    Finish(calls, movie, LoadU32(base, screen + 9932), frame, 0x82256C3C);
+    Finish(calls, movie, CLS(base, screen).scroll_down_anim(), frame, 0x82256C30);
+    Finish(calls, movie, CLS(base, screen).scroll_up_anim(), frame, 0x82256C3C);
     if (scrolled < 0) {
-      Play(calls, movie, LoadU32(base, screen + 9932), 1, frame, 0x82256C6C);
+      Play(calls, movie, CLS(base, screen).scroll_up_anim(), 1, frame, 0x82256C6C);
     } else {
-      Play(calls, movie, LoadU32(base, screen + 9928), 1, frame, 0x82256C6C);
+      Play(calls, movie, CLS(base, screen).scroll_down_anim(), 1, frame, 0x82256C6C);
     }
   }
   // Slot 27 (ShowMarks) with r4 = +10148.
-  Slot(base, r3, 108, LoadU32(base, screen + 10148), frame, 0x82256C84, calls);
+  Slot(base, r3, 108, CLS(base, screen).course_list_scroll(), frame, 0x82256C84, calls);
   calls.call(kRun, frame, 0x82256C90, movie, 0);
   return 1;
 }
@@ -733,7 +740,7 @@ uint64_t ColorListScreenStep10(uint8_t* base, uint64_t r3, uint32_t sp, const Ca
 uint64_t ColorListScreenDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82255198 ColorListScreen::~ColorListScreen");
   const uint32_t frame = Frame(base, sp, 96);
-  StoreU32(base, uint32_t(r3), kColorListScreenVtable);
+  CLS(base, uint32_t(r3)).set_vtable(kColorListScreenVtable);
   NodeTableDestruct(base, r3 + 10432);
   ReleaseList(base, r3 + 10360, frame, 0x822551C8, calls);
   ReleaseList(base, r3 + 10288, frame, 0x822551D0, calls);

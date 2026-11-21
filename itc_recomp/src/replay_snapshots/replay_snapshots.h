@@ -8,6 +8,13 @@
 // placed shape copies, Part464). Each part has a save (vehicle to record),
 // a restore (record to vehicle) and a copy (record to record).
 //
+// The snapshot, the record and its parts are schema views
+// (itc_recomp/schema/replay-snapshots.toml: ReplaySnapshot, ReplayRecord,
+// ReplayBodyState, ReplayVehiclePhysics, ReplayCollisionState,
+// ReplayShapeState) and the image words ReplaySnapshotsGlobals; the
+// vehicle's, body's, collision object's and shape's sides stay offsets
+// (other areas' types).
+//
 // The objects are guest objects shared with the recompiled code, so these
 // work on guest memory with the originals' loads and stores in their order:
 // an lfs then stfs pair keeps the word's bits (src/car_physics/float_ops.h),
@@ -29,14 +36,6 @@
 #include "vehicle/vehicle.h"
 
 namespace replay_snapshots {
-
-// The input recordings' pointer (docs/known-data.md) and its blocks.
-constexpr uint32_t kRecordings = 0x826C5B4C;
-constexpr uint32_t kRecordBytes = 5232;
-// The racers' manager's pointer (docs/functions/race-world.md).
-constexpr uint32_t kManager = 0x826D82F4;
-// The race data's pointer (docs/known-data.md).
-constexpr uint32_t kRaceData = 0x826C5B2C;
 
 // --- A vehicle's record: the restores (record to vehicle) ---
 

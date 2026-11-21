@@ -1,0 +1,441 @@
+# The schema of docs/functions/vehicle-accessors.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The vehicle accessors' objects: the collision object (the vehicle's +340)
+# and the contacts on it, the stage list and its 80-byte stages, the racer
+# records, the linked lists of the scene's pools, the vector library's
+# 16-byte vectors and its matrices, and small records handed by pointer.
+# The vehicle and its rigid body are car-physics.toml's (Vehicle,
+# RigidBody), the collision world car-physics.toml's CollisionWorld, the
+# scene's pools scene-loaders.toml's ScenePools and car-draw.toml's
+# CarScene, the race data race-states.toml's RaceData.
+#
+# Types that are another area's type met under another measure name (for
+# the Integrate phase to join; their field names follow that type's):
+# CollisionObject = car-physics.toml's CollisionWorldObject (this one is
+# the owner's); CollisionObjectContact = car-physics.toml's
+# CollisionContact; VehicleBox = collision.toml's BoxShape;
+# AccessorRacerRecord = race-setup.toml's Car (its racer record fields);
+# AccessorStageRoute = race-states.toml's StageRoute; AccessorCarDecal =
+# race-setup.toml's CarDecal; AccessorRigidBody = car-physics.toml's
+# RigidBody; VectorLibMatrix = matrix-math.toml's Matrix.
+
+# A collision object: the vehicle's +340; 320 bytes, vtable 0x82002A94, 50
+# of them in the collision world's +16 (known-data.md). Also the world's
+# list links (+228, +232) and the list head's object as the measure meets
+# them.
+[CollisionObject]
+measure = "CollisionObject"
+measures = ["CollisionObject.+228", "CollisionObject.+232", "new<72>@CollisionWorld::Create.+0", "sub_820B7CB8.r3", "sub_820B7CC0.r3"]
+size = 320
+origin = "embedded"
+vtable = 0x82002A94
+# 24 functions; areas: car-physics.md, replay-snapshots.md, vehicle-accessors.md
+fields = [
+  { name = "array_count", offset = -16, type = "u32", note = "the objects' block count header (the first object's -16)" },
+  { name = "vtable", offset = 0, type = "u32", note = "0x82002A94" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "body", offset = 16, type = "ptr", to = "RigidBody", note = "its rigid body" },
+  { name = "shape", offset = 20, type = "ptr", to = "BoxShape", note = "its shape (the vehicle's +344 box)" },
+  { name = "shape_template", offset = 32, type = "ptr", to = "BoxShape", note = "the embedded shape record's (+32 to +144) template shape" },
+  { name = "shape_previous", offset = 36, type = "u32", note = "the shape record's previous placed copy" },
+  { name = "shape_current", offset = 40, type = "u32", note = "the shape record's current placed copy (goes to the second query)" },
+  { name = "unknown_56", offset = 56, type = "u32", note = "the shape record's +24" },
+  { name = "lowest_travel", offset = 144, type = "f32", note = "minus the lowest wheel travel (the shape record's +112)" },
+  { name = "push_x", offset = 160, type = "f32", note = "the largest push per axis this tick" },
+  { name = "push_y", offset = 164, type = "f32" },
+  { name = "push_z", offset = 168, type = "f32" },
+  { name = "push_w", offset = 172, type = "f32" },
+  { name = "pair_torque_x", offset = 176, type = "f32", note = "the summed torque from pairs this tick" },
+  { name = "pair_torque_y", offset = 180, type = "f32" },
+  { name = "pair_torque_z", offset = 184, type = "f32" },
+  { name = "pair_torque_w", offset = 188, type = "f32" },
+  { name = "push_count", offset = 192, type = "u32", note = "how many pushes" },
+  { name = "push_scale_x", offset = 208, type = "f32", note = "a per-axis scale of the push-out (1, 1, 1 from CollisionObject::Init); sub_820B7D68 sets it" },
+  { name = "push_scale_y", offset = 212, type = "f32" },
+  { name = "push_scale_z", offset = 216, type = "f32" },
+  { name = "push_scale_w", offset = 220, type = "f32" },
+  { name = "torque_scale", offset = 224, type = "f32", note = "sub_820B7D70 sets it" },
+  { name = "next", offset = 228, type = "ptr", to = "CollisionObject", note = "the next in the world's active or free list" },
+  { name = "previous", offset = 232, type = "ptr", to = "CollisionObject" },
+  { name = "unknown_236", offset = 236, type = "u32" },
+  { name = "first_contact", offset = 240, type = "ptr", to = "CollisionObjectContact", note = "its contacts, linked by their +68" },
+  { name = "groups", offset = 244, type = "u32", note = "its own groups (CollisionObject::AddGroups, RemoveGroups)" },
+  { name = "collides_with", offset = 248, type = "u32", note = "the groups it collides with" },
+  { name = "mask", offset = 252, type = "u32", note = "a bit mask (sub_820B7D18 clears bits)" },
+  { name = "response_bits", offset = 256, type = "u32", note = "the surface bits that get a response (sub_820B7D28 sets, sub_820B7D38 clears)" },
+  { name = "push_out_bits", offset = 260, type = "u32", note = "the surface bits that push it out (sub_820B7D48 sets, sub_820B7D58 clears)" },
+  { name = "first_pair", offset = 264, type = "ptr", to = "CollisionPair", note = "the head of its pair list (sub_820B7CB8, sub_820B7CC0)" },
+  { name = "owner_id", offset = 268, type = "u32", note = "objects with the same nonzero id don't pair" },
+  { name = "no_queries", offset = 272, type = "u32", note = "set: no queries" },
+  { name = "unknown_276", offset = 276, type = "u32" },
+  { name = "box_friction", offset = 280, type = "u32", note = "set: friction from the +344 object alone" },
+  { name = "unmoved", offset = 284, type = "u32", note = "0 after a move" },
+  { name = "moved", offset = 288, type = "u32", note = "set when moved (sub_820B7998)" },
+  { name = "push_out_x", offset = 304, type = "f32", note = "this pass's push-out" },
+  { name = "push_out_y", offset = 308, type = "f32" },
+  { name = "push_out_z", offset = 312, type = "f32" },
+  { name = "push_out_w", offset = 316, type = "f32" },
+]
+
+# A contact on a collision object (from its +240, linked by +68): the
+# collision world's 80-byte records (CollisionWorld::NewContact).
+[CollisionObjectContact]
+measure = "Contact"
+measures = ["CollisionObject.+240.+68"]
+size = 80
+origin = "allocated"
+# 5 functions; areas: collision.md, vehicle-accessors.md
+fields = [
+  { name = "other", offset = 0, type = "u32", note = "the other object (Contact::Object when the top byte of the flags is 0, sub_820B8CE0 when not)" },
+  { name = "flags", offset = 4, type = "u32", note = "matched against masks" },
+  { name = "position", offset = 16, type = "bytes", count = 16, note = "Contact::Position's address" },
+  { name = "normal", offset = 32, type = "bytes", count = 16, note = "the hit's normal" },
+  { name = "push_direction", offset = 48, type = "bytes", count = 16 },
+  { name = "push_direction_x", offset = 48, type = "f32" },
+  { name = "push_direction_y", offset = 52, type = "f32" },
+  { name = "strength", offset = 64, type = "f32", note = "the approach speed into the surface (Contact::Strength)" },
+  { name = "next", offset = 68, type = "ptr", to = "CollisionObjectContact" },
+]
+
+# Two of the collision world's 80-byte hit records (the hits array as the
+# measure meets it; car-physics.toml's CollisionHit is one record), and
+# CollisionRecord::Copy's (sub_820B7D78) out: a hit record's first 68 bytes.
+[CollisionHitRecords]
+measure = "CollisionRecords"
+measures = ["sub_820B7D78.r3"]
+size = 160
+origin = "embedded"
+# 2 functions; areas: car-physics.md, vehicle-accessors.md
+fields = [
+  { name = "point", offset = 0, type = "bytes", count = 16 },
+  { name = "normal", offset = 16, type = "bytes", count = 16, note = "probably the surface normal" },
+  { name = "push", offset = 32, type = "bytes", count = 16, note = "the push direction" },
+  { name = "depth", offset = 48, type = "f32" },
+  { name = "depth_bits", offset = 48, type = "u32", note = "copied as a word (sub_820B7D78)" },
+  { name = "depth_2", offset = 52, type = "f32", note = "the depth again (walls)" },
+  { name = "depth_2_bits", offset = 52, type = "u32" },
+  { name = "surface_bits", offset = 56, type = "u32" },
+  { name = "key", offset = 60, type = "u32", note = "hits with the same key are merged" },
+  { name = "time", offset = 64, type = "f32" },
+  { name = "time_bits", offset = 64, type = "u32" },
+  { name = "hit1_depth", offset = 128, type = "f32", note = "the second record's +48" },
+  { name = "hit1_key", offset = 140, type = "u32", note = "the second record's +60" },
+]
+
+# The stage list: the race data's +0x59620 (known-data.md), 1,224 bytes:
+# ten 80-byte stages (RaceStage) from +0, then the count and the current.
+[Stages]
+measure = "Stages"
+measures = ["Stages::Copy.r4"]
+size = 1224
+origin = "embedded"
+# 9 functions; areas: race-setup.md, vehicle-accessors.md
+fields = [
+  { name = "stage0_type", offset = 0, type = "u32", note = "stage 0's +0 (the stages: RaceStage at + 80 x i)" },
+  { name = "stage0_word_4", offset = 4, type = "u32" },
+  { name = "stage0_word_8", offset = 8, type = "u32" },
+  { name = "stage0_racer0", offset = 44, type = "u32" },
+  { name = "stage0_racer0_word", offset = 48, type = "u32" },
+  { name = "stage0_slot_count", offset = 76, type = "u32" },
+  { name = "count", offset = 800, type = "u32", note = "the stage count" },
+  { name = "current", offset = 804, type = "u32", note = "the current stage (-1 in the accessors means it)" },
+  { name = "word_808", offset = 808, type = "u32", note = "sub_820FFAB0 sets it, sub_820FFC68 reads it" },
+  { name = "course_record", offset = 812, type = "bytes", count = 408, note = "a course record (race-states.toml's)" },
+  { name = "kept_word", offset = 1220, type = "u32", note = "a word Stages::Clear keeps" },
+]
+
+# One stage of the stage list (80 bytes at the list + 80 x i).
+[RaceStage]
+size = 80
+origin = "embedded"
+fields = [
+  { name = "type", offset = 0, type = "u32", note = "2 and 3 answer sub_820FFC30; 4 is never added (the reset's)" },
+  { name = "word_4", offset = 4, type = "u32" },
+  { name = "word_8", offset = 8, type = "u32" },
+  { name = "route", offset = 24, type = "bytes", count = 16, note = "its route (a StageRoute, Stages::SetRoute)" },
+  { name = "racer0", offset = 44, type = "u32", note = "slot i's racer index at +44 + 8 x i (-1 ends them)" },
+  { name = "racer0_word", offset = 48, type = "u32", note = "slot i's word at +48 + 8 x i" },
+  { name = "slot_count", offset = 76, type = "u32", note = "its slot count (Stages::AddRacer)" },
+]
+
+# Stage::Copy24's (sub_820FFD48) out: a stage's route (16 bytes).
+[AccessorStageRoute]
+measure = "sub_820FFD48.r3"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "course", offset = 0, type = "u32", note = "a course route's index" },
+  { name = "location", offset = 4, type = "u32" },
+  { name = "first_position", offset = 8, type = "u32", note = "section and slice" },
+  { name = "last_position", offset = 12, type = "u32", note = "section and slice (the finish)" },
+]
+
+# A racer record (3,936 bytes: the race data's 93 from +48; the fields
+# RacerRecord::Init sets and Racers::IndexOf reads).
+[AccessorRacerRecord]
+measure = "RacerRecord"
+size = 3936
+origin = "embedded"
+fields = [
+  { name = "start_section", offset = 3904, type = "u16", note = "-1 after RacerRecord::Init" },
+  { name = "start_slice", offset = 3906, type = "u16", note = "-1 after RacerRecord::Init" },
+  { name = "item_id", offset = 3912, type = "u32", note = "the data tables' item (-1 none); Racers::IndexOf's id" },
+  { name = "entry_index", offset = 3916, type = "u32", note = "the event's entry (-1 none)" },
+  { name = "racer_value", offset = 3920, type = "f32" },
+  { name = "racer_word", offset = 3924, type = "u32" },
+]
+
+# An array of 3,936-byte racer records with the count at +0x49FE0 (room for
+# 77: the race data's results records at +0x59AE8; RacerRecords::Add, At).
+[RacerRecordArray]
+measure = "RacerRecords"
+measures = ["RacerRecords::At.r3"]
+size = 303076
+origin = "embedded"
+fields = [
+  { name = "count", offset = 303072, type = "u32" },
+]
+
+# A linked list (List::Init, List::At: the scene's pools, 12 bytes there:
+# ScenePools' +56 + 12 x pool). +12 and +16 are other lists' (the
+# measure's: the archive's, the app states'), not the pools'.
+[AccessorList]
+measure = "List"
+size = 20
+origin = "file"
+# 6 functions; areas: app-states.md, archive.md, scene.md, vehicle-accessors.md
+fields = [
+  { name = "first", offset = 0, type = "ptr", to = "AccessorListNode", note = "the first node" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "count", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32", note = "another list kind's (the measure's)" },
+  { name = "unknown_16", offset = 16, type = "u32", note = "another list kind's (the measure's)" },
+]
+
+# A list node: an object of a scene pool (List::At's answer), linked by +8.
+# The fields past +32 are other node types' (a measure fault: List::At
+# serves every pool's objects).
+[AccessorListNode]
+measure = "List::At.ret"
+measures = ["List.+0"]
+size = 5076
+origin = "file"
+# 14 functions; areas: car-scene-draw.md, course-scenery.md, scene-loaders.md, scene-models.md, scene.md, second-set.md, vehicle-accessors.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "next", offset = 8, type = "ptr", to = "AccessorListNode" },
+  { name = "state", offset = 16, type = "u32", note = "0 free, 3 in use (ScenePools::Claim, Get)" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "kind", offset = 32, type = "u32", note = "the second set's pool 7's model kind (ScenePools::FindModel)" },
+  { name = "fault_4296", offset = 4296, type = "u32", note = "a measure fault (another node type's)" },
+  { name = "fault_5040", offset = 5040, type = "u32", note = "a measure fault (another node type's)" },
+  { name = "fault_5048", offset = 5048, type = "u32", note = "a measure fault (another node type's)" },
+  { name = "fault_5068", offset = 5068, type = "u32", note = "a measure fault (another node type's)" },
+  { name = "fault_5072", offset = 5072, type = "u32", note = "a measure fault (another node type's)" },
+]
+
+# The vehicle's +344 object, its collision box (collision.toml's BoxShape,
+# to join), with sub_820B99B0 to sub_820B99C8's halfwords (also met through
+# the track's wall query's +12).
+[VehicleBox]
+measure = "Vehicle.+344"
+measures = ["WallQuery.+12.+0"]
+size = 116
+origin = "embedded"
+# 8 functions; areas: car-physics.md, vehicle-accessors.md, vehicle.md
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82002B30 (a box)" },
+  { name = "car_float_16", offset = 16, type = "f32", note = "set from the car data's +1792 and +1796 (sub_820B9660)" },
+  { name = "car_float_20", offset = 20, type = "f32", note = "sub_820B9658" },
+  { name = "car_float_24", offset = 24, type = "f32", note = "sub_820B9678" },
+  { name = "friction", offset = 28, type = "f32", note = "sub_820B9670 sets it, sub_820B9668 reads it" },
+  { name = "unknown_112", offset = 112, type = "u16", note = "sub_820B99B0, sub_820B99B8" },
+  { name = "unknown_114", offset = 114, type = "u16", note = "sub_820B99C0, sub_820B99C8, sub_820C0450" },
+]
+
+# The vector library's 16-byte vector: x, y, z at +0, +4, +8 and a w at +12
+# (Vec3 and Vec4 alike); copies move the words' bits (the *_bits fields).
+# Also Quaternion::ToMatrix3's quaternion (x, y, z, w; matrix-math.toml's
+# Quaternion).
+[VectorLibVector]
+measure = "Vec3"
+measures = ["Vec4", "Vec3::Add.r4", "Vec3::Add.r5", "Vec3::Sub.r4", "Vec3::Sub.r5", "Vec3::Cross.r4", "Vec3::Cross.r5", "Vec3::CrossW1.r4", "Vec3::CrossW1.r5", "Vec3::Direction.r4", "Vec3::Direction.r5", "Vec3::Normalize.r4", "Vec4::Copy.r4", "Vec4::ScaleTo.r4", "Matrix::SetTranslation.r4", "Matrix::TransformPoint.r5", "Quaternion::ToMatrix3.r4", "sub_82293CD8.r4", "sub_82293CD8.ret", "sub_82294360.r3", "sub_822943C8.r3", "sub_82294470.r3", "sub_822944B0.r3"]
+size = 16
+origin = "embedded"
+fields = [
+  { name = "x", offset = 0, type = "f32" },
+  { name = "x_bits", offset = 0, type = "u32" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "y_bits", offset = 4, type = "u32" },
+  { name = "z", offset = 8, type = "f32" },
+  { name = "z_bits", offset = 8, type = "u32" },
+  { name = "w", offset = 12, type = "f32" },
+  { name = "w_bits", offset = 12, type = "u32" },
+]
+
+# A 4x4 matrix of 16-byte rows as the vector library reads it
+# (Matrix::Rotate's and TransformPoint's; matrix-math.toml's Matrix, to
+# join).
+[VectorLibMatrix]
+measures = ["Matrix::Rotate.r4", "Matrix::TransformPoint.r4", "sub_820B97D8.r4"]
+size = 64
+origin = "embedded"
+fields = [
+  { name = "m00", offset = 0, type = "f32" },
+  { name = "m01", offset = 4, type = "f32" },
+  { name = "m02", offset = 8, type = "f32" },
+  { name = "m03", offset = 12, type = "f32" },
+  { name = "m10", offset = 16, type = "f32" },
+  { name = "m11", offset = 20, type = "f32" },
+  { name = "m12", offset = 24, type = "f32" },
+  { name = "m13", offset = 28, type = "f32" },
+  { name = "m20", offset = 32, type = "f32" },
+  { name = "m21", offset = 36, type = "f32" },
+  { name = "m22", offset = 40, type = "f32" },
+  { name = "m23", offset = 44, type = "f32" },
+  { name = "m30", offset = 48, type = "f32", note = "the translation's x" },
+  { name = "m30_bits", offset = 48, type = "u32" },
+  { name = "m31", offset = 52, type = "f32" },
+  { name = "m31_bits", offset = 52, type = "u32" },
+  { name = "m32", offset = 56, type = "f32" },
+  { name = "m32_bits", offset = 56, type = "u32" },
+  { name = "m33", offset = 60, type = "f32" },
+  { name = "m33_bits", offset = 60, type = "u32" },
+]
+
+# Two halfwords (a route position's section and slice, probably):
+# sub_820FFE98's out and source, sub_820FFEB0's and sub_820FFF10's out
+# ((-1, -1) stored as one word).
+[AccessorPair]
+measures = ["sub_820FFE98.r3", "sub_820FFE98.r4", "sub_820FFEB0.r3", "sub_820FFF10.r3"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "first", offset = 0, type = "u16" },
+  { name = "both", offset = 0, type = "u32", note = "the two as one word (sub_820FFF10's (-1, -1))" },
+  { name = "second", offset = 2, type = "u16" },
+]
+
+# Five halfword pairs (AccessorPair at + 4 x i; sub_820FFEB0's source).
+[AccessorPairs]
+measure = "sub_820FFEB0.r4"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "pair0_first", offset = 0, type = "u16" },
+  { name = "pair4_first", offset = 16, type = "u16" },
+  { name = "pair4_second", offset = 18, type = "u16" },
+]
+
+# A decal entry as sub_820CC470 sets it (race-setup.toml's CarDecal).
+[AccessorCarDecal]
+measure = "sub_820CC470.ret"
+size = 24
+origin = "embedded"
+# 2 functions; areas: race-setup.md, vehicle-accessors.md
+fields = [
+  { name = "angle", offset = 16, type = "f32" },
+  { name = "packed", offset = 20, type = "u32", note = "sub_820CC470's r4" },
+]
+
+# A rigid body as sub_820B68A0 reads it (car-physics.toml's RigidBody).
+[AccessorRigidBody]
+measure = "sub_820B68A0.r3"
+size = 52
+origin = "embedded"
+fields = [
+  { name = "fixed", offset = 0, type = "u8", note = "set: immovable" },
+  { name = "float_48", offset = 48, type = "f32", note = "sub_820B68A0's answer when not fixed" },
+]
+
+# The lifted functions' arguments below are not read (docs/functions/lifted.md).
+
+# sub_820B9680's r3, sub_82293F68's and sub_82293FD0's r4: a float at +32
+# (probably a shape's radius, BoxShape's +32).
+[Sub820B9680Shape]
+measures = ["sub_820B9680.r3", "sub_82293F68.r4", "sub_82293FD0.r4"]
+size = 36
+origin = "embedded"
+fields = [
+  { name = "unknown_32", offset = 32, type = "f32", note = "probably a radius" },
+]
+
+# sub_820B9680's r4 (not read).
+[Sub820B9680Record]
+measure = "sub_820B9680.r4"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]
+
+# sub_820BA228's and sub_820BA688's r3 (468 bytes; floats every 32 bytes
+# from +304). Not read.
+[Sub820BA688Object]
+measures = ["sub_820BA228.r3", "sub_820BA688.r3"]
+size = 468
+origin = "embedded"
+fields = [
+  { name = "unknown_32", offset = 32, type = "f32" },
+  { name = "unknown_128", offset = 128, type = "f32" },
+  { name = "unknown_132", offset = 132, type = "f32" },
+  { name = "unknown_136", offset = 136, type = "f32" },
+  { name = "unknown_144", offset = 144, type = "f32" },
+  { name = "unknown_148", offset = 148, type = "f32" },
+  { name = "unknown_152", offset = 152, type = "f32" },
+  { name = "unknown_176", offset = 176, type = "f32" },
+  { name = "unknown_180", offset = 180, type = "f32" },
+  { name = "unknown_184", offset = 184, type = "f32" },
+  { name = "unknown_304", offset = 304, type = "f32" },
+  { name = "unknown_336", offset = 336, type = "f32" },
+  { name = "unknown_368", offset = 368, type = "f32" },
+  { name = "unknown_400", offset = 400, type = "f32" },
+  { name = "unknown_432", offset = 432, type = "f32" },
+  { name = "unknown_464", offset = 464, type = "f32" },
+]
+
+# sub_820BB450's r3 (a vector at +128). Not read.
+[Sub820BB450Object]
+measure = "sub_820BB450.r3"
+size = 140
+origin = "embedded"
+fields = [
+  { name = "unknown_128", offset = 128, type = "f32" },
+  { name = "unknown_132", offset = 132, type = "f32" },
+  { name = "unknown_136", offset = 136, type = "f32" },
+]
+
+# sub_820BD740's r3. Not read.
+[Sub820BD740Object]
+measure = "sub_820BD740.r3"
+size = 92
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_84", offset = 84, type = "f32" },
+  { name = "unknown_88", offset = 88, type = "f32" },
+]
+
+[globals]
+vehicles = { address = 0x826C2E34, type = "u32", note = "the seven 6,272-byte vehicles (a pointer)" }
+save_data = { address = 0x826C5B58, type = "u32", note = "player 0's save data (a pointer); player i's at + 4 x i (SaveData::Of)" }
+race_data = { address = 0x826C5B2C, type = "u32", note = "the race data (a pointer; race-states.toml's RaceData)" }
+query_walls = { address = 0x826C2D78, type = "u32", note = "the first query function (sub_820B8768 sets it)" }
+query_ground = { address = 0x826C2D7C, type = "u32", note = "the second query function (sub_820B8778 sets it)" }
+collision_world = { address = 0x826C2D88, type = "u32", note = "the collision world (a pointer; car-physics.toml's CollisionWorld)" }
+one = { address = 0x82000A30, type = "f32", note = "1.0" }
+one_bits = { address = 0x82000A30, type = "u32", note = "1.0, copied as a word" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0" }
+zero_bits = { address = 0x82000A34, type = "u32", note = "0.0, copied as a word" }
+quaternion_scale = { address = 0x820021E8, type = "f32", note = "2.0 (probably): Quaternion::ToMatrix3's scale" }
+kmh_scale = { address = 0x820029E0, type = "f32", note = "3.6 (m/s to km/h)" }
+frame_seconds = { address = 0x820029EC, type = "f32", note = "1/30" }
+slip_scale = { address = 0x82002BD8, type = "f32", note = "Vehicle::WheelSlip's threshold scale (1/3.6, ai-drivers.toml)" }

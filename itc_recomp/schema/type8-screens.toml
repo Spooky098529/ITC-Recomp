@@ -1,0 +1,764 @@
+# The schema of docs/functions/type8-screens.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The type 8 mode's panel, list and color list screens (src/type8_screens/;
+# docs/known-data.md, "type 8 panel and list screens"), never seen in play:
+# the panel screen with its panels inline (the panels' layouts are
+# car-list.toml's TabPanel, RowPanel, CarPanel, ColorPanel and ConfirmPanel,
+# each with the player in a word after them), the list screens over the
+# list screens' layout (type67-screens.toml's ListScreen, NodeListScreen,
+# ColorListScreen), their list parts and the parts' per-player blocks.
+# Embedded objects are `bytes` fields (their address), with the words the
+# code reaches through the outer object named beside them.
+#
+# Measure names left to other areas' types (the lead's to add there):
+# - "Type8ListScreen.+9672" is screen-constructors.toml's ListNodeTable
+#   (the PairedNodeTable at the list screen's +10360), and
+#   "Type8ColorListScreen.+9672" its ListColorNodeTable (the
+#   ColorNodeTable at +10432).
+# - "Type8PanelScreen::UpdateOpening.r4", "Type8PanelScreen::Leave.r4",
+#   "Type8PanelScreen::AskQuit.r4", "Type8ListScreen::SetUpRace.r4" and
+#   "Type8ColorListScreen::SetUpRace.r4" are the mode's dispatcher,
+#   boot-mode.toml's ModeDispatcher (+804 the ring count, +808 its start).
+
+# The panel screen (the type 8 member's +42740, vtable 0x82010AF0; UI movie
+# 4): the two players' car pick, over MachineScreen.
+[Type8PanelScreen]
+measure = "Type8PanelScreen"
+size = 15252
+origin = "embedded"
+vtable = 0x82010AF0
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82010AF0" },
+  { name = "machine", offset = 4, type = "bytes", count = 9616, note = "its StateMachine (game-modes.toml); the measure meets its transitions' words at +88 and +316" },
+  { name = "state", offset = 9608, type = "u32", note = "the machine's state (9 back, 10 leave)" },
+  { name = "car_list", offset = 9644, type = "ptr", to = "PanelSetPair", note = "the car list (+11272)" },
+  { name = "holder", offset = 9648, type = "ptr", to = "SingleGroup", note = "the group holder (+15220)" },
+  { name = "opens_itself", offset = 9652, type = "u32", note = "1: PanelScreen::WaitForMovie goes to state 3, Show skips the car list's restore" },
+  { name = "draw_mode", offset = 9656, type = "u32", note = "0 the list, 1 the quit dialog, 2 leaving" },
+  { name = "panel_f0", offset = 9660, type = "bytes", count = 148, note = "player 0's F panel (Type8TabPanel)" },
+  { name = "panel_e0", offset = 9808, type = "bytes", count = 164, note = "player 0's E panel (Type8RowPanel)" },
+  { name = "panel_c0", offset = 9972, type = "bytes", count = 324, note = "player 0's C panel (Type8CarPanel)" },
+  { name = "panel_d0", offset = 10296, type = "bytes", count = 96, note = "player 0's D panel (Type8ColorPanel)" },
+  { name = "confirm0", offset = 10392, type = "bytes", count = 44, note = "player 0's confirm panel (Type8ConfirmPanel)" },
+  { name = "confirm0_vtable", offset = 10392, type = "u32", note = "the destructor's store (0x82010B5C)" },
+  { name = "panel_f1", offset = 10436, type = "bytes", count = 148, note = "player 1's" },
+  { name = "panel_e1", offset = 10584, type = "bytes", count = 164 },
+  { name = "panel_c1", offset = 10748, type = "bytes", count = 324 },
+  { name = "panel_d1", offset = 11072, type = "bytes", count = 96 },
+  { name = "confirm1", offset = 11168, type = "bytes", count = 44 },
+  { name = "confirm1_vtable", offset = 11168, type = "u32" },
+  { name = "group", offset = 11212, type = "bytes", count = 36, note = "the panel group (Type8PanelGroup, UI movie 4)" },
+  { name = "player_node", offset = 11256, type = "u32", note = "11: ShowPlayerNodes' node" },
+  { name = "player_child", offset = 11260, type = "u32", note = "4: the node's first child (six from it)" },
+  { name = "open_anim", offset = 11264, type = "u32", note = "376: the group's opening animation" },
+  { name = "loop_anim", offset = 11268, type = "u32", note = "354: looped after the opening" },
+  { name = "pair", offset = 11272, type = "bytes", count = 3948, note = "the car list, a PanelSetPair (car-list.toml): bases at +11276 and +13248" },
+  { name = "list0_page_menu_player", offset = 11396, type = "u32", note = "base 0's page menu's player (PanelSetBase +120); 0 in the constructor" },
+  { name = "list0_tab", offset = 11508, type = "u32", note = "base 0's PanelSetBase +232: 0 and 1 the unlocked cars, 2 the garage" },
+  { name = "list0_row", offset = 11512, type = "u32", note = "+236" },
+  { name = "list0_scroll", offset = 11516, type = "u32", note = "+240" },
+  { name = "list0_color", offset = 11520, type = "u32", note = "+244" },
+  { name = "list0_color_scroll", offset = 11524, type = "u32", note = "+248" },
+  { name = "list0_current_list", offset = 13096, type = "u32", note = "base 0's +1820, the CarListList shown" },
+  { name = "list0_rows_shown", offset = 13192, type = "u32", note = "base 0's +1916 (3, InitWords)" },
+  { name = "list0_unknown_1920", offset = 13196, type = "u32", note = "base 0's +1920 (0 in the constructor)" },
+  { name = "list0_colors_shown", offset = 13200, type = "u32", note = "base 0's +1924 (4, InitWords)" },
+  { name = "list0_cancelled", offset = 13220, type = "u32", note = "base 0's +1944: set when player 0 backs out" },
+  { name = "list0_busy_anim_a", offset = 13236, type = "u32", note = "base 0's +1960 (360)" },
+  { name = "list0_busy_anim_b", offset = 13240, type = "u32", note = "+1964 (359)" },
+  { name = "list0_busy_anim_done", offset = 13244, type = "u32", note = "+1968 (361)" },
+  { name = "list1_page_menu_player", offset = 13368, type = "u32", note = "base 1's +120 (1 in the constructor)" },
+  { name = "list1_rows_shown", offset = 15164, type = "u32", note = "base 1's +1916 (3)" },
+  { name = "list1_unknown_1920", offset = 15168, type = "u32", note = "base 1's +1920" },
+  { name = "list1_colors_shown", offset = 15172, type = "u32", note = "base 1's +1924 (4)" },
+  { name = "list1_cancelled", offset = 15192, type = "u32", note = "base 1's +1944" },
+  { name = "list1_busy_anim_a", offset = 15208, type = "u32", note = "base 1's +1960 (363)" },
+  { name = "list1_busy_anim_b", offset = 15212, type = "u32", note = "+1964 (362)" },
+  { name = "list1_busy_anim_done", offset = 15216, type = "u32", note = "+1968 (364)" },
+  { name = "group_holder", offset = 15220, type = "bytes", count = 8, note = "the SingleGroup holding the panel group" },
+  { name = "message2_got", offset = 15228, type = "u32", note = "message 2 got: the opening may start" },
+  { name = "load_asked", offset = 15232, type = "u32", note = "the save load asked (message 29); cleared by 31" },
+  { name = "opening_played", offset = 15236, type = "u32" },
+  { name = "loaded_this_visit", offset = 15240, type = "u32", note = "the load asked this visit (0 after a race: no fade in, backing out leaves without the dialog)" },
+  { name = "dialog_answer", offset = 15244, type = "u32", note = "-1 none, 0 stay, 1 or 2 leave" },
+  { name = "unknown_15248", offset = 15248, type = "u32", note = "0 in the constructor" },
+]
+
+# The group holder's (SingleGroup's) vtable as the screen calls it.
+[Type8HolderVtable]
+measure = "Type8PanelScreen.+15220"
+size = 12
+origin = "image"
+fields = [
+  { name = "deleting_destructor", offset = 0, type = "fn" },
+  { name = "run", offset = 4, type = "fn", note = "slot 1 (GroupPair::Run)" },
+  { name = "wait_for_fade", offset = 8, type = "fn", note = "slot 2 (GroupPair::WaitForFade)" },
+]
+
+# The panel group (36 bytes at the panel screen's +11212): PanelGroupBase
+# (car-list.toml) with its own vtable.
+[Type8PanelGroup]
+measure = "PanelGroup8"
+size = 36
+origin = "embedded"
+vtable = 0x82010B48
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82010B48" },
+  { name = "movie", offset = 4, type = "u32", note = "its UI movie (4)" },
+  { name = "text_node_set", offset = 12, type = "u32", note = "10" },
+  { name = "caption_node", offset = 32, type = "u32", note = "0 in the constructor" },
+]
+
+# F, the tabs (148 bytes): car-list.toml's TabPanel and the player.
+[Type8TabPanel]
+measure = "Panel8F"
+size = 148
+origin = "embedded"
+vtable = 0x82001DD8
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82001DD8 (ListNode's)" },
+  { name = "group", offset = 4, type = "ptr", to = "Type8PanelGroup" },
+  { name = "node_set", offset = 24, type = "u32", note = "6 or 7 by the player" },
+  { name = "texts_node", offset = 28, type = "u32" },
+  { name = "tabs_node", offset = 32, type = "u32" },
+  { name = "buttons_node", offset = 36, type = "u32" },
+  { name = "cursor", offset = 40, type = "u32" },
+  { name = "tab0_text", offset = 44, type = "u32" },
+  { name = "tab1_text", offset = 48, type = "u32" },
+  { name = "tab2_text", offset = 52, type = "u32" },
+  { name = "buttons", offset = 84, type = "u32" },
+  { name = "tab_word_a", offset = 88, type = "u32" },
+  { name = "tab_word_b", offset = 92, type = "u32" },
+  { name = "tab_anims", offset = 96, type = "u32" },
+  { name = "scroll_down", offset = 100, type = "u32" },
+  { name = "scroll_up", offset = 104, type = "u32" },
+  { name = "show_anim", offset = 116, type = "u32" },
+  { name = "move_anim", offset = 120, type = "u32" },
+  { name = "loop_a", offset = 124, type = "u32" },
+  { name = "loop_b", offset = 128, type = "u32" },
+  { name = "player", offset = 144, type = "u32", note = "0 or 1" },
+]
+
+# E, the car rows (164 bytes): car-list.toml's RowPanel and the player.
+[Type8RowPanel]
+measure = "Panel8E"
+size = 164
+origin = "embedded"
+fields = [
+  { name = "group", offset = 0, type = "ptr", to = "Type8PanelGroup" },
+  { name = "row_count", offset = 4, type = "u32" },
+  { name = "node_set", offset = 12, type = "u32" },
+  { name = "node", offset = 16, type = "u32" },
+  { name = "row_node0", offset = 20, type = "u32", note = "the rows' child indices (RowPanel's row_nodes)" },
+  { name = "row_node1", offset = 24, type = "u32" },
+  { name = "row_node2", offset = 28, type = "u32" },
+  { name = "spare_row_node", offset = 60, type = "u32" },
+  { name = "unknown_64", offset = 64, type = "u32", note = "15 or 186 by the player" },
+  { name = "unknown_68", offset = 68, type = "u32", note = "25 or 196" },
+  { name = "unknown_72", offset = 72, type = "u32", note = "26 or 197" },
+  { name = "show_anim", offset = 76, type = "u32" },
+  { name = "hide_anim", offset = 88, type = "u32" },
+  { name = "row_anims", offset = 92, type = "u32" },
+  { name = "scroll_up", offset = 96, type = "u32" },
+  { name = "scroll_down", offset = 100, type = "u32" },
+  { name = "arrow_up", offset = 104, type = "u32" },
+  { name = "arrow_down", offset = 108, type = "u32" },
+  { name = "logo", offset = 120, type = "u32" },
+  { name = "text_maker", offset = 124, type = "u32" },
+  { name = "text_name", offset = 128, type = "u32" },
+  { name = "text_third", offset = 132, type = "u32" },
+  { name = "cursor", offset = 144, type = "u32" },
+  { name = "arrows", offset = 148, type = "u32" },
+  { name = "player", offset = 160, type = "u32" },
+]
+
+# C, the car's info (324 bytes): car-list.toml's CarPanel and the player.
+[Type8CarPanel]
+measure = "Panel8C"
+size = 324
+origin = "embedded"
+vtable = 0x82010B4C
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82010B4C" },
+  { name = "shows_price", offset = 4, type = "u32" },
+  { name = "group", offset = 12, type = "ptr", to = "Type8PanelGroup" },
+  { name = "node_set", offset = 16, type = "u32" },
+  { name = "node", offset = 20, type = "u32" },
+  { name = "stats_node", offset = 24, type = "u32" },
+  { name = "buttons_node", offset = 32, type = "u32" },
+  { name = "name_node", offset = 36, type = "u32" },
+  { name = "show_anim_a", offset = 40, type = "u32" },
+  { name = "show_anim_b", offset = 44, type = "u32" },
+  { name = "hide_anim_a", offset = 48, type = "u32" },
+  { name = "hide_anim_b", offset = 52, type = "u32" },
+  { name = "show_again_anim", offset = 56, type = "u32" },
+  { name = "arrow_a", offset = 60, type = "u32" },
+  { name = "arrow_b", offset = 64, type = "u32" },
+  { name = "action_anim0", offset = 68, type = "u32", note = "CarPanel's action_anims" },
+  { name = "action_anim1", offset = 72, type = "u32" },
+  { name = "scroll_back", offset = 108, type = "u32" },
+  { name = "scroll_on", offset = 112, type = "u32" },
+  { name = "stats_in", offset = 116, type = "u32" },
+  { name = "stats_out", offset = 120, type = "u32" },
+  { name = "text_maker", offset = 132, type = "u32" },
+  { name = "text_name", offset = 136, type = "u32" },
+  { name = "text_third", offset = 140, type = "u32" },
+  { name = "texts", offset = 144, type = "u32" },
+  { name = "cursor", offset = 152, type = "u32" },
+  { name = "arrows_child", offset = 156, type = "u32", note = "ShowArrows' child (negative: none)" },
+  { name = "stats_children", offset = 160, type = "bytes", count = 88, note = "22 child indices of the stats node (CarPanel's)" },
+  { name = "stats_child0", offset = 160, type = "u32" },
+  { name = "stats_child1", offset = 164, type = "u32" },
+  { name = "stats_child2", offset = 168, type = "u32" },
+  { name = "stats_child3", offset = 172, type = "u32" },
+  { name = "stats_child4", offset = 176, type = "u32" },
+  { name = "stats_child5", offset = 180, type = "u32" },
+  { name = "stats_child6", offset = 184, type = "u32" },
+  { name = "stats_child7", offset = 188, type = "u32" },
+  { name = "stats_child8", offset = 192, type = "u32" },
+  { name = "stats_child9", offset = 196, type = "u32" },
+  { name = "stats_child10", offset = 200, type = "u32" },
+  { name = "stats_child11", offset = 204, type = "u32" },
+  { name = "stats_child12", offset = 208, type = "u32" },
+  { name = "stats_child13", offset = 212, type = "u32" },
+  { name = "stats_child14", offset = 216, type = "u32" },
+  { name = "stats_child15", offset = 220, type = "u32" },
+  { name = "stats_child16", offset = 224, type = "u32" },
+  { name = "stats_child17", offset = 228, type = "u32" },
+  { name = "stats_child18", offset = 232, type = "u32" },
+  { name = "stats_child19", offset = 236, type = "u32" },
+  { name = "stats_child20", offset = 240, type = "u32" },
+  { name = "stats_child21", offset = 244, type = "u32" },
+  { name = "buttons", offset = 272, type = "u32" },
+  { name = "text_a", offset = 276, type = "u32" },
+  { name = "text_b", offset = 280, type = "u32" },
+  { name = "player", offset = 320, type = "u32" },
+]
+
+# D, the colors (96 bytes): car-list.toml's ColorPanel and the player.
+[Type8ColorPanel]
+measure = "Panel8D"
+size = 96
+origin = "embedded"
+vtable = 0x82001DD8
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82001DD8 (ListNode's)" },
+  { name = "group", offset = 4, type = "ptr", to = "Type8PanelGroup" },
+  { name = "node_set", offset = 8, type = "u32" },
+  { name = "node", offset = 12, type = "u32" },
+  { name = "show_anim", offset = 16, type = "u32" },
+  { name = "hide_anim", offset = 20, type = "u32" },
+  { name = "item_anims", offset = 24, type = "u32" },
+  { name = "scroll_back", offset = 28, type = "u32" },
+  { name = "scroll_on", offset = 32, type = "u32" },
+  { name = "swatches_on", offset = 36, type = "u32" },
+  { name = "swatches_back", offset = 40, type = "u32" },
+  { name = "arrow_a", offset = 52, type = "u32" },
+  { name = "arrow_b", offset = 56, type = "u32" },
+  { name = "arrows_node", offset = 60, type = "u32" },
+  { name = "cursor", offset = 64, type = "u32" },
+  { name = "swatches", offset = 68, type = "u32" },
+  { name = "arrow_up_node", offset = 72, type = "u32" },
+  { name = "arrow_down_node", offset = 76, type = "u32" },
+  { name = "swatch_color", offset = 80, type = "u32" },
+  { name = "player", offset = 92, type = "u32" },
+]
+
+# The confirm panel (44 bytes): car-list.toml's ConfirmPanel and the player.
+[Type8ConfirmPanel]
+measure = "ConfirmPanel8"
+size = 44
+origin = "embedded"
+vtable = 0x82010B5C
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82010B5C" },
+  { name = "group", offset = 4, type = "ptr", to = "Type8PanelGroup" },
+  { name = "unknown_12", offset = 12, type = "u32", note = "0 or 1 by the player" },
+  { name = "node_a", offset = 16, type = "u32" },
+  { name = "node_b", offset = 20, type = "u32" },
+  { name = "node_c", offset = 24, type = "u32" },
+  { name = "show_anim", offset = 28, type = "u32" },
+  { name = "loop_anim", offset = 32, type = "u32" },
+  { name = "hide_anim", offset = 36, type = "u32" },
+  { name = "player", offset = 40, type = "u32" },
+]
+
+# The list screen (the type 8 member's +19544, 11,368 bytes with its part;
+# vtable 0x82010E18) over Type8ListBase (vtable 0x82011638) over
+# NodeListScreen: one object, the list base's words and the screen's.
+[Type8ListScreen]
+measures = ["Type8ListScreen", "Type8ListBase"]
+size = 11368
+origin = "embedded"
+vtable = 0x82010E18
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "Type8ScreenVtable", note = "0x82010E18 (0x82011638 while only the base is built)" },
+  { name = "page", offset = 9644, type = "u32", note = "the page block: the page (-1 while a step runs)" },
+  { name = "next_page", offset = 9648, type = "u32", note = "the page after the step" },
+  { name = "previous_page", offset = 9652, type = "u32" },
+  { name = "step", offset = 9656, type = "u32", note = "-1 none" },
+  { name = "queued_step", offset = 9660, type = "u32" },
+  { name = "step_started", offset = 9668, type = "u32", note = "the step's first-pass word" },
+  { name = "node_table", offset = 9672, type = "ptr", to = "ListNodeTable", note = "the node table (+10360)" },
+  { name = "part", offset = 9676, type = "ptr", to = "Type8ListPart", note = "the list part (+10844)" },
+  { name = "movie_id", offset = 9680, type = "u32", note = "its UI movie" },
+  { name = "race_set", offset = 9688, type = "u32", note = "1 once the race is set (ListScreen::OnLeft goes to state 11)" },
+  { name = "part_open", offset = 9696, type = "u32", note = "1 while the list part is open" },
+  { name = "show_part_nodes", offset = 9708, type = "u32", note = "1" },
+  { name = "unknown_9712", offset = 9712, type = "u32", note = "0 in the constructor" },
+  { name = "unknown_9716", offset = 9716, type = "u32", note = "10" },
+  { name = "unknown_9720", offset = 9720, type = "u32", note = "11" },
+  { name = "selection_node_set", offset = 9724, type = "u32", note = "15: ShowSelection's nodes" },
+  { name = "part_node_set", offset = 9728, type = "u32", note = "6: part_node's" },
+  { name = "icons_node_set", offset = 9732, type = "u32", note = "2 (SetIcons)" },
+  { name = "color_cursor_node_set", offset = 9736, type = "u32", note = "20" },
+  { name = "scroll_text_node_set", offset = 9740, type = "u32", note = "1 (SetScrollText)" },
+  { name = "item_node_set", offset = 9744, type = "u32", note = "20: SetItemTexts' texts, the item cursor" },
+  { name = "marker_node", offset = 9748, type = "u32", note = "0: shown or hidden by the list part's helpers" },
+  { name = "arrow_a_node", offset = 9752, type = "u32", note = "8 (SetArrows)" },
+  { name = "arrow_b_node", offset = 9756, type = "u32", note = "9" },
+  { name = "selection_node", offset = 9768, type = "u32", note = "3 (ShowSelection)" },
+  { name = "selection_array", offset = 9776, type = "u32", note = "0x82637020 (an array in .data ShowSelection reads)" },
+  { name = "selection_entries", offset = 9784, type = "u32", note = "2" },
+  { name = "unknown_9788", offset = 9788, type = "u32", note = "1" },
+  { name = "arrow_on_frame", offset = 9800, type = "u32", note = "0 (SetArrows: the node's +108 when on)" },
+  { name = "arrow_off_frame", offset = 9804, type = "u32", note = "1" },
+  { name = "color_cursor_child", offset = 9808, type = "u32", note = "0" },
+  { name = "icons_child", offset = 9812, type = "u32", note = "4" },
+  { name = "scroll_text_child", offset = 9816, type = "u32", note = "0" },
+  { name = "prompt_node", offset = 9820, type = "u32", note = "7: hidden while the list is dimmed" },
+  { name = "part_node", offset = 9824, type = "u32", note = "1: under part_node_set, hidden while dimmed" },
+  { name = "item_cursor_child", offset = 9828, type = "u32", note = "0" },
+  { name = "opening_anim_c", offset = 9832, type = "u32", note = "143: played by Step0" },
+  { name = "course_in_anim", offset = 9848, type = "u32", note = "144: Step2's" },
+  { name = "course_out_anim", offset = 9852, type = "u32", note = "145: Step3's" },
+  { name = "opening_loop_a", offset = 9856, type = "u32", note = "146: replayed by Step0" },
+  { name = "opening_loop_b", offset = 9860, type = "u32", note = "0: replayed by Step0" },
+  { name = "opening_anim_a", offset = 9864, type = "u32", note = "-1 here: played by Step0" },
+  { name = "opened_loop_a", offset = 9868, type = "u32", note = "60: replayed once Step0 is done" },
+  { name = "course_loop", offset = 9872, type = "u32", note = "148: replayed once Step2 is done" },
+  { name = "opened_loop_b", offset = 9876, type = "u32", note = "5" },
+  { name = "opened_loop_c", offset = 9880, type = "u32", note = "-1" },
+  { name = "course_select_anim", offset = 9884, type = "u32", note = "4: played and looped by Step2, finished by Step3" },
+  { name = "opening_anim_b", offset = 9888, type = "u32", note = "4: played by Step0" },
+  { name = "toggle_anim_on", offset = 9892, type = "u32", note = "6: the toggle at its selection 0" },
+  { name = "toggle_anim_off", offset = 9896, type = "u32", note = "7" },
+  { name = "selection_anim", offset = 9900, type = "u32", note = "65: ShowSelection's" },
+  { name = "unknown_9904", offset = 9904, type = "u32", note = "117" },
+  { name = "unknown_9908", offset = 9908, type = "u32", note = "118" },
+  { name = "arrow_up_anim", offset = 9912, type = "u32", note = "78: played once a step for an upward move" },
+  { name = "arrow_down_anim", offset = 9916, type = "u32", note = "79" },
+  { name = "unknown_9928", offset = 9928, type = "u32", note = "130" },
+  { name = "unknown_9932", offset = 9932, type = "u32", note = "129" },
+  { name = "course_anims", offset = 9936, type = "bytes", count = 40, note = "the courses' named animations, 107 to 112 (one a course list item)" },
+  { name = "kind_anims", offset = 9976, type = "bytes", count = 40, note = "the kinds' named animations, 68 to 70 (one a kind list item)" },
+  { name = "kind_anim0", offset = 9976, type = "u32" },
+  { name = "kind_anim1", offset = 9980, type = "u32" },
+  { name = "kind_anim2", offset = 9984, type = "u32" },
+  { name = "kind_list", offset = 10144, type = "bytes", count = 72, note = "the race kind's MenuList (3 items; the race data's +32)" },
+  { name = "kind_list_scroll", offset = 10148, type = "u32", note = "the kind list's +4" },
+  { name = "kind_list_scroll_before", offset = 10152, type = "u32", note = "its +8" },
+  { name = "kind_list_selection_before", offset = 10164, type = "u32", note = "its +20" },
+  { name = "kind_list_move", offset = 10168, type = "u32", note = "its +24" },
+  { name = "course_list", offset = 10216, type = "bytes", count = 72, note = "the course's MenuList (8 items, 6 shown)" },
+  { name = "course_list_scroll", offset = 10220, type = "u32", note = "its +4: the first course shown" },
+  { name = "course_list_scroll_before", offset = 10224, type = "u32", note = "its +8" },
+  { name = "course_list_move", offset = 10240, type = "u32", note = "its +24" },
+  { name = "toggle", offset = 10288, type = "bytes", count = 72, note = "the traffic toggle's MenuList (2 items; the first: traffic 3)" },
+  { name = "toggle_move", offset = 10312, type = "u32", note = "its +24" },
+  { name = "node_table_object", offset = 10360, type = "bytes", count = 460, note = "the PairedNodeTable (ListNodeTable); the measure meets its vtable's slot 1 (Type8NodeTableVtable)" },
+  { name = "kind_texts", offset = 10820, type = "bytes", count = 12, note = "the kinds' scroll texts, 545 to 547" },
+  { name = "unknown_10832", offset = 10832, type = "u32", note = "548" },
+  { name = "course_text", offset = 10836, type = "u32", note = "549: the course list's scroll text" },
+  { name = "part_text", offset = 10840, type = "u32", note = "-1 in the base, 10 in the screen: the list part's scroll text" },
+  { name = "list_part", offset = 10844, type = "bytes", count = 524, note = "the Type8ListPart" },
+]
+
+# The color list screen (the type 8 member's +30912, 11,828 bytes with its
+# part; vtable 0x82010CF0) over ColorListScreen.
+[Type8ColorListScreen]
+measure = "Type8ColorListScreen"
+size = 11828
+origin = "embedded"
+vtable = 0x82010CF0
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "Type8ScreenVtable", note = "0x82010CF0" },
+  { name = "state", offset = 9608, type = "u32", note = "the machine's state (10: leave, SetUpRace)" },
+  { name = "node_table", offset = 9672, type = "ptr", to = "ListColorNodeTable", note = "the color node table (+10432)" },
+  { name = "part", offset = 9676, type = "ptr", to = "Type8ColorListPart", note = "the list part (+11040)" },
+  { name = "movie_id", offset = 9680, type = "u32" },
+  { name = "unknown_9684", offset = 9684, type = "u32", note = "0 in the constructor" },
+  { name = "show_part_nodes", offset = 9708, type = "u32", note = "1" },
+  { name = "unknown_9712", offset = 9712, type = "u32", note = "0" },
+  { name = "unknown_9716", offset = 9716, type = "u32", note = "10" },
+  { name = "unknown_9720", offset = 9720, type = "u32", note = "11" },
+  { name = "selection_node_set", offset = 9724, type = "u32", note = "16" },
+  { name = "part_node_set", offset = 9728, type = "u32", note = "6" },
+  { name = "icons_node_set", offset = 9732, type = "u32", note = "2" },
+  { name = "color_cursor_node_set", offset = 9736, type = "u32", note = "9" },
+  { name = "scroll_text_node_set", offset = 9740, type = "u32", note = "1" },
+  { name = "item_node_set", offset = 9744, type = "u32", note = "21: SetItemText's texts" },
+  { name = "marker_node", offset = 9748, type = "u32", note = "0" },
+  { name = "arrow_a_node", offset = 9752, type = "u32", note = "8" },
+  { name = "arrow_b_node", offset = 9756, type = "u32", note = "9" },
+  { name = "selection_node", offset = 9768, type = "u32", note = "3" },
+  { name = "selection_array", offset = 9776, type = "u32", note = "0x8263700C" },
+  { name = "selection_entries", offset = 9784, type = "u32", note = "2" },
+  { name = "unknown_9788", offset = 9788, type = "u32", note = "1" },
+  { name = "arrow_on_frame", offset = 9800, type = "u32", note = "0" },
+  { name = "arrow_off_frame", offset = 9804, type = "u32", note = "1" },
+  { name = "color_cursor_child", offset = 9808, type = "u32", note = "0" },
+  { name = "icons_child", offset = 9812, type = "u32", note = "4" },
+  { name = "scroll_text_child", offset = 9816, type = "u32", note = "0" },
+  { name = "prompt_node", offset = 9820, type = "u32", note = "7" },
+  { name = "part_node", offset = 9824, type = "u32", note = "1" },
+  { name = "item_cursor_child", offset = 9828, type = "u32", note = "0" },
+  { name = "unknown_9832", offset = 9832, type = "u32", note = "165, a named animation" },
+  { name = "unknown_9840", offset = 9840, type = "u32", note = "166" },
+  { name = "unknown_9844", offset = 9844, type = "u32", note = "168" },
+  { name = "unknown_9848", offset = 9848, type = "u32", note = "167" },
+  { name = "unknown_9852", offset = 9852, type = "u32", note = "169" },
+  { name = "unknown_9856", offset = 9856, type = "u32", note = "170" },
+  { name = "unknown_9860", offset = 9860, type = "u32", note = "0" },
+  { name = "unknown_9864", offset = 9864, type = "u32", note = "-1" },
+  { name = "unknown_9868", offset = 9868, type = "u32", note = "47" },
+  { name = "unknown_9872", offset = 9872, type = "u32", note = "171" },
+  { name = "unknown_9876", offset = 9876, type = "u32", note = "5" },
+  { name = "unknown_9888", offset = 9888, type = "u32", note = "-1" },
+  { name = "toggle_anim_on", offset = 9892, type = "u32", note = "6" },
+  { name = "toggle_anim_off", offset = 9896, type = "u32", note = "7" },
+  { name = "selection_anim", offset = 9900, type = "u32", note = "87" },
+  { name = "unknown_9904", offset = 9904, type = "u32", note = "139" },
+  { name = "unknown_9908", offset = 9908, type = "u32", note = "140" },
+  { name = "arrow_up_anim", offset = 9912, type = "u32", note = "100" },
+  { name = "arrow_down_anim", offset = 9916, type = "u32", note = "101" },
+  { name = "unknown_9920", offset = 9920, type = "u32", note = "20" },
+  { name = "unknown_9924", offset = 9924, type = "u32", note = "21" },
+  { name = "unknown_9928", offset = 9928, type = "u32", note = "152" },
+  { name = "unknown_9932", offset = 9932, type = "u32", note = "151" },
+  { name = "item_anims", offset = 9936, type = "bytes", count = 40, note = "the item list's named animations (129 to 131)" },
+  { name = "second_anims", offset = 9976, type = "bytes", count = 40, note = "90 to 92" },
+  { name = "third_anims", offset = 10016, type = "bytes", count = 40, note = "10 to 12" },
+  { name = "unknown_10056", offset = 10056, type = "u32", note = "141" },
+  { name = "unknown_10060", offset = 10060, type = "u32", note = "142" },
+  { name = "unknown_10064", offset = 10064, type = "u32", note = "143" },
+  { name = "unknown_10096", offset = 10096, type = "u32", note = "155" },
+  { name = "unknown_10100", offset = 10100, type = "u32", note = "156" },
+  { name = "unknown_10104", offset = 10104, type = "u32", note = "157" },
+  { name = "item_list", offset = 10144, type = "bytes", count = 72, note = "the item list's MenuList (9 items, 3 shown)" },
+  { name = "item_list_scroll", offset = 10148, type = "u32", note = "its +4" },
+  { name = "course_list", offset = 10216, type = "bytes", count = 72, note = "the course list's MenuList (2 items)" },
+  { name = "toggle", offset = 10288, type = "bytes", count = 72, note = "the traffic toggle's MenuList" },
+  { name = "kind_list", offset = 10360, type = "bytes", count = 72, note = "the race kind's MenuList (3 items)" },
+  { name = "color_node_table", offset = 10432, type = "bytes", count = 584, note = "the ColorNodeTable (ListColorNodeTable)" },
+  { name = "table_node_set_a", offset = 10440, type = "u32", note = "the table's +8 (12)" },
+  { name = "table_node_set_b", offset = 10444, type = "u32", note = "its +12 (11)" },
+  { name = "table_item_anims", offset = 10448, type = "bytes", count = 108, note = "its +16: 48 + the item" },
+  { name = "table_item_nodes", offset = 10588, type = "bytes", count = 108, note = "its +156: 1 + the item" },
+  { name = "table_item_masks", offset = 10744, type = "bytes", count = 108, note = "its +312: the item records' color masks" },
+  { name = "table_node_base_a", offset = 10852, type = "u32", note = "its +420 (5)" },
+  { name = "table_node_base_b", offset = 10856, type = "u32", note = "its +424 (20)" },
+  { name = "table_grid_a", offset = 10912, type = "bytes", count = 36, note = "its +480: 79, 76, 77, 78, 80, 81 at +484 on" },
+  { name = "table_grid_a0", offset = 10912, type = "u32" },
+  { name = "table_grid_a1", offset = 10916, type = "u32" },
+  { name = "table_grid_a2", offset = 10920, type = "u32" },
+  { name = "table_grid_a3", offset = 10924, type = "u32" },
+  { name = "table_grid_a4", offset = 10928, type = "u32" },
+  { name = "table_grid_a5", offset = 10932, type = "u32" },
+  { name = "table_grid_a6", offset = 10936, type = "u32" },
+  { name = "table_grid_a7", offset = 10940, type = "u32" },
+  { name = "table_grid_a8", offset = 10944, type = "u32" },
+  { name = "table_grid_b", offset = 10948, type = "bytes", count = 36, note = "its +516: 67, 64, 65, 66, 68, 69 at +520 on" },
+  { name = "table_grid_b0", offset = 10948, type = "u32" },
+  { name = "table_grid_b1", offset = 10952, type = "u32" },
+  { name = "table_grid_b2", offset = 10956, type = "u32" },
+  { name = "table_grid_b3", offset = 10960, type = "u32" },
+  { name = "table_grid_b4", offset = 10964, type = "u32" },
+  { name = "table_grid_b5", offset = 10968, type = "u32" },
+  { name = "table_grid_b6", offset = 10972, type = "u32" },
+  { name = "table_grid_b7", offset = 10976, type = "u32" },
+  { name = "table_grid_b8", offset = 10980, type = "u32" },
+  { name = "part_text", offset = 11036, type = "u32", note = "13: the list part's scroll text" },
+  { name = "list_part", offset = 11040, type = "bytes", count = 788, note = "the Type8ColorListPart" },
+]
+
+# The list screens' vtable slots their own code calls.
+[Type8ScreenVtable]
+measures = ["Type8ListBase.+0", "Type8ListScreen.+0", "Type8ColorListScreen.+0"]
+size = 116
+origin = "image"
+fields = [
+  { name = "set_item_texts", offset = 8, type = "fn", note = "slot 2" },
+  { name = "slot_26", offset = 104, type = "fn", note = "slot 26: the list screen's ShowMarks, the color list's SetDetails" },
+  { name = "slot_27", offset = 108, type = "fn", note = "slot 27: the list screen's SetLabels" },
+  { name = "slot_28", offset = 112, type = "fn", note = "slot 28: the color list's SetLabels" },
+]
+
+# The node table's vtable (the list screen's +10360) as the list base calls it.
+[Type8NodeTableVtable]
+measure = "Type8ListBase.+10360"
+size = 8
+origin = "image"
+fields = [
+  { name = "deleting_destructor", offset = 0, type = "fn" },
+  { name = "slot_1", offset = 4, type = "fn", note = "slot 1, called by Step2 before PairedNodeTable::Refresh" },
+]
+
+# A course's info (16 bytes from 0x82010D90, Type8ListScreen::ItemInfo's r5):
+# NodeTable::SetPairs' four pairs.
+[Type8CourseInfo]
+measure = "Type8ListScreen::ItemInfo.r5"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "third_pair", offset = 0, type = "u32", note = "the node table's +444" },
+  { name = "first_pair", offset = 4, type = "u32", note = "its +428" },
+  { name = "second_pair", offset = 8, type = "u32", note = "its +436" },
+  { name = "fourth_pair", offset = 12, type = "u32", note = "its +452 (bit 0: NodeListScreen's +9700 and +9704)" },
+]
+
+# The list screen's list part (20 bytes, its inner part at +20; vtable
+# 0x820114AC) over ListPartBase.
+[Type8ListPart]
+measures = ["Type8ListPart", "Type8ListBase.+9676"]
+size = 524
+origin = "embedded"
+vtable = 0x820114AC
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "Type8ListPartVtable", note = "0x820114AC" },
+  { name = "yes", offset = 4, type = "u32", note = "the prompt's yes" },
+  { name = "back", offset = 8, type = "u32", note = "the prompt's back" },
+  { name = "movie_id", offset = 12, type = "u32", note = "its UI movie's id (20)" },
+  { name = "inner_part", offset = 16, type = "ptr", to = "Type8ListPartInner", note = "+20" },
+  { name = "inner", offset = 20, type = "bytes", count = 504, note = "the Type8ListPartInner" },
+]
+
+# The color list screen's list part (20 bytes, its inner part at +20; vtable
+# 0x820113F4) over ListPartBase.
+[Type8ColorListPart]
+measure = "Type8ColorListPart"
+size = 788
+origin = "embedded"
+vtable = 0x820113F4
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "Type8ListPartVtable", note = "0x820113F4" },
+  { name = "yes", offset = 4, type = "u32" },
+  { name = "back", offset = 8, type = "u32" },
+  { name = "movie_id", offset = 12, type = "u32", note = "20" },
+  { name = "inner_part", offset = 16, type = "ptr", to = "Type8ColorPartInner", note = "+20" },
+  { name = "inner", offset = 20, type = "bytes", count = 768, note = "the Type8ColorPartInner" },
+]
+
+# The list parts' vtable slots the screens call.
+[Type8ListPartVtable]
+measures = ["Type8ListBase.+9676.+0", "Type8ColorListScreen.+11040"]
+size = 52
+origin = "image"
+fields = [
+  { name = "open", offset = 4, type = "fn", note = "slot 1 (ListPartBase::Open)" },
+  { name = "pick", offset = 8, type = "fn", note = "slot 2 (ListPartBase::Pick)" },
+  { name = "is_first_choice", offset = 44, type = "fn", note = "slot 11 (Type8ColorListPart::IsFirstChoice)" },
+  { name = "third_choice", offset = 48, type = "fn", note = "slot 12 (Type8ColorListPart::ThirdChoice)" },
+]
+
+# The inner parts' shared words (ListPartInnerBase's page block and
+# answers), as the shared step 1 and pages 1 and 2 reach them.
+[Type8PartInner]
+measure = "Type8PartInner"
+size = 40
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "page", offset = 4, type = "u32", note = "-1 while a step runs" },
+  { name = "next_page", offset = 8, type = "u32" },
+  { name = "previous_page", offset = 12, type = "u32" },
+  { name = "step", offset = 16, type = "u32", note = "-1 none" },
+  { name = "queued_step", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32", note = "-1 at Open, 0 when a queued step starts" },
+  { name = "step_started", offset = 28, type = "u32", note = "the step's first-call word" },
+  { name = "yes", offset = 32, type = "u32" },
+  { name = "back", offset = 36, type = "u32" },
+]
+
+# The list part's inner part (504 bytes, vtable 0x82011490) over
+# ListPartInnerBase: a Type8PlayerBlock a player.
+[Type8ListPartInner]
+measure = "Type8ListPartInner"
+size = 504
+origin = "embedded"
+vtable = 0x82011490
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82011490" },
+  { name = "page", offset = 4, type = "u32" },
+  { name = "next_page", offset = 8, type = "u32" },
+  { name = "previous_page", offset = 12, type = "u32" },
+  { name = "step", offset = 16, type = "u32" },
+  { name = "queued_step", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "step_started", offset = 28, type = "u32" },
+  { name = "yes", offset = 32, type = "u32" },
+  { name = "back", offset = 36, type = "u32" },
+  { name = "block0", offset = 40, type = "bytes", count = 232, note = "player 0's Type8PlayerBlock" },
+  { name = "block0_ready", offset = 44, type = "u32" },
+  { name = "block0_backed_out", offset = 48, type = "u32" },
+  { name = "block1", offset = 272, type = "bytes", count = 232, note = "player 1's" },
+  { name = "block1_ready", offset = 276, type = "u32" },
+]
+
+# The color list part's inner part (768 bytes, vtable 0x820113D8) over
+# ListPartInnerBase: a Type8ColorBlock a player.
+[Type8ColorPartInner]
+measure = "Type8ColorPartInner"
+size = 768
+origin = "embedded"
+vtable = 0x820113D8
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x820113D8" },
+  { name = "page", offset = 4, type = "u32" },
+  { name = "next_page", offset = 8, type = "u32" },
+  { name = "previous_page", offset = 12, type = "u32" },
+  { name = "step", offset = 16, type = "u32" },
+  { name = "queued_step", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "step_started", offset = 28, type = "u32" },
+  { name = "yes", offset = 32, type = "u32" },
+  { name = "back", offset = 36, type = "u32" },
+  { name = "block0", offset = 40, type = "bytes", count = 364, note = "player 0's Type8ColorBlock" },
+  { name = "block0_ready", offset = 44, type = "u32" },
+  { name = "block0_backed_out", offset = 48, type = "u32" },
+  { name = "block1", offset = 404, type = "bytes", count = 364, note = "player 1's" },
+  { name = "block1_ready", offset = 408, type = "u32" },
+]
+
+# A player's block in the list part (232 bytes): two MenuLists (the item
+# menu, 2 items, and the setting, 2 items) and the node, string and named
+# animation ids (from the tables at 0x82011430 to 0x82011488, by the player).
+[Type8PlayerBlock]
+measures = ["Type8PlayerBlock", "Type8PlayerBlock.+228"]
+size = 232
+origin = "embedded"
+fields = [
+  { name = "player", offset = 0, type = "u32", note = "0 or 1" },
+  { name = "ready", offset = 4, type = "u32", note = "0 picking, 1 ready (confirmed)" },
+  { name = "backed_out", offset = 8, type = "u32" },
+  { name = "menu", offset = 12, type = "bytes", count = 72, note = "the item MenuList (item 1: ready)" },
+  { name = "menu_selection_before", offset = 32, type = "u32", note = "the menu's +20" },
+  { name = "menu_move", offset = 36, type = "u32", note = "the menu's +24" },
+  { name = "menu_player", offset = 72, type = "u32", note = "the menu's +60: the player's pad" },
+  { name = "menu_block", offset = 80, type = "u32", note = "the menu's +68" },
+  { name = "setting", offset = 84, type = "bytes", count = 72, note = "the setting MenuList (2 items)" },
+  { name = "setting_selection_before", offset = 104, type = "u32", note = "its +20" },
+  { name = "setting_move", offset = 108, type = "u32", note = "its +24" },
+  { name = "setting_player", offset = 144, type = "u32", note = "its +60" },
+  { name = "setting_block", offset = 152, type = "u32", note = "its +68" },
+  { name = "node_set", offset = 156, type = "u32" },
+  { name = "node", offset = 160, type = "u32", note = "5" },
+  { name = "unknown_164", offset = 164, type = "u32", note = "7" },
+  { name = "text_node", offset = 168, type = "u32", note = "6: SetUp's SetText" },
+  { name = "text_child_a", offset = 172, type = "u32", note = "10" },
+  { name = "text_child_b", offset = 176, type = "u32", note = "11" },
+  { name = "item_anims", offset = 180, type = "bytes", count = 8, note = "the menu's items' named animations" },
+  { name = "item_anim0", offset = 180, type = "u32" },
+  { name = "item_anim1", offset = 184, type = "u32" },
+  { name = "unknown_188", offset = 188, type = "u32" },
+  { name = "ready_anim", offset = 192, type = "u32", note = "played by PlayReady" },
+  { name = "opening_anim_a", offset = 196, type = "u32" },
+  { name = "opening_anim_b", offset = 200, type = "u32" },
+  { name = "setting_anims", offset = 204, type = "bytes", count = 8, note = "the setting's items' named animations" },
+  { name = "setting_anim0", offset = 204, type = "u32", note = "also played by PlayOpening" },
+  { name = "setting_anim1", offset = 208, type = "u32" },
+  { name = "setting_item_anim", offset = 212, type = "u32", note = "restarted at item 1" },
+  { name = "selection_anim_a", offset = 216, type = "u32" },
+  { name = "selection_anim_b", offset = 220, type = "u32" },
+  { name = "cursor_child_a", offset = 224, type = "u32", note = "8: on (+108 = 1) at setting 0" },
+  { name = "cursor_child_b", offset = 228, type = "u32", note = "9: on at setting 1" },
+]
+
+# A player's block in the color list part (364 bytes): three MenuLists (the
+# item menu, 3 items; the third choice, 2; the second choice, 5) and the
+# ids (from the tables at 0x82011348 to 0x820113D4, by the player).
+[Type8ColorBlock]
+measures = ["Type8ColorBlock", "Type8ColorBlock.+360"]
+size = 364
+origin = "embedded"
+fields = [
+  { name = "player", offset = 0, type = "u32" },
+  { name = "ready", offset = 4, type = "u32" },
+  { name = "backed_out", offset = 8, type = "u32" },
+  { name = "menu", offset = 12, type = "bytes", count = 72, note = "the item MenuList (item 2: ready)" },
+  { name = "menu_selection_before", offset = 32, type = "u32", note = "the menu's +20" },
+  { name = "menu_move", offset = 36, type = "u32" },
+  { name = "menu_player", offset = 72, type = "u32" },
+  { name = "menu_block", offset = 80, type = "u32" },
+  { name = "third", offset = 84, type = "bytes", count = 72, note = "the third choice's MenuList (item 0: IsFirstChoice)" },
+  { name = "third_selection_before", offset = 104, type = "u32" },
+  { name = "third_move", offset = 108, type = "u32" },
+  { name = "third_player", offset = 144, type = "u32" },
+  { name = "third_block", offset = 152, type = "u32" },
+  { name = "second", offset = 156, type = "bytes", count = 72, note = "the second choice's MenuList (5 items, from 2; ThirdChoice reads it)" },
+  { name = "second_move", offset = 180, type = "u32" },
+  { name = "second_player", offset = 216, type = "u32" },
+  { name = "second_block", offset = 224, type = "u32" },
+  { name = "node_set", offset = 228, type = "u32" },
+  { name = "cursor_node", offset = 232, type = "u32", note = "5" },
+  { name = "count_node", offset = 236, type = "u32", note = "7" },
+  { name = "cursor_a_child", offset = 240, type = "u32", note = "3: PlaceCursorA's" },
+  { name = "slider_child_a", offset = 244, type = "u32", note = "12: PlaceCursorB's (+68 = 0.0)" },
+  { name = "slider_child_b", offset = 248, type = "u32", note = "13" },
+  { name = "slider_frame_a", offset = 252, type = "u32", note = "8: PlaceCursorB's (+108 = 1)" },
+  { name = "slider_frame_b", offset = 256, type = "u32", note = "9" },
+  { name = "text_node", offset = 260, type = "u32", note = "6" },
+  { name = "text_child_a", offset = 264, type = "u32", note = "10" },
+  { name = "text_child_b", offset = 268, type = "u32", note = "11" },
+  { name = "count_text_node", offset = 272, type = "u32", note = "8" },
+  { name = "count_child", offset = 276, type = "u32", note = "7: the second choice's number" },
+  { name = "item_anims", offset = 280, type = "bytes", count = 12, note = "the item menu's items' named animations" },
+  { name = "item_anim0", offset = 280, type = "u32" },
+  { name = "item_anim1", offset = 284, type = "u32" },
+  { name = "item_anim2", offset = 288, type = "u32" },
+  { name = "unknown_292", offset = 292, type = "u32" },
+  { name = "unknown_296", offset = 296, type = "u32" },
+  { name = "ready_anim", offset = 300, type = "u32" },
+  { name = "opening_anim_a", offset = 304, type = "u32" },
+  { name = "opening_anim_b", offset = 308, type = "u32" },
+  { name = "opening_anim_c", offset = 312, type = "u32" },
+  { name = "third_anims", offset = 316, type = "bytes", count = 8, note = "the third choice's items' named animations" },
+  { name = "third_anim0", offset = 316, type = "u32" },
+  { name = "third_anim1", offset = 320, type = "u32" },
+  { name = "item1_anim", offset = 324, type = "u32", note = "restarted at item 1" },
+  { name = "item2_anim", offset = 328, type = "u32", note = "restarted at item 2" },
+  { name = "selection_anim_a", offset = 332, type = "u32" },
+  { name = "selection_anim_b", offset = 336, type = "u32" },
+  { name = "selection_anim_c", offset = 344, type = "u32" },
+  { name = "selection_anim_d", offset = 348, type = "u32" },
+  { name = "cursor_child_a", offset = 356, type = "u32", note = "8" },
+  { name = "cursor_child_b", offset = 360, type = "u32", note = "9" },
+]
+
+[globals]
+garage_cars = { address = 0x82814EB8, type = "bytes", count = 3944, note = "the two players' garage cars (1,972 bytes each)" }
+dialog_player = { address = 0x82814E6C, type = "u32", note = "the player the quit dialog was asked for" }
+mode_before = { address = 0x826032E0, type = "u32", note = "the game mode before (1 the race)" }
+fade_in_passes = { address = 0x82001BEC, type = "u32", note = "the passes word ScreenFades::FadeIn is given" }
+fade_out_passes = { address = 0x82001BF0, type = "u32", note = "the passes word ScreenFades::FadeOut is given" }
+list_base_pages = { address = 0x82815FF0, type = "bytes", count = 80, note = "Type8ListBase::Draw's page table (10 member function pointers)" }
+list_base_page_guard = { address = 0x82816040, type = "u32", note = "bit 0 once built" }
+list_base_steps = { address = 0x82816044, type = "bytes", count = 48, note = "Type8ListBase::Update's step table (6 entries)" }
+list_base_step_guard = { address = 0x82816074, type = "u32", note = "bit 0 once built" }
+color_inner_steps = { address = 0x82637A44, type = "bytes", count = 8, note = "Type8ColorPartInner's steps (2)" }
+color_inner_pages = { address = 0x82637A4C, type = "bytes", count = 12, note = "Type8ColorPartInner's pages (3)" }
+pad_players = { address = 0x82637A64, type = "bytes", count = 8, note = "the pad player of each player's menus" }
+list_inner_steps = { address = 0x82637A6C, type = "bytes", count = 8, note = "Type8ListPartInner's steps (2)" }
+list_inner_pages = { address = 0x82637A74, type = "bytes", count = 12, note = "Type8ListPartInner's pages (3)" }
+color_item_texts = { address = 0x82010B90, type = "bytes", count = 36, note = "the color list's item string ids (3 a row, rows overlapping)" }
+color_detail_texts = { address = 0x82010BB4, type = "bytes", count = 32, note = "SetDetails' string ids" }
+color_label_texts = { address = 0x82010BD4, type = "bytes", count = 12, note = "SetLabels' string ids" }
+color_item_records = { address = 0x82010BE0, type = "bytes", count = 420, note = "the color list's 15 item records of 28 bytes (+8 a count, +12 on bit numbers)" }
+course_texts = { address = 0x82010D70, type = "bytes", count = 32, note = "the courses' string ids (6 a row, rows overlapping)" }
+course_infos = { address = 0x82010D90, type = "bytes", count = 128, note = "8 Type8CourseInfos" }
+color_block_ids = { address = 0x82011348, type = "bytes", count = 144, note = "Type8ColorBlock's id tables (by the player)" }
+player_block_ids = { address = 0x82011430, type = "bytes", count = 92, note = "Type8PlayerBlock's id tables (by the player)" }

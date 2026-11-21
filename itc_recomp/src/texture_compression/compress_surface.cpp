@@ -7,6 +7,7 @@
 #include "base/log.h"
 #include "graphics/resources.h"
 #include "guest.h"
+#include "schema/texture_compression.h"
 #include "texture_compression/blitter.h"
 
 namespace texture_compression {
@@ -54,10 +55,10 @@ uint32_t GetBlockDimensions(uint8_t* base, uint32_t format, uint32_t width, uint
   ITC_NATIVE_RUNNING("sub_8236D3C8 XGGetBlockDimensions");
   const graphics::Block block = graphics::GpuBlockSize(format);
   if (width != 0) {
-    Store(base, width, block.width);
+    schema::TcBlockDimension(base, width).set_value(block.width);
   }
   if (height != 0) {
-    Store(base, height, block.height);
+    schema::TcBlockDimension(base, height).set_value(block.height);
   }
   return format;
 }
@@ -115,29 +116,29 @@ std::optional<uint32_t> CompressSurface(uint8_t* base, const CompressArguments& 
   // The destination's description, in the original's order.
   const uint32_t x = Load(base, point + 0);
   const uint32_t y = Load(base, point + 4);
-  const uint32_t d = f + compress::kDestination;
-  Store(base, d + description::kData, a.destination);
-  Store(base, d + description::kRowPitch, a.pitch);
-  Store(base, d + description::kSlicePitch, 0);
-  Store(base, d + description::kBox + 0, x);
-  Store(base, d + description::kExtent + 0, 0);
-  Store(base, d + description::kExtent + 4, 0);
-  Store(base, d + description::kExtent + 8, a.width);
-  Store(base, d + description::kExtent + 12, a.height);
-  Store(base, d + description::kBox + 8, x + rect_width);
-  Store(base, d + description::kExtent + 16, 0);
-  Store(base, d + description::kExtent + 20, 1);
-  Store(base, d + description::kBox + 16, 0);
-  Store(base, d + description::kBox + 20, 1);
-  Store(base, d + description::kDither, 1);
-  Store(base, d + description::kDiffusion, 0);
-  Store(base, d + description::kSrgb, 0);
-  Store(base, d + description::kColorKey, 0);
-  Store(base, d + description::kPalette, 0);
-  Store(base, d + description::kBox + 4, y);
-  Store(base, d + description::kBox + 12, y + rect_height);
+  const schema::ImageDescription d(base, f + compress::kDestination);
+  d.set_data(a.destination);
+  d.set_row_pitch(a.pitch);
+  d.set_slice_pitch(0);
+  d.set_box_left(x);
+  d.set_extent_left(0);
+  d.set_extent_top(0);
+  d.set_extent_right(a.width);
+  d.set_extent_bottom(a.height);
+  d.set_box_right(x + rect_width);
+  d.set_extent_front(0);
+  d.set_extent_back(1);
+  d.set_box_front(0);
+  d.set_box_back(1);
+  d.set_dither(1);
+  d.set_diffusion(0);
+  d.set_srgb(0);
+  d.set_color_key(0);
+  d.set_palette(0);
+  d.set_box_top(y);
+  d.set_box_bottom(y + rect_height);
   if (const uint32_t format = DestinationFormat(gpu_format, flags); format != 0) {
-    Store(base, d + description::kFormat, format);
+    d.set_format(format);
   }
 
   // The source's: the rectangle is its extent and its box; +64 and +68 are
@@ -146,28 +147,29 @@ std::optional<uint32_t> CompressSurface(uint8_t* base, const CompressArguments& 
   const uint32_t top = Load(base, rect + 4);
   const uint32_t right = Load(base, rect + 8);
   const uint32_t bottom = Load(base, rect + 12);
-  const uint32_t s = f + compress::kSource;
-  Store(base, s + description::kData, a.source);
-  Store(base, s + description::kRowPitch, a.source_pitch);
-  Store(base, s + description::kSlicePitch, 0);
-  Store(base, s + description::kExtent + 0, left);
-  Store(base, s + description::kExtent + 4, top);
-  Store(base, s + description::kExtent + 8, right);
-  Store(base, s + description::kExtent + 12, bottom);
-  Store(base, s + description::kExtent + 16, 0);
-  Store(base, s + description::kExtent + 20, 1);
+  const schema::ImageDescription s(base, f + compress::kSource);
+  s.set_data(a.source);
+  s.set_row_pitch(a.source_pitch);
+  s.set_slice_pitch(0);
+  s.set_extent_left(left);
+  s.set_extent_top(top);
+  s.set_extent_right(right);
+  s.set_extent_bottom(bottom);
+  s.set_extent_front(0);
+  s.set_extent_back(1);
   for (uint32_t i = 0; i < 24; i += 4) {  // memcpy's 24 bytes
-    Store(base, s + description::kBox + i, Load(base, s + description::kExtent + i));
+    Store(base, s.box_left_address() + i, Load(base, s.extent_left_address() + i));
   }
-  Store(base, s + description::kSrgb, 0);
-  Store(base, s + description::kColorKey, 0);
-  Store(base, s + description::kPalette, 0);
-  Store(base, s + description::kFormat, source_gpu_format == 6 ? 0x18280086 : 0x1A22AAA6);
+  s.set_srgb(0);
+  s.set_color_key(0);
+  s.set_palette(0);
+  s.set_format(source_gpu_format == 6 ? 0x18280086 : 0x1A22AAA6);
 
-  guest::StoreFloat(base, kAlphaReference, float(a.alpha_reference));
-  Store(base, kPremultiplied, flags & 1);
-  const uint32_t result =
-      BlitterInit(base, blitter, d, s, Load(base, f + compress::kFilter), f, call);
+  using G = schema::TextureCompressionGlobals;
+  G::set_alpha_reference(base, float(a.alpha_reference));
+  G::set_premultiplied(base, flags & 1);
+  const uint32_t result = BlitterInit(base, blitter, d.address, s.address,
+                                      Load(base, f + compress::kFilter), f, call);
   BlitterRelease(base, blitter, f, call);
   return result;
 }

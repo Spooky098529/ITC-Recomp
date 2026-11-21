@@ -8,6 +8,7 @@
 #include "race_world/race_world.h"
 
 #include "guest.h"
+#include "schema/race_world.h"
 
 #include "base/log.h"
 #include "hooks/lifted_call.h"
@@ -30,7 +31,6 @@ constexpr uint32_t kZero = 0x82000A34;
 constexpr uint32_t kPlaceSpeed = 0x82009974;
 constexpr uint32_t kStepTime = 0x826193C8;
 
-constexpr uint32_t kSlots = 2336;  // 7 words: 0 or -1 free
 constexpr uint32_t kRecordBytes = 3936;
 
 }  // namespace
@@ -47,14 +47,14 @@ uint64_t GiveVehicle(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t manager,
     if (index >= 7) {
       return 0;
     }
-    const int32_t slot = int32_t(guest::LoadU32(base, manager + kSlots + 4 * index));
+    const int32_t slot = int32_t(guest::LoadU32(base, schema::RaceManager(base, manager).vehicle_slots_address() + 4 * index));
     if (slot == 0 || slot == -1) {
       break;
     }
   }
   guest::StoreU32(base, entry + 20, index);
   const uint32_t vehicle = uint32_t(call(kVehicleGet, {index}));
-  const uint32_t slot = manager + kSlots + 4 * index;
+  const uint32_t slot = schema::RaceManager(base, manager).vehicle_slots_address() + 4 * index;
   const uint32_t record = guest::LoadU32(base, kRaceData) +
                           guest::LoadU32(base, entry + 24) * kRecordBytes + 48;
   call(int32_t(guest::LoadU32(base, slot)) == -1 ? kResetForCar : kVehicleSetUp,

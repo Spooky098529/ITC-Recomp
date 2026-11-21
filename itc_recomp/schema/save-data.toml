@@ -3,45 +3,89 @@
 # Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
 # (a function's address), bytes (with `count`). `measure` is the type's
 # name in tools/type_map.py's tables.
+#
+# A player's save data in memory (src/save_data/). The save data block
+# itself is race-world.toml's (SaveData), its progress and stats record
+# career.toml's (Progress, Stats), its options options-screen.toml's
+# (Options), the menu list race-screens.toml's (MenuList); the course record
+# car-settings.toml's (CourseRecord). Described here: the unlock bit set, a
+# control map, the course records' header and the pair CourseRecords::Of
+# reads.
 
+# The 400-bit unlock set at the save data's +0x1ACE4 (BitSet400::SetAll):
+# 13 words, bit i at word i >> 5, 1 << (i & 31).
 [BitSet400]
 measure = "BitSet400"
-size = 4
+size = 52
 origin = "embedded"
-# 1 functions; areas: save-data.md
 fields = [
-  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "words", offset = 0, type = "bytes", count = 52, note = "13 big-endian words; bits 0 to 399 used, 400 to 415 stay 0" },
 ]
 
+# A control map (docs/known-data.md, "control map"): 15 words, each a
+# control number (0 to 30, PlayerInput::Control). Four in the options at
+# +44, +104 (player 0's pad and wheel), +164 and +224 (player 1's).
 [ControlMap]
 measure = "ControlMap"
-size = 4
+size = 60
 origin = "embedded"
-# 1 functions; areas: save-data.md
 fields = [
-  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "steering", offset = 0, type = "u32", note = "default 18" },
+  { name = "throttle", offset = 4, type = "u32", note = "default 14" },
+  { name = "brake", offset = 8, type = "u32", note = "default 13" },
+  { name = "input_10", offset = 12, type = "u32", note = "the car input's +10; default 9" },
+  { name = "button_16", offset = 16, type = "u32", note = "a button; default 0" },
+  { name = "button_20", offset = 20, type = "u32", note = "a button; default 10" },
+  { name = "button_24", offset = 24, type = "u32", note = "a button; default 16" },
+  { name = "button_28", offset = 28, type = "u32", note = "a button; default 15" },
+  { name = "button_32", offset = 32, type = "u32", note = "a button; default 24" },
+  { name = "button_36", offset = 36, type = "u32", note = "a button; default 7" },
+  { name = "button_40", offset = 40, type = "u32", note = "a button; default 17" },
+  { name = "unknown_44", offset = 44, type = "u32", note = "default 0" },
+  { name = "input_12", offset = 48, type = "u32", note = "the car input's +12; default 25" },
+  { name = "button_52", offset = 52, type = "u32", note = "a button; default 8" },
+  { name = "button_56", offset = 56, type = "u32", note = "a button; default 11" },
 ]
 
+# The course records at the save data's +0x1D52C (CourseRecords::Reset): a
+# header, then 22 CourseRecords (car-settings.toml) of 408 bytes, course x 2
+# + traffic (CourseRecords::Of).
 [CourseRecords]
 measure = "CourseRecords"
-size = 20
+size = 8996
 origin = "embedded"
-# 1 functions; areas: save-data.md
 fields = [
-  { name = "unknown_0", offset = 0, type = "u32" },
-  { name = "unknown_4", offset = 4, type = "u32" },
-  { name = "unknown_8", offset = 8, type = "u32" },
-  { name = "unknown_12", offset = 12, type = "u32" },
-  { name = "unknown_16", offset = 16, type = "u16" },
-  { name = "unknown_18", offset = 18, type = "u16" },
+  { name = "unknown_0", offset = 0, type = "u32", note = "0 at the reset" },
+  { name = "unknown_4", offset = 4, type = "u32", note = "0 at the reset" },
+  { name = "unknown_8", offset = 8, type = "u32", note = "0 at the reset" },
+  { name = "unknown_12", offset = 12, type = "u32", note = "0 at the reset" },
+  { name = "unknown_16", offset = 16, type = "u16", note = "0 at the reset" },
+  { name = "unknown_18", offset = 18, type = "u16", note = "0 at the reset" },
+  { name = "records", offset = 20, type = "bytes", count = 8976, note = "22 CourseRecords of 408 bytes, course x 2 + traffic" },
 ]
 
-[CourseRecords_Of_r4]
+# The pair CourseRecords::Of picks a record by (r4).
+[CourseRecordKey]
 measure = "CourseRecords::Of.r4"
 size = 8
 origin = "embedded"
-# 1 functions; areas: save-data.md
 fields = [
-  { name = "unknown_0", offset = 0, type = "u32" },
-  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "course", offset = 0, type = "u32", note = "0 to 10" },
+  { name = "traffic", offset = 4, type = "u32", note = "0 or 1" },
 ]
+
+[globals]
+zero = { address = 0x82000A34, type = "u32", note = "0.0 (loaded with lfs, stored with stfs)" }
+slots = { address = 0x826C5B58, type = "ptr", to = "SaveData", note = "player 0's save data; player i's at + 4 x i (SaveData::Of)" }
+two_player_block = { address = 0x826C5B5C, type = "u32", note = "player 1's slot: the two-player block SaveData::CreateTwoPlayerBlock makes (0x3AB74 bytes, a player's half 0x1D52C)" }
+play_time_frames = { address = 0x826C5B90, type = "u32", note = "the play time's frame counter (Progress::SetDefaults copies it to +6088)" }
+defaults_50a8 = { address = 0x826C50A8, type = "bytes", count = 60, note = "Defaults::Table50A8: copied into the save data's +0x19930" }
+defaults_3044 = { address = 0x826C3044, type = "bytes", count = 60, note = "Defaults::Table3044: less Table3E34's bits into +0x1996C" }
+defaults_3e34 = { address = 0x826C3E34, type = "bytes", count = 60, note = "Defaults::Table3E34: 15 words of bits taken from Table3044's" }
+defaults_3c24 = { address = 0x826C3C24, type = "bytes", count = 28, note = "Defaults::Table3C24: copied into +0x199A8" }
+defaults_50e4 = { address = 0x826C50E4, type = "bytes", count = 28, note = "Defaults::Table50E4: copied into +0x199C4" }
+mode_checks = { address = 0x826BAB40, type = "bytes", count = 16, note = "the mode's first four system checks (mode-tick.md), 1 each from TitleScreen::ResetPlayer" }
+controllers = { address = 0x826BABA4, type = "bytes", count = 16, note = "the player-to-controller table: 4 words, 0 to 3 from Players::ResetControllers" }
+profile_read_asked = { address = 0x826C7938, type = "u32", note = "1 asks for the profile read" }
+title_menu_list = { address = 0x82814E30, type = "ptr", to = "MenuList", note = "the title screen's menu list" }
+title_screen = { address = 0x82814E34, type = "ptr", note = "the title screen object (title-screen.md)" }

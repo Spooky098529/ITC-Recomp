@@ -6,6 +6,8 @@
 
 #include "race_world/race_world.h"
 
+#include "schema/race_world.h"
+
 #include "ai_drivers/ai_drivers.h"
 #include "base/log.h"
 #include "car_physics/float_ops.h"
@@ -23,6 +25,9 @@
 #include <cstdint>
 
 namespace race_world {
+
+using M = schema::RaceManager;
+using G = schema::RaceWorldGlobals;
 
 using namespace car_physics::ops;
 namespace va = vehicle_accessors;
@@ -72,7 +77,7 @@ uint32_t SectionRecord(uint8_t* base, uint32_t file, uint32_t section) {
 void Lose(uint8_t* base, uint32_t manager, uint32_t entry, uint32_t frame, bool heap,
           const OriginalCall& original) {
   const uint32_t which = Load(base, entry + 20);
-  if (int32_t(which) == -1 || int32_t(Load(base, manager + ((which + 584) << 2))) <= 0) {
+  if (int32_t(which) == -1 || int32_t(Load(base, M(base, manager).vehicle_slots_address() + (which << 2))) <= 0) {
     return;
   }
   Store(base, entry, Load(base, entry) & ~0x40u);
@@ -81,17 +86,17 @@ void Lose(uint8_t* base, uint32_t manager, uint32_t entry, uint32_t frame, bool 
   if (!heap || !vehicle::VehicleRemoveFromWorld(base, car, &removed)) {
     original(kRemoveFromWorld, frame, car, 0, 0);
   }
-  Store(base, manager + ((Load(base, entry + 20) + 584) << 2), 0);
+  Store(base, M(base, manager).vehicle_slots_address() + (Load(base, entry + 20) << 2), 0);
   Store(base, entry + 20, 0xFFFFFFFFu);
 }
 
 // An entry with a vehicle put in the racers' list (+2308): +2364 and
 // `counter` (+2372 the opponents', +2376 the traffic's) count.
 void List(uint8_t* base, uint32_t manager, uint32_t entry, uint32_t counter = 2372) {
-  Store(base, manager + ((Load(base, manager + 2364) + 577) << 2), entry);
-  const uint32_t listed = Load(base, manager + 2364);
+  Store(base, M(base, manager).racers_address() + (M(base, manager).racer_count() << 2), entry);
+  const uint32_t listed = M(base, manager).racer_count();
   const uint32_t racers = Load(base, manager + counter);
-  Store(base, manager + 2364, listed + 1);
+  M(base, manager).set_racer_count(listed + 1);
   Store(base, manager + counter, racers + 1);
 }
 
@@ -128,13 +133,13 @@ void StreamOpponents(uint8_t* base, uint32_t manager, uint32_t player, double sp
   // section's record.
   const uint32_t identity = va::VehicleIdentity(va::VehicleGet(base, Load(base, player + 20)));
   const uint32_t position = Load(base, identity + 4);
-  const int32_t count = int32_t(Load(base, manager + 2368));
+  const int32_t count = int32_t(M(base, manager).entry_count());
   const uint32_t file = Load(base, kRoute);
   Store(base, frame + 80, position);
   const uint32_t player_section = guest::LoadU16(base, frame + 80);
   const uint32_t player_record = SectionRecord(base, file, player_section);
   // The sorted list at + 176 emptied (+1776 to +1784).
-  Store(base, manager + 2372, 0);
+  M(base, manager).set_opponents_with_vehicle(0);
   Store(base, frame + 1780, 0);
   Store(base, frame + 1784, 0);
   Store(base, frame + 1776, 0);
@@ -144,7 +149,7 @@ void StreamOpponents(uint8_t* base, uint32_t manager, uint32_t player, double sp
     const double far_key = Lfs(base, kFarKey);
     const double zero = Lfs(base, kZero);
     for (int32_t i = 0;;) {
-      const uint32_t entry = manager + 4 + 28 * uint32_t(i);
+      const uint32_t entry = M(base, manager).entries_address() + 28 * uint32_t(i);
       const uint32_t flags = Load(base, entry);
       bool lose = (flags & 0x20) != 0 || (flags & 0x80) != 0;
       double key = 0.0;
@@ -181,7 +186,7 @@ void StreamOpponents(uint8_t* base, uint32_t manager, uint32_t player, double sp
         SortedListInsert(base, list, entry, key);
       }
       i++;
-      if (!(i < int32_t(Load(base, manager + 2368)))) {
+      if (!(i < int32_t(M(base, manager).entry_count()))) {
         break;
       }
     }
@@ -198,7 +203,7 @@ void StreamOpponents(uint8_t* base, uint32_t manager, uint32_t player, double sp
   // beyond `despawn` losing theirs, between keeping theirs.
   for (uint32_t node = Load(base, frame + 1776); node != 0; node = Load(base, node + 12)) {
     const uint32_t entry = Load(base, node);
-    if (Load(base, manager + 2372) >= 4) {
+    if (M(base, manager).opponents_with_vehicle() >= 4) {
       Lose(base, manager, entry, frame, heap, original);
       continue;
     }
@@ -239,14 +244,14 @@ void Refresh(uint8_t* base, uint32_t manager, uint32_t frame, bool heap,
   // The player's entry: the first flagged 0x4 (the count read again each
   // pass), or none (0: its +20 read at 20).
   uint32_t player = 0;
-  if (int32_t(Load(base, manager + 2368)) > 0) {
+  if (int32_t(M(base, manager).entry_count()) > 0) {
     for (int32_t i = 0;;) {
-      if ((Load(base, manager + 4 + 28 * uint32_t(i)) & 0x4) != 0) {
-        player = manager + 4 + 28 * uint32_t(i);
+      if ((Load(base, M(base, manager).entries_address() + 28 * uint32_t(i)) & 0x4) != 0) {
+        player = M(base, manager).entries_address() + 28 * uint32_t(i);
         break;
       }
       i++;
-      if (!(i < int32_t(Load(base, manager + 2368)))) {
+      if (!(i < int32_t(M(base, manager).entry_count()))) {
         break;
       }
     }
@@ -260,19 +265,19 @@ void Refresh(uint8_t* base, uint32_t manager, uint32_t frame, bool heap,
   const uint32_t player_slice = LoadS16(base, frame + 82);
   // The sorted list at + 176 emptied and the counts +2364, +2372, +2376 = 0.
   Store(base, frame + 1776, 0);
-  Store(base, manager + 2364, 0);
+  M(base, manager).set_racer_count(0);
   Store(base, frame + 1780, 0);
-  Store(base, manager + 2372, 0);
+  M(base, manager).set_opponents_with_vehicle(0);
   Store(base, frame + 1784, 0);
-  Store(base, manager + 2376, 0);
+  M(base, manager).set_traffic_with_vehicle(0);
   track_route::SlicePoint(base, frame + 112, 0, S16(player_section), player_slice);
   const uint32_t list = frame + 176;
-  if (int32_t(Load(base, manager + 2368)) > 0) {
+  if (int32_t(M(base, manager).entry_count()) > 0) {
     const double one = Lfs(base, kOne);
     const double far_key = Lfs(base, kFarKey);
     const double zero = Lfs(base, kZero);
     for (int32_t i = 0;;) {
-      const uint32_t entry = manager + 4 + 28 * uint32_t(i);
+      const uint32_t entry = M(base, manager).entries_address() + 28 * uint32_t(i);
       const uint32_t flags = Load(base, entry);
       bool lose = (flags & 0x20) != 0 || (flags & 0x80) != 0;
       double key = 0.0;
@@ -308,7 +313,7 @@ void Refresh(uint8_t* base, uint32_t manager, uint32_t frame, bool heap,
         SortedListInsert(base, list, entry, key);
       }
       i++;
-      if (!(i < int32_t(Load(base, manager + 2368)))) {
+      if (!(i < int32_t(M(base, manager).entry_count()))) {
         break;
       }
     }
@@ -325,7 +330,7 @@ void Refresh(uint8_t* base, uint32_t manager, uint32_t frame, bool heap,
   // theirs), beyond [0x82009970] losing theirs, between keeping theirs.
   for (uint32_t node = Load(base, frame + 1776); node != 0; node = Load(base, node + 12)) {
     const uint32_t entry = Load(base, node);
-    if (Load(base, manager + 2372) >= 4) {
+    if (M(base, manager).opponents_with_vehicle() >= 4) {
       Lose(base, manager, entry, frame, heap, original);
       continue;
     }
@@ -363,7 +368,7 @@ void Refresh(uint8_t* base, uint32_t manager, uint32_t frame, bool heap,
   // -1; no slot word check), else each is listed.
   if ((Load(base, Load(base, kRaceData) + kFlagsOffset) & 0x4000) != 0) {
     for (uint32_t t = 0; t < 3; t++) {
-      const uint32_t entry = manager + 2160 + 28 * t;
+      const uint32_t entry = M(base, manager).traffic_entries_address() + 28 * t;
       if (Load(base, entry) == 0) {
         continue;
       }
@@ -371,13 +376,13 @@ void Refresh(uint8_t* base, uint32_t manager, uint32_t frame, bool heap,
                       original);
       const uint32_t which = Load(base, entry + 20);
       Store(base, entry, 0);
-      Store(base, manager + ((which + 584) << 2), 0);
+      Store(base, M(base, manager).vehicle_slots_address() + (which << 2), 0);
       Store(base, entry + 20, 0xFFFFFFFFu);
     }
     return;
   }
   for (uint32_t t = 0; t < 3; t++) {
-    const uint32_t entry = manager + 2160 + 28 * t;
+    const uint32_t entry = M(base, manager).traffic_entries_address() + 28 * t;
     if (Load(base, entry) != 0) {
       List(base, manager, entry, 2376);
     }
@@ -408,12 +413,12 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
     const uint32_t other = va::VehicleGet(base, Load(base, second + 20));
     Store(base, frame + 80, Load(base, va::VehicleIdentity(other) + 4));
   }
-  Store(base, manager + 2376, 0);
+  M(base, manager).set_traffic_with_vehicle(0);
   // With the race data's flags 0x4000: every traffic car (the entries at
   // +2160) loses its vehicle.
   if ((Load(base, Load(base, kRaceData) + kFlagsOffset) & 0x4000) != 0) {
     for (uint32_t t = 0; t < 3; t++) {
-      const uint32_t entry = manager + 2160 + 28 * t;
+      const uint32_t entry = M(base, manager).traffic_entries_address() + 28 * t;
       if (Load(base, entry) == 0) {
         continue;
       }
@@ -421,7 +426,7 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
                       calls.original);
       const uint32_t which = Load(base, entry + 20);
       Store(base, entry, 0);
-      Store(base, manager + ((which + 584) << 2), 0);
+      Store(base, M(base, manager).vehicle_slots_address() + (which << 2), 0);
       Store(base, entry + 20, 0xFFFFFFFFu);
     }
     return;
@@ -440,14 +445,14 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
   // loses its vehicle when its slot word is above 0; else it's listed.
   const double zero = Lfs(base, kZero);
   for (uint32_t t = 0; t < 3; t++) {
-    const uint32_t entry = manager + 2160 + 28 * t;
+    const uint32_t entry = M(base, manager).traffic_entries_address() + 28 * t;
     if (Load(base, entry) == 0) {
       continue;
     }
     const uint32_t vehicle = va::VehicleGet(base, Load(base, entry + 20));
-    const uint32_t slot = manager + ((Load(base, entry + 20) + 584) << 2);
+    const uint32_t slot = M(base, manager).vehicle_slots_address() + (Load(base, entry + 20) << 2);
     Store(base, slot, Load(base, slot) + 1);
-    const uint32_t again = manager + ((Load(base, entry + 20) + 584) << 2);
+    const uint32_t again = M(base, manager).vehicle_slots_address() + (Load(base, entry + 20) << 2);
     if (int32_t(Load(base, again)) > 216000) {
       Store(base, again, 60);
     }
@@ -464,11 +469,11 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
       other = double(vl::Vec3Normalize(base, frame + 96, frame + 96));
     }
     if (first > outer && other > outer &&
-        int32_t(Load(base, manager + ((Load(base, entry + 20) + 584) << 2))) > 0) {
+        int32_t(Load(base, M(base, manager).vehicle_slots_address() + (Load(base, entry + 20) << 2))) > 0) {
       RemoveFromWorld(base, vehicle, frame, heap, calls.original);
       const uint32_t which = Load(base, entry + 20);
       Store(base, entry, 0);
-      Store(base, manager + ((which + 584) << 2), 0);
+      Store(base, M(base, manager).vehicle_slots_address() + (which << 2), 0);
       Store(base, entry + 20, 0xFFFFFFFFu);
     } else {
       // (The original also counts the entries flagged 0x800, for the
@@ -481,15 +486,15 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
   }
   // A new traffic car every 90 ticks at most (+2388 counts them), while
   // there are fewer than +2380.
-  if (!(int32_t(Load(base, manager + 2376)) < int32_t(Load(base, manager + 2380))) ||
-      Load(base, manager + 2388) < 90) {
-    const uint32_t ticks = Load(base, manager + 2388);
+  if (!(int32_t(M(base, manager).traffic_with_vehicle()) < int32_t(M(base, manager).traffic_allowed())) ||
+      M(base, manager).traffic_ticks() < 90) {
+    const uint32_t ticks = M(base, manager).traffic_ticks();
     if (ticks < 90) {
-      Store(base, manager + 2388, ticks + 1);
+      M(base, manager).set_traffic_ticks(ticks + 1);
     }
     return;
   }
-  Store(base, manager + 2388, 0);
+  M(base, manager).set_traffic_ticks(0);
   // The first free traffic entry (+0 0) with a free vehicle slot (its word
   // 0 or -1; the slots scanned for each free entry).
   uint32_t t = 0, which = 0xFFFFFFFFu;
@@ -497,11 +502,11 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
     if (t >= 3) {
       return;
     }
-    if (Load(base, manager + 2160 + 28 * t) != 0) {
+    if (Load(base, M(base, manager).traffic_entries_address() + 28 * t) != 0) {
       continue;
     }
     for (uint32_t k = 0; k < 7; k++) {
-      const uint32_t word = Load(base, manager + 2336 + 4 * k);
+      const uint32_t word = Load(base, M(base, manager).vehicle_slots_address() + 4 * k);
       if (word == 0 || word == 0xFFFFFFFFu) {
         which = k;
         break;
@@ -511,7 +516,7 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
       break;
     }
   }
-  const uint32_t entry = manager + 2160 + 28 * t;
+  const uint32_t entry = M(base, manager).traffic_entries_address() + 28 * t;
   // The spot: the original first looks on a section beside the player's
   // (RaceManager::BuildNeighbors' table, +2392) only while its count of the
   // listed traffic cars flagged 0x800 is below 0, which never holds (it
@@ -559,11 +564,11 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
                           LoadS16(base, frame + 90));
   Stfs(base, frame + 132, zero);
   {
-    uint32_t global = Load(base, kManager);
-    if (int32_t(Load(base, global + 2364)) > 0) {
+    uint32_t global = G::racers_manager(base).address;
+    if (int32_t(M(base, global).racer_count()) > 0) {
       const double too_near = Lfs(base, kTooNear);
       for (int32_t i = 0;;) {
-        const uint32_t listed = Load(base, global + 2308 + 4 * uint32_t(i));
+        const uint32_t listed = Load(base, M(base, global).racers_address() + 4 * uint32_t(i));
         const uint32_t body = Load(base, va::VehicleGet(base, Load(base, listed + 20)) + 336);
         const uint32_t point = va::RigidBodyPosition(body);
         for (uint32_t w = 0; w < 4; w++) {
@@ -573,9 +578,9 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
         if (double(vl::Vec3Direction(base, frame + 256, frame + 128, frame + 96)) < too_near) {
           return;
         }
-        global = Load(base, kManager);
+        global = G::racers_manager(base).address;
         i++;
-        if (!(i < int32_t(Load(base, global + 2364)))) {
+        if (!(i < int32_t(M(base, global).racer_count()))) {
           break;
         }
       }
@@ -591,7 +596,7 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
   const uint32_t number =
       Load(base, Load(base, kRaceData) + kSpacingOffset) + Load(base, entry + 16) + t;
   const uint32_t model = uint32_t(PickModel(base, number, branch, frame));
-  const uint32_t record = Load(base, manager + ((model + 561) << 2));
+  const uint32_t record = Load(base, M(base, manager).traffic_models_address() + (model << 2));
   Store(base, entry + 4, model);
   Store(base, entry + 0, 578);
   Store(base, entry + 24, record);
@@ -610,7 +615,7 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
   // (AiDriver::Setup: -1 at + 80, 1 at + 84); listed.
   Store(base, entry + 20, which);
   const uint32_t given = va::VehicleGet(base, which);
-  const uint32_t slot = manager + ((which + 584) << 2);
+  const uint32_t slot = M(base, manager).vehicle_slots_address() + (which << 2);
   const uint32_t car_record = Load(base, kRaceData) + Load(base, entry + 24) * 3936 + 48;
   double f1 = 0.0;
   vehicle::VehicleSetUp(base, given, car_record, frame - 224, int32_t(Load(base, slot)) != -1,
@@ -674,7 +679,7 @@ void MoveUnseen(uint8_t* base, uint32_t manager, uint32_t player, uint32_t frame
   const uint32_t body = Load(base, vehicle + 336);
   Store(base, frame + 88, Load(base, identity + 4));
   const uint32_t at = va::RigidBodyPosition(body);
-  const uint32_t racers = Load(base, manager + 2372);
+  const uint32_t racers = M(base, manager).opponents_with_vehicle();
   const uint32_t player_section = guest::LoadU16(base, frame + 88);
   const uint32_t race_flags = Load(base, Load(base, kRaceData) + 20);
   const uint32_t file = Load(base, kRoute);
@@ -697,9 +702,9 @@ void MoveUnseen(uint8_t* base, uint32_t manager, uint32_t player, uint32_t frame
   // With the race data's flags 0x10 or 0x20: whether an entry of item kind
   // 2 (sections 200 to 203, 258 to 261; clears + 84) or 3 (187, 188, 193,
   // 194, 251 to 253; clears + 80) is already there.
-  if ((flag10 != 0 || flag20 != 0) && int32_t(Load(base, manager + 2368)) > 0) {
+  if ((flag10 != 0 || flag20 != 0) && int32_t(M(base, manager).entry_count()) > 0) {
     for (int32_t i = 0;;) {
-      const uint32_t entry = manager + 4 + 28 * uint32_t(i);
+      const uint32_t entry = M(base, manager).entries_address() + 28 * uint32_t(i);
       const uint32_t number = Load(base, entry + 24);
       const uint32_t race = Load(base, kRaceData);
       const int32_t id = int32_t(S16(Load(base, number * 3936 + race + 3960)));
@@ -735,14 +740,14 @@ void MoveUnseen(uint8_t* base, uint32_t manager, uint32_t player, uint32_t frame
         break;
       }
       i++;
-      if (!(i < int32_t(Load(base, manager + 2368)))) {
+      if (!(i < int32_t(M(base, manager).entry_count()))) {
         break;
       }
     }
   }
   // Each entry not flagged 0x20 or 0x80 (its index at + 88).
   Store(base, frame + 88, 0);
-  if (!(int32_t(Load(base, manager + 2368)) > 0)) {
+  if (!(int32_t(M(base, manager).entry_count()) > 0)) {
     return;
   }
   const double ahead = Lfs(base, kAhead);
@@ -752,19 +757,19 @@ void MoveUnseen(uint8_t* base, uint32_t manager, uint32_t player, uint32_t frame
   const double one = Lfs(base, kOne);
   const double zero = Lfs(base, kZero);
   for (uint32_t i = 0;;) {
-    const uint32_t entry = manager + 4 + 28 * i;
+    const uint32_t entry = M(base, manager).entries_address() + 28 * i;
     const uint32_t flags = Load(base, entry);
     if ((flags & 0x20) != 0 || (flags & 0x80) != 0) {
     } else if ((flags & 0x40) != 0) {
       // With a vehicle: +8 its track position, +12 0.0, its slot word
       // counting its ticks (to 216,000, then 60).
       const uint32_t own = va::VehicleIdentity(va::VehicleGet(base, Load(base, entry + 20)));
-      const uint32_t slot = manager + ((Load(base, entry + 20) + 584) << 2);
+      const uint32_t slot = M(base, manager).vehicle_slots_address() + (Load(base, entry + 20) << 2);
       guest::StoreU16(base, entry + 8, guest::LoadU16(base, own + 4));
       guest::StoreU16(base, entry + 10, guest::LoadU16(base, own + 6));
       Stfs(base, entry + 12, zero);
       Store(base, slot, Load(base, slot) + 1);
-      const uint32_t again = manager + ((Load(base, entry + 20) + 584) << 2);
+      const uint32_t again = M(base, manager).vehicle_slots_address() + (Load(base, entry + 20) << 2);
       if (int32_t(Load(base, again)) > 216000) {
         Store(base, again, 60);
       }
@@ -821,7 +826,7 @@ void MoveUnseen(uint8_t* base, uint32_t manager, uint32_t player, uint32_t frame
       }
     }
     i++;
-    const int32_t count = int32_t(Load(base, manager + 2368));
+    const int32_t count = int32_t(M(base, manager).entry_count());
     Store(base, frame + 88, i);
     if (!(int32_t(i) < count)) {
       break;
@@ -859,14 +864,14 @@ void StreamAround(uint8_t* base, uint32_t manager, uint32_t sp, bool cruise, boo
   const uint32_t frame = sp - 160;
   // The player's entry: the first flagged 0x4, or none (0).
   uint32_t player = 0;
-  if (int32_t(Load(base, manager + 2368)) > 0) {
+  if (int32_t(M(base, manager).entry_count()) > 0) {
     for (int32_t i = 0;;) {
-      if ((Load(base, manager + 4 + 28 * uint32_t(i)) & 0x4) != 0) {
-        player = manager + 4 + 28 * uint32_t(i);
+      if ((Load(base, M(base, manager).entries_address() + 28 * uint32_t(i)) & 0x4) != 0) {
+        player = M(base, manager).entries_address() + 28 * uint32_t(i);
         break;
       }
       i++;
-      if (!(i < int32_t(Load(base, manager + 2368)))) {
+      if (!(i < int32_t(M(base, manager).entry_count()))) {
         break;
       }
     }
@@ -890,7 +895,7 @@ void StreamAround(uint8_t* base, uint32_t manager, uint32_t sp, bool cruise, boo
       f27 = Lfs(base, kTrafficNearCap);
     }
   }
-  Store(base, manager + 2364, 0);
+  M(base, manager).set_racer_count(0);
   StreamOpponents(base, manager, player, f30, f2, frame - 1920, heap,
                   make(frame - 1920 - 224).original);
   StreamTraffic(base, manager, player, f27, f28, 0, frame - 464, heap, make(frame - 464 - 224));
@@ -924,8 +929,8 @@ void StreamTwoPlayers(uint8_t* base, uint32_t manager, uint32_t sp, bool heap,
     const uint32_t data = Load(base, kRacerData);
     second_ahead = Lfs(base, data + 3012) < Lfs(base, data + 3984);
   }
-  const uint32_t ahead = second_ahead ? manager + 32 : manager + 4;
-  const uint32_t other = second_ahead ? manager + 4 : manager + 32;
+  const uint32_t ahead = second_ahead ? M(base, manager).entries_address() + 28 : M(base, manager).entries_address();
+  const uint32_t other = second_ahead ? M(base, manager).entries_address() : M(base, manager).entries_address() + 28;
   const double f31 = double(va::VehicleSpeed(base, va::VehicleGet(base, Load(base, ahead + 20))));
   double f13 = double(va::VehicleSpeed(base, va::VehicleGet(base, Load(base, other + 20))));
   if (!(f31 < f13)) {
@@ -948,7 +953,7 @@ void StreamTwoPlayers(uint8_t* base, uint32_t manager, uint32_t sp, bool heap,
       f30 = Lfs(base, kTrafficNearCap);
     }
   }
-  Store(base, manager + 2364, 0);
+  M(base, manager).set_racer_count(0);
   StreamOpponents(base, manager, ahead, f1, f2, frame - 1920, heap,
                   make(frame - 1920 - 224).original);
   StreamTraffic(base, manager, ahead, f30, f31b, other, frame - 464, heap,
@@ -982,7 +987,7 @@ void Stream(uint8_t* base, uint32_t manager, uint32_t sp, bool heap, const MakeC
 void Tick(uint8_t* base, uint32_t world, uint32_t frame, bool heap, const MakeCalls& make) {
   ITC_NATIVE_RUNNING("sub_82174BC0 RaceWorld::Tick");
   const StartCalls calls = make(frame - 224);
-  if (Load(base, world + 9608) != 0) {
+  if (schema::RaceWorld(base, world).two_humans() != 0) {
     const uint32_t race = Load(base, kRaceData);
     const uint32_t start = guest::LoadU8(base, kStart);
     if ((Load(base, race + kFlagsOffset) & 0x20) == 0 || start == 255) {
@@ -1018,7 +1023,7 @@ void Tick(uint8_t* base, uint32_t world, uint32_t frame, bool heap, const MakeCa
       }
     }
   }
-  Stream(base, Load(base, kManager), frame, heap, make);
+  Stream(base, G::racers_manager(base).address, frame, heap, make);
   calls.update_drivers(frame, 0x82174D04);
   TickVehicles(base, frame - 128, calls.tick);
   track_collision::TrackCollisionTick(base, frame - 144, calls.collision);

@@ -1,0 +1,254 @@
+# The schema of docs/functions/scene-models.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The scene models (src/scene_models/): the scene model (pool 7 of the car
+# scene's second set), the 3,696-byte car record, the wheels' and cockpit's
+# records, the wheels' 12-byte sizes, the second set's light kit (pool 4)
+# and the sound loads' context. The scene model record (4,244 bytes) is
+# car-makers.toml's SceneModelRecord; the parts', interior's and light
+# kit's records are car-draw.toml's PartsRecord, InteriorRecord and
+# LightKitRecord; the first set's car model is car-models.toml's CarModel and
+# a second set car model its CarModelsSceneCarModel. Arrays (the car
+# record's vinyl layers and stickers, the scene model's record copy and
+# block) are `bytes`: an element is a view at `<field>_address() + n x its
+# size` (car-models.toml's CarModelDecalRecord for a layer).
+
+# A car as the scene holds it (pool 7 of the second set; docs/known-data.md
+# "scene model"; 5,120 bytes, SceneModel::SceneModel, base vtable
+# 0x82004F90). +32 holds a copy of its 4,244-byte record (SceneModelRecord):
+# the record's +n is the model's +32 + n. Car::DrawUpdate's view of it is
+# race-setup.toml's Car (joined by the measure) and its 736-byte block at
+# +4288 car-draw.toml's CarDrawBlock.
+[SceneModel]
+measure = "SceneModel"
+size = 5120
+origin = "allocated"
+vtable = 0x82004F90
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82004F90 (measure fault: also SceneModel::Beam, BeamShape and BeamColor's out vector and CarScene::Draw's reads of it, filed at +0 to +15)" },
+  { name = "joined_vector_xy", offset = 0, type = "u64", note = "measure fault: the beam functions' out vector's x and y (ld/std)" },
+  { name = "joined_vector_y", offset = 4, type = "f32", note = "measure fault: the out vector's y" },
+  { name = "joined_vector_z", offset = 8, type = "f32", note = "measure fault: the out vector's z" },
+  { name = "joined_vector_zw", offset = 8, type = "u64", note = "measure fault: the out vector's z and w (ld/std)" },
+  { name = "joined_vector_w", offset = 12, type = "f32", note = "measure fault: the out vector's w" },
+  { name = "state", offset = 16, type = "u32", note = "the pool object's: 3 in use" },
+  { name = "index", offset = 20, type = "u32", note = "its index in the pool: the sound slot (0x826D8334 + 4i and the others)" },
+  { name = "record", offset = 32, type = "bytes", count = 4244, note = "a copy of its 4,244-byte record (SceneModelRecord; SceneModel::SetUp's SceneModelRecord::Copy). Measure fault: SceneModel::Accessory's interior loading object +140 (the interior record's +112, the accessory) is filed at +140" },
+  { name = "kind", offset = 32, type = "u32", note = "the record's +0: 1 and 2 cars (2 the players', the only kind with a cockpit), 3 traffic" },
+  { name = "car_record", offset = 48, type = "bytes", count = 3696, note = "the record's +16: the car record (CarRecord)" },
+  { name = "block", offset = 48, type = "u32", note = "the car record's +0: the model block (5 sets interior_gauge1_present and _kind)" },
+  { name = "paint", offset = 64, type = "bytes", count = 48, note = "the car record's +16: three 16-byte hue, saturation, value rows (SceneModel::ApplyPaint, load-poll.md)" },
+  { name = "wheel_paint", offset = 112, type = "bytes", count = 96, note = "the car record's +64: six rows for the wheels, front then rear (SceneModel::ApplyWheelPaint)" },
+  { name = "selected_texture", offset = 3728, type = "u32", note = "the car record's +3680 (the car model's selected texture); copied to the cockpit record's +20 by SceneModel::Build" },
+  { name = "parts_record", offset = 3744, type = "bytes", count = 60, note = "the record's +3712: the parts' 60 bytes (PartsRecord), handed to ScenePools::SetUpB and SceneParts::Apply" },
+  { name = "parts_bonnet", offset = 3764, type = "u32", note = "the parts record's +20: the cockpit record's +0 (plus 5 when 6 or more, SceneModel::Build)" },
+  { name = "parts_aero_kit", offset = 3768, type = "u32", note = "the parts record's +24: the cockpit record's +4" },
+  { name = "parts_aero6", offset = 3772, type = "u32", note = "the parts record's +28: the cockpit record's +8" },
+  { name = "parts_aero7", offset = 3776, type = "u32", note = "the parts record's +32: the cockpit record's +12" },
+  { name = "parts_aero9", offset = 3784, type = "u32", note = "the parts record's +40: the cockpit record's +16 (plus 7 when 4 or more)" },
+  { name = "parts_engine_stage", offset = 3788, type = "u32", note = "the parts record's +44: picks the sound assets' index (SceneModel::SetUp, blocks below 18)" },
+  { name = "interior_record", offset = 3804, type = "bytes", count = 120, note = "the record's +3772: the interior's 120 bytes (InteriorRecord), handed to ScenePools::SetUpB and SceneInterior::Apply, copied to the cockpit record's +24" },
+  { name = "interior_gauge1_present", offset = 3824, type = "u32", note = "the interior record's +20: 1 for block 5 (SceneModel::SetUp, ApplyRecord)" },
+  { name = "interior_gauge1_kind", offset = 3828, type = "u32", note = "the interior record's +24: 0 for block 5" },
+  { name = "cockpit_record", offset = 3924, type = "bytes", count = 144, note = "the record's +3892: the cockpit's 144 bytes (SceneModelsCockpitRecord), filled by SceneModel::Build for kind 2 in a race" },
+  { name = "cockpit_bonnet", offset = 3924, type = "u32", note = "the cockpit record's +0" },
+  { name = "cockpit_aero_kit", offset = 3928, type = "u32", note = "the cockpit record's +4" },
+  { name = "cockpit_aero6", offset = 3932, type = "u32", note = "the cockpit record's +8" },
+  { name = "cockpit_aero7", offset = 3936, type = "u32", note = "the cockpit record's +12" },
+  { name = "cockpit_aero9", offset = 3940, type = "u32", note = "the cockpit record's +16" },
+  { name = "cockpit_selected_texture", offset = 3944, type = "u32", note = "the cockpit record's +20" },
+  { name = "wheels_record", offset = 4068, type = "bytes", count = 156, note = "the record's +4036: the wheels' 156 bytes (SceneModelsWheelsRecord), handed to ScenePools::SetUpB" },
+  { name = "wheels_kind", offset = 4068, type = "u32", note = "the wheels record's +0: the kind, stored by SceneModel::SetUp" },
+  { name = "wheels_painted", offset = 4072, type = "u32", note = "the wheels record's +4 (SceneModel::ApplyWheelPaint)" },
+  { name = "light_kit_record", offset = 4224, type = "bytes", count = 52, note = "the record's +4192: the light kit's 52 bytes (LightKitRecord), handed to ScenePools::SetUpB" },
+  { name = "draw_block", offset = 4288, type = "bytes", count = 736, note = "the 736-byte block of matrices and draw words (car-draw.toml's CarDrawBlock, second-set.md's SceneModelBlock)" },
+  { name = "draw_enabled", offset = 4296, type = "u32", note = "the block's +8: a word from its owner (sub_8217FCB0); 0 makes Car::DrawUpdate draw nothing; SceneModel::Update's accessory waits for it in the front end" },
+  { name = "cockpit_only", offset = 4300, type = "u32", note = "the block's +12: with kind 2 only the cockpit is drawn (probably the cockpit view)" },
+  { name = "matrix", offset = 4304, type = "bytes", count = 64, note = "the block's +16: the world matrix (SceneModel::Update's accessory placement, CarOverlays::FindModel)" },
+  { name = "windows_alpha", offset = 4916, type = "f32", note = "the block's +628: the *_02 windows' alpha ([0x8200296C] in the front end, else [0x82001FBC], probably 0.1)" },
+  { name = "set_up", offset = 5024, type = "u32", note = "1 once SceneModel::SetUp ran" },
+  { name = "release_pending", offset = 5028, type = "u32", note = "the load poll waits while it's set (probably a release pending)" },
+  { name = "second_wheels_claimed", offset = 5032, type = "u32", note = "SceneModel::AddSecondWheels ran (the tuning screen waits for 0)" },
+  { name = "ready", offset = 5036, type = "u32", note = "the parts finished (the load poll; not for traffic)" },
+  { name = "build_pending", offset = 5040, type = "u32", note = "SceneModel::Build deferred to SceneModel::Update" },
+  { name = "build_delay", offset = 5044, type = "u32", note = "the updates until the deferred build (signed)" },
+  { name = "car_model", offset = 5048, type = "ptr", to = "CarModelsSceneCarModel", note = "pool 0 of the second set (-1 for traffic)" },
+  { name = "car_model_ready", offset = 5052, type = "u32" },
+  { name = "decals_reloaded", offset = 5056, type = "u32", note = "1 when the first-set car model's decals are done (+4088 3); 0 from ReloadDecals" },
+  { name = "parts", offset = 5060, type = "ptr", to = "SceneParts", note = "pool 1" },
+  { name = "parts_ready", offset = 5064, type = "u32" },
+  { name = "interior", offset = 5068, type = "u32", note = "pool 3 (SceneInterior): +36 its first-set interior" },
+  { name = "interior_ready", offset = 5072, type = "u32" },
+  { name = "cockpit", offset = 5076, type = "u32", note = "pool 2 (SceneCockpit)" },
+  { name = "cockpit_ready", offset = 5080, type = "u32", note = "1 when there's no cockpit" },
+  { name = "light_kit", offset = 5084, type = "ptr", to = "SceneLightKit", note = "pool 4" },
+  { name = "light_kit_ready", offset = 5088, type = "u32" },
+  { name = "traffic_body", offset = 5092, type = "u32", note = "pool 6 (SceneTraffic)" },
+  { name = "traffic_body_ready", offset = 5096, type = "u32" },
+  { name = "wheels", offset = 5100, type = "u32", note = "pool 5 (SceneWheels)" },
+  { name = "wheels_ready", offset = 5104, type = "u32" },
+  { name = "second_wheels", offset = 5108, type = "u32", note = "a second pool 5 object (SceneModel::AddSecondWheels)" },
+  { name = "second_wheels_ready", offset = 5112, type = "u32", note = "the second wheels' finisher answer: once 1 they replace +5100" },
+  { name = "scene", offset = 5116, type = "ptr", to = "CarScene" },
+]
+
+# The 3,696-byte car record (docs/known-data.md "scene model record" +16,
+# the car model's +32, the traffic body's +32; CarRecord::Copy, Reset,
+# sub_820D45B0). The measure also files the 64-byte vinyl layer reset
+# (sub_820D0A20, r3 a layer) and CarRecord::ResetBytes' words at +0.
+[CarRecord]
+measures = ["CarRecord", "CarRecord::Copy.r4", "sub_820D45B0.r3"]
+size = 3696
+origin = "embedded"
+fields = [
+  { name = "block", offset = 0, type = "u32", note = "the model block (traffic: the traffic car's number); -1 after Reset. Measure fault: a layer's +0 (sub_820D0A20) too" },
+  { name = "unknown_4", offset = 4, type = "u32", note = "measure fault: a layer's +4 and CarRecord::ResetBytes' words (+4 to +44), filed here" },
+  { name = "unknown_8", offset = 8, type = "u32", note = "measure fault: a layer's +8 (the region)" },
+  { name = "unknown_12", offset = 12, type = "u32", note = "measure fault: CarRecord::ResetBytes" },
+  { name = "paint", offset = 16, type = "bytes", count = 48, note = "three 16-byte hue, saturation, value rows (w 1.0; sub_820D45B0)" },
+  { name = "wheel_paint", offset = 64, type = "bytes", count = 96, note = "six rows for the wheels, front then rear" },
+  { name = "emblem_choice", offset = 160, type = "u32", note = "a count or choice passed to the traffic texture name's format" },
+  { name = "emblem_word", offset = 164, type = "u32", note = "handed to the team emblem's lookup (sub_820D3CF8) as r5" },
+  { name = "vinyl_layers_a", offset = 176, type = "bytes", count = 192, note = "three 64-byte vinyl layer records (CarModelDecalRecord)" },
+  { name = "vinyl_layers_b", offset = 368, type = "bytes", count = 192, note = "three more" },
+  { name = "stickers", offset = 560, type = "bytes", count = 3072, note = "eight groups of six 64-byte sticker records (384 bytes a group)" },
+  { name = "plate", offset = 3632, type = "bytes", count = 48, note = "twelve words (the number plate: CarRecord::ResetBytes, SetBytes; a 48-byte memcpy in CarRecord::Copy)" },
+  { name = "selected_texture", offset = 3680, type = "u32", note = "which of the car model's XPR indices CarModel::SelectedTexture picks" },
+  { name = "unknown_3684", offset = 3684, type = "u32" },
+  { name = "door_kind", offset = 3688, type = "u32", note = "nonzero the scissor doors (probably)" },
+  { name = "unknown_3692", offset = 3692, type = "u32" },
+]
+
+# The cockpit's 144-byte record (the scene model record's +3892, the
+# cockpit's +36; sub_820D34B8, SceneModel::Build).
+[SceneModelsCockpitRecord]
+measure = "sub_820D34B8.r3"
+size = 144
+origin = "embedded"
+fields = [
+  { name = "bonnet", offset = 0, type = "u32", note = "the parts record's +20 (plus 5 when 6 or more)" },
+  { name = "aero_kit", offset = 4, type = "u32", note = "the parts record's +24" },
+  { name = "aero6", offset = 8, type = "u32", note = "the parts record's +28" },
+  { name = "aero7", offset = 12, type = "u32", note = "the parts record's +32" },
+  { name = "aero9", offset = 16, type = "u32", note = "the parts record's +40 (plus 7 when 4 or more)" },
+  { name = "selected_texture", offset = 20, type = "u32", note = "the car record's +3680" },
+  { name = "interior_record", offset = 24, type = "bytes", count = 120, note = "its interior part (InteriorRecord), the set-up of the cockpit's own interior" },
+]
+
+# The wheels' 156-byte record (the scene model record's +4036, the wheels'
+# +32; sub_820D3900; docs/known-data.md "car draw records").
+[SceneModelsWheelsRecord]
+measure = "sub_820D3900.r3"
+size = 156
+origin = "embedded"
+fields = [
+  { name = "kind", offset = 0, type = "u32", note = "the car's kind (1 by default)" },
+  { name = "painted", offset = 4, type = "u32", note = "1 after SceneModelRecord::SetPaint" },
+  { name = "morph_each_draw", offset = 8, type = "u32", note = "0 when morphed once at set-up (else at every draw)" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "front_wheel", offset = 16, type = "u32", note = "the front wheel number (-1 stock)" },
+  { name = "front_f20", offset = 20, type = "f32", note = "[0x82002568] by default" },
+  { name = "front_f24", offset = 24, type = "f32", note = "0.5 by default" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "rear_wheel", offset = 32, type = "u32", note = "the rear wheel number (-1 stock)" },
+  { name = "rear_f36", offset = 36, type = "f32" },
+  { name = "rear_f40", offset = 40, type = "f32" },
+  { name = "front_size", offset = 44, type = "bytes", count = 12, note = "the front tire's morph inputs (SceneModelsWheelSize)" },
+  { name = "front_size_index", offset = 44, type = "u32" },
+  { name = "front_size_a", offset = 48, type = "f32" },
+  { name = "front_size_b", offset = 52, type = "f32" },
+  { name = "rear_size", offset = 56, type = "bytes", count = 12, note = "the rear tire's (+56 also read as the second rear wheel's offset)" },
+  { name = "rear_size_index", offset = 56, type = "u32" },
+  { name = "rear_size_a", offset = 60, type = "f32" },
+  { name = "rear_size_b", offset = 64, type = "f32" },
+  { name = "brake_kind", offset = 68, type = "u32" },
+  { name = "unknown_72", offset = 72, type = "u32" },
+  { name = "unknown_76", offset = 76, type = "u32" },
+  { name = "unknown_80", offset = 80, type = "u32" },
+  { name = "caliper_a", offset = 84, type = "u32", note = "the calipers" },
+  { name = "caliper_texture", offset = 88, type = "u32", note = "the calipers' texture (probably)" },
+  { name = "unknown_92", offset = 92, type = "u32" },
+  { name = "unknown_96", offset = 96, type = "u32" },
+  { name = "front_brake_turn", offset = 100, type = "f32", note = "degrees" },
+  { name = "rear_brake_turn", offset = 104, type = "f32" },
+  { name = "front_brake_size", offset = 108, type = "u32", note = "11 by default (probably inches)" },
+  { name = "rear_brake_size", offset = 112, type = "u32" },
+  { name = "unknown_116", offset = 116, type = "u32" },
+  { name = "unknown_120", offset = 120, type = "u32" },
+  { name = "unknown_124", offset = 124, type = "u32", note = "-1 by default" },
+  { name = "unknown_128", offset = 128, type = "f32" },
+  { name = "unknown_132", offset = 132, type = "f32" },
+  { name = "unknown_136", offset = 136, type = "f32" },
+  { name = "unknown_140", offset = 140, type = "f32" },
+  { name = "unknown_144", offset = 144, type = "f32" },
+  { name = "unknown_148", offset = 148, type = "f32" },
+  { name = "unknown_152", offset = 152, type = "f32" },
+]
+
+# A tire's 12-byte size (the wheels record's +44 and +56; sub_820D3B38):
+# an int and two scaled floats (car-makers.toml's front_size, _a, _b).
+[SceneModelsWheelSize]
+measure = "sub_820D3B38.r3"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "index", offset = 0, type = "u32", note = "-1 by default" },
+  { name = "a", offset = 4, type = "f32", note = "[0x82001BE0] (probably -1.0) by default" },
+  { name = "b", offset = 8, type = "f32" },
+]
+
+# Pool 4 of the second set: the light kit (13,168 bytes, vtable 0x820056E0;
+# docs/known-data.md "second set objects"; ScenePool4::SetUp).
+[SceneLightKit]
+measure = "ScenePool4"
+size = 13168
+origin = "allocated"
+vtable = 0x820056E0
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "state", offset = 16, type = "u32", note = "the pool object's: 3 in use" },
+  { name = "index", offset = 20, type = "u32" },
+  { name = "car_model", offset = 24, type = "ptr", to = "CarModelsSceneCarModel", note = "the second set's car model (sub_820E70B8)" },
+  { name = "first_set_object", offset = 28, type = "ptr", to = "Pool4Object", note = "pool 4 of the first set" },
+  { name = "record", offset = 32, type = "bytes", count = 52, note = "a copy of its 52-byte record (LightKitRecord)" },
+  { name = "points", offset = 96, type = "bytes", count = 13056, note = "the point block (car-draw.toml's LightPoints)" },
+  { name = "model", offset = 13152, type = "u32", note = "the first set's object's model (its +112)" },
+  { name = "finished", offset = 13156, type = "u32", note = "SceneLights::Finish" },
+  { name = "scene", offset = 13160, type = "ptr", to = "CarScene" },
+]
+
+# A second set part given its car model by sub_820E70B8 (pool 4's light
+# kit or pool 5's wheels: their +24).
+[SceneModelsPartLink]
+measure = "sub_820E70B8.r3"
+size = 28
+origin = "allocated"
+fields = [
+  { name = "car_model", offset = 24, type = "ptr", to = "CarModelsSceneCarModel" },
+]
+
+# The sound loads' callback context (0x826D8334 + 4i, sub_82175EE0's r6).
+[SceneModelsSoundContext]
+measure = "sub_82175EE0.r6"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "slot", offset = 0, type = "u32", note = "the scene model's slot i" },
+]
+
+[globals]
+scene = { address = 0x826C2E44, type = "ptr", to = "CarScene", note = "the car scene (its second set holds the scene models)" }
+accessories = { address = 0x826C5510, type = "ptr", to = "Accessories", note = "the accessories' set (sub_820F0E50 returns it)" }
+sound_contexts = { address = 0x826D8334, type = "bytes", count = 28, note = "the sound loads' callback contexts by slot (SceneModelsSoundContext, each holds i)" }
+sound_files_arrived = { address = 0x826D8350, type = "bytes", count = 8, note = "a byte by slot: the files arrived (sub_82175EE0 counts to 2)" }
+sound_loaded = { address = 0x826D83AC, type = "bytes", count = 28, note = "a word by slot: 1 when both files arrived" }
+one = { address = 0x82000A30, type = "f32", note = "1.0" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0" }
+minus_one = { address = 0x82001BE0, type = "f32", note = "probably -1.0" }
+half = { address = 0x82001BE4, type = "f32", note = "0.5" }
+wheel_default = { address = 0x82002568, type = "f32", note = "the wheels record's +20 and +36 by default" }
+car_record_z0 = { address = 0x82002A10, type = "f32", note = "CarRecord::Reset's first block's last row's z" }
+car_record_z1 = { address = 0x82002A88, type = "f32", note = "its other blocks' last row's z" }

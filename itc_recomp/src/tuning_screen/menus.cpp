@@ -15,6 +15,7 @@
 #include "debug/pause_menu_log.h"
 #include "guest.h"
 #include "native/buffers.h"
+#include "schema/menu_helpers.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
@@ -53,17 +54,17 @@ int64_t Unsigned8(uint8_t* base, uint32_t address) { return Byte(base, address);
 
 // The animation's flags after a +9716 set-up: +9720 = 0 when set, +9716 = 0.
 void ClearFlags(uint8_t* base, uint32_t screen) {
-  if (Load(base, screen + 9720) != 0) {
-    Store(base, screen + 9720, 0);
+  if (TS(base, screen).command_end_after_setup() != 0) {
+    TS(base, screen).set_command_end_after_setup(0);
   }
-  Store(base, screen + 9716, 0);
+  TS(base, screen).set_command_first_run(0);
 }
 
 // The queue's step with +9724, then +9724 = 0.
 void StepWith9724(uint8_t* base, uint32_t screen) {
-  if (Load(base, screen + 9724) != 0) {
+  if (TS(base, screen).command_end_now() != 0) {
     Advance(base, screen);
-    Store(base, screen + 9724, 0);
+    TS(base, screen).set_command_end_now(0);
   }
 }
 
@@ -118,10 +119,10 @@ uint64_t MoveCategory(uint8_t* base, const GuestCall& call, uint32_t screen, uin
   const uint32_t frame = Frame(base, sp, 128);
   const uint32_t mappers = Load(base, kControllerEntries) * 8 + kMapperEntries;
   const uint32_t entry = MovieEntry(base, frame, kMovieId);
-  const uint32_t menu = Load(base, screen + 10040);
+  const uint32_t menu = TS(base, screen).category_menu().address;
   const uint32_t movie = Load(base, entry);
   const int32_t step = int32_t(Load(base, menu + 8));
-  auto category = [&] { return uint64_t(Load(base, screen + kCategory)); };
+  auto category = [&] { return uint64_t(TS(base, screen).category()); };
   auto finish = [&](uint64_t index, uint32_t lr) {
     return call(kFinish, {movie, 27, index}, frame, lr);
   };
@@ -134,7 +135,8 @@ uint64_t MoveCategory(uint8_t* base, const GuestCall& call, uint32_t screen, uin
       finish(12, step == -1 ? 0x821D0848 : 0x821D08EC);
       finish(13, step == -1 ? 0x821D0858 : 0x821D08FC);
       const uint32_t node = ui_movies::FindNode(base, movie, 27, 0);
-      Store(base, node + 16, Scaled(base, frame, Signed(base, screen + kCategory)));
+      Store(base, UiNode(base, node).y_address(),
+            Scaled(base, frame, Signed(base, TS(base, screen).category_address())));
       first = step == -1 ? 8 : 2;
     } else {
       // The bar slid one way: 12 (down) or 13 (up) restarted.
@@ -172,9 +174,9 @@ uint64_t MarkPick(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_
   ITC_NATIVE_RUNNING("sub_821D6420 TuningScreen::MarkPick");
   const uint32_t frame = Frame(base, sp, 144);
   const uint32_t entry = MovieEntry(base, frame, kMovieId);
-  const int32_t state = int32_t(Load(base, screen + kState));
+  const int32_t state = int32_t(TS(base, screen).state());
   const uint32_t movie = Load(base, entry);
-  Store(base, screen + 9720, 1);
+  TS(base, screen).set_command_end_after_setup(1);
   uint64_t r3 = entry;
   // The row of `field`'s byte k on sub-scene n: Child(FindNode(n, 1), k + 5)
   // and FindNode(n, 0)'s children k + 15 and k + 26, their +16 = float(k) ×
@@ -182,7 +184,8 @@ uint64_t MarkPick(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_
   auto row = [&](uint32_t n, uint32_t field) {
     const uint32_t mark = ui_movies::Child(base, ui_movies::FindNode(base, movie, n, 1),
                                            Byte(base, screen + field) + 5);
-    Store(base, mark + 16, Scaled(base, frame, Unsigned8(base, screen + field)));
+    Store(base, UiNode(base, mark).y_address(),
+          Scaled(base, frame, Unsigned8(base, screen + field)));
     const uint32_t node = ui_movies::FindNode(base, movie, n, 0);
     const uint32_t a = ui_movies::Child(base, node, Byte(base, screen + field) + 15);
     Store(base, a + 16, Scaled(base, frame, Unsigned8(base, screen + field)));
@@ -195,14 +198,15 @@ uint64_t MarkPick(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_
   };
   bool marked = false;  // 486 restarted
   if (state == 4) {
-    const int32_t category = int32_t(Load(base, screen + kCategory));
-    auto item = [&] { return Byte(base, screen + kItem); };
+    const int32_t category = int32_t(TS(base, screen).category());
+    auto item = [&] { return uint32_t(TS(base, screen).item()); };
     if ((category == 0 && item() == 2) || (category == 1 && item() == 3)) {
       row(28, kLevel);
       marked = true;
     } else if (category == 3) {
       const uint32_t node = ui_movies::FindNode(base, movie, 27, item() + 5);
-      Store(base, node + 16, Scaled(base, frame, Unsigned8(base, screen + kItem)));
+      Store(base, UiNode(base, node).y_address(),
+            Scaled(base, frame, Unsigned8(base, TS(base, screen).item_address())));
       row(30, kLevel);
       r3 = restart(629, 0x821D6754, 0x821D6958, 1);
     } else if (category == 4 && item() == 4) {
@@ -217,15 +221,15 @@ uint64_t MarkPick(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_
     }
   } else if (state == 53) {
     // k = [+33548]; 3 puts the marks at 80.0 (0x82001E8C).
-    const uint32_t k_at = screen + 33548;
+    const uint32_t k_at = TS(base, screen).interior_pick_address();
     const uint32_t far = steps::Bits(steps::Lfs(base, 0x82001E8C));
     if (int32_t(Load(base, k_at)) == 3) {
       const uint32_t mark = ui_movies::Child(base, ui_movies::FindNode(base, movie, 28, 1), 7);
-      Store(base, mark + 16, far);
+      Store(base, UiNode(base, mark).y_address(), far);
     } else {
       const uint32_t mark = ui_movies::Child(base, ui_movies::FindNode(base, movie, 28, 1),
                                              Load(base, k_at) + 5);
-      Store(base, mark + 16, Scaled(base, frame, Signed(base, k_at)));
+      Store(base, UiNode(base, mark).y_address(), Scaled(base, frame, Signed(base, k_at)));
     }
     const uint32_t node = ui_movies::FindNode(base, movie, 28, 0);
     if (int32_t(Load(base, k_at)) == 3) {
@@ -251,19 +255,19 @@ uint64_t Command16(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   const uint32_t frame = Frame(base, sp, 128);
   const uint32_t entry = MovieEntry(base, frame, 13);
   const uint32_t movie = Load(base, entry);
-  if (Load(base, screen + 9716) != 0) {
-    if (Load(base, screen + 9720) != 0) {
+  if (TS(base, screen).command_first_run() != 0) {
+    if (TS(base, screen).command_end_after_setup() != 0) {
       PlayNamed(call, frame, 0x821FF754, movie, 219, 1);
       FinishNamed(call, frame, 0x821FF760, movie, 219);
       Advance(base, screen);
-      Store(base, screen + 9720, 0);
+      TS(base, screen).set_command_end_after_setup(0);
     } else {
       FinishNamed(call, frame, 0x821FF7A0, movie, 219);
       PlayNamed(call, frame, 0x821FF7BC, movie, 219, 1);
     }
-    Store(base, screen + 9716, 0);
+    TS(base, screen).set_command_first_run(0);
   }
-  const uint32_t pick = Load(base, screen + 30732);
+  const uint32_t pick = TS(base, screen).layer_cursor();
   if (pick <= 2) {
     // 195 + pick (169 + pick with the set +30724 not 0) restarted and
     // looped, 44 and 45 finished, 46 restarted.
@@ -275,7 +279,7 @@ uint64_t Command16(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
         {{0x821FF9E4, 0x821FFA00}, {0x821FFA10, 0x821FFA2C}},
         {{0x821FF97C, 0x821FF998}, {0x821FF9A8, 0x821FF9C4}},
     };
-    const bool other = int32_t(Load(base, screen + 30724)) != 0;
+    const bool other = int32_t(TS(base, screen).editor_page()) != 0;
     const uint64_t named = (other ? 169 : 195) + pick;
     const Lr& lr = kLr[pick][other ? 1 : 0];
     FinishNamed(call, frame, lr.finish, movie, named);
@@ -288,7 +292,7 @@ uint64_t Command16(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   } else if (pick <= 4) {
     // 195 to 197 and 213 (169 to 171 and 189) finished, 213 (189) played,
     // 44 (pick 3) or 45 (4) restarted and looped.
-    const bool other = int32_t(Load(base, screen + 30724)) != 0;
+    const bool other = int32_t(TS(base, screen).editor_page()) != 0;
     static constexpr uint32_t kFinishLr[2][2][4] = {
         {{0x821FF8B8, 0x821FF8C4, 0x821FF8D0, 0x821FF8DC},
          {0x821FF8EC, 0x821FF8F8, 0x821FF904, 0x821FF910}},
@@ -323,11 +327,12 @@ namespace {
 // 2's rear, child 10 shown. `match` the item-0 test's two pairs.
 void TirePictures(uint8_t* base, uint32_t screen, uint32_t frame, uint32_t movie, uint32_t n,
                   uint32_t front, uint32_t rear, bool match, bool clear) {
-  const uint32_t item = Byte(base, screen + kItem);
+  const uint32_t item = uint32_t(TS(base, screen).item());
   if (item == 0) {
     const uint32_t node = ui_movies::FindNode(base, movie, n, 0);
     const uint32_t picture = ui_movies::Child(base, node, 2);
-    Store(base, picture + 16, Scaled(base, frame, Signed(base, screen + front)));
+    Store(base, UiNode(base, picture).y_address(),
+          Scaled(base, frame, Signed(base, screen + front)));
     if (match) {
       if (clear) {
         Store(base, ui_movies::Child(base, node, 11) + 80, 0);
@@ -365,47 +370,53 @@ uint64_t ShowOptions(uint8_t* base, const GuestCall& call, uint32_t screen, uint
   ITC_NATIVE_RUNNING("sub_821D5028 TuningScreen::ShowOptions");
   const uint32_t frame = Frame(base, sp, 160);
   const uint32_t entry = MovieEntry(base, frame, kMovieId);
-  const int32_t category = int32_t(Load(base, screen + kCategory));
+  const int32_t category = int32_t(TS(base, screen).category());
   const uint32_t movie = Load(base, entry);
   uint64_t r3 = entry;
-  auto option = [&] { return uint64_t(Byte(base, screen + kOption)); };
+  auto option = [&] { return uint64_t(uint32_t(TS(base, screen).option())); };
   auto scene = [&](uint64_t index, uint32_t finish_lr, uint32_t play_lr) {
     call(kFinish, {movie, kAllScenes, index}, frame, finish_lr);
     call(kPlay, {movie, kAllScenes, index, 0, 0, 0, 0}, frame, play_lr);
   };
   if (category == 3) {
-    if (Load(base, screen + 9716) != 0) {
+    if (TS(base, screen).command_first_run() != 0) {
       scene(30, 0x821D508C, 0x821D50AC);
       bool match = false;
-      if (Byte(base, screen + kItem) == 0) {
-        match = int32_t(Load(base, screen + 35952)) == int32_t(Load(base, screen + 36080)) &&
-                int32_t(Load(base, screen + 35948)) == int32_t(Load(base, screen + 36076));
+      if (uint32_t(TS(base, screen).item()) == 0) {
+        match = int32_t(TS(base, screen).tire_front_option()) ==
+                    int32_t(TS(base, screen).tire_rear_option()) &&
+                int32_t(TS(base, screen).tire_front_choice()) ==
+                    int32_t(TS(base, screen).tire_rear_choice());
       }
       TirePictures(base, screen, frame, movie, 33, 35952, 36080, match, true);
       ClearFlags(base, screen);
     }
     const uint32_t mark = ui_movies::Child(base, ui_movies::FindNode(base, movie, 33, 1), 0);
-    Store(base, mark + 16, Scaled(base, frame, Unsigned8(base, screen + kOption)));
+    Store(base, UiNode(base, mark).y_address(),
+          Scaled(base, frame, Unsigned8(base, TS(base, screen).option_address())));
     Restarted(call, frame, movie, option() + 844, 1, {0x821D5310, 0x821D5330, 0x821D5340});
     r3 = Restarted(call, frame, movie, option() + 783, 0, {0x821D5350, 0x821D5370, 0x821D55BC});
-  } else if (category == 4 && Byte(base, screen + kItem) == 4) {
-    if (Load(base, screen + 9716) != 0) {
+  } else if (category == 4 && uint32_t(TS(base, screen).item()) == 4) {
+    if (TS(base, screen).command_first_run() != 0) {
       scene(34, 0x821D53AC, 0x821D53CC);
       ClearFlags(base, screen);
     }
     const uint32_t mark = ui_movies::FindNode(base, movie, 31, 0);
-    Store(base, mark + 16, Scaled(base, frame, Unsigned8(base, screen + kOption)));
+    Store(base, UiNode(base, mark).y_address(),
+          Scaled(base, frame, Unsigned8(base, TS(base, screen).option_address())));
     r3 = Restarted(call, frame, movie, option() + 675, 1, {0x821D5428, 0x821D5448, 0x821D55BC});
-  } else if (category == 5 && Byte(base, screen + kItem) == 1) {
-    if (Load(base, screen + 9716) != 0) {
+  } else if (category == 5 && uint32_t(TS(base, screen).item()) == 1) {
+    if (TS(base, screen).command_first_run() != 0) {
       scene(6, 0x821D548C, 0x821D54AC);
       const uint32_t picture = ui_movies::Child(base, ui_movies::FindNode(base, movie, 28, 0), 2);
-      Store(base, picture + 80, 1);
-      Store(base, picture + 16, Scaled(base, frame, Signed(base, screen + 36612)));
+      UiNode(base, picture).set_visible(1);
+      Store(base, UiNode(base, picture).y_address(),
+            Scaled(base, frame, Signed(base, TS(base, screen).exterior1_choice_address())));
       ClearFlags(base, screen);
     }
     const uint32_t mark = ui_movies::Child(base, ui_movies::FindNode(base, movie, 28, 1), 0);
-    Store(base, mark + 16, Scaled(base, frame, Unsigned8(base, screen + kOption)));
+    Store(base, UiNode(base, mark).y_address(),
+          Scaled(base, frame, Unsigned8(base, TS(base, screen).option_address())));
     Restarted(call, frame, movie, option() + 489, 1, {0x821D554C, 0x821D556C, 0x821D557C});
     r3 = Restarted(call, frame, movie, option() + 428, 0, {0x821D558C, 0x821D55AC, 0x821D55BC});
   }
@@ -417,10 +428,10 @@ uint64_t ShowLevels(uint8_t* base, const GuestCall& call, uint32_t screen, uint3
   ITC_NATIVE_RUNNING("sub_821D12C0 TuningScreen::ShowLevels");
   const uint32_t frame = Frame(base, sp, 160);
   const uint32_t entry = MovieEntry(base, frame, kMovieId);
-  const int32_t category = int32_t(Load(base, screen + kCategory));
+  const int32_t category = int32_t(TS(base, screen).category());
   const uint32_t movie = Load(base, entry);
   uint64_t r3 = entry;
-  auto level = [&] { return uint64_t(Byte(base, screen + kLevel)); };
+  auto level = [&] { return uint64_t(uint32_t(TS(base, screen).level())); };
   auto scene = [&](uint64_t index, uint32_t finish_lr, uint32_t play_lr) {
     call(kFinish, {movie, kAllScenes, index}, frame, finish_lr);
     call(kPlay, {movie, kAllScenes, index, 0, 0, 0, 0}, frame, play_lr);
@@ -432,35 +443,35 @@ uint64_t ShowLevels(uint8_t* base, const GuestCall& call, uint32_t screen, uint3
     const int32_t want_category = category == 0 ? 0 : 1;
     const uint32_t want_item = category == 0 ? 0 : 4;
     auto picked = [&] {
-      return int32_t(Load(base, screen + kCategory)) == want_category &&
-             Byte(base, screen + kItem) == want_item;
+      return int32_t(TS(base, screen).category()) == want_category &&
+             uint32_t(TS(base, screen).item()) == want_item;
     };
-    auto extended = [&] { return picked() && Byte(base, screen + 9677) > 8; };
-    if (Load(base, screen + 9716) != 0) {
+    auto extended = [&] { return picked() && uint32_t(TS(base, screen).level_count()) > 8; };
+    if (TS(base, screen).command_first_run() != 0) {
       if (category == 0) {
         scene(5, 0x821D1324, 0x821D1344);
       } else {
         scene(6, 0x821D1794, 0x821D17B4);
       }
       const uint32_t picture = ui_movies::Child(base, ui_movies::FindNode(base, movie, 28, 0), 2);
-      Store(base, picture + 80, 1);
+      UiNode(base, picture).set_visible(1);
       int64_t x;
       if (extended()) {
         const uint32_t choice = GetCurrentChoice(base, screen);
-        const uint32_t pick = Byte(base, screen + kLevel);
-        x = int32_t(Load(base, screen + 25100) - pick + choice);
+        const uint32_t pick = uint32_t(TS(base, screen).level());
+        x = int32_t(TS(base, screen).list_scroll_row() - pick + choice);
       } else {
         x = int32_t(GetCurrentChoice(base, screen));
       }
-      Store(base, picture + 16, Scaled(base, frame, x));
+      Store(base, UiNode(base, picture).y_address(), Scaled(base, frame, x));
       ClearFlags(base, screen);
     }
     const uint32_t mark = ui_movies::Child(base, ui_movies::FindNode(base, movie, 28, 1), 0);
-    const int64_t x =
-        extended() ? Signed(base, screen + 25100) : Unsigned8(base, screen + kLevel);
-    Store(base, mark + 16, Scaled(base, frame, x));
+    const int64_t x = extended() ? Signed(base, TS(base, screen).list_scroll_row_address())
+                                 : Unsigned8(base, TS(base, screen).level_address());
+    Store(base, UiNode(base, mark).y_address(), Scaled(base, frame, x));
     if (extended()) {
-      auto word = [&] { return uint64_t(Load(base, screen + 25100)); };
+      auto word = [&] { return uint64_t(TS(base, screen).list_scroll_row()); };
       FinishNamed(call, frame, 0x821D1488, movie, word() + 428);
       PlayNamed(call, frame, 0x821D14A8, movie, word() + 428, 1);
       LoopNamed(call, frame, 0x821D14B8, movie, word() + 428);
@@ -476,22 +487,24 @@ uint64_t ShowLevels(uint8_t* base, const GuestCall& call, uint32_t screen, uint3
       r3 = LoopNamed(call, frame, 0x821D195C, movie, level() + 489);
     }
   } else if (category == 3) {
-    if (Load(base, screen + 9716) != 0) {
+    if (TS(base, screen).command_first_run() != 0) {
       scene(7, 0x821D152C, 0x821D154C);
       bool match = false;
-      if (Byte(base, screen + kItem) == 0) {
-        match = int32_t(Load(base, screen + 35948)) == int32_t(Load(base, screen + 36076));
+      if (uint32_t(TS(base, screen).item()) == 0) {
+        match = int32_t(TS(base, screen).tire_front_choice()) ==
+                int32_t(TS(base, screen).tire_rear_choice());
       }
       TirePictures(base, screen, frame, movie, 30, 35948, 36076, match, false);
       ClearFlags(base, screen);
     }
     const uint32_t mark = ui_movies::Child(base, ui_movies::FindNode(base, movie, 30, 1), 0);
-    Store(base, mark + 16, Scaled(base, frame, Unsigned8(base, screen + kLevel)));
+    Store(base, UiNode(base, mark).y_address(),
+          Scaled(base, frame, Unsigned8(base, TS(base, screen).level_address())));
     FinishNamed(call, frame, 0x821D1744, movie, level() + 632);
     PlayNamed(call, frame, 0x821D1764, movie, level() + 632, 1);
     r3 = LoopNamed(call, frame, 0x821D195C, movie, level() + 632);
   }
-  if (Byte(base, screen + 9677) > 8) {
+  if (uint32_t(TS(base, screen).level_count()) > 8) {
     FinishNamed(call, frame, 0x821D1974, movie, 976);
     PlayNamed(call, frame, 0x821D1990, movie, 976, 1);
     FinishNamed(call, frame, 0x821D199C, movie, 1013);
@@ -515,14 +528,14 @@ uint64_t LightItems(uint8_t* base, uint64_t r3_in, uint64_t all, std::optional<u
   const uint32_t screen = uint32_t(r3_in);
   const uint32_t frame = Frame(base, sp, 144);
   const uint32_t entry = MovieEntry(base, frame, 13);
-  const int32_t page = int32_t(Load(base, screen + 30724));
+  const int32_t page = int32_t(TS(base, screen).editor_page());
   const uint32_t movie = Load(base, entry);
   auto single = [&](uint32_t address) {
     const float f = std::bit_cast<float>(Load(base, address));
     return std::bit_cast<uint32_t>(float(double(f)));
   };
   if (int32_t(uint32_t(all)) != 0) {
-    Store(base, screen + 9708, 1);
+    TS(base, screen).set_refresh_pending(1);
   }
   if (page != 0 && page != 1) {
     return entry;
@@ -535,11 +548,11 @@ uint64_t LightItems(uint8_t* base, uint64_t r3_in, uint64_t all, std::optional<u
     bool on = true;
     if (int32_t(uint32_t(all)) == 0) {
       const int32_t selected =
-          item ? int32_t(uint32_t(*item)) : int32_t(Load(base, screen + 30732));
+          item ? int32_t(uint32_t(*item)) : int32_t(TS(base, screen).layer_cursor());
       on = k == selected;
     }
     const uint32_t node = ui_movies::FindNode(base, movie, 0xFFFFFFFFu, first + uint32_t(k));
-    Store(base, node + 68, on ? lit : unlit);
+    Store(base, UiNode(base, node).alpha_address(), on ? lit : unlit);
     r3 = node;
   }
   return r3;
@@ -564,7 +577,7 @@ uint64_t UpdateItems(uint8_t* base, const GuestCall& call, uint64_t r3_in, uint3
   const uint32_t frame = Frame(base, sp, 128);
   const uint32_t mappers = Load(base, kControllerEntries) * 8 + kMapperEntries;
   const uint32_t entry = MovieEntry(base, frame, 13);
-  const int32_t state = int32_t(Load(base, screen + kState));
+  const int32_t state = int32_t(TS(base, screen).state());
   const uint32_t movie = Load(base, entry);
   uint64_t r3 = entry;
   auto asks = [&] { return int32_t(Load(base, mappers + 4)) != 1; };
@@ -589,7 +602,7 @@ uint64_t UpdateItems(uint8_t* base, const GuestCall& call, uint64_t r3_in, uint3
       }
       all = 1;
     }
-    return HighlightItem(base, r3_in, *all, Load(base, screen + 30756), frame);
+    return HighlightItem(base, r3_in, *all, TS(base, screen).order_position(), frame);
   }
   if (state != 28) {
     return r3;
@@ -619,7 +632,7 @@ uint64_t UpdateItems(uint8_t* base, const GuestCall& call, uint64_t r3_in, uint3
     }
   }
   r3 = LayOutItems(base, screen, frame);
-  const int32_t variant = int32_t(Load(base, screen + 30724));
+  const int32_t variant = int32_t(TS(base, screen).editor_page());
   if (variant != 0 && variant != 1) {
     return r3;
   }
@@ -628,14 +641,18 @@ uint64_t UpdateItems(uint8_t* base, const GuestCall& call, uint64_t r3_in, uint3
   // lookup), +36 = 0.0, +28 = +32 = the size, +132 = 0 (the first lookup).
   const bool second = variant == 1;
   const uint32_t first = second ? 22 : 19;
-  const uint32_t origin_x = screen + (second ? 30816 : 30800);
-  const uint32_t origin_y = screen + (second ? 30820 : 30804);
-  const uint32_t scale = screen + (second ? 30828 : 30812);
-  const uint32_t size = screen + (second ? 30824 : 30808);
+  const uint32_t origin_x = second ? TS(base, screen).page1_origin_x_address()
+                                   : TS(base, screen).page0_origin_x_address();
+  const uint32_t origin_y = second ? TS(base, screen).page1_origin_y_address()
+                                   : TS(base, screen).page0_origin_y_address();
+  const uint32_t scale = second ? TS(base, screen).page1_position_scale_address()
+                                : TS(base, screen).page0_position_scale_address();
+  const uint32_t size = second ? TS(base, screen).page1_size_scale_address()
+                               : TS(base, screen).page0_size_scale_address();
   const uint32_t looked = ui_movies::FindNode(base, movie, uint32_t(kAllScenes),
-                                              Load(base, screen + 30732) + first);
+                                              TS(base, screen).layer_cursor() + first);
   const uint32_t node = ui_movies::FindNode(base, movie, uint32_t(kAllScenes),
-                                            Load(base, screen + 30732) + first);
+                                            TS(base, screen).layer_cursor() + first);
   auto through_frame = [&](uint32_t at) {
     const int64_t x = int32_t(Load(base, at));
     Store(base, frame + 80, uint32_t(uint64_t(x) >> 32));
@@ -646,7 +663,7 @@ uint64_t UpdateItems(uint8_t* base, const GuestCall& call, uint64_t r3_in, uint3
   {
     const double s = steps::Lfs(base, scale);
     const double x = through_frame(origin_x);
-    steps::Stfs(base, node + 12, steps::Fadds(steps::Fmadds(s, zero, x),
+    steps::Stfs(base, UiNode(base, node).x_address(), steps::Fadds(steps::Fmadds(s, zero, x),
                                               steps::Lfs(base, second ? 0x8200CAECu : 0x8200CAF4u)));
   }
   {
@@ -655,18 +672,19 @@ uint64_t UpdateItems(uint8_t* base, const GuestCall& call, uint64_t r3_in, uint3
     Store(base, frame + 80, uint32_t(uint64_t(y_word) >> 32));
     Store(base, frame + 84, uint32_t(y_word));
     const double y = steps::Single(double(y_word));
-    steps::Stfs(base, node + 16, steps::Fadds(steps::Fmadds(s, zero, y),
+    steps::Stfs(base, UiNode(base, node).y_address(), steps::Fadds(steps::Fmadds(s, zero, y),
                                               steps::Lfs(base, second ? 0x8200CAE8u : 0x8200CAF0u)));
   }
   const double half = steps::Lfs(base, 0x82001BE4);
   Store(base, node + 20,
-        uint32_t(steps::Fctiwz(steps::Fmuls(steps::Lfs(base, looked + 100), half))));
-  const double height = steps::Fmuls(steps::Lfs(base, looked + 104), half);
-  steps::Stfs(base, node + 36, zero);
-  Store(base, node + 24, uint32_t(steps::Fctiwz(height)));
-  steps::Stfs(base, node + 28, steps::Lfs(base, size));
-  steps::Stfs(base, node + 32, steps::Lfs(base, size));
-  Store(base, looked + 132, 0);
+        uint32_t(steps::Fctiwz(
+            steps::Fmuls(steps::Lfs(base, UiNode(base, looked).width_address()), half))));
+  const double height = steps::Fmuls(steps::Lfs(base, UiNode(base, looked).height_address()), half);
+  steps::Stfs(base, UiNode(base, node).rotation_address(), zero);
+  UiNode(base, node).set_pivot_y(uint32_t(steps::Fctiwz(height)));
+  steps::Stfs(base, UiNode(base, node).scale_x_address(), steps::Lfs(base, size));
+  steps::Stfs(base, UiNode(base, node).scale_y_address(), steps::Lfs(base, size));
+  UiNode(base, looked).set_flip_x(0);
   return node;
 }
 
@@ -685,7 +703,7 @@ constexpr uint32_t kGet82 = 0x820CBC90;  // AeroParts::Get82(out, parts, level)
 // it.
 uint64_t AeroText(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t frame,
                   bool native_specs) {
-  const uint32_t save = Load(base, screen + kSaveData);
+  const uint32_t save = TS(base, screen).save_data().address;
   const uint32_t list = save + 6120;
   uint32_t count = Load(base, save + 0x19920);
   uint32_t at = uint32_t(int32_t(int16_t(guest::LoadU16(base, list + 204)))) * 4 + list;
@@ -722,12 +740,12 @@ uint64_t AeroText(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_
     }
     return uint32_t(call(function, {out, parts, level}, frame, lr));
   };
-  const uint32_t kit77 = get(kGet77, frame + 144, Byte(base, screen + kType), 0x821D2E80,
+  const uint32_t kit77 = get(kGet77, frame + 144, uint32_t(TS(base, screen).type()), 0x821D2E80,
                              car_specs::AeroPart77);
   const uint32_t a = Load(base, kit77 + 24);
-  const uint32_t kit82 = get(kGet82, frame + 224, Load(base, screen + 36588), 0x821D2EA0,
+  const uint32_t kit82 = get(kGet82, frame + 224, TS(base, screen).aero9_type(), 0x821D2EA0,
                              car_specs::AeroPart82);
-  const bool none = Load(base, screen + 36588) == 0;
+  const bool none = TS(base, screen).aero9_type() == 0;
   const uint32_t b = Load(base, kit82 + 24);
   if (none || (b & 2) != 0) {
     return (a & 1) != 0 ? 629 : 630;
@@ -742,11 +760,11 @@ uint64_t ShowTypes(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   ITC_NATIVE_RUNNING("sub_821D2A80 TuningScreen::ShowTypes");
   const uint32_t frame = Frame(base, sp, 320);
   const uint32_t entry = MovieEntry(base, frame, kMovieId);
-  const int32_t category = int32_t(Load(base, screen + kCategory));
+  const int32_t category = int32_t(TS(base, screen).category());
   const uint32_t movie = Load(base, entry);
   uint64_t r3 = entry;
-  auto type = [&] { return uint64_t(Byte(base, screen + kType)); };
-  auto item = [&] { return Byte(base, screen + kItem); };
+  auto type = [&] { return uint64_t(uint32_t(TS(base, screen).type())); };
+  auto item = [&] { return uint32_t(TS(base, screen).item()); };
   auto scene = [&](uint64_t index, uint32_t chained, uint32_t finish_lr, uint32_t play_lr) {
     call(kFinish, {movie, kAllScenes, index}, frame, finish_lr);
     call(kPlay, {movie, kAllScenes, index, chained, 0, 0, 0}, frame, play_lr);
@@ -755,29 +773,31 @@ uint64_t ShowTypes(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   // float(x) × 40.0; the flags cleared.
   auto picture = [&](auto x) {
     const uint32_t node = ui_movies::Child(base, ui_movies::FindNode(base, movie, 28, 0), 2);
-    Store(base, node + 80, 1);
-    Store(base, node + 16, Scaled(base, frame, x(node)));
+    UiNode(base, node).set_visible(1);
+    Store(base, UiNode(base, node).y_address(), Scaled(base, frame, x(node)));
     ClearFlags(base, screen);
   };
   auto choice = [&](uint32_t) { return int64_t(int32_t(GetCurrentChoice(base, screen))); };
   // The type's mark: node (28, 1)'s child 0 +16 = float(type) × 40.0.
   auto mark = [&] {
     const uint32_t node = ui_movies::Child(base, ui_movies::FindNode(base, movie, 28, 1), 0);
-    Store(base, node + 16, Scaled(base, frame, Unsigned8(base, screen + kType)));
+    Store(base, UiNode(base, node).y_address(),
+          Scaled(base, frame, Unsigned8(base, TS(base, screen).type_address())));
   };
   if (category == 0 && item() == 2) {
-    if (Load(base, screen + 9716) != 0) {
+    if (TS(base, screen).command_first_run() != 0) {
       FinishNamed(call, frame, 0x821D2AE4, movie, 989);
       PlayNamed(call, frame, 0x821D2B00, movie, 989, 0);
       ClearFlags(base, screen);
     }
     const uint32_t node = ui_movies::FindNode(base, movie, 29, 0);
-    Store(base, node + 16, Scaled(base, frame, Unsigned8(base, screen + kType)));
+    Store(base, UiNode(base, node).y_address(),
+          Scaled(base, frame, Unsigned8(base, TS(base, screen).type_address())));
     FinishNamed(call, frame, 0x821D2B5C, movie, type() + 532);
     PlayNamed(call, frame, 0x821D2B7C, movie, type() + 532, 1);
     r3 = LoopNamed(call, frame, 0x821D3278, movie, type() + 532);
   } else if (category == 4) {
-    if (Load(base, screen + 9716) != 0) {
+    if (TS(base, screen).command_first_run() != 0) {
       if (item() == 4) {
         scene(8, 1, 0x821D2BC0, 0x821D2BF0);
       } else {
@@ -786,14 +806,14 @@ uint64_t ShowTypes(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
       FinishNamed(call, frame, 0x821D2BFC, movie, 1011);
       PlayNamed(call, frame, 0x821D2C18, movie, 1011, 0);
       picture([&](uint32_t) {
-        return item() == 4 ? int64_t(int32_t(Load(base, screen + 36368)))
+        return item() == 4 ? int64_t(int32_t(TS(base, screen).aero4_type()))
                            : int64_t(int32_t(GetCurrentChoice(base, screen)));
       });
     }
     mark();
     Restarted(call, frame, movie, type() + 428, 1, {0x821D2CE0, 0x821D2D00, 0x821D2D10});
     Restarted(call, frame, movie, type() + 489, 0, {0x821D2D20, 0x821D2D40, 0x821D2D50});
-    if (Byte(base, screen + 9678) > 8) {
+    if (uint32_t(TS(base, screen).type_count()) > 8) {
       FinishNamed(call, frame, 0x821D2D68, movie, 976);
       PlayNamed(call, frame, 0x821D2D84, movie, 976, 1);
       Restarted(call, frame, movie, 1013, 1, {0x821D2D90, 0x821D2DAC, 0x821D2DB8});
@@ -809,7 +829,7 @@ uint64_t ShowTypes(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
     }
     r3 = call(kScrollText, {movie, 10, 0, 1}, frame, 0x821D2F34);
   } else if ((category == 5 || category == 6) && item() == 2) {
-    if (Load(base, screen + 9716) != 0) {
+    if (TS(base, screen).command_first_run() != 0) {
       scene(8, 0, 0x821D2F84, 0x821D2FA4);
       picture(choice);
     }
@@ -819,7 +839,7 @@ uint64_t ShowTypes(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
     r3 = LoopNamed(call, frame, 0x821D3278, movie, type() + 489);
   } else if ((category == 5 && item() == 3) || (category == 6 && item() <= 1)) {
     const uint32_t which = item();
-    if (Load(base, screen + 9716) != 0) {
+    if (TS(base, screen).command_first_run() != 0) {
       if (category == 6 && which == 0) {
         scene(6, 1, 0x821D30C0, 0x821D30E0);
         FinishNamed(call, frame, 0x821D30EC, movie, 1011);

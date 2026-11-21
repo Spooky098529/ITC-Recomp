@@ -126,20 +126,26 @@ void Submit(lifted::Regs& ctx, uint8_t* base, uint32_t frame_bytes, uint32_t ret
             uint32_t chunk, uint32_t key, uint32_t depth) {
   const uint64_t lr = ctx.lr;
   guest_call::InFrame(ctx, base, frame_bytes, return_address, [&](uint32_t) {
-    const uint32_t renderer = guest::LoadU32(base, ui_movies::kRenderer);
-    ctx.r3.u64 = renderer;
+    const schema::UiMovieRenderer renderer = schema::UiMoviesGlobals::renderer(base);
+    ctx.r3.u64 = renderer.address;
     ctx.r4.u64 = chunk;
     ctx.r5.u64 = key;
     ctx.fpscr.disableFlushMode();
     ctx.f1.f64 = double(std::bit_cast<float>(guest::LoadU32(base, depth)));
-    lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, renderer) + 16));
+    lifted::CallFromContext(ctx, base, renderer.vtable().submit());
   });
   ctx.lr = lr;
 }
 
-constexpr uint32_t kQuadDepth = 0x82000A34;        // 0.0 (the caller's f1 isn't read)
-constexpr uint32_t kClipResetDepth = 0x82001C00;
-constexpr uint32_t kStateResetDepth = 0x82001BFC;
+// The depths' floats: 0.0 for the quads (the caller's f1 isn't read).
+constexpr uint32_t kQuadDepth = schema::UiMoviesGlobals::zero_address();
+constexpr uint32_t kClipResetDepth = schema::UiMoviesGlobals::clip_reset_depth_address();
+constexpr uint32_t kStateResetDepth = schema::UiMoviesGlobals::state_reset_depth_address();
+
+// The command list the recorders record into.
+uint32_t MovieCommandList(uint8_t* base) {
+  return schema::UiMoviesGlobals::command_list<schema::View>(base).address;
+}
 
 // A quad recorder: r3 = the quad, r4 = the key (f1 isn't read).
 bool RecordQuad(lifted::Regs& ctx, uint8_t* base, bool textured, uint32_t return_address) {
@@ -148,7 +154,7 @@ bool RecordQuad(lifted::Regs& ctx, uint8_t* base, bool textured, uint32_t return
   }
   const uint32_t key = ctx.r4.u32;
   const std::optional<uint32_t> chunk = ui_movies::RecordQuad(
-      base, guest::LoadU32(base, ui_movies::kCommandList), ctx.r3.u32, textured);
+      base, MovieCommandList(base), ctx.r3.u32, textured);
   if (!chunk) {
     return false;
   }
@@ -177,7 +183,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8259E098) {
 // screen and the state reset, each recorded and handed on.
 ITC_NATIVE_ENTRY_ALWAYS(8259D7B0) {
   
-  const uint32_t list = guest::LoadU32(base, ui_movies::kCommandList);
+  const uint32_t list = MovieCommandList(base);
   if (!ITC_FLAG(native_ui_movies) || SlotDiagnostics() ||
       !ui_movies::ChunksFit(base, list,
                             {ui_movies::kResetChunkSlots, ui_movies::kResetChunkSlots})) {
@@ -189,7 +195,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8259D7B0) {
          kClipResetDepth);
   // The renderer only takes the chunk (it doesn't record into the list), so
   // the second still fits; checked again all the same.
-  const uint32_t list_now = guest::LoadU32(base, ui_movies::kCommandList);
+  const uint32_t list_now = MovieCommandList(base);
   if (!ui_movies::ChunksFit(base, list_now, {ui_movies::kResetChunkSlots})) {
     ITC_LOG_ERROR("ui_movies: the state reset chunk no longer fits after the clip reset's");
     return;
@@ -227,7 +233,8 @@ ITC_NATIVE_ENTRY_ALWAYS(8259EBE8) {
   const uint32_t quad = ctx.r3.u32, key = ctx.r4.u32;
   const double depth = ctx.f1.f64;
   const uint64_t lr = ctx.lr;
-  const bool textured = guest::LoadU32(base, quad + 84) != 0;
+  const schema::UiMovieDrawQuad q(base, quad);
+  const bool textured = q.texture() != 0;
   guest_call::InFrame(ctx, base, 112, textured ? 0x8259EC24 : 0x8259EC1C, [&](uint32_t) {
     ctx.r3.u64 = quad;
     ctx.r4.u64 = key;
@@ -238,7 +245,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8259EBE8) {
       lifted::Enter(ctx, base, lifted::entry::e8259E098);
     }
   });
-  if (guest::LoadU32(base, quad + 100) != 0) {
+  if (q.clipped() != 0) {
     guest_call::InFrame(ctx, base, 112, 0x8259EC3C, [&](uint32_t) {
       ctx.r3.u64 = uint64_t(key) + 1;
       ctx.fpscr.disableFlushMode();
@@ -349,10 +356,10 @@ ITC_REGS_STEP(Draw) {
     return;
   }
   ITC_NATIVE_RUNNING("sub_8259FA00 UiMovie::Draw");
-  const uint32_t context = ctx.r3.u32;
-  guest::StoreU32(base, context + 104, ctx.r7.u32);
-  guest::StoreU32(base, context + 96, ctx.r5.u32);
-  guest::StoreU32(base, context + 100, ctx.r6.u32);
+  const schema::UiMovieDrawContext context(base, ctx.r3.u32);
+  context.set_unknown_104(ctx.r7.u32);
+  context.set_textures(ctx.r5.u32);
+  context.set_text_list(ctx.r6.u32);
   ctx.r5.u64 = ctx.r4.u64;
   ctx.r6.u64 = 0;
   RecordDrawNode(ctx, base);

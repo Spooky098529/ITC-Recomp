@@ -9,6 +9,7 @@
 #include "debug/pause_menu_log.h"
 #include "guest.h"
 #include "mode_tick/mode_tick.h"
+#include "schema/game_modes.h"
 #include "tuning_screen/tuning_screen.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
@@ -22,6 +23,8 @@
 namespace tuning_pages {
 
 namespace {
+
+using G = schema::TuningPagesGlobals;
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -44,11 +47,6 @@ constexpr uint32_t kFiredSlot = 0x8210C010;    // ActionMapper::Fired (slot 12, 
 constexpr uint32_t kMenuStep = 0x82186568;       // Menu::Step(menu)
 constexpr uint32_t kMenuSoundPlay = 0x821103F0;  // MenuSound::Play(cue)
 constexpr uint32_t kUnloadAll = 0x82208738;      // DecalImages::UnloadAll(images)
-
-constexpr uint32_t kFadeIn = 0x826A50DC;   // layer 0's fade-in count
-constexpr uint32_t kFadeOut = 0x826A50E4;  // and fade-out count
-constexpr uint32_t kFadeInPasses = 0x82001BEC;
-constexpr uint32_t kFadeOutPasses = 0x82001BF0;
 
 // The mapper's read slot at `offset` (+40 slot 10, +48 slot 12) on
 // `action`, as the original's bctrl from `frame` returning to `lr`:
@@ -206,7 +204,7 @@ uint64_t LeaveEditor(uint8_t* base, const tuning_screen::GuestCall& call, uint64
   ITC_NATIVE_RUNNING("sub_821D8670 TuningScreen::LeaveEditor");
   const uint32_t s = uint32_t(screen);
   const uint32_t frame = Frame(base, sp, 128);
-  if ((Load(base, kFadeOut) | Load(base, kFadeIn)) != 0) {
+  if ((G::fade_out_counts(base) | G::fade_in_counts(base)) != 0) {
     return screen;
   }
   // Push(61), then the queue to state 62 (its page runs next).
@@ -222,7 +220,7 @@ uint64_t LeaveEditor(uint8_t* base, const tuning_screen::GuestCall& call, uint64
   Store(base, queue + 0, state);
   Store(base, queue + 12, 0xFFFFFFFFu);
   Store(base, queue + 16, 0xFFFFFFFFu);
-  mode_tick::ScreenFadesFadeIn(base, Load(base, kFadeInPasses), 0, 0, 0, 0);
+  mode_tick::ScreenFadesFadeIn(base, G::fade_in_passes(base), 0, 0, 0, 0);
   // The item's animation in state 4's list restarted and looped.
   const uint32_t movie = Load(base, tuning_screen::MovieEntry(base, frame, tuning_screen::kMovieId));
   auto item = [&] { return uint64_t(Byte(base, s + 9660)) + 2; };
@@ -357,7 +355,7 @@ uint64_t InputCategories(uint8_t* base, const tuning_screen::GuestCall& call, ui
     } else {
       call(kUnloadAll, {uint64_t(s) + 10048}, frame, 0x821D6DBC);
     }
-    mode_tick::ScreenFadesFadeOut(base, Load(base, kFadeOutPasses), 0, 0, 0, 0);
+    mode_tick::ScreenFadesFadeOut(base, G::fade_out_passes(base), 0, 0, 0, 0);
   }
   return tuning_screen::MoveCategory(base, call, s, frame, flags.native_slots);
 }
@@ -398,7 +396,7 @@ uint64_t BackToItems(uint8_t* base, const tuning_screen::GuestCall& call, uint64
   ITC_NATIVE_RUNNING("sub_821D87C0 TuningScreen::BackToItems");
   const uint32_t s = uint32_t(screen);
   const uint32_t frame = Frame(base, sp, 96);
-  if ((Load(base, kFadeOut) | Load(base, kFadeIn)) != 0) {
+  if ((G::fade_out_counts(base) | G::fade_in_counts(base)) != 0) {
     return screen;
   }
   uint64_t r3;
@@ -1245,7 +1243,7 @@ uint64_t InputItems(uint8_t* base, const tuning_screen::GuestCall& call, uint64_
           Store(base, queue + 0, state);
           Store(base, queue + 12, 0xFFFFFFFFu);
           Store(base, queue + 16, 0xFFFFFFFFu);
-          mode_tick::ScreenFadesFadeOut(base, Load(base, kFadeOutPasses), 0, 0, 0, 0);
+          mode_tick::ScreenFadesFadeOut(base, G::fade_out_passes(base), 0, 0, 0, 0);
           break;
         }
       }
@@ -2685,22 +2683,22 @@ uint64_t Leave(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821E25B0 TuningScreen::Leave");
   const uint32_t s = uint32_t(r3);
   const uint32_t frame = Frame(base, sp, 112);
-  if ((Load(base, kFadeOut) | Load(base, kFadeIn)) != 0) {
+  if ((G::fade_out_counts(base) | G::fade_in_counts(base)) != 0) {
     return r3;
   }
   Store(base, Load(base, s + 18904) + 6116, Load(base, s + 25116));
   tuning_screen::StoreToGarageCar(base, r3, frame);
   const uint64_t out = StoreOwnedParts(base, s, frame);
-  // Message 11 posted to r4's ring (+204: 50 records of 12 bytes, +804 the
-  // count, +808 the start).
-  const uint32_t ring = uint32_t(r4) + 204;
-  const uint32_t count = Load(base, ring + 600) + 1;
-  const uint32_t start = Load(base, ring + 604);
-  Store(base, ring + 600, count);
-  const uint32_t record = ring + ((start + count - 1) % 50) * 12;
-  Store(base, record + 0, 11);
-  Store(base, record + 4, 0);
-  Store(base, record + 8, 0);
+  // Message 11 posted to r4's ring (50 records of 12 bytes).
+  const schema::TuningPagesMode mode(base, uint32_t(r4));
+  const uint32_t count = mode.message_count() + 1;
+  const uint32_t start = mode.message_start();
+  mode.set_message_count(count);
+  const schema::ModeMessage record(
+      base, mode.messages_address() + ((start + count - 1) % 50) * 12);
+  record.set_id(11);
+  record.set_arg0(0);
+  record.set_arg1(0);
   return out;
 }
 

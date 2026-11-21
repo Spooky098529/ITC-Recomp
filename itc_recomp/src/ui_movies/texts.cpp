@@ -8,6 +8,8 @@
 
 #include "base/log.h"
 #include "debug/frame_state_diff.h"
+#include "schema/ui_movies.h"
+#include "schema/ui_movies_game.h"
 #include "strings_and_font/steps.h"
 #include "strings_and_font/strings_and_font.h"
 
@@ -45,29 +47,32 @@ double ScrollOffset(uint8_t* base, uint32_t movie, uint32_t params) {
   ITC_NATIVE_RUNNING("sub_8211B800 UiMovie::ScrollOffset");
   // The text's start x, as Font::SetParams works it out: x - (scale - 1) *
   // the origin's x.
-  const double scale = Lfs(base, params + 28);
-  const uint32_t id = guest::LoadU32(base, params + 120);
+  const schema::UiMovieTextParams p(base, params);
+  const double scale = Lfs(base, p.scale_x_address());
+  const uint32_t id = p.text_id();
   const double scale_less_one = scale - Lfd(base, kOne);
-  const double origin = ToSingle(int32_t(guest::LoadU32(base, params + 8)));
-  const double x = ToSingle(int32_t(guest::LoadU32(base, params + 0)));
+  const double origin = ToSingle(int32_t(p.origin_x()));
+  const double x = ToSingle(int32_t(p.x()));
   const double start = Single(-std::fma(scale_less_one, origin, -x));
   const uint32_t text = TextString(base, movie, id);
-  const double width =
-      strings_and_font::FontTextWidth(base, guest::LoadU32(base, strings_and_font::kFont), params,
-                                      text);
-  const uint32_t record = guest::LoadU32(
-      base, TextMapFindKey(base, movie + kMovieTexts, guest::LoadU32(base, params + 120)));
-  const int32_t counter = int32_t(guest::LoadU32(base, record + 8));
-  const int32_t delay = int32_t(guest::LoadU32(base, record + 12));
+  const double width = strings_and_font::FontTextWidth(
+      base, guest::LoadU32(base, strings_and_font::kFont), params, text);
+  const schema::UiMovieText record(
+      base,
+      schema::UiMovieWord(
+          base, TextMapFindKey(base, schema::UiMovie(base, movie).texts_address(), p.text_id()))
+          .value());
+  const int32_t counter = int32_t(record.scroll_counter());
+  const int32_t delay = int32_t(record.scroll_delay());
   if (counter < delay) {
-    return ToSingle(int32_t(guest::LoadU32(base, params + 0)));
+    return ToSingle(int32_t(p.x()));
   }
-  const double speed = Lfs(base, record + 16);
+  const double speed = Lfs(base, record.scroll_speed_address());
   const double end = Single(start - width);
   const double ticks = ToSingle(int32_t(uint32_t(counter) - uint32_t(delay)));
   double f1 = Single(-std::fma(ticks, speed, -start));
   if (f1 < end) {
-    const double step = Single(ToSingle(int32_t(guest::LoadU32(base, params + 68))) + width);
+    const double step = Single(ToSingle(int32_t(p.gap())) + width);
     do {
       f1 = Single(step + f1);
     } while (f1 < end);
@@ -81,27 +86,28 @@ uint32_t DrawTextsPop(uint8_t* base, uint32_t frame, uint32_t list) {
                          [](uint8_t* host, uint32_t, uint32_t bytes) {
                            std::memset(host, 0, bytes);
                          });
-  const uint32_t count = guest::LoadU32(base, list + 8) - 1;
-  guest::StoreU32(base, list + 8, count);
-  return guest::LoadU32(base, list + 0) + (count << 7);
+  const schema::UiMovieDrawTextList l(base, list);
+  const uint32_t count = l.count() - 1;
+  l.set_count(count);
+  return l.items().address + (count << 7);
 }
 
 void DrawTextsItem(uint8_t* base, uint32_t frame, uint32_t movie, bool draw_only) {
   const double f26 = Lfs(base, kF26), f27 = Lfs(base, kF27), f28 = Lfs(base, kF28),
                f29 = Lfs(base, kF29), f30 = Lfs(base, kF30), f31 = Lfs(base, kF31);
-  const uint32_t item = frame + kDrawTextsItem;
-  const uint32_t params = frame + kDrawTextsParams;
-  const uint32_t node = guest::LoadU32(base, item);
+  const schema::UiMovieTextItem item(base, frame + kDrawTextsItem);
+  const schema::UiMovieTextParams p(base, frame + kDrawTextsParams);
+  const uint32_t node = item.node();
   // The item's matrix (+16) to +304, the origin (0, 0, 0, f31) at +96, the
   // item's color (+84) at +240 and its clip rectangle (+100) at +256; the
   // origin transformed in place.
-  CopyBytes(base, frame + 304, item + 16, 64);
+  CopyBytes(base, frame + 304, item.matrix_address(), 64);
   Stfs(base, frame + 96, f30);
   Stfs(base, frame + 100, f30);
   Stfs(base, frame + 104, f30);
   Stfs(base, frame + 108, f31);
-  CopyBytes(base, frame + 240, item + 84, 16);
-  CopyBytes(base, frame + 256, item + 100, 16);
+  CopyBytes(base, frame + 240, item.red_address(), 16);
+  CopyBytes(base, frame + 256, item.clip_0_address(), 16);
   debug::Vec4Transform(base, frame + 96, frame + 304, frame + 96);
   // The node: the matrix's scale (+28, +32) and the clip rectangle (+40).
   const uint32_t clip[4] = {guest::LoadU32(base, frame + 256), guest::LoadU32(base, frame + 260),
@@ -116,12 +122,12 @@ void DrawTextsItem(uint8_t* base, uint32_t frame, uint32_t movie, bool draw_only
   // The draw parameters: the position, the color and alpha, the layout.
   const double item_alpha = Lfs(base, frame + 252);
   const double red_scale = Lfs(base, frame + 240);
-  guest::StoreU32(base, params + 0, uint32_t(Fctiwz(Lfs(base, frame + 96))));
+  p.set_x(uint32_t(Fctiwz(Lfs(base, frame + 96))));
   const double alpha = Single(Lfs(base, node + 68) * item_alpha);
   const int64_t red = int32_t(guest::LoadU32(base, node + 56));
   const int64_t green = int32_t(guest::LoadU32(base, node + 60));
   const int64_t blue = int32_t(guest::LoadU32(base, node + 64));
-  guest::StoreU32(base, params + 4, uint32_t(Fctiwz(Lfs(base, frame + 100))));
+  p.set_y(uint32_t(Fctiwz(Lfs(base, frame + 100))));
   StoreU64(base, frame + 288, uint64_t(red));
   StoreU64(base, frame + 272, uint64_t(green));
   StoreU64(base, frame + 280, uint64_t(blue));
@@ -133,47 +139,47 @@ void DrawTextsItem(uint8_t* base, uint32_t frame, uint32_t movie, bool draw_only
   r = Single(r * red_scale);
   g = Single(g * Lfs(base, frame + 244));
   b = Single(b * Lfs(base, frame + 248));
-  guest::StoreU32(base, params + 68, uint32_t(text_x));
-  guest::StoreU32(base, params + 72, uint32_t(Fctiwz(Lfs(base, node + 104))));
-  guest::StoreU32(base, params + 76, guest::LoadU32(base, node + 124));
+  p.set_gap(uint32_t(text_x));
+  p.set_unknown_72(uint32_t(Fctiwz(Lfs(base, node + 104))));
+  p.set_unknown_76(guest::LoadU32(base, node + 124));
   r = Single(r * f28);
   g = Single(g * f28);
   b = Single(b * f28);
-  guest::StoreU32(base, params + 80, guest::LoadU32(base, node + 128));
+  p.set_unknown_80(guest::LoadU32(base, node + 128));
   const int64_t red_byte = Fctidz(r);
-  guest::StoreU32(base, params + 84, uint32_t(Fctiwz(Lfs(base, node + 116))));
+  p.set_unknown_84(uint32_t(Fctiwz(Lfs(base, node + 116))));
   const int64_t green_byte = Fctidz(g);
-  guest::StoreU32(base, params + 88, uint32_t(Fctiwz(Lfs(base, node + 120))));
+  p.set_unknown_88(uint32_t(Fctiwz(Lfs(base, node + 120))));
   const int64_t blue_byte = Fctidz(b);
   guest::StoreU32(base, frame + 84, uint32_t(red_byte));
-  guest::StoreU32(base, params + 8, guest::LoadU32(base, node + 20));
-  guest::StoreU32(base, params + 12, guest::LoadU32(base, node + 24));
-  Stfs(base, params + 24, alpha);
+  p.set_origin_x(guest::LoadU32(base, node + 20));
+  p.set_origin_y(guest::LoadU32(base, node + 24));
+  Stfs(base, p.alpha_address(), alpha);
   guest::StoreU32(base, frame + 80, uint32_t(green_byte));
-  guest::StoreU8(base, params + 20, uint8_t(red_byte));
+  p.set_red(uint8_t(red_byte));
   guest::StoreU32(base, frame + 88, uint32_t(blue_byte));
-  guest::StoreU8(base, params + 21, uint8_t(green_byte));
-  guest::StoreU8(base, params + 22, uint8_t(blue_byte));
-  Stfs(base, params + 28, Lfs(base, node + 28));
-  Stfs(base, params + 32, Lfs(base, node + 32));
+  p.set_green(uint8_t(green_byte));
+  p.set_blue(uint8_t(blue_byte));
+  Stfs(base, p.scale_x_address(), Lfs(base, node + 28));
+  Stfs(base, p.scale_y_address(), Lfs(base, node + 32));
   const double angle = Lfs(base, node + 36);
-  guest::StoreU32(base, params + 64, 24);
-  Stfs(base, params + 16, angle);
+  p.set_unknown_64(24);
+  Stfs(base, p.angle_address(), angle);
   const uint32_t layer = guest::LoadU32(base, node + 72);
-  Stfs(base, params + 36, f31);
-  guest::StoreU8(base, params + 92, 128);
-  Stfs(base, params + 40, f31);
-  guest::StoreU8(base, params + 93, 128);
-  Stfs(base, params + 104, f31);
-  guest::StoreU8(base, params + 94, 128);
-  guest::StoreU32(base, params + 116, layer);
+  Stfs(base, p.glyph_scale_x_address(), f31);
+  p.set_unknown_92(128);
+  Stfs(base, p.glyph_scale_y_address(), f31);
+  p.set_unknown_93(128);
+  Stfs(base, p.unknown_104_address(), f31);
+  p.set_unknown_94(128);
+  p.set_layer(layer);
   for (uint32_t k = 0; k < 4; k++) {
-    guest::StoreU32(base, params + 44 + 4 * k, guest::LoadU32(base, node + 40 + 4 * k));
+    guest::StoreU32(base, p.clip_0_address() + 4 * k, guest::LoadU32(base, node + 40 + 4 * k));
   }
-  Stfs(base, params + 96, f27);
-  Stfs(base, params + 100, f27);
-  guest::StoreU32(base, params + 112, 0);
-  guest::StoreU32(base, params + 120, guest::LoadU32(base, node + 108));
+  Stfs(base, p.unknown_96_address(), f27);
+  Stfs(base, p.unknown_100_address(), f27);
+  p.set_unknown_112(0);
+  p.set_text_id(guest::LoadU32(base, node + 108));
   // The alignment from the node's flags (+76): bit 0 left (0), bit 1 (1),
   // bit 3 (3), else 2; bit 4 (with none of the others) also sets the glyph
   // scales to f26.
@@ -188,14 +194,14 @@ void DrawTextsItem(uint8_t* base, uint32_t frame, uint32_t movie, bool draw_only
   } else if (flags & 0x8) {
     alignment = 3;
   } else if (flags & 0x10) {
-    Stfs(base, params + 36, f26);
-    Stfs(base, params + 40, f26);
+    Stfs(base, p.glyph_scale_x_address(), f26);
+    Stfs(base, p.glyph_scale_y_address(), f26);
   }
-  guest::StoreU32(base, params + 60, alignment);
+  p.set_alignment(alignment);
   // A scrolling text's x, its counter stepped unless only drawing.
   if (TextField(base, movie, guest::LoadU32(base, node + 108), 4) != 0) {
-    const double x = ScrollOffset(base, movie, params);
-    guest::StoreU32(base, params + 0, uint32_t(Fctiwz(x)));
+    const double x = ScrollOffset(base, movie, p.address);
+    p.set_x(uint32_t(Fctiwz(x)));
     if (!draw_only) {
       AdvanceTextScroll(base, movie, guest::LoadU32(base, node + 108));
     }

@@ -10,8 +10,6 @@ namespace title_screen {
 
 namespace {
 
-constexpr uint32_t kControllers = 0x826BABA4;
-constexpr uint32_t kMapperEntries = 0x826BAB80;
 constexpr uint32_t kPressedSlot = 40;  // the mapper's slot 10
 
 struct DebugPageSpec {
@@ -56,16 +54,16 @@ namespace {
 uint64_t DebugPage(uint8_t* base, uint32_t which, uint64_t r3, uint32_t sp, const Calls& calls) {
   const DebugPageSpec& spec = kPages[which];
   const uint32_t frame = Frame(base, sp, 96);
-  const uint32_t entry = kMapperEntries + (Load(base, kControllers) << 3);
+  const uint32_t entry = G::mapper_entries_address() + (Load(base, G::controllers_address()) << 3);
   if (int32_t(Load(base, entry + 4)) == 1) {
     return r3;
   }
   const uint32_t mapper = Load(base, entry);
   r3 = calls.Call(Load(base, Load(base, mapper) + kPressedSlot), frame, spec.lr, mapper, 159);
   if ((r3 & 0xFF) != 0) {
-    Store(base, Load(base, kLoadBlock) + 8, spec.transition);
-    Store(base, Load(base, kLoadBlock) + 12, kNone);
-    Store(base, Load(base, kLoadBlock) + 16, 0);
+    G::load_block(base).set_transition(spec.transition);
+    G::load_block(base).set_page(kNone);
+    G::load_block(base).set_transition_started(0);
   }
   return r3;
 }
@@ -73,18 +71,18 @@ uint64_t DebugPage(uint8_t* base, uint32_t which, uint64_t r3, uint32_t sp, cons
 uint64_t DebugStep(uint8_t* base, uint32_t which, uint32_t started, uint32_t sp) {
   const DebugStepSpec& spec = kSteps[which];
   Frame(base, sp, spec.frame);
-  if (Load(base, started) == 0) {
-    Store(base, Load(base, kLoadBlock) + 4, 0);
-    Store(base, started, 1);
+  if (Started(base, started).started() == 0) {
+    G::load_block(base).set_tick_count(0);
+    Started(base, started).set_started(1);
   }
-  const uint32_t block = Load(base, kLoadBlock);
-  Store(base, block + 4, Load(base, block + 4) + 1);
-  const uint32_t now = Load(base, kLoadBlock);
-  if (int32_t(Load(base, now + 4)) > spec.limit) {
-    Store(base, now + 8, spec.transition);
-    Store(base, Load(base, kLoadBlock) + 12, spec.page);
+  const auto block = G::load_block(base);
+  block.set_tick_count(block.tick_count() + 1);
+  const auto now = G::load_block(base);
+  if (int32_t(now.tick_count()) > spec.limit) {
+    now.set_transition(spec.transition);
+    G::load_block(base).set_page(spec.page);
     if (spec.reset) {
-      Store(base, started, 0);
+      Started(base, started).set_started(0);
     }
   }
   // The original's r3: the debug print's first argument.

@@ -10,6 +10,7 @@
 
 #include "base/log.h"
 #include "hooks/lifted_call.h"
+#include "schema/sound_cues.h"
 
 namespace sound_cues {
 
@@ -52,9 +53,9 @@ uint32_t CheckedBegin(uint8_t* base, uint32_t manager, uint32_t end, uint32_t i)
 uint64_t AudioEngineDoWork(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t engine) {
   ITC_NATIVE_RUNNING("sub_8259D1A8 AudioEngine::DoWork");
   // A tail call: slot +16 of the XACT engine (+8), from this stack pointer.
-  const uint32_t xact = guest::LoadU32(base, engine + 8);
-  const uint32_t work = guest::LoadU32(base, guest::LoadU32(base, xact) + 16);
-  return lifted_call::Call(base, work, sp, r13, {xact}).r3;
+  const schema::XactEngine xact = schema::AudioEngine(base, engine).xact_engine();
+  const uint32_t work = xact.vtable().do_work();
+  return lifted_call::Call(base, work, sp, r13, {xact.address}).r3;
 }
 
 uint64_t ManagerFreeReleasedBanks(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t manager) {
@@ -71,13 +72,13 @@ uint64_t ManagerFreeReleasedBanks(uint8_t* base, uint32_t sp, uint64_t r13, uint
       break;
     }
     // Each read of an element re-reads the vector and checks the index.
-    if (guest::LoadU32(base, CheckedBegin(base, manager, end, i) + offset) == 0) {
+    if (!schema::BankPairSlot(base, CheckedBegin(base, manager, end, i) + offset).pair()) {
       continue;
     }
     const uint32_t pair_begin =
         CheckedBegin(base, manager, guest::LoadU32(base, manager + kBanksEnd), i);
     r3 = lifted_call::Call(base, kCanFree, frame, r13,
-                           {guest::LoadU32(base, pair_begin + offset)})
+                           {schema::BankPairSlot(base, pair_begin + offset).pair().address})
              .r3;
     if ((r3 & 0xFF) == 0) {
       continue;
@@ -111,8 +112,8 @@ uint64_t ManagerUpdateSounds(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t 
   // (list, node) built on the frame as the original does, the result (the
   // function) left at +80.
   const uint32_t list = manager + kSounds;
-  const uint32_t head = guest::LoadU32(base, list + 4);
-  const uint32_t first = guest::LoadU32(base, head);
+  const uint32_t head = schema::SoundList(base, list).head().address;
+  const uint32_t first = schema::SoundListNode(base, head).next().address;
   guest::StoreU32(base, frame + 88, list);
   guest::StoreU32(base, frame + 80, list);
   guest::StoreU32(base, frame + 84, head);

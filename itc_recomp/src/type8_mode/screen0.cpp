@@ -15,6 +15,9 @@
 #include "guest.h"
 #include "race_screens/race_screens.h"
 #include "save_data/save_data.h"
+#include "schema/game_modes.h"
+#include "schema/menu_helpers.h"
+#include "schema/type8_mode.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
@@ -25,13 +28,22 @@ namespace {
 using guest::LoadU32;
 using guest::StoreU32;
 
+using S = schema::Type8Screen0;
+using Stand = schema::Type8StandBlock;
+using Pages = schema::PageObject;
+using Machine = schema::StateMachine;
+using G = schema::Type8ModeGlobals;
+
 constexpr uint32_t kMinusOne = 0xFFFFFFFF;
-constexpr uint32_t kVtable = 0x82010B74;
 constexpr uint32_t kFinishAll = 0x8211DFF8;
 constexpr uint32_t kOperatorDelete = 0x825A70E8;
 constexpr uint32_t kListInit = 0x8220BAC0;
-constexpr uint32_t kModeBefore = 0x826032E0;
-constexpr uint32_t kList = 9680;
+
+// The menu list's r3 (the screen's r3 plus the list's offset, as the
+// original's addi on the whole register).
+uint64_t ListR3(uint8_t* base, uint64_t r3) {
+  return r3 + S(base, 0).menu_list_address();
+}
 
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   const uint32_t frame = sp - bytes;
@@ -80,46 +92,51 @@ uint32_t Texture(uint8_t* base, uint32_t movie, uint32_t child, uint32_t texture
 
 uint64_t Screen0Construct(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8223D2F0 Type8Screen0::Type8Screen0");
-  const uint32_t screen = uint32_t(r3);
+  const S s(base, uint32_t(r3));
   Frame(base, sp, 96);
-  boot_mode::ScreenMachineConstruct(base, screen + 4);
-  StoreU32(base, screen + 0, kVtable);
-  StoreU32(base, screen + 9748, 0);
-  StoreU32(base, screen + 9740, 0);
-  for (const uint32_t block : {screen + 9752, screen + 9772}) {
-    StoreU32(base, block + 0, 0);
-    StoreU32(base, block + 12, kMinusOne);
-    StoreU32(base, block + 8, kMinusOne);
-    StoreU32(base, block + 4, kMinusOne);
-    StoreU32(base, block + 16, 0);
+  boot_mode::ScreenMachineConstruct(base, s.machine_address());
+  s.set_vtable(S::kVtable);
+  // The MenuList's +68 (enabled) and +60 (player), left for its area.
+  StoreU32(base, s.menu_list_address() + 68, 0);
+  StoreU32(base, s.menu_list_address() + 60, 0);
+  for (const uint32_t at : {s.stand_0_address(), s.stand_1_address()}) {
+    const Stand block(base, at);
+    block.set_loading_shown(0);
+    block.set_loaded_anim(kMinusOne);
+    block.set_loading_loop_anim(kMinusOne);
+    block.set_loading_start_anim(kMinusOne);
+    block.set_model_made(0);
   }
-  StoreU32(base, screen + 9752, 0);
-  StoreU32(base, screen + 9768, 0);
-  StoreU32(base, screen + 9788, 0);
-  StoreU32(base, screen + 9772, 0);
-  StoreU32(base, screen + 9756, 45);
-  StoreU32(base, screen + 9760, 44);
-  StoreU32(base, screen + 9764, 46);
-  StoreU32(base, screen + 9644, 1);
-  StoreU32(base, screen + 9776, 48);
-  StoreU32(base, screen + 9780, 47);
-  StoreU32(base, screen + 9784, 49);
+  const Stand stand0(base, s.stand_0_address()), stand1(base, s.stand_1_address());
+  stand0.set_loading_shown(0);
+  stand0.set_model_made(0);
+  stand1.set_model_made(0);
+  stand1.set_loading_shown(0);
+  stand0.set_loading_start_anim(45);
+  stand0.set_loading_loop_anim(44);
+  stand0.set_loaded_anim(46);
+  s.set_menu_input(1);
+  stand1.set_loading_start_anim(48);
+  stand1.set_loading_loop_anim(47);
+  stand1.set_loaded_anim(49);
   return r3;
 }
 
 uint64_t Screen0Destruct(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
                          const ScreenCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8223BF00 Type8Screen0::~Type8Screen0");
-  StoreU32(base, uint32_t(r3), kVtable);
-  return type67_screens::ReleaseList(base, r3 + kList, sp, lr, calls);
+  const S s(base, uint32_t(r3));
+  s.set_vtable(S::kVtable);
+  return type67_screens::ReleaseList(base, ListR3(base, r3), sp, lr, calls);
 }
 
 uint64_t Screen0DeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
                                  const ScreenCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8223C528 Type8Screen0::DeletingDestructor");
   const uint32_t frame = Frame(base, sp, 112);
-  StoreU32(base, uint32_t(r3), kVtable);
-  type67_screens::ReleaseList(base, r3 + kList, frame, 0x8223C558, calls);
+  const S s(base, uint32_t(r3));
+  s.set_vtable(S::kVtable);
+  type67_screens::ReleaseList(base, ListR3(base, r3), frame, 0x8223C558, calls);
   if ((flags & 1) != 0) {
     const uint64_t args[6] = {r3, 0, 0, 0, 0, 0};
     calls.call_set(kOperatorDelete, args, 1, frame, 0x8223C568);
@@ -129,29 +146,31 @@ uint64_t Screen0DeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uin
 
 uint64_t Screen0OnEnter(uint8_t* base, uint64_t r3, uint32_t sp, const ScreenCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8223B630 Type8Screen0::OnEnter");
-  const uint32_t screen = uint32_t(r3);
+  const S s(base, uint32_t(r3));
+  const Pages pages(base, s.pages_address());
   const uint32_t frame = Frame(base, sp, 144);
   StoreU32(base, frame + 92, 158);
   StoreU32(base, frame + 84, 159);
-  StoreU32(base, screen + 9648, kMinusOne);
-  StoreU32(base, screen + 9644, 1);
-  StoreU32(base, screen + 9656, 0);
-  StoreU32(base, screen + 9652, 0);
-  StoreU32(base, screen + 9660, 0);
-  StoreU32(base, screen + 9672, kMinusOne);
-  StoreU32(base, screen + 9664, kMinusOne);
-  StoreU32(base, screen + 9676, 0);
-  const uint32_t list = screen + kList;
+  s.set_dialog_answer(kMinusOne);
+  s.set_menu_input(1);
+  pages.set_next_page(0);
+  pages.set_page(0);
+  pages.set_previous_page(0);
+  pages.set_unknown_20(kMinusOne);
+  pages.set_step(kMinusOne);
+  pages.set_step_started(0);
+  const uint32_t list = s.menu_list_address();
   const save_data::MenuListArgs args{5, 5, 1, 154, 153, 155, 156, 159, 158};
   if (calls.native_heap && save_data::MenuListInitNative(base, list)) {
     save_data::MenuListInit(base, list, args);
   } else {
-    const uint64_t regs[8] = {r3 + kList, 5, 5, 1, 154, 153, 155, 156};
+    const uint64_t regs[8] = {ListR3(base, r3), 5, 5, 1, 154, 153, 155, 156};
     calls.call8(kListInit, regs, frame, 0x8223B6A4);
   }
   race_screens::ListSetSelection(base, list, 0);
-  StoreU32(base, screen + 9608, LoadU32(base, screen + 9616) != 0 ? 1 : 9);
-  return r3 + kList;
+  const Machine machine(base, s.machine_address());
+  machine.set_state(machine.reenter() != 0 ? 1 : 9);
+  return ListR3(base, r3);
 }
 
 uint64_t Screen0OpenMovie(uint32_t sp, uint32_t lr, const ScreenCalls& calls) {
@@ -161,29 +180,29 @@ uint64_t Screen0OpenMovie(uint32_t sp, uint32_t lr, const ScreenCalls& calls) {
 
 uint64_t Screen0WaitForMovie(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8223B6D8 Type8Screen0::WaitForMovie");
-  const uint32_t screen = uint32_t(r3);
+  const Machine machine(base, S(base, uint32_t(r3)).machine_address());
   Frame(base, sp, 96);
-  if (LoadU32(base, screen + 9612) != 0) {
+  if (machine.loaded() != 0) {
     return r3;
   }
   const uint64_t loaded = ui_movies::IsLoaded(base, 24);
   if (uint32_t(loaded) == 0) {
     return loaded;
   }
-  StoreU32(base, screen + 9612, 1);
-  StoreU32(base, screen + 9608, LoadU32(base, kModeBefore) == 1 ? 4 : 9);
+  machine.set_loaded(1);
+  machine.set_state(G::mode_before(base) == 1 ? 4 : 9);
   return loaded;
 }
 
 uint64_t Screen0Suspend(uint8_t* base, uint64_t r3, uint32_t sp, const ScreenCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8223B540 Type8Screen0::Suspend");
-  const uint32_t screen = uint32_t(r3);
+  const S s(base, uint32_t(r3));
   const uint32_t frame = Frame(base, sp, 96);
-  if (LoadU32(base, screen + 9620) == 0) {
+  if (s.delete_movie() == 0) {
     return r3;
   }
   const uint64_t result = calls.remove(24, frame, 0x8223B568);
-  StoreU32(base, screen + 9612, 0);
+  Machine(base, s.machine_address()).set_loaded(0);
   return result;
 }
 
@@ -199,7 +218,7 @@ uint64_t Screen0Pick(uint8_t* base, uint64_t r3, uint32_t answer) {
       ITC_NATIVE_RUNNING("sub_8223B5B0 Type8Screen0::PickBack");
       break;
   }
-  StoreU32(base, uint32_t(r3) + 9648, answer);
+  S(base, uint32_t(r3)).set_dialog_answer(answer);
   return r3;
 }
 
@@ -237,9 +256,9 @@ uint64_t Screen0ShowPage(uint8_t* base, uint64_t a, uint64_t b, uint32_t sp) {
 
 uint64_t Screen0OnDialogClosed(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8223C098 Type8Screen0::OnDialogClosed");
-  const uint32_t screen = uint32_t(r3);
-  const uint32_t answer = LoadU32(base, screen + 9648);
-  StoreU32(base, screen + 9644, 1);
+  const S s(base, uint32_t(r3));
+  const uint32_t answer = s.dialog_answer();
+  s.set_menu_input(1);
   if (answer == 1) {
     return r3;
   }
@@ -263,64 +282,66 @@ uint64_t Screen0Leave(uint8_t* base, uint32_t dispatcher, uint32_t sp,
 uint64_t Screen0OnLeft(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
                        const ScreenCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8223B588 Type8Screen0::OnLeft");
-  return type67_screens::ReleaseList(base, r3 + kList, sp, lr, calls);
+  return type67_screens::ReleaseList(base, ListR3(base, r3), sp, lr, calls);
 }
 
 uint64_t Screen0Confirm(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
                         const ScreenCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8223C430 Type8Screen0::Confirm");
-  const uint32_t screen = uint32_t(r3);
+  const S s(base, uint32_t(r3));
   const uint32_t frame = Frame(base, sp, 128);
   const uint32_t movie = MovieAt(base, frame, 16);
   calls.set_text(frame, 0x8223C474, movie, kMinusOne, 0, 27);
   calls.set_text(frame, 0x8223C488, movie, 1, 3, 2);
   calls.set_text(frame, 0x8223C49C, movie, 1, 4, 3);
   StoreU32(base, movie + 40960, 1);
-  StoreU32(base, kDialogPlayer, 0);
+  G::set_dialog_player(base, 0);
   Post(base, dispatcher, 7);
-  StoreU32(base, screen + 9648, kMinusOne);
-  StoreU32(base, screen + 9644, 0);
+  s.set_dialog_answer(kMinusOne);
+  s.set_menu_input(0);
   return Screen0ShowPage(base, 1, 1, frame);
 }
 
 uint64_t Screen0ConfirmPage(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_8223B5C0 Type8Screen0::ConfirmPage");
-  const uint32_t screen = uint32_t(r3);
-  const uint32_t answer = LoadU32(base, screen + 9648);
+  const S s(base, uint32_t(r3));
+  const Pages pages(base, s.pages_address());
+  const uint32_t answer = s.dialog_answer();
   if (answer == 0 || answer == 2) {
-    const uint32_t page = LoadU32(base, screen + 9652);
+    const uint32_t page = pages.page();
     if (page != 0) {
-      StoreU32(base, screen + 9660, page);
+      pages.set_previous_page(page);
     }
-    StoreU32(base, screen + 9664, kMinusOne);
-    StoreU32(base, screen + 9652, 0);
-    StoreU32(base, screen + 9668, kMinusOne);
-    StoreU32(base, screen + 9648, kMinusOne);
+    pages.set_step(kMinusOne);
+    pages.set_page(0);
+    pages.set_queued_step(kMinusOne);
+    s.set_dialog_answer(kMinusOne);
   } else if (answer == 1) {
-    const uint32_t page = LoadU32(base, screen + 9652);
+    const uint32_t page = pages.page();
     if (page != 3) {
-      StoreU32(base, screen + 9660, page);
+      pages.set_previous_page(page);
     }
-    StoreU32(base, screen + 9664, 3);
-    StoreU32(base, screen + 9668, kMinusOne);
-    StoreU32(base, screen + 9656, 3);
-    StoreU32(base, screen + 9652, kMinusOne);
+    pages.set_step(3);
+    pages.set_queued_step(kMinusOne);
+    pages.set_next_page(3);
+    pages.set_page(kMinusOne);
   }
   return r3;
 }
 
 uint64_t Screen0ChosenPage(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8223C0C0 Type8Screen0::ChosenPage");
-  const uint32_t screen = uint32_t(r3);
+  const S s(base, uint32_t(r3));
+  const Machine machine(base, s.machine_address());
   const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t selection = race_screens::ListSelection(base, screen + kList);
+  const uint32_t selection = race_screens::ListSelection(base, s.menu_list_address());
   static constexpr uint32_t kMessages[4] = {16, 14, 19, 21};
   if (selection >= 4) {
     const uint64_t result = Screen0ShowPage(base, 0, 0, frame);
-    StoreU32(base, screen + 9608, 6);
+    machine.set_state(6);
     return result;
   }
-  StoreU32(base, screen + 9608, 9);
+  machine.set_state(9);
   Post(base, dispatcher, kMessages[selection], true);
   return selection;
 }
@@ -342,9 +363,9 @@ uint64_t Screen0PlaceCursor(uint8_t* base, uint64_t item, uint32_t sp) {
 uint64_t Screen0Draw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
                      const ScreenCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8223C888 Type8Screen0::Draw");
-  constexpr uint32_t kTable = 0x82814E94, kGuard = 0x82814EB4;
+  constexpr uint32_t kTable = G::page_table_address();
   const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t guard = LoadU32(base, kGuard);
+  const uint32_t guard = G::page_table_guard(base);
   if ((guard & 1) == 0) {
     StoreU32(base, frame + 80, 0x8223C6B8);   // MenuPage
     StoreU32(base, frame + 88, 0x8223B5C0);   // ConfirmPage
@@ -354,12 +375,12 @@ uint64_t Screen0Draw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
     StoreU32(base, frame + 100, 0);
     StoreU32(base, frame + 108, 0);
     StoreU32(base, frame + 104, 0x8223C0C0);  // ChosenPage
-    StoreU32(base, kGuard, guard | 1);
+    G::set_page_table_guard(base, guard | 1);
     for (uint32_t i = 0; i < 8; i++) {
       StoreU32(base, kTable + 4 * i, LoadU32(base, frame + 80 + 4 * i));
     }
   }
-  const uint32_t page = LoadU32(base, uint32_t(r3) + 9652);
+  const uint32_t page = Pages(base, S(base, uint32_t(r3)).pages_address()).page();
   if (page == kMinusOne) {
     return r3;
   }

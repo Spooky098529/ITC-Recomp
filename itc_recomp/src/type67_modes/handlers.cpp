@@ -6,6 +6,7 @@
 // (lfs, stfs) as the originals move them.
 
 #include "type67_modes/type67_modes.h"
+#include "type67_modes/views.h"
 
 #include "base/log.h"
 #include "guest.h"
@@ -22,6 +23,7 @@ namespace {
 
 using guest::LoadU32;
 using guest::StoreU32;
+using G = schema::Type6Type7ModesGlobals;
 
 // A float word through a float register and back (lfs, stfs).
 uint32_t ThroughFloat(uint8_t* base, uint32_t address) {
@@ -101,14 +103,15 @@ uint64_t GarageStageResetPose(uint8_t* base, uint64_t r3, uint32_t sp) {
 
 uint64_t CameraPresetConstruct(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8217BE08 CameraPreset::CameraPreset");
-  const uint32_t preset = uint32_t(r3);
+  const schema::CameraPreset preset(base, uint32_t(r3));
   const uint32_t zero = ThroughFloat(base, kZero);
   const uint32_t one = ThroughFloat(base, kOne);
   ScratchVectors(base, sp, zero, one, zero);
-  for (uint32_t offset = 4; offset <= 12; offset += 4) {
-    StoreU32(base, preset + offset, zero);
-  }
-  CopyWords(base, preset + 16, sp - 48, 12);
+  StoreU32(base, preset.elevation_address(), zero);
+  StoreU32(base, preset.value_8_address(), zero);
+  StoreU32(base, preset.value_12_address(), zero);
+  // The three vectors (+16, +32, +48), twelve words.
+  CopyWords(base, preset.vector_16_address(), sp - 48, 12);
   return r3;
 }
 
@@ -124,13 +127,11 @@ uint64_t CameraPresetCopy(uint8_t* base, uint32_t source, uint32_t sp) {
 
 namespace {
 
-constexpr uint32_t kPresets = 296;
-constexpr uint32_t kPresetCount = 296 + 4096;
-
-bool PresetsArePages(uint8_t* base, uint32_t camera) {
-  const uint32_t count = LoadU32(base, camera + kPresetCount);
+bool PresetsArePages(uint8_t* base, uint32_t address) {
+  const schema::GarageCamera camera(base, address);
+  const uint32_t count = camera.preset_count();
   for (uint32_t i = 0; i < count; i++) {
-    if (!memory::IsPages(LoadU32(base, camera + kPresets + 4 * i))) {
+    if (!memory::IsPages(LoadU32(base, camera.presets_address() + 4 * i))) {
       return false;
     }
   }
@@ -138,11 +139,11 @@ bool PresetsArePages(uint8_t* base, uint32_t camera) {
 }
 
 uint64_t FreePresets(uint8_t* base, uint64_t r3) {
-  const uint32_t camera = uint32_t(r3);
-  while (LoadU32(base, camera + kPresetCount) != 0) {
-    const uint32_t count = LoadU32(base, camera + kPresetCount) - 1;
-    StoreU32(base, camera + kPresetCount, count);
-    r3 = Free(LoadU32(base, camera + kPresets + 4 * count));
+  const schema::GarageCamera camera(base, uint32_t(r3));
+  while (camera.preset_count() != 0) {
+    const uint32_t count = camera.preset_count() - 1;
+    camera.set_preset_count(count);
+    r3 = Free(LoadU32(base, camera.presets_address() + 4 * count));
   }
   return r3;
 }
@@ -163,23 +164,25 @@ std::optional<uint64_t> GarageCameraOnPresetsLoaded(uint8_t* base, uint32_t data
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_8217FBE8 GarageCamera::OnPresetsLoaded");
-  uint32_t count = LoadU32(base, data + 4);
-  uint32_t record = LoadU32(base, data + 8) + data;
+  const schema::GaragePresetsData loaded(base, data);
+  const schema::GarageCamera cam(base, camera);
+  uint32_t count = loaded.count();
+  uint32_t record = loaded.records_offset() + data;
   while (count != 0) {
     const uint32_t copy = uint32_t(CameraPresetCopy(base, record, sp - 128));
-    const uint32_t presets = LoadU32(base, camera + kPresetCount);
+    const uint32_t presets = cam.preset_count();
     count--;
-    record += 64;
-    StoreU32(base, camera + kPresetCount, presets + 1);
-    StoreU32(base, camera + kPresets + 4 * presets, copy);
+    record += schema::CameraPreset::kSize;
+    cam.set_preset_count(presets + 1);
+    StoreU32(base, cam.presets_address() + 4 * presets, copy);
   }
-  StoreU32(base, camera + 0, 1);
+  cam.set_set_up(1);
   return Free(data);
 }
 
 std::optional<uint64_t> StandSlotFree(uint8_t* base, uint64_t r3) {
-  const uint32_t slot = uint32_t(r3);
-  const uint32_t block = LoadU32(base, slot);
+  const schema::StandSlot slot(base, uint32_t(r3));
+  const uint32_t block = slot.stage<schema::View>().address;
   if (block == 0) {
     ITC_NATIVE_RUNNING("sub_821800B0 StandSlot::Free");
     return r3;
@@ -189,8 +192,8 @@ std::optional<uint64_t> StandSlotFree(uint8_t* base, uint64_t r3) {
   }
   ITC_NATIVE_RUNNING("sub_821800B0 StandSlot::Free");
   FreePresets(base, block + 112);
-  const uint64_t freed = Free(LoadU32(base, slot));
-  StoreU32(base, slot, 0);
+  const uint64_t freed = Free(slot.stage<schema::View>().address);
+  slot.set_stage(0u);
   return freed;
 }
 
@@ -198,61 +201,71 @@ std::optional<uint64_t> StandSlotFree(uint8_t* base, uint64_t r3) {
 
 uint64_t ControllerOptionsOnEnter(uint8_t* base, uint32_t machine) {
   ITC_NATIVE_RUNNING("sub_821BB120 ControllerOptions::OnEnter");
-  StoreU32(base, machine + 9608, 1);
-  const uint32_t data = Pages(68);
-  StoreU32(base, kControllerData, data);
-  StoreU32(base, data + 12, 0);
-  StoreU32(base, data + 16, 6);
-  for (const uint32_t offset : {20, 0, 4, 8, 40, 48, 52, 36, 64, 24, 28, 32}) {
-    StoreU32(base, data + offset, 0);
-  }
-  StoreU32(base, LoadU32(base, kControllerData) + 64, 1);
-  const uint32_t page = Pages(28);
-  StoreU32(base, kControllerPage, page);
-  for (const uint32_t offset : {4, 0, 8, 24}) {
-    StoreU32(base, page + offset, 0);
-  }
-  StoreU32(base, page + 20, kMinusOne);
-  StoreU32(base, page + 12, kMinusOne);
-  return page;
+  schema::ControllerOptions(base, machine).set_loaded(1);
+  const schema::FrontEndMenu menu(base, Pages(68));
+  G::set_controller_menu(base, menu);
+  menu.set_first_item(0);
+  menu.set_last_item(6);
+  menu.set_wraps(0);
+  menu.set_cursor(0);
+  menu.set_previous(0);
+  menu.set_moved(0);
+  menu.set_wrapped(0);
+  menu.set_visible_row(0);
+  menu.set_previous_row(0);
+  menu.set_side(0);
+  menu.set_player(0);
+  menu.set_up_down_locked(0);
+  menu.set_left_right_steps(0);
+  menu.set_shoulders_step(0);
+  G::controller_menu(base).set_player(1);
+  const schema::PageObject page(base, Pages(28));
+  G::set_controller_page(base, page);
+  page.set_next_page(0);
+  page.set_page(0);
+  page.set_previous_page(0);
+  page.set_step_started(0);
+  page.set_unknown_20(kMinusOne);
+  page.set_step(kMinusOne);
+  return page.address;
 }
 
 std::optional<uint64_t> ControllerOptionsOnLeft(uint8_t* base) {
-  if (!AllPages({LoadU32(base, kControllerData), LoadU32(base, kControllerPage)})) {
+  if (!AllPages({G::controller_menu(base).address, G::controller_page(base).address})) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_821BB1F8 ControllerOptions::OnLeft");
-  Free(LoadU32(base, kControllerData));
-  const uint64_t r3 = Free(LoadU32(base, kControllerPage));
-  StoreU32(base, kControllerData, 0);
-  StoreU32(base, kControllerPage, 0);
+  Free(G::controller_menu(base).address);
+  const uint64_t r3 = Free(G::controller_page(base).address);
+  G::set_controller_menu(base, 0u);
+  G::set_controller_page(base, 0u);
   return r3;
 }
 
 uint64_t ControllerOptionsShow(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_821BB260 ControllerOptions::Show");
-  const uint32_t page = LoadU32(base, kControllerPage);
-  const uint32_t current = LoadU32(base, page + 0);
+  const schema::PageObject page = G::controller_page(base);
+  const uint32_t current = page.page();
   if (current != kMinusOne) {
-    StoreU32(base, page + 8, current);
+    page.set_previous_page(current);
   }
-  StoreU32(base, page + 0, kMinusOne);
-  StoreU32(base, page + 12, kMinusOne);
-  StoreU32(base, page + 16, kMinusOne);
+  page.set_page(kMinusOne);
+  page.set_step(kMinusOne);
+  page.set_queued_step(kMinusOne);
   return r3;
 }
 
 uint64_t ControllerOptionsOpen(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_821BC660 ControllerOptions::Open");
-  StoreU32(base, uint32_t(r3) + 9604, 4);
+  schema::ControllerOptions(base, uint32_t(r3)).set_state(4);
   return r3;
 }
 
 uint64_t ControllerOptionsLeave(uint8_t* base, uint64_t r3, uint32_t dispatcher) {
   ITC_NATIVE_RUNNING("sub_821BFB48 ControllerOptions::Leave");
-  StoreU32(base, uint32_t(r3) + 9604, 7);
+  schema::ControllerOptions(base, uint32_t(r3)).set_state(7);
   uint32_t message;
-  switch (int32_t(LoadU32(base, kModeType))) {
+  switch (int32_t(G::mode_type(base))) {
     case 2:
     case 4:
     case 6:
@@ -274,14 +287,14 @@ uint64_t ControllerOptionsLeave(uint8_t* base, uint64_t r3, uint32_t dispatcher)
 
 uint64_t ControllerOptionsStepSliders(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_821BB290 ControllerOptions::StepSliders");
-  const uint32_t menu = LoadU32(base, kControllerData);
-  const int32_t side = int32_t(LoadU32(base, menu + 36));
-  const uint32_t cursor = LoadU32(base, menu + 0);
+  const schema::FrontEndMenu menu = G::controller_menu(base);
+  const int32_t side = menu.side();
+  const uint32_t cursor = menu.cursor();
   if ((side != -1 && side != 1) || cursor >= 3) {
     return 0;
   }
   // The sliders (-10 to 10) at +272 to +280: no change at a bound.
-  const uint32_t settings = LoadU32(base, kControllerSettings);
+  const uint32_t settings = G::controller_settings<schema::View>(base).address;
   const uint32_t field = settings + 272 + 4 * cursor;
   const int32_t value = int32_t(LoadU32(base, field));
   if (side == -1 ? value <= -10 : value >= 10) {
@@ -297,14 +310,14 @@ uint64_t ControllerOptionsStepSide(uint8_t* base, uint32_t offset, uint32_t last
   } else {
     ITC_NATIVE_RUNNING("sub_821BB590 ControllerOptions::StepAnalog");
   }
-  const uint32_t menu = LoadU32(base, kControllerData);
-  const uint32_t side = LoadU32(base, menu + 36);
-  const uint32_t cursor = LoadU32(base, menu + 0);
-  StoreU32(base, LoadU32(base, kControllerSettings) + offset, 0);
+  const schema::FrontEndMenu menu = G::controller_menu(base);
+  const uint32_t side = uint32_t(menu.side());
+  const uint32_t cursor = menu.cursor();
+  StoreU32(base, G::controller_settings<schema::View>(base).address + offset, 0);
   if (side != kMinusOne && side != 1) {
     return 0;
   }
-  StoreU32(base, LoadU32(base, kControllerSettings) + offset, side);
+  StoreU32(base, G::controller_settings<schema::View>(base).address + offset, side);
   return cursor == last ? 0 : 1;
 }
 
@@ -337,26 +350,26 @@ uint64_t PanelScreenInitWords(uint8_t* base, uint64_t r3) {
 
 uint64_t ScreenMachineWait(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_82277068 ScreenMachine::Wait");
-  StoreU32(base, uint32_t(r3) + 9604, 9);
+  schema::ScreenMachine(base, uint32_t(r3)).set_state(9);
   return r3;
 }
 
 uint64_t ScreenWait(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_822508F0 Screen::Wait");
-  StoreU32(base, uint32_t(r3) + 9608, 9);
+  schema::Type67OffsetScreen(base, uint32_t(r3)).set_state(9);
   return r3;
 }
 
 uint64_t DialogQueueReopen(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_822419D0 Type7Dialog::QueueReopen");
-  StoreU32(base, uint32_t(r3) + 9748, 1);
+  schema::Type67Dialog(base, uint32_t(r3)).set_reopen(1);
   return r3;
 }
 
 uint64_t ScreenReenter(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_8223B740 Screen::Reenter");
-  const uint32_t screen = uint32_t(r3);
-  StoreU32(base, screen + 9608, int32_t(LoadU32(base, screen + 9612)) != 0 ? 4 : 1);
+  const schema::Type67OffsetScreen screen(base, uint32_t(r3));
+  screen.set_state(int32_t(screen.loaded()) != 0 ? 4 : 1);
   return r3;
 }
 
@@ -366,7 +379,7 @@ uint64_t DialogShown(uint8_t* base, uint64_t r3, uint32_t shown) {
   } else {
     ITC_NATIVE_RUNNING("sub_822419C0 Type7Dialog::Shown");
   }
-  StoreU32(base, uint32_t(r3) + shown, 0);
+  SetDialogStatus(schema::Type67Dialog(base, uint32_t(r3)), shown != 9756, 0);
   return r3;
 }
 
@@ -376,31 +389,41 @@ uint64_t DialogOnEnter(uint8_t* base, uint64_t r3, uint32_t shown) {
   } else {
     ITC_NATIVE_RUNNING("sub_82241A08 Type7Dialog::OnEnter");
   }
-  const uint32_t dialog = uint32_t(r3);
-  for (const uint32_t offset : {9608, 9644, 9640, 9648}) {
-    StoreU32(base, dialog + offset, 0);
-  }
-  StoreU32(base, dialog + 9660, kMinusOne);
-  StoreU32(base, dialog + 9652, kMinusOne);
-  StoreU32(base, dialog + 9664, 0);
-  StoreU32(base, dialog + 9752, 0);
-  StoreU32(base, dialog + 9680, 0);
-  StoreU32(base, dialog + 9684, 1);
-  StoreU32(base, dialog + 9688, 1);
-  for (const uint32_t offset :
-       {9668, 9672, 9676, 9708, 9716, 9720, 9704, 9732, 9692, 9696, 9700, 9736}) {
-    StoreU32(base, dialog + offset, 0);
-  }
-  StoreU32(base, dialog + 9740, 21);
-  StoreU32(base, dialog + 9744, 0);
-  const uint32_t open = LoadU32(base, dialog + 9612);
-  StoreU32(base, dialog + 9748, 0);
+  const schema::Type67Dialog dialog(base, uint32_t(r3));
+  const bool type7 = shown != 9756;
+  dialog.set_loaded(0);
+  dialog.set_next_page(0);
+  dialog.set_page(0);
+  dialog.set_previous_page(0);
+  dialog.set_page_word_20(kMinusOne);
+  dialog.set_step(kMinusOne);
+  dialog.set_step_started(0);
+  dialog.set_is_notice(0);
+  dialog.set_menu_first_item(0);
+  dialog.set_menu_last_item(1);
+  dialog.set_menu_wraps(1);
+  dialog.set_menu_cursor(0);
+  dialog.set_menu_previous(0);
+  dialog.set_menu_moved(0);
+  dialog.set_menu_wrapped(0);
+  dialog.set_menu_visible_row(0);
+  dialog.set_menu_previous_row(0);
+  dialog.set_menu_side(0);
+  dialog.set_menu_player(0);
+  dialog.set_menu_up_down_locked(0);
+  dialog.set_menu_left_right_steps(0);
+  dialog.set_menu_shoulders_step(0);
+  dialog.set_unknown_9736(0);
+  dialog.set_queued_state(21);
+  dialog.set_movie(0);
+  const uint32_t open = dialog.reenter();
+  dialog.set_reopen(0);
   if (int32_t(open) != 0) {
-    StoreU32(base, dialog + 9604, 1);
-    StoreU32(base, dialog + shown, kMinusOne);
+    dialog.set_state(1);
+    SetDialogStatus(dialog, type7, kMinusOne);
   } else {
-    StoreU32(base, dialog + 9604, 9);
-    StoreU32(base, dialog + shown, 3);
+    dialog.set_state(9);
+    SetDialogStatus(dialog, type7, 3);
   }
   return r3;
 }
@@ -411,11 +434,11 @@ uint64_t DialogWaitForMovies(uint8_t* base, uint64_t r3, uint32_t shown) {
   } else {
     ITC_NATIVE_RUNNING("sub_82242388 Type7Dialog::WaitForMovies");
   }
-  const uint32_t dialog = uint32_t(r3);
-  if (int32_t(LoadU32(base, dialog + 9608)) != 0) {
-    StoreU32(base, dialog + 9736, 1);
-    StoreU32(base, dialog + 9604, 9);
-    StoreU32(base, dialog + shown, 3);
+  const schema::Type67Dialog dialog(base, uint32_t(r3));
+  if (int32_t(dialog.loaded()) != 0) {
+    dialog.set_unknown_9736(1);
+    dialog.set_state(9);
+    SetDialogStatus(dialog, shown != 9756, 3);
     return r3;
   }
   for (uint32_t id = 16; id <= 19; id++) {
@@ -424,7 +447,7 @@ uint64_t DialogWaitForMovies(uint8_t* base, uint64_t r3, uint32_t shown) {
       return r3;
     }
   }
-  StoreU32(base, dialog + 9608, 1);
+  dialog.set_loaded(1);
   return r3;
 }
 
@@ -434,43 +457,50 @@ uint64_t Screen0OnEnter(uint8_t* base, uint32_t screen, uint32_t d, uint32_t ite
   } else {
     ITC_NATIVE_RUNNING("sub_82243F58 Type7Screen0::OnEnter");
   }
-  const uint32_t s = screen + d;
-  StoreU32(base, s + 9640, Pages(76));
-  StoreU32(base, s + 9644, Pages(28));
+  const Screen0View s(base, screen, d != 0);
+  s.set_words(Pages(76));
+  s.set_pages(Pages(28));
   const uint32_t list = Pages(68);
-  const uint32_t page = LoadU32(base, s + 9644);
-  StoreU32(base, s + 9648, list);
-  if (page != 0) {
-    for (const uint32_t offset : {4, 0, 8}) {
-      StoreU32(base, page + offset, 0);
-    }
-    StoreU32(base, page + 20, kMinusOne);
-    StoreU32(base, page + 12, kMinusOne);
-    StoreU32(base, page + 24, 0);
+  const schema::PageObject page = s.pages();
+  s.set_menu(list);
+  if (page) {
+    page.set_next_page(0);
+    page.set_page(0);
+    page.set_previous_page(0);
+    page.set_unknown_20(kMinusOne);
+    page.set_step(kMinusOne);
+    page.set_step_started(0);
   }
-  const uint32_t menu = LoadU32(base, s + 9640);
-  StoreU32(base, menu + 72, kMinusOne);
-  StoreU32(base, menu + 68, 0);
-  StoreU32(base, menu + 0, 0);
-  const uint32_t l = LoadU32(base, s + 9648);
-  StoreU32(base, s + 9652, 0);
-  StoreU32(base, l + 12, 0);
-  StoreU32(base, l + 16, items);
-  StoreU32(base, l + 20, 1);
-  for (const uint32_t offset : {0, 4, 8, 40, 44, 48, 52, 56}) {
-    StoreU32(base, l + offset, 0);
-  }
-  StoreU32(base, l + 60, items + 1);
-  for (const uint32_t offset : {36, 64, 24, 28, 32}) {
-    StoreU32(base, l + offset, 0);
-  }
-  StoreU32(base, s + 9604, int32_t(LoadU32(base, s + 9612)) != 0 ? 1 : 9);
+  const schema::Type67Screen0Words words = s.words();
+  words.set_pick(kMinusOne);
+  words.set_unknown_68(0);
+  words.set_loading_shown(0);
+  const schema::FrontEndMenu l = s.menu();
+  s.set_item_picked(0);
+  l.set_first_item(0);
+  l.set_last_item(items);
+  l.set_wraps(1);
+  l.set_cursor(0);
+  l.set_previous(0);
+  l.set_moved(0);
+  l.set_wrapped(0);
+  l.set_list_wrapped(0);
+  l.set_visible_row(0);
+  l.set_previous_row(0);
+  l.set_first_row(0);
+  l.set_rows_shown(items + 1);
+  l.set_side(0);
+  l.set_player(0);
+  l.set_up_down_locked(0);
+  l.set_left_right_steps(0);
+  l.set_shoulders_step(0);
+  s.set_state(int32_t(s.reenter()) != 0 ? 1 : 9);
   return list;
 }
 
 std::optional<uint64_t> Screen0OnLeft(uint8_t* base, uint32_t screen, uint32_t d) {
-  const uint32_t s = screen + d;
-  if (!AllPages({LoadU32(base, s + 9640), LoadU32(base, s + 9644), LoadU32(base, s + 9648)})) {
+  const Screen0View s(base, screen, d != 0);
+  if (!AllPages({s.words().address, s.pages().address, s.menu().address})) {
     return std::nullopt;
   }
   if (d == 0) {
@@ -478,12 +508,12 @@ std::optional<uint64_t> Screen0OnLeft(uint8_t* base, uint32_t screen, uint32_t d
   } else {
     ITC_NATIVE_RUNNING("sub_82243E08 Type7Screen0::OnLeft");
   }
-  Free(LoadU32(base, s + 9640));
-  Free(LoadU32(base, s + 9644));
-  const uint64_t r3 = Free(LoadU32(base, s + 9648));
-  StoreU32(base, s + 9640, 0);
-  StoreU32(base, s + 9644, 0);
-  StoreU32(base, s + 9648, 0);
+  Free(s.words().address);
+  Free(s.pages().address);
+  const uint64_t r3 = Free(s.menu().address);
+  s.set_words(0);
+  s.set_pages(0);
+  s.set_menu(0);
   return r3;
 }
 
@@ -493,14 +523,14 @@ uint64_t Screen0WaitForMovie(uint8_t* base, uint64_t r3, uint32_t d) {
   } else {
     ITC_NATIVE_RUNNING("sub_82244080 Type7Screen0::WaitForMovie");
   }
-  const uint32_t s = uint32_t(r3) + d;
-  if (int32_t(LoadU32(base, s + 9608)) != 0) {
-    StoreU32(base, s + 9604, 9);
+  const Screen0View s(base, uint32_t(r3), d != 0);
+  if (int32_t(s.loaded()) != 0) {
+    s.set_state(9);
     return r3;
   }
   const uint32_t loaded = ui_movies::IsLoaded(base, 22);
   if (int32_t(loaded) != 0) {
-    StoreU32(base, s + 9608, 1);
+    s.set_loaded(1);
   }
   return loaded;
 }
@@ -513,21 +543,21 @@ uint64_t Screen0Pick(uint8_t* base, uint64_t r3, uint32_t menu, uint32_t pick) {
   } else {
     ITC_NATIVE_RUNNING("sub_822339A0 Type6Screen0::PickNo");
   }
-  StoreU32(base, LoadU32(base, uint32_t(r3) + menu) + 72, pick);
+  Screen0View(base, uint32_t(r3), menu == 9644).words().set_pick(pick);
   return r3;
 }
 
 uint64_t Type6Screen0GoOn(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_822339C0 Type6Screen0::GoOn");
-  const uint32_t page = LoadU32(base, uint32_t(r3) + 9644);
-  const uint32_t current = LoadU32(base, page + 0);
+  const schema::PageObject page = schema::Type6Screen0(base, uint32_t(r3)).pages();
+  const uint32_t current = page.page();
   if (current != 3) {
-    StoreU32(base, page + 8, current);
+    page.set_previous_page(current);
   }
-  StoreU32(base, page + 12, 3);
-  StoreU32(base, page + 16, kMinusOne);
-  StoreU32(base, page + 4, 3);
-  StoreU32(base, page + 0, kMinusOne);
+  page.set_step(3);
+  page.set_queued_step(kMinusOne);
+  page.set_next_page(3);
+  page.set_page(kMinusOne);
   return r3;
 }
 

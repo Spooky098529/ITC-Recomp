@@ -11,6 +11,8 @@
 #include "guest.h"
 #include "mode_tick/mode_tick.h"
 #include "save_data/save_data.h"
+#include "schema/car_list.h"
+#include "schema/type8_screens.h"
 #include "screen_constructors/screen_constructors.h"
 
 namespace type8_screens {
@@ -23,6 +25,7 @@ using guest::StoreU16;
 using guest::StoreU32;
 
 namespace ts = type67_screens;
+using G = schema::Type8ScreensGlobals;
 
 constexpr uint32_t kGarageCarReset = 0x82110448;
 constexpr uint32_t kMemcpy = 0x825A7410;
@@ -41,9 +44,10 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
 uint64_t Construct(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_822386F0 Type8PanelScreen::Type8PanelScreen");
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 224);
+  const schema::Type8PanelScreen s(base, screen);
   screen_constructors::MachineScreen(base, screen);
-  const uint32_t group = screen + kGroup;
-  StoreU32(base, screen + 0, kScreenVtable);
+  const uint32_t group = s.group_address();
+  s.set_vtable(kScreenVtable);
   for (uint32_t player = 0; player < 2; player++) {
     Panel8FConstruct(base, screen + kPanelsF[player], player, group, frame);
     Panel8EConstruct(base, screen + kPanelsE[player], player, group, frame);
@@ -53,7 +57,7 @@ uint64_t Construct(uint8_t* base, uint64_t r3, uint32_t sp) {
   }
   PanelGroup8Construct(base, group, 4, frame);
   // PanelSetPair's constructor: r4 to r10, then its stack words.
-  const uint32_t pair = screen + kCarList;
+  const uint32_t pair = s.pair_address();
   StoreU32(base, frame + 108, group);
   StoreU32(base, frame + 100, screen + kConfirms[1]);
   StoreU32(base, frame + 92, screen + kConfirms[0]);
@@ -61,48 +65,51 @@ uint64_t Construct(uint8_t* base, uint64_t r3, uint32_t sp) {
   car_list::PairConstruct(base, pair, screen + kPanelsF[0], screen + kPanelsF[1],
                           screen + kPanelsE[0], screen + kPanelsE[1], screen + kPanelsD[0],
                           screen + kPanelsD[1], screen + kPanelsC[0], frame);
-  const uint32_t holder = screen + kHolder;
+  const uint32_t holder = s.group_holder_address();
   ts::SingleGroupConstruct(base, holder, group);
-  StoreU32(base, screen + 11256, 11);
-  StoreU32(base, screen + 11260, 4);
-  StoreU32(base, screen + 9644, pair);
-  StoreU32(base, screen + 9648, holder);
-  StoreU32(base, screen + 9652, 1);
-  StoreU32(base, screen + 11264, 376);
-  StoreU32(base, screen + 11268, 354);
-  StoreU32(base, screen + 11396, 0);
-  StoreU32(base, screen + 13368, 1);
-  StoreU32(base, pair + 1920, 0);
-  StoreU32(base, pair + 3892, 0);
-  StoreU32(base, pair + 1924, 0);
-  StoreU32(base, pair + 3896, 0);
-  StoreU32(base, screen + 13236, 360);
-  StoreU32(base, screen + 13240, 359);
-  StoreU32(base, screen + 13244, 361);
-  StoreU32(base, screen + 15208, 363);
-  StoreU32(base, screen + 15212, 362);
-  StoreU32(base, screen + 15216, 364);
-  for (const uint32_t at : {15228u, 15232u, 15236u, 15240u, 9656u}) {
-    StoreU32(base, screen + at, 0);
-  }
-  StoreU32(base, screen + 15244, 0xFFFFFFFFu);
-  StoreU32(base, screen + 15248, 0);
+  s.set_player_node(11);
+  s.set_player_child(4);
+  s.set_car_list(pair);
+  s.set_holder(holder);
+  s.set_opens_itself(1);
+  s.set_open_anim(376);
+  s.set_loop_anim(354);
+  s.set_list0_page_menu_player(0);
+  s.set_list1_page_menu_player(1);
+  s.set_list0_rows_shown(0);
+  s.set_list1_rows_shown(0);
+  s.set_list0_unknown_1920(0);
+  s.set_list1_unknown_1920(0);
+  s.set_list0_busy_anim_a(360);
+  s.set_list0_busy_anim_b(359);
+  s.set_list0_busy_anim_done(361);
+  s.set_list1_busy_anim_a(363);
+  s.set_list1_busy_anim_b(362);
+  s.set_list1_busy_anim_done(364);
+  s.set_message2_got(0);
+  s.set_load_asked(0);
+  s.set_opening_played(0);
+  s.set_loaded_this_visit(0);
+  s.set_draw_mode(0);
+  s.set_dialog_answer(0xFFFFFFFFu);
+  s.set_unknown_15248(0);
   return r3;
 }
 
 uint64_t Destruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82238368 Type8PanelScreen::~Type8PanelScreen");
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 112);
-  StoreU32(base, screen + 0, kScreenVtable);
+  const schema::Type8PanelScreen s(base, screen);
+  s.set_vtable(kScreenVtable);
   ts::GroupPairDestruct(base, r3 + kHolder);
   car_list::PairDestruct(base, r3 + kCarList, frame, CarListCalls(calls));
   car_list::GroupBaseDestruct(base, r3 + kGroup);
-  StoreU32(base, screen + kConfirms[1], kEmptyBaseVtable);
+  s.set_confirm1_vtable(kEmptyBaseVtable);
   archive::NodeDestruct(base, screen + kPanelsD[1]);
   car_list::CarPanelBaseDestruct(base, r3 + kPanelsC[1]);
   // The E panels' destructor is the empty sub_82106540.
   archive::NodeDestruct(base, screen + kPanelsF[1]);
-  StoreU32(base, screen + kConfirms[0], kEmptyBaseVtable);
+  s.set_confirm0_vtable(kEmptyBaseVtable);
   archive::NodeDestruct(base, screen + kPanelsD[0]);
   car_list::CarPanelBaseDestruct(base, r3 + kPanelsC[0]);
   archive::NodeDestruct(base, screen + kPanelsF[0]);
@@ -124,19 +131,20 @@ uint64_t DeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t s
 uint64_t PickCar(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82238C88 Type8PanelScreen::PickCar");
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 160);
+  const schema::Type8PanelScreen s(base, screen);
   for (uint32_t player = 0; player < 2; player++) {
-    // The car list base's words from its +236 (r30 in the original).
-    const uint32_t words = screen + 11512 + kGarageCarBytes * player;
-    const uint32_t car = kGarageCars + kGarageCarBytes * player;
-    const uint32_t step = LoadU32(base, words + 4) + LoadU32(base, words + 0);
-    const uint32_t entries = LoadU32(base, words + 1584);
+    // The player's car list base (r30 in the original its +236).
+    const schema::PanelSetBase list(base, s.pair_address() + 4 + kGarageCarBytes * player);
+    const uint32_t car = G::garage_cars_address() + kGarageCarBytes * player;
+    const uint32_t step = list.scroll() + list.row();
+    const uint32_t entries = list.current_list().address;
     const uint32_t id = LoadU32(base, LoadU32(base, entries + (step << 2)) + 8432);
     // GarageCar::Reset sets r4 before reading it: only r3 passed.
     const uint64_t reset[6] = {car, 0, 0, 0, 0, 0};
     calls.call_set(kGarageCarReset, reset, 1, frame, 0x82238CD4);
-    const uint32_t tab = LoadU32(base, words - 4);
+    const uint32_t tab = list.tab();
     if (tab < 2) {
-      const uint32_t index = LoadU32(base, words + 12) + LoadU32(base, words + 8);
+      const uint32_t index = list.color_scroll() + list.color();
       career::CarSetModelAndClass(base, car, id, frame);
       const uint16_t half = uint16_t(index);
       if (LoadU16(base, car + 4) == 0xFFFF) {
@@ -163,11 +171,11 @@ uint64_t PickCar(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
       StoreU32(base, car + kCarBytes, 1);
     }
   }
-  const uint32_t passes = LoadU32(base, kFadeOutPasses);
+  const uint32_t passes = G::fade_out_passes(base);
   mode_tick::ScreenFadesFadeOut(base, passes, 0, 0, 0, 0);
   calls.set_r4(0);
-  StoreU32(base, screen + 15240, 0);
-  StoreU32(base, screen + 9656, 2);
+  s.set_loaded_this_visit(0);
+  s.set_draw_mode(2);
   return passes;
 }
 

@@ -288,7 +288,6 @@ namespace race_overlays {
 
 namespace {
 
-
 // fctiwz as the translated code does it: NaN gives 0x80000000, values from
 // INT_MAX up INT_MAX, the rest truncated (0x80000000 below INT_MIN).
 int32_t Fctiwz(double value) {
@@ -595,9 +594,6 @@ namespace {
 
 using Fpscr = ::base::FloatMode;
 
-constexpr uint32_t kTrailTail = 64132;
-constexpr uint32_t kTrailLast = 64144;
-
 // A guest vector as the translated code holds it (word 0 in the top lane),
 // from four words.
 simde__m128 VectorOf(uint32_t w0, uint32_t w1, uint32_t w2, uint32_t w3) {
@@ -832,11 +828,6 @@ bool TrailAddPoint(uint8_t* base, uint32_t trail, uint32_t position, double spee
 
 namespace race_overlays {
 
-namespace {
-
-
-}  // namespace
-
 bool ParticlesBEmit(uint8_t* base, uint32_t effect, uint32_t position, double a,
                     uint32_t* result, double* sine) {
   ITC_NATIVE_RUNNING("sub_8212B4A8 ParticlesB::Emit");
@@ -1041,12 +1032,6 @@ namespace race_overlays {
 
 namespace {
 
-constexpr uint32_t kSparksStreak = 28928;
-constexpr uint32_t kSparksHead = 28932;
-constexpr uint32_t kSparksCount = 28940;
-constexpr uint32_t kSparksSpread = 28944;
-constexpr uint32_t kSparksPosition = 28960;
-constexpr uint32_t kSparksStreaking = 28976;
 constexpr uint32_t kSparksBytes = 144;
 
 // The 16 bytes at `to` (rounded down to 16) plus those at `from` (rounded
@@ -1179,8 +1164,6 @@ void SparksUpdateStreak(uint8_t* base, uint32_t sparks, double speed,
 namespace race_overlays {
 
 namespace {
-
-constexpr uint32_t kSparksEmitHead = 28936;
 
 // fctiwz of a float word, as the original's lfs, fctiwz, stfiwx.
 uint32_t FloatToInt(uint8_t* base, uint32_t address) {
@@ -1397,9 +1380,6 @@ namespace race_overlays {
 
 namespace {
 
-constexpr uint32_t kSmokeHead = 32532;
-constexpr uint32_t kSmokeCount = 32536;
-constexpr uint32_t kSmokeVelocity = 32544;
 constexpr uint32_t kSmokeBytes = 720;
 
 }  // namespace
@@ -1617,11 +1597,6 @@ bool EmitSmoke(uint8_t* base, uint32_t overlays, double rate, double speed, uint
 }  // namespace race_overlays
 
 namespace race_overlays {
-
-namespace {
-
-
-}  // namespace
 
 void OverlayConstruct(uint8_t* base, uint32_t overlay) {
   ITC_NATIVE_RUNNING("sub_82126498 Overlay::Overlay");
@@ -2123,7 +2098,6 @@ void SparksConstruct(uint8_t* base, uint32_t sparks) {
 
 namespace {
 
-
 constexpr uint32_t kParticleConstructor = 0x8212B3D0;  // Particle::Particle
 constexpr uint32_t kEmptyDestructor = 0x82106540;      // blr
 
@@ -2226,9 +2200,6 @@ void ParticlesBReset(uint8_t* base, uint32_t particles) {
 namespace race_overlays {
 
 namespace {
-
-constexpr uint32_t kSmokeOldest = 32528;  // the oldest emitter (Smoke::Emit adds at +32,532)
-constexpr uint32_t kSmokeRegionOn = 32624;
 
 // The index after `index` modulo `capacity` (divw, then the remainder, as
 // the originals do it).
@@ -2362,9 +2333,6 @@ namespace race_overlays {
 
 namespace {
 
-constexpr uint32_t kParticlesBOldest = 2768;  // the oldest entry (ParticlesB::Emit adds at +2,772)
-constexpr uint32_t kParticlesBCount = 2776;
-constexpr uint32_t kParticlesBMoved = 2800;
 constexpr uint32_t kParticlesBBytes = 176;
 
 // A single from guest memory times `factor` (fmuls), the single's NaN kept,
@@ -2490,17 +2458,6 @@ bool ParticlesBUpdate(uint8_t* base, uint32_t effect) {
 }  // namespace race_overlays
 
 namespace race_overlays {
-
-namespace {
-
-constexpr uint32_t kParticlesCPosition = 2672;
-constexpr uint32_t kParticlesCOldest = 2688;
-constexpr uint32_t kParticlesCNewest = 2692;
-constexpr uint32_t kParticlesCCount = 2696;
-constexpr uint32_t kParticlesCCapacity = 2700;
-constexpr uint32_t kParticlesCSpeed = 2704;
-
-}  // namespace
 
 bool ParticlesCUpdate(uint8_t* base, uint32_t effect, uint32_t* r3) {
   ITC_NATIVE_RUNNING("sub_8212C2F0 ParticlesC::Update");
@@ -3062,7 +3019,6 @@ void UpdateParticlesC(uint8_t* base, uint32_t overlays, uint32_t frame) {
 namespace race_overlays {
 
 namespace {
-
 
 constexpr uint32_t kSmokeEmitterBytes = 720;
 constexpr uint32_t kSmokeFrameCopies = 0x10000;  // more emitters than this: the original runs

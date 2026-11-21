@@ -12,10 +12,16 @@
 #include "models/xpr.h"
 #include "scene_loaders/objects.h"
 #include "scene_models/scene_models.h"
+#include "schema/scene_loaders.h"
 
 namespace scene_loaders {
 
 namespace {
+
+using G = schema::SceneLoadersGlobals;
+
+// A load slot's state (LoadSlot's +20; car-models.md's LoadSlot).
+constexpr uint32_t kSlotState = 20;
 
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
@@ -29,11 +35,6 @@ int32_t LoadS(uint8_t* base, uint32_t address) {
 
 // The guest views memcpy's override records copies into for the renderer.
 constexpr uint32_t kPhysical = 0xA0000000u;
-
-// The model set ([[object + offset] + 8]: 0 a, 1 b).
-uint32_t ModelSet(uint8_t* base, uint32_t object, uint32_t offset) {
-  return Load(base, Load(base, object + offset) + 8);
-}
 
 // Whether any of `count` slot states from `states` (24 bytes apart) is
 // loading.
@@ -53,8 +54,8 @@ bool AnyLoading(uint8_t* base, uint32_t states, uint32_t count) {
 uint32_t MakeA(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_820C3C40 ScenePools::MakeA");
   const uint32_t set = memory::AllocPages(kFirstSetBytes, 4096);
-  Store(base, kFirstSet, set);
-  Store(base, set + 4, 0);
+  G::set_first_set(base, set);
+  schema::ScenePools(base, set).set_state(0);
   return set;
 }
 
@@ -67,40 +68,46 @@ uint32_t AllocPages(uint8_t* base, uint32_t out, uint32_t size) {
 
 uint32_t CreateA(uint8_t* base, uint32_t set, uint32_t record, const CreateCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820C3FD8 ScenePools::CreateA");
-  Store(base, set + 4, 3);
-  Store(base, set + 8, Load(base, record + 0));
-  Store(base, set + 12, Load(base, record + 4));
-  const uint32_t pool0 = Load(base, set + 12);
-  Store(base, set + 16, Load(base, record + 8));
-  Store(base, set + 20, Load(base, record + 12) + Load(base, record + 16) + Load(base, record + 32));
-  Store(base, set + 24, Load(base, record + 16));
-  Store(base, set + 28, Load(base, record + 20));
-  Store(base, set + 32, Load(base, record + 24) + Load(base, record + 32) + Load(base, record + 28));
-  Store(base, set + 36, Load(base, record + 32) + Load(base, record + 28));
-  const uint32_t pool6 = Load(base, record + 32);
-  Store(base, set + 40, pool6);
-  uint32_t r3 = AllocPages(base, set + 52, (pool0 + pool6) * 80);
-  auto records = [&] { return int32_t((Load(base, set + 12) + Load(base, set + 40)) << 2); };
+  const schema::ScenePools s(base, set);
+  const schema::ScenePoolsCreateRecord rec(base, record);
+  s.set_state(3);
+  s.set_model_set(rec.model_set());
+  s.set_car_model_count(rec.car_models());
+  const uint32_t pool0 = s.car_model_count();
+  s.set_car_parts_count(rec.car_parts());
+  s.set_interior_count(rec.interiors() + rec.cockpits() + rec.traffic());
+  s.set_cockpit_count(rec.cockpits());
+  s.set_pool4_count(rec.pool4());
+  s.set_wheels_count(rec.wheels() + rec.traffic() + rec.extra_wheels());
+  s.set_unused_sum(rec.traffic() + rec.extra_wheels());
+  const uint32_t pool6 = rec.traffic();
+  s.set_traffic_count(pool6);
+  uint32_t r3 = AllocPages(base, s.deferred_releases_address(), (pool0 + pool6) * 80);
+  auto records = [&] { return int32_t((s.car_model_count() + s.traffic_count()) << 2); };
   for (int32_t i = 0; i < records(); i++) {
-    Store(base, Load(base, set + 52) + 20 * uint32_t(i) + 16, 0);
+    // A deferred release record's +16 (car-models.md's CarModelsDeferredRelease).
+    Store(base, Load(base, s.deferred_releases_address()) + 20 * uint32_t(i) + 16, 0);
   }
-  // The counts' offsets in the set, by pool.
-  static constexpr uint32_t kCounts[7] = {12, 16, 24, 20, 28, 32, 40};
+  // The counts in the set, by pool.
+  const uint32_t counts[7] = {s.car_model_count_address(), s.car_parts_count_address(),
+                              s.cockpit_count_address(),   s.interior_count_address(),
+                              s.pool4_count_address(),     s.wheels_count_address(),
+                              s.traffic_count_address()};
   using Construct = bool (*)(uint8_t*, uint32_t, uint32_t);
   static constexpr Construct kConstructs[7] = {CarModelConstruct, CarPartsConstruct,
                                                CockpitConstruct,  InteriorConstruct,
                                                Pool4Construct,    WheelsConstruct,
                                                TrafficConstruct};
   for (uint32_t pool = 0; pool < 7; pool++) {
-    const int32_t count = LoadS(base, set + kCounts[pool]);
-    const uint32_t list = set + 56 + 12 * pool;
+    const int32_t count = LoadS(base, counts[pool]);
+    const uint32_t list = s.pools_address() + 12 * pool;
     for (int32_t i = 0; i < count; i++) {
       const uint32_t object = memory::AllocPages(kPoolObjectBytes[pool], 4096);
       r3 = object;
       if (object != 0 && !kConstructs[pool](base, object, list)) {
         calls.construct(calls.user, pool, object, list);
       }
-      Store(base, object + 20, uint32_t(i));
+      schema::PoolNode(base, object).set_index(uint32_t(i));
     }
   }
   return r3;
@@ -110,55 +117,58 @@ uint32_t CreateA(uint8_t* base, uint32_t set, uint32_t record, const CreateCalls
 
 void PoolNodeConstruct(uint8_t* base, uint32_t node, uint32_t list) {
   ITC_NATIVE_RUNNING("sub_82594050 PoolNode::PoolNode");
-  Store(base, node + 4, list);
-  Store(base, node + 8, 0);
-  Store(base, node + 0, kPoolNodeVtable);
-  Store(base, node + 12, 0);
-  uint32_t owner;
-  if (Load(base, list + 0) == 0) {
-    Store(base, list + 0, node);
-    owner = Load(base, node + 4);
+  const schema::PoolNode n(base, node);
+  const schema::PoolList l(base, list);
+  n.set_list(list);
+  n.set_next(0);
+  n.set_vtable(kPoolNodeVtable);
+  n.set_previous(0);
+  schema::PoolList owner;
+  if (l.first().address == 0) {
+    l.set_first(node);
+    owner = n.list();
   } else {
-    Store(base, Load(base, list + 4) + 8, node);
-    owner = Load(base, node + 4);
-    Store(base, node + 12, Load(base, owner + 4));
+    l.last().set_next(node);
+    owner = n.list();
+    n.set_previous(owner.last().address);
   }
-  Store(base, owner + 4, node);
-  owner = Load(base, node + 4);
-  Store(base, owner + 8, Load(base, owner + 8) + 1);
+  owner.set_last(node);
+  owner = n.list();
+  owner.set_count(owner.count() + 1);
 }
 
 void PoolNodeDestruct(uint8_t* base, uint32_t node) {
   ITC_NATIVE_RUNNING("sub_825940B0 PoolNode::~PoolNode");
-  Store(base, node + 0, kPoolNodeVtable);
-  const uint32_t list = Load(base, node + 4);
-  if (list == 0) {
+  const schema::PoolNode n(base, node);
+  n.set_vtable(kPoolNodeVtable);
+  const schema::PoolList list = n.list();
+  if (list.address == 0) {
     return;
   }
-  const uint32_t previous = Load(base, node + 12);
-  if (previous == 0) {
-    if (Load(base, node + 8) == 0) {
+  const schema::PoolNode previous = n.previous();
+  if (previous.address == 0) {
+    if (n.next().address == 0) {
       // The only node.
-      Store(base, list + 0, 0);
-      Store(base, Load(base, node + 4) + 4, 0);
+      list.set_first(0);
+      n.list().set_last(0);
     } else {
       // The first node.
-      Store(base, list + 0, Load(base, node + 8));
-      Store(base, Load(base, Load(base, node + 4) + 0) + 12, 0);
+      list.set_first(n.next().address);
+      n.list().first().set_previous(0);
     }
   } else {
-    const uint32_t next = Load(base, node + 8);
-    if (next == 0) {
+    const schema::PoolNode next = n.next();
+    if (next.address == 0) {
       // The last node.
-      Store(base, list + 4, previous);
-      Store(base, Load(base, Load(base, node + 4) + 4) + 8, 0);
+      list.set_last(previous.address);
+      n.list().last().set_next(0);
     } else {
-      Store(base, previous + 8, next);
-      Store(base, Load(base, node + 8) + 12, Load(base, node + 12));
+      previous.set_next(next.address);
+      n.next().set_previous(n.previous().address);
     }
   }
-  const uint32_t owner = Load(base, node + 4);
-  Store(base, owner + 8, Load(base, owner + 8) - 1);
+  const schema::PoolList owner = n.list();
+  owner.set_count(owner.count() - 1);
 }
 
 // --- The loading objects' queries ---
@@ -173,12 +183,12 @@ uint32_t CarModelIsLoaded(uint8_t* base, uint32_t car_model) {
 
 uint32_t Pool4IsLoaded(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_820D6A08 Pool4Object::IsLoaded");
-  return LoadS(base, object + 100) == kSlotLoading ? 0 : 1;
+  return int32_t(schema::Pool4Object(base, object).slot_state()) == kSlotLoading ? 0 : 1;
 }
 
 bool Pool4SetRecord(uint8_t* base, uint32_t object, uint32_t record) {
   ITC_NATIVE_RUNNING("sub_820D6A60 Pool4Object::SetRecord");
-  const uint32_t to = object + 28;
+  const uint32_t to = schema::Pool4Object(base, object).record_address();
   if (to >= kPhysical) {
     return false;
   }
@@ -212,7 +222,8 @@ uint64_t PartsSlotOf(uint64_t r3, uint32_t kind, uint64_t base_slot, uint64_t ch
 uint32_t PartsPart(uint8_t* base, uint32_t parts, int32_t kind, uint32_t base_slot,
                    uint32_t choice) {
   ITC_NATIVE_RUNNING("sub_820D6E10 CarParts::Part");
-  const uint32_t set = ModelSet(base, parts, kPartsSet);
+  const schema::CarParts p(base, parts);
+  const uint32_t set = p.first_set().model_set();
   uint32_t slot;
   if (set == 0) {
     if (kind == 16) {
@@ -227,19 +238,20 @@ uint32_t PartsPart(uint8_t* base, uint32_t parts, int32_t kind, uint32_t base_sl
   } else {
     return 0;
   }
-  if (LoadS(base, parts + kSlotBytes * slot + kPartsStates) != kSlotArrived) {
+  if (LoadS(base, p.slots_address() + kSlotBytes * slot + kSlotState) != kSlotArrived) {
     return 0;
   }
-  return parts + kPartModelBytes * slot + kPartsModels;
+  return p.part_models_address() + kPartModelBytes * slot;
 }
 
 uint32_t PartsIsLoaded(uint8_t* base, uint32_t parts) {
   ITC_NATIVE_RUNNING("sub_820D7258 CarParts::IsLoaded");
-  const uint32_t set = ModelSet(base, parts, kPartsSet);
+  const schema::CarParts p(base, parts);
+  const uint32_t set = p.first_set().model_set();
   if (set > 1) {
     return 0;
   }
-  return AnyLoading(base, parts + kPartsStates, set == 0 ? kPartsCount : 17) ? 0 : 1;
+  return AnyLoading(base, p.slots_address() + kSlotState, set == 0 ? kPartsCount : 17) ? 0 : 1;
 }
 
 uint32_t PartWalkMaterials(uint8_t* base, uint32_t model) {
@@ -265,11 +277,12 @@ uint32_t PartWalkMaterials(uint8_t* base, uint32_t model) {
 
 uint32_t PartsWalkMaterials(uint8_t* base, uint32_t parts) {
   ITC_NATIVE_RUNNING("sub_820D6EB8 CarParts::WalkMaterials");
-  const uint32_t count = ModelSet(base, parts, kPartsSet) == 0 ? kPartsCount : 187;
+  const schema::CarParts p(base, parts);
+  const uint32_t count = p.first_set().model_set() == 0 ? kPartsCount : 187;
   uint32_t r3 = parts;
   for (uint32_t i = 0; i < count; i++) {
-    if (LoadS(base, parts + kPartsStates + kSlotBytes * i) == kSlotArrived) {
-      r3 = PartWalkMaterials(base, parts + kPartsModels + kPartModelBytes * i);
+    if (LoadS(base, p.slots_address() + kSlotState + kSlotBytes * i) == kSlotArrived) {
+      r3 = PartWalkMaterials(base, p.part_models_address() + kPartModelBytes * i);
     }
   }
   return r3;
@@ -277,23 +290,20 @@ uint32_t PartsWalkMaterials(uint8_t* base, uint32_t parts) {
 
 namespace {
 
-constexpr uint32_t kCockpitStates = 556;
-constexpr uint32_t kCockpitModels = 688;
-constexpr uint32_t kCockpitParts = 6;
-
 // The car parts' walk's count: 216 for set a, else 187.
 uint32_t PartsWalkCount(uint8_t* base, uint32_t parts) {
-  return ModelSet(base, parts, kPartsSet) == 0 ? kPartsCount : 187;
+  return schema::CarParts(base, parts).first_set().model_set() == 0 ? kPartsCount : 187;
 }
 
 }  // namespace
 
 uint64_t PartsApplyPalette(uint8_t* base, uint32_t parts, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_820D6F20 CarParts::ApplyPalette");
+  const schema::CarParts p(base, parts);
   const uint32_t count = PartsWalkCount(base, parts);
   for (uint32_t i = 0; i < count; i++) {
-    if (LoadS(base, parts + kPartsStates + kSlotBytes * i) == kSlotArrived) {
-      r3 = material_passes::ApplyPalette(base, parts + kPartsModels + kPartModelBytes * i,
+    if (LoadS(base, p.slots_address() + kSlotState + kSlotBytes * i) == kSlotArrived) {
+      r3 = material_passes::ApplyPalette(base, p.part_models_address() + kPartModelBytes * i,
                                          sp - 112);
     }
   }
@@ -303,10 +313,11 @@ uint64_t PartsApplyPalette(uint8_t* base, uint32_t parts, uint64_t r3, uint32_t 
 uint64_t PartsSetPaint(uint8_t* base, uint32_t parts, uint64_t r3, const uint64_t regs[6],
                        uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_820D7388 CarParts::SetPaint");
+  const schema::CarParts p(base, parts);
   const uint32_t count = PartsWalkCount(base, parts);
   for (uint32_t i = 0; i < count; i++) {
-    if (LoadS(base, parts + kPartsStates + kSlotBytes * i) == kSlotArrived) {
-      r3 = material_passes::SetPaint(base, parts + kPartsModels + kPartModelBytes * i, regs,
+    if (LoadS(base, p.slots_address() + kSlotState + kSlotBytes * i) == kSlotArrived) {
+      r3 = material_passes::SetPaint(base, p.part_models_address() + kPartModelBytes * i, regs,
                                      sp - 160);
     }
   }
@@ -333,24 +344,28 @@ uint64_t PaintSix(uint8_t* base, uint32_t states, uint32_t models_at, uint64_t r
 
 uint64_t CockpitApplyPalette(uint8_t* base, uint32_t cockpit, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_820D5FC8 Cockpit::ApplyPalette");
-  return PaintSix(base, cockpit + kCockpitStates, cockpit + kCockpitModels, r3, nullptr, sp);
+  const schema::Cockpit c(base, cockpit);
+  return PaintSix(base, c.part_slot_state_address(), c.part_models_address(), r3, nullptr, sp);
 }
 
 uint64_t CockpitSetPaint(uint8_t* base, uint32_t cockpit, uint64_t r3, const uint64_t regs[6],
                          uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_820D6328 Cockpit::SetPaint");
-  return PaintSix(base, cockpit + kCockpitStates, cockpit + kCockpitModels, r3, regs, sp);
+  const schema::Cockpit c(base, cockpit);
+  return PaintSix(base, c.part_slot_state_address(), c.part_models_address(), r3, regs, sp);
 }
 
 uint64_t InteriorApplyPalette(uint8_t* base, uint32_t interior, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_820D7690 Interior::ApplyPalette");
-  return PaintSix(base, interior + 180, interior + 304, r3, nullptr, sp);
+  const schema::Interior in(base, interior);
+  return PaintSix(base, in.part_slot_state_address(), in.part_models_address(), r3, nullptr, sp);
 }
 
 uint64_t InteriorSetPaint(uint8_t* base, uint32_t interior, uint64_t r3, const uint64_t regs[6],
                           uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_820D7840 Interior::SetPaint");
-  return PaintSix(base, interior + 180, interior + 304, r3, regs, sp);
+  const schema::Interior in(base, interior);
+  return PaintSix(base, in.part_slot_state_address(), in.part_models_address(), r3, regs, sp);
 }
 
 uint64_t TrafficApplyPalette(uint8_t* base, uint32_t traffic, uint64_t r3, uint32_t sp) {
@@ -381,10 +396,11 @@ uint32_t AccessoriesAllLoaded(uint8_t* base, uint32_t set) {
 
 uint32_t InteriorIsLoaded(uint8_t* base, uint32_t interior) {
   ITC_NATIVE_RUNNING("sub_820D7790 Interior::IsLoaded");
-  const uint32_t set = ModelSet(base, interior, 3092);
+  const schema::Interior in(base, interior);
+  const uint32_t set = in.first_set().model_set();
   uint32_t loaded = 0;
   if (set <= 1) {
-    loaded = AnyLoading(base, interior + 180, 6) ? 0 : 1;
+    loaded = AnyLoading(base, in.part_slot_state_address(), 6) ? 0 : 1;
   }
   if (AccessoriesAllLoaded(base, scene_models::Accessories(base)) == 0) {
     loaded = 0;
@@ -398,11 +414,13 @@ uint32_t NameMatches(uint8_t* base, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_820CE800 NameMatches");
   auto length = [&](uint32_t s) {
     uint32_t n = 0;
-    while (guest::LoadU8(base, s + n) != 0) {
+    while (guest::LoadU8(base, schema::SceneLoadersName(base, s).text_address() + n) != 0) {
       n++;
     }
     return int32_t(n);
   };
+  const schema::SceneLoadersName name_a(base, a);
+  const schema::SceneLoadersName name_b(base, b);
   const int32_t count = length(a);
   if (count != length(b)) {
     return 0;
@@ -412,8 +430,8 @@ uint32_t NameMatches(uint8_t* base, uint32_t a, uint32_t b) {
     return int8_t(c + c_runtime::ToUpperStep(c));
   };
   for (int32_t i = 0; i < count; i++) {
-    const int8_t ca = upper(guest::LoadU8(base, a + uint32_t(i)));
-    const int8_t cb = upper(guest::LoadU8(base, b + uint32_t(i)));
+    const int8_t ca = upper(guest::LoadU8(base, name_a.text_address() + uint32_t(i)));
+    const int8_t cb = upper(guest::LoadU8(base, name_b.text_address() + uint32_t(i)));
     if (ca != '*' && cb != '*' && ca != cb) {
       return 0;
     }

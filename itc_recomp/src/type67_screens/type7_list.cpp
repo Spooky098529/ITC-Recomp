@@ -19,6 +19,7 @@
 #include "car_list/car_list.h"
 #include "car_specs/car_specs.h"
 #include "guest.h"
+#include "schema/type67_screens.h"
 #include "menu_sounds/menu_sounds.h"
 #include "native/buffers.h"
 #include "race_screens/race_screens.h"
@@ -37,6 +38,7 @@ namespace {
 using namespace pages;
 using guest::LoadU32;
 using guest::StoreU32;
+using T7LS = schema::Type7ListScreen;
 
 constexpr uint32_t kListInit = 0x8220BAC0, kClearText = 0x8211C470, kMemcpy = 0x825A7410;
 // The item texts' string ids, the title's (3), the item records (28 bytes
@@ -128,7 +130,8 @@ uint64_t Type7ListScreenSetTitle(uint8_t* base, uint64_t r3, uint32_t sp, const 
   const uint32_t movie = MovieOf(base, uint32_t(r3), frame);
   uint64_t result = 0;
   for (uint32_t i = 0; i < 3; i++) {
-    result = calls.set_text(frame, 0x82243428, movie, 20, 5 + i, LoadU32(base, kTitleTexts + 4 * i));
+    result =
+        calls.set_text(frame, 0x82243428, movie, 20, 5 + i, LoadU32(base, kTitleTexts + 4 * i));
   }
   return result;
 }
@@ -137,7 +140,7 @@ uint64_t Type7ListScreenSetDetails(uint8_t* base, uint64_t r3, uint64_t r4, uint
                                    const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82243308 Type7ListScreen::SetDetails");
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 160);
-  StoreU32(base, frame + 96, LoadU32(base, screen + 9680));
+  StoreU32(base, frame + 96, T7LS(base, screen).movie());
   const uint32_t movie =
       LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 96));
   const uint32_t record = uint32_t(r4 * 28) + kItemRecords;
@@ -202,7 +205,7 @@ uint64_t Type7ListScreenBack(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t s
   ITC_NATIVE_RUNNING("sub_822434C8 Type7ListScreen::Back");
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t dispatcher = uint32_t(r4);
-  StoreU32(base, uint32_t(r3) + 9608, 9);
+  T7LS(base, uint32_t(r3)).set_state(9);
   // r6 as the post leaves it (the ring's start plus its count before, 64-bit),
   // passed on to the slot below.
   const uint64_t r6 = uint64_t(LoadU32(base, dispatcher + 204 + 604)) +
@@ -238,7 +241,7 @@ uint64_t Type7ListScreenSetUpRace(uint8_t* base, uint64_t r3, uint32_t sp, const
   // 0 to 14 (else 0), the color list's selection plus 0, 2, 4, 8 or 10, or
   // 6, 7 and 12 to 19.
   const uint32_t index =
-      LoadU32(base, screen + 10148) + race_screens::ListSelection(base, screen + 10144);
+      T7LS(base, screen).course_list_scroll() + race_screens::ListSelection(base, screen + 10144);
   auto colors = [&] { return uint64_t(race_screens::ListSelection(base, screen + 10216)); };
   uint64_t route = 0;
   switch (index) {
@@ -274,8 +277,8 @@ uint64_t Type7ListScreenSetUpRace(uint8_t* base, uint64_t r3, uint32_t sp, const
   vehicle_accessors::RaceDataSetWord59618(
       base, race_screens::ListSelection(base, screen + 10288) == 0 ? 4 : 0);
   vehicle_accessors::RaceDataSetWord5961C(base, 0);
-  const uint32_t answer =
-      uint32_t(Slot(base, LoadU32(base, screen + 9676), 20, std::nullopt, frame, 0x82243198, calls));
+  const uint32_t answer = uint32_t(Slot(base, T7LS(base, screen).list_part().address, 20,
+                                        std::nullopt, frame, 0x82243198, calls));
   // The player's racer record at the frame's +80: the type 7 car.
   const uint32_t record = frame + 80;
   rs::RacerRecordInit(base, record);
@@ -307,14 +310,14 @@ uint64_t Type7ListScreenSetUpRace(uint8_t* base, uint64_t r3, uint32_t sp, const
     const uint64_t args[6] = {4, 0, 0, 0, 0, 0};
     result = calls.call_set(kPlaceRacers, args, 1, frame, 0x82243228);
   }
-  StoreU32(base, screen + 9608, 10);
+  T7LS(base, screen).set_state(10);
   return result;
 }
 
 uint64_t Type7ListScreenDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82242EC8 Type7ListScreen::~Type7ListScreen");
   const uint32_t frame = Frame(base, sp, 96);
-  StoreU32(base, uint32_t(r3), kType7ListScreenVtable);
+  T7LS(base, uint32_t(r3)).set_vtable(kType7ListScreenVtable);
   ListPartDestruct(base, r3 + 11040, frame, calls);
   return ColorListScreenDestruct(base, r3, frame, calls);
 }

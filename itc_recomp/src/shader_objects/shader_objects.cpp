@@ -9,6 +9,7 @@
 #include "memory/c_runtime_heap.h"
 #include "models/memory_blocks.h"
 #include "native/buffers.h"
+#include "schema/shader_objects.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -118,9 +119,10 @@ bool VertexShaderInit(uint8_t* base, uint32_t object, uint32_t microcode) {
   if (object >= kPhysical || !c_runtime::InOneView(object, kVertexShaderBytes)) {
     return false;
   }
+  const schema::VertexShader shader(base, object);
   // Read before anything is written: with the checks below, nothing the
   // function writes is read again.
-  const uint32_t table = object + kVertexShaderBytes + Load(base, object + 612);
+  const uint32_t table = object + kVertexShaderBytes + shader.header_fetch_table();
   const uint32_t count = Load(base, table + 28);
   const uint32_t words = table + 4 * (Load(base, table + 24) + 10);
   if (count > kMaxFetches || c_runtime::MayShare(table + 24, 8, object, kVertexShaderBytes)) {
@@ -137,17 +139,17 @@ bool VertexShaderInit(uint8_t* base, uint32_t object, uint32_t microcode) {
     }
   }
   Clear(base, object, kVertexShaderBytes);
-  Store(base, object + 48, microcode);
-  Store(base, object + 0, 6);
-  Store(base, object + 4, 1);
-  Store(base, object + 20, 0xFFFF0000u);
-  Store(base, object + 24, 0xFFFFFFFFu);
-  Store(base, object + 60, count);
+  shader.set_microcode(microcode);
+  shader.set_common(6);
+  shader.set_reference_count(1);
+  shader.set_base_flush(0xFFFF0000u);
+  shader.set_unknown_24(0xFFFFFFFFu);
+  shader.set_fetch_count(count);
   for (uint32_t i = 0; i < count; i++) {
     const uint32_t word = Load(base, words + 4 * i);
-    Store(base, object + 64 + 4 * i, word);
+    Store(base, shader.fetch_words_address() + 4 * i, word);
     const uint32_t from = microcode + 12 * (word & 0xFFF);
-    const uint32_t to = object + 192 + 12 * i;
+    const uint32_t to = shader.fetch_instructions_address() + 12 * i;
     if (to != from) {
       std::memcpy(guest::Pointer(base, to), guest::Pointer(base, from), 12);
     }
@@ -157,11 +159,12 @@ bool VertexShaderInit(uint8_t* base, uint32_t object, uint32_t microcode) {
 
 void PixelShaderInit(uint8_t* base, uint32_t object, uint32_t microcode) {
   ITC_NATIVE_RUNNING("sub_822A85B8 PixelShader::Init");
+  const schema::PixelShader shader(base, object);
   Clear(base, object, kPixelShaderBytes);
-  Store(base, object + 24, microcode);
-  Store(base, object + 0, 7);
-  Store(base, object + 4, 1);
-  Store(base, object + 20, 0xFFFF0000u);
+  shader.set_microcode(microcode);
+  shader.set_common(7);
+  shader.set_reference_count(1);
+  shader.set_base_flush(0xFFFF0000u);
 }
 
 bool CopyVertexHeader(uint8_t* base, uint32_t object, uint32_t record) {
@@ -226,7 +229,8 @@ std::optional<uint32_t> VertexShaderCreate(uint8_t* base, uint32_t file, const C
   if (!VertexShaderInit(base, made->object, made->microcode)) {
     calls.init(calls.user, made->object, made->microcode);
   }
-  Store(base, made->object, Load(base, made->object) | kCreatedFlag);
+  const schema::VertexShader shader(base, made->object);
+  shader.set_common(shader.common() | kCreatedFlag);
   return made->object;
 }
 
@@ -240,12 +244,13 @@ std::optional<uint32_t> PixelShaderCreate(uint8_t* base, uint32_t file) {
     return 0;
   }
   const uint32_t object = made->object;
+  const schema::PixelShader shader(base, object);
   Clear(base, object, kPixelShaderBytes);
-  Store(base, object + 24, made->microcode);
-  Store(base, object + 0, 7);
-  Store(base, object + 4, 1);
-  Store(base, object + 20, 0xFFFF0000u);
-  Store(base, object + 0, 7 | kCreatedFlag);
+  shader.set_microcode(made->microcode);
+  shader.set_common(7);
+  shader.set_reference_count(1);
+  shader.set_base_flush(0xFFFF0000u);
+  shader.set_common(7 | kCreatedFlag);
   return object;
 }
 

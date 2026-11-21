@@ -38,7 +38,7 @@ uint32_t HidePartMarks(uint8_t* base, uint32_t sp) {
     const uint32_t node = ui_movies::FindNode(base, movie, 1, 14 + i);
     for (uint32_t k = 3; k <= 5; k++) {
       child = ui_movies::Child(base, node, k);
-      Store(base, child + 80, 0);
+      UiNode(base, child).set_visible(0);
     }
   }
   return child;
@@ -49,10 +49,10 @@ uint64_t ShowPartMarks(uint8_t* base, uint64_t r3, uint32_t row, uint64_t group,
   ITC_NATIVE_RUNNING("sub_821EE760 TuningScreen::ShowPartMarks");
   Frame(base, sp, 128);
   const uint32_t screen = uint32_t(r3);
-  const int32_t which = int32_t(Load(base, screen + 25196));
+  const int32_t which = int32_t(TS(base, screen).wheel_part_cursor());
   const uint64_t number = WheelNumber(group, index);
-  const bool front = int32_t(Load(base, screen + 27836)) == int32_t(number);
-  const bool rear = int32_t(Load(base, screen + 27840)) == int32_t(number);
+  const bool front = int32_t(TS(base, screen).saved_wheel_front()) == int32_t(number);
+  const bool rear = int32_t(TS(base, screen).saved_wheel_rear()) == int32_t(number);
   // Child 5 always, then 4 for the front wheel's, 3 for the rear's.
   auto mark = [&](uint32_t second) -> uint64_t {
     const uint32_t first = ui_movies::Child(base, row, 5);

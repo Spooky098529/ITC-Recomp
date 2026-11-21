@@ -17,6 +17,7 @@
 #include "hooks/title_screen_native.h"
 
 #include "guest.h"
+#include "schema/title_screen.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -36,8 +37,8 @@ ITC_FLAG_INT32(attract_after_s, 0, "ITC",
 
 namespace {
 
-constexpr uint32_t kTitleScreenPointer = 0x82814E34;
-constexpr uint32_t kIdleTicksOffset = 36;
+using G = schema::TitleScreenGlobals;
+constexpr uint32_t kTitleScreenPointer = G::data_address();
 constexpr int32_t kAttractTicks = 600;
 constexpr int32_t kTicksPerSecond = 30;
 
@@ -72,21 +73,21 @@ bool TitleScreen_SkipTickWait(bool in_race) {
 ITC_NATIVE_ENTRY_ALWAYS(822221A0) {
   
   int32_t after = ITC_FLAG(attract_after_s) * kTicksPerSecond;
-  uint32_t title = guest::LoadU32(base, kTitleScreenPointer);
-  int32_t before = title ? int32_t(guest::LoadU32(base, title + kIdleTicksOffset)) : 0;
+  const schema::TitleScreenData title = G::data(base);
+  int32_t before = title ? int32_t(title.idle_ticks()) : 0;
   if (hooks::TitleScreenNative()) {
     hooks::TitleScreenPressStart(ctx, base);  // src/title_screen/press_start.cpp
   } else {
     lifted::original::c822221A0(ctx, base);
   }
-  if (after <= 0 || !title || guest::LoadU32(base, kTitleScreenPointer) != title) {
+  if (after <= 0 || !title || G::data(base).address != title.address) {
     return;
   }
   // Only after a tick that counted (the counter went up by one): the next
   // one reaches the game's limit.
-  int32_t now = int32_t(guest::LoadU32(base, title + kIdleTicksOffset));
+  int32_t now = int32_t(title.idle_ticks());
   if (now == before + 1 && now >= after && now < kAttractTicks - 1) {
-    guest::StoreU32(base, title + kIdleTicksOffset, uint32_t(kAttractTicks - 1));
+    title.set_idle_ticks(uint32_t(kAttractTicks - 1));
   }
 }
 
@@ -98,7 +99,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820988C8) {
   if (ITC_FLAG(log_boot_modes)) {
     static std::string last;
     std::string now;
-    for (uint32_t pointer : {0x82814E2Cu, 0x82814E30u, kTitleScreenPointer}) {
+    for (uint32_t pointer : {G::pages_address(), G::list_address(), kTitleScreenPointer}) {
       uint32_t object = guest::LoadU32(base, pointer);
       now += std::format(" [{:08X}]={:08X}:", pointer, object);
       for (uint32_t i = 0; object && i < 24; i += 4) {

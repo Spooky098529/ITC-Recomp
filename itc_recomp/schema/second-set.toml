@@ -1,0 +1,655 @@
+# The schema of docs/functions/second-set.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The second set of the car scene's object pools (src/second_set/): its
+# objects (pool 0 the car model, 2 the cockpit body, 3 the interior, 5 the
+# wheels, 6 the traffic body; pool 1 the parts is load-poll.toml's
+# SceneParts, pool 4 the light kit scene-models.toml's SceneLightKit, pool 7
+# the scene model scene-models.toml's SceneModel), their 240-byte point
+# records, the cockpit's, interior's and wheels' point blocks (the parts',
+# light kit's and traffic body's are car-draw.toml's PartsPoints, LightPoints
+# and TrafficPoints), the scene model's 736-byte block and the wheels' morph.
+#
+# As in car-draw.toml, the measure meets a point block through each group's
+# functions (r3 the group), so a point block type holds both the block's own
+# words and the words its groups hold at the same offsets from their own
+# start (records at +240k or +16 + 240k). Arrays (the records, a group, a
+# matrix) are `bytes`: an element is a view at `<field>_address() + n x its
+# size` (SecondSetPointRecord for a record).
+
+# Pool 0 of the second set: a car model (3,744 bytes, vtable 0x82005130,
+# SceneCarModel::SceneCarModel sub_820DB770), a PoolNode at +0.
+[SceneCarModel]
+measure = "SceneCarModel"
+size = 3744
+origin = "allocated"
+vtable = 0x82005130
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82005130; the pool objects' base 0x82004F90 before ~PoolNode" },
+  { name = "state", offset = 16, type = "u32", note = "the pool object's: 0 free, 3 in use" },
+  { name = "index", offset = 20, type = "u32", note = "its index in the pool (-1 from the constructor)" },
+  { name = "car_model", offset = 24, type = "ptr", to = "SecondSetFirstSetObject", note = "the first set's car model (car-models.toml's CarModel); handed back by ScenePools::ReleaseA with its +20" },
+  { name = "car_record", offset = 32, type = "bytes", count = 3696, note = "the 3,696-byte car record (scene-models.toml's CarRecord)" },
+  { name = "scene", offset = 3728, type = "ptr", to = "CarScene", note = "the car scene (0 when reset)" },
+]
+
+# A first set's object a second set object holds (the car model's +24, the
+# scene model's +5084 pool 4 object) as the releases read it: its pool index.
+[SecondSetFirstSetObject]
+measures = ["SceneCarModel.+24", "SceneModel.+5084"]
+size = 24
+origin = "embedded"
+fields = [
+  { name = "index", offset = 20, type = "u32", note = "its index in its pool (ScenePools::ReleaseA's r5, ReleaseB's)" },
+]
+
+# Pool 2 of the second set: the cockpit body (4,320 bytes, vtable
+# 0x8200527C, SceneCockpit::SceneCockpit sub_820DC3E8).
+[SceneCockpit]
+measure = "SceneCockpit"
+size = 4320
+origin = "allocated"
+vtable = 0x8200527C
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x8200527C; the pool objects' base 0x82004F90 before ~PoolNode. Measure fault: CockpitPoints::Find's r4 (the part models at +4288) is filed here, its +0 to +20 the six part models" },
+  { name = "list", offset = 4, type = "u32", note = "the PoolNode's list (measure fault: part model 1)" },
+  { name = "next", offset = 8, type = "u32", note = "the PoolNode's links (measure fault: part models 2 and 3)" },
+  { name = "previous", offset = 12, type = "u32" },
+  { name = "state", offset = 16, type = "u32", note = "the pool object's: 3 in use (measure fault: part model 4)" },
+  { name = "index", offset = 20, type = "u32", note = "its index in the pool (measure fault: part model 5)" },
+  { name = "car_model", offset = 24, type = "u32", note = "the second set's car model (SceneCockpit::SetUp; 0 when reset)" },
+  { name = "interior", offset = 28, type = "ptr", to = "SceneInterior", note = "its own interior (pool 3 of the second set)" },
+  { name = "body", offset = 32, type = "u32", note = "the first set's cockpit body (pool 2 of [0x826C2E40]; scene-loaders.toml's Cockpit)" },
+  { name = "record", offset = 36, type = "bytes", count = 144, note = "the 144-byte cockpit record (scene-models.toml's SceneModelsCockpitRecord)" },
+  { name = "points", offset = 192, type = "bytes", count = 4084, note = "the point block (SecondSetCockpitPoints)" },
+  { name = "record_address", offset = 4272, type = "ptr", to = "SceneModelsCockpitRecord", note = "the record's address (+36)" },
+  { name = "part_models", offset = 4288, type = "bytes", count = 24, note = "the body's six part models (its +688 + 464i; SceneCockpit::Finish)" },
+  { name = "part_model_0", offset = 4288, type = "u32" },
+  { name = "part_models_01", offset = 4288, type = "u64", note = "part models 0 and 1 (cleared as doublewords by Reset)" },
+  { name = "part_models_23", offset = 4296, type = "u64" },
+  { name = "part_models_45", offset = 4304, type = "u64" },
+  { name = "finished", offset = 4312, type = "u32", note = "SceneCockpit::Finish" },
+  { name = "scene", offset = 4316, type = "ptr", to = "CarScene" },
+]
+
+# The cockpit's point block (the cockpit + 192) or one of its groups: +0
+# the fenders (3 records), +720 the cabin (2), +1200 the bonnet, +1440 the
+# doors (2), +1920 the mirror, +2160 the headlights (8: 4 nodes, 4 shapes).
+[SecondSetCockpitPoints]
+measure = "CockpitPoints"
+size = 4084
+origin = "embedded"
+fields = [
+  { name = "fenders", offset = 0, type = "bytes", count = 720, note = "the fenders' 3 records" },
+  { name = "record0_model", offset = 4, type = "u32", note = "a group's record 0: its model (the doors' window, DrawDoorWindow)" },
+  { name = "record0_shape", offset = 228, type = "u32" },
+  { name = "record1_model", offset = 244, type = "u32", note = "a group's record 1 (the cabin's window, DrawCabinWindow)" },
+  { name = "record1_shape", offset = 468, type = "u32" },
+  { name = "cabin", offset = 720, type = "bytes", count = 480, note = "the cabin's 2 records" },
+  { name = "bonnet", offset = 1200, type = "bytes", count = 240, note = "the bonnet's record" },
+  { name = "record5_model", offset = 1204, type = "u32", note = "a group's record 5 (the headlights', FindHeadlights' scaled)" },
+  { name = "record5_shape", offset = 1428, type = "u32" },
+  { name = "doors", offset = 1440, type = "bytes", count = 480, note = "the doors' 2 records" },
+  { name = "record6_model", offset = 1444, type = "u32" },
+  { name = "record6_shape", offset = 1668, type = "u32" },
+  { name = "mirror", offset = 1920, type = "bytes", count = 240, note = "the mirror's record" },
+  { name = "headlights", offset = 2160, type = "bytes", count = 1920, note = "the headlights' 8 records" },
+  { name = "word_4080", offset = 4080, type = "u32", note = "0 (CockpitPoints::Reset; not read in detail)" },
+]
+
+# Pool 3 of the second set: the interior (11,680 bytes, vtable 0x820062E4,
+# SceneInterior::SceneInterior sub_820E5340).
+[SceneInterior]
+measure = "SceneInterior"
+size = 11680
+origin = "allocated"
+vtable = 0x820062E4
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x820062E4; the pool objects' base 0x82004F90 before ~PoolNode. Measure fault: InteriorPoints::Find's r4 (the part models at +11632) is filed here, its +0 to +20 the six part models" },
+  { name = "list", offset = 4, type = "u32", note = "the PoolNode's list (measure fault: part model 1)" },
+  { name = "next", offset = 8, type = "u32", note = "the PoolNode's links (measure fault: part models 2 and 3)" },
+  { name = "previous", offset = 12, type = "u32" },
+  { name = "state", offset = 16, type = "u32", note = "the pool object's: 3 in use (measure fault: part model 4)" },
+  { name = "index", offset = 20, type = "u32", note = "its index in the pool (measure fault: part model 5)" },
+  { name = "car_model", offset = 24, type = "ptr", to = "CarModelsSceneCarModel", note = "the second set's car model (SceneInterior::Link): its +24 the first set's" },
+  { name = "skeleton", offset = 28, type = "u32", note = "the first set's car model's +3760 (SceneInterior::Link; the cockpit body + 208 under a cockpit)" },
+  { name = "texture_set", offset = 32, type = "u32", note = "the first set's car model's +4048 (SceneInterior::Link; the cockpit body + 496 under a cockpit)" },
+  { name = "first_set_interior", offset = 36, type = "ptr", to = "Interior", note = "the first set's interior (pool 3 of [0x826C2E40])" },
+  { name = "record", offset = 40, type = "bytes", count = 120, note = "the 120-byte interior record (car-draw.toml's InteriorRecord)" },
+  { name = "gauge0_present", offset = 48, type = "u32", note = "the record's +8 (SceneInterior::SetGauges)" },
+  { name = "gauge0_kind", offset = 52, type = "u32", note = "the record's +12" },
+  { name = "seat_model", offset = 140, type = "u32", note = "the record's +100 (SceneInterior::Apply)" },
+  { name = "accessory", offset = 152, type = "u32", note = "the record's +112: the accessory (3 none; SceneInterior::Draw)" },
+  { name = "accessory_arg", offset = 156, type = "u32", note = "the record's +116" },
+  { name = "points", offset = 160, type = "bytes", count = 11460, note = "the point block (SecondSetInteriorPoints)" },
+  { name = "meters_car_block", offset = 3316, type = "u32", note = "the point block's +3156 (the meters' +4): the car's block (SceneInterior::Finish)" },
+  { name = "meters_turbo_provider", offset = 8636, type = "u32", note = "the point block's +8476 (the meters' +5324) = +32 (SceneInterior::Finish)" },
+  { name = "points_seat_model", offset = 9656, type = "u32", note = "the point block's +9496: the scene + 784 + 464 x the record's +100 (SceneInterior::Apply)" },
+  { name = "points_seat_position", offset = 11600, type = "u32", note = "the point block's +11440: the first set's car model's +7168 (SceneInterior::Finish)" },
+  { name = "points_record", offset = 11604, type = "ptr", to = "InteriorRecord", note = "the point block's +11444: the record's address (+40)" },
+  { name = "points_skeleton", offset = 11608, type = "u32", note = "the point block's +11448: the first set's car model's +3760" },
+  { name = "points_cockpit", offset = 11612, type = "u32", note = "the point block's +11452: 1 under a cockpit (sub_820E3658)" },
+  { name = "points_accessory_shown", offset = 11616, type = "u32", note = "the point block's +11456: the accessory drawn (CarScene::SetInteriorWord; 1 from Reset)" },
+  { name = "part_models", offset = 11632, type = "bytes", count = 24, note = "six part models (the first set's interior's +304 + 464i)" },
+  { name = "part_model_0", offset = 11632, type = "u32" },
+  { name = "cockpit", offset = 11656, type = "u32", note = "1 under a cockpit (the cockpit set c)" },
+  { name = "finished", offset = 11660, type = "u32", note = "SceneInterior::Finish" },
+  { name = "cockpit_texture", offset = 11664, type = "u32", note = "the cockpit body's texture (SceneCockpit::Finish)" },
+  { name = "scene", offset = 11668, type = "ptr", to = "CarScene" },
+]
+
+# The interior's point block (the interior + 160) or one of its groups:
+# +0 the body's record, then groups with +0 the record, +4 a word, records
+# at +16 + 240k: +240 the dials (12), +3152 the meters (22), +8512 the
+# steering wheel (4), +9488 the seats (4), +10464 the roll cage (4).
+[SecondSetInteriorPoints]
+measure = "InteriorPoints"
+size = 11460
+origin = "embedded"
+fields = [
+  { name = "body", offset = 0, type = "bytes", count = 240, note = "the body's record" },
+  { name = "group_record", offset = 0, type = "ptr", to = "InteriorRecord", note = "a group's: the interior record (0 from the resets)" },
+  { name = "group_word_4", offset = 4, type = "u32", note = "a group's: the car's block (-1 from the resets; FindDials' IsBlockSetA, B)" },
+  { name = "group_word_8", offset = 8, type = "u32", note = "the dials' digits' texture provider (0 from ResetDials)" },
+  { name = "group_records", offset = 16, type = "bytes", count = 5280, note = "a group's records (+16 + 240k): the dials' 12, the meters' 22, the others' 4" },
+  { name = "dials", offset = 240, type = "bytes", count = 2912, note = "the dials' group (car-draw.toml's InteriorDials)" },
+  { name = "dials_record", offset = 240, type = "ptr", to = "InteriorRecord" },
+  { name = "record8_model", offset = 2180, type = "u32", note = "a group's record 8 (+16 + 240k): the dials' digits" },
+  { name = "record8_shape", offset = 2404, type = "u32" },
+  { name = "record9_model", offset = 2420, type = "u32" },
+  { name = "record9_shape", offset = 2644, type = "u32" },
+  { name = "record10_model", offset = 2660, type = "u32" },
+  { name = "record10_shape", offset = 2884, type = "u32" },
+  { name = "meters", offset = 3152, type = "bytes", count = 5360, note = "the meters' group (load-poll.toml's InteriorMeters)" },
+  { name = "meters_record", offset = 3152, type = "ptr", to = "InteriorRecord" },
+  { name = "gauge_providers", offset = 5296, type = "bytes", count = 28, note = "the meters' group: seven gauge texture providers (0 from ResetMeters)" },
+  { name = "gauge0_provider", offset = 5296, type = "u32" },
+  { name = "turbo_provider", offset = 5324, type = "u32", note = "the meters' group: gauge 1's in mode 5" },
+  { name = "steering", offset = 8512, type = "bytes", count = 976, note = "the steering wheel's group" },
+  { name = "steering_record", offset = 8512, type = "ptr", to = "InteriorRecord" },
+  { name = "seats", offset = 9488, type = "bytes", count = 976, note = "the seats' group" },
+  { name = "seats_record", offset = 9488, type = "ptr", to = "InteriorRecord" },
+  { name = "seat_position", offset = 9492, type = "u32", note = "the seats' +4: +11440" },
+  { name = "seat_model", offset = 9496, type = "u32", note = "the seats' +8: the scene + 784 + 464 x the record's +100, when that's set" },
+  { name = "roll_cage", offset = 10464, type = "bytes", count = 976, note = "the roll cage's group" },
+  { name = "roll_cage_record", offset = 10464, type = "ptr", to = "InteriorRecord" },
+  { name = "seat_position_source", offset = 11440, type = "u32", note = "the first set's car model's +7168 (SceneInterior::Finish; 0 from Reset)" },
+  { name = "record", offset = 11444, type = "ptr", to = "InteriorRecord", note = "the interior's record (its +40)" },
+  { name = "skeleton", offset = 11448, type = "u32", note = "the first set's car model's +3760" },
+  { name = "cockpit", offset = 11452, type = "u32", note = "1 under a cockpit (sub_820E3658; DrawRace)" },
+  { name = "accessory_shown", offset = 11456, type = "u32", note = "1 from Reset (CarScene::SetInteriorWord)" },
+]
+
+# Pool 5 of the second set: the wheels (16,800 bytes, vtable 0x82006638,
+# SceneWheels::SceneWheels sub_820ECE40).
+[SceneWheels]
+measure = "SceneWheels"
+size = 16800
+origin = "allocated"
+vtable = 0x82006638
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82006638; the pool objects' base 0x82004F90 before ~PoolNode" },
+  { name = "state", offset = 16, type = "u32", note = "the pool object's: 3 in use" },
+  { name = "index", offset = 20, type = "u32", note = "its index in the pool" },
+  { name = "car_model", offset = 24, type = "u32", note = "the second set's car model (0 for traffic)" },
+  { name = "first_set_wheels", offset = 28, type = "u32", note = "the first set's wheels (pool 5 of [0x826C2E40]; car-models.toml's CarWheels)" },
+  { name = "record", offset = 32, type = "bytes", count = 156, note = "the 156-byte wheels record (scene-models.toml's SceneModelsWheelsRecord: +n here is its +n - 32)" },
+  { name = "kind", offset = 32, type = "u32", note = "the record's +0" },
+  { name = "morph_each_draw", offset = 40, type = "u32", note = "the record's +8: 0 morphed once at set-up (SceneWheels::Draw)" },
+  { name = "front_tire_grade", offset = 44, type = "u32", note = "the record's +12 (SceneWheels::SetTireGrades)" },
+  { name = "front_wheel", offset = 48, type = "u32", note = "the record's +16" },
+  { name = "rear_tire_grade", offset = 60, type = "u32", note = "the record's +28" },
+  { name = "rear_wheel", offset = 64, type = "u32", note = "the record's +32" },
+  { name = "front_size_index", offset = 76, type = "u32", note = "the record's +44 to +64: the tires' sizes (SceneWheels::SetSizes)" },
+  { name = "front_size_a", offset = 80, type = "u32" },
+  { name = "front_size_b", offset = 84, type = "u32" },
+  { name = "rear_size_index", offset = 88, type = "u32" },
+  { name = "rear_size_a", offset = 92, type = "u32" },
+  { name = "rear_size_b", offset = 96, type = "u32" },
+  { name = "brake_kind", offset = 100, type = "u32", note = "the record's +68" },
+  { name = "unknown_104", offset = 104, type = "u32", note = "the record's +72 (SetSizes' r4)" },
+  { name = "unknown_108", offset = 108, type = "u32", note = "the record's +76 (SetSizes' r5)" },
+  { name = "table_112", offset = 112, type = "u32", note = "the record's +80 to +120: from the table at 0x820044B0 (SceneWheels::SetUp)" },
+  { name = "table_116", offset = 116, type = "u32" },
+  { name = "caliper_texture", offset = 120, type = "u32", note = "the record's +88 (SceneWheels::SetCaliperTexture)" },
+  { name = "table_124", offset = 124, type = "u32" },
+  { name = "table_128", offset = 128, type = "u32" },
+  { name = "front_brake_turn", offset = 132, type = "f32", note = "the record's +100" },
+  { name = "rear_brake_turn", offset = 136, type = "f32", note = "the record's +104" },
+  { name = "front_brake_size", offset = 140, type = "u32", note = "the record's +108" },
+  { name = "rear_brake_size", offset = 144, type = "u32", note = "the record's +112" },
+  { name = "front_tire", offset = 148, type = "u32", note = "the record's +116: the entry's +40 (tire 584 for aftermarket wheels)" },
+  { name = "rear_tire", offset = 152, type = "u32", note = "the record's +120" },
+  { name = "points", offset = 192, type = "bytes", count = 13648, note = "the point block (SecondSetWheelPoints)" },
+  { name = "points_car_model", offset = 192, type = "u32", note = "the point block's +0 (SceneWheels::SetUpPoints)" },
+  { name = "points_car_record", offset = 196, type = "ptr", to = "CarModelsTrafficIndex", note = "the point block's +4: the traffic record" },
+  { name = "points_matrix", offset = 200, type = "u32", note = "the point block's +8: the traffic body's tire positions" },
+  { name = "points_record", offset = 204, type = "ptr", to = "SecondSetWheelsRecord", note = "the point block's +12: the record's address (+32)" },
+  { name = "points_tire_model", offset = 208, type = "u32", note = "the point block's +16: the first set's wheels' + 240" },
+  { name = "points_rim_model", offset = 212, type = "u32", note = "the point block's +20: + 1216" },
+  { name = "points_brake_model", offset = 216, type = "u32", note = "the point block's +24: + 2336" },
+  { name = "textures_bound", offset = 16768, type = "u32", note = "SceneWheels::Finish" },
+  { name = "points_set_up", offset = 16772, type = "u32", note = "SceneWheels::SetUpPoints" },
+  { name = "traffic_record", offset = 16776, type = "u32", note = "the traffic record (its +0 the traffic car's index)" },
+  { name = "tire_positions", offset = 16780, type = "u32", note = "the traffic body's tire positions (its +7072; SceneModel::PollLoad)" },
+  { name = "scene", offset = 16784, type = "ptr", to = "CarScene" },
+]
+
+# The wheels' point block (the wheels + 192) or one of its groups. The
+# block: +0 the car model (second set), +4 and +8 the traffic record and
+# matrix, +12 the wheels record, +16 to +24 the tire, rim and brake models;
+# the groups: the tires +32 and +1872 (1,840 bytes each), set a's rims
+# +3712 and +5456, set b's +7200 and +8944 (1,744 each), the brakes +10688
+# and +13632 (2,944 each). Each group: +0 the matrix, +4 the car record, +8
+# the wheels record; a tire's +12 twelve 24-byte entries (sub_820E6F28),
+# +300 the front flag, +304 and +328 the morph's six shape indices and
+# weights, +352 and +356 sub_820E7010's outputs, +368 six records, +1808
+# two rows; a rim's or the brakes' +12 the front flag, +16 the morph's
+# weight, +20 a float, +32 seven (rims) or twelve (brakes) records, +1712
+# (rims) or +2912 (brakes) two rows.
+[SecondSetWheelPoints]
+measure = "WheelPoints"
+size = 13648
+origin = "embedded"
+fields = [
+  { name = "car_model", offset = 0, type = "u32", note = "the block's: the second set's car model (SceneCarModel; its +24 the first set's)" },
+  { name = "matrix", offset = 0, type = "ptr", to = "SecondSetWheelMatrix", note = "a group's: the car's matrix (the first set's car model's +6976, or the block's +8)" },
+  { name = "entry_value", offset = 0, type = "f32", note = "measure fault: sub_820E6F28's and sub_820E7010's entries (r3 a tire + 12) filed at +0 to +20" },
+  { name = "car_record", offset = 4, type = "ptr", to = "SecondSetWheelCarRecord", note = "the block's (traffic) and a group's: the car record (its +0 the block)" },
+  { name = "wheels_record", offset = 8, type = "ptr", to = "SecondSetWheelsRecord", note = "a group's: the wheels record; the block's: the traffic body's tire positions (a matrix)" },
+  { name = "word_12", offset = 12, type = "u32", note = "the block's: the wheels record; a rim's or the brakes': the front flag (1 from the resets)" },
+  { name = "tire_entries", offset = 12, type = "bytes", count = 288, note = "a tire's: twelve 24-byte entries (sub_820E6F28, sub_820E7010; cleared by ResetTire)" },
+  { name = "word_16", offset = 16, type = "u32", note = "the block's: the tire model (the rear's + 464)" },
+  { name = "weight", offset = 16, type = "f32", note = "a rim's or the brakes': the morph's weight" },
+  { name = "word_20", offset = 20, type = "u32", note = "the block's: the rim model" },
+  { name = "float_20", offset = 20, type = "f32", note = "a rim's: the tire's +356 copied (WheelPoints::SetUp)" },
+  { name = "brake_model", offset = 24, type = "u32", note = "the block's: the brake and caliper model" },
+  { name = "group_records", offset = 32, type = "bytes", count = 2880, note = "a rim's seven or the brakes' twelve records" },
+  { name = "front_tire", offset = 32, type = "bytes", count = 1840, note = "the front tire's group" },
+  { name = "front_tire_matrix", offset = 32, type = "u32", note = "also a rim's or the brakes' record 0's skeleton" },
+  { name = "front_tire_car_record", offset = 36, type = "u32", note = "also a rim's record 0's model (+32 + 4)" },
+  { name = "front_tire_wheels_record", offset = 40, type = "ptr", to = "SecondSetWheelsRecord" },
+  { name = "rim_record0_shape", offset = 260, type = "u32", note = "a rim's or the brakes' record 0's shape (+32 + 228)" },
+  { name = "tire_front", offset = 300, type = "u32", note = "a tire's: 1 the front (ResetTire), 0 the rear (WheelPoints::Reset)" },
+  { name = "tire_shapes", offset = 304, type = "bytes", count = 24, note = "a tire's: the morph's six shape indices (-1 from ResetTire; records 1 to 5's +228)" },
+  { name = "tire_shape0", offset = 304, type = "u32" },
+  { name = "tire_weights", offset = 328, type = "bytes", count = 24, note = "a tire's: the morph's six weights (sub_820E7010's float4)" },
+  { name = "tire_weight0", offset = 328, type = "f32" },
+  { name = "tire_out1", offset = 352, type = "f32", note = "a tire's: sub_820E7010's out1" },
+  { name = "tire_out2", offset = 356, type = "f32", note = "a tire's: sub_820E7010's out2" },
+  { name = "tire_records", offset = 368, type = "bytes", count = 1440, note = "a tire's six records" },
+  { name = "tire_record0_model", offset = 372, type = "u32", note = "a tire's record 0's model (+368 + 4)" },
+  { name = "front_tire_out1", offset = 384, type = "f32", note = "the block's: the front tire's +352" },
+  { name = "front_tire_out2", offset = 388, type = "f32", note = "the block's: the front tire's +356" },
+  { name = "rim_record1_shape", offset = 500, type = "u32", note = "a rim's or the brakes' record 1's shape (the morph's target)" },
+  { name = "tire_base_shape", offset = 596, type = "u32", note = "a tire's record 0's shape: the morph's base" },
+  { name = "rim_record2_shape", offset = 740, type = "u32" },
+  { name = "tire_record1_shape", offset = 836, type = "u32", note = "a tire's records 1 to 5's shapes at +836 + 240k" },
+  { name = "rim_record3_shape", offset = 980, type = "u32" },
+  { name = "rim_record4_shape", offset = 1220, type = "u32" },
+  { name = "rim_record5_shape", offset = 1460, type = "u32" },
+  { name = "rim_record6_shape", offset = 1700, type = "u32" },
+  { name = "rim_rows", offset = 1712, type = "bytes", count = 32, note = "a rim's two rows (32 bytes of the matrix's first or second half; (0, 0, 0, 1) from the resets)" },
+  { name = "rim_row0_x", offset = 1712, type = "f32" },
+  { name = "rim_row0_xy", offset = 1712, type = "u64" },
+  { name = "rim_row0_y", offset = 1716, type = "f32" },
+  { name = "rim_row0_z", offset = 1720, type = "f32" },
+  { name = "rim_row0_zw", offset = 1720, type = "u64" },
+  { name = "rim_row0_w", offset = 1724, type = "f32" },
+  { name = "rim_row1_xy", offset = 1728, type = "u64" },
+  { name = "rim_row1_zw", offset = 1736, type = "u64" },
+  { name = "tire_rows", offset = 1808, type = "bytes", count = 32, note = "a tire's two rows" },
+  { name = "tire_row0_x", offset = 1808, type = "f32" },
+  { name = "tire_row0_xy", offset = 1808, type = "u64" },
+  { name = "tire_row0_y", offset = 1812, type = "f32" },
+  { name = "tire_row0_z", offset = 1816, type = "f32" },
+  { name = "tire_row0_zw", offset = 1816, type = "u64" },
+  { name = "tire_row0_w", offset = 1820, type = "f32" },
+  { name = "tire_row1_xy", offset = 1824, type = "u64" },
+  { name = "tire_row1_zw", offset = 1832, type = "u64" },
+  { name = "rear_tire", offset = 1872, type = "bytes", count = 1840, note = "the rear tire's group" },
+  { name = "rear_tire_matrix", offset = 1872, type = "u32" },
+  { name = "rear_tire_car_record", offset = 1876, type = "u32" },
+  { name = "rear_tire_wheels_record", offset = 1880, type = "ptr", to = "SecondSetWheelsRecord" },
+  { name = "brake_record7_shape", offset = 1940, type = "u32" },
+  { name = "rear_tire_front", offset = 2172, type = "u32", note = "the block's: the rear tire's +300 (0)" },
+  { name = "brake_record8_shape", offset = 2180, type = "u32" },
+  { name = "rear_tire_out1", offset = 2224, type = "f32", note = "the block's: the rear tire's +352" },
+  { name = "rear_tire_out2", offset = 2228, type = "f32", note = "the block's: the rear tire's +356" },
+  { name = "brake_record9_shape", offset = 2420, type = "u32" },
+  { name = "brake_record10_model", offset = 2436, type = "u32", note = "the brakes' record 10 (scaled by 1.0)" },
+  { name = "brake_record10_shape", offset = 2660, type = "u32" },
+  { name = "brake_record11_model", offset = 2676, type = "u32" },
+  { name = "brake_record11_shape", offset = 2900, type = "u32" },
+  { name = "brake_rows", offset = 2912, type = "bytes", count = 32, note = "the brakes' two rows" },
+  { name = "brake_row0_x", offset = 2912, type = "f32" },
+  { name = "brake_row0_xy", offset = 2912, type = "u64" },
+  { name = "brake_row0_y", offset = 2916, type = "f32" },
+  { name = "brake_row0_z", offset = 2920, type = "f32" },
+  { name = "brake_row0_zw", offset = 2920, type = "u64" },
+  { name = "brake_row0_w", offset = 2924, type = "f32" },
+  { name = "brake_row1_xy", offset = 2928, type = "u64" },
+  { name = "brake_row1_zw", offset = 2936, type = "u64" },
+  { name = "rim_a_front", offset = 3712, type = "bytes", count = 1744, note = "set a's front rim's group" },
+  { name = "rim_a_front_matrix", offset = 3712, type = "u32" },
+  { name = "rim_a_front_wheels_record", offset = 3720, type = "u32" },
+  { name = "rim_a_front_weight", offset = 3728, type = "f32", note = "the front tire's +352" },
+  { name = "rim_a_front_float_20", offset = 3732, type = "f32" },
+  { name = "rim_a_rear", offset = 5456, type = "bytes", count = 1744, note = "set a's rear rim's group" },
+  { name = "rim_a_rear_matrix", offset = 5456, type = "ptr", to = "SecondSetWheelsRecord", note = "measure fault: the matrix word, filed as pointing to the wheels record" },
+  { name = "rim_a_rear_wheels_record", offset = 5464, type = "ptr", to = "SecondSetWheelsRecord" },
+  { name = "rim_a_rear_front", offset = 5468, type = "u32", note = "0 (WheelPoints::Reset)" },
+  { name = "rim_a_rear_weight", offset = 5472, type = "f32" },
+  { name = "rim_a_rear_float_20", offset = 5476, type = "f32" },
+  { name = "rim_b_front", offset = 7200, type = "bytes", count = 1744, note = "set b's front rim's group" },
+  { name = "rim_b_front_matrix", offset = 7200, type = "u32" },
+  { name = "rim_b_front_wheels_record", offset = 7208, type = "u32" },
+  { name = "rim_b_front_weight", offset = 7216, type = "f32" },
+  { name = "rim_b_front_float_20", offset = 7220, type = "f32" },
+  { name = "rim_b_rear", offset = 8944, type = "bytes", count = 1744, note = "set b's rear rim's group" },
+  { name = "rim_b_rear_matrix", offset = 8944, type = "u32" },
+  { name = "rim_b_rear_wheels_record", offset = 8952, type = "u32" },
+  { name = "rim_b_rear_front", offset = 8956, type = "u32", note = "0 (WheelPoints::Reset)" },
+  { name = "rim_b_rear_weight", offset = 8960, type = "f32" },
+  { name = "rim_b_rear_float_20", offset = 8964, type = "f32" },
+  { name = "brakes_front", offset = 10688, type = "bytes", count = 2944, note = "the front brakes' group" },
+  { name = "brakes_front_matrix", offset = 10688, type = "u32" },
+  { name = "brakes_front_car_record", offset = 10692, type = "u32" },
+  { name = "brakes_front_wheels_record", offset = 10696, type = "u32" },
+  { name = "brakes_rear", offset = 13632, type = "bytes", count = 2944, note = "the rear brakes' group (to +16576, past the block's measured 13,648)" },
+  { name = "brakes_rear_matrix", offset = 13632, type = "u32" },
+  { name = "brakes_rear_car_record", offset = 13636, type = "u32" },
+  { name = "brakes_rear_wheels_record", offset = 13640, type = "u32" },
+  { name = "brakes_rear_front", offset = 13644, type = "u32", note = "0 (WheelPoints::Reset)" },
+]
+
+# The matrix a wheels group's +0 points to (64 bytes, read as doublewords
+# by the set-ups' Rows), joined by the measure with the block's +0 (a
+# second set car model, its +24 the first set's car model).
+[SecondSetWheelMatrix]
+measure = "WheelPoints.+0"
+size = 64
+origin = "embedded"
+fields = [
+  { name = "row0_xy", offset = 0, type = "u64" },
+  { name = "row0_zw", offset = 8, type = "u64" },
+  { name = "row1_xy", offset = 16, type = "u64" },
+  { name = "row1_zw", offset = 24, type = "u64" },
+  { name = "car_model", offset = 24, type = "u32", note = "measure fault: the block's +0's +24 (WheelPoints::SetUp)" },
+  { name = "row2_xy", offset = 32, type = "u64" },
+  { name = "row2_zw", offset = 40, type = "u64" },
+  { name = "row3_xy", offset = 48, type = "u64" },
+  { name = "row3_zw", offset = 56, type = "u64" },
+]
+
+# The car record a wheels group's +4 points to (the first set's car model's
+# +32; scene-models.toml's CarRecord) as the tire's set-up reads it.
+[SecondSetWheelCarRecord]
+measure = "WheelPoints.+4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "block", offset = 0, type = "u32", note = "the model block (the tire table's entry, 24 bytes each at 0x82003EF8)" },
+]
+
+# The 156-byte wheels record as a wheels group's +8 points to it: the same
+# object as scene-models.toml's SceneModelsWheelsRecord (to merge).
+[SecondSetWheelsRecord]
+measure = "WheelPoints.+8944"
+size = 156
+origin = "embedded"
+fields = [
+  { name = "kind", offset = 0, type = "u32", note = "the car's kind (3 traffic). Measure fault: also sub_820E6F28's entry words" },
+  { name = "morph_each_draw", offset = 8, type = "u32", note = "0 when morphed once at set-up" },
+  { name = "rear_wheel_f36", offset = 32, type = "u64", note = "+32 and +36 read as a doubleword (the brakes' draws)" },
+  { name = "rear_f40_44", offset = 40, type = "u64", note = "+40 and +44 read as a doubleword" },
+  { name = "front_size_index", offset = 44, type = "u32", note = "-1: the tire table's" },
+  { name = "front_size_a", offset = 48, type = "u32" },
+  { name = "front_size_b", offset = 52, type = "u32" },
+  { name = "rear_size_index", offset = 56, type = "u32" },
+  { name = "rear_size_a", offset = 60, type = "u32" },
+  { name = "rear_size_b", offset = 64, type = "f32" },
+  { name = "brake_kind", offset = 68, type = "u32", note = "+1 to the brakes' steps for 3 to 5, +2 for 6" },
+  { name = "front_index_add", offset = 72, type = "u32", note = "added to the index table's entry for the front tire" },
+  { name = "rear_index_add", offset = 76, type = "u32" },
+  { name = "caliper_a", offset = 84, type = "u32" },
+  { name = "caliper_texture", offset = 88, type = "u32", note = "the calipers' texture (PartModel::SetTexture)" },
+  { name = "front_brake_turn", offset = 100, type = "f32" },
+  { name = "rear_brake_turn", offset = 104, type = "f32" },
+  { name = "front_brake_size", offset = 108, type = "u32", note = "the brakes' morph steps (- 9) for the front" },
+  { name = "rear_brake_size", offset = 112, type = "u32" },
+]
+
+# Pool 6 of the second set: a traffic car's body (9,808 bytes, vtable
+# 0x82006424, SceneTraffic::SceneTraffic sub_820E6E70).
+[SceneTraffic]
+measure = "SceneTraffic"
+size = 9808
+origin = "allocated"
+vtable = 0x82006424
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82006424; the pool objects' base 0x82004F90 before ~PoolNode. Measure fault: TrafficPoints::Find's r4 (the part models at +9768) is filed here, its +0 to +20 the six part models" },
+  { name = "list", offset = 4, type = "u32", note = "the PoolNode's list (measure fault: part model 1)" },
+  { name = "next", offset = 8, type = "u32", note = "the PoolNode's links (measure fault: part models 2 and 3)" },
+  { name = "previous", offset = 12, type = "u32" },
+  { name = "state", offset = 16, type = "u32", note = "the pool object's: 3 in use (measure fault: part model 4)" },
+  { name = "index", offset = 20, type = "u32", note = "its index in the pool (measure fault: part model 5)" },
+  { name = "car_record", offset = 32, type = "bytes", count = 3696, note = "the 3,696-byte car record (scene-models.toml's CarRecord)" },
+  { name = "points", offset = 3728, type = "bytes", count = 6032, note = "the point block (car-draw.toml's TrafficPoints)" },
+  { name = "points_front_plate_texture", offset = 5184, type = "u32", note = "the point block's +1456: the first set's body's +7040 (SceneTraffic::Finish)" },
+  { name = "points_rear_plate_texture", offset = 5188, type = "u32", note = "the point block's +1460: the body's +7048" },
+  { name = "body", offset = 9760, type = "u32", note = "the first set's traffic body (pool 6 of [0x826C2E40])" },
+  { name = "skeleton", offset = 9764, type = "u32", note = "the body's +3776" },
+  { name = "part_models", offset = 9768, type = "bytes", count = 24, note = "the body's six part models (its +4256 + 464i)" },
+  { name = "part_model_0", offset = 9768, type = "u32" },
+  { name = "finished", offset = 9792, type = "u32", note = "checked by SceneTraffic::Finish, never set there" },
+  { name = "scene", offset = 9796, type = "ptr", to = "CarScene" },
+]
+
+# A 240-byte point record a part model's node or shape is found into
+# (docs/known-data.md "point record"; PointRecord::, ModelPoint::Find in
+# scene-loaders.md, ModelPoint::FindShape). Measure fault: the parts' door
+# and headlight groups' inits (r3 the group, its record 0) file the groups'
+# matrices' w's at +3120 + 12 + 16k and +6016 + 12 + 16k here.
+[SecondSetPointRecord]
+measures = ["PointRecord", "ModelPoint"]
+size = 240
+origin = "embedded"
+fields = [
+  { name = "skeleton", offset = 0, type = "u32", note = "the skeleton (ModelPoint::Find; 0 from Clear)" },
+  { name = "model", offset = 4, type = "u32", note = "the model found (0 until found)" },
+  { name = "shape", offset = 8, type = "u32", note = "0, or (FindShape) the shape found (544 bytes, the model's +40)" },
+  { name = "matrix", offset = 16, type = "bytes", count = 64, note = "the node's matrix (the identity from Clear)" },
+  { name = "matrix_row0_w", offset = 28, type = "f32", note = "1.0 (PointRecord::PointRecord)" },
+  { name = "matrix_row1_w", offset = 44, type = "f32" },
+  { name = "matrix_row2_w", offset = 60, type = "f32" },
+  { name = "matrix_row3_x", offset = 64, type = "f32", note = "the translation (ModelPoint::Find scales it)" },
+  { name = "matrix_row3_xy", offset = 64, type = "u64" },
+  { name = "matrix_row3_y", offset = 68, type = "f32" },
+  { name = "matrix_row3_z", offset = 72, type = "f32" },
+  { name = "matrix_row3_zw", offset = 72, type = "u64" },
+  { name = "matrix_row3_w", offset = 76, type = "f32" },
+  { name = "inverse", offset = 80, type = "bytes", count = 64, note = "its inverse" },
+  { name = "inverse_row0_w", offset = 92, type = "f32" },
+  { name = "inverse_row1_w", offset = 108, type = "f32" },
+  { name = "inverse_row2_w", offset = 124, type = "f32" },
+  { name = "inverse_row3_w", offset = 140, type = "f32" },
+  { name = "position", offset = 144, type = "bytes", count = 16, note = "its translation ((0, 0, 0, 1) from Clear)" },
+  { name = "position_xy", offset = 144, type = "u64" },
+  { name = "position_zw", offset = 152, type = "u64" },
+  { name = "position_w", offset = 156, type = "f32", note = "1.0 (PointRecord::PointRecord)" },
+  { name = "node_name", offset = 160, type = "bytes", count = 32, note = "the node's name (SetNode; NameMatches)" },
+  { name = "node_name_0", offset = 160, type = "u8" },
+  { name = "shape_name", offset = 192, type = "bytes", count = 32, note = "the shape's name (SetShape)" },
+  { name = "shape_name_0", offset = 192, type = "u8" },
+  { name = "node_index", offset = 224, type = "u32", note = "-1 from Clear" },
+  { name = "shape_index", offset = 228, type = "u32", note = "-1, or (FindShape) the shape's index (the node's +40)" },
+  { name = "headlights_matrix_row0_w", offset = 3132, type = "f32", note = "measure fault: the parts' headlights group's +3120 matrix (InitHeadlights)" },
+  { name = "headlights_matrix_row1_w", offset = 3148, type = "f32" },
+  { name = "headlights_matrix_row2_w", offset = 3164, type = "f32" },
+  { name = "headlights_matrix_row3_w", offset = 3180, type = "f32" },
+  { name = "door_matrix_row0_w", offset = 6028, type = "f32", note = "measure fault: the parts' doors' group's +6016 matrix (InitLeftDoor, InitRightDoor)" },
+  { name = "door_matrix_row1_w", offset = 6044, type = "f32" },
+  { name = "door_matrix_row2_w", offset = 6060, type = "f32" },
+  { name = "door_matrix_row3_w", offset = 6076, type = "f32" },
+]
+
+# A name SetNode and SetShape copy from (r4: a string of the name tables).
+[SecondSetPointName]
+measures = ["PointRecord::SetNode.r4", "PointRecord::SetShape.r4"]
+size = 1
+origin = "embedded"
+fields = [
+  { name = "first", offset = 0, type = "u8", note = "its characters, to the 0" },
+]
+
+# A part model as ModelPoint::FindShape walks it (r4; models.toml's Model).
+[SecondSetFindModel]
+measure = "ModelPoint::FindShape.r4"
+size = 412
+origin = "embedded"
+fields = [
+  { name = "nodes", offset = 36, type = "ptr", to = "SecondSetModelNode", note = "192 bytes a node" },
+  { name = "shapes", offset = 40, type = "ptr", to = "ModelShape", note = "544 bytes a shape" },
+  { name = "node_count", offset = 408, type = "u32" },
+]
+
+# A part model's 192-byte node (FindShape's walk).
+[SecondSetModelNode]
+measure = "ModelPoint::FindShape.r4.+36"
+size = 192
+origin = "embedded"
+fields = [
+  { name = "shape", offset = 40, type = "u32", note = "its shape's index (-1 none)" },
+]
+
+# The skeleton a parts point record's +0 holds (FindHeadlights' record 0).
+[SecondSetPointSkeleton]
+measure = "PartsPoints.+0"
+size = 140
+origin = "embedded"
+fields = [
+  { name = "node_states", offset = 136, type = "u32", note = "the nodes' 144-byte records (model-animation.toml's Skeleton): +16 the float FindHeadlights takes" },
+]
+
+# The number plate's part model a bumper's group finds (record 6 of the
+# rear bumper, record 8 of the front).
+[SecondSetPlateModel]
+measures = ["PartsPoints.+1444", "PartsPoints.+1924"]
+size = 460
+origin = "embedded"
+fields = [
+  { name = "unknown_432", offset = 432, type = "u32", note = "set by the bumpers' draws (not read in detail)" },
+  { name = "texture", offset = 456, type = "u32", note = "the plate's texture (the group's +1684 or +2644)" },
+]
+
+# The car scene as the parts' point block's +37088 reads it (car-draw.toml's
+# CarScene).
+[SecondSetSceneRef]
+measure = "PartsPoints.+37088"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "model_set", offset = 4, type = "u32", note = "0 set a (the front end), 1 set b (a race)" },
+]
+
+# The scene model's 736-byte block (the scene model's +4288;
+# SceneModelBlock::SceneModelBlock, Reset): the same object as car-draw.toml's
+# CarDrawBlock (to merge; its names here).
+[SceneModelBlock]
+measure = "SceneModelBlock"
+size = 736
+origin = "embedded"
+fields = [
+  { name = "head", offset = 0, type = "u64", note = "+0 to +7 cleared as a doubleword" },
+  { name = "drawn", offset = 8, type = "u32", note = "the scene model's +4296: 0 draws nothing" },
+  { name = "cockpit_only", offset = 12, type = "u32", note = "the scene model's +4300" },
+  { name = "world", offset = 16, type = "bytes", count = 64, note = "the scene model's matrix (+4304; the identity from Reset)" },
+  { name = "world_row0_w", offset = 28, type = "f32", note = "1.0 (the constructor)" },
+  { name = "world_row1_w", offset = 44, type = "f32" },
+  { name = "world_row2_w", offset = 60, type = "f32" },
+  { name = "world_row3_w", offset = 76, type = "f32" },
+  { name = "wheel_turns", offset = 80, type = "bytes", count = 256, note = "the wheels' turns R_0 to R_3, 64 bytes each" },
+  { name = "wheel_r0_row0_w", offset = 92, type = "f32", note = "1.0 (the constructor; every row's w of the eight matrices)" },
+  { name = "wheel_r0_row1_w", offset = 108, type = "f32" },
+  { name = "wheel_r0_row2_w", offset = 124, type = "f32" },
+  { name = "wheel_r0_row3_w", offset = 140, type = "f32" },
+  { name = "wheel_spins", offset = 336, type = "bytes", count = 256, note = "the wheels' spins S_0 to S_3, 64 bytes each" },
+  { name = "wheel_s0_row0_w", offset = 348, type = "f32" },
+  { name = "wheel_s0_row1_w", offset = 364, type = "f32" },
+  { name = "wheel_s0_row2_w", offset = 380, type = "f32" },
+  { name = "wheel_s0_row3_w", offset = 396, type = "f32" },
+  { name = "rear_second_matrix", offset = 592, type = "u32", note = "set: the rear tires and rims drawn a second time, shifted" },
+  { name = "rim_looks", offset = 596, type = "bytes", count = 16, note = "four words (2 from Reset): set b's rims' records" },
+  { name = "front_rim_look_a", offset = 596, type = "u32" },
+  { name = "brake_alphas", offset = 612, type = "bytes", count = 16, note = "four floats (0.0 from Reset): record 10's alpha on the brakes" },
+  { name = "front_brake_alpha_a", offset = 612, type = "f32" },
+  { name = "window_alpha_02", offset = 628, type = "f32", note = "[0x8200296C] from Reset" },
+  { name = "window_alpha_01", offset = 632, type = "f32", note = "[0x82002A10] from Reset" },
+  { name = "lights_alpha", offset = 636, type = "f32", note = "[0x82002208] from Reset" },
+  { name = "bonnet_angle", offset = 640, type = "f32" },
+  { name = "left_door_x", offset = 656, type = "f32", note = "the left door's float4 (0.0 from Reset; w 1.0 from the constructor, then 0.0)" },
+  { name = "left_door_theta", offset = 660, type = "f32" },
+  { name = "left_door_phi", offset = 664, type = "f32" },
+  { name = "left_door_w", offset = 668, type = "f32" },
+  { name = "right_door_x", offset = 672, type = "f32", note = "the right door's float4" },
+  { name = "right_door_theta", offset = 676, type = "f32" },
+  { name = "right_door_phi", offset = 680, type = "f32" },
+  { name = "right_door_w", offset = 684, type = "f32" },
+  { name = "popup_set", offset = 688, type = "u32", note = "set: the pop-up's angle from +692" },
+  { name = "popup_angle", offset = 692, type = "f32" },
+  { name = "speed", offset = 696, type = "f32", note = "the digital speedometer's value" },
+  { name = "unknown_700", offset = 700, type = "f32", note = "0.0 from Reset" },
+  { name = "identity_world", offset = 724, type = "u32", note = "set: the light kit's world the identity in the front end" },
+  { name = "word_728", offset = 728, type = "u32", note = "0 from Reset (not read in detail)" },
+  { name = "no_side_offset", offset = 732, type = "u32", note = "1 from Reset: the wheels' sides not moved" },
+]
+
+# The wheels' morph record (124 bytes, on the set-ups' frames; Morph::SetUp,
+# Run and Blend).
+[Morph]
+measures = ["Morph", "Morph::Run.r4", "Morph::SetUp.r4"]
+size = 124
+origin = "embedded"
+fields = [
+  { name = "base_stream", offset = 0, type = "u32", note = "the base shape's first stream ([shape + 400] + 16)" },
+  { name = "base_stream2", offset = 4, type = "u32", note = "its second ([shape + 404] + 16)" },
+  { name = "out1", offset = 8, type = "ptr", to = "MorphStream", note = "the first output (Morph::Run)" },
+  { name = "out2", offset = 12, type = "ptr", to = "MorphStream", note = "the second" },
+  { name = "targets", offset = 16, type = "bytes", count = 28, note = "up to seven targets' first streams" },
+  { name = "target0", offset = 16, type = "u32" },
+  { name = "target6", offset = 40, type = "u32", note = "the seventh target's (Morph::SetUp reads it back)" },
+  { name = "target_seconds", offset = 48, type = "bytes", count = 28, note = "the base's second stream, once a target" },
+  { name = "target_second0", offset = 48, type = "ptr", to = "MorphStream" },
+  { name = "weights", offset = 80, type = "bytes", count = 28, note = "the targets' weights" },
+  { name = "weight0", offset = 80, type = "f32" },
+  { name = "count", offset = 112, type = "u32", note = "the targets (8 and above taken as 7)" },
+  { name = "vertices", offset = 116, type = "u32", note = "[[shape + 400]]: the vertices (16 bytes each)" },
+  { name = "kind", offset = 120, type = "u32", note = "[[shape + 404] + 4]: 6 Blend6, 7 Blend7, else 8 (sub_8258B7E0, never ran)" },
+]
+
+# A stream the never-run 8-kind blend (sub_8258B7E0) reads and writes.
+[MorphStream]
+measures = ["Morph.+12", "Morph.+48"]
+size = 32
+origin = "embedded"
+fields = [
+  { name = "unknown_28", offset = 28, type = "f32", note = "sub_8258B7E0 (never ran; not read in detail)" },
+]
+
+[globals]
+scene = { address = 0x826C2E44, type = "ptr", to = "CarScene", note = "the car scene (its second set at +4944)" }
+first_set = { address = 0x826C2E40, type = "ptr", to = "ScenePools", note = "the first set of scene pools (ScenePools::ReleaseA's r3)" }
+one = { address = 0x82000A30, type = "f32", note = "1.0" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0" }
+three = { address = 0x82006420, type = "f32", note = "3.0 (the traffic body's lights' scale)" }
+five = { address = 0x82005FE4, type = "f32", note = "5.0 (the parts' scale)" }
+brake_step = { address = 0x82006634, type = "f32", note = "1/9 (probably): the brakes' morph weight a step" }
+tire_table = { address = 0x82003EF8, type = "bytes", count = 2160, note = "24 bytes an entry by the block (+1080 for traffic): the tire's index, value and float, front then rear" }
+index_table = { address = 0x820044B0, type = "bytes", count = 2024, note = "44 bytes an entry by the block (+1980 for traffic)" }
+parts_names = { address = 0x826025F4, type = "bytes", count = 1064, note = "the parts', interior's, wheels' and traffic body's name tables (string pointers, to 0x82602A1B)" }
+cockpit_names = { address = 0x82005238, type = "bytes", count = 68, note = "the cockpit's name tables (to 0x8200527B)" }
+light_names = { address = 0x820055F0, type = "bytes", count = 216, note = "the light kit's three 18-name tables (to 0x820056C7)" }

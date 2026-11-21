@@ -3,6 +3,7 @@
 #include "sprites/world_sprites.h"
 
 #include "guest.h"
+#include "schema/sprites.h"
 
 #include "base/log.h"
 #include "hooks/lifted_call.h"
@@ -13,16 +14,13 @@ namespace sprites {
 
 namespace {
 
-constexpr uint32_t kQueueAndList = 0x826C5D5C;  // +0 the render queue, +4 the command list
+using G = schema::SpritesGlobals;
 constexpr uint32_t kOpenChunk = 0x8258C9D0;
 constexpr uint32_t kAllocateSlots = 0x8258CAA0;
 constexpr uint32_t kAllocateConstants = 0x8258CB98;
 constexpr uint32_t kAllocateVertices = 0x8258CB08;
 constexpr uint32_t kCloseChunk = 0x8258CA50;
 constexpr uint32_t kMultiply = 0x8209BD50;  // the 4x4 product into the constants
-constexpr uint32_t kOne = 0x82000A30;
-constexpr uint32_t kZero = 0x82000A34;
-constexpr uint32_t kTextureEnd = 0x82001BE4;
 
 constexpr uint32_t kListCount = 0x109F0;
 constexpr uint32_t kListState = 0x109F4;
@@ -48,7 +46,7 @@ class Recorder {
  public:
   Recorder(uint8_t* base, uint32_t frame, uint64_t r13) : base_(base), frame_(frame), r13_(r13) {}
 
-  uint32_t List() const { return guest::LoadU32(base_, kQueueAndList + 4); }
+  uint32_t List() const { return G::command_list(base_); }
   uint64_t Call(uint32_t function, std::initializer_list<uint64_t> args, double f1 = 0.0) const {
     return lifted_call::Call(base_, function, frame_, r13_, args, f1).r3;
   }
@@ -148,7 +146,7 @@ uint64_t CloseAndSubmit(uint8_t* base, const Recorder& r, const Opened& opened, 
   r.Put(1, 1, 0);
   r.Put(48, 1);
   r.Call(kCloseChunk, {r.List()});
-  const uint32_t queue = guest::LoadU32(base, kQueueAndList);
+  const uint32_t queue = G::render_queue(base);
   const uint32_t submit = guest::LoadU32(base, guest::LoadU32(base, queue) + 16);
   const double key = -double(guest::LoadFloat(base, opened.constants + 56));
   return r.Call(submit, {queue, opened.header, layer}, key);
@@ -231,9 +229,9 @@ uint64_t SpriteListRecord(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t lis
   const Recorder r(base, frame, r13);
   const Opened opened =
       OpenAndRecordStates(base, r, list, guest::LoadU32(base, list + kListState), camera);
-  const double end = double(guest::LoadFloat(base, kTextureEnd));
-  const double zero = double(guest::LoadFloat(base, kZero));
-  const double one = double(guest::LoadFloat(base, kOne));
+  const double end = double(G::size_scale(base));
+  const double zero = double(G::zero(base));
+  const double one = double(G::one(base));
   for (uint32_t i = 0; i < count; i++) {
     const uint32_t corners = list + 80 + 64 * i;
     const uint32_t vertices = QuadStates(r);

@@ -1,0 +1,212 @@
+# The schema of docs/functions/tuning-machine.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The type 2 mode's tuning screen machine: the tuning screen itself (the
+# type 2 mode block's +19792), its +9604 the machine's state
+# (src/tuning_machine/). Its fields are in docs/known-data.md ("tuning
+# screen").
+#
+# The seed's other types aren't described here:
+# - "new<28>@TuningMachine::Create" is the screen's command queue
+#   ([+10036], 28 bytes, VirtualAlloc'ed by Create): menu-helpers.toml's
+#   PageObject (a measure name to add there).
+# - "new<68>@TuningMachine::Create" is the category menu ([+10040]) and
+#   the second menu ([+10044]), 68 bytes each: menu-helpers.toml's
+#   FrontEndMenu (a measure name to add there).
+# - "UiMovies::Find.ret.+0.+28.+636" (movie 14's texture slot 159, its +0
+#   the placeholder texture DecalImages::SavePlaceholders14 keeps) is
+#   tuning-pages.toml's UiMovieTexture (a measure name to add there).
+
+# The tuning screen as its machine's handlers see it (r3). The measure
+# files the screen's TuningScreen:: functions under "TuningScreen"
+# (tuning-screen.md's) and the machine's handlers under "TuningMachine":
+# one object, to merge into tuning-screen.toml's type (this one's names
+# follow docs/known-data.md as that one's should).
+[TuningMachineScreen]
+measure = "TuningMachine"
+size = 36828
+origin = "embedded"
+fields = [
+  { name = "transitions", offset = 0, type = "bytes", count = 9600, note = "200 transitions, 48 bytes each (StateMachine's); the measure's +0 to +12 are ZeroRecord16's record (+30800, +30816), a measure fault" },
+  { name = "transition_count", offset = 9600, type = "u32" },
+  { name = "state", offset = 9604, type = "u32", note = "the machine's state: 1 open the movies, 2 wait for them, 9 wait for message 12, 4 start, 5 running, 8 unloading, 7 closing, 6 done" },
+  { name = "movies_loaded", offset = 9608, type = "u32", note = "movies 2, 13 and 14 loaded" },
+  { name = "reenter", offset = 9612, type = "u32", note = "nonzero: wait for message 12 after loading (1 from the mode's Init)" },
+  { name = "delete_movies", offset = 9616, type = "u32", note = "nonzero: Unload deletes movies 2, 13 and 14" },
+  { name = "screen_state", offset = 9652, type = "u32", note = "the screen's state, 3 to 58 (3 TUNING SHOP MAIN, 4 the category menu, 9 CONF BUY, 10 the money short, 11 CONF EQUIP, ...)" },
+  { name = "category", offset = 9656, type = "u32", note = "0 power, 1 power train, 2 body, 3 tire, 4 aero, 5 exterior, 6 interior" },
+  { name = "item", offset = 9660, type = "u8", note = "the item in the category" },
+  { name = "level", offset = 9661, type = "u8", note = "the level pick" },
+  { name = "type", offset = 9662, type = "u8", note = "the type pick" },
+  { name = "bonnet_choice", offset = 9663, type = "u8" },
+  { name = "option", offset = 9664, type = "u8", note = "the option pick (color, hardness or door type)" },
+  { name = "confirm_cursor", offset = 9665, type = "u8", note = "the dialogs 9 and 11's cursor" },
+  { name = "unknown_9666", offset = 9666, type = "u8" },
+  { name = "keep_cursor", offset = 9667, type = "u8", note = "dialog 12's cursor (probably)" },
+  { name = "discard_cursor", offset = 9668, type = "u8", note = "dialog 13's cursor (probably)" },
+  { name = "remove_cursor", offset = 9672, type = "u32", note = "dialog 14's cursor (probably)" },
+  { name = "item_count", offset = 9676, type = "u8", note = "the category's item count" },
+  { name = "level_count", offset = 9677, type = "u8", note = "the level list's length" },
+  { name = "type_count", offset = 9678, type = "u8", note = "the type list's length" },
+  { name = "color_rows", offset = 9679, type = "u8", note = "state 7's rows" },
+  { name = "option_count", offset = 9680, type = "u8", note = "state 8's options" },
+  { name = "unknown_9684", offset = 9684, type = "u32", note = "17 at creation" },
+  { name = "open_mask", offset = 9688, type = "u32", note = "a mask of the items state 4 opens; -1 at creation" },
+  { name = "unknown_9692", offset = 9692, type = "u32", note = "-1 at creation" },
+  { name = "unknown_9696", offset = 9696, type = "u32", note = "-1 at creation" },
+  { name = "unknown_9700", offset = 9700, type = "u32", note = "-1 at creation" },
+  { name = "unknown_9704", offset = 9704, type = "u32", note = "-1 at creation" },
+  { name = "refresh", offset = 9708, type = "u32", note = "the refresh sub_821E3AD0 runs while 1" },
+  { name = "bonnet_color_set", offset = 9712, type = "u32", note = "set by the bonnet's color choice" },
+  { name = "command_first_run", offset = 9716, type = "u32", note = "a command's first-run flag" },
+  { name = "command_end_after_setup", offset = 9720, type = "u32", note = "end the command at once after its set-up" },
+  { name = "command_end_now", offset = 9724, type = "u32" },
+  { name = "pages_enabled", offset = 9728, type = "u32", note = "the input pages run only while set" },
+  { name = "rewrite_car", offset = 9732, type = "u32", note = "the stand and garage car rewrite request" },
+  { name = "menu_category", offset = 9740, type = "u32", note = "the category copied from the menu" },
+  { name = "menu_choice", offset = 9744, type = "u32", note = "the level, type or option copied from the menu" },
+  { name = "unknown_9748", offset = 9748, type = "u32", note = "OnDialogNo copies the category menu's cursor here" },
+  { name = "unknown_9752", offset = 9752, type = "u32" },
+  { name = "state_history", offset = 9756, type = "bytes", count = 252, note = "63 states (words), pushed before a sub-page, popped on B; no bound check" },
+  { name = "history_depth", offset = 10008, type = "u8" },
+  { name = "stand_action", offset = 10012, type = "u32", note = "a pending stand action (1 to 10), -1 none" },
+  { name = "busy_shown", offset = 10016, type = "u32", note = "the busy icon shown" },
+  { name = "busy_movie", offset = 10020, type = "u32", note = "the busy icon's movie (2)" },
+  { name = "busy_animation_a", offset = 10024, type = "u32", note = "a named animation (172)" },
+  { name = "busy_animation_b", offset = 10028, type = "u32", note = "a named animation (171)" },
+  { name = "busy_animation_c", offset = 10032, type = "u32", note = "a named animation (173)" },
+  { name = "queue", offset = 10036, type = "ptr", to = "PageObject", note = "the command queue (28 bytes, VirtualAlloc'ed by Create)" },
+  { name = "category_menu", offset = 10040, type = "ptr", to = "FrontEndMenu" },
+  { name = "second_menu", offset = 10044, type = "ptr", to = "FrontEndMenu", note = "the sticker editor's menu" },
+  { name = "decal_images", offset = 10048, type = "bytes", count = 8856, note = "DecalImages (tuning-pages.toml), embedded" },
+  { name = "save_data", offset = 18904, type = "ptr", to = "SaveData", note = "player 0's save data" },
+  { name = "car_body_weight", offset = 18912, type = "f32", note = "the car data's +0 (the car data embedded at +18912)" },
+  { name = "car_front_weight", offset = 19312, type = "f32", note = "the car data's +400 (an axle's, probably)" },
+  { name = "car_rear_weight", offset = 19584, type = "f32", note = "the car data's +672 (an axle's, probably)" },
+  { name = "car_displacement", offset = 20200, type = "f32", note = "the car data's +1288" },
+  { name = "stat_displacement", offset = 20768, type = "u32" },
+  { name = "stat_weight", offset = 20772, type = "u32" },
+  { name = "stat_power", offset = 20776, type = "u32", note = "the peak power" },
+  { name = "stat_torque", offset = 20780, type = "f32", note = "the torque shown" },
+  { name = "camera_preset", offset = 25072, type = "u32", note = "the camera preset command last picked" },
+  { name = "previewed_slot", offset = 25076, type = "u32", note = "the part slot last previewed" },
+  { name = "unknown_25080", offset = 25080, type = "u32", note = "4 at Start" },
+  { name = "list_row", offset = 25100, type = "u32", note = "the list's scrolled row (category 4) or the level for long lists" },
+  { name = "list_previous_row", offset = 25104, type = "u32" },
+  { name = "money", offset = 25116, type = "u32" },
+  { name = "last_price", offset = 25120, type = "u32" },
+  { name = "unknown_25124", offset = 25124, type = "u8", note = "0xFF at Start" },
+  { name = "wheel_part_cursor", offset = 25196, type = "u32", note = "0 both, 1 front, 2 rear" },
+  { name = "unknown_25200", offset = 25200, type = "u32" },
+  { name = "wheel_brand", offset = 25204, type = "u32", note = "the part group or wheel brand (0 to 16)" },
+  { name = "unknown_25208", offset = 25208, type = "u32" },
+  { name = "brand_tab_row", offset = 25212, type = "u32" },
+  { name = "unknown_25216", offset = 25216, type = "u32" },
+  { name = "wheel_model", offset = 25220, type = "u32", note = "the list's cursor (the model in the brand)" },
+  { name = "wheel_model_last", offset = 25224, type = "u32", note = "the list's last index" },
+  { name = "wheel_size", offset = 25228, type = "u32", note = "state 17's cursor" },
+  { name = "wheel_size_last", offset = 25232, type = "u32", note = "state 17's last index" },
+  { name = "unknown_25236", offset = 25236, type = "u32" },
+  { name = "wheel_back_pressed", offset = 25240, type = "u32", note = "set by state 16's B" },
+  { name = "second_wheels_step", offset = 25244, type = "u32", note = "1 claim them, 2 paint them, 0 done" },
+  { name = "paint_row", offset = 30440, type = "u32", note = "hue, saturation, value, the choice, the buttons" },
+  { name = "paint_hue", offset = 30444, type = "u32" },
+  { name = "paint_saturation", offset = 30448, type = "u32" },
+  { name = "paint_value", offset = 30452, type = "u32" },
+  { name = "paint_choice", offset = 30456, type = "u32", note = "a two-way choice" },
+  { name = "paint_buttons", offset = 30460, type = "u32" },
+  { name = "unknown_30464", offset = 30464, type = "u32", note = "one of the paint page's previous values" },
+  { name = "unknown_30468", offset = 30468, type = "u32", note = "one of the paint page's previous values" },
+  { name = "unknown_30472", offset = 30472, type = "u32", note = "one of the paint page's previous values" },
+  { name = "light_kit_group", offset = 30492, type = "u32" },
+  { name = "unknown_30496", offset = 30496, type = "u32" },
+  { name = "light_kit_kind", offset = 30500, type = "u32", note = "0, 1 or 2 remove" },
+  { name = "unknown_30504", offset = 30504, type = "u32" },
+  { name = "light_kit0_row", offset = 30508, type = "u32" },
+  { name = "light_kit0_value_0", offset = 30512, type = "u32" },
+  { name = "light_kit0_value_1", offset = 30516, type = "u32" },
+  { name = "light_kit0_value_2", offset = 30520, type = "u32" },
+  { name = "light_kit0_value_3", offset = 30524, type = "u32" },
+  { name = "unknown_30528", offset = 30528, type = "u32", note = "read with light_kit0_row by the refresh" },
+  { name = "unknown_30532", offset = 30532, type = "u32" },
+  { name = "unknown_30536", offset = 30536, type = "u32" },
+  { name = "unknown_30540", offset = 30540, type = "u32" },
+  { name = "light_kit1_row", offset = 30544, type = "u32" },
+  { name = "light_kit1_value_0", offset = 30548, type = "u32" },
+  { name = "light_kit1_value_1", offset = 30552, type = "u32" },
+  { name = "light_kit1_value_2", offset = 30556, type = "u32" },
+  { name = "unknown_30560", offset = 30560, type = "u32", note = "read with light_kit1_row by the refresh" },
+  { name = "unknown_30564", offset = 30564, type = "u32" },
+  { name = "unknown_30568", offset = 30568, type = "u32" },
+  { name = "unknown_30572", offset = 30572, type = "u32" },
+  { name = "unknown_30576", offset = 30576, type = "u32" },
+  { name = "editor_page", offset = 30724, type = "u32", note = "the vinyl page (0 or 1), or the sticker editor's area (0 to 7)" },
+  { name = "editor_page_wrapped", offset = 30728, type = "u32" },
+  { name = "layer_cursor", offset = 30732, type = "u32", note = "the vinyl layer, or the sticker slot" },
+  { name = "layer_button", offset = 30736, type = "u32", note = "the layer page's remembered button" },
+  { name = "operation_cursor", offset = 30740, type = "u32", note = "0 edit, 1 order, 2 image, 3 remove" },
+  { name = "operation_wrapped", offset = 30744, type = "u32" },
+  { name = "edit_cursor", offset = 30748, type = "u32", note = "0 move, 1 rotate, 2 scale, 3 flip, 4 the free look, 5 and 6 two buttons" },
+  { name = "edit_row", offset = 30752, type = "u32", note = "the edit page's remembered row" },
+  { name = "order_position", offset = 30756, type = "u32", note = "the order page's position (the slot moved)" },
+  { name = "order_last_move", offset = 30760, type = "u32", note = "1 up, 2 down, 0 none" },
+  { name = "picked_image", offset = 30764, type = "u32", note = "the picked image or sticker" },
+  { name = "image_group", offset = 30768, type = "u32", note = "the picker's group" },
+  { name = "unknown_30772", offset = 30772, type = "u32", note = "0 before state 35" },
+  { name = "unknown_30776", offset = 30776, type = "u32", note = "0 before state 36" },
+  { name = "unknown_30780", offset = 30780, type = "u32", note = "0 before states 37 and 52" },
+  { name = "editor_last_page", offset = 30784, type = "u32" },
+  { name = "editor_last_layer", offset = 30788, type = "u32" },
+  { name = "order_last_position", offset = 30792, type = "u32", note = "state 27's last position" },
+  { name = "image_last_index", offset = 30796, type = "u32", note = "4, 193 or 198" },
+  { name = "page0_origin_x", offset = 30800, type = "u32" },
+  { name = "page0_origin_y", offset = 30804, type = "u32" },
+  { name = "page0_size_scale", offset = 30808, type = "f32" },
+  { name = "page0_position_scale", offset = 30812, type = "f32" },
+  { name = "page1_origin_x", offset = 30816, type = "u32" },
+  { name = "page1_origin_y", offset = 30820, type = "u32" },
+  { name = "page1_size_scale", offset = 30824, type = "f32" },
+  { name = "page1_position_scale", offset = 30828, type = "f32" },
+  { name = "edit_x", offset = 30832, type = "u32", note = "the edited decal's x" },
+  { name = "edit_y", offset = 30836, type = "u32" },
+  { name = "edit_angle", offset = 30840, type = "f32" },
+  { name = "edit_scale", offset = 30844, type = "f32" },
+  { name = "edit_flip", offset = 30848, type = "u32" },
+  { name = "unknown_30852", offset = 30852, type = "u32", note = "the edited decal's last word" },
+  { name = "edit_backup", offset = 30856, type = "bytes", count = 24, note = "a copy of the edited decal (restored on B)" },
+  { name = "vinyl_layers", offset = 30880, type = "bytes", count = 144, note = "six 24-byte decal records (x, y, angle, scale, flip, a word): 3 a page" },
+  { name = "saved_vinyl_layers", offset = 31024, type = "bytes", count = 144 },
+  { name = "vinyl_layer_ids", offset = 31168, type = "bytes", count = 24, note = "+12 x page + 4j, -1 an empty layer" },
+  { name = "saved_vinyl_layer_ids", offset = 31192, type = "bytes", count = 24 },
+  { name = "order_list", offset = 31216, type = "bytes", count = 24, note = "state 27's work list: ids (+0) and indices (+12)" },
+  { name = "saved_stickers", offset = 31240, type = "bytes", count = 960, note = "+120 x area + 24 x slot, decal records" },
+  { name = "saved_sticker_ids", offset = 32200, type = "bytes", count = 160, note = "+20 x area + 4 x slot" },
+  { name = "stickers", offset = 32360, type = "bytes", count = 960, note = "the placed stickers: +120 x area + 24 x slot" },
+  { name = "sticker_ids", offset = 33320, type = "bytes", count = 160, note = "+20 x area + 4 x slot" },
+  { name = "sticker_order", offset = 33480, type = "bytes", count = 20, note = "state 42's order list (slot indices)" },
+  { name = "interior_mode", offset = 33540, type = "u32", note = "the interior item's mode (0 goes back to state 53, 1 to 56)" },
+  { name = "interior_pages", offset = 33544, type = "bytes", count = 40, note = "the interior accessory's cursors (+33564 the pages' mode, +33572 the pair's second index, +33576 the slot)" },
+  { name = "paint_kept", offset = 36824, type = "u32", note = "set when a paint is kept, 0 when discarded" },
+]
+
+# The type 2 mode (type2-mode.md) as the machine's handlers see it (r4):
+# only its message ring, which they post to.
+[TuningMachineMode]
+measures = ["TuningMachine::Close.r4", "TuningMachine::OnDialogClosed.r4"]
+size = 812
+origin = "embedded"
+fields = [
+  { name = "messages", offset = 204, type = "bytes", count = 600, note = "50 messages of 12 bytes (id, two words)" },
+  { name = "message_count", offset = 804, type = "u32" },
+  { name = "message_start", offset = 808, type = "u32", note = "the ring's first slot" },
+]
+
+[globals]
+float_zero = { address = 0x82000A34, type = "u32", note = "0.0 (as bits)" }
+float_one = { address = 0x82000A30, type = "u32", note = "1.0 (as bits)" }
+axle_factor = { address = 0x820021E8, type = "f32", note = "the axles' factor in the weight (2.0 probably)" }
+torque_scale = { address = 0x8200ADA0, type = "f32", note = "the torque shown's scale" }
+fade_in_passes = { address = 0x82001BEC, type = "u32", note = "ScreenFades::FadeIn's pass count" }

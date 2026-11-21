@@ -34,6 +34,7 @@
 
 #include "base/flags.h"
 #include "track_route/track_route.h"
+#include "schema/track_route.h"
 
 ITC_FLAG_BOOL(native_track_route, true, "ITC",
               "Run the course's route (docs/functions/track-route.md: LanePoint sub_820F8668, "
@@ -117,8 +118,8 @@ ITC_TRACK_ROUTE(820F8420, ClampPosition(base, ctx.r3.u32, ctx.r4.u32))
 // f1 the distance; r3 LinkDistance's answer for positions in different
 // sections, else the route (left as it came).
 ITC_TRACK_ROUTE(820F9278, bool linked = false;
-                const bool apart = guest::LoadU16(base, ctx.r4.u32) !=
-                                   guest::LoadU16(base, ctx.r5.u32);
+                const bool apart = schema::TrackRoutePosition(base, ctx.r4.u32).section() !=
+                                   schema::TrackRoutePosition(base, ctx.r5.u32).section();
                 ctx.f1.f64 = Distance(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, &linked);
                 if (apart) { ctx.r3.u64 = linked ? 1 : 0; })
 

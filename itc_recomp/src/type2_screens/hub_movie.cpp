@@ -29,7 +29,7 @@ constexpr uint32_t kFadeOutLayer = 0x82001BF0;
 constexpr uint32_t kWrapLast = 0x82008914;
 constexpr uint32_t kZero = 0x82000A34;
 
-uint32_t Data(uint8_t* base) { return Load(base, kHubData); }
+schema::Type2HubData Data(uint8_t* base) { return Globals::hub_data(base); }
 
 uint64_t Play(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t movie, uint64_t sub,
               uint64_t child, uint64_t r6 = 0) {
@@ -52,10 +52,10 @@ uint32_t FadesDone(uint8_t* base) {
 // The description's string for the menu's item (`item`, the cursor + 1),
 // from `first` on: 587 and 588 for items 2 and 3 with a second-list car.
 uint32_t Description(uint8_t* base, uint32_t item, uint32_t first) {
-  if (item == 2 && Load(base, Data(base) + 12) != 0) {
+  if (item == 2 && Data(base).car_refused() != 0) {
     return 587;
   }
-  if (item == 3 && Load(base, Data(base) + 12) != 0) {
+  if (item == 3 && Data(base).car_refused() != 0) {
     return 588;
   }
   return first + item;
@@ -71,7 +71,7 @@ uint64_t HubUpdatePage(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp,
   for (uint32_t i = 0; i < 7; i++) {
     Store(base, frame + 80 + 4 * i, kHubPagesTable[i]);
   }
-  const uint32_t page = Load(base, Load(base, kHubPages) + 0);
+  const uint32_t page = Globals::hub_pages(base).page();
   if (page != kNone) {
     r3 = calls.Call(Load(base, frame + 80 + (page << 2)), frame, 0x82190530, mode, machine);
   }
@@ -82,23 +82,23 @@ uint64_t HubSetRecordText(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8218F4D8 Type2Hub::SetRecordText");
   const uint32_t frame = Frame(base, sp, 96);
   const uint32_t movie = FindMovie(base, 17, frame + 80);
-  return SetText(calls, frame, 0x8218F51C, movie, kAll, 1, Load(base, Data(base) + 424) + 7527);
+  return SetText(calls, frame, 0x8218F51C, movie, kAll, 1, Data(base).record_string() + 7527);
 }
 
 uint64_t HubRecordPage(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821900B8 Type2Hub::RecordPage");
   const uint32_t frame = Frame(base, sp, 96);
   const uint64_t r3 = HubSetRecordText(base, frame, calls);
-  const uint32_t pages = Load(base, kHubPages);
-  const uint32_t before = Load(base, pages + 0);
+  const schema::PageObject pages = Globals::hub_pages(base);
+  const uint32_t before = pages.page();
   if (before != kNone) {
-    Store(base, pages + 8, before);
+    pages.set_previous_page(before);
   }
-  Store(base, pages + 0, kNone);
-  Store(base, pages + 12, kNone);
-  Store(base, pages + 16, kNone);
+  pages.set_page(kNone);
+  pages.set_step(kNone);
+  pages.set_queued_step(kNone);
   Post(base, mode, 35);
-  Store(base, Data(base) + 24, 2);
+  Data(base).set_dialog_step(2);
   return r3;
 }
 
@@ -126,16 +126,19 @@ uint32_t HubShowNoticeImage(uint8_t* base, uint32_t image, uint32_t sp) {
   const uint32_t pair = ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80);
   const uint32_t movie = Load(base, pair);
   static constexpr struct {
-    uint32_t list, field;
-  } kLists[2] = {{32, 36}, {220, 32}};
+    uint32_t (schema::Type2HubData::*images)() const;
+    uint32_t (schema::Type2HubData::*count)() const;
+    uint32_t field;
+  } kLists[2] = {{&schema::Type2HubData::images_address, &schema::Type2HubData::image_count, 36},
+                 {&schema::Type2HubData::images2_address, &schema::Type2HubData::image2_count, 32}};
   for (const auto& list : kLists) {
-    const uint32_t at = Data(base) + list.list;
-    const uint32_t count = Load(base, at + 184);
+    const schema::Type2HubData data = Data(base);
+    const uint32_t count = (data.*list.count)();
     uint32_t texture = 0;
     for (uint32_t i = 0; i < count; i++) {
-      const uint32_t record = Load(base, at + 4 * i);
-      if (Load(base, record + 4) == image) {
-        texture = Load(base, record + 8);
+      const schema::Type2HubImage record(base, Load(base, (data.*list.images)() + 4 * i));
+      if (record.index() == image) {
+        texture = record.texture().address;
         break;
       }
     }
@@ -149,9 +152,9 @@ uint32_t HubShowNotice(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 128);
   const uint32_t movie = FindMovie(base, kHubMovie, frame + 80);
   const uint32_t entry =
-      data_tables::Entry56(base, Load(base, Data(base) + 432), Load(base, Data(base) + 436));
+      data_tables::Entry56(base, Data(base).notice_table(), Data(base).notice_entry());
   SetText(calls, frame, 0x8219042C, movie, 0, 1, Load(base, entry + 12) + 4650);
-  SetText(calls, frame, 0x82190448, movie, 0, 2, Load(base, Data(base) + 436) + 6683);
+  SetText(calls, frame, 0x82190448, movie, 0, 2, Data(base).notice_entry() + 6683);
   HubShowNoticeImage(base, Load(base, entry + 16), frame);
   const uint32_t more = uint32_t(calls.Call(kHasMoreText, frame, 0x82190460, movie, 0, 2));
   const uint32_t node = ui_movies::FindNode(base, movie, 0, 0);
@@ -170,13 +173,13 @@ uint64_t HubFillMenu(uint8_t* base, uint32_t sp, const Calls& calls) {
   for (uint32_t i = 0; i < 8; i++) {
     SetText(calls, frame, 0x8218FBA4, movie, 11, 5 + i, Load(base, frame + 96 + 4 * i));
   }
-  const uint32_t cursor = Load(base, Load(base, kHubMenu) + 0);
+  const uint32_t cursor = Globals::hub_menu(base).cursor();
   calls.Call(kScrollText, frame, 0x8218FBD4, movie, 9, 0, 1);
   calls.Call(kScrollReset, frame, 0x8218FBE4, movie, 9, 0);
   uint32_t text = 536 + cursor;
-  if (cursor == 2 && Load(base, Data(base) + 12) != 0) {
+  if (cursor == 2 && Data(base).car_refused() != 0) {
     text = 587;
-  } else if (cursor == 3 && Load(base, Data(base) + 12) != 0) {
+  } else if (cursor == 3 && Data(base).car_refused() != 0) {
     text = 588;
   }
   SetText(calls, frame, 0x8218FC38, movie, 9, 0, text);
@@ -185,7 +188,7 @@ uint64_t HubFillMenu(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t car = SelectedGarageCar(base, vehicle_accessors::SaveDataOf(base, 0));
   const uint64_t r3 = calls.Call(kGetCarSpec, frame, 0x8218FCA0, Load(base, car + 224));
   const bool second = guest::LoadU8(base, uint32_t(r3) + 771) == 1;
-  Store(base, Data(base) + 12, second ? 1 : 0);
+  Data(base).set_car_refused(second ? 1 : 0);
   return r3;
 }
 
@@ -211,15 +214,15 @@ uint64_t HubTransition1(uint8_t* base, uint32_t step, uint32_t sp, const Calls& 
   const uint32_t frame = Frame(base, sp, 128);
   const uint32_t movie = FindMovie(base, kHubMovie, frame + 80);
   if (Load(base, step) == 0) {
-    const uint32_t item = Load(base, Load(base, kHubMenu) + 0) + 1;
-    const uint32_t second = Load(base, Data(base) + 12);
+    const uint32_t item = Globals::hub_menu(base).cursor() + 1;
+    const uint32_t second = Data(base).car_refused();
     if (second == 0 || (item != 2 && item != 3)) {
       Play(calls, frame, 0x8218ED04, movie, 11, item + 1);
       calls.Call(kLoopLast, frame, 0x8218ED0C, movie);
     }
     Play(calls, frame, 0x8218ED2C, movie, 12, 1);
     calls.Call(kLoop, frame, 0x8218ED3C, movie, 12, 1);
-    if (Load(base, Data(base) + 12) != 0) {
+    if (Data(base).car_refused() != 0) {
       calls.Call(kSetNodeColor, frame, 0x8218ED60, movie, 11, 6, 2);
       calls.Call(kSetNodeColor, frame, 0x8218ED74, movie, 11, 7, 2);
     }
@@ -234,23 +237,23 @@ uint64_t HubTransition2(uint8_t* base, uint32_t step, uint32_t sp, const Calls& 
   const uint32_t frame = Frame(base, sp, 144);
   const uint32_t movie = FindMovie(base, kHubMovie, frame + 80);
   if (Load(base, step) == 0) {
-    const uint32_t menu = Load(base, kHubMenu);
-    const uint32_t before = Load(base, menu + 4);
-    const uint32_t item = Load(base, menu + 0) + 1;
+    const schema::FrontEndMenu menu = Globals::hub_menu(base);
+    const uint32_t before = menu.previous();
+    const uint32_t item = menu.cursor() + 1;
     calls.Call(kFinish, frame, 0x8218EEA4, movie, 11, before + 2);
-    if (Load(base, Data(base) + 12) != 0 && (item == 2 || item == 3)) {
+    if (Data(base).car_refused() != 0 && (item == 2 || item == 3)) {
       PlayNamed(calls, frame, 0x8218EEE4, movie, 39);
       calls.Call(kFinishNamed, frame, 0x8218EEF0, movie, 39);
       PlayNamed(calls, frame, 0x8218EF0C, movie, 40, 1, 1);
       calls.Call(kFinishNamed, frame, 0x8218EF18, movie, 40);
     } else {
-      Play(calls, frame, 0x8218EF44, movie, 11, Load(base, Load(base, kHubMenu) + 0) + 2, 1);
+      Play(calls, frame, 0x8218EF44, movie, 11, Globals::hub_menu(base).cursor() + 2, 1);
       calls.Call(kLoopLast, frame, 0x8218EF4C, movie);
     }
     calls.Call(kFinish, frame, 0x8218EF5C, movie, 11, 13);
     calls.Call(kFinish, frame, 0x8218EF6C, movie, 11, 12);
     const uint32_t cursor = item - 1;
-    const uint32_t way = Load(base, Load(base, kHubMenu) + 8);
+    const uint32_t way = Globals::hub_menu(base).moved();
     if (way == 1) {
       if (cursor == 7) {
         Store(base, ui_movies::FindNode(base, movie, 11, 0) + 16, Load(base, kWrapLast));
@@ -264,7 +267,7 @@ uint64_t HubTransition2(uint8_t* base, uint32_t step, uint32_t sp, const Calls& 
         Play(calls, frame, 0x8218EFDC, movie, 11, 12);
       }
     }
-    const uint32_t now = Load(base, Load(base, kHubMenu) + 0) + 1;
+    const uint32_t now = Globals::hub_menu(base).cursor() + 1;
     calls.Call(kScrollText, frame, 0x8218F014, movie, 9, 0, 1);
     SetText(calls, frame, 0x8218F064, movie, 9, 0, Description(base, now, 535));
     calls.Call(kScrollReset, frame, 0x8218F074, movie, 9, 0);
@@ -332,7 +335,7 @@ uint64_t HubTransition7(uint8_t* base, uint32_t step, uint32_t sp, const Calls& 
   }
   Run(calls, frame, 0x82190358, movie);
   const uint32_t done = FadesDone(base);
-  if (done != 0 && Load(base, Data(base) + 12) != 0) {
+  if (done != 0 && Data(base).car_refused() != 0) {
     calls.Call(kSetNodeColor, frame, 0x821903A0, movie, 11, 6, 2);
     calls.Call(kSetNodeColor, frame, 0x821903B4, movie, 11, 7, 2);
   }

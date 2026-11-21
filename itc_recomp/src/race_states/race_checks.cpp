@@ -55,8 +55,8 @@ uint32_t CountHits(uint8_t* base, uint32_t out, uint32_t progress, uint32_t inde
   const Progress p(base, progress);
   const Slot slot = SlotOf(base, progress, index);
   const uint32_t vehicle = va::VehicleGet(base, Load(base, slot.entry().address + 20));
-  const uint32_t e = index * kEntryBytes + progress;
-  const uint32_t lap = p.lap_records_on() != 0 ? Load(base, e + 3020) : 0;
+  const uint32_t e = index * kEntryBytes;  // entry `index`'s offset from entry 0
+  const uint32_t lap = p.lap_records_on() != 0 ? Load(base, p.e0_lap_record_address() + e) : 0;
   const double strength = Lfs(base, G::hit_strength_address());
   // The track (collision flag 0x2), then other objects (0x1): a strong
   // enough hit sets E +804; a hit starts a 15-tick hold, and when it runs
@@ -67,7 +67,7 @@ uint32_t CountHits(uint8_t* base, uint32_t out, uint32_t progress, uint32_t inde
     const auto set_hold = [&](uint32_t v) { track ? slot.set_hold_1(v) : slot.set_hold_0(v); };
     if (Load(base, vehicle + 6152) & bit) {
       if (!(Lfs(base, vehicle + 6160) < strength)) {
-        Store(base, e + 2992, 1);
+        Store(base, p.e0_strong_hit_address() + e, 1);
       }
       if (hold() == 0) {
         set_hold(15);
@@ -85,25 +85,26 @@ uint32_t CountHits(uint8_t* base, uint32_t out, uint32_t progress, uint32_t inde
     if (!(checks & 0x400) && !(checks & 0x200)) {
       return;
     }
-    const uint32_t at = lap * 76 + e + counter;
+    const uint32_t at = lap * kLapRecordBytes + e + counter;
     const uint32_t count = Load(base, at);
     if (int32_t(count) < 999) {
       Store(base, at, count + 1);
     }
     Store(base, e + copy, Load(base, at));
   };
-  hit(0x2, true, 2276, 2996);
-  hit(0x1, false, 2280, 3000);
+  hit(0x2, true, p.e0_lap_track_hits_address(), p.e0_track_hits_address());
+  hit(0x1, false, p.e0_lap_car_hits_address(), p.e0_car_hits_address());
   return Out(base, out, 0, 0);
 }
 
 uint32_t Damage(uint8_t* base, uint32_t out, uint32_t progress, uint32_t index, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_82164228 RaceProgress::Damage");
   const uint32_t vehicle = SlotVehicle(base, progress, index);
-  const uint32_t e = index * kEntryBytes + progress;
+  const Progress p(base, progress);
+  const uint32_t e = index * kEntryBytes;  // entry `index`'s offset from entry 0
   if ((Load(base, vehicle + 6148) & 129) == 0) {
-    const uint32_t quarter = uint32_t(uint64_t(Load(base, e + 2976)) * 25);
-    if (int32_t(quarter) / 100 > int32_t(Load(base, e + 2972))) {
+    const uint32_t quarter = uint32_t(uint64_t(Load(base, p.e0_start_sp_address() + e)) * 25);
+    if (int32_t(quarter) / 100 > int32_t(Load(base, p.e0_sp_address() + e))) {
       return Out(base, out, 0, 0);
     }
   }
@@ -111,14 +112,14 @@ uint32_t Damage(uint8_t* base, uint32_t out, uint32_t progress, uint32_t index, 
   Store(base, frame + 80, 0);
   if (contact != 0) {
     if (va::ContactObject(base, contact) != 0) {
-      if (int32_t(Load(base, e + 2972)) > 3000) {
+      if (int32_t(Load(base, p.e0_sp_address() + e)) > 3000) {
         Store(base, frame + 80,
-              FctidzWord(Fmuls(Lfs(base, Progress(base, progress).car_hit_cost_address()),
+              FctidzWord(Fmuls(Lfs(base, p.car_hit_cost_address()),
                                Lfs(base, G::car_hit_address()))));
       }
     } else {
       Store(base, frame + 80,
-            FctidzWord(Fmuls(Lfs(base, Progress(base, progress).track_hit_cost_address()),
+            FctidzWord(Fmuls(Lfs(base, p.track_hit_cost_address()),
                              Lfs(base, G::wall_hit_address()))));
     }
     const double impact = double(va::ContactStrength(base, contact));
@@ -136,7 +137,7 @@ uint32_t Damage(uint8_t* base, uint32_t out, uint32_t progress, uint32_t index, 
   if (lost > 500) {
     lost = 500;
   }
-  const uint32_t sp = e + kEntries + 784;
+  const uint32_t sp = p.e0_sp_address() + e;
   const int32_t left = int32_t(Load(base, sp) - lost);
   Store(base, sp, left > 0 ? uint32_t(left) : 0);
   return Out(base, out, 0, 0);
@@ -161,10 +162,10 @@ uint32_t DrainSp(uint8_t* base, uint32_t out, uint32_t progress, uint32_t frame)
         const uint32_t ahead_b = p.e0_route_distance_address() + kEntryBytes * uint32_t(b);
         const uint32_t vb = va::VehicleGet(
             base, Load(base, SlotOf(base, progress, uint32_t(b)).entry().address + 20));
-        if (int32_t(Load(base, ahead_b - 40)) <= 0) {
+        if (int32_t(Load(base, p.e0_sp_address() + kEntryBytes * uint32_t(b))) <= 0) {
           continue;
         }
-        double gap_a = Lfs(base, sp_a + 40);
+        double gap_a = Lfs(base, p.e0_route_distance_address() + kEntryBytes * uint32_t(a));
         const double gap_b = Lfs(base, ahead_b);
         if (!(gap_a < gap_b)) {  // bge: !lt, as the translation
           continue;
@@ -225,7 +226,9 @@ uint32_t DrainSp(uint8_t* base, uint32_t out, uint32_t progress, uint32_t frame)
       const uint32_t at = p.e0_sp_address() + kEntryBytes * uint32_t(j);
       // The debug print's argument (the empty sub_82106540): its distance's
       // double on the frame.
-      Store64(base, frame + 72, std::bit_cast<uint64_t>(Lfs(base, at + 40)));
+      Store64(base, frame + 72,
+              std::bit_cast<uint64_t>(
+                  Lfs(base, p.e0_route_distance_address() + kEntryBytes * uint32_t(j))));
       const uint32_t entry = SlotOf(base, progress, uint32_t(j)).entry().address;
       const uint32_t flags = Load(base, entry);
       if (flags & 0x4) {
@@ -262,10 +265,11 @@ uint32_t CheckLap(uint8_t* base, uint32_t out, uint32_t progress, uint32_t index
   Store(base, frame + 80, Load(base, va::VehicleIdentity(vehicle) + 4));
   const Progress p(base, progress);
   race_setup::CopyCourseRoute(base, frame, 288, p.route_course(), 0x821640E8);
-  const uint32_t e = index * kEntryBytes + progress;
-  const uint32_t lap = p.lap_records_on() != 0 ? Load(base, e + 3020) : 0;
-  const uint32_t record = lap * 76 + e;  // + 2208: the lap record
-  const uint32_t next = Load(base, record + 2268) + 1;
+  const uint32_t e = index * kEntryBytes;  // entry `index`'s offset from entry 0
+  const uint32_t lap = p.lap_records_on() != 0 ? Load(base, p.e0_lap_record_address() + e) : 0;
+  const uint32_t record = lap * kLapRecordBytes + e;  // the lap record's offset from entry 0's first
+  const uint32_t count = p.e0_lap_time_count_address() + record;
+  const uint32_t next = Load(base, count) + 1;
   va::PairsAt(base, frame + 84, frame + 96, next);
   if (int32_t(next) >= 5) {
     // Pairs::At's leftover below its caller's frame.
@@ -277,19 +281,18 @@ uint32_t CheckLap(uint8_t* base, uint32_t out, uint32_t progress, uint32_t index
       SectionsBeside(base, uint32_t(section), uint32_t(S16(base, frame + 80)), frame) != 0) {
     MapToSection(base, uint32_t(section), frame + 80, frame);
     if (PositionNotAfter(base, frame + 84, frame + 80) != 0) {
-      const double distance = Lfs(base, e + 3012);
+      const double distance = Lfs(base, p.e0_route_distance_address() + e);
       const double lap_distance = Lfs(base, p.lap_distances_address() + (next << 2));
       if (!(lap_distance > distance)) {
-        Store(base, frame + 80, Load(base, e + 2204));
-        for (uint32_t k = 0; Load(base, record + 2268) != 0 && k < Load(base, record + 2268);
-             k++) {
-          Store(base, frame + 84, Load(base, record + 2208 + 4 * k));
+        Store(base, frame + 80, Load(base, p.e0_time_address() + e));
+        const uint32_t times = p.e0_lap_times_address() + record;
+        for (uint32_t k = 0; Load(base, count) != 0 && k < Load(base, count); k++) {
+          Store(base, frame + 84, Load(base, times + 4 * k));
           Store(base, frame + 80, uint32_t(TimeSub(base, frame + 80, frame + 84)));
         }
         TickFraction(base, progress, index, frame + 80, frame - 112);
-        const uint32_t times = record + 2208;
-        Store(base, times + (Load(base, times + 60) << 2), Load(base, frame + 80));
-        Store(base, times + 60, Load(base, times + 60) + 1);
+        Store(base, times + (Load(base, count) << 2), Load(base, frame + 80));
+        Store(base, count, Load(base, count) + 1);
       }
     }
   }
@@ -307,11 +310,11 @@ uint32_t CheckFinish(uint8_t* base, uint32_t out, uint32_t progress, uint32_t in
   if (SectionsBeside(base, uint32_t(section), uint32_t(S16(base, frame + 80)), frame) != 0) {
     MapToSection(base, uint32_t(section), frame + 80, frame);
     if (PositionNotAfter(base, finish, frame + 80) != 0) {
-      const uint32_t e = index * kEntryBytes + progress;
-      if (!(Lfs(base, p.race_length_address()) > Lfs(base, e + 3012))) {
-        Store(base, frame + 80, Load(base, e + 2204));
+      const uint32_t e = index * kEntryBytes;  // entry `index`'s offset from entry 0
+      if (!(Lfs(base, p.race_length_address()) > Lfs(base, p.e0_route_distance_address() + e))) {
+        Store(base, frame + 80, Load(base, p.e0_time_address() + e));
         TickFraction(base, progress, index, frame + 80, frame - 112);
-        Store(base, e + 2204, Load(base, frame + 80));
+        Store(base, p.e0_time_address() + e, Load(base, frame + 80));
         return Out(base, out, 1, (Load(base, vehicle + 6148) & 1) ? 1 : 2);
       }
     }

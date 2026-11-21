@@ -6,7 +6,8 @@
 // their order. Float work is the translated code's step for step (doubles,
 // std::fma where the PowerPC code fuses), flush-to-zero off (the adapters'
 // job). Built with -ffp-model=strict and -ffp-contract=off (CMakeLists.txt).
-// Adapters: src/hooks/strings_and_font.cpp.
+// Adapters: src/hooks/strings_and_font.cpp. The objects' fields and the
+// image words: schema/strings_and_font.h (itc_recomp/schema/strings-and-font.toml).
 //
 // The string table: +0 the 17 files' pointers, +68 their loaded flags, +136
 // the mask of files asked for, +4236 the 17 counts. The font: +12 the mask
@@ -26,7 +27,6 @@ namespace strings_and_font {
 
 constexpr uint32_t kFont = 0x826C5C00;     // the font's pointer
 constexpr uint32_t kStrings = 0x826C5C34;  // the string table's pointer
-constexpr uint32_t kShaderEntries = 0x826C5C04;  // the four pixel shaders' sources
 
 constexpr uint32_t kStringFiles = 17;
 constexpr uint32_t kStringsBytes = 4304;
@@ -188,7 +188,6 @@ uint32_t FontOutCode(uint8_t* base, uint32_t font, uint32_t vertex);
 // The font's drawing (font.cpp). The globals at 0x826C5BCC: +0 the four
 // channels' glyph counts, +16 their vertex write pointers, +32 their
 // vertices' starts, +48 the chunk's first slot while drawing.
-constexpr uint32_t kDrawGlobals = 0x826C5BCC;
 
 // Whether the text is rotated (the parameters' +16 angle / 360, through a
 // float, not whole; a NaN is): Font::BuildVertices and Font::AddGlyph then
@@ -236,8 +235,6 @@ uint32_t TextDrawSetUp(uint8_t* base, uint32_t params);
 // --- The loads (from Text::Load at boot; Strings::Load from the front end's
 // screens too) ---
 
-constexpr uint32_t kFontPageIds = 0x82007C5C;    // the four pages' asset ids
-constexpr uint32_t kStringFileIds = 0x82007DD0;  // the 17 files' asset ids
 constexpr uint32_t kFontPageLoaded = 0x82109160; // the pages' load callback
 constexpr uint32_t kStringsLoaded = 0x8210A850;  // Strings::OnLoaded
 

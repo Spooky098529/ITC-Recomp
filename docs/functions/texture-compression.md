@@ -138,6 +138,19 @@ DXT codec's +144 targets' stay. `XGCompressSurface`'s went too once
 `Vinyl::Compress` was made native (`car-models.md`, the same run): its
 plain C++ calls `CompressSurface` directly.
 
+E5's step 2 (2026-11-21): the objects' fields are in
+`itc_recomp/schema/texture-compression.toml` (`schema/texture_compression.h`):
+the codecs (`ImageCodec` for the base and the 30 plain formats' classes,
+`DxtCodec`, `YuvCodec`, their vtables `ImageCodecVtable`), the DXT codec's
+block cache entries (`DxtBlockCacheEntry`), the blit object (`Blitter`), the
+image description (`ImageDescription`), the float4s (`TcFloat4`), the DXT
+blocks and the constants and switches the block encoders read (in
+`[globals]`). The hand ports read and write them through the views; the
+`codec`, `description` and `blit` namespaces went (`compress` stays: frame
+offsets). The measure joins the DXT blocks with the float4 pixels at the
+same pointers (`DxtColorBlock`, `DxtAlphaBlock`, `Dxt3ABlock`) and a word of
+`XGCompressSurface`'s frame with the blit object (its -4).
+
 Status:
 
 - **Native**: plain C++ in `itc_recomp/src/` that doesn't use the

@@ -20,6 +20,7 @@
 #include "save_interface/save_interface.h"
 #include "save_interface/save_layer.h"
 #include "save_interface/slot_handlers.h"
+#include "schema/save_interface.h"
 #include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_save_interface, true, "ITC",
@@ -232,7 +233,8 @@ ITC_REGS_STEP(SaveInterfaceBuffersCreate) {
 }
 
 ITC_REGS_STEP(SaveInterfaceBuffersFreeReplayList) {
-  const uint32_t records = guest::LoadU32(base, guest::LoadU32(base, si::kSaveBuffers) + 12);
+  const uint32_t records =
+      schema::SaveInterfaceGlobals::save_buffers(base).records().address;
   if (!hooks::NativeHeapActive() || (records != 0 && !memory::IsPages(records))) {
     lifted::original::c8228F7E8(ctx, base);
     return;
@@ -388,7 +390,7 @@ uint32_t DestroyPrologues(uint8_t* base, uint32_t sp, uint32_t lr, uint64_t r31,
                           uint32_t devices) {
   Prologue(base, sp, lr, 96, 31, &r31);
   const uint32_t frame = sp - 96;
-  if (guest::LoadU32(base, devices + 44) != 0) {
+  if (schema::SaveDevices(base, devices).slots<schema::View>().address != 0) {
     return ResetPrologue(base, frame, 0x820A572C, devices);
   }
   return frame;

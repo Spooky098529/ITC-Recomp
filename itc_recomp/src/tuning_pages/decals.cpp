@@ -17,6 +17,8 @@ namespace tuning_pages {
 
 namespace {
 
+using G = schema::TuningPagesGlobals;
+
 constexpr uint32_t kTgaCreateImage = 0x820ED020;
 constexpr uint32_t kResourceRelease = 0x822A67B0;
 constexpr uint32_t kMemcpy = 0x825A7410;
@@ -37,16 +39,25 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
 // Movie `movie_word`'s texture n's entry +0 = `value` (the table [movie+28]
 // read for it).
 void SetMovieTexture(uint8_t* base, uint32_t movie, uint32_t n, uint32_t value) {
-  const uint32_t table = Load(base, movie + 28);
-  Store(base, Load(base, table + n * 4), value);
+  MovieTexture(base, movie, n).set_texture(value);
 }
 
 // A movie texture restored from a placeholder word: movie `id`'s texture n's
-// +0 = [images + placeholder]. r3 the movie's entry.
-uint32_t RestoreTexture(uint8_t* base, uint32_t images, uint32_t id, uint32_t placeholder,
-                        uint32_t n, uint32_t frame) {
+// +0 = the decal images' placeholder w (0 and 1 movie 13's, 2 and 3 movie
+// 14's). r3 the movie's entry.
+uint32_t Placeholder(uint8_t* base, uint32_t images, uint32_t w) {
+  const schema::DecalImages im(base, images);
+  switch (w) {
+    case 0: return im.vinyl_placeholder_0();
+    case 1: return im.vinyl_placeholder_1();
+    case 2: return im.sticker_placeholder_0();
+    default: return im.sticker_placeholder_1();
+  }
+}
+uint32_t RestoreTexture(uint8_t* base, uint32_t images, uint32_t id, uint32_t w, uint32_t n,
+                        uint32_t frame) {
   const uint32_t entry = tuning_screen::MovieEntry(base, frame, id);
-  const uint32_t value = Load(base, images + placeholder);
+  const uint32_t value = Placeholder(base, images, w);
   SetMovieTexture(base, Load(base, entry), n, value);
   return entry;
 }
@@ -62,35 +73,32 @@ uint64_t VirtualFree(const tuning_screen::GuestCall& call, uint32_t address, uin
   return call(kVirtualFree, {address, 0, 0x8000}, frame, lr);
 }
 
-constexpr uint32_t kFadeIn = 0x826A50DC;   // layer 0's fade-in count
-constexpr uint32_t kFadeOut = 0x826A50E4;  // and fade-out count
-constexpr uint32_t kFadePasses = 0x82001BEC;
-
 }  // namespace
 
 uint64_t FreeTexture(uint8_t* base, uint64_t images, uint64_t i, const TextureFreeFn& free) {
   ITC_NATIVE_RUNNING("sub_821FE6A0 DecalImages::FreeTexture");
   const uint64_t entry = i * 36 + images;
   const uint32_t r3 = uint32_t(images);
-  const uint32_t texture = Load(base, uint32_t(entry) + 28);
+  const uint32_t texture = DecalEntryAt(base, images, i).texture_header();
   bool shared = false;
   for (uint32_t k = 0; k < 200; k++) {
-    if (Load(base, r3 + 7236 + 8 * k) == texture) {
+    if (DecalKeptAt(base, r3, k).texture_header() == texture) {
       shared = true;
     }
   }
   const int32_t index = int32_t(uint32_t(i));
   if (index >= 33 && index <= 50) {
     for (int32_t j = 33; j <= 50; j++) {
-      if (j != index && Load(base, r3 + 36 * uint32_t(j) + 28) == texture) {
+      if (j != index && DecalEntryAt(base, r3, uint32_t(j)).texture_header() == texture) {
         shared = true;
       }
     }
   }
+  const schema::DecalImageEntry e = DecalEntryAt(base, images, i);
   if (shared) {
-    return entry + 28;
+    return entry + 28;  // the texture header's address, all 64 bits (r3 as the original's)
   }
-  return free(uint32_t(entry) + 28, uint32_t(entry) + 32);
+  return free(e.texture_header_address(), e.texture_data_address());
 }
 
 uint64_t RestoreVinylTexture(uint8_t* base, uint64_t images, uint32_t w, uint32_t n,
@@ -98,10 +106,10 @@ uint64_t RestoreVinylTexture(uint8_t* base, uint64_t images, uint32_t w, uint32_
   ITC_NATIVE_RUNNING("sub_82204698 DecalImages::RestoreVinylTexture");
   const uint32_t frame = Frame(base, sp, 112);
   if (int32_t(w) == 0) {
-    return RestoreTexture(base, uint32_t(images), 13, 8836, n, frame);
+    return RestoreTexture(base, uint32_t(images), 13, 0, n, frame);
   }
   if (int32_t(w) == 1) {
-    return RestoreTexture(base, uint32_t(images), 13, 8840, n, frame);
+    return RestoreTexture(base, uint32_t(images), 13, 1, n, frame);
   }
   return images;
 }
@@ -111,10 +119,10 @@ uint64_t RestoreStickerTexture(uint8_t* base, uint64_t images, uint32_t w, uint3
   ITC_NATIVE_RUNNING("sub_821F89B8 DecalImages::RestoreStickerTexture");
   const uint32_t frame = Frame(base, sp, 112);
   if (int32_t(w) == 2) {
-    return RestoreTexture(base, uint32_t(images), 14, 8844, n, frame);
+    return RestoreTexture(base, uint32_t(images), 14, 2, n, frame);
   }
   if (int32_t(w) == 3) {
-    return RestoreTexture(base, uint32_t(images), 14, 8848, n, frame);
+    return RestoreTexture(base, uint32_t(images), 14, 3, n, frame);
   }
   return images;
 }
@@ -141,7 +149,7 @@ uint32_t BindVinylTexture(uint8_t* base, uint64_t images, uint32_t i, uint32_t g
     else if (index >= 35 && index <= 40) n = index + 125;
   }
   if (n >= 0) {
-    const uint32_t texture = Load(base, uint32_t(uint64_t(i) * 36 + images) + 28);
+    const uint32_t texture = DecalEntryAt(base, images, i).texture_header();
     SetMovieTexture(base, movie, uint32_t(n), texture);
   }
   return entry;
@@ -162,7 +170,8 @@ uint64_t BindVinylTextures(uint8_t* base, uint64_t screen, uint32_t sp) {
       {19, 173}, {6, 191},  {7, 192},  {8, 193},  {21, 175}, {22, 177}, {23, 178}, {35, 160},
       {36, 161}, {37, 162}, {38, 163}, {39, 164}, {40, 165}, {27, 194}, {28, 195}, {29, 196}};
   for (const auto& pair : kPairs) {
-    SetMovieTexture(base, movie, pair[1], Load(base, s + 10048 + 36 * pair[0] + 28));
+    SetMovieTexture(base, movie, pair[1],
+                    DecalEntryAt(base, s + 10048, pair[0]).texture_header());
   }
   return entry;
 }
@@ -189,7 +198,7 @@ uint64_t RestoreVinylMovie(uint8_t* base, uint64_t images, uint32_t sp) {
   uint64_t r3 = images;
   for (uint32_t w = 0; w < 2; w++) {
     for (const uint8_t n : w == 0 ? kGroup0 : kGroup1) {
-      RestoreTexture(base, uint32_t(images), 13, w == 0 ? 8836 : 8840, n, frame);
+      RestoreTexture(base, uint32_t(images), 13, w, n, frame);
       r3 = RestoreStickerTexture(base, images, w, n, frame);
     }
   }
@@ -217,13 +226,13 @@ uint64_t EnterEditor(uint8_t* base, uint64_t screen, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821D84F8 TuningScreen::EnterEditor");
   const uint32_t s = uint32_t(screen);
   const uint32_t frame = Frame(base, sp, 96);
-  if ((Load(base, kFadeOut) | Load(base, kFadeIn)) != 0) {
+  if ((G::fade_out_counts(base) | G::fade_in_counts(base)) != 0) {
     return screen;
   }
   if (AllLoaded(base, s + 10048) == 0) {
     return 0;
   }
-  const uint32_t passes = Load(base, kFadePasses);
+  const uint32_t passes = G::fade_in_passes(base);
   mode_tick::ScreenFadesFadeIn(base, passes, 0, 0, 0, 0);
   if (int32_t(Load(base, s + 9656)) != 5) {
     return passes;
@@ -308,17 +317,18 @@ uint64_t UpdateImages(uint8_t* base, const tuning_screen::GuestCall& call, uint6
   const uint32_t f = Frame(base, sp, 112);
   uint64_t r3 = images;
   for (uint32_t i = 0; i < 200; i++) {
-    const uint32_t e = uint32_t(images) + 36 * i;
-    if (Load(base, e + 20) == 0 || int32_t(Load(base, e + 8)) != 2) {
+    const schema::DecalImageEntry e = DecalEntryAt(base, images, i);
+    if (e.to_make() == 0 || int32_t(e.state()) != 2) {
       continue;
     }
-    const uint32_t file = Load(base, e + 12), size = Load(base, e + 16);
-    if (const auto made = TextureFromTga(base, call, file, size, e + 28, e + 32, f)) {
+    const uint32_t file = e.file(), size = e.file_size();
+    const uint32_t header = e.texture_header_address(), data = e.texture_data_address();
+    if (const auto made = TextureFromTga(base, call, file, size, header, data, f)) {
       r3 = *made;
     } else {
-      r3 = call(kTextureFromTga, {file, size, e + 28, e + 32}, f, 0x821FE670);
+      r3 = call(kTextureFromTga, {file, size, header, data}, f, 0x821FE670);
     }
-    Store(base, e + 20, 0);
+    e.set_to_make(0);
   }
   return r3;
 }
@@ -327,13 +337,13 @@ uint64_t Unload(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t im
                 uint32_t sp, bool native_free) {
   ITC_NATIVE_RUNNING("sub_821FEA68 DecalImages::Unload");
   const uint32_t f = Frame(base, sp, 112);
-  const uint32_t e = uint32_t(i * 36 + images);
-  if (int32_t(Load(base, e + 8)) != 2) {
+  const schema::DecalImageEntry e = DecalEntryAt(base, images, i);
+  if (int32_t(e.state()) != 2) {
     return images;
   }
-  Store(base, e + 0, 0xFFFFFFFFu);
-  Store(base, e + 4, 0);
-  Store(base, e + 8, 0);
+  e.set_asset_id(0xFFFFFFFFu);
+  e.set_handle(0);
+  e.set_state(0);
   // FreeTexture's tail call Texture::Free runs from this frame, returning
   // here.
   FreeTexture(base, images, i, [&](uint32_t header_in, uint32_t data_in) -> uint64_t {
@@ -342,14 +352,14 @@ uint64_t Unload(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t im
     }
     return call(kTextureFree, {header_in, data_in}, f, 0x821FEAA8);
   });
-  const uint32_t file = Load(base, e + 12);
-  Store(base, e + 28, 0);
-  Store(base, e + 32, 0);
+  const uint32_t file = e.file();
+  e.set_texture_header(0);
+  e.set_texture_data(0);
   const uint64_t r3 = VirtualFree(call, file, f, 0x821FEAC4);
-  Store(base, e + 12, 0);
-  Store(base, e + 16, 0);
-  Store(base, e + 20, 0);
-  Store(base, e + 24, 0);
+  e.set_file(0);
+  e.set_file_size(0);
+  e.set_to_make(0);
+  e.set_requested(0);
   return r3;
 }
 
@@ -363,14 +373,15 @@ uint64_t UnloadAll(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t
     r3 = Unload(base, call, images, i, f, native_free);
   }
   for (uint32_t k = 0; k < 200; k++) {
-    const uint32_t kept = uint32_t(images) + 7236 + 8 * k;
-    if (Load(base, kept) == 0 || Load(base, kept + 4) == 0) {
+    const schema::DecalImageKept kept = DecalKeptAt(base, images, k);
+    if (kept.texture_header() == 0 || kept.texture_data() == 0) {
       continue;
     }
-    if (native_free && car_models::TextureFreeable(base, kept)) {
-      r3 = car_models::TextureFree(base, kept, kept + 4);
+    const uint32_t header = kept.texture_header_address(), data = kept.texture_data_address();
+    if (native_free && car_models::TextureFreeable(base, header)) {
+      r3 = car_models::TextureFree(base, header, data);
     } else {
-      r3 = call(kTextureFree, {kept, kept + 4}, f, 0x822087A4);
+      r3 = call(kTextureFree, {header, data}, f, 0x822087A4);
     }
   }
   return r3;

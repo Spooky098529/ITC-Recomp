@@ -16,6 +16,8 @@
 #include <initializer_list>
 #include <optional>
 
+#include "schema/tuning_screen.h"
+
 namespace front_end_car_draw {
 struct Calls;
 struct DrawCallees;
@@ -26,7 +28,12 @@ struct Calls;
 
 namespace tuning_screen {
 
-// The screen's fields.
+// The screen's view (itc_recomp/schema/tuning-screen.toml).
+using TS = schema::TuningScreen;
+// A UI movie node's view.
+using UiNode = schema::UiMovieNode;
+
+// The screen's fields other areas' code still names by offset.
 constexpr uint32_t kState = 9652;      // the state machine (3 to 58)
 constexpr uint32_t kCategory = 9656;   // m: 0 power to 6 interior
 constexpr uint32_t kItem = 9660;       // p: a byte, the item in the category
@@ -34,7 +41,6 @@ constexpr uint32_t kLevel = 9661;      // a byte: the level pick
 constexpr uint32_t kType = 9662;       // a byte: the type pick
 constexpr uint32_t kType2 = 9663;      // a byte
 constexpr uint32_t kOption = 9664;     // a byte: the option pick
-constexpr uint32_t kPrice = 25120;     // GetPrice's answer kept
 constexpr uint32_t kPartSet = 33900;   // the power and power train tables' row
 constexpr uint32_t kSaveData = 18904;
 constexpr uint32_t kMovieId = 2;       // the screen's UI movie (13 and 14 the editors')  // the save data (its +6120 the garage's list)

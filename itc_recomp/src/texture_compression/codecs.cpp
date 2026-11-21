@@ -12,6 +12,7 @@
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "schema/texture_compression.h"
 #include "texture_compression/dxt45.h"
 #include "texture_compression/steps.h"
 
@@ -24,15 +25,14 @@ using namespace steps;
 
 namespace {
 
-constexpr uint32_t kInv255 = 0x82002200;  // probably 1/255
+using G = schema::TextureCompressionGlobals;
+
+constexpr uint32_t kInv255 = G::inverse_255_address();  // probably 1/255
 constexpr uint32_t kMaxAlloc = 0xFFFFF000;  // malloc's largest size
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
-}
-uint32_t Field(uint8_t* base, uint32_t codec, uint32_t offset) {
-  return Load(base, codec + offset);
 }
 
 bool Freeable(uint32_t block) { return block == 0 || memory::IsHeapBlock(block); }
@@ -70,9 +70,9 @@ uint32_t BlockRowBytes(uint32_t columns) {
 // The destination's address of block column `x` (pixels) on pixel row `y`
 // of slice `z`: data + (x >> 2) x +136 + (y >> 2) x +96 + z x +100.
 uint32_t BlockAddress(uint8_t* base, uint32_t codec, uint32_t x, uint32_t y, uint32_t z) {
-  return (x >> 2) * Field(base, codec, codec::kBlockBytes) +
-         (y >> 2) * Field(base, codec, codec::kRowPitch) +
-         Field(base, codec, codec::kSlicePitch) * z + Field(base, codec, codec::kData);
+  const schema::DxtCodec c(base, codec);
+  return (x >> 2) * c.block_bytes() + (y >> 2) * c.row_pitch() + c.slice_pitch() * z +
+         c.data().address;
 }
 
 // The DXT codec's block encode (+144): Dxt45::EncodeBlock's plain C++ for
@@ -100,21 +100,21 @@ uint32_t EncodeBlock(uint8_t* base, uint32_t function, uint32_t block, uint32_t 
 
 std::optional<uint32_t> DecodeA8R8G8B8Row(uint8_t* base, uint32_t codec, uint32_t row,
                                           uint32_t slice, uint32_t pixels) {
-  if (Field(base, codec, codec::kColorKey) != 0 || Field(base, codec, codec::kSrgb) != 0) {
+  const schema::ImageCodec c(base, codec);
+  if (c.color_key() != 0 || c.srgb() != 0) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_823F2620 A8R8G8B8Codec::DecodeRow");
-  uint32_t from = Field(base, codec, codec::kRowPitch) * row +
-                  Field(base, codec, codec::kSlicePitch) * slice + Field(base, codec, codec::kData);
-  const uint32_t end = (Field(base, codec, codec::kWidth) << 2) + from;
+  uint32_t from = c.row_pitch() * row + c.slice_pitch() * slice + c.data().address;
+  const uint32_t end = (c.width() << 2) + from;
   if (from < end) {
     const double scale = Lfs(base, kInv255);  // f0
     uint32_t to = pixels;
     do {
       static constexpr uint32_t kBytes[4] = {1, 2, 3, 0};  // red, green, blue, alpha
-      for (uint32_t c = 0; c < 4; c++) {
-        const double v = Fmuls(IntToSingle(guest::LoadU8(base, from + kBytes[c])), scale);
-        guest::StoreFloat(base, to + 4 * c, float(v));
+      for (uint32_t channel = 0; channel < 4; channel++) {
+        const double v = Fmuls(IntToSingle(guest::LoadU8(base, from + kBytes[channel])), scale);
+        guest::StoreFloat(base, to + 4 * channel, float(v));
       }
       from += 4;
       to += 16;
@@ -125,26 +125,24 @@ std::optional<uint32_t> DecodeA8R8G8B8Row(uint8_t* base, uint32_t codec, uint32_
 
 std::optional<uint32_t> DxtEncodeRow(uint8_t* base, uint32_t codec, uint32_t row, uint32_t slice,
                                      uint32_t pixels, uint32_t stack, const GuestCall& call) {
-  auto field = [&](uint32_t offset) { return Field(base, codec, offset); };
+  const schema::DxtCodec c(base, codec);
   // The refusals first, with nothing done.
-  if (field(codec::kConvertFrom) != 0 || field(codec::kSrgb) != 0) {
+  if (c.convert_from() != 0 || c.srgb() != 0) {
     return std::nullopt;
   }
-  const uint32_t z = field(codec::kBoxFront) + slice;  // r25
-  uint32_t y = row + field(codec::kBoxTop);            // r27
+  const uint32_t z = c.box_front() + slice;  // r25
+  uint32_t y = row + c.box_top();            // r27
   auto entry_of = [&]() {                               // r26
-    return (((z - field(codec::kFront)) * field(codec::kBlockRows) +
-             ((y - field(codec::kBlockTop)) >> 2))
-            << 3) +
-           field(codec::kCache);
+    return (((z - c.front()) * c.block_rows() + ((y - c.block_top()) >> 2)) << 3) +
+           c.cache().address;
   };
-  const bool row_refused = BlockRowBytes(field(codec::kBlockColumns)) > kMaxAlloc;
-  if (field(codec::kCache) == 0) {
-    if (CacheBytes(field(codec::kBlockRows) * field(codec::kSlices)) > kMaxAlloc || row_refused) {
+  const bool row_refused = BlockRowBytes(c.block_columns()) > kMaxAlloc;
+  if (c.cache().address == 0) {
+    if (CacheBytes(c.block_rows() * c.slices()) > kMaxAlloc || row_refused) {
       return std::nullopt;
     }
   } else {
-    const uint32_t held = Load(base, entry_of() + 4);
+    const uint32_t held = schema::DxtBlockCacheEntry(base, entry_of()).pixels().address;
     if (held == 0 ? row_refused : !Freeable(held)) {
       return std::nullopt;
     }
@@ -154,24 +152,24 @@ std::optional<uint32_t> DxtEncodeRow(uint8_t* base, uint32_t codec, uint32_t row
   uint32_t r3 = codec;
 
   // The cache, on the first row.
-  if (field(codec::kCache) == 0) {
+  if (c.cache().address == 0) {
     const auto made =
-        memory::crt::OperatorNew(base, CacheBytes(field(codec::kBlockRows) * field(codec::kSlices)));
+        memory::crt::OperatorNew(base, CacheBytes(c.block_rows() * c.slices()));
     const uint32_t cache = made ? *made : 0;
     if (!made) {
       ITC_LOG_ERROR("DxtCodec::EncodeRow: operator new refused the cache");
     }
-    Store(base, codec + codec::kCache, cache);
+    c.set_cache(cache);
     if (cache == 0) {
       return 0;
     }
-    Clear(base, cache, (field(codec::kBlockRows) * field(codec::kSlices)) << 3);
+    Clear(base, cache, (c.block_rows() * c.slices()) << 3);
     r3 = cache;
   }
-  const uint32_t entry = entry_of();
+  const schema::DxtBlockCacheEntry e(base, entry_of());
   // The block row's float4s.
-  if (Load(base, entry + 4) == 0) {
-    const uint32_t bytes = BlockRowBytes(field(codec::kBlockColumns));
+  if (e.pixels().address == 0) {
+    const uint32_t bytes = BlockRowBytes(c.block_columns());
     if (bytes > kMaxAlloc) {  // the cache made just now: the original's new handler
       ITC_LOG_ERROR("DxtCodec::EncodeRow: a block row of {} bytes", bytes);
       return 0;
@@ -181,97 +179,97 @@ std::optional<uint32_t> DxtEncodeRow(uint8_t* base, uint32_t codec, uint32_t row
     if (!made) {
       ITC_LOG_ERROR("DxtCodec::EncodeRow: operator new refused a block row");
     }
-    Store(base, entry + 4, block_row);
+    e.set_pixels(block_row);
     if (block_row == 0) {
       return 0;
     }
     r3 = block_row;
-    Store(base, entry, 0);
-    Store(base, codec + codec::kCacheCount, field(codec::kCacheCount) + 1);
+    e.set_rows_in(0);
+    c.set_cache_count(c.cache_count() + 1);
   }
 
   // A block row's first row: the destination's blocks the box cuts decoded
   // (+140) and the rows outside the box marked in.
-  if (Load(base, entry) == 0) {
+  if (e.rows_in() == 0) {
     const uint32_t first = y & ~3u;  // r24
-    const uint32_t top = field(codec::kBoxTop);
-    bool all = first < top && top > field(codec::kExtentY0);
+    const uint32_t top = c.box_top();
+    bool all = first < top && top > c.extent_top();
     if (!all) {
-      const uint32_t bottom = field(codec::kBoxBottom);
-      all = first + 4 > bottom && bottom < field(codec::kExtentY1);
+      const uint32_t bottom = c.box_bottom();
+      all = first + 4 > bottom && bottom < c.extent_bottom();
     }
     if (all) {
-      uint32_t x = field(codec::kBlockLeft);  // r30
-      uint32_t to = Load(base, entry + 4);    // r29
+      uint32_t x = c.block_left();       // r30
+      uint32_t to = e.pixels().address;  // r29
       uint32_t from = BlockAddress(base, codec, x, y, z);  // r28
-      if (x < field(codec::kBlockRight)) {
+      if (x < c.block_right()) {
         do {
-          r3 = call(field(codec::kDecodeBlock), frame, to, from, 0, 0);
+          r3 = call(c.decode_block(), frame, to, from, 0, 0);
           x += 4;
           to += 256;
-          from += field(codec::kBlockBytes);
-        } while (x < field(codec::kBlockRight));
+          from += c.block_bytes();
+        } while (x < c.block_right());
       }
     } else {
       // The left edge into the first block; the right edge's too (the
       // original's r3 is the block row's start for both).
-      const uint32_t left = field(codec::kBlockLeft);
-      const uint32_t box_left = field(codec::kBoxLeft);
-      if (left < box_left && box_left > field(codec::kExtentX0)) {
-        r3 = call(field(codec::kDecodeBlock), frame, Load(base, entry + 4),
+      const uint32_t left = c.block_left();
+      const uint32_t box_left = c.box_left();
+      if (left < box_left && box_left > c.extent_left()) {
+        r3 = call(c.decode_block(), frame, e.pixels().address,
                   BlockAddress(base, codec, left, y, z), 0, 0);
       }
-      const uint32_t right = field(codec::kBlockRight);
-      const uint32_t box_right = field(codec::kBoxRight);
-      if (right > box_right && box_right < field(codec::kExtentX1)) {
-        r3 = call(field(codec::kDecodeBlock), frame, Load(base, entry + 4),
+      const uint32_t right = c.block_right();
+      const uint32_t box_right = c.box_right();
+      if (right > box_right && box_right < c.extent_right()) {
+        r3 = call(c.decode_block(), frame, e.pixels().address,
                   BlockAddress(base, codec, right - 4, y, z), 0, 0);
       }
     }
     for (uint32_t i = 0; i < 4; i++) {
       const uint32_t at = i + first;
-      if (at < field(codec::kBoxTop) || !(at < field(codec::kBoxBottom))) {
-        Store(base, entry, Load(base, entry) | (1u << i));
+      if (at < c.box_top() || !(at < c.box_bottom())) {
+        e.set_rows_in(e.rows_in() | (1u << i));
       }
     }
   }
 
   // The row into the block row's float4s (row (y - +200) & 3 of each block).
   {
-    const uint32_t in_block = (y - field(codec::kBlockTop)) & 3;  // r6
-    uint32_t x = field(codec::kBoxLeft) - field(codec::kBlockLeft);
-    const uint32_t end = field(codec::kWidth) + x;
+    const uint32_t in_block = (y - c.block_top()) & 3;  // r6
+    uint32_t x = c.box_left() - c.block_left();
+    const uint32_t end = c.width() + x;
     uint32_t from = pixels;
     if (x < end) {
       do {
         const uint32_t index = (((x & ~3u) | in_block) << 2) | (x & 3);
-        CopyPixel(base, (index << 4) + Load(base, entry + 4), from);
+        CopyPixel(base, (index << 4) + e.pixels().address, from);
         x++;
         from += 16;
       } while (x < end);
     }
   }
-  const uint32_t mask = Load(base, entry) | (1u << (y & 3));
-  Store(base, entry, mask);
+  const uint32_t mask = e.rows_in() | (1u << (y & 3));
+  e.set_rows_in(mask);
   if (mask != 15) {
     return r3;
   }
 
   // All four rows in: each block padded past the surface's edge and encoded.
-  uint32_t x = field(codec::kBlockLeft);             // r29
+  uint32_t x = c.block_left();                       // r29
   uint32_t to = BlockAddress(base, codec, x, y, z);  // r28
-  uint32_t block_pixels = Load(base, entry + 4);     // r30
-  if (x < field(codec::kBlockRight)) {
+  uint32_t block_pixels = e.pixels().address;        // r30
+  if (x < c.block_right()) {
     static constexpr uint32_t kRepeat[4] = {0, 0, 0, 1};  // the original's r1 + 80
     y &= ~3u;
     do {
-      const uint32_t columns = field(codec::kExtentX1) - x;  // r6
-      const uint32_t rows = field(codec::kExtentY1) - y;     // r4
+      const uint32_t columns = c.extent_right() - x;  // r6
+      const uint32_t rows = c.extent_bottom() - y;    // r4
       if (columns < 4 && rows != 0) {
         for (uint32_t r = 0; r < 4; r++) {
-          for (uint32_t c = columns; c < 4; c++) {
-            CopyPixel(base, (((r << 2) | c) << 4) + block_pixels,
-                      (((r << 2) | kRepeat[c]) << 4) + block_pixels);
+          for (uint32_t column = columns; column < 4; column++) {
+            CopyPixel(base, (((r << 2) | column) << 4) + block_pixels,
+                      (((r << 2) | kRepeat[column]) << 4) + block_pixels);
           }
           if (!(r + 1 < rows)) {
             break;
@@ -280,36 +278,34 @@ std::optional<uint32_t> DxtEncodeRow(uint8_t* base, uint32_t codec, uint32_t row
       }
       if (rows < 4) {
         for (uint32_t r = rows; r < 4; r++) {
-          for (uint32_t c = 0; c < 4; c++) {
-            CopyPixel(base, (((r << 2) | c) << 4) + block_pixels,
-                      (((kRepeat[r] << 2) | c) << 4) + block_pixels);
+          for (uint32_t column = 0; column < 4; column++) {
+            CopyPixel(base, (((r << 2) | column) << 4) + block_pixels,
+                      (((kRepeat[r] << 2) | column) << 4) + block_pixels);
           }
         }
       }
-      const uint32_t dither =
-          field(codec::kDither) != 0 || field(codec::kErrorRow) != 0 ? 1 : 0;
-      r3 = EncodeBlock(base, field(codec::kEncodeBlock), to, block_pixels, dither, frame, call);
+      const uint32_t dither = c.dither() != 0 || c.error_row().address != 0 ? 1 : 0;
+      r3 = EncodeBlock(base, c.encode_block(), to, block_pixels, dither, frame, call);
       x += 4;
       block_pixels += 256;
-      to += field(codec::kBlockBytes);
-    } while (x < field(codec::kBlockRight));
+      to += c.block_bytes();
+    } while (x < c.block_right());
   }
 
   // The float4s to the next block row when it has none, else freed.
-  const uint32_t next = entry + 8;
-  const uint32_t end =
-      ((field(codec::kSlices) * field(codec::kBlockRows)) << 3) + field(codec::kCache);
-  if (next < end && Load(base, next) == 0 && Load(base, entry + 12) == 0) {
-    const uint32_t held = Load(base, entry + 4);
-    Store(base, entry + 4, 0);
-    Store(base, entry + 12, held);
+  const schema::DxtBlockCacheEntry next(base, e.address + schema::DxtBlockCacheEntry::kSize);
+  const uint32_t end = ((c.slices() * c.block_rows()) << 3) + c.cache().address;
+  if (next.address < end && next.rows_in() == 0 && next.pixels().address == 0) {
+    const uint32_t held = e.pixels().address;
+    e.set_pixels(0);
+    next.set_pixels(held);
   } else {
-    const uint32_t held = Load(base, entry + 4);
+    const uint32_t held = e.pixels().address;
     Delete(held, "DxtCodec::EncodeRow");
     r3 = held;
-    Store(base, codec + codec::kCacheCount, field(codec::kCacheCount) - 1);
+    c.set_cache_count(c.cache_count() - 1);
   }
-  Store(base, entry + 4, 0);
+  e.set_pixels(0);
   return r3;
 }
 
@@ -317,27 +313,27 @@ namespace {
 
 // The blocks ~DxtCodec frees from the cache, in its order.
 std::vector<uint32_t> CacheBlocks(uint8_t* base, uint32_t codec) {
+  const schema::DxtCodec c(base, codec);
   std::vector<uint32_t> blocks;
-  if (Field(base, codec, codec::kCacheCount) == 0) {
+  if (c.cache_count() == 0) {
     return blocks;
   }
-  uint32_t entry = Field(base, codec, codec::kCache);  // r28
+  uint32_t entry = c.cache().address;  // r28
   if (entry == 0) {
     return blocks;
   }
-  for (uint32_t z = Field(base, codec, codec::kFront); z < Field(base, codec, codec::kBack); z++) {
-    for (uint32_t y = Field(base, codec, codec::kBlockTop);
-         y < Field(base, codec, codec::kBlockBottom); y += 4) {
-      blocks.push_back(Load(base, entry + 4));
-      entry += 8;
+  for (uint32_t z = c.front(); z < c.back(); z++) {
+    for (uint32_t y = c.block_top(); y < c.block_bottom(); y += 4) {
+      blocks.push_back(schema::DxtBlockCacheEntry(base, entry).pixels().address);
+      entry += schema::DxtBlockCacheEntry::kSize;
     }
   }
   return blocks;
 }
 
 bool ImageCodecFreeable(uint8_t* base, uint32_t codec) {
-  return Freeable(Field(base, codec, codec::kPalette)) && Freeable(Field(base, codec, codec::kRow)) &&
-         Freeable(Field(base, codec, codec::kErrorRow));
+  const schema::ImageCodec c(base, codec);
+  return Freeable(c.palette()) && Freeable(c.row().address) && Freeable(c.error_row().address);
 }
 
 bool DxtCodecFreeable(uint8_t* base, uint32_t codec) {
@@ -346,28 +342,31 @@ bool DxtCodecFreeable(uint8_t* base, uint32_t codec) {
       return false;
     }
   }
-  return Freeable(Field(base, codec, codec::kDxtUnknown240)) &&
-         Freeable(Field(base, codec, codec::kCache)) && ImageCodecFreeable(base, codec);
+  const schema::DxtCodec c(base, codec);
+  return Freeable(c.decode_cache().address) && Freeable(c.cache().address) &&
+         ImageCodecFreeable(base, codec);
 }
 
 uint32_t ImageCodecDestructChecked(uint8_t* base, uint32_t codec) {
   ITC_NATIVE_RUNNING("sub_823EA070 ImageCodec::~ImageCodec");
-  Store(base, codec + codec::kVtable, kImageCodecVtable);
-  Delete(Field(base, codec, codec::kPalette), "ImageCodec::~ImageCodec");
-  Delete(Field(base, codec, codec::kRow), "ImageCodec::~ImageCodec");
-  const uint32_t last = Field(base, codec, codec::kErrorRow);
+  const schema::ImageCodec c(base, codec);
+  c.set_vtable(schema::ImageCodec::kVtable);
+  Delete(c.palette(), "ImageCodec::~ImageCodec");
+  Delete(c.row().address, "ImageCodec::~ImageCodec");
+  const uint32_t last = c.error_row().address;
   Delete(last, "ImageCodec::~ImageCodec");
   return last;
 }
 
 uint32_t DxtCodecDestructChecked(uint8_t* base, uint32_t codec) {
   ITC_NATIVE_RUNNING("sub_823EA770 DxtCodec::~DxtCodec");
-  Store(base, codec + codec::kVtable, kDxtCodecVtable);
+  const schema::DxtCodec c(base, codec);
+  c.set_vtable(schema::DxtCodec::kVtable);
   for (uint32_t block : CacheBlocks(base, codec)) {
     Delete(block, "DxtCodec::~DxtCodec");
   }
-  Delete(Field(base, codec, codec::kDxtUnknown240), "DxtCodec::~DxtCodec");
-  Delete(Field(base, codec, codec::kCache), "DxtCodec::~DxtCodec");
+  Delete(c.decode_cache().address, "DxtCodec::~DxtCodec");
+  Delete(c.cache().address, "DxtCodec::~DxtCodec");
   return ImageCodecDestructChecked(base, codec);
 }
 
@@ -414,10 +413,8 @@ std::optional<uint32_t> DxtCodecDelete(uint8_t* base, uint32_t codec, uint32_t f
 
 namespace {
 
-namespace desc = description;
-
-constexpr uint32_t kRounding = 0x8263C768;  // 32 floats of 0.5
-constexpr uint32_t kDitherTable = 0x8263C7E8;  // a 4 x 4 ordered dither's offsets
+constexpr uint32_t kRounding = G::rounding_table_address();  // 32 floats of 0.5
+constexpr uint32_t kDitherTable = G::dither_table_address();  // a 4 x 4 ordered dither's offsets
 constexpr uint32_t kTiledBit = 0x100;
 constexpr uint32_t kSignedUnsignedFormat = 0x2A200B45;  // kind 2 keeping sRGB (never in +4)
 
@@ -432,11 +429,12 @@ uint32_t RowBytes(uint32_t width) { return width > 0x0FFFFFFF ? 0xFFFFFFFF : wid
 
 // Whether ImageCodec::ImageCodec's error row would be a size operator new
 // refuses (the box's width read from the description, as the codec gets it).
-bool ErrorRowRefused(uint8_t* base, uint32_t d) {
-  if (Load(base, d + desc::kDiffusion) == 0) {
+bool ErrorRowRefused(uint8_t* base, uint32_t description) {
+  const schema::ImageDescription d(base, description);
+  if (d.diffusion() == 0) {
     return false;
   }
-  const uint32_t width = Load(base, d + desc::kBox + 8) - Load(base, d + desc::kBox);
+  const uint32_t width = d.box_right() - d.box_left();
   return ErrorRowBytes(width) > kMaxAlloc;
 }
 
@@ -451,79 +449,78 @@ void Copy24(uint8_t* base, uint32_t to, uint32_t from) {
   }
 }
 
-uint32_t ImageCodecConstructChecked(uint8_t* base, uint32_t codec, uint32_t d, uint32_t bits,
-                                    uint32_t kind) {
+uint32_t ImageCodecConstructChecked(uint8_t* base, uint32_t codec, uint32_t description,
+                                    uint32_t bits, uint32_t kind) {
   ITC_NATIVE_RUNNING("sub_823EA800 ImageCodec::ImageCodec");
-  auto field = [&](uint32_t offset) { return Field(base, codec, offset); };
-  auto set = [&](uint32_t offset, uint32_t value) { Store(base, codec + offset, value); };
-  set(codec::kVtable, kImageCodecVtable);
-  set(codec::kData, Load(base, d + desc::kData));
-  set(codec::kFormat, Load(base, d + desc::kFormat) & ~kTiledBit);
-  set(codec::kRowPitch, Load(base, d + desc::kRowPitch));
-  set(codec::kSlicePitch, Load(base, d + desc::kSlicePitch));
-  Copy24(base, codec + codec::kBoxLeft, d + desc::kBox);
-  set(codec::kRounding, Load(base, d + desc::kDither) != 0 ? kDitherTable : kRounding);
+  const schema::ImageCodec c(base, codec);
+  const schema::ImageDescription d(base, description);
+  c.set_vtable(schema::ImageCodec::kVtable);
+  c.set_data(d.data());
+  c.set_format(d.format() & ~kTiledBit);
+  c.set_row_pitch(d.row_pitch());
+  c.set_slice_pitch(d.slice_pitch());
+  Copy24(base, c.box_left_address(), d.box_left_address());
+  c.set_rounding(d.dither() != 0 ? kDitherTable : kRounding);
   const uint32_t bytes = bits >> 3;
   const uint32_t has_bits = bits != 0 ? 1 : 0;
-  set(codec::kKind, kind);
-  set(codec::kBytesPerPixel, bytes);
-  set(codec::kHasBits, has_bits);
-  set(codec::kConvertFrom, 0);
-  set(codec::kRow, 0);
-  set(codec::kColorKey, Load(base, d + desc::kColorKey));
-  set(codec::kPaletteSet, 0);
-  set(codec::kPalette, 0);
-  set(codec::kSrgbBoth, 0);
-  set(codec::kSrgb, Load(base, d + desc::kSrgb));
-  if (field(codec::kColorKey) != 0) {
-    const uint32_t key = Load(base, d + desc::kColorKey);
+  c.set_kind(kind);
+  c.set_bytes_per_pixel(bytes);
+  c.set_has_bits(has_bits);
+  c.set_convert_from(0);
+  c.set_row(0);
+  c.set_color_key(d.color_key());
+  c.set_palette_set(0);
+  c.set_palette(0);
+  c.set_srgb_both(0);
+  c.set_srgb(d.srgb());
+  if (c.color_key() != 0) {
+    const uint32_t key = d.color_key();
     const double scale = Lfs(base, kInv255);  // f0
-    const uint32_t channels[4] = {(key >> 16) & 0xFF, (key >> 8) & 0xFF, key & 0xFF, key >> 24};
-    for (uint32_t c = 0; c < 4; c++) {
-      guest::StoreFloat(base, codec + codec::kColorKeyFloats + 4 * c,
-                        float(Fmuls(IntToSingle(channels[c]), scale)));
-    }
+    c.set_color_key_red(float(Fmuls(IntToSingle((key >> 16) & 0xFF), scale)));
+    c.set_color_key_green(float(Fmuls(IntToSingle((key >> 8) & 0xFF), scale)));
+    c.set_color_key_blue(float(Fmuls(IntToSingle(key & 0xFF), scale)));
+    c.set_color_key_alpha(float(Fmuls(IntToSingle(key >> 24), scale)));
   }
-  if (kind == 2 && field(codec::kFormat) != kSignedUnsignedFormat) {
-    set(codec::kSrgb, 0);
+  if (kind == 2 && c.format() != kSignedUnsignedFormat) {
+    c.set_srgb(0);
   }
   if (kind == 3) {
-    set(codec::kSrgb, 0);
+    c.set_srgb(0);
   }
-  const uint32_t left = field(codec::kBoxLeft);
-  const uint32_t top = field(codec::kBoxTop);
-  const uint32_t front = field(codec::kBoxFront);
-  const uint32_t width = field(codec::kBoxRight) - left;
-  const uint32_t height = field(codec::kBoxBottom) - top;
-  const uint32_t depth = field(codec::kBoxBack) - front;
-  set(codec::kWidth, width);
-  set(codec::kRowBytes, width * bytes);
-  set(codec::kHeight, height);
-  set(codec::kDepth, depth);
+  const uint32_t left = c.box_left();
+  const uint32_t top = c.box_top();
+  const uint32_t front = c.box_front();
+  const uint32_t width = c.box_right() - left;
+  const uint32_t height = c.box_bottom() - top;
+  const uint32_t depth = c.box_back() - front;
+  c.set_width(width);
+  c.set_row_bytes(width * bytes);
+  c.set_height(height);
+  c.set_depth(depth);
   if (has_bits != 0) {
     // The data moved to the box's corner (signed products, 32-bit sums).
-    const uint32_t data = left * bytes + front * field(codec::kSlicePitch) +
-                          top * field(codec::kRowPitch) + field(codec::kData);
-    set(codec::kBoxLeft, 0);
-    set(codec::kBoxTop, 0);
-    set(codec::kBoxRight, width);
-    set(codec::kBoxBottom, height);
-    set(codec::kBoxBack, depth);
-    set(codec::kBoxFront, 0);
-    set(codec::kData, data);
+    const uint32_t data =
+        left * bytes + front * c.slice_pitch() + top * c.row_pitch() + c.data().address;
+    c.set_box_left(0);
+    c.set_box_top(0);
+    c.set_box_right(width);
+    c.set_box_bottom(height);
+    c.set_box_back(depth);
+    c.set_box_front(0);
+    c.set_data(data);
   }
-  if (Load(base, d + desc::kDiffusion) != 0) {
-    const auto made = memory::crt::OperatorNew(base, ErrorRowBytes(field(codec::kWidth)));
+  if (d.diffusion() != 0) {
+    const auto made = memory::crt::OperatorNew(base, ErrorRowBytes(c.width()));
     const uint32_t row = made ? *made : 0;
-    set(codec::kErrorRow, row);
+    c.set_error_row(row);
     if (row == 0) {
       // The original would clear from address 0.
       ITC_LOG_ERROR("ImageCodec::ImageCodec: operator new refused the error row");
     } else {
-      Clear(base, row, (field(codec::kWidth) + 2) << 4);
+      Clear(base, row, (c.width() + 2) << 4);
     }
   } else {
-    set(codec::kErrorRow, 0);
+    c.set_error_row(0);
   }
   return codec;
 }
@@ -544,50 +541,50 @@ constexpr DxtBlocks kDxtBlocks[] = {
     {41, 0x82422178, 0x82421C88, 8},    // DXT5A
 };
 
-uint32_t DxtCodecConstructChecked(uint8_t* base, uint32_t codec, uint32_t d) {
+uint32_t DxtCodecConstructChecked(uint8_t* base, uint32_t codec, uint32_t description) {
   ITC_NATIVE_RUNNING("sub_823F5FA0 DxtCodec::DxtCodec");
-  ImageCodecConstructChecked(base, codec, d, 0, 1);
-  auto field = [&](uint32_t offset) { return Field(base, codec, offset); };
-  auto set = [&](uint32_t offset, uint32_t value) { Store(base, codec + offset, value); };
-  const uint32_t which = (field(codec::kFormat) & ~kTiledBit) - 0x1A200052;
-  set(codec::kVtable, kDxtCodecVtable);
+  ImageCodecConstructChecked(base, codec, description, 0, 1);
+  const schema::DxtCodec c(base, codec);
+  const schema::ImageDescription d(base, description);
+  const uint32_t which = (c.format() & ~kTiledBit) - 0x1A200052;
+  c.set_vtable(schema::DxtCodec::kVtable);
   for (const DxtBlocks& b : kDxtBlocks) {
     if (b.offset == which) {
-      set(codec::kBlockBytes, b.bytes);
-      set(codec::kEncodeBlock, b.encode);
-      set(codec::kDecodeBlock, b.decode);
+      c.set_block_bytes(b.bytes);
+      c.set_encode_block(b.encode);
+      c.set_decode_block(b.decode);
     }
   }
-  Copy24(base, codec + codec::kExtentX0, d + desc::kExtent);
-  set(codec::kDxt232, 0xFFFFFFFF);
-  set(codec::kDxtUnknown240, 0);
-  set(codec::kCacheCount, 0);
-  set(codec::kCache, 0);
+  Copy24(base, c.extent_left_address(), d.extent_left_address());
+  c.set_unknown_232(0xFFFFFFFF);
+  c.set_decode_cache(0);
+  c.set_cache_count(0);
+  c.set_cache(0);
   // The extent rounded out to blocks (+172 to +192).
-  set(codec::kBlockExtent + 12, (field(codec::kExtentY1) + 3) & ~3u);
-  set(codec::kBlockExtent + 8, (field(codec::kExtentX1) + 3) & ~3u);
-  set(codec::kDxt236, 0xFFFFFFFF);
-  set(codec::kBlockExtent + 0, field(codec::kExtentX0) & ~3u);
-  set(codec::kBlockExtent + 4, field(codec::kExtentY0) & ~3u);
-  set(codec::kBlockExtent + 16, field(codec::kExtentX0 + 16));
-  set(codec::kBlockExtent + 20, field(codec::kExtentX0 + 20));
+  c.set_block_extent_bottom((c.extent_bottom() + 3) & ~3u);
+  c.set_block_extent_right((c.extent_right() + 3) & ~3u);
+  c.set_unknown_236(0xFFFFFFFF);
+  c.set_block_extent_left(c.extent_left() & ~3u);
+  c.set_block_extent_top(c.extent_top() & ~3u);
+  c.set_block_extent_front(c.extent_front());
+  c.set_block_extent_back(c.extent_back());
   // The box rounded out to blocks.
-  const uint32_t left = field(codec::kBoxLeft) & ~3u;
-  const uint32_t top = field(codec::kBoxTop) & ~3u;
-  const uint32_t right = (field(codec::kBoxRight) + 3) & ~3u;
-  const uint32_t bottom = (field(codec::kBoxBottom) + 3) & ~3u;
-  const uint32_t front = field(codec::kBoxFront);
-  const uint32_t back = field(codec::kBoxBack);
-  set(codec::kBlockLeft, left);
-  set(codec::kFront, front);
-  set(codec::kBlockTop, top);
-  set(codec::kBlockRight, right);
-  set(codec::kBlockBottom, bottom);
-  set(codec::kBack, back);
-  set(codec::kBlockColumns, (right - left) >> 2);
-  set(codec::kBlockRows, (bottom - top) >> 2);
-  set(codec::kSlices, back - front);
-  set(codec::kDither, Load(base, d + desc::kDither));
+  const uint32_t left = c.box_left() & ~3u;
+  const uint32_t top = c.box_top() & ~3u;
+  const uint32_t right = (c.box_right() + 3) & ~3u;
+  const uint32_t bottom = (c.box_bottom() + 3) & ~3u;
+  const uint32_t front = c.box_front();
+  const uint32_t back = c.box_back();
+  c.set_block_left(left);
+  c.set_front(front);
+  c.set_block_top(top);
+  c.set_block_right(right);
+  c.set_block_bottom(bottom);
+  c.set_back(back);
+  c.set_block_columns((right - left) >> 2);
+  c.set_block_rows((bottom - top) >> 2);
+  c.set_slices(back - front);
+  c.set_dither(d.dither());
   return codec;
 }
 
@@ -662,52 +659,55 @@ const Format* FindFormat(uint32_t format) {
 
 std::optional<uint32_t> ImageCodecConstruct(uint8_t* base, uint32_t codec, uint32_t description,
                                             uint32_t bits, uint32_t kind) {
-  if (Overlap(codec, 128, description, desc::kBytes) || ErrorRowRefused(base, description)) {
+  if (Overlap(codec, schema::ImageCodec::kSize, description, schema::ImageDescription::kSize) ||
+      ErrorRowRefused(base, description)) {
     return std::nullopt;
   }
   return ImageCodecConstructChecked(base, codec, description, bits, kind);
 }
 
 std::optional<uint32_t> DxtCodecConstruct(uint8_t* base, uint32_t codec, uint32_t description) {
-  if (Overlap(codec, 256, description, desc::kBytes) || ErrorRowRefused(base, description)) {
+  if (Overlap(codec, schema::DxtCodec::kSize, description, schema::ImageDescription::kSize) ||
+      ErrorRowRefused(base, description)) {
     return std::nullopt;
   }
   return DxtCodecConstructChecked(base, codec, description);
 }
 
 std::optional<uint32_t> PrepareCodecs(uint8_t* base, uint32_t destination, uint32_t source) {
-  auto field = [&](uint32_t codec, uint32_t offset) { return Field(base, codec, offset); };
-  const uint32_t kind = field(destination, codec::kKind);
-  const uint32_t source_kind = field(source, codec::kKind);
+  const schema::ImageCodec to(base, destination);
+  const schema::ImageCodec from(base, source);
+  const uint32_t kind = to.kind();
+  const uint32_t source_kind = from.kind();
   const bool convert = kind != source_kind && kind != 4;
-  const uint32_t convert_from = convert ? source_kind : field(destination, codec::kConvertFrom);
-  const bool row = convert_from != 0 || field(destination, codec::kSrgb) != 0;
-  if (row && RowBytes(field(destination, codec::kWidth)) > kMaxAlloc) {
+  const uint32_t convert_from = convert ? source_kind : to.convert_from();
+  const bool row = convert_from != 0 || to.srgb() != 0;
+  if (row && RowBytes(to.width()) > kMaxAlloc) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_823EAA90 ImageCodec::Prepare");
   if (convert) {
-    Store(base, destination + codec::kConvertFrom, source_kind);
+    to.set_convert_from(source_kind);
   }
   if (row) {
-    const auto made = memory::crt::OperatorNew(base, RowBytes(field(destination, codec::kWidth)));
+    const auto made = memory::crt::OperatorNew(base, RowBytes(to.width()));
     const uint32_t block = made ? *made : 0;
-    Store(base, destination + codec::kRow, block);
+    to.set_row(block);
     if (block == 0) {
       ITC_LOG_ERROR("ImageCodec::Prepare: operator new refused the row");
       return kOutOfMemory;
     }
   }
-  if (field(destination, codec::kSrgb) != 0 && field(source, codec::kSrgb) != 0) {
-    Store(base, source + codec::kSrgbBoth, 1);
-    Store(base, destination + codec::kSrgbBoth, 1);
+  if (to.srgb() != 0 && from.srgb() != 0) {
+    from.set_srgb_both(1);
+    to.set_srgb_both(1);
   }
   return 0;
 }
 
 std::optional<uint32_t> CreateCodec(uint8_t* base, uint32_t description, uint32_t stack,
                                     const GuestCall& call) {
-  const Format* format = FindFormat(Load(base, description + desc::kFormat));
+  const Format* format = FindFormat(schema::ImageDescription(base, description).format());
   if (format != nullptr &&
       (format->maker == Maker::kYuv || ErrorRowRefused(base, description))) {
     return std::nullopt;
@@ -727,10 +727,11 @@ std::optional<uint32_t> CreateCodec(uint8_t* base, uint32_t description, uint32_
   } else {
     ImageCodecConstructChecked(base, codec, description, format->bits, format->kind);
   }
-  Store(base, codec + codec::kVtable, format->vtable);
+  const schema::ImageCodec c(base, codec);
+  c.set_vtable(format->vtable);
   // +28 (the palette's) is 0 from ImageCodec::ImageCodec: no LoadPalette.
-  if (Field(base, codec, codec::kColorKey) != 0) {
-    const uint32_t quantize = Load(base, Field(base, codec, codec::kVtable) + 12);
+  if (c.color_key() != 0) {
+    const uint32_t quantize = c.vtable().quantize_color_key();
     call(quantize, stack - kCreateFrameBytes, codec, 0, 0, 0);
   }
   return codec;

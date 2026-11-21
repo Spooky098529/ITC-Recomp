@@ -20,12 +20,6 @@
 
 namespace scene_target {
 
-// The scene target, made once at boot (src/app_start_up/scene_target.cpp).
-constexpr uint32_t kSceneTarget = 0x8266D08C;
-// The textured and color rectangles' render queue (+0) and command list
-// (+4).
-constexpr uint32_t kRectLists = 0x826D83D0;
-
 // sub_8209AE48 SceneTarget::RecordTargets: in the open chunk of `list`,
 // command 23 with render targets 0-3 all the scene target's +4, then
 // command 24 with its +0 (the items' unread words left as they were).
@@ -36,20 +30,20 @@ std::optional<uint32_t> RecordTargets(uint8_t* base, uint32_t scene, uint32_t li
 // (the tile-sized pair).
 std::optional<uint32_t> RecordTileTargets(uint8_t* base, uint32_t scene, uint32_t list);
 // sub_8209B058 SceneTarget::RecordBoundTargets: RecordTargets on
-// [kSceneTarget].
+// the scene target [0x8266D08C] (schema::SceneTargetGlobals).
 std::optional<uint32_t> RecordBoundTargets(uint8_t* base, uint32_t list);
 
 // TexturedRect::RecordFlat's frame (its r1 less this, below its caller's).
 constexpr uint32_t kRecordFlatFrame = 272;
 
 // sub_8217AA98 TexturedRect::RecordFlat's chunk on the list at
-// [kRectLists + 4]: the texture (+112), the render states by +116 (blending
+// [0x826D83D4] (SceneTargetGlobals::rect_list): the texture (+112), the render states by +116 (blending
 // on or off), sampler 0's filters, the helper object's draw and four 24-byte
 // vertices of the rectangle `rect` (+80 x, +84 y, +88 width, +92 height,
 // +96 to +108 u0, v0, u1, v1); the words the original leaves in its frame
 // at `frame` (+80 to +111, +124 to +172) written as it does. Returns the
 // chunk's first slot, which the adapter hands to the render queue at
-// [kRectLists] (its slot 4); nullopt, with nothing done, where the
+// [0x826D83D0] (its slot 4); nullopt, with nothing done, where the
 // original's command list calls would print a message.
 std::optional<uint32_t> TexturedRectRecordFlat(uint8_t* base, uint32_t rect, uint32_t frame);
 

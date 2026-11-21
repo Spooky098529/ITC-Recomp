@@ -4,6 +4,8 @@
 
 #include "race_world/race_world.h"
 
+#include "schema/race_world.h"
+
 #include "car_physics/float_ops.h"
 
 #include "ai_drivers/ai_drivers.h"
@@ -16,6 +18,11 @@
 
 namespace race_world {
 
+using M = schema::RaceManager;
+using G = schema::RaceWorldGlobals;
+using L = schema::RaceSortedList;
+using N = schema::RaceSortedNode;
+
 using namespace car_physics::ops;
 namespace va = vehicle_accessors;
 namespace vl = vector_library;
@@ -23,10 +30,9 @@ namespace vl = vector_library;
 namespace {
 
 uint32_t Manager(uint8_t* base) {
-  return guest::LoadU32(base, kManager);
+  return G::racers_manager(base).address;
 }
 
-constexpr uint32_t kManagerBytes = 363592;
 constexpr uint32_t kMarkedRacer = 0x826C61A4;  // three floats
 constexpr uint32_t kNearDistance = 0x82002568;
 constexpr uint32_t kSegmentEnd = 0x820021E8;
@@ -73,8 +79,8 @@ uint32_t EntryOfRecord(uint8_t* base, uint32_t record) {
   if (manager == 0) {
     return 0;
   }
-  const int32_t count = int32_t(guest::LoadU32(base, manager + 2368));
-  uint32_t entry = manager + 4;
+  const int32_t count = int32_t(M(base, manager).entry_count());
+  uint32_t entry = M(base, manager).entries_address();
   for (int32_t i = 0; i < count; i++, entry += 28) {
     if (guest::LoadU32(base, entry + 24) == record) {
       return entry;
@@ -149,30 +155,30 @@ uint64_t PickModel(uint8_t* base, uint32_t number, uint32_t branch, uint32_t sp)
 
 void SortedListInsert(uint8_t* base, uint32_t list, uint32_t item, double key) {
   ITC_NATIVE_RUNNING("sub_82170AA0 SortedList::Insert");
-  const uint32_t count = guest::LoadU32(base, list + 1608);
-  const uint32_t first = guest::LoadU32(base, list + 1600);
+  const uint32_t count = L(base, list).count();
+  const uint32_t first = L(base, list).first().address;
   const uint32_t node = (count << 4) + list;
-  guest::StoreU32(base, list + 1608, count + 1);
-  guest::StoreFloat(base, node + 4, float(key));
-  guest::StoreU32(base, node + 0, item);
-  auto key_of = [&](uint32_t n) { return Lfs(base, n + 4); };
+  L(base, list).set_count(count + 1);
+  N(base, node).set_key(float(key));
+  N(base, node).set_item(item);
+  auto key_of = [&](uint32_t n) { return double(N(base, n).key()); };
   if (first == 0) {
-    guest::StoreU32(base, node + 8, 0);
-    guest::StoreU32(base, node + 12, 0);
-    guest::StoreU32(base, list + 1600, node);
-    guest::StoreU32(base, list + 1604, node);
+    N(base, node).set_previous(0);
+    N(base, node).set_next(0);
+    L(base, list).set_first(node);
+    L(base, list).set_last_inserted(node);
     return;
   }
-  uint32_t at = guest::LoadU32(base, list + 1604);
+  uint32_t at = L(base, list).last_inserted().address;
   if (!(key_of(at) > key)) {
     // Forward along +12 to the first node with a greater key.
     for (;;) {
-      const uint32_t next = guest::LoadU32(base, at + 12);
+      const uint32_t next = N(base, at).next().address;
       if (next == 0) {
-        guest::StoreU32(base, at + 12, node);
-        guest::StoreU32(base, node + 8, at);
-        guest::StoreU32(base, node + 12, 0);
-        guest::StoreU32(base, list + 1604, node);
+        N(base, at).set_next(node);
+        N(base, node).set_previous(at);
+        N(base, node).set_next(0);
+        L(base, list).set_last_inserted(node);
         return;
       }
       at = next;
@@ -181,28 +187,28 @@ void SortedListInsert(uint8_t* base, uint32_t list, uint32_t item, double key) {
       }
     }
     // Before `at`.
-    const uint32_t previous = guest::LoadU32(base, at + 8);
+    const uint32_t previous = N(base, at).previous().address;
     if (previous != 0) {
-      guest::StoreU32(base, previous + 12, node);
+      N(base, previous).set_next(node);
     } else {
-      guest::StoreU32(base, list + 1600, node);
+      L(base, list).set_first(node);
     }
-    const uint32_t before = guest::LoadU32(base, at + 8);
-    guest::StoreU32(base, node + 12, at);
-    guest::StoreU32(base, node + 8, before);
-    guest::StoreU32(base, at + 8, node);
-    guest::StoreU32(base, list + 1604, node);
+    const uint32_t before = N(base, at).previous().address;
+    N(base, node).set_next(at);
+    N(base, node).set_previous(before);
+    N(base, at).set_previous(node);
+    L(base, list).set_last_inserted(node);
     return;
   }
   // Back along +8 to the first node with a smaller key.
   for (;;) {
-    const uint32_t previous = guest::LoadU32(base, at + 8);
+    const uint32_t previous = N(base, at).previous().address;
     if (previous == 0) {
-      guest::StoreU32(base, at + 8, node);
-      guest::StoreU32(base, node + 8, 0);
-      guest::StoreU32(base, node + 12, at);
-      guest::StoreU32(base, list + 1600, node);
-      guest::StoreU32(base, list + 1604, node);
+      N(base, at).set_previous(node);
+      N(base, node).set_previous(0);
+      N(base, node).set_next(at);
+      L(base, list).set_first(node);
+      L(base, list).set_last_inserted(node);
       return;
     }
     at = previous;
@@ -211,23 +217,23 @@ void SortedListInsert(uint8_t* base, uint32_t list, uint32_t item, double key) {
     }
   }
   // After `at`.
-  const uint32_t next = guest::LoadU32(base, at + 12);
+  const uint32_t next = N(base, at).next().address;
   uint32_t after = 0;
   if (next != 0) {
-    guest::StoreU32(base, next + 8, node);
-    after = guest::LoadU32(base, at + 12);
+    N(base, next).set_previous(node);
+    after = N(base, at).next().address;
   }
-  guest::StoreU32(base, node + 12, after);
-  guest::StoreU32(base, at + 12, node);
-  guest::StoreU32(base, node + 8, at);
-  guest::StoreU32(base, list + 1604, node);
+  N(base, node).set_next(after);
+  N(base, at).set_next(node);
+  N(base, node).set_previous(at);
+  L(base, list).set_last_inserted(node);
 }
 
 void SortedListClear(uint8_t* base, uint32_t list) {
   ITC_NATIVE_RUNNING("sub_82170A88 SortedList::Clear");
-  guest::StoreU32(base, list + 1600, 0);
-  guest::StoreU32(base, list + 1604, 0);
-  guest::StoreU32(base, list + 1608, 0);
+  L(base, list).set_first(0);
+  L(base, list).set_last_inserted(0);
+  L(base, list).set_count(0);
 }
 
 // --- The race world's handlers ---
@@ -241,8 +247,8 @@ void OnPausedTick() {
 uint32_t Release(uint8_t* base, uint32_t r3) {
   ITC_NATIVE_RUNNING("sub_82171360 RaceWorld::Release");
   uint32_t manager = Manager(base);
-  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, manager + 2364)); i++) {
-    const uint32_t racer = guest::LoadU32(base, manager + 2308 + 4 * uint32_t(i));
+  for (int32_t i = 0; i < int32_t(M(base, manager).racer_count()); i++) {
+    const uint32_t racer = guest::LoadU32(base, M(base, manager).racers_address() + 4 * uint32_t(i));
     r3 = va::VehicleGet(base, guest::LoadU32(base, racer + 20));
     guest::StoreU8(base, r3 + 2384, 0);
     manager = Manager(base);
@@ -254,14 +260,15 @@ uint32_t Release(uint8_t* base, uint32_t r3) {
 
 std::optional<uint32_t> Create(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_821715B8 RaceManager::Create");
-  const auto block = memory::crt::OperatorNew(base, kManagerBytes);
+  const auto block = memory::crt::OperatorNew(base, M::kSize);
   if (!block) {
     return std::nullopt;
   }
   const uint32_t m = *block;
-  guest::StoreU32(base, kManager, m);
+  G::set_racers_manager(base, m);
   if (m != 0) {
-    guest::StoreU32(base, m + 0, 0);
+    const M manager(base, m);
+    manager.set_unknown_0(0);
     const double zero = Lfs(base, kZero);
     for (uint32_t r7 = 0; r7 < 2156; r7 += 28) {
       const uint32_t e = m + r7;
@@ -286,19 +293,23 @@ std::optional<uint32_t> Create(uint8_t* base) {
       guest::StoreU16(base, e + 2170, 0xFFFF);
       guest::StoreU32(base, e + 2164, 0);
     }
-    for (uint32_t at = 2244; at < 2308; at += 4) {
-      guest::StoreU32(base, m + at, 0xFFFFFFFF);
+    for (uint32_t k = 0; k < 16; k++) {
+      guest::StoreU32(base, manager.traffic_models_address() + 4 * k, 0xFFFFFFFF);
     }
-    for (uint32_t at = 2364; at <= 2388; at += 4) {
-      guest::StoreU32(base, m + at, 0);
-    }
-    for (uint32_t at = 2336; at < 2364; at += 4) {
-      guest::StoreU32(base, m + at - 28, 0);
-      guest::StoreU32(base, m + at, 0);
+    manager.set_racer_count(0);
+    manager.set_entry_count(0);
+    manager.set_opponents_with_vehicle(0);
+    manager.set_traffic_with_vehicle(0);
+    manager.set_traffic_allowed(0);
+    manager.set_traffic_model_count(0);
+    manager.set_traffic_ticks(0);
+    for (uint32_t k = 0; k < 7; k++) {
+      guest::StoreU32(base, manager.racers_address() + 4 * k, 0);
+      guest::StoreU32(base, manager.vehicle_slots_address() + 4 * k, 0);
     }
   }
   for (uint32_t i = 0; i < 300; i++) {
-    guest::StoreU32(base, m + 362392 + 4 * i, 0);
+    guest::StoreU32(base, M(base, m).neighbor_counts_address() + 4 * i, 0);
   }
   return m;
 }
@@ -308,8 +319,8 @@ void NoteMarkedRacer(uint8_t* base, uint32_t frame) {
   Stfs(base, frame + 92, Lfs(base, kZero));
   const uint32_t records = guest::LoadU32(base, kRaceData) + 48;
   uint32_t m = Manager(base);
-  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, m + 2364)); i++) {
-    const uint32_t racer = guest::LoadU32(base, m + 2308 + 4 * uint32_t(i));
+  for (int32_t i = 0; i < int32_t(M(base, m).racer_count()); i++) {
+    const uint32_t racer = guest::LoadU32(base, M(base, m).racers_address() + 4 * uint32_t(i));
     const uint32_t record = guest::LoadU32(base, racer + 24) * 3936 + records;
     const uint32_t vehicle = va::VehicleGet(base, guest::LoadU32(base, racer + 20));
     vl::Vec4Copy(base, frame + 80,
@@ -415,18 +426,18 @@ uint32_t Neighbours(uint8_t* base, uint32_t manager, uint32_t index) {
   const double behind_limit = Lfs(base, kBehindLimit);
   double ahead = ahead_limit;
   double behind = behind_limit;
-  const uint32_t position = guest::LoadU32(base, index) * 28 + manager + 12;
+  const uint32_t position = guest::LoadU32(base, index) * 28 + M(base, manager).entries_address() + 8;
   const uint32_t section = guest::LoadU16(base, position);
   if (S16(section) < 0) {
     return 0;
   }
   const uint32_t branch = guest::LoadU8(base, Section(base, section) + 3);
-  if (int32_t(guest::LoadU32(base, manager + 2368)) <= 0) {
+  if (int32_t(M(base, manager).entry_count()) <= 0) {
     return 0;
   }
   const double zero = Lfs(base, kZero);
-  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, manager + 2368)); i++) {
-    const uint32_t entry = manager + 4 + 28 * uint32_t(i);
+  for (int32_t i = 0; i < int32_t(M(base, manager).entry_count()); i++) {
+    const uint32_t entry = M(base, manager).entries_address() + 28 * uint32_t(i);
     if (int32_t(guest::LoadU32(base, index)) == i) {
       continue;
     }
@@ -527,8 +538,8 @@ void ReleaseForStage(uint8_t* base, uint32_t frame,
                                               uint32_t r4, uint32_t r5)>& original) {
   ITC_NATIVE_RUNNING("sub_821713C0 RaceWorld::ReleaseForStage");
   uint32_t m = Manager(base);
-  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, m + 2364)); i++) {
-    const uint32_t racer = guest::LoadU32(base, m + 2308 + 4 * uint32_t(i));
+  for (int32_t i = 0; i < int32_t(M(base, m).racer_count()); i++) {
+    const uint32_t racer = guest::LoadU32(base, M(base, m).racers_address() + 4 * uint32_t(i));
     guest::StoreU8(base, va::VehicleGet(base, guest::LoadU32(base, racer + 20)) + 2384, 0);
     m = Manager(base);
   }
@@ -560,13 +571,13 @@ void ReleaseForStage(uint8_t* base, uint32_t frame,
 void TickVehicles(uint8_t* base, uint32_t frame, const vehicle::GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_821714D8 RaceManager::TickVehicles");
   uint32_t m = Manager(base);
-  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, m + 2364)); i++) {
-    const uint32_t slot = m + 2308 + 4 * uint32_t(i);
+  for (int32_t i = 0; i < int32_t(M(base, m).racer_count()); i++) {
+    const uint32_t slot = M(base, m).racers_address() + 4 * uint32_t(i);
     const uint32_t index = guest::LoadU32(base, guest::LoadU32(base, slot) + 20);
     const uint32_t vehicle = va::VehicleGet(base, index);
     m = Manager(base);
     const uint32_t record =
-        guest::LoadU32(base, guest::LoadU32(base, m + 2308 + 4 * uint32_t(i)) + 24);
+        guest::LoadU32(base, guest::LoadU32(base, M(base, m).racers_address() + 4 * uint32_t(i)) + 24);
     const uint32_t car = record * 3936 + guest::LoadU32(base, kRaceData) + 48;
     vehicle::VehicleTick(base, vehicle, index, car, 1, frame - 144, call);
     m = Manager(base);
@@ -576,8 +587,8 @@ void TickVehicles(uint8_t* base, uint32_t frame, const vehicle::GuestCall& call)
 void RefreshVehicles(uint8_t* base, uint32_t frame, const Original& original) {
   ITC_NATIVE_RUNNING("sub_82171560 RaceManager::RefreshVehicles");
   uint32_t m = Manager(base);
-  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, m + 2364)); i++) {
-    const uint32_t racer = guest::LoadU32(base, m + 2308 + 4 * uint32_t(i));
+  for (int32_t i = 0; i < int32_t(M(base, m).racer_count()); i++) {
+    const uint32_t racer = guest::LoadU32(base, M(base, m).racers_address() + 4 * uint32_t(i));
     const uint32_t vehicle = va::VehicleGet(base, guest::LoadU32(base, racer + 20));
     double f1 = 0.0;
     uint32_t r3 = 0;
