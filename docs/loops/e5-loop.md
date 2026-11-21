@@ -145,16 +145,23 @@ the fixes the checks call for.
 - Done before the swarm, one at a time: `type2-dialog` (the pilot),
   `heap`, `c-runtime` (built, checked, committed), `xaudio-objects` (edits
   only, in the tree).
-- Convert done for 119 areas; the usage limit stopped the runs four times
-  (each earlier stop a resume of the same Workflow run, its finished agents
-  replayed from the journal; the fourth stop, 2026-11-21, ended a new run,
-  `wf_444dbbee-5ac`, which converted 41). **Left to convert (11):**
-  type8-screens, ui-movies-game, ui-movies, vehicle-accessors, vehicle,
-  video-output, xact, xact-tracks, xact-waves, xaudio-engine, xaudio. Some
-  were stopped partway: their files may hold part of the work (the next
-  agent picks up from them; the seed never overwrites).
-- Integrate and Cross-area: not started.
-- The 119 agents' reports (what each left, its notes for the lead):
+- Convert done for all 130 areas (the usage limit stopped the runs five
+  times; the last run, `wf_444dbbee-5ac`, resumed once).
+- Integrate done (2026-11-21): the full `schema_gen.py` gives 134 areas,
+  1,604 types; `schema_check.py` gives 0 accesses that fit no field. Its
+  report (merges, renames, fault fields, edits in `src/lifted/`) is in the
+  reports file.
+- Cross-area done for 91 areas; **left (43):** race-world, scene-loaders,
+  scenery-lists, screen-constructors, second-set, shader-objects,
+  single-commands, sound-cues, sprites, stand-models, std-string,
+  sticker-editor, strings-and-font, system-services, texture-compression,
+  title-screen, todays-result, track-route, track-zones, tuning-machine,
+  tuning-pages, tuning-screen, type10-mode, type2-dialog, type2-mode,
+  type2-screens, type5-mode, type6-type7-modes, type67-screens, type8-mode,
+  type8-screens, ui-movies, ui-movies-game, user-info, vehicle,
+  vehicle-accessors, video-output, xact, xact-tracks, xact-waves, xaudio,
+  xaudio-engine, xaudio-objects.
+- The agents' reports (130 convert, the integration, 91 cross-area) (what each left, its notes for the lead):
   `docs/loops/e5-swarm-reports.md`, copied from the journal; the
   Integrate phase takes their notes about schema files, the lead the rest.
 - The 2026-11-21 run was started by the user (`/e5-swarm`) and stopped by
