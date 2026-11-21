@@ -43,6 +43,15 @@ SCALARS = {
             "guest::StoreU64(base, {a}, std::bit_cast<uint64_t>(v))"),
 }
 IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+# C++ keywords a field can't be named (its accessor would be one).
+CPP_KEYWORDS = set("""alignas alignof and and_eq asm auto bitand bitor bool break case catch char
+char8_t char16_t char32_t class compl concept const consteval constexpr constinit const_cast
+continue co_await co_return co_yield decltype default delete do double dynamic_cast else enum
+explicit export extern false float for friend goto if inline int long mutable namespace new
+noexcept not not_eq nullptr operator or or_eq private protected public register
+reinterpret_cast requires return short signed sizeof static static_assert static_cast struct
+switch template this thread_local throw true try typedef typeid typename union unsigned using
+virtual void volatile wchar_t while xor xor_eq""".split())
 
 
 def load(tolerant=False):
@@ -89,7 +98,7 @@ def check(areas):
                       ((f["name"], f) for f in t.get("fields", [])))
             seen = set()
             for fname, f in fields:
-                if not IDENT.match(fname) or fname in seen:
+                if not IDENT.match(fname) or fname in CPP_KEYWORDS or fname in seen:
                     errors.append(f"{area}: {name}.{fname}: a bad or repeated name")
                 seen.add(fname)
                 ty = f.get("type")

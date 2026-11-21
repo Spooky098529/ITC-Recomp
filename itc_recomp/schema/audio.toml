@@ -147,7 +147,7 @@ measure = "sub_824657C8.r3.+0"
 size = 32
 origin = "image"
 fields = [
-  { name = "register", offset = 28, type = "fn", note = "AudioRenderDriver::Register (sub_824657E0)" },
+  { name = "register_driver", offset = 28, type = "fn", note = "AudioRenderDriver::Register (sub_824657E0)" },
 ]
 
 [globals]

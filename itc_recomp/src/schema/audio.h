@@ -237,9 +237,9 @@ struct AudioRenderDriverVtable : View {
   using View::View;
   static constexpr uint32_t kSize = 32;
   // AudioRenderDriver::Register (sub_824657E0)
-  uint32_t register() const { return guest::LoadU32(base, address + 28); }
-  void set_register(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
-  uint32_t register_address() const { return address + 28; }
+  uint32_t register_driver() const { return guest::LoadU32(base, address + 28); }
+  void set_register_driver(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
+  uint32_t register_driver_address() const { return address + 28; }
 };
 
 // The image words docs/functions/audio.md's code uses.
