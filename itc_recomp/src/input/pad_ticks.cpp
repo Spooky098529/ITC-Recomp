@@ -19,7 +19,9 @@ namespace input {
 namespace {
 
 // A line a read: user, result, packet number, buttons, the triggers, the
-// sticks (lx, ly, rx, ry). A race's start is a line `race <n>`.
+// sticks (lx, ly, rx, ry). A race entered is a line `race <n>`, and its
+// start (the race world loaded: the course set-up's message 4, after the
+// race's loads, whose length varies) a line `start <n>`.
 struct Read {
   uint32_t result;
   XInputState state;
@@ -27,8 +29,10 @@ struct Read {
 
 constexpr uint32_t kUsers = 4;
 
-// One user's reads, with where each race's mark falls (the index of the
-// first read after it).
+enum class Mark { kRace, kStart };
+
+// One user's reads, with where each mark falls (the index of the first read
+// after it), in order.
 struct Track {
   std::vector<Read> reads;
   std::vector<size_t> marks;
@@ -40,7 +44,10 @@ std::mutex g_mutex;
 bool g_loaded = false;
 bool g_playing = false;
 Track g_tracks[kUsers];
-size_t g_races = 0;  // races entered so far
+std::vector<Mark> g_kinds;  // the marks' kinds, in order
+size_t g_marks = 0;         // marks the game has reached so far
+size_t g_races = 0;         // races entered so far (recording)
+size_t g_starts = 0;        // races started so far (recording)
 bool g_end_logged = false;
 FILE* g_record = nullptr;
 
@@ -60,7 +67,9 @@ void Load() {
       while (std::fgets(line, sizeof(line), f)) {
         unsigned user, result, packet, buttons, lt, rt, race;
         int lx, ly, rx, ry;
-        if (std::sscanf(line, "race %u", &race) == 1) {
+        const bool is_race = std::sscanf(line, "race %u", &race) == 1;
+        if (is_race || std::sscanf(line, "start %u", &race) == 1) {
+          g_kinds.push_back(is_race ? Mark::kRace : Mark::kStart);
           for (Track& t : g_tracks) {
             t.marks.push_back(t.reads.size());
           }
@@ -78,7 +87,7 @@ void Load() {
       }
       std::fclose(f);
       g_playing = true;
-      ITC_LOG_INFO("pad ticks: playing {} reads ({} for user 0, {} races) from {}", count,
+      ITC_LOG_INFO("pad ticks: playing {} reads ({} for user 0, {} marks) from {}", count,
                    g_tracks[0].reads.size(), g_tracks[0].marks.size(), play);
     }
   }
@@ -108,9 +117,9 @@ uint32_t PadTicks_Next(uint32_t user, XInputState* state) {
     return 0x48F;
   }
   Track& t = g_tracks[user];
-  // At the next race's mark before the game has entered that race: the last
-  // read again, until it does.
-  const bool held = g_races < t.marks.size() && t.next >= t.marks[g_races];
+  // At the next mark before the game has reached it: the last read again,
+  // until it does.
+  const bool held = g_marks < t.marks.size() && t.next >= t.marks[g_marks];
   if (!held) {
     if (t.next < t.reads.size()) {
       t.last = t.reads[t.next++];
@@ -138,25 +147,43 @@ void PadTicks_Record(uint32_t user, uint32_t result, const XInputState& state) {
   std::fflush(g_record);
 }
 
+namespace {
+
+// The game reached a mark: recorded, or the playback lined up on it (reads
+// left before it, the game having got there sooner, skipped). A file with
+// no mark of this kind next (one recorded before start marks) is left as it
+// was.
+void OnMark(Mark kind, size_t n, const char* what) {
+  if (g_record) {
+    std::fprintf(g_record, "%s %zu\n", kind == Mark::kRace ? "race" : "start", n);
+    std::fflush(g_record);
+  }
+  if (!g_playing || g_marks >= g_kinds.size() || g_kinds[g_marks] != kind) {
+    return;
+  }
+  const size_t skipped = g_tracks[0].marks[g_marks] - std::min(g_tracks[0].next,
+                                                                g_tracks[0].marks[g_marks]);
+  for (Track& t : g_tracks) {
+    if (g_marks < t.marks.size() && t.next < t.marks[g_marks]) {
+      t.next = t.marks[g_marks];
+    }
+  }
+  ITC_LOG_INFO("pad ticks: race {} {}, {} reads skipped to line up", n, what, skipped);
+  g_marks++;
+}
+
+}  // namespace
+
 void PadTicks_OnRaceEntered() {
   std::lock_guard lock(g_mutex);
   Load();
-  if (g_record) {
-    std::fprintf(g_record, "race %zu\n", g_races);
-    std::fflush(g_record);
-  }
-  if (g_playing && g_races < g_tracks[0].marks.size()) {
-    // Reads left before the mark (the game got here sooner) are skipped.
-    const size_t skipped = g_tracks[0].marks[g_races] - std::min(g_tracks[0].next,
-                                                                  g_tracks[0].marks[g_races]);
-    for (Track& t : g_tracks) {
-      if (g_races < t.marks.size() && t.next < t.marks[g_races]) {
-        t.next = t.marks[g_races];
-      }
-    }
-    ITC_LOG_INFO("pad ticks: race {} entered, {} reads skipped to line up", g_races, skipped);
-  }
-  g_races++;
+  OnMark(Mark::kRace, g_races++, "entered");
+}
+
+void PadTicks_OnRaceStarted() {
+  std::lock_guard lock(g_mutex);
+  Load();
+  OnMark(Mark::kStart, g_starts++, "started");
 }
 
 }  // namespace input

@@ -34,4 +34,9 @@ void PadTicks_Record(uint32_t user, uint32_t result, const XInputState& state);
 // the mark recorded, or the playback lined up on it.
 void PadTicks_OnRaceEntered();
 
+// Main thread, when a race starts (the race world loaded: the course
+// set-up's message 4, race_loading/race_loading.cpp): the mark recorded, or
+// the playback lined up on it, as at a race entered.
+void PadTicks_OnRaceStarted();
+
 }  // namespace input
