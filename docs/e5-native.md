@@ -352,7 +352,7 @@ This step changes nothing the game sees: the same bytes, the same
 addresses. It's what makes the rest possible: once code says
 `machine.started()`, where `started` lives can change in one place.
 
-Done (2026-11-21, on `e5-native-16-11-26`) but for the pad replay: the
+Done (2026-11-21, on `e5-native-16-11-26`): the
 tools (`schema_seed.py`, `schema_gen.py` with `--area`, `schema_check.py`,
 `schema_lib.py`; `lift.py` names lifted fields from the schema), and every
 area converted: one at a time first (the type 2 dialog, the pilot; the
@@ -361,11 +361,13 @@ as a swarm of parallel agents ("Step 2 as a swarm" in
 `docs/loops/e5-loop.md`): 130 areas' schema files and hand ports, an
 integration pass, and each area's accesses to other areas' types. The
 schema: 134 areas, 1,608 types, every access in the code fitting a field.
-The lifted code re-emitted with the names, built, an attract race and a
-frame dump checked; the pad replay waits on a reboot (`/dev/uinput`). The
-agents' reports are in `docs/loops/e5-swarm-reports.md`; what's left for
-the lead (first, the measure's offset fault) under "For the lead after the
-swarm" there.
+The lifted code re-emitted with the names, built, an attract race, the pad
+replay and a frame dump checked. Then (2026-11-22) the measure's offset
+fault fixed (a pointer into an object votes for the object embedded
+there) and the schema brought along: 1,726 types. The agents' reports are
+in `docs/loops/e5-swarm-reports.md`; what's left (the class-name fault,
+the `fault_*` fields still reached, the seeded types' names) under "For
+the lead after the swarm" there.
 
 ### 3. Private objects to the host
 

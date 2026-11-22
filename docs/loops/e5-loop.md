@@ -159,9 +159,9 @@ the fixes the checks call for.
   `FrontEndMenu`'s old names; a stale SDL configure check after a glibc
   update, in the build directory only); an attract race (`attract_race.sh
   40`: 38 s at 30 ticks/s, the frame cap, no error lines) and a frame dump
-  (the race drawn right). **The pad replay didn't run:** `/dev/uinput`
-  can't open since the system's kernel was upgraded without a reboot (no
-  modules for the running kernel); run it after a reboot.
+  (the race drawn right). The pad replay ran after a reboot (2026-11-22:
+  `/dev/uinput` couldn't open until then, the kernel upgraded without
+  one): 124 s, no error lines.
 - The agents' reports (130 convert, the integration, 134 cross-area):
   `docs/loops/e5-swarm-reports.md`, copied from the journal.
 - `lifted.md` and `functions.md` (rows not yet in an area) weren't in the
@@ -185,26 +185,51 @@ same `scriptPath`, `resumeFromRunId` and args replays the finished agents).
 When it finishes: the lead's validation (above), then this file and
 `docs/e5-native.md` updated.
 
-### For the lead after the swarm (found so far)
+### For the lead after the swarm
 
-- The pad replay (`scripted_run.sh itc_recomp/pad_recordings/race_test.jsonl`)
-  after a reboot: step 2's last check.
-- **A measure fault** (`type_map.py`): a pointer into an object (`this +
-  96`, a sub-object) votes for the callee's parameter as the whole object:
-  the vote ignores the offset. It joins embedded objects with their
-  owners (XAudio's reverb stages with `ReverbCore`, `Reverb::Run`'s I3DL2
-  side with `Reverb`). Fix: a nonzero offset votes for an embedded type
-  (`T@+96`). Done after the swarm (it renames measure types under the
-  agents' feet), then `schema_check.py` again and the schema files' measure
-  names updated.
-- XAudio's `Size` functions' descriptor joined with the object it
-  describes (`xaudio-objects`' note); the codec's inner object joined with
-  the outer codec.
-- `docs/known-data.md` says XAudio's converter state is 96 bytes: it's 88
-  (`xaudio-objects`).
-- The integration's `fault_*` fields (`CarScene`, `Kind6Menu`, `Movie`,
-  `RaceScene`, `RouteRange`, race-setup's `Car`) are the measure's faults
-  standing in for fields: the offset fault above removes most; then the
-  fields go.
+Done (2026-11-22, `d557e44c`):
+
+- The pad replay (after a reboot): 127 s, no error lines, the race at the
+  frame cap.
+- **The measure's offset fault** (`type_map.py`): a pointer into an object
+  (`this + 96`) voted for the callee's parameter as the whole object. Now
+  a pointer at a nonzero offset votes for the object embedded there
+  (`T@+96`; a negative offset, `T@-12`, the object containing it: array
+  headers and secondary bases), one into an array inside it (an index
+  added) for nothing, and the same for a pointer stored in a field. The
+  joins of two named classes the measure refuses fell from 463 to 142,
+  its types from 4,884 to 5,133. The schema followed (a one-off script,
+  not kept): measure names renamed where the same object got a new name
+  (203 added, 86 gone), 117 split-off embedded objects seeded as their own
+  types (`<Owner>At<N>`, `<Owner>Outer<N>`, `unknown_` fields, in the
+  owner's file, each marked "Split from"), three of them given to the
+  types they are (`HsvColor`, `RoutePosition`), the XACT engine's
+  interface no longer duplicated in `menu-sounds.toml`, XAudio's reverb
+  stages placed (`ReverbLowPass`, `ReverbDelayLine`, `ReverbAllPass`,
+  `ReverbLineFill`, `ReverbEarlyStage`, `ReverbTwoTapLine`), and the 49
+  `fault_*` fields no access reaches any more removed. 1,726 types, 0
+  accesses that fit no field, 135 never seen (137 before). Built, an
+  attract race, the pad replay and a frame dump checked.
+- `docs/known-data.md`'s converter state: 88 bytes.
+
+Left:
+
+- **The class-name fault**, the same family: a function whose row names
+  it `X::Y` has its r3 joined with `X`, even when every caller passes an
+  object embedded in another (`CarScene::InitLighting`'s r3 is the scene +
+  5248; XAudio's `PcmCodec::Size`, `XmaCodec::Size`, `XAudioCodec::Size`
+  and `XAudioMatrix::Size` take the factory's descriptor). Tried
+  (2026-11-22): no name join when every r3 vote is embedded. It freed 123
+  of the 348 `fault_*` fields (against the offset fix's 49) but moved 404
+  schema types and seeded 323, losing the agents' names on the fault
+  fields; set aside for a pass of its own. Either that rule with the
+  schema reworked by hand, or the rows renamed (the `Size` functions as
+  the descriptor's).
+- 299 `fault_*` fields still reached: the class-name fault above and
+  others (the areas' reports say which).
+- The 117 seeded embedded types are `unknown_` until read.
 - The areas' reports list the accesses left as offsets (loops over tables,
   stack words, register arithmetic) and their notes for the lead.
+- `docs/functions/replay-snapshots.md`'s schema paragraph is stale
+  (`ReplayPlacedBox`, merged into `BoxShape`; the record copies' r4, split
+  by the offset fix).
