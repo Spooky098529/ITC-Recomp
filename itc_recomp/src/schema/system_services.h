@@ -748,15 +748,28 @@ struct SysRecvFromAnswer : View {
 };
 
 // allocated; measure: new<8>@Type12Screen7::Create
+struct NetScreen7DataData {
+  uint32_t unknown_0 = 0;  // +0
+  uint32_t unknown_4 = 0;  // +4
+};
+
 struct NetScreen7Data : View {
   using View::View;
   static constexpr uint32_t kSize = 8;
-  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
-  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t unknown_0_address() const { return address + 0; }
-  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
-  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
-  uint32_t unknown_4_address() const { return address + 4; }
+  static constexpr bool kHost = true;
+  NetScreen7DataData* data() const { return static_cast<NetScreen7DataData*>(memory::HandleObject(address)); }
+  static NetScreen7Data New(uint8_t* base) {
+    return NetScreen7Data(base, memory::MakeHandle(new NetScreen7DataData(), kSize, "NetScreen7Data"));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  uint32_t unknown_0() const { return data()->unknown_0; }
+  void set_unknown_0(uint32_t v) const { data()->unknown_0 = v; }
+  uint32_t unknown_0_bits() const { return data()->unknown_0; }
+  void set_unknown_0_bits(uint32_t v) const { data()->unknown_0 = v; }
+  uint32_t unknown_4() const { return data()->unknown_4; }
+  void set_unknown_4(uint32_t v) const { data()->unknown_4 = v; }
+  uint32_t unknown_4_bits() const { return data()->unknown_4; }
+  void set_unknown_4_bits(uint32_t v) const { data()->unknown_4 = v; }
 };
 
 // embedded; measure: sub_82577788.r3@+28, sub_82577850.r3@+8, sub_82577850.r3, sub_82577850.r3@+28

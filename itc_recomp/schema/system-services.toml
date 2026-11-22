@@ -464,10 +464,17 @@ fields = [
 
 # Type12Screen7's 8-byte block ([0x82816168], network-mode.md: +0, +4 0 from
 # its Create).
+# Host storage since E5 step 3: made by Type12Screen7::Create
+# (src/network_mode/machines.cpp's Screen7Create, in place of the
+# VirtualAlloc(8) at 0x82268D8C), freed by Type12Screen7::Destroy (DestroyOf,
+# in place of the VirtualFree at 0x82268F54, which returned 1); its handle in
+# [0x82816168] (network-mode.toml's screen7_data) and Create's r3. The Xbox
+# Live mode's (unreachable with --multiplayer_menu_items off).
 [NetScreen7Data]
 measure = "new<8>@Type12Screen7::Create"
 size = 8
 origin = "allocated"
+storage = "host"
 fields = [
   { name = "unknown_0", offset = 0, type = "u32" },
   { name = "unknown_4", offset = 4, type = "u32" },

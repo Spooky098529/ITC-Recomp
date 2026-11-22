@@ -15,6 +15,7 @@
 #include "guest.h"
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
+#include "memory/handles.h"
 #include "memory/heap.h"
 #include "models/xpr.h"
 #include "ui_movies/game.h"
@@ -157,10 +158,13 @@ void AnimFree(uint8_t* base, uint32_t object) {
 int64_t AnimsLoad(uint8_t* base, uint32_t id, const archive::LoadCall& load) {
   ITC_NATIVE_RUNNING("sub_82150B10 CameraAnims::Load");
   const uint32_t size = archive::AssetSize(base, id);
-  const uint32_t record = VirtualAlloc(4);
+  // The record lives in host memory (E5 step 3): the original's
+  // VirtualAlloc(4) at 0x82150B3C; the archive keeps its handle as the
+  // callback's context.
+  const schema::CameraAnimLoad record = schema::CameraAnimLoad::New(base);
   const uint32_t buffer = VirtualAlloc(size);
-  schema::CameraAnimLoad(base, record).set_id(id);
-  return load(id, buffer, kAnimsOnLoaded, record);
+  record.set_id(id);
+  return load(id, buffer, kAnimsOnLoaded, record.address);
 }
 
 uint32_t AnimParseObject(uint8_t* base, uint32_t object, const GuestCopy& xmemcpy) {
@@ -230,7 +234,8 @@ uint32_t AnimParseObject(uint8_t* base, uint32_t object, const GuestCopy& xmemcp
 
 bool AnimsOnLoaded(uint8_t* base, uint32_t data, uint32_t record, uint32_t frame,
                    const GuestCopy& memcpy, const GuestCopy& xmemcpy) {
-  if (!memory::IsPages(record) || !memory::IsPages(data)) {
+  // The record is a host object's handle (E5 step 3, CameraAnims::Load).
+  if (!memory::IsHandle(record) || !memory::IsPages(data)) {
     return false;
   }
   ITC_NATIVE_RUNNING("sub_82150878 CameraAnims::OnLoaded");
@@ -257,7 +262,7 @@ bool AnimsOnLoaded(uint8_t* base, uint32_t data, uint32_t record, uint32_t frame
   G::set_anim_count(base, n + 1);
   Copy(base, n * schema::CameraAnimEntry::kSize + G::anims_address(), frame + 80,
        schema::CameraAnimEntry::kSize, memcpy);
-  memory::FreePages(record);
+  schema::CameraAnimLoad(base, record).Delete();  // the original's VirtualFree at 0x82150940
   memory::FreePages(data);
   return true;
 }

@@ -1165,13 +1165,24 @@ struct CameraAnimFileBlock : View {
 };
 
 // allocated; measure: new<4>@CameraAnims::Load, CameraAnims::OnLoaded.r6
+struct CameraAnimLoadData {
+  uint32_t id = 0;  // +0
+};
+
 struct CameraAnimLoad : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
+  static constexpr bool kHost = true;
+  CameraAnimLoadData* data() const { return static_cast<CameraAnimLoadData*>(memory::HandleObject(address)); }
+  static CameraAnimLoad New(uint8_t* base) {
+    return CameraAnimLoad(base, memory::MakeHandle(new CameraAnimLoadData(), kSize, "CameraAnimLoad"));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // the asset id
-  uint32_t id() const { return guest::LoadU32(base, address + 0); }
-  void set_id(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t id_address() const { return address + 0; }
+  uint32_t id() const { return data()->id; }
+  void set_id(uint32_t v) const { data()->id = v; }
+  uint32_t id_bits() const { return data()->id; }
+  void set_id_bits(uint32_t v) const { data()->id = v; }
 };
 
 // embedded; measure: CameraAnim::EvalCamera.r5
