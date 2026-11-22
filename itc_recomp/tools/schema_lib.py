@@ -19,6 +19,7 @@ class Type:
         self.measure = data.get("measure")
         self.measures = ([self.measure] if self.measure else []) + data.get("measures", [])
         self.size = data.get("size", 0)
+        self.storage = data.get("storage", "guest")
         self.fields = data.get("fields", [])
         self.by_offset = {}
         for f in self.fields:

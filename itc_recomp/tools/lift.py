@@ -1141,12 +1141,59 @@ def name_fields(fn, st, line):
     if m is None or int(m.group(4)) != disp:
         return line
     obj = f"uint32_t({m.group(3)})" + (f" - {off}" if off > 0 else f" + {-off}" if off < 0 else "")
+    if ty.storage == "host":
+        return host_access(fn, ty, f, obj, off + disp - f["offset"], m, line)
     address = f"schema::{ty.name}(base, {obj}).{f['name']}_address()"
     inside = off + disp - f["offset"]
     if inside:
         address += f" + {inside}"
     VIEW_HEADERS.add(ty.header())
     return line[:m.start()] + f"REX_{m.group(1)}_U{m.group(2)}({address}" + line[m.end():]
+
+
+HOST_LEFT_RAW = []
+
+
+def host_access(fn, ty, f, obj, inside, m, line):
+    """A load or store of a host type's field (docs/loops/e5-loop.md, step
+    3): the view's raw bits of the field's width, or the bytes helpers
+    inside a bytes field. A partial access to a plain field stays raw (it
+    faults on the handle if reached) and is listed."""
+    VIEW_HEADERS.add(ty.header())
+    view = f"schema::{ty.name}(base, {obj})"
+    width = int(m.group(2))
+    store = m.group(1) == "STORE"
+    if f["type"] == "bytes":
+        at = f"{view}.{f['name']}() + {inside}"
+        load = f"schema::host::LoadU{width}({at})"
+        store_fn = f"schema::host::StoreU{width}({at}, "
+    elif inside == 0:
+        load = f"{view}.{f['name']}_bits()"
+        store_fn = f"{view}.set_{f['name']}_bits("
+    else:
+        HOST_LEFT_RAW.append(f"{fn}: {ty.name}.{f['name']} +{inside}, {width} bits")
+        return line
+    # The call's extent: from `REX_..._Un(` to its closing parenthesis.
+    depth, end = 0, None
+    for i in range(m.start() + len(f"REX_{m.group(1)}_U{m.group(2)}"), len(line)):
+        if line[i] == "(":
+            depth += 1
+        elif line[i] == ")":
+            depth -= 1
+            if depth == 0:
+                end = i
+                break
+    if end is None:
+        HOST_LEFT_RAW.append(f"{fn}: {ty.name}.{f['name']}, unparsed")
+        return line
+    if not store:
+        return line[:m.start()] + load + line[end + 1:]
+    args = line[m.end():end]
+    comma = args.find(",")
+    if comma < 0:
+        HOST_LEFT_RAW.append(f"{fn}: {ty.name}.{f['name']}, a store without its value")
+        return line
+    return line[:m.start()] + store_fn + args[comma + 1:].strip() + ")" + line[end + 1:]
 
 
 OWN_SPELLING = re.compile(r"\bREX_(LOAD|STORE)_U(8|16|32|64)\(|\bREX_RAW_ADDR\(")
@@ -1278,6 +1325,10 @@ def main(argv):
         with open(os.path.join(OUT, "functions.h"), "w") as f:
             f.write(emit_header(lifted_before))
         print(f"rewrote {len(batches)} batches: {len(everything)} functions")
+        if HOST_LEFT_RAW:
+            print(f"host types' accesses left raw (they fault if reached): {len(HOST_LEFT_RAW)}")
+            for x in HOST_LEFT_RAW[:40]:
+                print("  " + x)
         return 0
     print(__doc__)
     return 1
