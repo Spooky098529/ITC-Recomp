@@ -11,6 +11,7 @@
 #include "debug/state_digest.h"
 #include "input/pad_ticks.h"
 #include "guest.h"
+#include "memory/mapping.h"
 #ifndef ITC_NO_HARNESSES
 #include "harnesses/harness.h"
 #endif
@@ -45,6 +46,10 @@ ITC_FLAG_BOOL(native_race_draw_step, true, "ITC",
 ITC_FLAG_BOOL(log_race_changes, false, "ITC",
               "Log when the game enters and leaves a race (the race's draw step starts or "
               "stops running)");
+ITC_FLAG_BOOL(game_rand_by_tick, true, "ITC",
+              "Render-only passes don't advance the game's own random number generator "
+              "(sub_82293568's seed): the camera shake drew from it on every frame, so the "
+              "race's traffic and other draws depended on the frame rate");
 ITC_FLAG_BOOL(log_game_messages, false, "ITC",
               "Log game messages delivered and skipped, once a second");
 ITC_FLAG_STRING(render_only_update_handlers, "", "ITC",
@@ -510,6 +515,23 @@ void GameMessages_PassCounts(uint64_t& logic, uint64_t& render_only) {
 }
 
 void GameMessages_SetRenderOnlyPass(bool render_only) {
+  // The game's own random generator advances only on logic passes, as at the
+  // original 30 fps: its seed saved when a render-only pass starts, put back
+  // when the next pass starts (the camera shake draws from it every frame).
+  if (ITC_FLAG(game_rand_by_tick)) {
+    constexpr uint32_t kGameRandSeed = 0x82638188;  // race-overlays.toml's rand_seed
+    static bool saved = false;
+    static uint32_t seed = 0;
+    uint8_t* base = memory::Base();
+    if (saved) {
+      guest::StoreU32(base, kGameRandSeed, seed);
+      saved = false;
+    }
+    if (render_only) {
+      seed = guest::LoadU32(base, kGameRandSeed);
+      saved = true;
+    }
+  }
   g_passes[render_only ? 1 : 0]++;
   g_render_only_pass = render_only;
   g_paused = g_pause_drawn_this_pass;

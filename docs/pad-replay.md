@@ -135,6 +135,16 @@ loads before each logic tick (so loads end on a fixed tick) deadlocked the
 boot (the main thread waiting on the frame driver while its draw thread
 looped in the render replay); the race marks made it unnecessary.
 
+The game's own random generator is lined up too (2026-11-22, E5 step 4):
+at each race's start mark, recording and playback alike set its seed
+(`0x82638188`) to a fixed value per race (`PadTicks_OnRaceStarted`). The
+camera shake draws from it on every tick of a race's loading, whose length
+varies, so the next race's traffic (`Car::SetModel`'s random parts) moved
+with the load times before. With that and `--game_rand_by_tick`
+(`docs/frame-interpolation.md`), the baseline was made again (2026-11-22,
+from E5 step 4's pilot build, `ae77718d`, with both; batch 1 matched it in
+both races, twice).
+
 ## Recordings
 
 - `race_test.jsonl` (2026-10-22, 121 s): the title, the menus, a race.

@@ -790,3 +790,59 @@ dual by rule: its callers pass both shapes). Checked: build, attract race
 (38 s, no error lines, no handle fault), `tick_replay.sh` twice (both races
 all match), a frame dump (normal). The replay reaches `AppStates::Create`,
 `AddLayer`, `StateLayer::ApplyOp` and `Update` (every tick).
+
+### Batch 1: done (2026-11-22)
+
+Six agents, one per unit (edits only; a brief in the session, the pilot as the
+model), then the lead's build, checks and fixes:
+
+- **Moved** (host or dual): the framework (`Framework`, `FrameStart`, both
+  pool makers `MorphJobMaker`, `HandlerMapNode`, `AppOpListNode`; the
+  framework's interface views dual); the nine game mode objects and
+  `ModeHolder` (most dual: the measure joins them with stack answers and
+  blocks; every 812-byte dispatcher view dual); the car list's entries and
+  colors, the dealer's swatches, the camera presets and animations, the
+  four panels (dual: the type 8 mode embeds them); `AfterRaceMenuData`
+  and its screen (dual), `RaceDialogData`, `PowerGraphScreenData`,
+  `UserInfoData`; `CollisionWorld`; `InputClientList` and the race's car
+  inputs (`CarInput`, dual). About 40 types.
+- **Skipped**, by the agents (their reasons): the vector library and the
+  matrix math read field addresses as guest memory (`RigidBody`,
+  `BoxShape`, `CollisionHit`, `CollisionContact`); arrays allocated as one
+  block (`CollisionObjectBlock`, `PtrListNode`'s allocator); `InputManager`
+  and `ActionMapper` (arrays of embedded objects handed out by address);
+  `App` (its +16 interface's vtable read raw in other units' files); lifted
+  vtable slots reading their objects raw (`AppCamera` and its list and
+  entries, `CarDealerEntry`); kernel objects in place (`WorkerPool`);
+  objects handed to the graphics code (`AppScene`, `Type2HubTexture`).
+- **The lead's fixes on the way:** the game's frees (`memory::FreeHandle`
+  from `Free`, `FreePages`, `FreePhysical`) and `InRange`, `IsPages` and
+  `IsHeapBlock` take handles (a menu teardown fell into the kernel's
+  `NtFreeVirtualMemory` before); every `guest::Load*` and `Store*` reaches
+  a host object through its handle (`memory::RawHandleLoad` and `Store`,
+  as the guest's bytes would give it, logged once per type and offset):
+  raw accesses no longer stop the game (the career's free run,
+  `RaceStates::LinkTick`, copies car inputs raw); overlaid fields (a word
+  read as two halves) read the guest-order image of the members they
+  cover (`memory::LoadOverlay`), with `load_at` and `store_at` for lifted
+  accesses inside a field; scalars over bytes fields as members; embed
+  accessors as templates, their areas' headers included at the end.
+- **The replay's sensitivity to timing**, found because race 1 differed
+  from tick 0: the game's own random generator was advanced by the camera
+  shake on render-only passes and on each tick of a race's loading, so the
+  traffic's random parts moved with the frame rate and the load times
+  (found by logging each draw's caller in both builds). Fixed:
+  `--game_rand_by_tick` (on by default) and the replay's line-up at each
+  race's start (`docs/pad-replay.md`); the baseline made again from the
+  pilot's build with both. Things tried and ruled out on the way: the
+  moved types one unit at a time, `rand` (identical), zero-filled heap
+  blocks (no effect).
+- **Checked:** build; attract race (38 s, no error lines); `tick_replay.sh`
+  twice against the new baseline (both races all match); a frame dump
+  (normal). Raw accesses logged in the replay (handled, to convert): a
+  `CarInput`'s +0 to +16 (lifted copies), a `Framework`'s +72.
+- Rows proposed by the agents await the user's review (not written).
+- The schema check lists 23 accesses that fit no field: the modes' fault
+  fields the modes agent removed (block reads joined to the mode, which
+  stay guest reads, and the `ForceExit` stores at -28, never reached).
+
