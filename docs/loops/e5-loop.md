@@ -464,6 +464,14 @@ args, in the same session) only when the user's current message says to.
   (`docs/loops/e5-step3-reports.md`); both replay races match. Only
   `TitleLoadBlock` is on the replay's path; the other five are checked by
   the build only. Its proposed rows await the user's review.
-- `lift.py`'s `host_alloc` and `host_free`: written, not yet checked.
+- `lift.py`'s `host_alloc` and `host_free`: done and checked (2026-11-22)
+  on `FloatPair` (heap; made by `sub_820A70F8`, freed by `FloatPairItem`'s
+  destructor; not seen in play, so the emission and the build are what's
+  checked). `host_free`'s `returns` may be left out (operator delete and
+  free leave r3). Its first `tick_replay.sh` showed race 1 a tick late from
+  tick 12: not the move (it never ran) but the replay's lineup, which
+  didn't cover the race's own loads; fixed with a start mark
+  (`docs/pad-replay.md`, "By tick"), the recording and baseline made again,
+  then both races matched twice.
 - Batches 2 and 3: not started.
 - Merged into `rexglue-removal-project` up to the pilot (`fc5e3b94`).
