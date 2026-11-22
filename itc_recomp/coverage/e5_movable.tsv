@@ -206,7 +206,6 @@ CString	c-runtime	no	shared (3 areas)	0	_output_l _woutput_l	14	CompareStringA s
 CallocErrorOut	heap	no	no allocation seen	4		1	
 CameraAnim	camera-modes	no	overlapping fields	340	CameraAnim::ParseObject	8	CameraAnim::Free CameraAnim::ParseObject CameraAnim::Matrix
 CameraAnimBlock	camera-modes	yes		64	CameraAnim::ParseObject	6	CameraAnim::ParseObject CameraAnim::Matrix
-CameraAnimData	camera-modes	no	no allocation seen	64		3	CameraAnim::Matrix
 CameraAnimFileObject	camera-modes	no	no allocation seen	12		1	CameraAnims::OnLoaded
 CameraAnimLoad	camera-modes	yes		4	CameraAnims::Load	2	CameraAnims::OnLoaded
 CameraAnimObjects	camera-modes	no	no allocation seen; overlapping fields	260		3	
@@ -554,7 +553,7 @@ FileSizeArg	files-and-saves	no	no allocation seen	4		2
 FileSizeHighOut	files-and-saves	no	no allocation seen	4		1	
 FileVtable	files-and-saves	no	no allocation seen	24		1	
 FloatOutput	c-runtime	no	no allocation seen	26		1	sub_825B8B48
-FloatPair	heap	yes		12	sub_820A70F8	1	
+FloatPair	heap	yes		12	FloatPairItem::FloatPairItem	1	
 FloatPairItem	heap	yes		16	sub_820A81C0	1	
 FloatStrings	c-runtime	no	no allocation seen	16		3	_cftof2_l _fptostr
 FloatTriple	heap	yes		20	sub_820A7AF8	1	
@@ -773,7 +772,7 @@ ModeType2	type2-mode	no	shared (3 areas); overlapping fields	852	Mode::Create	13
 ModeType2Vtable	type2-mode	no	no allocation seen	56		6	
 ModeType4	title-screen	no	shared (3 areas); overlapping fields	852	Mode::Create	13	ModeType4::Init ModeType4::Interrupt ModeType4::ForceExit ModeType4::Restart ModeType4::WaitForLeave ModeType4::LeaveScreen ModeType4::NextMode ModeType4::Leaving
 ModeType5	type5-mode	no	shared (4 areas); overlapping fields	852	Mode::Create	12	ModeType5::Init ModeType5::Interrupt ModeType5::ForceExit ModeType5::WaitForLoads ModeType5::WaitForShown ModeType5::LeaveScreen ModeType5::Leaving ModeType5::NextMode
-ModeType8	boot-mode	yes		87768	Mode::Create	1	
+ModeType8	boot-mode	no	unreachable (the type 8 (two-player) mode)	87768	Mode::Create	1	
 ModeType8Member	boot-mode	no	shared (2 areas); no allocation seen	86920		2	
 ModeType9	todays-result	no	shared (4 areas); overlapping fields	852	Mode::Create	12	ModeType9::Init ModeType9::ForceExit ModeType9::WaitForLoads ModeType9::WaitForShown ModeType9::LeaveScreen ModeType9::NextMode ModeType9::Leaving
 ModeType9Block	todays-result	no	shared (2 areas); overlapping fields	19300	ModeType9::Init	6	ModeType9::Init ModeType9::ForceExit ModeType9::WaitForLoads ModeType9::NextMode ModeType9::Leaving
@@ -945,7 +944,8 @@ PathText	file-layer	no	tags file; no allocation seen	1		2
 PauseMenu4	race-screens-unseen	no	no allocation seen	4		21	PauseMenu4::ShowItems PauseMenu4::Draw
 PauseMenu4Data	race-screens-unseen	yes		80	PauseMenu4::Create	18	PauseMenu4::MainPage PauseMenu4::ShowItems PauseMenu4::SetUpMain
 PauseMenuData	race-screens	yes		160	PauseMenu::Create	29	PauseMenu::ShowItems PauseMenu::SetUpMain
-PauseMenuScreen	race-screens	yes		4	PauseMenu::Create	40	PauseMenu::ShowItems PauseMenu::Draw
+PauseMenuScreen	race-screens	yes		4	PauseMenu::Create	38	PauseMenu::ShowItems
+PauseMenuStarted	race-screens	no	no allocation seen	4		23	PauseMenu::Draw
 PcmCodec	xaudio-objects	no	no allocation seen; overlapping fields	272		4	PcmCodec::PcmCodec PcmCodec::Process
 PcmCodecOuter16	xaudio-objects	no	no allocation seen	228		1	
 PcmCodecOuter16_2	xaudio-objects	no	no allocation seen	268		1	
@@ -1380,7 +1380,7 @@ SysLinkId	system-services	no	no allocation seen	8		9	sub_82149BF0 sub_8214BCE0 s
 SysLinkIdSet	system-services	no	no allocation seen	12		11	sub_8214BCE0 sub_8214BF20
 SysLinkIdSetInsertResult	system-services	no	no allocation seen; overlapping fields	9		1	sub_8214C708
 SysLinkIdSetIter	system-services	no	no allocation seen; overlapping fields	8		11	sub_821496F8 sub_821497A8 sub_8214BCE0 sub_8214C708 sub_8214FCC8
-SysLinkIdSetNode	system-services	yes		26	sub_82149A30	12	sub_821496F8 sub_821497A8 sub_8214BCE0 sub_8214BF20 sub_8214C708
+SysLinkIdSetNode	system-services	no	unreachable (System Link)	26	sub_82149A30	12	sub_821496F8 sub_821497A8 sub_8214BCE0 sub_8214BF20 sub_8214C708
 SysLinkIdSetRange	system-services	no	no allocation seen	16		1	
 SysLinkMessage3	system-services	no	no allocation seen	3		1	sub_8214FC40
 SysLinkMessage9	system-services	no	no allocation seen	9		1	sub_8214FDF8
@@ -1428,7 +1428,6 @@ TireCoefficients	car-physics	no	no allocation seen	16		1
 TitleLoadBlock	title-screen	yes		68	TitleLoad::Create	22	TitleLoad::DebugPage0 TitleLoad::DebugPage1 TitleLoad::DebugPage2 TitleLoad::DebugPage3 TitleLoad::Draw TitleLoad::Update
 TitleScreenData	title-screen	no	shared (2 areas); tags save	68	TitleScreen::Create	24	TitleScreen::Update_822221A0 TitleScreen::MoveCareerCursor
 TitleTransitionStarted	title-screen	no	no allocation seen	4		3	
-TodaysEventImage	todays-result	yes		16	TodaysEvent::LoadImagePair	4	TodaysEvent::LoadImagePair
 TodaysEventMachine	todays-result	no	overlapping fields	9620	TodaysEvent::Create	20	TodaysEvent::NextUnlockEntry TodaysEvent::FreeImages TodaysEvent::LoadImagePair
 TodaysResultData	todays-result	yes		88	TodaysResult::Create	6	
 TodaysResultMachine	todays-result	no	no allocation seen; overlapping fields	9620		10	
@@ -1499,7 +1498,7 @@ TvCameraAt32	camera-modes	no	no allocation seen	12		1	TrackRoute::SliceFraction
 TvCameraAt368	camera-modes	no	no allocation seen	72		1	
 Type2DialogData	type2-dialog	yes		68	Type2Dialog::OnEnter	11	Type2Dialog::Update
 Type2Hub	type2-screens	yes		9620	Type2Hub::Create	44	Type2Hub::NextNotice Type2Hub::FreeImages Type2Hub::LoadNoticeImage Type2Hub::Choose Type2Hub::FillMenu Type2Hub::MenuPage Type2Hub::Update
-Type2HubImage	type2-screens	yes		16	Type2Hub::LoadNoticeImage	5	Type2Hub::LoadNoticeImage
+Type2HubImage	type2-screens	no	shared (2 areas)	16	TodaysEvent::LoadImagePair Type2Hub::LoadNoticeImage	9	Type2Hub::LoadNoticeImage TodaysEvent::LoadImagePair
 Type2HubTexture	type2-screens	yes		12	Type2Hub::ImageLoaded	1	
 Type2ModeBlock	type2-mode	no	overlapping fields	162688	ModeType2::Init	5	ModeType2::Init ModeType2::ForceExit ModeType2::WaitForLoads ModeType2::NextMode
 Type2ScreenMachine	type2-mode	no	no allocation seen	9620		3	ModeType2::FindShown ModeType2::NextMode ModeType2::Leaving

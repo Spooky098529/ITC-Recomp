@@ -3,9 +3,9 @@
 Instructions for running E5's steps 2 to 5 (`docs/e5-native.md`) area by
 area, as B7's loop did (`docs/loops/b7-loop.md`; its rules carried over by
 the user's call, 2026-11-16: precedent first, the user's limits per run).
-This file covers step 2 (the schema and named fields) and, drafted,
-step 3 (private objects to the host); steps 4 and 5 get their sections
-when they start.
+This file covers step 2 (the schema and named fields), step 3 (private
+objects to the host) and, drafted, step 4 (shared objects); step 5 gets
+its section when it starts.
 
 The session running the loop (the **lead**) does no area's work itself: it
 hands each area to one subagent at a time, reads its report, checks it
@@ -501,3 +501,265 @@ args, in the same session) only when the user's current message says to.
   areas). The rows for the leftovers await the user's review.
 - Merged into `rexglue-removal-project` up to the pilot (`fc5e3b94`), then
   with the batches, the leftovers and their rows (2026-11-22).
+
+## Step 4: shared objects (draft, 2026-11-22)
+
+`docs/e5-native.md` step 4 is the why. A draft for the user's review:
+nothing below is started.
+
+### The ground (measured 2026-11-22, after step 3)
+
+`tools/e5_movable.py` (`coverage/e5_movable.tsv`): 1,805 schema types the
+code touches, 17 in host memory (step 3's 16 moves; `Type2HubImage` counts
+as shared since `TodaysEventImage` merged into it). "Movable" lists 64: the
+16 host types, the movie library's 9 (a replaced library) and step 3's 39
+skipped. The rest, by what stops them (a type can have several):
+
+| Blocker | Types |
+| --- | --- |
+| No allocation seen (embedded in another object, static, or a parameter the measure couldn't join to its allocation) | 1,574 |
+| Shared (touched by several areas) | 339 |
+| Read from a file in place (with GPU 11, with save 3) | 328 |
+| Overlapping fields (a union, or a measure fault) | 313 |
+| Read by the GPU | 131 |
+| Saved | 43 |
+
+What matters is the combinations:
+
+- **910 private types blocked only by "no allocation seen"** (2,406
+  function touches): 741 embedded, 92 in the image, 56 allocated through a
+  path the measure doesn't follow, 21 other. By their measure names: 344
+  parameters (many are a caller's locals passed by address: step 6), 294
+  embedded at an offset (`T@+N`), 151 a field's pointee, 94 classes (the
+  menus' 9,620-byte machines carved out of a mode's one block:
+  `RaceHudMachine`, `CarDealer`, `GarageScreen`, `PlateEditor`,
+  `RaceMenu`; `TrackZone` inside `TrackZones`; `AiPath`), 17 returns.
+  257 have their owner noted ("Split from"); 31 have a vtable.
+- **22 types blocked only by "shared"** (allocated, no tags, no overlap):
+  18 of them shared by two areas (`PtrListNode`, `CollisionHit`,
+  `SceneCarModel`, `InputClientList`, `AfterRaceMenuData`, `Framework`,
+  `RaceDialogData`, `TabPanel`, `BuildScreenDataPart`, `CarSettingsData`,
+  `Movie`, `MovieWrapper`, `ColorPanel`, `RowPanel`, `CollisionWorld`,
+  `RaceScreens`, `CarPanel`, `Type2HubImage`, already host), 4 by three
+  (`XAudioAllocBlock`, `CString`, `NetRankingData`, `CarDealerData`).
+- Shared types by their number of areas: 180 two, 73 three, 29 four, 57
+  five or more (the hubs: `UiMovieTableValue` 40 areas, `RaceData` 38,
+  `SaveData` 36, `UiMovieNode` 19, `Vehicle` 15; most of them also tagged
+  file, save or GPU, or embedded).
+- **Step 3's 39 skipped**, by what stops them:
+  - virtual dispatch over a raw vtable word (15): `GameModeType6`,
+    `GameModeType7`, `ModeHolder`, `FloatPairItem`, `FloatTripleItem`,
+    `FloatTriple`, `FrameStart`, `MorphJobMaker`, `AppDelegate`,
+    `AppStates`, `OverlayView`, `SysUsers`, `AppCameraList`,
+    `AppCameraEntry`, `D3DXBuffer`;
+  - objects or interfaces embedded at offsets, their addresses handed out
+    (10): `TrackZones`, `CarSoundArray`, `Type4BlockPart`,
+    `LocationScreenPart`, `StateLayer`, `WorkerPool`, `Kind6MenuPart`,
+    `AppCamera`, `Type2Hub`, `CareerResultsScreen`;
+  - an address handed to a callee that reads guest memory (5):
+    `LocationScreenPictureTexture`, `CarDealerSwatch`, `Type2HubTexture`,
+    `CarOverlays`, `CameraCubeFaceSurface`;
+  - raw containers or arrays (5): `HandlerMapNode`, `ByteCountedList`,
+    `TrackCollisionObject`, `Vector16Storage`, `CollisionObjectBlock`;
+  - memcpy targets (3): `CarListEntry`, `CarDealerEntry`,
+    `StandModelsSpecCopy`;
+  - file-backed (1): `CarSoundWaveBank` (step 5).
+- **Virtual calls** in the lifted code (batches and originals): 2,515 calls
+  through `ctr`; 2,365 are the vtable idiom (`lwz a,0(obj)`, `lwz c,N(a)`,
+  `mtctr c`, `bctrl`), 484 of them with the vtable word read through a
+  view, 1,881 raw; 111 call a slot read from something else (callbacks,
+  functors), 39 a computed target. The hand ports: about 100 helpers like
+  `VirtualTarget` (`Load(Load(object) + offset)`), 226 uses of a `vtable`
+  accessor.
+
+What it means: being shared isn't what stops most types. Since step 2
+every area reads a type through the same view, so a shared type whose
+accesses all go through views moves like a private one, provided its
+allocation sites are known and every area's raw accesses are gone. What
+stops them is shape: objects living inside other objects (no allocation of
+their own), virtual calls that read the vtable word raw, interior
+pointers, memcpy, and addresses handed to callees that read guest memory.
+Step 4 is mostly groundwork for those shapes, then moving **units** (an
+allocated object with every object embedded in it) wherever their areas
+are.
+
+### Groundwork, before the pilot (done directly, not by agents)
+
+1. **Embedded objects in the schema.** A field type `embed`
+   (`{ name = "race_menu", offset = 9640, type = "embed", to = "RaceMenu" }`,
+   `count` for arrays): a guest view returns `T(base, address + offset)`; in
+   a host type, `T`'s struct becomes a member. Seeded from the measure's
+   `T@+N` votes and the "Split from" notes (`schema_seed.py` or a one-off
+   script), checked by `schema_check.py` (an embedded type's accesses must
+   fit its owner's span).
+2. **Host layout at the guest offsets.** Host structs keep each field at
+   its guest offset (`schema_gen.py` fills the gaps with padding and
+   `static_assert`s `offsetof`), in host byte order. Then an interior
+   pointer is `object + offset`, an embedded member sits where the guest
+   code expects it, and a memcpy between two host objects of one type is a
+   memcpy. (Step 3's structs are packed; regenerated this way, nothing that
+   reads them changes.) Repacked when the last guest-shaped reader goes
+   (step 9).
+3. **Interior handles.** `memory::HandleObject` accepts any value inside a
+   live object's span (`handle + offset`, already reserved by `MakeHandle`)
+   and returns `object + offset`; the views of embedded types inside a host
+   owner use it. The fault handler is unchanged for raw accesses.
+4. **Dual views** (`storage = "dual"`): for a type with instances in both
+   shapes while its owners convert (a generic container such as `PtrList`
+   embedded in host and guest objects; a record embedded in several
+   owners), the view checks `memory::IsHandle(address)` at each access and
+   reads the host struct or guest memory. No `_address()` either, so the
+   build still lists what's left. Used only where a type really has both;
+   a shared allocated type moves whole (all its allocation sites at once)
+   and needs no dual view.
+5. **Virtual calls over handles.** `lifted::VtableSlot(base, object,
+   offset)`: the vtable word from guest memory, or from a handle's host
+   object (its `vtable` member at +0, still the image table's guest address,
+   written by the constructors and destructors through the view as now).
+   `lift.py` emits it for the 2,365 vtable-idiom sites (`lwz a,0(obj)`
+   feeding `lwz c,N(a)` feeding `mtctr`), typed or not, and the hand ports'
+   `VirtualTarget`-style helpers call it. The call itself still goes
+   through the dispatch table by address. C++ virtual functions (the plan's
+   end state) come per class hierarchy once its slots' functions are all
+   typed and its objects all host: a follow-up after the moves, not
+   groundwork.
+6. **memcpy over host objects.** The game's memcpy and memmove (native
+   entries, so one place) accept handles on either side: host to host, a
+   memcpy of the host bytes (the layout is the guest's); host to guest or
+   guest to host, a per-type copy generated by `schema_gen.py`
+   (`CopyFromGuest`, `CopyToGuest`: each field swapped) when the size is
+   the type's or a field run's, else a logged stop. The same for memset.
+7. **Callbacks and contexts.** Callbacks stay guest function addresses
+   dispatched through the table (that works whatever shape the object is);
+   their context word may be a handle (`CameraAnimLoad` did it). Nothing to
+   build: the rule for agents. Function objects come with step 6.
+8. **Addresses handed to callees.** No tool: per site, by the precedents.
+   A value the callee only reads goes by value (`ui_movies::NameRecord`);
+   a callee that writes through it, or keeps it, takes the view (dual if
+   it gets both shapes).
+9. **The step 4 pick list** (`tools/e5_movable.py --units`, extended):
+   units (an allocated type with its `embed` closure), each with its
+   allocation and free sites, its areas and hand-port files, its raw
+   vtable reads, memcpy sites and interior addresses taken, and what keeps
+   it from moving in step 4's terms (a file, GPU or save tag: steps 5 and
+   7; an image static: step 8; a caller's local: step 6). Ordered leaves
+   first: fewest areas, then fewest functions.
+
+Each piece built, an attract race and `tick_replay.sh` (nothing moved yet:
+the game unchanged), committed. Pieces 1 to 4 change only generated code
+and step 3's structs' layout; 5 and 6 change every virtual call and copy,
+so they're checked like a batch.
+
+### The pilot
+
+Recommended: `app-states`' **`AppStates` with `StateLayer`** (and
+`AppDelegate`, made by `Delegate::Clone`). `AppStates` (12 B, vtable
+`0x820028F8`) is the app's state stack; `StateLayer` (48 B, vtable
+`0x820028E0`) holds a state interface at +4 (the layer + 4 is handed out
+as the state), and two `PtrList`s at +12 and +24 walked by the list
+helpers. Between them they need pieces 1 to 5 (embedded members, interior
+handles, the `PtrList` dual view, virtual calls through raw vtable words,
+`VirtualTarget`), and they run every tick, so the attract race and
+`tick_replay.sh` check them in full; a mistake stops the boot at once. The
+fallback if that's too much for one pilot: `race-overlays`' `CarOverlays`
+with `OverlayView` (vtables, an embedded part, the archive's callback
+context; run in every race).
+
+### Units and order
+
+From the measure (leaves first), in waves, each a few batches:
+
+1. **The pilot** (above).
+2. **Shared allocated types** (the 22 blocked only by "shared", less
+   `Type2HubImage`, already host, and `Movie` and `MovieWrapper` if the
+   movie wrappers no longer run): no new shape, only their areas' raw
+   accesses to clear.
+3. **Step 3's 39 skipped**, by groundwork piece: virtual dispatch (15),
+   embedded (10), handed addresses (5), containers (5), memcpy (3); less
+   `CarSoundWaveBank` (step 5) and `StandModelsSpecCopy` and
+   `Kind6MenuPart` (the Xbox Live mode: unreachable, to add to
+   `UNREACHABLE`).
+4. **Owners with their embedded objects**: the mode blocks
+   (`Type2ModeBlock`, `ModeType9Block`, ...) with the menus' machines and
+   screens inside them, `TrackZones` with `TrackZone`, `AiDriver` with
+   `AiPath`; the 910 private embedded types go with their owners here.
+   Areas by fewest ties first (`type_map_areas.tsv`'s shared weight:
+   `std-string` 0, `menu-helpers` 1, `morph-jobs` 1, `framework` 17,
+   `heap` 17, `screen-constructors` 19, `race-hud` 42, `c-runtime-core` 55,
+   `app-states` 56, `c-runtime` 66).
+5. **The hubs** last, as far as they go before steps 5 and 7: `Racers`,
+   `Vehicle`, the scene and its models, the car scene; the UI movies'
+   records and `RaceData` are file-tagged, `SaveData` saved: they move
+   with their loaders (step 5).
+
+Out of step 4: types tagged file, GPU or save (steps 5 and 7, even when
+otherwise movable), statics in the image (step 8), a caller's locals
+passed by address (step 6).
+
+### As a swarm
+
+Like step 3's (batches, one checked before the next; 6 agents at a time;
+edits only), with one change: **one agent per unit, not per area**, since a
+unit spans areas. The script (a new `e5-step4-swarm.js`) takes a batch of
+units whose hand-port files don't overlap (checked by the script from the
+pick list, so two agents never edit one file).
+
+An agent may:
+- set `storage = "host"` (or `"dual"`) on its unit's types, add `embed`
+  fields to them, list `host_alloc` and `host_free`;
+- edit every hand-port file touching its unit's types (any area), and the
+  unit's schema entries;
+- turn a raw access, a vtable read, a memcpy or a handed address into the
+  view, `VtableSlot`, the handle-aware copy, a value or a view parameter,
+  as the precedents above do.
+
+An agent may not:
+- edit `src/lifted/`, `src/schema/` or the tools, build, run the game, use
+  git, or run `lift.py`, `lift_originals.py`, `type_map.py` or the full
+  `schema_gen.py` (`schema_gen.py --area` only);
+- touch types outside its unit, or another unit's files;
+- write rows (proposed in its report);
+- change what the game does (the behavior rule: the same game tick for
+  tick);
+- move a type it can't clear of raw accesses: it skips it, with the reason
+  and the sites.
+
+### The lead's check after each batch
+
+Step 3's ("The lead's check after each batch"), plus:
+- `lift.py reemit`'s list of host types' accesses left raw must be empty
+  (each would fault);
+- a count of the vtable-idiom sites left raw (`lift.py` reports it);
+- `tick_replay.sh` twice, both races "all match"; a digest that differs is
+  narrowed to a unit by putting units back half at a time;
+- grep the replay's log for "native running" and say which moves only the
+  build has checked;
+- functions whose objects are now all host get the status **Host** (rows
+  proposed to the user first), then `check_function_statuses.py`;
+- `tools/e5_status.py` (the plan's "Tracking"; written in the groundwork
+  if the user wants it now): the counts after each wave, in
+  `docs/e5-native.md`.
+
+### Open points for the user
+
+1. Host structs at the guest offsets (groundwork piece 2), or packed with
+   an offset map for interior pointers? Recommended: the guest offsets,
+   repacked at step 9.
+2. Virtual calls: the bridge first (`VtableSlot`, the vtable word kept as
+   the image table's address, dispatch by address), C++ virtual functions
+   per hierarchy after the moves? Or C++ virtual functions as each class
+   moves? Recommended: the bridge first.
+3. Agents per unit, allowed to edit every area's files touching their
+   unit (batches with disjoint files)? Or per area as in step 3?
+   Recommended: per unit.
+4. The pilot: `AppStates` with `StateLayer` and `AppDelegate`, or
+   `CarOverlays` with `OverlayView`? Recommended: `AppStates`.
+5. Types tagged file, GPU or save left for steps 5 and 7 even when
+   otherwise movable in step 4? Recommended: yes.
+6. memcpy between host and guest objects of one type: a generated per-type
+   copy (groundwork piece 6), or refused (such types move only with every
+   copy's other side)? Recommended: the generated copy.
+7. `StandModelsSpecCopy` and `Kind6MenuPart` (the Xbox Live mode) added to
+   `e5_movable.py`'s `UNREACHABLE`? Recommended: yes.
+8. `tools/e5_status.py` written now, in the groundwork, or at step 4's
+   end? Recommended: now, so each wave has its figures.
