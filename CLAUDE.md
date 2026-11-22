@@ -797,7 +797,9 @@ measures B7; functions not seen in play still get rows, marked "Not seen in play
 (the user's call, 2026-10-23: a session may not have taken their path).
 `docs/pad-replay.md` is recording the user's pad and replaying it into the
 game through a virtual pad (`pad_record.py`, `scripted_run.sh`), for test
-runs past the title screen.
+runs past the title screen, and (since 2026-11-22) by tick with a state
+digest (`tick_replay.sh`: the same game tick for tick, compared with a
+baseline).
 `docs/tick-replay.md` is a lead (not started): translating draws once a
 tick and replaying our own list on in-between frames.
 `docs/pause-menu-fix.md` is the pause menu's too-fast input repeat: fixed

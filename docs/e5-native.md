@@ -507,7 +507,9 @@ The game is the check, as it has been since the rewiring's stage 4:
 - After each change: the build; `timeout 120 attract_race.sh 40`; the pad
   replay (`scripted_run.sh itc_recomp/pad_recordings/race_test.jsonl`,
   ~127 s, no error lines, the race at the frame cap); a frame dump.
-- **A state digest** (new, step 0 or 1; proposed): `--state_digest`, a line a
+- **A state digest** (built 2026-11-22: `--state_digest`, with the pad replayed
+  by tick, `tools/tick_replay.sh`; `docs/pad-replay.md` "By tick"; as first
+  proposed:) `--state_digest`, a line a
   tick with a hash of the state that matters (the racers' positions and
   speeds, the race's progress, the menus' selections, the app's state
   stack), so two builds can be compared over the same pad replay tick by

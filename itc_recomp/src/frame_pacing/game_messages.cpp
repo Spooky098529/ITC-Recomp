@@ -8,6 +8,8 @@
 #include "debug/frame_state_diff.h"
 #include "debug/idle_timer_scan.h"
 #include "debug/menu_selection_scan.h"
+#include "debug/state_digest.h"
+#include "input/pad_ticks.h"
 #include "guest.h"
 #ifndef ITC_NO_HARNESSES
 #include "harnesses/harness.h"
@@ -480,8 +482,15 @@ void GameMessages_OnPassFinished() {
         native::TextureCache_RaceLeft();
       }
     }
+    if (g_race_draw_step_seen && !g_in_race) {
+      debug::StateDigest_OnRaceEntered();
+      input::PadTicks_OnRaceEntered();
+    }
     g_in_race = g_race_draw_step_seen;
     g_race_draw_step_seen = false;
+    if (g_in_race) {
+      debug::StateDigest_OnRaceTick();
+    }
   }
 }
 

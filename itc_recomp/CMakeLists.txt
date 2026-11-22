@@ -746,9 +746,11 @@ set(ITC_SOURCES
     src/input/logical_pad.cpp
     src/input/physical_pad.cpp
     src/input/xinput.cpp
+    src/input/pad_ticks.cpp
     src/frame_pacing/frame_pacer.cpp
     src/frame_pacing/renderer_hooks.cpp
     src/debug/state_capture.cpp
+    src/debug/state_digest.cpp
     src/debug/frame_state_diff.cpp
     src/debug/idle_timer_scan.cpp
     src/debug/menu_selection_scan.cpp

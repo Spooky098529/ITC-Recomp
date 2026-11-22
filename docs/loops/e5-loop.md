@@ -249,14 +249,13 @@ outline (2026-11-22); the details below are a draft for review.
 
 ### Groundwork, before the first area (done directly, not by agents)
 
-1. **The state digest** (`--state_digest`, decided 2026-11-16, not built
-   yet): a line a tick with a hash of the state that matters (the racers'
-   positions and speeds, the race's progress, the menus' selections, the
-   app's state stack). Run the pad replay twice on the same build first:
-   what still varies between runs (threads' timing, the attract filter,
-   `rand`'s seed) is fixed under a flag or left out. Then a baseline
-   digest from the build before step 3, kept in the repo
-   (`itc_recomp/pad_recordings/`), that every area's replay is compared to.
+1. **The state digest**: done (2026-11-22). `--state_digest` logs each
+   race tick's racers (their body matrices and speeds); the pad is replayed
+   by tick (`--pad_ticks_play`), lined up at each race's start, so two
+   runs match tick for tick (`docs/pad-replay.md` "By tick").
+   `tools/tick_replay.sh` plays `pad_recordings/race_test.ticks` and
+   compares with `race_test.digest`, the baseline from the build before
+   step 3. Menus aren't in the digest yet (only races).
 2. **Host storage in the schema**: a type marked `storage = "host"` gets
    a generated C++ struct (host byte order, its fields as members, host
    pointers for `ptr` fields to other host types), and its view holds a
@@ -308,9 +307,9 @@ object moved yet, so the game is unchanged), committed.
 ### Check after each area (the lead)
 
 As now, plus the digest: the build; `timeout 120 attract_race.sh 40`; the
-pad replay (no error lines, the race at the frame cap) **with its state
-digest compared to the baseline: the first tick that differs is a
-halt**; a frame dump. A handle fault (a raw access to a moved object) is a
+pad replay (no error lines, the race at the frame cap); `tick_replay.sh`
+(**a race tick that differs from the baseline is a halt**); a frame
+dump. A handle fault (a raw access to a moved object) is a
 halt with its address. Then commit and push. The user drives before each
 merge into `rexglue-removal-project`.
 

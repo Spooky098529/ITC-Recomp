@@ -5,6 +5,7 @@
 #include "xinput.h"
 
 #include "gamepads.h"
+#include "pad_ticks.h"
 
 #include "base/log.h"
 
@@ -65,14 +66,35 @@ bool AsksForGamepad(uint32_t flags) {
 }
 
 bool Connected(uint32_t user) {
+  if (PadTicks_Playing()) {
+    return user == 0;
+  }
   GamepadState pad;
   return user < kGamepadSlots && Gamepads_Read(int(user), &pad);
 }
 
 }  // namespace
 
+namespace {
+uint32_t GetStateLive(uint32_t user, XInputState* state);
+}  // namespace
+
 uint32_t XInput_GetState(uint32_t user, XInputState* state) {
   user = User(user, 0);
+  if (PadTicks_Playing()) {
+    return PadTicks_Next(user, state);
+  }
+  XInputState read{};
+  uint32_t result = GetStateLive(user, &read);
+  PadTicks_Record(user, result, read);
+  if (state) {
+    *state = read;
+  }
+  return result;
+}
+
+namespace {
+uint32_t GetStateLive(uint32_t user, XInputState* state) {
   GamepadState pad;
   if (user >= kGamepadSlots || !Gamepads_Read(int(user), &pad)) {
     if (user < kGamepadSlots && g_packets[user].number) {
@@ -109,6 +131,7 @@ uint32_t XInput_GetState(uint32_t user, XInputState* state) {
   }
   return kXInputSuccess;
 }
+}  // namespace
 
 // The game stores the capabilities in the pad on connect (+192); nothing
 // known reads them, so they're fixed: a wired gamepad with every button but
@@ -133,6 +156,9 @@ uint32_t XInput_GetCapabilities(uint32_t user, uint32_t flags, XInputCapabilitie
 
 uint32_t XInput_SetState(uint32_t user, uint16_t left_motor, uint16_t right_motor) {
   user = User(user, 0);
+  if (PadTicks_Playing()) {
+    return user == 0 ? kXInputSuccess : kXInputDeviceNotConnected;
+  }
   if (!Connected(user)) {
     return kXInputDeviceNotConnected;
   }
