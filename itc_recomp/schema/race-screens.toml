@@ -73,11 +73,30 @@ fields = [
 # measure's "PauseMenu" also takes the transitions' r3, the page object's
 # step word (a 4-byte word at +0 as well).
 [PauseMenuScreen]
-measures = ["new<4>@PauseMenu::Create", "PauseMenu"]
+measure = "new<4>@PauseMenu::Create"
 size = 4
 origin = "allocated"
+# In host memory since E5 step 3 (2026-11-22): made by PauseMenu::Create
+# (the original's VirtualAlloc(4) at 0x8220D808), freed by PauseMenu::Destroy
+# (its VirtualFree at 0x8220C508, which returned 1); the global at
+# 0x826D84D0 and the race HUD holder's +1012 hold its handle. The measure's
+# "PauseMenu" (the transitions' started word) is PauseMenuStarted's since.
+storage = "host"
+host_alloc = [0x8220D808]
+host_free = [{ call = 0x8220C508, reg = "r3", returns = 1 }]
 fields = [
   { name = "movie", offset = 0, type = "ptr", note = "UI movie 4 (UiMovies::Find)" },
+]
+
+# The pause menu's transitions' r3 (the measure's "PauseMenu"): the page
+# object's step word, a pointer to its +24 (0 on a step's first call, set to
+# 1 there); split from PauseMenuScreen in E5 step 3.
+[PauseMenuStarted]
+measure = "PauseMenu"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "started", offset = 0, type = "u32", note = "0 on the step's first call; the transition sets 1" },
 ]
 
 # The pause menu's data ([0x826D84D4], 160 bytes): the options copied from

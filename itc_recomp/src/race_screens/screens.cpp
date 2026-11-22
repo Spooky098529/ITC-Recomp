@@ -75,19 +75,22 @@ void ListInit(uint8_t* base, uint32_t list) {
 // A four-block screen's teardown: when the screen's global is set,
 // MenuList::Release(list), then each block freed and its global 0 (screen,
 // data, list, pages); else the text.
-// `free_data`, when given, frees the data block in host memory (E5 step 3)
-// and returns what the original's VirtualFree returned (1), in its place in
-// the order.
+// `free_data` and `free_screen`, when given, free the data or screen block
+// in host memory (E5 step 3) and return what the original's VirtualFree
+// returned (1), in its place in the order.
 std::optional<uint64_t> DestroyFour(uint8_t* base, uint32_t sp, uint32_t screen, uint32_t data,
                                     uint32_t pages, uint32_t list, uint32_t text,
-                                    uint64_t (*free_data)(uint8_t*) = nullptr) {
+                                    uint64_t (*free_data)(uint8_t*) = nullptr,
+                                    uint64_t (*free_screen)(uint8_t*) = nullptr) {
   const uint32_t frame = sp - 128;
   if (Get(base, screen) == 0) {
     Frame(base, sp, 128);
     return DebugText(text);
   }
   const bool data_ok = free_data ? memory::IsHandle(Get(base, data)) : AllPages(base, {data});
-  if (!data_ok || !AllPages(base, {screen, list, pages}) ||
+  const bool screen_ok =
+      free_screen ? memory::IsHandle(Get(base, screen)) : AllPages(base, {screen});
+  if (!data_ok || !screen_ok || !AllPages(base, {list, pages}) ||
       !alt_hud::MenuListReleasable(base, Get(base, list))) {
     return std::nullopt;
   }
@@ -95,7 +98,9 @@ std::optional<uint64_t> DestroyFour(uint8_t* base, uint32_t sp, uint32_t screen,
   alt_hud::MenuListRelease(base, Get(base, list), frame);
   uint64_t r3 = 0;
   for (const uint32_t global : {screen, data, list, pages}) {
-    r3 = (free_data && global == data) ? free_data(base) : Free(base, global);
+    r3 = (free_data && global == data)       ? free_data(base)
+         : (free_screen && global == screen) ? free_screen(base)
+                                             : Free(base, global);
     guest::StoreU32(base, global, 0);
   }
   return r3;
@@ -105,6 +110,13 @@ std::optional<uint64_t> DestroyFour(uint8_t* base, uint32_t sp, uint32_t screen,
 // place of the original's VirtualFree at 0x8220C524, which returned 1.
 uint64_t FreePauseData(uint8_t* base) {
   G::pause_data(base).Delete();
+  return 1;
+}
+
+// The pause menu's screen in host memory (PauseMenu::Create): deleted in
+// place of the original's VirtualFree at 0x8220C508, which returned 1.
+uint64_t FreePauseScreen(uint8_t* base) {
+  G::pause_screen(base).Delete();
   return 1;
 }
 
@@ -164,7 +176,9 @@ uint32_t ClampTruncate(uint8_t* base, uint32_t address, uint32_t upper) {
 uint64_t PauseMenuCreate(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8220D7E8 PauseMenu::Create");
   Frame(base, sp, 96);
-  G::set_pause_screen(base, Pages(4));
+  // The screen and the data live in host memory (E5 step 3): the original's
+  // VirtualAlloc(4) at 0x8220D808; the global holds its handle.
+  G::set_pause_screen(base, schema::PauseMenuScreen::New(base));
   // The data lives in host memory (E5 step 3): the original's
   // VirtualAlloc(160) at 0x8220D824; the global holds its handle.
   G::set_pause_data(base, schema::PauseMenuData::New(base));
@@ -270,7 +284,7 @@ std::optional<uint64_t> PauseMenuDestroy(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8220C4C8 PauseMenu::Destroy");
   return DestroyFour(base, sp, G::pause_screen_address(), G::pause_data_address(),
                      G::pause_pages_address(), G::pause_list_address(), kTextBase - 13100,
-                     FreePauseData);
+                     FreePauseData, FreePauseScreen);
 }
 
 std::optional<uint64_t> PauseMenu4Destroy(uint8_t* base, uint32_t sp) {
