@@ -211,23 +211,27 @@ Done (2026-11-22, `d557e44c`):
   accesses that fit no field, 135 never seen (137 before). Built, an
   attract race, the pad replay and a frame dump checked.
 - `docs/known-data.md`'s converter state: 88 bytes.
+- **The class-name fault** (the same family; 2026-11-22, `cf9d3f4b`): a
+  function whose row names it `X::Y` had its r3 joined with `X` even when
+  every caller passes an object embedded in another
+  (`CarScene::InitLighting`'s r3 is the scene + 5248). Now the callers
+  win: no join by name when every r3 vote is embedded. Refused joins 142
+  -> 103. The schema followed (the same script, improved): 212 more
+  embedded types seeded, their fields named from the owners' `fault_`
+  fields where those covered them (`CarScene`'s `fault_lighting_*` are the
+  lighting block's `lighting_*`), one field per width read, a handful of
+  names two types claimed given to one by their accesses, and 63 more
+  unreached `fault_*` fields removed. 1,938 types, 0 accesses that fit no
+  field, 136 never seen. Built, an attract race, the pad replay and a
+  frame dump checked.
 
 Left:
 
-- **The class-name fault**, the same family: a function whose row names
-  it `X::Y` has its r3 joined with `X`, even when every caller passes an
-  object embedded in another (`CarScene::InitLighting`'s r3 is the scene +
-  5248; XAudio's `PcmCodec::Size`, `XmaCodec::Size`, `XAudioCodec::Size`
-  and `XAudioMatrix::Size` take the factory's descriptor). Tried
-  (2026-11-22): no name join when every r3 vote is embedded. It freed 123
-  of the 348 `fault_*` fields (against the offset fix's 49) but moved 404
-  schema types and seeded 323, losing the agents' names on the fault
-  fields; set aside for a pass of its own. Either that rule with the
-  schema reworked by hand, or the rows renamed (the `Size` functions as
-  the descriptor's).
-- 299 `fault_*` fields still reached: the class-name fault above and
-  others (the areas' reports say which).
-- The 117 seeded embedded types are `unknown_` until read.
+- 236 `fault_*` fields still reached (other measure faults; the areas' reports
+  say which). `RaceData.fault_car_count` is no longer reached but a hand
+  port uses it (`track_collision/track_world.cpp`).
+- The 329 seeded embedded types (each marked "Split from") are `unknown_`
+  until read, but where an owner's `fault_` field covered them.
 - The areas' reports list the accesses left as offsets (loops over tables,
   stack words, register arithmetic) and their notes for the lead.
 - `docs/functions/replay-snapshots.md`'s schema paragraph is stale

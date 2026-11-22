@@ -363,10 +363,11 @@ integration pass, and each area's accesses to other areas' types. The
 schema: 134 areas, 1,608 types, every access in the code fitting a field.
 The lifted code re-emitted with the names, built, an attract race, the pad
 replay and a frame dump checked. Then (2026-11-22) the measure's offset
-fault fixed (a pointer into an object votes for the object embedded
-there) and the schema brought along: 1,726 types. The agents' reports are
-in `docs/loops/e5-swarm-reports.md`; what's left (the class-name fault,
-the `fault_*` fields still reached, the seeded types' names) under "For
+and class-name faults fixed (a pointer into an object votes for the
+object embedded there; a function's row name doesn't override what every
+caller passes) and the schema brought along: 1,938 types. The agents' reports are
+in `docs/loops/e5-swarm-reports.md`; what's left (the `fault_*` fields still
+reached, the seeded types' names) under "For
 the lead after the swarm" there.
 
 ### 3. Private objects to the host
