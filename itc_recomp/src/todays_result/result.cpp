@@ -9,6 +9,7 @@
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <bit>
+#include <cstring>
 
 namespace todays_result {
 
@@ -87,10 +88,13 @@ uint64_t ResultCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls&
   const uint32_t menu = uint32_t(calls.Call(kVirtualAlloc, frame, 0x8225A810, 0, 68, 0x1000, 4));
   G::set_result_menu(base, menu);
   InitMenu(schema::FrontEndMenu(base, menu));
-  const uint64_t r3 = calls.Call(kVirtualAlloc, frame, 0x8225A86C, 0, 68, 0x1000, 4);
-  const uint32_t data = uint32_t(r3);
+  // A host object (E5 step 3) in place of the VirtualAlloc at 0x8225A86C
+  // (68 bytes asked, used to +87: all 88 held); the global and r3 hold its
+  // handle.
+  const auto data = schema::TodaysResultData::New(base);
+  const uint64_t r3 = data.address;
   G::set_result_data(base, data);
-  schema::TodaysResultData(base, data).set_ready(0);
+  data.set_ready(0);
   m.set_state(m.reenter() != 0 ? 1 : 9);
   return r3;
 }
@@ -169,12 +173,8 @@ uint64_t ReadDay(uint8_t* base, uint32_t sp, const Calls& calls) {
   Data(base).set_money(save.money());
   const uint64_t r3 =
       calls.Call(kCareerNextDay, frame, 0x8225A6E4, vehicle_accessors::SaveDataOf(base, 0));
-  // The save's 20-byte pick copied word by word.
-  const uint32_t pick = Data(base).pick_address();
-  const uint32_t save_pick = schema::CareerSave(base, save.address).pick_address();
-  for (uint32_t k = 0; k < 5; k++) {
-    Store(base, pick + 4 * k, Load(base, save_pick + 4 * k));
-  }
+  // The save's 20-byte pick copied (guest order).
+  std::memcpy(Data(base).pick(), base + schema::CareerSave(base, save.address).pick_address(), 20);
   return r3;
 }
 
@@ -209,8 +209,14 @@ uint64_t SetTexts(uint8_t* base, uint32_t sp, const Calls& calls) {
   SetTextDouble(base, calls, frame, 0x8225B060, movie, 47, 436, Data(base).career_win_rate());
   SetText(calls, frame, 0x8225B07C, movie, 49, 8, Data(base).best_win_streak());
   calls.Call(kSetNumberText, frame, 0x8225B094, movie, kAll, 50, Data(base).money());
-  return calls.Call(kSetChildNameText, frame, 0x8225B0AC, movie, kAll, 7,
-                    Data(base).pick_address());
+  // UiMovie::SetChildNameText on the host copy of the pick: its
+  // SetNodeText (r3 its answer) or nothing (r3 the movie), as the original's.
+  uint64_t args[8];
+  if (!ui_movies::ChildNameTextArgs(base, movie, kAll, 7,
+                                    ui_movies::NameRecordFromBytes(Data(base).pick()), args)) {
+    return movie;
+  }
+  return calls.CallArgs(ui_movies::kSetNodeTextFunction, frame, 0x8225B0AC, args);
 }
 
 uint64_t SetUpMovie(uint8_t* base, uint32_t sp, const Calls& calls) {
@@ -433,8 +439,10 @@ uint64_t ResultDestroy(uint8_t* base, uint32_t machine, uint32_t sp, const Calls
   Machine(base, machine).set_state(Data(base).movie_queued() != 0 ? 20 : 13);
   calls.Call(kVirtualFree, frame, 0x8225A8F0, G::result_pages(base).address, 0, kMemRelease);
   calls.Call(kVirtualFree, frame, 0x8225A904, G::result_menu(base).address, 0, kMemRelease);
-  const uint64_t r3 =
-      calls.Call(kVirtualFree, frame, 0x8225A914, G::result_data(base).address, 0, kMemRelease);
+  // Deleted in place of the VirtualFree at 0x8225A914 (r3 = 1, as it
+  // returned).
+  G::result_data(base).Delete();
+  const uint64_t r3 = 1;
   G::set_result_pages(base, 0u);
   G::set_result_menu(base, 0u);
   G::set_result_data(base, 0u);

@@ -136,6 +136,10 @@ fields = [
 measure = "new<68>@TodaysResult::Create#2"
 size = 88
 origin = "allocated"
+# A host object (E5 step 3, 2026-11-22): TodaysResult::Create's New and
+# Destroy's Delete (no lifted call allocates or frees it); the pick goes to
+# the movie by value (ui_movies::NameRecordFromBytes).
+storage = "host"
 fields = [
   { name = "ready", offset = 0, type = "u32", note = "1 once the texts are set (SetUpMovie)" },
   { name = "movie_queued", offset = 4, type = "u32", note = "1 when LeavePage queued a movie; Destroy then goes to state 20" },

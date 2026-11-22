@@ -21,14 +21,15 @@ uint64_t Play(uint32_t movie, uint64_t named, uint32_t frame, uint32_t lr, const
 // A toggle's word in the data: set, it goes 0 and command `off` runs; else
 // it goes 1 and `on` does (tail calls: from the caller's `sp` and `lr`).
 // `field` is the word's address getter (turning, doors or doors2).
-uint64_t Toggle(uint8_t* base, uint32_t (ScreenData::*field)() const, uint32_t off, uint32_t on,
-                uint32_t sp, uint32_t lr, const Calls& calls) {
-  const uint32_t word = (Data(base).*field)();
-  if (Load(base, word) != 0) {
-    Store(base, word, 0);
+uint64_t Toggle(uint8_t* base, uint32_t (ScreenData::*get)() const,
+                void (ScreenData::*set)(uint32_t) const, uint32_t off, uint32_t on, uint32_t sp,
+                uint32_t lr, const Calls& calls) {
+  const ScreenData data = Data(base);
+  if ((data.*get)() != 0) {
+    (data.*set)(0);
     return StageCommand(base, off, sp, lr, calls);
   }
-  Store(base, word, 1);
+  (data.*set)(1);
   return StageCommand(base, on, sp, lr, calls);
 }
 
@@ -114,17 +115,17 @@ uint64_t SetUpView(uint8_t* base, uint32_t sp, const Calls& calls) {
 
 uint64_t ToggleTurn(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821918D0 GarageScreen::ToggleTurn");
-  return Toggle(base, &ScreenData::turning_address, 1, 0, sp, lr, calls);
+  return Toggle(base, &ScreenData::turning, &ScreenData::set_turning, 1, 0, sp, lr, calls);
 }
 
 uint64_t ToggleDoors(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82191920 GarageScreen::ToggleDoors");
-  return Toggle(base, &ScreenData::doors_address, 3, 2, sp, lr, calls);
+  return Toggle(base, &ScreenData::doors, &ScreenData::set_doors, 3, 2, sp, lr, calls);
 }
 
 uint64_t ToggleDoors2(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82191970 GarageScreen::ToggleDoors2");
-  return Toggle(base, &ScreenData::doors2_address, 5, 4, sp, lr, calls);
+  return Toggle(base, &ScreenData::doors2, &ScreenData::set_doors2, 5, 4, sp, lr, calls);
 }
 
 uint64_t TurnLeft(uint8_t* base, uint32_t sp, const Calls& calls) {

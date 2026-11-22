@@ -7,6 +7,8 @@
 #include "garage_screen/internal.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
+#include <cstring>
+
 namespace garage_screen {
 
 namespace {
@@ -48,9 +50,10 @@ uint64_t Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls
     l.set_enabled(0);
     l.set_player(0);
   }
-  const uint64_t r3 = calls.Call(kVirtualAlloc, frame, 0x82191D20, 0, ScreenData::kSize,
-                                 kMemCommit, kReadWrite);
-  const ScreenData data(base, uint32_t(r3));
+  // A host object (E5 step 3) in place of the VirtualAlloc at 0x82191D20;
+  // the global and r3 hold its handle.
+  const ScreenData data = ScreenData::New(base);
+  const uint64_t r3 = data.address;
   G::set_data(base, data);
   data.set_set_up(0);
   data.set_busy_shown(0);
@@ -89,9 +92,7 @@ uint64_t ReadSave(uint8_t* base, uint32_t sp) {
   const ScreenData data = Data(base);
   // The career's pick (20 bytes), the money, the weekday (signed) and the
   // day (at most 999).
-  for (uint32_t i = 0; i < 5; i++) {
-    Store(base, data.pick_address() + 4 * i, Load(base, save.pick_head_address() + 4 * i));
-  }
+  std::memcpy(data.pick(), base + save.pick_head_address(), 20);
   const int32_t day = int32_t(save.day());
   Data(base).set_money(save.money());
   Data(base).set_weekday(uint32_t(day - (day / 7) * 7));
@@ -106,7 +107,13 @@ uint64_t SetHeader(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t movie = FindMovie(base, kMovie, frame + 80);
   calls.Call(kResetPose, frame, 0x82192CB8, movie);
-  calls.Call(kSetChildNameText, frame, 0x82192CD4, movie, 15, 6, Data(base).pick_address());
+  // UiMovie::SetChildNameText on the host copy of the pick: its
+  // SetNodeText (or nothing), as the original's.
+  uint64_t args[8];
+  if (ui_movies::ChildNameTextArgs(base, movie, 15, 6,
+                                   ui_movies::NameRecordFromBytes(Data(base).pick()), args)) {
+    calls.CallArgs(ui_movies::kSetNodeTextFunction, frame, 0x82192CD4, args);
+  }
   calls.Call(kSetNumberText, frame, 0x82192CEC, movie, 15, 9, Data(base).money());
   calls.CallArgs(kSetText, frame, 0x82192D08, {movie, 15, 13, 8, Data(base).day(), 0, 0, 0});
   const uint32_t node = ui_movies::FindNode(base, movie, 15, 11);
@@ -163,8 +170,10 @@ uint64_t Destroy(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 112);
   calls.Call(kVirtualFree, frame, 0x821915D8, PagesOf(base).address, 0, kMemRelease);
   calls.Call(kVirtualFree, frame, 0x821915EC, List(base), 0, kMemRelease);
-  const uint64_t r3 =
-      calls.Call(kVirtualFree, frame, 0x82191600, Data(base).address, 0, kMemRelease);
+  // Deleted in place of the VirtualFree at 0x82191600 (r3 = 1, as it
+  // returned).
+  Data(base).Delete();
+  const uint64_t r3 = 1;
   // The second list [0x826D8428] isn't freed (nor the lists' flags blocks),
   // as the original.
   G::set_pages(base, 0u);
