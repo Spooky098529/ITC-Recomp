@@ -256,6 +256,17 @@ outline (2026-11-22); the details below are a draft for review.
    `tools/tick_replay.sh` plays `pad_recordings/race_test.ticks` and
    compares with `race_test.digest`, the baseline from the build before
    step 3. Menus aren't in the digest yet (only races).
+Done (2026-11-22): all five, each built and checked (an attract race and
+`tick_replay.sh` unchanged). 1 is above; 2 `f70cd5e8`; 3 `2a995859`; 4
+`024face6` (`src/memory/handles.h`: 0x60000000 to 0x7EFFFFFF, nothing
+touched it); 5 `tools/e5_movable.py` (`coverage/e5_movable.tsv`): 68
+types movable now in 31 areas; of the 1,806 the code touches, 1,574 have no
+allocation the measure saw (embedded or static: step 4), 338 are shared,
+314 read from files, 313 have overlapping fields, 131 feed the GPU, 43
+are saved. The first area is a pilot done directly (as step 2's was):
+`type2-dialog`'s `Type2DialogData` (68 bytes, one allocation, step 2's
+pilot area).
+
 2. **Host storage in the schema**: a type marked `storage = "host"` gets
    a generated C++ struct (host byte order, its fields as members, host
    pointers for `ptr` fields to other host types), and its view holds a
