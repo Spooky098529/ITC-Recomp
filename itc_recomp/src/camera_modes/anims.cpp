@@ -18,6 +18,8 @@
 #include "memory/handles.h"
 #include "memory/heap.h"
 #include "models/xpr.h"
+
+#include <cstring>
 #include "ui_movies/game.h"
 #include "schema/camera_modes.h"
 #include "schema/game_modes.h"
@@ -80,7 +82,7 @@ bool ObjectFreeable(uint8_t* base, uint32_t object) {
   }
   for (uint32_t i = 0; i < count; i++) {
     const uint32_t block = guest::LoadU32(base, anim.blocks_address() + 4 * i);
-    if (!memory::IsPages(block)) {
+    if (!memory::IsHandle(block)) {  // host objects (E5 step 3)
       return false;
     }
     const uint32_t data = schema::CameraAnimBlock(base, block).data();
@@ -149,7 +151,9 @@ void AnimFree(uint8_t* base, uint32_t object) {
     anim.set_blocks_used(count);
     const uint32_t block = guest::LoadU32(base, anim.blocks_address() + (count << 2));
     BlockFree(base, block);
-    memory::FreePages(block);
+    // A host object (E5 step 3): deleted in place of the VirtualFree at
+    // 0x821500E8.
+    schema::CameraAnimBlock(base, block).Delete();
   }
 }
 
@@ -194,16 +198,16 @@ uint32_t AnimParseObject(uint8_t* base, uint32_t object, const GuestCopy& xmemcp
   }
   uint32_t n = 0;
   do {
-    const uint32_t block = VirtualAlloc(schema::CameraAnimBlock::kSize);
+    // A host object (E5 step 3) in place of the VirtualAlloc(64) at
+    // 0x82150220; the anim's list holds its handle.
+    const uint32_t block = schema::CameraAnimBlock::New(base).address;
     schema::CameraAnimBlock(base, block).set_unknown_12(float(zero));
     schema::CameraAnimBlock(base, block).set_channel(0);
     schema::CameraAnimBlock(base, block).set_duration(float(zero));
     schema::CameraAnimBlock(base, block).set_header_size(0);
     schema::CameraAnimBlock(base, block).set_data_size(0);
     schema::CameraAnimBlock(base, block).set_data(0);
-    for (uint32_t i = 0; i < 10; i++) {
-      guest::StoreU32(base, schema::CameraAnimBlock(base, block).unknown_20_address() + 4 * i, 0);
-    }
+    std::memset(schema::CameraAnimBlock(base, block).unknown_20(), 0, 40);
     const schema::CameraAnimFileBlock source_block(base, from);
     schema::CameraAnimBlock(base, block).set_channel(source_block.channel());
     schema::CameraAnimBlock(base, block).set_header_size(source_block.header_size());
