@@ -1853,7 +1853,7 @@ loc_822B63BC:
   // addi r4,r1,80
   r4 = uint64_t(int64_t(int64_t(r1) + 80));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,24(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 24);
   // mtctr r11
@@ -1900,7 +1900,7 @@ loc_822B6438:
   // rotlwi r3,r11,0
   r3 = __builtin_rotateleft32(uint32_t(r11), 0);
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,28(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 28);
   // mtctr r11
@@ -4172,7 +4172,7 @@ loc_82369C8C:
   // mr r4,r31
   r4 = r31;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,4(r11)
   r11 = guest::LoadU32(base, schema::ImageCodecVtable(base, uint32_t(r11)).decode_row_address());
   // mtctr r11
@@ -4189,7 +4189,7 @@ loc_82369C8C:
   // mr r4,r31
   r4 = r31;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,8(r11)
   r11 = guest::LoadU32(base, schema::ImageCodecVtable(base, uint32_t(r11)).encode_row_address());
   // mtctr r11
@@ -4224,7 +4224,7 @@ loc_82369CEC:
   // mr r4,r31
   r4 = r31;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,8(r11)
   r11 = guest::LoadU32(base, schema::ImageCodecVtable(base, uint32_t(r11)).encode_row_address());
   // mtctr r11
@@ -4279,7 +4279,7 @@ loc_82369D50:
   // mr r4,r31
   r4 = r31;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,8(r11)
   r11 = guest::LoadU32(base, schema::ImageCodecVtable(base, uint32_t(r11)).encode_row_address());
   // mtctr r11
@@ -4532,7 +4532,7 @@ loc_82369EF8:
   // rlwinm r4,r30,16,16,31
   r4 = __builtin_rotateleft64(uint32_t(r30) | (r30 << 32), 16) & 0xFFFF;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,4(r11)
   r11 = guest::LoadU32(base, schema::ImageCodecVtable(base, uint32_t(r11)).decode_row_address());
   // mtctr r11
@@ -4600,7 +4600,7 @@ loc_82369F8C:
   // mr r4,r27
   r4 = r27;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,8(r11)
   r11 = guest::LoadU32(base, schema::ImageCodecVtable(base, uint32_t(r11)).encode_row_address());
   // mtctr r11
@@ -5152,7 +5152,7 @@ loc_8236A348:
   // mr r4,r28
   r4 = r28;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,4(r11)
   r11 = guest::LoadU32(base, schema::ImageCodecVtable(base, uint32_t(r11)).decode_row_address());
   // mtctr r11
@@ -5173,7 +5173,7 @@ loc_8236A348:
   // addi r4,r28,1
   r4 = uint64_t(int64_t(int64_t(r28) + 1));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,4(r11)
   r11 = guest::LoadU32(base, schema::ImageCodecVtable(base, uint32_t(r11)).decode_row_address());
   // mtctr r11
@@ -5342,7 +5342,7 @@ loc_8236A494:
   // mr r4,r27
   r4 = r27;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,8(r11)
   r11 = guest::LoadU32(base, schema::ImageCodecVtable(base, uint32_t(r11)).encode_row_address());
   // mtctr r11
@@ -5738,7 +5738,7 @@ loc_8236A740:
   // mr r4,r31
   r4 = r31;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,4(r11)
   r11 = guest::LoadU32(base, schema::ImageCodecVtable(base, uint32_t(r11)).decode_row_address());
   // mtctr r11
@@ -5759,7 +5759,7 @@ loc_8236A740:
   // mr r4,r31
   r4 = r31;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,4(r11)
   r11 = guest::LoadU32(base, schema::ImageCodecVtable(base, uint32_t(r11)).decode_row_address());
   // mtctr r11
@@ -5781,7 +5781,7 @@ loc_8236A78C:
   // addi r4,r31,1
   r4 = uint64_t(int64_t(int64_t(r31) + 1));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,4(r11)
   r11 = guest::LoadU32(base, schema::ImageCodecVtable(base, uint32_t(r11)).decode_row_address());
   // mtctr r11
@@ -5807,7 +5807,7 @@ loc_8236A7B4:
   // addi r4,r31,1
   r4 = uint64_t(int64_t(int64_t(r31) + 1));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,4(r11)
   r11 = guest::LoadU32(base, schema::ImageCodecVtable(base, uint32_t(r11)).decode_row_address());
   // mtctr r11
@@ -6062,7 +6062,7 @@ loc_8236A970:
   // mr r4,r18
   r4 = r18;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,8(r11)
   r11 = guest::LoadU32(base, schema::ImageCodecVtable(base, uint32_t(r11)).encode_row_address());
   // mtctr r11
@@ -6298,7 +6298,7 @@ loc_8236AC30:
   // mr r4,r25
   r4 = r25;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,4(r11)
   r11 = guest::LoadU32(base, schema::ImageCodecVtable(base, uint32_t(r11)).decode_row_address());
   // mtctr r11
@@ -6337,7 +6337,7 @@ loc_8236AC84:
   // mr r4,r26
   r4 = r26;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,4(r11)
   r11 = guest::LoadU32(base, schema::ImageCodecVtable(base, uint32_t(r11)).decode_row_address());
   // mtctr r11
@@ -6562,7 +6562,7 @@ loc_8236AE1C:
   // mr r4,r24
   r4 = r24;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,8(r11)
   r11 = guest::LoadU32(base, schema::ImageCodecVtable(base, uint32_t(r11)).encode_row_address());
   // mtctr r11
@@ -6867,7 +6867,7 @@ loc_8236B01C:
   // mr r4,r22
   r4 = r22;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,4(r11)
   r11 = guest::LoadU32(base, schema::ImageCodecVtable(base, uint32_t(r11)).decode_row_address());
   // mtctr r11
@@ -6884,7 +6884,7 @@ loc_8236B01C:
   // mr r4,r22
   r4 = r22;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,4(r11)
   r11 = guest::LoadU32(base, schema::ImageCodecVtable(base, uint32_t(r11)).decode_row_address());
   // mtctr r11
@@ -6929,7 +6929,7 @@ loc_8236B09C:
   // mr r4,r23
   r4 = r23;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,4(r11)
   r11 = guest::LoadU32(base, schema::ImageCodecVtable(base, uint32_t(r11)).decode_row_address());
   // mtctr r11
@@ -6946,7 +6946,7 @@ loc_8236B09C:
   // mr r4,r23
   r4 = r23;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,4(r11)
   r11 = guest::LoadU32(base, schema::ImageCodecVtable(base, uint32_t(r11)).decode_row_address());
   // mtctr r11
@@ -7337,7 +7337,7 @@ loc_8236B37C:
   // mr r4,r21
   r4 = r21;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,8(r11)
   r11 = guest::LoadU32(base, schema::ImageCodecVtable(base, uint32_t(r11)).encode_row_address());
   // mtctr r11
@@ -7923,7 +7923,7 @@ loc_8236BA4C:
   // add r30,r11,r31
   r30 = r11 + r31;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,4(r11)
   r11 = guest::LoadU32(base, schema::ImageCodecVtable(base, uint32_t(r11)).decode_row_address());
   // mtctr r11
@@ -8558,7 +8558,7 @@ loc_8236BE5C:
   // lwz r11,104(r3)
   r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
   // lwz r9,0(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).vtable_address());
+  r9 = lifted::VtableWord(base, uint32_t(r3));
   // mullw r11,r11,r31
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r31))));
   // lwz r9,8(r9)
@@ -9036,7 +9036,7 @@ loc_8236C194:
   // mr r4,r26
   r4 = r26;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,4(r11)
   r11 = guest::LoadU32(base, schema::ImageCodecVtable(base, uint32_t(r11)).decode_row_address());
   // mtctr r11
@@ -9633,7 +9633,7 @@ loc_8236C574:
   // lwz r4,0(r29)
   r4 = guest::LoadU32(base, schema::BlitTriangleWeights(base, uint32_t(r29) - 8).first_index_address());
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,8(r11)
   r11 = guest::LoadU32(base, schema::ImageCodecVtable(base, uint32_t(r11)).encode_row_address());
   // mtctr r11
@@ -13490,7 +13490,7 @@ lifted::Result f8245A4E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   goto loc_8245A54C;
 loc_8245A52C:
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,8(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 8);
   // mtctr r11
@@ -13996,7 +13996,7 @@ lifted::Result f8245B170(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // beq cr6,0x8245b1bc
   if (cr6.eq) goto loc_8245B1BC;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::XAudioBumpAllocator(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,4(r11)
   r11 = guest::LoadU32(base, schema::XAudioBumpAllocatorVtable(base, uint32_t(r11)).release_address());
   // mtctr r11
@@ -14224,7 +14224,7 @@ lifted::Result f8245B940(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::XAudioMasteringDriver(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,28(r11)
   r11 = guest::LoadU32(base, schema::XAudioMasteringDriverVtable(base, uint32_t(r11)).register_callback_address());
   // mtctr r11
@@ -14426,7 +14426,7 @@ loc_8245BA98:
   { const lifted::Result o = lifted::Import(base, __imp__KfLowerIrql, LIFTED_ARGS(0x8245BADC, r31)); r3 = o.r3; f1 = o.f1; }
 loc_8245BADC:
   // lwz r11,0(r28)
-  r11 = guest::LoadU32(base, schema::XAudioList(base, uint32_t(r28)).next_address());
+  r11 = lifted::VtableWord(base, uint32_t(r28));
   // mr r3,r28
   r3 = r28;
   // lwz r11,12(r11)
@@ -14640,7 +14640,7 @@ loc_8245BC1C:
   { const lifted::Result o = lifted::Import(base, __imp__KfLowerIrql, LIFTED_ARGS(0x8245BC5C, r31)); r3 = o.r3; f1 = o.f1; }
 loc_8245BC5C:
   // lwz r11,0(r28)
-  r11 = guest::LoadU32(base, schema::XAudioList(base, uint32_t(r28)).next_address());
+  r11 = lifted::VtableWord(base, uint32_t(r28));
   // mr r3,r28
   r3 = r28;
   // lwz r11,12(r11)
@@ -14762,7 +14762,7 @@ loc_8245BD2C:
   // beq cr6,0x8245bd4c
   if (cr6.eq) goto loc_8245BD4C;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::XAudioMasteringVoice(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,12(r11)
   r11 = guest::LoadU32(base, schema::XAudioMasteringVoiceVtable(base, uint32_t(r11)).delete_object_address());
   // mtctr r11
@@ -14858,7 +14858,7 @@ loc_8245BD8C:
   // beq cr6,0x8245bdf4
   if (cr6.eq) goto loc_8245BDF4;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::XAudioBumpAllocator(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,4(r11)
   r11 = guest::LoadU32(base, schema::XAudioBumpAllocatorVtable(base, uint32_t(r11)).release_address());
   // mtctr r11
@@ -15989,7 +15989,7 @@ lifted::Result f8245FB10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::XAudioMasteringDriver(base, uint32_t(r3) - 4).inner_vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,0(r11)
   r11 = guest::LoadU32(base, schema::XAudioMasteringDriverInnerVtable(base, uint32_t(r11)).delete_object_address());
   // mtctr r11

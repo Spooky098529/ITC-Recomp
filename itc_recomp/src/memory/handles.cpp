@@ -25,6 +25,7 @@ struct Entry {
   uint32_t start = 0;  // the object's handle
   uint32_t size = 0;
   const char* type = nullptr;
+  const Layout* layout = nullptr;
 };
 
 Entry* g_entries = nullptr;            // kGranules, allocated once
@@ -94,7 +95,7 @@ bool ProtectHandles(uint8_t* base) {
   return true;
 }
 
-uint32_t MakeHandle(void* object, uint32_t size, const char* type) {
+uint32_t MakeHandle(void* object, uint32_t size, const char* type, const Layout* layout) {
   const uint32_t count = std::max<uint32_t>(1, (size + kHandleGranule - 1) / kHandleGranule);
   std::lock_guard lock(g_mutex);
   uint32_t first = UINT32_MAX;
@@ -115,7 +116,7 @@ uint32_t MakeHandle(void* object, uint32_t size, const char* type) {
   }
   const uint32_t handle = kHandlesStart + first * kHandleGranule;
   for (uint32_t i = 0; i < count; i++) {
-    g_entries[first + i] = {object, handle, size, type};
+    g_entries[first + i] = {object, handle, size, type, layout};
   }
   return handle;
 }
@@ -138,14 +139,29 @@ void ReleaseHandle(uint32_t handle) {
   g_free.emplace_back(first, count);
 }
 
+bool DescribeHandle(uint32_t value, HandleInfo* info) {
+  if (!IsHandle(value) || !g_entries) {
+    return false;
+  }
+  const Entry& e = g_entries[Granule(value)];
+  if (!e.object || value - e.start >= std::max<uint32_t>(e.size, 1)) {
+    return false;
+  }
+  *info = {e.object, value - e.start, e.size, e.type, e.layout};
+  return true;
+}
+
 void* HandleObject(uint32_t handle) {
   if (handle == 0) {
     return nullptr;
   }
   if (IsHandle(handle) && g_entries) {
+    // A value inside the object's span names the member there: host
+    // structs keep the guest offsets (tools/schema_gen.py), so an embedded
+    // object's or an interface's address is the owner's handle + offset.
     const Entry& e = g_entries[Granule(handle)];
-    if (e.object && e.start == handle) {
-      return e.object;
+    if (e.object && handle - e.start < std::max<uint32_t>(e.size, 1)) {
+      return static_cast<uint8_t*>(e.object) + (handle - e.start);
     }
   }
   static std::atomic<bool> logged{false};

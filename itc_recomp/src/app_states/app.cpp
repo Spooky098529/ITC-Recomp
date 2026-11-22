@@ -68,7 +68,7 @@ void ForEachIn(uint8_t* base, uint32_t result, uint64_t first, uint64_t last, ui
 }  // namespace
 
 uint32_t VirtualTarget(uint8_t* base, uint32_t object, uint32_t offset) {
-  return Load(base, Load(base, object) + offset);
+  return Load(base, guest::VtableWord(base, object) + offset);
 }
 
 uint32_t StatesIsEmpty(uint8_t* base, uint32_t states, const AppCalls& calls) {

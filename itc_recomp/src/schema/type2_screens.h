@@ -140,20 +140,26 @@ struct Type2HubTexture : View {
 };
 
 // allocated; measure: new<16>@Type2Hub::LoadNoticeImage, new<16>@Type2Hub::LoadNoticeImage#2, Type2Hub::ImageLoaded.r6, Type2Hub.+32, Type2Hub.+220, Type2Hub.+220.+4, new<16>@TodaysEvent::LoadImagePair, new<16>@TodaysEvent::LoadImagePair#2, TodaysEvent.+4, TodaysEvent.+192, TodaysEvent.+192.+4
+#pragma pack(push, 1)
 struct Type2HubImageData {
   uint32_t loaded = 0;  // +0
   uint32_t index = 0;  // +4
   uint32_t texture = 0;  // +8
   uint32_t xpr = 0;  // +12
 };
+#pragma pack(pop)
+static_assert(sizeof(Type2HubImageData) == 16);
+inline constexpr memory::LayoutField kType2HubImageFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}};
+inline constexpr memory::Layout kType2HubImageLayout = {kType2HubImageFields, 4};
 
 struct Type2HubImage : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
   static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   Type2HubImageData* data() const { return static_cast<Type2HubImageData*>(memory::HandleObject(address)); }
   static Type2HubImage New(uint8_t* base) {
-    return Type2HubImage(base, memory::MakeHandle(new Type2HubImageData(), kSize, "Type2HubImage"));
+    return Type2HubImage(base, memory::MakeHandle(new Type2HubImageData(), sizeof(Type2HubImageData), "Type2HubImage", &kType2HubImageLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // 1 once ImageLoaded ran
@@ -168,7 +174,7 @@ struct Type2HubImage : View {
   void set_index_bits(uint32_t v) const { data()->index = v; }
   template <typename T = Type2HubTexture>
   T texture() const { return T(base, data()->texture); }
-  void set_texture(const View& v) const { data()->texture = v.address; }
+  void set_texture(const View& w) const { const uint32_t v = w.address; data()->texture = v; }
   void set_texture(uint32_t v) const { data()->texture = v; }
   uint32_t texture_bits() const { return data()->texture; }
   void set_texture_bits(uint32_t v) const { data()->texture = v; }

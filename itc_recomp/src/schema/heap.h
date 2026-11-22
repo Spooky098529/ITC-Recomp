@@ -278,19 +278,26 @@ struct FloatPairItem : View {
 };
 
 // allocated; measure: new<12>@FloatPairItem::FloatPairItem
+#pragma pack(push, 1)
 struct FloatPairData {
   uint8_t flag = 0;  // +0
+  uint8_t pad_1[3] = {};
   float a = 0;  // +4
   float b = 0;  // +8
 };
+#pragma pack(pop)
+static_assert(sizeof(FloatPairData) == 12);
+inline constexpr memory::LayoutField kFloatPairFields[] = {{4, 4}, {8, 4}};
+inline constexpr memory::Layout kFloatPairLayout = {kFloatPairFields, 2};
 
 struct FloatPair : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
   static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   FloatPairData* data() const { return static_cast<FloatPairData*>(memory::HandleObject(address)); }
   static FloatPair New(uint8_t* base) {
-    return FloatPair(base, memory::MakeHandle(new FloatPairData(), kSize, "FloatPair"));
+    return FloatPair(base, memory::MakeHandle(new FloatPairData(), sizeof(FloatPairData), "FloatPair", &kFloatPairLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // 1 when made

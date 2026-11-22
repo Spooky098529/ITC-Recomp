@@ -896,6 +896,49 @@ def mark_needs_lr(infos, emitting):
                     break
 
 
+VTABLE_LOAD = re.compile(r"\s*// lwz (r\d+),0\((r\d+)\)$")
+VTABLE_WORDS = [0]
+
+
+def vtable_words(body):
+    """Virtual calls over handles (docs/loops/e5-loop.md, step 4): the
+    vtable idiom's first load (`lwz a,0(obj)` feeding `lwz c,N(a)` feeding
+    `mtctr c`) reads the word through lifted::VtableWord, which takes a
+    guest address or a handle, typed by the schema or not."""
+    for i, line in enumerate(body):
+        m = VTABLE_LOAD.match(line)
+        if not m or i + 1 >= len(body):
+            continue
+        a, obj = m.groups()
+        code = body[i + 1]
+        if not code.startswith(f"  {a} = "):
+            continue
+        slot = None
+        skip = None
+        for j in range(i + 2, min(len(body), i + 40)):
+            s = body[j]
+            if j == skip:
+                continue  # the slot's own load
+            if s.endswith(":") and not s.startswith(" "):
+                break  # a label: another path may reach the call
+            if slot is None:
+                mm = re.match(rf"\s*// lwz (r\d+),-?\d+\({a}\)$", s)
+                if mm:
+                    slot = mm.group(1)
+                    skip = j + 1
+                    continue
+                if re.match(rf"\s*{a} = ", s) or re.match(r"\s*(if|switch) ", s) or "lifted::" in s:
+                    break
+            else:
+                if re.match(rf"\s*// mtctr {slot}$", s):
+                    body[i + 1] = f"  {a} = lifted::VtableWord(base, uint32_t({obj}));"
+                    VTABLE_WORDS[0] += 1
+                    break
+                if re.match(rf"\s*{slot} = ", s) or re.match(r"\s*(if|switch) ", s) or "lifted::" in s:
+                    break
+    return body
+
+
 def emit_function(info, infos, emitting):
     out = []
     used = set()
@@ -997,7 +1040,7 @@ def emit_function(info, infos, emitting):
     if xer:
         out.append("  uint8_t " + ", ".join(f"{r} = 0" for r in xer) + ";")
     out.extend("  " + d for d in decls.values())
-    out.extend(body)
+    out.extend(vtable_words(body))
     if not info.stmts or info.stmts[-1].kind not in ("return", "abort", "goto"):
         out.append("  " + return_stmt(info))
     out.append("}")
@@ -1150,7 +1193,7 @@ def name_fields(fn, st, line):
     if m is None or int(m.group(4)) != disp:
         return line
     obj = f"uint32_t({m.group(3)})" + (f" - {off}" if off > 0 else f" + {-off}" if off < 0 else "")
-    if ty.storage == "host":
+    if ty.host:
         return host_access(fn, ty, f, obj, off + disp - f["offset"], m, line)
     address = f"schema::{ty.name}(base, {obj}).{f['name']}_address()"
     inside = off + disp - f["offset"]
@@ -1392,7 +1435,8 @@ def main(argv):
                 f.write(text)
         with open(os.path.join(OUT, "functions.h"), "w") as f:
             f.write(emit_header(lifted_before))
-        print(f"rewrote {len(batches)} batches: {len(everything)} functions")
+        print(f"rewrote {len(batches)} batches: {len(everything)} functions; "
+              f"{VTABLE_WORDS[0]} vtable words through lifted::VtableWord")
         if HOST_LEFT_RAW:
             print(f"host types' accesses left raw (they fault if reached): {len(HOST_LEFT_RAW)}")
             for x in HOST_LEFT_RAW[:40]:

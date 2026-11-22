@@ -93,6 +93,7 @@ def check(areas):
             if name in types:
                 errors.append(f"{area}: type {name} also in {types[name]}")
             types[name] = area
+    alltypes = {n: t for data in areas.values() for n, t in data.items() if n != "globals"}
     claimed = {}
     for area, data in areas.items():
         for name, t in data.items():
@@ -111,7 +112,7 @@ def check(areas):
         for name, t in data.items():
             if name == "globals" or ("host_alloc" not in t and "host_free" not in t):
                 continue
-            if t.get("storage") != "host":
+            if t.get("storage") not in ("host", "dual"):
                 errors.append(f"{area}: {name}: host_alloc and host_free are for host types only")
                 continue
             calls = []
@@ -142,18 +143,19 @@ def check(areas):
         for name, t in data.items():
             if name == "globals" or t.get("storage", "guest") == "guest":
                 continue
-            if t.get("storage") != "host":
-                errors.append(f"{area}: {name}: storage {t.get('storage')!r} (guest or host)")
+            if t.get("storage") not in ("host", "dual"):
+                errors.append(f"{area}: {name}: storage {t.get('storage')!r} (guest, host or dual)")
                 continue
             spans = []
             for f in t.get("fields", []):
-                width = f.get("count", 0) if f.get("type") == "bytes" else WIDTHS.get(f.get("type"), 0)
-                spans.append((f["offset"], f["offset"] + width, f["name"]))
-            spans.sort()
-            for (a0, a1, an), (b0, b1, bn) in zip(spans, spans[1:]):
-                if b0 < a1:
-                    errors.append(f"{area}: {name} (host): {an} and {bn} overlap; a host type's "
-                                  "fields are members")
+                spans.append((f["offset"], f["offset"] + field_width(f, alltypes), f["name"]))
+                to = alltypes.get(f.get("to"))
+                if f.get("type") == "embed" and to and to.get("storage", "guest") not in ("host", "dual"):
+                    errors.append(f"{area}: {name}.{f['name']}: embeds {f['to']}, a guest type, "
+                                  "in a host type (its address is the owner's handle + offset)")
+            # Overlapping fields are allowed: the struct keeps the guest
+            # offsets, and a field over an earlier one is read at its offset
+            # (host_type).
     for area, data in areas.items():
         for name, t in data.items():
             fields = (t.items() if name == "globals" else
@@ -166,9 +168,33 @@ def check(areas):
                 ty = f.get("type")
                 if ty == "ptr" and f.get("to") and f["to"] not in types:
                     errors.append(f"{area}: {name}.{fname} points to an unknown type {f['to']}")
-                if ty not in SCALARS and ty not in ("ptr", "bytes"):
+                if ty == "embed" and (f.get("to") not in types or not alltypes[f["to"]].get("size")):
+                    errors.append(f"{area}: {name}.{fname} embeds {f.get('to')!r}: a known type with a size")
+                if ty not in SCALARS and ty not in ("ptr", "bytes", "embed"):
                     errors.append(f"{area}: {name}.{fname}: an unknown type {ty!r}")
     return types, errors
+
+
+def field_width(f, alltypes):
+    """A field's width in bytes; an embed's is its type's size times its count."""
+    if f.get("type") == "bytes":
+        return f.get("count", 0)
+    if f.get("type") == "embed":
+        return alltypes.get(f.get("to"), {}).get("size", 0) * f.get("count", 1)
+    return WIDTHS.get(f.get("type"), 0)
+
+
+ALLTYPES = {}
+
+
+def embed_accessors(f, view_address):
+    """An embedded object's view: the owner's address (a guest address, or a
+    handle, whose interior values name the object inside) plus its offset;
+    an array of them takes an index."""
+    to, off, n = f["to"], f["offset"], f["name"]
+    if f.get("count", 1) > 1:
+        return [f"  {to} {n}(uint32_t i) const {{ return {to}(base, {view_address} + {off} + i * {to}::kSize); }}"]
+    return [f"  {to} {n}() const {{ return {to}(base, {view_address} + {off}); }}"]
 
 
 def accessors(fname, f, at, static):
@@ -179,7 +205,9 @@ def accessors(fname, f, at, static):
     sep = ", " if static else ""
     ty = f["type"]
     out = []
-    if ty == "ptr":
+    if ty == "embed":
+        out.extend(embed_accessors(f, "address"))
+    elif ty == "ptr":
         to = f.get("to")
         if to:
             out.append(f"  template <typename T = {to}>")
@@ -199,57 +227,184 @@ def accessors(fname, f, at, static):
     return out
 
 
-def host_type(name, t):
-    """A host type (`storage = "host"`, docs/loops/e5-loop.md step 3): its
-    members in `<name>Data`, and a view over a handle (memory/handles.h) with
-    the same accessors as a guest view's but no `_address()`, plus
-    `<field>_bits()` and `set_<field>_bits()` (the raw bits of the field's
-    width, what lifted code loads and stores) and `New` and `Delete`."""
-    out = [f"struct {name}Data {{"]
+def members(t):
+    """A host type's fields that are struct members: the others overlap one
+    (a union, or a measure's `fault_` field) and are read at their offset.
+    Real fields first, by offset; then `fault_` fields where they fit."""
+    taken, chosen = [], set()
+    for f in sorted(t.get("fields", []), key=lambda f: (f["name"].startswith("fault_"), f["offset"])):
+        lo, hi = f["offset"], f["offset"] + field_width(f, ALLTYPES)
+        if f["type"] == "embed" or any(lo < b and a < hi for a, b in taken):
+            continue
+        taken.append((lo, hi))
+        chosen.add(f["name"])
+    return chosen
+
+
+def layout_fields(t, at=0, depth=0):
+    """A host type's scalar fields wider than a byte, embedded objects'
+    included (their own fields at the owner's offset), for copies between it
+    and guest memory (memory/host_copy.h); a field over an earlier one is
+    left out (the earlier one decides the bytes' order)."""
+    out = []
+    mem = members(t)
     for f in sorted(t.get("fields", []), key=lambda f: f["offset"]):
+        if f["type"] != "embed" and f["name"] not in mem:
+            continue
+        if f["type"] == "embed" and depth < 8:
+            inner = ALLTYPES.get(f["to"], {})
+            for i in range(f.get("count", 1)):
+                out += layout_fields(inner, at + f["offset"] + i * inner.get("size", 0), depth + 1)
+        elif f["type"] in WIDTHS and WIDTHS[f["type"]] > 1:
+            out.append((at + f["offset"], WIDTHS[f["type"]]))
+    return sorted(out)
+
+
+def host_type(name, t):
+    """A host type (`storage = "host"`, docs/loops/e5-loop.md step 3) or a
+    dual one (`storage = "dual"`, step 4): its members in `<name>Data`, laid
+    out at the guest offsets (packed, the gaps padding, in host byte order
+    but for bytes fields, which keep guest order), so a value inside a
+    handle's span names the member there (memory::HandleObject) and an
+    embedded object is a member where the guest code expects it. Its view
+    holds a handle (a dual view: a handle or a guest address, told apart at
+    each access) with the same accessors as a guest view's but no
+    `_address()`, plus `<field>_bits()` and `set_<field>_bits()` (the raw
+    bits of the field's width, what lifted code loads and stores) and `New`
+    and `Delete`."""
+    dual = t.get("storage") == "dual"
+    fields = sorted(t.get("fields", []), key=lambda f: f["offset"])
+    size = max([t.get("size", 0)] + [f["offset"] + field_width(f, ALLTYPES) for f in fields])
+    out = ["#pragma pack(push, 1)", f"struct {name}Data {{"]
+    at = 0
+    mem = members(t)
+    overlaid = {f["name"] for f in fields if f["name"] not in mem and f["type"] != "embed"}
+    # Embedded objects whose bytes no member covers get bytes of their own.
+    cover = [f for f in fields if f["name"] in mem or
+             (f["type"] == "embed" and not any(
+                 g["name"] in mem and g["offset"] < f["offset"] + field_width(f, ALLTYPES)
+                 and f["offset"] < g["offset"] + field_width(g, ALLTYPES) for g in fields))]
+    for f in sorted(cover, key=lambda f: f["offset"]):
+        if f["offset"] < at:
+            continue  # an embed over another (left to its members' bytes)
+        if f["offset"] > at:
+            out.append(f"  uint8_t pad_{at}[{f['offset'] - at}] = {{}};")
         if f["type"] == "bytes":
             out.append(f"  uint8_t {f['name']}[{f['count']}] = {{}};  // +{f['offset']}, guest order")
+        elif f["type"] == "embed":
+            # The embedded type's members, reached through its own view (an
+            # interior handle): bytes here, so headers need no order.
+            out.append(f"  uint8_t {f['name']}[{field_width(f, ALLTYPES)}] = {{}};  "
+                       f"// +{f['offset']}, {f.get('count', 1)} x {f['to']}")
         else:
             out.append(f"  {HOST[f['type']][0]} {f['name']} = 0;  // +{f['offset']}")
+        at = f["offset"] + field_width(f, ALLTYPES)
+    if size > at:
+        out.append(f"  uint8_t pad_{at}[{size - at}] = {{}};")
     out.append("};")
+    out.append("#pragma pack(pop)")
+    out.append(f"static_assert(sizeof({name}Data) == {size});")
+    lay = layout_fields(t)
+    if lay:
+        out.append(f"inline constexpr memory::LayoutField k{name}Fields[] = {{"
+                   + ", ".join(f"{{{o}, {w}}}" for o, w in lay) + "};")
+        out.append(f"inline constexpr memory::Layout k{name}Layout = {{k{name}Fields, {len(lay)}}};")
+    else:
+        out.append(f"inline constexpr memory::Layout k{name}Layout = {{nullptr, 0}};")
     out.append("")
     out.append(f"struct {name} : View {{")
     out.append("  using View::View;")
     out.append(f"  static constexpr uint32_t kSize = {t.get('size', 0)};")
-    out.append("  static constexpr bool kHost = true;")
+    out.append(f"  static constexpr bool kHost = {'false' if dual else 'true'};")
+    out.append(f"  static constexpr bool kDual = {'true' if dual else 'false'};")
     if "vtable" in t:
         out.append(f"  static constexpr uint32_t kVtable = 0x{t['vtable']:08X};")
     out.append(f"  {name}Data* data() const {{ return static_cast<{name}Data*>(memory::HandleObject(address)); }}")
+    if dual:
+        out.append("  bool on_host() const { return memory::IsHandle(address); }")
     out.append(f"  static {name} New(uint8_t* base) {{")
-    out.append(f"    return {name}(base, memory::MakeHandle(new {name}Data(), kSize, \"{name}\"));")
+    out.append(f"    return {name}(base, memory::MakeHandle(new {name}Data(), sizeof({name}Data), \"{name}\", &k{name}Layout));")
     out.append("  }")
     out.append(f"  void Delete() const {{ delete data(); memory::ReleaseHandle(address); }}")
+
+    def pick(host, guest):
+        return f"on_host() ? {host} : {guest}" if dual else host
+
     for f in t.get("fields", []):
-        n, ty = f["name"], f["type"]
+        n, ty, off = f["name"], f["type"], f["offset"]
         if f.get("note"):
             out.append(f"  // {f['note']}")
+        if ty == "embed":
+            out.extend(embed_accessors(f, "address"))
+            continue
         if ty == "bytes":
-            out.append(f"  uint8_t* {n}() const {{ return data()->{n}; }}")
+            out.append(f"  uint8_t* {n}() const {{ return "
+                       + pick(f"data()->{n}", f"guest::Pointer(base, address + {off})") + "; }")
             continue
         member, bits = HOST[ty]
+        if n in overlaid:
+            # A field over an earlier one (a union, or a measure fault): its
+            # bytes at its offset, in host order.
+            p = f"reinterpret_cast<uint8_t*>(data()) + {off}"
+            gl = (SCALARS[ty] if ty in SCALARS else SCALARS["u32"])[1].format(a=f"address + {off}")
+            w = {1: "U8", 2: "U16", 4: "U32", 8: "U64"}[WIDTHS[ty]]
+            hget = f"[&] {{ {bits} v; std::memcpy(&v, {p}, sizeof v); return v; }}()"
+            gbits = f"guest::Load{w}(base, address + {off})"
+            getbits = f"on_host() ? {hget} : {gbits}" if dual else hget
+            out.append(f"  {bits} {n}_bits() const {{ return {getbits}; }}")
+            hput = f"std::memcpy({p}, &v, sizeof v)"
+            gput = f"guest::Store{w}(base, address + {off}, v)"
+            putbits = f"if (on_host()) {hput}; else {gput};" if dual else f"{hput};"
+            out.append(f"  void set_{n}_bits({bits} v) const {{ {putbits} }}")
+            if ty == "ptr":
+                out.append(f"  View {n}() const {{ return View(base, {n}_bits()); }}")
+                out.append(f"  void set_{n}(uint32_t v) const {{ set_{n}_bits(v); }}")
+            else:
+                cv = f"std::bit_cast<{member}>({n}_bits())" if member != bits and ty in ("f32", "f64") else f"{member}({n}_bits())"
+                out.append(f"  {member} {n}() const {{ return {cv}; }}")
+                sv = f"std::bit_cast<{bits}>(v)" if ty in ("f32", "f64") else f"{bits}(v)"
+                out.append(f"  void set_{n}({member} v) const {{ set_{n}_bits({sv}); }}")
+            continue
+        if ty in SCALARS:
+            ctype, gload, gstore = SCALARS[ty]
+        else:  # ptr
+            ctype, gload, gstore = SCALARS["u32"]
+        ga = f"address + {off}"
+        gl = gload.format(a=ga)
+        gs = gstore.format(a=ga)
+        if dual:
+            get = f"return on_host() ? {member}(data()->{n}) : {member}({gl});"
+            put = f"if (on_host()) data()->{n} = v; else {gs};"
+        else:
+            get = f"return data()->{n};"
+            put = f"data()->{n} = v;"
         if ty == "ptr":
             to = f.get("to")
+            pget = get.replace("return ", "return T(base, ").rstrip(";") + ");" if not dual else \
+                f"return T(base, on_host() ? data()->{n} : {gl});"
             if to:
                 out.append(f"  template <typename T = {to}>")
-                out.append(f"  T {n}() const {{ return T(base, data()->{n}); }}")
-                out.append(f"  void set_{n}(const View& v) const {{ data()->{n} = v.address; }}")
+                out.append(f"  T {n}() const {{ {pget} }}")
+                out.append(f"  void set_{n}(const View& w) const {{ const uint32_t v = w.address; {put} }}")
             else:
-                out.append(f"  View {n}() const {{ return View(base, data()->{n}); }}")
-            out.append(f"  void set_{n}(uint32_t v) const {{ data()->{n} = v; }}")
+                vget = pget.replace("T(base", "View(base")
+                out.append(f"  View {n}() const {{ {vget} }}")
+            out.append(f"  void set_{n}(uint32_t v) const {{ {put} }}")
         else:
-            out.append(f"  {member} {n}() const {{ return data()->{n}; }}")
-            out.append(f"  void set_{n}({member} v) const {{ data()->{n} = v; }}")
+            out.append(f"  {member} {n}() const {{ {get} }}")
+            out.append(f"  void set_{n}({member} v) const {{ {put} }}")
+        # The raw bits of the field's width, what lifted code loads and stores.
         if member == bits:
-            out.append(f"  {bits} {n}_bits() const {{ return data()->{n}; }}")
-            out.append(f"  void set_{n}_bits({bits} v) const {{ data()->{n} = v; }}")
+            bget, bput = f"data()->{n}", f"data()->{n} = v"
         else:
-            out.append(f"  {bits} {n}_bits() const {{ return std::bit_cast<{bits}>(data()->{n}); }}")
-            out.append(f"  void set_{n}_bits({bits} v) const {{ data()->{n} = std::bit_cast<{member}>(v); }}")
+            bget, bput = f"std::bit_cast<{bits}>(data()->{n})", f"data()->{n} = std::bit_cast<{member}>(v)"
+        if dual:
+            w = {1: "U8", 2: "U16", 4: "U32", 8: "U64"}[WIDTHS[ty]]
+            out.append(f"  {bits} {n}_bits() const {{ return on_host() ? {bget} : guest::Load{w}(base, {ga}); }}")
+            out.append(f"  void set_{n}_bits({bits} v) const {{ if (on_host()) {bput}; else guest::Store{w}(base, {ga}, v); }}")
+        else:
+            out.append(f"  {bits} {n}_bits() const {{ return {bget}; }}")
+            out.append(f"  void set_{n}_bits({bits} v) const {{ {bput}; }}")
     out.append("};")
     out.append("")
     return out
@@ -278,7 +433,7 @@ def emit_area(area, data):
         measures = ([t["measure"]] if t.get("measure") else []) + t.get("measures", [])
         if measures or t.get("origin"):
             lines.append(f"// {t.get('origin', '?')}; measure: {', '.join(measures) or '-'}")
-        if t.get("storage") == "host":
+        if t.get("storage") in ("host", "dual"):
             lines.extend(host_type(name, t))
             continue
         lines.append(f"struct {name} : View {{")
@@ -316,6 +471,7 @@ def main(argv):
             print(f"{area}: no schema file (or it doesn't parse)", file=sys.stderr)
             return 1
         types, errors = check(areas)
+        ALLTYPES.update({n: t for d in areas.values() for n, t in d.items() if n != "globals"})
         errors = [e for e in errors if e.startswith(f"{area}:")]
         if errors:
             for e in errors:
@@ -328,6 +484,7 @@ def main(argv):
         return 0
     areas = load()
     types, errors = check(areas)
+    ALLTYPES.update({n: t for d in areas.values() for n, t in d.items() if n != "globals"})
     if errors:
         for e in errors:
             print(e, file=sys.stderr)

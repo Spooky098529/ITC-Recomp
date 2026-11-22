@@ -91,7 +91,7 @@ std::optional<uint64_t> RequestCommon(uint8_t* base, uint32_t devices, uint32_t 
 }  // namespace
 
 uint32_t VirtualTarget(uint8_t* base, uint32_t object, uint32_t offset) {
-  return Load(base, Load(base, object) + offset);
+  return Load(base, guest::VtableWord(base, object) + offset);
 }
 
 std::optional<uint32_t> AppDevices(uint8_t* base, uint32_t interface) {

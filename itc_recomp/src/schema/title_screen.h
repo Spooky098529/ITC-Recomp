@@ -245,21 +245,28 @@ struct Type4Machine : View {
 };
 
 // allocated; measure: new<68>@TitleLoad::Create
+#pragma pack(push, 1)
 struct TitleLoadBlockData {
   uint32_t unknown_0 = 0;  // +0
   uint32_t tick_count = 0;  // +4
   uint32_t transition = 0;  // +8
   uint32_t page = 0;  // +12
   uint32_t transition_started = 0;  // +16
+  uint8_t pad_20[48] = {};
 };
+#pragma pack(pop)
+static_assert(sizeof(TitleLoadBlockData) == 68);
+inline constexpr memory::LayoutField kTitleLoadBlockFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}};
+inline constexpr memory::Layout kTitleLoadBlockLayout = {kTitleLoadBlockFields, 5};
 
 struct TitleLoadBlock : View {
   using View::View;
   static constexpr uint32_t kSize = 68;
   static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   TitleLoadBlockData* data() const { return static_cast<TitleLoadBlockData*>(memory::HandleObject(address)); }
   static TitleLoadBlock New(uint8_t* base) {
-    return TitleLoadBlock(base, memory::MakeHandle(new TitleLoadBlockData(), kSize, "TitleLoadBlock"));
+    return TitleLoadBlock(base, memory::MakeHandle(new TitleLoadBlockData(), sizeof(TitleLoadBlockData), "TitleLoadBlock", &kTitleLoadBlockLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // 0 from Create; not read

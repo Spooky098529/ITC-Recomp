@@ -1,6 +1,7 @@
 // The C runtime's string and character helpers natively (strings.h).
 
 #include "c_runtime/strings.h"
+#include "memory/host_copy.h"
 
 #include "base/log.h"
 
@@ -181,6 +182,9 @@ int64_t Strstr(uint8_t* base, uint32_t string, uint32_t find) {
 }
 
 void CopyForward(uint8_t* base, uint32_t destination, uint32_t source, uint32_t count) {
+  if (memory::CopyWithHandles(base, destination, source, count)) {
+    return;
+  }
   while (count != 0 && (destination & 3) != 0) {
     guest::StoreU8(base, destination++, guest::LoadU8(base, source++));
     count--;
@@ -368,6 +372,9 @@ bool MayShare(uint32_t a, uint32_t a_size, uint32_t b, uint32_t b_size) {
 }
 
 bool Memcpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size) {
+  if (memory::CopyWithHandles(base, destination, source, size)) {
+    return true;  // a host object on either side
+  }
   if (size == 0) {
     return true;
   }
@@ -383,6 +390,9 @@ bool Memcpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size)
 }
 
 void XMemSet(uint8_t* base, uint32_t destination, uint32_t value, uint32_t bytes) {
+  if (memory::FillWithHandles(base, destination, uint8_t(value), bytes)) {
+    return;
+  }
   ITC_NATIVE_RUNNING("sub_822962B0 XMemSet");
   const uint8_t byte = uint8_t(value);
   if (bytes < 16) {
@@ -487,12 +497,18 @@ bool XMemCpyFits(uint8_t* base, uint32_t destination, uint32_t source, uint32_t 
 }
 
 bool XMemCpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t bytes) {
+  if (memory::CopyWithHandles(base, destination, source, bytes)) {
+    return true;
+  }
   ITC_NATIVE_RUNNING("sub_82295890 XMemCpy");
   const auto copied = XMemCpyBytes(base, source, bytes);
   return copied && Memcpy(base, destination, source, *copied);
 }
 
 bool MemmoveDown(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size) {
+  if (memory::CopyWithHandles(base, destination, source, size)) {
+    return true;
+  }
   if (size == 0) {
     return true;
   }

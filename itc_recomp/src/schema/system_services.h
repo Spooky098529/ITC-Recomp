@@ -748,18 +748,24 @@ struct SysRecvFromAnswer : View {
 };
 
 // allocated; measure: new<8>@Type12Screen7::Create
+#pragma pack(push, 1)
 struct NetScreen7DataData {
   uint32_t unknown_0 = 0;  // +0
   uint32_t unknown_4 = 0;  // +4
 };
+#pragma pack(pop)
+static_assert(sizeof(NetScreen7DataData) == 8);
+inline constexpr memory::LayoutField kNetScreen7DataFields[] = {{0, 4}, {4, 4}};
+inline constexpr memory::Layout kNetScreen7DataLayout = {kNetScreen7DataFields, 2};
 
 struct NetScreen7Data : View {
   using View::View;
   static constexpr uint32_t kSize = 8;
   static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   NetScreen7DataData* data() const { return static_cast<NetScreen7DataData*>(memory::HandleObject(address)); }
   static NetScreen7Data New(uint8_t* base) {
-    return NetScreen7Data(base, memory::MakeHandle(new NetScreen7DataData(), kSize, "NetScreen7Data"));
+    return NetScreen7Data(base, memory::MakeHandle(new NetScreen7DataData(), sizeof(NetScreen7DataData), "NetScreen7Data", &kNetScreen7DataLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
   uint32_t unknown_0() const { return data()->unknown_0; }

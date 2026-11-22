@@ -79,6 +79,7 @@ set(ITC_SOURCES
     src/memory/heap.cpp
     src/memory/mapping.cpp
     src/memory/handles.cpp
+    src/memory/host_copy.cpp
     src/hooks/c_runtime_heap.cpp
     src/memory/c_runtime_heap.cpp
     src/memory/memory_imports.cpp

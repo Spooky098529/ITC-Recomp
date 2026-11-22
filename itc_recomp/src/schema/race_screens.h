@@ -106,17 +106,23 @@ struct MenuList : View {
 };
 
 // allocated; measure: new<4>@PauseMenu::Create
+#pragma pack(push, 1)
 struct PauseMenuScreenData {
   uint32_t movie = 0;  // +0
 };
+#pragma pack(pop)
+static_assert(sizeof(PauseMenuScreenData) == 4);
+inline constexpr memory::LayoutField kPauseMenuScreenFields[] = {{0, 4}};
+inline constexpr memory::Layout kPauseMenuScreenLayout = {kPauseMenuScreenFields, 1};
 
 struct PauseMenuScreen : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
   static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   PauseMenuScreenData* data() const { return static_cast<PauseMenuScreenData*>(memory::HandleObject(address)); }
   static PauseMenuScreen New(uint8_t* base) {
-    return PauseMenuScreen(base, memory::MakeHandle(new PauseMenuScreenData(), kSize, "PauseMenuScreen"));
+    return PauseMenuScreen(base, memory::MakeHandle(new PauseMenuScreenData(), sizeof(PauseMenuScreenData), "PauseMenuScreen", &kPauseMenuScreenLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // UI movie 4 (UiMovies::Find)
@@ -137,6 +143,7 @@ struct PauseMenuStarted : View {
 };
 
 // allocated; measure: new<160>@PauseMenu::Create
+#pragma pack(push, 1)
 struct PauseMenuDataData {
   uint32_t hud_option_0 = 0;  // +0
   uint32_t hud_option_1 = 0;  // +4
@@ -179,14 +186,19 @@ struct PauseMenuDataData {
   uint32_t run_count = 0;  // +152
   uint32_t first_day = 0;  // +156
 };
+#pragma pack(pop)
+static_assert(sizeof(PauseMenuDataData) == 160);
+inline constexpr memory::LayoutField kPauseMenuDataFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 4}, {24, 4}, {28, 4}, {32, 4}, {36, 4}, {40, 4}, {44, 4}, {48, 4}, {52, 4}, {56, 4}, {60, 4}, {64, 4}, {68, 4}, {72, 4}, {76, 4}, {80, 4}, {84, 4}, {88, 4}, {92, 4}, {96, 4}, {100, 4}, {104, 4}, {108, 4}, {112, 4}, {116, 4}, {120, 4}, {124, 4}, {128, 4}, {132, 4}, {136, 4}, {140, 4}, {144, 4}, {148, 4}, {152, 4}, {156, 4}};
+inline constexpr memory::Layout kPauseMenuDataLayout = {kPauseMenuDataFields, 40};
 
 struct PauseMenuData : View {
   using View::View;
   static constexpr uint32_t kSize = 160;
   static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   PauseMenuDataData* data() const { return static_cast<PauseMenuDataData*>(memory::HandleObject(address)); }
   static PauseMenuData New(uint8_t* base) {
-    return PauseMenuData(base, memory::MakeHandle(new PauseMenuDataData(), kSize, "PauseMenuData"));
+    return PauseMenuData(base, memory::MakeHandle(new PauseMenuDataData(), sizeof(PauseMenuDataData), "PauseMenuData", &kPauseMenuDataLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // the four HUD options (the save's options words +0 to +12)

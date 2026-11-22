@@ -268,6 +268,7 @@ struct TodaysEventMachine : View {
 };
 
 // allocated; measure: new<68>@TodaysResult::Create#2
+#pragma pack(push, 1)
 struct TodaysResultDataData {
   uint32_t ready = 0;  // +0
   uint32_t movie_queued = 0;  // +4
@@ -288,14 +289,19 @@ struct TodaysResultDataData {
   uint32_t day = 0;  // +64
   uint8_t pick[20] = {};  // +68, guest order
 };
+#pragma pack(pop)
+static_assert(sizeof(TodaysResultDataData) == 88);
+inline constexpr memory::LayoutField kTodaysResultDataFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 4}, {24, 4}, {28, 4}, {32, 4}, {36, 4}, {40, 4}, {44, 4}, {48, 4}, {52, 4}, {56, 4}, {60, 4}, {64, 4}};
+inline constexpr memory::Layout kTodaysResultDataLayout = {kTodaysResultDataFields, 17};
 
 struct TodaysResultData : View {
   using View::View;
   static constexpr uint32_t kSize = 88;
   static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   TodaysResultDataData* data() const { return static_cast<TodaysResultDataData*>(memory::HandleObject(address)); }
   static TodaysResultData New(uint8_t* base) {
-    return TodaysResultData(base, memory::MakeHandle(new TodaysResultDataData(), kSize, "TodaysResultData"));
+    return TodaysResultData(base, memory::MakeHandle(new TodaysResultDataData(), sizeof(TodaysResultDataData), "TodaysResultData", &kTodaysResultDataLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // 1 once the texts are set (SetUpMovie)

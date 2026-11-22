@@ -269,6 +269,7 @@ struct NetModeDispatcher : View {
 };
 
 // allocated; measure: new<36>@NetModeSelect::Create
+#pragma pack(push, 1)
 struct NetModeSelectDataData {
   uint32_t shown_before = 0;  // +0
   uint32_t back = 0;  // +4
@@ -280,14 +281,19 @@ struct NetModeSelectDataData {
   uint32_t sign_in_ticks = 0;  // +28
   uint32_t sign_in_continues = 0;  // +32
 };
+#pragma pack(pop)
+static_assert(sizeof(NetModeSelectDataData) == 36);
+inline constexpr memory::LayoutField kNetModeSelectDataFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 4}, {24, 4}, {28, 4}, {32, 4}};
+inline constexpr memory::Layout kNetModeSelectDataLayout = {kNetModeSelectDataFields, 9};
 
 struct NetModeSelectData : View {
   using View::View;
   static constexpr uint32_t kSize = 36;
   static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   NetModeSelectDataData* data() const { return static_cast<NetModeSelectDataData*>(memory::HandleObject(address)); }
   static NetModeSelectData New(uint8_t* base) {
-    return NetModeSelectData(base, memory::MakeHandle(new NetModeSelectDataData(), kSize, "NetModeSelectData"));
+    return NetModeSelectData(base, memory::MakeHandle(new NetModeSelectDataData(), sizeof(NetModeSelectDataData), "NetModeSelectData", &kNetModeSelectDataLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // 1 once set up (SetUp): Open starts with ShowCursor, not Intro

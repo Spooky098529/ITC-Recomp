@@ -8,6 +8,7 @@
 #pragma once
 
 #include "guest_code.h"
+#include "memory/handles.h"
 
 #include <bit>
 #include <cstdint>
@@ -207,6 +208,18 @@ inline float LoadFloat(uint8_t* base, uint32_t address) {
 
 inline void StoreFloat(uint8_t* base, uint32_t address, float value) {
   guest::StoreU32(base, address, std::bit_cast<uint32_t>(value));
+}
+
+// An object's vtable word (its +0) for a virtual call (docs/loops/e5-loop.md,
+// step 4): from guest memory, or from the host object a handle names (host
+// structs keep the guest offsets and hold the word, still the image table's
+// guest address, in host order). An interface's address inside an object
+// (handle + offset) reads that interface's word.
+inline uint32_t VtableWord(uint8_t* base, uint32_t object) {
+  if (memory::IsHandle(object)) {
+    return *static_cast<const uint32_t*>(memory::HandleObject(object));
+  }
+  return guest::LoadU32(base, object);
 }
 
 // Reserves space on the guest stack for the lifetime of the object, for

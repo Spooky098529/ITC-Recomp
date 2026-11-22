@@ -5624,7 +5624,7 @@ lifted::Result f82481A70(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   uint64_t r11 = 0, r31 = 0, ctr = 0;
   double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::MoviePlayer(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,80(r11)
   r11 = guest::LoadU32(base, schema::MoviePlayerVtable(base, uint32_t(r11)).render_next_frame_address());
   // mtctr r11
@@ -5652,7 +5652,7 @@ lifted::Result f82481A80(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::MoviePlayer(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // li r29,0
   r29 = uint64_t(int64_t(0));
   // mr r30,r4
@@ -5683,7 +5683,7 @@ lifted::Result f82481A80(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // beq cr6,0x82481aec
   if (cr6.eq) goto loc_82481AEC;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // li r6,0
   r6 = uint64_t(int64_t(0));
   // addi r5,r1,84
@@ -5729,7 +5729,7 @@ loc_82481B14:
   // beq cr6,0x82481b30
   if (cr6.eq) goto loc_82481B30;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,8(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 8);
   // mtctr r11
@@ -5747,7 +5747,7 @@ loc_82481B30:
   // beq cr6,0x82481b4c
   if (cr6.eq) goto loc_82481B4C;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,8(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 8);
   // mtctr r11
@@ -8504,7 +8504,7 @@ lifted::Result f825981C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x8259822C, r31)); r3 = o.r3; f1 = o.f1; }
 loc_8259822C:
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, schema::StdThrownObject(base, uint32_t(r31)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r31));
   // mr r3,r31
   r3 = r31;
   // lwz r11,8(r11)
@@ -15585,7 +15585,7 @@ loc_825BFB9C:
   goto loc_825BFBC8;
 loc_825BFBAC:
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // addi r5,r1,80
   r5 = uint64_t(int64_t(int64_t(r1) + 80));
   // lhz r4,1(r31)
@@ -15704,7 +15704,7 @@ lifted::Result f825C07C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // beq cr6,0x825c07e4
   if (cr6.eq) goto loc_825C07E4;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,12(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 12);
   // mtctr r11

@@ -150,7 +150,8 @@ def main(argv):
         f.write(lift.own_spelling("\n".join(cpp)))
     with open(os.path.join(lift.OUT, "originals.h"), "w") as f:
         f.write("\n".join(h))
-    print(f"originals: {len(names)} lifted, {len(refused)} refused")
+    print(f"originals: {len(names)} lifted, {len(refused)} refused; "
+          f"{lift.VTABLE_WORDS[0]} vtable words through lifted::VtableWord")
     return 0
 
 

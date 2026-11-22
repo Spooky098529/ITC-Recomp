@@ -660,7 +660,7 @@ uint64_t DevicesUpdate(uint8_t* base, uint64_t self, uint64_t r4, const CallSite
     return c;
   };
   const auto method = [&](uint32_t object, uint32_t offset) {
-    return Load(base, Load(base, object) + offset);
+    return Load(base, guest::VtableWord(base, object) + offset);
   };
   const uint32_t source = schema::SaveDevices(base, devices).device_list();
   const uint32_t list_function = method(source, 4);

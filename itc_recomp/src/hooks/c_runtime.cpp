@@ -4,6 +4,7 @@
 // compiler's array helpers in src/c_runtime/arrays.cpp, and atexit and the
 // exit lock in src/c_runtime/exit.cpp.
 
+#include "memory/host_copy.h"
 #include "guest.h"
 #include "lifted/names.h"
 #include "lifted/functions.h"
@@ -166,6 +167,9 @@ ITC_NATIVE_ENTRY_ALWAYS(825A9934) {
 // then words, then bytes: the same bytes in the end.
 ITC_NATIVE_ENTRY(825A71D0, ITC_FLAG(native_c_runtime)) {
   const uint8_t value = ctx.r4.u8;
+  if (memory::FillWithHandles(base, ctx.r3.u32, value, ctx.r5.u32)) {
+    return;  // a host object
+  }
   guest::ForEachHostPart(base, ctx.r3.u32, ctx.r5.u32,
                          [&](uint8_t* host, uint32_t, uint32_t bytes) {
                            std::memset(host, value, bytes);

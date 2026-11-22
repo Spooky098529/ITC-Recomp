@@ -3072,7 +3072,7 @@ lifted::Result f8227FC80(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r4,161
   r4 = uint64_t(int64_t(161));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -3101,7 +3101,7 @@ loc_8227FCF0:
   // li r4,162
   r4 = uint64_t(int64_t(162));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11

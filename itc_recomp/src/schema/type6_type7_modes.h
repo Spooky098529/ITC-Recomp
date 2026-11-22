@@ -294,19 +294,26 @@ struct Type7Screen0 : View {
 };
 
 // allocated; measure: new<76>@Type6Screen0::OnEnter, new<76>@Type7Screen0::OnEnter
+#pragma pack(push, 1)
 struct Type67Screen0WordsData {
   uint32_t loading_shown = 0;  // +0
+  uint8_t pad_4[64] = {};
   uint32_t unknown_68 = 0;  // +68
   uint32_t pick = 0;  // +72
 };
+#pragma pack(pop)
+static_assert(sizeof(Type67Screen0WordsData) == 76);
+inline constexpr memory::LayoutField kType67Screen0WordsFields[] = {{0, 4}, {68, 4}, {72, 4}};
+inline constexpr memory::Layout kType67Screen0WordsLayout = {kType67Screen0WordsFields, 3};
 
 struct Type67Screen0Words : View {
   using View::View;
   static constexpr uint32_t kSize = 76;
   static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   Type67Screen0WordsData* data() const { return static_cast<Type67Screen0WordsData*>(memory::HandleObject(address)); }
   static Type67Screen0Words New(uint8_t* base) {
-    return Type67Screen0Words(base, memory::MakeHandle(new Type67Screen0WordsData(), kSize, "Type67Screen0Words"));
+    return Type67Screen0Words(base, memory::MakeHandle(new Type67Screen0WordsData(), sizeof(Type67Screen0WordsData), "Type67Screen0Words", &kType67Screen0WordsLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // the stand's loading animation shown (named 44 to 46; Update)

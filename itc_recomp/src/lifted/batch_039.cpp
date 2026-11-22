@@ -682,7 +682,7 @@ loc_8226F00C:
   // lwz r3,29856(r11)
   r3 = guest::LoadU32(base, uint32_t(r11) + 29856);
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::NetworkManager(base, uint32_t(r3)).voice_engine_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,52(r11)
   r11 = guest::LoadU32(base, schema::VoiceEngine(base, uint32_t(r11)).slot_is_headset_present_address());
   // mtctr r11

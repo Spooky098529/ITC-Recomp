@@ -72,7 +72,7 @@ lifted::Result f82095AF0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r3,r29
   r3 = r29;
   // lwz r10,0(r29)
-  r10 = guest::LoadU32(base, uint32_t(r29) + 0);
+  r10 = lifted::VtableWord(base, uint32_t(r29));
   // stw r11,248(r31)
   guest::StoreU32(base, uint32_t(r31) + 248, uint32_t(r11));
   // lwz r11,8(r10)
@@ -97,7 +97,7 @@ lifted::Result f82095AF0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r28 = uint64_t(int64_t(int64_t(r31) + 24));
 loc_82095B54:
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r30));
   // addi r4,r1,80
   r4 = uint64_t(int64_t(int64_t(r1) + 80));
   // mr r3,r30
@@ -115,7 +115,7 @@ loc_82095B54:
   // (left out: dead in C++)
   { const lifted::Result o = game::Event::Signal(base, r1, r13, r3, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r30));
   // mr r3,r30
   r3 = r30;
   // lwz r11,20(r11)
@@ -126,7 +126,7 @@ loc_82095B54:
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x82095B88, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r30));
   // mr r3,r30
   r3 = r30;
   // lwz r11,12(r11)
@@ -150,7 +150,7 @@ loc_82095B54:
   // stw r11,248(r31)
   guest::StoreU32(base, uint32_t(r31) + 248, uint32_t(r11));
   // lwz r11,0(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r29));
   // lwz r11,8(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 8);
   // mtctr r11
@@ -392,7 +392,7 @@ loc_82095D00:
   // beq cr6,0x82095dc0
   if (cr6.eq) goto loc_82095DC0;
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r30));
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // mr r3,r30
@@ -405,7 +405,7 @@ loc_82095D00:
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x82095D3C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r30));
   // mr r3,r30
   r3 = r30;
   // lwz r11,24(r11)
@@ -421,7 +421,7 @@ loc_82095D00:
   // bne 0x82095d6c
   if (!cr0.eq) goto loc_82095D6C;
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r30));
   // mr r3,r30
   r3 = r30;
   // lwz r11,20(r11)
@@ -433,7 +433,7 @@ loc_82095D00:
   { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x82095D6C, r31)); r3 = o.r3; f1 = o.f1; }
 loc_82095D6C:
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r30));
   // mr r3,r30
   r3 = r30;
   // lwz r11,12(r11)
@@ -555,7 +555,7 @@ lifted::Result f822BE278(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // bne cr6,0x822be2b0
   if (!cr6.eq) goto loc_822BE2B0;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // lwz r11,20(r11)
@@ -659,7 +659,7 @@ loc_822BE4B8:
   goto loc_822BE514;
 loc_822BE4CC:
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r31));
   // mr r4,r30
   r4 = r30;
   // mr r3,r31
@@ -677,7 +677,7 @@ loc_822BE4CC:
   // bge 0x822be50c
   if (!cr0.lt) goto loc_822BE50C;
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r31));
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // mr r3,r31
@@ -921,7 +921,7 @@ loc_822BE3B4:
   // stw r3,0(r5)
   guest::StoreU32(base, uint32_t(r5) + 0, uint32_t(r3));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,4(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 4);
   // mtctr r11

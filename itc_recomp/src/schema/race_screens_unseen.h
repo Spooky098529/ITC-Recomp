@@ -340,6 +340,7 @@ struct PauseMenu4 : View {
 };
 
 // allocated; measure: new<80>@PauseMenu4::Create
+#pragma pack(push, 1)
 struct PauseMenu4DataData {
   uint32_t music_volume = 0;  // +0
   uint32_t effects_volume = 0;  // +4
@@ -347,6 +348,7 @@ struct PauseMenu4DataData {
   uint32_t effects_edit = 0;  // +12
   uint32_t music_default = 0;  // +16
   uint32_t effects_default = 0;  // +20
+  uint8_t pad_24[28] = {};
   uint32_t item_count = 0;  // +52
   uint32_t answer = 0;  // +56
   uint32_t volume_toggle = 0;  // +60
@@ -355,14 +357,19 @@ struct PauseMenu4DataData {
   uint32_t player = 0;  // +72
   uint32_t kind = 0;  // +76
 };
+#pragma pack(pop)
+static_assert(sizeof(PauseMenu4DataData) == 80);
+inline constexpr memory::LayoutField kPauseMenu4DataFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 4}, {52, 4}, {56, 4}, {60, 4}, {64, 4}, {68, 4}, {72, 4}, {76, 4}};
+inline constexpr memory::Layout kPauseMenu4DataLayout = {kPauseMenu4DataFields, 13};
 
 struct PauseMenu4Data : View {
   using View::View;
   static constexpr uint32_t kSize = 80;
   static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   PauseMenu4DataData* data() const { return static_cast<PauseMenu4DataData*>(memory::HandleObject(address)); }
   static PauseMenu4Data New(uint8_t* base) {
-    return PauseMenu4Data(base, memory::MakeHandle(new PauseMenu4DataData(), kSize, "PauseMenu4Data"));
+    return PauseMenu4Data(base, memory::MakeHandle(new PauseMenu4DataData(), sizeof(PauseMenu4DataData), "PauseMenu4Data", &kPauseMenu4DataLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // player 0's save data's byte +0x1F878, sign-extended

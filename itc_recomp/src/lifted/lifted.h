@@ -178,6 +178,10 @@ void RegisterFallbacks(const Registration* entries, size_t count);
 // with neither is logged and stops the program.
 Result Call(uint8_t* base, uint32_t address, const Args& args);
 
+// An object's vtable word for a virtual call: guest::VtableWord (a guest
+// address or a handle), what lift.py emits for the vtable idiom.
+inline uint32_t VtableWord(uint8_t* base, uint32_t object) { return guest::VtableWord(base, object); }
+
 // A function's original asked for where it couldn't be lifted (a flag off,
 // or a case the port declines): logged, and the program stops.
 [[noreturn]] void NoOriginal(uint32_t address);

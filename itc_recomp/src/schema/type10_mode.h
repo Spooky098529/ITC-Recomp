@@ -258,20 +258,26 @@ struct ReplayTheaterMachine : View {
 };
 
 // allocated; measure: new<16>@ReplayTheater::Create
+#pragma pack(push, 1)
 struct ReplayTheaterDataData {
   uint32_t started = 0;  // +0
   uint32_t asked = 0;  // +4
   uint32_t replay_loaded = 0;  // +8
   uint32_t interrupted = 0;  // +12
 };
+#pragma pack(pop)
+static_assert(sizeof(ReplayTheaterDataData) == 16);
+inline constexpr memory::LayoutField kReplayTheaterDataFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}};
+inline constexpr memory::Layout kReplayTheaterDataLayout = {kReplayTheaterDataFields, 4};
 
 struct ReplayTheaterData : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
   static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   ReplayTheaterDataData* data() const { return static_cast<ReplayTheaterDataData*>(memory::HandleObject(address)); }
   static ReplayTheaterData New(uint8_t* base) {
-    return ReplayTheaterData(base, memory::MakeHandle(new ReplayTheaterDataData(), kSize, "ReplayTheaterData"));
+    return ReplayTheaterData(base, memory::MakeHandle(new ReplayTheaterDataData(), sizeof(ReplayTheaterDataData), "ReplayTheaterData", &kReplayTheaterDataLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // 0 from Create, 1 from StartPage

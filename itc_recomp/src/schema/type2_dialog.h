@@ -9,19 +9,26 @@
 namespace schema {
 
 // allocated; measure: new<68>@Type2Dialog::OnEnter#2
+#pragma pack(push, 1)
 struct Type2DialogDataData {
   uint32_t movies_loaded = 0;  // +0
   uint32_t queued_state = 0;  // +4
   uint32_t movie_shown = 0;  // +8
+  uint8_t pad_12[56] = {};
 };
+#pragma pack(pop)
+static_assert(sizeof(Type2DialogDataData) == 68);
+inline constexpr memory::LayoutField kType2DialogDataFields[] = {{0, 4}, {4, 4}, {8, 4}};
+inline constexpr memory::Layout kType2DialogDataLayout = {kType2DialogDataFields, 3};
 
 struct Type2DialogData : View {
   using View::View;
   static constexpr uint32_t kSize = 68;
   static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   Type2DialogDataData* data() const { return static_cast<Type2DialogDataData*>(memory::HandleObject(address)); }
   static Type2DialogData New(uint8_t* base) {
-    return Type2DialogData(base, memory::MakeHandle(new Type2DialogDataData(), kSize, "Type2DialogData"));
+    return Type2DialogData(base, memory::MakeHandle(new Type2DialogDataData(), sizeof(Type2DialogDataData), "Type2DialogData", &kType2DialogDataLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
   uint32_t movies_loaded() const { return data()->movies_loaded; }

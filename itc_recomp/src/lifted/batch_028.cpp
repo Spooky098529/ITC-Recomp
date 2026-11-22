@@ -399,7 +399,7 @@ lifted::Result f825DB438(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   // beq 0x825db474
   if (cr0.eq) goto loc_825DB474;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // lwz r11,0(r11)

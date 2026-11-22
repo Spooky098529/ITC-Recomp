@@ -4038,7 +4038,7 @@ lifted::Result f821BA010(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r3,23680(r11)
   r3 = guest::LoadU32(base, uint32_t(r11) + 23680);
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,52(r11)
   r11 = guest::LoadU32(base, schema::AudioManagerVtable(base, uint32_t(r11)).stop_cue_address());
   // mtctr r11
@@ -4076,7 +4076,7 @@ loc_821BA070:
   // lwz r3,23680(r11)
   r3 = guest::LoadU32(base, uint32_t(r11) + 23680);
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,56(r11)
   r11 = guest::LoadU32(base, schema::AudioManagerVtable(base, uint32_t(r11)).is_cue_playing_address());
   // mtctr r11
@@ -4165,7 +4165,7 @@ lifted::Result f821BA0F0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   // lwz r3,23680(r11)
   r3 = guest::LoadU32(base, uint32_t(r11) + 23680);
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,52(r11)
   r11 = guest::LoadU32(base, schema::AudioManagerVtable(base, uint32_t(r11)).stop_cue_address());
   // mtctr r11
@@ -4204,7 +4204,7 @@ loc_821BA14C:
   // stw r11,92(r1)
   guest::StoreU32(base, uint32_t(r1) + 92, uint32_t(r11));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,56(r11)
   r11 = guest::LoadU32(base, schema::AudioManagerVtable(base, uint32_t(r11)).is_cue_playing_address());
   // mtctr r11
@@ -4239,7 +4239,7 @@ loc_821BA1A8:
   // stw r30,100(r1)
   guest::StoreU32(base, uint32_t(r1) + 100, uint32_t(r30));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,20(r11)
   r11 = guest::LoadU32(base, schema::AudioManagerVtable(base, uint32_t(r11)).release_bank_address());
   // mtctr r11
@@ -4267,7 +4267,7 @@ loc_821BA1D0:
   // addi r4,r1,104
   r4 = uint64_t(int64_t(int64_t(r1) + 104));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,32(r11)
   r11 = guest::LoadU32(base, schema::AudioManagerVtable(base, uint32_t(r11)).is_bank_slot_empty_address());
   // mtctr r11
@@ -4425,7 +4425,7 @@ loc_821BA314:
   // addi r4,r1,112
   r4 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::OptionsMusicPlayResult(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,24(r11)
   r11 = guest::LoadU32(base, schema::OptionsMusicPlayVtable(base, uint32_t(r11)).slot_6_address());
   // mtctr r11
@@ -15091,7 +15091,7 @@ loc_821D4B9C:
   // li r4,159
   r4 = uint64_t(int64_t(159));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -15240,7 +15240,7 @@ loc_821D4CA0:
   // li r4,158
   r4 = uint64_t(int64_t(158));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -15794,7 +15794,7 @@ lifted::Result f821E9920(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r4,153
   r4 = uint64_t(int64_t(153));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -15819,7 +15819,7 @@ loc_821E9990:
   // li r4,167
   r4 = uint64_t(int64_t(167));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -15844,7 +15844,7 @@ loc_821E99BC:
   // li r4,154
   r4 = uint64_t(int64_t(154));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -15869,7 +15869,7 @@ loc_821E99E8:
   // li r4,168
   r4 = uint64_t(int64_t(168));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -15894,7 +15894,7 @@ loc_821E9A14:
   // li r4,159
   r4 = uint64_t(int64_t(159));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -15951,7 +15951,7 @@ loc_821E9A78:
   // li r4,158
   r4 = uint64_t(int64_t(158));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -16310,7 +16310,7 @@ lifted::Result f821E9DD8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r4,153
   r4 = uint64_t(int64_t(153));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -16335,7 +16335,7 @@ loc_821E9E48:
   // li r4,167
   r4 = uint64_t(int64_t(167));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -16360,7 +16360,7 @@ loc_821E9E74:
   // li r4,154
   r4 = uint64_t(int64_t(154));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -16385,7 +16385,7 @@ loc_821E9EA0:
   // li r4,168
   r4 = uint64_t(int64_t(168));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -16410,7 +16410,7 @@ loc_821E9ECC:
   // li r4,159
   r4 = uint64_t(int64_t(159));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -16467,7 +16467,7 @@ loc_821E9F30:
   // li r4,158
   r4 = uint64_t(int64_t(158));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -16809,7 +16809,7 @@ lifted::Result f821EA898(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r4,155
   r4 = uint64_t(int64_t(155));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -16834,7 +16834,7 @@ loc_821EA910:
   // li r4,169
   r4 = uint64_t(int64_t(169));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -16859,7 +16859,7 @@ loc_821EA93C:
   // li r4,156
   r4 = uint64_t(int64_t(156));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -16884,7 +16884,7 @@ loc_821EA968:
   // li r4,170
   r4 = uint64_t(int64_t(170));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -16909,7 +16909,7 @@ loc_821EA994:
   // li r4,159
   r4 = uint64_t(int64_t(159));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -16934,7 +16934,7 @@ loc_821EA9C0:
   // li r4,158
   r4 = uint64_t(int64_t(158));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -17685,7 +17685,7 @@ lifted::Result f821EB2A0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r4,155
   r4 = uint64_t(int64_t(155));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -17710,7 +17710,7 @@ loc_821EB314:
   // li r4,169
   r4 = uint64_t(int64_t(169));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -17735,7 +17735,7 @@ loc_821EB340:
   // li r4,156
   r4 = uint64_t(int64_t(156));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -17760,7 +17760,7 @@ loc_821EB36C:
   // li r4,170
   r4 = uint64_t(int64_t(170));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -17785,7 +17785,7 @@ loc_821EB398:
   // li r4,159
   r4 = uint64_t(int64_t(159));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -17810,7 +17810,7 @@ loc_821EB3C4:
   // li r4,158
   r4 = uint64_t(int64_t(158));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -17952,7 +17952,7 @@ loc_821EB41C:
   // li r4,155
   r4 = uint64_t(int64_t(155));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -17977,7 +17977,7 @@ loc_821EB4EC:
   // li r4,169
   r4 = uint64_t(int64_t(169));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -18002,7 +18002,7 @@ loc_821EB518:
   // li r4,156
   r4 = uint64_t(int64_t(156));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -18027,7 +18027,7 @@ loc_821EB544:
   // li r4,170
   r4 = uint64_t(int64_t(170));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -18625,7 +18625,7 @@ lifted::Result f821EBA00(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r4,153
   r4 = uint64_t(int64_t(153));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -18650,7 +18650,7 @@ loc_821EBA70:
   // li r4,167
   r4 = uint64_t(int64_t(167));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -18675,7 +18675,7 @@ loc_821EBA9C:
   // li r4,154
   r4 = uint64_t(int64_t(154));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -18700,7 +18700,7 @@ loc_821EBAC8:
   // li r4,168
   r4 = uint64_t(int64_t(168));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -18725,7 +18725,7 @@ loc_821EBAF4:
   // li r4,159
   r4 = uint64_t(int64_t(159));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -18788,7 +18788,7 @@ loc_821EBB64:
   // li r4,158
   r4 = uint64_t(int64_t(158));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -19175,7 +19175,7 @@ lifted::Result f821EC038(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r4,153
   r4 = uint64_t(int64_t(153));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -19200,7 +19200,7 @@ loc_821EC0A8:
   // li r4,167
   r4 = uint64_t(int64_t(167));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -19225,7 +19225,7 @@ loc_821EC0D4:
   // li r4,154
   r4 = uint64_t(int64_t(154));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -19250,7 +19250,7 @@ loc_821EC100:
   // li r4,168
   r4 = uint64_t(int64_t(168));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -19275,7 +19275,7 @@ loc_821EC12C:
   // li r4,159
   r4 = uint64_t(int64_t(159));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -19475,7 +19475,7 @@ loc_821EC288:
   // li r4,158
   r4 = uint64_t(int64_t(158));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::TuningPagesScreenWord(base, uint32_t(r3)).value_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, schema::TuningPagesIndexFault(base, uint32_t(r11)).fault_40_address());
   // mtctr r11
@@ -20114,7 +20114,7 @@ lifted::Result f821EC7E0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r4,153
   r4 = uint64_t(int64_t(153));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -20139,7 +20139,7 @@ loc_821EC850:
   // li r4,167
   r4 = uint64_t(int64_t(167));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -20164,7 +20164,7 @@ loc_821EC87C:
   // li r4,154
   r4 = uint64_t(int64_t(154));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -20189,7 +20189,7 @@ loc_821EC8A8:
   // li r4,168
   r4 = uint64_t(int64_t(168));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -20214,7 +20214,7 @@ loc_821EC8D4:
   // li r4,159
   r4 = uint64_t(int64_t(159));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -20271,7 +20271,7 @@ loc_821EC938:
   // li r4,158
   r4 = uint64_t(int64_t(158));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -20778,7 +20778,7 @@ lifted::Result f821ED108(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r4,153
   r4 = uint64_t(int64_t(153));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -20803,7 +20803,7 @@ loc_821ED178:
   // li r4,167
   r4 = uint64_t(int64_t(167));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -20828,7 +20828,7 @@ loc_821ED1A4:
   // li r4,154
   r4 = uint64_t(int64_t(154));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -20853,7 +20853,7 @@ loc_821ED1D0:
   // li r4,168
   r4 = uint64_t(int64_t(168));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -20878,7 +20878,7 @@ loc_821ED1FC:
   // li r4,155
   r4 = uint64_t(int64_t(155));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -20903,7 +20903,7 @@ loc_821ED228:
   // li r4,169
   r4 = uint64_t(int64_t(169));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -20928,7 +20928,7 @@ loc_821ED254:
   // li r4,156
   r4 = uint64_t(int64_t(156));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -20953,7 +20953,7 @@ loc_821ED280:
   // li r4,170
   r4 = uint64_t(int64_t(170));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -20978,7 +20978,7 @@ loc_821ED2AC:
   // li r4,159
   r4 = uint64_t(int64_t(159));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -21099,7 +21099,7 @@ loc_821ED380:
   // li r4,158
   r4 = uint64_t(int64_t(158));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -22301,7 +22301,7 @@ lifted::Result f821EDCA8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r4,153
   r4 = uint64_t(int64_t(153));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -22326,7 +22326,7 @@ loc_821EDD18:
   // li r4,167
   r4 = uint64_t(int64_t(167));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -22351,7 +22351,7 @@ loc_821EDD44:
   // li r4,154
   r4 = uint64_t(int64_t(154));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -22376,7 +22376,7 @@ loc_821EDD70:
   // li r4,168
   r4 = uint64_t(int64_t(168));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -22401,7 +22401,7 @@ loc_821EDD9C:
   // li r4,159
   r4 = uint64_t(int64_t(159));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -22536,7 +22536,7 @@ loc_821EDE88:
   // li r4,158
   r4 = uint64_t(int64_t(158));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -23311,7 +23311,7 @@ lifted::Result f821EF320(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r4,153
   r4 = uint64_t(int64_t(153));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -23336,7 +23336,7 @@ loc_821EF37C:
   // li r4,167
   r4 = uint64_t(int64_t(167));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -23361,7 +23361,7 @@ loc_821EF3A8:
   // li r4,154
   r4 = uint64_t(int64_t(154));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -23386,7 +23386,7 @@ loc_821EF3D4:
   // li r4,168
   r4 = uint64_t(int64_t(168));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -23411,7 +23411,7 @@ loc_821EF400:
   // li r4,159
   r4 = uint64_t(int64_t(159));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -23504,7 +23504,7 @@ loc_821EF4B0:
   // li r4,158
   r4 = uint64_t(int64_t(158));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -23710,7 +23710,7 @@ lifted::Result f821EF5E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r4,153
   r4 = uint64_t(int64_t(153));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -23735,7 +23735,7 @@ loc_821EF644:
   // li r4,167
   r4 = uint64_t(int64_t(167));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -23760,7 +23760,7 @@ loc_821EF670:
   // li r4,154
   r4 = uint64_t(int64_t(154));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -23785,7 +23785,7 @@ loc_821EF69C:
   // li r4,168
   r4 = uint64_t(int64_t(168));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -23810,7 +23810,7 @@ loc_821EF6C8:
   // li r4,159
   r4 = uint64_t(int64_t(159));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -24139,7 +24139,7 @@ loc_821EF940:
   // li r4,158
   r4 = uint64_t(int64_t(158));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -24346,7 +24346,7 @@ lifted::Result f821EFA78(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r4,153
   r4 = uint64_t(int64_t(153));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -24371,7 +24371,7 @@ loc_821EFAD4:
   // li r4,167
   r4 = uint64_t(int64_t(167));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -24396,7 +24396,7 @@ loc_821EFB00:
   // li r4,154
   r4 = uint64_t(int64_t(154));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -24421,7 +24421,7 @@ loc_821EFB2C:
   // li r4,168
   r4 = uint64_t(int64_t(168));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -24446,7 +24446,7 @@ loc_821EFB58:
   // li r4,155
   r4 = uint64_t(int64_t(155));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -24471,7 +24471,7 @@ loc_821EFB84:
   // li r4,169
   r4 = uint64_t(int64_t(169));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -24496,7 +24496,7 @@ loc_821EFBB0:
   // li r4,156
   r4 = uint64_t(int64_t(156));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -24521,7 +24521,7 @@ loc_821EFBDC:
   // li r4,170
   r4 = uint64_t(int64_t(170));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -24546,7 +24546,7 @@ loc_821EFC08:
   // li r4,159
   r4 = uint64_t(int64_t(159));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -24707,7 +24707,7 @@ loc_821EFD38:
   // li r4,158
   r4 = uint64_t(int64_t(158));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -24837,7 +24837,7 @@ loc_821EFE20:
   // li r4,170
   r4 = uint64_t(int64_t(170));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,20(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 20);
   // mtctr r11
@@ -24874,7 +24874,7 @@ loc_821EFE68:
   // li r4,170
   r4 = uint64_t(int64_t(170));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,20(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 20);
   // mtctr r11
@@ -24936,7 +24936,7 @@ loc_821EFECC:
   // li r4,170
   r4 = uint64_t(int64_t(170));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,20(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 20);
   // mtctr r11
@@ -24973,7 +24973,7 @@ loc_821EFF14:
   // li r4,170
   r4 = uint64_t(int64_t(170));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,20(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 20);
   // mtctr r11
@@ -25035,7 +25035,7 @@ loc_821EFF78:
   // li r4,170
   r4 = uint64_t(int64_t(170));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,20(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 20);
   // mtctr r11
@@ -25072,7 +25072,7 @@ loc_821EFFC0:
   // li r4,170
   r4 = uint64_t(int64_t(170));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,20(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 20);
   // mtctr r11
@@ -25196,7 +25196,7 @@ loc_821F0090:
   // li r4,169
   r4 = uint64_t(int64_t(169));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,20(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 20);
   // mtctr r11
@@ -25233,7 +25233,7 @@ loc_821F00D8:
   // li r4,169
   r4 = uint64_t(int64_t(169));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,20(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 20);
   // mtctr r11
@@ -25292,7 +25292,7 @@ loc_821F0138:
   // li r4,169
   r4 = uint64_t(int64_t(169));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,20(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 20);
   // mtctr r11
@@ -25329,7 +25329,7 @@ loc_821F0180:
   // li r4,169
   r4 = uint64_t(int64_t(169));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,20(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 20);
   // mtctr r11
@@ -25388,7 +25388,7 @@ loc_821F01E0:
   // li r4,169
   r4 = uint64_t(int64_t(169));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,20(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 20);
   // mtctr r11
@@ -25425,7 +25425,7 @@ loc_821F0228:
   // li r4,169
   r4 = uint64_t(int64_t(169));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,20(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 20);
   // mtctr r11
@@ -25597,7 +25597,7 @@ lifted::Result f821F0318(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r4,153
   r4 = uint64_t(int64_t(153));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -25622,7 +25622,7 @@ loc_821F0374:
   // li r4,167
   r4 = uint64_t(int64_t(167));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -25647,7 +25647,7 @@ loc_821F03A0:
   // li r4,154
   r4 = uint64_t(int64_t(154));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -25672,7 +25672,7 @@ loc_821F03CC:
   // li r4,168
   r4 = uint64_t(int64_t(168));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -25697,7 +25697,7 @@ loc_821F03F8:
   // li r4,155
   r4 = uint64_t(int64_t(155));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -25722,7 +25722,7 @@ loc_821F0424:
   // li r4,169
   r4 = uint64_t(int64_t(169));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -25747,7 +25747,7 @@ loc_821F0450:
   // li r4,156
   r4 = uint64_t(int64_t(156));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -25772,7 +25772,7 @@ loc_821F047C:
   // li r4,170
   r4 = uint64_t(int64_t(170));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -25797,7 +25797,7 @@ loc_821F04A8:
   // li r4,159
   r4 = uint64_t(int64_t(159));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -25958,7 +25958,7 @@ loc_821F05D8:
   // li r4,158
   r4 = uint64_t(int64_t(158));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -26084,7 +26084,7 @@ loc_821F06B8:
   // li r4,170
   r4 = uint64_t(int64_t(170));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,20(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 20);
   // mtctr r11
@@ -26121,7 +26121,7 @@ loc_821F0700:
   // li r4,170
   r4 = uint64_t(int64_t(170));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,20(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 20);
   // mtctr r11
@@ -26282,7 +26282,7 @@ loc_821F0810:
   // li r4,169
   r4 = uint64_t(int64_t(169));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,20(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 20);
   // mtctr r11
@@ -26319,7 +26319,7 @@ loc_821F0858:
   // li r4,169
   r4 = uint64_t(int64_t(169));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,20(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 20);
   // mtctr r11

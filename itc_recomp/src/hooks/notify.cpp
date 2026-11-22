@@ -83,7 +83,7 @@ void CallAt(lifted::Regs& ctx, uint8_t* base, uint32_t function, uint32_t return
 
 // An object's method: its vtable's word at `offset`.
 uint32_t Method(uint8_t* base, uint32_t object, uint32_t offset) {
-  return guest::LoadU32(base, guest::LoadU32(base, object) + offset);
+  return guest::LoadU32(base, guest::VtableWord(base, object) + offset);
 }
 
 }  // namespace

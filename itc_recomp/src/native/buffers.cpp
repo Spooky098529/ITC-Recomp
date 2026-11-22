@@ -25,6 +25,7 @@
 // vertex and index ranges drawn around it and the textures the cache holds.
 // Every 5 s, a summary by caller.
 
+#include "memory/host_copy.h"
 #include <format>
 #include "buffers.h"
 #include "hooks/native_entry.h"
@@ -701,6 +702,9 @@ bool Buffers_NativeMemcpy() {
 
 bool Buffers_Memcpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size,
                     uint32_t caller) {
+  if (memory::CopyWithHandles(base, destination, source, size)) {
+    return true;
+  }
   if (!ITC_FLAG(native_memcpy) ||
       (size != 0 && c_runtime::MayShare(destination, size, source, size))) {
     return false;
@@ -719,7 +723,9 @@ bool Buffers_Memcpy(uint8_t* base, uint32_t destination, uint32_t source, uint32
 // ranges don't share memory; r3 stays the destination either way, and the
 // other registers the original changes are read by no caller.
 ITC_NATIVE_ENTRY_ALWAYS(825A7410) {
-  
+  if (memory::CopyWithHandles(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    return;  // a host object on either side (not the renderer's memory)
+  }
   native::CopyWithRecords(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, uint32_t(ctx.lr), [&] {
     if (!ITC_FLAG(native_memcpy) ||
         !c_runtime::Memcpy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {

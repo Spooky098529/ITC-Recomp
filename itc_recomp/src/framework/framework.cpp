@@ -173,7 +173,7 @@ void DebugTextSetPosition(uint8_t* base, uint32_t x, uint32_t y) {
 }
 
 uint32_t VirtualTarget(uint8_t* base, uint32_t object, uint32_t offset) {
-  return guest::LoadU32(base, guest::LoadU32(base, object) + offset);
+  return guest::LoadU32(base, guest::VtableWord(base, object) + offset);
 }
 
 uint32_t DelegateSlot0Target(uint8_t* base, uint32_t object) {

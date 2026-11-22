@@ -649,7 +649,7 @@ loc_82263C18:
   // stw r31,84(r1)
   guest::StoreU32(base, uint32_t(r1) + 84, uint32_t(r31));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,52(r11)
   r11 = guest::LoadU32(base, schema::AudioManagerVtable(base, uint32_t(r11)).stop_cue_address());
   // mtctr r11
@@ -664,7 +664,7 @@ loc_82263C18:
   // addi r4,r1,88
   r4 = uint64_t(int64_t(int64_t(r1) + 88));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,20(r11)
   r11 = guest::LoadU32(base, schema::AudioManagerVtable(base, uint32_t(r11)).release_bank_address());
   // mtctr r11
@@ -3693,7 +3693,7 @@ loc_822654C8:
   // lwz r3,23680(r31)
   r3 = guest::LoadU32(base, uint32_t(r31) + 23680);
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,52(r11)
   r11 = guest::LoadU32(base, schema::AudioManagerVtable(base, uint32_t(r11)).stop_cue_address());
   // mtctr r11
@@ -3708,7 +3708,7 @@ loc_822654C8:
   // addi r4,r1,96
   r4 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,20(r11)
   r11 = guest::LoadU32(base, schema::AudioManagerVtable(base, uint32_t(r11)).release_bank_address());
   // mtctr r11
@@ -4147,7 +4147,7 @@ lifted::Result f822657D8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r30,80(r1)
   guest::StoreU32(base, uint32_t(r1) + 80, uint32_t(r30));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,24(r11)
   r11 = guest::LoadU32(base, schema::AudioManagerVtable(base, uint32_t(r11)).is_bank_loading_address());
   // mtctr r11
@@ -11822,7 +11822,7 @@ lifted::Result f822692D8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r4,155
   r4 = uint64_t(int64_t(155));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -11847,7 +11847,7 @@ loc_82269358:
   // li r4,169
   r4 = uint64_t(int64_t(169));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -11964,7 +11964,7 @@ loc_82269418:
   // li r4,156
   r4 = uint64_t(int64_t(156));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -11989,7 +11989,7 @@ loc_82269454:
   // li r4,170
   r4 = uint64_t(int64_t(170));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -12741,7 +12741,7 @@ loc_82269A2C:
   // li r4,155
   r4 = uint64_t(int64_t(155));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -12768,7 +12768,7 @@ loc_82269A78:
   // li r4,169
   r4 = uint64_t(int64_t(169));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -12894,7 +12894,7 @@ loc_82269B4C:
   // li r4,156
   r4 = uint64_t(int64_t(156));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -12921,7 +12921,7 @@ loc_82269B88:
   // li r4,170
   r4 = uint64_t(int64_t(170));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -13353,7 +13353,7 @@ loc_82269E70:
   // li r4,155
   r4 = uint64_t(int64_t(155));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -13380,7 +13380,7 @@ loc_82269EB8:
   // li r4,169
   r4 = uint64_t(int64_t(169));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -13506,7 +13506,7 @@ loc_82269F8C:
   // li r4,156
   r4 = uint64_t(int64_t(156));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -13533,7 +13533,7 @@ loc_82269FC8:
   // li r4,170
   r4 = uint64_t(int64_t(170));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -18071,7 +18071,7 @@ loc_8226BDFC:
   // lwz r3,29856(r11)
   r3 = guest::LoadU32(base, uint32_t(r11) + 29856);
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::NetworkManager(base, uint32_t(r3)).voice_engine_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,52(r11)
   r11 = guest::LoadU32(base, schema::VoiceEngine(base, uint32_t(r11)).slot_is_headset_present_address());
   // mtctr r11
@@ -20371,7 +20371,7 @@ loc_8226CDDC:
   // lwz r3,23680(r11)
   r3 = guest::LoadU32(base, uint32_t(r11) + 23680);
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,52(r11)
   r11 = guest::LoadU32(base, schema::AudioManagerVtable(base, uint32_t(r11)).stop_cue_address());
   // mtctr r11
@@ -20860,7 +20860,7 @@ loc_8226D218:
   // lwz r3,23680(r11)
   r3 = guest::LoadU32(base, uint32_t(r11) + 23680);
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,52(r11)
   r11 = guest::LoadU32(base, schema::AudioManagerVtable(base, uint32_t(r11)).stop_cue_address());
   // mtctr r11
@@ -20995,7 +20995,7 @@ loc_8226D318:
   // lwz r3,23680(r11)
   r3 = guest::LoadU32(base, uint32_t(r11) + 23680);
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,52(r11)
   r11 = guest::LoadU32(base, schema::AudioManagerVtable(base, uint32_t(r11)).stop_cue_address());
   // mtctr r11
@@ -21081,7 +21081,7 @@ loc_8226D3B8:
   // lwz r3,23680(r11)
   r3 = guest::LoadU32(base, uint32_t(r11) + 23680);
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,52(r11)
   r11 = guest::LoadU32(base, schema::AudioManagerVtable(base, uint32_t(r11)).stop_cue_address());
   // mtctr r11

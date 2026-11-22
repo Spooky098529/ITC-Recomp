@@ -286,20 +286,26 @@ struct LocationScreenDispatcher : View {
 };
 
 // allocated; measure: Picture, LocationScreen.+8, new<16>@LocationScreen::OnPictureLoadedA, new<16>@LocationScreen::OnPictureLoadedB
+#pragma pack(push, 1)
 struct LocationScreenPictureData {
   uint32_t loaded = 0;  // +0
   uint32_t id = 0;  // +4
   uint32_t texture = 0;  // +8
   uint32_t xpr = 0;  // +12
 };
+#pragma pack(pop)
+static_assert(sizeof(LocationScreenPictureData) == 16);
+inline constexpr memory::LayoutField kLocationScreenPictureFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}};
+inline constexpr memory::Layout kLocationScreenPictureLayout = {kLocationScreenPictureFields, 4};
 
 struct LocationScreenPicture : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
   static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   LocationScreenPictureData* data() const { return static_cast<LocationScreenPictureData*>(memory::HandleObject(address)); }
   static LocationScreenPicture New(uint8_t* base) {
-    return LocationScreenPicture(base, memory::MakeHandle(new LocationScreenPictureData(), kSize, "LocationScreenPicture"));
+    return LocationScreenPicture(base, memory::MakeHandle(new LocationScreenPictureData(), sizeof(LocationScreenPictureData), "LocationScreenPicture", &kLocationScreenPictureLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
   uint32_t loaded() const { return data()->loaded; }
@@ -313,7 +319,7 @@ struct LocationScreenPicture : View {
   void set_id_bits(uint32_t v) const { data()->id = v; }
   template <typename T = LocationScreenPictureTexture>
   T texture() const { return T(base, data()->texture); }
-  void set_texture(const View& v) const { data()->texture = v.address; }
+  void set_texture(const View& w) const { const uint32_t v = w.address; data()->texture = v; }
   void set_texture(uint32_t v) const { data()->texture = v; }
   uint32_t texture_bits() const { return data()->texture; }
   void set_texture_bits(uint32_t v) const { data()->texture = v; }

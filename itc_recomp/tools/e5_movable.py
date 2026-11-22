@@ -9,7 +9,6 @@ measure name it claims (tools/type_map.py):
     measure's tags), and isn't the image's data (origin "image");
   - the measure saw it allocated (an allocation site to make the host object
     at); an object embedded in another moves with its owner (step 4);
-  - its fields don't overlap (a host type's fields are members).
 Each movable type lists its allocation sites and the functions touching it
 that also make accesses the measure couldn't type (read those first: a
 raw access reaching the moved object faults on its handle).
@@ -43,10 +42,13 @@ UNREACHABLE = {
 }
 
 
+SCHEMA_TYPES = {}
+
+
 def overlaps(ty):
     spans = []
     for f in ty.fields:
-        width = f.get("count", 0) if f["type"] == "bytes" else schema_lib.WIDTHS.get(f["type"], 0)
+        width = ty.width(f, SCHEMA_TYPES)
         spans.append((f["offset"], f["offset"] + width))
     spans.sort()
     return any(b0 < a1 for (a0, a1), (b0, b1) in zip(spans, spans[1:]))
@@ -56,6 +58,7 @@ def main(argv):
     only = argv[1].removesuffix(".md") if len(argv) > 1 else None
     _, m = type_map.typed_accesses()
     sch = schema_lib.load()
+    SCHEMA_TYPES.update(sch.types)
     # The measure's types by display name, with what each holds.
     roots = collections.defaultdict(lambda: {"areas": collections.Counter(), "tags": set(),
                                              "allocs": [], "touch": set()})
@@ -98,8 +101,8 @@ def main(argv):
             reasons.append("tags " + ",".join(sorted(tags & BLOCKING_TAGS)))
         if not allocs:
             reasons.append("no allocation seen")
-        if overlaps(ty):
-            reasons.append("overlapping fields")
+        # Overlapping fields no longer stop a move (step 4: host structs keep
+        # the guest offsets; a field over another is read at its offset).
         if name in UNREACHABLE:
             reasons.append(f"unreachable ({UNREACHABLE[name]})")
         risky = sorted(fn for fn in touch if m.unattributed.get(fn))

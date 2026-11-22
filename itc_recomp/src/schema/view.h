@@ -12,9 +12,11 @@
 
 #include "guest.h"
 #include "memory/handles.h"
+#include "memory/host_copy.h"
 
 #include <bit>
 #include <cstdint>
+#include <cstring>
 
 namespace schema {
 

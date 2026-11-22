@@ -7709,7 +7709,7 @@ lifted::Result f82481B88(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   uint64_t r11 = 0, r31 = 0, ctr = 0;
   double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::MoviePlayer(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,56(r11)
   r11 = guest::LoadU32(base, schema::MoviePlayerVtable(base, uint32_t(r11)).set_callback_address());
   // mtctr r11
@@ -7977,7 +7977,7 @@ loc_82481CFC:
   // stw r11,120(r1)
   guest::StoreU32(base, uint32_t(r1) + 120, uint32_t(r11));
   // lwz r11,0(r27)
-  r11 = guest::LoadU32(base, uint32_t(r27) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r27));
   // lwz r11,44(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 44);
   // mtctr r11
@@ -8025,7 +8025,7 @@ loc_82481D5C:
   // stw r11,152(r1)
   guest::StoreU32(base, uint32_t(r1) + 152, uint32_t(r11));
   // lwz r11,0(r26)
-  r11 = guest::LoadU32(base, uint32_t(r26) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r26));
   // lwz r11,44(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 44);
   // mtctr r11
@@ -8093,7 +8093,7 @@ loc_82481E18:
   // blt cr6,0x82481ec0
   if (cr6.lt) goto loc_82481EC0;
   // lwz r11,0(r23)
-  r11 = guest::LoadU32(base, uint32_t(r23) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r23));
   // li r9,0
   r9 = uint64_t(int64_t(0));
   // li r8,0
@@ -8164,7 +8164,7 @@ loc_82481E18:
   // stw r11,200(r1)
   guest::StoreU32(base, uint32_t(r1) + 200, uint32_t(r11));
   // lwz r11,0(r19)
-  r11 = guest::LoadU32(base, uint32_t(r19) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r19));
   // lwz r11,36(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 36);
   // mtctr r11
@@ -8184,7 +8184,7 @@ loc_82481EC0:
   // blt cr6,0x82481eec
   if (cr6.lt) goto loc_82481EEC;
   // lwz r11,0(r27)
-  r11 = guest::LoadU32(base, uint32_t(r27) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r27));
   // mr r4,r25
   r4 = r25;
   // mr r3,r27
@@ -8208,7 +8208,7 @@ loc_82481EEC:
   // blt cr6,0x82481f18
   if (cr6.lt) goto loc_82481F18;
   // lwz r11,0(r26)
-  r11 = guest::LoadU32(base, uint32_t(r26) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r26));
   // mr r4,r24
   r4 = r24;
   // mr r3,r26
@@ -8232,7 +8232,7 @@ loc_82481F18:
   // blt cr6,0x82481f44
   if (cr6.lt) goto loc_82481F44;
   // lwz r11,0(r27)
-  r11 = guest::LoadU32(base, uint32_t(r27) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r27));
   // addi r4,r1,84
   r4 = uint64_t(int64_t(int64_t(r1) + 84));
   // mr r3,r27
@@ -8256,7 +8256,7 @@ loc_82481F44:
   // blt cr6,0x82481f9c
   if (cr6.lt) goto loc_82481F9C;
   // lwz r11,0(r26)
-  r11 = guest::LoadU32(base, uint32_t(r26) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r26));
   // addi r4,r1,80
   r4 = uint64_t(int64_t(int64_t(r1) + 80));
   // mr r3,r26
@@ -8276,7 +8276,7 @@ loc_82481F70:
   // blt cr6,0x82481f9c
   if (cr6.lt) goto loc_82481F9C;
   // lwz r11,0(r23)
-  r11 = guest::LoadU32(base, uint32_t(r23) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r23));
   // li r6,0
   r6 = uint64_t(int64_t(0));
   // lwz r5,80(r1)
@@ -8300,7 +8300,7 @@ loc_82481F9C:
   // beq cr6,0x82481fb8
   if (cr6.eq) goto loc_82481FB8;
   // lwz r11,0(r27)
-  r11 = guest::LoadU32(base, uint32_t(r27) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r27));
   // mr r3,r27
   r3 = r27;
   // lwz r11,8(r11)
@@ -8316,7 +8316,7 @@ loc_82481FB8:
   // beq cr6,0x82481fd4
   if (cr6.eq) goto loc_82481FD4;
   // lwz r11,0(r26)
-  r11 = guest::LoadU32(base, uint32_t(r26) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r26));
   // mr r3,r26
   r3 = r26;
   // lwz r11,8(r11)
@@ -8332,7 +8332,7 @@ loc_82481FD4:
   // beq cr6,0x82481ff0
   if (cr6.eq) goto loc_82481FF0;
   // lwz r11,0(r21)
-  r11 = guest::LoadU32(base, uint32_t(r21) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r21));
   // mr r3,r21
   r3 = r21;
   // lwz r11,8(r11)
@@ -8348,7 +8348,7 @@ loc_82481FF0:
   // beq cr6,0x8248200c
   if (cr6.eq) goto loc_8248200C;
   // lwz r11,0(r20)
-  r11 = guest::LoadU32(base, uint32_t(r20) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r20));
   // mr r3,r20
   r3 = r20;
   // lwz r11,8(r11)
@@ -8364,7 +8364,7 @@ loc_8248200C:
   // beq cr6,0x82482028
   if (cr6.eq) goto loc_82482028;
   // lwz r11,0(r23)
-  r11 = guest::LoadU32(base, uint32_t(r23) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r23));
   // mr r3,r23
   r3 = r23;
   // lwz r11,8(r11)
@@ -8394,7 +8394,7 @@ loc_82482040:
   // beq cr6,0x8248205c
   if (cr6.eq) goto loc_8248205C;
   // lwz r11,0(r19)
-  r11 = guest::LoadU32(base, uint32_t(r19) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r19));
   // mr r3,r19
   r3 = r19;
   // lwz r11,8(r11)
@@ -8532,7 +8532,7 @@ loc_8248210C:
   // beq cr6,0x82482184
   if (cr6.eq) goto loc_82482184;
   // lwz r11,0(r23)
-  r11 = guest::LoadU32(base, schema::MovieLibNew82487BE8(base, uint32_t(r23)).unknown_0_address());
+  r11 = lifted::VtableWord(base, uint32_t(r23));
   // mr r24,r23
   r24 = r23;
   // mr r3,r23
@@ -8707,7 +8707,7 @@ loc_82482218:
   guest::StoreU32(base, uint32_t(r1) + 96, uint32_t(r26));
 loc_82482260:
   // lwz r11,0(r23)
-  r11 = guest::LoadU32(base, schema::MovieLibNew82487BE8(base, uint32_t(r23)).unknown_0_address());
+  r11 = lifted::VtableWord(base, uint32_t(r23));
   // addi r4,r1,96
   r4 = uint64_t(int64_t(int64_t(r1) + 96));
   // mr r3,r23
@@ -8882,7 +8882,7 @@ loc_82482370:
   // beq cr6,0x824820fc
   if (cr6.eq) goto loc_824820FC;
   // lwz r11,0(r23)
-  r11 = guest::LoadU32(base, schema::MovieLibNew82487660(base, uint32_t(r23)).unknown_0_address());
+  r11 = lifted::VtableWord(base, uint32_t(r23));
   // lwz r5,40(r31)
   r5 = guest::LoadU32(base, schema::MovieLib82482068R4(base, uint32_t(r31)).unknown_40_address());
   // lwz r4,32(r31)
@@ -8932,7 +8932,7 @@ loc_824823C0:
   // bne cr6,0x82482418
   if (!cr6.eq) goto loc_82482418;
   // lwz r11,0(r23)
-  r11 = guest::LoadU32(base, schema::MovieLibNew82487660(base, uint32_t(r23)).unknown_0_address());
+  r11 = lifted::VtableWord(base, uint32_t(r23));
   // mr r24,r23
   r24 = r23;
   // mr r3,r23
@@ -8986,7 +8986,7 @@ loc_82482454:
   // beq cr6,0x82482690
   if (cr6.eq) goto loc_82482690;
   // lwz r11,0(r24)
-  r11 = guest::LoadU32(base, uint32_t(r24) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r24));
   // mr r3,r24
   r3 = r24;
   // lwz r5,44(r31)
@@ -9043,7 +9043,7 @@ loc_824824A8:
   // beq cr6,0x82482520
   if (cr6.eq) goto loc_82482520;
   // lwz r11,0(r23)
-  r11 = guest::LoadU32(base, schema::MovieLibNew82487BE8(base, uint32_t(r23)).unknown_0_address());
+  r11 = lifted::VtableWord(base, uint32_t(r23));
   // mr r24,r23
   r24 = r23;
   // mr r3,r23
@@ -9212,7 +9212,7 @@ loc_824825B4:
   guest::StoreU32(base, uint32_t(r1) + 96, uint32_t(r26));
 loc_824825F0:
   // lwz r11,0(r23)
-  r11 = guest::LoadU32(base, schema::MovieLibNew82487BE8(base, uint32_t(r23)).unknown_0_address());
+  r11 = lifted::VtableWord(base, uint32_t(r23));
   // addi r4,r1,96
   r4 = uint64_t(int64_t(int64_t(r1) + 96));
   // mr r3,r23
@@ -9284,7 +9284,7 @@ loc_82482650:
   guest::StoreU32(base, uint32_t(r1) + 96, uint32_t(r26));
 loc_82482674:
   // lwz r11,0(r24)
-  r11 = guest::LoadU32(base, uint32_t(r24) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r24));
   // mr r3,r24
   r3 = r24;
   // addi r4,r1,96
@@ -9327,7 +9327,7 @@ loc_824826B8:
   // beq cr6,0x824826d4
   if (cr6.eq) goto loc_824826D4;
   // lwz r11,0(r23)
-  r11 = guest::LoadU32(base, schema::MovieLibNew82487BE8(base, uint32_t(r23)).unknown_0_address());
+  r11 = lifted::VtableWord(base, uint32_t(r23));
   // mr r3,r23
   r3 = r23;
   // lwz r11,8(r11)
@@ -9343,7 +9343,7 @@ loc_824826D4:
   // beq cr6,0x824826f0
   if (cr6.eq) goto loc_824826F0;
   // lwz r11,0(r24)
-  r11 = guest::LoadU32(base, uint32_t(r24) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r24));
   // mr r3,r24
   r3 = r24;
   // lwz r11,8(r11)
@@ -9373,7 +9373,7 @@ loc_82482708:
   // beq cr6,0x82482724
   if (cr6.eq) goto loc_82482724;
   // lwz r11,0(r21)
-  r11 = guest::LoadU32(base, uint32_t(r21) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r21));
   // mr r3,r21
   r3 = r21;
   // lwz r11,8(r11)
@@ -9629,7 +9629,7 @@ lifted::Result f82483130(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r29,r4
   r29 = r4;
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, schema::MovieLib82483130R3(base, uint32_t(r31)).unknown_0_address());
+  r11 = lifted::VtableWord(base, uint32_t(r31));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, schema::MovieLib82483130R3At0(base, uint32_t(r11)).unknown_40_address());
   // mtctr r11
@@ -9663,7 +9663,7 @@ lifted::Result f82483130(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   if (!cr6.lt) goto loc_82483194;
 loc_82483180:
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, schema::MovieLib82483130R3(base, uint32_t(r31)).unknown_0_address());
+  r11 = lifted::VtableWord(base, uint32_t(r31));
   // mr r3,r31
   r3 = r31;
   // lwz r11,44(r11)
@@ -9924,7 +9924,7 @@ lifted::Result f82483770(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r29,r4
   r29 = r4;
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, schema::MovieLibNew82483460(base, uint32_t(r30)).unknown_0_address());
+  r11 = lifted::VtableWord(base, uint32_t(r30));
   // lwz r11,44(r11)
   r11 = guest::LoadU32(base, schema::MovieLib82483770R3At0(base, uint32_t(r11)).unknown_44_address());
   // mtctr r11
@@ -10050,7 +10050,7 @@ loc_82483834:
   // blt cr6,0x82483894
   if (cr6.lt) goto loc_82483894;
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, schema::MovieLibNew82483460(base, uint32_t(r30)).unknown_0_address());
+  r11 = lifted::VtableWord(base, uint32_t(r30));
   // mr r3,r30
   r3 = r30;
   // lwz r4,0(r29)
@@ -10070,7 +10070,7 @@ loc_82483834:
   if (!cr6.lt) goto loc_824838A8;
 loc_82483894:
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, schema::MovieLibNew82483460(base, uint32_t(r30)).unknown_0_address());
+  r11 = lifted::VtableWord(base, uint32_t(r30));
   // mr r3,r30
   r3 = r30;
   // lwz r11,44(r11)
@@ -10689,7 +10689,7 @@ lifted::Result f824878D0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r29,r5
   r29 = r5;
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, schema::MovieLibNew824878B0(base, uint32_t(r31)).unknown_0_address());
+  r11 = lifted::VtableWord(base, uint32_t(r31));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, schema::MovieLibNew824878B0At0(base, uint32_t(r11)).unknown_48_address());
   // mtctr r11
@@ -11007,7 +11007,7 @@ lifted::Result f824893B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r3,r31,136
   r3 = uint64_t(int64_t(int64_t(r31) + 136));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::MovieLibNew824847D0(base, uint32_t(r3) - 136).unknown_136_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,60(r11)
   r11 = guest::LoadU32(base, schema::MovieLibNew824847D0At136(base, uint32_t(r11)).unknown_60_address());
   // mtctr r11
@@ -11155,7 +11155,7 @@ lifted::Result f8248CBD0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r3,r31,124
   r3 = uint64_t(int64_t(int64_t(r31) + 124));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::MovieLibNew82485460(base, uint32_t(r3) - 124).unknown_124_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,60(r11)
   r11 = guest::LoadU32(base, schema::MovieLibNew82485460At124(base, uint32_t(r11)).unknown_60_address());
   // mtctr r11

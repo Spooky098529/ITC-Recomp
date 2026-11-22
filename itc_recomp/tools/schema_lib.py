@@ -21,6 +21,9 @@ class Type:
         self.size = data.get("size", 0)
         self.storage = data.get("storage", "guest")
         self.fields = data.get("fields", [])
+        # Moved to host memory (step 3: "host"), or with instances in both
+        # shapes (step 4: "dual", the view telling them apart by the handle).
+        self.host = self.storage in ("host", "dual")
         self.data = data
         self.by_offset = {}
         for f in self.fields:
@@ -28,6 +31,15 @@ class Type:
 
     def header(self):
         return "schema/" + self.area.replace("-", "_") + ".h"
+
+    def width(self, f, types=None):
+        """A field's width in bytes (an embed: its type's size times its count)."""
+        if f["type"] == "bytes":
+            return f.get("count", 0)
+        if f["type"] == "embed":
+            to = (types or {}).get(f.get("to"))
+            return (to.size if to else 0) * f.get("count", 1)
+        return WIDTHS.get(f["type"], 0)
 
     def field_at(self, offset, width):
         """The field at `offset` read or written `width` bytes wide: one of
@@ -66,7 +78,7 @@ class Schema:
         # ("alloc", type) or ("free", type, register, returned value).
         self.host_sites = {}
         for ty in self.types.values():
-            if ty.storage != "host":
+            if not ty.host:
                 continue
             for a in ty.data.get("host_alloc", []):
                 self.host_sites[a] = ("alloc", ty)

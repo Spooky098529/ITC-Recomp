@@ -10405,7 +10405,7 @@ lifted::Result f82262040(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r4,153
   r4 = uint64_t(int64_t(153));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -10430,7 +10430,7 @@ loc_822620C0:
   // li r4,167
   r4 = uint64_t(int64_t(167));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -10455,7 +10455,7 @@ loc_822620EC:
   // li r4,154
   r4 = uint64_t(int64_t(154));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -10480,7 +10480,7 @@ loc_82262118:
   // li r4,168
   r4 = uint64_t(int64_t(168));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -10678,7 +10678,7 @@ loc_82262244:
   // li r4,155
   r4 = uint64_t(int64_t(155));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -10703,7 +10703,7 @@ loc_822622A8:
   // li r4,169
   r4 = uint64_t(int64_t(169));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -10749,7 +10749,7 @@ loc_822622E8:
   // li r4,156
   r4 = uint64_t(int64_t(156));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11
@@ -10774,7 +10774,7 @@ loc_82262324:
   // li r4,170
   r4 = uint64_t(int64_t(170));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,48(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 48);
   // mtctr r11

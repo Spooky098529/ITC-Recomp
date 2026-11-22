@@ -203,20 +203,27 @@ struct Type5Dialog : View {
 };
 
 // allocated; measure: new<68>@Type5Dialog::OnEnter#2
+#pragma pack(push, 1)
 struct Type5DialogDataData {
   uint32_t movies_loaded = 0;  // +0
   uint32_t queued_state = 0;  // +4
   uint32_t movie_shown = 0;  // +8
   uint32_t interrupted = 0;  // +12
+  uint8_t pad_16[52] = {};
 };
+#pragma pack(pop)
+static_assert(sizeof(Type5DialogDataData) == 68);
+inline constexpr memory::LayoutField kType5DialogDataFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}};
+inline constexpr memory::Layout kType5DialogDataLayout = {kType5DialogDataFields, 4};
 
 struct Type5DialogData : View {
   using View::View;
   static constexpr uint32_t kSize = 68;
   static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   Type5DialogDataData* data() const { return static_cast<Type5DialogDataData*>(memory::HandleObject(address)); }
   static Type5DialogData New(uint8_t* base) {
-    return Type5DialogData(base, memory::MakeHandle(new Type5DialogDataData(), kSize, "Type5DialogData"));
+    return Type5DialogData(base, memory::MakeHandle(new Type5DialogDataData(), sizeof(Type5DialogDataData), "Type5DialogData", &kType5DialogDataLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // 1 once movies 16 to 19 are loaded

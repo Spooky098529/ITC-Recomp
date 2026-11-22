@@ -1832,7 +1832,7 @@ loc_82294CA8:
   // beq cr6,0x82294ccc
   if (cr6.eq) goto loc_82294CCC;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // lwz r11,0(r11)

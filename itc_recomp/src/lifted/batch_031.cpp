@@ -1245,7 +1245,7 @@ loc_8210B990:
   // stwx r11,r9,r10
   guest::StoreU32(base, uint32_t(r9) + uint32_t(r10), uint32_t(r11));
   // lwz r11,0(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r11));
   // lwz r11,0(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 0);
   // mtctr r11
@@ -1313,7 +1313,7 @@ loc_8210B9F8:
   // stwx r11,r9,r10
   guest::StoreU32(base, uint32_t(r9) + uint32_t(r10), uint32_t(r11));
   // lwz r11,0(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r11));
   // lwz r11,0(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 0);
   // mtctr r11
@@ -4340,7 +4340,7 @@ lifted::Result f821D7C90(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r4,159
   r4 = uint64_t(int64_t(159));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -4688,7 +4688,7 @@ loc_821D7F7C:
   // li r4,158
   r4 = uint64_t(int64_t(158));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,40(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 40);
   // mtctr r11
@@ -5954,7 +5954,7 @@ lifted::Result f823EACC8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   guest::StoreU32(base, schema::ImageCodec(base, uint32_t(r31)).row_address(), uint32_t(r30));
 loc_823EAD4C:
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r31)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r31));
   // addi r30,r31,36
   r30 = uint64_t(int64_t(int64_t(r31) + 36));
   // li r5,0
@@ -5973,7 +5973,7 @@ loc_823EAD4C:
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x823EAD70, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r31)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r31));
   // mr r6,r30
   r6 = r30;
   // li r5,0
@@ -13110,7 +13110,7 @@ loc_8246B6E0:
   // mr r4,r29
   r4 = r29;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,92(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 92);
   // mtctr r11

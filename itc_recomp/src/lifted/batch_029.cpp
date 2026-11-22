@@ -2717,7 +2717,7 @@ lifted::Result f8211E8C0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // bgt 0x8211e900
   if (cr0.gt) goto loc_8211E900;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,12(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 12);
   // mtctr r11
@@ -18340,7 +18340,7 @@ lifted::Result f8224EA10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x8224EB2C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, schema::CarPanel(base, uint32_t(r31)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r31));
   // lbz r5,129(r30)
   r5 = guest::LoadU8(base, schema::CarSpecCopies(base, uint32_t(r30)).spec_byte_129_address());
   // mr r3,r31

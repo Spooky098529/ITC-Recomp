@@ -3560,7 +3560,7 @@ lifted::Result f8258DE50(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r3,8(r3)
   r3 = guest::LoadU32(base, schema::FrameDriver(base, uint32_t(r3)).thread_object_address());
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::FrameDriver(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,4(r11)
   r11 = guest::LoadU32(base, schema::GameThreadVtable(base, uint32_t(r11)).run_address());
   // mtctr r11
@@ -3722,7 +3722,7 @@ lifted::Result f8258E5C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r3,r11,4
   r3 = uint64_t(int64_t(int64_t(r11) + 4));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::RenderQueueState(base, uint32_t(r3) - 4).drawer_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,4(r11)
   r11 = guest::LoadU32(base, schema::RenderQueueState(base, uint32_t(r11)).drawer_address());
   // mtctr r11
@@ -4563,7 +4563,7 @@ loc_8258F6EC:
   // lwz r4,-20008(r31)
   r4 = guest::LoadU32(base, uint32_t(r31) + -20008);
   // lwz r29,0(r3)
-  r29 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r29 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r10,28(r11)
   r10 = guest::LoadU32(base, uint32_t(r11) + 28);
   // lwz r9,24(r11)
@@ -5431,7 +5431,7 @@ lifted::Result f82590DE0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // beq cr6,0x82590e24
   if (cr6.eq) goto loc_82590E24;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::PassList(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // lwz r11,0(r11)
@@ -5449,7 +5449,7 @@ loc_82590E24:
   // beq cr6,0x82590e44
   if (cr6.eq) goto loc_82590E44;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::PassList(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // lwz r11,0(r11)
@@ -5601,7 +5601,7 @@ loc_82591718:
   // lwz r3,0(r31)
   r3 = guest::LoadU32(base, schema::Single(base, uint32_t(r31) - 20).data_4_address());
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::SingleReleaseObject(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,4(r11)
   r11 = guest::LoadU32(base, schema::SingleReleaseVtable(base, uint32_t(r11)).slot1_address());
   // mtctr r11
@@ -5612,7 +5612,7 @@ loc_82591718:
   // lwz r3,0(r31)
   r3 = guest::LoadU32(base, schema::Single(base, uint32_t(r31) - 20).data_4_address());
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::SingleReleaseObject(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,8(r11)
   r11 = guest::LoadU32(base, schema::SingleReleaseVtable(base, uint32_t(r11)).slot2_address());
   // mtctr r11
@@ -5642,7 +5642,7 @@ loc_82591718:
   // lwz r3,0(r31)
   r3 = guest::LoadU32(base, schema::Single(base, uint32_t(r31) - 20).data_4_address());
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::SingleReleaseObject(base, uint32_t(r3)).vtable_address());
+  r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,12(r11)
   r11 = guest::LoadU32(base, schema::SingleReleaseVtable(base, uint32_t(r11)).slot3_address());
   // mtctr r11

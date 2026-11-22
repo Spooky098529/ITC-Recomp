@@ -35,7 +35,7 @@ constexpr uint32_t kOnModeChange = 0x8209E7E8;
 constexpr uint32_t kSetBlocked = 0x8209F318;
 
 uint32_t Slot(uint8_t* base, uint32_t object, uint32_t offset) {
-  return guest::LoadU32(base, guest::LoadU32(base, object) + offset);
+  return guest::LoadU32(base, guest::VtableWord(base, object) + offset);
 }
 
 }  // namespace

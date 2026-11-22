@@ -1083,6 +1083,7 @@ struct CameraAnim : View {
 };
 
 // allocated; measure: CameraAnimBlock, new<64>@CameraAnim::ParseObject, CameraAnim::EvalTarget.r4.+80, CameraAnims::Find.ret.+0.+80, CameraAnim::EvalTarget.r4.+80.+60
+#pragma pack(push, 1)
 struct CameraAnimBlockData {
   uint32_t channel = 0;  // +0
   uint32_t header_size = 0;  // +4
@@ -1092,14 +1093,19 @@ struct CameraAnimBlockData {
   uint8_t unknown_20[40] = {};  // +20, guest order
   uint32_t values = 0;  // +60
 };
+#pragma pack(pop)
+static_assert(sizeof(CameraAnimBlockData) == 64);
+inline constexpr memory::LayoutField kCameraAnimBlockFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {60, 4}};
+inline constexpr memory::Layout kCameraAnimBlockLayout = {kCameraAnimBlockFields, 6};
 
 struct CameraAnimBlock : View {
   using View::View;
   static constexpr uint32_t kSize = 64;
   static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   CameraAnimBlockData* data() const { return static_cast<CameraAnimBlockData*>(memory::HandleObject(address)); }
   static CameraAnimBlock New(uint8_t* base) {
-    return CameraAnimBlock(base, memory::MakeHandle(new CameraAnimBlockData(), kSize, "CameraAnimBlock"));
+    return CameraAnimBlock(base, memory::MakeHandle(new CameraAnimBlockData(), sizeof(CameraAnimBlockData), "CameraAnimBlock", &kCameraAnimBlockLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // 0 x, 1 y, 2 -z, 101 the film's height, 102 the focal length, 109 -roll
@@ -1177,17 +1183,23 @@ struct CameraAnimFileBlock : View {
 };
 
 // allocated; measure: new<4>@CameraAnims::Load, CameraAnims::OnLoaded.r6
+#pragma pack(push, 1)
 struct CameraAnimLoadData {
   uint32_t id = 0;  // +0
 };
+#pragma pack(pop)
+static_assert(sizeof(CameraAnimLoadData) == 4);
+inline constexpr memory::LayoutField kCameraAnimLoadFields[] = {{0, 4}};
+inline constexpr memory::Layout kCameraAnimLoadLayout = {kCameraAnimLoadFields, 1};
 
 struct CameraAnimLoad : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
   static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   CameraAnimLoadData* data() const { return static_cast<CameraAnimLoadData*>(memory::HandleObject(address)); }
   static CameraAnimLoad New(uint8_t* base) {
-    return CameraAnimLoad(base, memory::MakeHandle(new CameraAnimLoadData(), kSize, "CameraAnimLoad"));
+    return CameraAnimLoad(base, memory::MakeHandle(new CameraAnimLoadData(), sizeof(CameraAnimLoadData), "CameraAnimLoad", &kCameraAnimLoadLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // the asset id

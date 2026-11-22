@@ -50,6 +50,7 @@ struct GarageScreenMode : View {
 };
 
 // allocated; measure: new<104>@GarageScreen::Create
+#pragma pack(push, 1)
 struct GarageScreenDataData {
   uint32_t set_up = 0;  // +0
   uint8_t pick[20] = {};  // +4, guest order
@@ -57,6 +58,7 @@ struct GarageScreenDataData {
   uint32_t day = 0;  // +28
   uint32_t weekday = 0;  // +32
   uint32_t save = 0;  // +36
+  uint8_t pad_40[4] = {};
   uint32_t selection = 0;  // +44
   uint32_t scroll = 0;  // +48
   uint32_t action = 0;  // +52
@@ -73,14 +75,19 @@ struct GarageScreenDataData {
   uint32_t doors2 = 0;  // +96
   uint32_t sale_price = 0;  // +100
 };
+#pragma pack(pop)
+static_assert(sizeof(GarageScreenDataData) == 104);
+inline constexpr memory::LayoutField kGarageScreenDataFields[] = {{0, 4}, {24, 4}, {28, 4}, {32, 4}, {36, 4}, {44, 4}, {48, 4}, {52, 4}, {56, 4}, {60, 4}, {64, 4}, {68, 4}, {72, 4}, {76, 4}, {80, 4}, {84, 4}, {88, 4}, {92, 4}, {96, 4}, {100, 4}};
+inline constexpr memory::Layout kGarageScreenDataLayout = {kGarageScreenDataFields, 20};
 
 struct GarageScreenData : View {
   using View::View;
   static constexpr uint32_t kSize = 104;
   static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   GarageScreenDataData* data() const { return static_cast<GarageScreenDataData*>(memory::HandleObject(address)); }
   static GarageScreenData New(uint8_t* base) {
-    return GarageScreenData(base, memory::MakeHandle(new GarageScreenDataData(), kSize, "GarageScreenData"));
+    return GarageScreenData(base, memory::MakeHandle(new GarageScreenDataData(), sizeof(GarageScreenDataData), "GarageScreenData", &kGarageScreenDataLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // 1 once the header is set (SetHeader)
@@ -108,7 +115,7 @@ struct GarageScreenData : View {
   // player 0's save data (SaveData::Of)
   template <typename T = SaveData>
   T save() const { return T(base, data()->save); }
-  void set_save(const View& v) const { data()->save = v.address; }
+  void set_save(const View& w) const { const uint32_t v = w.address; data()->save = v; }
   void set_save(uint32_t v) const { data()->save = v; }
   uint32_t save_bits() const { return data()->save; }
   void set_save_bits(uint32_t v) const { data()->save = v; }
