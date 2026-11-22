@@ -211,7 +211,7 @@ Done (2026-11-22, `d557e44c`):
   accesses that fit no field, 135 never seen (137 before). Built, an
   attract race, the pad replay and a frame dump checked.
 - `docs/known-data.md`'s converter state: 88 bytes.
-- **The class-name fault** (the same family; 2026-11-22, `cf9d3f4b`): a
+- **The class-name fault** (the same family; 2026-11-22, `81b2de4b`): a
   function whose row names it `X::Y` had its r3 joined with `X` even when
   every caller passes an object embedded in another
   (`CarScene::InitLighting`'s r3 is the scene + 5248). Now the callers
