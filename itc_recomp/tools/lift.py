@@ -1187,7 +1187,9 @@ def host_site(st):
                 f"  // host_alloc {st.lr} ({ty.name})")
     _, _, reg, returns = site
     HOST_SITE_REGS.add(reg)
-    return (f"{{ schema::{ty.name}(base, uint32_t({reg})).Delete(); r3 = {returns}; }}"
+    # No `returns`: r3 as it was (operator delete and free leave it).
+    after = "" if returns is None else f" r3 = {returns};"
+    return (f"{{ schema::{ty.name}(base, uint32_t({reg})).Delete();{after} }}"
             f"  // host_free {st.lr} ({ty.name})")
 
 

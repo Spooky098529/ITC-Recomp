@@ -125,11 +125,11 @@ def check(areas):
                 errors.append(f"{area}: {name}: host_free is a list of {{ call, reg, returns }}")
                 frees = []
             for fr in frees:
-                if (not isinstance(fr, dict) or set(fr) != {"call", "reg", "returns"}
-                        or not isinstance(fr["call"], int) or not isinstance(fr["returns"], int)
+                if (not isinstance(fr, dict) or not {"call", "reg"} <= set(fr) <= {"call", "reg", "returns"}
+                        or not isinstance(fr["call"], int) or not isinstance(fr.get("returns", 0), int)
                         or not isinstance(fr["reg"], str) or not re.fullmatch(r"r([3-9]|10)", fr["reg"])):
                     errors.append(f"{area}: {name}: host_free entry {fr!r}: "
-                                  "{ call = <return address>, reg = \"r3\"..\"r10\", returns = <int> }")
+                                  "{ call = <return address>, reg = \"r3\"..\"r10\", returns = <int> (left out: r3 kept) }")
                     continue
                 calls.append(fr["call"])
             for a in calls:

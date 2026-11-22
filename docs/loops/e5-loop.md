@@ -400,13 +400,18 @@ name). The spec:
   `host_alloc = [0x820F77DC]` (the calls' return addresses), and its lifted
   frees, `host_free = [{ call = 0x8215E2C4, reg = "r3", returns = 1 }]` (the
   register holding the object's pointer: r3 for VirtualFree, operator
-  delete and free, r5 for HeapFree; what the call returned).
+  delete and free, r5 for HeapFree; what the call returned: 1 for
+  VirtualFree and HeapFree; left out for operator delete and free, which
+  leave r3 as it was, so the replacement doesn't set it).
 - `lift.py` (where it emits a call statement) replaces a listed allocation
   with `{ r3 = schema::<Type>::New(base).address; f1 = 0; }` and a listed
   free with `{ schema::<Type>(base, uint32_t(<reg>)).Delete(); r3 = <returns>; }`,
   adding the type's header; `lift_originals.py` the same in `originals.cpp`.
   An address listed that no emitted call has is an error (the tool stops
-  with it), so a wrong address can't pass silently.
+  with it), so a wrong address can't pass silently. Each replacement is marked with
+  its address (`// host_alloc 0x820A7130 (FloatPair)`), which is how each
+  tool finds the sites the other emitted. A free of 0 does nothing
+  (`Delete()` on handle 0), as operator delete's and free's.
 - `schema_gen.py` accepts the two keys (on host types only) and checks
   their form.
 - Checked on one type first (built, an attract race, `tick_replay.sh`),

@@ -71,7 +71,7 @@ class Schema:
             for a in ty.data.get("host_alloc", []):
                 self.host_sites[a] = ("alloc", ty)
             for fr in ty.data.get("host_free", []):
-                self.host_sites[fr["call"]] = ("free", ty, fr["reg"], fr["returns"])
+                self.host_sites[fr["call"]] = ("free", ty, fr["reg"], fr.get("returns"))
 
     def of_measure(self, measure_name):
         return self.by_measure.get(measure_name)
