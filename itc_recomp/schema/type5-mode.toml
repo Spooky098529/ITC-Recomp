@@ -122,6 +122,10 @@ fields = [
 measure = "new<68>@Type5Dialog::OnEnter#2"
 size = 68
 origin = "allocated"
+# In host memory since E5 step 3 (2026-11-22): made by Type5Dialog::OnEnter
+# (the original's VirtualAlloc(68) at 0x8222593C), freed by OnLeft (its
+# VirtualFree at 0x822257F8); the global at 0x82814E44 holds its handle.
+storage = "host"
 fields = [
   { name = "movies_loaded", offset = 0, type = "u32", note = "1 once movies 16 to 19 are loaded" },
   { name = "queued_state", offset = 4, type = "u32", note = "the machine's state queued by the close steps (9); 21 none" },

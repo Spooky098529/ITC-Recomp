@@ -432,7 +432,15 @@ uint64_t DestroyOf(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& ca
     case EndKind::kDataBack:
     case EndKind::kDataBackChecked: {
       const uint32_t data = Load(base, s.data);
-      if ((s.end == EndKind::kDataBack || data != 0) && Load(base, data + 4) != 0) {
+      // The mode select's data is a host object (E5 step 3): its +4
+      // through the view.
+      uint32_t back;
+      if constexpr (I == 0) {
+        back = schema::NetModeSelectData(base, data).back();
+      } else {
+        back = (s.end == EndKind::kDataBack || data != 0) ? Load(base, data + 4) : 0;
+      }
+      if ((s.end == EndKind::kDataBack || data != 0) && back != 0) {
         state(14);
       }
       if (m.back() == 1) {
@@ -466,6 +474,15 @@ uint64_t DestroyOf(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& ca
   }
   uint64_t r3 = 0;
   for (uint32_t i = 0; i < s.count; i++) {
+    if constexpr (I == 0) {
+      if (s.frees[i].global == G::select_data_address()) {
+        // The host data (Create): the original's VirtualFree at
+        // 0x8227C540, which returned 1.
+        G::select_data(base).Delete();
+        r3 = 1;
+        continue;
+      }
+    }
     r3 = calls.Call(kVirtualFree, frame, s.frees[i].lr, Load(base, s.frees[i].global), 0,
                     kMemRelease);
   }
@@ -512,11 +529,13 @@ uint64_t ModeSelectCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Ca
   const uint32_t menu = uint32_t(Alloc(calls, frame, 0x8227C400, 68));
   G::set_select_menu(base, menu);
   MenuCountFirst(base, menu, 1, 1);
-  const uint64_t r3 = Alloc(calls, frame, 0x8227C45C, 36);
-  const uint32_t data = uint32_t(r3);
-  G::set_select_data(base, data);
+  // The data lives in host memory (E5 step 3): the original's
+  // VirtualAlloc(36) at 0x8227C45C; the global holds its handle.
   using D = schema::NetModeSelectData;
-  Apply(D(base, data), {{&D::set_shown_before, 0},
+  const D data = D::New(base);
+  const uint64_t r3 = data.address;
+  G::set_select_data(base, data);
+  Apply(data, {{&D::set_shown_before, 0},
                         {&D::set_back, 0},
                         {&D::set_dialog_page, kNone},
                         {&D::set_dialog_transition, kNone},

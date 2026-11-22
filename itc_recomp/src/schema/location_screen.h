@@ -286,25 +286,42 @@ struct LocationScreenDispatcher : View {
 };
 
 // allocated; measure: Picture, LocationScreen.+8, new<16>@LocationScreen::OnPictureLoadedA, new<16>@LocationScreen::OnPictureLoadedB
+struct LocationScreenPictureData {
+  uint32_t loaded = 0;  // +0
+  uint32_t id = 0;  // +4
+  uint32_t texture = 0;  // +8
+  uint32_t xpr = 0;  // +12
+};
+
 struct LocationScreenPicture : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
-  uint32_t loaded() const { return guest::LoadU32(base, address + 0); }
-  void set_loaded(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t loaded_address() const { return address + 0; }
+  static constexpr bool kHost = true;
+  LocationScreenPictureData* data() const { return static_cast<LocationScreenPictureData*>(memory::HandleObject(address)); }
+  static LocationScreenPicture New(uint8_t* base) {
+    return LocationScreenPicture(base, memory::MakeHandle(new LocationScreenPictureData(), kSize, "LocationScreenPicture"));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  uint32_t loaded() const { return data()->loaded; }
+  void set_loaded(uint32_t v) const { data()->loaded = v; }
+  uint32_t loaded_bits() const { return data()->loaded; }
+  void set_loaded_bits(uint32_t v) const { data()->loaded = v; }
   // the picture id (a 56- or 20-byte data table entry's +16), -1 until the ring's front is taken
-  uint32_t id() const { return guest::LoadU32(base, address + 4); }
-  void set_id(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
-  uint32_t id_address() const { return address + 4; }
+  uint32_t id() const { return data()->id; }
+  void set_id(uint32_t v) const { data()->id = v; }
+  uint32_t id_bits() const { return data()->id; }
+  void set_id_bits(uint32_t v) const { data()->id = v; }
   template <typename T = LocationScreenPictureTexture>
-  T texture() const { return T(base, guest::LoadU32(base, address + 8)); }
-  void set_texture(const View& v) const { guest::StoreU32(base, address + 8, v.address); }
-  void set_texture(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t texture_address() const { return address + 8; }
+  T texture() const { return T(base, data()->texture); }
+  void set_texture(const View& v) const { data()->texture = v.address; }
+  void set_texture(uint32_t v) const { data()->texture = v; }
+  uint32_t texture_bits() const { return data()->texture; }
+  void set_texture_bits(uint32_t v) const { data()->texture = v; }
   // the XPR (24 bytes, XPR::XPR and XPR::Create over the loaded buffer)
-  View xpr() const { return View(base, guest::LoadU32(base, address + 12)); }
-  void set_xpr(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
-  uint32_t xpr_address() const { return address + 12; }
+  View xpr() const { return View(base, data()->xpr); }
+  void set_xpr(uint32_t v) const { data()->xpr = v; }
+  uint32_t xpr_bits() const { return data()->xpr; }
+  void set_xpr_bits(uint32_t v) const { data()->xpr = v; }
 };
 
 // allocated; measure: Picture.+8, new<12>@LocationScreen::OnPictureLoadedA, new<12>@LocationScreen::OnPictureLoadedB, new<16>@LocationScreen::OnPictureLoadedA.+8, new<16>@LocationScreen::OnPictureLoadedB.+8

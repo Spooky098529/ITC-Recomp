@@ -203,25 +203,42 @@ struct Type5Dialog : View {
 };
 
 // allocated; measure: new<68>@Type5Dialog::OnEnter#2
+struct Type5DialogDataData {
+  uint32_t movies_loaded = 0;  // +0
+  uint32_t queued_state = 0;  // +4
+  uint32_t movie_shown = 0;  // +8
+  uint32_t interrupted = 0;  // +12
+};
+
 struct Type5DialogData : View {
   using View::View;
   static constexpr uint32_t kSize = 68;
+  static constexpr bool kHost = true;
+  Type5DialogDataData* data() const { return static_cast<Type5DialogDataData*>(memory::HandleObject(address)); }
+  static Type5DialogData New(uint8_t* base) {
+    return Type5DialogData(base, memory::MakeHandle(new Type5DialogDataData(), kSize, "Type5DialogData"));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // 1 once movies 16 to 19 are loaded
-  uint32_t movies_loaded() const { return guest::LoadU32(base, address + 0); }
-  void set_movies_loaded(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t movies_loaded_address() const { return address + 0; }
+  uint32_t movies_loaded() const { return data()->movies_loaded; }
+  void set_movies_loaded(uint32_t v) const { data()->movies_loaded = v; }
+  uint32_t movies_loaded_bits() const { return data()->movies_loaded; }
+  void set_movies_loaded_bits(uint32_t v) const { data()->movies_loaded = v; }
   // the machine's state queued by the close steps (9); 21 none
-  uint32_t queued_state() const { return guest::LoadU32(base, address + 4); }
-  void set_queued_state(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
-  uint32_t queued_state_address() const { return address + 4; }
+  uint32_t queued_state() const { return data()->queued_state; }
+  void set_queued_state(uint32_t v) const { data()->queued_state = v; }
+  uint32_t queued_state_bits() const { return data()->queued_state; }
+  void set_queued_state_bits(uint32_t v) const { data()->queued_state = v; }
   // the movie shown, 16 to 19
-  uint32_t movie_shown() const { return guest::LoadU32(base, address + 8); }
-  void set_movie_shown(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t movie_shown_address() const { return address + 8; }
+  uint32_t movie_shown() const { return data()->movie_shown; }
+  void set_movie_shown(uint32_t v) const { data()->movie_shown = v; }
+  uint32_t movie_shown_bits() const { return data()->movie_shown; }
+  void set_movie_shown_bits(uint32_t v) const { data()->movie_shown = v; }
   // set by message 18 (OnInterrupt); the pages close with message 20
-  uint32_t interrupted() const { return guest::LoadU32(base, address + 12); }
-  void set_interrupted(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
-  uint32_t interrupted_address() const { return address + 12; }
+  uint32_t interrupted() const { return data()->interrupted; }
+  void set_interrupted(uint32_t v) const { data()->interrupted = v; }
+  uint32_t interrupted_bits() const { return data()->interrupted; }
+  void set_interrupted_bits(uint32_t v) const { data()->interrupted = v; }
 };
 
 // embedded; measure: Mode::Slot14Thunk.r4

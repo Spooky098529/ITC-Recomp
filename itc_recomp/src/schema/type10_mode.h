@@ -258,25 +258,42 @@ struct ReplayTheaterMachine : View {
 };
 
 // allocated; measure: new<16>@ReplayTheater::Create
+struct ReplayTheaterDataData {
+  uint32_t started = 0;  // +0
+  uint32_t asked = 0;  // +4
+  uint32_t replay_loaded = 0;  // +8
+  uint32_t interrupted = 0;  // +12
+};
+
 struct ReplayTheaterData : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
+  static constexpr bool kHost = true;
+  ReplayTheaterDataData* data() const { return static_cast<ReplayTheaterDataData*>(memory::HandleObject(address)); }
+  static ReplayTheaterData New(uint8_t* base) {
+    return ReplayTheaterData(base, memory::MakeHandle(new ReplayTheaterDataData(), kSize, "ReplayTheaterData"));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // 0 from Create, 1 from StartPage
-  uint32_t started() const { return guest::LoadU32(base, address + 0); }
-  void set_started(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t started_address() const { return address + 0; }
+  uint32_t started() const { return data()->started; }
+  void set_started(uint32_t v) const { data()->started = v; }
+  uint32_t started_bits() const { return data()->started; }
+  void set_started_bits(uint32_t v) const { data()->started = v; }
   // what was asked of the save screen: 0 the list, 1 a replay's load, 2 the device lost, 3 back, -1 after an interrupt
-  uint32_t asked() const { return guest::LoadU32(base, address + 4); }
-  void set_asked(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
-  uint32_t asked_address() const { return address + 4; }
+  uint32_t asked() const { return data()->asked; }
+  void set_asked(uint32_t v) const { data()->asked = v; }
+  uint32_t asked_bits() const { return data()->asked; }
+  void set_asked_bits(uint32_t v) const { data()->asked = v; }
   // 1 once a replay is loaded and the race set up from it; Destroy then goes to state 11 (the race)
-  uint32_t replay_loaded() const { return guest::LoadU32(base, address + 8); }
-  void set_replay_loaded(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t replay_loaded_address() const { return address + 8; }
+  uint32_t replay_loaded() const { return data()->replay_loaded; }
+  void set_replay_loaded(uint32_t v) const { data()->replay_loaded = v; }
+  uint32_t replay_loaded_bits() const { return data()->replay_loaded; }
+  void set_replay_loaded_bits(uint32_t v) const { data()->replay_loaded = v; }
   // set by message 15 (OnInterrupt), cleared by 16 (OnResume)
-  uint32_t interrupted() const { return guest::LoadU32(base, address + 12); }
-  void set_interrupted(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
-  uint32_t interrupted_address() const { return address + 12; }
+  uint32_t interrupted() const { return data()->interrupted; }
+  void set_interrupted(uint32_t v) const { data()->interrupted = v; }
+  uint32_t interrupted_bits() const { return data()->interrupted; }
+  void set_interrupted_bits(uint32_t v) const { data()->interrupted = v; }
 };
 
 // allocated; measure: Replay

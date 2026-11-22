@@ -467,7 +467,9 @@ uint64_t Screen0OnEnter(uint8_t* base, uint32_t screen, uint32_t d, uint32_t ite
     ITC_NATIVE_RUNNING("sub_82243F58 Type7Screen0::OnEnter");
   }
   const Screen0View s(base, screen, d != 0);
-  s.set_words(Pages(76));
+  // The screen's words live in host memory (E5 step 3): the original's
+  // VirtualAlloc(76); the screen's +9640 (type 7: +9644) holds the handle.
+  s.set_words(schema::Type67Screen0Words::New(base).address);
   s.set_pages(Pages(28));
   const uint32_t list = Pages(68);
   const schema::PageObject page = s.pages();
@@ -509,7 +511,9 @@ uint64_t Screen0OnEnter(uint8_t* base, uint32_t screen, uint32_t d, uint32_t ite
 
 std::optional<uint64_t> Screen0OnLeft(uint8_t* base, uint32_t screen, uint32_t d) {
   const Screen0View s(base, screen, d != 0);
-  if (!AllPages({s.words().address, s.pages().address, s.menu().address})) {
+  // The words are a host handle (OnEnter, E5 step 3); the other two blocks
+  // are the allocation layer's pages, or the original runs.
+  if (!AllPages({s.pages().address, s.menu().address})) {
     return std::nullopt;
   }
   if (d == 0) {
@@ -517,7 +521,7 @@ std::optional<uint64_t> Screen0OnLeft(uint8_t* base, uint32_t screen, uint32_t d
   } else {
     ITC_NATIVE_RUNNING("sub_82243E08 Type7Screen0::OnLeft");
   }
-  Free(s.words().address);
+  s.words().Delete();  // the original's VirtualFree, which returned 1
   Free(s.pages().address);
   const uint64_t r3 = Free(s.menu().address);
   s.set_words(0);

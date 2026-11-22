@@ -56,7 +56,13 @@ uint64_t PictureFree(uint8_t* base, uint32_t sp, uint32_t picture, const Calls& 
     r3 = calls.Call(kOperatorDelete, frame, 0x8222846C, record.address);
   }
   if (p.xpr().address != 0) {
-    r3 = calls.Call(kXprRelease, frame, 0x82228484, p.xpr_address());
+    // The picture is a host object (E5 step 3): XPR::Release takes the
+    // slot's address, so it gets a frame word holding the XPR (cleared by
+    // it, as the picture's +12 is just below).
+    const uint32_t slot = frame + 80;
+    guest::StoreU32(base, slot, p.xpr().address);
+    r3 = calls.Call(kXprRelease, frame, 0x82228484, slot);
+    p.set_xpr(guest::LoadU32(base, slot));
   }
   p.set_texture(0u);
   p.set_xpr(0u);
@@ -70,17 +76,21 @@ uint64_t FreePictures(uint8_t* base, uint32_t sp, uint32_t screen, const Calls& 
   uint64_t r3 = screen;
   const schema::LocationScreen s(base, screen);
   struct List {
-    uint32_t pictures, count, lr;
+    uint32_t pictures, count;
   };
-  for (const List& list : {List{s.pictures_a_address(), s.picture_count_a_address(), 0x822284E8},
-                           List{s.pictures_b_address(), s.picture_count_b_address(), 0x82228534}}) {
+  for (const List& list : {List{s.pictures_a_address(), s.picture_count_a_address()},
+                           List{s.pictures_b_address(), s.picture_count_b_address()}}) {
     const uint32_t pictures = list.pictures;
     while (guest::LoadU32(base, list.count) != 0) {
       const uint32_t count = guest::LoadU32(base, list.count) - 1;
       guest::StoreU32(base, list.count, count);
       const uint32_t picture = guest::LoadU32(base, pictures + ((count << 2) & 0xFFFFFFFCu));
       PictureFree(base, frame, picture, calls);
-      r3 = calls.Call(kVirtualFree, frame, list.lr, picture, 0, kMemRelease);
+      // The host picture (OnPictureLoaded, E5 step 3): the original's
+      // VirtualFree (0x822284E8 for list A, 0x82228534 for B), which
+      // returned 1.
+      schema::LocationScreenPicture(base, picture).Delete();
+      r3 = 1;
     }
   }
   return r3;
@@ -102,9 +112,10 @@ uint64_t OnPictureLoaded(uint8_t* base, uint32_t sp, uint32_t screen, uint32_t b
   const uint32_t ring_start = list == 0 ? s.queued_start_a_address() : s.queued_start_b_address();
   const uint32_t frame = sp - 160;
   guest::StoreU32(base, frame, sp);
-  const uint32_t picture =
-      uint32_t(calls.Call(kVirtualAlloc, frame, 0x82228EB4 + at, 0, 16, 4096, 4));
-  const schema::LocationScreenPicture p(base, picture);
+  // The picture lives in host memory (E5 step 3): the original's
+  // VirtualAlloc(16) at 0x82228EB4 (+at); the list keeps its handle.
+  const schema::LocationScreenPicture p = schema::LocationScreenPicture::New(base);
+  const uint32_t picture = p.address;
   p.set_loaded(0);
   p.set_id(0xFFFFFFFFu);
   p.set_texture(0u);
