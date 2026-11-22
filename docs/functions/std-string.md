@@ -14,7 +14,11 @@ by the B7 loop's mapping agent, 2026-10-23, from the UI movies' lead.
   the allocator, `sub_820912B0`) and go back with operator delete (both
   in `heap.md`, shared; Native behind adapters since the C runtime heap's
   migration), and text is copied with `memcpy_s` (`sub_825A7270`,
-  `c-runtime.md`, shared; Overridden).
+  `c-runtime.md`, shared; Overridden). The schema's `StdString`
+  (`itc_recomp/schema/std-string.toml`, E5 step 2: `text`, `block`,
+  `length`, `capacity`), with `StdStringLogicError` (`_Xlen`'s and
+  `_Xran`'s exception, `sub_82091968`), `StdStringCString` and
+  `StdStringMatchWord` (the wildcard search's arguments).
 - **Growth** (`_Grow`, `_Copy`): a new capacity of the length asked for
   with its low four bits set, or 1.5 times the old one when that's more,
   a new block of capacity + 1, the old text copied over and the old block
@@ -94,6 +98,11 @@ Status:
   calls direct or through the dispatch table. While the SDK or code not
   native yet still reaches it, its entry for them is an override in
   `src/lifted/` (deleted when nothing reaches it that way).
+- **Host**: E5 (`docs/e5-native.md`, steps 3 to 5): our C++ whose objects
+  are host structs (host byte order, host pointers, made with `new` or
+  kept in containers), read and written as C++ members instead of by
+  offset in guest memory. A Native or Lifted function becomes Host when
+  its area's objects move to the host.
 
 A function usually moves from recompiled or Wrapped to Overridden to
 Native as the `ctx` edge moves up through its callers, or straight to

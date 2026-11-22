@@ -13,6 +13,7 @@
 #include "base/log.h"
 #include "camera_modes/steps.h"
 #include "guest.h"
+#include "schema/ui_movies_game.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
@@ -58,7 +59,7 @@ struct Movie13 {
   }
   // UiMovie::ShowNode and HideNode (sub_8211AC00, sub_8211AC48).
   void Shown(uint32_t sub_scene, uint32_t child, uint32_t shown) {
-    Store(base, Node(sub_scene, child) + 80, shown);
+    UiNode(base, Node(sub_scene, child)).set_visible(shown);
   }
   // UiMovie::SetNodeTexture (sub_8211A708).
   void Texture(uint32_t sub_scene, uint32_t child, uint32_t texture) {
@@ -90,13 +91,13 @@ struct Movie13 {
   // The part that every state shares.
   void Common() {
     Call(kSetChildNameText, {movie, 0, 6, uint64_t(screen) + 20792}, 0x82207728);
-    Call(kSetNumberText, {movie, 0, 9, Word(25116)}, 0x8220773C);
-    Text(0, 13, 8, Word(25092), 0x82207754);
-    Texture(0, 11, Word(25096));
+    Call(kSetNumberText, {movie, 0, 9, TS(base, screen).money()}, 0x8220773C);
+    Text(0, 13, 8, TS(base, screen).day(), 0x82207754);
+    Texture(0, 11, TS(base, screen).weekday());
     Shown(1, 0, 1);
     Shown(1, 1, 1);
     // (1, 2)'s +68 = 0.0 (lfs, stfs).
-    steps::Stfs(base, Node(1, 2) + 68, steps::Lfs(base, 0x82000A34));
+    steps::Stfs(base, UiNode(base, Node(1, 2)).alpha_address(), steps::Lfs(base, 0x82000A34));
     Shown(1, 10, 0);
     Texture(1, 4, 0);
     Texture(1, 5, 0);
@@ -109,20 +110,21 @@ struct Movie13 {
     Text(kAllScenes, 43, 457, 0, 0x8220785C);
     Text(kAllScenes, 44, 458, 0, 0x82207870);
     Text(kAllScenes, 45, 459, 0, 0x82207884);
-    Text(kAllScenes, 34, 8, Word(30832), 0x8220789C);
-    Text(kAllScenes, 35, 8, Word(30836), 0x822078B4);
+    Text(kAllScenes, 34, 8, TS(base, screen).edited_x(), 0x8220789C);
+    Text(kAllScenes, 35, 8, TS(base, screen).edited_y(), 0x822078B4);
     // +30840 as an int (fctiwz, its low word through the frame's +80).
-    Store(base, frame + 80, uint32_t(steps::Fctiwz(steps::Lfs(base, screen + 30840))));
+    Store(base, frame + 80,
+          uint32_t(steps::Fctiwz(steps::Lfs(base, TS(base, screen).edited_angle_address()))));
     Text(kAllScenes, 36, 8, Load(base, frame + 80), 0x822078DC);
     // +30844 as a double in r7, through the frame's +48, and in f1.
-    const double value = steps::Lfs(base, screen + 30844);
+    const double value = steps::Lfs(base, TS(base, screen).edited_scale_address());
     const uint64_t bits = std::bit_cast<uint64_t>(value);
     Store(base, frame + 48, uint32_t(bits >> 32));
     Store(base, frame + 52, uint32_t(bits));
     *f1 = value;
     Text(kAllScenes, 37, 452, bits, 0x822078FC);
-    Text(kAllScenes, 38, int32_t(Word(30848)) != 0 ? 0 : 1, 0, 0x82207920);
-    if (int32_t(Word(kState)) != 28) {
+    Text(kAllScenes, 38, int32_t(TS(base, screen).edited_flip()) != 0 ? 0 : 1, 0, 0x82207920);
+    if (int32_t(TS(base, screen).state()) != 28) {
       r3 = LayOutItems(base, screen, frame);
     }
     r3 = ShowOptionMarks(base, screen, 0, frame);
@@ -136,28 +138,28 @@ struct Movie13 {
     Shown(1, 10, 1);
     Texture(1, 4, 0);
     Texture(1, 5, 1);
-    steps::Stfs(base, Node(1, 3) + 12, steps::Lfs(base, 0x82008650));
+    steps::Stfs(base, UiNode(base, Node(1, 3)).x_address(), steps::Lfs(base, 0x82008650));
   }
 
   // State 28: a layer's settings, on sub-scene 26 (+30724 0) or 25 (1).
   void LayerSet() {
-    const int32_t set = int32_t(Word(30724));
+    const int32_t set = int32_t(TS(base, screen).editor_page());
     if (set == 0) {
-      Text(26, 2, uint64_t(Word(30764)) + 1442, 0, 0x82207A24);
+      Text(26, 2, uint64_t(TS(base, screen).picked_image()) + 1442, 0, 0x82207A24);
       Text(26, 10, 1241, 0, 0x82207A38);
       Text(26, 7, 449, 0, 0x82207A4C);
-      Text(26, 8, 8, uint64_t(Word(30764)) + 1, 0x82207A68);
+      Text(26, 8, 8, uint64_t(TS(base, screen).picked_image()) + 1, 0x82207A68);
       Text(26, 9, 8, 5, 0x82207AF4);
     } else if (set == 1) {
-      Text(25, 2, uint64_t(Word(30764)) + 1248, 0, 0x82207A94);
-      Text(25, 10, uint64_t(Word(30768)) + 1229, 0, 0x82207AAC);
+      Text(25, 2, uint64_t(TS(base, screen).picked_image()) + 1248, 0, 0x82207A94);
+      Text(25, 10, uint64_t(TS(base, screen).image_group()) + 1229, 0, 0x82207AAC);
       Text(25, 7, 449, 0, 0x82207AC0);
-      Text(25, 8, 8, uint64_t(Word(30764)) + 1, 0x82207ADC);
+      Text(25, 8, 8, uint64_t(TS(base, screen).picked_image()) + 1, 0x82207ADC);
       Text(25, 9, 8, 194, 0x82207AF4);
     }
     Shown(kAll, 26, 0);
     Shown(kAll, 25, 0);
-    const int32_t now = int32_t(Word(30724));
+    const int32_t now = int32_t(TS(base, screen).editor_page());
     if (now == 0) {
       Shown(kAll, 26, 1);
     } else if (now == 1) {
@@ -182,11 +184,11 @@ struct Movie13 {
       NodeText(ChildOf(node, 5), 5, 0x82207C38);
     }
     const uint32_t first = ChildOf(Node(11, 1), 0);
-    const int32_t pick = int32_t(Word(30748));
-    Store(base, first + 80, pick >= 0 && pick <= 4 ? 1 : 0);
+    const int32_t pick = int32_t(TS(base, screen).edit_cursor());
+    UiNode(base, first).set_visible(pick >= 0 && pick <= 4 ? 1 : 0);
     // 816 not used.
     static constexpr uint32_t kHelp[7] = {812, 813, 814, 815, 817, 818, 819};
-    const uint32_t which = Word(30748);
+    const uint32_t which = TS(base, screen).edit_cursor();
     Scroll(which < 7 ? std::optional<uint64_t>(kHelp[which]) : std::nullopt,
            {0x82207C80, 0x82207CF4, 0x82207D08});
     Shown(1, 1, 0);
@@ -198,7 +200,7 @@ struct Movie13 {
     for (uint32_t i = 0; i < 4; i++) {
       Text(10, 5 + i, 333 + i, 0, kLr[i]);
     }
-    const uint32_t which = Word(30740);
+    const uint32_t which = TS(base, screen).operation_cursor();
     Scroll(which < 4 ? std::optional<uint64_t>(806 + which) : std::nullopt,
            {0x82207D6C, 0x82207DB4, 0x82207DC8});
   }
@@ -208,14 +210,15 @@ struct Movie13 {
   void Layers() {
     Shown(kAll, 28, 0);
     Shown(kAll, 27, 0);
-    const int32_t set = int32_t(Word(30724));
+    const int32_t set = int32_t(TS(base, screen).editor_page());
     if (set == 0 || set == 1) {
       Shown(kAll, set == 0 ? 28 : 27, 1);
       static constexpr uint32_t kSlots[2][3] = {{724, 732, 736}, {700, 708, 712}};
       static constexpr uint32_t kFrom[2][3] = {{10076, 10112, 10148}, {10832, 10868, 10904}};
       for (uint32_t i = 0; i < 3; i++) {
         const uint32_t value = Word(kFrom[set][i]);
-        Store(base, Load(base, Load(base, movie + 28) + kSlots[set][i]), value);
+        const uint32_t textures = Load(base, schema::UiMovie(base, movie).textures_address());
+        Store(base, Load(base, textures + kSlots[set][i]), value);
       }
     }
     Text(9, 4, 4, 0, 0x82207E94);
@@ -246,7 +249,7 @@ uint64_t RefreshMovie13(uint8_t* base, const GuestCall& call, uint32_t screen, u
   const uint32_t entry = MovieEntry(base, frame, kMovie13);
   Movie13 m{base, call, screen, frame, Load(base, entry), f1, entry};
   m.Common();
-  switch (int32_t(m.Word(kState))) {
+  switch (int32_t(TS(m.base, m.screen).state())) {
     case 23: m.Top(); break;
     case 24: m.Layers(); break;
     case 25: m.Kinds(); break;

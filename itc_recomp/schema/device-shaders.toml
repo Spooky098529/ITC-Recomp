@@ -1,0 +1,209 @@
+# The schema of docs/functions/device-shaders.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The render queue (scene + 64, the game's "OT", an ordering table): its
+# 88-byte state, its two double-buffered pass lists with their items and
+# buckets, and the chunk items the replay walks (src/graphics/render_queue.cpp,
+# src/graphics/device_shaders.cpp). The shader setters' objects (the device,
+# the shaders) are other areas' (device-state.md, shader-objects.md).
+
+[RenderQueue]
+measure = "RenderQueue"
+measures = ["sub_8258E5C8.r3", "Font.+8", "[82970BD4]"]
+size = 16
+origin = "gpu"
+vtable = 0x8206CB8C
+# 9 functions; areas: device-shaders.md
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "RenderQueueVtable", note = "0x8206CB8C" },
+  { name = "state", offset = 4, type = "ptr", to = "RenderQueueState", note = "operator new(88)" },
+  { name = "list_1", offset = 8, type = "ptr", to = "PassList", note = "the list recorded when the replay index is 1, replayed when it's 0" },
+  { name = "list_0", offset = 12, type = "ptr", to = "PassList", note = "the list recorded when the replay index is 0, replayed when it's 1" },
+]
+
+# The vtable 0x8206CB8C (ten slots, read from the image).
+[RenderQueueVtable]
+measure = "RenderQueue.+0"
+measures = ["Font.+8.+0", "[82970BD4].+0"]
+# measures from SceneryRenderQueueVtable (scenery-lists), merged at the integration
+size = 40
+origin = "gpu"
+# 3 functions; areas: device-shaders.md
+fields = [
+  { name = "init", offset = 0, type = "fn", note = "RenderQueue::Init sub_8258ED00" },
+  { name = "slot_1", offset = 4, type = "fn", note = "sub_8258E5C8, the drawer's slot 1 (not seen in play)" },
+  { name = "clear_recording", offset = 8, type = "fn", note = "RenderQueue::ClearRecording sub_8258ED78" },
+  { name = "destructor", offset = 12, type = "fn", note = "the empty destructor sub_82106540" },
+  { name = "add", offset = 16, type = "fn", note = "RenderQueue::Add sub_8258EDC8" },
+  { name = "replay", offset = 20, type = "fn", note = "RenderQueue::Replay sub_82591238" },
+  { name = "flip", offset = 24, type = "fn", note = "RenderQueue::Flip sub_8258E5E0" },
+  { name = "recording", offset = 28, type = "fn", note = "RenderQueue::Recording sub_8258E5F8" },
+  { name = "replaying", offset = 32, type = "fn", note = "RenderQueue::Replaying sub_8258E618" },
+  { name = "deleting_destructor", offset = 36, type = "fn", note = "sub_82590EA0 (not seen in play)" },
+]
+
+# The queue's 88-byte state (RenderQueue +4).
+[RenderQueueState]
+measure = "new<88>@RenderQueue::RenderQueue"
+measures = ["sub_8258E5C8.r3.+4"]
+size = 88
+origin = "allocated"
+# 1 functions; areas: device-shaders.md
+fields = [
+  { name = "replay_index", offset = 0, type = "u32", note = "0: +12 recorded, +8 replayed; 1 the other way" },
+  { name = "drawer", offset = 4, type = "u32", note = "the primitive drawer's vtable word (the drawer itself is here, model-animation.md)" },
+  { name = "drawer_state", offset = 12, type = "bytes", count = 32, note = "the drawer's state, published at 0x82970BBC (single-commands.md)" },
+  { name = "cleared_24", offset = 24, type = "u32", note = "zeroed by the replay" },
+  { name = "cleared_28", offset = 28, type = "u32", note = "zeroed by the replay" },
+  { name = "cleared_32", offset = 32, type = "u32", note = "zeroed by the replay" },
+  { name = "cleared_36", offset = 36, type = "u32", note = "zeroed by the replay" },
+  { name = "video_output", offset = 44, type = "u32", note = "the video output the replay was given" },
+  { name = "render_target_0", offset = 48, type = "u32", note = "Device::GetRenderTarget(device, 0) (RenderQueue::Init); published at 0x82970BC0" },
+  { name = "render_target_1", offset = 52, type = "u32" },
+  { name = "render_target_2", offset = 56, type = "u32" },
+  { name = "render_target_3", offset = 60, type = "u32" },
+  { name = "depth_surface", offset = 64, type = "u32", note = "GetDepthStencilSurface(device)" },
+  { name = "release_list", offset = 68, type = "u32", note = "a PtrVector's allocator word: the release list (published at 0x8296BD8C)" },
+  { name = "release_first", offset = 72, type = "u32" },
+  { name = "release_last", offset = 76, type = "u32" },
+  { name = "release_end", offset = 80, type = "u32" },
+  { name = "sequence", offset = 84, type = "f32", note = "the submission sequence, += 0.1 an Add" },
+]
+
+# A pass list (36 bytes, vtable 0x8206CB88: one slot, the destructor).
+[PassList]
+measure = "PassList"
+measures = ["RenderQueue.+8", "RenderQueue.+12"]
+size = 36
+origin = "allocated"
+vtable = 0x8206CB88
+# 4 functions; areas: device-shaders.md
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "PassListVtable", note = "0x8206CB88" },
+  { name = "bucket_done", offset = 4, type = "u8", note = "the replay's \"bucket done\" flag" },
+  { name = "item_count", offset = 8, type = "u32", note = "4,096" },
+  { name = "bucket_count", offset = 12, type = "u32", note = "1,024" },
+  { name = "items_used", offset = 16, type = "u32" },
+  { name = "items", offset = 20, type = "ptr", to = "PassListItem", note = "item_count items of 20 bytes" },
+  { name = "buckets", offset = 24, type = "ptr", to = "PassListBucket", note = "bucket_count buckets of 16 bytes" },
+  { name = "cleared_28", offset = 28, type = "u32", note = "zeroed by Clear and the replay" },
+  { name = "current_item", offset = 32, type = "ptr", to = "PassListItem", note = "the replay's current item" },
+]
+
+[PassListVtable]
+measures = ["RenderQueue.+8.+0", "RenderQueue.+12.+0"]
+size = 4
+origin = "gpu"
+fields = [
+  { name = "destructor", offset = 0, type = "fn", note = "PassList::~PassList" },
+]
+
+# An item of a pass list (20 bytes): its +4 is the replay's entry.
+[PassListItem]
+measure = "new<4294967295>@PassList::PassList"
+size = 20
+origin = "allocated"
+# 1 functions; areas: device-shaders.md
+fields = [
+  { name = "next", offset = 0, type = "ptr", to = "PassListItem" },
+  { name = "chunk", offset = 4, type = "ptr", to = "ChunkItem" },
+  { name = "key", offset = 8, type = "f32" },
+  { name = "sequence", offset = 12, type = "f32" },
+  { name = "unknown_16", offset = 16, type = "u32", note = "never written here" },
+]
+
+# A pass list's bucket (16 bytes).
+[PassListBucket]
+measure = "new<4294967295>@PassList::PassList#2"
+size = 16
+origin = "allocated"
+# 3 functions; areas: device-shaders.md
+fields = [
+  { name = "first", offset = 0, type = "ptr", to = "PassListItem" },
+  { name = "last", offset = 4, type = "ptr", to = "PassListItem" },
+  { name = "next", offset = 8, type = "ptr", to = "PassListBucket", note = "the next bucket, 0 for the last (PassList::PassList)" },
+  { name = "count", offset = 12, type = "u32", note = "items added; Clear never resets it, nothing here reads it" },
+]
+
+# The replay's sort entry: a pass list item's +4 (the words at 0x8296BD98).
+[RenderQueueEntry]
+measure = "QueueEntry"
+measures = ["[8296BD98]"]
+size = 12
+origin = "gpu"
+fields = [
+  { name = "chunk", offset = 0, type = "ptr", to = "ChunkItem" },
+  { name = "key", offset = 4, type = "f32" },
+  { name = "sequence", offset = 8, type = "f32", note = "QueueEntry::Sequence sub_8258E5C0" },
+]
+
+# An item of a chunk's chain (ChunkChain::Run): the kind in the first word's
+# low halfword; kind 0 a count of single commands, 16 bytes each from +16;
+# kinds 1, 2 and 5 commands inline from +16; kinds 3 and 4 commands out of
+# line at +4.
+[ChunkItem]
+measure = "ChunkChain::RunInline.r4"
+measures = ["ChunkChain::RunInlineLast.r4", "ChunkChain::RunInlineLinked.r4", "ChunkChain::RunOutOfLine.r4", "ChunkChain::RunOutOfLineLast.r4", "ChunkChain::RunSingles.r4", "[8296BD98].+0"]
+size = 32
+origin = "gpu"
+fields = [
+  { name = "kind", offset = 0, type = "u32", note = "the low halfword, sign-extended: 0 singles, 1 inline, 2 inline linked, 3 out of line, 4 out of line last, 5 inline last, 6 the end" },
+  { name = "link", offset = 4, type = "u32", note = "kinds 3 and 4: the out-of-line commands (ChunkCommand); kind 2: the next item" },
+  { name = "single_count", offset = 8, type = "u32", note = "kind 0: the single commands' count" },
+  { name = "command_id", offset = 16, type = "u32", note = "the first inline command (kinds 1, 2, 5): its id, 36 the end" },
+  { name = "command_arg0", offset = 20, type = "u32", note = "its r4" },
+  { name = "command_arg1", offset = 24, type = "u32", note = "its r5" },
+]
+
+# A render command in a list (16-byte steps): the id (an index into the table
+# 0x8265EDE0, 36 the end), the handler's r4 and r5, the payload at +16.
+[ChunkCommand]
+measure = "ChunkChain::RunOutOfLine.r4.+4"
+measures = ["ChunkChain::RunOutOfLineLast.r4.+4"]
+size = 16
+origin = "gpu"
+fields = [
+  { name = "id", offset = 0, type = "u32" },
+  { name = "arg0", offset = 4, type = "u32" },
+  { name = "arg1", offset = 8, type = "u32" },
+]
+
+# A std::vector of pointers (the release list).
+[PtrVector]
+measure = "PtrVector"
+size = 16
+origin = "gpu"
+# 2 functions; areas: device-shaders.md
+fields = [
+  { name = "allocator", offset = 0, type = "u32" },
+  { name = "first", offset = 4, type = "ptr", to = "PtrVectorSlot" },
+  { name = "last", offset = 8, type = "ptr", to = "PtrVectorSlot" },
+  { name = "end", offset = 12, type = "ptr", to = "PtrVectorSlot" },
+]
+
+# A pointer-sized element of a PtrVector (or the value PushBack is handed).
+[PtrVectorSlot]
+measure = "PtrVector.+8"
+measures = ["PtrVector::PushBack.r4"]
+size = 4
+origin = "gpu"
+fields = [
+  { name = "value", offset = 0, type = "u32" },
+]
+
+[globals]
+release_list = { address = 0x8296BD8C, type = "ptr", to = "PtrVector", note = "the replay's release list (state + 68), emptied at its start" }
+replay_device = { address = 0x8296BD90, type = "u32", note = "the device during the replay, 0 after" }
+replay_entries = { address = 0x8296BD98, type = "bytes", count = 20000, note = "the replay's sort array: 5,000 RenderQueueEntry pointers" }
+replay_drawer = { address = 0x82970BB8, type = "u32", note = "the queue state's +4, the primitive drawer" }
+replay_drawer_state = { address = 0x82970BBC, type = "u32", note = "the queue state's +12" }
+replay_render_targets = { address = 0x82970BC0, type = "u32", note = "the queue state's +48" }
+single_commands = { address = 0x8265ED48, type = "bytes", count = 152, note = "the single commands' handlers by id" }
+commands = { address = 0x8265EDE0, type = "bytes", count = 148, note = "the render commands' handlers by id (36 the end)" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0" }
+key_max = { address = 0x82002814, type = "f32", note = "10,000.0" }
+key_min = { address = 0x82001C00, type = "f32", note = "-10,000.0" }
+sequence_step = { address = 0x82001FBC, type = "f32", note = "0.1" }

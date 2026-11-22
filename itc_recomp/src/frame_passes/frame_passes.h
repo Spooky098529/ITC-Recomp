@@ -19,10 +19,6 @@
 
 namespace frame_passes {
 
-// The command list and render queue the primitive reset is recorded on.
-constexpr uint32_t kCommandList = 0x8296B918;
-constexpr uint32_t kRenderQueue = 0x8296B91C;
-
 // sub_82589A78 WorkMem::Flip: the work memory's current buffer
 // [0x8296B780] ^= 1, then the new one's (i) [0x8296B784 + 4i], headers used
 // [0x8296B798 + 4i] and bytes used [0x8296B7A0 + 4i] = 0.
@@ -53,9 +49,9 @@ std::optional<uint32_t> RecordSamplers(uint8_t* base, uint32_t list);
 constexpr uint32_t kRecordPrimitiveResetFrame = 128;
 
 // sub_82589990 FramePasses::RecordPrimitiveReset: on the list at
-// [kCommandList] a chunk with command 1 (render state 328 = 1, 332 =
+// [0x8296B918] a chunk with command 1 (render state 328 = 1, 332 =
 // 0xFFFF) and command 36. Returns the chunk, which the adapter hands to the
-// render queue at [kRenderQueue] (its slot 4, bucket 0, f1 = 0.0); nullopt,
+// render queue at [0x8296B91C] (its slot 4, bucket 0, f1 = 0.0); nullopt,
 // with nothing done, where a chunk is open or the list hasn't room.
 std::optional<uint32_t> RecordPrimitiveReset(uint8_t* base);
 

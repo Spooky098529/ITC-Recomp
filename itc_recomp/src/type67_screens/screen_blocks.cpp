@@ -11,6 +11,7 @@
 #include "base/log.h"
 #include "car_list/car_list.h"
 #include "guest.h"
+#include "schema/type67_screens.h"
 #include "type67_screens/list_pages.h"
 
 namespace type67_screens {
@@ -19,6 +20,8 @@ namespace {
 
 using namespace pages;
 using guest::StoreU32;
+using Blocks6 = schema::Type6Screens;
+using Blocks7 = schema::Type7Screens;
 
 constexpr uint32_t kType6ScreensVtable = 0x82010A78, kType7ScreensVtable = 0x82010FE0;
 // The power graph member's base vtable (empty slots).
@@ -29,8 +32,8 @@ constexpr uint32_t kPowerGraphBaseVtable = 0x82010A2C;
 uint64_t Type6ScreensDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822367C0 Type6Screens::~Type6Screens");
   const uint32_t block = uint32_t(r3), frame = Frame(base, sp, 96);
-  StoreU32(base, block, kType6ScreensVtable);
-  StoreU32(base, block + 52692, kPowerGraphBaseVtable);
+  Blocks6(base, block).set_vtable(kType6ScreensVtable);
+  Blocks6(base, block).set_power_graph_vtable(kPowerGraphBaseVtable);
   PanelScreenDestruct(base, r3 + 40948, false, frame, calls);
   Type6NodeScreenDestruct(base, r3 + 30396, frame, calls);
   Type6ListScreenDestruct(base, r3 + 19432, frame, calls);
@@ -41,8 +44,8 @@ uint64_t Type6ScreensDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
 uint64_t Type7ScreensDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82246BE0 Type7Screens::~Type7Screens");
   const uint32_t block = uint32_t(r3), frame = Frame(base, sp, 96);
-  StoreU32(base, block, kType7ScreensVtable);
-  StoreU32(base, block + 42352, kPowerGraphBaseVtable);
+  Blocks7(base, block).set_vtable(kType7ScreensVtable);
+  Blocks7(base, block).set_power_graph_vtable(kPowerGraphBaseVtable);
   PanelScreenDestruct(base, r3 + 30608, true, frame, calls);
   Type7ListScreenDestruct(base, r3 + 19428, frame, calls);
   // The first screen's base: ListNode::~ListNode on +4 (its r3 left).

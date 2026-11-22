@@ -9,7 +9,6 @@
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
-#include <bit>
 
 namespace options_screen {
 
@@ -17,6 +16,9 @@ namespace {
 
 using guest::LoadU32;
 using guest::StoreU32;
+using G = schema::OptionsScreenGlobals;
+using S = schema::OptionsSettings;
+using Node = schema::UiMovieNode;
 
 // A helper's frame (`bytes` below `sp`, its back chain) and `m`.
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
@@ -52,7 +54,7 @@ uint32_t ShowPicture(uint8_t* base, uint32_t shown, uint32_t sub_scene, int32_t 
   uint32_t node = 0;
   for (int32_t i = 0; i < count; i++) {
     node = ui_movies::FindNode(base, m, sub_scene, uint32_t(i) + 6);
-    StoreU32(base, node + 80, int32_t(shown) == i ? 1 : 0);
+    Node(base, node).set_visible(int32_t(shown) == i ? 1 : 0);
   }
   return node;
 }
@@ -66,7 +68,7 @@ uint32_t SetCategoryArrow(uint8_t* base, uint64_t value, uint32_t sp) {
   const int64_t word = int64_t(int32_t(uint32_t(value)));
   StoreWord(base, frame + 80, word);
   const uint32_t child = ui_movies::Child(base, node, 0);
-  StoreU32(base, child + 16, std::bit_cast<uint32_t>(float(double(word))));
+  Node(base, child).set_y(float(double(word)));
   return child;
 }
 
@@ -82,7 +84,7 @@ uint64_t ShowVolumeNumber(uint8_t* base, uint32_t node, uint64_t volume, uint32_
   uint32_t child = 0;
   for (int32_t i = 1; i <= 15; i++) {
     child = ui_movies::Child(base, node, uint32_t(i) + 3);
-    StoreU32(base, child + 80, i == int32_t(uint32_t(volume)) ? 1 : 0);
+    Node(base, child).set_visible(i == int32_t(uint32_t(volume)) ? 1 : 0);
   }
   return child;
 }
@@ -150,7 +152,7 @@ uint32_t ShowVolumeBar(uint8_t* base, uint32_t node, uint64_t volume, uint32_t s
   uint32_t child = 0;
   for (int32_t i = 1; i <= 15; i++) {
     child = ui_movies::Child(base, node, uint32_t(i) + 21);
-    StoreU32(base, child + 80, i <= int32_t(uint32_t(volume)) ? 1 : 0);
+    Node(base, child).set_visible(i <= int32_t(uint32_t(volume)) ? 1 : 0);
   }
   return child;
 }
@@ -160,24 +162,23 @@ uint64_t ShowVolumeNumbers(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t m = FindMovie(base, frame);
   const uint32_t music = ui_movies::FindNode(base, m, 6, 6);
-  ShowVolumeNumber(base, music, LoadU32(base, LoadU32(base, kSettings) + 252), frame, calls);
+  ShowVolumeNumber(base, music, G::settings(base).edit_music_volume(), frame, calls);
   const uint32_t effects = ui_movies::FindNode(base, m, 6, 7);
-  return ShowVolumeNumber(base, effects, LoadU32(base, LoadU32(base, kSettings) + 256), frame,
-                          calls);
+  return ShowVolumeNumber(base, effects, G::settings(base).edit_effects_volume(), frame, calls);
 }
 
 namespace {
 
-// The three slider edits (o +260 to +268) copied to the frame's +88, node
+// The three slider edits (edit_slider_0 to 2) copied to the frame's +88, node
 // (7, 0), and `show` on its children 4 to 6 with each value. A 144-byte
 // frame. `show`'s last answer.
 template <typename Show>
 uint64_t ShowSliders(uint8_t* base, uint32_t sp, Show show) {
   const uint32_t frame = Frame(base, sp, 144);
   const uint32_t m = FindMovie(base, frame);
-  const uint32_t o = LoadU32(base, kSettings);
+  const S o = G::settings(base);
   for (uint32_t i = 0; i < 3; i++) {
-    StoreU32(base, frame + 88 + 4 * i, LoadU32(base, o + 260 + 4 * i));
+    StoreU32(base, frame + 88 + 4 * i, LoadU32(base, o.edit_slider_0_address() + 4 * i));
   }
   const uint32_t node = ui_movies::FindNode(base, m, 7, 0);
   uint64_t r3 = 0;
@@ -208,28 +209,32 @@ uint64_t ShowHudValues(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821BE290 Options::ShowHudValues");
   const uint32_t frame = Frame(base, sp, 208);
   const uint32_t m = FindMovie(base, frame);
-  const uint32_t o = LoadU32(base, kSettings);
+  const S o = G::settings(base);
   for (uint32_t i = 0; i < 4; i++) {
-    StoreU32(base, frame + 96 + 4 * i, LoadU32(base, o + 236 + 4 * i));
+    StoreU32(base, frame + 96 + 4 * i, LoadU32(base, o.edit_hud_0_address() + 4 * i));
   }
-  StoreU32(base, frame + 112, LoadU32(base, o + 660));
+  StoreU32(base, frame + 112, o.ok_default());
   const uint32_t group = ui_movies::FindNode(base, m, 5, 2);
   uint64_t r3 = group;
-  for (int32_t i = 0; i < int32_t(LoadU32(base, group + 104)); i++) {
-    const uint32_t row = ui_movies::FindNode(base, m, 5, LoadU32(base, group + 100) + uint32_t(i));
-    const uint32_t left = ui_movies::FindNode(base, m, 5, LoadU32(base, row + 100));
+  const Node g(base, group);
+  for (int32_t i = 0; i < int32_t(LoadU32(base, g.height_address())); i++) {
+    const uint32_t row =
+        ui_movies::FindNode(base, m, 5, LoadU32(base, g.width_address()) + uint32_t(i));
+    const uint32_t left =
+        ui_movies::FindNode(base, m, 5, LoadU32(base, Node(base, row).width_address()));
     const uint32_t left_frame = ui_movies::Child(base, left, 0);
     const uint32_t left_shown = ui_movies::Child(base, left, 2);
-    const uint32_t right = ui_movies::FindNode(base, m, 5, LoadU32(base, row + 100) + 1);
+    const uint32_t right =
+        ui_movies::FindNode(base, m, 5, LoadU32(base, Node(base, row).width_address()) + 1);
     const uint32_t right_frame = ui_movies::Child(base, right, 0);
     const uint32_t right_shown = ui_movies::Child(base, right, 2);
     // The value as the frame holds it (rows past the five read the frame's
     // next words, as the original does).
     const uint32_t on = int32_t(LoadU32(base, frame + 96 + 4 * uint32_t(i))) == 1 ? 1 : 0;
-    StoreU32(base, left_frame + 108, on ^ 1);
-    StoreU32(base, left_shown + 80, on);
-    StoreU32(base, right_frame + 108, on);
-    StoreU32(base, right_shown + 80, on ^ 1);
+    Node(base, left_frame).set_texture_entry(on ^ 1);
+    Node(base, left_shown).set_visible(on);
+    Node(base, right_frame).set_texture_entry(on);
+    Node(base, right_shown).set_visible(on ^ 1);
     r3 = right_shown;
   }
   return r3;
@@ -251,7 +256,7 @@ uint32_t ShowList(uint8_t* base, uint32_t frame, uint32_t m, uint32_t sub_scene,
     const uint32_t text = ui_movies::Child(base, item, 0);
     calls.Call(kSetNodeText, frame, text_lr, m, text, names[i], 0);
     picture = ui_movies::Child(base, item, 1);
-    StoreU32(base, picture + 108, LoadU32(base, frame + values + 4 * i));
+    Node(base, picture).set_texture_entry(LoadU32(base, frame + values + 4 * i));
   }
   return picture;
 }
@@ -288,11 +293,9 @@ uint32_t ShowButtonList(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 208);
   const uint32_t m = FindMovie(base, frame);
   // The twelve edits in menu order at the frame's +96.
-  static constexpr uint32_t kEdits[12] = {284, 288, 292, 296, 300, 304,
-                                          320, 312, 316, 308, 324, 328};
-  const uint32_t o = LoadU32(base, kSettings);
+  const S o = G::settings(base);
   for (uint32_t i = 0; i < 12; i++) {
-    StoreU32(base, frame + 96 + 4 * i, LoadU32(base, o + kEdits[i]));
+    StoreU32(base, frame + 96 + 4 * i, (o.*kButtonEdits[i])());
   }
   static constexpr uint32_t kNames[12] = {348, 349, 350, 351, 352, 353,
                                           354, 355, 356, 357, 358, 359};
@@ -304,11 +307,10 @@ uint32_t ShowAnalogList(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 208);
   const uint32_t m = FindMovie(base, frame);
   // The six edits in menu order at the frame's +128, the names at +96.
-  static constexpr uint32_t kEdits[6] = {380, 384, 388, 396, 392, 400};
   static constexpr uint32_t kNames[6] = {351, 352, 353, 354, 355, 359};
-  const uint32_t o = LoadU32(base, kSettings);
+  const S o = G::settings(base);
   for (uint32_t i = 0; i < 6; i++) {
-    StoreU32(base, frame + 128 + 4 * i, LoadU32(base, o + kEdits[i]));
+    StoreU32(base, frame + 128 + 4 * i, (o.*kAnalogEdits[i])());
     StoreU32(base, frame + 96 + 4 * i, kNames[i]);
   }
   return ShowList(base, frame, m, 11, kNames, 128, 6, 0x821BF5FC, calls);

@@ -20,6 +20,7 @@
 #include "base/log.h"
 #include "guest.h"
 #include "lifted/sdk.h"
+#include "schema/system_services.h"
 
 ITC_FLAG_BOOL(native_start_up, true, "ITC",
               "Start the game's main thread in our start-up (src/app/start_up.cpp: the C "
@@ -29,10 +30,9 @@ ITC_FLAG_BOOL(native_start_up, true, "ITC",
 namespace app {
 namespace {
 
+using G = schema::SystemServicesGlobals;
+
 constexpr uint32_t kFrameBytes = 496;            // xstart's frame
-constexpr uint32_t kCrtGlobalA = 0x82978330;     // set to -1 first
-constexpr uint32_t kCrtGlobalB = 0x82978334;
-constexpr uint32_t kCommandLineSet = 0x829537B8; // split the command line when set
 constexpr uint32_t kCheckHeap = 0x82297CE0;
 constexpr uint32_t kThreadNotify = 0x82297B38;
 constexpr uint32_t kMtInit = 0x825AA708;
@@ -47,8 +47,8 @@ lifted::Result StartUp(uint8_t* base, const lifted::Args& in) {
   ITC_NATIVE_RUNNING("xstart StartUp");
   const uint32_t frame = uint32_t(in.r1) - kFrameBytes;
   guest::StoreU32(base, frame, uint32_t(in.r1));
-  guest::StoreU32(base, kCrtGlobalA, 0xFFFFFFFFu);
-  guest::StoreU32(base, kCrtGlobalB, 0xFFFFFFFFu);
+  G::set_crt_word_a(base, 0xFFFFFFFFu);
+  G::set_crt_word_b(base, 0xFFFFFFFFu);
   auto call = [&](uint32_t function, uint64_t r3) {
     lifted::Args args;
     args.r1 = frame;
@@ -61,7 +61,7 @@ lifted::Result StartUp(uint8_t* base, const lifted::Args& in) {
   call(kMtInit, 0);
   call(kInittermE, 0);
   call(kCInit, 1);
-  if (guest::LoadU32(base, kCommandLineSet) != 0) {
+  if (G::command_line_set(base) != 0) {
     ITC_LOG_WARN("start-up: [0x829537B8] is set, but main gets no arguments");
   }
   const uint64_t result = call(kMain, 0);

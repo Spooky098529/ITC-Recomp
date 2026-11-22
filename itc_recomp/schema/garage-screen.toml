@@ -1,0 +1,167 @@
+# The schema of docs/functions/garage-screen.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The garage screen: the type 2 mode's screen machine at its block's
+# +0x23018, UI movie 5, the list of the player's garage cars over the stand
+# (src/garage_screen/). Its page object ([0x826D8420], 28 bytes) is a
+# PageObject (menu-helpers.toml's; the measure files it as
+# "new<28>@GarageScreen::Create"); its two menu lists ([0x826D8424],
+# [0x826D8428], 72 bytes each) are MenuList (race-screens.md's; filed as
+# "new<72>@GarageScreen::Create" and "new<72>@GarageScreen::Create#2"); the
+# garage cars it reads (GarageScreen::CarValue.ret and the "GarageScreen"
+# words +1568, +1892, +1900) are car-makers.toml's GarageCar.
+
+# The screen's machine: a StateMachine (game-modes.toml) with a word of its
+# own after it, as the type 2 mode's other machines. The measure also files
+# under "GarageScreen" the transitions' started word (r3 = the page
+# object's +24) at +0, ShowSpecTexts' stack record (+0 to +20), the garage
+# car the sale and spec helpers take (+12 its id, +1568, +1892, +1900) and
+# the page handlers' mode (r3) at +804 and +808: they fit `transitions` but
+# aren't the machine's (a measure fault).
+[GarageScreen]
+measure = "GarageScreen"
+size = 9620
+origin = "embedded"
+fields = [
+  { name = "transitions", offset = 0, type = "bytes", count = 9600, note = "200 transitions, 48 bytes each (StateMachine's)" },
+  { name = "transition_count", offset = 9600, type = "u32" },
+  { name = "state", offset = 9604, type = "u32" },
+  { name = "loaded", offset = 9608, type = "u32", note = "1 once movie 5 is loaded (WaitForLoad)" },
+  { name = "reenter", offset = 9612, type = "u32", note = "nonzero: Create and WaitForLoad go to state 9 (ScreenMachine::Reenter); the mode's Init sets 1" },
+  { name = "delete_movie", offset = 9616, type = "u32", note = "nonzero: Unload deletes movie 5 (UiMovies::Delete) and clears `loaded`" },
+]
+
+# The type 2 mode (type2-mode.md) as the screen's handlers see it (r4): only
+# its message ring, which they post to.
+[GarageScreenMode]
+measures = ["GarageScreen::Close.r4", "GarageScreen::OnNo.r4", "GarageScreen::OnPlateCancelled.r4", "GarageScreen::OnPlateDone.r4"]
+size = 812
+origin = "embedded"
+fields = [
+  { name = "messages", offset = 204, type = "bytes", count = 600, note = "50 messages of 12 bytes (id, two words)" },
+  { name = "message_count", offset = 804, type = "u32" },
+  { name = "message_start", offset = 808, type = "u32", note = "the ring's first slot" },
+]
+
+# The screen's data ([0x826D842C], 104 bytes, VirtualAlloc by
+# GarageScreen::Create, freed by GarageScreen::Destroy; docs/known-data.md).
+[GarageScreenData]
+measure = "new<104>@GarageScreen::Create"
+size = 104
+origin = "allocated"
+fields = [
+  { name = "set_up", offset = 0, type = "u32", note = "1 once the header is set (SetHeader)" },
+  { name = "pick", offset = 4, type = "bytes", count = 20, note = "the career's pick (player 0's save data +8 to +27, shown as a name)" },
+  { name = "money", offset = 24, type = "u32", note = "save data +6116; the sale adds its price" },
+  { name = "day", offset = 28, type = "u32", note = "save data +6100, at most 999" },
+  { name = "weekday", offset = 32, type = "u32", note = "the day mod 7" },
+  { name = "save", offset = 36, type = "ptr", to = "SaveData", note = "player 0's save data (SaveData::Of)" },
+  { name = "selection", offset = 44, type = "u32", note = "the selected row (+ scroll: the car's index in the garage)" },
+  { name = "scroll", offset = 48, type = "u32", note = "the list's scroll" },
+  { name = "action", offset = 52, type = "u32", note = "the action to select when the actions are set up again" },
+  { name = "unknown_56", offset = 56, type = "u32", note = "0 (Transition4)" },
+  { name = "plate_pending", offset = 60, type = "u32", note = "1 while the plate editor's question is pending" },
+  { name = "answered_yes", offset = 64, type = "u32", note = "the dialog answered yes" },
+  { name = "question", offset = 68, type = "u32", note = "the question asked: 0 the new plate, 1 make the car current, 2 sell it" },
+  { name = "stand_shown", offset = 72, type = "u32", note = "the stand shown (Update loads and draws the car)" },
+  { name = "stand_model", offset = 76, type = "u32", note = "GarageStage::ReloadModel's answer for the shown car (0 until loaded)" },
+  { name = "toggles_shown", offset = 80, type = "u32", note = "the view's options 1 and 2 (the doors) offered: the car spec's byte +771 is 1 (SetUpOptions)" },
+  { name = "busy_shown", offset = 84, type = "u32", note = "the stand's busy marker shown" },
+  { name = "turning", offset = 88, type = "u32", note = "the car turning on the stand (ToggleTurn)" },
+  { name = "doors", offset = 92, type = "u32", note = "the first door animation open (ToggleDoors)" },
+  { name = "doors2", offset = 96, type = "u32", note = "the second door animation open (ToggleDoors2)" },
+  { name = "sale_price", offset = 100, type = "u32", note = "SalePrice's answer (SetSaleQuestion)" },
+]
+
+# A car's spec: one of table 72's 8,432-byte records (Params::GetCarSpec
+# sub_820C9E98; car-specs.md loads them, docs/known-data.md's "car spec").
+# +0 block 1 (640 bytes, the physics), +640 block 2 (340, the spec sheet);
+# every block starts with the 8-byte car id. Fields named where the docs
+# say; the rest of the words are read by Car::SetModel (car-models.md).
+[CarSpec]
+measure = "Params::GetCarSpec.ret"
+size = 8432
+origin = "file"
+fields = [
+  { name = "id", offset = 0, type = "bytes", count = 8, note = "the car id (block 1's head)" },
+  { name = "drive_type", offset = 356, type = "u32", note = "block 1 +356" },
+  { name = "drive_record", offset = 360, type = "u32", note = "an index into 0x8260181C" },
+  { name = "front_torque_share", offset = 364, type = "f32" },
+  { name = "unknown_368", offset = 368, type = "f32" },
+  { name = "final_drive", offset = 372, type = "f32" },
+  { name = "gear_ratios", offset = 384, type = "bytes", count = 36, note = "9 floats: reverse, then up to 8 forward ratios" },
+  { name = "unknown_632", offset = 632, type = "u32", note = "block 1's floats +528 to +636 (read as words)" },
+  { name = "unknown_636", offset = 636, type = "u32" },
+  { name = "block2_id", offset = 640, type = "bytes", count = 8, note = "block 2's car id" },
+  { name = "displacement", offset = 648, type = "u32", note = "block 2 +8 (cc)" },
+  { name = "engine_type", offset = 708, type = "u8", note = "block 2 +68 (cylinders for the tuning)" },
+  { name = "turbo", offset = 709, type = "u8", note = "block 2 +69: 1 for turbo" },
+  { name = "unknown_716", offset = 716, type = "u32", note = "CheckLimits: at most 4700" },
+  { name = "unknown_720", offset = 720, type = "u32", note = "CheckLimits: at most 2000" },
+  { name = "unknown_724", offset = 724, type = "u32", note = "CheckLimits: at most 1700" },
+  { name = "price", offset = 744, type = "u32", note = "the car's price (Car::SetModelAndClass; the garage car's +1900)" },
+  { name = "class_word", offset = 748, type = "u32", note = "Car::SetModelAndClass (the garage car's +1884)" },
+  { name = "maker", offset = 769, type = "u8", note = "string 1934 + it: the maker's name" },
+  { name = "unknown_770", offset = 770, type = "u8", note = "string 421 + it (CarDealer::SetSpecTexts)" },
+  { name = "list_kind", offset = 771, type = "u8", note = "0 the first car list, 1 the second (the garage screen's door toggles with 1), others not sold" },
+  { name = "unknown_772", offset = 772, type = "u32" },
+  { name = "unknown_776", offset = 776, type = "u32" },
+  { name = "unknown_780", offset = 780, type = "u32" },
+  { name = "unknown_784", offset = 784, type = "u32" },
+  { name = "unknown_788", offset = 788, type = "u32" },
+  { name = "unknown_792", offset = 792, type = "u32" },
+  { name = "unknown_796", offset = 796, type = "u32" },
+  { name = "unknown_800", offset = 800, type = "u32" },
+  { name = "unknown_804", offset = 804, type = "u32" },
+  { name = "unknown_808", offset = 808, type = "u32" },
+  { name = "unknown_812", offset = 812, type = "u32" },
+  { name = "unknown_816", offset = 816, type = "u32" },
+  { name = "unknown_820", offset = 820, type = "u32" },
+  { name = "unknown_824", offset = 824, type = "u32" },
+  { name = "unknown_828", offset = 828, type = "u32" },
+  { name = "unknown_884", offset = 884, type = "u32" },
+  { name = "unknown_888", offset = 888, type = "u32" },
+  { name = "unknown_892", offset = 892, type = "u32" },
+  { name = "unknown_896", offset = 896, type = "u32" },
+  { name = "unknown_900", offset = 900, type = "u32" },
+  { name = "unknown_904", offset = 904, type = "u32" },
+  { name = "engine_stages", offset = 980, type = "bytes", count = 3264, note = "16 engine stages of 204 bytes (indexed by the car's +1656)" },
+  { name = "front_tires", offset = 4244, type = "bytes", count = 1932, note = "21 tires of 92 bytes (CarSpec::GetTire)" },
+  { name = "rear_tires", offset = 6176, type = "bytes", count = 1932, note = "21 tires of 92 bytes" },
+  { name = "paints", offset = 8108, type = "bytes", count = 272, note = "13 20-byte paint slots from +8, the count at +268" },
+  { name = "stock_wheel", offset = 8380, type = "bytes", count = 48, note = "a wheel record (car-specs.toml's CarWheelRecord)" },
+]
+
+# A UI movie node (docs/known-data.md's "UI movie node", ui-movies.md's) as
+# SetScrollArrows answers it: the list's down arrow.
+[GarageScreenArrowNode]
+measure = "GarageScreen::SetScrollArrows.ret"
+size = 84
+origin = "embedded"
+fields = [
+  { name = "visible", offset = 80, type = "u32" },
+]
+
+[globals]
+pages = { address = 0x826D8420, type = "ptr", to = "PageObject", note = "pages 0 the car list, 1 the car's five actions, 2 the view on the stand, 3 the view's options, 4 leaving; 18 transitions" }
+list = { address = 0x826D8424, type = "ptr", to = "MenuList", note = "a MenuList (72 bytes): the car list (page 0), the actions (page 1) or the view's options (page 3)" }
+list2 = { address = 0x826D8428, type = "ptr", to = "MenuList", note = "a MenuList (72 bytes): the car list beside the actions; Destroy doesn't free it" }
+data = { address = 0x826D842C, type = "ptr", to = "GarageScreenData" }
+stand_holder = { address = 0x826D83E0, type = "ptr", to = "StandHolder", note = "the stand scene's holder (StandScene::Create): +0 the garage stage's holder, whose +0 is the stage" }
+plate_editor = { address = 0x826D8438, type = "ptr", to = "PlateEditorData", note = "the license plate editor's data (76 bytes, type2-screens.md)" }
+spec_sheet = { address = 0x826D846C, type = "ptr", to = "SpecSheetData", note = "the power graph screen's data (1,968 bytes, type2-screens.md)" }
+fade_in_argument = { address = 0x82001BEC, type = "u32", note = "Start's ScreenFades::FadeIn r3" }
+fade_out_argument = { address = 0x82001BF0, type = "u32", note = "Transition3's ScreenFades::FadeOut r3" }
+fade_count_a = { address = 0x826A50DC, type = "u32", note = "a screen fade's count (Transition3 waits for both at 0)" }
+fade_count_b = { address = 0x826A50E4, type = "u32", note = "a screen fade's count" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0 (CarValue's start)" }
+value_weights = { address = 0x8200A260, type = "f32", note = "around CarValue's part weights (from 0x8200A260 - 64)" }
+price_constants = { address = 0x8200A348, type = "f32", note = "SalePrice's: +0 the price's factor, +52 nine mileage thresholds, +84 their factors" }
+value_factor = { address = 0x82002208, type = "f32", note = "SalePrice: CarValue's factor" }
+weight_scale = { address = 0x82009F00, type = "f64", note = "ShowSpecTexts: the weight's scale" }
+spec_scale = { address = 0x82009F08, type = "f64", note = "ShowSpecTexts: the +20 float's scale" }
+curve_scale = { address = 0x82009EC0, type = "f32", note = "the power curve's peak scale (ShowCarSpecs, SetUpSpecSheet)" }
+power_scale = { address = 0x820021E8, type = "f32", note = "ShowCarSpecs, SetUpSpecSheet" }

@@ -125,6 +125,74 @@ areas (as B7 did), not as one change.
   `guest::LoadU32`-style, one spelling for lifted and hand-ported code), so
   the later steps' tools see one form.
 
+Done (2026-11-16, on `e5-native-16-11-26`), in four commits, each built and
+checked:
+
+- **The calls.** The 16,856 were 8,990 in the lifted batches and 7,866 in
+  `originals.cpp` (the lifted originals hand ports fall back to with their
+  flag off). By target: 13,731 a hand port's entry, 215 a lifted function
+  (lifted in a later batch than its caller), 2,910 an address with no
+  function of ours (1,266 functions with plain C++ but no adapter, such as
+  `List16::Insert32` `sub_82154378`; their callers never run in play). Hand
+  ports' entries are now `lifted::entry::e<address>` (no longer `static` in
+  `ITC_NATIVE_ENTRY_DEFINE`), declared in `src/lifted/entries.h`, which
+  `tools/entry_list.py` writes from a build's symbols (3,543 entries; the
+  wrapper macros' forms don't read well from the sources); run it again
+  after adding or removing an entry. `lift.py` and `lift_originals.py` call
+  entries directly (the uniform `(base, Args)`: typed parameters come when
+  a port is converted) and lifted functions typed; the 2,910 stay
+  `lifted::Call`, which stops the program. The hand ports' own 235
+  `lifted::CallFromContext(ctx, base, 0x8...)`: 227 became
+  `lifted::Enter(ctx, base, <entry>)` (none reads `ctr` after; the lifted
+  functions' uniform entries are now `lifted::e<address>` in `functions.h`
+  for this), and 8 target no function of ours. Among those,
+  `save_interface.cpp`'s call to `0x822900E0` (a "rep" save's parse) has a
+  lifted original but no entry, so reaching it would stop the program: to
+  look at. `lift.py reemit` writes every batch again from its registration
+  table (checked first: today's output, but for one function's tail block
+  placed elsewhere).
+- **The names.** `tools/function_names.py` writes `src/lifted/names.h`:
+  4,423 of our functions under `game::A::B` (1,120 lifted, 3,303 entries),
+  each a reference to the function, from the rows' Name cells ("probably"
+  names taken; constructors `Ctor`, destructors `Dtor`, `std` as `Std`, a
+  keyword part with `_`, operators kept as `sub_X`; 40 names shared by
+  several functions, or also a namespace of others, get `_<address>`). The
+  lifted code calls by these names (15,851 sites), each definition's comment
+  names its function, and the hand ports' 175 `lifted::Enter` to an entry
+  use them. Run the tool and `lift.py reemit` again when rows are renamed.
+- **One spelling for guest memory.** `guest.h`'s `guest::Load{U8,U16,U32,U64}`,
+  `guest::Store*` and `guest::Pointer` (new: `LoadU64`, `StoreU64`,
+  `Pointer`), written as plain inline functions with the same volatile
+  accesses; `lift.py` emits them in place of `REX_LOAD_*`, `REX_STORE_*`
+  and `REX_RAW_ADDR` (`own_spelling`), the 27 hand-port files that used the
+  macros were rewritten the same way, and the macros are gone from
+  `guest_code.h`.
+
+The dispatch table is now reached by the 2,382 calls through pointers and
+vtable slots (`lifted::Call(base, ctr)`), the 2,918 to addresses with no
+function of ours, and the hand ports' calls by a computed address.
+
+Corrected (2026-11-17): the calls to an address with no entry *are* reached
+in play. An attract race (`itc_5753`) stopped at "a call to 825D55E0, which
+has no entry": the lifted `sub_825D1830` calls `XACTTrackInstance::CheckDone`
+by address, whose adapter was removed in B7 (only plain C++ called it then).
+The call predates E5 (in `rexglue-removal-project` before step 0; 1 of the
+last 40 logs). Fixed for all of them: `lift_originals.py --all` also lifts
+every address lifted code or a hand port calls with no entry (2,369
+originals, from 1,408), `originals.cpp` registers each as a fallback
+(`lifted::RegisterFallbacks`), and `lifted::Call` and `Find` run the
+fallback when an address has no entry, so the game's own code runs there,
+as it did when recompiled. Four can't be lifted (two read their caller's
+registers, two the float control register: `sub_825B32F0`, `sub_825B8778`,
+`sub_825B0BB0`, `sub_825B0BE4`) and still stop the program if reached.
+`save_interface.cpp`'s call to `0x822900E0` is covered too (its original
+is a fallback now). Two attract races and the pad replay clean. Only
+the first level: the originals' own calls aren't followed, since that
+closure runs through most of the game (tried: 2,369 originals grew past
+4,451 in ten rounds without settling); an original's call to an address
+with no entry still stops the program with its address in the log, to be
+lifted then (`lift_originals.py` with that function).
+
 ### 1. The measure: types, owners, and what crosses
 
 Recorded here, as E1's and E2's measures were; it picks the order of steps
@@ -155,6 +223,110 @@ Done when the tables exist for every type the static map reaches, with the
 share of loads and stores the tool could attribute to a type (the rest
 listed, to read by hand).
 
+Measured (2026-11-17, on `e5-native-16-11-26`), for the user's review:
+`itc_recomp/tools/type_map.py` (it reads code, changes none; ~4 s) writes
+`itc_recomp/coverage/type_map.tsv` (a row a type: functions, accesses,
+fields with offset, width and int/float/pointee, allocation sizes and
+sites, vtables, owner, areas, tags), `type_map_areas.tsv` (the graph's
+nodes: an area's private and shared types, its shared weight, its heaviest
+neighbors) and `type_map_split.tsv` (an area's typed accesses by kind).
+
+How it reads the code: the original PowerPC instructions (the comments in
+`generated/`) of the 8,289 functions the static map reaches from `main`
+that are ours or unported (the replaced libraries left out), following
+pointers through registers in a straight read of each function (branches
+not followed: a simplification). Types come from four sources:
+- a row's class (`X::Y` takes an `X` in r3), joined only when the function
+  uses r3 as a pointer: a name like `Controls::ButtonIndex` is a free
+  function;
+- allocations: 573 sites (`operator new`, `new[]`, `malloc`, `XMemAlloc`,
+  `HeapAlloc`, the memory blocks', `VirtualAlloc`, the physical ones)
+  named by the constructor they're handed to, else `new<size>@caller`;
+- paths: what a field or an image word holds (`App.+24`, `[826C5C80]`),
+  joined with the type stored there when every store agrees;
+- parameters and returns (`sub_X.r4`, `Find.ret`), joined with what every
+  caller passes or every return gives. A generic function (lists, copies)
+  keeps a type of its own.
+
+The joins are made again each pass from the last pass's votes (four
+passes; the output is the same from run to run), and two classes the rows name differently are never merged (463
+such joins refused: base and derived classes, generic helpers). The first
+runs without those rules merged half the game into one type (`Mesh` with
+`Car`, `CarScene`, `Skeleton`...); what's left may still hold such merges,
+smaller, to read by hand.
+
+The figures (2026-11-17):
+
+| Loads and stores (192,480 in the 8,289 functions) | Count | Share |
+| --- | --- | --- |
+| Through a typed pointer (fields) | 80,800 | 42.0% |
+| On the stack (the frame and locals' addresses) | 68,266 | 35.5% |
+| At an image address (2,819 addresses; 2,134 used by one area) | 18,021 | 9.4% |
+| Untyped (a register the read lost: after an indirect call, a loop's join) | 10,933 | 5.7% |
+| Indexed by an untyped register | 7,311 | 3.8% |
+| An array inside a typed object (`[i]`), or indexed and typed | 6,417 | 3.3% |
+| Other constant addresses, the thread block | 732 | 0.4% |
+
+Of the accesses not on the stack, **80.6% are attributed** (to a type or the
+image); the rest are listed per function by the tool. 4,884 types: 4,573
+named (by a class, a path, a parameter or a return), 311 allocations
+without a class; **4,468 private, 416 shared**. 180 constructors' vtables
+found.
+
+Typed accesses by their types' kind: **36.5% on types tagged file, GPU or
+save** (touched by an area that reads `DATA/` in place, feeds the GPU, or
+saves: steps 5 and 7; the tags are by area, not proof), **36.2% private**
+(step 3), **27.4% shared** (step 4).
+
+What can't move by itself (the tags, by type): 831 touched by a file area,
+251 by a GPU area, 85 by a save area; 86 types are what an image word
+points to (the game's singletons and globals, `[826C5C80]`, the scene at
+`[826C2E44]`); 4,501 types have no allocation seen (embedded objects, file
+data, globals' contents, or allocations through a path the tool doesn't
+follow).
+
+The most shared types (areas, functions): the UI movie records
+(`UiMovies::Find`'s return: 39, 937; `UiMovie`: 27, 303;
+`UiMovie::Child`'s: 17, 167), the save data (`SaveData::Of`'s: 36, 165),
+`Racers` (38, 195), `SceneLights` (22, 69), the objects at `[826C5C80]`
+and `[826BABA0]` (15 and 14), the stand scene's 24-byte allocation (12,
+81). These are step 4's hubs, moved last or behind handles.
+
+The order it gives (to confirm with the user):
+- **Step 3 first**, the areas most on private types (share of their typed
+  accesses): XAudio's objects (99.5%), our heap (94.7%), the type 2 dialog
+  (90.6%), the C runtime (88.4%), the framework (87.0%), XAudio (86.4%),
+  the track zones (84.5%), the app states (81.2%), the race menu (80.3%),
+  the action mappers (79.5%), then the race world, collision, XAudio's
+  engine, the car sounds, the type 5 mode, the movies, the game modes,
+  today's result and the AI drivers (67% to 73%). That's the plan's guess
+  (the C runtime, XAudio, the action mappers, the menus' machines).
+- **The leaves** of the graph (fewest shared ties): `std::string`, XACT's
+  core, the morph jobs, the shader objects, the file layer, the archive,
+  the data tables, the framework.
+- **The heaviest ties** (functions on both sides of a shared type): the
+  tuning pages and the tuning screen (336), the AI drivers and the car
+  physics (215), the tuning screen and the UI movies (171), and every
+  front-end screen with the UI movies (130 to 135): those pairs move
+  together, the UI movies' records last.
+- **Steps 5 and 7** are as big as step 3 by accesses (36.5%): the file
+  loaders and the renderer's inputs aren't a tail.
+
+Four fixes found by step 2 (2026-11-17; the figures above are after
+them): a function without an area no longer takes it from a callee called
+from more than 20 places or in a library area (the C runtime, the heap,
+the math: operator new and delete filed every deleting destructor under
+the heap, `__ultod` and `log` 44 image filters under the C runtime); a
+name the rows give several functions carries the address in the measure's
+names (`memcpy_825A7410.r3`); a function's second allocation of the same size is another
+type (`new<68>@Type2Dialog::OnEnter#2`: the dialog's menu and data were
+one), and a constructor calling its base class's constructor on its own
+`this` (`ScreenMachine`'s `StateMachine`) no longer makes them one type.
+
+The functions still filed in `lifted.md` (the lift sweep's catch-all) were
+given their callers' area; those with no caller in the code (reached by a
+pointer) stay there as one area (2,573 typed accesses).
+
 ### 2. The schema and named fields (no change in memory)
 
 - **The schema** (`itc_recomp/schema/`, one file per area, in a form the
@@ -179,6 +351,24 @@ listed, to read by hand).
 This step changes nothing the game sees: the same bytes, the same
 addresses. It's what makes the rest possible: once code says
 `machine.started()`, where `started` lives can change in one place.
+
+Done (2026-11-21, on `e5-native-16-11-26`): the
+tools (`schema_seed.py`, `schema_gen.py` with `--area`, `schema_check.py`,
+`schema_lib.py`; `lift.py` names lifted fields from the schema), and every
+area converted: one at a time first (the type 2 dialog, the pilot; the
+heap; the C runtime; XAudio's objects), then the rest, by the user's call,
+as a swarm of parallel agents ("Step 2 as a swarm" in
+`docs/loops/e5-loop.md`): 130 areas' schema files and hand ports, an
+integration pass, and each area's accesses to other areas' types. The
+schema: 134 areas, 1,608 types, every access in the code fitting a field.
+The lifted code re-emitted with the names, built, an attract race, the pad
+replay and a frame dump checked. Then (2026-11-22) the measure's offset
+and class-name faults fixed (a pointer into an object votes for the
+object embedded there; a function's row name doesn't override what every
+caller passes) and the schema brought along: 1,938 types. The agents' reports are
+in `docs/loops/e5-swarm-reports.md`; what's left (the `fault_*` fields still
+reached, the seeded types' names) under "For
+the lead after the swarm" there.
 
 ### 3. Private objects to the host
 
@@ -236,9 +426,9 @@ as well as the host type's):
 - the string tables and fonts, the data tables (`strings-and-font.md`,
   `data-tables.md`, `car-specs.md`);
 - the UI movies' data (`ui-movies.md`);
-- saves (`save-data.md`, `saves/`): read and written in their on-disk
-  format, converted to and from host structures, so players' saves keep
-  loading (and saves made after load on older builds; see the decisions).
+- saves (`save-data.md`, `saves/`): converted to and from host structures;
+  saves from older builds may stop loading (the user's call, 2026-11-16,
+  under "Decided").
 
 A type the game reads from a file and also builds in memory (a model the
 game edits, the vinyl sheets) moves with its loader.
@@ -317,7 +507,9 @@ The game is the check, as it has been since the rewiring's stage 4:
 - After each change: the build; `timeout 120 attract_race.sh 40`; the pad
   replay (`scripted_run.sh itc_recomp/pad_recordings/race_test.jsonl`,
   ~127 s, no error lines, the race at the frame cap); a frame dump.
-- **A state digest** (new, step 0 or 1; proposed): `--state_digest`, a line a
+- **A state digest** (built 2026-11-22: `--state_digest`, with the pad replayed
+  by tick, `tools/tick_replay.sh`; `docs/pad-replay.md` "By tick"; as first
+  proposed:) `--state_digest`, a line a
   tick with a hash of the state that matters (the racers' positions and
   speeds, the race's progress, the menus' selections, the app's state
   stack), so two builds can be compared over the same pad replay tick by
@@ -327,8 +519,8 @@ The game is the check, as it has been since the rewiring's stage 4:
   first and either fixed under a flag or left out of the digest.
 - Frame dumps at fixed points of the pad replay, compared (dumps vary
   ~0.25% of pixels between runs today: the comparison allows that).
-- Saves: a save made before E5 loads after each step that touches the save
-  path, and one made after loads too.
+- Saves: after each step that touches the save path, a save made on that
+  build loads again (older builds' saves may break: "Decided").
 - A drive by the user before each merge into `rexglue-removal-project`.
 - `generated/` stays the reference for what the original did when a check
   differs (read, not run).
@@ -374,6 +566,30 @@ steps 4, 7 and 9.
 - **The names.** Entry and function names from the rows (step 0) where the
   row's name is marked "probably": take them, or keep `sub_X` until read.
 
+Decided (the user, 2026-11-16), on `e5-native-16-11-26`:
+
+- **Behavior**: as proposed. No change a player can see or the state
+  digest shows (the same game, tick for tick, on the same input); layouts,
+  allocation order and frees may change.
+- **Saves**: breaking saves from older builds is fine. The on-disk format
+  doesn't have to be kept for compatibility, either way. (The plan's save
+  check and the risk "byte-for-byte what the game wrote" no longer apply.)
+- **Order**: bottom-up, as drafted.
+- **The schema's form**: TOML files, one per area, in
+  `itc_recomp/schema/`; the tools read them and generate the C++.
+- **The state digest**: built as drafted (`--state_digest`).
+- **The image's data**: committed as C++ data, extracted by a tool from
+  the player's `default.xex` on the developer's machine; `default.xex` is
+  then no longer read.
+- **Process**: steps 2 to 5 run as loops with migration agents per area
+  (B7's rules carried over); steps 0, 1 and 6 to 9 done directly.
+- **The names**: rows' names taken even where marked "probably"; rows
+  without a name keep `sub_X`.
+- **The Host status** (2026-11-17): added, as proposed: a function whose
+  objects are host structs (steps 3 to 5); in every file's status
+  definitions and in `tools/check_function_statuses.py` (checked as
+  Native).
+
 ## Risks
 
 - **Scale.** E5 touches every function; B7 took 47 loop runs for less. The
@@ -390,5 +606,5 @@ steps 4, 7 and 9.
 - **Timing.** Host objects and direct calls change timing between threads
   (the frame driver's workers, the tiling workers, the audio threads); the
   state digest and drives are the check.
-- **Saves.** A save written from host structures must be byte-for-byte what
-  the game wrote (checked against saves from earlier builds).
+- **Saves.** A save written from host structures must load back the same
+  game state (older builds' saves need not load: "Decided").

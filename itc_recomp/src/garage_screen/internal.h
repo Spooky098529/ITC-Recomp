@@ -10,9 +10,26 @@
 #include "garage_screen/garage_screen.h"
 #include "guest.h"
 #include "native/buffers.h"
+#include "schema/car_makers.h"
+#include "schema/career.h"
+#include "schema/garage_screen.h"
+#include "schema/menu_helpers.h"
+#include "schema/race_event.h"
+#include "schema/race_screens.h"
+#include "schema/stand_models.h"
+#include "schema/tuning_screen.h"
+#include "schema/type2_screens.h"
 #include "ui_movies/game.h"
 
 namespace garage_screen {
+
+using G = schema::GarageScreenGlobals;
+using Machine = schema::GarageScreen;
+using PageObject = schema::PageObject;
+using ScreenData = schema::GarageScreenData;
+using MenuList = schema::MenuList;
+using SaveData = schema::SaveData;
+using Node = schema::UiMovieNode;
 
 inline uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 inline void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -36,16 +53,28 @@ inline uint32_t FindMovie(uint8_t* base, uint32_t id, uint32_t key) {
   return Load(base, FindPair(base, id, key));
 }
 
-inline uint32_t Data(uint8_t* base) { return Load(base, kData); }
+// The screen's data ([0x826D842C]).
+inline ScreenData Data(uint8_t* base) { return G::data(base); }
+// The page object ([0x826D8420]).
+inline PageObject PagesOf(uint8_t* base) { return G::pages(base); }
+// The two menu lists' addresses ([0x826D8424], [0x826D8428]).
+inline uint32_t List(uint8_t* base) { return G::list(base).address; }
+inline uint32_t List2(uint8_t* base) { return G::list2(base).address; }
+// The two menu lists as race-screens' MenuList.
+inline MenuList ListView(uint8_t* base) { return G::list(base); }
+inline MenuList List2View(uint8_t* base) { return G::list2(base); }
+// The screen's save data (the data's +36).
+inline SaveData Save(uint8_t* base) { return Data(base).save(); }
 
 // The garage car record at `index` in the save's garage (+6120): the list
 // walked from its head (the halfword +204) `index` times through each
 // node's halfword +0 (nodes at the garage + 4 × the index), then the slot
 // (the node's halfword +2); the record at the garage + 1,968 × the slot
 // (the car itself at its +212). As the originals walk it inline.
-inline uint32_t GarageRecord(uint8_t* base, uint32_t save, uint32_t index) {
-  const uint32_t garage = save + 6120;
-  uint32_t link = garage + 4 * uint32_t(int32_t(int16_t(guest::LoadU16(base, garage + 204))));
+inline uint32_t GarageRecord(uint8_t* base, const SaveData& save, uint32_t index) {
+  const schema::CareerGarageList list(base, save.garage_address());
+  const uint32_t garage = list.address;
+  uint32_t link = garage + 4 * uint32_t(int32_t(int16_t(list.head())));
   while (index != 0) {
     link = garage + 4 * uint32_t(int32_t(int16_t(guest::LoadU16(base, link))));
     index -= 1;
@@ -57,32 +86,35 @@ inline uint32_t GarageRecord(uint8_t* base, uint32_t save, uint32_t index) {
 // Posts the message (id, 0, 0) on `mode`'s ring (+204: its count +600,
 // start +604, 50 slots of 12 bytes), as the handlers do inline.
 inline void Post(uint8_t* base, uint32_t mode, uint32_t id) {
-  const uint32_t ring = mode + 204;
-  const uint32_t count = Load(base, ring + 600) + 1;
-  const uint32_t start = Load(base, ring + 604);
-  Store(base, ring + 600, count);
-  const uint32_t slot = ring + 12 * ((start + count - 1) % 50);
+  const schema::GarageScreenMode m(base, mode);
+  const uint32_t count = m.message_count() + 1;
+  const uint32_t start = m.message_start();
+  m.set_message_count(count);
+  const uint32_t slot = m.messages_address() + 12 * ((start + count - 1) % 50);
   Store(base, slot + 0, id);
   Store(base, slot + 4, 0);
   Store(base, slot + 8, 0);
 }
 
 // The garage stage's holder ([[0x826D83E0]]).
-inline uint32_t Holder(uint8_t* base) { return Load(base, Load(base, kStandHolder)); }
+inline uint32_t Holder(uint8_t* base) { return G::stand_holder(base).stage_block_0(); }
+// The garage stage (the holder's +0).
+inline schema::GarageStage Stage(uint8_t* base) {
+  return schema::GarageStage(base, Load(base, Holder(base)));
+}
 
 // The page object's moves the pages make inline: to `page` after
 // `transition` then `queued` (-1 for none), +8 the page before unless it
 // was `page`.
-inline void PagesGo(uint8_t* base, uint32_t pages, uint32_t page, uint32_t transition,
-                    uint32_t queued) {
-  const uint32_t before = Load(base, pages + 0);
+inline void PagesGo(const PageObject& pages, uint32_t page, uint32_t transition, uint32_t queued) {
+  const uint32_t before = pages.page();
   if (before != page) {
-    Store(base, pages + 8, before);
+    pages.set_previous_page(before);
   }
-  Store(base, pages + 0, 0xFFFFFFFFu);
-  Store(base, pages + 16, queued);
-  Store(base, pages + 12, transition);
-  Store(base, pages + 4, page);
+  pages.set_page(0xFFFFFFFFu);
+  pages.set_queued_step(queued);
+  pages.set_step(transition);
+  pages.set_next_page(page);
 }
 
 // A float word read as the translated lfs does (a double of the float).

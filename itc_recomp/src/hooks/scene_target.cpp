@@ -19,6 +19,8 @@
 #include "hooks/guest_call.h"
 #include "hooks/scene_target.h"
 #include "scene_target/scene_target.h"
+#include "schema/app_start_up.h"
+#include "schema/scene_target.h"
 
 #include <optional>
 #include "lifted/sdk.h"
@@ -60,11 +62,11 @@ void hooks::SceneTargetTexturedRect(lifted::Regs& ctx, uint8_t* base) {
     }
     done = true;
     // The render queue's slot 4: r4 = the chunk, r5 = the bucket, f1 = 0.0.
-    ctx.r3.u64 = guest::LoadU32(base, scene_target::kRectLists);
+    ctx.r3.u64 = schema::SceneTargetGlobals::rect_queue(base);
     ctx.r4.u64 = *chunk;
     ctx.r5.u64 = bucket;
     ctx.fpscr.disableFlushMode();
-    ctx.f1.f64 = double(guest::LoadFloat(base, 0x82000A34));
+    ctx.f1.f64 = double(schema::SceneTargetGlobals::zero(base));
     const uint32_t function =
         guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 16);
     ctx.ctr.u64 = function;
@@ -98,11 +100,11 @@ void hooks::SceneTargetRecordPasses(lifted::Regs& ctx, uint8_t* base) {
         // queue), the queue's slot 4 (f1 = 0.0, the original's f30).
         calls.submit = [&](uint32_t chunk, uint32_t bucket, uint32_t lr1, uint32_t lr2,
                            uint32_t lr3) {
-          ctx.r3.u64 = guest::LoadU32(base, 0x826BABA0);
+          ctx.r3.u64 = schema::AppStartUpGlobals::render_app<schema::View>(base).address;
           vtable_call(32, lr1);
           vtable_call(8, lr2);
           ctx.fpscr.disableFlushMode();
-          ctx.f1.f64 = double(guest::LoadFloat(base, 0x82000A34));
+          ctx.f1.f64 = double(schema::SceneTargetGlobals::zero(base));
           ctx.r5.u64 = bucket;
           ctx.r4.u64 = chunk;
           vtable_call(16, lr3);

@@ -26,7 +26,6 @@
 
 namespace race_world {
 
-constexpr uint32_t kManager = 0x826D82F4;    // the racers' manager (a pointer)
 constexpr uint32_t kRaceData = 0x826C5B2C;   // the race data (a pointer)
 constexpr uint32_t kRaceEvent = 0x826C6078;  // the race event (a pointer)
 constexpr uint32_t kRoute = 0x826C5B10;      // the course's route

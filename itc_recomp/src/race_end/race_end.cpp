@@ -7,11 +7,21 @@
 #include "guest.h"
 #include "mode_tick/mode_tick.h"
 #include "network_mode/network_mode.h"
+#include "schema/boot_mode.h"
+#include "schema/game_modes.h"
+#include "schema/race_end.h"
+#include "schema/race_event.h"
+#include "schema/race_states.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 namespace race_end {
 
 namespace {
+
+using G = schema::RaceEndGlobals;
+
+// The race data ([0x826C5B2C], race-states.toml's RaceData).
+schema::RaceData Race(uint8_t* base) { return schema::RaceData(base, G::race_data(base).address); }
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -29,22 +39,23 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
 // type, byte +80 1; +81 to +83 left as the stack has them), then its 8
 // bytes stored at `answer` (one doubleword in the original).
 void Answer(uint8_t* base, uint32_t answer, uint32_t frame, uint32_t type) {
-  Store(base, frame + 84, type);
-  guest::StoreU8(base, frame + 80, 1);
-  const uint32_t w0 = Load(base, frame + 80), w1 = Load(base, frame + 84);
-  Store(base, answer, w0);
-  Store(base, answer + 4, w1);
+  const schema::ModeAnswer built(base, frame + 80), out(base, answer);
+  built.set_next_type(type);
+  built.set_changed(1);
+  const uint32_t w0 = built.word0(), w1 = built.next_type();
+  out.set_word0(w0);
+  out.set_next_type(w1);
 }
 
 // The race data's flags word.
-uint32_t FlagsAt(uint8_t* base) { return Load(base, kRaceData) + kFlags; }
+uint32_t FlagsAt(uint8_t* base) { return Race(base).flags_address(); }
 
 // The flag `bit` cleared (the word loaded again, as the original does).
 void ClearFlag(uint8_t* base, uint32_t at, uint32_t bit) { Store(base, at, Load(base, at) & ~bit); }
 
 // ScreenFades::FadeIn([0x82001BEC] passes, black, layer 0).
 void FadeIn(uint8_t* base) {
-  mode_tick::ScreenFadesFadeIn(base, Load(base, kFadeInPasses), 0, 0, 0, 0);
+  mode_tick::ScreenFadesFadeIn(base, G::fade_in_passes(base), 0, 0, 0, 0);
 }
 
 // Career::EventLocation(save) from the frame (its plain C++; the condition
@@ -76,18 +87,19 @@ void UnlocksAnswer(uint8_t* base, uint32_t answer, uint32_t frame, uint32_t save
 void MoviesAnswer(uint8_t* base, uint32_t answer, uint32_t frame, uint32_t save,
                   uint32_t first, uint32_t second, const Calls& calls) {
   for (uint32_t k = 0; k < 5; k++) {
-    Store(base, kBootMovies + 4 * k, 11);
+    Store(base, G::boot_movie_ids_address() + 4 * k, 11);
   }
-  Store(base, kBootMovies + 28, 0);
-  Store(base, kBootMovies + 24, 1);
-  Store(base, kBootMovies + 0, first);
-  Store(base, kBootMovies + 4, second);
-  Store(base, frame + 84, 3);
-  Store(base, kBootMovies + 20, 9);
-  guest::StoreU8(base, frame + 80, 1);
-  const uint32_t w0 = Load(base, frame + 80), w1 = Load(base, frame + 84);
-  Store(base, answer, w0);
-  Store(base, answer + 4, w1);
+  G::set_boot_movies_index(base, 0);
+  G::set_boot_movies_skippable(base, 1);
+  Store(base, G::boot_movie_ids_address() + 0, first);
+  Store(base, G::boot_movie_ids_address() + 4, second);
+  const schema::ModeAnswer built(base, frame + 80), out(base, answer);
+  built.set_next_type(3);
+  G::set_boot_movies_next_mode(base, 9);
+  built.set_changed(1);
+  const uint32_t w0 = built.word0(), w1 = built.next_type();
+  out.set_word0(w0);
+  out.set_next_type(w1);
   FadeIn(base);
   if (career::CheckUnlocksNative(base, frame)) {
     career::ProgressCheckUnlocks(base, save, frame);
@@ -101,18 +113,20 @@ void MoviesAnswer(uint8_t* base, uint32_t answer, uint32_t frame, uint32_t save,
 void ModeAfterRace(uint8_t* base, uint32_t answer, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82150E00 RaceMode::ModeAfterRace");
   const uint32_t frame = Frame(base, sp, kModeAfterRaceFrame);
-  const uint32_t race = Load(base, kRaceData);
-  Store(base, answer + 4, 0);
-  const uint32_t flags = Load(base, race + kFlags);
-  guest::StoreU8(base, answer, 0);
+  const schema::RaceData race = Race(base);
+  const schema::ModeAnswer out(base, answer);
+  out.set_next_type(0);
+  const uint32_t flags = race.flags();
+  out.set_changed(0);
   const auto title = [&] {
     // The title (4), the title's flag set.
-    Store(base, frame + 84, 4);
-    guest::StoreU8(base, frame + 80, 1);
-    const uint32_t w0 = Load(base, frame + 80), w1 = Load(base, frame + 84);
-    Store(base, kTitleFlag, 1);
-    Store(base, answer, w0);
-    Store(base, answer + 4, w1);
+    const schema::ModeAnswer built(base, frame + 80);
+    built.set_next_type(4);
+    built.set_changed(1);
+    const uint32_t w0 = built.word0(), w1 = built.next_type();
+    G::set_title_flag(base, 1);
+    out.set_word0(w0);
+    out.set_next_type(w1);
   };
   if (flags & 0x8000) {
     title();
@@ -123,7 +137,7 @@ void ModeAfterRace(uint8_t* base, uint32_t answer, uint32_t sp, const Calls& cal
     Answer(base, answer, frame, 12);
     return;
   }
-  const int32_t kind = int32_t(Load(base, race + kKind));
+  const int32_t kind = int32_t(race.kind());
   switch (kind) {
     case 0:
       FadeIn(base);
@@ -139,7 +153,7 @@ void ModeAfterRace(uint8_t* base, uint32_t answer, uint32_t sp, const Calls& cal
       Answer(base, answer, frame, 8);
       return;
     case 5: {
-      const bool network = int32_t(Load(base, race + kRaceMode)) == 7 && Load(base, kSession) != 0;
+      const bool network = int32_t(race.race_mode()) == 7 && G::session(base).address != 0;
       Answer(base, answer, frame, network ? 12 : 10);
       return;
     }
@@ -151,7 +165,8 @@ void ModeAfterRace(uint8_t* base, uint32_t answer, uint32_t sp, const Calls& cal
   }
   // The career (kind 1, or any other).
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const int32_t race_mode = int32_t(Load(base, Load(base, kRaceData) + kRaceMode));
+  const schema::SaveData save_data(base, save);
+  const int32_t race_mode = int32_t(Race(base).race_mode());
   if (race_mode == 0 || race_mode == 1) {
     Answer(base, answer, frame, 2);
     return;
@@ -161,9 +176,9 @@ void ModeAfterRace(uint8_t* base, uint32_t answer, uint32_t sp, const Calls& cal
           ? int32_t(career::ProgressAfterRace(base, save, frame))
           : int32_t(uint32_t(calls.guest.Call(kAfterRace, frame, 0x82150EB8, save)));
   if (stage == 6) {
-    if (Load(base, save + kUnlocksShown) != 0) {
+    if (save_data.unlocks_shown_count() != 0) {
       UnlocksAnswer(base, answer, frame, save, calls);
-      Store(base, save + kStageShown, 6);
+      save_data.set_movie_after_results(6);
     } else {
       MoviesAnswer(base, answer, frame, save, 6, 7, calls);
     }
@@ -174,8 +189,8 @@ void ModeAfterRace(uint8_t* base, uint32_t answer, uint32_t sp, const Calls& cal
     return;
   }
   if (stage != -1) {
-    Store(base, save + kStageShown, uint32_t(stage));
-    if (Load(base, save + kUnlocksShown) != 0) {
+    save_data.set_movie_after_results(uint32_t(stage));
+    if (save_data.unlocks_shown_count() != 0) {
       UnlocksAnswer(base, answer, frame, save, calls);
     } else {
       Answer(base, answer, frame, 9);
@@ -188,8 +203,8 @@ void ModeAfterRace(uint8_t* base, uint32_t answer, uint32_t sp, const Calls& cal
   if (now & 0x8) {
     Store(base, at, now & ~0x8u);
     uint32_t type = 9;
-    if (int32_t(Load(base, Load(base, kRaceData) + kKind)) == 1) {
-      const int32_t day = int32_t(Load(base, vehicle_accessors::SaveDataOf(base, 0) + 6100));
+    if (int32_t(Race(base).kind()) == 1) {
+      const int32_t day = int32_t(schema::SaveData(base, vehicle_accessors::SaveDataOf(base, 0)).day());
       if (day <= 999 && day == 1) {
         type = 2;
       }
@@ -207,41 +222,42 @@ void ModeAfterRace(uint8_t* base, uint32_t answer, uint32_t sp, const Calls& cal
 void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82151EF0 RaceMode::NextMode");
   const uint32_t frame = Frame(base, sp, kNextModeFrame);
-  Store(base, answer + 4, 0);
-  guest::StoreU8(base, answer, 0);
+  const schema::ModeAnswer out(base, answer);
+  out.set_next_type(0);
+  out.set_changed(0);
   // The messages, as the original inlines GameMessages::Post: the count + 1
   // stored, then the message and two zero words at (start + count - 1) mod
   // 50 (unsigned).
-  const uint32_t ring = mode + kRing;
+  const schema::RaceMode race_mode(base, mode);
   const auto post = [&](uint32_t message) {
-    const uint32_t count = Load(base, ring + 600) + 1;
-    const uint32_t at = Load(base, ring + 604) + count - 1;
-    Store(base, ring + 600, count);
-    const uint32_t slot = ring + (at % 50) * 12;
-    Store(base, slot, message);
-    Store(base, slot + 4, 0);
-    Store(base, slot + 8, 0);
+    const uint32_t count = race_mode.ring_count() + 1;
+    const uint32_t at = race_mode.ring_start() + count - 1;
+    race_mode.set_ring_count(count);
+    const schema::ModeMessage slot(base, race_mode.ring_address() + (at % 50) * 12);
+    slot.set_id(message);
+    slot.set_arg0(0);
+    slot.set_arg1(0);
   };
-  if (Load(base, mode + kPostUpdate) != 0) {
+  if (race_mode.running() != 0) {
     post(0);
   }
   post(1);
-  const int32_t state = int32_t(Load(base, mode + kMachineState));
+  const int32_t state = int32_t(race_mode.course_setup_state());
   if (state == 3 || state == 4) {
     race_loading::Run(base, ~0ull, frame, 0x82151FD4, calls.loading);
   }
   race_loading::CheckSystemRequest(base, frame, calls.loading);
-  calls.guest.Call(kDispatch, frame, 0x82151FE0, mode + kDispatcher);
-  if (int32_t(Load(base, mode + kMachineState)) != 35) {
+  calls.guest.Call(kDispatch, frame, 0x82151FE0, race_mode.handlers_address());
+  if (int32_t(race_mode.course_setup_state()) != 35) {
     return;
   }
   Calls inner = calls;
   inner.event = calls.event.Down(kNextModeFrame);
-  const uint32_t temporary = frame + 80;
-  ModeAfterRace(base, temporary, frame, inner);
-  const uint32_t w0 = Load(base, temporary), w1 = Load(base, temporary + 4);
-  Store(base, answer, w0);
-  Store(base, answer + 4, w1);
+  const schema::ModeAnswer temporary(base, frame + 80);
+  ModeAfterRace(base, temporary.address, frame, inner);
+  const uint32_t w0 = temporary.word0(), w1 = temporary.next_type();
+  out.set_word0(w0);
+  out.set_next_type(w1);
 }
 
 }  // namespace race_end

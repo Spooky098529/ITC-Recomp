@@ -21,6 +21,9 @@
 #include "guest.h"
 #include "race_screens/race_screens.h"
 #include "save_data/save_data.h"
+#include "schema/tuning_screen.h"
+#include "schema/type67_screens.h"
+#include "schema/type8_screens.h"
 #include "screen_constructors/screen_constructors.h"
 #include "type67_screens/list_pages.h"
 #include "ui_movies/game.h"
@@ -33,6 +36,7 @@ using guest::StoreU32;
 
 namespace ts = type67_screens;
 namespace rs = race_screens;
+using G = schema::Type8ScreensGlobals;
 
 namespace part_detail {
 
@@ -89,23 +93,25 @@ uint64_t Restart(uint8_t* base, uint32_t movie, uint32_t named_word, uint32_t fr
 }
 
 void MoveOn(uint8_t* base, uint32_t inner) {
-  const uint32_t queued = LoadU32(base, inner + 20);
+  const schema::Type8PartInner in(base, inner);
+  const uint32_t queued = in.queued_step();
   if (queued == 0xFFFFFFFFu) {
-    const uint32_t after = LoadU32(base, inner + 8);
-    StoreU32(base, inner + 16, 0xFFFFFFFFu);
-    StoreU32(base, inner + 4, after);
+    const uint32_t after = in.next_page();
+    in.set_step(0xFFFFFFFFu);
+    in.set_page(after);
   } else {
-    StoreU32(base, inner + 24, 0);
-    StoreU32(base, inner + 16, queued);
-    StoreU32(base, inner + 20, 0xFFFFFFFFu);
+    in.set_unknown_24(0);
+    in.set_step(queued);
+    in.set_queued_step(0xFFFFFFFFu);
   }
-  StoreU32(base, inner + 28, 0);
+  in.set_step_started(0);
 }
 
 uint64_t InnerInput(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t steps, uint32_t lr_step,
                     uint32_t lr_run, uint32_t sp, const Calls& calls) {
   const uint32_t inner = uint32_t(r3), frame = Frame(base, sp, 128);
-  const uint32_t step = LoadU32(base, inner + 16);
+  const schema::Type8PartInner in(base, inner);
+  const uint32_t step = in.step();
   const uint32_t movie = MovieAt(base, frame + 80, uint32_t(r4));
   if (step == 0xFFFFFFFFu) {
     return calls.call(ts::kRun, frame, lr_run, movie, 0);
@@ -120,7 +126,7 @@ uint64_t InnerInput(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t steps, uin
 
 uint64_t InnerPick(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t r5, uint32_t pages,
                    uint32_t sp, uint32_t lr, const Calls& calls) {
-  const uint32_t page = LoadU32(base, uint32_t(r3) + 4);
+  const uint32_t page = schema::Type8PartInner(base, uint32_t(r3)).page();
   if (page == 0xFFFFFFFFu) {
     return 0;
   }
@@ -130,44 +136,46 @@ uint64_t InnerPick(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t r5, uint32_
 
 void OpenBegin(uint8_t* base, uint32_t inner, uint32_t id, uint32_t frame, uint32_t lr,
                const Calls& calls) {
-  StoreU32(base, inner + 8, 0);
-  StoreU32(base, inner + 4, 0);
-  StoreU32(base, inner + 12, 0);
-  StoreU32(base, inner + 24, 0xFFFFFFFFu);
-  StoreU32(base, inner + 16, 0xFFFFFFFFu);
-  StoreU32(base, inner + 28, 0);
-  StoreU32(base, inner + 16, 0);
-  StoreU32(base, inner + 20, 0xFFFFFFFFu);
-  StoreU32(base, inner + 8, 0);
+  const schema::Type8PartInner in(base, inner);
+  in.set_next_page(0);
+  in.set_page(0);
+  in.set_previous_page(0);
+  in.set_unknown_24(0xFFFFFFFFu);
+  in.set_step(0xFFFFFFFFu);
+  in.set_step_started(0);
+  in.set_step(0);
+  in.set_queued_step(0xFFFFFFFFu);
+  in.set_next_page(0);
   const uint32_t movie = MovieAt(base, frame + 80, id);
-  StoreU32(base, inner + 4, 0xFFFFFFFFu);
+  in.set_page(0xFFFFFFFFu);
   calls.call(ts::kResetPose, frame, lr, movie, frame + 80);
 }
 
 void Page0End(uint8_t* base, uint32_t inner, uint64_t first, uint64_t second, uint32_t backed,
               const Calls& calls) {
+  const schema::Type8PartInner in(base, inner);
   if (int32_t(uint32_t(first)) != 0 && int32_t(uint32_t(second)) != 0) {
-    const uint32_t page = LoadU32(base, inner + 4);
+    const uint32_t page = in.page();
     if (page != 1) {
-      StoreU32(base, inner + 12, page);
+      in.set_previous_page(page);
     }
-    StoreU32(base, inner + 4, 1);
-    StoreU32(base, inner + 16, 0xFFFFFFFFu);
-    StoreU32(base, inner + 20, 0xFFFFFFFFu);
+    in.set_page(1);
+    in.set_step(0xFFFFFFFFu);
+    in.set_queued_step(0xFFFFFFFFu);
     ts::pages::FadeOut(base, calls);
     return;
   }
   if (LoadU32(base, backed) == 0) {
     return;
   }
-  const uint32_t page = LoadU32(base, inner + 4);
+  const uint32_t page = in.page();
   if (page != 2) {
-    StoreU32(base, inner + 12, page);
+    in.set_previous_page(page);
   }
-  StoreU32(base, inner + 16, 1);
-  StoreU32(base, inner + 20, 0xFFFFFFFFu);
-  StoreU32(base, inner + 8, 2);
-  StoreU32(base, inner + 4, 0xFFFFFFFFu);
+  in.set_step(1);
+  in.set_queued_step(0xFFFFFFFFu);
+  in.set_next_page(2);
+  in.set_page(0xFFFFFFFFu);
 }
 
 }  // namespace part_detail
@@ -179,32 +187,33 @@ using namespace part_detail;
 uint64_t PlayerBlockConstruct(uint8_t* base, uint64_t r3, uint64_t player) {
   ITC_NATIVE_RUNNING("sub_822542B8 Type8PlayerBlock::Type8PlayerBlock");
   const uint32_t b = uint32_t(r3), p4 = uint32_t(player) << 2, p8 = uint32_t(player) << 3;
-  constexpr uint32_t t = 0x82011458;
-  StoreU32(base, b + 80, 0);
-  StoreU32(base, b + 72, 0);
-  StoreU32(base, b + 152, 0);
-  StoreU32(base, b + 144, 0);
-  StoreU32(base, b + 0, uint32_t(player));
-  StoreU32(base, b + 8, 0);
-  StoreU32(base, b + 160, 5);
-  StoreU32(base, b + 164, 7);
-  StoreU32(base, b + 156, LoadU32(base, t + 48 + p4));
-  StoreU32(base, b + 180, LoadU32(base, t + 8 + p4));
-  StoreU32(base, b + 184, LoadU32(base, t + 16 + p4));
-  StoreU32(base, b + 188, LoadU32(base, t - 40 + p8));
-  StoreU32(base, b + 192, LoadU32(base, t - 36 + p8));
-  StoreU32(base, b + 196, LoadU32(base, t - 24 + p8));
-  StoreU32(base, b + 200, LoadU32(base, t - 20 + p8));
-  StoreU32(base, b + 204, LoadU32(base, t + 24 + p8));
-  StoreU32(base, b + 208, LoadU32(base, t + 28 + p8));
-  StoreU32(base, b + 168, 6);
-  StoreU32(base, b + 172, 10);
-  StoreU32(base, b + 176, 11);
-  StoreU32(base, b + 212, LoadU32(base, t + 40 + p4));
-  StoreU32(base, b + 216, LoadU32(base, t - 8 + p4));
-  StoreU32(base, b + 224, 8);
-  StoreU32(base, b + 228, 9);
-  StoreU32(base, b + 220, LoadU32(base, t + p4));
+  const schema::Type8PlayerBlock blk(base, b);
+  constexpr uint32_t t = G::player_block_ids_address() + 40;  // 0x82011458
+  blk.set_menu_block(0);
+  blk.set_menu_player(0);
+  blk.set_setting_block(0);
+  blk.set_setting_player(0);
+  blk.set_player(uint32_t(player));
+  blk.set_backed_out(0);
+  blk.set_node(5);
+  blk.set_unknown_164(7);
+  blk.set_node_set(LoadU32(base, t + 48 + p4));
+  blk.set_item_anim0(LoadU32(base, t + 8 + p4));
+  blk.set_item_anim1(LoadU32(base, t + 16 + p4));
+  blk.set_unknown_188(LoadU32(base, t - 40 + p8));
+  blk.set_ready_anim(LoadU32(base, t - 36 + p8));
+  blk.set_opening_anim_a(LoadU32(base, t - 24 + p8));
+  blk.set_opening_anim_b(LoadU32(base, t - 20 + p8));
+  blk.set_setting_anim0(LoadU32(base, t + 24 + p8));
+  blk.set_setting_anim1(LoadU32(base, t + 28 + p8));
+  blk.set_text_node(6);
+  blk.set_text_child_a(10);
+  blk.set_text_child_b(11);
+  blk.set_setting_item_anim(LoadU32(base, t + 40 + p4));
+  blk.set_selection_anim_a(LoadU32(base, t - 8 + p4));
+  blk.set_cursor_child_a(8);
+  blk.set_cursor_child_b(9);
+  blk.set_selection_anim_b(LoadU32(base, t + p4));
   return r3;
 }
 
@@ -212,53 +221,60 @@ uint64_t PlayerBlockSetUp(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp,
                           const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822545D0 Type8PlayerBlock::SetUp");
   const uint32_t b = uint32_t(r3), frame = Frame(base, sp, 160);
-  const uint32_t pad = LoadU32(base, kPadPlayers + (LoadU32(base, b) << 2));
-  InitList(base, b + 12, {2, 2, 1, 154, 153, 155, 156, 159, 158}, frame, 0x8225462C, calls);
-  StoreU32(base, b + 72, pad);
-  InitList(base, b + 84, {2, 2, 1, 156, 155, 154, 153, 159, 158}, frame, 0x8225465C, calls);
+  const schema::Type8PlayerBlock blk(base, b);
+  const uint32_t pad = LoadU32(base, G::pad_players_address() + (blk.player() << 2));
+  InitList(base, blk.menu_address(), {2, 2, 1, 154, 153, 155, 156, 159, 158}, frame, 0x8225462C,
+           calls);
+  blk.set_menu_player(pad);
+  InitList(base, blk.setting_address(), {2, 2, 1, 156, 155, 154, 153, 159, 158}, frame, 0x8225465C,
+           calls);
   const uint32_t movie = MovieAt(base, frame + 96, uint32_t(id));
-  StoreU32(base, b + 144, pad);
-  calls.set_text(frame, 0x8225468C, movie, LoadU32(base, b + 156), LoadU32(base, b + 168), 11);
+  blk.set_setting_player(pad);
+  calls.set_text(frame, 0x8225468C, movie, blk.node_set(), blk.text_node(), 11);
   const uint32_t node =
-      ui_movies::FindNode(base, movie, LoadU32(base, b + 156), LoadU32(base, b + 160));
-  SetNodeText(movie, ui_movies::Child(base, node, LoadU32(base, b + 172)), 0, frame, 0x822546B8,
+      ui_movies::FindNode(base, movie, blk.node_set(), blk.node());
+  SetNodeText(movie, ui_movies::Child(base, node, blk.text_child_a()), 0, frame, 0x822546B8,
               calls);
   const uint64_t result = SetNodeText(
-      movie, ui_movies::Child(base, node, LoadU32(base, b + 176)), 1, frame, 0x822546D4, calls);
+      movie, ui_movies::Child(base, node, blk.text_child_b()), 1, frame, 0x822546D4, calls);
   StoreU32(base, movie + 40960, 1);
-  StoreU32(base, b + 4, 0);
-  StoreU32(base, b + 8, 0);
+  blk.set_ready(0);
+  blk.set_backed_out(0);
   return result;
 }
 
 uint64_t PlayerBlockPlayOpening(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_822546F8 Type8PlayerBlock::PlayOpening");
   const uint32_t b = uint32_t(r3), frame = Frame(base, sp, 112);
+  const schema::Type8PlayerBlock blk(base, b);
   const uint32_t movie = MovieAt(base, frame + 80, uint32_t(id));
-  ui_movies::PlayNamed(base, movie, LoadU32(base, b + 196), 1, 0, 0, 0);
-  ui_movies::PlayNamed(base, movie, LoadU32(base, b + 200), 1, 0, 0, 0);
-  return ui_movies::PlayNamed(base, movie, LoadU32(base, b + 204), 1, 0, 0, 0);
+  ui_movies::PlayNamed(base, movie, blk.opening_anim_a(), 1, 0, 0, 0);
+  ui_movies::PlayNamed(base, movie, blk.opening_anim_b(), 1, 0, 0, 0);
+  return ui_movies::PlayNamed(base, movie, blk.setting_anim0(), 1, 0, 0, 0);
 }
 
 uint64_t PlayerBlockShowMenuMove(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp,
                                  const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82254798 Type8PlayerBlock::ShowMenuMove");
   const uint32_t b = uint32_t(r3), frame = Frame(base, sp, 144);
+  const schema::Type8PlayerBlock blk(base, b);
   const uint32_t movie = MovieAt(base, frame + 80, uint32_t(id));
-  const uint32_t selection = rs::ListSelection(base, b + 12);
-  const uint32_t previous = LoadU32(base, b + 12 + rs::kListSelectionBefore);
-  calls.call(kFinishNamed, frame, 0x822547F8, movie, LoadU32(base, b + ((previous + 45) << 2)));
-  uint64_t result = Restart(base, movie, b + ((selection + 45) << 2), frame, 0x8225480C,
-                            0x82254834, calls);
+  const uint32_t selection = rs::ListSelection(base, blk.menu_address());
+  const uint32_t previous = blk.menu_selection_before();
+  calls.call(kFinishNamed, frame, 0x822547F8, movie,
+             LoadU32(base, blk.item_anims_address() + (previous << 2)));
+  uint64_t result = Restart(base, movie, blk.item_anims_address() + (selection << 2), frame,
+                            0x8225480C, 0x82254834, calls);
   if (previous == 0) {
-    const uint32_t setting = rs::ListSelection(base, b + 84);
+    const uint32_t setting = rs::ListSelection(base, blk.setting_address());
     result = calls.call(kFinishNamed, frame, 0x8225485C, movie,
-                        LoadU32(base, b + ((setting + 51) << 2)));
+                        LoadU32(base, blk.setting_anims_address() + (setting << 2)));
   }
   if (selection == 1) {
-    result = Restart(base, movie, b + 212, frame, 0x82254870, 0x82254898, calls);
+    result =
+        Restart(base, movie, blk.setting_item_anim_address(), frame, 0x82254870, 0x82254898, calls);
   } else if (previous == 1) {
-    result = calls.call(kFinishNamed, frame, 0x822548B0, movie, LoadU32(base, b + 212));
+    result = calls.call(kFinishNamed, frame, 0x822548B0, movie, blk.setting_item_anim());
   }
   return result;
 }
@@ -267,26 +283,28 @@ uint64_t PlayerBlockPlayReady(uint8_t* base, uint64_t r3, uint64_t id, uint32_t 
                               const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822548B8 Type8PlayerBlock::PlayReady");
   const uint32_t b = uint32_t(r3), frame = Frame(base, sp, 112);
+  const schema::Type8PlayerBlock blk(base, b);
   const uint32_t movie = MovieAt(base, frame + 80, uint32_t(id));
-  calls.call(kFinishNamed, frame, 0x822548F8, movie, LoadU32(base, b + 212));
-  calls.call(kFinishNamed, frame, 0x82254904, movie, LoadU32(base, b + 200));
-  calls.call(kFinishNamed, frame, 0x82254910, movie, LoadU32(base, b + 192));
-  return ui_movies::PlayNamed(base, movie, LoadU32(base, b + 192), 1, 0, 0, 0);
+  calls.call(kFinishNamed, frame, 0x822548F8, movie, blk.setting_item_anim());
+  calls.call(kFinishNamed, frame, 0x82254904, movie, blk.opening_anim_b());
+  calls.call(kFinishNamed, frame, 0x82254910, movie, blk.ready_anim());
+  return ui_movies::PlayNamed(base, movie, blk.ready_anim(), 1, 0, 0, 0);
 }
 
 uint64_t PlayerBlockPlaceCursor(uint8_t* base, uint64_t r3, uint64_t id, uint64_t selection,
                                 uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82254948 Type8PlayerBlock::PlaceCursor");
   const uint32_t b = uint32_t(r3), frame = Frame(base, sp, 128);
+  const schema::Type8PlayerBlock blk(base, b);
   const uint32_t movie = MovieAt(base, frame + 80, uint32_t(id));
   const uint32_t node =
-      ui_movies::FindNode(base, movie, LoadU32(base, b + 156), LoadU32(base, b + 160));
+      ui_movies::FindNode(base, movie, blk.node_set(), blk.node());
   const bool first = int32_t(uint32_t(selection)) == 0;
-  const uint32_t off = LoadU32(base, b + (first ? 224 : 228));
-  const uint32_t on = LoadU32(base, b + (first ? 228 : 224));
-  StoreU32(base, ui_movies::Child(base, node, off) + 108, 0);
+  const uint32_t off = first ? blk.cursor_child_a() : blk.cursor_child_b();
+  const uint32_t on = first ? blk.cursor_child_b() : blk.cursor_child_a();
+  schema::UiMovieNode(base, ui_movies::Child(base, node, off)).set_texture_entry(0);
   const uint32_t child = ui_movies::Child(base, node, on);
-  StoreU32(base, child + 108, 1);
+  schema::UiMovieNode(base, child).set_texture_entry(1);
   return child;
 }
 
@@ -294,14 +312,16 @@ uint64_t PlayerBlockShowSelections(uint8_t* base, uint64_t r3, uint64_t id, uint
                                    const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82254AD8 Type8PlayerBlock::ShowSelections");
   const uint32_t b = uint32_t(r3), frame = Frame(base, sp, 128);
+  const schema::Type8PlayerBlock blk(base, b);
   const uint32_t movie = MovieAt(base, frame + 80, uint32_t(id));
-  const uint32_t selection = rs::ListSelection(base, b + 12);
-  Restart(base, movie, b + ((selection + 45) << 2), frame, 0x82254B28, 0x82254B50, calls);
-  Restart(base, movie, b + 216, frame, 0x82254B5C, 0x82254B84, calls);
-  Restart(base, movie, b + 220, frame, 0x82254B90, 0x82254BB8, calls);
-  const uint32_t setting = rs::ListSelection(base, b + 84);
+  const uint32_t selection = rs::ListSelection(base, blk.menu_address());
+  Restart(base, movie, blk.item_anims_address() + (selection << 2), frame, 0x82254B28, 0x82254B50,
+          calls);
+  Restart(base, movie, blk.selection_anim_a_address(), frame, 0x82254B5C, 0x82254B84, calls);
+  Restart(base, movie, blk.selection_anim_b_address(), frame, 0x82254B90, 0x82254BB8, calls);
+  const uint32_t setting = rs::ListSelection(base, blk.setting_address());
   PlayerBlockPlaceCursor(base, r3, id, setting, frame);
-  const uint32_t named = b + ((setting + 51) << 2);
+  const uint32_t named = blk.setting_anims_address() + (setting << 2);
   Restart(base, movie, named, frame, 0x82254BE8, 0x82254C10, calls);
   return Restart(base, movie, named, frame, 0x82254C1C, 0x82254C44, calls);
 }
@@ -310,10 +330,11 @@ uint64_t PlayerBlockWhileReady(uint8_t* base, uint64_t r3, uint64_t id, uint32_t
                                const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82254A70 Type8PlayerBlock::WhileReady");
   const uint32_t b = uint32_t(r3), frame = Frame(base, sp, 112);
+  const schema::Type8PlayerBlock blk(base, b);
   if (int32_t(uint32_t(ts::pages::Call1(calls, rs::kListCancelled, r3 + 12, frame,
                                         0x82254A94))) != 0) {
     ts::pages::PlaySound(base, 2, frame, calls);
-    StoreU32(base, b + 4, 0);
+    blk.set_ready(0);
     PlayerBlockShowMenuMove(base, r3, id, frame, calls);
   }
   return 1;
@@ -323,11 +344,14 @@ uint64_t PlayerBlockSettingMoved(uint8_t* base, uint64_t r3, uint64_t id, uint32
                                  const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82254C50 Type8PlayerBlock::SettingMoved");
   const uint32_t b = uint32_t(r3), frame = Frame(base, sp, 144);
+  const schema::Type8PlayerBlock blk(base, b);
   const uint32_t movie = MovieAt(base, frame + 80, uint32_t(id));
-  const uint32_t setting = rs::ListSelection(base, b + 84);
-  const uint32_t previous = LoadU32(base, b + 84 + rs::kListSelectionBefore);
-  calls.call(kFinishNamed, frame, 0x82254CB0, movie, LoadU32(base, b + ((previous + 51) << 2)));
-  Restart(base, movie, b + ((setting + 51) << 2), frame, 0x82254CC4, 0x82254CEC, calls);
+  const uint32_t setting = rs::ListSelection(base, blk.setting_address());
+  const uint32_t previous = blk.setting_selection_before();
+  calls.call(kFinishNamed, frame, 0x82254CB0, movie,
+             LoadU32(base, blk.setting_anims_address() + (previous << 2)));
+  Restart(base, movie, blk.setting_anims_address() + (setting << 2), frame, 0x82254CC4, 0x82254CEC,
+          calls);
   return PlayerBlockPlaceCursor(base, r3, id, setting, frame);
 }
 
@@ -335,8 +359,9 @@ uint64_t PlayerBlockUpdateSetting(uint8_t* base, uint64_t r3, uint64_t id, uint3
                                   const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82254DB8 Type8PlayerBlock::UpdateSetting");
   const uint32_t b = uint32_t(r3), frame = Frame(base, sp, 112);
+  const schema::Type8PlayerBlock blk(base, b);
   const uint64_t result = ts::pages::Call1(calls, rs::kListUpdate, r3 + 84, frame, 0x82254DDC);
-  if (LoadU32(base, b + 108) == 0) {
+  if (blk.setting_move() == 0) {
     return result;
   }
   ts::pages::PlaySound(base, 4, frame, calls);
@@ -347,6 +372,7 @@ uint64_t PlayerBlockInput(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp,
                           const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82254EC8 Type8PlayerBlock::Input");
   const uint32_t b = uint32_t(r3), frame = Frame(base, sp, 128);
+  const schema::Type8PlayerBlock blk(base, b);
   const uint64_t list = r3 + 12;
   ts::pages::Call1(calls, rs::kListUpdate, list, frame, 0x82254EE8);
   const uint32_t selection = rs::ListSelection(base, uint32_t(list));
@@ -354,7 +380,7 @@ uint64_t PlayerBlockInput(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp,
       0) {
     ts::pages::PlaySound(base, 0, frame, calls);
     if (selection == 1) {
-      StoreU32(base, b + 4, 1);
+      blk.set_ready(1);
       PlayerBlockPlayReady(base, r3, id, frame, calls);
       return 0;
     }
@@ -364,11 +390,11 @@ uint64_t PlayerBlockInput(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp,
   }
   if (int32_t(uint32_t(ts::pages::Call1(calls, rs::kListCancelled, list, frame, 0x82254F44))) !=
       0) {
-    ts::pages::PlaySound(base, LoadU32(base, b) != 0 ? 3 : 2, frame, calls);
-    StoreU32(base, b + 8, 1);
+    ts::pages::PlaySound(base, blk.player() != 0 ? 3 : 2, frame, calls);
+    blk.set_backed_out(1);
     return 0;
   }
-  if (LoadU32(base, b + 36) != 0) {
+  if (blk.menu_move() != 0) {
     ts::pages::PlaySound(base, 4, frame, calls);
     PlayerBlockShowMenuMove(base, r3, id, frame, calls);
   } else if (selection == 0) {
@@ -382,9 +408,10 @@ uint64_t PlayerBlockInput(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp,
 uint64_t ListInnerConstruct(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_822543C0 Type8ListPartInner::Type8ListPartInner");
   const uint32_t inner = uint32_t(r3);
+  const schema::Type8ListPartInner in(base, inner);
   Frame(base, sp, 96);
   screen_constructors::ListPartInnerBase(base, inner);
-  StoreU32(base, inner, kListInnerVtable);
+  in.set_vtable(kListInnerVtable);
   PlayerBlockConstruct(base, r3 + 40, 0);
   PlayerBlockConstruct(base, r3 + 272, 1);
   return r3;
@@ -393,18 +420,19 @@ uint64_t ListInnerConstruct(uint8_t* base, uint64_t r3, uint32_t sp) {
 uint64_t ListPartConstruct(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82254488 Type8ListPart::Type8ListPart");
   const uint32_t part = uint32_t(r3), frame = Frame(base, sp, 112);
+  const schema::Type8ListPart pt(base, part);
   screen_constructors::ListPartBase(base, part);
-  StoreU32(base, part, kListPartVtable);
+  pt.set_vtable(kListPartVtable);
   ListInnerConstruct(base, r3 + 20, frame);
-  StoreU32(base, part + 16, part + 20);
-  StoreU32(base, part + 12, 20);
+  pt.set_inner_part(part + 20);
+  pt.set_movie_id(20);
   return r3;
 }
 
 uint64_t ListInnerDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82254418 Type8ListPartInner::~Type8ListPartInner");
   const uint32_t frame = Frame(base, sp, 112);
-  StoreU32(base, uint32_t(r3), kListInnerVtable);
+  schema::Type8ListPartInner(base, uint32_t(r3)).set_vtable(kListInnerVtable);
   ts::ReleaseList(base, r3 + 272 + 84, frame, 0x82254448, calls);
   ts::ReleaseList(base, r3 + 272 + 12, frame, 0x82254450, calls);
   ts::ReleaseList(base, r3 + 40 + 84, frame, 0x8225445C, calls);
@@ -426,7 +454,7 @@ uint64_t ListInnerDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, u
 uint64_t ListPartDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822544E8 Type8ListPart::~Type8ListPart");
   const uint32_t frame = Frame(base, sp, 96);
-  StoreU32(base, uint32_t(r3), kListPartVtable);
+  schema::Type8ListPart(base, uint32_t(r3)).set_vtable(kListPartVtable);
   ListInnerDestruct(base, r3 + 20, frame, calls);
   return ts::ListPartBaseDestruct(base, r3);
 }
@@ -446,11 +474,12 @@ uint64_t ListInnerOpen(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
                        const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822549D8 Type8ListPartInner::Open");
   const uint32_t inner = uint32_t(r3), frame = Frame(base, sp, 128);
+  const schema::Type8ListPartInner in(base, inner);
   OpenBegin(base, inner, uint32_t(r4), frame, 0x82254A48, calls);
   PlayerBlockSetUp(base, r3 + 40, r4, frame, calls);
   const uint64_t result = PlayerBlockSetUp(base, r3 + 272, r4, frame, calls);
-  StoreU32(base, inner + 32, 0);
-  StoreU32(base, inner + 36, 0);
+  in.set_yes(0);
+  in.set_back(0);
   return result;
 }
 
@@ -470,12 +499,13 @@ uint64_t ListInnerStep0(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
                         const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82254D08 Type8ListPartInner::Step0");
   const uint32_t inner = uint32_t(r3), frame = Frame(base, sp, 128);
+  const schema::Type8ListPartInner in(base, inner);
   const uint32_t movie = MovieAt(base, frame + 80, uint32_t(r4));
-  if (LoadU32(base, inner + 28) == 0) {
+  if (in.step_started() == 0) {
     PlayerBlockPlayOpening(base, r3 + 40, r4, frame);
     PlayerBlockPlayOpening(base, r3 + 272, r4, frame);
     ui_movies::PlayNamed(base, movie, 47, 0, 0, 0, 0);
-    StoreU32(base, inner + 28, 1);
+    in.set_step_started(1);
   }
   const uint64_t done = uint32_t(calls.call(ts::kRun, frame, 0x82254D88, movie, 0)) == 0 ? 1 : 0;
   if (done != 0) {
@@ -489,17 +519,18 @@ uint64_t ListInnerPage0(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
                         const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82254FB8 Type8ListPartInner::Page0");
   const uint32_t inner = uint32_t(r3), frame = Frame(base, sp, 128);
+  const schema::Type8ListPartInner in(base, inner);
   // Each block by its state (+4): 0 its input (answers 0), 1 ready (1),
   // else 1 with no call.
   auto block = [&](uint64_t at) -> uint64_t {
-    const uint32_t state = LoadU32(base, uint32_t(at) + 4);
+    const uint32_t state = schema::Type8PlayerBlock(base, uint32_t(at)).ready();
     if (state == 0) return PlayerBlockInput(base, at, r4, frame, calls);
     if (state == 1) return PlayerBlockWhileReady(base, at, r4, frame, calls);
     return 1;
   };
   const uint64_t first = block(r3 + 40);
   const uint64_t second = block(r3 + 272);
-  Page0End(base, inner, first, second, inner + 48, calls);
+  Page0End(base, inner, first, second, in.block0_backed_out_address(), calls);
   return 0;
 }
 
@@ -507,10 +538,11 @@ uint64_t PartInnerStep1(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
                         const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822538A8 Type8PartInner::Step1");
   const uint32_t inner = uint32_t(r3), frame = Frame(base, sp, 112);
+  const schema::Type8PartInner in(base, inner);
   const uint32_t movie = MovieAt(base, frame + 80, uint32_t(r4));
-  if (LoadU32(base, inner + 28) == 0) {
+  if (in.step_started() == 0) {
     ui_movies::PlayNamed(base, movie, 48, 0, 0, 0, 0);
-    StoreU32(base, inner + 28, 1);
+    in.set_step_started(1);
   }
   const uint64_t done = uint32_t(calls.call(ts::kRun, frame, 0x82253918, movie, 0)) == 0 ? 1 : 0;
   if (done != 0) {
@@ -521,11 +553,13 @@ uint64_t PartInnerStep1(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
 
 uint64_t PartInnerPage1(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_82253108 Type8PartInner::Page1");
-  if ((LoadU32(base, ts::kFadeCountA) | LoadU32(base, ts::kFadeCountB)) != 0) {
+  if ((schema::Type67ScreensGlobals::fade_out_count(base) |
+       schema::Type67ScreensGlobals::fade_in_count(base)) != 0) {
     return 0;
   }
-  StoreU32(base, uint32_t(r3) + 32, 1);
-  StoreU32(base, uint32_t(r3) + 36, 0);
+  const schema::Type8PartInner in(base, uint32_t(r3));
+  in.set_yes(1);
+  in.set_back(0);
   return 1;
 }
 
@@ -536,8 +570,9 @@ uint64_t PartInnerPage2(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp) {
   if (ui_movies::IsNamedActive(base, movie, 48) != 0) {
     return 0;
   }
-  StoreU32(base, uint32_t(r3) + 32, 0);
-  StoreU32(base, uint32_t(r3) + 36, 1);
+  const schema::Type8PartInner in(base, uint32_t(r3));
+  in.set_yes(0);
+  in.set_back(1);
   return 1;
 }
 

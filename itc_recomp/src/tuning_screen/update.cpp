@@ -26,9 +26,6 @@ namespace tuning_screen {
 namespace {
 
 constexpr uint32_t kFrameBytes = 144;
-constexpr uint32_t kRefreshing = 9708;  // 1: run the refresh this update
-constexpr uint32_t kQueue = 10036;      // [it]: the command queue
-constexpr uint32_t kStandDirty = 9732;  // set: put the stand back this update
 constexpr uint32_t kRun = 0x8211E1B8;   // UiMovie::Run(movie, 0)
 
 // The command runners never seen in play (the command's 8-bit table at
@@ -75,7 +72,6 @@ uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint64_t r3, uint64_t r
   const uint32_t frame = sp - kFrameBytes;
   guest::StoreU32(base, frame, sp);  // the back chain, as stwu
   const uint32_t s = uint32_t(r3);
-  const auto word = [&](uint32_t offset) { return guest::LoadU32(base, s + offset); };
   const auto guest_call = [&](uint32_t function, std::initializer_list<uint64_t> args,
                               uint32_t lr) {
     const uint64_t answer = call(function, args, frame, lr);
@@ -84,13 +80,13 @@ uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint64_t r3, uint64_t r
   };
 
   // Block 1: the refresh while +9708 is 1, +9708 = whether it answered 0.
-  if (int32_t(word(kRefreshing)) == 1) {
+  if (int32_t(TS(base, s).refresh_pending()) == 1) {
     const uint64_t answer = Refresh(base, stand, r3, frame, f1);
-    guest::StoreU32(base, s + kRefreshing, uint32_t(answer) == 0 ? 1 : 0);
+    TS(base, s).set_refresh_pending(uint32_t(answer) == 0 ? 1 : 0);
   }
 
   // Block 2: the state's debug handler (states 3 to 58).
-  const uint32_t state = word(kState);
+  const uint32_t state = TS(base, s).state();
   if (state - 3 <= 55) {
     switch (state) {
       case 3: DebugMainMenu(base, frame); break;
@@ -139,17 +135,18 @@ uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint64_t r3, uint64_t r
 
   // Block 3: the queue, its current command and the state's movie (13 for
   // 23 to 37, 14 for 38 to 52, for 61 13 with the vinyl else 14, else 2).
-  const uint32_t queue = word(kQueue);
-  const uint32_t command = guest::LoadU32(base, queue + 12);
+  const auto queue_view = TS(base, s).queue();
+  const uint32_t queue = queue_view.address;
+  const uint32_t command = queue_view.current();
   uint32_t id = 2;
   {
-    const int32_t st = int32_t(word(kState));
+    const int32_t st = int32_t(TS(base, s).state());
     if (st >= 23 && st <= 37) {
       id = 13;
     } else if (st >= 23 && st <= 52) {
       id = 14;
     } else if (st == 61) {
-      id = int32_t(word(kCategory)) == 5 && guest::LoadU8(base, s + kItem) == 6 ? 13 : 14;
+      id = int32_t(TS(base, s).category()) == 5 && uint32_t(TS(base, s).item()) == 6 ? 13 : 14;
     }
   }
   const uint32_t movie = guest::LoadU32(base, MovieEntry(base, frame, id));
@@ -161,17 +158,17 @@ uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint64_t r3, uint64_t r
   // command and those above 64.
   uint64_t r30 = queue;
   const auto step = [&] {
-    const uint32_t q = word(kQueue);
-    const uint32_t next = guest::LoadU32(base, q + 16);
+    const auto q = TS(base, s).queue();
+    const uint32_t next = q.next();
     if (int32_t(next) == -1) {
-      guest::StoreU32(base, q + 0, guest::LoadU32(base, q + 4));
-      guest::StoreU32(base, q + 12, 0xFFFFFFFFu);
+      q.set_page(q.resume());
+      q.set_current(0xFFFFFFFFu);
     } else {
-      guest::StoreU32(base, q + 20, 0);
-      guest::StoreU32(base, q + 12, next);
-      guest::StoreU32(base, q + 16, 0xFFFFFFFFu);
+      q.set_step(0);
+      q.set_current(next);
+      q.set_next(0xFFFFFFFFu);
     }
-    guest::StoreU32(base, q + 24, 0);
+    q.set_started(0);
   };
   if (int32_t(command) == -1) {
     guest_call(kRun, {movie, 0}, 0x821E7308);
@@ -179,8 +176,8 @@ uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint64_t r3, uint64_t r
     guest_call(kRun, {movie, 0}, 0x821E72C4);
     step();
   } else {
-    if (int32_t(guest::LoadU32(base, queue + 24)) == 0) {
-      guest::StoreU32(base, queue + 24, 1);
+    if (int32_t(queue_view.started()) == 0) {
+      queue_view.set_started(1);
       const uint32_t dispatcher = uint32_t(r4);
       const Guest g = CommandGuest(command);
       if (g.function != 0 && calls.native_pages && tuning_pages::IsStickerCommand(command)) {
@@ -209,7 +206,10 @@ uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint64_t r3, uint64_t r
           case 17: Command17(base, call, s, frame); break;
           case 18: Command18(base, call, s, frame); break;
           case 19: Command19(base, call, s, frame); break;
-          case 20: Command20(base, call, s, frame, word(9644), word(9648)); break;
+          case 20:
+            Command20(base, call, s, frame, TS(base, s).vinyl_animation_a(),
+                      TS(base, s).vinyl_animation_b());
+            break;
           case 21: Command21(base, call, r3, frame, calls.native_pages); break;
           case 22: Command22(base, call, s, frame); break;
           case 23: Command23(base, call, s, frame); break;
@@ -256,13 +256,13 @@ uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint64_t r3, uint64_t r
   UpdateListDots(base, s, frame);
   UpdateListCounter(base, call, s, frame);
   uint64_t answer = UpdateStand(base, stand, calls.draw, calls.paint_poll, s, frame);
-  if (int32_t(word(kStandDirty)) != 0) {
+  if (int32_t(TS(base, s).rewrite_car()) != 0) {
     StoreToGarageCar(base, r3, frame);
     double stats_f1 = 0.0;
     SetCarStats(base, stand.calls, s, frame, &stats_f1);
     *f1 = stats_f1;
     answer = RestoreStand(base, stand, r3, frame, f1);
-    guest::StoreU32(base, s + kStandDirty, 0);
+    TS(base, s).set_rewrite_car(0);
   }
   return answer;
 }

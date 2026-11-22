@@ -3,6 +3,8 @@
 // steps the harness shares (hooks/scene_loaders.h).
 
 #include "hooks/scene_loaders.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
@@ -19,6 +21,8 @@
 #include "scene_loaders/model_point.h"
 #include "scene_loaders/objects.h"
 #include "scene_loaders/pools.h"
+#include "schema/models.h"
+#include "schema/scene_loaders.h"
 #include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, native_material_passes);
@@ -126,7 +130,7 @@ ITC_REGS_STEP(SceneLoadersPool4SetRecord) {
     lifted::original::c820D6A60(ctx, base);
     return;
   }
-  ctx.r3.u64 = ctx.r3.u32 + 28;
+  ctx.r3.u64 = schema::Pool4Object(base, ctx.r3.u32).record_address();
 }
 
 ITC_REGS_STEP(SceneLoadersPartsSlotOf) {
@@ -358,7 +362,8 @@ sl::FileLoadedCalls MakeFileLoadedCalls(lifted::Regs& ctx, uint8_t* base,
     ctx.r4.u64 = 0;
     ctx.r5.u64 = xpr;
     ctx.lr = at.provider_set;
-    lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, provider) + 16));
+    // The provider's vtable's slot 4, TextureProvider::Set (models.md).
+    lifted::CallFromContext(ctx, base, schema::TextureProvider(base, provider).vtable().set());
     return ctx.r3.u64;
   };
   calls.skeleton_bind = [&ctx, base, at](uint32_t skeleton, uint32_t file) {
@@ -377,7 +382,7 @@ sl::FileLoadedCalls MakeFileLoadedCalls(lifted::Regs& ctx, uint8_t* base,
     // From MakePlate's frame, below the callback's.
     guest_call::InFrame(ctx, base, car_models::kPlateFrameBytes, 0x820ED8E4, [&](uint32_t) {
       ctx.r3.u64 = surface;
-      lifted::CallFromContext(ctx, base, 0x822A67B0);
+      lifted::Enter(ctx, base, game::Resource::Release);
     });
   };
   return calls;
@@ -464,7 +469,7 @@ ITC_REGS_STEP(SceneLoadersCarModelLoadsDestruct) {
     return;
   }
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = ctx.r3.u32 + sl::kCarModelLoadsSkeleton;
+  ctx.r3.u64 = schema::CarModelLoads(base, ctx.r3.u32).skeleton_address();
 }
 
 // The resets that free: the plain C++, or the original where it refuses.

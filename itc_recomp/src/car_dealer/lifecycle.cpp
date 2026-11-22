@@ -15,18 +15,19 @@ namespace {
 
 constexpr uint32_t kMemRelease = 0x8000;
 
-// Frees a list's entries from the last: the list at the data's +`list`, its
-// count at the list's +`count`, the data reloaded after each free as the
-// originals do. The last VirtualFree's r3 (`r3` when none).
-uint64_t FreeEntries(uint8_t* base, uint32_t list, uint32_t count, uint32_t frame, uint32_t lr,
+// Frees a list's entries from the last: the list (a CarDealerList or the
+// CarDealerColors, `L`) at the data's `at`, the data reloaded after each
+// free as the originals do. The last VirtualFree's r3 (`r3` when none).
+template <typename L>
+uint64_t FreeEntries(uint8_t* base, uint32_t (Data::*at)() const, uint32_t frame, uint32_t lr,
                      uint64_t r3, const Calls& calls) {
-  uint32_t data = Load(base, kData);
-  while (Load(base, data + list + count) != 0) {
-    const uint32_t at = data + list;
-    const uint32_t n = Load(base, at + count) - 1;
-    Store(base, at + count, n);
-    r3 = calls.Call(kVirtualFree, frame, lr, Load(base, (n << 2) + at), 0, kMemRelease);
-    data = Load(base, kData);
+  Data data = G::data(base);
+  while (L(base, (data.*at)()).count() != 0) {
+    const L list(base, (data.*at)());
+    const uint32_t n = list.count() - 1;
+    list.set_count(n);
+    r3 = calls.Call(kVirtualFree, frame, lr, Load(base, (n << 2) + list.address), 0, kMemRelease);
+    data = G::data(base);
   }
   return r3;
 }
@@ -37,14 +38,15 @@ uint64_t Unload(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls
   ITC_NATIVE_RUNNING("sub_821816B8 CarDealer::Unload");
   const uint32_t frame = Frame(base, sp, 128);
   uint64_t r3 = machine;
-  r3 = FreeEntries(base, 104, 512, frame, 0x821816FC, r3, calls);
-  r3 = FreeEntries(base, 620, 512, frame, 0x82181734, r3, calls);
-  r3 = FreeEntries(base, 1140, 52, frame, 0x8218176C, r3, calls);
+  r3 = FreeEntries<List>(base, &Data::first_list_address, frame, 0x821816FC, r3, calls);
+  r3 = FreeEntries<List>(base, &Data::second_list_address, frame, 0x82181734, r3, calls);
+  r3 = FreeEntries<Colors>(base, &Data::colors_address, frame, 0x8218176C, r3, calls);
   const uint32_t movie = FindMovie(base, 4, frame + 80);
   r3 = calls.Call(kFinishAll, frame, 0x8218179C, movie);
-  if (Load(base, machine + kMachineDelete) != 0) {
+  const Machine m(base, machine);
+  if (m.delete_movie() != 0) {
     r3 = calls.Call(kMoviesDelete, frame, 0x821817B0, 4);
-    Store(base, machine + kMachineLoaded, 0);
+    m.set_loaded(0);
   }
   return r3;
 }
@@ -52,12 +54,12 @@ uint64_t Unload(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls
 uint64_t Close(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82181838 CarDealer::Close");
   const uint32_t frame = Frame(base, sp, 112);
-  Store(base, machine + kMachineState, 7);
+  Machine(base, machine).set_state(7);
   const uint32_t movie = FindMovie(base, 4, frame + 80);
   calls.Call(kFinishAll, frame, 0x8218187C, movie);
   uint64_t r3 = calls.Call(kMoviesDelete, frame, 0x82181884, 4);
-  r3 = FreeEntries(base, 104, 512, frame, 0x821818B4, r3, calls);
-  r3 = FreeEntries(base, 620, 512, frame, 0x821818F0, r3, calls);
+  r3 = FreeEntries<List>(base, &Data::first_list_address, frame, 0x821818B4, r3, calls);
+  r3 = FreeEntries<List>(base, &Data::second_list_address, frame, 0x821818F0, r3, calls);
   Post(base, mode, 4);
   return r3;
 }
@@ -65,21 +67,22 @@ uint64_t Close(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp, cons
 uint64_t Destroy(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82180E70 CarDealer::Destroy");
   const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t data = Load(base, kData);
-  if (Load(base, data + 8) != 0) {
-    Store(base, machine + kMachineState, 14);
-  } else if (Load(base, data + 4) != 0) {
-    Store(base, machine + kMachineState, 20);
+  const Data data = G::data(base);
+  const Machine m(base, machine);
+  if (data.leaving_bought() != 0) {
+    m.set_state(14);
+  } else if (data.first_car() != 0) {
+    m.set_state(20);
   }
-  calls.Call(kMenuListRelease, frame, 0x82180EB8, Load(base, kListMenu));
-  calls.Call(kVirtualFree, frame, 0x82180ED4, Load(base, kPages), 0, kMemRelease);
-  calls.Call(kVirtualFree, frame, 0x82180EE4, Load(base, kListMenu), 0, kMemRelease);
-  calls.Call(kVirtualFree, frame, 0x82180EF8, Load(base, kColorMenu), 0, kMemRelease);
+  calls.Call(kMenuListRelease, frame, 0x82180EB8, G::list_menu(base).address);
+  calls.Call(kVirtualFree, frame, 0x82180ED4, G::pages(base).address, 0, kMemRelease);
+  calls.Call(kVirtualFree, frame, 0x82180EE4, G::list_menu(base).address, 0, kMemRelease);
+  calls.Call(kVirtualFree, frame, 0x82180EF8, G::color_menu(base).address, 0, kMemRelease);
   const uint64_t r3 =
-      calls.Call(kVirtualFree, frame, 0x82180F08, Load(base, kData), 0, kMemRelease);
-  Store(base, kPages, 0);
-  Store(base, kListMenu, 0);
-  Store(base, kData, 0);
+      calls.Call(kVirtualFree, frame, 0x82180F08, G::data(base).address, 0, kMemRelease);
+  G::set_pages(base, 0);
+  G::set_list_menu(base, 0);
+  G::set_data(base, 0);
   return r3;
 }
 
@@ -101,42 +104,44 @@ uint64_t StartFirstRace(uint8_t* base, uint32_t sp, const Calls& calls) {
 uint64_t BuildLists(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821813B0 CarDealer::BuildLists");
   const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  uint64_t r3 = save;
+  const Save save(base, vehicle_accessors::SaveDataOf(base, 0));
+  uint64_t r3 = save.address;
   {
-    const uint32_t to = Load(base, kData) + 64;
-    const int32_t day = int32_t(Load(base, save + 6100));
+    const uint32_t to = G::data(base).pick_address();
+    const int32_t day = int32_t(save.day());
     for (uint32_t k = 0; k < 5; k++) {
-      Store(base, to + 4 * k, Load(base, save + 8 + 4 * k));
+      Store(base, to + 4 * k, Load(base, save.pick_address() + 4 * k));
     }
-    const uint32_t money = Load(base, save + 6116);
+    const uint32_t money = save.money();
     const int32_t week = day / 7;
-    Store(base, Load(base, kData) + 84, money);
-    Store(base, Load(base, kData) + 88, uint32_t(day) - uint32_t(week) * 7);
-    Store(base, Load(base, kData) + 92, day > 999 ? 999 : uint32_t(day));
-    Store(base, Load(base, kData) + 96, uint32_t(int32_t(int16_t(guest::LoadU16(base, save + 6328)))));
-    Store(base, Load(base, kData) + 100, Load(base, save + 0x1991C));
-    const int16_t count = int16_t(guest::LoadU16(base, save + 6328));
-    Store(base, Load(base, kData) + 4, count <= 0 ? 1 : 0);
+    G::data(base).set_money(money);
+    G::data(base).set_weekday(uint32_t(day) - uint32_t(week) * 7);
+    G::data(base).set_day(day > 999 ? 999 : uint32_t(day));
+    G::data(base).set_garage_count(uint32_t(int32_t(int16_t(save.garage_count()))));
+    G::data(base).set_garage_size(Load(base, save.address + 0x1991C));
+    const int16_t count = int16_t(save.garage_count());
+    G::data(base).set_first_car(count <= 0 ? 1 : 0);
   }
   for (int32_t id = 0; id < 72; id++) {
-    const uint32_t word = Load(base, uint32_t(((id >> 5) + 26185) << 2) + save);
+    // The reward cars' bit set (0x19924), a word each 32 cars.
+    const uint32_t word = Load(base, save.reward_cars_address() + (uint32_t(id >> 5) << 2));
     if ((word & (1u << (id & 31))) == 0) {
       continue;
     }
-    const uint32_t entry =
-        uint32_t(calls.Call(kVirtualAlloc, frame, 0x821814CC, 0, 8448, 4096, 4));
-    Store(base, entry + 8432, uint32_t(id));
+    const Entry entry(base,
+                      uint32_t(calls.Call(kVirtualAlloc, frame, 0x821814CC, 0, 8448, 4096, 4)));
+    entry.set_car_id(uint32_t(id));
     const uint32_t spec = car_specs::GetCarSpec(base, uint32_t(id));
-    r3 = calls.Call(kMemcpy, frame, 0x821814EC, entry, spec, 8432);
-    const int8_t kind = int8_t(guest::LoadU8(base, entry + 771));
+    r3 = calls.Call(kMemcpy, frame, 0x821814EC, entry.address, spec, 8432);
+    const int8_t kind = int8_t(entry.list_kind());
     if (kind == 0 || kind == 1) {
-      const uint32_t list = Load(base, kData) + (kind == 0 ? 104 : 620);
-      const uint32_t n = Load(base, list + 512);
-      Store(base, list + 512, n + 1);
-      Store(base, (n << 2) + list, entry);
+      const Data data = G::data(base);
+      const List list(base, kind == 0 ? data.first_list_address() : data.second_list_address());
+      const uint32_t n = list.count();
+      list.set_count(n + 1);
+      Store(base, (n << 2) + list.address, entry.address);
     } else {
-      r3 = calls.Call(kVirtualFree, frame, 0x82181540, entry, 0, kMemRelease);
+      r3 = calls.Call(kVirtualFree, frame, 0x82181540, entry.address, 0, kMemRelease);
     }
   }
   return r3;
@@ -145,72 +150,74 @@ uint64_t BuildLists(uint8_t* base, uint32_t sp, const Calls& calls) {
 uint64_t Buy(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82182E68 CarDealer::Buy");
   const uint32_t frame = Frame(base, sp, 2112);
-  const uint32_t from = Load(base, kLimits) + 4;
-  const uint32_t first = vehicle_accessors::SaveDataOf(base, 0);
+  const uint32_t from = Type2G::plate_data(base).plate_address();
+  const Save first(base, vehicle_accessors::SaveDataOf(base, 0));
   {
-    const uint32_t entry = SelectedEntry(base);
-    const uint32_t money = Load(base, first + 6116);
-    const int32_t left = int32_t(money - Load(base, entry + 744));
-    Store(base, first + 6116, left < 0 ? 0 : uint32_t(left));
+    const Entry entry = SelectedEntry(base);
+    const uint32_t money = first.money();
+    const int32_t left = int32_t(money - entry.price());
+    first.set_money(left < 0 ? 0 : uint32_t(left));
   }
-  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const uint32_t car = frame + 96;
-  const uint32_t id = Load(base, SelectedEntry(base) + 8432);
-  calls.Call(kGarageCarReset, frame, 0x82182EF8, car);
-  calls.Call(kSetModelAndClass, frame, 0x82182F04, car, id);
+  const Save save(base, vehicle_accessors::SaveDataOf(base, 0));
+  const schema::Car car(base, frame + 96);
+  const uint32_t id = SelectedEntry(base).car_id();
+  calls.Call(kGarageCarReset, frame, 0x82182EF8, car.address);
+  calls.Call(kSetModelAndClass, frame, 0x82182F04, car.address, id);
   {
-    const uint32_t data = Load(base, kData);
-    const uint16_t kind = guest::LoadU16(base, car + 4);
-    const uint16_t color = uint16_t(Load(base, data + 60) + Load(base, data + 56));
+    const Data data = G::data(base);
+    const uint16_t kind = car.body_class();
+    const uint16_t color = uint16_t(data.color_scroll() + data.color_selection());
     if (kind == 0xFFFF) {
-      guest::StoreU16(base, car + 4, color);
+      car.set_body_class(color);
     }
-    const uint16_t old = guest::LoadU16(base, car + 0);
-    guest::StoreU16(base, car + 0, color);
-    guest::StoreU16(base, car + 2, old);
+    const uint16_t old = car.paint_pick();
+    car.set_paint_pick(color);
+    car.set_paint_2(old);
   }
-  uint64_t r3 = calls.Call(kGarageAdd, frame, 0x82182F40, save, car);
+  uint64_t r3 = calls.Call(kGarageAdd, frame, 0x82182F40, save.address, car.address);
   {
-    const uint32_t bought = save + 48 + 6004;
+    const uint32_t bought = save.stats_address() + 6004;
     const int16_t n = int16_t(guest::LoadU16(base, bought));
     if (n < 9999) {
       guest::StoreU16(base, bought, uint16_t(n + 1));
     }
   }
-  const uint32_t garage = save + 6120;
-  const int32_t last = int32_t(int16_t(guest::LoadU16(base, save + 6328))) - 1;
+  const GarageList garage(base, save.garage_address());
+  const int32_t last = int32_t(int16_t(save.garage_count())) - 1;
   {
     int32_t left = last;
-    uint32_t node = uint32_t(int32_t(int16_t(guest::LoadU16(base, garage + 204))));
-    uint32_t at = (node << 2) + garage;
+    uint32_t node = uint32_t(int32_t(int16_t(garage.head())));
+    uint32_t at = (node << 2) + garage.nodes_address();
     while (left != 0) {
       node = uint32_t(int32_t(int16_t(guest::LoadU16(base, at + 0))));
       left--;
-      at = (node << 2) + garage;
+      at = (node << 2) + garage.nodes_address();
     }
     const int32_t slot = int16_t(guest::LoadU16(base, at + 2));
-    const uint32_t to = uint32_t(slot) * 1968 + garage + 1780;
+    const schema::Car added(base, uint32_t(slot) * 1968 + garage.cars_address());
+    const uint32_t to = added.extras_address();
     for (uint32_t k = 0; k < 5; k++) {
       Store(base, to + 4 * k, Load(base, from + 4 * k));
     }
   }
-  uint32_t data = Load(base, kData);
-  if (Load(base, data + 4) != 0) {
-    Store(base, save + 0x19920, uint32_t(last));
-    data = Load(base, kData);
-  } else if (Load(base, data + 24) != 0) {
+  Data data = G::data(base);
+  if (data.first_car() != 0) {
+    save.set_selected_car(uint32_t(last));
+    data = G::data(base);
+  } else if (data.select_bought() != 0) {
     const uint32_t movie = FindMovie(base, 4, frame + 80);
-    Store(base, save + 0x19920, uint32_t(last));
-    calls.Call(kPickNext, frame, 0x82183018, save, 1);
-    const uint32_t to = Load(base, kData) + 64;
+    save.set_selected_car(uint32_t(last));
+    calls.Call(kPickNext, frame, 0x82183018, save.address, 1);
+    const uint32_t to = G::data(base).pick_address();
     for (uint32_t k = 0; k < 5; k++) {
-      Store(base, to + 4 * k, Load(base, save + 8 + 4 * k));
+      Store(base, to + 4 * k, Load(base, save.pick_address() + 4 * k));
     }
-    r3 = calls.Call(kSetChildNameText, frame, 0x82183058, movie, 15, 6, Load(base, kData) + 64);
-    data = Load(base, kData);
+    r3 = calls.Call(kSetChildNameText, frame, 0x82183058, movie, 15, 6,
+                    G::data(base).pick_address());
+    data = G::data(base);
   }
-  if (Load(base, data + 4) != 0) {
-    r3 = calls.Call(kPickFromCar, frame, 0x82183070, first);
+  if (data.first_car() != 0) {
+    r3 = calls.Call(kPickFromCar, frame, 0x82183070, first.address);
   }
   return r3;
 }
@@ -218,16 +225,15 @@ uint64_t Buy(uint8_t* base, uint32_t sp, const Calls& calls) {
 uint64_t OnYes(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82181968 CarDealer::OnYes");
   const uint32_t frame = Frame(base, sp, 112);
-  Store(base, Load(base, kData) + 16, 1);
-  const uint32_t data = Load(base, kData);
-  if (Load(base, data + 36) != 2) {
+  G::data(base).set_answer(1);
+  const Data data = G::data(base);
+  if (data.buy_step() != 2) {
     return r3;
   }
   const uint32_t movie = FindMovie(base, 4, frame + 80);
-  const uint32_t entry = SelectedEntry(base);
-  Store(base, data + 84, Load(base, data + 84) - Load(base, entry + 744));
-  return calls.Call(kSetNumberText, frame, 0x821819F4, movie, 15, 9,
-                    Load(base, Load(base, kData) + 84));
+  const Entry entry = SelectedEntry(base);
+  data.set_money(data.money() - entry.price());
+  return calls.Call(kSetNumberText, frame, 0x821819F4, movie, 15, 9, G::data(base).money());
 }
 
 uint64_t UpdatePage(uint8_t* base, uint64_t r3, uint64_t mode, uint32_t sp, const Calls& calls) {
@@ -235,7 +241,7 @@ uint64_t UpdatePage(uint8_t* base, uint64_t r3, uint64_t mode, uint32_t sp, cons
   const uint32_t frame = Frame(base, sp, 112);
   static constexpr uint32_t kHandlers[6] = {0x82180F90, 0x82183428, 0x82183600,
                                             0x82181A10, 0x82181B98, 0x82181BE8};
-  const uint32_t page = Load(base, Load(base, kPages) + 0);
+  const uint32_t page = G::pages(base).page();
   for (uint32_t k = 0; k < 6; k++) {
     Store(base, frame + 80 + 4 * k, kHandlers[k]);
   }

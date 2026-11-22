@@ -22,6 +22,15 @@
 #include "race_screens/race_screens.h"
 #include "race_setup/race_setup.h"
 #include "save_data/save_data.h"
+#include "schema/app_start_up.h"
+#include "schema/car_makers.h"
+#include "schema/menu_sounds.h"
+#include "schema/race_setup.h"
+#include "schema/race_states.h"
+#include "schema/screen_constructors.h"
+#include "schema/tuning_screen.h"
+#include "schema/type8_screens.h"
+#include "schema/type67_screens.h"
 #include "screen_constructors/screen_constructors.h"
 #include "type67_screens/list_pages.h"
 #include "type8_screens/part_helpers.h"
@@ -40,13 +49,14 @@ using guest::StoreU32;
 namespace ts = type67_screens;
 namespace pg = type67_screens::pages;
 namespace rs = race_screens;
+using G = schema::Type8ScreensGlobals;
 
 constexpr uint32_t kNone = 0xFFFFFFFFu;
 constexpr uint64_t kMinusOne = ~uint64_t(0);
 // The course names' string ids (6 a row, rows overlapping) and the item
 // infos (16 bytes each).
-constexpr uint32_t kCourseTexts = 0x82010D70;
-constexpr uint32_t kItemInfos = 0x82010D90;
+constexpr uint32_t kCourseTexts = G::course_texts_address();
+constexpr uint32_t kItemInfos = G::course_infos_address();
 
 uint64_t SoundThunk(void* user, uint32_t function, const uint64_t args[4], int set, uint32_t r1,
                     uint32_t lr) {
@@ -59,30 +69,31 @@ uint64_t SoundThunk(void* user, uint32_t function, const uint64_t args[4], int s
 uint64_t SetShown(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child,
                   uint32_t shown) {
   const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
-  StoreU32(base, node + 80, shown);
+  schema::UiMovieNode(base, node).set_visible(shown);
   return node;
 }
 
 // FinishNamed, PlayNamed (chained 1) and LoopNamed of the screen's word at
-// `field` when it's >= 0 (each call reading it again).
-void Replay(uint8_t* base, const Calls& calls, uint32_t screen, uint32_t movie, uint32_t field,
-            uint32_t frame, const uint32_t lr[3]) {
-  if (int32_t(LoadU32(base, screen + field)) < 0) return;
-  calls.call(kFinishNamed, frame, lr[0], movie, LoadU32(base, screen + field));
-  pg::Play(calls, movie, LoadU32(base, screen + field), 1, frame, lr[1]);
-  calls.call(kLoopNamed, frame, lr[2], movie, LoadU32(base, screen + field));
+// `field` (its address) when it's >= 0 (each call reading it again).
+void Replay(uint8_t* base, const Calls& calls, uint32_t field, uint32_t movie, uint32_t frame,
+            const uint32_t lr[3]) {
+  if (int32_t(LoadU32(base, field)) < 0) return;
+  calls.call(kFinishNamed, frame, lr[0], movie, LoadU32(base, field));
+  pg::Play(calls, movie, LoadU32(base, field), 1, frame, lr[1]);
+  calls.call(kLoopNamed, frame, lr[2], movie, LoadU32(base, field));
 }
 
 // The scroll text of the kind list's selection, [+10820 + 4 × it].
 uint32_t KindText(uint8_t* base, uint32_t screen) {
-  return LoadU32(base, screen + ((rs::ListSelection(base, screen + 10144) + 2705) << 2));
+  const schema::Type8ListScreen ls(base, screen);
+  return LoadU32(base,
+                 ls.kind_texts_address() + (rs::ListSelection(base, ls.kind_list_address()) << 2));
 }
 
 // The race set-up's guest fallbacks and the float 0.0 Race::AddRacer gets.
 constexpr uint32_t kResetGlobal = 0x821021A8, kStagesSetRoute = 0x82101E90,
                    kRaceSetRoute = 0x82101D38, kMemcpy = 0x825A7410, kCarRefresh = 0x820C4998,
                    kAddRacer = 0x821017C0, kPlaceRacers = 0x82102048;
-constexpr uint32_t kZero = 0x82000A34;
 constexpr uint32_t kSetUpRaceFrame = 4096;
 constexpr uint32_t kGarageCarBytes = 1972;
 
@@ -107,12 +118,13 @@ uint64_t RunDone(const Calls& calls, uint32_t movie, uint32_t frame, uint32_t lr
 // +9644 or, where the original orders them so, +9656, +9644, +9660:
 // pg::ToPage).
 void StepThenPage(uint8_t* base, uint32_t screen, uint32_t page, uint32_t step) {
-  const uint32_t now = LoadU32(base, screen + 9644);
-  if (now != page) StoreU32(base, screen + 9652, now);
-  StoreU32(base, screen + 9660, kNone);
-  StoreU32(base, screen + 9656, step);
-  StoreU32(base, screen + 9648, page);
-  StoreU32(base, screen + 9644, kNone);
+  const schema::Type8ListScreen ls(base, screen);
+  const uint32_t now = ls.page();
+  if (now != page) ls.set_previous_page(now);
+  ls.set_queued_step(kNone);
+  ls.set_step(step);
+  ls.set_next_page(page);
+  ls.set_page(kNone);
 }
 
 }  // namespace
@@ -122,70 +134,96 @@ void StepThenPage(uint8_t* base, uint32_t screen, uint32_t page, uint32_t step) 
 uint64_t ListBaseConstruct(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_822574D0 Type8ListBase::Type8ListBase");
   const uint32_t screen = uint32_t(r3);
+  const schema::Type8ListScreen ls(base, screen);
   part_detail::Frame(base, sp, 96);
   screen_constructors::NodeListScreen(base, screen);
-  StoreU32(base, screen, kListBaseVtable);
-  for (uint32_t i = 0; i < 3; i++) StoreU32(base, screen + 10820 + 4 * i, 545 + i);
-  StoreU32(base, screen + 10832, 548);
-  StoreU32(base, screen + 10836, 549);
-  StoreU32(base, screen + 10840, kNone);
+  ls.set_vtable(kListBaseVtable);
+  for (uint32_t i = 0; i < 3; i++) StoreU32(base, ls.kind_texts_address() + 4 * i, 545 + i);
+  ls.set_unknown_10832(548);
+  ls.set_course_text(549);
+  ls.set_part_text(kNone);
   return r3;
 }
 
 uint64_t ListScreen8Construct(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8223F140 Type8ListScreen::Type8ListScreen");
   const uint32_t s = uint32_t(r3), frame = part_detail::Frame(base, sp, 112);
+  const schema::Type8ListScreen ls(base, s);
   ListBaseConstruct(base, r3, frame);
-  StoreU32(base, s, kListScreenVtable);
+  ls.set_vtable(kListScreenVtable);
   type8_screens::ListPartConstruct(base, r3 + kListScreenPart, frame);
-  StoreU32(base, s + 9676, uint32_t(r3 + kListScreenPart));
-  auto store = [&](uint32_t at, uint32_t value) { StoreU32(base, s + at, value); };
+  ls.set_part(uint32_t(r3 + kListScreenPart));
   // The node table's words through [+9672], read again where the original
   // reads it again.
-  auto table = [&] { return LoadU32(base, s + 9672); };
-  uint32_t t = table();
-  static constexpr uint32_t kFirst[][2] = {
-      {9832, 143}, {9848, 144}, {9852, 145}, {9856, 146}, {9868, 60},  {9872, 148},
-      {9876, 5},   {9880, kNone}, {9860, 0},  {10840, 10}, {9912, 78},  {9896, 7},
-      {9820, 7},   {9904, 117}, {9908, 118}, {9916, 79},  {9900, 65},  {9892, 6},
-      {9888, 4},   {9728, 6},   {9824, 1},
-  };
-  for (const auto& w : kFirst) store(w[0], w[1]);
-  StoreU32(base, t + 8, 10);
+  auto table = [&] { return ls.node_table(); };
+  schema::PairedNodeTable t = table();
+  ls.set_opening_anim_c(143);
+  ls.set_course_in_anim(144);
+  ls.set_course_out_anim(145);
+  ls.set_opening_loop_a(146);
+  ls.set_opened_loop_a(60);
+  ls.set_course_loop(148);
+  ls.set_opened_loop_b(5);
+  ls.set_opened_loop_c(kNone);
+  ls.set_opening_loop_b(0);
+  ls.set_part_text(10);
+  ls.set_arrow_up_anim(78);
+  ls.set_toggle_anim_off(7);
+  ls.set_prompt_node(7);
+  ls.set_unknown_9904(117);
+  ls.set_unknown_9908(118);
+  ls.set_arrow_down_anim(79);
+  ls.set_selection_anim(65);
+  ls.set_toggle_anim_on(6);
+  ls.set_opening_anim_b(4);
+  ls.set_part_node_set(6);
+  ls.set_part_node(1);
+  t.set_node_set_a(10);
   t = table();
-  StoreU32(base, t + 12, 9);
-  static constexpr uint32_t kSecond[][2] = {
-      {9716, 10}, {9776, 0x82637020}, {9724, 15}, {9712, 0},  {9720, 11}, {9752, 8},
-      {9756, 9},  {9768, 3},          {9800, 0},  {9804, 1},  {9748, 0},
-  };
-  for (const auto& w : kSecond) store(w[0], w[1]);
-  for (uint32_t i = 0; i < 4; i++) StoreU32(base, table() + 296 + 4 * i, 6 + i);
-  store(9788, 1);
-  store(9784, 2);
+  t.set_node_set_b(9);
+  ls.set_unknown_9716(10);
+  ls.set_selection_array(0x82637020);
+  ls.set_selection_node_set(15);
+  ls.set_unknown_9712(0);
+  ls.set_unknown_9720(11);
+  ls.set_arrow_a_node(8);
+  ls.set_arrow_b_node(9);
+  ls.set_selection_node(3);
+  ls.set_arrow_on_frame(0);
+  ls.set_arrow_off_frame(1);
+  ls.set_marker_node(0);
+  for (uint32_t i = 0; i < 4; i++) StoreU32(base, table().children_address() + 4 * i, 6 + i);
+  ls.set_unknown_9788(1);
+  ls.set_selection_entries(2);
   for (uint32_t i = 0; i < 27; i++) {
-    const uint32_t at = table() + 16 + 4 * i;
-    StoreU32(base, at + 140, 1 + i);
-    StoreU32(base, table() + 16 + 4 * i, 8 + i);
+    StoreU32(base, table().item_nodes_address() + 4 * i, 1 + i);
+    StoreU32(base, table().item_anims_address() + 4 * i, 8 + i);
   }
-  for (uint32_t i = 0; i < 8; i++) StoreU32(base, table() + 124 + 4 * i, 39 + i);
-  for (uint32_t i = 0; i < 6; i++) store(9936 + 4 * i, 107 + i);
+  for (uint32_t i = 0; i < 8; i++) StoreU32(base, table().more_anims_address() + 4 * i, 39 + i);
+  for (uint32_t i = 0; i < 6; i++) StoreU32(base, ls.course_anims_address() + 4 * i, 107 + i);
   t = table();
-  static constexpr uint32_t kThird[][2] = {
-      {9732, 2}, {9812, 4}, {9740, 1}, {9816, 0}, {9976, 68}, {9980, 69}, {9984, 70},
-  };
-  for (const auto& w : kThird) store(w[0], w[1]);
-  StoreU32(base, t + 420, 6);
-  StoreU32(base, table() + 424, 55);
-  static constexpr uint32_t kLast[][2] = {
-      {9708, 1}, {9928, 130}, {9932, 129}, {9744, 20}, {9828, 0}, {9736, 20}, {9808, 0},
-  };
-  for (const auto& w : kLast) store(w[0], w[1]);
+  ls.set_icons_node_set(2);
+  ls.set_icons_child(4);
+  ls.set_scroll_text_node_set(1);
+  ls.set_scroll_text_child(0);
+  ls.set_kind_anim0(68);
+  ls.set_kind_anim1(69);
+  ls.set_kind_anim2(70);
+  t.set_extra_node_base(6);
+  table().set_text_node_base(55);
+  ls.set_show_part_nodes(1);
+  ls.set_unknown_9928(130);
+  ls.set_unknown_9932(129);
+  ls.set_item_node_set(20);
+  ls.set_item_cursor_child(0);
+  ls.set_color_cursor_node_set(20);
+  ls.set_color_cursor_child(0);
   return r3;
 }
 
 uint64_t ListBaseDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82257548 Type8ListBase::~Type8ListBase");
-  StoreU32(base, uint32_t(r3), kListBaseVtable);
+  schema::Type8ListScreen(base, uint32_t(r3)).set_vtable(kListBaseVtable);
   return ts::NodeListScreenDestruct(base, r3, sp, calls);
 }
 
@@ -193,7 +231,7 @@ uint64_t ListBaseDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, ui
                                   const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82257B20 Type8ListBase::DeletingDestructor");
   const uint32_t frame = part_detail::Frame(base, sp, 112);
-  StoreU32(base, uint32_t(r3), kListBaseVtable);
+  schema::Type8ListScreen(base, uint32_t(r3)).set_vtable(kListBaseVtable);
   ts::NodeListScreenDestruct(base, r3, frame, calls);
   if ((flags & 1) != 0) {
     // operator delete, r4 as the destructor left it.
@@ -218,30 +256,31 @@ uint64_t ListScreen8DeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags,
 
 uint64_t ListScreen8IsLoaded(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_8223F590 Type8ListScreen::IsLoaded");
-  return ui_movies::IsLoaded(base, LoadU32(base, uint32_t(r3) + 9680));
+  return ui_movies::IsLoaded(base, schema::Type8ListScreen(base, uint32_t(r3)).movie_id());
 }
 
 uint64_t ListScreen8OpenMovie(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
                               const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8223F3E0 Type8ListScreen::OpenMovie");
-  return calls.open(LoadU32(base, uint32_t(r3) + 9680), 22584, sp, lr);
+  return calls.open(schema::Type8ListScreen(base, uint32_t(r3)).movie_id(), 22584, sp, lr);
 }
 
 uint64_t ListScreen8Release(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
                             const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8223F588 Type8ListScreen::Release");
-  return calls.remove(LoadU32(base, uint32_t(r3) + 9680), sp, lr);
+  return calls.remove(schema::Type8ListScreen(base, uint32_t(r3)).movie_id(), sp, lr);
 }
 
 uint64_t ListScreen8SetItemTexts(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
                                  const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8223F5D8 Type8ListScreen::SetItemTexts");
   const uint32_t s = uint32_t(r3), frame = part_detail::Frame(base, sp, 128);
+  const schema::Type8ListScreen ls(base, s);
   const uint32_t movie = pg::MovieOf(base, s, frame);
   const uint32_t texts = (uint32_t(r4) << 2) + kCourseTexts;
   uint64_t result = 0;
   for (uint32_t i = 0; i < 6; i++) {
-    result = calls.set_text(frame, 0x8223F630, movie, LoadU32(base, s + 9744), 5 + i,
+    result = calls.set_text(frame, 0x8223F630, movie, ls.item_node_set(), 5 + i,
                             LoadU32(base, texts + 4 * i));
   }
   return result;
@@ -252,7 +291,11 @@ uint64_t ListScreen8ItemInfo(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t i
   const uint32_t item = uint32_t(r4);
   if (item > 7) return r3;
   const uint32_t from = (item << 4) + kItemInfos;
-  for (uint32_t i = 0; i < 16; i += 4) StoreU32(base, info + i, LoadU32(base, from + i));
+  const schema::Type8CourseInfo to(base, info), of(base, from);
+  to.set_third_pair(of.third_pair());
+  to.set_first_pair(of.first_pair());
+  to.set_second_pair(of.second_pair());
+  to.set_fourth_pair(of.fourth_pair());
   return r3;
 }
 
@@ -263,14 +306,14 @@ uint64_t ListScreen8ShowMarks(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t 
   const uint32_t which = uint32_t(r4);
   uint32_t node = ui_movies::FindNode(base, movie, kNone, 7);
   if (int32_t(which) < 0) {
-    StoreU32(base, node + 80, 0);
+    schema::UiMovieNode(base, node).set_visible(0);
     return node;
   }
-  StoreU32(base, node + 80, 1);
+  schema::UiMovieNode(base, node).set_visible(1);
   node = ui_movies::FindNode(base, movie, kNone, 17);
-  StoreU32(base, node + 80, which != 0 ? 1 : 0);
+  schema::UiMovieNode(base, node).set_visible(which != 0 ? 1 : 0);
   node = ui_movies::FindNode(base, movie, kNone, 18);
-  StoreU32(base, node + 80, which != 2 ? 1 : 0);
+  schema::UiMovieNode(base, node).set_visible(which != 2 ? 1 : 0);
   return node;
 }
 
@@ -289,13 +332,14 @@ uint64_t ListScreen8SetLabels(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
 uint64_t ListScreen8SetUpMenus(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8223F3F0 Type8ListScreen::SetUpMenus");
   const uint32_t s = uint32_t(r3), frame = part_detail::Frame(base, sp, 176);
-  part_detail::InitList(base, s + 10216, {8, 6, 1, 154, 153, 155, 156, 159, 158}, frame,
-                        0x8223F434, calls);
-  part_detail::InitList(base, s + 10288, {2, 2, 1, 156, 155, 154, 153, 159, 158}, frame,
+  const schema::Type8ListScreen ls(base, s);
+  part_detail::InitList(base, ls.course_list_address(), {8, 6, 1, 154, 153, 155, 156, 159, 158},
+                        frame, 0x8223F434, calls);
+  part_detail::InitList(base, ls.toggle_address(), {2, 2, 1, 156, 155, 154, 153, 159, 158}, frame,
                         0x8223F464, calls);
-  rs::ListSetSelection(base, s + 10288, 1);
-  part_detail::InitList(base, s + 10144, {3, 3, 1, 154, 153, 155, 156, 159, 158}, frame,
-                        0x8223F49C, calls);
+  rs::ListSetSelection(base, ls.toggle_address(), 1);
+  part_detail::InitList(base, ls.kind_list_address(), {3, 3, 1, 154, 153, 155, 156, 159, 158},
+                        frame, 0x8223F49C, calls);
   ts::Slot(base, r3, 8, 0, frame, 0x8223F4B4, calls);
   ts::Slot(base, r3, 108, std::nullopt, frame, 0x8223F4C8, calls);
   calls.set_r4(0);
@@ -305,9 +349,9 @@ uint64_t ListScreen8SetUpMenus(uint8_t* base, uint64_t r3, uint32_t sp, const Ca
   // &cue 2 and, when it answers a nonzero byte, its StopCue (slot 13); then
   // slot 14 for bank 1's cue 0 and, when it isn't playing, Sound::Play.
   auto slot = [&](uint32_t offset, uint32_t bank, uint32_t cue, uint32_t lr) {
-    const uint32_t manager = LoadU32(base, menu_sounds::kSoundManager);
-    const uint64_t args[6] = {manager, bank, cue, 0, 0, 0};
-    return calls.call_set(LoadU32(base, LoadU32(base, manager) + offset), args, 3, frame, lr);
+    const schema::AudioManager manager = schema::MenuSoundsGlobals::sound_manager(base);
+    const uint64_t args[6] = {manager.address, bank, cue, 0, 0, 0};
+    return calls.call_set(LoadU32(base, manager.vtable().address + offset), args, 3, frame, lr);
   };
   StoreU32(base, frame + 96, 2);
   StoreU32(base, frame + 100, 1);
@@ -332,20 +376,21 @@ uint64_t ListScreen8SetUpRace(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t 
   ITC_NATIVE_RUNNING("sub_8223F778 Type8ListScreen::SetUpRace");
   namespace rsu = race_setup;
   const uint32_t s = uint32_t(r3), frame = part_detail::Frame(base, sp, kSetUpRaceFrame);
-  auto data = [base] { return LoadU32(base, rsu::kRaceData); };
+  const schema::Type8ListScreen ls(base, s);
+  auto data = [base] { return schema::RaceSetupGlobals::race_data(base).address; };
   if (!rsu::RaceDataResetGlobal(base, frame - 112)) {
     pg::Call1(calls, kResetGlobal, r3, frame, 0x8223F794);
   }
   rsu::StagesClear(base, data() + rsu::kStageList);
-  StoreU32(base, data() + 0xA3AF0, 4);
-  StoreU32(base, data() + 0xA3AF4, 5);
-  vehicle_accessors::RaceDataSetWord32(base, rs::ListSelection(base, s + 10144));
+  schema::RaceData(base, data()).set_kind(4);
+  schema::RaceData(base, data()).set_race_mode(5);
+  vehicle_accessors::RaceDataSetWord32(base, rs::ListSelection(base, ls.kind_list_address()));
   // The course: the course list's +4 plus its selection, 0 to 7 (the
   // switch's cases each answer their own index; case 0 is the merged piece
   // Type8ListScreen::AddRacers sub_8223F818). The recompiled switch traps
   // past 7 (the original's jump table read past its end); never in play.
   const uint32_t route =
-      LoadU32(base, s + 10220) + rs::ListSelection(base, s + 10216);
+      ls.course_list_scroll() + rs::ListSelection(base, ls.course_list_address());
   if (route > 7) {
     ITC_LOG_ERROR("Type8ListScreen::SetUpRace: course {} past the switch's cases", route);
     __builtin_trap();
@@ -361,18 +406,18 @@ uint64_t ListScreen8SetUpRace(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t 
   }
   // The traffic (the toggle's first item: 3).
   vehicle_accessors::RaceDataSetWord59618(
-      base, rs::ListSelection(base, s + 10288) == 0 ? 3 : 0);
+      base, rs::ListSelection(base, ls.toggle_address()) == 0 ? 3 : 0);
   // The two players' racer records at the frame's +80: the garage cars,
   // each one's +3892 whether its player's first menu (the list part's
   // blocks' +84) is at its first item.
-  const double zero = double(std::bit_cast<float>(LoadU32(base, kZero)));
+  const double zero = double(std::bit_cast<float>(schema::AppStartUpGlobals::float_zero(base)));
   const uint32_t record = frame + 80;
   for (uint32_t player = 0; player < 2; player++) {
-    const uint32_t car = kGarageCars + kGarageCarBytes * player;
+    const uint32_t car = G::garage_cars_address() + kGarageCarBytes * player;
     const uint32_t menu = s + 10864 + (player == 0 ? 124 : 356);
     const uint32_t first = rs::ListSelection(base, menu) == 0 ? 1 : 0;
     rsu::RacerRecordInit(base, record);
-    rsu::SetModel(base, record, LoadU32(base, car + 12));
+    rsu::SetModel(base, record, schema::CarMakersCar(base, car).car_id());
     StoreU32(base, frame + 3972, first);
     if (!native::Buffers_Memcpy(base, record, car, 1884, 0x8223F8F4)) {
       const uint64_t args[6] = {record, car, 1884, 0, 0, 0};
@@ -414,7 +459,7 @@ uint64_t ListBaseDraw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, cons
       ts::kEmpty, ts::kEmpty, 0x82257588, 0x82257768, 0x82258A40,
       0x82258AD0, 0x822578D8, ts::kEmpty, 0x82257900, 0x82255818};
   pg::BuildTable(base, frame, kListBasePageGuard, kListBasePages, kEntries, 10);
-  const uint32_t page = LoadU32(base, uint32_t(r3) + 9644);
+  const uint32_t page = schema::Type8ListScreen(base, uint32_t(r3)).page();
   if (page == kNone) return r3;
   const uint32_t entry = kListBasePages + (page << 3);
   const uint32_t target = LoadU32(base, entry);
@@ -426,9 +471,9 @@ uint64_t ListBaseUpdate(uint8_t* base, uint64_t r3, std::optional<uint64_t> r5, 
                         const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82258EB0 Type8ListBase::Update");
   const uint32_t frame = part_detail::Frame(base, sp, 160);
-  const uint32_t step = LoadU32(base, uint32_t(r3) + 9656);
+  const uint32_t step = schema::Type8ListScreen(base, uint32_t(r3)).step();
   // r4 the guard's word as loaded (the original keeps it there).
-  const uint32_t guard = LoadU32(base, kListBaseStepGuard);
+  const uint32_t guard = G::list_base_step_guard(base);
   static constexpr uint32_t kEntries[6] = {0x82258158, 0x82258648, 0x82258BE0,
                                            0x82258438, 0x822580E0, 0x82258578};
   if (pg::BuildTable(base, frame, kListBaseStepGuard, kListBaseSteps, kEntries, 6)) {
@@ -445,11 +490,10 @@ uint64_t ListBaseUpdate(uint8_t* base, uint64_t r3, std::optional<uint64_t> r5, 
 uint64_t ListBasePage2(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82257588 Type8ListBase::Page2");
   const uint32_t s = uint32_t(r3), frame = part_detail::Frame(base, sp, 112);
+  const schema::Type8ListScreen ls(base, s);
   const uint64_t list = r3 + 10144;
   pg::Call1(calls, rs::kListUpdate, list, frame, 0x822575AC);
-  const uint32_t kinds = uint32_t(list);
-  if (LoadU32(base, s + 10168) != 0 ||
-      LoadU32(base, kinds + 4) - LoadU32(base, kinds + 8) != 0) {
+  if (ls.kind_list_move() != 0 || ls.kind_list_scroll() - ls.kind_list_scroll_before() != 0) {
     // The kind moved: its scroll text, page 2 after step 1.
     pg::PlaySound(base, 4, frame, calls);
     ts::ListScreenShowSelection(base, r3, list, frame, calls);
@@ -460,27 +504,27 @@ uint64_t ListBasePage2(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& cal
     // Into the course list from its first item: page 3 after step 2.
     pg::PlaySound(base, 0, frame, calls);
     StepThenPage(base, s, 3, 2);
-    StoreU32(base, s + 10220, 0);
-    rs::ListSetSelection(base, s + 10216, 0);
-    ts::Slot(base, r3, 8, LoadU32(base, s + 10220), frame, 0x8225763C, calls);
-    const uint32_t first = LoadU32(base, s + 10220);
-    const uint32_t selection = rs::ListSelection(base, s + 10216);
+    ls.set_course_list_scroll(0);
+    rs::ListSetSelection(base, ls.course_list_address(), 0);
+    ts::Slot(base, r3, 8, ls.course_list_scroll(), frame, 0x8225763C, calls);
+    const uint32_t first = ls.course_list_scroll();
+    const uint32_t selection = rs::ListSelection(base, ls.course_list_address());
     return ts::NodeListScreenLoadItem(base, r3, uint64_t(first) + uint64_t(selection), frame,
                                       calls);
   }
   if (int32_t(uint32_t(pg::Call1(calls, rs::kListCancelled, list, frame, 0x82257664))) != 0) {
     // Back out: page 8 with the screen fades' fade-out.
     pg::PlaySound(base, 2, frame, calls);
-    const uint32_t now = LoadU32(base, s + 9644);
-    if (now != 8) StoreU32(base, s + 9652, now);
-    StoreU32(base, s + 9656, kNone);
-    StoreU32(base, s + 9660, kNone);
-    StoreU32(base, s + 9644, 8);
+    const uint32_t now = ls.page();
+    if (now != 8) ls.set_previous_page(now);
+    ls.set_step(kNone);
+    ls.set_queued_step(kNone);
+    ls.set_page(8);
     return pg::FadeOut(base, calls);
   }
   const uint64_t toggle = r3 + 10288;
   const uint64_t result = pg::Call1(calls, rs::kListUpdate, toggle, frame, 0x822576C4);
-  if (LoadU32(base, s + 10312) == 0) return result;
+  if (ls.toggle_move() == 0) return result;
   pg::PlaySound(base, 4, frame, calls);
   return ts::ListScreenOnToggleMoved(base, r3, toggle, frame, calls);
 }
@@ -488,52 +532,53 @@ uint64_t ListBasePage2(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& cal
 uint64_t ListBasePage3(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82257768 Type8ListBase::Page3");
   const uint32_t s = uint32_t(r3), frame = part_detail::Frame(base, sp, 112);
+  const schema::Type8ListScreen ls(base, s);
   const uint64_t list = r3 + 10216;
   pg::Call1(calls, rs::kListUpdate, list, frame, 0x8225778C);
   const uint32_t courses = uint32_t(list);
-  if (LoadU32(base, s + 10240) != 0 ||
-      LoadU32(base, courses + 4) - LoadU32(base, courses + 8) != 0) {
+  if (ls.course_list_move() != 0 ||
+      ls.course_list_scroll() - ls.course_list_scroll_before() != 0) {
     // The course moved: its texts and item, page 3 after step 4.
     pg::PlaySound(base, 4, frame, calls);
-    ts::Slot(base, r3, 8, LoadU32(base, s + 10220), frame, 0x82257870, calls);
+    ts::Slot(base, r3, 8, ls.course_list_scroll(), frame, 0x82257870, calls);
     ts::PairedNodeTableSavePairs(base, r3 + 10360);
-    const uint32_t first = LoadU32(base, s + 10220);
+    const uint32_t first = ls.course_list_scroll();
     const uint32_t selection = rs::ListSelection(base, courses);
     const uint64_t result =
         ts::NodeListScreenLoadItem(base, r3, uint64_t(first) + uint64_t(selection), frame, calls);
-    const uint32_t now = LoadU32(base, s + 9644);
-    if (now != 3) StoreU32(base, s + 9652, now);
-    StoreU32(base, s + 9644, kNone);
-    StoreU32(base, s + 9648, 3);
-    StoreU32(base, s + 9656, 4);
-    StoreU32(base, s + 9660, kNone);
+    const uint32_t now = ls.page();
+    if (now != 3) ls.set_previous_page(now);
+    ls.set_page(kNone);
+    ls.set_next_page(3);
+    ls.set_step(4);
+    ls.set_queued_step(kNone);
     return result;
   }
   if (int32_t(uint32_t(pg::Call1(calls, rs::kListAccepted, list, frame, 0x822577B0))) != 0) {
     // Page 4 (the list part).
     const uint64_t result = pg::PlaySound(base, 0, frame, calls);
-    const uint32_t now = LoadU32(base, s + 9644);
-    if (now != 4) StoreU32(base, s + 9652, now);
-    StoreU32(base, s + 9644, 4);
-    StoreU32(base, s + 9656, kNone);
-    StoreU32(base, s + 9660, kNone);
+    const uint32_t now = ls.page();
+    if (now != 4) ls.set_previous_page(now);
+    ls.set_page(4);
+    ls.set_step(kNone);
+    ls.set_queued_step(kNone);
     return result;
   }
   if (int32_t(uint32_t(pg::Call1(calls, rs::kListCancelled, list, frame, 0x822577EC))) != 0) {
     // Back to the kind list: page 2 after step 3.
     pg::PlaySound(base, 2, frame, calls);
     const uint64_t result = type8_screens::PairedNodeTableClear(base, r3 + 10360, frame, calls);
-    const uint32_t now = LoadU32(base, s + 9644);
-    if (now != 2) StoreU32(base, s + 9652, now);
-    StoreU32(base, s + 9644, kNone);
-    StoreU32(base, s + 9648, 2);
-    StoreU32(base, s + 9656, 3);
-    StoreU32(base, s + 9660, kNone);
+    const uint32_t now = ls.page();
+    if (now != 2) ls.set_previous_page(now);
+    ls.set_page(kNone);
+    ls.set_next_page(2);
+    ls.set_step(3);
+    ls.set_queued_step(kNone);
     return result;
   }
   const uint64_t toggle = r3 + 10288;
   const uint64_t result = pg::Call1(calls, rs::kListUpdate, toggle, frame, 0x8225782C);
-  if (LoadU32(base, s + 10312) == 0) return result;
+  if (ls.toggle_move() == 0) return result;
   pg::PlaySound(base, 4, frame, calls);
   return ts::ListScreenOnToggleMoved(base, r3, toggle, frame, calls);
 }
@@ -541,13 +586,14 @@ uint64_t ListBasePage3(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& cal
 uint64_t ListBasePage4(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82258A40 Type8ListBase::Page4");
   const uint32_t s = uint32_t(r3), frame = part_detail::Frame(base, sp, 96);
-  const uint32_t part = LoadU32(base, s + 9676);
+  const schema::Type8ListScreen ls(base, s);
+  const uint32_t part = ls.part().address;
   if (part != 0) {
     // Slot 1 (ListPartBase::Open) with r4 as the page was given it.
     ts::Slot(base, part, 4, std::nullopt, frame, 0x82258A70, calls);
-    StoreU32(base, s + 9696, 1);
+    ls.set_part_open(1);
   }
-  ts::ListScreenSetScrollText(base, r3, LoadU32(base, s + 10840), 1, frame, calls);
+  ts::ListScreenSetScrollText(base, r3, ls.part_text(), 1, frame, calls);
   pg::ToPage(base, s, 5);
   return type8_screens::ListBaseDimList(base, r3, 1, frame, calls);
 }
@@ -555,7 +601,8 @@ uint64_t ListBasePage4(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& cal
 uint64_t ListBasePage5(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82258AD0 Type8ListBase::Page5");
   const uint32_t s = uint32_t(r3), frame = part_detail::Frame(base, sp, 96);
-  const uint32_t part = LoadU32(base, s + 9676);
+  const schema::Type8ListScreen ls(base, s);
+  const uint32_t part = ls.part().address;
   if (part == 0) {
     pg::ToPage(base, s, 9);
     return part;
@@ -563,19 +610,19 @@ uint64_t ListBasePage5(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, con
   // Slot 2 (ListPartBase::Pick) with the page's r4.
   const uint64_t picked = ts::Slot(base, part, 8, r4, frame, 0x82258B00, calls);
   if (int32_t(uint32_t(picked)) == 0) return picked;
-  const uint32_t now = LoadU32(base, s + 9676);
-  if (LoadU32(base, now + 4) != 0) {
+  const schema::Type8ListPart now = ls.part();
+  if (now.yes() != 0) {
     // Yes: page 6, the race set.
     pg::ToPage(base, s, 6);
-    StoreU32(base, s + 9696, 0);
-    StoreU32(base, s + 9688, 1);
+    ls.set_part_open(0);
+    ls.set_race_set(1);
     return picked;
   }
-  if (LoadU32(base, now + 8) == 0) return picked;
+  if (now.back() == 0) return picked;
   // Back: page 3, the course list's scroll text, the list undimmed.
   pg::ToPage(base, s, 3);
-  StoreU32(base, s + 9696, 0);
-  ts::ListScreenSetScrollText(base, r3, LoadU32(base, s + 10836), 1, frame, calls);
+  ls.set_part_open(0);
+  ts::ListScreenSetScrollText(base, r3, ls.course_text(), 1, frame, calls);
   return type8_screens::ListBaseDimList(base, r3, 0, frame, calls);
 }
 
@@ -587,7 +634,8 @@ uint64_t ListBasePage6(uint8_t* base, uint64_t r3) {
 
 uint64_t ListBasePage8(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_82257900 Type8ListBase::Page8");
-  if ((LoadU32(base, ts::kFadeCountA) | LoadU32(base, ts::kFadeCountB)) != 0) return r3;
+  if ((schema::Type67ScreensGlobals::fade_out_count(base) |
+       schema::Type67ScreensGlobals::fade_in_count(base)) != 0) return r3;
   pg::ToPage(base, uint32_t(r3), 9);
   return r3;
 }
@@ -597,42 +645,43 @@ uint64_t ListBasePage8(uint8_t* base, uint64_t r3) {
 uint64_t ListBaseStep0(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82258158 Type8ListBase::Step0");
   const uint32_t s = uint32_t(r3), frame = part_detail::Frame(base, sp, 128);
+  const schema::Type8ListScreen ls(base, s);
   const uint32_t movie = pg::MovieOf(base, s, frame);
-  if (LoadU32(base, s + 9668) == 0) {
+  if (ls.step_started() == 0) {
     // FinishNamed and PlayNamed (chained 1) of +9864, +9888, +9832.
-    static constexpr uint32_t kPlayed[3][3] = {{9864, 0x822581A4, 0x822581C0},
-                                               {9888, 0x822581D4, 0x822581F0},
-                                               {9832, 0x82258204, 0x82258220}};
-    for (const auto& p : kPlayed) {
-      if (int32_t(LoadU32(base, s + p[0])) < 0) continue;
-      calls.call(kFinishNamed, frame, p[1], movie, LoadU32(base, s + p[0]));
-      pg::Play(calls, movie, LoadU32(base, s + p[0]), 1, frame, p[2]);
+    const uint32_t played[3][3] = {{ls.opening_anim_a_address(), 0x822581A4, 0x822581C0},
+                                   {ls.opening_anim_b_address(), 0x822581D4, 0x822581F0},
+                                   {ls.opening_anim_c_address(), 0x82258204, 0x82258220}};
+    for (const auto& p : played) {
+      if (int32_t(LoadU32(base, p[0])) < 0) continue;
+      calls.call(kFinishNamed, frame, p[1], movie, LoadU32(base, p[0]));
+      pg::Play(calls, movie, LoadU32(base, p[0]), 1, frame, p[2]);
     }
     static constexpr uint32_t kLr9856[3] = {0x82258234, 0x82258250, 0x8225825C};
     static constexpr uint32_t kLr9860[3] = {0x82258270, 0x8225828C, 0x82258298};
-    Replay(base, calls, s, movie, 9856, frame, kLr9856);
-    Replay(base, calls, s, movie, 9860, frame, kLr9860);
+    Replay(base, calls, ls.opening_loop_a_address(), movie, frame, kLr9856);
+    Replay(base, calls, ls.opening_loop_b_address(), movie, frame, kLr9860);
     for (uint32_t i = 0; i < 10; i++) {
-      const uint32_t named = LoadU32(base, s + 9976 + 4 * i);
+      const uint32_t named = LoadU32(base, ls.kind_anims_address() + 4 * i);
       if (int32_t(named) >= 0) calls.call(kFinishNamed, frame, 0x822582B4, movie, named);
     }
     ts::ListScreenClearScrollText(base, r3, frame, calls);
     ts::ListScreenSetScrollText(base, r3, KindText(base, s), 1, frame, calls);
     // Slot 26 (ShowMarks) with r4 = -1.
     ts::Slot(base, r3, 104, kMinusOne, frame, 0x82258304, calls);
-    mode_tick::ScreenFadesFadeIn(base, LoadU32(base, kFadeInPasses), 0, 0, 0, 0);
+    mode_tick::ScreenFadesFadeIn(base, G::fade_in_passes(base), 0, 0, 0, 0);
     calls.set_r4(0);
-    StoreU32(base, s + 9668, 1);
+    ls.set_step_started(1);
   }
   uint64_t done = RunDone(calls, movie, frame, 0x82258334);
-  if (int32_t(LoadU32(base, s + 9832)) < 0 && int32_t(LoadU32(base, s + 9864)) < 0) done = 1;
+  if (int32_t(ls.opening_anim_c()) < 0 && int32_t(ls.opening_anim_a()) < 0) done = 1;
   if (done == 0) return 0;
   static constexpr uint32_t kLr9868[3] = {0x82258374, 0x82258390, 0x8225839C};
   static constexpr uint32_t kLr9876[3] = {0x822583B0, 0x822583CC, 0x822583D8};
   static constexpr uint32_t kLr9880[3] = {0x822583EC, 0x82258408, 0x82258414};
-  Replay(base, calls, s, movie, 9868, frame, kLr9868);
-  Replay(base, calls, s, movie, 9876, frame, kLr9876);
-  Replay(base, calls, s, movie, 9880, frame, kLr9880);
+  Replay(base, calls, ls.opened_loop_a_address(), movie, frame, kLr9868);
+  Replay(base, calls, ls.opened_loop_b_address(), movie, frame, kLr9876);
+  Replay(base, calls, ls.opened_loop_c_address(), movie, frame, kLr9880);
   // ListScreen::LoopSecondNode and ShowToggle.
   ts::ListScreenLoopNode(base, r3, r3 + 10144, 9976, frame, calls);
   ts::ListScreenShowToggle(base, r3, r3 + 10288, frame, calls);
@@ -642,22 +691,23 @@ uint64_t ListBaseStep0(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& cal
 uint64_t ListBaseStep1(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82258648 Type8ListBase::Step1");
   const uint32_t s = uint32_t(r3), frame = part_detail::Frame(base, sp, 144);
+  const schema::Type8ListScreen ls(base, s);
   const uint32_t movie = pg::MovieOf(base, s, frame);
-  const uint32_t kinds = s + 10144;
+  const uint32_t kinds = ls.kind_list_address();
   const uint32_t selection = rs::ListSelection(base, kinds);
   // MenuList::GetPreviousSelection (sub_8220BC28): +20.
-  const uint32_t previous = LoadU32(base, kinds + 20);
+  const uint32_t previous = ls.kind_list_selection_before();
   const int32_t moved = int32_t(selection - previous);
-  if (LoadU32(base, s + 9668) == 0) {
+  if (ls.step_started() == 0) {
     if (moved != 0) {
       // The kinds' named animations, [+9976 + 4i]: the previous one's
       // finished, the new one's replayed.
       if (int32_t(previous) >= 0) {
-        const uint32_t named = LoadU32(base, s + ((previous + 2494) << 2));
+        const uint32_t named = LoadU32(base, ls.kind_anims_address() + (previous << 2));
         if (int32_t(named) >= 0) calls.call(kFinishNamed, frame, 0x822586CC, movie, named);
       }
       if (int32_t(selection) >= 0) {
-        const uint32_t named = LoadU32(base, s + ((selection + 2494) << 2));
+        const uint32_t named = LoadU32(base, ls.kind_anims_address() + (selection << 2));
         if (int32_t(named) >= 0) {
           calls.call(kFinishNamed, frame, 0x822586F4, movie, named);
           pg::Play(calls, movie, named, 1, frame, 0x82258710);
@@ -666,8 +716,8 @@ uint64_t ListBaseStep1(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& cal
       }
       // The direction's arrow (+9916 down, +9912 up) played once a step
       // moved, the other finished.
-      const uint32_t play = LoadU32(base, s + (moved > 0 ? 9916 : 9912));
-      const uint32_t other = LoadU32(base, s + (moved > 0 ? 9912 : 9916));
+      const uint32_t play = moved > 0 ? ls.arrow_down_anim() : ls.arrow_up_anim();
+      const uint32_t other = moved > 0 ? ls.arrow_up_anim() : ls.arrow_down_anim();
       if (int32_t(other) >= 0) calls.call(kFinishNamed, frame, 0x82258748, movie, other);
       if (int32_t(play) >= 0) {
         const uint32_t sign = uint32_t(moved >> 31);
@@ -679,7 +729,7 @@ uint64_t ListBaseStep1(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& cal
         if (count > 1) calls.call(kFinishNamed, frame, 0x822587A8, movie, play);
       }
     }
-    StoreU32(base, s + 9668, 1);
+    ls.set_step_started(1);
   }
   calls.call(ts::kRun, frame, 0x822587BC, movie, 0);
   return 1;
@@ -688,62 +738,65 @@ uint64_t ListBaseStep1(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& cal
 uint64_t ListBaseStep2(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82258BE0 Type8ListBase::Step2");
   const uint32_t s = uint32_t(r3), frame = part_detail::Frame(base, sp, 128);
+  const schema::Type8ListScreen ls(base, s);
   const uint32_t movie = pg::MovieOf(base, s, frame);
-  if (LoadU32(base, s + 9668) == 0) {
-    if (int32_t(LoadU32(base, s + 9884)) >= 0) {
-      pg::Play(calls, movie, LoadU32(base, s + 9884), 1, frame, 0x82258C3C);
-      calls.call(kLoopNamed, frame, 0x82258C48, movie, LoadU32(base, s + 9884));
+  if (ls.step_started() == 0) {
+    if (int32_t(ls.course_select_anim()) >= 0) {
+      pg::Play(calls, movie, ls.course_select_anim(), 1, frame, 0x82258C3C);
+      calls.call(kLoopNamed, frame, 0x82258C48, movie, ls.course_select_anim());
     }
-    if (int32_t(LoadU32(base, s + 9848)) >= 0) {
-      pg::Play(calls, movie, LoadU32(base, s + 9848), 0, frame, 0x82258C6C);
+    if (int32_t(ls.course_in_anim()) >= 0) {
+      pg::Play(calls, movie, ls.course_in_anim(), 0, frame, 0x82258C6C);
     }
-    ts::ColorListScreenPlaceColorCursor(base, r3, rs::ListSelection(base, s + 10216), frame);
+    ts::ColorListScreenPlaceColorCursor(base, r3, rs::ListSelection(base, ls.course_list_address()),
+                                        frame);
     // The node table's slot 1, then PairedNodeTable::Refresh.
     const uint64_t table = r3 + 10360;
     ts::Slot(base, table, 4, std::nullopt, frame, 0x82258C98, calls);
     ts::PairedNodeTableRefresh(base, table, frame, calls);
-    ts::ListScreenSetScrollText(base, r3, LoadU32(base, s + 10836), 1, frame, calls);
-    StoreU32(base, s + 9668, 1);
+    ts::ListScreenSetScrollText(base, r3, ls.course_text(), 1, frame, calls);
+    ls.set_step_started(1);
   }
   uint64_t done = RunDone(calls, movie, frame, 0x82258CC4);
-  const uint32_t named = LoadU32(base, s + 9848);
+  const uint32_t named = ls.course_in_anim();
   if (int32_t(named) < 0) done = 1;
   if (done == 0) return 0;
   if (int32_t(named) >= 0) calls.call(kFinishNamed, frame, 0x82258CF4, movie, named);
   // ListScreen::LoopItemNode.
   ts::ListScreenLoopNode(base, r3, r3 + 10216, 9936, frame, calls);
   static constexpr uint32_t kLr9872[3] = {0x82258D14, 0x82258D30, 0x82258D3C};
-  Replay(base, calls, s, movie, 9872, frame, kLr9872);
+  Replay(base, calls, ls.course_loop_address(), movie, frame, kLr9872);
   // Slot 26 (ShowMarks) with r4 = +10220.
-  ts::Slot(base, r3, 104, LoadU32(base, s + 10220), frame, 0x82258D54, calls);
+  ts::Slot(base, r3, 104, ls.course_list_scroll(), frame, 0x82258D54, calls);
   return done;
 }
 
 uint64_t ListBaseStep3(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82258438 Type8ListBase::Step3");
   const uint32_t s = uint32_t(r3), frame = part_detail::Frame(base, sp, 128);
+  const schema::Type8ListScreen ls(base, s);
   const uint32_t movie = pg::MovieOf(base, s, frame);
-  if (LoadU32(base, s + 9668) == 0) {
-    const uint32_t courses = s + 10216;
+  if (ls.step_started() == 0) {
+    const uint32_t courses = ls.course_list_address();
     auto course_node = [&] {
-      return LoadU32(base, s + ((rs::ListSelection(base, courses) + 2484) << 2));
+      return LoadU32(base, ls.course_anims_address() + (rs::ListSelection(base, courses) << 2));
     };
     if (int32_t(course_node()) >= 0) {
       calls.call(kFinishNamed, frame, 0x822584B0, movie, course_node());
     }
-    if (int32_t(LoadU32(base, s + 9852)) >= 0) {
-      pg::Play(calls, movie, LoadU32(base, s + 9852), 0, frame, 0x822584D4);
+    if (int32_t(ls.course_out_anim()) >= 0) {
+      pg::Play(calls, movie, ls.course_out_anim(), 0, frame, 0x822584D4);
     }
     ts::Slot(base, r3, 104, kMinusOne, frame, 0x822584EC, calls);
     ts::ListScreenSetScrollText(base, r3, KindText(base, s), 1, frame, calls);
-    StoreU32(base, s + 9668, 1);
+    ls.set_step_started(1);
   }
   uint64_t done = RunDone(calls, movie, frame, 0x82258524);
-  const uint32_t named = LoadU32(base, s + 9852);
+  const uint32_t named = ls.course_out_anim();
   if (int32_t(named) < 0) done = 1;
   if (done == 0) return 0;
   if (int32_t(named) >= 0) calls.call(kFinishNamed, frame, 0x82258554, movie, named);
-  const uint32_t toggle = LoadU32(base, s + 9884);
+  const uint32_t toggle = ls.course_select_anim();
   if (int32_t(toggle) >= 0) calls.call(kFinishNamed, frame, 0x82258568, movie, toggle);
   return done;
 }
@@ -754,20 +807,21 @@ uint64_t ListBaseDimList(uint8_t* base, uint64_t r3, uint64_t dim, uint32_t sp,
                          const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822587C8 Type8ListBase::DimList");
   const uint32_t s = uint32_t(r3), frame = part_detail::Frame(base, sp, 128);
+  const schema::Type8ListScreen ls(base, s);
   const uint32_t movie = pg::MovieOf(base, s, frame);
   const bool dimming = int32_t(uint32_t(dim)) != 0;
   // The toggle's named animation (+9892 for its selection 0, else +9896)
   // and the course's ([+9936 + 4 × the course list's selection]), read
   // again for each call as the original does.
-  const uint32_t toggle = s + 10288, courses = s + 10216;
+  const uint32_t toggle = ls.toggle_address(), courses = ls.course_list_address();
   auto toggle_node = [&] {
-    return LoadU32(base, s + (rs::ListSelection(base, toggle) == 0 ? 9892 : 9896));
+    return rs::ListSelection(base, toggle) == 0 ? ls.toggle_anim_on() : ls.toggle_anim_off();
   };
   auto course_node = [&] {
-    return LoadU32(base, s + ((rs::ListSelection(base, courses) + 2484) << 2));
+    return LoadU32(base, ls.course_anims_address() + (rs::ListSelection(base, courses) << 2));
   };
   uint64_t result = rs::ListSelection(base, toggle);
-  if (int32_t(LoadU32(base, s + (uint32_t(result) == 0 ? 9892 : 9896))) >= 0) {
+  if (int32_t(uint32_t(result) == 0 ? ls.toggle_anim_on() : ls.toggle_anim_off()) >= 0) {
     if (dimming) {
       result = calls.call(kFinishNamed, frame, 0x82258850, movie, toggle_node());
     } else {
@@ -776,7 +830,7 @@ uint64_t ListBaseDimList(uint8_t* base, uint64_t r3, uint64_t dim, uint32_t sp,
     }
   }
   result = rs::ListSelection(base, courses);
-  if (int32_t(LoadU32(base, s + ((uint32_t(result) + 2484) << 2))) >= 0) {
+  if (int32_t(LoadU32(base, ls.course_anims_address() + (uint32_t(result) << 2))) >= 0) {
     if (dimming) {
       result = calls.call(kFinishNamed, frame, 0x822588F0, movie, course_node());
     } else {
@@ -785,39 +839,40 @@ uint64_t ListBaseDimList(uint8_t* base, uint64_t r3, uint64_t dim, uint32_t sp,
     }
   }
   const uint32_t shown = dimming ? 0 : 1;
-  const uint32_t prompt = LoadU32(base, s + 9820);
+  const uint32_t prompt = ls.prompt_node();
   if (int32_t(prompt) >= 0) result = SetShown(base, movie, kNone, prompt, shown);
-  const uint32_t part = LoadU32(base, s + 9824);
+  const uint32_t part = ls.part_node();
   if (int32_t(part) >= 0) {
-    result = SetShown(base, movie, LoadU32(base, s + 9728), part, shown);
+    result = SetShown(base, movie, ls.part_node_set(), part, shown);
   }
   return result;
 }
 
 uint64_t PairedNodeTableClear(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82248A20 PairedNodeTable::Clear");
-  const uint32_t t = uint32_t(r3), frame = part_detail::Frame(base, sp, 128);
-  StoreU32(base, frame + 80, LoadU32(base, t + 4));
+  const uint32_t frame = part_detail::Frame(base, sp, 128);
+  const schema::PairedNodeTable t(base, uint32_t(r3));
+  StoreU32(base, frame + 80, t.movie());
   const uint32_t found = ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80);
   const uint32_t movie = LoadU32(base, found);
   uint64_t result = found;
   // The third pair's named animation, [+124 + 4 × +444].
-  const uint32_t third = LoadU32(base, t + 444);
+  const uint32_t third = t.third();
   if (int32_t(third) >= 0) {
-    const uint32_t named = LoadU32(base, t + ((third + 31) << 2));
+    const uint32_t named = LoadU32(base, t.more_anims_address() + (third << 2));
     if (int32_t(named) >= 0) result = calls.call(kFinishNamed, frame, 0x82248A74, movie, named);
   }
   // The first pair's item and the second's (unless the same), shown off
   // and their named animations ([+16 + 4i], read before) finished.
-  const uint32_t first = LoadU32(base, t + 428);
+  const uint32_t first = t.item();
   if (int32_t(first) >= 0) {
-    const uint32_t named = LoadU32(base, t + ((first + 4) << 2));
+    const uint32_t named = LoadU32(base, t.item_anims_address() + (first << 2));
     result = ts::NodeTableShowNode(base, r3, first, 0, 0, frame);
     if (int32_t(named) >= 0) result = calls.call(kFinishNamed, frame, 0x82248AB4, movie, named);
   }
-  const uint32_t now = LoadU32(base, t + 428), second = LoadU32(base, t + 436);
+  const uint32_t now = t.item(), second = t.second();
   if (second != now && int32_t(second) >= 0) {
-    const uint32_t named = LoadU32(base, t + ((second + 4) << 2));
+    const uint32_t named = LoadU32(base, t.item_anims_address() + (second << 2));
     result = ts::NodeTableShowNode(base, r3, second, 0, 0, frame);
     if (int32_t(named) >= 0) result = calls.call(kFinishNamed, frame, 0x82248B00, movie, named);
   }

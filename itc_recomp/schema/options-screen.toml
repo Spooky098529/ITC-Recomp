@@ -1,0 +1,295 @@
+# The schema of docs/functions/options-screen.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The front end's options screen (UI movie 7) and the settings it edits
+# (src/options_screen/). Its seven blocks are VirtualAlloc'ed by
+# Options::OnEnter (globals below): the page block [0x826D8470] and the
+# blocks [0x826D8480] are PageObjects and the menus [0x826D8474] and
+# [0x826D8484] FrontEndMenus (menu-helpers.toml's; the measure files them as
+# "new<28>@Options::OnEnter", "#3", "new<68>@Options::OnEnter", "#2"); the
+# load and save pages' blocks [0x826D847C] and [0x826D8488] are
+# options-load-save.toml's.
+
+# The screen's machine: a StateMachine (game-modes.toml) with a word of its
+# own after it, as the other front-end screens' machines. The measure also
+# files under it the steps' r3 (the step word: +0), Options::SetDefaults'
+# save options (+4 to +41) and Options::ClosePage's dispatcher (+804,
+# +808): all inside `transitions` here (measure faults).
+[OptionsMachine]
+measure = "Options"
+size = 9620
+origin = "embedded"
+fields = [
+  { name = "transitions", offset = 0, type = "bytes", count = 9600, note = "200 transitions, 48 bytes each (StateMachine's)" },
+  { name = "transition_count", offset = 9600, type = "u32" },
+  { name = "state", offset = 9604, type = "u32" },
+  { name = "loaded", offset = 9608, type = "u32", note = "1 once movie 7 is loaded (WaitForMovie)" },
+  { name = "reenter", offset = 9612, type = "u32", note = "nonzero: OnEnter and WaitForMovie go to state 9 (open on its message)" },
+  { name = "delete_movie", offset = 9616, type = "u32", note = "set: Options::Close deletes movie 7" },
+]
+
+# The mode as the handlers see it (r4, the dispatcher): only its message
+# ring, which they post to.
+[OptionsDispatcher]
+measures = ["Options::Close.r4", "Options::Leave.r4", "Options::OnClosed.r4", "Options::Show.r4"]
+size = 812
+origin = "embedded"
+fields = [
+  { name = "messages", offset = 204, type = "bytes", count = 600, note = "50 messages of 12 bytes (id, two words)" },
+  { name = "message_count", offset = 804, type = "u32" },
+  { name = "message_start", offset = 808, type = "u32", note = "the ring's first slot" },
+]
+
+# The options' settings ([0x826D8478], 716 bytes; docs/known-data.md): the
+# context, type 2's career info, three copies of a 192-byte settings block
+# (the current settings, the edits, the defaults) and the pages' state.
+# "Settings.+-31624" and "new<68>@Options::OnEnter.+4.+-31620" are this
+# block reached through the globals' base register (measure faults).
+[OptionsSettings]
+measures = ["Settings", "Settings.+-31624", "new<68>@Options::OnEnter.+4.+-31620",
+            "Settings.+-31596"]
+size = 716
+origin = "allocated"
+fields = [
+  { name = "set_up", offset = 0, type = "u32", note = "1 once Options::SetUpMovie ran" },
+  { name = "context", offset = 4, type = "u32", note = "from the mode type: 2 -> 1, 4 -> 0, 6 -> 2, 7 -> 3, 8 -> 4" },
+  { name = "music_preview_shown", offset = 8, type = "u32", note = "save +4, or bit 5 of save +6092" },
+  { name = "name_0", offset = 12, type = "u32", note = "save +8 + 4i (probably the player's name; type 2 only)" },
+  { name = "name_1", offset = 16, type = "u32" },
+  { name = "name_2", offset = 20, type = "u32" },
+  { name = "name_3", offset = 24, type = "u32" },
+  { name = "name_4", offset = 28, type = "u32" },
+  { name = "money", offset = 32, type = "u32", note = "save +6116 (type 2 only)" },
+  { name = "day_of_week", offset = 36, type = "u32", note = "save +6100 mod 7 (probably; type 2 only)" },
+  { name = "day", offset = 40, type = "u32", note = "save +6100 capped at 999 (probably; type 2 only)" },
+  { name = "current_block", offset = 44, type = "bytes", count = 192, note = "the current settings: the 192-byte settings block named word by word below" },
+  { name = "current_hud_0", offset = 44, type = "u32", note = "the HUD's four on/off values (save options +0 to +12)" },
+  { name = "current_hud_1", offset = 48, type = "u32" },
+  { name = "current_hud_2", offset = 52, type = "u32" },
+  { name = "current_hud_3", offset = 56, type = "u32" },
+  { name = "current_music_volume", offset = 60, type = "u32", note = "0 to 15 (save options byte +28)" },
+  { name = "current_effects_volume", offset = 64, type = "u32", note = "0 to 15 (save options byte +29)" },
+  { name = "current_slider_0", offset = 68, type = "u32", note = "-10 to 10 (save options bytes +36 to +38)" },
+  { name = "current_slider_1", offset = 72, type = "u32" },
+  { name = "current_slider_2", offset = 76, type = "u32" },
+  { name = "current_p1_slider_0", offset = 80, type = "u32", note = "player 1's (save options bytes +39 to +41)" },
+  { name = "current_p1_slider_1", offset = 84, type = "u32" },
+  { name = "current_p1_slider_2", offset = 88, type = "u32" },
+  { name = "current_button_0", offset = 92, type = "u32", note = "button indexes in menu order (save options record +44)" },
+  { name = "current_button_1", offset = 96, type = "u32" },
+  { name = "current_button_2", offset = 100, type = "u32" },
+  { name = "current_button_3", offset = 104, type = "u32" },
+  { name = "current_button_4", offset = 108, type = "u32" },
+  { name = "current_button_5", offset = 112, type = "u32" },
+  { name = "current_button_6", offset = 116, type = "u32" },
+  { name = "current_button_7", offset = 120, type = "u32" },
+  { name = "current_button_8", offset = 124, type = "u32" },
+  { name = "current_button_9", offset = 128, type = "u32" },
+  { name = "current_button_10", offset = 132, type = "u32" },
+  { name = "current_button_11", offset = 136, type = "u32" },
+  { name = "current_p1_button_0", offset = 140, type = "u32", note = "player 1's (save options record +164)" },
+  { name = "current_p1_button_1", offset = 144, type = "u32" },
+  { name = "current_p1_button_2", offset = 148, type = "u32" },
+  { name = "current_p1_button_3", offset = 152, type = "u32" },
+  { name = "current_p1_button_4", offset = 156, type = "u32" },
+  { name = "current_p1_button_5", offset = 160, type = "u32" },
+  { name = "current_p1_button_6", offset = 164, type = "u32" },
+  { name = "current_p1_button_7", offset = 168, type = "u32" },
+  { name = "current_p1_button_8", offset = 172, type = "u32" },
+  { name = "current_p1_button_9", offset = 176, type = "u32" },
+  { name = "current_p1_button_10", offset = 180, type = "u32" },
+  { name = "current_p1_button_11", offset = 184, type = "u32" },
+  { name = "current_analog_0", offset = 188, type = "u32", note = "analog indexes (save options record +104)" },
+  { name = "current_analog_1", offset = 192, type = "u32" },
+  { name = "current_analog_2", offset = 196, type = "u32" },
+  { name = "current_analog_3", offset = 200, type = "u32" },
+  { name = "current_analog_4", offset = 204, type = "u32" },
+  { name = "current_analog_5", offset = 208, type = "u32" },
+  { name = "current_p1_analog_0", offset = 212, type = "u32", note = "player 1's (save options record +224; slot 4 written to word 8)" },
+  { name = "current_p1_analog_1", offset = 216, type = "u32" },
+  { name = "current_p1_analog_2", offset = 220, type = "u32" },
+  { name = "current_p1_analog_3", offset = 224, type = "u32" },
+  { name = "current_p1_analog_4", offset = 228, type = "u32" },
+  { name = "current_p1_analog_5", offset = 232, type = "u32" },
+  { name = "edit_block", offset = 236, type = "bytes", count = 192, note = "the edits the pages change: the 192-byte settings block named word by word below" },
+  { name = "edit_hud_0", offset = 236, type = "u32", note = "the HUD's four on/off values (save options +0 to +12)" },
+  { name = "edit_hud_1", offset = 240, type = "u32" },
+  { name = "edit_hud_2", offset = 244, type = "u32" },
+  { name = "edit_hud_3", offset = 248, type = "u32" },
+  { name = "edit_music_volume", offset = 252, type = "u32", note = "0 to 15 (save options byte +28)" },
+  { name = "edit_effects_volume", offset = 256, type = "u32", note = "0 to 15 (save options byte +29)" },
+  { name = "edit_slider_0", offset = 260, type = "u32", note = "-10 to 10 (save options bytes +36 to +38)" },
+  { name = "edit_slider_1", offset = 264, type = "u32" },
+  { name = "edit_slider_2", offset = 268, type = "u32" },
+  { name = "edit_p1_slider_0", offset = 272, type = "u32", note = "player 1's (save options bytes +39 to +41)" },
+  { name = "edit_p1_slider_1", offset = 276, type = "u32" },
+  { name = "edit_p1_slider_2", offset = 280, type = "u32" },
+  { name = "edit_button_0", offset = 284, type = "u32", note = "button indexes in menu order (save options record +44)" },
+  { name = "edit_button_1", offset = 288, type = "u32" },
+  { name = "edit_button_2", offset = 292, type = "u32" },
+  { name = "edit_button_3", offset = 296, type = "u32" },
+  { name = "edit_button_4", offset = 300, type = "u32" },
+  { name = "edit_button_5", offset = 304, type = "u32" },
+  { name = "edit_button_6", offset = 308, type = "u32" },
+  { name = "edit_button_7", offset = 312, type = "u32" },
+  { name = "edit_button_8", offset = 316, type = "u32" },
+  { name = "edit_button_9", offset = 320, type = "u32" },
+  { name = "edit_button_10", offset = 324, type = "u32" },
+  { name = "edit_button_11", offset = 328, type = "u32" },
+  { name = "edit_p1_button_0", offset = 332, type = "u32", note = "player 1's (save options record +164)" },
+  { name = "edit_p1_button_1", offset = 336, type = "u32" },
+  { name = "edit_p1_button_2", offset = 340, type = "u32" },
+  { name = "edit_p1_button_3", offset = 344, type = "u32" },
+  { name = "edit_p1_button_4", offset = 348, type = "u32" },
+  { name = "edit_p1_button_5", offset = 352, type = "u32" },
+  { name = "edit_p1_button_6", offset = 356, type = "u32" },
+  { name = "edit_p1_button_7", offset = 360, type = "u32" },
+  { name = "edit_p1_button_8", offset = 364, type = "u32" },
+  { name = "edit_p1_button_9", offset = 368, type = "u32" },
+  { name = "edit_p1_button_10", offset = 372, type = "u32" },
+  { name = "edit_p1_button_11", offset = 376, type = "u32" },
+  { name = "edit_analog_0", offset = 380, type = "u32", note = "analog indexes (save options record +104)" },
+  { name = "edit_analog_1", offset = 384, type = "u32" },
+  { name = "edit_analog_2", offset = 388, type = "u32" },
+  { name = "edit_analog_3", offset = 392, type = "u32" },
+  { name = "edit_analog_4", offset = 396, type = "u32" },
+  { name = "edit_analog_5", offset = 400, type = "u32" },
+  { name = "edit_p1_analog_0", offset = 404, type = "u32", note = "player 1's (save options record +224; slot 4 written to word 8)" },
+  { name = "edit_p1_analog_1", offset = 408, type = "u32" },
+  { name = "edit_p1_analog_2", offset = 412, type = "u32" },
+  { name = "edit_p1_analog_3", offset = 416, type = "u32" },
+  { name = "edit_p1_analog_4", offset = 420, type = "u32" },
+  { name = "edit_p1_analog_5", offset = 424, type = "u32" },
+  { name = "default_block", offset = 428, type = "bytes", count = 192, note = "the defaults: the 192-byte settings block named word by word below" },
+  { name = "default_hud_0", offset = 428, type = "u32", note = "the HUD's four on/off values (save options +0 to +12)" },
+  { name = "default_hud_1", offset = 432, type = "u32" },
+  { name = "default_hud_2", offset = 436, type = "u32" },
+  { name = "default_hud_3", offset = 440, type = "u32" },
+  { name = "default_music_volume", offset = 444, type = "u32", note = "0 to 15 (save options byte +28)" },
+  { name = "default_effects_volume", offset = 448, type = "u32", note = "0 to 15 (save options byte +29)" },
+  { name = "default_slider_0", offset = 452, type = "u32", note = "-10 to 10 (save options bytes +36 to +38)" },
+  { name = "default_slider_1", offset = 456, type = "u32" },
+  { name = "default_slider_2", offset = 460, type = "u32" },
+  { name = "default_p1_slider_0", offset = 464, type = "u32", note = "player 1's (save options bytes +39 to +41)" },
+  { name = "default_p1_slider_1", offset = 468, type = "u32" },
+  { name = "default_p1_slider_2", offset = 472, type = "u32" },
+  { name = "default_button_0", offset = 476, type = "u32", note = "button indexes in menu order (save options record +44)" },
+  { name = "default_button_1", offset = 480, type = "u32" },
+  { name = "default_button_2", offset = 484, type = "u32" },
+  { name = "default_button_3", offset = 488, type = "u32" },
+  { name = "default_button_4", offset = 492, type = "u32" },
+  { name = "default_button_5", offset = 496, type = "u32" },
+  { name = "default_button_6", offset = 500, type = "u32" },
+  { name = "default_button_7", offset = 504, type = "u32" },
+  { name = "default_button_8", offset = 508, type = "u32" },
+  { name = "default_button_9", offset = 512, type = "u32" },
+  { name = "default_button_10", offset = 516, type = "u32" },
+  { name = "default_button_11", offset = 520, type = "u32" },
+  { name = "default_p1_button_0", offset = 524, type = "u32", note = "player 1's (save options record +164)" },
+  { name = "default_p1_button_1", offset = 528, type = "u32" },
+  { name = "default_p1_button_2", offset = 532, type = "u32" },
+  { name = "default_p1_button_3", offset = 536, type = "u32" },
+  { name = "default_p1_button_4", offset = 540, type = "u32" },
+  { name = "default_p1_button_5", offset = 544, type = "u32" },
+  { name = "default_p1_button_6", offset = 548, type = "u32" },
+  { name = "default_p1_button_7", offset = 552, type = "u32" },
+  { name = "default_p1_button_8", offset = 556, type = "u32" },
+  { name = "default_p1_button_9", offset = 560, type = "u32" },
+  { name = "default_p1_button_10", offset = 564, type = "u32" },
+  { name = "default_p1_button_11", offset = 568, type = "u32" },
+  { name = "default_analog_0", offset = 572, type = "u32", note = "analog indexes (save options record +104)" },
+  { name = "default_analog_1", offset = 576, type = "u32" },
+  { name = "default_analog_2", offset = 580, type = "u32" },
+  { name = "default_analog_3", offset = 584, type = "u32" },
+  { name = "default_analog_4", offset = 588, type = "u32" },
+  { name = "default_analog_5", offset = 592, type = "u32" },
+  { name = "default_p1_analog_0", offset = 596, type = "u32", note = "player 1's (save options record +224; slot 4 written to word 8)" },
+  { name = "default_p1_analog_1", offset = 600, type = "u32" },
+  { name = "default_p1_analog_2", offset = 604, type = "u32" },
+  { name = "default_p1_analog_3", offset = 608, type = "u32" },
+  { name = "default_p1_analog_4", offset = 612, type = "u32" },
+  { name = "default_p1_analog_5", offset = 616, type = "u32" },
+  { name = "load_dialog_state", offset = 620, type = "u32", note = "page 9's dialog (category 5, the load): the state shown" },
+  { name = "load_dialog_next", offset = 624, type = "u32", note = "the state next" },
+  { name = "load_dialog_kind", offset = 628, type = "u32" },
+  { name = "load_dialog_passes", offset = 632, type = "u32", note = "the passes its note and wait sub-pages count" },
+  { name = "load_dialog_default", offset = 636, type = "u32", note = "the default answer" },
+  { name = "save_dialog_state", offset = 640, type = "u32", note = "page 10's dialog (category 6, the save): the state shown" },
+  { name = "save_dialog_next", offset = 644, type = "u32", note = "the state next" },
+  { name = "save_dialog_kind", offset = 648, type = "u32" },
+  { name = "save_dialog_passes", offset = 652, type = "u32", note = "the passes its note and wait sub-pages count" },
+  { name = "save_dialog_default", offset = 656, type = "u32", note = "the default answer" },
+  { name = "ok_default", offset = 660, type = "u32", note = "the category page's last row: 1 OK, else Default" },
+  { name = "category_cursor", offset = 664, type = "u32", note = "the category picked" },
+  { name = "buttons_side", offset = 668, type = "u32", note = "the buttons page's last left or right (-1, 1, else 0)" },
+  { name = "p1_buttons_side", offset = 672, type = "u32", note = "player 1's (the controller pages')" },
+  { name = "analog_side", offset = 676, type = "u32", note = "the analog page's last left or right" },
+  { name = "p1_analog_side", offset = 680, type = "u32", note = "player 1's (the controller pages')" },
+  { name = "wait_counter", offset = 684, type = "u32", note = "the wait steps' pass counter" },
+  { name = "music_track", offset = 688, type = "u32", note = "the music track picked (0 to 16, bgm_tmp_01 to bgm_tmp_17)" },
+  { name = "track_previewed", offset = 692, type = "u32", note = "-1 none" },
+  { name = "track_loaded", offset = 696, type = "u32", note = "the track loaded in bank 2, -1 none" },
+  { name = "preview_state", offset = 700, type = "u32", note = "the music preview's state (0 to 3)" },
+  { name = "menu_music_cue", offset = 704, type = "u32", note = "the menu music's cue (bank 1) to restart" },
+  { name = "dialog_cancel", offset = 708, type = "u32", note = "the dialog's cancel flag" },
+  { name = "save_page_closed", offset = 712, type = "u32", note = "1 at reset, 0 at a load or save page's set-up, 1 when its close or cancel sub-page runs" },
+  { name = "fault_settings_global", offset = -31624, type = "u32", note = "measure fault: the image word [0x826D8478] read through the globals' base 0x826E0000, not a field" },
+  { name = "fault_controller_settings_global", offset = -31596, type = "u32", note = "measure fault: the image word [0x826D8494] read through the globals' base 0x826E0000, not a field" },
+]
+
+# A measure fault: Options::MoveHudCursor's globals' base register, which
+# the measure takes for the menu's +4 (probably 0x826DFFFC: -31620 the
+# settings' global).
+[OptionsFaultBase]
+measure = "new<68>@Options::OnEnter.+4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "fault_settings_global", offset = -31620, type = "u32", note = "measure fault: the image word [0x826D8478], not a field" },
+]
+
+# UiMovies::Find's answer: the address of a value in a {key, value} pair
+# table (mostly the movie table 0x826C5CCC's), or 0x826C5CDC when not found.
+[UiMovieTableValue]
+measure = "UiMovies::Find.ret"
+size = 4
+origin = "file"
+fields = [
+  { name = "value", offset = 0, type = "u32", note = "the value (in the movie table: the UI movie)" },
+]
+
+# What Options::PlayMusicPreview reads after Music::Play: probably the sound
+# manager [0x826C5C80] reloaded (a measure fault), its vtable's slot 6
+# (IsBankLoading, +24).
+[OptionsMusicPlayVtable]
+measure = "Music::Play.ret.+0"
+size = 28
+origin = "embedded"
+fields = [
+  { name = "slot_6", offset = 24, type = "u32", note = "probably the sound manager's IsBankLoading" },
+]
+
+[OptionsMusicPlayResult]
+measure = "Music::Play.ret"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "OptionsMusicPlayVtable" },
+]
+
+[globals]
+pages = { address = 0x826D8470, type = "ptr", to = "PageObject", note = "the options' page block" }
+menu = { address = 0x826D8474, type = "ptr", to = "FrontEndMenu", note = "the categories' and every category page's menu" }
+settings = { address = 0x826D8478, type = "ptr", to = "OptionsSettings" }
+load_pages = { address = 0x826D847C, type = "u32", note = "page 9's sub-page block (28 bytes, options-load-save.toml's)" }
+spare_pages = { address = 0x826D8480, type = "ptr", to = "PageObject", note = "a 28-byte block laid out as the page block, set up by OnEnter only" }
+dialog_menu = { address = 0x826D8484, type = "ptr", to = "FrontEndMenu", note = "the save pages' two-item menu" }
+save_pages = { address = 0x826D8488, type = "u32", note = "page 10's sub-page block (28 bytes, options-load-save.toml's)" }
+mode_type = { address = 0x826032DC, type = "u32", note = "the mode type the context and the posts follow" }
+return_menu = { address = 0x826364EC, type = "u32", note = "which front-end menu to show on return (probably); 0 from the categories' back in type 4" }
+categories = { address = 0x8200A578, type = "bytes", count = 140, note = "the category table: 5 contexts of 7 words, -1 past the last" }
+slider_scale = { address = 0x8200A6AC, type = "f32", note = "the sliders' x scale" }
+screen_fades = { address = 0x82001BEC, type = "u32", note = "the screen fades object FadeIn is given" }

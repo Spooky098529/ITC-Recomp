@@ -6,6 +6,7 @@
 #include "base/log.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/data_load.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
@@ -13,7 +14,10 @@ namespace data_load {
 
 namespace {
 
-std::optional<int64_t> MovieListAdd(uint8_t* base, uint32_t list, uint32_t id,
+using G = schema::DataLoadGlobals;
+
+// A movie list: its movies, then their count at +64.
+std::optional<int64_t> MovieListAdd(uint8_t* base, uint32_t list, uint32_t count_address, uint32_t id,
                                     const MovieCalls& calls) {
   const auto made = memory::crt::OperatorNew(base, kMovieBytes);
   if (!made) {
@@ -25,8 +29,8 @@ std::optional<int64_t> MovieListAdd(uint8_t* base, uint32_t list, uint32_t id,
   }
   ui_movies::InitAnimationLists(base, movie);
   const int64_t serial = ui_movies::MovieLoad(base, movie, id, calls.load);
-  const uint32_t count = guest::LoadU32(base, list + 64);
-  guest::StoreU32(base, list + 64, count + 1);
+  const uint32_t count = guest::LoadU32(base, count_address);
+  guest::StoreU32(base, count_address, count + 1);
   guest::StoreU32(base, list + 4 * count, movie);
   return serial;
 }
@@ -35,18 +39,18 @@ std::optional<int64_t> MovieListAdd(uint8_t* base, uint32_t list, uint32_t id,
 
 std::optional<int64_t> LoadingScreenAddMovie(uint8_t* base, uint32_t id, const MovieCalls& calls) {
   ITC_NATIVE_RUNNING("sub_82247AA0 LoadingScreen::AddMovie");
-  return MovieListAdd(base, kLoadingMovies, id, calls);
+  return MovieListAdd(base, G::loading_movies_address(), G::loading_movie_count_address(), id, calls);
 }
 
 std::optional<int64_t> OtherMoviesAdd(uint8_t* base, uint32_t id, const MovieCalls& calls) {
   ITC_NATIVE_RUNNING("sub_822912A0 (the other UI movie set's add)");
-  return MovieListAdd(base, kOtherMovies, id, calls);
+  return MovieListAdd(base, G::other_movies_address(), G::other_movie_count_address(), id, calls);
 }
 
 int64_t LoadingScreenLoad(uint8_t* base, const MovieAdd& add) {
   ITC_NATIVE_RUNNING("sub_82247B98 LoadingScreen::Load");
-  guest::StoreU32(base, kLoadingMovies + 64, 0);
-  guest::StoreU32(base, kLoadingShown, 0);
+  G::set_loading_movie_count(base, 0);
+  G::set_loading_shown(base, 0);
   add(22575);
   add(22574);
   return add(22576);
@@ -56,13 +60,13 @@ uint32_t OtherMoviesLoad(uint8_t* base, const MovieAdd& add,
                          const std::function<uint32_t(int which)>& render_object) {
   ITC_NATIVE_RUNNING("sub_82291328 (the other UI movie set's load)");
   for (uint32_t i = 0; i < 3; i++) {
-    add(guest::LoadU32(base, kOtherMovieIds + 4 * i));
+    add(guest::LoadU32(base, G::other_movie_ids_address() + 4 * i));
   }
   for (uint32_t i = 0; i < 9; i++) {
-    guest::StoreU32(base, kOtherWords + 4 * i, 0);
+    guest::StoreU32(base, G::unknown_828165D0_address() + 4 * i, 0);
   }
-  guest::StoreU32(base, kOtherWord8600, 0);
-  guest::StoreU32(base, kOtherWord8130, 0);
+  G::set_unknown_82816600(base, 0);
+  G::set_unknown_82638130(base, 0);
   const uint32_t list = render_object(0);
   const uint32_t renderer = render_object(1);
   ui_movies::SetRenderer(base, renderer, list);
@@ -83,10 +87,10 @@ uint32_t CreateObjects(uint8_t* base, const BootCall& call) {
 
 std::optional<uint32_t> BootDataLoad(uint8_t* base, uint32_t frame, const BootCall& call) {
   ITC_NATIVE_RUNNING("sub_82106618 BootData::Load");
-  if (guest::LoadU32(base, kLoaded) != 0) {
+  if (G::loaded(base) != 0) {
     return std::nullopt;
   }
-  guest::StoreU32(base, kLoaded, 1);
+  G::set_loaded(base, 1);
   // GlobalMemoryStatus(frame + 80) (Dropped) left out: r3 its buffer, as
   // Shaders::LoadAll gets it.
   call(0x820A08A0, frame + 80, 0x82106648);  // Shaders::LoadAll

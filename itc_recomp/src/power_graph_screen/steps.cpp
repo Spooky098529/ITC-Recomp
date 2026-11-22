@@ -9,6 +9,9 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/menu_helpers.h"
+#include "schema/power_graph_screen.h"
+#include "schema/tuning_screen.h"
 #include "ui_movies/game.h"
 
 #include <bit>
@@ -21,6 +24,10 @@ namespace {
 
 using guest::LoadU32;
 using guest::StoreU32;
+using G = schema::PowerGraphScreenGlobals;
+using Data = schema::PowerGraphScreenData;
+using Member = schema::PowerGraphScreen67;
+using Node = schema::UiMovieNode;  // tuning-screen.toml
 
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   const uint32_t frame = sp - bytes;
@@ -74,7 +81,7 @@ uint64_t SetPartIcon(uint8_t* base, uint32_t value, uint32_t sp) {
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t movie = FindMovie(base, frame);
   const uint32_t node = ui_movies::FindNode(base, movie, 3, 0);
-  StoreU32(base, node + 108, value);
+  Node(base, node).set_texture_entry(value);
   return node;
 }
 
@@ -85,15 +92,16 @@ uint64_t SetPartRow2(uint8_t* base, uint32_t values, uint32_t sp) {
   const uint32_t group = ui_movies::FindNode(base, movie, 3, 2);
   uint32_t r3 = group;
   // The children's count re-read each time (a child's stores could reach it).
-  for (int32_t i = 0; i < int32_t(LoadU32(base, group + 104)); i++) {
-    const uint32_t first = LoadU32(base, group + 100);
+  // A group's first child index (+100) and child count (+104), read as words.
+  for (int32_t i = 0; i < int32_t(LoadU32(base, Node(base, group).height_address())); i++) {
+    const uint32_t first = LoadU32(base, Node(base, group).width_address());
     const uint32_t value = LoadU32(base, values + 4 * uint32_t(i));
     r3 = ui_movies::FindNode(base, movie, 3, first + uint32_t(i));
     if (int32_t(value) != 10) {
-      StoreU32(base, r3 + 108, value);
-      StoreU32(base, r3 + 80, 1);
+      Node(base, r3).set_texture_entry(value);
+      Node(base, r3).set_visible(1);
     } else {
-      StoreU32(base, r3 + 80, 0);
+      Node(base, r3).set_visible(0);
     }
   }
   return r3;
@@ -106,14 +114,14 @@ uint64_t SetPartRow1(uint8_t* base, uint32_t values, uint32_t sp) {
   const uint32_t group = ui_movies::FindNode(base, movie, 3, 1);
   uint32_t r3 = group;
   for (uint32_t i = 0; i < 7; i++) {
-    const uint32_t first = LoadU32(base, group + 100);
+    const uint32_t first = LoadU32(base, Node(base, group).width_address());
     const uint32_t value = LoadU32(base, values + 4 * i);
     r3 = ui_movies::FindNode(base, movie, 3, i + first);
     if (int32_t(value) < 37) {
-      StoreU32(base, r3 + 108, value);
-      StoreU32(base, r3 + 80, 1);
+      Node(base, r3).set_texture_entry(value);
+      Node(base, r3).set_visible(1);
     } else {
-      StoreU32(base, r3 + 80, 0);
+      Node(base, r3).set_visible(0);
     }
   }
   return r3;
@@ -164,16 +172,18 @@ uint64_t SetTexts(uint8_t* base, uint64_t member, uint32_t sp, const Calls& call
   // result over its high word), string 8 with it. r10 = the frame's +80
   // where the original sets it (not for node 12).
   struct Number {
-    uint32_t lr, node, field, scale;
+    uint32_t lr, node;
+    uint32_t (Data::*field)() const;
+    uint32_t scale;
     bool r10;
   };
-  static constexpr Number kNumbers[] = {{0x82251024, 10, 8, kScale10, true},
-                                        {0x82251070, 11, 12, kScale11, true},
-                                        {0x822510BC, 12, 16, kScale12, false},
-                                        {0x82251100, 13, 20, kScale12, true},
-                                        {0x82251144, 14, 24, kScale12, true}};
+  static constexpr Number kNumbers[] = {{0x82251024, 10, &Data::car_value, kScale10, true},
+                                        {0x82251070, 11, &Data::rating, kScale11, true},
+                                        {0x822510BC, 12, &Data::spec_word_0, kScale12, false},
+                                        {0x82251100, 13, &Data::spec_word_1, kScale12, true},
+                                        {0x82251144, 14, &Data::spec_word_2, kScale12, true}};
   for (const Number& n : kNumbers) {
-    const int32_t word = int32_t(LoadU32(base, LoadU32(base, kData) + n.field));
+    const int32_t word = int32_t((G::data(base).*n.field)());
     StoreU32(base, frame + 80, word < 0 ? 0xFFFFFFFFu : 0);
     StoreU32(base, frame + 84, uint32_t(word));
     const double scaled = double(float(double(float(double(int64_t(word)))) * Lfd(base, n.scale)));
@@ -183,20 +193,25 @@ uint64_t SetTexts(uint8_t* base, uint64_t member, uint32_t sp, const Calls& call
   // The record's ids: strings from the maker, the car id, its spec, class
   // and flag.
   struct Id {
-    uint32_t lr, node, field, offset;
+    uint32_t lr, node;
+    uint32_t (Data::*field)() const;
+    uint32_t offset;
   };
-  static constexpr Id kIds[] = {{0x82251160, 20, 32, 1934}, {0x8225117C, 21, 28, 1646},
-                                {0x82251198, 22, 28, 1790}, {0x822511B4, 29, 28, 1718},
-                                {0x822511D0, 30, 36, 421},  {0x822511EC, 31, 40, 428},
-                                {0x82251208, 32, 44, 426}};
+  static constexpr Id kIds[] = {{0x82251160, 20, &Data::spec_byte_0, 1934},
+                                {0x8225117C, 21, &Data::car_id, 1646},
+                                {0x82251198, 22, &Data::car_id, 1790},
+                                {0x822511B4, 29, &Data::car_id, 1718},
+                                {0x822511D0, 30, &Data::spec_byte_1, 421},
+                                {0x822511EC, 31, &Data::engine_class, 428},
+                                {0x82251208, 32, &Data::spec_flag, 426}};
   for (const Id& id : kIds) {
-    text(id.lr, id.node, uint64_t(LoadU32(base, LoadU32(base, kData) + id.field)) + id.offset);
+    text(id.lr, id.node, uint64_t((G::data(base).*id.field)()) + id.offset);
   }
-  text(0x82251224, 33, 8, LoadU32(base, LoadU32(base, kData) + 52));
+  text(0x82251224, 33, 8, G::data(base).curve_value_0());
   {
     // Node 34: string 436 with the float +60 scaled, a double in r7 (and
     // f1), stored at the frame's +48.
-    const float value = guest::LoadFloat(base, LoadU32(base, kData) + 60);
+    const float value = G::data(base).peak_torque();
     const double f1 = double(float(double(value) * Lfd(base, kScale34)));
     const uint64_t bits = std::bit_cast<uint64_t>(f1);
     StoreU32(base, frame + 48, uint32_t(bits >> 32));
@@ -204,35 +219,36 @@ uint64_t SetTexts(uint8_t* base, uint64_t member, uint32_t sp, const Calls& call
     const uint64_t args[8] = {movie, all, 34, 436, bits, 0, 0, 0};
     calls.call(calls.user, kSetText, args, &f1, frame, 0x82251258);
   }
-  text(0x82251274, 39, 8, LoadU32(base, LoadU32(base, kData) + 48));
-  text(0x82251290, 40, 8, LoadU32(base, LoadU32(base, kData) + 56));
-  text(0x822512AC, 41, 8, LoadU32(base, LoadU32(base, kData) + 64));
+  text(0x82251274, 39, 8, G::data(base).spec_word_3());
+  text(0x82251290, 40, 8, G::data(base).curve_value_1());
+  text(0x822512AC, 41, 8, G::data(base).peak_index());
   // Node 3 (the parts) shown by the tab: 2 and 5 shown, 0, 1, 3 and 4
   // hidden, above 5 unchanged.
   const uint32_t node = ui_movies::FindNode(base, movie, 0xFFFFFFFFu, 3);
-  const uint32_t tab = LoadU32(base, LoadU32(base, kData) + 88);
+  const uint32_t tab = G::data(base).tab();
   if (tab <= 5) {
-    StoreU32(base, node + 80, tab == 2 || tab == 5 ? 1 : 0);
+    Node(base, node).set_visible(tab == 2 || tab == 5 ? 1 : 0);
   }
-  if (LoadU32(base, node + 80) == 0) {
+  if (Node(base, node).visible() == 0) {
     return node;
   }
   (void)member;
-  return SetParts(base, LoadU32(base, kData) + 68, frame);
+  return SetParts(base, G::data(base).parts_address(), frame);
 }
 
 uint64_t Step0(uint8_t* base, uint64_t member, uint32_t started, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82251320 PowerGraphScreen67::Step0");
   const uint32_t frame = Frame(base, sp, 128);
   const uint32_t movie = FindMovie(base, frame);
-  if (LoadU32(base, started) == 0) {
+  const schema::PowerGraphStepStarted s(base, started);
+  if (s.started() == 0) {
     SetTexts(base, member, frame, calls);
     calls.CallArgs(kPlay, frame, 0x82251384, {movie, 0xFFFFFFFFFFFFFFFFull, 0, 0, 0, 0, 0, 0});
-    StoreU32(base, started, 1);
+    s.set_started(1);
   }
   const uint32_t done = Done(calls.Call(kRun, frame, 0x82251398, movie, 0));
   if (done != 0) {
-    StoreU32(base, kShown, 1);
+    G::set_shown(base, 1);
   }
   return done;
 }
@@ -241,10 +257,11 @@ uint64_t Step1(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls)
   ITC_NATIVE_RUNNING("sub_82250AA8 PowerGraphScreen67::Step1");
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t movie = FindMovie(base, frame);
-  if (LoadU32(base, started) == 0) {
+  const schema::PowerGraphStepStarted s(base, started);
+  if (s.started() == 0) {
     calls.CallArgs(kPlay, frame, 0x82250B08, {movie, 0xFFFFFFFFFFFFFFFFull, 1, 0, 0, 0, 0, 0});
-    StoreU32(base, started, 1);
-    StoreU32(base, kShown, 0);
+    s.set_started(1);
+    G::set_shown(base, 0);
   }
   return Done(calls.Call(kRun, frame, 0x82250B28, movie, 0));
 }
@@ -262,8 +279,8 @@ uint64_t Update(uint8_t* base, uint64_t member, uint32_t sp, const Calls& calls)
   StoreU32(base, frame + 92, 0);
   StoreU32(base, frame + 96, kStep1);
   StoreU32(base, frame + 100, 0);
-  const uint32_t pages = LoadU32(base, kPages);
-  const uint32_t step = LoadU32(base, pages + 12);
+  const schema::PageObject pages = G::pages(base);
+  const uint32_t step = pages.step();
   uint64_t answer = movie;
   if (step == 0xFFFFFFFFu) {
     answer = calls.Call(kRun, frame, 0x822514D8, movie, 0);
@@ -273,33 +290,34 @@ uint64_t Update(uint8_t* base, uint64_t member, uint32_t sp, const Calls& calls)
       // No bounds check: the words at the table's index.
       const uint32_t adjust = LoadU32(base, frame + 84 + (step << 3));
       const uint32_t target = LoadU32(base, frame + 80 + (step << 3));
-      answer = calls.Call(target, frame, 0x82251470, uint64_t(adjust) + member, pages + 24);
+      answer = calls.Call(target, frame, 0x82251470, uint64_t(adjust) + member,
+                          pages.step_started_address());
       done = int32_t(answer) != 0;
     }
     if (done) {
-      const uint32_t p = LoadU32(base, kPages);
-      const uint32_t queued = LoadU32(base, p + 16);
+      const schema::PageObject p = G::pages(base);
+      const uint32_t queued = p.queued_step();
       if (queued == 0xFFFFFFFFu) {
         if (int32_t(step) >= 0) {
-          StoreU32(base, p + 0, LoadU32(base, p + 4));
-          StoreU32(base, p + 12, queued);
+          p.set_page(p.next_page());
+          p.set_step(queued);
         } else {
-          const uint32_t next = LoadU32(base, p + 4);
-          StoreU32(base, p + 12, 0xFFFFFFFFu);
-          StoreU32(base, p + 0, next);
+          const uint32_t next = p.next_page();
+          p.set_step(0xFFFFFFFFu);
+          p.set_page(next);
         }
       } else {
-        StoreU32(base, p + 16, 0xFFFFFFFFu);
-        StoreU32(base, p + 20, 0);
-        StoreU32(base, p + 12, queued);
+        p.set_queued_step(0xFFFFFFFFu);
+        p.set_unknown_20(0);
+        p.set_step(queued);
       }
-      StoreU32(base, p + 24, 0);
+      p.set_step_started(0);
     }
   }
-  const uint32_t state = LoadU32(base, LoadU32(base, kData) + 4);
+  const uint32_t state = G::data(base).queued_state();
   if (state != 21) {
-    StoreU32(base, uint32_t(member) + kMachineState, state);
-    StoreU32(base, LoadU32(base, kData) + 4, 21);
+    Member(base, uint32_t(member)).set_machine_state(state);
+    G::data(base).set_queued_state(21);
   }
   return answer;
 }

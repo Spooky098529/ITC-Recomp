@@ -7,10 +7,41 @@
 #include <cstdint>
 
 #include "guest.h"
+#include "schema/car_makers.h"
+#include "schema/career.h"
+#include "schema/game_modes.h"
+#include "schema/garage_screen.h"
+#include "schema/menu_helpers.h"
+#include "schema/race_event.h"
+#include "schema/race_screens.h"
+#include "schema/racer_controllers.h"
+#include "schema/tuning_screen.h"
+#include "schema/type2_screens.h"
+#include "schema/ui_movies_game.h"
+#include "schema/user_info.h"
 #include "type2_screens/type2_screens.h"
 #include "ui_movies/game.h"
 
 namespace type2_screens {
+
+using Globals = schema::Type2ScreensGlobals;
+using Node = schema::UiMovieNode;          // tuning-screen.toml
+using MenuList = schema::MenuList;         // race-screens.toml
+using SaveData = schema::SaveData;         // race-event.toml
+
+// A UI movie's texture word `index` (UiMovie +28's vector data).
+inline uint32_t MovieTextureSlot(uint8_t* base, uint32_t movie, uint32_t index) {
+  return schema::UiMovie(base, movie).textures() + 4 * index;
+}
+
+// A group node's first child index (+100) and child count (+104), read as
+// words.
+inline uint32_t FirstChild(uint8_t* base, uint32_t node) {
+  return guest::LoadU32(base, Node(base, node).width_address());
+}
+inline uint32_t ChildCount(uint8_t* base, uint32_t node) {
+  return guest::LoadU32(base, Node(base, node).height_address());
+}
 
 inline uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 inline void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -37,16 +68,17 @@ inline uint32_t FindMovie(uint8_t* base, uint32_t id, uint32_t key) {
 // The page object's moves the handlers make inline: to `page` after
 // `transition` then `queued` (-1 for none), +8 the page before unless it
 // was `page`.
-inline void PagesGo(uint8_t* base, uint32_t pages, uint32_t page, uint32_t transition,
+inline void PagesGo(uint8_t* base, uint32_t pages_address, uint32_t page, uint32_t transition,
                     uint32_t queued) {
-  const uint32_t before = Load(base, pages + 0);
+  const schema::PageObject pages(base, pages_address);
+  const uint32_t before = pages.page();
   if (before != page) {
-    Store(base, pages + 8, before);
+    pages.set_previous_page(before);
   }
-  Store(base, pages + 12, transition);
-  Store(base, pages + 16, queued);
-  Store(base, pages + 4, page);
-  Store(base, pages + 0, 0xFFFFFFFFu);
+  pages.set_step(transition);
+  pages.set_queued_step(queued);
+  pages.set_next_page(page);
+  pages.set_page(0xFFFFFFFFu);
 }
 
 // Player 0's selected garage car: the garage (save + 6120) walked by its
@@ -54,9 +86,10 @@ inline void PagesGo(uint8_t* base, uint32_t pages, uint32_t page, uint32_t trans
 // link's +2; its 1,968-byte record's address (garage + 1,968 x the slot;
 // the car itself at +212).
 inline uint32_t SelectedGarageCar(uint8_t* base, uint32_t save) {
-  const uint32_t garage = save + 6120;
-  uint32_t steps = Load(base, save + 0x19920);
-  uint32_t link = garage + 4 * uint32_t(int32_t(int16_t(guest::LoadU16(base, garage + 204))));
+  const SaveData sv(base, save);
+  const uint32_t garage = sv.garage_address();
+  uint32_t steps = sv.selected_car();
+  uint32_t link = garage + 4 * uint32_t(int32_t(int16_t(sv.garage_head())));
   while (steps != 0) {
     const int32_t next = int16_t(guest::LoadU16(base, link));
     steps -= 1;

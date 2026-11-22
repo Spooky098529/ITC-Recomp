@@ -9,6 +9,7 @@
 #include "c_runtime/strings.h"
 
 #include "guest.h"
+#include "schema/c_runtime.h"
 
 #include <algorithm>
 #include <climits>
@@ -192,17 +193,18 @@ uint32_t Ld12ToFloat(const LongDouble12& value, uint16_t extra, int32_t* status)
 }
 
 int32_t WriteChar(uint8_t* base, uint32_t character, uint32_t stream, uint32_t count) {
-  if ((guest::LoadU32(base, stream + 12) & 0x40) != 0 && guest::LoadU32(base, stream + 8) == 0) {
+  const schema::Stream s(base, stream);
+  if ((s.flags() & 0x40) != 0 && s.buffer() == 0) {
     guest::StoreU32(base, count, guest::LoadU32(base, count) + 1);
     return 0;
   }
-  const uint32_t room = guest::LoadU32(base, stream + 4) - 1;
+  const uint32_t room = s.room() - 1;
   if (int32_t(room) < 0) {
     return -1;  // _flsbuf
   }
-  guest::StoreU32(base, stream + 4, room);
-  guest::StoreU8(base, guest::LoadU32(base, stream), uint8_t(character));
-  guest::StoreU32(base, stream, guest::LoadU32(base, stream) + 1);
+  s.set_room(room);
+  guest::StoreU8(base, s.pointer(), uint8_t(character));
+  s.set_pointer(s.pointer() + 1);
   guest::StoreU32(base, count, guest::LoadU32(base, count) + 1);
   return 1;
 }
@@ -216,7 +218,8 @@ bool Overlap(uint32_t a, uint32_t a_bytes, uint32_t b, uint32_t b_bytes) {
 
 // A string stream with no buffer: write_char and its wide one only count.
 bool CountsOnly(uint8_t* base, uint32_t stream) {
-  return (guest::LoadU32(base, stream + 12) & 0x40) != 0 && guest::LoadU32(base, stream + 8) == 0;
+  const schema::Stream s(base, stream);
+  return (s.flags() & 0x40) != 0 && s.buffer() == 0;
 }
 
 }  // namespace
@@ -231,8 +234,9 @@ bool WriteMultiChar(uint8_t* base, uint32_t string, int32_t length, uint32_t str
   if (length <= 0) {
     return true;
   }
-  const uint32_t room = guest::LoadU32(base, stream + 4);
-  const uint32_t pointer = guest::LoadU32(base, stream);
+  const schema::Stream s(base, stream);
+  const uint32_t room = s.room();
+  const uint32_t pointer = s.pointer();
   const uint32_t counted = guest::LoadU32(base, count);
   if (Overlap(pointer, uint32_t(length), stream, 16) ||
       Overlap(pointer, uint32_t(length), count, 4) || Overlap(count, 4, stream, 16)) {
@@ -255,16 +259,17 @@ bool PutwcString(uint8_t* base, uint16_t unit, uint32_t stream) {
   if (stream == kStreams + 32 || stream == kStreams + 64) {
     return false;  // stdout and stderr: the console
   }
-  if ((guest::LoadU32(base, stream + 12) & 0x40) == 0) {
+  const schema::Stream s(base, stream);
+  if ((s.flags() & 0x40) == 0) {
     return false;  // a file stream
   }
-  const uint32_t room = guest::LoadU32(base, stream + 4) - 2;
+  const uint32_t room = s.room() - 2;
   if (int32_t(room) < 0) {
     return false;  // _flswbuf
   }
-  guest::StoreU32(base, stream + 4, room);
-  guest::StoreU16(base, guest::LoadU32(base, stream), unit);
-  guest::StoreU32(base, stream, guest::LoadU32(base, stream) + 2);
+  s.set_room(room);
+  guest::StoreU16(base, s.pointer(), unit);
+  s.set_pointer(s.pointer() + 2);
   return true;
 }
 
@@ -452,11 +457,11 @@ bool Cftof2(GuestText& text, int32_t precision, int32_t sign, int32_t exponent, 
 }
 
 uint32_t DecimalPointAddress(uint8_t* base, uint32_t* words) {
-  constexpr uint32_t kLocaleData = 0x8266C024;
-  const uint32_t first = guest::LoadU32(base, kLocaleData);
-  const uint32_t point = guest::LoadU32(base, first);
+  const schema::Lconv lconv = schema::CRuntimeGlobals::lconv(base);
+  const uint32_t first = lconv.address;
+  const uint32_t point = lconv.decimal_point().address;
   if (words) {
-    words[0] = kLocaleData;
+    words[0] = schema::CRuntimeGlobals::lconv_address();
     words[1] = first;
     words[2] = point;
   }

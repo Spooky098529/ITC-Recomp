@@ -28,14 +28,8 @@ constexpr uint32_t kDrawTriangleFrameBytes = 496;
 constexpr uint32_t kDrawSpanFrameBytes = 272;
 constexpr uint32_t kBlendPixelFrameBytes = 112;
 
-// The regions of the sheet (16 bytes each: left, top, right, bottom) and its
-// width (the pitch is 4 times it).
-constexpr uint32_t kVinylRegions = 0x82602A50;
-constexpr uint32_t kVinylSheetWidth = 0x82602570;
-// The floats the rasterizer reads: 0.5, 0.0 and the texel weights' scale.
-constexpr uint32_t kRasterHalf = 0x82001BE4;
-constexpr uint32_t kRasterZero = 0x82000A34;
-constexpr uint32_t kTexelScale = 0x82001FAC;
+// The sheet's regions and width, and the floats the rasterizer reads (0.5,
+// 0.0 and the texel weights' scale): schema::CarModelsGlobals.
 
 // sub_820ED2A0: the decal's texel at (u, v), bilinear: the four pixels
 // around it (clamped to the image), weighted by the fractions times the
@@ -93,10 +87,11 @@ bool DecalRegionPorted(uint32_t region);
 // pixels its caller left (the header from the registers, spilled to `stack`
 // + 32 to + 79 as the original does; the scale at `stack` + 96, the pixels'
 // address at + 116, the sheet's at + 132) as a quad the TGA's size in the
-// region's rectangle (kVinylRegions), its corners through DecalCorner, its
-// texels mirrored left to right when asked, drawn as two triangles. `stack`
-// is the guest r1 at entry. Returns the original's r3 (`stack` + 32);
-// nullopt, with nothing done, for a region not DecalRegionPorted.
+// region's rectangle (CarModelsGlobals::vinyl_regions), its corners through
+// DecalCorner, its texels mirrored left to right when asked, drawn as two
+// triangles. `stack` is the guest r1 at entry. Returns the original's r3
+// (`stack` + 32); nullopt, with nothing done, for a region not
+// DecalRegionPorted.
 std::optional<uint32_t> DrawDecal(uint8_t* base, const DecalArguments& arguments,
                                   uint32_t stack);
 

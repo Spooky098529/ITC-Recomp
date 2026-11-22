@@ -14,8 +14,8 @@
 
 namespace data_tables {
 
-// The table object's pointer (a 64-byte object: +4 the loads pending, +8 the
-// item count, +12 the block, +16 to +60 the tables).
+// The table object's pointer (schema::DataTables, schema/data_tables.h; the
+// constant kept for other areas' code and the harnesses).
 constexpr uint32_t kTables = 0x826C5CA0;
 
 // SwapWord (sub_820C97D8): reverses a guest word's four bytes in place, with
@@ -57,9 +57,6 @@ uint32_t Entry20(uint8_t* base, uint32_t index);
 uint32_t Entry40(uint8_t* base, uint32_t index);
 
 // --- The set-up and the loads (from BootData::CreateObjects, once) ---
-
-// The eight 56-byte tables' asset ids (+20 to +48).
-constexpr uint32_t kTableIds = 0x82616C64;
 
 // sub_82116DB0 DataTables::Init: the 64-byte object (operator new's plain
 // C++) into 0x826C5CA0, its +12, +4 and +8 = 0; then two passes over the

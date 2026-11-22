@@ -28,7 +28,7 @@ uint64_t CloseDialog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& cal
   Fn f(base, sp, 128, calls);
   const uint32_t movie = FindMovie(base, 44, f.frame + 80);
   if (int32_t(Load(base, step)) == 0) {
-    const uint32_t state = Load(base, Data(base) + 16);
+    const uint32_t state = Data(base).dialog_state();
     if (state == 0) {
       const uint64_t selection = f.Call(kMenuListSelection, 0x821A50B0, List(base));
       f.Call(kFinishNamed, 0x821A50C0, movie, selection + 2);
@@ -44,8 +44,8 @@ uint64_t CloseDialog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& cal
   }
   const bool done = uint32_t(f.Call(kRun, 0x821A50F8, movie, 0)) == 0;
   if (done) {
-    const uint32_t data = Data(base);
-    Store(base, data + 16, Load(base, data + 20));
+    const auto data = Data(base);
+    data.set_dialog_state(data.state_after_close());
   }
   return done ? 1 : 0;
 }

@@ -113,9 +113,8 @@ double SinCos(uint8_t* base, double angle, uint32_t sine, uint32_t cosine);
 // its clean-up 0x825DACA0 registered with atexit (through `call` when the
 // native one can't); returns atexit's r3. `sp` is the caller's r1.
 // sub_825D9060 IdentityMatrix::StaticInit: the same with 1.0 (0x82000A30) at
-// +160, +180, +200 and +220, into 0x8266D040, clean-up 0x825DAC98.
-constexpr uint32_t kZeroMatrix = 0x8266D000;
-constexpr uint32_t kIdentityMatrix = 0x8266D040;
+// +160, +180, +200 and +220, into 0x8266D040, clean-up 0x825DAC98 (the
+// two matrices: schema::MatrixMathGlobals' zero_matrix and identity_matrix).
 int32_t ZeroMatrixStaticInit(uint8_t* base, uint32_t sp, const c_runtime::AtexitCall& call);
 int32_t IdentityMatrixStaticInit(uint8_t* base, uint32_t sp, const c_runtime::AtexitCall& call);
 // sub_825DACA0 and sub_825DAC98: their clean-ups, empty (a lone blr; never

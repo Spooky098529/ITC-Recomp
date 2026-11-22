@@ -26,8 +26,6 @@
 
 namespace race_states {
 
-constexpr uint32_t kProgress = 0x826D82E8;  // the race's progress (a pointer)
-
 // --- The race's progress (src/race_states/race_progress.cpp) ---
 
 // RaceProgress::Create (sub_821698B0): 7,248 bytes from operator new; with

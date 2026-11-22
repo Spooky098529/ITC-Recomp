@@ -27,21 +27,12 @@ namespace car_dealer {
 
 using Calls = race_hud_object::Calls;
 
-// The globals: the stand's holder ([0x826D83E0]: +0 the garage stage), the
-// page object, the two menus, the dealer's data, the spec sheet's object
-// ([0x826D8438], another screen's: CheckLimits' words).
-constexpr uint32_t kStandHolder = 0x826D83E0;
-constexpr uint32_t kPages = 0x826D83E8;
-constexpr uint32_t kListMenu = 0x826D83EC;
-constexpr uint32_t kColorMenu = 0x826D83F0;
-constexpr uint32_t kData = 0x826D83F4;
-constexpr uint32_t kLimits = 0x826D8438;
-
-// The machine's words.
-constexpr uint32_t kMachineState = 9604;
-constexpr uint32_t kMachineLoaded = 9608;
-constexpr uint32_t kMachineReenter = 9612;
-constexpr uint32_t kMachineDelete = 9616;
+// The globals (the stand's holder, the page object, the two menus, the
+// dealer's data) and the machine's words are schema::CarDealerGlobals and
+// schema::CarDealer (itc_recomp/schema/car-dealer.toml). The license plate
+// editor's data CheckLimits writes is schema::Type2ScreensGlobals::plate_data
+// (type2-screens.toml), the save data schema::CareerSave (career.toml) and the
+// menus schema::MenuList (race-screens.toml).
 
 // The callees by address.
 constexpr uint32_t kVirtualAlloc = 0x82295398;

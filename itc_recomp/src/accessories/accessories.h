@@ -17,7 +17,7 @@
 
 namespace accessories {
 
-constexpr uint32_t kSet = 0x826C5510;  // [it] the set
+constexpr uint32_t kSet = 0x826C5510;  // [it] the set (AccessoriesGlobals::set)
 constexpr uint32_t kSetBytes = 32;
 constexpr uint32_t kEntryBytes = 1104;
 constexpr uint32_t kFileBytes = 36;
@@ -25,9 +25,6 @@ constexpr uint32_t kFileBytes = 36;
 constexpr uint32_t kSetBaseVtable = 0x8200672C;
 constexpr uint32_t kSetVtable = 0x82006740;
 constexpr uint32_t kFileVtable = 0x82006738;
-// The floats 1.0 and 0.0 the originals load.
-constexpr uint32_t kOne = 0x82000A30;
-constexpr uint32_t kZero = 0x82000A34;
 // AccessoryFile::OnArchiveDone, the callback AccessoryFile::Load hands the
 // archive.
 constexpr uint32_t kFileOnArchiveDone = 0x820F0C20;
@@ -206,8 +203,7 @@ uint32_t SetDestruct(uint8_t* base, uint32_t set, uint32_t flags);
 // --- The draw's helpers ---
 
 // The material groups Accessory::SetTexture walks: the words at
-// 0x820066D0 (0 and 1).
-constexpr uint32_t kMaterialGroups = 0x820066D0;
+// 0x820066D0 (0 and 1; AccessoriesGlobals::material_group_0 and _1).
 // Accessory::SetTexture (sub_820EF568): +1040 = `index`; once loaded
 // (+1048), the texture provider's (+80) vtable +12 with r4 = 0 (`texture_set`:
 // a guest call the adapter makes from the 160-byte frame below `sp`, whose

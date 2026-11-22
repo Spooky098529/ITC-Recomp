@@ -1,0 +1,136 @@
+area	functions	private_types	shared_types	shared_weight	tags	top_neighbors
+?	8	0	0	0		
+std-string.md	22	20	0	0		
+xact.md	4	2	0	0	file	
+menu-helpers.md	2	0	1	1		tuning-pages.md:1
+morph-jobs.md	27	34	1	1		framework.md:1
+shader-objects.md	7	11	1	1	file	models.md:1
+type8-mode.md	2	1	1	1		boot-mode.md:1
+file-layer.md	21	14	1	3	file	files-and-saves.md:2,ui-movies.md:1
+archive.md	14	11	6	6	file	files-and-saves.md:5,scene.md:1
+data-tables.md	18	7	3	10	file	career.md:4,save-data.md:2,car-specs.md:1,files-and-saves.md:1,race-sounds.md:1
+framework.md	100	114	13	17		files-and-saves.md:5,app-states.md:3,video-output.md:3,car-draw.md:2,app-start-up.md:1
+heap.md	27	25	1	17		c-runtime-core.md:6,c-runtime.md:6,files-and-saves.md:3,save-interface.md:2
+screen-constructors.md	41	29	13	19		type67-screens.md:10,car-list.md:5,type6-type7-modes.md:4
+graphics-resources.md	47	46	8	37	gpu	predicated-tiling.md:8,command-buffer.md:7,video-output.md:7,device-state.md:6,single-commands.md:4
+command-list.md	11	2	2	41	gpu	cameras.md:3,frame-passes.md:3,minimap.md:3,mode-tick.md:3,post-effects.md:3
+race-hud.md	2	1	4	42		camera-modes.md:2,race-hud-machine.md:2,race-hud-object.md:2,alt-hud.md:1,car-dealer.md:1
+c-runtime-core.md	83	66	14	55		c-runtime.md:23,video-output.md:6,xaudio-engine.md:6,files-and-saves.md:6,heap.md:6
+functions.md	11	3	10	55		single-commands.md:18,device-state.md:16,device-shaders.md:13,predicated-tiling.md:6,app-states.md:1
+app-states.md	76	89	15	56		race-end.md:9,car-dealer.md:8,race-menu.md:8,todays-result.md:8,framework.md:3
+c-runtime.md	80	163	14	66		c-runtime-core.md:23,xaudio-objects.md:9,lifted.md:9,heap.md:6,files-and-saves.md:3
+achievements.md	5	8	5	72		race-states.md:5,race-screens-unseen.md:4,race-hud-machine.md:3,race-hud-object.md:3,race-sounds.md:3
+race-flow.md	5	1	5	92		racer-controllers.md:5,ai-drivers.md:4,camera-modes.md:3,car-sounds.md:3,collision-world.md:3
+command-buffer.md	26	20	8	99	gpu	predicated-tiling.md:26,device-state.md:24,video-output.md:24,single-commands.md:15,graphics-resources.md:7
+save-interface.md	77	39	15	124	save	files-and-saves.md:11,race-screens-unseen.md:10,race-screens.md:10,system-services.md:8,type10-mode.md:8
+xaudio-engine.md	68	94	15	127		xaudio.md:41,xaudio-objects.md:22,audio.md:21,lifted.md:21,video-output.md:9
+files-and-saves.md	72	76	34	142		video-output.md:13,save-interface.md:11,c-runtime-core.md:6,framework.md:5,archive.md:5
+boot-mode.md	40	20	33	147		app-start-up.md:11,action-mappers.md:9,mode-tick.md:7,camera-modes.md:6,todays-result.md:6
+track-zones.md	92	86	10	158		camera-modes.md:16,race-states.md:12,race-world.md:12,ai-drivers.md:11,minimap.md:9
+audio.md	48	42	12	168		xaudio-engine.md:21,xaudio.md:19,xaudio-objects.md:19,lifted.md:17,video-output.md:4
+options-load-save.md	16	4	13	174	save	options-screen.md:62,front-end-screen-helpers.md:18,type6-type7-modes.md:12,race-screens-unseen.md:4,race-screens.md:4
+app-start-up.md	24	25	22	175		boot-mode.md:11,camera-modes.md:9,cameras.md:9,post-effects.md:9,screen-objects.md:8
+race-end.md	1	0	15	187		car-dealer.md:10,race-menu.md:10,todays-result.md:10,app-states.md:9,mode-tick.md:5
+build-screen.md	4	3	11	189		type6-type7-modes.md:11,car-makers.md:4,front-end-car-draw.md:4,stand-models.md:4,tuning-pages.md:4
+type2-mode.md	20	25	13	192		title-screen.md:11,network-mode.md:8,type10-mode.md:8,type6-type7-modes.md:7,mode-tick.md:6
+user-info.md	14	6	5	203		type2-screens.md:9,alt-hud.md:7,power-graph-screen.md:7,race-hud-machine.md:7,race-screens.md:7
+car-settings.md	21	7	11	246		car-makers.md:10,options-screen.md:10,type2-screens.md:9,type6-type7-modes.md:9,type67-screens.md:9
+device-shaders.md	38	33	18	268	gpu	device-state.md:17,single-commands.md:16,functions.md:13,predicated-tiling.md:11,screen-objects.md:6
+single-commands.md	57	33	20	282	gpu	device-state.md:48,predicated-tiling.md:32,functions.md:18,device-shaders.md:16,command-buffer.md:15
+replay-snapshots.md	30	19	15	304		racer-controllers.md:17,race-states.md:15,race-world.md:14,car-physics.md:11,ai-drivers.md:11
+save-screen.md	57	7	24	316	save	front-end-screen-helpers.md:33,type10-mode.md:18,title-screen.md:15,race-screens-unseen.md:14,system-services.md:12
+save-data.md	25	7	19	319	save	title-screen.md:12,career.md:10,mode-tick.md:8,tuning-pages.md:6,tuning-screen.md:6
+game-modes.md	40	37	23	326		front-end-screen-helpers.md:9,mode-tick.md:9,type6-type7-modes.md:8,car-sounds.md:7,menu-sounds.md:7
+power-graph-screen.md	22	17	8	327		car-dealer.md:13,garage-screen.md:13,tuning-screen.md:13,alt-hud.md:12,race-hud-machine.md:12
+frame-passes.md	13	17	18	339	gpu	scenery-lists.md:18,car-draw.md:13,accessories.md:11,frame-driver.md:11,scene-target.md:9
+xaudio.md	92	79	12	362		xaudio-objects.md:43,xaudio-engine.md:41,lifted.md:27,audio.md:19,video-output.md:6
+type5-mode.md	33	20	8	369		type6-type7-modes.md:15,location-screen.md:14,todays-result.md:14,type2-screens.md:14,front-end-screen-helpers.md:13
+input.md	24	25	6	370		action-mappers.md:6,ai-drivers.md:6,camera-modes.md:6,cameras.md:6,car-draw.md:6
+type2-dialog.md	28	10	3	382		car-dealer.md:15,garage-screen.md:15,race-menu.md:15,todays-result.md:15,tuning-pages.md:15
+car-list.md	155	66	27	386		tuning-pages.md:29,tuning-screen.md:28,ui-movies-game.md:22,garage-screen.md:21,type6-type7-modes.md:21
+load-poll.md	32	6	21	408		second-set.md:40,scene-models.md:37,car-models.md:20,scene-loaders.md:16,car-draw.md:16
+scene-target.md	6	1	17	430	gpu	mode-tick.md:17,post-effects.md:13,cameras.md:12,minimap.md:12,sprites.md:10
+data-load.md	25	29	14	446	file	strings-and-font.md:12,ui-movies-game.md:10,camera-modes.md:9,car-scene-draw.md:9,cameras.md:8
+movies.md	82	64	9	450		cameras.md:11,car-draw.md:8,car-scene-draw.md:8,camera-modes.md:8,accessories.md:7
+sprites.md	5	6	17	475	gpu	cameras.md:12,mode-tick.md:12,car-scene-draw.md:11,post-effects.md:11,scene-target.md:10
+device-state.md	144	28	28	478	gpu	single-commands.md:48,predicated-tiling.md:39,command-buffer.md:24,video-output.md:23,device-shaders.md:17
+frame-driver.md	28	65	123	483		scenery-lists.md:104,location-screen.md:25,car-scene-draw.md:23,course-scenery.md:12,camera-modes.md:11
+race-overlays.md	30	24	10	486		camera-modes.md:14,car-scene-draw.md:14,mode-tick.md:11,race-update.md:11,course-scenery.md:10
+sound-cues.md	84	88	20	490	file	menu-sounds.md:26,car-sounds.md:10,cameras.md:9,ai-drivers.md:9,car-physics.md:9
+power-graph.md	6	15	23	519		type2-screens.md:18,garage-screen.md:15,tuning-pages.md:15,tuning-screen.md:15,car-makers.md:14
+scene.md	23	31	28	575		car-draw.md:20,car-scene-draw.md:18,scene-models.md:17,second-set.md:17,car-physics.md:17
+race-scene.md	21	8	28	586		camera-modes.md:24,race-update.md:23,car-scene-draw.md:15,car-sounds.md:15,ai-drivers.md:15
+video-output.md	54	41	35	587	gpu	predicated-tiling.md:31,command-buffer.md:24,device-state.md:23,single-commands.md:14,files-and-saves.md:13
+predicated-tiling.md	31	23	27	635	gpu	device-state.md:39,single-commands.md:32,video-output.md:31,command-buffer.md:26,device-shaders.md:11
+racer-controllers.md	28	16	17	640		race-world.md:36,race-states.md:35,ai-drivers.md:26,race-hud-machine.md:25,camera-modes.md:24
+strings-and-font.md	37	32	20	652	file	ui-movies-game.md:20,screen-objects.md:18,cameras.md:17,camera-modes.md:17,post-effects.md:16
+models.md	64	81	28	669	file	scenery-lists.md:21,car-draw.md:20,second-set.md:18,camera-modes.md:15,screen-objects.md:14
+menu-sounds.md	40	22	17	673		sound-cues.md:26,race-sounds.md:21,type6-type7-modes.md:21,car-sounds.md:17,front-end-screen-helpers.md:12
+race-loading.md	49	25	69	681		system-services.md:63,network-mode.md:51,mode-tick.md:47,race-screens-unseen.md:26,ui-movies-game.md:25
+race-update.md	10	13	33	708		race-scene.md:23,camera-modes.md:22,car-sounds.md:20,race-states.md:19,car-scene-draw.md:18
+action-mappers.md	46	37	19	725		ai-drivers.md:18,car-physics.md:17,texture-compression.md:17,vehicle.md:17,camera-modes.md:16
+race-event.md	103	45	24	756		race-world.md:58,race-states.md:54,race-hud-machine.md:39,camera-modes.md:38,race-setup.md:30
+model-animation.md	44	59	8	777	file	lifted.md:19,ui-movies-game.md:19,camera-modes.md:18,ai-drivers.md:17,car-draw.md:17
+scene-loaders.md	79	34	26	781	file	car-models.md:35,scene-models.md:31,second-set.md:30,car-scene-draw.md:20,ai-drivers.md:17
+scene-models.md	47	31	31	801		second-set.md:45,load-poll.md:37,scene-loaders.md:31,car-models.md:26,car-scene-draw.md:24
+race-sounds.md	31	20	24	850		type6-type7-modes.md:27,car-sounds.md:25,race-hud-object.md:22,menu-sounds.md:21,race-states.md:19
+track-route.md	41	69	21	855		ai-drivers.md:30,camera-modes.md:28,collision-world.md:28,car-physics.md:23,race-world.md:21
+type10-mode.md	48	22	26	856		network-mode.md:31,title-screen.md:29,type67-screens.md:28,todays-result.md:27,type6-type7-modes.md:27
+car-models.md	50	79	25	873	file	scene-loaders.md:35,car-draw.md:27,scene-models.md:26,second-set.md:26,car-scene-draw.md:21
+matrix-math.md	25	20	9	875		vehicle-accessors.md:25,cameras.md:25,camera-modes.md:24,car-physics.md:24,car-scene-draw.md:22
+tuning-machine.md	22	27	42	898		tuning-screen.md:38,tuning-pages.md:36,car-physics.md:27,garage-screen.md:24,camera-modes.md:21
+material-passes.md	23	25	30	906	file	car-physics.md:28,camera-modes.md:27,ai-drivers.md:27,car-draw.md:24,car-scene-draw.md:23
+screen-objects.md	55	72	36	944		camera-modes.md:32,cameras.md:31,car-physics.md:31,ai-drivers.md:26,post-effects.md:24
+car-makers.md	26	10	42	953		stand-models.md:52,front-end-car-draw.md:44,type6-type7-modes.md:39,garage-screen.md:32,tuning-screen.md:32
+front-end-screen-helpers.md	28	2	34	954		options-screen.md:67,type6-type7-modes.md:46,ui-movies-game.md:43,type67-screens.md:40,network-mode.md:39
+stand-models.md	50	3	35	965		front-end-car-draw.md:62,car-makers.md:52,car-draw.md:39,type6-type7-modes.md:31,tuning-pages.md:30
+race-screens-unseen.md	96	13	43	975		race-screens.md:51,network-mode.md:50,system-services.md:39,race-hud-object.md:37,race-hud-machine.md:33
+race-screens.md	124	28	31	975		race-screens-unseen.md:51,car-dealer.md:37,race-hud-object.md:37,tuning-pages.md:35,tuning-screen.md:35
+course-scenery.md	76	100	45	982	file	car-scene-draw.md:32,camera-modes.md:28,car-draw.md:27,cameras.md:26,scenery-lists.md:22
+scenery-lists.md	25	75	126	995	file	frame-driver.md:104,car-draw.md:43,car-scene-draw.md:31,location-screen.md:28,camera-modes.md:24
+minimap.md	17	401	26	1004		camera-modes.md:27,race-world.md:27,ai-drivers.md:25,race-states.md:24,mode-tick.md:23
+alt-hud.md	26	4	18	1020		race-hud-machine.md:45,type2-screens.md:42,tuning-screen.md:41,ui-movies-game.md:41,tuning-pages.md:38
+accessories.md	58	70	31	1039		car-physics.md:35,car-draw.md:33,ai-drivers.md:33,camera-modes.md:32,car-scene-draw.md:26
+car-specs.md	49	29	18	1045	file	car-physics.md:31,camera-modes.md:29,collision-world.md:29,vehicle.md:29,car-draw.md:28
+race-setup.md	47	21	24	1050		race-world.md:42,race-states.md:32,ai-drivers.md:31,camera-modes.md:31,race-event.md:30
+todays-result.md	57	31	26	1053		type2-screens.md:55,type67-screens.md:45,tuning-pages.md:43,race-menu.md:42,type6-type7-modes.md:42
+race-menu.md	35	11	26	1070		todays-result.md:42,type67-screens.md:41,tuning-pages.md:38,type2-screens.md:38,type6-type7-modes.md:38
+post-effects.md	60	39	45	1090	gpu	cameras.md:51,camera-modes.md:46,car-physics.md:37,ai-drivers.md:33,car-draw.md:31
+mode-tick.md	57	57	96	1157		system-services.md:79,ui-movies-game.md:53,network-mode.md:50,race-loading.md:47,race-states.md:32
+sticker-editor.md	25	6	18	1160		tuning-screen.md:73,tuning-pages.md:68,type2-screens.md:29,type6-type7-modes.md:27,ui-movies-game.md:23
+title-screen.md	87	30	33	1196		network-mode.md:53,type2-screens.md:48,tuning-pages.md:45,type67-screens.md:43,type6-type7-modes.md:43
+ui-movies.md	48	198	19	1211	file	ui-movies-game.md:43,tuning-pages.md:39,texture-compression.md:33,tuning-screen.md:31,car-physics.md:29
+career.md	77	97	78	1231		car-physics.md:51,ai-drivers.md:43,camera-modes.md:35,car-sounds.md:32,race-states.md:32
+system-services.md	247	355	133	1269		network-mode.md:122,ui-movies-game.md:99,lifted.md:81,mode-tick.md:79,race-loading.md:63
+car-dealer.md	74	12	34	1291		type2-screens.md:84,tuning-pages.md:80,garage-screen.md:78,tuning-screen.md:77,ui-movies-game.md:70
+xaudio-objects.md	148	268	46	1301		lifted.md:68,car-physics.md:48,xaudio.md:43,ai-drivers.md:41,camera-modes.md:36
+second-set.md	154	119	42	1337		car-draw.md:68,scene-models.md:45,load-poll.md:40,car-physics.md:40,ai-drivers.md:39
+location-screen.md	55	44	44	1353		type2-screens.md:35,race-hud-machine.md:35,type6-type7-modes.md:34,car-scene-draw.md:31,scenery-lists.md:28
+type8-screens.md	126	83	17	1371		type67-screens.md:74,type6-type7-modes.md:65,tuning-pages.md:63,ui-movies-game.md:61,network-mode.md:57
+vehicle.md	33	29	62	1414		car-physics.md:92,ai-drivers.md:50,car-sounds.md:48,camera-modes.md:47,vehicle-accessors.md:40
+collision.md	83	62	23	1415		car-physics.md:89,ai-drivers.md:70,camera-modes.md:68,texture-compression.md:60,car-draw.md:56
+front-end-car-draw.md	31	8	43	1420		stand-models.md:62,type6-type7-modes.md:48,car-makers.md:44,lifted.md:42,car-draw.md:37
+race-hud-object.md	87	35	54	1438		race-hud-machine.md:61,ui-movies-game.md:48,race-screens-unseen.md:37,race-world.md:37,race-screens.md:37
+vehicle-accessors.md	147	64	35	1445		car-physics.md:87,camera-modes.md:55,ai-drivers.md:54,collision.md:52,car-draw.md:51
+texture-compression.md	132	214	23	1480	file	car-physics.md:104,ai-drivers.md:97,camera-modes.md:77,car-draw.md:66,collision.md:60
+cameras.md	52	103	51	1484		camera-modes.md:76,ai-drivers.md:55,car-physics.md:55,post-effects.md:51,lifted.md:43
+collision-world.md	45	52	39	1502		ai-drivers.md:57,camera-modes.md:55,car-physics.md:47,race-world.md:45,collision.md:44
+car-scene-draw.md	22	43	66	1518		camera-modes.md:48,car-draw.md:46,ai-drivers.md:42,car-physics.md:41,second-set.md:34
+options-screen.md	149	13	31	1558		tuning-screen.md:114,ui-movies-game.md:113,type6-type7-modes.md:109,type67-screens.md:100,type2-screens.md:94
+garage-screen.md	77	27	27	1566		tuning-screen.md:109,tuning-pages.md:90,type6-type7-modes.md:87,type2-screens.md:85,car-dealer.md:78
+car-sounds.md	66	102	69	1636		car-physics.md:86,ai-drivers.md:75,camera-modes.md:62,vehicle.md:48,car-draw.md:46
+network-mode.md	151	61	101	1637		lifted.md:130,system-services.md:122,ui-movies-game.md:87,type6-type7-modes.md:63,type67-screens.md:60
+race-states.md	89	66	59	1645		race-world.md:119,ai-drivers.md:68,camera-modes.md:61,race-event.md:54,race-hud-machine.md:54
+type67-screens.md	230	121	41	1714		ui-movies-game.md:105,type2-screens.md:101,options-screen.md:100,type6-type7-modes.md:94,tuning-screen.md:90
+race-hud-machine.md	73	28	39	1772		race-hud-object.md:61,race-world.md:55,race-states.md:54,alt-hud.md:45,type2-screens.md:45
+race-world.md	50	51	57	1789		race-states.md:119,ai-drivers.md:101,camera-modes.md:78,race-event.md:58,race-hud-machine.md:55
+car-draw.md	88	124	65	1981		camera-modes.md:97,ai-drivers.md:88,car-physics.md:87,second-set.md:68,texture-compression.md:66
+type2-screens.md	151	41	41	2063		tuning-screen.md:126,ui-movies-game.md:124,tuning-pages.md:109,type67-screens.md:101,options-screen.md:94
+car-physics.md	135	148	121	2215		ai-drivers.md:200,camera-modes.md:124,texture-compression.md:104,vehicle.md:92,collision.md:89
+ai-drivers.md	159	209	76	2314		car-physics.md:200,camera-modes.md:125,race-world.md:101,texture-compression.md:97,car-draw.md:88
+type6-type7-modes.md	180	90	92	2386		options-screen.md:109,type67-screens.md:94,tuning-pages.md:92,tuning-screen.md:90,garage-screen.md:87
+camera-modes.md	97	163	91	2461		ai-drivers.md:125,car-physics.md:124,car-draw.md:97,race-world.md:78,texture-compression.md:77
+lifted.md	461	596	101	2479		network-mode.md:130,ui-movies-game.md:90,car-physics.md:82,system-services.md:81,xaudio-objects.md:68
+tuning-screen.md	154	28	62	2808		tuning-pages.md:336,ui-movies-game.md:155,type2-screens.md:126,options-screen.md:114,garage-screen.md:109
+ui-movies-game.md	185	148	77	2810	file	tuning-screen.md:155,tuning-pages.md:128,type2-screens.md:124,options-screen.md:113,type67-screens.md:105
+tuning-pages.md	127	39	70	2890		tuning-screen.md:336,ui-movies-game.md:128,type2-screens.md:109,type6-type7-modes.md:92,garage-screen.md:90

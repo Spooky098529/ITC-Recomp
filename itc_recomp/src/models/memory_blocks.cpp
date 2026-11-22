@@ -7,6 +7,7 @@
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "schema/models.h"
 #include "std_list/ptr_list.h"
 
 #include <cstdlib>
@@ -16,11 +17,13 @@ namespace models {
 
 namespace {
 
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
-}
-uint32_t Load(uint8_t* base, uint32_t address) {
-  return guest::LoadU32(base, address);
+using Header = schema::MemoryBlockHeader;
+using List = schema::PendingFreesList;
+using Node = schema::PendingFreesNode;
+
+// The pending frees at 0x8296BD54.
+List PendingFrees(uint8_t* base) {
+  return List(base, schema::ModelsGlobals::pending_frees_address());
 }
 
 // The block's header, when the block is one (not null, `XLMM`); else 0.
@@ -29,13 +32,13 @@ uint32_t HeaderOf(uint8_t* base, uint32_t block) {
     return 0;
   }
   const uint32_t header = block - kBlockHeaderBytes;
-  return Load(base, header) == kBlockTag ? header : 0;
+  return Header(base, header).tag() == kBlockTag ? header : 0;
 }
 
 // The header put at the end of the pending frees, its checks made.
 void Queue(uint8_t* base, uint32_t header) {
-  const uint32_t head = Load(base, kPendingFrees + kListHead);
-  if (!PendingFreesInsert(base, kPendingFrees, head, header)) {
+  const uint32_t head = PendingFrees(base).head().address;
+  if (!PendingFreesInsert(base, PendingFrees(base).address, head, header)) {
     ITC_LOG_ERROR("Memory::FreeLater: the pending frees' insert refused after its checks");
     std::abort();
   }
@@ -50,29 +53,30 @@ std::recursive_mutex& MemoryBlocksMutex() {
 
 void ScopedLockEnter(uint8_t* base, uint32_t lock, uint32_t critical_section) {
   ITC_NATIVE_RUNNING("sub_8258E580 ScopedLock::ScopedLock");
-  Store(base, lock, critical_section);
+  guest::StoreU32(base, lock, critical_section);
   MemoryBlocksMutex().lock();
 }
 
 uint32_t ScopedLockLeave(uint8_t* base, uint32_t lock) {
   ITC_NATIVE_RUNNING("sub_8258E5B8 ScopedLock::~ScopedLock");
-  const uint32_t critical_section = Load(base, lock);
+  const uint32_t critical_section = guest::LoadU32(base, lock);
   MemoryBlocksMutex().unlock();
   return critical_section;
 }
 
 bool PendingFreesIncSize(uint8_t* base, uint32_t list, uint32_t count) {
   ITC_NATIVE_RUNNING("sub_8258E2F8 PendingFrees::IncSize");
-  const uint32_t size = Load(base, list + kListSize);
+  const List l(base, list);
+  const uint32_t size = l.size();
   if (0x3FFFFFFFu - size < count) {
     return false;
   }
-  Store(base, list + kListSize, size + count);
+  l.set_size(size + count);
   return true;
 }
 
 bool PendingFreesCanInsert(uint8_t* base, uint32_t list) {
-  return std_list::CanAllocate(base, 1) && 0x3FFFFFFFu - Load(base, list + kListSize) >= 1;
+  return std_list::CanAllocate(base, 1) && 0x3FFFFFFFu - List(base, list).size() >= 1;
 }
 
 bool PendingFreesInsert(uint8_t* base, uint32_t list, uint32_t where, uint32_t value) {
@@ -80,33 +84,34 @@ bool PendingFreesInsert(uint8_t* base, uint32_t list, uint32_t where, uint32_t v
   if (!PendingFreesCanInsert(base, list)) {
     return false;
   }
-  const uint32_t previous = Load(base, where + kNodePrevious);
-  const auto made = memory::crt::OperatorNew(base, kNodeBytes);
+  const uint32_t previous = Node(base, where).previous().address;
+  const auto made = memory::crt::OperatorNew(base, Node::kSize);
   if (!made) {
     ITC_LOG_ERROR("PendingFrees::Insert: operator new refused a node after its checks");
     std::abort();
   }
-  const uint32_t node = *made;
+  const Node node(base, *made);
   // The original's null checks on the node, its +4 and its +8.
-  if (node != 0) {
-    Store(base, node + kNodeNext, where);
+  if (node.address != 0) {
+    node.set_next(where);
   }
-  if (node + kNodePrevious != 0) {
-    Store(base, node + kNodePrevious, previous);
+  if (node.previous_address() != 0) {
+    node.set_previous(previous);
   }
-  if (node + kNodeValue != 0) {
-    Store(base, node + kNodeValue, value);
+  if (node.header_address() != 0) {
+    node.set_header(value);
   }
   PendingFreesIncSize(base, list, 1);
-  Store(base, where + kNodePrevious, node);
-  Store(base, Load(base, node + kNodePrevious), node);
+  Node(base, where).set_previous(node);
+  // The node before it: its next (+0).
+  node.previous().set_next(node);
   return true;
 }
 
 bool PendingFreesHaveRoom(uint8_t* base, uint32_t count) {
   std::lock_guard<std::recursive_mutex> lock(MemoryBlocksMutex());
   return std_list::CanAllocate(base, 1) &&
-         0x3FFFFFFFu - Load(base, kPendingFrees + kListSize) >= count;
+         0x3FFFFFFFu - PendingFrees(base).size() >= count;
 }
 
 bool FreeLater(uint8_t* base, uint32_t block) {
@@ -116,7 +121,7 @@ bool FreeLater(uint8_t* base, uint32_t block) {
   if (header == 0) {
     return true;
   }
-  if (!PendingFreesCanInsert(base, kPendingFrees)) {
+  if (!PendingFreesCanInsert(base, PendingFrees(base).address)) {
     return false;
   }
   Queue(base, header);
@@ -130,18 +135,15 @@ bool FreePhysicalLater(uint8_t* base, uint32_t block, uint32_t attributes) {
   if (header == 0) {
     return true;
   }
-  if (!PendingFreesCanInsert(base, kPendingFrees)) {
+  if (!PendingFreesCanInsert(base, PendingFrees(base).address)) {
     return false;
   }
-  Store(base, header + kBlockAttributes, attributes);
+  Header(base, header).set_attributes(attributes);
   Queue(base, header);
   return true;
 }
 
 namespace {
-
-constexpr uint32_t kBlockKind = 4;
-constexpr uint32_t kBlockPasses = 8;
 
 uint32_t PagesFor(uint32_t bytes) { return (bytes + 8191) & 0xFFFFF000u; }
 
@@ -151,24 +153,25 @@ uint32_t Made(uint8_t* base, uint32_t header, uint32_t kind) {
   if (header == 0) {
     return 0;
   }
+  const Header h(base, header);
   switch (kind) {
     case 0:
-      Store(base, header + kBlockPasses, 1);
-      Store(base, header + 0, kBlockTag);
-      Store(base, header + kBlockKind, 0);
-      Store(base, header + kBlockAttributes, 0);
+      h.set_passes(1u);
+      h.set_tag(kBlockTag);
+      h.set_kind(0u);
+      h.set_attributes(0u);
       break;
     case 1:
-      Store(base, header + kBlockAttributes, 0);
-      Store(base, header + 0, kBlockTag);
-      Store(base, header + kBlockKind, 1);
-      Store(base, header + kBlockPasses, 1);
+      h.set_attributes(0u);
+      h.set_tag(kBlockTag);
+      h.set_kind(1u);
+      h.set_passes(1u);
       break;
     default:
-      Store(base, header + kBlockKind, 2);
-      Store(base, header + 0, kBlockTag);
-      Store(base, header + kBlockPasses, 1);
-      Store(base, header + kBlockAttributes, 0);
+      h.set_kind(2u);
+      h.set_tag(kBlockTag);
+      h.set_passes(1u);
+      h.set_attributes(0u);
       break;
   }
   return header + kBlockHeaderBytes;
@@ -203,13 +206,14 @@ uint32_t AllocPhysical(uint8_t* base, uint32_t bytes, uint32_t attributes) {
 bool FreeDue(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_8258E1D8 PendingFrees::FreeDue");
   std::lock_guard<std::recursive_mutex> lock(MemoryBlocksMutex());
-  const uint32_t head = Load(base, kPendingFrees + kListHead);
+  const List list = PendingFrees(base);
+  const uint32_t head = list.head().address;
   // The checks first, over the due headers.
   std::vector<uint32_t> due;
-  for (uint32_t node = Load(base, head + kNodeNext); node != head;
-       node = Load(base, node + kNodeNext)) {
-    const uint32_t header = Load(base, node + kNodeValue);
-    if (Load(base, header + kBlockPasses) != 0) {
+  for (uint32_t node = Node(base, head).next().address; node != head;
+       node = Node(base, node).next().address) {
+    const uint32_t header = Node(base, node).header().address;
+    if (Header(base, header).passes() != 0) {
       continue;
     }
     for (const uint32_t other : due) {
@@ -218,37 +222,39 @@ bool FreeDue(uint8_t* base) {
       }
     }
     due.push_back(header);
-    const uint32_t kind = Load(base, header + kBlockKind);
+    const uint32_t kind = Header(base, header).kind();
     if (!memory::IsHeapBlock(node) || (kind == 0 && !memory::IsPages(header)) ||
-        (kind == 2 && !(Load(base, header + kBlockAttributes) & kXMemPhysical) &&
+        (kind == 2 && !(Header(base, header).attributes() & kXMemPhysical) &&
          !memory::IsHeapBlock(header))) {
       return false;
     }
   }
-  uint32_t node = Load(base, head + kNodeNext);
-  while (Load(base, kPendingFrees + kListHead) != node) {
-    const uint32_t header = Load(base, node + kNodeValue);
-    const uint32_t passes = Load(base, header + kBlockPasses);
+  uint32_t node = Node(base, head).next().address;
+  while (list.head().address != node) {
+    const Node n(base, node);
+    const Header h = n.header();
+    const uint32_t header = h.address;
+    const uint32_t passes = h.passes();
     if (passes != 0) {
-      Store(base, header + kBlockPasses, passes - 1);
-      node = Load(base, node + kNodeNext);
+      h.set_passes(passes - 1);
+      node = n.next().address;
       continue;
     }
-    const uint32_t kind = Load(base, header + kBlockKind);
-    Store(base, header + 0, 0);
+    const uint32_t kind = h.kind();
+    h.set_tag(0u);
     if (kind == 0) {
       memory::FreePages(header);
     } else if (kind == 1) {
       memory::FreePhysical(header);
     } else if (kind == 2) {
-      memory::crt::XMemFree(header, Load(base, header + kBlockAttributes));
+      memory::crt::XMemFree(header, h.attributes());
     }
-    const uint32_t next = Load(base, node + kNodeNext);
-    if (node != Load(base, kPendingFrees + kListHead)) {
-      Store(base, Load(base, node + kNodePrevious) + kNodeNext, next);
-      Store(base, Load(base, node + kNodeNext) + kNodePrevious, Load(base, node + kNodePrevious));
+    const uint32_t next = n.next().address;
+    if (node != list.head().address) {
+      n.previous().set_next(next);
+      n.next().set_previous(n.previous());
       memory::crt::OperatorDelete(node);
-      Store(base, kPendingFrees + kListSize, Load(base, kPendingFrees + kListSize) - 1);
+      list.set_size(list.size() - 1);
     }
     node = next;
   }

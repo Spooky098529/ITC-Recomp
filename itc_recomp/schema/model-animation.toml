@@ -1,0 +1,368 @@
+# The schema of docs/functions/model-animation.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The graphics library's model animation: the five track sets a model holds
+# for its part file's sections (model +304 to +384), the sections they bind
+# (big-endian part file data: their tracks, channels and 20-byte keys), the
+# value arrays the set-ups allocate, the skeleton under a model's node file
+# (+112; the base class SkeletonBase is the same object) and its instances'
+# cursors; beside it in the library, the primitive drawer, and the physical
+# pad (input.md's, filed here by the measure: its 12-byte records are
+# cleared by this area's sub_825A18D8). Names from docs/known-data.md ("track
+# set", "animation section", "skeleton", "physical pad") and the hand port's
+# comments (src/model_animation/model_animation.h).
+#
+# Skeleton and PrimitiveDrawer were first described in heap.toml (their
+# deleting destructors' r3): moved here, with heap.toml's measures.
+
+# A track set (20 bytes, model +304, +324, +344, +364, +384): the section it
+# views and the values it animates, one a track.
+[TrackSet]
+measure = "TrackSet"
+measures = ["sub_825A1148.r3", "TrackSet::SetupFloat.r3", "TrackSet::ReleaseArray.r3", "TrackSet::Release.r3", "TrackSet::EndTime.r3", "TrackSet::TrackSet.r3", "TrackSet::Track.r3", "TrackSet::Channels.r3"]
+# sub_825A1148.r3 from SceneryMaterialTrackSet (scenery-lists), merged at the integration
+size = 20
+origin = "file"
+fields = [
+  { name = "section", offset = 0, type = "ptr", to = "AnimationSection", note = "the part file's section (0: none)" },
+  { name = "track_count_pointer", offset = 4, type = "u32", note = "the section's +16 (its track count)'s address" },
+  { name = "tracks", offset = 8, type = "ptr", to = "AnimationTrack", note = "the section's +20: its 80-byte tracks" },
+  { name = "start_time", offset = 12, type = "f32", note = "the section's default start time (its +4)" },
+  { name = "values", offset = 16, type = "ptr", to = "TrackValues", note = "one value a track (16, 4, 4, 32 or 208 bytes by the set); the 16-, 32- and 208-byte ones after a 16-byte count header" },
+]
+
+# An animation section (a part file's +0x28 to +0x3C, big-endian), as a
+# track set or a skeleton cursor binds it. The measure joins it with what
+# the set's +4 and +8 point to (its own +16 and +20).
+[AnimationSection]
+measure = "TrackSet::View.r4"
+size = 100
+origin = "file"
+fields = [
+  { name = "start_time", offset = 4, type = "f32", note = "the default start time" },
+  { name = "end_time", offset = 8, type = "f32", note = "the default end time" },
+  { name = "track_count", offset = 16, type = "u32" },
+  { name = "tracks", offset = 20, type = "bytes", count = 80, note = "the tracks from here (80 bytes each; the +0x28 section's are 20-byte SkeletonNodeEntry, the +0x3C section's 352 bytes)" },
+]
+
+# A section's track (80 bytes).
+[AnimationTrack]
+measure = "TrackSet::Track.ret"
+size = 80
+origin = "file"
+fields = [
+  { name = "channel_count", offset = 64, type = "u32" },
+  { name = "channels_offset", offset = 68, type = "u32", note = "the first channel's offset from the section" },
+  { name = "start_time", offset = 72, type = "f32" },
+  { name = "end_time", offset = 76, type = "f32" },
+]
+
+# A track of the +0x3C section (352 bytes; sub_825A6648, the 208-byte set's
+# TrackSet::Track), as sub_825A1938 reads it (lifted, never ran in play, not
+# read).
+[AnimationTrack208]
+measure = "sub_825A6648.ret"
+size = 352
+origin = "file"
+fields = [
+  { name = "unknown_64", offset = 64, type = "u64" },
+  { name = "unknown_72", offset = 72, type = "u64" },
+  { name = "unknown_80", offset = 80, type = "u64" },
+  { name = "unknown_88", offset = 88, type = "u64" },
+  { name = "unknown_96", offset = 96, type = "u64" },
+  { name = "unknown_104", offset = 104, type = "u64" },
+  { name = "unknown_112", offset = 112, type = "u64" },
+  { name = "unknown_120", offset = 120, type = "u64" },
+  { name = "unknown_128", offset = 128, type = "u64" },
+  { name = "unknown_136", offset = 136, type = "u64" },
+  { name = "unknown_144", offset = 144, type = "u64" },
+  { name = "unknown_152", offset = 152, type = "u64" },
+  { name = "unknown_160", offset = 160, type = "u64" },
+  { name = "unknown_168", offset = 168, type = "u64" },
+  { name = "unknown_176", offset = 176, type = "f32" },
+  { name = "unknown_180", offset = 180, type = "f32" },
+  { name = "unknown_184", offset = 184, type = "f32" },
+  { name = "unknown_188", offset = 188, type = "f32" },
+  { name = "unknown_212", offset = 212, type = "f32" },
+  { name = "unknown_216", offset = 216, type = "u32" },
+]
+
+# A track's channel: its keys follow it, the next channel after them.
+[AnimationChannel]
+measure = "TrackSet::Channels.ret"
+size = 28
+origin = "file"
+fields = [
+  { name = "key_count", offset = 0, type = "u32" },
+  { name = "component", offset = 4, type = "u32", note = "the float index of the value it writes" },
+  { name = "keys", offset = 8, type = "bytes", count = 20, note = "the 20-byte AnimationKeys from here" },
+]
+
+# A key (20 bytes).
+[AnimationKey]
+measures = ["Key", "Key::Interpolate.r4"]
+size = 20
+origin = "file"
+fields = [
+  { name = "time", offset = 0, type = "f32" },
+  { name = "flags", offset = 4, type = "u32", note = "2 linear, 8 stepped, else cubic Hermite" },
+  { name = "value", offset = 8, type = "f32" },
+  { name = "in_tangent", offset = 12, type = "f32" },
+  { name = "out_tangent", offset = 16, type = "f32" },
+]
+
+# A channel's keys as the curve samplers walk them (an array, not an object:
+# Curve::Sample reads keys +20 and +40, the second and third keys' times).
+[AnimationKeyRun]
+measure = "CursorCurve::Sample.r4"
+measures = ["TrackSet::Channels.ret@+8"]
+size = 60
+origin = "file"
+fields = [
+  { name = "keys", offset = 0, type = "bytes", count = 60, note = "20-byte AnimationKeys" },
+]
+
+# A track set's values (an array: the measure joins the five sets' kinds).
+[TrackValues]
+measure = "Mesh@+364.+16"
+measures = ["Mesh@+384.+16", "Mesh@+304.+16"]
+size = 208
+origin = "allocated"
+fields = [
+  { name = "values", offset = 0, type = "bytes", count = 208, note = "one a track: 16 bytes (x, y, z, +12 the time) at +304, a float (the time) at +324 and +344, 32 bytes (+16 the time, +20 the mask of the components written) at +364, 208 bytes at +384 (+196 sub_825A6608's)" },
+]
+
+# The block operator new[] gives the 16-, 32- and 208-byte values: a count
+# header, the values from +16 (each one's +12 set to 1.0; the 208-byte ones
+# their eleven floats +12, +28, ... +172).
+[TrackValueBlock]
+measures = ["new<4294967295>@TrackSet::SetupFloat4", "new<4294967295>@TrackSet::Setup32", "new<4294967295>@TrackSet::Setup208"]
+size = 224
+origin = "allocated"
+fields = [
+  { name = "count", offset = 0, type = "u32", note = "operator new[]'s count header: the track count" },
+  { name = "values", offset = 16, type = "bytes", count = 208, note = "the values (TrackSet +16 points here)" },
+]
+
+# A skeleton (180 bytes; a model's +112): the base class SkeletonBase
+# (vtable 0x8206CE60, 164 bytes) and the skeleton (vtable 0x8206CE50) are
+# one object here.
+[Skeleton]
+measure = "Skeleton"
+measures = ["SkeletonBase", "sub_82599BE0.r3", "sub_8259B600.r3", "Skeleton::LocalMatrices.r3", "Skeleton::ResetPose.r3", "Skeleton::~Skeleton.r3", "Skeleton::Skeleton.r3", "Skeleton::FreeNodeValues.r3", "Skeleton::UpdateMatrices.r3", "SceneParts@+176@+24480.+0"]
+# measures from SecondSetPointSkeleton (second-set), merged at the integration
+size = 180
+origin = "file"
+vtable = 0x8206CE50
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x8206CE50 (the base's 0x8206CE60)" },
+  { name = "matrix", offset = 16, type = "bytes", count = 64, note = "a matrix, the identity when made (the root's is multiplied by it)" },
+  { name = "node_file", offset = 80, type = "u32", note = "the node file's view (sub_825A21A8, +80 to +124) starts here: the file (+4 the node count, +8 the bones, +12 the first bone's node)" },
+  { name = "node_records", offset = 84, type = "u32", note = "the file's node records (160 bytes: +128 the parent, +132 the type, 0x40 and 0x80 flags)" },
+  { name = "rest_translations", offset = 88, type = "u32", note = "16 bytes a node (Skeleton::ResetPose copies them to the node states' +0; probably)" },
+  { name = "rest_angles", offset = 92, type = "u32", note = "16 bytes a node (to the node states' +16; probably)" },
+  { name = "rest_scales", offset = 96, type = "u32", note = "16 bytes a node (to the node states' +32; probably)" },
+  { name = "unknown_100", offset = 100, type = "u32", note = "the view's +20" },
+  { name = "file_matrices", offset = 104, type = "u32", note = "the file's 64-byte matrices, one a node" },
+  { name = "unknown_108", offset = 108, type = "u32", note = "the view's +28" },
+  { name = "unknown_112", offset = 112, type = "u32", note = "the view's +32" },
+  { name = "unknown_116", offset = 116, type = "u32", note = "the view's +36 (+32's + 16)" },
+  { name = "unknown_120", offset = 120, type = "u32", note = "the view's +40" },
+  { name = "unknown_124", offset = 124, type = "u32", note = "the view's +44 (the file's +4 - +8)" },
+  { name = "cursors", offset = 128, type = "ptr", to = "SkeletonCursor", note = "one an instance (operator new[], no header)" },
+  { name = "own_matrices", offset = 132, type = "u32", note = "64 bytes a node (count header) when no matrices were given" },
+  { name = "node_states", offset = 136, type = "u32", note = "the nodes' 144-byte records (count header): +0 translation, +16 angles, +32 scale, +64 the channels' cursors" },
+  { name = "bone_states", offset = 140, type = "u32", note = "node [file +12]'s record in node_states" },
+  { name = "bone_matrices", offset = 144, type = "u32", note = "64 bytes for each of the file's +8 (count header; +52 = 1)" },
+  { name = "matrices", offset = 148, type = "u32", note = "the nodes' 64-byte matrices (given, or own_matrices)" },
+  { name = "unknown_152", offset = 152, type = "u32", note = "cleared when made" },
+  { name = "root_index", offset = 156, type = "u32" },
+  { name = "instance_count", offset = 160, type = "s32" },
+  { name = "node_values", offset = 176, type = "u32", note = "a float4 a node (x, y, z 0.0 at bind; +8 the node's animation time; operator new[], no header)" },
+]
+
+# An instance's cursor (20 bytes, Skeleton +128): a track set over the
+# +0x28 section with +16 = 0.
+[SkeletonCursor]
+measure = "SkeletonCursor"
+measures = ["Skeleton.+128"]
+size = 20
+origin = "file"
+fields = [
+  { name = "section", offset = 0, type = "ptr", to = "AnimationSection", note = "the +0x28 section (the measure joins it with its entries)" },
+  { name = "entry_count_pointer", offset = 4, type = "u32", note = "the section's +16 (its entry count)'s address" },
+  { name = "entries", offset = 8, type = "ptr", to = "SkeletonNodeEntry", note = "the section's +20: its 20-byte entries" },
+  { name = "start_time", offset = 12, type = "f32", note = "the section's +4" },
+  { name = "unknown_16", offset = 16, type = "u32", note = "0 (Clear, View)" },
+]
+
+# An entry of the +0x28 section (20 bytes): a node's channels. The measure
+# joins it with what the cursor's +0 and +4 point to (the section: +4 its
+# start time, a float; its entry count at +16).
+[SkeletonNodeEntry]
+measure = "SkeletonCursor.+0"
+measures = ["Skeleton.+128.+8", "Mesh@+112.+128.+8", "Mesh@+112.+128.+4", "Skeleton.+128.+4"]
+size = 20
+origin = "file"
+fields = [
+  { name = "node", offset = 0, type = "u32" },
+  { name = "channel_count", offset = 4, type = "u32" },
+  { name = "channels_offset", offset = 8, type = "u32", note = "the first channel's offset from the section" },
+  { name = "time", offset = 12, type = "f32", note = "Skeleton::LoadNodeValues copies it to the node's x and z (its animation time)" },
+  { name = "unknown_16", offset = 16, type = "f32", note = "Skeleton::LoadNodeValues copies it to the node's y" },
+]
+
+# The primitive drawer (8 bytes, vtable 0x820721D4).
+[PrimitiveDrawer]
+measures = ["PrimitiveDrawer", "sub_825A13D8.r3",
+            "sub_825A1810.r3"]
+size = 8
+origin = "file"
+vtable = 0x820721D4
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "declaration", offset = 4, type = "ptr", to = "PrimitiveDrawerDeclaration", note = "operator new(4), freed by the destructor" },
+]
+
+# The primitive drawer's 4-byte block: its vertex declaration.
+[PrimitiveDrawerDeclaration]
+measure = "sub_825A1810.r3.+4"
+measures = ["PrimitiveDrawer.+4"]
+size = 4
+origin = "allocated"
+fields = [
+  { name = "vertex_declaration", offset = 0, type = "u32", note = "sub_822A8980's" },
+]
+
+# A physical pad (212 bytes, vtable 0x8206CBF4; input.md's
+# PhysicalPad::PhysicalPad sub_82591B68). The measure files RecordClear's
+# (sub_825A18D8) stores to the records at +168 and +180 as the pad's +0, +4
+# and +8 (a measure fault: its r3 is pad + 168).
+[PhysicalPad]
+measure = "InputManager@+988"
+size = 212
+origin = "file"
+vtable = 0x8206CBF4
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32", note = "0 when made" },
+  { name = "values", offset = 8, type = "bytes", count = 160, note = "the 40 values (slot 1, PhysicalPad::Values)" },
+  { name = "record_a", offset = 168, type = "bytes", count = 12, note = "a PhysicalPadRecord" },
+  { name = "record_b", offset = 180, type = "bytes", count = 12, note = "a PhysicalPadRecord" },
+]
+
+# A physical pad's 12-byte record (+168, +180), as sub_825A18D8 clears it
+# (the measure files it as the pad).
+[PhysicalPadRecord]
+size = 12
+origin = "file"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32", note = "0.0 when made" },
+  { name = "unknown_4", offset = 4, type = "u32", note = "0 when made" },
+  { name = "unknown_8", offset = 8, type = "u32", note = "0 when made" },
+]
+
+[globals]
+float_two = { address = 0x820021E8, type = "f32", note = "the game's float 2.0 (Key::Interpolate)" }
+two_pi = { address = 0x82001FA8, type = "f32", note = "2 pi (Skeleton::LocalMatrices' angle wrap)" }
+inverse_two_pi = { address = 0x82001FA4, type = "f32", note = "1 / (2 pi) (Skeleton::LocalMatrices' angle wrap)" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from PhysicalPad.
+[PhysicalPadAt168]
+measure = "InputManager@+988@+168"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from Skeleton.
+[SkeletonAt112]
+measure = "Mesh@+112"
+size = 180
+origin = "embedded"
+fields = [
+  { name = "unknown_128", offset = 128, type = "u32" },
+  { name = "unknown_176", offset = 176, type = "u32" },
+]
+
+# Split from SkeletonCursor.
+[SkeletonCursorPart]
+measure = "Mesh@+112.+128"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Split from TrackSet.
+[TrackSetAt304]
+measure = "Mesh@+304"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "unknown_16", offset = 16, type = "u32" },
+]
+
+# Split from TrackSet.
+[TrackSetAt364]
+measure = "Mesh@+364"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "unknown_16", offset = 16, type = "u32" },
+]
+
+# Split from TrackSet.
+[TrackSetAt384]
+measure = "Mesh@+384"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+]
+
+# Split from TrackSet.
+[TrackSetAt304_2]
+measure = "Model::Animate.r3@+304"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+]
+
+# Split from TrackSet.
+[TrackSetAt364_2]
+measure = "Model::Animate.r3@+364"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+]
+
+# Split from PrimitiveDrawer.
+[PrimitiveDrawerAt4]
+measure = "new<88>@RenderQueue::RenderQueue@+4"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+]

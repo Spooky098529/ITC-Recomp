@@ -11,13 +11,8 @@
 
 namespace race_flow {
 
-// The machine's words.
-constexpr uint32_t kState = 9604;    // the state (1 at set-up)
-constexpr uint32_t kFlags = 9608;    // 0 at set-up; bit 0x1 set by OnSetUp
-constexpr uint32_t kPlayers = 9612;  // the human cars' players (+9612, +9616)
-// The race data's pointer and its kind.
-constexpr uint32_t kRaceData = 0x826C5B2C;
-constexpr uint32_t kRaceKind = 0xA3AF0;
+// The machine is schema::RaceFlow (racer-controllers.toml), the race data
+// schema::RaceData (race-states.toml).
 
 // RaceFlow::Init's frame (its r1 less this).
 constexpr uint32_t kInitFrame = 3600;

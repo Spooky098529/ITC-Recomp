@@ -6,6 +6,9 @@
 #include "graphics/device_shaders.h"
 
 #include "guest.h"
+#include "schema/device_shaders.h"
+#include "schema/device_state.h"
+#include "schema/shader_objects.h"
 
 #include "base/log.h"
 #include "native/buffers.h"
@@ -19,44 +22,39 @@ namespace graphics::device_shaders {
 
 namespace {
 
-constexpr uint32_t kVertexConstantMask = 0;   // the vertex float constants' dirty mask
-constexpr uint32_t kPixelConstantMask = 8;    // the pixel float constants'
-constexpr uint32_t kShaderStateMask = 16;     // the shader state's dirty mask
-constexpr uint32_t kRenderStateMask = 24;     // the render state's
-constexpr uint32_t kShadow = 1024;            // the register shadow
-constexpr uint32_t kFlags10810 = 10810;       // a byte; SetVertexShader clears its top bit
-constexpr uint32_t kVertexDeclaration = 11552;
-constexpr uint32_t kPixelShader = 12432;
-constexpr uint32_t kVertexShader = 12436;
-constexpr uint32_t kTitleVertexShader = 13156;  // the entry's copy (read by nothing)
+using schema::Device;
 
 constexpr uint64_t kVertexShaderBit = 1ull << 51;
 constexpr uint64_t kPixelShaderBits[] = {1ull << 52, 1ull << 49};
 
 constexpr uint32_t kPassListVtable = 0x8206CB88;
 constexpr uint32_t kRenderQueueVtable = 0x8206CB8C;
-constexpr uint32_t kZero = 0x82000A34;  // 0.0
+using schema::PassList;
+using schema::PassListBucket;
+using schema::RenderQueue;
+using schema::RenderQueueState;
 
-constexpr uint32_t kVertexPatches = 592;  // where the vertex shader's file header was copied
-constexpr uint32_t kPixelPatches = 56;    // the pixel shader's
+// Where each shader's file header was copied: right after the object's fields.
+constexpr uint32_t kVertexPatches = schema::VertexShader::kSize;  // 592
+constexpr uint32_t kPixelPatches = schema::PixelShader::kSize;    // 56
 
 void Or64(uint8_t* base, uint32_t address, uint64_t bits) {
-  REX_STORE_U64(address, REX_LOAD_U64(address) | bits);
+  guest::StoreU64(base, address, guest::LoadU64(base, address) | bits);
 }
 
 // The patches at p (header + its +12): the constant mask ORed into the
-// device's `mask`, the render state's bit 1, then the records into the
+// device's dirty mask at `mask` (an address), the render state's bit 1, then the records into the
 // shadow. `r3` follows the original's: each memcpy leaves its destination.
 // `at` is the memcpy call's return address in the original.
-void ApplyPatches(uint8_t* base, uint32_t device, uint32_t p, uint32_t mask, uint32_t at,
+void ApplyPatches(uint8_t* base, const Device& d, uint32_t p, uint32_t mask, uint32_t at,
                   const ShaderCalls& calls, uint32_t& r3) {
-  Or64(base, device + mask, REX_LOAD_U64(p + 0));
-  if (REX_LOAD_U64(p + 8) != 0) {
-    Or64(base, device + kRenderStateMask, 2);
+  Or64(base, mask, guest::LoadU64(base, p + 0));
+  if (guest::LoadU64(base, p + 8) != 0) {
+    Or64(base, d.render_dirty_address(), 2);
   }
   uint32_t record = p + 24;
   const uint32_t end = guest::LoadU32(base, p + 16) + record;
-  const uint32_t shadow = device + kShadow;
+  const uint32_t shadow = d.fetch_constants_address();  // the register shadow (0x4800 on)
   // The copy records, up to one with a count of 0.
   bool masked = false;
   while (record < end) {
@@ -104,29 +102,30 @@ void ApplyPatches(uint8_t* base, uint32_t device, uint32_t p, uint32_t mask, uin
 uint32_t SetVertexShader(uint8_t* base, uint32_t device, uint32_t shader,
                          const ShaderCalls& calls) {
   ITC_NATIVE_RUNNING("sub_822A8808 Device::SetVertexShader");
+  const Device d(base, device);
   uint32_t r3 = device;
-  const uint32_t bound = guest::LoadU32(base, device + kVertexShader);
+  const uint32_t bound = d.vertex_shader();
   const bool same = shader != 0 && shader == bound;
   refcount::NoteSetVertexShader(same);
   if (same) {
     // The rebind skip: AddRef and Release would leave the count as it is;
     // Release's r3 would be that count.
-    r3 = guest::LoadU32(base, shader + 4);
+    r3 = schema::VertexShader(base, shader).reference_count();
   } else {
     if (shader != 0) {
       r3 = refcount::AddRef(base, shader);
     }
     // Read again after AddRef, as the original does.
-    const uint32_t old = guest::LoadU32(base, device + kVertexShader);
+    const uint32_t old = d.vertex_shader();
     r3 = old;
     if (old != 0) {
       r3 = calls.release(old);
     }
   }
-  const uint8_t flags = guest::LoadU8(base, device + kFlags10810);
-  guest::StoreU32(base, device + kVertexShader, shader);
-  guest::StoreU8(base, device + kFlags10810, flags & 0x7F);
-  Or64(base, device + kShaderStateMask, kVertexShaderBit);
+  const uint8_t flags = d.flags2();
+  d.set_vertex_shader(shader);
+  d.set_flags2(flags & 0x7F);
+  Or64(base, d.shader_dirty_address(), kVertexShaderBit);
   if (shader == 0) {
     return r3;
   }
@@ -138,24 +137,25 @@ uint32_t SetVertexShader(uint8_t* base, uint32_t device, uint32_t shader,
   if (offset == 0) {
     return r3;
   }
-  ApplyPatches(base, device, offset + header, kVertexConstantMask, 0x822A88EC, calls, r3);
+  ApplyPatches(base, d, offset + header, d.vertex_float_dirty_address(), 0x822A88EC, calls, r3);
   return r3;
 }
 
 uint32_t SetVertexShaderEntry(uint8_t* base, uint32_t device, uint32_t shader,
                               const ShaderCalls& calls) {
   ITC_NATIVE_RUNNING("sub_822A8958 D3DDevice_SetVertexShader");
-  guest::StoreU32(base, device + kTitleVertexShader, shader);
+  Device(base, device).set_entry_vertex_shader(shader);
   return SetVertexShader(base, device, shader, calls);
 }
 
 uint32_t SetPixelShader(uint8_t* base, uint32_t device, uint32_t shader,
                         const ShaderCalls& calls) {
   ITC_NATIVE_RUNNING("sub_822A8618 Device::SetPixelShader");
+  const Device d(base, device);
   uint32_t r3 = device;
-  guest::StoreU32(base, device + kPixelShader, shader);
+  d.set_pixel_shader(shader);
   for (uint64_t bit : kPixelShaderBits) {
-    Or64(base, device + kShaderStateMask, bit);
+    Or64(base, d.shader_dirty_address(), bit);
   }
   if (shader == 0) {
     return r3;
@@ -165,83 +165,86 @@ uint32_t SetPixelShader(uint8_t* base, uint32_t device, uint32_t shader,
   if (offset == 0) {
     return r3;
   }
-  ApplyPatches(base, device, offset + header, kPixelConstantMask, 0x822A86D4, calls, r3);
+  ApplyPatches(base, d, offset + header, d.pixel_float_dirty_address(), 0x822A86D4, calls, r3);
   return r3;
 }
 
 void SetVertexDeclaration(uint8_t* base, uint32_t device, uint32_t declaration) {
   ITC_NATIVE_RUNNING("sub_822A8960 Device::SetVertexDeclaration");
-  guest::StoreU32(base, device + kVertexDeclaration, declaration);
-  Or64(base, device + kShaderStateMask, kVertexShaderBit);
+  const Device d(base, device);
+  d.set_vertex_declaration(declaration);
+  Or64(base, d.shader_dirty_address(), kVertexShaderBit);
 }
 
 void PassListClear(uint8_t* base, uint32_t list) {
   ITC_NATIVE_RUNNING("sub_8258EB38 PassList::Clear");
-  for (uint32_t i = 0, offset = 0; i < guest::LoadU32(base, list + 12); i++, offset += 16) {
-    guest::StoreU32(base, guest::LoadU32(base, list + 24) + offset, 0);
-    guest::StoreU32(base, guest::LoadU32(base, list + 24) + offset + 4, 0);
+  const PassList l(base, list);
+  for (uint32_t i = 0, offset = 0; i < l.bucket_count(); i++, offset += 16) {
+    PassListBucket(base, l.buckets().address + offset).set_first(0);
+    PassListBucket(base, l.buckets().address + offset).set_last(0);
   }
-  guest::StoreU32(base, list + 16, 0);
-  guest::StoreU32(base, list + 28, 0);
-  guest::StoreU32(base, list + 32, 0);
+  l.set_items_used(0);
+  l.set_cleared_28(0);
+  l.set_current_item(0);
 }
 
 bool PassListConstruct(uint8_t* base, uint32_t list, uint32_t items, uint32_t buckets) {
   ITC_NATIVE_RUNNING("sub_82590B38 PassList::PassList");
-  guest::StoreU32(base, list + 8, items);
-  guest::StoreU32(base, list + 0, kPassListVtable);
-  guest::StoreU32(base, list + 16, 0);
-  guest::StoreU8(base, list + 4, 1);
-  guest::StoreU32(base, list + 12, buckets);
+  const PassList l(base, list);
+  l.set_item_count(items);
+  l.set_vtable(kPassListVtable);
+  l.set_items_used(0);
+  l.set_bucket_done(1);
+  l.set_bucket_count(buckets);
   const auto item_block =
       memory::crt::OperatorNewArray(base, items > 0x0CCCCCCCu ? 0xFFFFFFFFu : items * 20);
   if (!item_block) {
     return false;
   }
-  guest::StoreU32(base, list + 20, *item_block);
-  const uint32_t count = guest::LoadU32(base, list + 12);
+  l.set_items(*item_block);
+  const uint32_t count = l.bucket_count();
   const auto bucket_block =
       memory::crt::OperatorNewArray(base, count > 0x0FFFFFFFu ? 0xFFFFFFFFu : count << 4);
   if (!bucket_block) {
     return false;
   }
-  guest::StoreU32(base, list + 24, *bucket_block);
+  l.set_buckets(*bucket_block);
   PassListClear(base, list);
-  if (guest::LoadU32(base, list + 12) - 1 != 0) {
+  if (l.bucket_count() - 1 != 0) {
     uint32_t i = 0, offset = 0;
     do {
-      const uint32_t bucket = guest::LoadU32(base, list + 24) + offset;
+      const PassListBucket bucket(base, l.buckets().address + offset);
       i++;
-      guest::StoreU32(base, bucket + 8, bucket + 16);
-      guest::StoreU32(base, guest::LoadU32(base, list + 24) + offset + 12, 0);
+      bucket.set_next(bucket.address + 16);
+      PassListBucket(base, l.buckets().address + offset).set_count(0);
       offset += 16;
-    } while (i < guest::LoadU32(base, list + 12) - 1);
+    } while (i < l.bucket_count() - 1);
   }
-  guest::StoreU32(base, (guest::LoadU32(base, list + 12) << 4) + guest::LoadU32(base, list + 24) - 8,
-                  0);
-  guest::StoreU32(base, (guest::LoadU32(base, list + 12) << 4) + guest::LoadU32(base, list + 24) - 4,
-                  0);
+  // The last bucket's +8 and +12 (the bucket before the end's).
+  PassListBucket(base, (l.bucket_count() << 4) + l.buckets().address - 16).set_next(0);
+  PassListBucket(base, (l.bucket_count() << 4) + l.buckets().address - 16).set_count(0);
   return true;
 }
 
 bool RenderQueueConstruct(uint8_t* base, uint32_t queue) {
   ITC_NATIVE_RUNNING("sub_825915E0 RenderQueue::RenderQueue");
-  guest::StoreU32(base, queue + 0, kRenderQueueVtable);
+  const RenderQueue q(base, queue);
+  q.set_vtable(kRenderQueueVtable);
   const auto state_block = memory::crt::OperatorNew(base, 88);
   if (!state_block) {
     return false;
   }
-  const uint32_t state = *state_block;
-  if (state != 0) {
-    if (!model_animation::PrimitiveDrawerConstruct(base, state + 4)) {
+  const RenderQueueState state(base, *state_block);
+  if (state) {
+    if (!model_animation::PrimitiveDrawerConstruct(base, state.drawer_address())) {
       return false;
     }
-    guest::StoreU32(base, state + 72, 0);
-    guest::StoreU32(base, state + 76, 0);
-    guest::StoreU32(base, state + 80, 0);
+    state.set_release_first(0);
+    state.set_release_last(0);
+    state.set_release_end(0);
   }
-  guest::StoreU32(base, queue + 4, state);
-  for (uint32_t field : {8u, 12u}) {
+  q.set_state(state);
+  for (uint32_t field : {q.list_1_address(), q.list_0_address()}) {
     const auto block = memory::crt::OperatorNew(base, 36);
     if (!block) {
       return false;
@@ -249,17 +252,19 @@ bool RenderQueueConstruct(uint8_t* base, uint32_t queue) {
     if (*block != 0 && !PassListConstruct(base, *block, 4096, 1024)) {
       return false;
     }
-    guest::StoreU32(base, queue + field, *block);
+    guest::StoreU32(base, field, *block);  // list_1, then list_0
   }
-  PassListClear(base, guest::LoadU32(base, queue + 8));
-  PassListClear(base, guest::LoadU32(base, queue + 12));
-  guest::StoreU32(base, guest::LoadU32(base, queue + 4) + 0, 0);
+  PassListClear(base, q.list_1().address);
+  PassListClear(base, q.list_0().address);
+  q.state().set_replay_index(0);
   // lfs, then stfs: the float through a double, as the original.
-  const double zero = guest::LoadFloat(base, kZero);
-  guest::StoreFloat(base, guest::LoadU32(base, queue + 4) + 84, float(zero));
-  for (uint32_t field : {48u, 52u, 56u, 60u, 64u}) {
-    guest::StoreU32(base, guest::LoadU32(base, queue + 4) + field, 0);
-  }
+  const double zero = schema::DeviceShadersGlobals::zero(base);
+  q.state().set_sequence(float(zero));
+  q.state().set_render_target_0(0);
+  q.state().set_render_target_1(0);
+  q.state().set_render_target_2(0);
+  q.state().set_render_target_3(0);
+  q.state().set_depth_surface(0);
   return true;
 }
 

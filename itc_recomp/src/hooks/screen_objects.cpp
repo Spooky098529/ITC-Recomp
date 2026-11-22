@@ -14,6 +14,8 @@
 // InsertUnique, ~UvMap) went once those callers were native.
 
 #include "guest.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -22,6 +24,8 @@
 #include "hooks/direct_slots.h"
 #include "hooks/heap.h"
 #include "hooks/screen_objects.h"
+#include "schema/app_start_up.h"
+#include "schema/screen_objects.h"
 #include "screen_objects/screen_objects.h"
 #include "screen_objects/uv_trees.h"
 #include "lifted/sdk.h"
@@ -80,7 +84,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82130198) {
     return;
   }
   so::MapConstruct(base, ctx.r3.u32);
-  ctx.r3.u64 = guest::LoadU32(base, ctx.r3.u32 + so::kHead);
+  ctx.r3.u64 = schema::ScreenObjectUvMap(base, ctx.r3.u32).head().address;
 }
 
 // --- ScreenObject ---
@@ -105,13 +109,16 @@ namespace {
 // The video output: [0x8266D088]'s slot 7, then that one's slot 3, with
 // the original's return addresses.
 uint32_t VideoOutputCall(lifted::Regs& ctx, uint8_t* base, uint32_t first, uint32_t second) {
-  ctx.r3.u64 = guest::LoadU32(base, 0x8266D088);
+  ctx.r3.u64 = schema::AppStartUpGlobals::scene_target_app(base).address;
   ctx.lr = first;
   // Slot 7's plain C++ where it's the game's (hooks::DirectSlotCall).
-  const uint32_t slot7 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
+  const uint32_t slot7 =
+      guest::LoadU32(base, schema::AppInterface16(base, ctx.r3.u32).vtable() + 28);
   if (!hooks::DirectSlotCall(ctx, base, slot7)) {
     lifted::CallFromContext(ctx, base, slot7);
   }
+  // Slot 3 of what slot 7 answers (no schema type yet: app-start-up's
+  // AppInterface16 has no vtable type, and slot 7's answer has none).
   ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 12);
   ctx.lr = second;
   lifted::CallFromContext(ctx, base, ctx.ctr.u32);
@@ -127,7 +134,7 @@ so::ReleaseCalls ReleaseCalls(lifted::Regs& ctx, uint8_t* base, int& releases) {
           [&ctx, base, &releases](uint32_t resource) {
             ctx.r3.u64 = resource;
             ctx.lr = releases++ == 0 ? 0x8212F100 : 0x8212F110;
-            lifted::CallFromContext(ctx, base, 0x822A67B0);
+            lifted::Enter(ctx, base, game::Resource::Release);
           }};
 }
 

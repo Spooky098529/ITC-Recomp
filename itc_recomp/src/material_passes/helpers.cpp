@@ -7,6 +7,8 @@
 #include "c_runtime/strings.h"
 #include "camera_modes/steps.h"
 #include "guest.h"
+#include "schema/material_passes.h"
+#include "schema/matrix_math.h"
 
 namespace material_passes {
 
@@ -14,14 +16,16 @@ using namespace camera_modes::steps;
 
 namespace {
 
-constexpr uint32_t kTableVectors = 0x82601A00;
-constexpr uint64_t kRecords = 0xFFFFFFFF82003680ull;  // lis -32256 + 13952, sign-extended
+using G = schema::MaterialPassesGlobals;
+
+// lis -32256 + 13952, sign-extended.
+constexpr uint64_t kRecords = uint64_t(int64_t(int32_t(G::part_records_address())));
 
 }  // namespace
 
 void TableVector(uint8_t* base, uint32_t out, uint32_t index, uint32_t sub) {
   ITC_NATIVE_RUNNING("sub_820D35D0 TableVector");
-  const uint32_t from = kTableVectors + ((index * 4 + sub) << 4);
+  const uint32_t from = G::table_vectors_address() + ((index * 4 + sub) << 4);
   const uint32_t a0 = guest::LoadU32(base, from + 0);
   const uint32_t a1 = guest::LoadU32(base, from + 4);
   guest::StoreU32(base, out + 0, a0);
@@ -61,11 +65,18 @@ bool TransposeRotation(uint8_t* base, uint32_t out, uint32_t m, uint32_t sp) {
   if (!c_runtime::Memcpy(base, out, frame + 80, 64)) {
     return false;
   }
-  static constexpr uint32_t kFrom[9] = {0, 16, 32, 4, 20, 36, 8, 24, 40};
-  static constexpr uint32_t kTo[9] = {0, 4, 8, 16, 20, 24, 32, 36, 40};
-  for (int i = 0; i < 9; i++) {
-    Stfs(base, out + kTo[i], Lfs(base, m + kFrom[i]));
-  }
+  // out's upper 3x3 = m's transposed, each word through lfs and stfs.
+  const schema::MaterialPassesMatrix from(base, m);
+  const schema::Matrix to(base, out);
+  Stfs(base, to.m00_address(), double(from.m00()));
+  Stfs(base, to.m01_address(), double(from.m10()));
+  Stfs(base, to.m02_address(), double(from.m20()));
+  Stfs(base, to.m10_address(), double(from.m01()));
+  Stfs(base, to.m11_address(), double(from.m11()));
+  Stfs(base, to.m12_address(), double(from.m21()));
+  Stfs(base, to.m20_address(), double(from.m02()));
+  Stfs(base, to.m21_address(), double(from.m12()));
+  Stfs(base, to.m22_address(), double(from.m22()));
   return true;
 }
 

@@ -19,9 +19,6 @@ namespace car_scene_draw::ops {
 
 using Fpscr = ::base::FloatMode;
 
-inline constexpr uint32_t kOne = 0x82000A30;   // the game's float 1.0
-inline constexpr uint32_t kZero = 0x82000A34;  // 0.0
-
 inline uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 inline void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);

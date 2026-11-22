@@ -49,14 +49,9 @@ constexpr uint32_t kPanelsC[2] = {9972, 10748};
 constexpr uint32_t kPanelsD[2] = {10296, 11072};
 constexpr uint32_t kConfirms[2] = {10392, 11168};
 constexpr uint32_t kScreenBytes = 15252;
-// The two players' garage cars PickCar fills (1,972 bytes each) and the
-// player the quit dialog answers.
-constexpr uint32_t kGarageCars = 0x82814EB8;
-constexpr uint32_t kDialogPlayer = 0x82814E6C;
-// The mode before ([0x826032E0]: 1 the race) and the screen fades' passes.
-constexpr uint32_t kModeBefore = 0x826032E0;
-constexpr uint32_t kFadeInPasses = 0x82001BEC;
-constexpr uint32_t kFadeOutPasses = 0x82001BF0;
+// The two players' garage cars PickCar fills, the player the quit dialog
+// answers, the mode before and the screen fades' passes are
+// schema::Type8ScreensGlobals' (schema/type8_screens.h).
 
 // The car list's plain C++ guest calls through `calls` (r3 to r10, as
 // car_list::Calls sets them; f1 isn't passed).

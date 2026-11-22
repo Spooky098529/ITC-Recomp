@@ -1,0 +1,86 @@
+# The schema of docs/functions/user-info.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The user info screen: the type 2 mode's machine at its block's +0x102D8,
+# the player's record over UI movie 10 (src/user_info/). Its page object
+# ([0x826D84C4], 28 bytes) is a PageObject and its menu ([0x826D84C8], 68
+# bytes) a FrontEndMenu (menu-helpers.toml's; the measure files them as
+# "new<28>@UserInfo::Create" and "new<68>@UserInfo::Create").
+
+# The screen's machine: a StateMachine (game-modes.toml). The measure joins
+# two other things with it: the transitions' r3 (the page object's +24,
+# PageObject.step_started) and MenuPage's r3 (the dispatcher, the type 2 mode
+# UpdatePage passes on): the "measure fault" fields.
+[UserInfoMachine]
+measure = "UserInfo"
+size = 9616
+origin = "embedded"
+fields = [
+  { name = "transitions", offset = 0, type = "bytes", count = 9600, note = "200 transitions, 48 bytes each (StateMachine's)" },
+  { name = "fault_step_started", offset = 0, type = "u32", note = "measure fault: the transitions' r3 is the page object's +24 (PageObject.step_started), not the machine's" },
+  { name = "fault_message_count", offset = 804, type = "u32", note = "measure fault: MenuPage's r3 is the dispatcher (UserInfoMode.message_count), not the machine" },
+  { name = "fault_message_start", offset = 808, type = "u32", note = "measure fault: the dispatcher's message_start, as above" },
+  { name = "transition_count", offset = 9600, type = "u32" },
+  { name = "state", offset = 9604, type = "u32", note = "0 at set-up, 1 open the movie, 2 its load, 9 waiting for message 27, 4 and 5 shown, 7 and 6 closed" },
+  { name = "loaded", offset = 9608, type = "u32", note = "1 once movie 10 is loaded (WaitForLoad)" },
+  { name = "reenter", offset = 9612, type = "u32", note = "set by the mode's Init: nonzero, Create goes to state 1, else 9" },
+]
+
+# The type 2 mode (type2-mode.md) as the handlers see it (r4, and MenuPage's
+# r3): only its message ring, which they post to.
+[UserInfoMode]
+measure = "UserInfo::Close.r4"
+size = 812
+origin = "embedded"
+fields = [
+  { name = "messages", offset = 204, type = "bytes", count = 600, note = "50 messages of 12 bytes (id, two words)" },
+  { name = "message_count", offset = 804, type = "u32" },
+  { name = "message_start", offset = 808, type = "u32", note = "the ring's first slot" },
+]
+
+# The screen's data ([0x826D84CC], 60 bytes, VirtualAlloc'ed by Create;
+# docs/known-data.md): the player's record Type2Hub::FillPlayerRecord writes
+# (type2-screens.md) from player 0's stats record (save data + 48).
+[UserInfoData]
+measure = "new<60>@UserInfo::Create"
+size = 60
+origin = "allocated"
+fields = [
+  { name = "loaded", offset = 0, type = "u32", note = "1 once loaded (WaitForLoad)" },
+  { name = "queued_state", offset = 4, type = "u32", note = "the state Update moves the machine to: 21 none, 9 from Closing" },
+  { name = "count_12", offset = 8, type = "u32", note = "the stats' halfword +12 (node 8)" },
+  { name = "count_14", offset = 12, type = "u32", note = "the stats' halfword +14 (node 9)" },
+  { name = "count_16", offset = 16, type = "u32", note = "the stats' halfword +16 (node 10)" },
+  { name = "ratio", offset = 20, type = "f32", note = "+12 / +22 times 100 (node 11, string 453; probably the win rate)" },
+  { name = "stats_5968", offset = 24, type = "u32", note = "the stats' +5968 (node 12)" },
+  { name = "distance_5976", offset = 28, type = "f32", note = "the stats' +5976, shown times 0.62138 (node 19, kilometers in miles)" },
+  { name = "distance_5904", offset = 32, type = "f32", note = "the stats' +5904, shown times 0.62138 (node 20)" },
+  { name = "distance_5992", offset = 36, type = "s32", note = "the stats' +5992 truncated, shown times 0.62138 (node 21)" },
+  { name = "stats_6024", offset = 40, type = "u32", note = "the stats' +6024 (node 22, SetNumberText)" },
+  { name = "play_hours", offset = 44, type = "u32", note = "the play time's hours (PlayTime::Add; shown at most 9999)" },
+  { name = "play_time_word", offset = 48, type = "u32", note = "PlayTime::Add's word +4: the minutes and seconds bytes" },
+  { name = "play_minutes", offset = 48, type = "u8" },
+  { name = "play_seconds", offset = 49, type = "u8" },
+  { name = "garage_count", offset = 52, type = "u32", note = "the garage's count (node 24, string 444)" },
+  { name = "save_1991C", offset = 56, type = "u32", note = "the save's +0x1991C (node 24)" },
+]
+
+# PlayTime::Add's answer (8 bytes, r3 the caller's buffer; save-interface.md):
+# the stats record's play time after the frames since its last update.
+[PlayTimeAnswer]
+measure = "PlayTime::Add.ret"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "hours", offset = 0, type = "u32", note = "the stats' +6032" },
+  { name = "time_word", offset = 4, type = "u32", note = "the stats' word +6036: the minutes, seconds and frames bytes" },
+]
+
+[globals]
+pages = { address = 0x826D84C4, type = "ptr", to = "PageObject", note = "pages 0 the menu page, 1 none (closing); steps 0 the opening, 1 the closing" }
+menu = { address = 0x826D84C8, type = "ptr", to = "FrontEndMenu", note = "a front-end menu, items 0 to 7, no wrap; stepped, its cursor not read" }
+data = { address = 0x826D84CC, type = "ptr", to = "UserInfoData" }
+miles_per_km = { address = 0x8200A510, type = "f64", note = "0.62138 (kilometers to miles)" }

@@ -4,6 +4,8 @@
 #include "type67_screens/type67_screens.h"
 
 #include "guest.h"
+#include "schema/boot_mode.h"
+#include "schema/game_modes.h"
 #include "type8_screens/type8_screens.h"
 
 namespace type67_screens {
@@ -12,14 +14,15 @@ using guest::LoadU32;
 using guest::StoreU32;
 
 void Post(uint8_t* base, uint32_t dispatcher, uint32_t message) {
-  const uint32_t ring = dispatcher + 204;
-  const uint32_t count = LoadU32(base, ring + 600) + 1;
-  const uint32_t end = LoadU32(base, ring + 604) + count - 1;
-  StoreU32(base, ring + 600, count);
-  const uint32_t slot = ring + (end - (end / 50) * 50) * 12;
-  StoreU32(base, slot + 0, message);
-  StoreU32(base, slot + 4, 0);
-  StoreU32(base, slot + 8, 0);
+  const schema::ModeDispatcher d(base, dispatcher);
+  const uint32_t ring = d.ring_address();
+  const uint32_t count = d.ring_count() + 1;
+  const uint32_t end = d.ring_start() + count - 1;
+  d.set_ring_count(count);
+  const schema::ModeMessage slot(base, ring + (end - (end / 50) * 50) * 12);
+  slot.set_id(message);
+  slot.set_arg0(0);
+  slot.set_arg1(0);
 }
 
 // The plain C++ for a slot's target, from the frame at `sp` (the callee's

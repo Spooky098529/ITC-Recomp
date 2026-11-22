@@ -28,23 +28,12 @@ namespace user_info {
 
 using Calls = race_hud_object::Calls;
 
-// The screen's blocks: the page object (28 bytes: +0 the page UpdatePage
-// runs, -1 while a transition runs; +4 the page after it; +8 the page
-// before; +12 the running transition, -1 none; +16 the queued one; +20; +24
-// the transition's started word), the menu (68: a front-end menu, items 0
-// to 7) and the data (60: +0 1 once loaded, +4 the state Update moves the
-// machine to, 21 none; +8 to +56 the record).
-constexpr uint32_t kPages = 0x826D84C4;
-constexpr uint32_t kMenu = 0x826D84C8;
-constexpr uint32_t kData = 0x826D84CC;
+// The screen's blocks (the page object, the menu and the data), its machine
+// and the mode's message ring are the views of schema/user_info.h
+// (itc_recomp/schema/user-info.toml) and schema/menu_helpers.h.
 // UI movie 10 and its asset.
 constexpr uint32_t kMovie = 10;
 constexpr uint32_t kAsset = 22552;
-
-// The machine's words.
-constexpr uint32_t kMachineState = 9604;
-constexpr uint32_t kMachineLoaded = 9608;
-constexpr uint32_t kMachineReenter = 9612;
 
 // The callees by address.
 constexpr uint32_t kVirtualAlloc = 0x82295398;

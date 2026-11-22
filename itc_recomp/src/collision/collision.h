@@ -196,9 +196,9 @@ uint32_t BoxBoxOutcode(uint8_t* base, uint32_t block);
 // BoxBox::BlockCorners (sub_820BC978): the block's 8 corners and their
 // outcodes. `frame`: the original's 320 bytes.
 void BoxBoxBlockCorners(uint8_t* base, uint32_t block, uint32_t frame);
-// BoxBox::MoveCorners (sub_820BCCE8): the 8 corners from `corners` (a
-// block's +80) moved by the offset, their outcodes again.
-void BoxBoxMoveCorners(uint8_t* base, uint32_t corners, uint32_t offset);
+// BoxBox::MoveCorners (sub_820BCCE8; its r3 the block's corners, +80):
+// the block's 8 corners moved by the offset, their outcodes again.
+void BoxBoxMoveCorners(uint8_t* base, uint32_t block, uint32_t offset);
 // BoxBox::FaceSeparates (sub_820BB300): 1 when box B lies wholly outside
 // the face at both placements (the faces of A's previous and current
 // copies, B's previous and current copies), else 0.

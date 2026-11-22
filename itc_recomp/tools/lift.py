@@ -9,6 +9,9 @@ usage:
                                     the static map lists, by reason
   lift.py emit <batch> sub_X ...    writes src/lifted/batch_<batch>.cpp with
                                     those functions, and functions.h
+  lift.py reemit                    writes every batch again (its functions
+                                    from its registration table, in order),
+                                    and functions.h
 
 How a function is translated (it reads generated/, never edits it):
   registers   one local each: r0-r31, ctr and the reservation as uint64_t,
@@ -22,8 +25,11 @@ How a function is translated (it reads generated/, never edits it):
               address or an import passes them all)
   return      r3 and f1 when the function writes them (a call writes what
               its callee returns); void, uint64_t, double or lifted::Result
-  calls       a lifted function directly; any other function through the
-              dispatch table (lifted::Call, by address); imports through
+  calls       by the game's names (lifted/names.h) where the rows give one;
+              a lifted function directly, typed; a hand port's entry
+              (lifted/entries.h) directly, with every argument register;
+              any other address through the dispatch table (lifted::Call,
+              which stops the program: none is reached); imports through
               lifted::Import; the register save and restore helpers left
               out (their stack bytes are dead)
   lr          return addresses are dead in C++ (a return is a return): the
@@ -126,11 +132,17 @@ def overridden():
 
 # --- Statements ---
 
+# The ordinal of the comment the statement being parsed follows (counted as
+# type_map.py counts them: the measure's typed accesses are keyed by it).
+CURRENT_INSN = 0
+
+
 class Stmt:
     def __init__(self, kind, code, comment, **kw):
         self.kind = kind          # label goto if return trap call switch case end plain skip
         self.code = code
         self.comment = comment
+        self.insn = CURRENT_INSN
         self.__dict__.update(kw)
 
 
@@ -145,6 +157,8 @@ IF_GOTO_RE = re.compile(r"^if \((.*)\) goto (loc_[0-9A-F]+);$")
 
 
 def parse(name, lines):
+    global CURRENT_INSN
+    CURRENT_INSN = 0
     stmts = []
     comment = None
     braces = []
@@ -154,6 +168,8 @@ def parse(name, lines):
         s = raw.strip()
         if not s:
             continue
+        if s.startswith("//"):
+            CURRENT_INSN += 1
         if s.startswith("//") and not pending:
             comment = s[2:].strip()
             continue
@@ -819,6 +835,37 @@ def assign_result(info_callee, call):
     return f"{call};"
 
 
+_ENTRIES = None
+_NAMES = None
+
+
+def names():
+    """The game's names of our functions by address (`game::A::B`, from the
+    rows of docs/functions/: tools/function_names.py, which writes
+    lifted/names.h)."""
+    global _NAMES
+    if _NAMES is None:
+        sys.path.insert(0, TOOLS)
+        import function_names
+        _NAMES = function_names.names_by_address()
+    return _NAMES
+
+
+def name_of(target, fallback):
+    """A call's callee under its game name (lifted/names.h), else `fallback`."""
+    return names().get(target[4:], fallback)
+
+
+def entries():
+    """The hand ports' entries lifted/entries.h declares (tools/entry_list.py
+    writes it from a build), by address."""
+    global _ENTRIES
+    if _ENTRIES is None:
+        with open(os.path.join(OUT, "entries.h")) as f:
+            _ENTRIES = frozenset(re.findall(r"Result e(8[0-9A-F]{7})\(", f.read()))
+    return _ENTRIES
+
+
 def is_direct(st, infos, emitting):
     """Whether a call statement is a direct C++ call to a lifted function."""
     return (st.how == "direct" and st.target in infos and infos[st.target].lifted
@@ -868,10 +915,16 @@ def emit_function(info, infos, emitting):
             lr = st.lr or "lr"  # a tail call passes on the function's own
             if is_direct(st, infos, emitting):
                 callee = infos[st.target]
-                call = f"{fname(st.target)}({', '.join(['base'] + callee.params + ([lr] if callee.needs_lr else []))})"
+                call = f"{name_of(st.target, fname(st.target))}({', '.join(['base'] + callee.params + ([lr] if callee.needs_lr else []))})"
                 used.update(callee.params)
                 line = assign_result(callee, call)
+            elif st.how == "direct" and st.target[4:] in entries():
+                # A hand port's entry (lifted/entries.h): called directly.
+                line = assign_result(None, f"{name_of(st.target, 'lifted::entry::e' + st.target[4:])}(base, LIFTED_ARGS({lr}, r31))")
+                used.update(ALL_ARGS | {"r31"})
             elif st.how == "direct":
+                # No function of ours at the address (not seen in play):
+                # the dispatch table, which stops the program.
                 line = assign_result(None, f"lifted::Call(base, 0x{st.target[4:]}, LIFTED_ARGS({lr}, r31))")
                 used.update(ALL_ARGS | {"r31"})
             elif st.how == "import":
@@ -904,6 +957,7 @@ def emit_function(info, infos, emitting):
             body.append("  " + st.code)
         else:
             body.append("  " + plain(st.code))
+            body[-1] = name_fields(info.name, st, body[-1])
         # A conditional return (a conditional branch to the link register)
         # returns what the function returns.
         if body[-1].endswith(" return;") and st.kind != "return":
@@ -917,7 +971,8 @@ def emit_function(info, infos, emitting):
         used.add("r3")
     if f1:
         used.add("f1")
-    out.append(f"// {info.name}: lifted from generated/ by lift.py.")
+    named = names().get(info.name[4:])
+    out.append(f"// {info.name}{' ' + named if named else ''}: lifted from generated/ by lift.py.")
     out.append(signature(info) + " {")
     out.append(f'  ITC_NATIVE_RUNNING("{info.name} (lifted)");')
     locals_ = [r for r in GPRS + ["ctr", "reserved", "msr"] if r in used and r not in info.params]
@@ -981,7 +1036,9 @@ def emit_batch(batch, names, infos, emitting):
         "// itc_recomp/tools/lift.py from generated/. Don't edit it by hand: run the",
         "// tool again.",
         "",
+        '#include "lifted/entries.h"',
         '#include "lifted/functions.h"',
+        '#include "lifted/names.h"',
         '#include "lifted/sdk.h"',
         "",
         '#include "base/flags.h"',
@@ -1006,14 +1063,20 @@ def emit_batch(batch, names, infos, emitting):
         "namespace lifted {",
         "",
     ]
+    VIEW_HEADERS.clear()
     for name in names:
         lines.extend(emit_function(infos[name], infos, emitting))
         lines.append("")
-    lines.append("namespace {")
-    lines.append("")
+    # The schema's views the functions name (docs/e5-native.md, step 2).
+    at = lines.index('#include "lifted/sdk.h"') + 1
+    lines[at:at] = [f'#include "{h}"' for h in sorted(VIEW_HEADERS)]
+    # The uniform entries (functions.h declares them: hand ports call a
+    # lifted function by them, docs/e5-native.md, step 0).
     for name in names:
         lines.extend(emit_entry(infos[name]))
         lines.append("")
+    lines.append("namespace {")
+    lines.append("")
     lines.append("const Registration kEntries[] = {")
     for name in names:
         lines.append(f"    {{0x{name[4:]}, {ename(name)}}},")
@@ -1031,7 +1094,121 @@ def emit_batch(batch, names, infos, emitting):
     # code calls them directly or through the dispatch table.
     # The functions with LIFTED_ARGS but without some of its registers as
     # locals or parameters would not build: every call adds them to `used`.
-    return "\n".join(lines)
+    return own_spelling("\n".join(lines))
+
+
+_VIEWS = None
+# The schema's headers the function being emitted names (emit_batch
+# includes them).
+VIEW_HEADERS = set()
+ADDRESS_RE = re.compile(r"\bREX_(LOAD|STORE)_U(8|16|32|64)\(uint32_t\((r\d+)\) \+ (-?\d+)\b")
+
+
+def views():
+    """The measure's typed accesses (tools/type_map.py) whose type the
+    schema describes and whose offset is one of its fields: (function, the
+    statement's comment ordinal) -> (the type, the field, the register's
+    offset into the object, the displacement)."""
+    global _VIEWS
+    if _VIEWS is None:
+        sys.path.insert(0, TOOLS)
+        import schema_lib
+        import type_map
+        schema = schema_lib.load()
+        _VIEWS = {}
+        if schema.types:
+            accesses, _ = type_map.typed_accesses()
+            for key, (t, off, disp, width, store) in accesses.items():
+                ty = schema.of_measure(t)
+                if ty is None or off is None:
+                    continue
+                f = ty.field_at(off + disp, width)
+                if f is not None:
+                    _VIEWS[key] = (ty, f, off, disp)
+    return _VIEWS
+
+
+def name_fields(fn, st, line):
+    """A load's or store's address named by the schema's view
+    (docs/e5-native.md, step 2): `REX_LOAD_U32(uint32_t(r31) + 24)` as
+    `REX_LOAD_U32(schema::T(base, uint32_t(r31)).field_address())` where the
+    measure knows r31 holds a T; the access itself is unchanged."""
+    v = views().get((fn, st.insn))
+    if v is None:
+        return line
+    ty, f, off, disp = v
+    m = ADDRESS_RE.search(line)
+    if m is None or int(m.group(4)) != disp:
+        return line
+    obj = f"uint32_t({m.group(3)})" + (f" - {off}" if off > 0 else f" + {-off}" if off < 0 else "")
+    if ty.storage == "host":
+        return host_access(fn, ty, f, obj, off + disp - f["offset"], m, line)
+    address = f"schema::{ty.name}(base, {obj}).{f['name']}_address()"
+    inside = off + disp - f["offset"]
+    if inside:
+        address += f" + {inside}"
+    VIEW_HEADERS.add(ty.header())
+    return line[:m.start()] + f"REX_{m.group(1)}_U{m.group(2)}({address}" + line[m.end():]
+
+
+HOST_LEFT_RAW = []
+
+
+def host_access(fn, ty, f, obj, inside, m, line):
+    """A load or store of a host type's field (docs/loops/e5-loop.md, step
+    3): the view's raw bits of the field's width, or the bytes helpers
+    inside a bytes field. A partial access to a plain field stays raw (it
+    faults on the handle if reached) and is listed."""
+    VIEW_HEADERS.add(ty.header())
+    view = f"schema::{ty.name}(base, {obj})"
+    width = int(m.group(2))
+    store = m.group(1) == "STORE"
+    if f["type"] == "bytes":
+        at = f"{view}.{f['name']}() + {inside}"
+        load = f"schema::host::LoadU{width}({at})"
+        store_fn = f"schema::host::StoreU{width}({at}, "
+    elif inside == 0:
+        load = f"{view}.{f['name']}_bits()"
+        store_fn = f"{view}.set_{f['name']}_bits("
+    else:
+        HOST_LEFT_RAW.append(f"{fn}: {ty.name}.{f['name']} +{inside}, {width} bits")
+        return line
+    # The call's extent: from `REX_..._Un(` to its closing parenthesis.
+    depth, end = 0, None
+    for i in range(m.start() + len(f"REX_{m.group(1)}_U{m.group(2)}"), len(line)):
+        if line[i] == "(":
+            depth += 1
+        elif line[i] == ")":
+            depth -= 1
+            if depth == 0:
+                end = i
+                break
+    if end is None:
+        HOST_LEFT_RAW.append(f"{fn}: {ty.name}.{f['name']}, unparsed")
+        return line
+    if not store:
+        return line[:m.start()] + load + line[end + 1:]
+    args = line[m.end():end]
+    comma = args.find(",")
+    if comma < 0:
+        HOST_LEFT_RAW.append(f"{fn}: {ty.name}.{f['name']}, a store without its value")
+        return line
+    return line[:m.start()] + store_fn + args[comma + 1:].strip() + ")" + line[end + 1:]
+
+
+OWN_SPELLING = re.compile(r"\bREX_(LOAD|STORE)_U(8|16|32|64)\(|\bREX_RAW_ADDR\(")
+
+
+def own_spelling(text):
+    """Guest memory accesses in our own spelling (docs/e5-native.md, step
+    0): the generated code's REX_LOAD_U32(x), REX_STORE_U32(x, y) and
+    REX_RAW_ADDR(x) as guest::LoadU32(base, x), guest::StoreU32(base, x, y)
+    and guest::Pointer(base, x) (guest.h), as the hand ports write them."""
+    def rep(m):
+        if m.group(1):
+            return f"guest::{m.group(1).capitalize()}U{m.group(2)}(base, "
+        return "guest::Pointer(base, "
+    return OWN_SPELLING.sub(rep, text)
 
 
 def emit_header(signatures):
@@ -1048,6 +1225,10 @@ def emit_header(signatures):
     ]
     for name in sorted(signatures):
         lines.append(signatures[name] + ";")
+    lines += ["", "// Their uniform entries (the dispatch table's), for code that holds a",
+              "// call's registers (a hand port's lifted::Regs: lifted::Enter).", ""]
+    for name in sorted(signatures):
+        lines.append(f"Result {ename(name)}(uint8_t* base, const Args& a);")
     lines += ["", "}  // namespace lifted", ""]
     return "\n".join(lines)
 
@@ -1120,6 +1301,34 @@ def main(argv):
         with open(os.path.join(OUT, "functions.h"), "w") as f:
             f.write(emit_header(signatures))
         print(f"wrote batch {batch}: {len(chosen)} functions")
+        return 0
+    if argv[1] == "reemit":
+        # Every batch written again from its own registration table (its
+        # functions, in their order), as `emit` wrote it, with today's tool.
+        batches = {}
+        for path in sorted(glob.glob(os.path.join(OUT, "batch_*.cpp"))):
+            batch = re.search(r"batch_(\w+)\.cpp$", path).group(1)
+            with open(path) as f:
+                batches[batch] = ["sub_" + a for a in re.findall(r"\{0x(8[0-9A-F]{7}), e8", f.read())]
+        everything = sorted({n for names in batches.values() for n in names})
+        infos = build(sorted(set(everything) | set(lifted_before)), bodies, skip - set(lifted_before))
+        bad = [n for n in everything if not infos[n].lifted]
+        if bad:
+            for n in bad:
+                print(f"{n}: refused: {infos[n].error}")
+            return 1
+        emitting = set(everything) | set(lifted_before)
+        mark_needs_lr(infos, emitting)
+        for batch, names in batches.items():
+            with open(os.path.join(OUT, f"batch_{batch}.cpp"), "w") as f:
+                f.write(emit_batch(batch, names, infos, emitting))
+        with open(os.path.join(OUT, "functions.h"), "w") as f:
+            f.write(emit_header(lifted_before))
+        print(f"rewrote {len(batches)} batches: {len(everything)} functions")
+        if HOST_LEFT_RAW:
+            print(f"host types' accesses left raw (they fault if reached): {len(HOST_LEFT_RAW)}")
+            for x in HOST_LEFT_RAW[:40]:
+                print("  " + x)
         return 0
     print(__doc__)
     return 1

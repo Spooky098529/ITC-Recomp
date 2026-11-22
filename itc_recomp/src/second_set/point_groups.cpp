@@ -9,6 +9,8 @@
 #include "material_passes/material_passes.h"
 #include "native/buffers.h"
 #include "second_set/points.h"
+#include "schema/car_draw.h"
+#include "schema/second_set.h"
 
 #include <bit>
 #include <cstdlib>
@@ -62,22 +64,24 @@ void Identity(uint8_t* base, uint32_t at) {
   }
 }
 
-constexpr uint32_t kFive = 0x82005FE4;  // 5.0
+constexpr uint32_t kFive = schema::SecondSetGlobals::five_address();  // 5.0
 
 }  // namespace
 
 uint32_t PartsResetFrontBumper(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DE0E0 PartsPoints::ResetFrontBumper");
-  Store(base, group + 2648, 0);
-  Store(base, group + 2644, 0);
-  Store(base, group + 2640, 1);
+  const schema::PartsPoints g(base, group);
+  g.set_front_car_record(0u);
+  g.set_front_plate_texture(0u);
+  g.set_front_plate_set(1u);
   return NameRecords(base, group, 0x826025F4, 11, 0, stack - 112);
 }
 
 uint32_t PartsResetRearBumper(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DE2C8 PartsPoints::ResetRearBumper");
-  Store(base, group + 1680, 1);
-  Store(base, group + 1684, 0);
+  const schema::PartsPoints g(base, group);
+  g.set_rear_plate_set(1u);
+  g.set_rear_plate_texture(0u);
   return NameRecords(base, group, 0x82602624, 7, 0, stack - 112);
 }
 
@@ -93,7 +97,7 @@ uint32_t PartsResetBonnet(uint8_t* base, uint32_t group, uint32_t stack) {
 
 uint32_t PartsResetLeftDoor(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DE600 PartsPoints::ResetLeftDoor");
-  Store(base, group + 6080, 0);
+  schema::PartsPoints(base, group).set_door_car_record(0u);
   return NameRecords(base, group, 0x82602658, 25, 2, stack - 128);
 }
 
@@ -104,10 +108,9 @@ uint32_t PartsResetRightDoor(uint8_t* base, uint32_t group, uint32_t stack) {
   // The mirror winkers scaled, though Clear left their models 0.
   uint32_t r3 = 0;
   for (uint32_t i = 7; i <= 10; i++) {
-    const uint32_t record = group + kPointRecordBytes * i;
+    const schema::SecondSetPointRecord record(base, group + kPointRecordBytes * i);
     const double five = double(guest::LoadFloat(base, kFive));
-    r3 = material_passes::ScaleBlended(base, Load(base, record + 4), Load(base, record + 228),
-                                       five, sp);
+    r3 = material_passes::ScaleBlended(base, record.model(), record.shape_index(), five, sp);
   }
   return r3;
 }
@@ -122,11 +125,12 @@ uint32_t PartsResetHeadlights(uint8_t* base, uint32_t group, uint32_t stack) {
   const uint32_t sp = stack - 192;
   NameRecords(base, group, 0x82602788, 13, 7, sp);
   Identity(base, sp + 80);
-  if (!native::Buffers_Memcpy(base, group + 3120, sp + 80, 64, 0x820DF7E8)) {
+  const uint32_t popup = schema::PartsPoints(base, group).headlights_popup_matrix_address();
+  if (!native::Buffers_Memcpy(base, popup, sp + 80, 64, 0x820DF7E8)) {
     ITC_LOG_ERROR("Second set: ResetHeadlights' memcpy refused after its checks");
     std::abort();
   }
-  return group + 3120;
+  return popup;
 }
 
 uint32_t PartsResetTailLights(uint8_t* base, uint32_t group, uint32_t stack) {
@@ -156,7 +160,7 @@ uint32_t PartsResetMufflers(uint8_t* base, uint32_t group, uint32_t stack) {
 
 uint32_t PartsResetShadows(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DF128 PartsPoints::ResetShadows");
-  Store(base, group + 960, 0);
+  schema::PartsPoints(base, group).set_shadows_word_960(0u);
   return NameRecords(base, group, 0x82602844, 4, 0, stack - 112);
 }
 
@@ -222,54 +226,59 @@ uint32_t InteriorInitBody(uint8_t* base, uint32_t record, uint32_t stack) {
 
 uint32_t InteriorResetDials(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E2FC8 InteriorPoints::ResetDials");
-  Store(base, group + 0, 0);
-  Store(base, group + 8, 0);
-  Store(base, group + 4, 0xFFFFFFFFu);
-  return NameRecords(base, group + 16, 0x82602868, 12, 2, stack - 128);
+  const schema::SecondSetInteriorPoints g(base, group);
+  g.set_group_record(0u);
+  g.set_group_word_8(0);
+  g.set_group_word_4(0xFFFFFFFFu);
+  return NameRecords(base, g.group_records_address(), 0x82602868, 12, 2, stack - 128);
 }
 
 uint32_t InteriorResetMeters(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E3200 InteriorPoints::ResetMeters");
-  Store(base, group + 0, 0);
-  Store(base, group + 4, 0xFFFFFFFFu);
-  Store(base, group + 5324, 0);
-  const uint32_t r3 = NameRecords(base, group + 16, 0x82602898, 22, 7, stack - 144);
+  const schema::SecondSetInteriorPoints g(base, group);
+  g.set_group_record(0u);
+  g.set_group_word_4(0xFFFFFFFFu);
+  g.set_turbo_provider(0);
+  const uint32_t r3 = NameRecords(base, g.group_records_address(), 0x82602898, 22, 7, stack - 144);
   for (uint32_t w = 0; w < 7; w++) {
-    Store(base, group + 5296 + 4 * w, 0);
+    Store(base, g.gauge_providers_address() + 4 * w, 0);
   }
   return r3;
 }
 
 uint32_t InteriorResetSteering(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E33F0 InteriorPoints::ResetSteering");
-  return NameRecords(base, group + 16, 0x826028F0, 4, 0, stack - 112);
+  return NameRecords(base, schema::SecondSetInteriorPoints(base, group).group_records_address(),
+                     0x826028F0, 4, 0, stack - 112);
 }
 
 uint32_t InteriorResetSeats(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E3440 InteriorPoints::ResetSeats");
-  return NameRecords(base, group + 16, 0x82602900, 4, 2, stack - 128);
+  return NameRecords(base, schema::SecondSetInteriorPoints(base, group).group_records_address(),
+                     0x82602900, 4, 2, stack - 128);
 }
 
 uint32_t InteriorResetRollCage(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E34F8 InteriorPoints::ResetRollCage");
-  return NameRecords(base, group + 16, 0x82602910, 4, 0, stack - 112);
+  return NameRecords(base, schema::SecondSetInteriorPoints(base, group).group_records_address(),
+                     0x82602910, 4, 0, stack - 112);
 }
 
 uint32_t LightsResetFront(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DC748 LightPoints::ResetFront");
-  Store(base, group + 0, 0);
+  schema::LightPoints(base, group).set_record(0u);
   return NameRecords(base, group + 16, 0x820055F0, 18, 0, stack - 112);
 }
 
 uint32_t LightsResetSides(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DC7A0 LightPoints::ResetSides");
-  Store(base, group + 0, 0);
+  schema::LightPoints(base, group).set_record(0u);
   return NameRecords(base, group + 16, 0x82005638, 18, 0, stack - 112);
 }
 
 uint32_t LightsResetRear(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DC7F8 LightPoints::ResetRear");
-  Store(base, group + 0, 0);
+  schema::LightPoints(base, group).set_record(0u);
   return NameRecords(base, group + 16, 0x82005680, 18, 0, stack - 112);
 }
 
@@ -311,38 +320,40 @@ void ZeroOneRows(uint8_t* base, uint32_t rows) {
 uint32_t WheelsResetTire(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E74B8 WheelPoints::ResetTire");
   const uint32_t sp = stack - 128;
-  CopyWord(base, kZero, group + 352);
-  CopyWord(base, kZero, group + 356);
-  Store(base, group + 0, 0);
-  Store(base, group + 4, 0);
-  Store(base, group + 8, 0);
-  Store(base, group + 300, 1);
-  NameRecords(base, group + 368, 0x8260299C, 6, 0, sp);
+  const schema::SecondSetWheelPoints g(base, group);
+  CopyWord(base, kZero, g.tire_out1_address());
+  CopyWord(base, kZero, g.tire_out2_address());
+  g.set_matrix(0u);
+  g.set_car_record(0u);
+  g.set_wheels_record(0u);
+  g.set_tire_front(1);
+  NameRecords(base, g.tire_records_address(), 0x8260299C, 6, 0, sp);
   for (uint32_t i = 0; i < 6; i++) {
-    CopyWord(base, kZero, group + 328 + 4 * i);
-    Store(base, group + 304 + 4 * i, 0xFFFFFFFFu);
+    CopyWord(base, kZero, g.tire_weights_address() + 4 * i);
+    Store(base, g.tire_shapes_address() + 4 * i, 0xFFFFFFFFu);
   }
-  ZeroOneRows(base, group + 1808);
+  ZeroOneRows(base, g.tire_rows_address());
   for (uint32_t i = 0; i < 288; i++) {
-    base[group + 12 + i] = 0;
+    base[g.tire_entries_address() + i] = 0;
   }
-  return group + 12;
+  return g.tire_entries_address();
 }
 
 uint32_t WheelsResetRimA(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E7918 WheelPoints::ResetRimA");
   const uint32_t sp = stack - 144;
-  Store(base, group + 0, 0);
-  Store(base, group + 8, 0);
-  Store(base, group + 12, 1);
-  const uint32_t r3 = NameRecords(base, group + 32, 0x826029B4, 7, 0, sp);
+  const schema::SecondSetWheelPoints g(base, group);
+  g.set_matrix(0u);
+  g.set_wheels_record(0u);
+  g.set_word_12(1);
+  const uint32_t r3 = NameRecords(base, g.group_records_address(), 0x826029B4, 7, 0, sp);
   CopyWord(base, kZero, sp + 80);
   CopyWord(base, kZero, sp + 84);
   CopyWord(base, kZero, sp + 88);
   CopyWord(base, kOne, sp + 92);
   for (uint32_t row = 0; row < 2; row++) {
     for (uint32_t w = 0; w < 4; w++) {
-      Store(base, group + 1712 + 16 * row + 4 * w, Load(base, sp + 80 + 4 * w));
+      Store(base, g.rim_rows_address() + 16 * row + 4 * w, Load(base, sp + 80 + 4 * w));
     }
   }
   return r3;
@@ -350,21 +361,23 @@ uint32_t WheelsResetRimA(uint8_t* base, uint32_t group, uint32_t stack) {
 
 uint32_t WheelsResetRimB(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E7C08 WheelPoints::ResetRimB");
-  Store(base, group + 0, 0);
-  Store(base, group + 8, 0);
-  Store(base, group + 12, 1);
-  const uint32_t r3 = NameRecords(base, group + 32, 0x826029D0, 7, 0, stack - 128);
-  ZeroOneRows(base, group + 1712);
+  const schema::SecondSetWheelPoints g(base, group);
+  g.set_matrix(0u);
+  g.set_wheels_record(0u);
+  g.set_word_12(1);
+  const uint32_t r3 = NameRecords(base, g.group_records_address(), 0x826029D0, 7, 0, stack - 128);
+  ZeroOneRows(base, g.rim_rows_address());
   return r3;
 }
 
 uint32_t WheelsResetBrakes(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E7F90 WheelPoints::ResetBrakes");
-  Store(base, group + 0, 0);
-  Store(base, group + 8, 0);
-  Store(base, group + 12, 1);
-  const uint32_t r3 = NameRecords(base, group + 32, 0x826029EC, 12, 0, stack - 128);
-  ZeroOneRows(base, group + 2912);
+  const schema::SecondSetWheelPoints g(base, group);
+  g.set_matrix(0u);
+  g.set_wheels_record(0u);
+  g.set_word_12(1);
+  const uint32_t r3 = NameRecords(base, g.group_records_address(), 0x826029EC, 12, 0, stack - 128);
+  ZeroOneRows(base, g.brake_rows_address());
   return r3;
 }
 

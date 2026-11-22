@@ -18,6 +18,13 @@
 #include "mode_tick/mode_tick.h"
 #include "race_event/race_event.h"
 #include "race_setup/race_setup.h"
+#include "schema/car_draw.h"
+#include "schema/career.h"
+#include "schema/garage_screen.h"
+#include "schema/race_event.h"
+#include "schema/race_hud_machine.h"
+#include "schema/race_states.h"
+#include "schema/scene_models.h"
 #include "ui_movies/game.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -53,9 +60,9 @@ uint32_t EvaluateView(uint8_t* base, uint32_t frame, uint32_t which, uint32_t ti
   }
   guest::StoreU32(base, frame + 160, zero);
   guest::StoreU32(base, frame + 164, zero);
-  const uint32_t location = guest::LoadU32(base, Screen(base) + 852);
+  const uint32_t location = Screen(base).location_index();
   const uint32_t id =
-      guest::LoadU32(base, ((location << 4) & 0xFFFFFFF0u) + 0x82636518 + 4 * which);
+      guest::LoadU32(base, ((location << 4) & 0xFFFFFFF0u) + G::locations_address() + 4 * which);
   const uint32_t out = frame + 128;
   std::optional<double> f1;
   const uint32_t evaluated = camera_modes::AnimsEvaluate(
@@ -64,15 +71,20 @@ uint32_t EvaluateView(uint8_t* base, uint32_t frame, uint32_t which, uint32_t ti
         calls.Call(0x82150350, frame - 144, 0x821509C4, object, object, out, time);
       },
       &f1);
+  // The view (the screen's +560) of the screen loaded at each store.
+  auto view = [&] { return schema::LocationScreenView(base, Screen(base).view_address()); };
   for (uint32_t i = 0; i < 16; i += 4) {
-    guest::StoreU32(base, Screen(base) + 592 + i, guest::LoadU32(base, frame + 144 + i));
+    guest::StoreU32(base, view().camera_vector_1_address() + i,
+                    guest::LoadU32(base, frame + 144 + i));
   }
   for (uint32_t i = 0; i < 16; i += 4) {
-    guest::StoreU32(base, Screen(base) + 608 + i, guest::LoadU32(base, frame + 128 + i));
+    guest::StoreU32(base, view().camera_vector_0_address() + i,
+                    guest::LoadU32(base, frame + 128 + i));
   }
-  const uint32_t screen = Screen(base);
-  guest::StoreU32(base, screen + 664, ThroughFloat(base, frame + 160));
-  guest::StoreU32(base, screen + 668, ThroughFloat(base, frame + 164));
+  const schema::LocationScreenView v = view();
+  // The floats' bits as lfs and stfs leave them.
+  guest::StoreU32(base, v.camera_float_0_address(), ThroughFloat(base, frame + 160));
+  guest::StoreU32(base, v.camera_float_1_address(), ThroughFloat(base, frame + 164));
   return evaluated;
 }
 
@@ -91,7 +103,7 @@ uint32_t Transition4(uint8_t* base, uint32_t sp, uint32_t step, const Calls& cal
     PlayNamed(base, movie, 103);
     LoopLast(base, frame, movie);
     ShowListEntry(base, frame, calls);
-    PlayNamed(base, movie, guest::LoadU32(base, guest::LoadU32(base, kListMenu)) + 52);
+    PlayNamed(base, movie, G::list_menu(base).cursor() + 52);
     LoopLast(base, frame, movie);
     SetText(base, calls, frame, movie, 0, 0, 578);
     Required(ui_movies::ResetTextScroll(base, movie, 0, 0), "sub_8211C5F8");
@@ -120,17 +132,22 @@ uint32_t Transition5(uint8_t* base, uint32_t sp, uint32_t step, const Calls& cal
     ListNode(base, frame, 0);
     // The list's menu reset: its count (the location record's, +812) less 1
     // at +16, +20 = 1, the rest 0 (the original's store order).
-    const uint32_t count = guest::LoadU32(base, Screen(base) + 812) - 1;
-    const uint32_t menu = guest::LoadU32(base, kListMenu);
-    guest::StoreU32(base, menu + 12, 0);
-    guest::StoreU32(base, menu + 20, 1);
-    for (uint32_t offset : {0u, 4u, 8u, 40u, 48u}) {
-      guest::StoreU32(base, menu + offset, 0);
-    }
-    guest::StoreU32(base, menu + 16, count);
-    for (uint32_t offset : {52u, 36u, 64u, 24u, 28u, 32u}) {
-      guest::StoreU32(base, menu + offset, 0);
-    }
+    const uint32_t count = Screen(base).list_count() - 1;
+    const schema::FrontEndMenu menu = G::list_menu(base);
+    menu.set_first_item(0);
+    menu.set_wraps(1);
+    menu.set_cursor(0);
+    menu.set_previous(0);
+    menu.set_moved(0);
+    menu.set_wrapped(0);
+    menu.set_visible_row(0);
+    menu.set_last_item(count);
+    menu.set_previous_row(0);
+    menu.set_side(0);
+    menu.set_player(0);
+    menu.set_up_down_locked(0);
+    menu.set_left_right_steps(0);
+    menu.set_shoulders_step(0);
     FinishNamed(calls, frame, 0x8222DBF4, movie, 103);
     SetCarColor(base, frame);
   }
@@ -146,7 +163,7 @@ uint32_t Transition8(uint8_t* base, uint32_t sp, uint32_t step, const Calls& cal
     ui_movies::ResetNode(base, movie, 0xFFFFFFFFu, 11);
     ShowListEntry(base, frame, calls);
     ui_movies::Play(base, movie, 0xFFFFFFFFu, 10, 0, 0, 0, 0);
-    PlayNamed(base, movie, guest::LoadU32(base, guest::LoadU32(base, kListMenu)) + 52);
+    PlayNamed(base, movie, G::list_menu(base).cursor() + 52);
     LoopLast(base, frame, movie);
     ShowPictures(base, frame);
     guest::StoreU32(base, step, 1);
@@ -198,56 +215,59 @@ uint32_t Start(uint8_t* base, uint32_t sp, const Calls& calls) {
   // count at +0x19920; the slot's car (1,968 bytes each from +6120) +224
   // the spec's id.
   uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const uint32_t garage = save + 6120;
-  uint32_t count = guest::LoadU32(base, save + 0x19920);
-  uint32_t entry =
-      (uint32_t(int32_t(int16_t(guest::LoadU16(base, garage + 204)))) << 2) + garage;
+  const schema::CareerGarageList list(base, schema::SaveData(base, save).garage_address());
+  const uint32_t garage = list.address;
+  uint32_t count = schema::SaveData(base, save).selected_car();
+  uint32_t entry = (uint32_t(int32_t(int16_t(list.head()))) << 2) + garage;
   for (; count != 0; count--) {
     entry = (uint32_t(int32_t(int16_t(guest::LoadU16(base, entry)))) << 2) + garage;
   }
   const uint32_t slot = uint32_t(int32_t(int16_t(guest::LoadU16(base, entry + 2))));
-  const uint32_t spec = car_specs::GetCarSpec(base, guest::LoadU32(base, slot * 1968 + garage + 224));
-  guest::StoreU32(base, Screen(base) + 892, guest::LoadU8(base, spec + 771) == 1 ? 1 : 0);
+  const schema::CarSpec spec(
+      base, car_specs::GetCarSpec(
+                base, schema::CareerAddedCar(base, slot * 1968 + list.cars_address()).car_id()));
+  Screen(base).set_special_car(spec.list_kind() == 1 ? 1 : 0);
   ResetMovie(base, frame, calls);
   save = vehicle_accessors::SaveDataOf(base, 0);
-  const uint32_t unlocks = save + 0x1C778;
-  const uint32_t race = guest::LoadU32(base, kRaceData);
-  const uint32_t record = vehicle_accessors::RacerRecordsAt(base, race + kRacerRecords, 0xFFFFFFFFu);
-  const uint32_t pages = guest::LoadU32(base, kPages);
+  const schema::SaveData unlocks(base, save);
+  const schema::RaceData race = schema::RaceStatesGlobals::race_data(base);
+  const uint32_t record =
+      vehicle_accessors::RacerRecordsAt(base, race.results_address(), 0xFFFFFFFFu);
+  const schema::PageObject pages = G::pages(base);
   uint32_t page, transition;
-  if (vehicle_accessors::StagesWord808(base, race + 0x59620) != 0 && record != 0 &&
-      guest::LoadU32(base, Screen(base) + 816) == 0) {
+  if (vehicle_accessors::StagesWord808(base, race.stages_address()) != 0 && record != 0 &&
+      Screen(base).item2_taken() == 0) {
     // After a race: page 12 through transition 23.
-    data_tables::Item(base, guest::LoadU32(base, record + 980));
-    guest::StoreU32(base, Screen(base) + 872, 0);
-    guest::StoreU32(base, Screen(base) + 876, 0);
+    data_tables::Item(base, schema::RacerResultsRecord(base, record).e1_item());
+    Screen(base).set_entry_offset(0);
+    Screen(base).set_entry_table(0);
     page = 12;
     transition = 23;
-  } else if (guest::LoadU32(base, unlocks + 768) != 0) {
+  } else if (unlocks.unlocks_shown_count() != 0) {
     // An unlock to show: page 13 through transition 25.
     page = 13;
     transition = 25;
   } else {
     // Page 0, set directly.
-    const uint32_t current = guest::LoadU32(base, pages);
+    const uint32_t current = pages.page();
     if (current != 0) {
-      guest::StoreU32(base, pages + 8, current);
+      pages.set_previous_page(current);
     }
-    guest::StoreU32(base, pages + 12, 0);
-    guest::StoreU32(base, pages + 4, 0);
-    guest::StoreU32(base, pages + 16, 0xFFFFFFFFu);
-    guest::StoreU32(base, pages + 0, 0xFFFFFFFFu);
+    pages.set_step(0);
+    pages.set_next_page(0);
+    pages.set_queued_step(0xFFFFFFFFu);
+    pages.set_page(0xFFFFFFFFu);
     mode_tick::ScreenFadesFadeIn(base, 30, 0, 0, 0, 0);
     return 30;
   }
-  const uint32_t current = guest::LoadU32(base, pages);
+  const uint32_t current = pages.page();
   if (current != page) {
-    guest::StoreU32(base, pages + 8, current);
+    pages.set_previous_page(current);
   }
-  guest::StoreU32(base, pages + 0, 0xFFFFFFFFu);
-  guest::StoreU32(base, pages + 4, page);
-  guest::StoreU32(base, pages + 16, 0xFFFFFFFFu);
-  guest::StoreU32(base, pages + 12, transition);
+  pages.set_page(0xFFFFFFFFu);
+  pages.set_next_page(page);
+  pages.set_queued_step(0xFFFFFFFFu);
+  pages.set_step(transition);
   mode_tick::ScreenFadesFadeIn(base, 30, 0, 0, 0, 0);
   return 30;
 }
@@ -257,9 +277,9 @@ uint32_t ShowOpponentSpecs(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = sp - kShowOpponentSpecsFrame;
   guest::StoreU32(base, frame, sp);
   const uint32_t movie = Movie(base, frame, kMenusMovie);
-  guest::StoreU32(base, frame + 80, guest::LoadU32(base, Screen(base) + 800));
+  guest::StoreU32(base, frame + 80, Screen(base).picked_opponent());
   const uint32_t event = race_setup::EventCurrent(base);
-  const uint32_t item = race_event::GroupItem(base, event, guest::LoadU32(base, Screen(base) + 804),
+  const uint32_t item = race_event::GroupItem(base, event, Screen(base).group_kind(),
                                               guest::LoadU32(base, frame + 80));
   Copy(base, calls, frame, 0x8222C1E4, frame + 96, item, 3008);
   // The item's car build's car id (+160 + 2788).
@@ -268,7 +288,7 @@ uint32_t ShowOpponentSpecs(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t n9 = ui_movies::FindNode(base, movie, 12, 9);
   const uint32_t n10 = ui_movies::FindNode(base, movie, 12, 10);
   const uint32_t n11 = ui_movies::FindNode(base, movie, 12, 11);
-  SetNodeText(base, calls, frame, movie, n9, guest::LoadU8(base, spec + 769) + 1934);
+  SetNodeText(base, calls, frame, movie, n9, schema::CarSpec(base, spec).maker() + 1934);
   SetNodeText(base, calls, frame, movie, n10, id + 1646);
   return SetNodeText(base, calls, frame, movie, n11, id + 1718);
 }
@@ -280,30 +300,31 @@ uint32_t Transition9(uint8_t* base, uint32_t sp, uint32_t step, const Calls& cal
   const uint32_t movie = Movie(base, frame, kMenusMovie);
   if (guest::LoadU32(base, step) == 0) {
     ResetMovie(base, frame, calls);
-    if (guest::LoadU32(base, Screen(base) + 888) != 0) {
+    if (Screen(base).more_opponent_text() != 0) {
       HidePictures(base, frame);
     } else {
-      const uint32_t menu = guest::LoadU32(base, kOpponentMenu);
-      const uint32_t cursor = guest::LoadU32(base, menu);
-      guest::StoreU32(base, menu + 0, 0);
-      guest::StoreU32(base, menu + 4, cursor);
+      const schema::FrontEndMenu menu = G::opponent_menu(base);
+      const uint32_t cursor = menu.cursor();
+      menu.set_cursor(0);
+      menu.set_previous(cursor);
     }
     for (uint32_t i = 0; i < 10; i++) {
       FinishNamed(calls, frame, 0x8222DF60, movie, 13 + i);
     }
-    for (uint32_t i = 0; i < guest::LoadU32(base, Screen(base) + 808); i++) {
+    for (uint32_t i = 0; i < Screen(base).opponent_count(); i++) {
       FinishNamed(calls, frame, 0x8222DF8C, movie, 84 + i);
     }
     HideNode(base, movie, 0xFFFFFFFFu, 18);
     HideNode(base, movie, 0xFFFFFFFFu, 17);
     ui_movies::Play(base, movie, 0xFFFFFFFFu, 2, 0, 0, 0, 0);
-    PlayNamed(base, movie, guest::LoadU32(base, Screen(base) + 800) + 84);
+    PlayNamed(base, movie, Screen(base).picked_opponent() + 84);
     LoopLast(base, frame, movie);
     ShowOpponentInfo(base, frame, calls);
     // The location's second camera animation at the picked opponent's time
     // (0x82010780 + 4 x +800).
-    const uint32_t picked = guest::LoadU32(base, Screen(base) + 800);
-    EvaluateView(base, frame, 1, guest::LoadU32(base, ((picked << 2) & 0xFFFFFFFCu) + 0x82010780),
+    const uint32_t picked = Screen(base).picked_opponent();
+    EvaluateView(base, frame, 1,
+                 guest::LoadU32(base, ((picked << 2) & 0xFFFFFFFCu) + G::opponent_times_address()),
                  calls);
     ShowOpponentSpecs(base, frame, calls);
     ShowOpponentPictures(base, frame, calls);
@@ -316,12 +337,21 @@ uint32_t Transition9(uint8_t* base, uint32_t sp, uint32_t step, const Calls& cal
     LoopLast(base, frame, movie);
     // The opponents' menu reset: 6 items (+16 = 6), the rest 0 (the
     // original's store order).
-    const uint32_t menu = guest::LoadU32(base, kOpponentMenu);
-    guest::StoreU32(base, menu + 12, 0);
-    guest::StoreU32(base, menu + 16, 6);
-    for (uint32_t offset : {20u, 0u, 4u, 8u, 40u, 48u, 52u, 36u, 64u, 24u, 28u, 32u}) {
-      guest::StoreU32(base, menu + offset, 0);
-    }
+    const schema::FrontEndMenu menu = G::opponent_menu(base);
+    menu.set_first_item(0);
+    menu.set_last_item(6);
+    menu.set_wraps(0);
+    menu.set_cursor(0);
+    menu.set_previous(0);
+    menu.set_moved(0);
+    menu.set_wrapped(0);
+    menu.set_visible_row(0);
+    menu.set_previous_row(0);
+    menu.set_side(0);
+    menu.set_player(0);
+    menu.set_up_down_locked(0);
+    menu.set_left_right_steps(0);
+    menu.set_shoulders_step(0);
     SetCarColor(base, frame);
   }
   return done;
@@ -346,11 +376,10 @@ course_scenery::Calls SceneryCalls(const Calls& calls) {
 // The location's camera animation `which`'s id (0x82636518 + 16 x the
 // location + 4 x which).
 uint32_t AnimId(uint8_t* base, uint32_t which) {
-  const uint32_t location = guest::LoadU32(base, Screen(base) + 852);
-  return guest::LoadU32(base, ((location << 4) & 0xFFFFFFF0u) + 0x82636518 + 4 * which);
+  const uint32_t location = Screen(base).location_index();
+  return guest::LoadU32(base, ((location << 4) & 0xFFFFFFF0u) + G::locations_address() + 4 * which);
 }
 
-constexpr uint32_t kCarScene = 0x826C2E44;
 constexpr uint32_t kCarSceneUpdate = 0x820C9608;
 constexpr uint32_t kCarSceneDraw = 0x820C5DE8;
 constexpr uint32_t kSceneModelPollLoad = 0x820DA318;
@@ -367,11 +396,11 @@ uint64_t PollLoad(uint8_t* base, uint32_t sp, uint32_t machine, const Calls& cal
     return 0;
   }
   const uint32_t evaluated = EvaluateView(base, frame, 0, 0, calls);
-  const uint32_t scene = guest::LoadU32(base, kCarScene);
+  const uint32_t scene = schema::CarDrawGlobals::scene(base).address;
   calls.Call(kCarSceneUpdate, frame, 0x82229350, evaluated);
   uint64_t r3 = calls.Call(kCarSceneDraw, frame, 0x8222935C, scene, 0);
-  for (uint32_t i = 0; i < guest::LoadU32(base, Screen(base) + 808); i++) {
-    const uint32_t index = guest::LoadU32(base, Screen(base) + 824 + 4 * i);
+  for (uint32_t i = 0; i < Screen(base).opponent_count(); i++) {
+    const uint32_t index = guest::LoadU32(base, Screen(base).opponent_models_address() + 4 * i);
     const uint32_t model = vehicle_accessors::ScenePoolsGetB(base, scene, 7, index);
     if (camera_modes::AnimsFind(base, AnimId(base, 2)) == 0) {
       return 0;
@@ -385,10 +414,10 @@ uint64_t PollLoad(uint8_t* base, uint32_t sp, uint32_t machine, const Calls& cal
         guest::StoreU32(base, at + 4 * column, row == column ? 0x3F800000u : 0);
       }
     }
-    const uint32_t matrix = model + 4304;
+    const uint32_t matrix = schema::SceneModel(base, model).matrix_address();
     Copy(base, calls, frame, 0x82229404, matrix, frame + 176, 64);
     // The third animation's object at the opponent's time (0x82010780 + 4i).
-    const uint32_t time = guest::LoadU32(base, 0x82010780 + 4 * i);
+    const uint32_t time = guest::LoadU32(base, G::opponent_times_address() + 4 * i);
     if ((frame & 0xF) != 0) {
       calls.Call(0x82150A10, frame, 0x82229424, matrix, AnimId(base, 2), time);
     } else {
@@ -398,8 +427,9 @@ uint64_t PollLoad(uint8_t* base, uint32_t sp, uint32_t machine, const Calls& cal
                                         calls.Call(kMemcpy, inner, 0x82150600, to, from, size);
                                       });
     }
-    if (!PoseCar(base, frame, model + 4288, i, calls)) {
-      calls.Call(0x82228588, frame, 0x82229430, model + 4288, i);
+    const uint32_t block = schema::SceneModel(base, model).draw_block_address();
+    if (!PoseCar(base, frame, block, i, calls)) {
+      calls.Call(0x82228588, frame, 0x82229430, block, i);
     }
     r3 = calls.Call(kSceneModelPollLoad, frame, 0x82229438, model);
     if (uint32_t(r3) == 0) {
@@ -407,9 +437,11 @@ uint64_t PollLoad(uint8_t* base, uint32_t sp, uint32_t machine, const Calls& cal
     }
   }
   // Every picture of list A loaded (its +0).
-  const uint32_t screen = Screen(base);
-  for (uint32_t i = 0; i < guest::LoadU32(base, screen + 136); i++) {
-    if (guest::LoadU32(base, guest::LoadU32(base, screen + 8 + 4 * i)) == 0) {
+  const schema::LocationScreen screen = Screen(base);
+  for (uint32_t i = 0; i < screen.picture_count_a(); i++) {
+    const schema::LocationScreenPicture picture(
+        base, guest::LoadU32(base, screen.pictures_a_address() + 4 * i));
+    if (picture.loaded() == 0) {
       return r3;
     }
   }
@@ -421,7 +453,7 @@ uint64_t PollLoad(uint8_t* base, uint32_t sp, uint32_t machine, const Calls& cal
       movies = 1;
     }
   }
-  const uint32_t manager = guest::LoadU32(base, Screen(base) + 552);
+  const uint32_t manager = Screen(base).scenery<schema::View>().address;
   if (native_scenery) {
     r3 = course_scenery::SceneryIsLoaded(base, SceneryCalls(calls), frame, manager, native_queue);
   } else {
@@ -430,20 +462,21 @@ uint64_t PollLoad(uint8_t* base, uint32_t sp, uint32_t machine, const Calls& cal
   if (uint32_t(r3) == 0 || movies == 0) {
     return r3;
   }
-  if (guest::LoadU32(base, Screen(base) + 896) == 0) {
+  if (Screen(base).load_faded() == 0) {
     mode_tick::ScreenFadesFadeOut(base, 30, 0, 0, 0, 0);
-    guest::StoreU32(base, Screen(base) + 896, 1);
+    Screen(base).set_load_faded(1);
   }
   uint32_t movie = Movie(base, frame, kMenusMovie);
   uint32_t picture = ui_movies::FindNode(base, movie, 6, 1);
-  guest::StoreU32(base, Screen(base) + 544,
-                  guest::LoadU32(base, ui_movies::PictureTextureSlot(base, movie, picture)));
+  Screen(base).set_default_texture_a(
+      guest::LoadU32(base, ui_movies::PictureTextureSlot(base, movie, picture)));
   movie = Movie(base, frame, kMenusMovie);
   picture = ui_movies::FindNode(base, movie, 6, 0);
   const uint32_t texture = guest::LoadU32(base, ui_movies::PictureTextureSlot(base, movie, picture));
-  guest::StoreU32(base, Screen(base) + 548, texture);
-  guest::StoreU32(base, machine + 9608, 1);
-  guest::StoreU32(base, machine + 9604, 4);
+  Screen(base).set_default_texture_b(texture);
+  const schema::LocationScreenMachine m(base, machine);
+  m.set_loaded(1);
+  m.set_state(4);
   return texture;
 }
 

@@ -6,9 +6,21 @@
 
 #include "guest.h"
 #include "save_screen/save_screen.h"
+#include "schema/action_mappers.h"
+#include "schema/game_modes.h"
+#include "schema/menu_helpers.h"
+#include "schema/race_event.h"
+#include "schema/race_screens.h"
+#include "schema/racer_controllers.h"
+#include "schema/save_interface.h"
+#include "schema/save_screen.h"
+#include "schema/system_services.h"
 #include "ui_movies/game.h"
 
 namespace save_screen {
+
+using G = schema::SaveScreenGlobals;
+using Machine = schema::SaveScreen;
 
 inline uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 inline void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -39,53 +51,56 @@ struct Fn {
   uint64_t r3;
 };
 
-inline uint32_t Data(uint8_t* base) { return Load(base, kData); }
-inline uint32_t Pages(uint8_t* base) { return Load(base, kPages); }
-inline uint32_t List(uint8_t* base) { return Load(base, kList); }
+// The screen's blocks, from their globals at the call: the data
+// (SaveScreenData), the page block (PageObject) and the menu list's address
+// (a MenuList, race-screens.toml's; G::list(base) for its fields).
+inline schema::SaveScreenData Data(uint8_t* base) { return G::data(base); }
+inline schema::PageObject Pages(uint8_t* base) { return G::pages(base); }
+inline uint32_t List(uint8_t* base) { return Load(base, G::list_address()); }
 
 // The page block's moves the pages make inline: to `page` after `step`
 // then `queued` (-1 for none), +8 the page before unless it was `page`.
 inline void Go(uint8_t* base, uint32_t page, uint32_t step, uint32_t queued) {
-  const uint32_t pages = Pages(base);
-  const uint32_t before = Load(base, pages + 0);
+  const auto pages = Pages(base);
+  const uint32_t before = pages.page();
   if (int32_t(before) != int32_t(page)) {
-    Store(base, pages + 8, before);
+    pages.set_previous_page(before);
   }
-  Store(base, pages + 12, step);
-  Store(base, pages + 16, queued);
-  Store(base, pages + 4, page);
-  Store(base, pages + 0, kNone);
+  pages.set_step(step);
+  pages.set_queued_step(queued);
+  pages.set_next_page(page);
+  pages.set_page(kNone);
 }
 // Straight to `page`: +8 the page before unless it was `page`, +0 the page,
 // +12 and +16 -1.
 inline void Jump(uint8_t* base, uint32_t page) {
-  const uint32_t pages = Pages(base);
-  const uint32_t before = Load(base, pages + 0);
+  const auto pages = Pages(base);
+  const uint32_t before = pages.page();
   if (int32_t(before) != int32_t(page)) {
-    Store(base, pages + 8, before);
+    pages.set_previous_page(before);
   }
-  Store(base, pages + 0, page);
-  Store(base, pages + 12, kNone);
-  Store(base, pages + 16, kNone);
+  pages.set_page(page);
+  pages.set_step(kNone);
+  pages.set_queued_step(kNone);
 }
 // The data's next message (+12) and the dialog's state after the close
 // (+20).
 inline void Message(uint8_t* base, uint32_t message, uint32_t state) {
-  Store(base, Data(base) + 12, message);
-  Store(base, Data(base) + 20, state);
+  Data(base).set_message(message);
+  Data(base).set_state_after_close(state);
 }
 
-// The message {id, 0, 0} posted on the mode's ring (+204: the count +600 up
-// by one, the slot (+604 + count - 1) mod 50, 12 bytes).
+// The message {id, 0, 0} posted on the mode's ring (the count up by one,
+// the slot (start + count - 1) mod 50, 12 bytes).
 inline void Post(uint8_t* base, uint32_t mode, uint32_t id) {
-  const uint32_t ring = mode + 204;
-  const uint32_t count = Load(base, ring + 600) + 1;
-  const uint32_t at = Load(base, ring + 604) + count - 1;
-  Store(base, ring + 600, count);
-  const uint32_t entry = ring + 12 * (at % 50);
-  Store(base, entry + 8, 0);
-  Store(base, entry + 4, 0);
-  Store(base, entry + 0, id);
+  const schema::SaveScreenMode ring(base, mode);
+  const uint32_t count = ring.message_count() + 1;
+  const uint32_t at = ring.message_start() + count - 1;
+  ring.set_message_count(count);
+  const schema::ModeMessage entry(base, ring.messages_address() + 12 * (at % 50));
+  entry.set_arg1(0);
+  entry.set_arg0(0);
+  entry.set_id(id);
 }
 
 // UiMovies::Find(id) as the originals make it: the id stored at `key` (a

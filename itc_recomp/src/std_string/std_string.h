@@ -33,8 +33,9 @@
 
 namespace std_string {
 
+// The fields are schema::StdString's (schema/std_string.h); these two stay
+// for other areas' code that reads the layout (ui_movies/objects.cpp).
 constexpr uint32_t kText = 4;
-constexpr uint32_t kLength = 20;
 constexpr uint32_t kCapacity = 24;
 constexpr uint32_t kInPlace = 16;  // capacities under this keep the text in place
 

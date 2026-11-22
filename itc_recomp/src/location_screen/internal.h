@@ -10,6 +10,9 @@
 #include "guest.h"
 #include "location_screen/location_screen.h"
 #include "mode_tick/mode_tick.h"
+#include "schema/location_screen.h"
+#include "schema/menu_helpers.h"
+#include "schema/tuning_screen.h"
 #include "ui_movies/game.h"
 
 #include <bit>
@@ -22,7 +25,9 @@ constexpr uint32_t kFinishNamed = 0x8211DF20;
 constexpr uint32_t kFinishAll = 0x8211DFF8;
 constexpr uint32_t kRun = 0x8211E1B8;
 
-inline uint32_t Screen(uint8_t* base) { return guest::LoadU32(base, kScreen); }
+using G = schema::LocationScreenGlobals;
+
+inline schema::LocationScreen Screen(uint8_t* base) { return G::screen(base); }
 
 // A float word through a float register and back (lfs, stfs).
 inline uint32_t ThroughFloat(uint8_t* base, uint32_t address) {
@@ -63,13 +68,13 @@ inline uint32_t SetNodeText(uint8_t* base, const Calls& calls, uint32_t frame, u
 
 inline uint32_t ShowNode(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child) {
   const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
-  guest::StoreU32(base, node + 80, 1);
+  schema::UiMovieNode(base, node).set_visible(1);
   return node;
 }
 
 inline uint32_t HideNode(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child) {
   const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
-  guest::StoreU32(base, node + 80, 0);
+  schema::UiMovieNode(base, node).set_visible(0);
   return node;
 }
 

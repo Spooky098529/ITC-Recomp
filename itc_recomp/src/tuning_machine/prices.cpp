@@ -12,6 +12,8 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/car_makers.h"
+#include "schema/tuning_screen.h"
 #include "tuning_screen/tuning_screen.h"
 
 namespace tuning_machine {
@@ -55,8 +57,14 @@ void Fill(uint8_t* base, uint32_t at, uint32_t count, uint32_t word) {
 
 void SetPrices(uint8_t* base, uint32_t screen, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821DAD58 TuningScreen::SetPrices");
-  const uint32_t s = screen;
-  const uint32_t price = Load(base, tuning_screen::SelectedGarageCar(base, s) + 2112);
+  const schema::TuningScreen ts(base, screen);
+  // The selected garage car's price (the car at its +212).
+  const uint32_t price =
+      schema::GarageCar(base, tuning_screen::SelectedGarageCar(base, screen) + 212).spec_744();
+  // The part tables (the screen's +34104): offsets below are from them,
+  // the screen's own in the comments. The rows at +33904 (40 bytes a part
+  // set) and +33584 aren't named in tuning-screen.toml: from the screen.
+  const uint32_t tables = ts.part_tables_address();
   // The price's doubleword for fcfid (extsw, std at sp - 144).
   Store(base, sp - 144, int32_t(price) < 0 ? 0xFFFFFFFFu : 0);
   Store(base, sp - 140, price);
@@ -69,82 +77,96 @@ void SetPrices(uint8_t* base, uint32_t screen, uint32_t sp) {
   };
   // The part set's rows (40 bytes at +33904, 28 at +34524), the part set
   // [+33900] read again for each store as the original (unchecked).
-  const auto by_set = [&](uint32_t offset, uint32_t stride, uint32_t value) {
-    Store(base, s + offset + stride * Load(base, s + tuning_screen::kPartSet), value);
+  const auto by_set = [&](uint32_t at, uint32_t stride, uint32_t value) {
+    Store(base, at + stride * ts.price_class(), value);
   };
-  by_set(33904, 40, 0);
-  by_set(33908, 40, part(0x8200AD94));
-  by_set(33912, 40, part(0x82002C9C));
-  by_set(33916, 40, price);
-  by_set(33920, 40, part(0x8200AD90));
-  by_set(33924, 40, part(0x8200AD8C));
-  by_set(33928, 40, part(0x820021E8));
-  by_set(33932, 40, part(0x8200AD88));
-  by_set(33936, 40, part(0x8200AD84));
-  by_set(33940, 40, part(0x820021E4));
-  by_set(34524, 28, 0);
-  by_set(34528, 28, part(0x82002204));
-  by_set(34532, 28, part(0x82002C4C));
-  by_set(34536, 28, part(0x82002968));
-  by_set(34540, 28, part(0x82002C50));
-  by_set(34544, 28, part(0x82002D14));
-  by_set(34548, 28, part(0x82002A14));
+  by_set(ts.address + 33904, 40, 0);
+  by_set(ts.address + 33908, 40, part(0x8200AD94));
+  by_set(ts.address + 33912, 40, part(0x82002C9C));
+  by_set(ts.address + 33916, 40, price);
+  by_set(ts.address + 33920, 40, part(0x8200AD90));
+  by_set(ts.address + 33924, 40, part(0x8200AD8C));
+  by_set(ts.address + 33928, 40, part(0x820021E8));
+  by_set(ts.address + 33932, 40, part(0x8200AD88));
+  by_set(ts.address + 33936, 40, part(0x8200AD84));
+  by_set(ts.address + 33940, 40, part(0x820021E4));
+  by_set(tables + 420, 28, 0);
+  by_set(tables + 424, 28, part(0x82002204));
+  by_set(tables + 428, 28, part(0x82002C4C));
+  by_set(tables + 432, 28, part(0x82002968));
+  by_set(tables + 436, 28, part(0x82002C50));
+  by_set(tables + 440, 28, part(0x82002D14));
+  by_set(tables + 444, 28, part(0x82002A14));
   // The other items' prices and words, by address (the original's order
   // differs, but no two stores share a word and none is read back but
-  // +25172 below, which none of them is).
-  Row(base, s + 34964, {0, part(0x82002CBC), part(0x82002208), part(0x8200AD94),
-                        part(0x8200AD80), part(0x82002A14), part(0x8200295C)});
-  Row(base, s + 35056, {0, part(0x82002C48), part(0x82001FBC), part(0x8200AD7C),
-                        part(0x8200AD78), part(0x8200296C), part(0x82002D14)});
-  Row(base, s + 35172, {0, part(0x82002CBC), part(0x82002208), part(0x8200AD94),
-                        part(0x8200AD80), part(0x82002A14), part(0x8200295C)});
-  Row(base, s + 35260, {0, part(0x82002C48), part(0x82001FBC), part(0x8200AD7C),
-                        part(0x8200AD78), part(0x8200296C), part(0x82002D14)});
-  Row(base, s + 35348, {0, part(0x8200AD74), part(0x82002A10), part(0x82002C9C),
-                        part(0x8200AD70), part(0x820029D4), part(0x820027A8)});
-  Row(base, s + 35436, {0, part(0x82001FBC), part(0x8200296C), part(0x82001BE4),
-                        part(0x82002A3C), part(0x82002A2C), part(0x820029D4)});
-  Row(base, s + 35528, {0, part(0x82002CBC), part(0x8200AD94), part(0x82002A14),
-                        part(0x82002A1C), part(0x8200AD6C), part(0x8200295C),
-                        part(0x82001FBC), part(0x82001BE4), part(0x82002A2C)});
-  Row(base, s + 35652, {0, part(0x8200AD68), part(0x82001070), part(0x8200AD90),
-                        part(0x8200AD64), part(0x8200AD60), part(0x820021E4)});
+  // the aero 3 remap (+25172) below, which none of them is).
+  // +34964
+  Row(base, tables + 860, {0, part(0x82002CBC), part(0x82002208), part(0x8200AD94),
+                           part(0x8200AD80), part(0x82002A14), part(0x8200295C)});
+  // +35056
+  Row(base, tables + 952, {0, part(0x82002C48), part(0x82001FBC), part(0x8200AD7C),
+                           part(0x8200AD78), part(0x8200296C), part(0x82002D14)});
+  // +35172
+  Row(base, tables + 1068, {0, part(0x82002CBC), part(0x82002208), part(0x8200AD94),
+                            part(0x8200AD80), part(0x82002A14), part(0x8200295C)});
+  // +35260
+  Row(base, tables + 1156, {0, part(0x82002C48), part(0x82001FBC), part(0x8200AD7C),
+                            part(0x8200AD78), part(0x8200296C), part(0x82002D14)});
+  // +35348
+  Row(base, tables + 1244, {0, part(0x8200AD74), part(0x82002A10), part(0x82002C9C),
+                            part(0x8200AD70), part(0x820029D4), part(0x820027A8)});
+  // +35436
+  Row(base, tables + 1332, {0, part(0x82001FBC), part(0x8200296C), part(0x82001BE4),
+                            part(0x82002A3C), part(0x82002A2C), part(0x820029D4)});
+  // +35528
+  Row(base, tables + 1424, {0, part(0x82002CBC), part(0x8200AD94), part(0x82002A14),
+                            part(0x82002A1C), part(0x8200AD6C), part(0x8200295C),
+                            part(0x82001FBC), part(0x82001BE4), part(0x82002A2C)});
+  // +35652
+  Row(base, tables + 1548, {0, part(0x8200AD68), part(0x82001070), part(0x8200AD90),
+                            part(0x8200AD64), part(0x8200AD60), part(0x820021E4)});
   // Three rows alike at +35740, +35888 and +36016.
-  for (const uint32_t at : {35740u, 35888u, 36016u}) {
-    Row(base, s + at, {0, 0, 0, part(0x8200AD5C), part(0x82001FBC), part(0x82002A1C),
-                       part(0x8200AD58), part(0x82002208), part(0x8200AD54), part(0x82009EBC),
-                       part(0x8200296C), part(0x8200AD50), part(0x8200AD6C), part(0x82002A10),
-                       part(0x8200AD4C)});
+  for (const uint32_t at : {1636u, 1784u, 1912u}) {  // +35740, +35888, +36016
+    Row(base, tables + at, {0, 0, 0, part(0x8200AD5C), part(0x82001FBC), part(0x82002A1C),
+                            part(0x8200AD58), part(0x82002208), part(0x8200AD54), part(0x82009EBC),
+                            part(0x8200296C), part(0x8200AD50), part(0x8200AD6C), part(0x82002A10),
+                            part(0x8200AD4C)});
   }
   const uint32_t wheel = part(0x82002FB0);
-  for (const uint32_t at : {36144u, 36188u, 36232u}) {
-    Row(base, s + at, {0, wheel, wheel, wheel, wheel});
+  for (const uint32_t at : {2040u, 2084u, 2128u}) {  // +36144, +36188, +36232
+    Row(base, tables + at, {0, wheel, wheel, wheel, wheel});
   }
-  Store(base, s + 36276, 0);
-  // +36280 to +36296: the first 0 when +25172 is set (read each time).
+  Store(base, tables + 2172, 0);  // +36276
+  // +36280 to +36296: the first 0 with the aero 3 remap (read each time).
   for (uint32_t i = 1; i < 6; i++) {
-    if (Load(base, s + 25172) != 0 && i == 1) {
-      Store(base, s + 36280, 0);
+    if (ts.aero3_type_remap() != 0 && i == 1) {
+      Store(base, tables + 2176, 0);
     } else {
-      Store(base, s + (9069 + i) * 4, wheel);
+      Store(base, tables + 2172 + 4 * i, wheel);
     }
   }
   const uint32_t other = part(0x8200256C);
-  Row(base, s + 36328, {0, 0, wheel, other, wheel, other, wheel, other, wheel, other});
-  for (const uint32_t at : {36420u, 36456u, 36492u, 36528u}) {
-    Row(base, s + at, {0, wheel, wheel, wheel});
+  // +36328
+  Row(base, tables + 2224, {0, 0, wheel, other, wheel, other, wheel, other, wheel, other});
+  for (const uint32_t at : {2316u, 2352u, 2388u, 2424u}) {  // +36420 to +36528
+    Row(base, tables + at, {0, wheel, wheel, wheel});
   }
-  Row(base, s + 36564, {0, part(0x82001BE4), part(0x82001BE4)});
-  Store(base, s + 25248, 0);
-  Fill(base, s + 25400, 608, 50);
-  Row(base, s + 36604, {0, 200});
-  Fill(base, s + 36624, 3, 0);
-  Row(base, s + 36652, {0, 50, 50, 50});
-  Row(base, s + 36688, {0, 100, 100, 100, 100});
-  Row(base, s + 36736, {0, 100, 100, 100});
-  Fill(base, s + 36772, 6, 0);
-  Row(base, s + 33584, {0, 50, 50, 50});
-  Fill(base, s + 33640, 20, 50);
+  // +36564
+  Row(base, tables + 2460, {0, part(0x82001BE4), part(0x82001BE4)});
+  Store(base, ts.wheel_prices_address(), 0);
+  Fill(base, ts.wheel_prices_address() + 152, 608, 50);  // +25400
+  // +36604
+  Row(base, tables + 2500, {0, 200});
+  Fill(base, tables + 2520, 3, 0);  // +36624
+  // +36652
+  Row(base, tables + 2548, {0, 50, 50, 50});
+  // +36688
+  Row(base, tables + 2584, {0, 100, 100, 100, 100});
+  // +36736
+  Row(base, tables + 2632, {0, 100, 100, 100});
+  Fill(base, tables + 2668, 6, 0);  // +36772
+  Row(base, ts.address + 33584, {0, 50, 50, 50});
+  Fill(base, ts.unknown_33640_address(), 20, 50);
   // The conversions' last words below sp (stfiwx and read back).
   Store(base, sp - 160, other);
   Store(base, sp - 156, part(0x8200AD54));

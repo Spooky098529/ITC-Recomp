@@ -6,8 +6,10 @@
 #include "c_runtime/strings.h"
 #include "guest.h"
 #include "models/memory_blocks.h"
+#include "schema/car_sounds.h"
 #include "sound_cues/sound_cues.h"
 
+#include <array>
 #include <climits>
 #include <cmath>
 
@@ -24,24 +26,61 @@ void StoreF(uint8_t* base, uint32_t address, double value) {
   guest::StoreFloat(base, address, float(value));
 }
 
-// The view's fields.
-constexpr uint32_t kViewBankData = 12;  // the bank + its +8: +0 flags, +4 count, +84 the format
-constexpr uint32_t kViewEntries = 16;   // 24 bytes a wave
-constexpr uint32_t kViewWaveData = 20;
-constexpr uint32_t kEntryBytes = 24;
+using BankView = schema::CarSoundWaveBankView;
+using Entry = schema::CarSoundWaveEntry;
+using Sound = schema::CarSound;
+using G = schema::CarSoundsGlobals;
+
+// A wave's entry (24 bytes a wave from the view's entries).
+Entry EntryAt(uint8_t* base, uint32_t entries, uint32_t wave) {
+  return Entry(base, Entry::kSize * wave + entries);
+}
 
 bool PastCount(uint8_t* base, uint32_t view, uint32_t wave) {
-  return wave >= Load(base, Load(base, view + kViewBankData) + 4);
+  return wave >= BankView(base, view).bank_data().count();
+}
+
+// The ten parts' voice holders in CarSound::CarSound's order (the
+// destructor walks them backward).
+std::array<uint32_t, 10> HolderAddresses(uint8_t* base, uint32_t sound) {
+  const Sound s(base, sound);
+  return {schema::CarSoundHits(base, s.hits_address()).holder_address(),
+          schema::CarSoundTires(base, s.tires_address()).holder_address(),
+          schema::CarSoundGear(base, s.gear_address()).holder_address(),
+          schema::CarSoundRoll(base, s.roll_address()).holder_address(),
+          schema::CarSoundEvents(base, s.events_address()).holder_address(),
+          schema::CarSoundFade(base, s.fade_address()).holder_address(),
+          schema::CarSoundTurbo(base, s.turbo_address()).holder_address(),
+          schema::CarSoundWind(base, s.wind_address()).holder_address(),
+          schema::CarSoundHorn(base, s.horn_address()).holder_address(),
+          schema::CarSoundPassBy(base, s.pass_by_address()).holder_address()};
+}
+
+// CarSounds::Destroy's vtables put back on one car sound: the holders from
+// the last, then the pitched layer's and the layer's (each its own, then
+// its holder's).
+void RestoreVtables(uint8_t* base, uint32_t sound) {
+  const auto holders = HolderAddresses(base, sound);
+  for (auto it = holders.rbegin(); it != holders.rend(); ++it) {
+    schema::CarSoundVoiceHolder(base, *it).set_vtable(kHolderVtable);
+  }
+  const schema::CarSoundEngine e(base, Sound(base, sound).engine_address());
+  for (const uint32_t at : {e.pitched_layer_address(), e.layer_address()}) {
+    const schema::CarSoundEngineLayer layer(base, at);
+    layer.set_vtable(kLayerVtable);
+    schema::CarSoundVoiceHolder(base, layer.holder_address()).set_vtable(kHolderVtable);
+  }
 }
 
 // A voice holder's set-up as CarSound::CarSound and EngineSound's loops do
 // it: the vtable, +20, then the voice words +4 to +16 and +24 to +36.
 void ConstructHolder(uint8_t* base, uint32_t holder) {
-  Store(base, holder + 0, kHolderVtable);
-  Store(base, holder + 20, 0);
+  const schema::CarSoundVoiceHolder h(base, holder);
+  h.set_vtable(kHolderVtable);
+  h.set_voice_count(0);
   for (uint32_t i = 0; i < 4; i++) {
-    Store(base, holder + 4 + 4 * i, 0);
-    Store(base, holder + 24 + 4 * i, 0);
+    Store(base, h.voices_address() + 4 * i, 0);
+    Store(base, h.paused_address() + 4 * i, 0);
   }
 }
 
@@ -65,42 +104,44 @@ int32_t ConvertToInt(double value) {
 
 uint32_t WaveBankViewInit(uint8_t* base, uint32_t view, uint32_t bank) {
   ITC_NATIVE_RUNNING("sub_8210C9D8 WaveBankView::Init");
-  Store(base, view + 0, bank);
-  Store(base, view + 12, 0);
-  Store(base, view + 16, 0);
-  Store(base, view + 20, 0);
-  Store(base, view + 4, 0);
-  Store(base, view + 8, bank);
-  Store(base, view + 12, Load(base, bank + 8) + bank);
-  Store(base, view + 16, Load(base, bank + 16) + bank);
-  Store(base, view + 20, Load(base, bank + 40) + bank);
+  const BankView v(base, view);
+  const schema::CarSoundWaveBank b(base, bank);
+  v.set_bank(bank);
+  v.set_bank_data(0);
+  v.set_entries(0);
+  v.set_wave_data(0);
+  v.set_unknown_4(0);
+  v.set_bank_copy(bank);
+  v.set_bank_data(b.data_offset() + bank);
+  v.set_entries(b.entries_offset() + bank);
+  v.set_wave_data(b.wave_data_offset() + bank);
   return 0;
 }
 
 uint32_t WaveBankFormat(uint8_t* base, uint32_t view, uint32_t wave, uint32_t out) {
   ITC_NATIVE_RUNNING("sub_8210C850 WaveBankView::Format");
-  const uint32_t data = Load(base, view + kViewBankData);
-  if (wave >= Load(base, data + 4)) {
+  const BankView v(base, view);
+  const schema::CarSoundWaveFormat o(base, out);
+  const auto data = v.bank_data();
+  if (wave >= data.count()) {
     return 1;
   }
   // The compact bank's one format, or the wave's entry's.
-  const bool compact = (Load(base, data + 0) & 0x20000) != 0;
-  const uint32_t format_at =
-      compact ? data + 84 : Load(base, view + kViewEntries) + kEntryBytes * wave + 4;
-  const uint32_t format = Load(base, format_at);
+  const bool compact = (data.flags() & 0x20000) != 0;
+  const auto read = [&] {
+    return compact ? v.bank_data().compact_format()
+                   : EntryAt(base, v.entries(), wave).format();
+  };
+  const uint32_t format = compact ? data.compact_format() : EntryAt(base, v.entries(), wave).format();
   if ((format & 3) != 0) {
     return 1;
   }
-  guest::StoreU8(base, out + 0, (format >> 31) != 0 ? 1 : 2);
+  o.set_sample_type((format >> 31) != 0 ? 1 : 2);
   // Read again after the store, as the original does.
-  const uint32_t again =
-      compact ? Load(base, Load(base, view + kViewBankData) + 84)
-              : Load(base, Load(base, view + kViewEntries) + kEntryBytes * wave + 4);
-  Store(base, out + 8, (again >> 5) & 0x3FFFF);
-  const uint32_t last =
-      compact ? Load(base, Load(base, view + kViewBankData) + 84)
-              : Load(base, Load(base, view + kViewEntries) + kEntryBytes * wave + 4);
-  guest::StoreU8(base, out + 4, uint8_t((last >> 2) & 7));
+  const uint32_t again = read();
+  o.set_rate((again >> 5) & 0x3FFFF);
+  const uint32_t last = read();
+  o.set_channels(uint8_t((last >> 2) & 7));
   return 0;
 }
 
@@ -109,7 +150,7 @@ uint32_t WaveBankLength(uint8_t* base, uint32_t view, uint32_t wave, uint32_t ou
   if (PastCount(base, view, wave)) {
     return 1;
   }
-  Store(base, out, Load(base, kEntryBytes * wave + Load(base, view + kViewEntries) + 12));
+  schema::CarSoundWaveWord(base, out).set_value(EntryAt(base, BankView(base, view).entries(), wave).length());
   return 0;
 }
 
@@ -118,17 +159,18 @@ uint32_t WaveBankData(uint8_t* base, uint32_t view, uint32_t wave, uint32_t out)
   if (PastCount(base, view, wave)) {
     return 1;
   }
-  const uint32_t entry = kEntryBytes * wave + Load(base, view + kViewEntries);
-  const uint32_t start = Load(base, view + kViewWaveData);
-  Store(base, out, Load(base, entry + 8) + start);
+  const BankView v(base, view);
+  const Entry entry = EntryAt(base, v.entries(), wave);
+  const uint32_t start = v.wave_data();
+  schema::CarSoundWaveWord(base, out).set_value(entry.data_offset() + start);
   return 0;
 }
 
 std::optional<uint32_t> WaveBankEntry(uint8_t* base, uint32_t view, uint32_t wave,
                                       uint32_t out) {
   ITC_NATIVE_RUNNING("sub_8210C998 WaveBankView::Entry");
-  const uint32_t entry = kEntryBytes * wave + Load(base, view + kViewEntries);
-  if (!c_runtime::XMemCpy(base, out, entry, kEntryBytes)) {
+  const uint32_t entry = EntryAt(base, BankView(base, view).entries(), wave).address;
+  if (!c_runtime::XMemCpy(base, out, entry, Entry::kSize)) {
     return std::nullopt;
   }
   return 0;
@@ -136,40 +178,47 @@ std::optional<uint32_t> WaveBankEntry(uint8_t* base, uint32_t view, uint32_t wav
 
 void SetBanks(uint8_t* base, uint32_t sound, uint32_t i, uint32_t j) {
   ITC_NATIVE_RUNNING("sub_8210CB48 CarSounds::SetBanks");
-  const uint32_t parameters = Load(base, Load(base, (i << 4) + kSoundParameters) + (j << 2));
+  const uint32_t parameters =
+      Load(base, Load(base, (i << 4) + G::sound_parameters_address()) + (j << 2));
   const uint32_t engine = parameters + 820;
-  Store(base, sound + 496, parameters);
-  Store(base, sound + 504, Load(base, parameters));
-  Store(base, sound + 500, parameters);
-  Store(base, sound + 508, Load(base, parameters));
-  Store(base, sound + 412, engine);
-  Store(base, sound + 420, Load(base, engine));
-  Store(base, sound + 416, engine);
-  Store(base, sound + 424, Load(base, engine));
-  Store(base, sound + 1248, 1);
+  const Sound s(base, sound);
+  const schema::CarSoundEngine e(base, s.engine_address());
+  const schema::CarSoundEngineLayer pitched(base, e.pitched_layer_address());
+  const schema::CarSoundEngineLayer layer(base, e.layer_address());
+  using Table = schema::CarSoundEngineTable;
+  pitched.set_table(parameters);
+  pitched.set_table_volume(Table(base, parameters).volume_scale());
+  pitched.set_table_copy(parameters);
+  pitched.set_table_volume_copy(Table(base, parameters).volume_scale());
+  layer.set_table(engine);
+  layer.set_table_volume(Table(base, engine).volume_scale());
+  layer.set_table_copy(engine);
+  layer.set_table_volume_copy(Table(base, engine).volume_scale());
+  s.set_live(1);
 }
 
 void TireSoundAmount(uint8_t* base, uint32_t part, double f1) {
   ITC_NATIVE_RUNNING("sub_8210CA28 TireSound::Amount");
+  const schema::CarSoundTires t(base, part);
   const double limit = LoadF(base, 0x82007FC8);
-  double amount = LoadF(base, part + 72);
+  double amount = double(t.slip_time());
   if (amount < LoadF(base, 0x820067B0)) {
     amount = double(float(amount * LoadF(base, 0x82002A60)));
-    StoreF(base, part + 80, amount);
+    t.set_volume(float(amount));
     if (amount > limit) {
       amount = limit;
     }
   } else {
     amount = limit;
   }
-  StoreF(base, part + 80, amount);
+  t.set_volume(float(amount));
   const double one = LoadF(base, 0x82000A34);
   if (f1 == one) {
-    StoreF(base, part + 80, double(float(LoadF(base, part + 80) * LoadF(base, 0x8200295C))));
+    t.set_volume(float(double(float(double(t.volume()) * LoadF(base, 0x8200295C)))));
   }
   // The target: 8192 - 14 x +70 for small +70, else f1 scaled, negated
   // between `one` and [0x82007FEC] and below `one`.
-  const uint16_t step = guest::LoadU16(base, part + 70);
+  const uint16_t step = t.slip_steps();
   int32_t target;
   if (step < 7) {
     target = int16_t(uint32_t(8192) - uint32_t(int32_t(int16_t(step)) * 14));
@@ -192,24 +241,27 @@ void TireSoundAmount(uint8_t* base, uint32_t part, double f1) {
   } else if (target > 1170) {
     target = 1170;
   }
-  const uint16_t current = guest::LoadU16(base, part + 76);
+  const uint16_t current = t.pitch();
   const int32_t difference = int32_t(int16_t(target)) - int32_t(int16_t(current));
-  guest::StoreU16(base, part + 76, uint16_t(uint32_t(difference / 3) + current));
+  t.set_pitch(uint16_t(uint32_t(difference / 3) + current));
 }
 
 void EngineSoundConstruct(uint8_t* base, uint32_t engine) {
   ITC_NATIVE_RUNNING("sub_8210CBA0 EngineSound::EngineSound");
-  for (const uint32_t layer : {engine, engine + 84}) {
-    Store(base, layer + 0, kLayerVtable);
-    ConstructHolder(base, layer + 44);
+  const schema::CarSoundEngine e(base, engine);
+  for (const uint32_t at : {e.layer_address(), e.pitched_layer_address()}) {
+    const schema::CarSoundEngineLayer layer(base, at);
+    layer.set_vtable(kLayerVtable);
+    ConstructHolder(base, layer.holder_address());
   }
 }
 
 uint32_t CarSoundConstruct(uint8_t* base, uint32_t sound) {
   ITC_NATIVE_RUNNING("sub_8210CC18 CarSound::CarSound");
-  EngineSoundConstruct(base, sound + 408);
-  for (const uint32_t offset : {584u, 676u, 736u, 792u, 840u, 888u, 952u, 1016u, 1072u, 1136u}) {
-    ConstructHolder(base, sound + offset);
+  const Sound s(base, sound);
+  EngineSoundConstruct(base, s.engine_address());
+  for (const uint32_t holder : HolderAddresses(base, sound)) {
+    ConstructHolder(base, holder);
   }
   return sound;
 }
@@ -217,30 +269,17 @@ uint32_t CarSoundConstruct(uint8_t* base, uint32_t sound) {
 Destroyed CarSoundsDestroy(uint8_t* base, uint32_t sound, uint32_t flags) {
   ITC_NATIVE_RUNNING("sub_8210DCA8 CarSounds::Destroy");
   if ((flags & 2) != 0) {
-    const uint32_t block = sound - 16;
-    const uint32_t count = Load(base, block);
+    const uint32_t block = Sound(base, sound).array_count_address();
+    const uint32_t count = Sound(base, sound).array_count();
     // From the last element down; the loop's count is signed.
-    uint32_t at = sound + count * kCarSoundBytes;
+    uint32_t at = sound + count * Sound::kSize;
     for (int32_t left = int32_t(count - 1); left >= 0; left--) {
-      at -= kCarSoundBytes;
-      for (const uint32_t offset :
-           {1136u, 1072u, 1016u, 952u, 888u, 840u, 792u, 736u, 676u, 584u}) {
-        Store(base, at + offset, kHolderVtable);
-      }
-      Store(base, at + 492, kLayerVtable);
-      Store(base, at + 536, kHolderVtable);
-      Store(base, at + 408, kLayerVtable);
-      Store(base, at + 452, kHolderVtable);
+      at -= Sound::kSize;
+      RestoreVtables(base, at);
     }
     return {block, (flags & 1) != 0 ? block : 0, true};
   }
-  for (const uint32_t offset : {1136u, 1072u, 1016u, 952u, 888u, 840u, 792u, 736u, 676u, 584u}) {
-    Store(base, sound + offset, kHolderVtable);
-  }
-  Store(base, sound + 492, kLayerVtable);
-  Store(base, sound + 536, kHolderVtable);
-  Store(base, sound + 408, kLayerVtable);
-  Store(base, sound + 452, kHolderVtable);
+  RestoreVtables(base, sound);
   return {sound, (flags & 1) != 0 ? sound : 0, false};
 }
 
@@ -248,61 +287,72 @@ uint32_t SetUp(uint8_t* base, uint32_t sound, uint32_t matrix) {
   ITC_NATIVE_RUNNING("sub_8210DDC8 CarSound::SetUp");
   // The floats move as lfs and stfs move them.
   const auto copy = [&](uint32_t to, uint32_t from) { StoreF(base, to, LoadF(base, from)); };
-  const auto a = [&](uint32_t offset) { copy(sound + offset, 0x82000A34); };
-  const auto b = [&](uint32_t offset) { copy(sound + offset, 0x82007FC8); };
+  constexpr uint32_t kA = 0x82000A34;
+  constexpr uint32_t kB = 0x82007FC8;
+  const Sound s(base, sound);
+  const schema::X3DAudioListener l(base, s.listener_address());
+  const schema::X3DAudioEmitter e(base, s.emitter_address());
+  const schema::X3DAudioDspSettings dsp(base, s.dsp_address());
+  const schema::X3DAudioCurve curve(base, s.volume_curve_address());
+  // The volume curve's floats (six {distance, value} points).
+  const auto curve_float = [&](uint32_t i) { return s.volume_curve_points_address() + 4 * i; };
   // The listener's front, top, position and velocity; the emitter's start.
-  a(40), a(44), a(4), a(48), a(8), a(80);
-  b(12);
-  a(84), a(16);
-  Store(base, sound + 52, sound + 144);
-  b(20);
-  a(88), a(24), a(92), a(28), a(96), a(32), a(100);
-  copy(sound + 36, 0x8200277C);
-  a(56), a(60);
-  b(64);
-  a(68);
-  b(72);
-  a(76);
+  copy(l.velocity_x_address(), kA), copy(l.velocity_y_address(), kA);
+  copy(l.front_x_address(), kA), copy(l.velocity_z_address(), kA);
+  copy(l.front_y_address(), kA), copy(e.position_x_address(), kA);
+  copy(l.front_z_address(), kB);
+  copy(e.position_y_address(), kA), copy(l.top_x_address(), kA);
+  e.set_cone(s.cone_address());
+  copy(l.top_y_address(), kB);
+  copy(e.position_z_address(), kA), copy(l.top_z_address(), kA);
+  copy(e.velocity_x_address(), kA), copy(l.position_x_address(), kA);
+  copy(e.velocity_y_address(), kA), copy(l.position_y_address(), kA);
+  copy(e.velocity_z_address(), kA);
+  copy(l.position_z_address(), 0x8200277C);
+  copy(e.front_x_address(), kA), copy(e.front_y_address(), kA);
+  copy(e.front_z_address(), kB);
+  copy(e.top_x_address(), kA);
+  copy(e.top_y_address(), kB);
+  copy(e.top_z_address(), kA);
   // The cone at +144, through the emitter's pointer (+52).
-  copy(sound + 144, 0x82000A34);
-  const auto cone = [&](uint32_t offset, uint32_t from) {
-    copy(Load(base, sound + 52) + offset, from);
-  };
-  cone(4, 0x82000A34), cone(8, 0x82000A34), cone(12, 0x82007FC8), cone(16, 0x82000A34);
-  cone(20, 0x82007FC8), cone(24, 0x82000A34), cone(28, 0x82007FC8);
-  b(1196);
-  copy(sound + 1200, 0x82002208);
-  b(1204);
-  Store(base, sound + 1244, 6);
-  copy(sound + 1208, 0x82002A10);
-  Store(base, sound + 104, 1);
-  copy(sound + 1212, 0x82002C50);
-  Store(base, sound + 120, 0);
-  copy(sound + 1216, 0x82007FD4);
-  Store(base, sound + 124, 0);
-  copy(sound + 1220, 0x82002208);
-  Store(base, sound + 128, 0);
-  copy(sound + 1224, 0x82001070);
-  Store(base, sound + 132, 0);
-  copy(sound + 1228, 0x82001FBC);
-  Store(base, sound + 112, 0x826C5C38);
-  b(1232);
-  Store(base, sound + 184, 1);
-  a(1236);
-  Store(base, sound + 188, 6);
-  a(108);
-  Store(base, sound + 1240, sound + 1192);
-  copy(sound + 136, 0x82002A20);
-  Store(base, sound + 116, sound + 1240);
-  b(140);
-  a(1192);
-  Store(base, sound + 176, matrix);
+  copy(schema::X3DAudioCone(base, s.cone_address()).inner_angle_address(), kA);
+  copy(e.cone().outer_angle_address(), kA), copy(e.cone().inner_volume_address(), kA);
+  copy(e.cone().outer_volume_address(), kB), copy(e.cone().inner_lpf_address(), kA);
+  copy(e.cone().outer_lpf_address(), kB), copy(e.cone().inner_reverb_address(), kA);
+  copy(e.cone().outer_reverb_address(), kB);
+  copy(curve_float(1), kB);
+  copy(curve_float(2), 0x82002208);
+  copy(curve_float(3), kB);
+  curve.set_count(6);
+  copy(curve_float(4), 0x82002A10);
+  e.set_channel_count(1);
+  copy(curve_float(5), 0x82002C50);
+  e.set_lfe_curve(0);
+  copy(curve_float(6), 0x82007FD4);
+  e.set_lpf_direct_curve(0);
+  copy(curve_float(7), 0x82002208);
+  e.set_lpf_reverb_curve(0);
+  copy(curve_float(8), 0x82001070);
+  e.set_reverb_curve(0);
+  copy(curve_float(9), 0x82001FBC);
+  e.set_channel_azimuths(G::channel_azimuths_address());
+  copy(curve_float(10), kB);
+  dsp.set_source_channels(1);
+  copy(curve_float(11), kA);
+  dsp.set_destination_channels(6);
+  copy(e.channel_radius_address(), kA);
+  curve.set_points(s.volume_curve_points_address());
+  copy(e.curve_distance_scaler_address(), 0x82002A20);
+  e.set_volume_curve(s.volume_curve_address());
+  copy(e.doppler_scaler_address(), kB);
+  copy(curve_float(0), kA);
+  dsp.set_matrix(matrix);
   // The two vectors (x, y, z, w): +368 all [0x82000A34], +384 the same
   // with z [0x8200277C]; stvx stores at the address rounded down to 16.
-  const uint32_t one = guest::LoadU32(base, 0x82000A34);
+  const uint32_t one = guest::LoadU32(base, kA);
   const uint32_t z = guest::LoadU32(base, 0x8200277C);
-  const uint32_t first = (sound + 368) & ~15u;
-  const uint32_t second = (sound + 384) & ~15u;
+  const uint32_t first = s.emitter_position_x_address() & ~15u;
+  const uint32_t second = s.listener_position_x_address() & ~15u;
   for (uint32_t i = 0; i < 4; i++) {
     Store(base, first + 4 * i, one);
   }
@@ -315,25 +365,25 @@ uint32_t SetUp(uint8_t* base, uint32_t sound, uint32_t matrix) {
 void SoundGlobalsInit(uint8_t* base, uint32_t music_player) {
   ITC_NATIVE_RUNNING("sub_82110258 SoundGlobals::Init");
   const auto volume = [&](uint32_t address) { StoreF(base, address, LoadF(base, 0x82000A30)); };
-  volume(0x82616BEC);
-  Store(base, 0x826C5C80, music_player);
-  volume(0x82616C34);
-  guest::StoreU8(base, 0x826C5C84, 0);
-  volume(0x82616C38);
-  volume(0x82616C3C);
-  guest::StoreU8(base, 0x826C5C85, 0);
+  volume(G::music_volume_address());
+  G::set_sound_manager(base, music_player);
+  volume(G::volume_c34_address());
+  G::set_music_byte(base, 0);
+  volume(G::effects_volume_address());
+  volume(G::effects_volume_2_address());
+  G::set_unknown_826C5C85(base, 0);
   for (uint32_t i = 0; i < 7; i++) {
-    Store(base, 0x826C5C64 + 4 * i, 0);
+    Store(base, G::sound_picks_b_address() + 4 * i, 0);
   }
   for (uint32_t i = 0; i < 7; i++) {
-    Store(base, 0x826C5C48 + 4 * i, 0);
+    Store(base, G::sound_picks_a_address() + 4 * i, 0);
   }
-  Store(base, 0x826C5C8C, models::AllocPhysicalEx(base, 512, 0, 0xFFFFFFFFu, 0, 4));
-  Store(base, 0x826C5C88, models::AllocPhysicalEx(base, 3145728, 0, 0xFFFFFFFFu, 2048, 4));
+  G::set_bank_pair_small_buffer(base, models::AllocPhysicalEx(base, 512, 0, 0xFFFFFFFFu, 0, 4));
+  G::set_bank_pair_buffer(base, models::AllocPhysicalEx(base, 3145728, 0, 0xFFFFFFFFu, 2048, 4));
 }
 
 uint32_t SoundGlobalsInit3D(uint8_t* base) {
-  return sound_cues::X3DAudioInitialize(base, 63, LoadF(base, 0x820080F8), kX3DAudioHandle);
+  return sound_cues::X3DAudioInitialize(base, 63, LoadF(base, 0x820080F8), G::x3daudio_address());
 }
 
 }  // namespace car_sounds

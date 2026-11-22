@@ -43,7 +43,9 @@ uint64_t SetUpEvents(uint8_t* base, uint64_t machine_r3, uint32_t sp, const Call
   const uint32_t machine = uint32_t(machine_r3);
   const uint32_t frame = Frame(base, sp, 288);
   const uint32_t table = frame + 80;
-  const uint32_t bits = Load(base, machine + 10148);
+  const uint32_t bits = Machine(base, machine).progress_bits();
+  // The copies' destinations are the 64-bit r3 + the field's offset, as the
+  // original's (Machine's event_kinds and events).
   // The first table (+9980) built in the frame, copied, then the frame's
   // words changed into the second (+9852), with the stores the original
   // makes in its order (some overwrite others).

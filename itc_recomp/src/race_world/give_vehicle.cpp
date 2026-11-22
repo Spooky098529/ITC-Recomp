@@ -8,6 +8,11 @@
 #include "race_world/race_world.h"
 
 #include "guest.h"
+#include "schema/car_physics.h"
+#include "schema/minimap.h"
+#include "schema/race_setup.h"
+#include "schema/race_states.h"
+#include "schema/race_world.h"
 
 #include "base/log.h"
 #include "hooks/lifted_call.h"
@@ -30,7 +35,6 @@ constexpr uint32_t kZero = 0x82000A34;
 constexpr uint32_t kPlaceSpeed = 0x82009974;
 constexpr uint32_t kStepTime = 0x826193C8;
 
-constexpr uint32_t kSlots = 2336;  // 7 words: 0 or -1 free
 constexpr uint32_t kRecordBytes = 3936;
 
 }  // namespace
@@ -47,30 +51,34 @@ uint64_t GiveVehicle(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t manager,
     if (index >= 7) {
       return 0;
     }
-    const int32_t slot = int32_t(guest::LoadU32(base, manager + kSlots + 4 * index));
+    const int32_t slot = int32_t(guest::LoadU32(base, schema::RaceManager(base, manager).vehicle_slots_address() + 4 * index));
     if (slot == 0 || slot == -1) {
       break;
     }
   }
-  guest::StoreU32(base, entry + 20, index);
+  const schema::MinimapRacerEntry e(base, entry);
+  e.set_vehicle_index(index);
   const uint32_t vehicle = uint32_t(call(kVehicleGet, {index}));
-  const uint32_t slot = manager + kSlots + 4 * index;
-  const uint32_t record = guest::LoadU32(base, kRaceData) +
-                          guest::LoadU32(base, entry + 24) * kRecordBytes + 48;
+  const schema::Vehicle v(base, vehicle);
+  const uint32_t slot = schema::RaceManager(base, manager).vehicle_slots_address() + 4 * index;
+  const uint32_t record =
+      schema::RaceData(base, guest::LoadU32(base, kRaceData)).racer_records_address() +
+      e.record() * kRecordBytes;
   call(int32_t(guest::LoadU32(base, slot)) == -1 ? kResetForCar : kVehicleSetUp,
        {vehicle, record});
   // Placed at the entry's route position with the start speed, or with flag
   // 0x10 at the record's +3904 with its +3908 (at rest when that's 0.0).
   const double zero = double(guest::LoadFloat(base, kZero));
   double speed;
-  if ((guest::LoadU32(base, entry) & 0x10) != 0) {
-    guest::StoreU32(base, frame + 80, guest::LoadU32(base, record + 3904));
-    speed = double(guest::LoadFloat(base, record + 3908));
+  if ((e.flags() & 0x10) != 0) {
+    const schema::Car car(base, record);
+    guest::StoreU32(base, frame + 80, car.start_position());
+    speed = double(car.start_float());
     if (speed == zero) {
-      guest::StoreU8(base, vehicle + 2384, 1);
+      v.set_forced_rest(1);
     }
   } else {
-    guest::StoreU32(base, frame + 80, guest::LoadU32(base, entry + 8));
+    guest::StoreU32(base, frame + 80, e.position());
     speed = double(guest::LoadFloat(base, kPlaceSpeed));
   }
   call(kPlaceOnRoute, {vehicle, frame + 80, 0, 0, 1}, {speed, zero});
@@ -78,14 +86,14 @@ uint64_t GiveVehicle(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t manager,
   // pointer's five words.
   call(kInputRecordClear, {frame + 96});
   const uint32_t to =
-      guest::LoadU32(base, kInputRecords + 4 * (guest::LoadU32(base, entry + 20) & 0xFF));
+      guest::LoadU32(base, kInputRecords + 4 * (e.vehicle_index() & 0xFF));
   for (uint32_t k = 0; k < 20; k += 4) {
     guest::StoreU32(base, to + k, guest::LoadU32(base, frame + 96 + k));
   }
-  call(kBodySetUp, {vehicle + 6160, vehicle});
+  call(kBodySetUp, {v.status_address(), vehicle});
   call(kPhysicsStep, {vehicle}, {double(guest::LoadFloat(base, kStepTime))});
-  call(kStatusUpdate, {vehicle + 6160, vehicle, 0, 1});
-  guest::StoreU32(base, entry, guest::LoadU32(base, entry) | 0x240);
+  call(kStatusUpdate, {v.status_address(), vehicle, 0, 1});
+  e.set_flags(e.flags() | 0x240);
   guest::StoreU32(base, slot, 1);
   return 1;
 }

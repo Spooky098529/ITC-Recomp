@@ -16,6 +16,7 @@
 #include "base/log.h"
 #include "game_modes/game_modes.h"
 #include "guest.h"
+#include "schema/race_states.h"
 
 namespace race_states {
 
@@ -1167,8 +1168,8 @@ std::optional<uint32_t> Init(uint8_t* base, uint32_t machine, uint32_t frame, bo
   if (!ProgressCreate(base)) {
     return std::nullopt;
   }
-  const uint32_t progress = guest::LoadU32(base, kProgress);
-  guest::StoreU32(base, machine + 9624, progress);
+  const uint32_t progress = schema::RaceStatesGlobals::progress(base).address;
+  schema::RaceStates(base, machine).set_progress(progress);
   ProgressReset(base, progress, reset_frame);
   auto at = [&](const Value& v) {
     switch (v.base) {

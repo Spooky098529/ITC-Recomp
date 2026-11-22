@@ -7,6 +7,10 @@
 #include "base/log.h"
 #include "guest.h"
 #include "native/buffers.h"
+#include "schema/menu_helpers.h"
+#include "schema/options_load_save.h"
+#include "schema/options_screen.h"
+#include "schema/save_interface.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 namespace options_screen {
@@ -15,11 +19,24 @@ namespace {
 
 using guest::LoadU32;
 using guest::StoreU32;
+using G = schema::OptionsLoadSaveGlobals;
+using SubPageBlock = schema::OptionsSubPageBlock;
+using OptionsGlobals = schema::OptionsScreenGlobals;
+using OptionsSettings = schema::OptionsSettings;
+using PageObject = schema::PageObject;
+using FrontEndMenu = schema::FrontEndMenu;
 
 constexpr uint32_t kMinusOne = 0xFFFFFFFFu;
 constexpr uint64_t kMinusOne64 = ~uint64_t(0);
 
-uint32_t Settings(uint8_t* base) { return LoadU32(base, kSettings); }
+// [0x826D8478], loaded again at every use as the original does.
+OptionsSettings Settings(uint8_t* base) { return OptionsGlobals::settings(base); }
+
+// [0x826D8470], the options' page block, loaded again at every use.
+PageObject Pages(uint8_t* base) { return OptionsGlobals::pages(base); }
+
+// [0x826D8484], the dialog's menu, loaded again at every use.
+FrontEndMenu DialogMenu(uint8_t* base) { return OptionsGlobals::dialog_menu(base); }
 
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   StoreU32(base, sp - bytes, sp);
@@ -36,33 +53,51 @@ struct Side {
   uint32_t show_step;
   uint32_t cursor_step;
   uint32_t leave_step;
-  uint32_t next;
-  uint32_t kind;
-  uint32_t counter;
+  uint32_t (OptionsSettings::*next)() const;
+  void (OptionsSettings::*set_next)(uint32_t) const;
+  uint32_t (OptionsSettings::*kind)() const;
+  void (OptionsSettings::*set_kind)(uint32_t) const;
+  uint32_t (OptionsSettings::*counter)() const;
+  void (OptionsSettings::*set_counter)(uint32_t) const;
 };
-constexpr Side kLoad{9, kLoadPages, 44, 43, 45, 41, 624, 628, 632};
-constexpr Side kSave{10, kSavePages, 47, 46, 48, 42, 644, 648, 652};
+constexpr Side kLoad{9, G::load_pages_address(), 44, 43, 45, 41,
+                     &OptionsSettings::load_dialog_next, &OptionsSettings::set_load_dialog_next,
+                     &OptionsSettings::load_dialog_kind, &OptionsSettings::set_load_dialog_kind,
+                     &OptionsSettings::load_dialog_passes, &OptionsSettings::set_load_dialog_passes};
+constexpr Side kSave{10, G::save_pages_address(), 47, 46, 48, 42,
+                     &OptionsSettings::save_dialog_next, &OptionsSettings::set_save_dialog_next,
+                     &OptionsSettings::save_dialog_kind, &OptionsSettings::set_save_dialog_kind,
+                     &OptionsSettings::save_dialog_passes, &OptionsSettings::set_save_dialog_passes};
+
+// The side's settings words, through the settings block loaded again.
+uint32_t Kind(uint8_t* base, const Side& s) { return (Settings(base).*s.kind)(); }
+void SetKind(uint8_t* base, const Side& s, uint32_t v) { (Settings(base).*s.set_kind)(v); }
+void SetNext(uint8_t* base, const Side& s, uint32_t v) { (Settings(base).*s.set_next)(v); }
+
+SubPageBlock SubPages(uint8_t* base, const Side& s) {
+  return SubPageBlock(base, LoadU32(base, s.pages_global));
+}
 
 // A block's page (+0) set to `sub`: +8 the one before unless the same,
 // +12 and +16 -1, in the order `order` gives (0: +0, +12, +16; 1: +16, +12,
 // +0; 2: +12, +16, +0).
-void SetSubPage(uint8_t* base, uint32_t block, uint32_t sub, int order) {
-  const uint32_t current = LoadU32(base, block + 0);
+void SetSubPage(const SubPageBlock& block, uint32_t sub, int order) {
+  const uint32_t current = block.page();
   if (current != sub) {
-    StoreU32(base, block + 8, current);
+    block.set_previous_page(current);
   }
   if (order == 0) {
-    StoreU32(base, block + 0, sub);
-    StoreU32(base, block + 12, kMinusOne);
-    StoreU32(base, block + 16, kMinusOne);
+    block.set_page(sub);
+    block.set_step(kMinusOne);
+    block.set_queued_step(kMinusOne);
   } else if (order == 1) {
-    StoreU32(base, block + 16, kMinusOne);
-    StoreU32(base, block + 12, kMinusOne);
-    StoreU32(base, block + 0, sub);
+    block.set_queued_step(kMinusOne);
+    block.set_step(kMinusOne);
+    block.set_page(sub);
   } else {
-    StoreU32(base, block + 12, kMinusOne);
-    StoreU32(base, block + 16, kMinusOne);
-    StoreU32(base, block + 0, sub);
+    block.set_step(kMinusOne);
+    block.set_queued_step(kMinusOne);
+    block.set_page(sub);
   }
 }
 
@@ -70,15 +105,15 @@ void SetSubPage(uint8_t* base, uint32_t block, uint32_t sub, int order) {
 // and the page after: +8 the page before unless it's the side's, +12, +16,
 // +4, +0 -1.
 void QueueDialog(uint8_t* base, const Side& s) {
-  const uint32_t p = LoadU32(base, kPage);
-  const uint32_t current = LoadU32(base, p + 0);
+  const PageObject p = Pages(base);
+  const uint32_t current = p.page();
   if (current != s.page) {
-    StoreU32(base, p + 8, current);
+    p.set_previous_page(current);
   }
-  StoreU32(base, p + 12, s.change_step);
-  StoreU32(base, p + 16, s.show_step);
-  StoreU32(base, p + 4, s.page);
-  StoreU32(base, p + 0, kMinusOne);
+  p.set_step(s.change_step);
+  p.set_queued_step(s.show_step);
+  p.set_next_page(s.page);
+  p.set_page(kMinusOne);
 }
 
 // LoadPage::SetDialog and SavePage::SetDialog (their native-running prints
@@ -89,49 +124,47 @@ void SetDialog(uint8_t* base, const Side& s, uint32_t kind, uint32_t next) {
   } else {
     ITC_NATIVE_RUNNING("sub_821BB708 SavePage::SetDialog");
   }
-  const uint32_t pages = LoadU32(base, s.pages_global);
+  const SubPageBlock pages = SubPages(base, s);
   if (next == 2) {
     QueueDialog(base, s);
-    SetSubPage(base, pages, 3, 2);
-    StoreU32(base, Settings(base) + s.next, 2);
+    SetSubPage(pages, 3, 2);
+    SetNext(base, s, 2);
   } else if (next < 2) {
-    SetSubPage(base, pages, next + 1, 0);
+    SetSubPage(pages, next + 1, 0);
     QueueDialog(base, s);
-    StoreU32(base, Settings(base) + s.next, next);
+    SetNext(base, s, next);
   }
-  StoreU32(base, Settings(base) + s.kind, kind);
+  SetKind(base, s, kind);
 }
 
 // The sub-page close (4): p +8 the page before unless -1, +16 -1, +12 the
 // leave step, +4 and +0 -1; the settings' +712 1.
 void ClosePage(uint8_t* base, const Side& s) {
-  const uint32_t p = LoadU32(base, kPage);
-  const uint32_t current = LoadU32(base, p + 0);
+  const PageObject p = Pages(base);
+  const uint32_t current = p.page();
   if (current != kMinusOne) {
-    StoreU32(base, p + 8, current);
+    p.set_previous_page(current);
   }
-  StoreU32(base, p + 16, kMinusOne);
-  StoreU32(base, p + 12, s.leave_step);
-  StoreU32(base, p + 4, kMinusOne);
-  StoreU32(base, p + 0, kMinusOne);
-  StoreU32(base, Settings(base) + 712, 1);
+  p.set_queued_step(kMinusOne);
+  p.set_step(s.leave_step);
+  p.set_next_page(kMinusOne);
+  p.set_page(kMinusOne);
+  Settings(base).set_save_page_closed(1);
 }
-
-uint32_t SubPages(uint8_t* base, const Side& s) { return LoadU32(base, s.pages_global); }
 
 // The dialog menu's move: the cursor step with the side's page after, sound
 // 4.
 uint64_t MoveCursor(uint8_t* base, const Side& s, uint32_t frame, uint32_t lr,
                     const Calls& calls) {
-  const uint32_t p = LoadU32(base, kPage);
-  const uint32_t current = LoadU32(base, p + 0);
+  const PageObject p = Pages(base);
+  const uint32_t current = p.page();
   if (current != s.page) {
-    StoreU32(base, p + 8, current);
+    p.set_previous_page(current);
   }
-  StoreU32(base, p + 16, kMinusOne);
-  StoreU32(base, p + 12, s.cursor_step);
-  StoreU32(base, p + 4, s.page);
-  StoreU32(base, p + 0, kMinusOne);
+  p.set_queued_step(kMinusOne);
+  p.set_step(s.cursor_step);
+  p.set_next_page(s.page);
+  p.set_page(kMinusOne);
   return calls.Call(kMenuSoundPlay, frame, lr, 4);
 }
 
@@ -156,29 +189,29 @@ uint64_t CheckDevice(uint8_t* base, const Side& s, uint32_t sp, uint32_t no_devi
 // the close played, Options::SetUpCategoryPage; every pass UiMovie::Run, and
 // once it answers 0 the page block to step 5 with the categories after and
 // SaveBuffers::Destroy. 0.
-uint64_t Leave(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls, uint64_t first,
+uint64_t Leave(uint8_t* base, const schema::OptionsLeaveStarted& step, uint32_t sp, const Calls& calls, uint64_t first,
                uint64_t close, const uint32_t (&lr)[6]) {
   const uint32_t frame = Frame(base, sp, 128);
   const uint32_t m = FindMovie(base, frame);
-  if (LoadU32(base, step) == 0) {
-    const uint64_t cursor = LoadU32(base, LoadU32(base, kDialogMenu) + 0);
+  if (step.started() == 0) {
+    const uint64_t cursor = DialogMenu(base).cursor();
     calls.Call(kFinishNamed, frame, lr[0], m, first);
     calls.Call(kFinishNamed, frame, lr[1], m, cursor + first + 2);
     calls.Call(kPlay, frame, lr[2], m, kMinusOne64, close, 0);
     SetUpCategoryPage(base, frame, calls);
-    StoreU32(base, step, 1);
+    step.set_started(1);
   }
   if (int32_t(calls.Call(kRun, frame, lr[3], m, 0)) == 0) {
-    const uint32_t p = LoadU32(base, kPage);
-    const uint32_t current = LoadU32(base, p + 0);
+    const PageObject p = Pages(base);
+    const uint32_t current = p.page();
     if (current != 0) {
-      StoreU32(base, p + 8, current);
+      p.set_previous_page(current);
     }
-    StoreU32(base, p + 16, kMinusOne);
-    StoreU32(base, p + 4, 0);
-    StoreU32(base, p + 12, 5);
-    StoreU32(base, p + 0, kMinusOne);
-    StoreU32(base, LoadU32(base, kPage) + 24, 0);
+    p.set_queued_step(kMinusOne);
+    p.set_next_page(0);
+    p.set_step(5);
+    p.set_page(kMinusOne);
+    Pages(base).set_step_started(0);
     calls.Call(kSaveBuffersDestroy, frame, lr[4]);
   }
   return 0;
@@ -208,7 +241,7 @@ void SavePageClose(uint8_t* base) {
 
 void SavePagesCancel(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_821B9FF8 OptionsSavePages::Cancel");
-  StoreU32(base, Settings(base) + 712, 1);
+  Settings(base).set_save_page_closed(1);
 }
 
 uint64_t LoadPageCheckDevice(uint8_t* base, uint32_t sp, const Calls& calls) {
@@ -244,20 +277,20 @@ uint64_t LoadPageDeviceAnswer(uint8_t* base, uint32_t sp, const Calls& calls) {
 uint64_t LoadPageAnswer(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821BC7B0 LoadPage::Answer");
   const uint32_t frame = Frame(base, sp, 112);
-  calls.Call(kMenuStep, frame, 0x821BC7D0, LoadU32(base, kDialogMenu));
-  const uint32_t menu = LoadU32(base, kDialogMenu);
-  const uint32_t moved = LoadU32(base, menu + 8);
-  const int32_t cursor = int32_t(LoadU32(base, menu + 0));
+  calls.Call(kMenuStep, frame, 0x821BC7D0, DialogMenu(base).address);
+  const FrontEndMenu menu = DialogMenu(base);
+  const uint32_t moved = menu.moved();
+  const int32_t cursor = int32_t(menu.cursor());
   if (moved != 0) {
     return MoveCursor(base, kLoad, frame, 0x821BC820, calls);
   }
-  const uint64_t accept = calls.Call(kMenuPressed, frame, 0x821BC82C, menu, 159);
+  const uint64_t accept = calls.Call(kMenuPressed, frame, 0x821BC82C, menu.address, 159);
   if (int32_t(accept) == 0) {
-    return calls.Call(kMenuPressed, frame, 0x821BC928, LoadU32(base, kDialogMenu), 158);
+    return calls.Call(kMenuPressed, frame, 0x821BC928, DialogMenu(base).address, 158);
   }
   uint64_t r3 = calls.Call(kMenuSoundPlay, frame, 0x821BC83C, 0);
-  const int32_t kind = int32_t(LoadU32(base, Settings(base) + kLoad.kind));
-  const uint32_t pages = SubPages(base, kLoad);
+  const int32_t kind = int32_t(Kind(base, kLoad));
+  const SubPageBlock pages = SubPages(base, kLoad);
   if (kind < 0) {
     return r3;
   }
@@ -273,7 +306,7 @@ uint64_t LoadPageAnswer(uint8_t* base, uint32_t sp, const Calls& calls) {
   if (kind == 4) {
     if (cursor == 0) {
       r3 = calls.Call(kRequestDevice, frame, 0x821BC8A4, 0);
-      SetSubPage(base, SubPages(base, kLoad), 0, 0);
+      SetSubPage(SubPages(base, kLoad), 0, 0);
       return r3;
     }
     SetDialog(base, kLoad, 6, 0);
@@ -284,7 +317,7 @@ uint64_t LoadPageAnswer(uint8_t* base, uint32_t sp, const Calls& calls) {
   }
   if (kind <= 6) {
     if (cursor == 0) {
-      SetSubPage(base, pages, 4, 0);
+      SetSubPage(pages, 4, 0);
       return r3;
     }
     SetDialog(base, kLoad, 0, 2);
@@ -294,32 +327,32 @@ uint64_t LoadPageAnswer(uint8_t* base, uint32_t sp, const Calls& calls) {
     return r3;
   }
   if (cursor == 0) {
-    SetSubPage(base, pages, 4, 0);
+    SetSubPage(pages, 4, 0);
     return r3;
   }
   r3 = calls.Call(kRequestDevice, frame, 0x821BC8A4, 0);
-  SetSubPage(base, SubPages(base, kLoad), 0, 0);
+  SetSubPage(SubPages(base, kLoad), 0, 0);
   return r3;
 }
 
 uint64_t SavePageAnswer(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821BCA60 SavePage::Answer");
   const uint32_t frame = Frame(base, sp, 96);
-  calls.Call(kMenuStep, frame, 0x821BCA7C, LoadU32(base, kDialogMenu));
-  const uint32_t menu = LoadU32(base, kDialogMenu);
-  if (LoadU32(base, menu + 8) != 0) {
+  calls.Call(kMenuStep, frame, 0x821BCA7C, DialogMenu(base).address);
+  const FrontEndMenu menu = DialogMenu(base);
+  if (menu.moved() != 0) {
     return MoveCursor(base, kSave, frame, 0x821BCAC8, calls);
   }
-  const uint64_t accept = calls.Call(kMenuPressed, frame, 0x821BCAD4, menu, 159);
+  const uint64_t accept = calls.Call(kMenuPressed, frame, 0x821BCAD4, menu.address, 159);
   if (int32_t(accept) == 0) {
-    return calls.Call(kMenuPressed, frame, 0x821BCBF8, LoadU32(base, kDialogMenu), 158);
+    return calls.Call(kMenuPressed, frame, 0x821BCBF8, DialogMenu(base).address, 158);
   }
-  const int32_t cursor = int32_t(LoadU32(base, LoadU32(base, kDialogMenu) + 0));
+  const int32_t cursor = int32_t(DialogMenu(base).cursor());
   uint64_t r3 = calls.Call(kMenuSoundPlay, frame, 0x821BCAEC, 0);
-  const uint32_t kind = LoadU32(base, Settings(base) + kSave.kind);
+  const uint32_t kind = Kind(base, kSave);
   // Sub-page 0 then SaveSlots::RequestDevice(0).
   const auto device = [&]() {
-    SetSubPage(base, SubPages(base, kSave), 0, 0);
+    SetSubPage(SubPages(base, kSave), 0, 0);
     return calls.Call(kRequestDevice, frame, 0x821BCB80, 0);
   };
   if (kind < 2 || kind == 5) {
@@ -339,7 +372,7 @@ uint64_t SavePageAnswer(uint8_t* base, uint32_t sp, const Calls& calls) {
   }
   if (kind == 6) {
     if (cursor == 0) {
-      SetSubPage(base, SubPages(base, kSave), 4, 0);
+      SetSubPage(SubPages(base, kSave), 4, 0);
       return r3;
     }
     SetDialog(base, kSave, 0, 2);
@@ -347,7 +380,7 @@ uint64_t SavePageAnswer(uint8_t* base, uint32_t sp, const Calls& calls) {
   }
   if (kind == 11) {
     if (cursor == 0) {
-      SetSubPage(base, SubPages(base, kSave), 4, 0);
+      SetSubPage(SubPages(base, kSave), 4, 0);
       return r3;
     }
     return device();
@@ -364,24 +397,24 @@ template <typename OnKind>
 uint64_t Note(uint8_t* base, const Side& s, uint32_t sp, const uint32_t (&lr)[4],
               const Calls& calls, OnKind on_kind) {
   const uint32_t frame = Frame(base, sp, 112);
-  calls.Call(kMenuStep, frame, lr[0], LoadU32(base, kDialogMenu));
-  const uint32_t o = Settings(base);
-  StoreU32(base, o + s.counter, LoadU32(base, o + s.counter) + 1);
-  const uint32_t o2 = Settings(base);
+  calls.Call(kMenuStep, frame, lr[0], DialogMenu(base).address);
+  const OptionsSettings o = Settings(base);
+  (o.*s.set_counter)((o.*s.counter)() + 1);
+  const OptionsSettings o2 = Settings(base);
   const auto device = [&]() {
     const uint64_t r3 = calls.Call(kRequestDevice, frame, lr[1], 0);
-    SetSubPage(base, SubPages(base, s), 0, 1);
+    SetSubPage(SubPages(base, s), 0, 1);
     return r3;
   };
-  if (int32_t(LoadU32(base, o2 + s.counter)) >= 45 && int32_t(LoadU32(base, o2 + s.kind)) == 3) {
+  if (int32_t((o2.*s.counter)()) >= 45 && int32_t((o2.*s.kind)()) == 3) {
     return device();
   }
-  const uint64_t accept = calls.Call(kMenuPressed, frame, lr[2], LoadU32(base, kDialogMenu), 159);
+  const uint64_t accept = calls.Call(kMenuPressed, frame, lr[2], DialogMenu(base).address, 159);
   if (int32_t(accept) == 0) {
     return accept;
   }
   const uint64_t r3 = calls.Call(kMenuSoundPlay, frame, lr[3], 0);
-  return on_kind(LoadU32(base, Settings(base) + s.kind), r3, device);
+  return on_kind(Kind(base, s), r3, device);
 }
 
 }  // namespace
@@ -406,7 +439,7 @@ uint64_t LoadPageNote(uint8_t* base, uint32_t sp, const Calls& calls) {
       case 8:
       case 9:
       case 12:
-        SetSubPage(base, SubPages(base, kLoad), 4, 1);
+        SetSubPage(SubPages(base, kLoad), 4, 1);
         return r3;
       default: return r3;
     }
@@ -420,7 +453,7 @@ uint64_t SavePageNote(uint8_t* base, uint32_t sp, const Calls& calls) {
     switch (int32_t(kind)) {
       case 2:
       case 9:
-        SetSubPage(base, SubPages(base, kSave), 4, 1);
+        SetSubPage(SubPages(base, kSave), 4, 1);
         return r3;
       case 3: return device();
       case 7:
@@ -441,13 +474,13 @@ uint64_t LoadPageWait(uint8_t* base, uint32_t sp, const Calls& calls) {
     SetDialog(base, kLoad, 4, 0);
     return 4;
   }
-  const uint32_t o = Settings(base);
-  StoreU32(base, o + kLoad.counter, LoadU32(base, o + kLoad.counter) + 1);
-  const uint32_t o2 = Settings(base);
-  if (int32_t(LoadU32(base, o2 + kLoad.counter)) < 90) {
+  const OptionsSettings o = Settings(base);
+  (o.*kLoad.set_counter)((o.*kLoad.counter)() + 1);
+  const OptionsSettings o2 = Settings(base);
+  if (int32_t((o2.*kLoad.counter)()) < 90) {
     return state;
   }
-  const uint32_t kind = LoadU32(base, o2 + kLoad.kind);
+  const uint32_t kind = (o2.*kLoad.kind)();
   if (kind == 0) {
     const uint64_t check = calls.Call(kGameDataCheck, frame, 0x821C2738, 0);
     switch (uint32_t(check)) {
@@ -468,14 +501,14 @@ uint64_t LoadPageWait(uint8_t* base, uint32_t sp, const Calls& calls) {
     const uint64_t word = calls.Call(kWord992, frame, 0x821C269C, 0);
     const uint64_t r3 = calls.Call(kRequest980, frame, 0x821C26A8, 0);
     if (int32_t(word) == 4) {
-      const uint32_t pages = SubPages(base, kLoad);
-      const uint32_t current = LoadU32(base, pages + 0);
+      const SubPageBlock pages = SubPages(base, kLoad);
+      const uint32_t current = pages.page();
       if (current != 6) {
-        StoreU32(base, pages + 8, current);
+        pages.set_previous_page(current);
       }
-      StoreU32(base, pages + 12, kMinusOne);
-      StoreU32(base, pages + 0, 6);
-      StoreU32(base, pages + 16, kMinusOne);
+      pages.set_step(kMinusOne);
+      pages.set_page(6);
+      pages.set_queued_step(kMinusOne);
     }
     return r3;
   }
@@ -483,8 +516,8 @@ uint64_t LoadPageWait(uint8_t* base, uint32_t sp, const Calls& calls) {
     return state;
   }
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const uint32_t buffer = LoadU32(base, LoadU32(base, kSaveBuffers) + 0);
-  if (guest::LoadU16(base, buffer + 6328) == 0) {
+  const uint32_t buffer = schema::SaveInterfaceGlobals::save_buffers(base).game_data();
+  if (schema::OptionsLoadedGameData(base, buffer).garage_count() == 0) {
     SetDialog(base, kLoad, 12, 1);
     return 12;
   }
@@ -504,13 +537,13 @@ uint64_t SavePageWait(uint8_t* base, uint32_t sp, const Calls& calls) {
     SetDialog(base, kSave, 4, 0);
     return 4;
   }
-  const uint32_t o = Settings(base);
-  StoreU32(base, o + kSave.counter, LoadU32(base, o + kSave.counter) + 1);
-  const uint32_t o2 = Settings(base);
-  if (int32_t(LoadU32(base, o2 + kSave.counter)) < 90) {
+  const OptionsSettings o = Settings(base);
+  (o.*kSave.set_counter)((o.*kSave.counter)() + 1);
+  const OptionsSettings o2 = Settings(base);
+  if (int32_t((o2.*kSave.counter)()) < 90) {
     return state;
   }
-  const int32_t kind = int32_t(LoadU32(base, o2 + kSave.kind));
+  const int32_t kind = int32_t((o2.*kSave.kind)());
   if (kind == 0) {
     const uint64_t check = calls.Call(kGameDataCheck, frame, 0x821BBEB8, 0);
     switch (uint32_t(check)) {
@@ -533,24 +566,24 @@ uint64_t SavePageWait(uint8_t* base, uint32_t sp, const Calls& calls) {
   // 1, the sub-pages' block, then p to steps 47 and 46 with page 10 after
   // (`p_order` 0: +4, +0, +12, +16; 1: +0, +12, +16, +4).
   const auto inline_note = [&](uint32_t note, int p_order) {
-    StoreU32(base, Settings(base) + kSave.kind, note);
-    StoreU32(base, Settings(base) + kSave.next, 1);
-    SetSubPage(base, SubPages(base, kSave), 2, 0);
-    const uint32_t p = LoadU32(base, kPage);
-    const uint32_t current = LoadU32(base, p + 0);
+    SetKind(base, kSave, note);
+    SetNext(base, kSave, 1);
+    SetSubPage(SubPages(base, kSave), 2, 0);
+    const PageObject p = Pages(base);
+    const uint32_t current = p.page();
     if (current != 10) {
-      StoreU32(base, p + 8, current);
+      p.set_previous_page(current);
     }
     if (p_order == 0) {
-      StoreU32(base, p + 4, 10);
-      StoreU32(base, p + 0, kMinusOne);
-      StoreU32(base, p + 12, 47);
-      StoreU32(base, p + 16, 46);
+      p.set_next_page(10);
+      p.set_page(kMinusOne);
+      p.set_step(47);
+      p.set_queued_step(46);
     } else {
-      StoreU32(base, p + 0, kMinusOne);
-      StoreU32(base, p + 12, 47);
-      StoreU32(base, p + 16, 46);
-      StoreU32(base, p + 4, 10);
+      p.set_page(kMinusOne);
+      p.set_step(47);
+      p.set_queued_step(46);
+      p.set_next_page(10);
     }
   };
   if (s == 2) {
@@ -572,14 +605,14 @@ uint64_t LoadPageLeave(uint8_t* base, uint32_t step, uint32_t sp, const Calls& c
   ITC_NATIVE_RUNNING("sub_821C6468 LoadPage::Leave");
   static constexpr uint32_t kLr[6] = {0x821C64B8, 0x821C64C4, 0x821C64E4,
                                       0x821C64FC, 0x821C6544, 0};
-  return Leave(base, step, sp, calls, 841, 10, kLr);
+  return Leave(base, schema::OptionsLeaveStarted(base, step), sp, calls, 841, 10, kLr);
 }
 
 uint64_t SavePageLeave(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821C6550 SavePage::Leave");
   static constexpr uint32_t kLr[6] = {0x821C65A0, 0x821C65AC, 0x821C65CC,
                                       0x821C65E4, 0x821C662C, 0};
-  return Leave(base, step, sp, calls, 857, 11, kLr);
+  return Leave(base, schema::OptionsLeaveStarted(base, step), sp, calls, 857, 11, kLr);
 }
 
 }  // namespace options_screen

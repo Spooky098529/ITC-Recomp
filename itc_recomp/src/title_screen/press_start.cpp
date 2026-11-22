@@ -3,6 +3,9 @@
 // (docs/functions/title-screen.md): see title_screen.h.
 
 #include "base/log.h"
+#include "schema/action_mappers.h"
+#include "schema/racer_controllers.h"
+#include "schema/save_screen.h"
 #include "title_screen/internal.h"
 
 namespace title_screen {
@@ -11,13 +14,10 @@ namespace {
 
 // The players' controllers (a word a player: its mapper entry's index; the
 // word after them, +16, a fifth slot) and the mapper entries (8 bytes each:
-// the mapper, blocked when +4 is 1).
-constexpr uint32_t kControllers = 0x826BABA4;
-constexpr uint32_t kMapperEntries = 0x826BAB80;
-// Set when a player's controller changes (the profile read asked for).
-constexpr uint32_t kProfileRead = 0x826C7938;
-// The controller pick's count (the save screen's third block, +52).
-constexpr uint32_t kPickBlock = 0x826D8454;
+// the mapper, blocked when +4 is 1): TitleScreenGlobals' controllers and
+// mapper_entries.
+constexpr uint32_t kControllers = G::controllers_address();
+constexpr uint32_t kMapperEntries = G::mapper_entries_address();
 constexpr uint32_t kMenuSoundPlay = 0x821103F0;
 constexpr uint32_t kSetUpAttractRace = 0x82222038;
 constexpr uint32_t kPressedSlot = 40;  // the mapper's slot 10
@@ -26,15 +26,15 @@ constexpr int32_t kAttractTicks = 600;
 // The page object to `page` through `transition` (+8 the old page unless
 // it's `page`).
 void Through(uint8_t* base, uint32_t transition, uint32_t page) {
-  const uint32_t pages = Load(base, kPages);
-  const uint32_t old = Load(base, pages + 0);
+  const auto pages = G::pages(base);
+  const uint32_t old = pages.page();
   if (old != page) {
-    Store(base, pages + 8, old);
+    pages.set_previous_page(old);
   }
-  Store(base, pages + 0, kNone);
-  Store(base, pages + 4, page);
-  Store(base, pages + 16, kNone);
-  Store(base, pages + 12, transition);
+  pages.set_page(kNone);
+  pages.set_next_page(page);
+  pages.set_queued_step(kNone);
+  pages.set_step(transition);
 }
 
 }  // namespace
@@ -48,7 +48,7 @@ void AssignController(uint8_t* base, uint32_t player, uint32_t controller) {
       break;
     }
   }
-  Store(base, kProfileRead, 1);
+  G::set_profile_read(base, 1);
   const uint32_t mine = Load(base, kControllers + (player << 2));
   Store(base, kControllers + (holder << 2), mine);
   Store(base, kControllers + (player << 2), controller);
@@ -66,11 +66,14 @@ uint64_t PressStart(uint8_t* base, uint32_t sp, const Calls& calls) {
   static constexpr uint32_t kLrs[4] = {0x82222230, 0x82222264, 0x82222298, 0x822222CC};
   uint64_t r3 = 120;
   for (uint32_t p = 0; p < 4; p++) {
-    if (int32_t(Load(base, entries[p] + 4)) == 1) {
+    // The player's mapper entry (racer-controllers' PlayerMapperEntry).
+    const schema::PlayerMapperEntry entry(base, entries[p]);
+    if (int32_t(entry.unread()) == 1) {
       continue;
     }
-    const uint32_t mapper = Load(base, entries[p]);
-    r3 = calls.Call(Load(base, Load(base, mapper) + kPressedSlot), frame, kLrs[p], mapper, 152);
+    const schema::ActionMapper mapper = entry.mapper();
+    r3 = calls.Call(Load(base, mapper.vtable() + kPressedSlot), frame, kLrs[p], mapper.address,
+                    152);
     if ((r3 & 0xFF) == 0) {
       continue;
     }
@@ -79,10 +82,10 @@ uint64_t PressStart(uint8_t* base, uint32_t sp, const Calls& calls) {
     Through(base, 3, 1);
     break;
   }
-  const uint32_t words = Words(base);
-  Store(base, words + 36, Load(base, words + 36) + 1);
-  if (int32_t(Load(base, Words(base) + 36)) >= kAttractTicks) {
-    Store(base, Words(base) + 4, 8);
+  const auto words = Words(base);
+  words.set_idle_ticks(words.idle_ticks() + 1);
+  if (int32_t(Words(base).idle_ticks()) >= kAttractTicks) {
+    Words(base).set_main_item(8);
     Through(base, 8, 5);
     // SetUpAttractRace (sub_82222038) stays recompiled: never seen in the
     // coverage session (attract races reach it); see its row.
@@ -93,16 +96,17 @@ uint64_t PressStart(uint8_t* base, uint32_t sp, const Calls& calls) {
 
 uint64_t ScreenOnControllerPicked(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_822219E0 TitleScreen::OnControllerPicked");
-  const uint32_t count = Load(base, Load(base, kPickBlock) + 52);
+  // The controller pick (the save screen's data, save-screen's SaveScreenData).
+  const uint32_t count = G::pick_block(base).controller_pick();
   if (count == 0) {
-    const uint32_t pages = Load(base, kPages);
-    const uint32_t old = Load(base, pages + 0);
+    const auto pages = G::pages(base);
+    const uint32_t old = pages.page();
     if (old != 2) {
-      Store(base, pages + 8, old);
+      pages.set_previous_page(old);
     }
-    Store(base, pages + 12, kNone);
-    Store(base, pages + 0, 2);
-    Store(base, pages + 16, kNone);
+    pages.set_step(kNone);
+    pages.set_page(2);
+    pages.set_queued_step(kNone);
     return r3;
   }
   if (count >= 4) {

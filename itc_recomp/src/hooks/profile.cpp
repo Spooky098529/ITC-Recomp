@@ -5,6 +5,7 @@
 #include "guest.h"
 #include "hooks/native_entry.h"
 
+#include "schema/system_services.h"
 #include "user/profile.h"
 #include "user/user.h"
 
@@ -20,9 +21,10 @@ uint32_t Answer(uint8_t* base, uint32_t overlapped, uint32_t result) {
   if (!overlapped) {
     return result;
   }
-  guest::StoreU32(base, overlapped + 0, result);
-  guest::StoreU32(base, overlapped + 4, result ? 0xFFFFFFFF : 0);
-  guest::StoreU32(base, overlapped + 24, result);
+  const schema::SysXOverlapped answer(base, overlapped);
+  answer.set_result(result);
+  answer.set_length(result ? 0xFFFFFFFF : 0);
+  answer.set_extended_error(result);
   return kErrorIoPending;
 }
 

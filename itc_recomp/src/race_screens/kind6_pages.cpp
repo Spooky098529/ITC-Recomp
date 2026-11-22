@@ -13,6 +13,12 @@
 #include "ai_drivers/ai_drivers.h"
 #include "base/log.h"
 #include "guest.h"
+#include "schema/network_mode.h"
+#include "schema/race_hud_machine.h"
+#include "schema/race_states.h"
+#include "schema/race_screens_unseen.h"
+#include "schema/save_interface.h"
+#include "schema/tuning_screen.h"
 #include "memory/c_runtime_heap.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
@@ -50,12 +56,12 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
 
 uint64_t Register(uint32_t address) { return uint64_t(int64_t(int32_t(address))); }
 
-uint32_t Screen(uint8_t* base) { return Get(base, kKind6Menu); }
-uint32_t Field(uint8_t* base, uint32_t field) { return guest::LoadU32(base, Screen(base) + field); }
-void SetField(uint8_t* base, uint32_t field, uint32_t value) {
-  guest::StoreU32(base, Screen(base) + field, value);
-}
-uint32_t Session(uint8_t* base) { return Get(base, kKind6Session); }
+using Globals = schema::RaceScreensUnseenGlobals;
+
+// The screen [0x82814E10], read again at each use.
+schema::Kind6Menu Screen(uint8_t* base) { return Globals::kind6_menu(base); }
+schema::Session SessionView(uint8_t* base) { return Globals::kind6_session(base); }
+uint32_t Session(uint8_t* base) { return SessionView(base).address; }
 
 uint64_t LoadU64(uint8_t* base, uint32_t address) {
   return (uint64_t(guest::LoadU32(base, address)) << 32) | guest::LoadU32(base, address + 4);
@@ -63,10 +69,10 @@ uint64_t LoadU64(uint8_t* base, uint32_t address) {
 
 // ScreenPages::Go on page object A (+40) or B (+208), the screen read again.
 void GoA(uint8_t* base, uint32_t page, uint32_t transition = kNone, uint32_t queued = kNone) {
-  PagesGo(base, Screen(base) + 40, page, transition, queued);
+  PagesGo(base, Screen(base).pages_a_page_address(), page, transition, queued);
 }
 void GoB(uint8_t* base, uint32_t page, uint32_t transition = kNone, uint32_t queued = kNone) {
-  PagesGo(base, Screen(base) + 208, page, transition, queued);
+  PagesGo(base, Screen(base).pages_b_page_address(), page, transition, queued);
 }
 
 uint64_t Sound(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t id) {
@@ -81,7 +87,7 @@ bool Pressed(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t menu, uin
 // The leaderboard results [0x826C6AD4] (an XUSER_STATS_READ_RESULTS): its
 // view (+4), whose +4 is the total row count, +8 the rows read, +12 the
 // 48-byte rows.
-uint32_t Results(uint8_t* base) { return Get(base, kKind6Results); }
+uint32_t Results(uint8_t* base) { return Globals::kind6_results(base).address; }
 
 }  // namespace
 
@@ -96,7 +102,7 @@ uint64_t Kind6Rank(uint8_t* base) {
   uint32_t rank = 0;
   if (count != 0) {
     const uint32_t rows = guest::LoadU32(base, view + 12);
-    const uint64_t xuid = LoadU64(base, Session(base) + 168);
+    const uint64_t xuid = LoadU64(base, SessionView(base).xuid_address());
     for (uint32_t i = 0; i < count; i++) {
       if (LoadU64(base, rows + 48 * i) == xuid) {
         rank = guest::LoadU32(base, rows + 48 * i + 8);
@@ -151,8 +157,8 @@ uint64_t Kind6NetState(uint8_t* base, uint64_t state, uint32_t sp, const Calls& 
     case 4112: {
       const uint64_t r3 = calls.Call(kNetSetState, frame, 0x822927D8, 4112);
       const uint32_t session = Session(base);
-      guest::StoreU32(base, kKind6ReadSpec, guest::LoadU32(base, session + 188));
-      guest::StoreU32(base, session + 180, 0);
+      Globals::set_kind6_read_spec(base, schema::Session(base, session).view_id());
+      schema::Session(base, session).set_read_state(0);
       return r3;
     }
     default:
@@ -164,15 +170,16 @@ uint32_t Kind6ReadSpecSetUp(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82292648 Leaderboard::SetUpSpec");
   // The spec's view id from [0x826C72F4]; for ids 1 to 16 (their sixteen
   // jump table cases, each sub_82292690) three columns, ids 1, 2 and 3.
-  const uint32_t view = guest::LoadU32(base, kKind6ReadSpec);
-  guest::StoreU32(base, kKind6StatsSpec, view);
+  const schema::Kind6StatsSpec spec(base, Globals::kind6_stats_spec_address());
+  const uint32_t view = Globals::kind6_read_spec(base);
+  spec.set_view_id(view);
   if (view - 1 <= 15) {
-    guest::StoreU32(base, kKind6StatsSpec + 4, 3);
-    guest::StoreU16(base, kKind6StatsSpec + 8, 1);
-    guest::StoreU16(base, kKind6StatsSpec + 10, 2);
-    guest::StoreU16(base, kKind6StatsSpec + 12, 3);
+    spec.set_column_count(3);
+    spec.set_column_0(1);
+    spec.set_column_1(2);
+    spec.set_column_2(3);
   }
-  return kKind6StatsSpec;
+  return spec.address;
 }
 
 uint64_t Kind6LeaderboardRead(uint8_t* base, uint32_t session, uint32_t sp, const Calls& calls) {
@@ -181,67 +188,64 @@ uint64_t Kind6LeaderboardRead(uint8_t* base, uint32_t session, uint32_t sp, cons
   // Not signed in to Xbox Live (XUserGetSigninState of the player's
   // controller isn't 2 for any user today): the read's state 4.
   if (user::SigninState(Get(base, kControllerEntries)) != 2) {
-    guest::StoreU32(base, session + 180, 4);
+    schema::Session(base, session).set_read_state(4);
   }
   // The old results freed (operator delete[]).
-  const uint32_t results = Get(base, kKind6Results);
+  const uint32_t results = Results(base);
   if (results != 0) {
     if (!memory::crt::OperatorDeleteArray(results)) {
       calls.Call(kOperatorDeleteArray, frame, 0x82292D08, results);
     }
-    guest::StoreU32(base, kKind6Results, 0);
+    Globals::set_kind6_results(base, 0u);
   }
   Kind6ReadSpecSetUp(base);
   // The stats enumerator (XUserCreateStatsEnumeratorByRank or ByXuid), its
   // buffer into [0x826C6AD4] and XEnumerate: answered as no Live (the
   // user's call, 2026-11-14): the read failed, no buffer, the state 4. The
   // original's r3 there isn't read by its callers.
-  guest::StoreU32(base, session + 180, 4);
+  schema::Session(base, session).set_read_state(4);
   return 0;
 }
 
 uint64_t Kind6SaveReplay(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8221D678 Kind6Menu::SaveReplay");
   const uint32_t frame = Frame(base, sp, 176);
-  const uint32_t race = Get(base, kRaceData);
-  const uint32_t selection = ListSelection(base, Screen(base) + 136);
-  const uint32_t records = race + 0x59AE8;
+  const schema::RaceData race = Globals::race_data(base);
+  const uint32_t selection = ListSelection(base, Screen(base).slot_list_count_address());
+  const uint32_t records = race.results_address();
   // The slot: the list's scroll (+4) and selection.
-  const uint32_t slot = Field(base, 140) + selection;
+  const uint32_t slot = Screen(base).slot_list_scroll() + selection;
   vehicle_accessors::RacerRecordsAt(base, records, kNone);
   // The 36-byte record in the frame: cleared, the date and time
   // (GetLocalTime), +24 the race data's +60, +16 the last result's time.
   const uint32_t record = frame + 80;
+  const schema::SaveReplayRecord built(base, record);
   for (uint32_t k = 0; k < 36; k += 4) guest::StoreU32(base, record + k, 0);
   const uint32_t replay = Get(base, kRaceReplay);
   calls.Call(kGetLocalTime, frame, 0x8221D6E8, record);
-  guest::StoreU32(base, record + 24, guest::LoadU32(base, race + 60));
-  guest::StoreU32(base, record + 16,
-                  ai_drivers::TimeFromTicks(guest::LoadU32(
-                      base, vehicle_accessors::RacerRecordsAt(base, records, kNone) + 3932)));
+  built.set_course(race.record0_place());
+  built.set_time(ai_drivers::TimeFromTicks(
+      schema::RacerResultsRecord(base, vehicle_accessors::RacerRecordsAt(base, records, kNone)).ticks()));
   // By the race kind: +20 the kind's index, +32 a value of the last result.
-  switch (int32_t(guest::LoadU32(base, race + 0xA3AF0))) {
+  switch (int32_t(race.kind())) {
     case 1:
-      guest::StoreU32(base, record + 32,
-                      guest::LoadU32(base, vehicle_accessors::RacerRecordsAt(base, records, kNone) +
-                                               980));
-      guest::StoreU32(base, record + 20, 0);
+      built.set_result(
+          schema::RacerResultsRecord(base, vehicle_accessors::RacerRecordsAt(base, records, kNone)).e1_item());
+      built.set_mode(0);
       break;
     case 2:
-      guest::StoreU32(base, record + 32,
-                      guest::LoadU32(base, vehicle_accessors::RacerRecordsAt(base, records, kNone) +
-                                               3892));
-      guest::StoreU32(base, record + 20, 1);
+      built.set_result(
+          schema::RacerResultsRecord(base, vehicle_accessors::RacerRecordsAt(base, records, kNone)).route());
+      built.set_mode(1);
       break;
     case 4:
-      guest::StoreU32(base, record + 32, 0);
-      guest::StoreU32(base, record + 20, 2);
+      built.set_result(0);
+      built.set_mode(2);
       break;
     case 6:
-      guest::StoreU32(base, record + 32,
-                      guest::LoadU32(base, vehicle_accessors::RacerRecordsAt(base, records, kNone) +
-                                               3892));
-      guest::StoreU32(base, record + 20, 3);
+      built.set_result(
+          schema::RacerResultsRecord(base, vehicle_accessors::RacerRecordsAt(base, records, kNone)).route());
+      built.set_mode(3);
       break;
     default:
       break;
@@ -254,21 +258,21 @@ uint64_t Kind6SaveReplay(uint8_t* base, uint32_t sp, const Calls& calls) {
 uint64_t Kind6ShowPanelB(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8221CEA0 Kind6Menu::ShowPanelB");
   const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t movie = Field(base, 24);
+  const uint32_t movie = Screen(base).menu_movie().address;
   calls.Call(kShowNode, frame, 0x8221CED0, movie, 1, 4);
   calls.Call(kShowNode, frame, 0x8221CEE0, movie, 1, 5);
   uint32_t a = ui_movies::FindNode(base, movie, 1, 4);
   uint32_t b = ui_movies::FindNode(base, movie, 1, 5);
   if (a == 0 || b == 0) return b;
-  guest::StoreU32(base, a + 108, 0);
-  guest::StoreU32(base, b + 108, 0);
+  schema::UiMovieNode(base, a).set_texture_entry(0);
+  schema::UiMovieNode(base, b).set_texture_entry(0);
   calls.Call(kShowNode, frame, 0x8221CF34, movie, 1, 6);
   calls.Call(kShowNode, frame, 0x8221CF44, movie, 1, 7);
   a = ui_movies::FindNode(base, movie, 1, 6);
   b = ui_movies::FindNode(base, movie, 1, 7);
   if (a == 0 || b == 0) return b;
-  guest::StoreU32(base, a + 108, 1);
-  guest::StoreU32(base, b + 108, 1);
+  schema::UiMovieNode(base, a).set_texture_entry(1);
+  schema::UiMovieNode(base, b).set_texture_entry(1);
   calls.Call(kHideNode, frame, 0x8221CF98, movie, 1, 8);
   return calls.Call(kHideNode, frame, 0x8221CFA8, movie, 1, 9);
 }
@@ -279,7 +283,7 @@ namespace {
 // seconds, thousandths), r10 0 (the user's call for the parking area).
 uint64_t ShowTime(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t lr,
                   uint32_t movie) {
-  const uint32_t time = Field(base, 4);
+  const uint32_t time = Screen(base).time();
   const uint64_t args[8] = {movie, kMinusOne, 17, 528, (time >> 16) & 0x7FFF, (time >> 10) & 0x3F,
                             time & 0x3FF, 0};
   return calls.CallArgs(kSetText, frame, lr, args);
@@ -297,18 +301,18 @@ uint64_t NodeText(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t movi
 uint64_t Kind6ShowTimeOnly(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8221D3D0 Kind6Menu::ShowTimeOnly");
   const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t movie = Field(base, 24);
-  if (int32_t(Field(base, 316)) != 0) calls.Call(kHideNode, frame, 0x8221D404, movie, kMinusOne, 16);
+  const uint32_t movie = Screen(base).menu_movie().address;
+  if (int32_t(Screen(base).rows_shown()) != 0) calls.Call(kHideNode, frame, 0x8221D404, movie, kMinusOne, 16);
   calls.Call(kShowNode, frame, 0x8221D414, movie, kMinusOne, 17);
   ShowTime(base, calls, frame, 0x8221D444, movie);
   uint64_t r3 = 0;
   for (uint32_t i = 0; i < 5; i++) {
     const uint32_t node = ui_movies::FindNode(base, movie, kNone, i + 23);
-    guest::StoreU32(base, node + 80, 1);
+    schema::UiMovieNode(base, node).set_visible(1);
     NodeText(calls, frame, 0x8221D47C, movie, ui_movies::Child(base, node, 0), 533);
     NodeText(calls, frame, 0x8221D498, movie, ui_movies::Child(base, node, 1), 534);
     const uint32_t mark = ui_movies::Child(base, ui_movies::Child(base, node, 2), 0);
-    guest::StoreU32(base, mark + 108, 0);
+    schema::UiMovieNode(base, mark).set_texture_entry(0);
     r3 = NodeText(calls, frame, 0x8221D4D4, movie, ui_movies::Child(base, node, 6), 531);
   }
   return r3;
@@ -341,7 +345,7 @@ uint64_t Kind6RankingTime(uint8_t* base, uint64_t row, uint32_t minutes, uint32_
 uint64_t Kind6ShowRanking(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8221E1A0 Kind6Menu::ShowRanking");
   const uint32_t frame = Frame(base, sp, 192);
-  const uint32_t movie = Field(base, 24);
+  const uint32_t movie = Screen(base).menu_movie().address;
   const uint64_t rank64 = Kind6Rank(base);
   const int32_t rank = int32_t(uint32_t(rank64));
   auto total = [&]() -> int32_t {
@@ -365,7 +369,7 @@ uint64_t Kind6ShowRanking(uint8_t* base, uint32_t sp, const Calls& calls) {
   } else {
     return rank64;
   }
-  if (int32_t(Field(base, 316)) != 0) {
+  if (int32_t(Screen(base).rows_shown()) != 0) {
     calls.Call(kShowNode, frame, 0x8221E274, movie, kMinusOne, 16);
   }
   calls.Call(kShowNode, frame, 0x8221E284, movie, kMinusOne, 17);
@@ -380,7 +384,7 @@ uint64_t Kind6ShowRanking(uint8_t* base, uint32_t sp, const Calls& calls) {
     if ((rank == 0 && slot <= 1) || (rank == 1 && slot == 0)) continue;
     if (row >= total()) return r3;
     const uint32_t node = ui_movies::FindNode(base, movie, kNone, slot + 23);
-    guest::StoreU32(base, node + 80, 1);
+    schema::UiMovieNode(base, node).set_visible(1);
     const uint32_t child0 = ui_movies::Child(base, node, 0);
     r3 = child0;
     const uint32_t place = Results(base) != 0 ? guest::LoadU32(base, entry() + 8) : kNone;
@@ -401,7 +405,7 @@ uint64_t Kind6ShowRanking(uint8_t* base, uint32_t sp, const Calls& calls) {
     guest::StoreU32(base, frame + 80, 0);
     guest::StoreU32(base, frame + 84, 0);
     guest::StoreU32(base, frame + 88, 0);
-    guest::StoreU32(base, mark + 108, logo);
+    schema::UiMovieNode(base, mark).set_texture_entry(logo);
     r3 = Kind6RankingTime(base, uint64_t(int64_t(row)), frame + 80, frame + 84, frame + 88);
     const uint32_t mins = guest::LoadU32(base, frame + 80);
     const uint32_t secs = guest::LoadU32(base, frame + 84);
@@ -419,12 +423,12 @@ uint64_t Kind6ShowRanking(uint8_t* base, uint32_t sp, const Calls& calls) {
 uint64_t Kind6MainPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8221E788 Kind6Menu::MainPage");
   const uint32_t frame = Frame(base, sp, 96);
-  if (int32_t(Field(base, 340)) == 0) return 0;
-  calls.Call(kMenuStep, frame, 0x8221E7B4, Screen(base) + 68);
-  if (Pressed(calls, frame, 0x8221E7C4, Screen(base) + 68, 159)) {
+  if (int32_t(Screen(base).input_on()) == 0) return 0;
+  calls.Call(kMenuStep, frame, 0x8221E7B4, Screen(base).main_menu_cursor_address());
+  if (Pressed(calls, frame, 0x8221E7C4, Screen(base).main_menu_cursor_address(), 159)) {
     Kind6NetState(base, 4109, frame, calls);
     Sound(calls, frame, 0x8221E7DC, 0);
-    const uint32_t cursor = Field(base, 68);
+    const uint32_t cursor = Screen(base).main_menu_cursor();
     if (cursor <= 1) {
       GoB(base, 0);
       GoA(base, 1);
@@ -438,9 +442,9 @@ uint64_t Kind6MainPage(uint8_t* base, uint32_t sp, const Calls& calls) {
       GoA(base, 13);
       GoB(base, 0);
     }
-  } else if (Pressed(calls, frame, 0x8221E8A0, Screen(base) + 68, 158)) {
+  } else if (Pressed(calls, frame, 0x8221E8A0, Screen(base).main_menu_cursor_address(), 158)) {
     GoA(base, 0, 7);
-  } else if (int32_t(Field(base, 76)) != 0) {
+  } else if (int32_t(Screen(base).main_menu_moved()) != 0) {
     GoA(base, 0, 3);
     Sound(calls, frame, 0x8221E8EC, 4);
   }
@@ -449,13 +453,13 @@ uint64_t Kind6MainPage(uint8_t* base, uint32_t sp, const Calls& calls) {
 
 uint64_t Kind6AnswerPage(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_8221C1E0 Kind6Menu::AnswerPage");
-  const uint32_t cursor = Field(base, 68);
+  const uint32_t cursor = Screen(base).main_menu_cursor();
   uint32_t answer = 3;
   if (cursor <= 1 || cursor == 3) {
     answer = cursor == 0 ? 1 : (cursor == 1 ? 2 : 3);
-    guest::StoreU32(base, Session(base) + 240, cursor == 3 ? 1 : 0);
+    SessionView(base).set_screen3_after_race(cursor == 3 ? 1 : 0);
   }
-  guest::StoreU32(base, kKind6Word, answer);
+  Globals::set_kind6_answer(base, answer);
   return answer;
 }
 
@@ -466,14 +470,14 @@ uint64_t Kind6SlotPage(uint8_t* base, uint32_t sp, const Calls& calls) {
     RaceDialogShowSaving(base, frame, calls);
     GoA(base, 5);
   }
-  calls.Call(kListUpdate, frame, 0x8221DAAC, Screen(base) + 136);
-  if (int32_t(uint32_t(calls.Call(kListAccepted, frame, 0x8221DAB8, Screen(base) + 136))) != 0) {
+  calls.Call(kListUpdate, frame, 0x8221DAAC, Screen(base).slot_list_count_address());
+  if (int32_t(uint32_t(calls.Call(kListAccepted, frame, 0x8221DAB8, Screen(base).slot_list_count_address()))) != 0) {
     GoA(base, 4);
     Kind6SaveReplay(base, frame, calls);
   } else if (int32_t(uint32_t(calls.Call(kListCancelled, frame, 0x8221DAE8,
-                                         Screen(base) + 136))) != 0) {
+                                         Screen(base).slot_list_count_address()))) != 0) {
     GoA(base, 0, 5);
-  } else if (int32_t(Field(base, 160)) != 0 || Field(base, 140) - Field(base, 144) != 0) {
+  } else if (int32_t(Screen(base).slot_list_move()) != 0 || Screen(base).slot_list_scroll() - Screen(base).slot_list_scroll_before() != 0) {
     GoA(base, 2, 6);
   }
   return 0;
@@ -486,7 +490,7 @@ uint64_t Kind6SavePage(uint8_t* base, uint64_t r4, uint32_t sp, const Calls& cal
   if (answer == 1) {
     GoA(base, 2, 4);
   } else if (answer == 2) {
-    SetField(base, 340, 1);
+    Screen(base).set_input_on(1);
     GoA(base, 0);
     calls.Call(kSaveBuffersDestroy, frame, 0x8221C284);
   }
@@ -533,14 +537,15 @@ uint64_t Kind6CheckRecordPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8221E510 Kind6Menu::CheckRecordPage");
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t session = Session(base);
-  if (LoadU64(base, session + 208) > LoadU64(base, session + 200)) {
+  const schema::Session times(base, session);
+  if (LoadU64(base, times.best_time_address()) > LoadU64(base, times.race_time_address())) {
     Kind6NetState(base, 4111, frame, calls);
-    guest::StoreU32(base, Session(base) + 160, 1);
-    guest::StoreU32(base, Session(base) + 236, 0);
+    SessionView(base).set_unknown_160(1);
+    SessionView(base).set_upload_state(0);
     GoA(base, 8);
-    SetField(base, 316, 1);
+    Screen(base).set_rows_shown(1);
   } else {
-    SetField(base, 316, 0);
+    Screen(base).set_rows_shown(0);
     GoA(base, 9);
     GoB(base, 0, 6);
     Kind6ShowRanking(base, frame, calls);
@@ -552,29 +557,29 @@ uint64_t Kind6RankingReadPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8221C008 Kind6Menu::RankingReadPage");
   const uint32_t frame = Frame(base, sp, 128);
   uint32_t session = Session(base);
-  if (int32_t(Field(base, 356)) != 0) return 0;
-  if (int32_t(Field(base, 320)) == 0) {
+  if (int32_t(Screen(base).ranking_skipped()) != 0) return 0;
+  if (int32_t(Screen(base).read_started()) == 0) {
     Kind6NetState(base, 4112, frame, calls);
     Kind6LeaderboardRead(base, session, frame, calls);
-    if (int32_t(Field(base, 340)) != 0) {
-      SetField(base, 324, 44);
+    if (int32_t(Screen(base).input_on()) != 0) {
+      Screen(base).set_box_message(44);
       GoB(base, 5, 5);
     }
-    SetField(base, 320, 1);
+    Screen(base).set_read_started(1);
     session = Session(base);
   }
-  const uint32_t state = guest::LoadU32(base, session + 180);
+  const uint32_t state = schema::Session(base, session).read_state();
   if (state <= 1) return 0;
   if (state == 2) {
-    if (int32_t(Field(base, 340)) == 0) GoB(base, 0, 6);
+    if (int32_t(Screen(base).input_on()) == 0) GoB(base, 0, 6);
     GoA(base, 9);
-    SetField(base, 320, 0);
+    Screen(base).set_read_started(0);
   } else {
-    if (int32_t(Field(base, 340)) == 0) GoB(base, 3, 6, 2);
+    if (int32_t(Screen(base).input_on()) == 0) GoB(base, 3, 6, 2);
     GoA(base, 11);
-    SetField(base, 320, 0);
-    SetField(base, 324, 57);
-    SetField(base, 328, 1);
+    Screen(base).set_read_started(0);
+    Screen(base).set_box_message(57);
+    Screen(base).set_message_which(1);
   }
   return 0;
 }
@@ -583,39 +588,39 @@ uint64_t Kind6UploadPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8221E5E8 Kind6Menu::UploadPage");
   const uint32_t frame = Frame(base, sp, 128);
   uint32_t session = Session(base);
-  if (int32_t(guest::LoadU32(base, session + 224)) != 0 &&
-      int32_t(guest::LoadU32(base, session + 236)) == 1) {
+  if (int32_t(schema::Session(base, session).unknown_224()) != 0 &&
+      int32_t(schema::Session(base, session).upload_state()) == 1) {
     const uint32_t rank = uint32_t(Kind6Rank(base));
     session = Session(base);
     if (rank > 19) {
-      guest::StoreU32(base, session + 236, 3);
-      SetField(base, 316, 1);
+      schema::Session(base, session).set_upload_state(3);
+      Screen(base).set_rows_shown(1);
       GoA(base, 9);
       GoB(base, 0, 6);
-    } else if (int32_t(guest::LoadU32(base, session + 228)) != 0) {
+    } else if (int32_t(schema::Session(base, session).privilege()) != 0) {
       GoA(base, 11);
-      SetField(base, 316, 1);
-      SetField(base, 324, 48);
-      SetField(base, 332, 1);
+      Screen(base).set_rows_shown(1);
+      Screen(base).set_box_message(48);
+      Screen(base).set_question_which(1);
       GoB(base, 4, 6);
       Kind6ShowPanelB(base, frame, calls);
     } else {
       GoA(base, 11);
-      SetField(base, 316, 1);
-      SetField(base, 328, 3);
-      SetField(base, 324, 49);
+      Screen(base).set_rows_shown(1);
+      Screen(base).set_message_which(3);
+      Screen(base).set_box_message(49);
       GoB(base, 3, 6, 2);
-      guest::StoreU32(base, Session(base) + 236, 2);
+      SessionView(base).set_upload_state(2);
       Kind6ShowPanelA(base, frame, calls);
     }
     Kind6ShowRanking(base, frame, calls);
     session = Session(base);
   }
-  if (int32_t(guest::LoadU32(base, session + 232)) != 0) {
-    guest::StoreU32(base, session + 236, 3);
-    SetField(base, 316, 0);
-    SetField(base, 328, 1);
-    SetField(base, 324, 57);
+  if (int32_t(schema::Session(base, session).unknown_232()) != 0) {
+    schema::Session(base, session).set_upload_state(3);
+    Screen(base).set_rows_shown(0);
+    Screen(base).set_message_which(1);
+    Screen(base).set_box_message(57);
     GoB(base, 3, 6, 2);
     GoA(base, 11);
   }
@@ -625,7 +630,7 @@ uint64_t Kind6UploadPage(uint8_t* base, uint32_t sp, const Calls& calls) {
 uint64_t Kind6MenuBackPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8221D898 Kind6Menu::MenuBackPage");
   const uint32_t frame = Frame(base, sp, 96);
-  if (int32_t(Field(base, 340)) != 0) {
+  if (int32_t(Screen(base).input_on()) != 0) {
     GoA(base, 0);
     GoB(base, 0);
     Kind6ShowPanelA(base, frame, calls);
@@ -636,15 +641,15 @@ uint64_t Kind6MenuBackPage(uint8_t* base, uint32_t sp, const Calls& calls) {
 uint64_t Kind6UploadResultPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8221D908 Kind6Menu::UploadResultPage");
   const uint32_t frame = Frame(base, sp, 96);
-  const int32_t state = int32_t(guest::LoadU32(base, Session(base) + 236));
+  const int32_t state = int32_t(SessionView(base).upload_state());
   if (state == 0) {
     GoA(base, 14);
     GoB(base, 4, 6);
   } else if (state == 4) {
     GoA(base, 11);
     GoB(base, 3, 6, 2);
-    SetField(base, 324, 52);
-    SetField(base, 328, 2);
+    Screen(base).set_box_message(52);
+    Screen(base).set_message_which(2);
     Kind6ShowPanelA(base, frame, calls);
   }
   return 0;
@@ -654,33 +659,34 @@ uint64_t Kind6RankingPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8221BE90 Kind6Menu::RankingPage");
   const uint32_t frame = Frame(base, sp, 128);
   uint32_t session = Session(base);
-  if (int32_t(guest::LoadU32(base, session + 144)) == 0 && int32_t(Field(base, 320)) == 0) {
+  if (int32_t(schema::Session(base, session).read_started()) == 0 && int32_t(Screen(base).read_started()) == 0) {
     Kind6NetState(base, 4112, frame, calls);
     Kind6LeaderboardRead(base, session, frame, calls);
-    SetField(base, 320, 1);
+    Screen(base).set_read_started(1);
     session = Session(base);
   }
-  const uint32_t state = guest::LoadU32(base, session + 180);
+  const uint32_t state = schema::Session(base, session).read_state();
   if (state < 2) return 0;
   if (state == 2) {
     GoA(base, 6);
-    SetField(base, 308, uint32_t(Kind6Rank(base)));
+    const uint32_t rank = uint32_t(Kind6Rank(base));
+    Screen(base).set_rank(rank);
     const uint32_t results = Results(base);
-    SetField(base, 312,
-             results != 0 ? guest::LoadU32(base, guest::LoadU32(base, results + 4) + 8) : kNone);
-    SetField(base, 320, 0);
+    const uint32_t rows = results != 0 ? guest::LoadU32(base, guest::LoadU32(base, results + 4) + 8) : kNone;
+    Screen(base).set_rows_read(rows);
+    Screen(base).set_read_started(0);
   } else if (state == 3) {
     Kind6NetState(base, 4111, frame, calls);
-    guest::StoreU32(base, Session(base) + 160, 1);
+    SessionView(base).set_unknown_160(1);
     GoA(base, 8);
-    SetField(base, 316, 1);
-    SetField(base, 320, 0);
+    Screen(base).set_rows_shown(1);
+    Screen(base).set_read_started(0);
   } else {
     GoA(base, 11);
     GoB(base, 3, 6, 2);
-    SetField(base, 320, 0);
-    SetField(base, 324, 57);
-    SetField(base, 328, 1);
+    Screen(base).set_read_started(0);
+    Screen(base).set_box_message(57);
+    Screen(base).set_message_which(1);
   }
   return 0;
 }
@@ -688,11 +694,11 @@ uint64_t Kind6RankingPage(uint8_t* base, uint32_t sp, const Calls& calls) {
 uint64_t Kind6MessageBackPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8221D9D8 Kind6Menu::MessageBackPage");
   const uint32_t frame = Frame(base, sp, 96);
-  if (int32_t(Field(base, 340)) != 0) {
+  if (int32_t(Screen(base).input_on()) != 0) {
     GoA(base, 11);
     GoB(base, 3, 2);
-    SetField(base, 324, 51);
-    SetField(base, 328, 0);
+    Screen(base).set_box_message(51);
+    Screen(base).set_message_which(0);
     Kind6ShowPanelA(base, frame, calls);
   }
   return 0;
@@ -703,31 +709,31 @@ uint64_t Kind6MessageBackPage(uint8_t* base, uint32_t sp, const Calls& calls) {
 uint64_t Kind6QuestionPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8221E980 Kind6Menu::QuestionPage");
   const uint32_t frame = Frame(base, sp, 96);
-  calls.Call(kMenuStep, frame, 0x8221E9A0, Screen(base) + 236);
+  calls.Call(kMenuStep, frame, 0x8221E9A0, Screen(base).question_menu_cursor_address());
   bool leave = false;
-  if (Pressed(calls, frame, 0x8221E9B0, Screen(base) + 236, 159)) {
+  if (Pressed(calls, frame, 0x8221E9B0, Screen(base).question_menu_cursor_address(), 159)) {
     Sound(calls, frame, 0x8221E9C0, 0);
-    const int32_t item = int32_t(Field(base, 236));
+    const int32_t item = int32_t(Screen(base).question_menu_cursor());
     if (item == 0) {
       GoA(base, 11);
       GoB(base, 2, 1);
-      SetField(base, 324, 50);
-      SetField(base, 332, 2);
+      Screen(base).set_box_message(50);
+      Screen(base).set_question_which(2);
     } else if (item == 1) {
       leave = true;
     }
-  } else if (Pressed(calls, frame, 0x8221EA38, Screen(base) + 236, 158)) {
+  } else if (Pressed(calls, frame, 0x8221EA38, Screen(base).question_menu_cursor_address(), 158)) {
     Sound(calls, frame, 0x8221EA48, 2);
     leave = true;
   }
   if (leave) {
-    SetField(base, 320, 0);
+    Screen(base).set_read_started(0);
     GoA(base, 9);
     GoB(base, 0, 1);
-    guest::StoreU32(base, Session(base) + 236, 3);
-    SetField(base, 356, 1);
+    SessionView(base).set_upload_state(3);
+    Screen(base).set_ranking_skipped(1);
   }
-  if (int32_t(Field(base, 244)) != 0) {
+  if (int32_t(Screen(base).question_menu_moved()) != 0) {
     Sound(calls, frame, 0x8221EAB8, 4);
     GoB(base, 1, 4);
   }
@@ -737,11 +743,11 @@ uint64_t Kind6QuestionPage(uint8_t* base, uint32_t sp, const Calls& calls) {
 uint64_t Kind6QuestionAnswerPage(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8221C360 Kind6Menu::QuestionAnswerPage");
   Frame(base, sp, 96);
-  const int32_t answer = int32_t(Field(base, 332));
+  const int32_t answer = int32_t(Screen(base).question_which());
   if (answer == 1) {
     GoB(base, 1, 0);
   } else if (answer == 2) {
-    guest::StoreU32(base, Session(base) + 236, 2);
+    SessionView(base).set_upload_state(2);
     GoA(base, 10);
     GoB(base, 5, 5);
   }
@@ -751,15 +757,15 @@ uint64_t Kind6QuestionAnswerPage(uint8_t* base, uint32_t sp) {
 uint64_t Kind6MessagePage(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8221EAE8 Kind6Menu::MessagePage");
   const uint32_t frame = Frame(base, sp, 96);
-  if (!Pressed(calls, frame, 0x8221EB0C, Screen(base) + 236, 159)) return 0;
+  if (!Pressed(calls, frame, 0x8221EB0C, Screen(base).question_menu_cursor_address(), 159)) return 0;
   Sound(calls, frame, 0x8221EB1C, 0);
-  const uint32_t kind = Field(base, 328);
+  const uint32_t kind = Screen(base).message_which();
   if (kind == 1) {
     Kind6ShowTimeOnly(base, frame, calls);
     GoA(base, 0);
     GoB(base, 0, 3);
   } else if (kind <= 3) {
-    SetField(base, 320, 0);
+    Screen(base).set_read_started(0);
     GoA(base, 9);
     GoB(base, 0, 3);
   }
@@ -769,15 +775,16 @@ uint64_t Kind6MessagePage(uint8_t* base, uint32_t sp, const Calls& calls) {
 uint64_t Kind6WaitingPage(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8221C3F0 Kind6Menu::WaitingPage");
   Frame(base, sp, 96);
-  if (int32_t(Field(base, 332)) == 1) GoB(base, 1, 0);
+  if (int32_t(Screen(base).question_which()) == 1) GoB(base, 1, 0);
   return 0;
 }
 
 // --- The update ---
 
-uint64_t Kind6Update(uint8_t* base, uint32_t screen, uint64_t r4, uint32_t sp,
+uint64_t Kind6Update(uint8_t* base, uint32_t screen_address, uint64_t r4, uint32_t sp,
                      const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8221F1E8 Kind6Menu::Update");
+  const schema::Kind6Menu screen(base, screen_address);
   // r4 isn't read: the original sets it before its calls (the dialog pages
   // get the r4 left at their call, which their callees don't read).
   (void)r4;
@@ -790,17 +797,17 @@ uint64_t Kind6Update(uint8_t* base, uint32_t screen, uint64_t r4, uint32_t sp,
                                0x8221D908, kReturns0,  0x8221BE90, 0x8221C308, 0x8221D9D8};
   for (uint32_t i = 0; i < 6; i++) guest::StoreU32(base, frame + 80 + 4 * i, kB[i]);
   for (uint32_t i = 0; i < 15; i++) guest::StoreU32(base, frame + 112 + 4 * i, kA[i]);
-  const int32_t a = int32_t(guest::LoadU32(base, screen + 40));
-  const int32_t b = int32_t(guest::LoadU32(base, screen + 208));
-  uint64_t r3 = uint64_t(screen) + 40;
+  const int32_t a = int32_t(screen.pages_a_page());
+  const int32_t b = int32_t(screen.pages_b_page());
+  uint64_t r3 = uint64_t(screen.pages_a_page_address());
   uint64_t regs4 = Register(0x8221C308), regs5 = Register(0x8221D9D8), regs6 = Register(kReturns0);
-  if (int32_t(guest::LoadU32(base, screen + 352)) != 0) {
-    guest::StoreU32(base, screen + 324, 44);
-    PagesGo(base, screen + 40, 7, kNone, kNone);
-    PagesGo(base, screen + 208, 5, 5, kNone);
-    guest::StoreU32(base, screen + 352, 0);
-    guest::StoreU32(base, screen + 320, 0);
-    r3 = uint64_t(screen) + 208;
+  if (int32_t(screen.reset_request()) != 0) {
+    screen.set_box_message(44);
+    PagesGo(base, screen.pages_a_page_address(), 7, kNone, kNone);
+    PagesGo(base, screen.pages_b_page_address(), 5, 5, kNone);
+    screen.set_reset_request(0);
+    screen.set_read_started(0);
+    r3 = uint64_t(screen.pages_b_page_address());
     regs4 = 5;
     regs5 = 5;
     regs6 = kMinusOne;

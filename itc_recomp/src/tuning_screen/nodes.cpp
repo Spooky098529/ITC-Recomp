@@ -14,8 +14,6 @@ namespace tuning_screen {
 
 namespace {
 
-uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-uint32_t Load8(uint8_t* base, uint32_t address) { return guest::LoadU8(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
@@ -35,16 +33,16 @@ uint32_t ShowInteriorPicture(uint8_t* base, uint32_t screen, uint32_t type, uint
   const uint32_t movie = Movie(base, Frame(base, sp, 128));
   const uint32_t node = ui_movies::FindNode(base, movie, kAll, 0);
   if (type == 0) {
-    Store(base, node + 80, 0);
+    UiNode(base, node).set_visible(0);
     return node;
   }
-  Store(base, node + 80, 1);
+  UiNode(base, node).set_visible(1);
   const uint32_t picture = ui_movies::Child(base, ui_movies::FindNode(base, movie, kAll, 0), 0);
-  switch (Load8(base, screen + kType)) {
-    case 1: Store(base, picture + 108, index); break;
-    case 2: Store(base, picture + 108, index + 4); break;
-    case 3: Store(base, picture + 108, index + 8); break;
-    case 4: Store(base, picture + 108, index + 11); break;
+  switch (uint32_t(TS(base, screen).type())) {
+    case 1: UiNode(base, picture).set_texture_entry(index); break;
+    case 2: UiNode(base, picture).set_texture_entry(index + 4); break;
+    case 3: UiNode(base, picture).set_texture_entry(index + 8); break;
+    case 4: UiNode(base, picture).set_texture_entry(index + 11); break;
     default: break;
   }
   return picture;
@@ -58,7 +56,7 @@ uint32_t HideTireMarks(uint8_t* base, uint32_t sp) {
     const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, 0);
     for (const uint32_t k : {11u, 10u, 1u}) {
       child = ui_movies::Child(base, node, k);
-      Store(base, child + 80, 0);
+      UiNode(base, child).set_visible(0);
     }
   }
   return child;
@@ -69,28 +67,28 @@ uint64_t HideNode19(uint8_t* base, uint64_t r3, uint32_t sp) {
   (void)r3;
   const uint32_t screen = uint32_t(r3);
   const uint32_t movie = Movie(base, Frame(base, sp, 112));
-  const int32_t state = int32_t(Load(base, screen + kState));
-  const int32_t category = int32_t(Load(base, screen + kCategory));
-  const uint32_t item = Load8(base, screen + kItem);
+  const int32_t state = int32_t(TS(base, screen).state());
+  const int32_t category = int32_t(TS(base, screen).category());
+  const uint32_t item = uint32_t(TS(base, screen).item());
   bool hide = false;
   if (state == 5) {
-    hide = category == 3 || Load8(base, screen + kLevel) == 0;
+    hide = category == 3 || uint32_t(TS(base, screen).level()) == 0;
   } else if (state == 6) {
     if (category == 4 && item == 3) {
-      const bool set = int32_t(Load(base, screen + 25172)) != 0;
-      const uint32_t type = Load8(base, screen + kType);
+      const bool set = int32_t(TS(base, screen).aero3_type_remap()) != 0;
+      const uint32_t type = uint32_t(TS(base, screen).type());
       hide = type == 0 || (set && type == 1);
     } else if (category == 0 && item == 2) {
-      hide = Load8(base, screen + kLevel) == 0;
+      hide = uint32_t(TS(base, screen).level()) == 0;
     } else {
-      hide = Load8(base, screen + kType) == 0;
+      hide = uint32_t(TS(base, screen).type()) == 0;
     }
   } else if (state == 8) {
-    hide = category == 5 && item == 1 && Load8(base, screen + kOption) == 0;
+    hide = category == 5 && item == 1 && uint32_t(TS(base, screen).option()) == 0;
   } else if (state == 54) {
-    hide = int32_t(Load(base, screen + 33548)) == 0;
+    hide = int32_t(TS(base, screen).interior_pick()) == 0;
   } else if (state == 56) {
-    hide = int32_t(Load(base, screen + 33564)) == 4;
+    hide = int32_t(TS(base, screen).interior_page_mode()) == 4;
   } else {
     hide = state == 9 || state == 10 || state == 11 || state == 14 || state == 15;
   }
@@ -98,7 +96,7 @@ uint64_t HideNode19(uint8_t* base, uint64_t r3, uint32_t sp) {
     return movie;
   }
   const uint32_t node = ui_movies::FindNode(base, movie, kAll, 19);
-  Store(base, node + 80, 0);
+  UiNode(base, node).set_visible(0);
   return node;
 }
 
@@ -106,28 +104,34 @@ uint32_t ShowTireMarks(uint8_t* base, uint32_t screen, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821E22E8 TuningScreen::ShowTireMarks");
   const uint32_t frame = Frame(base, sp, 176);
   const uint32_t movie = Movie(base, frame);
-  auto at = [&](uint32_t offset) { return int32_t(Load(base, screen + offset)); };
   auto child = [&](uint32_t sub_scene, uint32_t k) {
     return ui_movies::Child(base, ui_movies::FindNode(base, movie, sub_scene, 0), k);
   };
   auto tire_state = [&](bool with_5) {
-    const int32_t s = at(kState);
-    return ((with_5 && s == 5) || s == 8 || s == 9 || s == 10 || s == 11) && at(kCategory) == 3;
+    const int32_t s = int32_t(TS(base, screen).state());
+    return ((with_5 && s == 5) || s == 8 || s == 9 || s == 10 || s == 11) &&
+           int32_t(TS(base, screen).category()) == 3;
   };
   uint32_t r3 = child(30, 2);
-  Store(base, r3 + 80, 1);
+  UiNode(base, r3).set_visible(1);
   if (tire_state(true)) {
-    if (Load8(base, screen + kItem) == 0) {
+    if (uint32_t(TS(base, screen).item()) == 0) {
       r3 = child(30, 1);
-      Store(base, r3 + 80, at(35948) == at(36076) ? 0 : 1);
+      UiNode(base, r3).set_visible(int32_t(TS(base, screen).tire_front_choice()) ==
+                    int32_t(TS(base, screen).tire_rear_choice())
+                ? 0
+                : 1);
       r3 = child(33, 1);
-      const bool differs = at(35952) != at(36080) || at(35948) != at(36076);
-      Store(base, r3 + 80, differs ? 1 : 0);
+      const bool differs = int32_t(TS(base, screen).tire_front_option()) !=
+                               int32_t(TS(base, screen).tire_rear_option()) ||
+                           int32_t(TS(base, screen).tire_front_choice()) !=
+                               int32_t(TS(base, screen).tire_rear_choice());
+      UiNode(base, r3).set_visible(differs ? 1 : 0);
     } else {
       r3 = child(30, 1);
-      Store(base, r3 + 80, 0);
+      UiNode(base, r3).set_visible(0);
       r3 = child(33, 1);
-      Store(base, r3 + 80, 0);
+      UiNode(base, r3).set_visible(0);
     }
   } else {
     r3 = HideTireMarks(base, frame);
@@ -135,38 +139,43 @@ uint32_t ShowTireMarks(uint8_t* base, uint32_t screen, uint32_t sp) {
   if (!tire_state(false)) {
     return r3;
   }
-  if (Load8(base, screen + kItem) == 0) {
+  if (uint32_t(TS(base, screen).item()) == 0) {
     const uint32_t a = ui_movies::FindNode(base, movie, 30, 0);
     r3 = ui_movies::Child(base, a, 2);
-    Store(base, r3 + 80, 0);
+    UiNode(base, r3).set_visible(0);
     r3 = ui_movies::Child(base, a, 1);
-    Store(base, r3 + 80, 0);
+    UiNode(base, r3).set_visible(0);
   }
-  const uint32_t item = Load8(base, screen + kItem);
+  const uint32_t item = uint32_t(TS(base, screen).item());
   if (item == 0) {
     r3 = child(33, 2);
-    Store(base, r3 + 80, int32_t(Load8(base, screen + kLevel)) == at(35948) ? 1 : 0);
+    UiNode(base, r3).set_visible(int32_t(uint32_t(TS(base, screen).level())) == int32_t(TS(base, screen).tire_front_choice())
+            ? 1
+            : 0);
     r3 = child(33, 1);
-    const int32_t level = int32_t(Load8(base, screen + kLevel));
-    const int32_t rear = at(36076);
+    const int32_t level = int32_t(uint32_t(TS(base, screen).level()));
+    const int32_t rear = int32_t(TS(base, screen).tire_rear_choice());
     bool shown = false;
     if (level == rear) {
-      shown = at(35952) != at(36080) || at(35948) != rear;
+      shown = int32_t(TS(base, screen).tire_front_option()) !=
+                  int32_t(TS(base, screen).tire_rear_option()) ||
+              int32_t(TS(base, screen).tire_front_choice()) != rear;
     }
-    Store(base, r3 + 80, shown ? 1 : 0);
+    UiNode(base, r3).set_visible(shown ? 1 : 0);
   } else if (item == 1 || item == 2) {
     const uint32_t node = child(33, 2);
     r3 = GetCurrentChoice(base, screen);
-    Store(base, node + 80, int32_t(Load8(base, screen + kLevel)) == int32_t(r3) ? 1 : 0);
+    UiNode(base, node)
+        .set_visible(int32_t(uint32_t(TS(base, screen).level())) == int32_t(r3) ? 1 : 0);
   }
   return r3;
 }
 
 void SetRgb(uint8_t* base, uint32_t node, uint32_t r, uint32_t g, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_821E7DA0 UiNode::SetRgb");
-  Store(base, node + 56, r);
-  Store(base, node + 60, g);
-  Store(base, node + 64, b);
+  UiNode(base, node).set_red(r);
+  UiNode(base, node).set_green(g);
+  UiNode(base, node).set_blue(b);
 }
 
 }  // namespace tuning_screen

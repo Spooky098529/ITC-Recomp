@@ -104,7 +104,11 @@ order), its adapters in `src/hooks/strings_and_font.cpp`, behind
 `strings_and_font` (`src/harnesses/strings_and_font.cpp`). The string
 table's allocation and frees go through the allocation layer
 (`docs/native-memory.md`), so those two run natively only while
-`--native_heap` does.
+`--native_heap` does. Since E5's step 2 (2026-11-21) the objects' fields
+and the area's image words are named in `itc_recomp/schema/strings-and-font.toml`
+(`Font`, `FontDrawParams`, `FontPage`, `FontGlyphTable`, `FontGlyphRecord`,
+`FontText`, `FontGlyphQuad`, `FontVertex`, `Strings`, `StringsLoadedFlag`),
+and the hand ports read them through its views (`schema/strings_and_font.h`).
 
 Status:
 
@@ -147,6 +151,11 @@ Status:
   calls direct or through the dispatch table. While the SDK or code not
   native yet still reaches it, its entry for them is an override in
   `src/lifted/` (deleted when nothing reaches it that way).
+- **Host**: E5 (`docs/e5-native.md`, steps 3 to 5): our C++ whose objects
+  are host structs (host byte order, host pointers, made with `new` or
+  kept in containers), read and written as C++ members instead of by
+  offset in guest memory. A Native or Lifted function becomes Host when
+  its area's objects move to the host.
 
 A function usually moves from recompiled or Wrapped to Overridden to
 Native as the `ctx` edge moves up through its callers, or straight to

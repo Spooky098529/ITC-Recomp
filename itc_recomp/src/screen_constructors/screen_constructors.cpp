@@ -7,6 +7,10 @@
 #include "base/log.h"
 #include "boot_mode/boot_mode.h"
 #include "guest.h"
+#include "schema/car_list.h"
+#include "schema/screen_constructors.h"
+#include "schema/type67_screens.h"
+#include "schema/type6_type7_modes.h"
 
 namespace screen_constructors {
 
@@ -31,100 +35,109 @@ constexpr uint32_t kPanelVtable = 0x82010974;
 void PanelC(uint8_t* base, uint32_t panel, uint32_t group, uint32_t vtable, uint32_t w20,
             uint32_t w24, uint32_t w32) {
   PanelCBase(base, panel);
-  Store(base, panel + 12, group);
-  Store(base, panel + 20, w20);
-  Store(base, panel + 0, vtable);
-  Store(base, panel + 4, 0);
-  Store(base, panel + 24, w24);
-  Store(base, panel + 32, w32);
-  Store(base, panel + 40, 109);
-  Fill(base, panel + 44, panel + 56, kNone);
-  Store(base, panel + 60, 112);
-  Store(base, panel + 68, 5);
-  Store(base, panel + 72, 6);
-  Store(base, panel + 108, 15);
-  Store(base, panel + 112, 16);
-  Store(base, panel + 124, 0);
-  Store(base, panel + 128, 43);
-  Store(base, panel + 132, 13);
-  Store(base, panel + 136, 14);
-  Store(base, panel + 140, 15);
-  Store(base, panel + 144, 5);
-  Store(base, panel + 152, 0);
+  const schema::CarPanel p(base, panel);
+  p.set_group(group);
+  p.set_node(w20);
+  p.set_vtable(vtable);
+  p.set_shows_price(0);
+  p.set_stats_node(w24);
+  p.set_buttons_node(w32);
+  p.set_show_anim_a(109);
+  p.set_show_anim_b(kNone);
+  p.set_hide_anim_a(kNone);
+  p.set_hide_anim_b(kNone);
+  p.set_show_again_anim(kNone);
+  p.set_arrow_a(112);
+  Store(base, p.action_anims_address() + 0, 5);
+  Store(base, p.action_anims_address() + 4, 6);
+  p.set_scroll_back(15);
+  p.set_scroll_on(16);
+  p.set_loop_a(0);
+  p.set_loop_b(43);
+  p.set_text_maker(13);
+  p.set_text_name(14);
+  p.set_text_third(15);
+  p.set_texts(5);
+  p.set_cursor(0);
   for (uint32_t i = 0; i < 4; i++) {
-    Store(base, panel + 160 + 4 * i, 5 + i);  // +160 to +172: 5 to 8
+    Store(base, p.stats_children_address() + 4 * i, 5 + i);  // +160 to +172: 5 to 8
   }
-  Store(base, panel + 176, 11);
-  Store(base, panel + 180, 12);
-  Store(base, panel + 216, 9);
-  Store(base, panel + 220, 10);
-  Store(base, panel + 224, 13);
-  Store(base, panel + 228, 14);
-  Store(base, panel + 272, 4);
-  Store(base, panel + 276, 123);
-  Store(base, panel + 280, 112);
+  Store(base, p.stats_children_address() + 16, 11);  // +176
+  Store(base, p.stats_children_address() + 20, 12);  // +180
+  Store(base, p.stats_children_address() + 56, 9);   // +216
+  Store(base, p.stats_children_address() + 60, 10);  // +220
+  Store(base, p.stats_children_address() + 64, 13);  // +224
+  Store(base, p.stats_children_address() + 68, 14);  // +228
+  p.set_buttons(4);
+  p.set_text_a(123);
+  p.set_text_b(112);
 }
 
 // Panel6D's and Panel7D's words (+28 to +40: `w28` up).
 void PanelD(uint8_t* base, uint32_t panel, uint32_t group, uint32_t w12, uint32_t w24,
             uint32_t w28, uint32_t w60) {
   PanelDBase(base, panel);
-  Store(base, panel + 0, kPanelVtable);
-  Store(base, panel + 4, group);
-  Store(base, panel + 12, w12);
-  Store(base, panel + 16, 110);
-  Store(base, panel + 20, 111);
-  Store(base, panel + 24, w24);
+  const schema::ColorPanel p(base, panel);
+  p.set_vtable(kPanelVtable);
+  p.set_group(group);
+  p.set_node(w12);
+  p.set_show_anim(110);
+  p.set_hide_anim(111);
+  p.set_item_anims(w24);
   for (uint32_t i = 0; i < 4; i++) {
-    Store(base, panel + 28 + 4 * i, w28 + i);
+    // +28 to +40: scroll_back, scroll_on, swatches_on, swatches_back
+    Store(base, p.scroll_back_address() + 4 * i, w28 + i);
   }
-  Store(base, panel + 60, w60);
-  Store(base, panel + 64, 0);
-  Store(base, panel + 68, 1);
-  Store(base, panel + 80, 2);
+  p.set_arrows_node(w60);
+  p.set_cursor(0);
+  p.set_swatches(1);
+  p.set_swatch_color(2);
 }
 
 // Panel6F's and Panel7F's words (the same in both).
 void PanelF(uint8_t* base, uint32_t panel, uint32_t group) {
   PanelFBase(base, panel);
-  Store(base, panel + 0, kPanelVtable);
-  Store(base, panel + 4, group);
-  Store(base, panel + 28, 3);
-  Store(base, panel + 32, 6);
-  Store(base, panel + 36, 0);
-  Store(base, panel + 40, 0);
-  Store(base, panel + 44, 5);
-  Store(base, panel + 48, 6);
-  Store(base, panel + 52, 7);
-  Store(base, panel + 84, 4);
-  Store(base, panel + 88, 1);
-  Store(base, panel + 92, 0);
-  Store(base, panel + 96, 5);
-  Store(base, panel + 100, 15);
-  Store(base, panel + 104, 16);
-  Store(base, panel + 108, 29);
-  Store(base, panel + 112, 30);
-  Store(base, panel + 116, 79);
-  Store(base, panel + 120, 73);
-  Store(base, panel + 124, 2);
-  Store(base, panel + 132, 75);
-  Store(base, panel + 136, 83);
+  const schema::TabPanel p(base, panel);
+  p.set_vtable(kPanelVtable);
+  p.set_group(group);
+  p.set_texts_node(3);
+  p.set_tabs_node(6);
+  p.set_buttons_node(0);
+  p.set_cursor(0);
+  p.set_tab0_text(5);
+  p.set_tab1_text(6);
+  p.set_tab2_text(7);
+  p.set_buttons(4);
+  p.set_tab_word_a(1);
+  p.set_tab_word_b(0);
+  p.set_tab_anims(5);
+  p.set_scroll_down(15);
+  p.set_scroll_up(16);
+  p.set_unknown_108(29);
+  p.set_unknown_112(30);
+  p.set_show_anim(79);
+  p.set_move_anim(73);
+  p.set_loop_a(2);
+  p.set_loop_c(75);
+  p.set_loop_d(83);
 }
 
 // The three PanelGroups' words.
 void PanelGroupWords(uint8_t* base, uint32_t group, uint32_t w4, uint32_t w12) {
   PanelGroupBase(base, group);
-  Store(base, group + 4, w4);
-  Store(base, group + 0, 0x82010E8C);
-  Store(base, group + 12, w12);
-  Store(base, group + 32, 0);
+  const schema::PanelGroup g(base, group);
+  g.set_movie(w4);
+  g.set_vtable(0x82010E8C);
+  g.set_caption_node_set(w12);
+  g.set_unknown_32(0);
 }
 
 // The node tables' four pairs (0, -1) at +428 to +456.
 void NodeTablePairs(uint8_t* base, uint32_t table) {
+  const schema::PairedNodeTable t(base, table);
   for (uint32_t i = 0; i < 4; i++) {
-    Store(base, table + 428 + 8 * i, 0);
-    Store(base, table + 432 + 8 * i, kNone);
+    Store(base, t.pairs_address() + 8 * i, 0);
+    Store(base, t.pairs_address() + 4 + 8 * i, kNone);
   }
 }
 
@@ -148,11 +161,12 @@ struct PanelScreenType {
 void PanelScreen(uint8_t* base, uint32_t screen, uint32_t sp, const New& new_panel,
                  const PanelScreenType& type) {
   const uint32_t frame = sp - kPanelScreenFrame;
+  const schema::Type67PanelScreen s(base, screen);
   MachineScreen(base, screen);
-  Store(base, screen + 0, type.vtable);
-  const uint32_t group_a = screen + 9664;
+  s.set_vtable(type.vtable);
+  const uint32_t group_a = s.group_a_address();
   PanelGroup(base, group_a);
-  const uint32_t group_b = screen + 9708;
+  const uint32_t group_b = s.group_b_address();
   type.group_b(base, group_b);
   // Each panel built unless operator new gave 0 (the original's check).
   auto make = [&](uint32_t size, void (*construct)(uint8_t*, uint32_t, uint32_t),
@@ -163,27 +177,24 @@ void PanelScreen(uint8_t* base, uint32_t screen, uint32_t sp, const New& new_pan
     }
     return panel;
   };
-  const uint32_t c = make(320, type.panel_c, group_b);
-  const uint32_t d = make(92, type.panel_d, group_b);
-  const uint32_t e = make(160, PanelE, group_a);
-  const uint32_t f = make(144, type.panel_f, group_a);
-  const uint32_t set = screen + 9752;
+  const uint32_t c = make(schema::CarPanel::kSize, type.panel_c, group_b);
+  const uint32_t d = make(schema::ColorPanel::kSize, type.panel_d, group_b);
+  const uint32_t e = make(schema::RowPanel::kSize, PanelE, group_a);
+  const uint32_t f = make(schema::TabPanel::kSize, type.panel_f, group_a);
+  const uint32_t set = s.set_address();
   PanelSet(base, set, f, e, d, c, group_b, frame);
-  const uint32_t pair = screen + 11728;
+  const uint32_t pair = s.pair_address();
   GroupPair(base, pair, group_a, group_b);
-  Store(base, screen + 9644, set);
-  Store(base, screen + 9648, pair);
-  Store(base, screen + 11648, pair);
-  Fill(base, screen + 11672, screen + type.last_zero, 0);
-  Store(base, screen + 11716, 45);
-  Store(base, screen + 11720, 44);
-  Store(base, screen + 11724, 46);
+  s.set_car_list(set);
+  s.set_group_pair(pair);
+  s.set_set_group_pair(pair);
+  // +11672 (the set's +1920) to +11676 or +11680.
+  Fill(base, s.set_unknown_1920_address(), screen + type.last_zero, 0);
+  s.set_set_unknown_1964(45);
+  s.set_set_unknown_1968(44);
+  s.set_set_unknown_1972(46);
 }
 
-// Type7ListScreen's items' records (28 bytes; +0 a count, +12 and +16 bit
-// numbers).
-constexpr uint32_t kType7Records = 0x826370A0;
-constexpr uint32_t kType7RecordBytes = 28;
 // The empty base many classes share (as ListNode's in archive.md).
 constexpr uint32_t kEmptyBaseVtable = 0x82010B5C;
 
@@ -193,82 +204,91 @@ constexpr uint32_t kEmptyBaseVtable = 0x82010B5C;
 
 void NodeBase(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82258FB0 NodeBase::NodeBase");
-  Store(base, object + 4, 0);
-  Store(base, object + 0, kEmptyBaseVtable);
+  const schema::NodeBase node(base, object);
+  node.set_unknown_4(0);
+  node.set_vtable(kEmptyBaseVtable);
 }
 
 void PanelGroupBase(uint8_t* base, uint32_t group) {
   ITC_NATIVE_RUNNING("sub_8224EEA8 PanelGroupBase::PanelGroupBase");
   NodeBase(base, group);
-  Store(base, group + 0, 0x82010974);
-  Fill(base, group + 8, group + 32, kNone);
+  const schema::PanelGroupBase g(base, group);
+  g.set_vtable(0x82010974);
+  Fill(base, g.unknown_8_address(), g.caption_node_address(), kNone);  // +8 to +32
 }
 
 void PanelCBase(uint8_t* base, uint32_t panel) {
   ITC_NATIVE_RUNNING("sub_8224D6D0 PanelCBase::PanelCBase");
-  Store(base, panel + 0, 0x820111C0);
-  Store(base, panel + 4, 1);
-  Store(base, panel + 8, kNone);
-  Store(base, panel + 12, 0);
-  Store(base, panel + 16, kNone);
-  Fill(base, panel + 24, panel + 140, kNone);
-  Fill(base, panel + 148, panel + 244, kNone);
-  Fill(base, panel + 260, panel + 272, kNone);
-  Fill(base, panel + 276, panel + 316, 0);
+  const schema::CarPanel p(base, panel);
+  p.set_vtable(0x820111C0);
+  p.set_shows_price(1);
+  p.set_action(kNone);
+  p.set_group(0);
+  p.set_node_set(kNone);
+  Fill(base, p.stats_node_address(), p.texts_address(), kNone);  // +24 to +140
+  // +148 to +244 (unknown_148 to the stats children's 22nd word).
+  Fill(base, p.unknown_148_address(), p.stats_children_address() + 84, kNone);
+  Fill(base, p.price_child_address(), p.buttons_address(), kNone);  // +260 to +272
+  Fill(base, p.text_a_address(), p.two_players_address(), 0);       // +276 to +316
 }
 
 void PanelDBase(uint8_t* base, uint32_t panel) {
   ITC_NATIVE_RUNNING("sub_8224CFA0 PanelDBase::PanelDBase");
-  Store(base, panel + 4, 0);
-  Store(base, panel + 0, kEmptyBaseVtable);
-  Fill(base, panel + 8, panel + 80, kNone);
-  Store(base, panel + 88, 0);
+  const schema::ColorPanel p(base, panel);
+  p.set_group(0);
+  p.set_vtable(kEmptyBaseVtable);
+  Fill(base, p.node_set_address(), p.swatch_color_address(), kNone);  // +8 to +80
+  p.set_two_players(0);
 }
 
 void PanelEBase(uint8_t* base, uint32_t panel) {
   ITC_NATIVE_RUNNING("sub_8224EF78 PanelEBase::PanelEBase");
-  Store(base, panel + 0, 0);
-  Store(base, panel + 4, 0);
-  Fill(base, panel + 8, panel + 148, kNone);
-  Store(base, panel + 152, 0);
-  Store(base, panel + 156, 0);
+  const schema::RowPanel p(base, panel);
+  p.set_group(0);
+  p.set_row_count(0);
+  Fill(base, p.row_address(), p.arrows_address(), kNone);  // +8 to +148
+  p.set_show_alt(0);
+  p.set_two_players(0);
 }
 
 void PanelE(uint8_t* base, uint32_t panel, uint32_t group) {
   ITC_NATIVE_RUNNING("sub_82230800 PanelE::PanelE");
   PanelEBase(base, panel);
-  Store(base, panel + 0, group);  // no vtable
-  Store(base, panel + 4, 4);
-  Store(base, panel + 16, 4);
+  const schema::RowPanel p(base, panel);
+  p.set_group(group);  // no vtable
+  p.set_row_count(4);
+  p.set_node(4);
   for (uint32_t i = 0; i < 4; i++) {
-    Store(base, panel + 20 + 4 * i, 5 + i);   // +20 to +32: 5 to 8
-    Store(base, panel + 124 + 4 * i, 5 + i);  // +124 to +136: 5 to 8
+    Store(base, p.row_nodes_address() + 4 * i, 5 + i);  // +20 to +32: 5 to 8
+    // +124 to +136 (text_maker, text_name, text_third, unknown_136): 5 to 8
+    Store(base, p.text_maker_address() + 4 * i, 5 + i);
   }
-  Store(base, panel + 60, 9);
-  Store(base, panel + 64, 5);
-  Store(base, panel + 68, 15);
-  Store(base, panel + 72, 16);
-  Store(base, panel + 76, 80);
-  Store(base, panel + 80, 81);
-  Store(base, panel + 88, 82);
-  Store(base, panel + 92, 62);
-  Store(base, panel + 96, 67);
-  Store(base, panel + 100, 68);
-  Store(base, panel + 104, 72);
-  Store(base, panel + 112, 2);
-  Store(base, panel + 116, 83);
-  Store(base, panel + 120, 3);
-  Store(base, panel + 140, kNone);
-  Store(base, panel + 144, 1);
-  Store(base, panel + 148, 3);
+  p.set_spare_row_node(9);
+  p.set_unknown_64(5);
+  p.set_unknown_68(15);
+  p.set_unknown_72(16);
+  p.set_show_anim(80);
+  p.set_show_anim_alt(81);
+  p.set_hide_anim(82);
+  p.set_row_anims(62);
+  p.set_scroll_up(67);
+  p.set_scroll_down(68);
+  p.set_arrow_up(72);
+  p.set_loop_a(2);
+  p.set_loop_b(83);
+  p.set_logo(3);
+  p.set_unknown_140(kNone);
+  p.set_cursor(1);
+  p.set_arrows(3);
 }
 
 void PanelFBase(uint8_t* base, uint32_t panel) {
   ITC_NATIVE_RUNNING("sub_8224FA88 PanelFBase::PanelFBase");
-  Store(base, panel + 4, 0);
-  Store(base, panel + 0, kEmptyBaseVtable);
-  Fill(base, panel + 24, panel + 136, kNone);
-  Store(base, panel + 140, 0);
+  const schema::TabPanel p(base, panel);
+  p.set_group(0);
+  p.set_vtable(kEmptyBaseVtable);
+  Fill(base, p.node_set_address(), p.loop_d_address(), kNone);  // +24 to +136
+  p.set_two_players(0);
 }
 
 void Panel6C(uint8_t* base, uint32_t panel, uint32_t group) {
@@ -318,396 +338,490 @@ void PanelGroup7B(uint8_t* base, uint32_t group) {
 
 void PanelSetBase(uint8_t* base, uint32_t set_base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8224AD28 PanelSetBase::PanelSetBase");
-  Store(base, set_base + 0, 0x820110C4);
+  const schema::PanelSetBase s(base, set_base);
+  s.set_vtable(0x820110C4);
   // The original clears eleven words below its r1 (it has no frame) and
   // reads ten of them back into its fields.
   Fill(base, sp - 48, sp - 8, 0);
-  Store(base, set_base + 128, 0);
-  Store(base, set_base + 120, 0);
-  Store(base, set_base + 200, Load(base, sp - 44));
-  Store(base, set_base + 192, Load(base, sp - 40));
-  Store(base, set_base + 784, Load(base, sp - 36));
-  Store(base, set_base + 1300, Load(base, sp - 32));
-  Store(base, set_base + 1816, Load(base, sp - 28));
-  Store(base, set_base + 1876, Load(base, sp - 24));
+  s.set_page_menu_items(0);
+  s.set_page_menu_player(0);
+  s.set_rows_menu_items(Load(base, sp - 44));
+  s.set_rows_menu_player(Load(base, sp - 40));
+  s.set_list0_count(Load(base, sp - 36));
+  s.set_list1_count(Load(base, sp - 32));
+  s.set_list2_count(Load(base, sp - 28));
+  s.set_color_count(Load(base, sp - 24));
   const uint32_t at_20 = Load(base, sp - 20);
-  Store(base, set_base + 224, kNone);
-  Store(base, set_base + 204, at_20);
-  Store(base, set_base + 208, Load(base, sp - 16));
-  Store(base, set_base + 212, Load(base, sp - 12));
-  Store(base, set_base + 216, Load(base, sp - 8));
-  Store(base, set_base + 220, 0);
-  Fill(base, set_base + 228, set_base + 248, 0);
-  Store(base, set_base + 1916, 0);
-  Store(base, set_base + 1920, 1);
-  Store(base, set_base + 4, 0);
-  Store(base, set_base + 12, 0);
-  Store(base, set_base + 1928, 1);
-  Fill(base, set_base + 16, set_base + 28, 0);
-  Store(base, kPanelWord, 0);
-  Store(base, set_base + 1932, kNone);
-  Store(base, set_base + 1936, 1);
-  Store(base, set_base + 1940, 1);
-  Store(base, set_base + 1944, 0);
-  Store(base, set_base + 1948, 1);
-  Store(base, set_base + 1952, kNone);
-  Fill(base, set_base + 1892, set_base + 1912, 0);
-  Store(base, set_base + 1956, 0);
-  Fill(base, set_base + 1960, set_base + 1968, kNone);
+  s.set_unknown_224(kNone);
+  s.set_answer_record(at_20);
+  s.set_unknown_208(Load(base, sp - 16));
+  s.set_unknown_212(Load(base, sp - 12));
+  s.set_unknown_216(Load(base, sp - 8));
+  s.set_unknown_220(0);
+  Fill(base, s.tab_shown_address(), s.color_scroll_address(), 0);  // +228 to +248
+  s.set_rows_shown(0);
+  s.set_unknown_1920(1);
+  s.set_built(0);
+  s.set_done(0);
+  s.set_open_kind(1);
+  Fill(base, s.power_graph_asked_address(), s.busy_playing_address(), 0);  // +16 to +28
+  schema::CarListGlobals::set_two_players(base, 0);
+  s.set_page_drawn(kNone);
+  s.set_page_changed(1);
+  s.set_may_leave(1);
+  s.set_cancelled(0);
+  s.set_fade_with_steps(1);
+  s.set_player(kNone);
+  Fill(base, s.back_object_address(), s.confirm_panel_address(), 0);  // +1892 to +1912
+  s.set_group_b(0);
+  Fill(base, s.busy_anim_a_address(), s.busy_anim_done_address(), kNone);  // +1960 to +1968
 }
 
 void PanelSet(uint8_t* base, uint32_t set, uint32_t f, uint32_t e, uint32_t d, uint32_t c,
               uint32_t group_b, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8224B660 PanelSet::PanelSet");
-  Store(base, set + 0, 0x820110C8);
-  PanelSetBase(base, set + 4, sp - kPanelSetFrame);
+  const schema::PanelSet s(base, set);
+  s.set_vtable(0x820110C8);
+  PanelSetBase(base, s.base_vtable_address(), sp - kPanelSetFrame);
   // The panels get the word as it reads after each store (not checked for 0).
-  Store(base, kPanelWord, 0);
-  Store(base, set + 1900, f);
-  Store(base, f + 140, Load(base, kPanelWord));
-  Store(base, set + 1904, e);
-  Store(base, e + 156, Load(base, kPanelWord));
-  Store(base, set + 1908, d);
-  Store(base, d + 88, Load(base, kPanelWord));
-  Store(base, set + 1912, c);
-  Store(base, c + 316, Load(base, kPanelWord));
-  Store(base, set + 1960, group_b);
+  schema::CarListGlobals::set_two_players(base, 0);
+  s.set_tabs(f);
+  schema::TabPanel(base, f).set_two_players(schema::CarListGlobals::two_players(base));
+  s.set_rows(e);
+  schema::RowPanel(base, e).set_two_players(schema::CarListGlobals::two_players(base));
+  s.set_color_panel(d);
+  schema::ColorPanel(base, d).set_two_players(schema::CarListGlobals::two_players(base));
+  s.set_car_panel(c);
+  schema::CarPanel(base, c).set_two_players(schema::CarListGlobals::two_players(base));
+  s.set_group_b(group_b);
 }
 
 void GroupPair(uint8_t* base, uint32_t pair, uint32_t group_a, uint32_t group_b) {
   ITC_NATIVE_RUNNING("sub_82249C08 GroupPair::GroupPair");
-  Store(base, pair + 8, group_a);
-  Store(base, pair + 12, group_b);
-  Store(base, pair + 0, 0x82011084);
+  const schema::GroupPair p(base, pair);
+  p.set_group_a(group_a);
+  p.set_group_b(group_b);
+  p.set_vtable(0x82011084);
 }
 
 // --- The screens' bases ---
 
 void MachineScreen(uint8_t* base, uint32_t screen) {
   ITC_NATIVE_RUNNING("sub_8224CF58 MachineScreen::MachineScreen");
-  boot_mode::ScreenMachineConstruct(base, screen + 4);
-  Store(base, screen + 9652, 0);
-  Store(base, screen + 0, 0x82011168);
+  const schema::MachineScreen s(base, screen);
+  boot_mode::ScreenMachineConstruct(base, s.machine_address());
+  s.set_opens_itself(0);
+  s.set_vtable(0x82011168);
 }
 
 void Type6Screen0(uint8_t* base, uint32_t screen) {
   ITC_NATIVE_RUNNING("sub_82235BD8 Type6Screen0::Type6Screen0");
-  boot_mode::ScreenMachineConstruct(base, screen);
+  boot_mode::ScreenMachineConstruct(base, schema::Type6Screen0(base, screen).machine_address());
 }
 
 void Type7Screen0(uint8_t* base, uint32_t screen) {
   ITC_NATIVE_RUNNING("sub_82245FF8 Type7Screen0::Type7Screen0");
-  boot_mode::ScreenMachineConstruct(base, screen + 4);
-  Store(base, screen + 0, kEmptyBaseVtable);
+  const schema::Type7Screen0 s(base, screen);
+  boot_mode::ScreenMachineConstruct(base, s.machine_address());
+  s.set_vtable(kEmptyBaseVtable);
 }
 
 // --- The list screens' parts ---
 
 void NodeTable(uint8_t* base, uint32_t table) {
   ITC_NATIVE_RUNNING("sub_82247BE8 NodeTable::NodeTable");
-  Store(base, table + 0, 0x82010FF0);
-  Fill(base, table + 8, table + 308, kNone);
-  Fill(base, table + 312, table + 416, 0);
-  Store(base, table + 420, kNone);
-  Store(base, table + 424, kNone);
+  const schema::NodeTable t(base, table);
+  t.set_vtable(0x82010FF0);
+  // +8 to +308 (node_set_a to the children's last word).
+  Fill(base, t.node_set_a_address(), t.children_address() + 12, kNone);
+  Fill(base, t.item_masks_address(), t.item_masks_address() + 104, 0);  // +312 to +416
+  t.set_extra_node_base(kNone);
+  t.set_text_node_base(kNone);
 }
 
 void PairedNodeTable(uint8_t* base, uint32_t table) {
   ITC_NATIVE_RUNNING("sub_82247C60 PairedNodeTable::PairedNodeTable");
   NodeTable(base, table);
-  Store(base, table + 0, 0x82010FF8);
+  schema::PairedNodeTable(base, table).set_vtable(0x82010FF8);
   NodeTablePairs(base, table);
 }
 
 void ColorNodeTable(uint8_t* base, uint32_t table) {
   ITC_NATIVE_RUNNING("sub_82247D08 ColorNodeTable::ColorNodeTable");
   NodeTable(base, table);
-  Store(base, table + 0, 0x82011000);
-  NodeTablePairs(base, table);  // +460 to +472 not written
-  Fill(base, table + 476, table + 548, kNone);
-  Fill(base, table + 552, table + 564, 255);
-  Store(base, table + 568, 205);
-  Store(base, table + 572, 235);
-  Store(base, table + 576, 67);
-  Store(base, table + 580, 255);
+  const schema::ColorNodeTable t(base, table);
+  t.set_vtable(0x82011000);
+  NodeTablePairs(base, table);  // +460 to +472 (the marks) not written
+  // +476 to +548 (color_child, the two grids).
+  Fill(base, t.color_child_address(), t.grid_b_address() + 32, kNone);
+  Fill(base, t.color_a_address(), t.color_a_address() + 12, 255);  // +552 to +564
+  Store(base, t.color_b_address() + 0, 205);
+  Store(base, t.color_b_address() + 4, 235);
+  Store(base, t.color_b_address() + 8, 67);
+  Store(base, t.color_b_address() + 12, 255);
 }
 
 void ListScreen(uint8_t* base, uint32_t screen) {
   ITC_NATIVE_RUNNING("sub_82252290 ListScreen::ListScreen");
-  boot_mode::ScreenMachineConstruct(base, screen + 4);
-  Store(base, screen + 0, 0x82011218);
-  Store(base, screen + 9676, 0);
-  Store(base, screen + 9680, 1);
-  Store(base, screen + 9684, 1);
-  Store(base, screen + 9708, 0);
-  Fill(base, screen + 9712, screen + 9768, kNone);
-  Store(base, screen + 9772, 0);
-  Store(base, screen + 9776, 0);  // +9780 not written
-  Store(base, screen + 9784, 0);
-  Store(base, screen + 9788, 1);
+  const schema::ListScreen s(base, screen);
+  boot_mode::ScreenMachineConstruct(base, s.machine_address());
+  s.set_vtable(0x82011218);
+  s.set_list_part(0);
+  s.set_movie(1);
+  s.set_unknown_9684(1);
+  s.set_part_nodes(0);
+  Fill(base, s.title_child_address(), s.selection_child_address(), kNone);  // +9712 to +9768
+  s.set_previous_children(0);
+  s.set_selection_children(0);  // +9780 not written
+  s.set_children_count(0);
+  s.set_shown_child_on(1);
   // +9792 to +9932, then five runs of ten words from +9936 (to +10132).
-  Fill(base, screen + 9792, screen + 10132, kNone);
-  Store(base, screen + 10136, 0);
-  Store(base, screen + 10140, kNone);
+  Fill(base, s.unknown_9792_address(), s.item_anims_c_address() + 36, kNone);
+  s.set_scroll_text_shown(0);
+  s.set_scroll_text(kNone);
 }
 
 void ListPartBase(uint8_t* base, uint32_t part) {
   ITC_NATIVE_RUNNING("sub_822523F8 ListPartBase::ListPartBase");
-  Store(base, part + 0, 0x820112A0);
-  Fill(base, part + 4, part + 16, 0);
+  const schema::ListPart p(base, part);
+  p.set_vtable(0x820112A0);
+  Fill(base, p.yes_address(), p.inner_address(), 0);  // +4 to +16
 }
 
 void ListPartInnerBase(uint8_t* base, uint32_t inner) {
   ITC_NATIVE_RUNNING("sub_822525E0 ListPartInnerBase::ListPartInnerBase");
-  Store(base, inner + 0, 0x820112CC);
-  Store(base, inner + 32, 0);
-  Store(base, inner + 36, 0);
+  const schema::ListPartInner p(base, inner);
+  p.set_vtable(0x820112CC);
+  p.set_yes(0);
+  p.set_back(0);
 }
 
 void ListPartInner(uint8_t* base, uint32_t inner) {
   ITC_NATIVE_RUNNING("sub_822526A0 ListPartInner::ListPartInner");
   ListPartInnerBase(base, inner);
-  Store(base, inner + 0, 0x820112F8);
-  Store(base, inner + 100, 0);
-  Store(base, inner + 108, 0);
-  Store(base, inner + 112, 3);
-  Store(base, inner + 116, 0);
+  const schema::ListPartInner p(base, inner);
+  p.set_vtable(0x820112F8);
+  p.set_menu_player(0);
+  p.set_menu_enabled(0);
+  p.set_prompt_state(3);
+  p.set_leave_asked(0);
 }
 
 void ListPart(uint8_t* base, uint32_t part) {
   ITC_NATIVE_RUNNING("sub_82252908 ListPart::ListPart");
   ListPartBase(base, part);
-  Store(base, part + 0, 0x82011314);
-  ListPartInner(base, part + 20);
-  Store(base, part + 12, 16);
-  Store(base, part + 16, part + 20);
+  const schema::ListPart p(base, part);
+  p.set_vtable(0x82011314);
+  ListPartInner(base, p.inner_storage_address());
+  p.set_movie(16);
+  p.set_inner(p.inner_storage_address());
 }
 
 void ColorListScreen(uint8_t* base, uint32_t screen) {
   ITC_NATIVE_RUNNING("sub_822550F8 ColorListScreen::ColorListScreen");
   ListScreen(base, screen);
-  Store(base, screen + 0, 0x820114E0);
-  for (uint32_t offset : {10204u, 10212u, 10276u, 10284u, 10348u, 10356u, 10420u, 10428u}) {
-    Store(base, screen + offset, 0);
-  }
-  ColorNodeTable(base, screen + 10432);
-  const uint32_t count = Load(base, screen + 9680);
-  Store(base, screen + 9672, screen + 10432);
-  Store(base, screen + 10436, count);
+  const schema::ColorListScreen s(base, screen);
+  s.set_vtable(0x820114E0);
+  s.set_course_list_player(0);
+  s.set_course_list_enabled(0);
+  s.set_color_list_player(0);
+  s.set_color_list_enabled(0);
+  s.set_toggle_player(0);
+  s.set_toggle_enabled(0);
+  s.set_kind_list_player(0);
+  s.set_kind_list_enabled(0);
+  ColorNodeTable(base, s.color_table_address());
+  const uint32_t count = s.movie();
+  s.set_node_table(s.color_table_address());
+  s.set_table_movie(count);
   for (uint32_t i = 0; i < 5; i++) {
-    Store(base, screen + 11016 + 4 * i, 545 + i);  // +11016 to +11032: 545 to 549
+    // +11016 to +11032 (text_items to text_colors): 545 to 549
+    Store(base, s.text_items_address() + 4 * i, 545 + i);
   }
-  Store(base, screen + 11036, kNone);
+  s.set_text_part(kNone);
 }
 
 void Type7ListScreen(uint8_t* base, uint32_t screen) {
   ITC_NATIVE_RUNNING("sub_82242BE8 Type7ListScreen::Type7ListScreen");
   ColorListScreen(base, screen);
-  Store(base, screen + 0, 0x82010F18);
-  ListPart(base, screen + 11040);
-  Store(base, screen + 9676, screen + 11040);
-  static constexpr uint32_t kWords[][2] = {
-      {9832, 165},  {9840, 166},  {9844, 168},  {9848, 167},  {9852, 169},  {9856, 170},
-      {9860, 0},    {9868, 47},   {9872, 171},  {9876, 5},    {9884, 82},   {9892, 6},
-      {9896, 7},    {9900, 87},   {9904, 139},  {9908, 140},  {9912, 100},  {9916, 101},
-      {9920, 20},   {9924, 21},   {9728, 6},    {9724, 16},   {9720, 11},   {10916, 79},
-      {10920, 76},  {10924, 77},  {10932, 78},  {10936, 80},  {10940, 81},  {10952, 67},
-      {10956, 64},  {10960, 65},  {10968, 66},  {10972, 68},  {10976, 69},
-      {10440, 12},  // the node table's +8 and +12, stored directly
-      {10444, 11},
-  };
-  for (const auto& w : kWords) {
-    Store(base, screen + w[0], w[1]);
-  }
-  const uint32_t table = Load(base, screen + 9672);
-  Store(base, screen + 9716, 10);
-  Store(base, screen + 9712, 0);
-  Store(base, screen + 9800, 0);
-  Store(base, screen + 9752, 8);
-  Store(base, screen + 9756, 9);
-  Store(base, screen + 9804, 1);
-  Store(base, screen + 9768, 3);
-  Store(base, screen + 9748, 0);
-  Store(base, table + 296, 6);
+  const schema::Type7ListScreen s(base, screen);
+  s.set_vtable(0x82010F18);
+  ListPart(base, s.part_address());
+  s.set_list_part(s.part_address());
+  s.set_open_anim(165);
+  s.set_first_to_items_anim(166);
+  s.set_items_to_first_anim(168);
+  s.set_items_to_colors_anim(167);
+  s.set_colors_to_items_anim(169);
+  s.set_open_loop_a(170);
+  s.set_open_loop_b(0);
+  s.set_shown_loop_a(47);
+  s.set_items_loop(171);
+  s.set_shown_loop_b(5);
+  s.set_shown_loop_d(82);
+  s.set_toggle_anim_a(6);
+  s.set_toggle_anim_b(7);
+  s.set_selection_anim(87);
+  s.set_item_up_anim(139);
+  s.set_item_down_anim(140);
+  s.set_first_back_anim(100);
+  s.set_first_forward_anim(101);
+  s.set_color_back_anim(20);
+  s.set_color_forward_anim(21);
+  s.set_text_sub_scene(6);
+  s.set_selection_sub_scene(16);
+  s.set_text_child_b(11);
+  s.set_table_word_10916(79);
+  s.set_table_word_10920(76);
+  s.set_table_word_10924(77);
+  s.set_table_word_10932(78);
+  s.set_table_word_10936(80);
+  s.set_table_word_10940(81);
+  s.set_table_word_10952(67);
+  s.set_table_word_10956(64);
+  s.set_table_word_10960(65);
+  s.set_table_word_10968(66);
+  s.set_table_word_10972(68);
+  s.set_table_word_10976(69);
+  s.set_table_node_set_a(12);  // the node table's +8 and +12, stored directly
+  s.set_table_node_set_b(11);
+  const uint32_t table = s.node_table().address;
+  s.set_text_child_a(10);
+  s.set_title_child(0);
+  s.set_arrow_on_frame(0);
+  s.set_arrow_child_a(8);
+  s.set_arrow_child_b(9);
+  s.set_arrow_off_frame(1);
+  s.set_selection_child(3);
+  s.set_shown_child(0);
+  Store(base, schema::ColorNodeTable(base, table).children_address(), 6);
   for (uint32_t i = 1; i < 4; i++) {
-    Store(base, Load(base, screen + 9672) + 296 + 4 * i, 6 + i);  // +300 to +308: 7 to 9
+    const schema::ColorNodeTable t(base, s.node_table().address);
+    Store(base, t.children_address() + 4 * i, 6 + i);  // +300 to +308: 7 to 9
   }
-  Store(base, screen + 9784, 2);
-  Store(base, screen + 9788, 1);
+  s.set_children_count(2);
+  s.set_shown_child_on(1);
   // 15 items, through the table at +10432 directly: +16 + 4i = 48 + i,
   // +156 + 4i = 1 + i, +312 + 4i = the record's mask.
   for (uint32_t i = 0; i < 15; i++) {
-    const uint32_t item = screen + 10448 + 4 * i;
-    Store(base, item, 48 + i);
-    Store(base, item + 140, 1 + i);
-    const uint32_t record = kType7Records + kType7RecordBytes * i;
-    const int32_t count = int32_t(Load(base, record));
+    Store(base, s.table_item_anim_0_address() + 4 * i, 48 + i);
+    Store(base, s.table_item_node_0_address() + 4 * i, 1 + i);
+    const schema::Type7ListRecord record(
+        base, schema::ScreenConstructorsGlobals::type7_list_records_address() +
+                  schema::Type7ListRecord::kSize * i);
+    const int32_t count = record.count();
     uint32_t mask = 0;
     if (count >= 2) {
-      mask = Bit(Load(base, record + 16)) | Bit(Load(base, record + 12));
+      mask = Bit(record.bit_b()) | Bit(record.bit_a());
     } else if (count != 0) {
-      mask = Bit(Load(base, record + 12));
+      mask = Bit(record.bit_a());
     }
-    Store(base, item + 296, mask);
+    Store(base, s.table_item_mask_0_address() + 4 * i, mask);
   }
-  Store(base, screen + 10852, 5);
-  Store(base, screen + 10856, 20);
+  s.set_table_extra_node_base(5);
+  s.set_table_text_node_base(20);
   for (uint32_t i = 0; i < 3; i++) {
-    Store(base, screen + 9936 + 4 * i, 129 + i);
-    Store(base, screen + 9976 + 4 * i, 90 + i);
-    Store(base, screen + 10016 + 4 * i, 10 + i);
+    Store(base, s.item_anims_address() + 4 * i, 129 + i);
+    Store(base, s.first_anims_address() + 4 * i, 90 + i);
+    Store(base, s.color_anims_address() + 4 * i, 10 + i);
   }
-  Store(base, screen + 9736, 9);
-  Store(base, screen + 9808, 0);
-  Store(base, screen + 9732, 2);
-  Store(base, screen + 9740, 1);
-  Store(base, screen + 9816, 0);
-  Store(base, screen + 9744, 21);
-  Store(base, screen + 10056, 141);
-  Store(base, screen + 9776, 0x826371A4);
-  Store(base, screen + 10060, 142);
-  Store(base, screen + 10064, 143);
-  Store(base, screen + 10096, 155);
-  Store(base, screen + 10104, 157);
-  Store(base, screen + 9812, 4);
-  Store(base, screen + 10100, 156);
-  Store(base, screen + 9828, 0);
-  Store(base, screen + 9684, 0);
-  Store(base, screen + 9928, 152);
-  Store(base, screen + 9932, 151);
+  s.set_color_cursor_node(9);
+  s.set_color_cursor_child(0);
+  s.set_icon_sub_scene(2);
+  s.set_scroll_sub_scene(1);
+  s.set_scroll_child(0);
+  s.set_item_cursor_node(21);
+  s.set_item_anim_b_0(141);
+  s.set_selection_children(0x826371A4);
+  s.set_item_anim_b_1(142);
+  s.set_item_anim_b_2(143);
+  s.set_item_anim_c_0(155);
+  s.set_item_anim_c_2(157);
+  s.set_icon_child(4);
+  s.set_item_anim_c_1(156);
+  s.set_item_cursor_child(0);
+  s.set_unknown_9684(0);
+  s.set_scroll_down_anim(152);
+  s.set_scroll_up_anim(151);
 }
 
 void NodeListScreen(uint8_t* base, uint32_t screen) {
   ITC_NATIVE_RUNNING("sub_82256F68 NodeListScreen::NodeListScreen");
   ListScreen(base, screen);
-  Store(base, screen + 0, 0x82011558);
-  for (uint32_t offset : {10204u, 10212u, 10276u, 10284u, 10348u, 10356u}) {
-    Store(base, screen + offset, 0);
-  }
-  PairedNodeTable(base, screen + 10360);
-  Store(base, screen + 9672, screen + 10360);
-  Store(base, screen + 9680, 25);
-  Store(base, screen + 10364, 25);
+  const schema::NodeListScreen s(base, screen);
+  s.set_vtable(0x82011558);
+  s.set_kind_list_player(0);
+  s.set_kind_list_enabled(0);
+  s.set_course_list_player(0);
+  s.set_course_list_enabled(0);
+  s.set_toggle_player(0);
+  s.set_toggle_enabled(0);
+  PairedNodeTable(base, s.paired_table_address());
+  s.set_node_table(s.paired_table_address());
+  s.set_movie(25);
+  s.set_table_movie(25);
 }
 
 void TitledListScreen(uint8_t* base, uint32_t screen) {
   ITC_NATIVE_RUNNING("sub_822570F0 TitledListScreen::TitledListScreen");
   NodeListScreen(base, screen);
-  Store(base, screen + 0, 0x820115C8);
-  Store(base, screen + 10820, 923);
+  const schema::Type6ListScreen s(base, screen);  // TitledListScreen's layout
+  s.set_vtable(0x820115C8);
+  s.set_scroll_text_id(923);
 }
 
 void Type6ListScreen(uint8_t* base, uint32_t screen) {
   ITC_NATIVE_RUNNING("sub_822330F0 Type6ListScreen::Type6ListScreen");
   TitledListScreen(base, screen);
-  Store(base, screen + 0, 0x820109A8);
-  ListPart(base, screen + 10824);
-  Store(base, screen + 9676, screen + 10824);
-  static constexpr uint32_t kWords[][2] = {
-      {9712, 0},   {9716, 10},  {9720, 11},  {9724, 15},  {9728, 7},   {9732, 2},
-      {9740, 1},   {9744, 8},   {9748, 0},   {9752, 8},   {9756, 9},   {9760, 19},
-      {9768, 3},   {9784, 0},   {9788, 0},   {9800, 0},   {9804, 1},   {9812, 4},
-      {9816, 0},   {9828, 0},   {9832, 104}, {9856, 105}, {9860, 0},   {9868, 98},
-      {9872, 107}, {9876, 5},   {9880, 106}, {9892, 6},   {9896, 7},   {9900, 103},
-      {9904, 20},  {9908, 21},  {9928, 33},  {9932, 32},
-  };
-  for (const auto& w : kWords) {
-    Store(base, screen + w[0], w[1]);
-  }
+  const schema::Type6ListScreen s(base, screen);
+  s.set_vtable(0x820109A8);
+  ListPart(base, s.part_address());
+  s.set_list_part(s.part_address());
+  s.set_title_child(0);
+  s.set_text_child_a(10);
+  s.set_text_child_b(11);
+  s.set_selection_sub_scene(15);
+  s.set_text_sub_scene(7);
+  s.set_icon_sub_scene(2);
+  s.set_scroll_sub_scene(1);
+  s.set_item_cursor_node(8);
+  s.set_shown_child(0);
+  s.set_arrow_child_a(8);
+  s.set_arrow_child_b(9);
+  s.set_selection_node(19);
+  s.set_selection_child(3);
+  s.set_children_count(0);
+  s.set_shown_child_on(0);
+  s.set_arrow_on_frame(0);
+  s.set_arrow_off_frame(1);
+  s.set_icon_child(4);
+  s.set_scroll_child(0);
+  s.set_item_cursor_child(0);
+  s.set_open_anim(104);
+  s.set_open_loop_a(105);
+  s.set_open_loop_b(0);
+  s.set_shown_loop_a(98);
+  s.set_items_loop(107);
+  s.set_shown_loop_b(5);
+  s.set_shown_loop_c(106);
+  s.set_toggle_anim_a(6);
+  s.set_toggle_anim_b(7);
+  s.set_selection_anim(103);
+  s.set_item_up_anim(20);
+  s.set_item_down_anim(21);
+  s.set_scroll_down_anim(33);
+  s.set_scroll_up_anim(32);
   for (uint32_t i = 0; i < 8; i++) {
-    Store(base, screen + 9936 + 4 * i, 10 + i);  // +9936 to +9964: 10 to 17
+    Store(base, s.item_anims_address() + 4 * i, 10 + i);  // +9936 to +9964: 10 to 17
   }
   // The node table's words, each through [+9672] read again.
-  auto table = [&](uint32_t offset, uint32_t value) {
-    Store(base, Load(base, screen + 9672) + offset, value);
-  };
-  table(8, 10);
-  table(12, 9);
+  auto table = [&] { return schema::PairedNodeTable(base, s.node_table().address); };
+  table().set_node_set_a(10);
+  table().set_node_set_b(9);
   for (uint32_t i = 0; i < 4; i++) {
-    table(296 + 4 * i, 6 + i);  // +296 to +308: 6 to 9
+    const auto t = table();
+    Store(base, t.children_address() + 4 * i, 6 + i);  // +296 to +308: 6 to 9
   }
   for (uint32_t i = 0; i < 27; i++) {
-    table(156 + 4 * i, 1 + i);  // +156 to +260: 1 to 27
-    table(16 + 4 * i, 46 + i);  // +16 to +120: 46 to 72
+    const auto t = table();
+    Store(base, t.item_nodes_address() + 4 * i, 1 + i);  // +156 to +260: 1 to 27
+    const auto u = table();
+    Store(base, u.item_anims_address() + 4 * i, 46 + i);  // +16 to +120: 46 to 72
   }
   for (uint32_t i = 0; i < 8; i++) {
-    table(124 + 4 * i, 77 + i);  // +124 to +152: 77 to 84
+    const auto t = table();
+    Store(base, t.more_anims_address() + 4 * i, 77 + i);  // +124 to +152: 77 to 84
   }
-  table(420, 6);
-  table(424, 55);
+  table().set_extra_node_base(6);
+  table().set_text_node_base(55);
 }
 
 uint32_t NodeScreen(uint8_t* base, uint32_t screen, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8225A3D8 NodeScreen::NodeScreen");
   const uint32_t frame = sp - kNodeScreenFrame;
   Store(base, sp + 20, screen);  // its caller's frame
-  boot_mode::ScreenMachineConstruct(base, screen + 460);
-  PairedNodeTable(base, screen);
+  boot_mode::ScreenMachineConstruct(base, schema::NodeScreen(base, screen).machine_address());
+  PairedNodeTable(base, screen);  // the screen's +0
   Store(base, frame + 92, 15);
-  Store(base, screen + 0, 0x820116B8);
+  schema::NodeScreen(base, screen).set_vtable(0x820116B8);
   Store(base, frame + 84, 0);
   Store(base, frame + 88, 0);
   Store(base, frame + 80, 0);
-  Store(base, frame + 100, screen + 10456);
+  Store(base, frame + 100, schema::NodeScreen(base, screen).record_texts_address() + 40);
   Store(base, frame + 96, 10);
-  const uint32_t s = Load(base, sp + 20);
-  Store(base, s + 10200, 0);
-  Store(base, s + 10192, 0);
-  Store(base, s + 10272, Load(base, frame + 84));
-  Store(base, s + 10264, Load(base, frame + 88));
-  Store(base, s + 4, 15);
+  const schema::NodeScreen s(base, Load(base, sp + 20));
+  s.set_course_list_enabled(0);
+  s.set_course_list_player(0);
+  s.set_toggle_enabled(Load(base, frame + 84));
+  s.set_toggle_player(Load(base, frame + 88));
+  s.set_table_movie(15);
   const uint32_t runs = Load(base, frame + 100);
-  Store(base, s + 10100, 15);
-  Store(base, s + 10276, kNone);
-  Fill(base, s + 10284, s + 10340, kNone);
-  Fill(base, s + 10392, s + 10412, kNone);
-  Store(base, s + 10536, kNone);
-  Store(base, s + 10540, kNone);
+  s.set_movie(15);
+  s.set_sub_scene(kNone);
+  Fill(base, s.open_anim_address(), s.item_down_anim_address(), kNone);  // +10284 to +10340
+  Fill(base, s.records_anim_address(), s.text_child_b_address(), kNone);  // +10392 to +10412
+  s.set_arrow_on_frame(kNone);
+  s.set_arrow_off_frame(kNone);
   // Three runs of ten words through the frame's word (+10416 to +10532).
   for (uint32_t i = 0; i < 10; i++) {
     Store(base, runs - 40 + 4 * i, kNone);
     Store(base, runs + 4 * i, kNone);
     Store(base, runs + 40 + 4 * i, kNone);
   }
-  Fill(base, s + 10352, s + 10388, kNone);
-  return s;
+  Fill(base, s.item_anims_address(), s.item_anims_address() + 36, kNone);  // +10352 to +10388
+  return s.address;
 }
 
 void Type6NodeScreen(uint8_t* base, uint32_t screen, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82236C30 Type6NodeScreen::Type6NodeScreen");
   NodeScreen(base, screen, sp - kType6NodeScreenFrame);
-  Store(base, screen + 0, 0x82010A80);
+  const schema::NodeScreen s(base, screen);
+  s.set_vtable(0x82010A80);
   // The node table (the screen's +0).
-  Store(base, screen + 8, 11);
-  Store(base, screen + 12, 10);
+  s.set_table_node_set_a(11);
+  s.set_table_node_set_b(10);
   for (uint32_t i = 0; i < 27; i++) {
-    Store(base, screen + 16 + 4 * i, 48 + i);  // +16 to +120: 48 to 74
-    Store(base, screen + 156 + 4 * i, 1 + i);  // +156 to +260: 1 to 27
+    Store(base, s.table_item_anims_address() + 4 * i, 48 + i);  // +16 to +120: 48 to 74
+    Store(base, s.table_item_nodes_address() + 4 * i, 1 + i);   // +156 to +260: 1 to 27
   }
   for (uint32_t i = 0; i < 8; i++) {
-    Store(base, screen + 124 + 4 * i, 79 + i);  // +124 to +152: 79 to 86
+    Store(base, s.table_more_anims_address() + 4 * i, 79 + i);  // +124 to +152: 79 to 86
   }
   for (uint32_t i = 0; i < 4; i++) {
-    Store(base, screen + 296 + 4 * i, 6 + i);  // +296 to +308: 6 to 9
+    Store(base, s.table_children_address() + 4 * i, 6 + i);  // +296 to +308: 6 to 9
   }
-  Store(base, screen + 420, 6);
-  Store(base, screen + 424, 55);
-  static constexpr uint32_t kWords[][2] = {
-      {10276, 8},   {10280, 5},   {10284, 101}, {10296, 0},  {10304, 47}, {10308, 102},
-      {10312, 43},  {10324, 44},  {10328, 45},  {10336, 16}, {10340, 17}, {10344, 29},
-      {10348, 28},  {10392, 103}, {10396, 8},   {10400, 9},  {10404, 0},  {10408, 10},
-      {10412, 11},  {10536, 0},   {10540, 1},   {10544, 15}, {10548, 0},
-  };
-  for (const auto& w : kWords) {
-    Store(base, screen + w[0], w[1]);
-  }
+  s.set_table_extra_node_base(6);
+  s.set_table_text_node_base(55);
+  s.set_sub_scene(8);
+  s.set_cursor_node(5);
+  s.set_open_anim(101);
+  s.set_open_loop_b(0);
+  s.set_shown_loop_a(47);
+  s.set_shown_loop_b(102);
+  s.set_shown_loop_c(43);
+  s.set_toggle_anim_a(44);
+  s.set_toggle_anim_b(45);
+  s.set_item_up_anim(16);
+  s.set_item_down_anim(17);
+  s.set_scroll_down_anim(29);
+  s.set_scroll_up_anim(28);
+  s.set_records_anim(103);
+  s.set_arrow_child_a(8);
+  s.set_arrow_child_b(9);
+  s.set_title_child(0);
+  s.set_text_child_a(10);
+  s.set_text_child_b(11);
+  s.set_arrow_on_frame(0);
+  s.set_arrow_off_frame(1);
+  s.set_course_node(15);
+  s.set_cursor_child(0);
   for (uint32_t i = 0; i < 6; i++) {
-    Store(base, screen + 10352 + 4 * i, 6 + i);  // +10352 to +10372: 6 to 11
+    Store(base, s.item_anims_address() + 4 * i, 6 + i);  // +10352 to +10372: 6 to 11
   }
   for (uint32_t i = 0; i < 10; i++) {
-    Store(base, screen + 10416 + 4 * i, 30 + 5 * i);  // 30, 35, ... 75
-    Store(base, screen + 10456 + 4 * i, 31 + 5 * i);  // 31, 36, ... 76
-    Store(base, screen + 10496 + 4 * i, 32 + 5 * i);  // 32, 37, ... 77
+    Store(base, s.record_texts_address() + 4 * i, 30 + 5 * i);       // 30, 35, ... 75
+    Store(base, s.record_texts_address() + 40 + 4 * i, 31 + 5 * i);  // 31, 36, ... 76
+    Store(base, s.record_texts_address() + 80 + 4 * i, 32 + 5 * i);  // 32, 37, ... 77
   }
 }
 
@@ -726,37 +840,39 @@ void Type7PanelScreen(uint8_t* base, uint32_t screen, uint32_t sp, const New& ne
 void Type6Screens(uint8_t* base, uint32_t block, uint32_t sp, const New& new_panel) {
   ITC_NATIVE_RUNNING("sub_822366F0 Type6Screens::Type6Screens");
   const uint32_t members = sp - kScreensFrame;
-  Store(base, block + 0, 0x82010A78);
+  const schema::Type6Screens b(base, block);
+  b.set_vtable(0x82010A78);
   Type6Screen0(base, block + 4);
   boot_mode::ScreenMachineConstruct(base, block + 9672);
-  Type6ListScreen(base, block + 19432);
-  Type6NodeScreen(base, block + 30396, members);
-  Type6PanelScreen(base, block + 40948, members, new_panel);
+  Type6ListScreen(base, b.list_screen_address());
+  Type6NodeScreen(base, b.node_screen_address(), members);
+  Type6PanelScreen(base, b.panel_screen_address(), members, new_panel);
   boot_mode::ScreenMachineConstruct(base, block + 52696);
-  Store(base, block + 52692, 0x82010A68);
+  b.set_power_graph_vtable(0x82010A68);
   boot_mode::ScreenMachineConstruct(base, block + 62336);
   boot_mode::ScreenMachineConstruct(base, block + 71976);
   boot_mode::ScreenMachineConstruct(base, block + 81616);
-  Store(base, block + 91260, 0);
-  guest::StoreU8(base, block + 91256, 0);
-  Store(base, block + 91264, 0);
+  b.set_answer_word(0);
+  b.set_answer(0);
+  b.set_phase(0);
 }
 
 void Type7Screens(uint8_t* base, uint32_t block, uint32_t sp, const New& new_panel) {
   ITC_NATIVE_RUNNING("sub_82246B28 Type7Screens::Type7Screens");
   const uint32_t members = sp - kScreensFrame;
-  Store(base, block + 0, 0x82010FE0);
+  const schema::Type7Screens b(base, block);
+  b.set_vtable(0x82010FE0);
   Type7Screen0(base, block + 4);
   boot_mode::ScreenMachineConstruct(base, block + 9664);
-  Type7ListScreen(base, block + 19428);
-  Type7PanelScreen(base, block + 30608, members, new_panel);
+  Type7ListScreen(base, b.list_screen_address());
+  Type7PanelScreen(base, b.panel_screen_address(), members, new_panel);
   boot_mode::ScreenMachineConstruct(base, block + 42356);
-  Store(base, block + 42352, 0x82010FD0);
+  b.set_power_graph_vtable(0x82010FD0);
   boot_mode::ScreenMachineConstruct(base, block + 51996);
   boot_mode::ScreenMachineConstruct(base, block + 61636);
-  Store(base, block + 71280, 0);
-  guest::StoreU8(base, block + 71276, 0);
-  Store(base, block + 71284, 0);
+  b.set_answer_word(0);
+  b.set_answer(0);
+  b.set_phase(0);
 }
 
 }  // namespace screen_constructors

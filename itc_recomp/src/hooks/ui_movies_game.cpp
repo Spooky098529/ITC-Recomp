@@ -2,6 +2,8 @@
 // src/ui_movies/game.cpp (docs/functions/ui-movies-game.md).
 
 #include "guest.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
@@ -23,6 +25,10 @@
 #include "hooks/strings_and_font.h"
 #include "memory/c_runtime_heap.h"
 #include "hooks/ui_movies_game.h"
+#include "schema/app_start_up.h"
+#include "schema/strings_and_font.h"
+#include "schema/tuning_screen.h"
+#include "schema/ui_movies_game.h"
 #include "strings_and_font/strings_and_font.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
@@ -153,7 +159,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211AC00) {
   
   NATIVE_OR_ORIGINAL(8211AC00);
   const uint32_t node = ui_movies::FindNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
-  guest::StoreU32(base, node + 80, 1);
+  schema::UiMovieNode(base, node).set_visible(1);
   ctx.r3.u64 = node;
 }
 
@@ -161,7 +167,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211AC48) {
   
   NATIVE_OR_ORIGINAL(8211AC48);
   const uint32_t node = ui_movies::FindNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
-  guest::StoreU32(base, node + 80, 0);
+  schema::UiMovieNode(base, node).set_visible(0);
   ctx.r3.u64 = node;
 }
 
@@ -172,9 +178,9 @@ ITC_NATIVE_ENTRY_ALWAYS(8211AAA8) {
   NATIVE_OR_ORIGINAL(8211AAA8);
   const uint32_t movie = ctx.r3.u32;
   const uint32_t picture = ui_movies::FindNode(base, movie, ctx.r4.u32, ctx.r5.u32);
-  const uint32_t slot = ui_movies::PictureTextureSlot(base, movie, picture);
-  const uint32_t old = guest::LoadU32(base, slot);
-  guest::StoreU32(base, slot, ctx.r6.u32);
+  const schema::UiMovieWord slot(base, ui_movies::PictureTextureSlot(base, movie, picture));
+  const uint32_t old = slot.value();
+  slot.set_value(ctx.r6.u32);
   ctx.r3.u64 = old;
 }
 
@@ -269,7 +275,7 @@ void CopySlot(lifted::Regs& ctx, uint8_t* base, uint32_t to, uint32_t from, uint
     ctx.r3.u64 = to;
     ctx.r4.u64 = from;
     ctx.r5.u64 = 40;
-    lifted::CallFromContext(ctx, base, 0x825A7410);
+    lifted::Enter(ctx, base, game::memcpy_825A7410);
   });
   ctx.lr = lr;
 }
@@ -331,7 +337,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211AD00) {
     return;  // a harness's (the race HUD object's)
   }
   NATIVE_OR_ORIGINAL(8211AD00);
-  constexpr uint32_t kScene = 0x826BABA0;
+  constexpr uint32_t kScene = schema::AppStartUpGlobals::render_app_address();
   ui_movies::ClearScreenFlag(base);
   const uint64_t lr = ctx.lr;
   uint32_t list = 0, renderer = 0;
@@ -504,7 +510,8 @@ ITC_REGS_STEP(DrawTexts) {
   NATIVE_OR_ORIGINAL(8211CD90);
   const uint32_t movie = ctx.r3.u32, list = ctx.r4.u32;
   const bool draw_only = ctx.r5.u32 != 0;
-  if (guest::LoadU32(base, list + 8) == 0) {
+  const schema::UiMovieDrawTextList texts(base, list);
+  if (texts.count() == 0) {
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -521,14 +528,14 @@ ITC_REGS_STEP(DrawTexts) {
       }
       ui_movies::DrawTextsItem(base, frame, movie, draw_only);
       // Text::Draw (its adapter: the render queue's guest call).
-      ctx.r3.u64 = guest::LoadU32(base, strings_and_font::kStrings);
+      ctx.r3.u64 = guest::LoadU32(base, schema::StringsAndFontGlobals::strings_address());
       ctx.r4.u64 = frame + ui_movies::kDrawTextsParams;
       ctx.r5.u64 = frame + ui_movies::kDrawTextsBuffer;
       ctx.lr = 0x8211D190;
-      lifted::CallFromContext(ctx, base, 0x8210A758);
+      lifted::Enter(ctx, base, game::Text::Draw);
       ctx.fpscr.disableFlushMode();
       ctx.r3.u64 = ui_movies::ClearTextItem(base, item);
-    } while (guest::LoadU32(base, list + 8) != 0);
+    } while (texts.count() != 0);
   });
   ctx.lr = lr;
 }
@@ -556,14 +563,15 @@ void FinishIn(lifted::Regs& ctx, uint8_t* base, uint32_t movie, uint32_t frame_b
     if (!found) {
       return;
     }
-    ctx.r3.u64 = guest::LoadU32(base, found->slot + 12);
-    ctx.r4.u64 = guest::LoadU32(base, found->slot + 16);
+    const schema::UiMovieAnimationSlot slot(base, found->slot);
+    ctx.r3.u64 = slot.scene();
+    ctx.r4.u64 = slot.animation();
     ctx.r6.u64 = 0;
     ctx.fpscr.disableFlushMode();
     ctx.f1.f64 = double(std::bit_cast<float>(found->time));
     ctx.lr = apply_return;
-    lifted::CallFromContext(ctx, base, 0x825A08E0);
-    const uint32_t queue = movie + ui_movies::kMovieQueue;
+    lifted::Enter(ctx, base, game::UiMovie::ApplyAnimation);
+    const uint32_t queue = schema::UiMovie(base, movie).queue_address();
     ui_movies::RemoveAt(base, queue, found->position);
     ctx.r3.u64 = queue;
   });
@@ -600,32 +608,33 @@ ITC_NATIVE_ENTRY_ALWAYS(8211D280) {
   NATIVE_OR_ORIGINAL(8211D280);
   ITC_NATIVE_RUNNING("sub_8211D280 UiMovie::Draw");
   const uint32_t movie = ctx.r3.u32;
+  const schema::UiMovie m(base, movie);
   const uint64_t lr = ctx.lr;
   guest_call::InFrame(ctx, base, 112, 0x8211D2A4, [&](uint32_t) {
     ctx.r3.u64 = movie;
-    ctx.r4.u64 = guest::LoadU32(base, movie + ui_movies::kMovieSaved);
-    ctx.r5.u64 = guest::LoadU32(base, movie + ui_movies::kMovieLive);
+    ctx.r4.u64 = m.saved_scene();
+    ctx.r5.u64 = m.live_scene();
     ctx.r6.u64 = 0;
     ctx.r7.u64 = 0;
     ctx.lr = 0x8211D2A4;
-    lifted::CallFromContext(ctx, base, 0x82119B80);
-    ctx.r3.u64 = movie + 64;
-    ctx.r4.u64 = guest::LoadU32(base, movie + ui_movies::kMovieLive);
-    ctx.r5.u64 = movie + ui_movies::kMovieTextures;
-    ctx.r6.u64 = movie + 40;
+    lifted::Enter(ctx, base, game::UiMovie::RestorePose);
+    ctx.r3.u64 = m.draw_context_address();
+    ctx.r4.u64 = m.live_scene();
+    ctx.r5.u64 = m.textures_address();
+    ctx.r6.u64 = m.text_items_address();
     ctx.r7.s64 = -1;
     ctx.lr = 0x8211D2C4;
-    lifted::CallFromContext(ctx, base, 0x8259FA00);
+    lifted::Enter(ctx, base, game::UiMovie::Draw_8259FA00);
     ctx.r3.u64 = movie;
-    ctx.r4.u64 = movie + 40;
+    ctx.r4.u64 = m.text_items_address();
     ctx.r5.u64 = 0;
     ctx.lr = 0x8211D2D4;
-    lifted::CallFromContext(ctx, base, 0x8211CD90);
+    lifted::Enter(ctx, base, game::UiMovie::DrawTexts);
     for (uint32_t k = 0; k < 2; k++) {
-      ctx.r3.u64 = movie + 64;
+      ctx.r3.u64 = m.draw_context_address();
       ctx.r4.u64 = k == 0 ? 678 : 148;
       ctx.lr = k == 0 ? 0x8211D2E0 : 0x8211D2EC;
-      lifted::CallFromContext(ctx, base, 0x8259DAC0);
+      lifted::Enter(ctx, base, lifted::entry::e8259DAC0);
     }
   });
   ctx.lr = lr;
@@ -639,7 +648,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211E1B8) {
   
   NATIVE_OR_ORIGINAL(8211E1B8);
   ITC_NATIVE_RUNNING("sub_8211E1B8 UiMovie::Run");
-  lifted::CallFromContext(ctx, base, 0x8211D2F8);
+  lifted::Enter(ctx, base, game::UiMovie::Update);
 }
 
 // UiMovie::FinishAll (sub_8211DFF8): r3 = movie. Every looping slot moved
@@ -656,11 +665,11 @@ ITC_NATIVE_ENTRY_ALWAYS(8211DFF8) {
   NATIVE_UNWATCHED_OR_ORIGINAL(8211DFF8);
   ITC_NATIVE_RUNNING("sub_8211DFF8 UiMovie::FinishAll");
   const uint32_t movie = ctx.r3.u32;
-  const uint32_t queue = movie + ui_movies::kMovieQueue;
-  const uint32_t looping = movie + ui_movies::kMovieLooping;
+  const uint32_t queue = schema::UiMovie(base, movie).queue_address();
+  const uint32_t looping = schema::UiMovie(base, movie).looping_address();
   const uint64_t lr = ctx.lr;
   auto count = [&](uint32_t list) {
-    return uint32_t(int32_t(int16_t(guest::LoadU16(base, list + 136))));
+    return uint32_t(int32_t(int16_t(schema::UiMovieAnimationList(base, list).count())));
   };
   guest_call::InFrame(ctx, base, 176, 0x8211E05C, [&](uint32_t frame) {
     const uint32_t copy = frame + 80;
@@ -673,7 +682,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211DFF8) {
         ctx.r4.u64 = from;
         ctx.r5.u64 = 40;
         ctx.lr = return_address;
-        lifted::CallFromContext(ctx, base, 0x825A7410);
+        lifted::Enter(ctx, base, game::memcpy_825A7410);
       }
       ctx.r3.u64 = copy;
     };
@@ -686,20 +695,21 @@ ITC_NATIVE_ENTRY_ALWAYS(8211DFF8) {
         ctx.r4.u64 = copy;
         ctx.r5.s64 = int32_t(count(queue));
         ctx.lr = 0x8211E0A0;
-        lifted::CallFromContext(ctx, base, 0x8211B4D0);
+        lifted::Enter(ctx, base, game::AnimationList::Insert);
       } while (--n != 0);
     }
     n = count(queue);
     if (n != 0) {
       do {
         copy_first(queue, 0x8211E0F0);
-        ctx.r3.u64 = guest::LoadU32(base, copy + 12);
-        ctx.r4.u64 = guest::LoadU32(base, copy + 16);
+        const schema::UiMovieAnimationSlot slot(base, copy);
+        ctx.r3.u64 = slot.scene();
+        ctx.r4.u64 = slot.animation();
         ctx.r6.u64 = 0;
         ctx.fpscr.disableFlushMode();
         ctx.f1.f64 = double(std::bit_cast<float>(ui_movies::FinishTime(base, copy)));
         ctx.lr = 0x8211E118;
-        lifted::CallFromContext(ctx, base, 0x825A08E0);
+        lifted::Enter(ctx, base, game::UiMovie::ApplyAnimation);
         ui_movies::UnlinkQueueFirst(base, queue);
       } while (--n != 0);
     }
@@ -741,15 +751,17 @@ ITC_NATIVE_ENTRY_ALWAYS(8211B0E8) {
 ITC_NATIVE_ENTRY_ALWAYS(8211C168) {
   
   NATIVE_HEAP_OR_ORIGINAL(8211C168,
-                          ui_movies::PairsSet(base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32),
-                                              guest::LoadU32(base, ctx.r5.u32)));
+                          ui_movies::PairsSet(base, ctx.r3.u32,
+                                              schema::UiMovieWord(base, ctx.r4.u32).value(),
+                                              schema::UiMovieWord(base, ctx.r5.u32).value()));
 }
 
 // sub_8211AE68: r3 = a vector of words, r4 = the word's address.
 ITC_NATIVE_ENTRY_ALWAYS(8211AE68) {
   
   NATIVE_HEAP_OR_ORIGINAL(8211AE68,
-                          ui_movies::WordsAppend(base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32)));
+                          ui_movies::WordsAppend(base, ctx.r3.u32,
+                                                 schema::UiMovieWord(base, ctx.r4.u32).value()));
 }
 
 // UiMovie::UiMovie: r3 = movie; returned.
@@ -802,7 +814,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211BEE8) {
     ui_movies::EffectBegin(base, frame);
     ctx.r3.u64 = 0;
     ctx.lr = 0x8211BF9C;
-    lifted::CallFromContext(ctx, base, 0x8209F7A8);
+    lifted::Enter(ctx, base, game::CameraPasses::RenderTarget);
     const uint32_t texture = ctx.r3.u32;
     ctx.fpscr.disableFlushMode();
     const double depth = ui_movies::EffectQuad(base, frame, primitive, texture);
@@ -811,7 +823,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211BEE8) {
     ctx.fpscr.disableFlushMode();
     ctx.f1.f64 = depth;
     ctx.lr = 0x8211C154;
-    lifted::CallFromContext(ctx, base, 0x8259EBE8);
+    lifted::Enter(ctx, base, lifted::entry::e8259EBE8);
   });
   ctx.lr = lr;
 }
@@ -1091,8 +1103,8 @@ uint32_t CallFrom(lifted::Regs& ctx, uint8_t* base, uint32_t sp, uint32_t bytes,
 uint32_t SetPair(lifted::Regs& ctx, uint8_t* base, uint32_t sp, uint32_t back,
                  uint32_t key_address, uint32_t value_address) {
   if (const auto r3 = ui_movies::PairsSet(base, ui_movies::kMovieTable,
-                                          guest::LoadU32(base, key_address),
-                                          guest::LoadU32(base, value_address))) {
+                                          schema::UiMovieWord(base, key_address).value(),
+                                          schema::UiMovieWord(base, value_address).value())) {
     return *r3;
   }
   return CallFrom(ctx, base, sp, 128, back, ITC_REGS_FN(lifted::original::c8211C168), ui_movies::kMovieTable,
@@ -1204,7 +1216,7 @@ ui_movies::OnLoadedCalls OnLoadedCalls(lifted::Regs& ctx, uint8_t* base, uint32_
     if (!native::Buffers_Memcpy(base, to, from, size, kBack[which])) {
       call(kBack[which],
            +[](lifted::Regs& ctx, uint8_t* base) {
-             lifted::CallFromContext(ctx, base, 0x825A7410);
+             lifted::Enter(ctx, base, game::memcpy_825A7410);
            },
            to, from, size);
     }
@@ -1278,7 +1290,7 @@ ui_movies::OnLoadedCalls OnLoadedCalls(lifted::Regs& ctx, uint8_t* base, uint32_
     call(0x8211E740, ITC_REGS_FN(lifted::original::c822A5B78), texture, 0, desc);
   };
   calls.append = [call, base](uint32_t vector, uint32_t word_address) {
-    if (!ui_movies::WordsAppend(base, vector, guest::LoadU32(base, word_address))) {
+    if (!ui_movies::WordsAppend(base, vector, schema::UiMovieWord(base, word_address).value())) {
       call(0x8211E75C, ITC_REGS_FN(lifted::original::c8211AE68), vector, word_address);
     }
   };

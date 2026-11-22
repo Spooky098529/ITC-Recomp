@@ -57,23 +57,26 @@ uint64_t OpenListMenu(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82184338 CarDealer::OpenListMenu");
   const uint32_t frame = Frame(base, sp, 160);
   const uint32_t movie = FindMovie(base, 4, frame + 96);
-  InitList(base, calls, frame, 0x8218439C, Load(base, kListMenu), 2, 2, 154, 153, 155, 156);
-  calls.Call(kListSetSelection, frame, 0x821843B0, Load(base, kListMenu),
-             Load(base, Load(base, kData) + 40));
-  SetKindBar(base, uint64_t(Load(base, Load(base, kData) + 40)) * 40, frame);
+  InitList(base, calls, frame, 0x8218439C, G::list_menu(base).address, 2, 2, 154, 153, 155, 156);
+  calls.Call(kListSetSelection, frame, 0x821843B0, G::list_menu(base).address,
+             G::data(base).kind_selection());
+  SetKindBar(base, uint64_t(G::data(base).kind_selection()) * 40, frame);
   SetText(calls, frame, 0x821843DC, movie, 8, 5, 124);
   SetText(calls, frame, 0x821843DC, movie, 8, 6, 125);
   const uint32_t second = ui_movies::FindNode(base, movie, 11, 1);
   const uint32_t first = ui_movies::FindNode(base, movie, 11, 0);
-  const uint32_t picked = uint32_t(calls.Call(kListSelection, frame, 0x82184418, Load(base, kListMenu)));
+  const uint32_t picked = uint32_t(calls.Call(kListSelection, frame, 0x82184418, G::list_menu(base).address));
   if (picked <= 1) {
-    Store(base, second + 108, picked);
-    Store(base, first + 108, picked);
+    Node(base, second).set_texture_entry(picked);
+    Node(base, first).set_texture_entry(picked);
   }
-  const uint64_t selection = calls.Call(kListSelection, frame, 0x82184440, Load(base, kListMenu));
+  const uint64_t selection = calls.Call(kListSelection, frame, 0x82184440, G::list_menu(base).address);
   uint64_t text = selection + 550;
   if (uint32_t(selection) <= 1) {
-    const uint32_t count = Load(base, Load(base, kData) + (uint32_t(selection) == 0 ? 616 : 1132));
+    const Data data = G::data(base);
+    const uint32_t count =
+        List(base, uint32_t(selection) == 0 ? data.first_list_address() : data.second_list_address())
+            .count();
     if (count == 0) {
       text = 583;  // the list empty
     }
@@ -85,56 +88,56 @@ uint64_t OpenCarList(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82184488 CarDealer::OpenCarList");
   const uint32_t frame = Frame(base, sp, 176);
   const uint32_t movie = FindMovie(base, 4, frame + 96);
-  const uint32_t n = Load(base, Load(base, Load(base, kData) + 1136) + 512);
+  const uint32_t n = G::data(base).shown_list().count();
   const bool few = int32_t(n) < 4;
   const uint64_t shown = few ? n : 4;
-  InitList(base, calls, frame, few ? 0x82184504 : 0x82184548, Load(base, kListMenu), n, shown,
+  InitList(base, calls, frame, few ? 0x82184504 : 0x82184548, G::list_menu(base).address, n, shown,
            154, 153, 155, 156);
-  InitList(base, calls, frame, few ? 0x82184534 : 0x82184578, Load(base, kColorMenu), n, shown,
+  InitList(base, calls, frame, few ? 0x82184534 : 0x82184578, G::color_menu(base).address, n, shown,
            162, 161, 153, 154);
-  calls.Call(kListSetSelection, frame, 0x82184588, Load(base, kListMenu),
-             Load(base, Load(base, kData) + 48));
-  Store(base, Load(base, kListMenu) + 4, Load(base, Load(base, kData) + 52));
-  calls.Call(kListFit, frame, 0x821845A4, Load(base, kListMenu), 1);
+  calls.Call(kListSetSelection, frame, 0x82184588, G::list_menu(base).address,
+             G::data(base).car_selection());
+  G::list_menu(base).set_scroll(G::data(base).car_scroll());
+  calls.Call(kListFit, frame, 0x821845A4, G::list_menu(base).address, 1);
   for (uint32_t i = 0; i < 4; i++) {
     const uint32_t card = ui_movies::FindNode(base, movie, 7, i + 5);
-    Store(base, card + 80, int32_t(i) < int32_t(n) ? 1 : 0);
+    Node(base, card).set_visible(int32_t(i) < int32_t(n) ? 1 : 0);
   }
   const uint32_t more = ui_movies::FindNode(base, movie, 7, 1);
   if (int32_t(n) > 4) {
-    Store(base, more + 80, 1);
-    SetScrollArrows(base, Load(base, Load(base, kListMenu) + 4), n, frame);
+    Node(base, more).set_visible(1);
+    SetScrollArrows(base, G::list_menu(base).scroll(), n, frame);
   } else {
-    Store(base, more + 80, 0);
+    Node(base, more).set_visible(0);
   }
   calls.Call(kCarCardsFillAll, frame, 0x82184618);
-  const uint64_t selection = calls.Call(kListSelection, frame, 0x82184620, Load(base, kListMenu));
-  const uint32_t index = (Load(base, Load(base, kListMenu) + 4) + uint32_t(selection)) << 2;
-  const uint32_t entry = Load(base, index + Load(base, Load(base, kData) + 1136));
-  return HelpLineSet(base, uint64_t(Load(base, entry + 8432)) + 1862, frame, calls);
+  const uint64_t selection = calls.Call(kListSelection, frame, 0x82184620, G::list_menu(base).address);
+  const uint32_t index = (G::list_menu(base).scroll() + uint32_t(selection)) << 2;
+  const Entry entry(base, Load(base, index + G::data(base).shown_list().address));
+  return HelpLineSet(base, uint64_t(entry.car_id()) + 1862, frame, calls);
 }
 
 uint64_t OpenCar(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82184650 CarDealer::OpenCar");
   const uint32_t frame = Frame(base, sp, 144);
   const uint32_t movie = FindMovie(base, 4, frame + 96);
-  InitList(base, calls, frame, 0x821846B4, Load(base, kListMenu), 2, 2, 154, 153, 155, 156);
-  calls.Call(kListSetSelection, frame, 0x821846CC, Load(base, kColorMenu),
-             Load(base, Load(base, kData) + 48));
-  Store(base, Load(base, kColorMenu) + 4, Load(base, Load(base, kData) + 52));
-  calls.Call(kListFit, frame, 0x821846E8, Load(base, kColorMenu), 1);
-  const uint64_t selection = calls.Call(kListSelection, frame, 0x821846F0, Load(base, kListMenu));
+  InitList(base, calls, frame, 0x821846B4, G::list_menu(base).address, 2, 2, 154, 153, 155, 156);
+  calls.Call(kListSetSelection, frame, 0x821846CC, G::color_menu(base).address,
+             G::data(base).car_selection());
+  G::color_menu(base).set_scroll(G::data(base).car_scroll());
+  calls.Call(kListFit, frame, 0x821846E8, G::color_menu(base).address, 1);
+  const uint64_t selection = calls.Call(kListSelection, frame, 0x821846F0, G::list_menu(base).address);
   SetKindBar(base, selection * 40, frame);
   SetText(calls, frame, 0x8218470C, movie, 8, 5, 127);
   SetText(calls, frame, 0x82184720, movie, 8, 6, 112);
   {
-    const uint32_t data = Load(base, kData);
-    ShowCarInfo(base, uint64_t(Load(base, data + 52)) + Load(base, data + 48), frame, calls);
+    const Data data = G::data(base);
+    ShowCarInfo(base, uint64_t(data.car_scroll()) + data.car_selection(), frame, calls);
   }
-  const uint32_t shown = Load(base, Load(base, Load(base, kData) + 1136) + 512) == 1 ? 0 : 1;
-  Store(base, ui_movies::FindNode(base, movie, kAll, 23) + 80, shown);
-  Store(base, ui_movies::FindNode(base, movie, kAll, 24) + 80, shown);
-  return calls.Call(kStageSetPlates, frame, 0x82184798, Load(base, Load(base, kStandHolder)), 0);
+  const uint32_t shown = G::data(base).shown_list().count() == 1 ? 0 : 1;
+  Node(base, ui_movies::FindNode(base, movie, kAll, 23)).set_visible(shown);
+  Node(base, ui_movies::FindNode(base, movie, kAll, 24)).set_visible(shown);
+  return calls.Call(kStageSetPlates, frame, 0x82184798, Stage(base), 0);
 }
 
 uint64_t OpenColors(uint8_t* base, uint32_t sp, const Calls& calls) {
@@ -143,49 +146,50 @@ uint64_t OpenColors(uint8_t* base, uint32_t sp, const Calls& calls) {
   Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask));
   const uint32_t frame = Frame(base, sp, 240);
   const uint32_t movie = FindMovie(base, 4, frame + 96);
-  uint32_t entry;
+  Entry entry;
   {
-    const uint32_t data = Load(base, kData);
-    const uint32_t index = (Load(base, data + 52) + Load(base, data + 48)) << 2;
-    entry = Load(base, index + Load(base, data + 1136));
+    const Data data = G::data(base);
+    const uint32_t index = (data.car_scroll() + data.car_selection()) << 2;
+    entry = Entry(base, Load(base, index + data.shown_list().address));
   }
-  const uint32_t n = Load(base, entry + 8376);
+  const uint32_t n = entry.color_count();
   const bool over = int32_t(n) > 9;
-  InitList(base, calls, frame, over ? 0x82184838 : 0x82184858, Load(base, kListMenu), n,
+  InitList(base, calls, frame, over ? 0x82184838 : 0x82184858, G::list_menu(base).address, n,
            over ? 9 : n, 154, 153, 155, 156);
-  calls.Call(kListSetSelection, frame, 0x82184868, Load(base, kListMenu),
-             Load(base, Load(base, kData) + 56));
-  Store(base, Load(base, kListMenu) + 4, Load(base, Load(base, kData) + 60));
-  calls.Call(kListFit, frame, 0x82184884, Load(base, kListMenu), 1);
-  const uint64_t selection = calls.Call(kListSelection, frame, 0x8218488C, Load(base, kListMenu));
+  calls.Call(kListSetSelection, frame, 0x82184868, G::list_menu(base).address,
+             G::data(base).color_selection());
+  G::list_menu(base).set_scroll(G::data(base).color_scroll());
+  calls.Call(kListFit, frame, 0x82184884, G::list_menu(base).address, 1);
+  const uint64_t selection = calls.Call(kListSelection, frame, 0x8218488C, G::list_menu(base).address);
   SetColorBar(base, uint64_t(uint32_t(selection) << 5) + 3, frame);
-  Store(base, ui_movies::FindNode(base, movie, kAll, 25) + 80, over ? 1 : 0);
+  Node(base, ui_movies::FindNode(base, movie, kAll, 25)).set_visible(over ? 1 : 0);
   // The old color records freed, from the last.
-  while (Load(base, Load(base, kData) + 1192) != 0) {
-    const uint32_t colors = Load(base, kData) + 1140;
-    const uint32_t last = Load(base, colors + 52) - 1;
-    Store(base, colors + 52, last);
-    calls.Call(kVirtualFree, frame, 0x821848F0, Load(base, (last << 2) + colors), 0, 0x8000);
+  while (Colors(base, G::data(base).colors_address()).count() != 0) {
+    const Colors colors(base, G::data(base).colors_address());
+    const uint32_t last = colors.count() - 1;
+    colors.set_count(last);
+    calls.Call(kVirtualFree, frame, 0x821848F0, Load(base, (last << 2) + colors.address), 0,
+               0x8000);
   }
   if (int32_t(n) > 0) {
-    // Each color (20-byte records from +8116: +0 the kind, +4 the hue, +6
-    // the saturation, +7 the value) into a 32-byte record: +16 to +24 the
-    // HSV floats, +0 to +8 the RGB integers.
+    // Each of the entry's colors (CarDealerSpecColor) into a 32-byte record:
+    // +16 to +24 the HSV floats, +0 to +8 the RGB integers.
     const double scale = double(guest::LoadFloat(base, 0x82000C44));
     const double unit = double(guest::LoadFloat(base, 0x82002200));
-    uint32_t source = entry + 8116;
-    for (uint32_t left = n; left != 0; left--, source += 20) {
-      const uint32_t record = uint32_t(calls.Call(kVirtualAlloc, frame, 0x8218493C, 0, 32, 4096, 4));
-      const int64_t hue = int64_t(int32_t(guest::LoadU16(base, source + 4)));
+    SpecColor source(base, entry.color_records_address());
+    for (uint32_t left = n; left != 0; left--, source.address += SpecColor::kSize) {
+      const Swatch record(
+          base, uint32_t(calls.Call(kVirtualAlloc, frame, 0x8218493C, 0, 32, 4096, 4)));
+      const int64_t hue = int64_t(int32_t(source.hue()));
       StoreWide(base, frame + 96, hue);
-      guest::StoreFloat(base, record + 16, float(double(float(double(hue)))));
-      const int64_t saturation = guest::LoadU8(base, source + 6);
+      record.set_hue(float(double(float(double(hue)))));
+      const int64_t saturation = source.saturation();
       StoreWide(base, frame + 104, saturation);
       const double s = double(float(double(saturation)));
-      guest::StoreFloat(base, record + 20, float(double(float(s * unit))));
-      const uint32_t kind = guest::LoadU16(base, source + 0);
+      record.set_saturation(float(double(float(s * unit))));
+      const uint32_t kind = source.kind();
       const uint32_t add = Load(base, kind == 1 ? 0x82002FF4 : 0x82002FF8);
-      int32_t value = int32_t(guest::LoadU8(base, source + 7) + add);
+      int32_t value = int32_t(source.value() + add);
       if (value < 0) {
         value = 0;
       } else if (value > 255) {
@@ -193,31 +197,34 @@ uint64_t OpenColors(uint8_t* base, uint32_t sp, const Calls& calls) {
       }
       StoreWide(base, kind == 1 ? frame + 112 : frame + 120, value);
       const double v = double(float(double(int64_t(value))));
-      guest::StoreFloat(base, record + 24, float(double(float(v * unit))));
-      calls.Call(kHsvToRgb, frame, 0x82184A00, frame + 128, record + 16);
+      record.set_value(float(double(float(v * unit))));
+      calls.Call(kHsvToRgb, frame, 0x82184A00, frame + 128, record.hue_address());
       const double red = double(float(double(guest::LoadFloat(base, frame + 128)) * scale));
       const double green = double(float(double(guest::LoadFloat(base, frame + 132)) * scale));
       const double blue = double(float(double(guest::LoadFloat(base, frame + 136)) * scale));
-      Store(base, record + 0, Fctiwz(red));
-      Store(base, record + 4, Fctiwz(green));
-      Store(base, record + 8, Fctiwz(blue));
-      const uint32_t colors = Load(base, kData) + 1140;
-      const uint32_t count = Load(base, colors + 52);
-      Store(base, colors + 52, count + 1);
-      Store(base, (count << 2) + colors, record);
+      record.set_red(Fctiwz(red));
+      record.set_green(Fctiwz(green));
+      record.set_blue(Fctiwz(blue));
+      const Colors colors(base, G::data(base).colors_address());
+      const uint32_t count = colors.count();
+      colors.set_count(count + 1);
+      Store(base, (count << 2) + colors.address, record.address);
     }
   }
   // Sub-scene 26's swatches shown for those below n.
   const uint32_t swatches = ui_movies::FindNode(base, movie, 26, 1);
-  for (uint32_t i = 0; int32_t(i) < int32_t(Load(base, swatches + 104)); i++) {
-    const uint32_t swatch = ui_movies::FindNode(base, movie, 26, i + Load(base, swatches + 100));
-    Store(base, swatch + 80, int32_t(i) < int32_t(n) ? 1 : 0);
+  // The group's +104 and +100 read as words (its child count, first child).
+  const Node group(base, swatches);
+  for (uint32_t i = 0; int32_t(i) < int32_t(Load(base, group.height_address())); i++) {
+    const uint32_t swatch =
+        ui_movies::FindNode(base, movie, 26, i + Load(base, group.width_address()));
+    Node(base, swatch).set_visible(int32_t(i) < int32_t(n) ? 1 : 0);
   }
   ShowSwatches(base, frame);
   {
-    const uint32_t data = Load(base, kData);
+    const Data data = G::data(base);
     calls.Call(kShowCarById, frame, 0x82184AD4,
-               uint64_t(Load(base, data + 60)) + Load(base, data + 56));
+               uint64_t(data.color_scroll()) + data.color_selection());
   }
   return HelpLineSet(base, 552, frame, calls);
 }

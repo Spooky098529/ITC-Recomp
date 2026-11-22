@@ -330,13 +330,6 @@ bool SetGammaRamp(uint8_t* base, uint32_t device, uint32_t ramp);
 // SetShaderGprAllocation(0, 0).
 void SetDefaultState(uint8_t* base, uint32_t device, const DeviceCalls& calls);
 
-// Device fields the setters write (byte offsets).
-constexpr uint32_t kShaderDirty = 16;  // the dirty masks: the shader state
-constexpr uint32_t kRenderDirty = 24;  // the render state
-constexpr uint32_t kOtherDirty = 32;   // the other state
-constexpr uint32_t kRenderTargets = 12184;  // four surfaces
-constexpr uint32_t kDepthSurface = 12200;
-constexpr uint32_t kTextures = 12288;       // a texture a stage
-constexpr uint32_t kFetchConstants = 1024;  // 24 bytes a sampler
+// The device's fields: schema::Device (itc_recomp/schema/device-state.toml).
 
 }  // namespace graphics::device_state

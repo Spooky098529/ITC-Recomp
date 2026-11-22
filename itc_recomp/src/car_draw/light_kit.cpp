@@ -13,15 +13,19 @@
 #include "material_passes/material_passes.h"
 #include "matrix_math/matrix_math.h"
 #include "native/buffers.h"
+#include "schema/cameras.h"
+#include "schema/car_draw.h"
+#include "schema/scene_models.h"
 #include "second_set/objects.h"
 
 namespace car_draw {
 
 namespace {
 
-constexpr uint32_t kScene = 0x826C2E44;
-constexpr uint32_t kCameraPasses = 0x826BAC00;
-constexpr uint32_t kCullSwap = 0x826C5104;
+using G = schema::CarDrawGlobals;
+using Record = schema::LightKitRecord;
+
+constexpr uint32_t kCameraPasses = schema::CamerasGlobals::passes_address();
 constexpr uint32_t kOne = 0x82000A30;           // 1.0
 constexpr uint32_t kFrontEndY = 0x820029D8;     // the copy's world y in the front end
 constexpr uint32_t kCarPartDraw = 0x820D06F0;
@@ -37,9 +41,6 @@ double Lfs(uint8_t* base, uint32_t address) {
 }
 void Stfs(uint8_t* base, uint32_t address, double value) {
   guest::StoreFloat(base, address, float(value));
-}
-uint64_t LoadU64(uint8_t* base, uint32_t address) {
-  return (uint64_t(Load(base, address)) << 32) | Load(base, address + 4);
 }
 
 // The frame `bytes` below `stack`, its back chain written (stwu's).
@@ -60,19 +61,24 @@ void Memcpy(uint8_t* base, const Calls& calls, uint32_t to, uint32_t from, uint3
 
 // Each group's offsets and its calls' return addresses.
 struct GroupSites {
-  uint32_t mode;      // the record's mode
-  uint32_t fraction;  // the record's on fraction (then the fade and the rate)
-  uint32_t last;      // the spots' last mode + 1
+  uint32_t (Record::*mode)() const;  // the record's mode
+  float (Record::*on)() const;       // its on fraction, fade and rate
+  float (Record::*fade)() const;
+  float (Record::*rate)() const;
+  uint32_t last;  // the spots' last mode + 1
   uint32_t leds, spots;
   uint32_t spots_copy, spots_call, leds_copy, leds_call, neon_copy;
   uint32_t neon_draw;  // the neon's CarPart::Draw call's return address
 };
 constexpr GroupSites kSites[3] = {
-    {4, 8, 10, 0x820DCC70, 0x820DCF98, 0x820DDB34, 0x820DDB48, 0x820DDB58, 0x820DDB6C,
+    {&Record::front_mode, &Record::front_on, &Record::front_fade, &Record::front_rate, 10,
+     0x820DCC70, 0x820DCF98, 0x820DDB34, 0x820DDB48, 0x820DDB58, 0x820DDB6C,
      0x820DDB7C, 0x820DCC64},
-    {20, 24, 12, 0x820DD110, 0x820DD438, 0x820DDBE4, 0x820DDBF8, 0x820DDC08, 0x820DDC1C,
+    {&Record::sides_mode, &Record::sides_on, &Record::sides_fade, &Record::sides_rate, 12,
+     0x820DD110, 0x820DD438, 0x820DDBE4, 0x820DDBF8, 0x820DDC08, 0x820DDC1C,
      0x820DDC2C, 0x820DD104},
-    {36, 40, 10, 0x820DD620, 0x820DD948, 0x820DDC94, 0x820DDCA8, 0x820DDCB8, 0x820DDCCC,
+    {&Record::rear_mode, &Record::rear_on, &Record::rear_fade, &Record::rear_rate, 10,
+     0x820DD620, 0x820DD948, 0x820DDC94, 0x820DDCA8, 0x820DDCB8, 0x820DDCCC,
      0x820DDCDC, 0x820DD614},
 };
 
@@ -103,12 +109,14 @@ Left LightPointsDrawNeon(uint8_t* base, const Calls& calls, LightGroup which, ui
   }
   const GroupSites& sites = Sites(which);
   const uint32_t frame = Frame(base, stack, kNeonDrawFrame);
-  const uint32_t record = Load(base, group + 0);
-  const double rate = Lfs(base, record + sites.fraction + 8);
-  const double fade = Lfs(base, record + sites.fraction + 4);
-  const double on = Lfs(base, record + sites.fraction);
+  const schema::LightPoints points(base, group);
+  const Record record = points.record();
+  const double rate = double((record.*sites.rate)());
+  const double fade = double((record.*sites.fade)());
+  const double on = double((record.*sites.on)());
   const double level = LightKitBlinkLevel(base, counter, on, fade, rate, frame);
-  material_passes::SetAlpha(base, Load(base, group + 20), Load(base, group + 244), level, frame);
+  const uint32_t model = points.neon_model();
+  material_passes::SetAlpha(base, model, points.neon_shape(), level, frame);
   const auto draw = CarPartDraw(base, calls, frame, group + 16, view_projection, block + 16, 0, 0,
                                 caller_r24, caller_r28);
   Left left;
@@ -145,7 +153,7 @@ Left LightPointsDraw(uint8_t* base, const Calls& calls, LightGroup which, uint32
   }
   const GroupSites& sites = Sites(which);
   const uint32_t frame = Frame(base, stack, kLightPointsDrawFrame);
-  const uint32_t mode = Load(base, Load(base, group + 0) + sites.mode);
+  const uint32_t mode = (schema::LightPoints(base, group).record().*sites.mode)();
   Left left;
   left.r3 = group;
   if (mode < 1 || mode >= sites.last) {
@@ -175,10 +183,10 @@ Left SceneLightsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t
                      uint32_t caller_r28) {
   ITC_NATIVE_RUNNING("sub_820DDE58 SceneLights::Draw");
   const uint32_t frame = Frame(base, stack, kSceneLightsDrawFrame);
-  const uint32_t scene = Load(base, kScene);
+  const schema::CarScene scene = G::scene(base);
   const uint32_t local = frame + 208;
   second_set::SceneModelBlockConstruct(base, local);
-  const uint32_t mask = Load(base, scene + 5132);
+  const uint32_t mask = scene.pass_mask();
   const double one = Lfs(base, kOne);
   Stfs(base, frame + 156, one);
   Stfs(base, frame + 172, one);
@@ -191,12 +199,12 @@ Left SceneLightsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t
   }
   Memcpy(base, calls, local, block, 736, frame, 0x820DDEB0);
   const uint32_t view_projection = frame + 144;
-  if (int32_t(Load(base, Load(base, kit + 13160) + 4)) == 0) {
+  if (int32_t(schema::SceneLightKit(base, kit).scene().model_set()) == 0) {
     // The front end: camera pass 0's view-projection, the copy's world y
     // (+68) the float at 0x820029D8, its world the identity first with the
     // block's +724 set.
-    matrix_math::Copy(base, view_projection, kCameraPasses + 144);
-    interpolation::BlendState_OnCopy(base, view_projection, kCameraPasses + 144, 0x820DDED4);
+    matrix_math::Copy(base, view_projection, schema::CameraPass(base, kCameraPasses).view_projection_address());
+    interpolation::BlendState_OnCopy(base, view_projection, schema::CameraPass(base, kCameraPasses).view_projection_address(), 0x820DDED4);
     const double y = Lfs(base, kFrontEndY);
     Stfs(base, frame + 276, y);
     if (int32_t(Load(base, frame + 932)) != 0) {
@@ -209,31 +217,38 @@ Left SceneLightsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t
       Stfs(base, frame + 276, y);
     }
   } else {
-    uint32_t pass = kCameraPasses + Load(base, scene + 5084) * 592;
-    if (pass == 0 || int32_t(Load(base, pass + 588)) == 0) {
+    uint32_t pass = kCameraPasses + scene.pass_light_kit_camera() * schema::CameraPass::kSize;
+    if (pass == 0 || int32_t(schema::CameraPass(base, pass).enabled()) == 0) {
       pass = 0;
     }
-    matrix_math::Copy(base, view_projection, pass + 144);
-    interpolation::BlendState_OnCopy(base, view_projection, pass + 144, 0x820DDF7C);
+    matrix_math::Copy(base, view_projection, schema::CameraPass(base, pass).view_projection_address());
+    interpolation::BlendState_OnCopy(base, view_projection, schema::CameraPass(base, pass).view_projection_address(), 0x820DDF7C);
   }
-  if (int32_t(Load(base, Load(base, kit + 13160) + 5048)) == 0 && advance_blink) {
-    BlinkTimersAdvance(base, kit + 96, frame);
+  if (int32_t(schema::SceneLightKit(base, kit).scene().blink_timers_held()) == 0 &&
+      advance_blink) {
+    BlinkTimersAdvance(base, schema::SceneLightKit(base, kit).points_address(), frame);
   }
-  Store(base, kCullSwap, Load(base, kCullSwap) == 0 ? 1 : 0);
+  G::set_lights_flip(base, G::lights_flip(base) == 0 ? 1 : 0);
+  // The groups at the point block's (kit + 96) +48, +4384, +8720, their
+  // counters the block's.
+  const schema::LightPoints timers(base, schema::SceneLightKit(base, kit).points_address());
   struct Group {
     LightGroup which;
-    uint32_t offset, counter, copy_lr;
+    uint32_t offset;
+    uint64_t (schema::LightPoints::*counter)() const;
+    uint32_t copy_lr;
   };
-  constexpr Group kGroups[3] = {{LightGroup::kFront, 144, 112, 0x820DDFB8},
-                                {LightGroup::kSides, 4480, 120, 0x820DDFDC},
-                                {LightGroup::kRear, 8816, 128, 0x820DE000}};
+  constexpr Group kGroups[3] = {
+      {LightGroup::kFront, 144, &schema::LightPoints::front_counter, 0x820DDFB8},
+      {LightGroup::kSides, 4480, &schema::LightPoints::sides_counter, 0x820DDFDC},
+      {LightGroup::kRear, 8816, &schema::LightPoints::rear_counter, 0x820DE000}};
   const uint32_t copy = frame + 80;
   for (const Group& g : kGroups) {
     Memcpy(base, calls, copy, view_projection, 64, frame, g.copy_lr);
-    left = LightPointsDraw(base, calls, g.which, frame, kit + g.offset,
-                           LoadU64(base, kit + g.counter), local, copy, caller_r24, caller_r28);
+    left = LightPointsDraw(base, calls, g.which, frame, kit + g.offset, (timers.*g.counter)(),
+                           local, copy, caller_r24, caller_r28);
   }
-  Store(base, kCullSwap, Load(base, kCullSwap) == 0 ? 1 : 0);
+  G::set_lights_flip(base, G::lights_flip(base) == 0 ? 1 : 0);
   return left;
 }
 

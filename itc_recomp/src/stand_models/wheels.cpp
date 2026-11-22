@@ -11,6 +11,15 @@
 #include "guest.h"
 #include "native/buffers.h"
 #include "race_setup/race_setup.h"
+#include "schema/action_mappers.h"
+#include "schema/car_makers.h"
+#include "schema/career.h"
+#include "schema/race_event.h"
+#include "schema/race_setup.h"
+#include "schema/scene_models.h"
+#include "schema/second_set.h"
+#include "schema/stand_models.h"
+#include "schema/tuning_screen.h"
 #include "strings_and_font/steps.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -19,6 +28,7 @@ namespace stand_models {
 namespace {
 
 using namespace car_scene_draw::ops;
+using Globals = schema::StandModelsGlobals;
 
 constexpr uint32_t kSetupVehicle = 0x820CD5C8;
 constexpr uint32_t kWheelsSetRecord = 0x820D8EC0;
@@ -90,11 +100,19 @@ void CopyFloat(uint8_t* base, uint32_t from, uint32_t to) { Store(base, to, Load
 // record), through the frame's scratch doubleword.
 template <typename Wheel>
 void Colors(uint8_t* base, uint32_t to, const Wheel& wheel, double scale, uint32_t scratch) {
-  for (const uint32_t from : {8u, 20u, 24u}) {
-    const uint32_t at = to + (from == 8 ? 0 : from == 20 ? 16 : 32);
-    Stfs(base, at, Convert(base, guest::LoadU16(base, wheel() + from), scratch));
-    Stfs(base, at + 4, Fmuls(Convert(base, guest::LoadU8(base, wheel() + from + 2), scratch), scale));
-    Stfs(base, at + 8, Fmuls(Convert(base, guest::LoadU8(base, wheel() + from + 3), scratch), scale));
+  using W = schema::StandWheelSource;
+  // The three colors' fields: hue, saturation, value.
+  static constexpr uint16_t (W::*kHue[3])() const = {&W::color0_hue, &W::color1_hue,
+                                                     &W::color2_hue};
+  static constexpr uint8_t (W::*kSaturation[3])() const = {
+      &W::color0_saturation, &W::color1_saturation, &W::color2_saturation};
+  static constexpr uint8_t (W::*kValue[3])() const = {&W::color0_value, &W::color1_value,
+                                                      &W::color2_value};
+  for (uint32_t c = 0; c < 3; c++) {
+    const uint32_t at = to + 16 * c;
+    Stfs(base, at, Convert(base, (W(base, wheel()).*kHue[c])(), scratch));
+    Stfs(base, at + 4, Fmuls(Convert(base, (W(base, wheel()).*kSaturation[c])(), scratch), scale));
+    Stfs(base, at + 8, Fmuls(Convert(base, (W(base, wheel()).*kValue[c])(), scratch), scale));
   }
 }
 
@@ -103,15 +121,17 @@ void Colors(uint8_t* base, uint32_t to, const Wheel& wheel, double scale, uint32
 // The selected garage car of a save data: its list at +6120 walked
 // [+0x19920] steps from the head halfword +204; the car's address.
 uint32_t SelectedGarageCar(uint8_t* base, uint32_t save) {
-  const uint32_t nodes = save + 6120;
-  uint32_t n = Load(base, save + 0x19920);
-  uint32_t node = uint32_t(int32_t(int16_t(guest::LoadU16(base, nodes + 204)))) * 4 + nodes;
+  const schema::SaveData data(base, save);
+  const uint32_t nodes = data.garage_address();
+  const schema::CareerGarageList list(base, nodes);
+  uint32_t n = data.selected_car();
+  uint32_t node = uint32_t(int32_t(int16_t(list.head()))) * 4 + nodes;
   while (n != 0) {
     node = uint32_t(int32_t(int16_t(guest::LoadU16(base, node)))) * 4 + nodes;
     n--;
   }
   const int64_t slot = int16_t(guest::LoadU16(base, node + 2));
-  return uint32_t(uint64_t(slot) * 1968) + nodes + 212;
+  return uint32_t(uint64_t(slot) * 1968) + list.cars_address();
 }
 
 uint64_t FitAxles(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_t car,
@@ -131,16 +151,17 @@ uint64_t FitAxles(uint8_t* base, const GuestCall& call, uint32_t holder, uint32_
     r3 = call(kSetupVehicle, {car, data}, frame, 0x82178BC8);
     *f1 = std::nullopt;  // as the guest call left it
   }
-  const auto stage = [&] { return Load(base, holder); };
-  Stfs(base, stage() + 6176, Lfs(base, frame + 416));
-  const double one = Lfs(base, kOne);
-  Stfs(base, stage() + 6180, Lfs(base, frame + 420));
-  Stfs(base, stage() + 6184, Lfs(base, frame + 424));
-  Stfs(base, stage() + 6188, one);
-  Stfs(base, stage() + 6192, Lfs(base, frame + 688));
-  Stfs(base, stage() + 6196, Lfs(base, frame + 692));
-  Stfs(base, stage() + 6200, Lfs(base, frame + 696));
-  Stfs(base, stage() + 6204, one);
+  // The stage loaded again for each store, as the original.
+  const auto stage = [&] { return schema::GarageStage(base, Load(base, holder)); };
+  stage().set_front_axle_x(float(Lfs(base, frame + 416)));
+  const double one = schema::ActionMappersGlobals::one(base);  // 1.0
+  stage().set_front_axle_y(float(Lfs(base, frame + 420)));
+  stage().set_front_axle_z(float(Lfs(base, frame + 424)));
+  stage().set_front_axle_w(float(one));
+  stage().set_rear_axle_x(float(Lfs(base, frame + 688)));
+  stage().set_rear_axle_y(float(Lfs(base, frame + 692)));
+  stage().set_rear_axle_z(float(Lfs(base, frame + 696)));
+  stage().set_rear_axle_w(float(one));
   return r3;
 }
 
@@ -155,20 +176,21 @@ uint64_t SceneWheelsSetSizes(uint8_t* base, const GuestCall& call, uint32_t whee
   Store64(base, stack + 64, r8);
   Store64(base, stack + 56, r7);
   Store64(base, stack + 72, r9);
+  const schema::SceneWheels sw(base, wheels);
   const uint32_t w0 = Load(base, stack + 48);
-  Store(base, wheels + 108, b);
+  sw.set_unknown_108(b);
   const uint32_t w1 = Load(base, stack + 52), w2 = Load(base, stack + 56);
   const uint32_t v2 = Load(base, stack + 72), v0 = Load(base, stack + 64);
   const uint32_t v1 = Load(base, stack + 68);
-  Store(base, wheels + 104, a);
-  const uint32_t first = Load(base, wheels + 28);
-  Store(base, wheels + 76, w0);
-  Store(base, wheels + 80, w1);
-  Store(base, wheels + 84, w2);
-  Store(base, wheels + 88, v0);
-  Store(base, wheels + 92, v1);
-  Store(base, wheels + 96, v2);
-  return call(kWheelsSetRecord, {first, wheels + 32}, frame, 0x820E73F4);
+  sw.set_unknown_104(a);
+  const uint32_t first = sw.first_set_wheels();
+  sw.set_front_size_index(w0);
+  sw.set_front_size_a(w1);
+  sw.set_front_size_b(w2);
+  sw.set_rear_size_index(v0);
+  sw.set_rear_size_a(v1);
+  sw.set_rear_size_b(v2);
+  return call(kWheelsSetRecord, {first, sw.record_address()}, frame, 0x820E73F4);
 }
 
 uint64_t SetWheel(uint8_t* base, const GuestCall& call, uint32_t holder, uint64_t r4,
@@ -188,10 +210,11 @@ uint64_t SetWheel(uint8_t* base, const GuestCall& call, uint32_t holder, uint64_
   }
   Store64(base, frame + 80, r4);
   const uint32_t model = StageModel(base, holder);
-  const uint32_t rec = model + 32;
+  const schema::SceneModel m(base, model);
+  const schema::SceneModelRecord rec(base, m.record_address());
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const uint32_t spec =
-      car_specs::GetCarSpec(base, Load(base, SelectedGarageCar(base, save) + 12));
+  const uint32_t spec = car_specs::GetCarSpec(
+      base, schema::CarMakersCar(base, SelectedGarageCar(base, save)).car_id());
   uint64_t number = r4;
   if (int32_t(number) > 178) {
     number = 178;
@@ -208,59 +231,69 @@ uint64_t SetWheel(uint8_t* base, const GuestCall& call, uint32_t holder, uint64_
   const double scale = Lfs(base, kByteScale);
   const bool front = side == 0 || side == 1, rear = side != 1;
   if (front) {
-    Store(base, rec + 4052, word);
+    rec.set_front_wheel(word);
   }
   if (rear) {
-    Store(base, rec + 4068, word);
+    rec.set_rear_wheel(word);
   }
   if (front) {
-    Colors(base, rec + 80, wheel, scale, scratch);
+    Colors(base, rec.front_wheel_paint0_hue_address(), wheel, scale, scratch);
   }
   if (rear) {
-    Colors(base, rec + 128, wheel, scale, scratch);
+    Colors(base, rec.rear_wheel_paint0_hue_address(), wheel, scale, scratch);
   }
+  using W = schema::StandWheelSource;
   if (front) {
-    CopyFloat(base, wheel() + 16, rec + 4060);
-    CopyFloat(base, wheel() + 28, rec + 4056);
+    CopyFloat(base, W(base, wheel()).f16_address(), rec.front_wheel_f16_address());
+    CopyFloat(base, W(base, wheel()).f28_address(), rec.front_wheel_f28_address());
   }
   if (rear) {
-    CopyFloat(base, wheel() + 16, rec + 4076);
-    CopyFloat(base, wheel() + 28, rec + 4072);
+    CopyFloat(base, W(base, wheel()).f16_address(), rec.rear_wheel_f16_address());
+    CopyFloat(base, W(base, wheel()).f28_address(), rec.rear_wheel_f28_address());
   }
   using strings_and_font::steps::Fctiwz;
   if (front) {
-    Store(base, rec + 4080, uint32_t(Fctiwz(Lfs(base, car + 3164))));
-    Stfs(base, rec + 4084, Fmuls(Lfs(base, car + 3132), Lfs(base, kTireScale)));
-    Stfs(base, rec + 4088, Fmuls(Lfs(base, car + 3168), Lfs(base, kHundred)));
+    // The tire copy's +80 and +84 (the Car's +3164 and +3168): no field.
+    rec.set_front_size(uint32_t(Fctiwz(Lfs(base, car + 3164))));
+    rec.set_front_size_a(
+        float(Fmuls(schema::Car(base, car).front_tire_width(), Lfs(base, kTireScale))));
+    rec.set_front_size_b(float(Fmuls(Lfs(base, car + 3168), Lfs(base, kHundred))));
   }
   if (rear) {
-    Store(base, rec + 4092, uint32_t(Fctiwz(Lfs(base, car + 3256))));
-    Stfs(base, rec + 4096, Fmuls(Lfs(base, car + 3224), Lfs(base, kTireScale)));
-    Stfs(base, rec + 4100, Fmuls(Lfs(base, car + 3260), Lfs(base, kHundred)));
+    rec.set_rear_size(uint32_t(Fctiwz(Lfs(base, car + 3256))));
+    rec.set_rear_size_a(
+        float(Fmuls(schema::Car(base, car).rear_tire_width(), Lfs(base, kTireScale))));
+    rec.set_rear_size_b(float(Fmuls(Lfs(base, car + 3260), Lfs(base, kHundred))));
   }
   FitAxles(base, call, holder, car, frame, f1);
-  return SceneWheelsSetSizes(base, call, Load(base, model + 5100), Load(base, model + 4140),
-                             Load(base, model + 4144), Load64(base, model + 4112),
-                             uint64_t(Load(base, model + 4120)) << 32, Load64(base, model + 4124),
-                             uint64_t(Load(base, model + 4132)) << 32, frame);
+  // The sizes as the original's words and doublewords (ld: two word loads,
+  // the high one first).
+  const schema::SceneModelsWheelsRecord wr(base, m.wheels_record_address());
+  return SceneWheelsSetSizes(base, call, m.wheels(), wr.front_index_add(), wr.rear_index_add(),
+                             Load64(base, rec.front_size_address()),
+                             uint64_t(Load(base, rec.front_size_b_address())) << 32,
+                             Load64(base, rec.rear_size_address()),
+                             uint64_t(Load(base, rec.rear_size_b_address())) << 32, frame);
 }
 
 uint64_t PreviewWheel(uint8_t* base, const GuestCall& call, uint32_t screen, uint64_t r4,
                       uint32_t which, uint32_t stack, std::optional<double>* f1) {
   ITC_NATIVE_RUNNING("sub_821DFA78 TuningScreen::PreviewWheel");
   const uint32_t frame = Frame(base, stack, 4016);
-  const uint32_t garage = SelectedGarageCar(base, Load(base, screen + 18904));
+  const uint32_t garage =
+      SelectedGarageCar(base, schema::TuningScreen(base, screen).save_data().address);
   const uint32_t car = frame + 80;
   race_setup::CarInit(base, car);
   if (!native::Buffers_Memcpy(base, car, garage, 1884, 0x821DFAE8)) {
     call(kMemcpy, {car, garage, 1884}, frame, 0x821DFAE8);
   }
-  Store(base, car + 3888, Load(base, car + 3888) | 1);
+  const schema::Car c(base, car);
+  c.set_flags(c.flags() | 1);
   uint32_t refreshed = 0;
   if (!car_specs::CarRefresh(base, car, &refreshed)) {
     call(kRefresh, {car}, frame, 0x821DFAFC);
   }
-  const uint32_t holder = Load(base, Load(base, kHolder));
+  const uint32_t holder = Load(base, Globals::stand_holder(base).address);
   return SetWheel(base, call, holder, r4, which, car, frame, f1);
 }
 

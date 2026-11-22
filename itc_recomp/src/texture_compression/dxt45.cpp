@@ -6,6 +6,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/texture_compression.h"
 #include "texture_compression/dxt_alpha.h"
 #include "texture_compression/dxt_color.h"
 #include "texture_compression/steps.h"
@@ -51,7 +52,7 @@ void EncodeDxt45Block(uint8_t* base, const float pixels[16][4], int32_t dither, 
                       uint8_t block[16]) {
   ITC_NATIVE_RUNNING("sub_82422A68 Dxt45::EncodeBlock");
   const uint32_t frame = stack - kDxt45FrameBytes;
-  if (guest::LoadU32(base, kPremultiplied) != 0) {
+  if (schema::TextureCompressionGlobals::premultiplied(base) != 0) {
     EncodeDxt45BlockPremultiplied(base, pixels, dither, frame, block);
     return;
   }

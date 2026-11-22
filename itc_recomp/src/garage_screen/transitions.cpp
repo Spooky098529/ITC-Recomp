@@ -31,9 +31,9 @@ uint64_t Transition0(uint8_t* base, uint32_t started, uint32_t sp, const Calls& 
     PlayLoop(movie, 126, frame, 0x82195C68, 0x82195C74, calls);
     PlayLoop(movie, 45, frame, 0x82195C90, 0x82195C9C, calls);
     PlayLoop(movie, 49, frame, 0x82195CB8, 0x82195CC4, calls);
-    const uint32_t data = Data(base);
-    Store(base, data + 44, 0);
-    Store(base, data + 48, 0);
+    const ScreenData data = Data(base);
+    data.set_selection(0);
+    data.set_scroll(0);
     SetUpLists(base, frame, calls);
     Store(base, started, 1);
   }
@@ -45,7 +45,7 @@ uint64_t Transition1(uint8_t* base, uint32_t started, uint32_t sp, const Calls& 
   const uint32_t frame = Frame(base, sp, 128);
   const uint32_t movie = FindMovie(base, kMovie, frame + 80);
   if (Load(base, started) == 0) {
-    const uint64_t named = uint64_t(race_screens::ListSelection(base, Load(base, kList))) + 67;
+    const uint64_t named = uint64_t(race_screens::ListSelection(base, List(base))) + 67;
     PlayLoop(movie, named, frame, 0x82192DC8, 0x82192DD4, calls);
     PlayLoop(movie, 77, frame, 0x82192DF0, 0x82192DFC, calls);
     Store(base, started, 1);
@@ -59,16 +59,16 @@ uint64_t Transition3(uint8_t* base, uint32_t started, uint32_t sp, const Calls& 
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t movie = FindMovie(base, kMovie, frame + 80);
   if (Load(base, started) == 0) {
-    const uint64_t named = uint64_t(race_screens::ListSelection(base, Load(base, kList))) + 67;
+    const uint64_t named = uint64_t(race_screens::ListSelection(base, List(base))) + 67;
     calls.Call(kFinishNamed, frame, 0x82192E7C, movie, named);
     calls.Call(kFinishNamed, frame, 0x82192E88, movie, 77);
     calls.Call(kFinishNamed, frame, 0x82192E94, movie, 128);
-    calls.Call(kFadeOut, frame, 0x82192EB0, Load(base, 0x82001BF0), 0, 0, 0);
+    calls.Call(kFadeOut, frame, 0x82192EB0, G::fade_out_argument(base), 0, 0, 0);
     Store(base, started, 1);
   }
   calls.Call(kRun, frame, 0x82192EC4, movie, 0);
   // Done once both fades' counts are 0.
-  return (Load(base, 0x826A50E4) | Load(base, 0x826A50DC)) == 0 ? 1 : 0;
+  return (G::fade_count_b(base) | G::fade_count_a(base)) == 0 ? 1 : 0;
 }
 
 }  // namespace garage_screen

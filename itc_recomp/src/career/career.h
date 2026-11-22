@@ -13,17 +13,8 @@
 
 namespace career {
 
-// The save data's parts.
-constexpr uint32_t kStats = 48;                // the stats record
-constexpr uint32_t kItemRecords = 0x199F8;     // 400 records of 12 bytes
-constexpr uint32_t kItemFlags = 0x1ACE4;       // a 400-bit set
-constexpr uint32_t kGarage = 6120;             // the garage's list
-constexpr uint32_t kSelectedCar = 0x19920;     // the selected garage car
-constexpr uint32_t kUnlockSet = 0x19930;       // the unlocks the rewards set
-// The play time's frame counter (PlayTime::Add measures from it).
-constexpr uint32_t kPlayTimeFrames = 0x826C5B90;
-// The float the set-ups store (0.0, at 0x82000A34 in the xex).
-constexpr uint32_t kZeroFloat = 0x82000A34;
+// The save data's parts, its globals and the float constants are named by
+// the schema's views (itc_recomp/schema/career.toml, src/schema/career.h).
 
 // Whether `size` bytes copy natively (memcpy's plain C++): below the
 // physical views (memcpy's override records those for the renderer's

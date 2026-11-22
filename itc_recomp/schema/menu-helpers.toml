@@ -1,0 +1,51 @@
+# The schema of docs/functions/menu-helpers.md's objects (docs/e5-native.md, step 2).
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+
+# The front-end menu (68 bytes, docs/known-data.md; the measure's "Menu" is
+# every menu Menu::Step, Menu::Pressed and Menu::StepList are given): stepped by Menu::Step
+# (sub_82186568) and read by Menu::Pressed (sub_821864C8); every front-end
+# screen keeps one or more.
+[FrontEndMenu]
+measures = ["Menu", "new<68>@Type2Dialog::OnEnter", "new<68>@Type12Screen7::Create",
+            "new<68>@NetRanking::Create", "new<68>@TitleScreen::Create", "new<68>@TodaysResult::Create", "new<68>@TodaysEvent::Create", "new<68>@TuningMachine::Create", "new<68>@Type2Hub::Create", "new<68>@PowerGraphScreen::Create", "new<68>@Type5Dialog::OnEnter", "new<68>@Type6Screen0::OnEnter", "new<68>@Type7Screen0::OnEnter", "new<68>@ControllerOptions::OnEnter", "new<68>@UserInfo::Create", "new<68>@Type12Screen1::Create#2", "new<68>@Type12Screen1::Create#3", "new<68>@Type12Screen1::Create#4", "TuningScreen.+10044", "TuningScreen.+10040"]
+size = 68
+origin = "allocated"
+fields = [
+  { name = "cursor", offset = 0, type = "u32" },
+  { name = "previous", offset = 4, type = "u32" },
+  { name = "moved", offset = 8, type = "u32", note = "set when the last Menu::Step moved the cursor" },
+  { name = "first_item", offset = 12, type = "u32", note = "0 in every menu seen" },
+  { name = "last_item", offset = 16, type = "u32" },
+  { name = "wraps", offset = 20, type = "u32", note = "1 when the cursor wraps (probably)" },
+  { name = "up_down_locked", offset = 24, type = "u32" },
+  { name = "left_right_steps", offset = 28, type = "u32" },
+  { name = "shoulders_step", offset = 32, type = "u32" },
+  { name = "side", offset = 36, type = "s32", note = "-1 or 1 when left or right was asked" },
+  { name = "wrapped", offset = 40, type = "u32", note = "1 when the last Menu::Step wrapped" },
+  { name = "list_wrapped", offset = 44, type = "u32", note = "1 when the last Menu::StepList wrapped (probably; tuning-pages.md)" },
+  { name = "visible_row", offset = 48, type = "u32", note = "the visible row, kept within first_row to rows_shown - 1 (probably)" },
+  { name = "previous_row", offset = 52, type = "u32", note = "the row before the last up or down step (probably)" },
+  { name = "first_row", offset = 56, type = "u32", note = "probably" },
+  { name = "rows_shown", offset = 60, type = "u32", note = "8 where seen (probably)" },
+  { name = "player", offset = 64, type = "u32", note = "the player: an index into [0x826BABA4], then the mapper entry at 0x826BAB80" },
+]
+
+# The page object (28 bytes): a front-end screen's pages and steps, made by
+# its Create or OnEnter beside its menu (the type 2 dialog's at
+# [0x826D83F8], Type12Screen7's at [0x82816160]).
+[PageObject]
+measure = "new<28>@Type2Dialog::OnEnter"
+measures = ["new<28>@Type12Screen7::Create", "ScreenPages", "new<28>@PauseMenu::Create", "new<28>@RaceDialog::Create", "new<28>@AfterRaceMenu::Create", "new<28>@PauseMenu4::Create", "new<28>@Type12Screen6::Create", "new<28>@Type12Screen9::Create", "new<28>@Type12Dialog11::Create", "new<28>@NetRanking::Create", "new<28>@TitleScreen::Create", "new<28>@TodaysResult::Create", "new<28>@TodaysEvent::Create", "new<28>@TuningMachine::Create", "new<28>@Type2Hub::Create", "new<28>@BuildScreen::Create", "new<28>@PowerGraphScreen::Create", "new<28>@ReplayTheater::Create", "new<28>@Type5Dialog::OnEnter", "new<28>@Type6Screen0::OnEnter", "new<28>@Type7Screen0::OnEnter", "new<28>@ControllerOptions::OnEnter", "new<28>@UserInfo::Create", "ScreenPages::Finish.r3"]
+size = 28
+origin = "allocated"
+fields = [
+  { name = "page", offset = 0, type = "u32", note = "the page Draw runs; -1 while a step runs" },
+  { name = "next_page", offset = 4, type = "u32", note = "the page after the step" },
+  { name = "previous_page", offset = 8, type = "u32" },
+  { name = "step", offset = 12, type = "u32", note = "the step Update runs; -1 none" },
+  { name = "queued_step", offset = 16, type = "u32", note = "the step after it" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "step_started", offset = 24, type = "u32", note = "the step's started word" },
+]

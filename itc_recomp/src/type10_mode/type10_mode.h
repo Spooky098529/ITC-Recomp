@@ -33,56 +33,24 @@ namespace type10_mode {
 
 using Calls = race_hud_object::Calls;
 
-// The theater's blocks: the page object (28 bytes: +0 the page Draw runs,
-// -1 while a transition runs; +4 the page after; +8 the page before; +12 the
-// transition Update runs, -1 none; +16 the one queued after it; +20; +24 the
-// transition's started word), the menu list (72) and the theater's data (16:
-// +4 what was asked of the save screen, +8 a replay loaded, +12
-// interrupted).
-constexpr uint32_t kPages = 0x828161E0;
-constexpr uint32_t kList = 0x828161E4;
-constexpr uint32_t kData = 0x828161E8;
-// The save layer's header (+12 the replays' 36-byte records, +20 their
-// count) and the save screen's data (+40 the replay picked, +56 its prompt
-// state).
-constexpr uint32_t kSaveBuffers = 0x828161F0;
-constexpr uint32_t kSaveScreenData = 0x826D8454;
-// How the title is entered (NextMode's 14 clears it, ForceExit's 0 and 1
-// set it).
-constexpr uint32_t kEntered = 0x826364EC;
-// The pad blocked (two words: the system UI, probably).
-constexpr uint32_t kPadBlocked0 = 0x826C7960;
-constexpr uint32_t kPadBlocked1 = 0x826C7964;
-// The kept replay, the race data and the input recordings OnDone hands to
-// Replay::SetUpRace.
-constexpr uint32_t kKeptReplay = 0x826C5B50;
-constexpr uint32_t kRaceData = 0x826C5B2C;
-constexpr uint32_t kRecordings = 0x826C5B4C;
+// The theater's blocks (schema/type10_mode.h's Type10ModeGlobals): the
+// page object (pages, 28 bytes), the menu list (list, 72) and the theater's
+// data (data, ReplayTheaterData, 16); the save layer's header
+// (save_buffers: +12 the replays' 36-byte records, +20 their count) and the
+// save screen's data (save_screen_data: +40 the replay picked, +56 its
+// prompt state); how the title is entered (entered), the pad blocked
+// (pad_blocked0 and 1), and the kept replay, the race data and the input
+// recordings OnDone hands to Replay::SetUpRace.
 
 // The UI movie and its asset.
 constexpr uint32_t kMovie = 45;
 constexpr uint32_t kAsset = 22591;
 
-// The machine's words.
-constexpr uint32_t kMachineState = 9604;
-constexpr uint32_t kMachineLoaded = 9608;
-constexpr uint32_t kMachineReenter = 9612;
-constexpr uint32_t kMachineDelete = 9616;
-
-// The mode's fields: the delegate's holder (+4) and the delegate (+8), the
-// dispatcher (+36: the handlers, the count +200; its ring +204 is the
-// mode's +240), the message ring (+240: 50 entries of 12 bytes, the count
-// +840, the start +844) and the block (+848).
-constexpr uint32_t kDispatcher = 36;
-constexpr uint32_t kRing = 240;
-constexpr uint32_t kBlock = 848;
-// The block (19,300 bytes): the theater at +0, the save screen at +9640,
-// the shown machine's index (+19280), +19284, and the next mode's 8-byte
-// answer (+19292).
+// The mode (ModeType10), its block (ModeType10Block, 19,300 bytes: the
+// theater at +0, the save screen at +9640, the shown machine's index, the
+// next mode's answer) and the theater's machine (ReplayTheaterMachine): their
+// views in schema/type10_mode.h.
 constexpr uint32_t kBlockBytes = 19300;
-constexpr uint32_t kSaveScreenAt = 9640;
-constexpr uint32_t kShown = 19280;
-constexpr uint32_t kNextAnswer = 19292;
 
 // The callees by address.
 constexpr uint32_t kVirtualAlloc = 0x82295398;
@@ -114,12 +82,8 @@ constexpr uint32_t kLoadingRun = 0x82247898;
 constexpr uint32_t kScreenStart = 0x8211AD00;
 constexpr uint32_t kStringsLoad = 0x8210A8D0;
 constexpr uint32_t kSaveScreenInit = 0x821A7AC8;
-// The fades' passes FadeIn and FadeOut get, and the fades' counts FadeOut
-// waits on.
-constexpr uint32_t kFadesIn = 0x82001BEC;
-constexpr uint32_t kFadesOut = 0x82001BF0;
-constexpr uint32_t kFadeCount0 = 0x826A50E4;
-constexpr uint32_t kFadeCount1 = 0x826A50DC;
+// The fades' passes FadeIn and FadeOut get (fades_in, fades_out), and the
+// fades' counts FadeOut waits on (fade_count0 and 1): globals.
 
 // --- The mode (mode.cpp) ---
 

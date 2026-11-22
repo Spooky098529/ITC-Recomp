@@ -61,7 +61,10 @@ Never seen in play, without rows (as in `models.md`): `std::vector`'s
 `_Xlen` (`sub_825981C8`) and `bad_alloc`'s copy (`sub_82091200`,
 `std-string.md`). Fields: `../known-data.md` ("scene pass description",
 "car scene draw tables", "frustum", the scene's and the scene model's
-rows).
+rows). The objects' layout (E5's step 2, 2026-11-17):
+`itc_recomp/schema/car-scene-draw.toml` (the points, the std::vector of
+them, the box, the planes, the frustum, the scene pass description, the
+records at `0x82002D40` and the image words the draw reads).
 
 What wraps or reads these functions, kept around native bodies by the
 migration (the precedent of the car draw and `XPR::GetTexture`): the
@@ -134,6 +137,11 @@ Status:
   calls direct or through the dispatch table. While the SDK or code not
   native yet still reaches it, its entry for them is an override in
   `src/lifted/` (deleted when nothing reaches it that way).
+- **Host**: E5 (`docs/e5-native.md`, steps 3 to 5): our C++ whose objects
+  are host structs (host byte order, host pointers, made with `new` or
+  kept in containers), read and written as C++ members instead of by
+  offset in guest memory. A Native or Lifted function becomes Host when
+  its area's objects move to the host.
 
 A function usually moves from recompiled or Wrapped to Overridden to
 Native as the `ctx` edge moves up through its callers, or straight to

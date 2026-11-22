@@ -3,6 +3,8 @@
 // register steps the harness shares (hooks/location_screen.h).
 
 #include "hooks/location_screen.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -16,6 +18,7 @@
 #include "hooks/strings_and_font.h"
 #include "location_screen/location_screen.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/location_screen.h"
 #include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, native_ui_movies_game);
@@ -153,7 +156,7 @@ uint64_t RunThrough(void* user, uint32_t movie, uint32_t draw_only, uint32_t fra
   guest_call::InFrame(ctx, guest.base, frame_bytes, lr, [&](uint32_t) {
     ctx.r3.u64 = movie;
     ctx.r4.u64 = draw_only;
-    lifted::CallFromContext(ctx, guest.base, 0x8211E1B8);
+    lifted::Enter(ctx, guest.base, game::UiMovie::Run);
   });
   return ctx.r3.u64;
 }
@@ -202,7 +205,9 @@ ITC_REGS_STEP(LocationScreenReset) {
   }
   ctx.fpscr.disableFlushMode();
   ls::Reset(base, screen);
-  ctx.r3.u64 = screen + 560 + 176;
+  // r3 the view's second matrix (memcpy's).
+  ctx.r3.u64 = schema::LocationScreenView(base, schema::LocationScreen(base, screen).view_address())
+                   .matrix1_address();
 }
 
 ITC_REGS_STEP(LocationScreenResetView) {
@@ -213,7 +218,7 @@ ITC_REGS_STEP(LocationScreenResetView) {
   }
   ctx.fpscr.disableFlushMode();
   ls::ResetView(base, view);
-  ctx.r3.u64 = view + 176;
+  ctx.r3.u64 = schema::LocationScreenView(base, view).matrix1_address();
 }
 
 ITC_REGS_STEP(LocationScreenApplyQueuedPage) {

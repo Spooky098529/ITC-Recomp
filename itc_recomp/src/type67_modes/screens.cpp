@@ -8,6 +8,7 @@
 // PanelScreen::InitWords' plain C++ where a slot holds them.
 
 #include "type67_modes/type67_modes.h"
+#include "type67_modes/views.h"
 
 #include "base/log.h"
 #include "guest.h"
@@ -18,20 +19,21 @@ namespace {
 
 using guest::LoadU32;
 using guest::StoreU32;
+using G = schema::Type6Type7ModesGlobals;
 
 constexpr uint32_t kMinusOne = 0xFFFFFFFF;
 
 // A message (`message`, 0, 0) queued in a dispatcher's ring (+204), as the
 // handlers do it inline.
 void Post(uint8_t* base, uint32_t dispatcher, uint32_t message) {
-  const uint32_t ring = dispatcher + 204;
-  const uint32_t count = LoadU32(base, ring + 600) + 1;
-  const uint32_t end = LoadU32(base, ring + 604) + count - 1;
-  StoreU32(base, ring + 600, count);
-  const uint32_t slot = ring + (end - (end / 50) * 50) * 12;
-  StoreU32(base, slot + 0, message);
-  StoreU32(base, slot + 4, 0);
-  StoreU32(base, slot + 8, 0);
+  const schema::ModeDispatcher d(base, dispatcher);
+  const uint32_t count = d.ring_count() + 1;
+  const uint32_t end = d.ring_start() + count - 1;
+  d.set_ring_count(count);
+  const schema::ModeMessage slot(base, d.ring_address() + (end - (end / 50) * 50) * 12);
+  slot.set_id(message);
+  slot.set_arg0(0);
+  slot.set_arg1(0);
 }
 
 // A vtable slot of `object` called from the frame at `frame` (returning to
@@ -79,7 +81,7 @@ uint64_t DialogLeave(uint8_t* base, uint32_t dialog, uint32_t dispatcher, bool t
   }
   const uint32_t frame = sp - 96;
   const uint32_t lr = type7 ? 0x82241E80 : 0x82225C98;
-  StoreU32(base, dialog + 9604, 7);
+  schema::Type67Dialog(base, dialog).set_state(7);
   uint64_t r3 = 0;
   for (uint32_t i = 0; i < 4; i++) {
     r3 = calls.remove(16 + i, frame, lr + 8 * i);
@@ -94,10 +96,10 @@ uint64_t Screen0Leave(uint8_t* base, uint32_t screen, uint32_t dispatcher, bool 
   if (type7) {
     ITC_NATIVE_RUNNING("sub_82244350 Type7Screen0::Leave");
     r3 = calls.remove(22, sp - 112, 0x82244374);
-    StoreU32(base, screen + 9608, 7);
+    schema::Type7Screen0(base, screen).set_state(7);
   } else {
     ITC_NATIVE_RUNNING("sub_82233DF8 Type6Screen0::Leave");
-    StoreU32(base, screen + 9604, 7);
+    schema::Type6Screen0(base, screen).set_state(7);
     r3 = calls.remove(22, sp - 96, 0x82233E20);
   }
   Post(base, dispatcher, type7 ? 3 : 4);
@@ -106,16 +108,17 @@ uint64_t Screen0Leave(uint8_t* base, uint32_t screen, uint32_t dispatcher, bool 
 
 uint64_t ListScreenInit(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822515A0 ListScreen::Init");
-  const uint32_t screen = uint32_t(r3), frame = sp - 112;
-  StoreU32(base, screen + 9648, 0);
-  StoreU32(base, screen + 9664, kMinusOne);
-  StoreU32(base, screen + 9656, kMinusOne);
-  StoreU32(base, screen + 9644, 0);
-  StoreU32(base, screen + 9652, 0);
-  StoreU32(base, screen + 9668, 0);
-  Slot(base, r3, 16, frame, 0x822515E8, calls);
-  const uint64_t result = Slot(base, r3, 20, frame, 0x822515FC, calls);
-  StoreU32(base, screen + 9608, 0);
+  const schema::ListScreen screen(base, uint32_t(r3));
+  const uint32_t frame = sp - 112;
+  screen.set_next_page(0);
+  screen.set_unknown_9664(kMinusOne);
+  screen.set_step(kMinusOne);
+  screen.set_page(0);
+  screen.set_previous_page(0);
+  screen.set_step_started(0);
+  Slot(base, r3, 16, frame, 0x822515E8, calls);  // ListScreenVtable slot4
+  const uint64_t result = Slot(base, r3, 20, frame, 0x822515FC, calls);  // slot5
+  screen.set_state(0);
   return result;
 }
 
@@ -128,29 +131,30 @@ uint64_t PanelScreenInit(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& c
 
 uint64_t NodeScreenInit(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82259128 NodeScreen::Init");
-  const uint32_t screen = uint32_t(r3), frame = sp - 112;
-  StoreU32(base, screen + 10100, 15);
-  StoreU32(base, screen + 4, 15);
-  StoreU32(base, screen + 10108, 2);
-  StoreU32(base, screen + 10104, 2);
-  StoreU32(base, screen + 10112, 2);
-  StoreU32(base, screen + 10124, kMinusOne);
-  StoreU32(base, screen + 10116, kMinusOne);
-  StoreU32(base, screen + 10128, 0);
-  Slot(base, r3, 28, frame, 0x82259180, calls);
-  const uint64_t result = Slot(base, r3, 32, frame, 0x82259194, calls);
-  StoreU32(base, screen + 10064, 0);
+  const schema::NodeScreen screen(base, uint32_t(r3));
+  const uint32_t frame = sp - 112;
+  screen.set_movie(15);
+  screen.set_table_movie(15);
+  screen.set_next_page(2);
+  screen.set_page(2);
+  screen.set_previous_page(2);
+  screen.set_unknown_10124(kMinusOne);
+  screen.set_step(kMinusOne);
+  screen.set_step_started(0);
+  Slot(base, r3, 28, frame, 0x82259180, calls);  // NodeScreenVtable slot7
+  const uint64_t result = Slot(base, r3, 32, frame, 0x82259194, calls);  // slot8
+  screen.set_state(0);
   return result;
 }
 
 uint64_t Type6Screen0Draw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, uint32_t lr,
                           const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82234ED8 Type6Screen0::Draw");
-  const uint32_t page = LoadU32(base, LoadU32(base, uint32_t(r3) + 9644));
+  const uint32_t page = schema::Type6Screen0(base, uint32_t(r3)).pages().page();
   if (page == kMinusOne) {
     return r3;
   }
-  const uint32_t target = LoadU32(base, 0x826367B8 + (page << 2));
+  const uint32_t target = LoadU32(base, G::type6_draw_table_address() + (page << 2));
   return calls.call(target, sp, lr, r3, r4);  // a tail call
 }
 
@@ -162,7 +166,7 @@ uint64_t DialogDraw(uint8_t* base, uint64_t r3, uint64_t r4, bool type7, uint32_
     ITC_NATIVE_RUNNING("sub_82232740 Type6Dialog::Draw");
   }
   const uint32_t frame = sp - 96;
-  const uint32_t page = LoadU32(base, uint32_t(r3) + 9640);
+  const uint32_t page = schema::Type67Dialog(base, uint32_t(r3)).page();
   StoreU32(base, frame + 80, type7 ? 0x82241EF8 : 0x82232328);
   StoreU32(base, frame + 84, type7 ? 0x822420C0 : 0x822324E8);
   if (page == kMinusOne) {
@@ -175,10 +179,10 @@ uint64_t DialogDraw(uint8_t* base, uint64_t r3, uint64_t r4, bool type7, uint32_
 uint64_t Type7Screen0Draw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
                           const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82245148 Type7Screen0::Draw");
-  constexpr uint32_t kTable = 0x82815E20, kGuard = 0x82815E38;
+  constexpr uint32_t kTable = G::type7_draw_table_address();
   const uint32_t frame = sp - 112;
-  const uint32_t guard = LoadU32(base, kGuard);
-  const uint32_t page = LoadU32(base, LoadU32(base, uint32_t(r3) + 9648));
+  const uint32_t guard = G::type7_draw_guard(base);
+  const uint32_t page = schema::Type7Screen0(base, uint32_t(r3)).pages().page();
   if ((guard & 1) == 0) {
     StoreU32(base, frame + 80, 0x82244BF8);
     StoreU32(base, frame + 88, 0x82244E00);
@@ -186,7 +190,7 @@ uint64_t Type7Screen0Draw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
     StoreU32(base, frame + 84, 0);
     StoreU32(base, frame + 92, 0);
     StoreU32(base, frame + 100, 0);
-    StoreU32(base, kGuard, guard | 1);
+    G::set_type7_draw_guard(base, guard | 1);
     for (uint32_t i = 0; i < 6; i++) {
       StoreU32(base, kTable + 4 * i, LoadU32(base, frame + 80 + 4 * i));
     }
@@ -204,7 +208,7 @@ uint64_t ControllerOptionsDraw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t
   ITC_NATIVE_RUNNING("sub_821C7F28 ControllerOptions::Draw");
   const uint32_t frame = sp - 112;
   StoreU32(base, frame + 80, 0x821C5A20);
-  const uint32_t page = LoadU32(base, LoadU32(base, kControllerPage));
+  const uint32_t page = G::controller_page(base).page();
   StoreU32(base, frame + 84, 0x821C5B70);
   StoreU32(base, frame + 88, 0x821C5C70);
   if (page == kMinusOne) {

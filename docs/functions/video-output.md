@@ -76,6 +76,17 @@ game's `Semaphore`, `Event`, critical section and wait wrappers stay
 recompiled for their other callers (the archive loader's four semaphores
 and the rest): the core's shared sync.
 
+The schema (E5 step 2, `itc_recomp/schema/video-output.toml`, header
+`src/schema/video_output.h`): `VideoOutput` (308 bytes, with the
+presentation parameters at +16 as `params_*` fields),
+`VideoPresentParameters`, the sync wrappers `Event`, `Semaphore` and
+`ScopedLock`, `VideoOutputDeviceHolder` (`UnlockDevice`'s word), the
+never-seen device blocks and debug text objects, and the vblank words and
+`resolve_z` in `[globals]`. `src/graphics/video_output.cpp` and
+`src/hooks/video_mode.cpp` reach the video output through it; the
+device's thread word (+10760) and parameters copy (+13188) stay offsets
+until `device-state.toml`'s `Device` is switched to.
+
 Status:
 
 - **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
@@ -117,6 +128,11 @@ Status:
   calls direct or through the dispatch table. While the SDK or code not
   native yet still reaches it, its entry for them is an override in
   `src/lifted/` (deleted when nothing reaches it that way).
+- **Host**: E5 (`docs/e5-native.md`, steps 3 to 5): our C++ whose objects
+  are host structs (host byte order, host pointers, made with `new` or
+  kept in containers), read and written as C++ members instead of by
+  offset in guest memory. A Native or Lifted function becomes Host when
+  its area's objects move to the host.
 
 A function usually moves from recompiled or Wrapped to Overridden to
 Native as the `ctx` edge moves up through its callers, or straight to

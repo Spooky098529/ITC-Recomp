@@ -4,6 +4,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/files_and_saves.h"
 
 #include <atomic>
 
@@ -19,10 +20,11 @@ uint32_t LoadLittle(uint8_t* base, uint32_t address) {
 
 uint32_t GetEntry(uint8_t* base, uint32_t container, uint32_t index, bool skip_empty) {
   ITC_NATIVE_RUNNING("sub_82294730 DataFile::GetEntry");
-  if (index >= LoadLittle(base, container)) {
+  const schema::DataFile file(base, container);
+  if (index >= LoadLittle(base, file.count_address())) {
     return 0;
   }
-  const uint32_t entry = container + LoadLittle(base, container + 4 + 4 * index);
+  const uint32_t entry = container + LoadLittle(base, file.offsets_address() + 4 * index);
   if (skip_empty && guest::LoadU32(base, entry) == 0) {
     return 0;
   }

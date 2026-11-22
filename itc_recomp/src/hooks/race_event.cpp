@@ -3,6 +3,7 @@
 // shares (hooks/race_event.h).
 
 #include "hooks/race_event.h"
+#include "lifted/functions.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -56,7 +57,7 @@ uint32_t RaceEventGuest::Test(void* user, uint32_t function, uint32_t condition,
   guest_call::InFrame(ctx, self.base_, depth, 0x82142A58, [&](uint32_t) {
     ctx.r3.u64 = condition;
     ctx.r4.u64 = level;
-    lifted::CallFromContext(ctx, self.base_, 0x82141668);  // EventCondition::Power
+    lifted::Enter(ctx, self.base_, lifted::e82141668);  // EventCondition::Power
     r3 = ctx.r3.u32;
   });
   ctx.fpscr.disableFlushMode();

@@ -1,0 +1,53 @@
+# The schema of docs/functions/shader-objects.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The graphics library's shader objects (src/shader_objects/): a vertex
+# shader's 592 bytes of fields and a pixel shader's 56, the shader file's
+# header copied after them. The renderer reads them to find a draw's shaders.
+# Their first 24 bytes are probably D3D's resource header (common word,
+# reference count, fences, identifier, base flush).
+#
+# The memory blocks and the pending frees this file's rows make and free are
+# models.toml's types (MemoryBlockHeader, PendingFreesList, PendingFreesNode);
+# the measure files some of their accesses under this area
+# ("new<?>@Memory::AllocPhysicalEx", "[8296BD58]" and its nodes,
+# "sub_825A71C0.ret"): left for models.toml (see the area's report). The
+# shader file and ShaderFile::Parse's record are models.toml's too.
+
+# A vertex shader object (592 bytes of fields, the file's header after them).
+# The measure's "VertexShader" also holds VertexShader::Create's r3, which is
+# the shader file (its +0, +4 and +8 loads; a measure fault).
+[VertexShader]
+measures = ["VertexShader", "new<?>@VertexShader::Create"]
+size = 592
+origin = "allocated"
+fields = [
+  { name = "common", offset = 0, type = "u32", note = "6 (the type), bit 0x00100000 set by VertexShader::Create; Create's loads here are the shader file's magic (a measure fault)" },
+  { name = "reference_count", offset = 4, type = "u32", note = "1 when made; Create's loads here are the shader file's header size (a measure fault)" },
+  { name = "fence", offset = 8, type = "u32", note = "probably (D3D's resource header); only Create's load of the shader file's microcode size reaches it (a measure fault)" },
+  { name = "base_flush", offset = 20, type = "u32", note = "0xFFFF0000 when made (probably D3D's BaseFlush)" },
+  { name = "unknown_24", offset = 24, type = "u32", note = "-1 when made (VertexShader::Init)" },
+  { name = "microcode", offset = 48, type = "ptr", note = "the microcode (physical memory)" },
+  { name = "fetch_count", offset = 60, type = "u32", note = "the fetch table's count (the table's +28), at most 32" },
+  { name = "fetch_words", offset = 64, type = "bytes", count = 128, note = "the fetch table's words (u32 each, up to 32)" },
+  { name = "fetch_instructions", offset = 192, type = "bytes", count = 384, note = "12 bytes a fetch word from the microcode at 12 x its low 12 bits, probably the vertex fetch instructions" },
+  { name = "header_fetch_table", offset = 612, type = "u32", note = "the copied file header's +20: the fetch table's offset from the header (+592)" },
+]
+
+# A pixel shader object (56 bytes of fields, the file's header after them).
+# The measure's "PixelShader" also holds PixelShader::Create's r3, the shader
+# file (its +0, +4 and +8 loads; a measure fault).
+[PixelShader]
+measures = ["PixelShader", "new<?>@PixelShader::Create"]
+size = 56
+origin = "allocated"
+fields = [
+  { name = "common", offset = 0, type = "u32", note = "7 (the type), bit 0x00100000 set by PixelShader::Create; Create's loads here are the shader file's magic (a measure fault)" },
+  { name = "reference_count", offset = 4, type = "u32", note = "1 when made; Create's loads here are the shader file's header size (a measure fault)" },
+  { name = "fence", offset = 8, type = "u32", note = "probably (D3D's resource header); only Create's load of the shader file's microcode size reaches it (a measure fault)" },
+  { name = "base_flush", offset = 20, type = "u32", note = "0xFFFF0000 when made (probably D3D's BaseFlush)" },
+  { name = "microcode", offset = 24, type = "ptr", note = "the microcode (physical memory)" },
+]

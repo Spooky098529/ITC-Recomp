@@ -13,3 +13,6 @@
 # static_map.py's full dump (made again on every run; docs/loops/static-map.md
 # is the committed summary)
 /itc_recomp/coverage/static_map.tsv
+
+# Python bytecode the tools write when they run.
+__pycache__/

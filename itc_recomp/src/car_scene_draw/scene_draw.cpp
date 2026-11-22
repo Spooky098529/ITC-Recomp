@@ -25,6 +25,13 @@
 #include "models/texture_provider.h"
 #include "models/xpr.h"
 #include "native/buffers.h"
+#include "schema/camera_modes.h"
+#include "schema/cameras.h"
+#include "schema/car_draw.h"
+#include "schema/car_scene_draw.h"
+#include "schema/device_shaders.h"
+#include "schema/race_states.h"
+#include "schema/scene_models.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <cstring>
@@ -38,12 +45,17 @@ using namespace ops;
 
 constexpr uint32_t kCameraPasses = 0x826BAC00;
 constexpr uint32_t kPassSize = 592;
-constexpr uint32_t kRenderApp = 0x826BABA0;   // the render manager
-constexpr uint32_t kSharedTexture = 0x8296B8F0;
-constexpr uint32_t kLightDirection = 0x8296B950;  // the scene lights' first vector
-constexpr uint32_t kRecords = 0x82002D40;  // the three records, 60 bytes each (w0 to w14)
-constexpr uint32_t kRecordSize = 60;
-constexpr uint32_t kLightX = 0x82001BE8;   // the second path's light's x
+
+using G = schema::CarSceneDrawGlobals;
+using Record = schema::CarSceneDrawRecord;
+using Description = schema::ScenePass;
+using CameraPass = schema::CameraPass;
+using SceneModel = schema::SceneModel;
+
+// Record r of the three at 0x82002D40.
+Record RecordAt(uint8_t* base, uint32_t r) {
+  return Record(base, G::records_address() + r * Record::kSize);
+}
 
 // The originals' wrapped callees (src/debug/frame_state_diff.cpp).
 constexpr uint32_t kXprGetTexture = 0x82597118;
@@ -125,7 +137,7 @@ class SceneDraw {
   // The description's keys and mask around Car::DrawUpdate(model).
   void DrawModel(uint32_t i, uint32_t p, uint32_t model, uint64_t r24);
   uint32_t list_at_(uint32_t n) {
-    const uint32_t list = scene_ + 5028;
+    const uint32_t list = Scene().scene_models_first_address();
     return uint32_t(Wrapped(base_, kListAt, list, [&] {
       return uint64_t(vehicle_accessors::ListAt(base_, list, n));
     }));
@@ -159,7 +171,7 @@ class SceneDraw {
   // Slot 8's plain C++ called directly where it's the game's
   // (app_start_up::RenderManagerScene).
   uint32_t Get(uint32_t slot, uint32_t x) {
-    const uint32_t manager = Load(base_, kRenderApp);
+    const uint32_t manager = G::render_manager(base_).address;
     const auto scene = app_start_up::RenderManagerScene(base_, manager);
     const uint32_t object = scene ? *scene : VtableCall(manager, 8, x);
     return VtableCall(object, slot, x + 16);
@@ -194,15 +206,15 @@ class SceneDraw {
   // key, f1 = 0.0), the getters at x and x + 16, the call at x + 0x2C.
   void Submit(uint32_t chunk, uint32_t key, uint32_t x) {
     const uint32_t queue = Get(2, x);
-    const uint32_t function = Load(base_, Load(base_, queue) + 16);
+    const uint32_t function = Load(base_, schema::RenderQueue(base_, queue).vtable().add_address());
     Call(function, {queue, chunk, key}, x + 0x2C, {zero_});
   }
   // One slot's three words.
   void Command(uint32_t x, uint32_t w0, uint32_t w1, uint32_t w2) {
-    const uint32_t slot = Allocate(1, x);
-    Store(base_, slot + 0, w0);
-    Store(base_, slot + 4, w1);
-    Store(base_, slot + 8, w2);
+    const schema::ChunkCommand slot(base_, Allocate(1, x));
+    slot.set_id(w0);
+    slot.set_arg0(w1);
+    slot.set_arg1(w2);
   }
 
   // --- Callees ---
@@ -234,13 +246,13 @@ class SceneDraw {
     const uint64_t player = Wrapped(base_, kPlayerModel, index, [&] {
       return uint64_t(CarScenePlayerModel(base_, index));
     });
-    const uint32_t list = scene_ + 5028;
+    const uint32_t list = Scene().scene_models_first_address();
     return uint32_t(Wrapped(base_, kListAt, list, [&] {
       return uint64_t(vehicle_accessors::ListAt(base_, list, uint32_t(player)));
     }));
   }
   void SetLight(uint32_t direction, double distance) {
-    const uint32_t pass = Load(base_, f_ + 1716) + 5072;
+    const uint32_t pass = schema::CarScene(base_, Load(base_, f_ + 1716)).pass_camera_address();
     Wrapped(base_, kSetLight, pass, [&] {
       return uint64_t(ScenePassSetLight(base_, pass, direction, distance, f_, calls_.memcpy));
     });
@@ -284,6 +296,8 @@ class SceneDraw {
   void SharedTextures(uint32_t record);
   uint32_t Projections(uint32_t record, uint32_t model, uint32_t pass);
   void LightArrays();
+
+  schema::CarScene Scene() const { return schema::CarScene(base_, scene_); }
 
   uint8_t* base_;
   const SceneDrawCalls& calls_;
@@ -346,8 +360,8 @@ uint32_t SceneDraw::ProjectionChunk(const ChunkSteps& s, uint32_t reg, uint32_t 
 void SceneDraw::SizeConstant(uint32_t slot, uint32_t pass, uint32_t temp) {
   Stfs(base_, temp + 8, zero_);
   Stfs(base_, temp + 12, zero_);
-  const int32_t width = LoadS(base_, pass + 504);
-  const int32_t height = LoadS(base_, pass + 508);
+  const int32_t width = LoadS(base_, CameraPass(base_, pass).viewport_width_address());
+  const int32_t height = LoadS(base_, CameraPass(base_, pass).viewport_height_address());
   StoreDoubleword(base_, f_ + 240, uint64_t(int64_t(width)));
   StoreDoubleword(base_, f_ + 256, uint64_t(int64_t(height)));
   Stfs(base_, temp + 0, Frsp(double(int64_t(width))));
@@ -365,25 +379,25 @@ void SceneDraw::HeightConstant(uint32_t slot, uint32_t height) {
 void SceneDraw::SetUp(uint32_t matrix) {
   // Pass 0's view-projection kept (put back at the end), then with a matrix
   // the matrix times it for the draw.
+  const uint32_t pass0 = CameraPass(base_, kCameraPasses).view_projection_address();
   for (uint32_t i = 0; i < 64; i += 8) {
-    CopyDoubleword(base_, f_ + 1328 + i, kCameraPasses + 144 + i);
+    CopyDoubleword(base_, f_ + 1328 + i, pass0 + i);
   }
   Store(base_, f_ + 88, kCameraPasses);
-  one_ = Lfs(base_, kOne);
+  one_ = double(G::one(base_));
   if (matrix != 0) {
     Stfs(base_, f_ + 1020, one_);
     Stfs(base_, f_ + 1036, one_);
     Stfs(base_, f_ + 1052, one_);
     Stfs(base_, f_ + 1068, one_);
-    matrix_math::Multiply(base_, f_ + 1008, matrix, kCameraPasses + 144);
-    interpolation::BlendState_OnMultiply(base_, f_ + 1008, matrix, kCameraPasses + 144,
-                                         0x820C5E7C);
+    matrix_math::Multiply(base_, f_ + 1008, matrix, pass0);
+    interpolation::BlendState_OnMultiply(base_, f_ + 1008, matrix, pass0, 0x820C5E7C);
     FlushOff();
-    CopyMatrix(kCameraPasses + 144, f_ + 1008, 0x820C5E88);
+    CopyMatrix(pass0, f_ + 1008, 0x820C5E88);
   }
   Store(base_, f_ + 192, 0);
-  Store(base_, f_ + 228, 0x8296BB60);
-  Store(base_, f_ + 224, 0x8296BAE0);
+  Store(base_, f_ + 228, G::headlight_colors_b_address());
+  Store(base_, f_ + 224, G::headlight_colors_a_address());
 }
 
 // --- Path +4 = 0 ---
@@ -391,10 +405,10 @@ void SceneDraw::SetUp(uint32_t matrix) {
 uint64_t SceneDraw::FirstPath() {
   // The shared assets' texture when slot 0 is done.
   uint32_t texture = 0;
-  if (LoadS(base_, scene_ + 84) == 3) {
+  if (LoadS(base_, Scene().asset141_state_address()) == 3) {
     texture = uint32_t(XprTexture(scene_ + 88));
   }
-  Store(base_, kSharedTexture, texture);
+  G::set_shared_texture(base_, texture);
   // The camera passes: all 21 disabled, then the view's, the begins and
   // ends recorded.
   for (uint32_t i = 0; i < 21; i++) {
@@ -412,14 +426,14 @@ uint64_t SceneDraw::FirstPath() {
 
   // The light's direction: 0x8296B950's first vector, normalized, at +128.
   Stfs(base_, f_ + 140, one_);
-  Copy16(base_, f_ + 128, kLightDirection);
+  Copy16(base_, f_ + 128, G::light_direction_address());
   Store(base_, f_ + 80, 3);
-  const double far_plane = Lfs(base_, 0x82000C34);
-  const double size = Lfs(base_, 0x820021F4);
-  const double distance = Lfs(base_, 0x820021E4);
-  const double light_distance = Lfs(base_, 0x82002FB0);
+  const double far_plane = double(G::light_far_plane(base_));
+  const double size = double(G::fit_height_band(base_));
+  const double distance = double(G::light_eye_distance(base_));
+  const double light_distance = double(G::light_distance(base_));
   NormalizeInPlace(f_ + 128);
-  zero_ = Lfs(base_, kZero);
+  zero_ = double(G::zero(base_));
 
   static constexpr ChunkSteps kSteps = {
       0x820C611C, 0x820C6144, 0x820C617C, 0x820C61BC, 0x820C61F0, 0x820C6228,
@@ -427,18 +441,18 @@ uint64_t SceneDraw::FirstPath() {
       0x820C6410, 0x820C6448, 0x820C6470, 0x820C61DC, 0x820C6330, 0};
   uint64_t r24 = 0;
   for (uint32_t r = 0; r < 3; r++) {
-    const uint32_t record = kRecords + r * kRecordSize;
-    const uint32_t pass = Pass(base_, Load(base_, record + 0));
-    const uint32_t model = RecordModel(Load(base_, record + 36));
+    const Record record = RecordAt(base_, r);
+    const uint32_t pass = Pass(base_, record.car_pass());
+    const uint32_t model = RecordModel(record.model_index());
     r24 = model;
-    if (LoadS(base_, pass + 588) != 0 && model != 0) {
+    if (LoadS(base_, CameraPass(base_, pass).enabled_address()) != 0 && model != 0) {
       SetLight(f_ + 128, light_distance);
       // The model's position (its matrix's (0, 0, 0, 1)) at +272.
       Stfs(base_, f_ + 272, zero_);
       Stfs(base_, f_ + 276, zero_);
       Stfs(base_, f_ + 280, zero_);
       Stfs(base_, f_ + 284, one_);
-      Memcpy(f_ + 528, model + 4304, 64, 0x820C6040);
+      Memcpy(f_ + 528, SceneModel(base_, model).matrix_address(), 64, 0x820C6040);
       Transform(f_ + 272, f_ + 528, f_ + 272);
       // The eye (+592): the position plus the direction times `distance`;
       // up (0, 1, 0) at +496.
@@ -473,12 +487,12 @@ uint64_t SceneDraw::FirstPath() {
         ProjectorBuildOrtho(base_, out, eye, target, up, size, size, zero_, far_plane, f_);
         return uint64_t(out);
       });
-      const uint32_t light_pass = Pass(base_, Load(base_, record + 16));  // w4
-      CopyMatrix(light_pass + 144, out, 0x820C6108);
+      const uint32_t light_pass = Pass(base_, record.light_pass());  // w4
+      CopyMatrix(CameraPass(base_, light_pass).view_projection_address(), out, 0x820C6108);
       r24 = ProjectionChunk(
-          kSteps, 14, out, 7, 0, Load(base_, record + 32), 77,
+          kSteps, 14, out, 7, 0, record.light_target(), 77,
           [&](uint32_t slot) { SizeConstant(slot, light_pass, f_ + 144); },
-          Load(base_, record + 56));
+          record.light_key());
     }
     Store(base_, f_ + 80, 2 - r);
   }
@@ -508,9 +522,9 @@ void SceneDraw::LightArrays() {
     }
   };
   clear();
-  fill(0x8296BAE0, 0x8296BB60, 128);
+  fill(G::headlight_colors_a_address(), G::headlight_colors_b_address(), 128);
   clear();
-  fill(0x8296B980, 0x8296B9B0, 48);
+  fill(G::light_vectors_a_address(), G::light_vectors_b_address(), 48);
 
   // The scene lights: 0x8296B950 = the direction, 0x8296B980 = ([0x82001BE4]
   // x3, 1.0), 0x8296B9B0 = ([0x8200296C] x3, 1.0), 0x8296B990, 0x8296B9A0,
@@ -521,11 +535,11 @@ void SceneDraw::LightArrays() {
   Stfs(base_, f_ + 132, zero_);
   Stfs(base_, f_ + 136, zero_);
   Stfs(base_, f_ + 140, one_);
-  const double ambient = Lfs(base_, 0x82001BE4);
+  const double ambient = double(G::half(base_));
   Stfs(base_, f_ + 144, ambient);
   Stfs(base_, f_ + 148, ambient);
   Stfs(base_, f_ + 152, ambient);
-  const double diffuse = Lfs(base_, 0x8200296C);
+  const double diffuse = double(G::diffuse(base_));
   {
     uint32_t w[4];
     for (int i = 0; i < 4; i++) {
@@ -535,7 +549,7 @@ void SceneDraw::LightArrays() {
     Stfs(base_, f_ + 116, diffuse);
     Stfs(base_, f_ + 120, diffuse);
     for (int i = 0; i < 4; i++) {
-      Store(base_, 0x8296B980 + 4 * i, w[i]);
+      Store(base_, G::light_vectors_a_address() + 4 * i, w[i]);
     }
   }
   // The (0, 0, 0, 1)s at +240, +256 and +208 (the light's direction at +176
@@ -553,7 +567,7 @@ void SceneDraw::LightArrays() {
     Stfs(base_, at + 12, one_);
   }
   for (int i = 0; i < 4; i++) {
-    Store(base_, kLightDirection + 4 * i, direction[i]);
+    Store(base_, G::light_direction_address() + 4 * i, direction[i]);
   }
   uint32_t w240[4], w256[4];
   for (int i = 0; i < 4; i++) {
@@ -563,18 +577,18 @@ void SceneDraw::LightArrays() {
   Stfs(base_, f_ + 208, zero_);
   Stfs(base_, f_ + 212, zero_);
   for (int i = 0; i < 4; i++) {
-    Store(base_, 0x8296B9B0 + 4 * i, specular[i]);
-    Store(base_, 0x8296B990 + 4 * i, position[i]);
-    Store(base_, 0x8296B9C0 + 4 * i, w240[i]);
-    Store(base_, 0x8296B9A0 + 4 * i, w256[i]);
+    Store(base_, G::light_vectors_b_address() + 4 * i, specular[i]);
+    Store(base_, G::light_vectors_a_address() + 16 + 4 * i, position[i]);
+    Store(base_, G::light_vectors_b_address() + 16 + 4 * i, w240[i]);
+    Store(base_, G::light_vectors_a_address() + 32 + 4 * i, w256[i]);
   }
   Stfs(base_, f_ + 216, zero_);
   Stfs(base_, f_ + 220, one_);
   for (uint32_t i = 0; i < 16; i += 8) {
-    CopyDoubleword(base_, 0x8296B9D0 + i, f_ + 208 + i);
+    CopyDoubleword(base_, G::light_vectors_b_address() + 32 + i, f_ + 208 + i);
   }
   for (uint32_t i = 0; i < 16; i += 8) {
-    CopyDoubleword(base_, 0x8265ED00 + i, scene_ + 5280 + i);
+    CopyDoubleword(base_, G::light_vector_address() + i, Scene().light_vector_lo_address() + i);
   }
 }
 
@@ -587,11 +601,11 @@ void SceneDraw::HeadlightProjector(uint32_t record, uint32_t model) {
   const uint32_t scene = Load(base_, f_ + 1716);
   Stfs(base_, f_ + 444, one_);
   Stfs(base_, f_ + 476, one_);
-  Copy16(base_, f_ + 480, scene + 5376);
+  Copy16(base_, f_ + 480, schema::CarScene(base_, scene).headlight_position_lo_address());
   // The model's matrix at +528; the eye (+432) = the scene's +5376 through
   // it, then its last row cleared: the beam (+464) and up (+384, (0, 1, 0))
   // turned by it.
-  Memcpy(f_ + 528, model + 4304, 64, 0x820C690C);
+  Memcpy(f_ + 528, SceneModel(base_, model).matrix_address(), 64, 0x820C690C);
   Stfs(base_, f_ + 384, zero_);
   Stfs(base_, f_ + 388, one_);
   Stfs(base_, f_ + 392, zero_);
@@ -608,7 +622,7 @@ void SceneDraw::HeadlightProjector(uint32_t record, uint32_t model) {
   for (uint32_t i = 0; i < 16; i += 4) {
     Stfs(base_, f_ + 128 + i, Fneg(Lfs(base_, f_ + 464 + i)));
   }
-  const double fov = Lfs(base_, scene + 5436);
+  const double fov = Lfs(base_, schema::CarScene(base_, scene).projector_fov_address());
   Stfs(base_, f_ + 828, one_);
   Stfs(base_, f_ + 844, one_);
   Stfs(base_, f_ + 860, one_);
@@ -623,7 +637,7 @@ void SceneDraw::HeadlightProjector(uint32_t record, uint32_t model) {
     Stfs(base_, f_ + 512 + i, Fsubs(Lfs(base_, f_ + 432 + i), Lfs(base_, f_ + 112 + i)));
   }
   const uint32_t out = f_ + 816, eye = f_ + 432, target = f_ + 512, up = f_ + 384;
-  const double far_plane = Lfs(base_, 0x82002FA8);
+  const double far_plane = double(G::headlight_far_plane(base_));
   if (PerspectiveDeclines(base_, fov)) {
     Call(kBuild, {out, eye, target, up}, 0x820C6A2C, {fov, one_, one_, far_plane});
   } else {
@@ -634,21 +648,23 @@ void SceneDraw::HeadlightProjector(uint32_t record, uint32_t model) {
       return uint64_t(out);
     });
   }
-  const uint32_t pass = Pass(base_, Load(base_, record + 4));  // w1
-  CopyMatrix(pass + 144, out, 0x820C6A48);
+  const Record rec(base_, record);
+  const uint32_t pass = Pass(base_, rec.headlight_pass());  // w1
+  CopyMatrix(CameraPass(base_, pass).view_projection_address(), out, 0x820C6A48);
   static constexpr ChunkSteps kSteps = {
       0x820C6A5C, 0x820C6A84, 0x820C6ABC, 0x820C6AFC, 0x820C6B30, 0x820C6B68,
       0x820C6BA4, 0x820C6BE0, 0x820C6C1C, 0x820C6C54, 0x820C6C9C, 0x820C6CDC,
       0x820C6D68, 0x820C6DA0, 0x820C6DC8, 0x820C6B1C, 0x820C6C80, 96};
   ProjectionChunk(
-      kSteps, 87, out, 8, 0, Load(base_, record + 20), 77,
-      [&](uint32_t slot) { SizeConstant(slot, pass, f_ + 208); }, Load(base_, record + 40));
+      kSteps, 87, out, 8, 0, rec.headlight_target(), 77,
+      [&](uint32_t slot) { SizeConstant(slot, pass, f_ + 208); }, rec.headlight_key());
 }
 
 void SceneDraw::SharedTextures(uint32_t record) {
   Open(0x820C6E08);
   const uint32_t chunk = Allocate(1, 0x820C6E30);
-  const uint32_t provider = Load(base_, f_ + 1716) + 432;
+  const uint32_t provider =
+      schema::CarScene(base_, Load(base_, f_ + 1716)).texture_provider_145_address();
   Store(base_, f_ + 96, 5);
   guest::StoreU16(base_, chunk + 2, 5);
   Store(base_, f_ + 80, provider);
@@ -681,21 +697,22 @@ void SceneDraw::SharedTextures(uint32_t record) {
   } while (left != 0);
   Command(0x820C7078, 36, 0, 0);
   Close(0x820C70B0);
-  Submit(chunk, Load(base_, record + 44), 0x820C70D8);
+  Submit(chunk, Record(base_, record).shared_textures_key(), 0x820C70D8);
 }
 
 uint32_t SceneDraw::Projections(uint32_t record, uint32_t model, uint32_t pass) {
-  const double scale = Lfs(base_, 0x82002FAC);
-  const double band = Lfs(base_, 0x820021F4);
-  const double raise = Lfs(base_, 0x82001FD8);
-  const double cut1 = Lfs(base_, 0x82002C38);
-  const double far1 = Lfs(base_, 0x82002204);
-  const double cut2 = Lfs(base_, 0x82002A0C);
-  const double least2 = Lfs(base_, 0x82002CAC);
-  const double far2 = Lfs(base_, 0x82002A1C);
-  const double cut3 = Lfs(base_, 0x82000D44);
-  const double least3 = Lfs(base_, 0x82002674);
-  const double far3 = Lfs(base_, 0x8200222C);
+  const Record rec(base_, record);
+  const double scale = double(G::fit_ratio_scale(base_));
+  const double band = double(G::fit_height_band(base_));
+  const double raise = double(G::fit_down_raise(base_));
+  const double cut1 = double(G::fit_down_cut(base_));
+  const double far1 = double(G::fit_down_scale(base_));
+  const double cut2 = double(G::fit_band_cut(base_));
+  const double least2 = double(G::fit_band_least(base_));
+  const double far2 = double(G::fit_band_scale(base_));
+  const double cut3 = double(G::fit_light_cut(base_));
+  const double least3 = double(G::fit_light_least(base_));
+  const double far3 = double(G::fit_light_scale(base_));
   // The model's position (its matrix's (0, 0, 0, 1)) at `at`, through its
   // matrix copied to `matrix`.
   auto position = [&](uint32_t at, uint32_t matrix, uint32_t lr) {
@@ -703,7 +720,7 @@ uint32_t SceneDraw::Projections(uint32_t record, uint32_t model, uint32_t pass) 
     Stfs(base_, at + 4, zero_);
     Stfs(base_, at + 8, zero_);
     Stfs(base_, at + 12, one_);
-    Memcpy(matrix, model + 4304, 64, lr);
+    Memcpy(matrix, SceneModel(base_, model).matrix_address(), 64, lr);
     Transform(at, matrix, at);
   };
   auto ones = [&](uint32_t out) {
@@ -715,7 +732,7 @@ uint32_t SceneDraw::Projections(uint32_t record, uint32_t model, uint32_t pass) 
   // [0x820021F4] into pass w2.
   {
     position(f_ + 352, f_ + 1200, 0x820C7124);
-    const double ratio = Fdivs(scale, Lfs(base_, pass + 368));
+    const double ratio = Fdivs(scale, Lfs(base_, CameraPass(base_, pass).field_of_view_address()));
     const double height = Lfs(base_, f_ + 356);
     ones(f_ + 752);
     const double low = Fsubs(height, band);
@@ -723,19 +740,20 @@ uint32_t SceneDraw::Projections(uint32_t record, uint32_t model, uint32_t pass) 
     const double least = Fmuls(ratio, band);
     const double cut = Fmuls(ratio, cut1);
     Fit(f_ + 752, pass, f_ + 304, high, low, cut, least, far1, 0x820C7174);
-    CopyMatrix(Pass(base_, Load(base_, record + 8)) + 144, f_ + 752, 0x820C7190);
+    CopyMatrix(CameraPass(base_, Pass(base_, rec.fit_down_pass())).view_projection_address(),
+               f_ + 752, 0x820C7190);
     static constexpr ChunkSteps kSteps = {
         0x820C71A4, 0x820C71CC, 0x820C7204, 0x820C7244, 0x820C7278, 0x820C72B0,
         0x820C72E8, 0x820C7320, 0x820C7358, 0x820C7390, 0x820C73D4, 0x820C7414,
         0x820C745C, 0x820C7494, 0x820C74BC, 0x820C7264, 0x820C73B8, 92};
     ProjectionChunk(
-        kSteps, 70, f_ + 752, 9, 1, Load(base_, record + 24), 68,
-        [&](uint32_t slot) { HeightConstant(slot, f_ + 356); }, Load(base_, record + 48));
+        kSteps, 70, f_ + 752, 9, 1, rec.fit_down_target(), 68,
+        [&](uint32_t slot) { HeightConstant(slot, f_ + 356); }, rec.fit_down_key());
   }
   // (4) Between the height ± [0x820021F4] into pass w3.
   {
     position(f_ + 320, f_ + 1264, 0x820C7508);
-    const double ratio = Fdivs(scale, Lfs(base_, pass + 368));
+    const double ratio = Fdivs(scale, Lfs(base_, CameraPass(base_, pass).field_of_view_address()));
     ones(f_ + 944);
     const double least = Fmuls(ratio, least2);
     const double cut = Fmuls(ratio, cut2);
@@ -743,21 +761,22 @@ uint32_t SceneDraw::Projections(uint32_t record, uint32_t model, uint32_t pass) 
     const double low = Fsubs(height, band);
     const double high = Fadds(height, band);
     Fit(f_ + 944, pass, f_ + 304, high, low, cut, least, far2, 0x820C7558);
-    CopyMatrix(Pass(base_, Load(base_, record + 12)) + 144, f_ + 944, 0x820C7574);
+    CopyMatrix(CameraPass(base_, Pass(base_, rec.fit_band_pass())).view_projection_address(),
+               f_ + 944, 0x820C7574);
     static constexpr ChunkSteps kSteps = {
         0x820C7588, 0x820C75B0, 0x820C75E8, 0x820C7628, 0x820C765C, 0x820C7694,
         0x820C76CC, 0x820C7704, 0x820C773C, 0x820C7774, 0x820C77B8, 0x820C77F8,
         0x820C7840, 0x820C7878, 0x820C78A0, 0x820C7648, 0x820C779C, 92};
     ProjectionChunk(
-        kSteps, 74, f_ + 944, 10, 1, Load(base_, record + 28), 69,
-        [&](uint32_t slot) { HeightConstant(slot, f_ + 324); }, Load(base_, record + 52));
+        kSteps, 74, f_ + 944, 10, 1, rec.fit_band_target(), 69,
+        [&](uint32_t slot) { HeightConstant(slot, f_ + 324); }, rec.fit_band_key());
   }
   // (5) Along the light (+176) into pass w4, the description's light set
   // first.
   {
     SetLight(f_ + 176, far1);
     position(f_ + 416, f_ + 1120, 0x820C7900);
-    const double ratio = Fdivs(scale, Lfs(base_, pass + 368));
+    const double ratio = Fdivs(scale, Lfs(base_, CameraPass(base_, pass).field_of_view_address()));
     ones(f_ + 880);
     const double least = Fmuls(ratio, least3);
     const double cut = Fmuls(ratio, cut3);
@@ -765,14 +784,15 @@ uint32_t SceneDraw::Projections(uint32_t record, uint32_t model, uint32_t pass) 
     const double low = Fsubs(height, band);
     const double high = Fadds(height, band);
     Fit(f_ + 880, pass, f_ + 176, high, low, cut, least, far3, 0x820C7950);
-    CopyMatrix(Pass(base_, Load(base_, record + 16)) + 144, f_ + 880, 0x820C796C);
+    CopyMatrix(CameraPass(base_, Pass(base_, rec.light_pass())).view_projection_address(),
+               f_ + 880, 0x820C796C);
     static constexpr ChunkSteps kSteps = {
         0x820C7980, 0x820C79A8, 0x820C79E0, 0x820C7A20, 0x820C7A54, 0x820C7A8C,
         0x820C7AC4, 0x820C7AFC, 0x820C7B34, 0x820C7B6C, 0,          0,
         0x820C7BAC, 0x820C7BE4, 0x820C7C0C, 0x820C7A40, 0x820C7B94, 0};
     return ProjectionChunk(
-        kSteps, 14, f_ + 880, 7, 0, Load(base_, record + 32), 0, [](uint32_t) {},
-        Load(base_, record + 56));
+        kSteps, 14, f_ + 880, 7, 0, rec.light_target(), 0, [](uint32_t) {},
+        rec.light_key());
   }
 }
 
@@ -781,20 +801,20 @@ uint64_t SceneDraw::SecondPath() {
   // [0x8296B8F0]: the shared assets' texture when the scene's +5044 is set,
   // else render target 1.
   uint32_t texture;
-  if (LoadS(base_, scene_ + 5044) != 0) {
+  if (LoadS(base_, Scene().set_up_r5_address()) != 0) {
     texture = uint32_t(XprTexture(scene_ + 88));
   } else {
     texture = RenderTarget(1);
   }
   Stfs(base_, f_ + 180, one_);
   Stfs(base_, f_ + 308, one_);
-  Store(base_, kSharedTexture, texture);
+  G::set_shared_texture(base_, texture);
   // The light's direction at +176: ([0x82001BE8], 1.0, 0.0, 0.0) normalized,
   // or with the scene's +5052 set 0x8296B950's first vector normalized; the
   // fits' direction (0, 1, 0, 0) at +304.
-  Stfs(base_, f_ + 176, Lfs(base_, kLightX));
-  zero_ = Lfs(base_, kZero);
-  const bool parking = LoadS(base_, scene_ + 5052) != 0;
+  Stfs(base_, f_ + 176, double(G::light_x(base_)));
+  zero_ = double(G::zero(base_));
+  const bool parking = LoadS(base_, Scene().lighting_fixed_address()) != 0;
   Stfs(base_, f_ + 184, zero_);
   Stfs(base_, f_ + 188, zero_);
   Stfs(base_, f_ + 304, zero_);
@@ -802,7 +822,7 @@ uint64_t SceneDraw::SecondPath() {
   Stfs(base_, f_ + 316, zero_);
   NormalizeInPlace(f_ + 176);
   if (parking) {
-    Copy16(base_, f_ + 176, kLightDirection);
+    Copy16(base_, f_ + 176, G::light_direction_address());
     NormalizeInPlace(f_ + 176);
   } else {
     LightArrays();
@@ -811,14 +831,14 @@ uint64_t SceneDraw::SecondPath() {
   Store(base_, f_ + 160, 3);
   uint64_t r24 = 0;
   for (uint32_t r = 0; r < 3; r++) {
-    const uint32_t record = kRecords + r * kRecordSize;
-    const uint32_t pass = Load(base_, f_ + 88) + Load(base_, record + 0) * kPassSize;
+    const Record record = RecordAt(base_, r);
+    const uint32_t pass = Load(base_, f_ + 88) + record.car_pass() * kPassSize;
     r24 = pass;
-    const uint32_t model = RecordModel(Load(base_, record + 36));
-    if (LoadS(base_, pass + 588) != 0 && model != 0) {
-      HeadlightProjector(record, model);
-      SharedTextures(record);
-      r24 = Projections(record, model, pass);
+    const uint32_t model = RecordModel(record.model_index());
+    if (LoadS(base_, CameraPass(base_, pass).enabled_address()) != 0 && model != 0) {
+      HeadlightProjector(record.address, model);
+      SharedTextures(record.address);
+      r24 = Projections(record.address, model, pass);
     }
     Store(base_, f_ + 160, 2 - r);
   }
@@ -828,27 +848,22 @@ uint64_t SceneDraw::SecondPath() {
 
 // --- Both paths: the pass descriptions (loc_820C7C50) ---
 
-constexpr uint32_t kQueueKeyA = 0x8296B90C;  // the render queue's keys
-constexpr uint32_t kQueueKeyB = 0x8296B900;
-constexpr uint32_t kQueueKeyC = 0x8296B908;
-constexpr uint32_t kRaceData = 0x826C5B2C;
-constexpr uint32_t kViewports = 0x826C2CE8;
 
 void SceneDraw::PassLoop(bool second_path, uint64_t r24) {
-  const uint32_t count = Load(base_, scene_ + 5036);
+  const uint32_t count = Load(base_, Scene().scene_models_count_address());
   Store(base_, f_ + 96, count);
-  Store(base_, kQueueKeyA, Load(base_, 0x82601854));
-  Store(base_, kQueueKeyB, Load(base_, 0x82601858));
+  G::set_queue_key_group0(base_, G::queue_key_a_start(base_));
+  G::set_queue_key_group1(base_, G::queue_key_b_start(base_));
   uint32_t descriptions = second_path ? 4 : 1;  // r26
   // The player's model p (CarScene::PlayerModel(0) inlined).
   uint32_t p = 0;
   Store(base_, f_ + 160, p);
   {
-    const uint32_t race = Load(base_, kRaceData);
-    const int32_t kind = LoadS(base_, race + 0xA3AF0);
-    const uint32_t word = Load(base_, race + 0x59614);
+    const schema::RaceData race = G::race_data(base_);
+    const int32_t kind = LoadS(base_, race.kind_address());
+    const uint32_t word = race.added_count();
     if (kind == 6 && word == 2) {
-      p = Load(base_, 0x826C7820 + 4) == 0 ? 1 : 0;
+      p = G::second_human(base_) == 0 ? 1 : 0;
       Store(base_, f_ + 160, p);
     }
   }
@@ -856,23 +871,23 @@ void SceneDraw::PassLoop(bool second_path, uint64_t r24) {
   uint32_t offset = 0;  // r14
   Store(base_, f_ + 80, descriptions);
   Store(base_, f_ + 84, offset);
-  Store(base_, f_ + 240, 0x8296BA60);
-  Store(base_, f_ + 256, 0x8296BC60);
-  Store(base_, f_ + 288, 0x8296B9E0);
-  Store(base_, f_ + 336, 0x8296BBE0);
-  Store(base_, f_ + 340, 0x8265ECA0);
-  Store(base_, f_ + 344, 0x8265ECE0);
-  Store(base_, f_ + 368, 0x82002EF8);
-  Store(base_, f_ + 348, 0x82002F38);
-  Store(base_, f_ + 92, 0x82002DF8);
-  const uint32_t description = scene_ + 5072;  // r20
-  const uint32_t lights = scene_ + 5248;  // r22
+  Store(base_, f_ + 240, G::headlight_shapes_address());
+  Store(base_, f_ + 256, G::headlight_vectors_address());
+  Store(base_, f_ + 288, G::headlight_positions_address());
+  Store(base_, f_ + 336, G::headlight_directions_address());
+  Store(base_, f_ + 340, G::view_matrix_address());
+  Store(base_, f_ + 344, G::view_eye_address());
+  Store(base_, f_ + 368, G::front_end_description_address());
+  Store(base_, f_ + 348, G::mode8_description_address());
+  Store(base_, f_ + 92, G::pass_descriptions_address());
+  const Description description(base_, Scene().pass_camera_address());  // r20
+  const uint32_t lights = Scene().car_light_factor_a_address();  // r22
 
   // The description's camera pass, or 0 when it isn't active (the
   // original's add. and +588 checks, made again at each use).
   auto active_pass = [&]() -> uint32_t {
-    const uint32_t pass = Load(base_, description + 0) * kPassSize + Load(base_, f_ + 88);
-    if (pass == 0 || LoadS(base_, pass + 588) == 0) {
+    const uint32_t pass = description.camera_pass() * kPassSize + Load(base_, f_ + 88);
+    if (pass == 0 || LoadS(base_, CameraPass(base_, pass).enabled_address()) == 0) {
       return 0;
     }
     return pass;
@@ -880,14 +895,15 @@ void SceneDraw::PassLoop(bool second_path, uint64_t r24) {
   auto list_at = [&](uint32_t n) { return list_at_(n); };
   // Viewport v's view mode is 2 (probably the cockpit).
   auto cockpit_view = [&](uint32_t v) {
-    const uint32_t viewport = Load(base_, Load(base_, kViewports) + 4 * v);
-    return viewport != 0 && LoadS(base_, viewport + 1860) == 2;
+    const uint32_t viewport = Load(base_, G::viewports(base_).address + 4 * v);
+    return viewport != 0 &&
+           LoadS(base_, schema::Viewport(base_, viewport).view_mode_address()) == 2;
   };
   // List::At(n)'s +4296 = value when it exists (two List::At calls, as the
   // original).
   auto show = [&](uint32_t n, uint32_t value) {
     if (list_at(n) != 0) {
-      Store(base_, list_at(n) + 4296, value);
+      Store(base_, SceneModel(base_, list_at(n)).draw_enabled_address(), value);
     }
   };
 
@@ -896,19 +912,21 @@ void SceneDraw::PassLoop(bool second_path, uint64_t r24) {
     if (second_path) {
       table = Load(base_, f_ + 92);
     } else {
-      table = LoadS(base_, 0x826032DC) == 8 ? Load(base_, f_ + 348) : Load(base_, f_ + 368);
+      table = int32_t(G::mode_type(base_)) == 8 ? Load(base_, f_ + 348) : Load(base_, f_ + 368);
     }
-    Memcpy(description, offset + table, 64, 0x820C7D9C);
+    Memcpy(description.address, offset + table, 64, 0x820C7D9C);
     if (active_pass() != 0) {
       // The pass's eye to 0x8265ECE0 and its view to 0x8265ECA0.
-      Copy16(base_, Load(base_, f_ + 344), active_pass() + 400);
-      CopyMatrix(Load(base_, f_ + 340), active_pass() + 16, 0x820C7E28);
+      Copy16(base_, Load(base_, f_ + 344),
+             CameraPass(base_, active_pass()).eye_xy_address());
+      CopyMatrix(Load(base_, f_ + 340), CameraPass(base_, active_pass()).view_address(),
+                 0x820C7E28);
       if (second_path) {
         // The player's and model 1's +4296 by the pass's type.
-        const uint32_t type = Load(base_, active_pass() + 584);
+        const uint32_t type = Load(base_, CameraPass(base_, active_pass()).type_address());
         if (type == 0) {
           const uint32_t stage = f_ + 1120;
-          const uint32_t stages = Load(base_, kRaceData) + 0x59620;
+          const uint32_t stages = G::race_data(base_).stages_address();
           if (!debug::IsHidden(kStagesCopy)) {
             debug::FrameStateDiff_Before(base_);
             FlushOff();
@@ -921,11 +939,11 @@ void SceneDraw::PassLoop(bool second_path, uint64_t r24) {
               Call(kStagesCopy, {stage, stages, 0xFFFFFFFFFFFFFFFFull}, 0x820C7F54);
             }
           }
-          const uint32_t race = Load(base_, kRaceData);
-          if ((LoadS(base_, race + 0xA3AF0) != 6 || LoadS(base_, stage) == 1) &&
-              (Load(base_, race + 0x59AE4) & 0x80) == 0 && list_at(p) != 0) {
+          const schema::RaceData race = G::race_data(base_);
+          if ((LoadS(base_, race.kind_address()) != 6 || LoadS(base_, stage) == 1) &&
+              (race.flags() & 0x80) == 0 && list_at(p) != 0) {
             const uint32_t value = cockpit_view(0) ? 0 : 1;
-            Store(base_, list_at(p) + 4296, value);
+            Store(base_, SceneModel(base_, list_at(p)).draw_enabled_address(), value);
           }
         } else if (type == 1) {
           show(1, 1);
@@ -944,10 +962,11 @@ void SceneDraw::PassLoop(bool second_path, uint64_t r24) {
       const int32_t models = LoadS(base_, f_ + 96);  // r28
       for (uint32_t i = 0; int32_t(i) < models; i++) {
         const uint32_t model = list_at(i);  // r18
-        if (LoadS(base_, model + 16) != 3 || Load(base_, model + 5048) == 0) {
+        if (LoadS(base_, SceneModel(base_, model).state_address()) != 3 ||
+            Load(base_, SceneModel(base_, model).car_model_address()) == 0) {
           continue;
         }
-        if (second_path && LoadS(base_, scene_ + 5052) == 0) {
+        if (second_path && LoadS(base_, Scene().lighting_fixed_address()) == 0) {
           r24 = OtherHeadlights(i, lights);
         }
         DrawModel(i, p, model, r24);
@@ -987,8 +1006,9 @@ uint64_t SceneDraw::OtherHeadlights(uint32_t i, uint32_t lights) {
       SceneModelBeam(base_, beam, other);
       return uint64_t(beam);
     });
-    if (j == i || other == 0 || LoadS(base_, other + 16) != 3 ||
-        Load(base_, other + 5048) == 0 || LoadS(base_, other + 32) == 3) {
+    if (j == i || other == 0 || LoadS(base_, SceneModel(base_, other).state_address()) != 3 ||
+        Load(base_, SceneModel(base_, other).car_model_address()) == 0 ||
+        LoadS(base_, SceneModel(base_, other).kind_address()) == 3) {
       continue;
     }
     const uint32_t at = slot << 4;
@@ -997,7 +1017,7 @@ uint64_t SceneDraw::OtherHeadlights(uint32_t i, uint32_t lights) {
     }
     // Its position (the scene's +5376 through its matrix) at +608, its beam
     // through it at +448, the beam's minus (+128) normalized at +480.
-    Memcpy(f_ + 528, other + 4304, 64, 0x820C8134);
+    Memcpy(f_ + 528, SceneModel(base_, other).matrix_address(), 64, 0x820C8134);
     Transform(f_ + 608, f_ + 528, f_ + 672);
     Stfs(base_, f_ + 588, zero_);
     Stfs(base_, f_ + 584, zero_);
@@ -1064,33 +1084,33 @@ uint64_t SceneDraw::OtherHeadlights(uint32_t i, uint32_t lights) {
 }
 
 void SceneDraw::DrawModel(uint32_t i, uint32_t p, uint32_t model, uint64_t r24) {
-  const uint32_t description = scene_ + 5072;
+  const Description description(base_, Scene().pass_camera_address());
   // The render queue's keys: the description's +64 to +72 keep them, they
   // take its +20 to +28.
-  const uint32_t key_b = Load(base_, description + 24);
-  const uint32_t key_a = Load(base_, description + 20);
-  Store(base_, description + 64, Load(base_, kQueueKeyA));
-  Store(base_, description + 68, Load(base_, kQueueKeyB));
-  const uint32_t key_c = Load(base_, kQueueKeyC);
-  Store(base_, kQueueKeyB, key_b);
-  Store(base_, kQueueKeyA, key_a);
-  Store(base_, description + 72, key_c);
-  Store(base_, kQueueKeyC, Load(base_, description + 28));
+  const uint32_t key_b = description.group1_key();
+  const uint32_t key_a = description.group0_key();
+  description.set_saved_group0_key(G::queue_key_group0(base_));
+  description.set_saved_group1_key(G::queue_key_group1(base_));
+  const uint32_t key_c = G::queue_key_depth(base_);
+  G::set_queue_key_group1(base_, key_b);
+  G::set_queue_key_group0(base_, key_a);
+  description.set_saved_depth_key(key_c);
+  G::set_queue_key_depth(base_, description.depth_key());
   // The mask (+5132, the description's +60) for the call, by the pass's
   // type (pass 0's address, 584, read when the pass isn't active, as the
   // original).
-  uint32_t pass = Load(base_, description + 0) * kPassSize + Load(base_, f_ + 88);
-  const uint32_t saved = Load(base_, scene_ + 5132);
+  uint32_t pass = description.camera_pass() * kPassSize + Load(base_, f_ + 88);
+  const uint32_t saved = Load(base_, Scene().pass_mask_address());
   uint32_t mask = saved;
-  if (pass == 0 || LoadS(base_, pass + 588) == 0) {
+  if (pass == 0 || LoadS(base_, CameraPass(base_, pass).enabled_address()) == 0) {
     pass = 0;
   }
-  const uint32_t type = Load(base_, pass + 584);
+  const uint32_t type = Load(base_, CameraPass(base_, pass).type_address());
   if (type == 0) {
     if (p == i) {
       mask &= ~0x4u;
     }
-    if (LoadS(base_, scene_ + 5052) != 0) {
+    if (LoadS(base_, Scene().lighting_fixed_address()) != 0) {
       mask &= ~0x8u;
       mask &= ~0xE0u;
     }
@@ -1103,18 +1123,18 @@ void SceneDraw::DrawModel(uint32_t i, uint32_t p, uint32_t model, uint64_t r24) 
       mask &= ~0x4u;
     }
   }
-  Store(base_, scene_ + 5132, mask);
+  Store(base_, Scene().pass_mask_address(), mask);
   Wrapped(base_, kCarDrawUpdate, model, [&] {
     calls_.car_draw_update(model, r24, f_, 0x820C840C);
     return uint64_t(0);
   });
-  const uint32_t key = Load(base_, scene_ + 5144);
-  Store(base_, scene_ + 5132, saved);
-  Store(base_, kQueueKeyC, key);
-  const uint32_t b = Load(base_, description + 68);
-  const uint32_t a = Load(base_, description + 64);
-  Store(base_, kQueueKeyB, b);
-  Store(base_, kQueueKeyA, a);
+  const uint32_t key = Load(base_, Scene().pass_saved_key_depth_address());
+  Store(base_, Scene().pass_mask_address(), saved);
+  G::set_queue_key_depth(base_, key);
+  const uint32_t b = description.saved_group1_key();
+  const uint32_t a = description.saved_group0_key();
+  G::set_queue_key_group1(base_, b);
+  G::set_queue_key_group0(base_, a);
 }
 
 void SceneDraw::End() {
@@ -1128,7 +1148,7 @@ uint32_t CarSceneDraw(uint8_t* base, const SceneDrawCalls& calls, uint32_t stack
   ITC_NATIVE_RUNNING("sub_820C5DE8 CarScene::Draw");
   const uint32_t f = stack - kSceneDrawFrame;
   Store(base, f, stack);  // the back chain, as stwu
-  const int32_t state = LoadS(base, scene + 0);
+  const int32_t state = LoadS(base, schema::CarScene(base, scene).state_address());
   Store(base, f + 1716, scene);
   if (state == 4) {
     return scene;  // r3 as it came
@@ -1138,7 +1158,7 @@ uint32_t CarSceneDraw(uint8_t* base, const SceneDrawCalls& calls, uint32_t stack
   SceneDrawFrame frame;
   frame.f = f;
   frame.scene = scene;
-  frame.second_path = LoadS(base, scene + 4) != 0;
+  frame.second_path = LoadS(base, schema::CarScene(base, scene).model_set_address()) != 0;
   const uint64_t r24 = frame.second_path ? draw.SecondPath() : draw.FirstPath();
   // Both paths: the pass descriptions, then pass 0's view-projection put
   // back.

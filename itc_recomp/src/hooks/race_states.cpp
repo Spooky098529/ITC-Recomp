@@ -12,6 +12,7 @@
 #include "hooks/race_world.h"
 #include "native/buffers.h"
 #include "race_states/race_states.h"
+#include "schema/race_states.h"
 #include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_race_states, true, "ITC",
@@ -351,7 +352,8 @@ ITC_REGS_STEP(RaceStatesOnRaceEnd) {
 }
 
 ITC_REGS_STEP(RaceStatesTimeAdd) {
-  ctx.r3.u64 = rs::TimeAdd(guest::LoadU32(base, ctx.r3.u32), guest::LoadU32(base, ctx.r4.u32));
+  ctx.r3.u64 = rs::TimeAdd(schema::PackedTime(base, ctx.r3.u32).packed(),
+                           schema::PackedTime(base, ctx.r4.u32).packed());
 }
 
 }  // namespace hooks

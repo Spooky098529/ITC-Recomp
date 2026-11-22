@@ -4,14 +4,16 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/video_output.h"
 
 namespace archive {
 
-HostSemaphore::HostSemaphore(uint32_t mirror, int32_t count) : count_(count), mirror_(mirror) {}
+HostSemaphore::HostSemaphore(uint32_t semaphore, int32_t count)
+    : count_(count), semaphore_(semaphore) {}
 
 void HostSemaphore::Mirror(uint8_t* base) {
-  if (mirror_ != 0) {
-    guest::StoreU32(base, mirror_, uint32_t(count_.load(std::memory_order_relaxed)));
+  if (semaphore_ != 0) {
+    schema::Semaphore(base, semaphore_).set_count(count_.load(std::memory_order_relaxed));
   }
 }
 
@@ -93,7 +95,7 @@ Semaphores& CurrentSemaphores() {
 
 ScopedTestSemaphores::ScopedTestSemaphores(uint8_t* base) : base_(base), previous_(g_test) {
   for (int i = 0; i < 4; i++) {
-    saved_[i] = guest::LoadU32(base, kAll[i] + kSemaphoreCount);
+    saved_[i] = uint32_t(schema::Semaphore(base, kAll[i]).count());
   }
   set_.MirrorAll(base);
   g_test = &set_;
@@ -106,7 +108,7 @@ ScopedTestSemaphores::~ScopedTestSemaphores() {
     outer.MirrorAll(base_);
   } else {
     for (int i = 0; i < 4; i++) {
-      guest::StoreU32(base_, kAll[i] + kSemaphoreCount, saved_[i]);
+      schema::Semaphore(base_, kAll[i]).set_count(int32_t(saved_[i]));
     }
   }
 }

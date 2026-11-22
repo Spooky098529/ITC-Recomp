@@ -1,0 +1,274 @@
+# The schema of docs/functions/material-passes.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The part models' material passes (src/material_passes/): the passes over
+# a part model's material records that set what its draws read (the paint
+# colors, the palette's, the alpha, the blend mode, a texture, the cull
+# mode, fields by a mask), the color conversions from hue, saturation and
+# value, and the small matrix helpers beside them. The material record and
+# block are in docs/known-data.md ("material record", "material block"); the
+# model (Model, 432 bytes) is models.md's: the part model below repeats only
+# the base's shape count its passes read.
+
+# One draw of a shape's material block (0x200 bytes; block + 16 + 512 x i,
+# group 1 after group 0: Model::Material, Model::MaterialAt). Pixel
+# constants as Model::RecordMaterials binds them (c63 +64, c64 +80, c65 +16
+# with w from +88, c66 +32). Float4s are copied by doublewords (ld, std):
+# the _xy and _zw words beside the floats.
+[MaterialRecord]
+measure = "Model::Material.ret"
+measures = ["Model::MaterialAt.ret"]
+size = 512
+origin = "file"
+# 11 functions; areas: accessories.md, material-passes.md, models.md, scenery-lists.md
+fields = [
+  { name = "color_r", offset = 0, type = "f32", note = "vertex c13: the paint's first color (SetPaint's A, the palette's), scaled by ScaleBlended below 1.1" },
+  { name = "color_xy", offset = 0, type = "u64", note = "+0 to +7 as a doubleword" },
+  { name = "color_g", offset = 4, type = "f32" },
+  { name = "color_b", offset = 8, type = "f32" },
+  { name = "color_zw", offset = 8, type = "u64", note = "+8 to +15 as a doubleword" },
+  { name = "color_a", offset = 12, type = "f32", note = "the alpha (SetAlpha, SetPair1002Alpha; 1.0 by ScaleBlended)" },
+  { name = "pixel_c65_r", offset = 16, type = "f32", note = "pixel c65 (w from +88): the palette's third color" },
+  { name = "pixel_c65_xy", offset = 16, type = "u64" },
+  { name = "pixel_c65_g", offset = 20, type = "f32" },
+  { name = "pixel_c65_b", offset = 24, type = "f32" },
+  { name = "pixel_c65_zw", offset = 24, type = "u64" },
+  { name = "pixel_c65_a", offset = 28, type = "f32" },
+  { name = "pixel_c66_r", offset = 32, type = "f32", note = "pixel c66: the paint's third color (SetPaint's C)" },
+  { name = "pixel_c66_xy", offset = 32, type = "u64" },
+  { name = "pixel_c66_g", offset = 36, type = "f32" },
+  { name = "pixel_c66_b", offset = 40, type = "f32" },
+  { name = "pixel_c66_zw", offset = 40, type = "u64" },
+  { name = "pixel_c66_a", offset = 44, type = "f32" },
+  { name = "pixel_c63_xy", offset = 64, type = "u64", note = "pixel c63: (1, 1, 1, 1) or the paint's color (SetPaint)" },
+  { name = "pixel_c63_zw", offset = 72, type = "u64" },
+  { name = "pixel_c64_x", offset = 80, type = "f32", note = "pixel c64 (bound as words): the palette entry's +48 to +56 floats into x, y, z" },
+  { name = "pixel_c64_xy", offset = 80, type = "u64" },
+  { name = "pixel_c64_y", offset = 84, type = "f32" },
+  { name = "pixel_c64_z", offset = 88, type = "f32", note = "also pixel c65's w" },
+  { name = "pixel_c64_zw", offset = 88, type = "u64" },
+  { name = "shader_pair", offset = 96, type = "u32", note = "the part's own shader pair (index into the model's +24, 16 bytes each)" },
+  { name = "flags", offset = 104, type = "u32", note = "bits 2 and 4: sampler 6, the environment texture" },
+  { name = "blend_mode", offset = 108, type = "u32", note = "render state 3 by the blend table (2 set by ScaleBlended)" },
+  { name = "render_state_100", offset = 112, type = "u32" },
+  { name = "environment_arg_0", offset = 120, type = "u32", note = "the environment texture's arguments" },
+  { name = "environment_arg_1", offset = 124, type = "u32" },
+  { name = "texture_count", offset = 128, type = "u32" },
+  { name = "xpr_index", offset = 144, type = "u32", note = "+144 + 4i: texture i's XPR2 index (0 set by SetTexture); the first" },
+  { name = "texture_index", offset = 176, type = "u32", note = "+176 + 4i: texture i's index in the XPR2, -1 none (SetTexture's texture); the first" },
+  { name = "color_index", offset = 208, type = "u32", note = "+208 + 4i: an index into the model's +320 float4s (vertex c9 + i) or -1; the first" },
+  { name = "texture_float", offset = 240, type = "f32", note = "+240 + 4i: floats (pixel c67); the first" },
+  { name = "sampler_state_0", offset = 272, type = "u32", note = "+272 + 4i: texture i's sampler state 0; the first" },
+  { name = "sampler_state_4", offset = 304, type = "u32", note = "+304 + 4i: texture i's sampler state 4; the first" },
+  { name = "draw_count", offset = 340, type = "u32" },
+  { name = "cull_mode", offset = 344, type = "u32", note = "render state 56, probably the cull mode: 2 and 6 swapped by FlipCulling and while 0x826C5100 is set" },
+  { name = "primitive_type", offset = 348, type = "u32" },
+  { name = "index_buffer", offset = 352, type = "bytes", count = 36, note = "an index buffer header (+0x178 its address, relocated)" },
+  { name = "render_state_96", offset = 388, type = "u32", note = "group 0 only" },
+  { name = "shared_pair", offset = 392, type = "u32", note = "the shared shader pair (1000-1005) or 0" },
+  { name = "material_animation", offset = 396, type = "u32", note = "the material animation's index or -1" },
+  { name = "category", offset = 408, type = "u32", note = "1 and 2 the paint's (SetPaint), 1-10 the palette entry (ApplyPalette), 3 and 5 Model::RecordMaterials' textures" },
+  { name = "fault_640", offset = 640, type = "u32", note = "measure fault: Model::RecordMaterials' pointers into the per-texture arrays (+144, +304 and on, advanced by 4) carry the record's type" },
+  { name = "fault_656", offset = 656, type = "u32", note = "measure fault: as fault_640" },
+  { name = "fault_688", offset = 688, type = "u32", note = "measure fault: as fault_640" },
+  { name = "fault_784", offset = 784, type = "u32", note = "measure fault: as fault_640" },
+  { name = "fault_816", offset = 816, type = "u32", note = "measure fault: as fault_640" },
+]
+
+# The car part model (vtable 0x8200338C, sub_820CE928): a Model (432 bytes,
+# models.md) with eight words of its own (+432 to +460), the 464-byte
+# models the car's loading objects keep for their parts.
+[PartModel]
+measure = "PartModel"
+measures = ["SceneInterior.+11632", "ModelPoint::Find.r4", "PartModel::PartModel.r3", "PartModel::Clear.r3", "PartModel::SetPaint.r3", "PartModel::SetPaintBody.r3", "PartModel::ApplyPalette.r3", "PartModel::SetMaterials.r3"]
+size = 464
+origin = "file"
+vtable = 0x8200338C
+# 9 functions; areas: material-passes.md, models.md
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x8200338C (the Model's 0x8206CD18 under it)" },
+  { name = "shape_count", offset = 412, type = "u32", note = "the Model's: the part file's +0x10, the shape count" },
+  { name = "use_override_texture", offset = 432, type = "u32", note = "with +456: Model::RecordMaterials' textures from +456 (0 at Clear)" },
+  { name = "replaced_texture_index", offset = 436, type = "u32", note = "a texture index replaced by +460 (pair 1003; -1 at Clear)" },
+  { name = "force_pair_1005", offset = 440, type = "u32", note = "forces shared pair 1005 (0 at Clear)" },
+  { name = "vinyl_sheet", offset = 444, type = "u32", note = "the vinyl sheet: sampler 0 for pairs 1000 and 1004, sampler 1 for 1002 (SetVinylTextures' a)" },
+  { name = "vinyl_texture_b", offset = 448, type = "u32", note = "SetVinylTextures' b; not read here" },
+  { name = "category3_texture", offset = 452, type = "u32", note = "category 3's texture" },
+  { name = "override_texture", offset = 456, type = "u32", note = "an override texture (with +432)" },
+  { name = "replacement_texture", offset = 460, type = "u32", note = "the texture that replaces +436's index" },
+  { name = "model_196", offset = 196, type = "u32", note = "the Model's +196 (models.toml), read by ModelPoint::Find" },
+  { name = "model_260", offset = 260, type = "u32", note = "the Model's +260, read by ModelPoint::Find" },
+  { name = "file_08", offset = 408, type = "u32", note = "the Model's: the part file's +8 (ModelPoint::Find)" },
+]
+
+# A color as RGB: Color::HsvToRgb's output (floats, +12 = 1.0) and
+# Color::HsvToRgb8's (bytes +0 to +2, +3 left).
+[PaintRgb]
+measure = "Color"
+size = 16
+origin = "file"
+# 2 functions; areas: material-passes.md
+fields = [
+  { name = "red", offset = 0, type = "f32" },
+  { name = "red8", offset = 0, type = "u8", note = "HsvToRgb8's" },
+  { name = "green8", offset = 1, type = "u8" },
+  { name = "blue8", offset = 2, type = "u8" },
+  { name = "green", offset = 4, type = "f32" },
+  { name = "blue", offset = 8, type = "f32" },
+  { name = "alpha", offset = 12, type = "f32", note = "1.0 (not written for a negative hue, or saturation 0)" },
+]
+
+# A color as hue (degrees), saturation and value: Color::HsvToRgb's input
+# (r4). The measure joins it with the car dealer's swatch (CarDealer::
+# OpenColors passes the swatch's +16), so it sees no access of its own.
+[HsvColor]
+measures = ["Color::HsvToRgb_8224AB50.r4", "new<32>@CarDealer::OpenColors@+16", "new<32>@PanelSetBase::SetUpColors@+16"]
+size = 16
+origin = "file"
+fields = [
+  { name = "hue", offset = 0, type = "f32", note = "degrees" },
+  { name = "hue_saturation", offset = 0, type = "u64", note = "+0 to +7 as a doubleword (HsvToRgb's copy)" },
+  { name = "saturation", offset = 4, type = "f32" },
+  { name = "value", offset = 8, type = "f32" },
+  { name = "value_w", offset = 8, type = "u64", note = "+8 to +15 as a doubleword (HsvToRgb's copy)" },
+  { name = "w", offset = 12, type = "f32", note = "1.0 in the palette; not read" },
+]
+
+# The car dealer's color swatch (32 bytes, VirtualAlloc by CarDealer::
+# OpenColors, docs/functions/car-dealer.md): the color record's hue,
+# saturation and value as floats, and Color::HsvToRgb's answer scaled to
+# integers.
+[CarDealerSwatch]
+measure = "new<32>@CarDealer::OpenColors"
+size = 32
+origin = "allocated"
+# 2 functions; areas: car-dealer.md, material-passes.md
+fields = [
+  { name = "red", offset = 0, type = "u32", note = "HsvToRgb's red x [0x82000C44], truncated (fctiwz)" },
+  { name = "green", offset = 4, type = "u32" },
+  { name = "blue", offset = 8, type = "u32" },
+  { name = "hue", offset = 16, type = "f32", note = "the color record's halfword +4" },
+  { name = "saturation", offset = 20, type = "f32", note = "the color record's byte +6 x [0x82002200]" },
+  { name = "value", offset = 24, type = "f32", note = "the color record's byte +7 plus a kind's offset, clamped to 0-255, x [0x82002200]" },
+]
+
+# A packed color (Color::HsvToRgb8's input): the hue in degrees, the
+# saturation and the value as bytes.
+[PackedHsv]
+measure = "Color::HsvToRgb8.r4"
+size = 4
+origin = "file"
+# 1 functions; areas: material-passes.md
+fields = [
+  { name = "hue", offset = 0, type = "s16", note = "degrees" },
+  { name = "saturation", offset = 2, type = "u8", note = "0 gives the value in all three" },
+  { name = "value", offset = 3, type = "u8" },
+]
+
+# A 4x4 matrix as the material passes' helpers meet it (rows at +16 x r):
+# Matrix::TransposeRotation's input (its upper 3x3 read) and
+# Projector::Matrices' scale matrix (its diagonal written). The same layout
+# as matrix-math's Matrix.
+[MaterialPassesMatrix]
+measure = "Matrix::TransposeRotation.r4"
+measures = ["Projector::Matrices.r5"]
+size = 64
+origin = "file"
+# 1 functions; areas: material-passes.md
+fields = [
+  { name = "m00", offset = 0, type = "f32" },
+  { name = "m01", offset = 4, type = "f32" },
+  { name = "m02", offset = 8, type = "f32" },
+  { name = "m03", offset = 12, type = "f32" },
+  { name = "m10", offset = 16, type = "f32" },
+  { name = "m11", offset = 20, type = "f32" },
+  { name = "m12", offset = 24, type = "f32" },
+  { name = "m13", offset = 28, type = "f32" },
+  { name = "m20", offset = 32, type = "f32" },
+  { name = "m21", offset = 36, type = "f32" },
+  { name = "m22", offset = 40, type = "f32" },
+  { name = "m23", offset = 44, type = "f32" },
+  { name = "m30", offset = 48, type = "f32" },
+  { name = "m31", offset = 52, type = "f32" },
+  { name = "m32", offset = 56, type = "f32" },
+  { name = "m33", offset = 60, type = "f32" },
+]
+
+# One of the paint palette's 16 entries (0x826C5110 + 64 x k, filled by
+# PaintPalette::Init; image data, no measure).
+[PaintPaletteEntry]
+size = 64
+origin = "image"
+fields = [
+  { name = "color_a", offset = 0, type = "bytes", count = 16, note = "an HsvColor (w = 1.0): a material's +0 by ApplyPalette" },
+  { name = "color_b", offset = 16, type = "bytes", count = 16, note = "an HsvColor: a material's +32" },
+  { name = "color_c", offset = 32, type = "bytes", count = 16, note = "an HsvColor: a material's +16 (entry j's for shared pair 1000 + j)" },
+  { name = "float_0", offset = 48, type = "f32", note = "into a material's +80 (pixel c64's x)" },
+  { name = "float_1", offset = 52, type = "f32", note = "into +84 (entry 11: 1.2 with the scene's +4 set, else 3.0; entry 13: 7.0, else 20.0)" },
+  { name = "float_2", offset = 56, type = "f32", note = "into +88 (entry 14: 0.6 with the scene's +4 set, else 0.503125)" },
+  { name = "unused_60", offset = 60, type = "u32", note = "never written" },
+]
+
+[globals]
+paint_palette = { address = 0x826C5110, type = "bytes", count = 1024, note = "16 PaintPaletteEntry (64 bytes each), filled by PaintPalette::Init" }
+table_vectors = { address = 0x82601A00, type = "bytes", count = 16, note = "16-byte vectors by 4 x index + sub (sub_820D35D0); the table's size not looked up" }
+part_records = { address = 0x82003680, type = "bytes", count = 48, note = "48-byte records by index (sub_820D3728); the table's size not looked up" }
+one = { address = 0x82000A30, type = "f32", note = "1.0" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0" }
+minus_one = { address = 0x82001BE0, type = "f32", note = "probably -1.0" }
+half = { address = 0x82001BE4, type = "f32", note = "0.5" }
+sixtieth = { address = 0x820029E8, type = "f32", note = "1/60: a hue's sector (Color::HsvToRgb)" }
+blended_limit = { address = 0x82002CB0, type = "f32", note = "1.1: ScaleBlended scales colors below it" }
+value_10 = { address = 0x82001FD8, type = "f32", note = "10.0 (the palette; Projector::Matrices' size from the depth, side set)" }
+projector_depth_scale = { address = 0x82001FC0, type = "f32", note = "Projector::Matrices' size from the depth, side 0; not looked up" }
+projector_depth_bias = { address = 0x82001FCC, type = "f32", note = "Projector::Matrices; not looked up" }
+projector_size_scale = { address = 0x82002CC4, type = "f32", note = "Projector::Matrices; not looked up" }
+projector_size_double = { address = 0x82003588, type = "f64", note = "Projector::Matrices' double factor; not looked up" }
+value_0_6 = { address = 0x82002A14, type = "f32", note = "0.6 (the palette; Projector::Matrices' size factor, side set)" }
+projector_size_factor = { address = 0x82002A10, type = "f32", note = "Projector::Matrices, side 0; not looked up" }
+value_0_8 = { address = 0x82001070, type = "f32", note = "0.8 (the palette; Projector::Matrices: sizes below it in magnitude scaled by it)" }
+projector_size_min = { address = 0x82002828, type = "f32", note = "Projector::Matrices' smallest size; not looked up" }
+projector_size_max = { address = 0x820027A8, type = "f32", note = "Projector::Matrices' largest size; not looked up" }
+value_0_016667 = { address = 0x820035C8, type = "f32", note = "0.016667 (the palette)" }
+value_0_01667 = { address = 0x820035DC, type = "f32", note = "0.01667 (the palette)" }
+value_0_05098 = { address = 0x820035C0, type = "f32", note = "0.05098 (the palette)" }
+value_0_09375 = { address = 0x82003598, type = "f32", note = "0.09375 (the palette)" }
+value_0_1 = { address = 0x82001FBC, type = "f32", note = "0.1 (the palette)" }
+value_0_125 = { address = 0x82002A88, type = "f32", note = "0.125 (the palette)" }
+value_0_16 = { address = 0x820035D4, type = "f32", note = "0.16 (the palette)" }
+value_0_160133 = { address = 0x820035D0, type = "f32", note = "0.160133 (the palette)" }
+value_0_199987 = { address = 0x820035A4, type = "f32", note = "0.199987 (the palette)" }
+value_0_2 = { address = 0x82002208, type = "f32", note = "0.2 (the palette)" }
+value_0_25 = { address = 0x82002968, type = "f32", note = "0.25 (the palette)" }
+value_0_3 = { address = 0x8200296C, type = "f32", note = "0.3 (the palette)" }
+value_0_375 = { address = 0x820035B4, type = "f32", note = "0.375 (the palette)" }
+value_0_49558 = { address = 0x820035C4, type = "f32", note = "0.49558 (the palette)" }
+value_0_49668 = { address = 0x820035E8, type = "f32", note = "0.49668 (the palette)" }
+value_0_503125 = { address = 0x820035D8, type = "f32", note = "0.503125 (the palette)" }
+value_0_546875 = { address = 0x820035BC, type = "f32", note = "0.546875 (the palette)" }
+value_0_578125 = { address = 0x820035E0, type = "f32", note = "0.578125 (the palette)" }
+value_0_640625 = { address = 0x820035E4, type = "f32", note = "0.640625 (the palette)" }
+value_0_671875 = { address = 0x8200359C, type = "f32", note = "0.671875 (the palette)" }
+value_0_703125 = { address = 0x820035EC, type = "f32", note = "0.703125 (the palette)" }
+value_0_828125 = { address = 0x820035B8, type = "f32", note = "0.828125 (the palette)" }
+value_0_90625 = { address = 0x820035CC, type = "f32", note = "0.90625 (the palette)" }
+value_0_921875 = { address = 0x820035F0, type = "f32", note = "0.921875 (the palette)" }
+value_1_2 = { address = 0x820029D4, type = "f32", note = "1.2 (the palette)" }
+value_2 = { address = 0x820021E8, type = "f32", note = "2.0 (the palette)" }
+value_3 = { address = 0x820021E4, type = "f32", note = "3.0 (the palette)" }
+value_7 = { address = 0x820035B0, type = "f32", note = "7.0 (the palette)" }
+value_18 = { address = 0x820035A8, type = "f32", note = "18.0 (the palette)" }
+value_20 = { address = 0x82002568, type = "f32", note = "20.0 (the palette)" }
+value_22_3 = { address = 0x820035AC, type = "f32", note = "22.3 (the palette)" }
+value_24 = { address = 0x82002228, type = "f32", note = "24.0 (the palette)" }
+value_54 = { address = 0x82003590, type = "f32", note = "54.0 (the palette)" }
+value_100 = { address = 0x82002A0C, type = "f32", note = "100.0 (the palette)" }
+value_105 = { address = 0x82003594, type = "f32", note = "105.00004 (the palette)" }
+value_115 = { address = 0x820035A0, type = "f32", note = "115.0 (the palette)" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+

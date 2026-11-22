@@ -3,6 +3,8 @@
 // harness shares (hooks/vehicle_native.h).
 
 #include "hooks/vehicle_native.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
@@ -10,6 +12,7 @@
 #include "base/log.h"
 #include "car_physics/float_ops.h"
 #include "hooks/heap.h"
+#include "schema/vehicle.h"
 #include "vehicle/vehicle.h"
 #include "lifted/sdk.h"
 
@@ -139,7 +142,7 @@ ITC_REGS_STEP(VehicleApplyInput) {
     return;
   }
   ctx.r3.u64 = vehicle;
-  ctx.f1.f64 = double(guest::LoadFloat(base, vh::kStepSeconds));
+  ctx.f1.f64 = double(schema::VehicleGlobals::step_seconds(base));
 }
 
 ITC_REGS_STEP(VehicleSlipWheelValue) {
@@ -289,7 +292,7 @@ ITC_REGS_STEP(VehiclePlaceOnRoute) {
     if (address == 0x820B7998) {
       lifted::original::c820B7998(ctx, base);
     } else {
-      lifted::CallFromContext(ctx, base, 0x825A7410);  // memcpy, through its override as the original
+      lifted::Enter(ctx, base, game::memcpy_825A7410);  // memcpy, through its override as the original
     }
     ctx.r1.u64 = saved;
     ctx.fpscr.disableFlushMode();

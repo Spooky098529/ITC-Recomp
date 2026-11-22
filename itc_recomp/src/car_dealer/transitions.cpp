@@ -7,17 +7,18 @@
 #include "base/log.h"
 #include "car_dealer/internal.h"
 #include "guest.h"
+#include "schema/mode_tick.h"
+#include "schema/race_menu.h"
 #include "ui_movies/game.h"
 
 namespace car_dealer {
 
 namespace {
 
-// The screen fades' counts (mode-tick.md).
-constexpr uint32_t kFadeOutCount = 0x826A50E4;
-constexpr uint32_t kFadeInCount = 0x826A50DC;
-// ScreenFades::FadeOut's layer word.
-constexpr uint32_t kFadeOutLayer = 0x82001BF0;
+// The screen fades' counts are mode-tick.toml's; FadeOut's passes word
+// (0x82001BF0) race-menu.toml's.
+using Ticks = schema::ModeTickGlobals;
+using Fades = schema::RaceMenuGlobals;
 constexpr uint32_t kNone = 0xFFFFFFFFu;
 
 // The named animation calls on movie 4 (UiMovie::PlayNamed with r5, r6 to
@@ -36,7 +37,7 @@ uint64_t Run(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t movie) {
   return calls.Call(kRun, frame, lr, movie, 0);
 }
 uint64_t Selection(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t lr) {
-  return calls.Call(kListSelection, frame, lr, Load(base, kListMenu));
+  return calls.Call(kListSelection, frame, lr, G::list_menu(base).address);
 }
 
 // Transition0's and Transition5's end: 75 and 77 played and looped.
@@ -54,11 +55,11 @@ uint64_t Transition3(uint8_t* base, uint32_t step, uint32_t sp, const Calls& cal
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t movie = FindMovie(base, 4, frame + 80);
   if (Load(base, step) == 0) {
-    calls.Call(kFadeOut, frame, 0x82181DC4, Load(base, kFadeOutLayer), 0, 0, 0);
+    calls.Call(kFadeOut, frame, 0x82181DC4, Fades::fade_out_passes(base), 0, 0, 0);
     Store(base, step, 1);
   }
   calls.Call(kRun, frame, 0x82181DD8, movie, 0);
-  return (Load(base, kFadeOutCount) | Load(base, kFadeInCount)) == 0 ? 1 : 0;
+  return (Ticks::fade_out_count_0(base) | Ticks::fade_in_count_0(base)) == 0 ? 1 : 0;
 }
 
 uint64_t Transition0(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
@@ -66,7 +67,7 @@ uint64_t Transition0(uint8_t* base, uint32_t step, uint32_t sp, const Calls& cal
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t movie = FindMovie(base, 4, frame + 80);
   if (Load(base, step) == 0) {
-    Store(base, Load(base, kData) + 40, 0);
+    G::data(base).set_kind_selection(0);
     OpenListMenu(base, frame, calls);
     SetHeader(base, 0, 0, frame);
     Play(calls, frame, 0x82184CEC, movie, 149, 1);
@@ -88,8 +89,8 @@ uint64_t Transition4(uint8_t* base, uint32_t step, uint32_t sp, const Calls& cal
   const uint32_t movie = FindMovie(base, 4, frame + 80);
   if (Load(base, step) == 0) {
     const uint64_t selection = Selection(base, calls, frame, 0x82184DE4);
-    Store(base, Load(base, kData) + 48, 0);
-    Store(base, Load(base, kData) + 52, 0);
+    G::data(base).set_car_selection(0);
+    G::data(base).set_car_scroll(0);
     OpenCarList(base, frame, calls);
     SetHeader(base, 0, 1, frame);
     Finish(calls, frame, 0x82184E1C, movie, selection + 37);
@@ -105,13 +106,13 @@ uint64_t Transition5(uint8_t* base, uint32_t step, uint32_t sp, const Calls& cal
   const uint32_t movie = FindMovie(base, 4, frame + 80);
   if (Load(base, step) == 0) {
     Selection(base, calls, frame, 0x82184EAC);
-    Store(base, Load(base, kData) + 48, 0);
-    Store(base, Load(base, kData) + 52, 0);
+    G::data(base).set_car_selection(0);
+    G::data(base).set_car_scroll(0);
     {
-      const uint32_t data = Load(base, kData);
-      Store(base, data + 1136, data + 104);
+      const Data data = G::data(base);
+      data.set_shown_list(data.first_list_address());
     }
-    Store(base, Load(base, kData) + 44, 0);
+    G::data(base).set_list_shown(0);
     OpenCarList(base, frame, calls);
     SetHeader(base, 1, 1, frame);
     Play(calls, frame, 0x82184F04, movie, 159);
@@ -137,8 +138,8 @@ uint64_t Transition8(uint8_t* base, uint32_t step, uint32_t sp, const Calls& cal
     Finish(calls, frame, 0x8218501C, movie, 34);
     Play(calls, frame, 0x82185038, movie, 153);
     {
-      const uint32_t data = Load(base, kData);
-      Store(base, data + 40, Load(base, data + 44));
+      const Data data = G::data(base);
+      data.set_kind_selection(data.list_shown());
     }
     OpenListMenu(base, frame, calls);
     SetHeader(base, 1, 0, frame);
@@ -146,16 +147,16 @@ uint64_t Transition8(uint8_t* base, uint32_t step, uint32_t sp, const Calls& cal
   }
   if (int32_t(uint32_t(Run(calls, frame, 0x82185068, movie))) == 0) {
     // Done: transition 1 to page 0, none queued, the started word 0.
-    const uint32_t pages = Load(base, kPages);
-    const uint32_t page = Load(base, pages + 0);
+    const Pages pages = G::pages(base);
+    const uint32_t page = pages.page();
     if (page != 0) {
-      Store(base, pages + 8, page);
+      pages.set_previous_page(page);
     }
-    Store(base, pages + 12, 1);
-    Store(base, pages + 16, kNone);
-    Store(base, pages + 4, 0);
-    Store(base, pages + 0, kNone);
-    Store(base, Load(base, kPages) + 24, 0);
+    pages.set_step(1);
+    pages.set_queued_step(kNone);
+    pages.set_next_page(0);
+    pages.set_page(kNone);
+    G::pages(base).set_step_started(0);
   }
   return 0;
 }
@@ -183,21 +184,21 @@ uint64_t Transition1(uint8_t* base, uint32_t step, uint32_t sp, const Calls& cal
   if (Load(base, step) == 0) {
     const uint32_t selection = uint32_t(Selection(base, calls, frame, 0x82181C7C));
     if (selection < 1) {
-      if (Load(base, Load(base, kData) + 616) > 0) {
+      if (List(base, G::data(base).first_list_address()).count() > 0) {
         Play(calls, frame, 0x82181CEC, movie, 37);
         Loop(calls, frame, 0x82181CF8, movie, 37);
       }
     } else if (selection == 1) {
-      if (Load(base, Load(base, kData) + 1132) > 0) {
+      if (List(base, G::data(base).second_list_address()).count() > 0) {
         Play(calls, frame, 0x82181CB8, movie, 38);
         Loop(calls, frame, 0x82181CF8, movie, 38);
       }
     }
     // The two items colored 0, or 2 for an empty list.
     calls.Call(kSetNodeColor, frame, 0x82181D20, movie, 8, 5,
-               Load(base, Load(base, kData) + 616) > 0 ? 0 : 2);
+               List(base, G::data(base).first_list_address()).count() > 0 ? 0 : 2);
     calls.Call(kSetNodeColor, frame, 0x82181D48, movie, 8, 6,
-               Load(base, Load(base, kData) + 1132) > 0 ? 0 : 2);
+               List(base, G::data(base).second_list_address()).count() > 0 ? 0 : 2);
     Store(base, step, 1);
   }
   Run(calls, frame, 0x82181D5C, movie);
@@ -226,7 +227,7 @@ uint64_t ShowSelected(uint8_t* base, uint32_t step, uint32_t sp, const Calls& ca
       Loop(calls, frame, extra[k].loop_lr, movie, extra[k].id);
     }
     if (draw_stand) {
-      Store(base, Load(base, kData) + 28, 1);
+      G::data(base).set_car_shown(1);
     }
     Store(base, step, 1);
   }
@@ -276,22 +277,22 @@ uint64_t Transition7(uint8_t* base, uint32_t step, uint32_t sp, const Calls& cal
   if (Load(base, step) == 0) {
     const uint64_t selection = Selection(base, calls, frame, 0x82183E24);
     const uint64_t before =
-        calls.Call(kListSelectionBefore, frame, 0x82183E30, Load(base, kListMenu));
-    const uint32_t list = Load(base, kListMenu);
-    const uint32_t scroll = Load(base, list + 4);
-    const int32_t moved = int32_t(scroll - Load(base, list + 8));
+        calls.Call(kListSelectionBefore, frame, 0x82183E30, G::list_menu(base).address);
+    const MenuList list = G::list_menu(base);
+    const uint32_t scroll = list.scroll();
+    const int32_t moved = int32_t(scroll - list.scroll_before());
     Finish(calls, frame, 0x82183E50, movie, before + 24);
     Play(calls, frame, 0x82183E70, movie, selection + 24);
     Loop(calls, frame, 0x82183E7C, movie, selection + 24);
     if (moved != 0) {
       // The list scrolled: the cards refilled, the one coming in (after the
       // shown four, or before them) filled into (7, 9) and slid in.
-      const uint32_t n = Load(base, Load(base, Load(base, kData) + 1136) + 512);
+      const uint32_t n = G::data(base).shown_list().count();
       const uint32_t card = ui_movies::FindNode(base, movie, 7, 9);
       calls.Call(kCarCardsFillAll, frame, 0x82183EAC);
       Finish(calls, frame, 0x82183EB8, movie, 29);
       Finish(calls, frame, 0x82183EC4, movie, 30);
-      const uint32_t shown = Load(base, Load(base, kData) + 1136);
+      const uint32_t shown = G::data(base).shown_list().entries_address();
       uint32_t slide;
       if (moved < 0) {
         calls.Call(kCarCardFill, frame, 0x82183EE8, card, Load(base, ((scroll + 4) << 2) + shown));
@@ -304,8 +305,8 @@ uint64_t Transition7(uint8_t* base, uint32_t step, uint32_t sp, const Calls& cal
       SetScrollArrows(base, scroll, n, frame);
     }
     const uint32_t index = (scroll + uint32_t(selection)) << 2;
-    const uint32_t entry = Load(base, index + Load(base, Load(base, kData) + 1136));
-    HelpLineSet(base, uint64_t(Load(base, entry + 8432)) + 1862, frame, calls);
+    const Entry entry(base, Load(base, index + G::data(base).shown_list().address));
+    HelpLineSet(base, uint64_t(entry.car_id()) + 1862, frame, calls);
     Store(base, step, 1);
   }
   Run(calls, frame, 0x82183F5C, movie);
@@ -322,8 +323,8 @@ uint64_t Transition15(uint8_t* base, uint32_t step, uint32_t sp, const Calls& ca
     Finish(calls, frame, 0x82185378, movie, 86);
     Finish(calls, frame, 0x82185384, movie, 87);
     Play(calls, frame, 0x821853A0, movie, 152);
-    Store(base, Load(base, kData) + 56, 0);
-    Store(base, Load(base, kData) + 60, 0);
+    G::data(base).set_color_selection(0);
+    G::data(base).set_color_scroll(0);
     OpenColors(base, frame, calls);
     SetHeader(base, 1, 2, frame);
     Store(base, step, 1);
@@ -338,22 +339,22 @@ uint64_t Transition17(uint8_t* base, uint32_t step, uint32_t sp, const Calls& ca
   if (Load(base, step) == 0) {
     const uint64_t selection = Selection(base, calls, frame, 0x8218405C);
     const uint64_t before =
-        calls.Call(kListSelectionBefore, frame, 0x82184068, Load(base, kListMenu));
-    const uint32_t list = Load(base, kListMenu);
-    const uint32_t scroll = Load(base, list + 4);
-    const int32_t moved = int32_t(scroll - Load(base, list + 8));
-    Store(base, Load(base, kData) + 56, uint32_t(selection));
-    Store(base, Load(base, kData) + 60, scroll);
+        calls.Call(kListSelectionBefore, frame, 0x82184068, G::list_menu(base).address);
+    const MenuList list = G::list_menu(base);
+    const uint32_t scroll = list.scroll();
+    const int32_t moved = int32_t(scroll - list.scroll_before());
+    G::data(base).set_color_selection(uint32_t(selection));
+    G::data(base).set_color_scroll(scroll);
     Finish(calls, frame, 0x8218409C, movie, before + 134);
     Play(calls, frame, 0x821840BC, movie, selection + 134);
     Loop(calls, frame, 0x821840C8, movie, selection + 134);
     Finish(calls, frame, 0x821840D4, movie, 143);
     Finish(calls, frame, 0x821840E0, movie, 144);
     calls.Call(kShowCarByIdWithClass, frame, 0x821840E8, uint64_t(scroll) + selection);
-    const uint32_t menu = Load(base, kListMenu);
-    if (Load(base, menu + 32) == 0) {
+    const MenuList menu = G::list_menu(base);
+    if (menu.wrapped() == 0) {
       // The move's arrow by its sign (none when 0).
-      const int32_t move = int32_t(Load(base, menu + 24));
+      const int32_t move = int32_t(menu.move());
       if (move > 0) {
         Play(calls, frame, 0x82184130, movie, 144);
       } else if (move < 0) {

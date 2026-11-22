@@ -22,14 +22,14 @@ constexpr uint32_t kQuitWord = 0x826364EC;
 // Movie 16's word at +40960 (the question's kind).
 constexpr uint32_t kQuestionKind = 40960;
 
-uint32_t Data(uint8_t* base) { return Load(base, kHubData); }
+schema::Type2HubData Data(uint8_t* base) { return Globals::hub_data(base); }
 
 uint64_t Sound(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t id) {
   return calls.Call(kMenuSoundPlay, frame, lr, id);
 }
 uint64_t Pressed(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t lr,
                  uint32_t button) {
-  return calls.Call(kMenuPressed, frame, lr, Load(base, kHubMenu), button);
+  return calls.Call(kMenuPressed, frame, lr, Globals::hub_menu(base).address, button);
 }
 
 // The quit questions on movie 16: its texts (-1, 0) `title`, (1, 3) 2 and
@@ -42,28 +42,28 @@ uint64_t Question(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t mo
   calls.Call(kSetText, frame, lr[1], movie, 1, 3, 2);
   const uint64_t r3 = calls.Call(kSetText, frame, lr[2], movie, 1, 4, 3);
   Store(base, movie + kQuestionKind, kind);
-  const uint32_t pages = Load(base, kHubPages);
-  const uint32_t before = Load(base, pages + 0);
+  const schema::PageObject pages = Globals::hub_pages(base);
+  const uint32_t before = pages.page();
   if (before != kNone) {
-    Store(base, pages + 8, before);
+    pages.set_previous_page(before);
   }
-  Store(base, pages + 0, kNone);
-  Store(base, pages + 12, kNone);
-  Store(base, pages + 16, kNone);
+  pages.set_page(kNone);
+  pages.set_step(kNone);
+  pages.set_queued_step(kNone);
   Post(base, mode, 34);
   return r3;
 }
 
 // Page 0 with no transition, then SetPrompts(0, 0, 6, 2, 7, 3).
 uint64_t ToMenu(uint8_t* base, uint32_t frame) {
-  const uint32_t pages = Load(base, kHubPages);
-  const uint32_t before = Load(base, pages + 0);
+  const schema::PageObject pages = Globals::hub_pages(base);
+  const uint32_t before = pages.page();
   if (before != 0) {
-    Store(base, pages + 8, before);
+    pages.set_previous_page(before);
   }
-  Store(base, pages + 0, 0);
-  Store(base, pages + 12, kNone);
-  Store(base, pages + 16, kNone);
+  pages.set_page(0);
+  pages.set_step(kNone);
+  pages.set_queued_step(kNone);
   static constexpr uint32_t kPrompts[6] = {0, 0, 6, 2, 7, 3};
   return HubSetPrompts(base, kPrompts, frame);
 }
@@ -73,15 +73,15 @@ uint64_t ToMenu(uint8_t* base, uint32_t frame) {
 void HubFillPlayerRecord(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8218DA48 Type2Hub::FillPlayerRecord");
   const uint32_t frame = Frame(base, sp, 6176);
-  const uint32_t record = Load(base, kRecordScreen) + 8;
+  const schema::UserInfoData record = schema::UserInfoGlobals::data(base);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   const uint32_t stats = save + 48;
   calls.Call(kMemcpy, frame, 0x8218DA84, frame + 96, stats, 6044);
   const auto half = [&](uint32_t at) { return int32_t(int16_t(guest::LoadU16(base, frame + at))); };
   const int32_t a = half(108), b = half(110), c = half(112), d = half(118);
-  Store(base, record + 0, uint32_t(a));
-  Store(base, record + 4, uint32_t(b));
-  Store(base, record + 8, uint32_t(c));
+  record.set_count_12(uint32_t(a));
+  record.set_count_14(uint32_t(b));
+  record.set_count_16(uint32_t(c));
   float ratio;
   if (d != 0) {
     // The original's stack words for fcfid (+88 a, +80 d, as doublewords).
@@ -97,17 +97,18 @@ void HubFillPlayerRecord(uint8_t* base, uint32_t sp, const Calls& calls) {
   const int32_t e = half(6064);
   const uint32_t r9 = Load(base, frame + 6120);
   const float f12 = guest::LoadFloat(base, frame + 6088);
-  guest::StoreFloat(base, record + 12, ratio);
-  guest::StoreFloat(base, record + 20, guest::LoadFloat(base, frame + 6072));
-  Store(base, record + 16, uint32_t(e));
-  guest::StoreFloat(base, record + 24, guest::LoadFloat(base, frame + 6000));
-  Store(base, record + 32, r9);
-  Store(base, record + 28, uint32_t(TruncateWord(double(f12))));
+  record.set_ratio(ratio);
+  record.set_distance_5976(guest::LoadFloat(base, frame + 6072));
+  record.set_stats_5968(uint32_t(e));
+  record.set_distance_5904(guest::LoadFloat(base, frame + 6000));
+  record.set_stats_6024(r9);
+  record.set_distance_5992(TruncateWord(double(f12)));
   const uint32_t time = uint32_t(calls.Call(kPlayTimeAdd, frame, 0x8218DB2C, frame + 80, stats));
-  Store(base, record + 36, Load(base, time + 0));
-  Store(base, record + 40, Load(base, time + 4));
-  Store(base, record + 44, uint32_t(int32_t(int16_t(guest::LoadU16(base, save + 6328)))));
-  Store(base, record + 48, Load(base, save + 0x1991C));
+  const schema::PlayTimeAnswer answer(base, time);
+  record.set_play_hours(answer.hours());
+  record.set_play_time_word(answer.time_word());
+  record.set_garage_count(uint32_t(int32_t(int16_t(SaveData(base, save).garage_count()))));
+  record.set_save_1991C(Load(base, save + 0x1991C));  // not in SaveData yet
 }
 
 uint64_t HubNoticePage(uint8_t* base, uint32_t sp, const Calls& calls) {
@@ -123,17 +124,17 @@ uint64_t HubNoticePage(uint8_t* base, uint32_t sp, const Calls& calls) {
   if (uint32_t(r3) != 0) {
     const uint32_t more = uint32_t(calls.Call(kHasMoreText, frame, 0x8218EA48, movie, 0, 2));
     const uint32_t node = ui_movies::FindNode(base, movie, 0, 0);
-    Store(base, node + 80, more != 0 ? 1 : 0);
+    Node(base, node).set_visible(more != 0 ? 1 : 0);
     return node;
   }
   const uint32_t next = HubNextNotice(base, frame);
   if (next == 0) {
-    PagesGo(base, Load(base, kHubPages), 4, 11, 10);
+    PagesGo(base, Globals::hub_pages(base).address, 4, 11, 10);
   } else if (next == 1) {
-    PagesGo(base, Load(base, kHubPages), 4, 9, 8);
+    PagesGo(base, Globals::hub_pages(base).address, 4, 9, 8);
   } else if (next == 2) {
     const uint32_t found = HubNextNotice2(base, frame);
-    PagesGo(base, Load(base, kHubPages), found != 0 ? 5 : 0, 6, 7);
+    PagesGo(base, Globals::hub_pages(base).address, found != 0 ? 5 : 0, 6, 7);
     return found;
   }
   return next;
@@ -143,63 +144,63 @@ uint64_t HubOnDialogDone(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp,
                          const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8218F800 Type2Hub::OnDialogDone");
   const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t data = Data(base);
-  const uint32_t step = Load(base, data + 24);
+  const schema::Type2HubData data = Data(base);
+  const uint32_t step = data.dialog_step();
   if (step == 0) {
-    const uint32_t answer = Load(base, data + 28);
+    const uint32_t answer = data.dialog_answer();
     if (answer == 0) {
       static constexpr uint32_t kLr[3] = {0x8218F9E0, 0x8218F9F4, 0x8218FA08};
       r3 = Question(base, calls, frame, mode, 29, 0, kLr);
-      Store(base, Data(base) + 24, 1);
+      Data(base).set_dialog_step(1);
       return r3;
     }
     return answer < 3 ? ToMenu(base, frame) : r3;
   }
   if (step == 1) {
-    const uint32_t answer = Load(base, data + 28);
+    const uint32_t answer = data.dialog_answer();
     if (answer == 0) {
-      const uint32_t pages = Load(base, kHubPages);
-      const uint32_t before = Load(base, pages + 0);
+      const schema::PageObject pages = Globals::hub_pages(base);
+      const uint32_t before = pages.page();
       if (before != 6) {
-        Store(base, pages + 8, before);
+        pages.set_previous_page(before);
       }
-      Store(base, pages + 12, kNone);
-      Store(base, pages + 16, kNone);
-      Store(base, pages + 0, 6);
+      pages.set_step(kNone);
+      pages.set_queued_step(kNone);
+      pages.set_page(6);
       Post(base, mode, 43);
       return r3;
     }
     if (answer == 1) {
-      const uint32_t pages = Load(base, kHubPages);
-      const uint32_t before = Load(base, pages + 0);
+      const schema::PageObject pages = Globals::hub_pages(base);
+      const uint32_t before = pages.page();
       if (before != 3) {
-        Store(base, pages + 8, before);
+        pages.set_previous_page(before);
       }
-      Store(base, pages + 12, 3);
-      Store(base, pages + 16, kNone);
-      Store(base, pages + 0, kNone);
-      Store(base, pages + 4, 3);
+      pages.set_step(3);
+      pages.set_queued_step(kNone);
+      pages.set_page(kNone);
+      pages.set_next_page(3);
       Store(base, kQuitWord, 0);
       return calls.Call(kPlayTimeUpdate, frame, 0x8218F8D0, vehicle_accessors::SaveDataOf(base, 0));
     }
     return answer < 3 ? ToMenu(base, frame) : r3;
   }
   if (step == 2) {
-    if (Load(base, data + 20) == 1) {
+    if (data.unknown_20() == 1) {
       return ToMenu(base, frame);
     }
     const uint32_t found = HubNextNotice2(base, frame);
     if (found == 0) {
       return ToMenu(base, frame);
     }
-    const uint32_t pages = Load(base, kHubPages);
-    const uint32_t before = Load(base, pages + 0);
+    const schema::PageObject pages = Globals::hub_pages(base);
+    const uint32_t before = pages.page();
     if (before != 5) {
-      Store(base, pages + 8, before);
+      pages.set_previous_page(before);
     }
-    Store(base, pages + 12, kNone);
-    Store(base, pages + 0, 5);
-    Store(base, pages + 16, kNone);
+    pages.set_step(kNone);
+    pages.set_page(5);
+    pages.set_queued_step(kNone);
     return found;
   }
   return r3;
@@ -208,42 +209,42 @@ uint64_t HubOnDialogDone(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp,
 uint64_t HubMenuPage(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8218FCC8 Type2Hub::MenuPage");
   const uint32_t frame = Frame(base, sp, 2112);
-  calls.Call(kMenuStep, frame, 0x8218FCE4, Load(base, kHubMenu));
+  calls.Call(kMenuStep, frame, 0x8218FCE4, Globals::hub_menu(base).address);
   // The page object to `page` after `transition` (none queued), +8 the page
   // before unless it was `page`.
   const auto go = [&](uint32_t page, uint32_t transition) {
-    const uint32_t pages = Load(base, kHubPages);
-    const uint32_t before = Load(base, pages + 0);
+    const schema::PageObject pages = Globals::hub_pages(base);
+    const uint32_t before = pages.page();
     if (before != page) {
-      Store(base, pages + 8, before);
+      pages.set_previous_page(before);
     }
-    Store(base, pages + 12, transition);
-    Store(base, pages + 16, kNone);
-    Store(base, pages + 4, page);
-    Store(base, pages + 0, kNone);
+    pages.set_step(transition);
+    pages.set_queued_step(kNone);
+    pages.set_next_page(page);
+    pages.set_page(kNone);
   };
   // Pages 2's moves (the spec sheet, the record): +8 the page before unless
   // 2; then SetPrompts with the pair given.
   const auto other = [&](uint32_t a, uint32_t b) {
-    const uint32_t pages = Load(base, kHubPages);
-    const uint32_t before = Load(base, pages + 0);
+    const schema::PageObject pages = Globals::hub_pages(base);
+    const uint32_t before = pages.page();
     if (before != 2) {
-      Store(base, pages + 8, before);
+      pages.set_previous_page(before);
     }
-    Store(base, pages + 16, kNone);
-    Store(base, pages + 12, kNone);
-    Store(base, pages + 0, 2);
+    pages.set_queued_step(kNone);
+    pages.set_step(kNone);
+    pages.set_page(2);
     const uint32_t prompts[6] = {a, b, kNone, kNone, kNone, kNone};
     return HubSetPrompts(base, prompts, frame);
   };
-  if (Load(base, Load(base, kHubMenu) + 8) != 0) {
+  if (Globals::hub_menu(base).moved() != 0) {
     const uint64_t r3 = Sound(calls, frame, 0x8218FCFC, 4);
     go(0, 2);
     return r3;
   }
   uint64_t r3 = Pressed(base, calls, frame, 0x8218FD24, 159);
   if (uint32_t(r3) != 0) {
-    const int32_t item = int32_t(Load(base, Load(base, kHubMenu) + 0) + 1);
+    const int32_t item = int32_t(Globals::hub_menu(base).cursor() + 1);
     if (item <= 0 || item > 8) {
       return r3;
     }
@@ -251,11 +252,11 @@ uint64_t HubMenuPage(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& cal
       Sound(calls, frame, 0x8218FD64, 0);
       static constexpr uint32_t kLr[3] = {0x8218FD94, 0x8218FDA8, 0x8218FDBC};
       Question(base, calls, frame, mode, 27, 1, kLr);
-      Store(base, Data(base) + 24, 0);
+      Data(base).set_dialog_step(0);
       static constexpr uint32_t kPrompts[6] = {0, 0, 1, 1, kNone, kNone};
       return HubSetPrompts(base, kPrompts, frame);
     }
-    if ((item == 2 || item == 3) && Load(base, Data(base) + 12) != 0) {
+    if ((item == 2 || item == 3) && Data(base).car_refused() != 0) {
       return Sound(calls, frame, 0x8218FE80, 3);
     }
     r3 = Sound(calls, frame, 0x8218FE8C, 0);

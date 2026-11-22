@@ -16,6 +16,8 @@
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/cameras.h"
+#include "schema/car_scene_draw.h"
 
 #include <cstdlib>
 
@@ -25,15 +27,15 @@ namespace {
 
 using namespace ops;
 
+using G = schema::CarSceneDrawGlobals;
+using Point = schema::CarScenePoint;
+using CameraPass = schema::CameraPass;
+
 constexpr uint32_t kFitFrame = 1248;
-constexpr uint32_t kMinusOne = 0x82001BE0;  // -1.0
-constexpr uint32_t kHalf = 0x82001BE4;      // 0.5
-constexpr uint32_t kTwo = 0x820021E8;       // probably 2.0 (BuildOrtho's scale)
-// The last matrix's three constants (+484, +488 and the second +208's +264).
-constexpr uint32_t kFlip484 = 0x82001BE8;
-constexpr uint32_t kFlip488 = 0x820027A8;
-constexpr uint32_t kFlip264 = 0x8206CE4C;
-constexpr uint32_t kBias = 0x8265EED0;  // the bias matrix, as the projectors'
+// The frame's objects: the std::vector of points, its box and the frustum.
+constexpr uint32_t kPoints = 128;
+constexpr uint32_t kBox = 624;
+constexpr uint32_t kFrustum = 784;
 
 // The multiplies' return addresses (frame interpolation notes them; the one
 // at 0x82599644 is the temporary camera of "The headlight beam far from the
@@ -160,7 +162,7 @@ void CrossingSpread(uint8_t* base, uint32_t sp, uint32_t plane, uint32_t length,
 }  // namespace
 
 bool TextureProjectionFitDeclines(uint8_t* base, uint32_t pass) {
-  return PerspectiveDeclines(base, Lfs(base, pass + 368));
+  return PerspectiveDeclines(base, Lfs(base, CameraPass(base, pass).field_of_view_address()));
 }
 
 bool TextureProjectionFit(uint8_t* base, uint32_t out, uint32_t pass, uint32_t direction,
@@ -179,11 +181,11 @@ bool TextureProjectionFit(uint8_t* base, uint32_t out, uint32_t pass, uint32_t d
   const simde__m128 dir = VNormalized(dir_in, VDot3(dir_in, dir_in));
   Stvx(base, sp + 336, dir);
   // The pass's view (+560) and projection (+656).
-  Copy64(base, sp + 560, pass + 16);
-  Copy64(base, sp + 656, pass + 80);
+  Copy64(base, sp + 560, CameraPass(base, pass).view_address());
+  Copy64(base, sp + 656, CameraPass(base, pass).projection_address());
   // Its near and far ordered, the far cut to far_cut.
-  double far_plane = Lfs(base, pass + 388);   // f20
-  double near_plane = Lfs(base, pass + 384);  // f25
+  double far_plane = Lfs(base, CameraPass(base, pass).far_address());   // f20
+  double near_plane = Lfs(base, CameraPass(base, pass).near_address());  // f25
   if (far_plane < near_plane) {
     const double swapped = far_plane;
     far_plane = near_plane;
@@ -193,24 +195,26 @@ bool TextureProjectionFit(uint8_t* base, uint32_t out, uint32_t pass, uint32_t d
     far_plane = far_cut;
   }
   {
-    const double width = Lfs(base, pass + 376);
-    const double height = Lfs(base, pass + 380);
-    const double fov = Lfs(base, pass + 368);
+    const double width = Lfs(base, CameraPass(base, pass).width_address());
+    const double height = Lfs(base, CameraPass(base, pass).height_address());
+    const double fov = Lfs(base, CameraPass(base, pass).field_of_view_address());
     Perspective(base, sp + 656, fov, Fdivs(width, height), near_plane, far_plane, sp);
   }
   // The std::vector of 16-byte points at +128, empty.
-  Store(base, sp + 132, 0);
-  Store(base, sp + 136, 0);
-  Store(base, sp + 140, 0);
-  FrustumFromMatrix(base, sp + 784, sp + 656, sp);
-  const double one = Lfs(base, kOne);  // f30
+  const schema::Vector16 points(base, sp + kPoints);
+  points.set_first(0u);
+  points.set_last(0u);
+  points.set_end(0u);
+  const schema::CarSceneFrustum frustum(base, sp + kFrustum);
+  FrustumFromMatrix(base, frustum.address, sp + 656, sp);
+  const double one = double(G::one(base));  // f30
   for (uint32_t i = 0; i < 8; i++) {
     Stfs(base, sp + 668 + 16 * i, one);
   }
   for (uint32_t at : {156u, 172u, 188u, 204u}) {
     Stfs(base, sp + at, one);
   }
-  const double zero = Lfs(base, kZero);  // f31
+  const double zero = double(G::zero(base));  // f31
   // The view's inverse (+144): the camera in the world.
   matrix_math::Inverse(base, sp + 144, sp + 560);
 
@@ -262,7 +266,7 @@ bool TextureProjectionFit(uint8_t* base, uint32_t out, uint32_t pass, uint32_t d
 
   // The frustum's corners: the near ones to +656, the far ones to +720.
   for (uint32_t i = 0; i < 4; i++) {
-    const uint32_t from = sp + 912 + 32 * i;
+    const uint32_t from = frustum.corners_address() + 32 * i;
     uint32_t w[8];
     for (uint32_t k = 0; k < 8; k++) {
       w[k] = Load(base, from + 4 * k);
@@ -330,8 +334,8 @@ bool TextureProjectionFit(uint8_t* base, uint32_t out, uint32_t pass, uint32_t d
   // The eight corners into the vector.
   for (uint32_t i = 0; i < 8; i++) {
     const uint32_t value = sp + 656 + 16 * i;
-    if (!Vector16PushBack(base, sp + 128, value, sp)) {
-      push_back(sp + 128, value, sp, kPushBackReturn);
+    if (!Vector16PushBack(base, points.address, value, sp)) {
+      push_back(points.address, value, sp, kPushBackReturn);
     }
   }
 
@@ -341,7 +345,7 @@ bool TextureProjectionFit(uint8_t* base, uint32_t out, uint32_t pass, uint32_t d
   Stfs(base, sp + 80, zero);
   Stfs(base, sp + 84, zero);
   Stfs(base, sp + 92, zero);
-  const double minus_one = Lfs(base, kMinusOne);  // f21
+  const double minus_one = double(G::minus_one(base));  // f21
   Stfs(base, sp + 88, minus_one);
   Copy64(base, sp + 208, sp + 560);
   Stfs(base, sp + 256, zero);
@@ -371,9 +375,9 @@ bool TextureProjectionFit(uint8_t* base, uint32_t out, uint32_t pass, uint32_t d
   const simde__m128 c_raw =
       VNmsub(Permute<0x78>(d), Permute<0x9C>(a), VMul(Permute<0x9C>(d), Permute<0x78>(a)));
   const simde__m128 c_dot = VDot3(c_raw, c_raw);
-  const uint32_t first = Load(base, sp + 132);  // r30
+  const uint32_t first = points.first().address;  // r30
   Stfs(base, sp + 412, one);
-  const uint32_t last = Load(base, sp + 136);  // r31
+  const uint32_t last = points.last().address;  // r31
   Stvx(base, sp + 112, VNormalized(c_raw, c_dot));
   const double cx = Lfs(base, sp + 112);  // f24
   const double cy = Lfs(base, sp + 116);  // f23
@@ -392,15 +396,16 @@ bool TextureProjectionFit(uint8_t* base, uint32_t out, uint32_t pass, uint32_t d
 
   // Their box (+624), its center's x and y with its lowest z less the
   // distance (+80) and the spread of the points seen from there.
-  BoxFromPoints(base, sp + 624, sp + 128, sp);
+  const schema::CarSceneBox box(base, sp + kBox);
+  BoxFromPoints(base, box.address, points.address, sp);
   double distance;  // f29
-  const double half = Lfs(base, kHalf);  // f25
+  const double half = double(G::half(base));  // f25
   double eye_z;  // f9
   {
-    const double sx = Fadds(Lfs(base, sp + 624), Lfs(base, sp + 640));
-    const double sy = Fadds(Lfs(base, sp + 644), Lfs(base, sp + 628));
-    const double min_z = Lfs(base, sp + 632);
-    const double sz = Fadds(Lfs(base, sp + 648), min_z);
+    const double sx = Fadds(double(box.min_x()), double(box.max_x()));
+    const double sy = Fadds(double(box.max_y()), double(box.min_y()));
+    const double min_z = double(box.min_z());
+    const double sz = Fadds(double(box.max_z()), min_z);
     distance = Fmuls(far_plane, distance_scale);
     Stfs(base, sp + 124, one);
     Stfs(base, sp + 112, Fmuls(sx, half));
@@ -420,9 +425,10 @@ bool TextureProjectionFit(uint8_t* base, uint32_t out, uint32_t pass, uint32_t d
   double spread_y = zero;  // f28
   double depth = zero;     // f27
   for (uint32_t at = first; at != last; at += 16) {
-    const double z = Fsubs(Lfs(base, at + 8), eye_z);
-    const double x = Fsubs(Lfs(base, at + 0), eye_x);
-    const double y = Fsubs(Lfs(base, at + 4), eye_y);
+    const Point point(base, at);
+    const double z = Fsubs(double(point.z()), eye_z);
+    const double x = Fsubs(double(point.x()), eye_x);
+    const double y = Fsubs(double(point.y()), eye_y);
     const double scale = Fdivs(one, z);
     const double sx = Fmuls(x, scale);
     if (!(spread_x > Fabs(sx))) {
@@ -495,7 +501,7 @@ bool TextureProjectionFit(uint8_t* base, uint32_t out, uint32_t pass, uint32_t d
     for (uint32_t at : {212u, 216u, 220u, 224u, 232u}) {
       Stfs(base, sp + at, zero);
     }
-    const double two = Lfs(base, kTwo);  // f28
+    const double two = double(G::two(base));  // f28
     wx = Fmuls(wx, two);
     Stfs(base, sp + 236, zero);
     wy = Fmuls(wy, two);
@@ -520,15 +526,15 @@ bool TextureProjectionFit(uint8_t* base, uint32_t out, uint32_t pass, uint32_t d
     Stfs(base, sp + 436, zero);
     Stfs(base, sp + 440, zero);
     Stfs(base, sp + 444, zero);
-    Stfs(base, sp + 484, Lfs(base, kFlip484));
+    Stfs(base, sp + 484, double(G::light_x(base)));
     Stfs(base, sp + 448, zero);
     Stfs(base, sp + 452, zero);
     Stfs(base, sp + 456, minus_one);
-    Stfs(base, sp + 488, Lfs(base, kFlip488));
+    Stfs(base, sp + 488, double(G::flip_488(base)));
     Stfs(base, sp + 460, zero);
     Stfs(base, sp + 464, zero);
     Stfs(base, sp + 468, one);
-    const double shift = Lfs(base, kFlip264);
+    const double shift = double(G::flip_264(base));
     Stfs(base, sp + 472, zero);
     Stfs(base, sp + 476, zero);
     Stfs(base, sp + 480, zero);
@@ -551,7 +557,7 @@ bool TextureProjectionFit(uint8_t* base, uint32_t out, uint32_t pass, uint32_t d
   Multiply(base, sp + 432, sp + 432, sp + 208, kMultiplyFlip);
   Multiply(base, sp + 352, sp + 352, sp + 432, kMultiplyFlipped);
   Multiply(base, out, sp + 560, sp + 352, kMultiplyView);
-  Multiply(base, out, out, kBias, kMultiplyBias);
+  Multiply(base, out, out, G::bias_matrix_address(), kMultiplyBias);
   *r3 = out;
   if (first != 0) {
     if (!memory::crt::OperatorDelete(first)) {

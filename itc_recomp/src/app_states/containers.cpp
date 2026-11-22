@@ -7,6 +7,7 @@
 
 #include "base/log.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/app_states.h"
 
 namespace app_states {
 
@@ -31,8 +32,9 @@ bool MessagesErase(uint8_t* base, uint32_t vector, uint32_t first_vector, uint32
     return false;
   }
   ITC_NATIVE_RUNNING("sub_82092E70 MessageVector::Erase");
+  const schema::MessageVector v(base, vector);
   if (first != last) {
-    const uint32_t end = Load(base, vector + kVectorLast);
+    const uint32_t end = v.last().address;
     const uint32_t moved = uint32_t(int32_t(end - last) >> 2) << 2;
     const uint32_t new_last = first + moved;
     if (last != end) {
@@ -41,14 +43,15 @@ bool MessagesErase(uint8_t* base, uint32_t vector, uint32_t first_vector, uint32
         Store(base, from + delta, Load(base, from));
       }
     }
-    Store(base, vector + kVectorLast, new_last);
+    v.set_last(new_last);
   }
   return true;
 }
 
 bool MessagesClear(uint8_t* base, uint32_t vector) {
-  const uint32_t first = Load(base, vector + kVectorFirst);
-  const uint32_t last = Load(base, vector + kVectorLast);
+  const schema::MessageVector v(base, vector);
+  const uint32_t first = v.first().address;
+  const uint32_t last = v.last().address;
   if (first > last || vector == 0) {
     return false;
   }
@@ -65,20 +68,22 @@ std::optional<uint32_t> MessagesAllocate(uint8_t* base, uint32_t count) {
 }
 
 std::optional<uint32_t> OpAllocateNodes(uint8_t* base, uint32_t count) {
-  if (count != 0 && 0xFFFFFFFFu / count < kOpNodeBytes) {
+  constexpr uint32_t kNodeBytes = schema::AppOpListNode::kSize;
+  if (count != 0 && 0xFFFFFFFFu / count < kNodeBytes) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_820ACF10 OpList::AllocateNodes");
-  return memory::crt::OperatorNew(base, count * kOpNodeBytes);
+  return memory::crt::OperatorNew(base, count * kNodeBytes);
 }
 
 bool OpIncSize(uint8_t* base, uint32_t list, uint32_t count) {
-  const uint32_t size = Load(base, list + kListSize);
+  const schema::OpList ops(base, list);
+  const uint32_t size = ops.size();
   if (kOpListMaxSize - size < count) {
     return false;
   }
   ITC_NATIVE_RUNNING("sub_820AD768 OpList::IncSize");
-  Store(base, list + kListSize, size + count);
+  ops.set_size(size + count);
   return true;
 }
 
@@ -92,14 +97,16 @@ bool OpConstruct(uint8_t* base, uint32_t list) {
   }
   ITC_NATIVE_RUNNING("sub_820AD0B8 OpList::OpList");
   // The original's null checks on the node and its +4.
+  const schema::AppOpListNode node(base, *head);
   if (*head != 0) {
-    Store(base, *head + kNodeNext, *head);
+    node.set_next(*head);
   }
-  if (*head + kNodePrevious != 0) {
-    Store(base, *head + kNodePrevious, *head);
+  if (node.previous_address() != 0) {
+    node.set_previous(*head);
   }
-  Store(base, list + kListHead, *head);
-  Store(base, list + kListSize, 0);
+  const schema::OpList ops(base, list);
+  ops.set_head(*head);
+  ops.set_size(0);
   return true;
 }
 
@@ -113,33 +120,35 @@ std::optional<uint32_t> OpBuyNode(uint8_t* base, uint32_t next, uint32_t previou
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_820ACFF8 OpList::BuyNode");
+  const schema::AppOpListNode n(base, *node);
   if (*node != 0) {
-    Store(base, *node + kNodeNext, next);
+    n.set_next(next);
   }
-  if (*node + kNodePrevious != 0) {
-    Store(base, *node + kNodePrevious, previous);
+  if (n.previous_address() != 0) {
+    n.set_previous(previous);
   }
-  if (*node + kNodeValue != 0) {
-    Store(base, *node + kNodeValue, type);
-    Store(base, *node + kNodeValue + 4, state);
+  if (n.op_address() != 0) {
+    n.set_op_type(type);
+    n.set_op_state(state);
   }
   return *node;
 }
 
 bool LayerPush(uint8_t* base, uint32_t layer, uint32_t state) {
-  const uint32_t list = layer + kLayerOps;
-  if (kOpListMaxSize - Load(base, list + kListSize) < 1) {
+  const uint32_t list = schema::StateLayer(base, layer).ops_address();
+  const schema::OpList ops(base, list);
+  if (kOpListMaxSize - ops.size() < 1) {
     return false;
   }
-  const uint32_t head = Load(base, list + kListHead);
-  const auto node = OpBuyNode(base, head, Load(base, head + kNodePrevious), 2, state);
+  const auto head = ops.head();
+  const auto node = OpBuyNode(base, head.address, head.previous().address, 2, state);
   if (!node) {
     return false;
   }
   ITC_NATIVE_RUNNING("sub_820ADAD0 StateLayer::Push");
   OpIncSize(base, list, 1);
-  Store(base, head + kNodePrevious, *node);
-  Store(base, Load(base, *node + kNodePrevious) + kNodeNext, *node);
+  head.set_previous(*node);
+  schema::AppOpListNode(base, *node).previous().set_next(*node);
   return true;
 }
 
@@ -152,13 +161,14 @@ uint32_t Words(uint32_t from, uint32_t to) { return uint32_t(int32_t(to - from) 
 
 bool MessagesInsertN(uint8_t* base, uint32_t vector, uint32_t where, uint32_t count,
                      uint32_t value) {
-  const uint32_t first = Load(base, vector + kVectorFirst);
-  const uint32_t capacity = first == 0 ? 0 : Words(first, Load(base, vector + kVectorEnd));
+  const schema::MessageVector v(base, vector);
+  const uint32_t first = v.first().address;
+  const uint32_t capacity = first == 0 ? 0 : Words(first, v.end().address);
   if (count == 0) {
     ITC_NATIVE_RUNNING("sub_820938C0 MessageVector::InsertN");
     return true;
   }
-  const uint32_t last = Load(base, vector + kVectorLast);
+  const uint32_t last = v.last().address;
   const uint32_t size = first == 0 ? 0 : Words(first, last);
   if (kMessagesMaxSize - size < count) {
     return false;  // the length_error
@@ -190,7 +200,7 @@ bool MessagesInsertN(uint8_t* base, uint32_t vector, uint32_t where, uint32_t co
         Store(base, fill, value);
       }
     }
-    const uint32_t old_last = Load(base, vector + kVectorLast);
+    const uint32_t old_last = v.last().address;
     if (where != old_last) {
       uint32_t moved = to + 4 * count;
       for (uint32_t from = where; from != old_last; from += 4, moved += 4) {
@@ -199,15 +209,14 @@ bool MessagesInsertN(uint8_t* base, uint32_t vector, uint32_t where, uint32_t co
         }
       }
     }
-    const uint32_t old_first = Load(base, vector + kVectorFirst);
-    const uint32_t new_size =
-        (old_first == 0 ? 0 : Words(old_first, Load(base, vector + kVectorLast))) + count;
+    const uint32_t old_first = v.first().address;
+    const uint32_t new_size = (old_first == 0 ? 0 : Words(old_first, v.last().address)) + count;
     if (old_first != 0) {
       Delete(old_first, "MessageVector::InsertN");
     }
-    Store(base, vector + kVectorFirst, block);
-    Store(base, vector + kVectorEnd, block + 4 * new_capacity);
-    Store(base, vector + kVectorLast, block + 4 * new_size);
+    v.set_first(block);
+    v.set_end(block + 4 * new_capacity);
+    v.set_last(block + 4 * new_size);
     return true;
   }
   ITC_NATIVE_RUNNING("sub_820938C0 MessageVector::InsertN");
@@ -220,14 +229,14 @@ bool MessagesInsertN(uint8_t* base, uint32_t vector, uint32_t where, uint32_t co
         Store(base, to, Load(base, from));
       }
     }
-    uint32_t fill = Load(base, vector + kVectorLast);
+    uint32_t fill = v.last().address;
     for (uint32_t left = count - Words(where, fill); left != 0; left--, fill += 4) {
       if (fill != 0) {
         Store(base, fill, value);
       }
     }
-    const uint32_t new_last = Load(base, vector + kVectorLast) + 4 * count;
-    Store(base, vector + kVectorLast, new_last);
+    const uint32_t new_last = v.last().address + 4 * count;
+    v.set_last(new_last);
     for (uint32_t at = where; at != new_last - 4 * count; at += 4) {
       Store(base, at, value);
     }
@@ -237,13 +246,13 @@ bool MessagesInsertN(uint8_t* base, uint32_t vector, uint32_t where, uint32_t co
   // back by `count` (copy_backward), then the gap filled.
   const uint32_t bytes = 4 * count;
   const uint32_t split = last - bytes;
-  uint32_t to = Load(base, vector + kVectorLast);
+  uint32_t to = v.last().address;
   for (uint32_t from = split; from != last; from += 4, to += 4) {
     if (to != 0) {
       Store(base, to, Load(base, from));
     }
   }
-  Store(base, vector + kVectorLast, to);
+  v.set_last(to);
   if (where != split) {
     uint32_t at = split;
     do {
@@ -259,8 +268,9 @@ bool MessagesInsertN(uint8_t* base, uint32_t vector, uint32_t where, uint32_t co
 
 std::optional<uint32_t> MessagesInsert(uint8_t* base, uint32_t vector, uint32_t where_vector,
                                        uint32_t where, uint32_t value) {
-  const uint32_t first = Load(base, vector + kVectorFirst);
-  const uint32_t last = Load(base, vector + kVectorLast);
+  const schema::MessageVector v(base, vector);
+  const uint32_t first = v.first().address;
+  const uint32_t last = v.last().address;
   int32_t offset = 0;
   if (first != 0 && Words(first, last) != 0) {
     if (first > last || where_vector == 0 || where_vector != vector) {
@@ -272,22 +282,23 @@ std::optional<uint32_t> MessagesInsert(uint8_t* base, uint32_t vector, uint32_t 
   if (offset < 0 || offset > size + 1) {
     return std::nullopt;  // the result's traps, after the insert
   }
-  if (!MessagesInsertN(base, vector, where, 1, Load(base, value))) {
+  if (!MessagesInsertN(base, vector, where, 1, schema::AppMessageWord(base, value).value())) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_82094110 MessageVector::Insert");
-  return Load(base, vector + kVectorFirst) + uint32_t(offset) * 4;
+  return v.first().address + uint32_t(offset) * 4;
 }
 
 std::optional<bool> MessagesPushBack(uint8_t* base, uint32_t vector, uint32_t value) {
-  const uint32_t first = Load(base, vector + kVectorFirst);
-  const uint32_t last = Load(base, vector + kVectorLast);
-  if (first != 0 && Words(first, last) < Words(first, Load(base, vector + kVectorEnd))) {
+  const schema::MessageVector v(base, vector);
+  const uint32_t first = v.first().address;
+  const uint32_t last = v.last().address;
+  if (first != 0 && Words(first, last) < Words(first, v.end().address)) {
     ITC_NATIVE_RUNNING("sub_820944E0 MessageVector::PushBack");
     if (last != 0) {
-      Store(base, last, Load(base, value));
+      schema::AppMessageWord(base, last).set_value(schema::AppMessageWord(base, value).value());
     }
-    Store(base, vector + kVectorLast, last + 4);
+    v.set_last(last + 4);
     return false;
   }
   if (first > last || !MessagesInsert(base, vector, vector, last, value)) {
@@ -299,24 +310,27 @@ std::optional<bool> MessagesPushBack(uint8_t* base, uint32_t vector, uint32_t va
 
 uint32_t ListClear(uint8_t* base, uint32_t list) {
   ITC_NATIVE_RUNNING("sub_820ACF88 List::Clear");
-  uint32_t head = Load(base, list + kListHead);
-  uint32_t node = Load(base, head + kNodeNext);
-  Store(base, head + kNodeNext, head);
-  head = Load(base, list + kListHead);
-  Store(base, head + kNodePrevious, head);
-  head = Load(base, list + kListHead);
-  Store(base, list + kListSize, 0);
-  while (node != head) {
-    const uint32_t next = Load(base, node + kNodeNext);
+  // Any list with 16-byte or other nodes: the layout of a list of pointers
+  // (+4 the head, +8 the size; a node +0 next, +4 previous).
+  const schema::PtrList l(base, list);
+  auto head = l.head();
+  uint32_t node = head.next().address;
+  head.set_next(head.address);
+  head = l.head();
+  head.set_previous(head.address);
+  head = l.head();
+  l.set_size(0);
+  while (node != head.address) {
+    const uint32_t next = schema::StateListNode(base, node).next().address;
     Delete(node, "List::Clear");
-    head = Load(base, list + kListHead);
+    head = l.head();
     node = next;
   }
   return node;
 }
 
 std::optional<uint32_t> DelegateClone(uint8_t* base, uint32_t delegate) {
-  const auto block = memory::crt::OperatorNew(base, kDelegateBytes);
+  const auto block = memory::crt::OperatorNew(base, schema::AppDelegate::kSize);
   if (!block) {
     return std::nullopt;
   }
@@ -324,15 +338,17 @@ std::optional<uint32_t> DelegateClone(uint8_t* base, uint32_t delegate) {
   if (*block == 0) {
     return 0;
   }
-  Store(base, *block + 0, kDelegateVtable);
-  Store(base, *block + 4, Load(base, delegate + 4));
-  Store(base, *block + 8, Load(base, delegate + 8));
+  const schema::AppDelegate copy(base, *block), from(base, delegate);
+  copy.set_vtable(kDelegateVtable);
+  copy.set_object(from.object());
+  copy.set_function(from.function());
   return *block;
 }
 
 uint32_t LayerIsEmpty(uint8_t* base, uint32_t state) {
   ITC_NATIVE_RUNNING("sub_820ACE50 StateLayer::IsEmpty");
-  return Load(base, state + 28) == 0 && Load(base, state + 16) == 0 ? 1 : 0;
+  const schema::StateLayer layer(base, state - 4);
+  return layer.states_size() == 0 && layer.children_size() == 0 ? 1 : 0;
 }
 
 }  // namespace app_states

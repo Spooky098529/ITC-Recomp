@@ -11,6 +11,9 @@
 // left the same.
 
 #include "guest.h"
+#include "lifted/names.h"
+#include "lifted/functions.h"
+#include "lifted/entries.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
@@ -22,6 +25,8 @@
 #include "hooks/direct_slots.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
+#include "schema/app_start_up.h"
+#include "schema/cameras.h"
 
 #include <functional>
 #include <optional>
@@ -166,7 +171,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820A0C40) {
     has_surfaces = cameras::ReleaseSurfaces(base, pass, [&](uint32_t surface, uint32_t field) {
       ctx.r3.u64 = surface;
       ctx.lr = field == 576 ? 0x820A0C8C : 0x820A0CA0;
-      lifted::CallFromContext(ctx, base, 0x822A67B0);
+      lifted::Enter(ctx, base, game::Resource::Release);
       released_580 = field == 580;
     });
   });
@@ -184,7 +189,7 @@ namespace {
 // slot 7, then that object's slot 3, as guest calls with the original's
 // return addresses. r3 = the video output after.
 uint32_t VideoOutputCall(lifted::Regs& ctx, uint8_t* base, uint32_t first, uint32_t second) {
-  ctx.r3.u64 = guest::LoadU32(base, 0x8266D088);
+  ctx.r3.u64 = schema::AppStartUpGlobals::scene_target_app(base).address;
   const uint32_t slot7 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
   ctx.lr = first;
   // Slot 7's plain C++ where it's the game's (hooks::DirectSlotCall).
@@ -225,13 +230,13 @@ bool CameraPassesMakeRenderTarget(lifted::Regs& ctx, uint8_t* base) {
          [&](uint32_t target) {
            ctx.r3.u64 = target;
            ctx.lr = 0x8209FC40;
-           lifted::CallFromContext(ctx, base, 0x8209F7A8);
+           lifted::Enter(ctx, base, game::CameraPasses::RenderTarget);
            return ctx.r3.u32;
          },
          [&](uint32_t resource) {
            ctx.r3.u64 = resource;
            ctx.lr = 0x8209FC4C;
-           lifted::CallFromContext(ctx, base, 0x822A67B0);
+           lifted::Enter(ctx, base, game::Resource::Release);
          }});
   });
   ctx.lr = lr;
@@ -265,7 +270,7 @@ bool CameraPassSetUpSurfaces(lifted::Regs& ctx, uint8_t* base) {
     cameras::SetUpSurfaces(
         base, frame, pass,
         {[&](int at) {
-           const uint32_t type = guest::LoadU32(base, pass + 584);
+           const uint32_t type = schema::CameraPass(base, pass).type();
            const ReturnAddresses r = at == 0 && type <= 20 ? kLock[type]
                                                           : ReturnAddresses{0x820A3950, 0x820A3960};
            return VideoOutputCall(ctx, base, r.first, r.second);
@@ -273,26 +278,26 @@ bool CameraPassSetUpSurfaces(lifted::Regs& ctx, uint8_t* base) {
          [&](uint32_t id) {
            ctx.r3.u64 = id;
            ctx.lr = 0x820A2FF0;
-           lifted::CallFromContext(ctx, base, 0x8209F7A8);
+           lifted::Enter(ctx, base, game::CameraPasses::RenderTarget);
            return ctx.r3.u32;
          },
          [&](uint32_t id) {
            ctx.r3.u64 = id;
            ctx.lr = 0x820A2FE8;
-           lifted::CallFromContext(ctx, base, 0x8209FBF0);
+           lifted::Enter(ctx, base, game::CameraPasses::MakeRenderTarget);
          },
          [&](uint32_t texture, uint32_t face) {
            ctx.r3.u64 = texture;
            ctx.r4.u64 = face;
            ctx.r5.u64 = 0;
            ctx.lr = 0x820A30BC;
-           lifted::CallFromContext(ctx, base, 0x822A5C50);
+           lifted::Enter(ctx, base, lifted::e822A5C50);
            return ctx.r3.u32;
          },
          [&] {
            ctx.r3.u64 = pass;
            ctx.lr = 0x820A2F60;
-           lifted::CallFromContext(ctx, base, 0x820A0C40);
+           lifted::Enter(ctx, base, game::CameraPass::ReleaseSurfaces);
          }});
   });
   ctx.lr = lr;
@@ -311,7 +316,7 @@ void CameraPassesInit(lifted::Regs& ctx, uint8_t* base, bool all) {
         ctx.r4.u64 = type;
         ctx.r5.u64 = r5;
         ctx.lr = 0x8209F990;
-        lifted::CallFromContext(ctx, base, 0x820A3DB0);
+        lifted::Enter(ctx, base, game::CameraPass::Init);
       },
       [&](uint32_t mode) {
         original_set_mode = true;
@@ -347,7 +352,7 @@ bool CameraPassInit(lifted::Regs& ctx, uint8_t* base) {
                       {[&] {
                          ctx.r3.u64 = pass;
                          ctx.lr = 0x820A3DD4;
-                         lifted::CallFromContext(ctx, base, 0x82593908);
+                         lifted::Enter(ctx, base, game::Camera::Ctor);
                          ctx.fpscr.disableFlushMode();
                        },
                        [&](int at) {
@@ -357,12 +362,12 @@ bool CameraPassInit(lifted::Regs& ctx, uint8_t* base) {
                        [&] {
                          ctx.r3.u64 = pass;
                          ctx.lr = 0x820A4348;
-                         lifted::CallFromContext(ctx, base, 0x820A3978);
+                         lifted::Enter(ctx, base, game::CameraPass::Update);
                        },
                        [&] {
                          ctx.r3.u64 = pass;
                          ctx.lr = 0x820A4350;
-                         lifted::CallFromContext(ctx, base, 0x820A2F40);
+                         lifted::Enter(ctx, base, game::CameraPass::SetUpSurfaces);
                        }});
   });
   ctx.lr = lr;
@@ -486,7 +491,8 @@ ITC_FLAG_DECLARE(bool, log_recording_by_pass);
 
 namespace {
 
-constexpr uint32_t kScene = 0x826BABA0;
+// The render manager ([0x826BABA0], app-start-up.toml's render_app).
+using AppG = schema::AppStartUpGlobals;
 
 // A call through slot `slot` of r3's vtable, returning to `return_address`.
 // The render manager's slots 8 and 7 by their plain C++ where they're the
@@ -501,7 +507,7 @@ void VtableCall(lifted::Regs& ctx, uint8_t* base, uint32_t slot, uint32_t return
 }
 
 // A chunk recorded and handed to the render queue, as RecordViewport and
-// RecordClear do: the command list from the scene ([kScene]'s slot 8, then
+// RecordClear do: the command list from the scene ([0x826BABA0]'s slot 8, then
 // slot 1), `record(list)` (the plain C++: its first slot, or nullopt where
 // the original must run), the render queue (slot 8, then slot 2) and its
 // slot 4 (r4 = the chunk, r5 = the key, f1 = 0.0), the calls made from a
@@ -520,14 +526,14 @@ bool RecordAndSubmit(lifted::Regs& ctx, uint8_t* base, uint32_t frame_bytes,
   const uint64_t lr = ctx.lr;
   std::optional<uint32_t> chunk;
   guest_call::InFrame(ctx, base, frame_bytes, returns[0], [&](uint32_t) {
-    ctx.r3.u64 = guest::LoadU32(base, kScene);
+    ctx.r3.u64 = AppG::render_app(base).address;
     VtableCall(ctx, base, 8, returns[0]);
     VtableCall(ctx, base, 1, returns[1]);
     chunk = record(ctx.r3.u32);
     if (!chunk) {
       return;
     }
-    ctx.r3.u64 = guest::LoadU32(base, kScene);
+    ctx.r3.u64 = AppG::render_app(base).address;
     VtableCall(ctx, base, 8, returns[2]);
     VtableCall(ctx, base, 2, returns[3]);
     ctx.fpscr.disableFlushMode();
@@ -563,7 +569,7 @@ struct Route {
 // chunk, r5 = the key, f1 = 0.0).
 void Submit(lifted::Regs& ctx, uint8_t* base, const cameras::Submissions& subs, const Route& route) {
   for (uint32_t i = 0; i < subs.count; i++) {
-    ctx.r3.u64 = guest::LoadU32(base, kScene);
+    ctx.r3.u64 = AppG::render_app(base).address;
     VtableCall(ctx, base, 8, route.get[i][0]);
     VtableCall(ctx, base, 2, route.get[i][1]);
     ctx.fpscr.disableFlushMode();
@@ -590,7 +596,7 @@ bool RecordPass(lifted::Regs& ctx, uint8_t* base, const uint32_t (&list_returns)
   const uint64_t lr = ctx.lr;
   bool done = false;
   guest_call::InFrame(ctx, base, 176, list_returns[0], [&](uint32_t) {
-    ctx.r3.u64 = guest::LoadU32(base, kScene);
+    ctx.r3.u64 = AppG::render_app(base).address;
     VtableCall(ctx, base, 8, list_returns[0]);
     VtableCall(ctx, base, 1, list_returns[1]);
     const std::optional<cameras::Submissions> subs = record(ctx.r3.u32);
@@ -697,7 +703,7 @@ bool CameraUpdate(lifted::Regs& ctx, uint8_t* base) {
   });
   ctx.lr = lr;
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = camera + 144;
+  ctx.r3.u64 = schema::CameraPass(base, camera).view_projection_address();
   return true;
 }
 
@@ -736,7 +742,7 @@ ITC_REGS_STEP(RecordClear) {
 bool CameraPassRecordBegin(lifted::Regs& ctx, uint8_t* base) {
   static constexpr uint32_t kList[2] = {0x820A0CEC, 0x820A0CFC};
   const uint32_t pass = ctx.r3.u32;
-  const Route route = BeginRoute(guest::LoadU32(base, pass + 584));
+  const Route route = BeginRoute(schema::CameraPass(base, pass).type());
   if (!RecordPass(ctx, base, kList, route,
                   [&](uint32_t list) { return cameras::RecordBegin(base, list, pass); })) {
     ctx.r3.u64 = pass;
@@ -748,13 +754,13 @@ bool CameraPassRecordBegin(lifted::Regs& ctx, uint8_t* base) {
 bool CameraPassRecordEnd(lifted::Regs& ctx, uint8_t* base) {
   static constexpr uint32_t kList[2] = {0x820A1C5C, 0x820A1C6C};
   const uint32_t pass = ctx.r3.u32;
-  const Route route = EndRoute(guest::LoadU32(base, pass + 584));
+  const Route route = EndRoute(schema::CameraPass(base, pass).type());
   if (!RecordPass(ctx, base, kList, route, [&](uint32_t list) {
         return cameras::RecordEnd(base, list, pass, [&](uint32_t id) {
           // Through its override (the diagnostics' wrapper), as the original.
           ctx.r3.u64 = id;
           ctx.lr = route.render_target;
-          lifted::CallFromContext(ctx, base, 0x8209F7A8);
+          lifted::Enter(ctx, base, game::CameraPasses::RenderTarget);
           return ctx.r3.u32;
         });
       })) {
@@ -832,8 +838,10 @@ bool CameraPassUpdate(lifted::Regs& ctx, uint8_t* base) {
   // stop after the viewport size) or its view-projection (Matrix::Multiply's
   // out).
   ctx.fpscr.disableFlushMode();
-  const uint32_t type = guest::LoadU32(base, pass + 584);
-  ctx.r3.u64 = ((type >= 10 && type <= 18) || type == 20) ? pass : pass + 144;
+  const uint32_t type = schema::CameraPass(base, pass).type();
+  ctx.r3.u64 = ((type >= 10 && type <= 18) || type == 20)
+                   ? pass
+                   : schema::CameraPass(base, pass).view_projection_address();
   return true;
 }
 
@@ -851,7 +859,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820AA4A8) {
   const uint64_t lr = ctx.lr;
   guest_call::InFrame(ctx, base, 112, 0x820AA534, [&](uint32_t) {
     ctx.r3.u64 = pass;
-    lifted::CallFromContext(ctx, base, 0x820A3978);
+    lifted::Enter(ctx, base, game::CameraPass::Update);
   });
   ctx.lr = lr;
 }

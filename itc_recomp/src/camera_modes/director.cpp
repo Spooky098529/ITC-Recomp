@@ -13,10 +13,16 @@
 #include "post_effects/post_effects.h"
 #include "track_zones/track_zones.h"
 #include "vehicle_accessors/vehicle_accessors.h"
+#include "schema/camera_modes.h"
+#include "schema/race_event.h"
+#include "schema/race_states.h"
 
 namespace camera_modes {
 
 using namespace steps;
+
+using G = schema::CameraModesGlobals;
+using Director = schema::CameraDirector;
 
 namespace {
 
@@ -534,8 +540,8 @@ uint32_t DirectorInitStates(uint8_t* base, uint32_t director, uint32_t frame, bo
         }
         break;
       case Op::kAdd:
-        r3 = game_modes::StateMachineAdd(base, director + kMachine, at(step.a), at(step.b),
-                                         replaced);
+        r3 = game_modes::StateMachineAdd(base, Director(base, director).machine_address(),
+                                         at(step.a), at(step.b), replaced);
         break;
     }
   }
@@ -548,26 +554,23 @@ uint32_t DirectorSetMode(uint8_t* base, uint32_t director, uint32_t view, uint32
   const uint32_t first_vehicle = track_zones::RacersVehicle(base, 0);
   guest::StoreU32(base, frame + 80, first_vehicle);
   const uint32_t second_vehicle = track_zones::RacersVehicle(base, 1);
-  const uint32_t viewports = guest::LoadU32(base, kViewports);
+  const schema::Viewports viewports = G::viewports(base);
   guest::StoreU32(base, frame + 84, second_vehicle);
-  const uint32_t first = guest::LoadU32(base, viewports + 0);
-  const uint32_t second = guest::LoadU32(base, viewports + 4);
-  guest::StoreU32(base, director + kView, view);
-  guest::StoreU32(base, first + 1860, view);
-  guest::StoreU32(base, second + 1860, guest::LoadU32(base, director + kView));
+  const schema::Viewport first = viewports.first();
+  const schema::Viewport second = viewports.second();
+  const Director d(base, director);
+  d.set_view(view);
+  first.set_view_mode(view);
+  second.set_view_mode(d.view());
   ResetRoll(base);
   // ResetRoll's r3: viewport 1 (its adapter's), what a view past 5 leaves.
-  uint32_t r3 = guest::LoadU32(base, guest::LoadU32(base, kViewports) + 4);
-  const uint32_t current = director + kCurrentCamera;
-  const uint32_t current2 = director + kCurrentCamera2;
-  const uint32_t mode = guest::LoadU32(base, director + kView);
-  guest::StoreU32(base, current, 0);
-  guest::StoreU32(base, current2, 0);
+  uint32_t r3 = G::viewports(base).second().address;
+  const uint32_t mode = d.view();
+  d.set_camera(0);
+  d.set_camera2(0);
   // The followed player's vehicle from the two kept in the frame (a player
   // past 1 reads the frame's next words, as the original does).
-  auto followed = [&] {
-    return guest::LoadU32(base, frame + 80 + 4 * guest::LoadU32(base, director + kFollowed));
-  };
+  auto followed = [&] { return guest::LoadU32(base, frame + 80 + 4 * d.followed()); };
   // The view's object made in place; 0 where its address is 0 (never in play).
   auto make = [&](uint32_t view_index, uint32_t offset, uint32_t viewport, uint32_t vehicle,
                   uint32_t back) -> uint32_t {
@@ -581,49 +584,48 @@ uint32_t DirectorSetMode(uint8_t* base, uint32_t director, uint32_t view, uint32
     uint32_t offset;
     uint32_t back;
   };
-  static constexpr View kViews[6] = {{12976, 0x821593C0}, {11856, 0x8215939C},
-                                     {9648, 0x82159378},  {67760, 0x82159300},
-                                     {13360, 0x821592D8}, {56896, 0x821592B4}};
+  const Director at0(base, 0);
+  const View views[6] = {
+      {at0.view0_camera_address(), 0x821593C0}, {at0.view1_camera_address(), 0x8215939C},
+      {at0.view2_camera_address(), 0x82159378}, {at0.intro_camera_address(), 0x82159300},
+      {at0.tv_camera_address(), 0x821592D8},    {at0.cutscene_address(), 0x821592B4}};
   if (mode > 5) {
     return r3;
   }
-  if (mode == 2 && guest::LoadU32(base, guest::LoadU32(base, kViewports) + 8) != 0) {
+  if (mode == 2 && G::viewports(base).split() != 0) {
     // Split screen: player 0's and player 1's in-car views.
-    r3 = make(2, 9648, first, first_vehicle, 0x82159328);
-    guest::StoreU32(base, current, r3);
-    r3 = make(2, 10752, second, second_vehicle, 0x8215934C);
-    guest::StoreU32(base, current2, r3);
+    r3 = make(2, at0.view2_camera_address(), first.address, first_vehicle, 0x82159328);
+    d.set_camera(r3);
+    r3 = make(2, at0.view2_camera2_address(), second.address, second_vehicle, 0x8215934C);
+    d.set_camera2(r3);
     return r3;
   }
-  r3 = director + kViews[mode].offset == 0
+  r3 = director + views[mode].offset == 0
            ? 0
-           : make(mode, kViews[mode].offset, first, followed(), kViews[mode].back);
-  guest::StoreU32(base, current, r3);
+           : make(mode, views[mode].offset, first.address, followed(), views[mode].back);
+  d.set_camera(r3);
   return r3;
 }
 
 namespace {
-
-constexpr uint32_t kRaceKind = 0xA3AF0;      // the race data's kind (4 split screen, 6 ...)
-constexpr uint32_t kTwoPlayerFlag = 0x826C7824;  // [0x826C7820 + 4]
 
 // OnRaceStart's and Resume's choice of the followed player: with the race's
 // kind 6 and the current stage's copy's first word (Stages::Copy of stage
 // -1 into `frame` + 80) not 1, 1 when [0x826C7824] is 0, else 0; nullopt
 // where the original leaves them.
 std::optional<uint32_t> Followed(uint8_t* base, uint32_t frame, const StagesCopyCall& stages_copy) {
-  const uint32_t race = guest::LoadU32(base, kRaceData);
-  if (int32_t(guest::LoadU32(base, race + kRaceKind)) != 6) {
+  const uint32_t race = G::race_data(base);
+  if (int32_t(schema::RaceData(base, race).kind()) != 6) {
     return std::nullopt;
   }
-  const uint32_t stages = race + 0x59620;
+  const uint32_t stages = schema::RaceData(base, race).stages_address();
   if (!vehicle_accessors::StagesCopy(base, frame + 80, stages, 0xFFFFFFFF)) {
     stages_copy(frame + 80, stages, 0xFFFFFFFF);
   }
-  if (int32_t(guest::LoadU32(base, frame + 80)) == 1) {
+  if (int32_t(schema::StageCopy(base, frame + 80).first()) == 1) {
     return std::nullopt;
   }
-  return guest::LoadU32(base, kTwoPlayerFlag) == 0 ? 1u : 0u;
+  return G::two_player(base) == 0 ? 1u : 0u;
 }
 
 }  // namespace
@@ -632,35 +634,36 @@ void DirectorOnRaceStart(uint8_t* base, uint32_t director, uint32_t frame,
                          const StagesCopyCall& stages_copy,
                          const std::function<void(uint32_t view)>& set_mode) {
   ITC_NATIVE_RUNNING("sub_821596B0 CameraDirector::OnRaceStart");
-  const uint32_t holder = guest::LoadU32(base, kViewports);
-  const uint32_t first = guest::LoadU32(base, holder + 0);
-  const uint32_t second = guest::LoadU32(base, holder + 4);
-  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0) + 131072 - 1956;
-  if (int32_t(guest::LoadU32(base, guest::LoadU32(base, kRaceData) + kRaceKind)) == 4) {
-    guest::StoreU32(base, guest::LoadU32(base, kViewports) + 8, 1);
+  const schema::Viewports holder = G::viewports(base);
+  const schema::Viewport first = holder.first();
+  const schema::Viewport second = holder.second();
+  const Director d(base, director);
+  const schema::SaveData save(base, vehicle_accessors::SaveDataOf(base, 0));
+  if (int32_t(schema::RaceData(base, G::race_data(base)).kind()) == 4) {
+    G::viewports(base).set_split(1);
   }
   if (const auto followed = Followed(base, frame, stages_copy)) {
-    guest::StoreU32(base, director + kFollowed, *followed);
-    guest::StoreU32(base, director + kFollowedInput, *followed);
+    d.set_followed(*followed);
+    d.set_followed_input(*followed);
   }
-  if (guest::LoadU32(base, guest::LoadU32(base, kViewports) + 8) == 0) {
-    guest::StoreU32(base, director + 9624, 0);
-    const uint32_t setting = guest::LoadU32(base, save + 24);
+  if (G::viewports(base).split() == 0) {
+    d.set_start_view(0);
+    const uint32_t setting = save.camera_view();
     if (setting == 0) {
-      guest::StoreU32(base, director + 9624, 2);
+      d.set_start_view(2);
     } else if (setting == 1) {
-      guest::StoreU32(base, director + 9624, 1);
+      d.set_start_view(1);
     } else if (setting == 2) {
-      guest::StoreU32(base, director + 9624, 0);
+      d.set_start_view(0);
     }
-    guest::StoreU32(base, first + 1860, guest::LoadU32(base, director + 9624));
+    first.set_view_mode(d.start_view());
   } else {
-    guest::StoreU32(base, director + 9624, 2);
-    guest::StoreU32(base, first + 1860, 2);
-    guest::StoreU32(base, second + 1860, guest::LoadU32(base, director + 9624));
+    d.set_start_view(2);
+    first.set_view_mode(2);
+    second.set_view_mode(d.start_view());
   }
-  set_mode(guest::LoadU32(base, director + 9624));
-  guest::StoreU32(base, director + kViewKept, guest::LoadU32(base, director + 9624));
+  set_mode(d.start_view());
+  d.set_view_kept(d.start_view());
 }
 
 bool DirectorResumeReady(uint8_t* base) {
@@ -679,28 +682,29 @@ void DirectorResume(uint8_t* base, uint32_t director, uint32_t frame,
                     const StagesCopyCall& stages_copy,
                     const std::function<void(uint32_t view)>& set_mode) {
   ITC_NATIVE_RUNNING("sub_821597F0 CameraDirector::Resume");
-  const uint32_t holder = guest::LoadU32(base, kViewports);
-  const uint32_t first = guest::LoadU32(base, holder + 0);
-  const uint32_t second = guest::LoadU32(base, holder + 4);
+  const schema::Viewports holder = G::viewports(base);
+  const schema::Viewport first = holder.first();
+  const schema::Viewport second = holder.second();
+  const Director d(base, director);
   const uint32_t followed = Followed(base, frame, stages_copy).value_or(0);
   // Without the kind 6 path, or with [0x826C7824] set, both are 0.
-  guest::StoreU32(base, director + kFollowed, followed);
-  guest::StoreU32(base, director + kFollowedInput, followed);
-  if (int32_t(guest::LoadU32(base, guest::LoadU32(base, kRaceData) + kRaceKind)) == 4) {
-    guest::StoreU32(base, guest::LoadU32(base, kViewports) + 8, 1);
-    guest::StoreU32(base, first + 1860, 2);
-    guest::StoreU32(base, second + 1860, 2);
+  d.set_followed(followed);
+  d.set_followed_input(followed);
+  if (int32_t(schema::RaceData(base, G::race_data(base)).kind()) == 4) {
+    G::viewports(base).set_split(1);
+    first.set_view_mode(2);
+    second.set_view_mode(2);
     set_mode(2);
   } else {
-    guest::StoreU32(base, first + 1860, guest::LoadU32(base, director + kViewKept));
+    first.set_view_mode(d.view_kept());
   }
   const uint32_t filter = post_effects::Get(base, 2);
   if (filter == 0) {
     return;
   }
-  const double zero = Lfs(base, 0x82000A34);
+  const double zero = G::zero(base);
   post_effects::ColorFilterSet(base, filter, 8112, zero);
-  const double one = Lfs(base, 0x82000A30);
+  const double one = G::one(base);
   post_effects::ColorFilterSetColor0(base, filter, one, one, one);
   post_effects::ColorFilterSet(base, filter, 8116, zero);
 }
@@ -708,22 +712,21 @@ void DirectorResume(uint8_t* base, uint32_t director, uint32_t frame,
 void DirectorUpdate(uint8_t* base, uint32_t director, uint32_t frame,
                     const DirectorUpdateCalls& calls) {
   ITC_NATIVE_RUNNING("sub_821594B8 CameraDirector::Update");
-  const uint32_t holder = guest::LoadU32(base, kViewports);
-  const uint32_t first = guest::LoadU32(base, holder + 0);
+  const schema::Viewports holder = G::viewports(base);
+  const schema::Viewport first = holder.first();
+  const Director d(base, director);
   // The followed player's car input record (0x826C5B30 + 4 x its low byte):
   // five words copied into the frame at +96.
-  const uint32_t player = guest::LoadU32(base, director + kFollowedInput) & 0xFF;
-  const uint32_t input = guest::LoadU32(base, 0x826C5B30 + 4 * player);
+  const uint32_t player = d.followed_input() & 0xFF;
+  const uint32_t input = guest::LoadU32(base, G::input_records_address() + 4 * player);
   for (uint32_t i = 0; i < 5; i++) {
     guest::StoreU32(base, frame + 96 + 4 * i, guest::LoadU32(base, input + 4 * i));
   }
   const uint32_t buttons = guest::LoadU32(base, frame + 96);
-  auto tv_flag = [&] {
-    return (guest::LoadU32(base, guest::LoadU32(base, kRaceData) + 0x59AE4) >> 7) & 1;
-  };
+  auto tv_flag = [&] { return (schema::RaceData(base, G::race_data(base)).flags() >> 7) & 1; };
   if (buttons & 0x40) {
     // The camera button: viewport 0's view mode cycles.
-    const uint32_t mode = guest::LoadU32(base, first + 1860);
+    const uint32_t mode = first.view_mode();
     std::optional<uint32_t> next;
     if (tv_flag()) {
       next = mode == 0 ? std::optional<uint32_t>(4)
@@ -731,47 +734,48 @@ void DirectorUpdate(uint8_t* base, uint32_t director, uint32_t frame,
              : mode == 2 ? std::optional<uint32_t>(0)
              : mode == 4 ? std::optional<uint32_t>(1)
                          : std::nullopt;
-    } else if (guest::LoadU32(base, holder + 8) == 0) {
+    } else if (holder.split() == 0) {
       next = mode == 0 ? std::optional<uint32_t>(1)
              : mode == 1 ? std::optional<uint32_t>(2)
              : mode == 2 ? std::optional<uint32_t>(0)
                          : std::nullopt;
     }
     if (next) {
-      guest::StoreU32(base, first + 1860, *next);
+      first.set_view_mode(*next);
     }
   }
-  if (tv_flag() && int32_t(guest::LoadU32(base, first + 1860)) != 4) {
-    calls.track(director + 13360, guest::LoadU32(base, director + kCurrentCamera) + 260);
+  if (tv_flag() && int32_t(first.view_mode()) != 4) {
+    // The camera's track position's +4 (its tracker's +228).
+    calls.track(d.tv_camera_address(), d.camera() + 260);
   }
-  const uint32_t mode = guest::LoadU32(base, first + 1860);
-  if (int32_t(mode) != int32_t(guest::LoadU32(base, director + kView))) {
+  const uint32_t mode = first.view_mode();
+  if (int32_t(mode) != int32_t(d.view())) {
     calls.set_mode(mode);
   }
-  if ((buttons & 0x80) && guest::LoadU32(base, director + kView) == 0) {
-    guest::StoreU32(base, director + 13356, 1);
+  if ((buttons & 0x80) && d.view() == 0) {
+    d.set_view0_state(1);
   }
-  if (guest::LoadU32(base, director + kView) == 1) {
+  if (d.view() == 1) {
     // The input's +12 halfword (the camera stick, probably), as a
     // doubleword at +80 and then a float.
     const int64_t stick = int16_t(guest::LoadU16(base, frame + 108));
     guest::StoreU32(base, frame + 80, uint32_t(uint64_t(stick) >> 32));
     guest::StoreU32(base, frame + 84, uint32_t(stick));
     const double value = Single(double(stick));
-    Stfs(base, director + 12960,
-         Fmuls(Fmuls(value, Lfs(base, 0x82002BD4)), Lfs(base, 0x820093CC)));
+    d.set_view1_look_angle(
+        float(Fmuls(Fmuls(value, Lfs(base, 0x82002BD4)), Lfs(base, 0x820093CC))));
   }
-  calls.slot0(guest::LoadU32(base, director + kCurrentCamera), 0);
-  if (guest::LoadU32(base, guest::LoadU32(base, kViewports) + 8) != 0) {
-    const uint32_t second = guest::LoadU32(base, director + kCurrentCamera2);
+  calls.slot0(d.camera(), 0);
+  if (G::viewports(base).split() != 0) {
+    const uint32_t second = d.camera2();
     if (second != 0) {
       calls.slot0(second, 1);
     }
   }
-  cameras::ViewportUpdate(base, first);
-  const uint32_t again = guest::LoadU32(base, kViewports);
-  if (guest::LoadU32(base, again + 8) != 0) {
-    cameras::ViewportUpdate(base, guest::LoadU32(base, again + 4));
+  cameras::ViewportUpdate(base, first.address);
+  const schema::Viewports again = G::viewports(base);
+  if (again.split() != 0) {
+    cameras::ViewportUpdate(base, again.second().address);
   }
 }
 

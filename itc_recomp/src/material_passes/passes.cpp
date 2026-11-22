@@ -10,6 +10,7 @@
 #include "camera_modes/steps.h"
 #include "guest.h"
 #include "models/model.h"
+#include "schema/material_passes.h"
 
 namespace material_passes {
 
@@ -17,12 +18,8 @@ using namespace camera_modes::steps;
 
 namespace {
 
-constexpr uint32_t kOne = 0x82000A30;           // 1.0
-constexpr uint32_t kBlendedLimit = 0x82002CB0;  // 1.1
-
-int32_t LoadS(uint8_t* base, uint32_t address) {
-  return int32_t(guest::LoadU32(base, address));
-}
+using G = schema::MaterialPassesGlobals;
+using Material = schema::MaterialRecord;
 
 // stwu's back chain at the bottom of the original's frame.
 void BackChain(uint8_t* base, uint32_t sp, uint32_t frame_bytes) {
@@ -50,7 +47,7 @@ uint32_t EachMaterial(uint8_t* base, uint32_t model, uint32_t shape, Each each) 
 // Every shape (the part model's +412): r3 the model when there are none.
 template <typename Each>
 uint32_t EachShape(uint8_t* base, uint32_t model, Each each) {
-  const int32_t shapes = LoadS(base, model + 412);
+  const int32_t shapes = int32_t(schema::PartModel(base, model).shape_count());
   uint32_t r3 = model;
   for (int32_t shape = 0; shape < shapes; shape++) {
     r3 = EachMaterial(base, model, uint32_t(shape), each);
@@ -68,8 +65,9 @@ uint32_t SetTexture(uint8_t* base, uint32_t model, uint32_t texture, int32_t sha
     return model;
   }
   auto set = [&](uint32_t material) {
-    guest::StoreU32(base, material + 144, 0);
-    guest::StoreU32(base, material + 176, texture);
+    const Material m(base, material);
+    m.set_xpr_index(0);
+    m.set_texture_index(texture);
   };
   if (shape == -1) {
     return EachShape(base, model, set);
@@ -84,11 +82,12 @@ uint32_t FlipCulling(uint8_t* base, uint32_t model, uint32_t sp) {
     return model;
   }
   return EachShape(base, model, [&](uint32_t material) {
-    const uint32_t cull = guest::LoadU32(base, material + 344);
+    const Material m(base, material);
+    const uint32_t cull = m.cull_mode();
     if (cull == 2) {
-      guest::StoreU32(base, material + 344, 6);
+      m.set_cull_mode(6);
     } else if (cull == 6) {
-      guest::StoreU32(base, material + 344, 2);
+      m.set_cull_mode(2);
     }
   });
 }
@@ -106,20 +105,21 @@ uint32_t ScaleBlended(uint8_t* base, uint32_t model, uint32_t shape, double fact
   if (second <= 0) {
     return r3;
   }
-  const double one = Lfs(base, kOne);
-  const double limit = Lfs(base, kBlendedLimit);
+  const double one = double(G::one(base));
+  const double limit = double(G::blended_limit(base));
   for (int32_t i = 0; i < second; i++) {
     r3 = models::Material(base, model, shape, uint32_t(i), 1);
-    const double x = Lfs(base, r3 + 0);
+    const Material m(base, r3);
+    const double x = double(m.color_r());
     if (x < limit) {
-      Stfs(base, r3 + 0, Fmuls(x, factor));
-      const double y = Lfs(base, r3 + 4);
-      const double z = Lfs(base, r3 + 8);
-      Stfs(base, r3 + 4, Fmuls(y, factor));
-      Stfs(base, r3 + 8, Fmuls(z, factor));
+      m.set_color_r(float(Fmuls(x, factor)));
+      const double y = double(m.color_g());
+      const double z = double(m.color_b());
+      m.set_color_g(float(Fmuls(y, factor)));
+      m.set_color_b(float(Fmuls(z, factor)));
     }
-    Stfs(base, r3 + 12, one);
-    guest::StoreU32(base, r3 + 108, 2);
+    m.set_color_a(float(one));
+    m.set_blend_mode(2);
   }
   return r3;
 }
@@ -132,8 +132,9 @@ uint32_t SetPair1002Alpha(uint8_t* base, uint32_t model, uint32_t shape, double 
     return model;
   }
   return EachMaterial(base, model, shape, [&](uint32_t material) {
-    if (guest::LoadU32(base, material + 392) == 1002) {
-      Stfs(base, material + 12, alpha);
+    const Material m(base, material);
+    if (m.shared_pair() == 1002) {
+      m.set_color_a(float(alpha));
     }
   });
 }
@@ -145,7 +146,7 @@ uint32_t SetAlpha(uint8_t* base, uint32_t model, uint32_t shape, double alpha, u
     return model;
   }
   return EachMaterial(base, model, shape,
-                      [&](uint32_t material) { Stfs(base, material + 12, alpha); });
+                      [&](uint32_t material) { Material(base, material).set_color_a(float(alpha)); });
 }
 
 }  // namespace material_passes

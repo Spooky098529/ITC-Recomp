@@ -91,6 +91,13 @@ calls the native next request and takes the semaphores directly, as
 `Semaphore` class itself, the list's unseen clear and destructors, the
 functor's clone and the static clean-ups.
 
+The objects (E5 step 2, `itc_recomp/schema/archive.toml`, views in
+`src/schema/archive.h`): the request slot `ArchiveRequestSlot`, the queue's
+list `ArchiveList`, the list node `ArchiveListNode`, a TOC entry
+`ArchiveTocEntry`, a loose file's entry `ArchiveLooseFile`, the loader's
+`LoaderFunctor`, and the globals in `ArchiveGlobals`; `src/archive/` and the
+loose read in `src/hooks/archive.cpp` read them through the views.
+
 The harness: the cases that read or write the game's queue and slots take
 the game's queue lock (migration 1's, through `Semaphore::Wait` and
 `Signal`). The cases of the functions over the semaphores first wait for
@@ -149,6 +156,11 @@ Status:
   calls direct or through the dispatch table. While the SDK or code not
   native yet still reaches it, its entry for them is an override in
   `src/lifted/` (deleted when nothing reaches it that way).
+- **Host**: E5 (`docs/e5-native.md`, steps 3 to 5): our C++ whose objects
+  are host structs (host byte order, host pointers, made with `new` or
+  kept in containers), read and written as C++ members instead of by
+  offset in guest memory. A Native or Lifted function becomes Host when
+  its area's objects move to the host.
 
 A function usually moves from recompiled or Wrapped to Overridden to
 Native as the `ctx` edge moves up through its callers, or straight to

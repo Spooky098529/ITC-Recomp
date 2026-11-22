@@ -8,10 +8,20 @@
 #include "hooks/last_error.h"
 #include "save_interface/save_interface.h"
 #include "saves/slot_steps.h"
+#include "schema/achievements.h"
+#include "schema/c_runtime_core.h"
+#include "schema/files_and_saves.h"
+#include "schema/save_interface.h"
 
 namespace save_interface {
 
 namespace {
+
+// The save slot (files-and-saves.toml's SaveSlot), and the XOVERLAPPED
+// (achievements.toml's AchievementOverlapped) and Win32 OVERLAPPED
+// (c-runtime-core.toml's CrtOverlapped) the result reads take.
+using schema::SaveSlot;
+using XOverlapped = schema::AchievementOverlapped;
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -36,56 +46,56 @@ uint32_t WritePrologue(uint8_t* base, const CallSite& at, uint32_t frame_bytes, 
 
 uint32_t SlotWaitForUser(uint8_t* base, uint32_t slot) {
   ITC_NATIVE_RUNNING("sub_820A4870 SaveSlot::WaitForUser");
-  const int32_t user = int32_t(Load(base, slot + 956));
+  const int32_t user = int32_t(SaveSlot(base, slot).user());
   return user >= 0 && user <= 3 ? 3 : 0;
 }
 
 uint32_t SlotFailed(uint8_t* base, uint32_t slot) {
   ITC_NATIVE_RUNNING("sub_820A4890 SaveSlot::Failed");
-  if (Load(base, slot + 980) == 0) {
+  if (SaveSlot(base, slot).failure_acknowledged() == 0) {
     return 2;
   }
-  Store(base, slot + 980, 0);
-  Store(base, slot + 992, 0);
+  SaveSlot(base, slot).set_failure_acknowledged(0);
+  SaveSlot(base, slot).set_failure_reason(0);
   return 3;
 }
 
 uint32_t SlotWaitForDevice(uint8_t* base, uint32_t slot, const CallSite& at) {
   ITC_NATIVE_RUNNING("sub_820A5878 SaveSlot::WaitForDevice");
   WritePrologue(base, at, 96, 31);
-  if (Load(base, slot + 960) != 0) {
+  if (SaveSlot(base, slot).request_device_selector() != 0) {
     return saves::slot::ShowDeviceSelector(base, slot) == 1 ? 4 : 1;
   }
-  return Load(base, slot + 36) != 0 ? 3 : 1;
+  return SaveSlot(base, slot).device() != 0 ? 3 : 1;
 }
 
 uint32_t SlotReady(uint8_t* base, uint32_t slot, const CallSite& at) {
   ITC_NATIVE_RUNNING("sub_820A58D8 SaveSlot::Ready");
   WritePrologue(base, at, 96, 31);
-  if (Load(base, slot + 36) == 0) {
+  if (SaveSlot(base, slot).device() == 0) {
     return 1;
   }
-  if (Load(base, slot + 960) != 0) {
+  if (SaveSlot(base, slot).request_device_selector() != 0) {
     return saves::slot::ShowDeviceSelector(base, slot) == 1 ? 4 : 3;
   }
-  if (Load(base, slot + 964) != 0) {
-    Store(base, slot + 96, 1);
-    Store(base, slot + 964, 0);
+  if (SaveSlot(base, slot).request_enumeration() != 0) {
+    SaveSlot(base, slot).set_enumeration_step(1);
+    SaveSlot(base, slot).set_request_enumeration(0);
     return 5;
   }
-  if (Load(base, slot + 968) != 0) {
-    Store(base, slot + 948, 1);
-    Store(base, slot + 968, 0);
+  if (SaveSlot(base, slot).request_save() != 0) {
+    SaveSlot(base, slot).set_step(1);
+    SaveSlot(base, slot).set_request_save(0);
     return 7;
   }
-  if (Load(base, slot + 972) != 0) {
-    Store(base, slot + 948, 1);
-    Store(base, slot + 972, 0);
+  if (SaveSlot(base, slot).request_load() != 0) {
+    SaveSlot(base, slot).set_step(1);
+    SaveSlot(base, slot).set_request_load(0);
     return 8;
   }
-  if (Load(base, slot + 976) != 0) {
-    Store(base, slot + 948, 9);
-    Store(base, slot + 976, 0);
+  if (SaveSlot(base, slot).request_delete() != 0) {
+    SaveSlot(base, slot).set_step(9);
+    SaveSlot(base, slot).set_request_delete(0);
     return 9;
   }
   return 3;
@@ -94,29 +104,29 @@ uint32_t SlotReady(uint8_t* base, uint32_t slot, const CallSite& at) {
 uint32_t SlotEnumerateStep(uint8_t* base, uint32_t devices, uint32_t slot, const CallSite& at) {
   ITC_NATIVE_RUNNING("sub_820A59C0 SaveSlot::EnumerateStep");
   WritePrologue(base, at, 112, 30);
-  const uint32_t step = Load(base, slot + 96);
+  const uint32_t step = SaveSlot(base, slot).enumeration_step();
   if (step == 1) {
     const int32_t r3 = saves::slot::Enumerate(base, devices, slot);
     if (r3 == 1) {
-      Store(base, slot + 96, 2);
+      SaveSlot(base, slot).set_enumeration_step(2);
     } else if (r3 == -2) {
-      Store(base, slot + 96, 0);
+      SaveSlot(base, slot).set_enumeration_step(0);
       return 3;
     } else if (r3 == -4) {
-      Store(base, slot + 984, 0);
-      Store(base, slot + 96, 2);
+      SaveSlot(base, slot).set_enumerated_saves(0);
+      SaveSlot(base, slot).set_enumeration_step(2);
     }
     return 5;
   }
   if (step == 2) {
     const int32_t r3 = saves::slot::WaitEnumerate(base, slot);
     if (r3 == 1) {
-      Store(base, slot + 96, 0);
-      Store(base, slot + 128, 1);
+      SaveSlot(base, slot).set_enumeration_step(0);
+      SaveSlot(base, slot).set_check_step(1);
       return 6;
     }
     if (r3 == -6) {
-      Store(base, slot + 96, 0);
+      SaveSlot(base, slot).set_enumeration_step(0);
       return 3;
     }
   }
@@ -137,9 +147,9 @@ void DevicesOnEvent(uint8_t* base, uint32_t devices, uint32_t loop, uint32_t eve
   site.r30 = devices;
   site.r31 = loop;
   site.lr = 0x820A4840;
-  call(16, devices + 4, site);
+  call(16, schema::SaveDevices(base, devices).tick_key_address(), site);
   site.lr = 0x820A4858;
-  call(12, devices + 8, site);
+  call(12, schema::SaveDevices(base, devices).listener_key_address(), site);
 }
 
 uint32_t FrameworkDeviceList(uint8_t* base, uint32_t object) {
@@ -151,10 +161,11 @@ uint32_t XGetOverlappedResult(uint8_t* base, uint32_t overlapped, uint32_t resul
                               const CallSite& at, const KernelCalls& kernel) {
   ITC_NATIVE_RUNNING("sub_82295C98 XGetOverlappedResult");
   const uint32_t sp = WritePrologue(base, at, 112, 30);
-  if (Load(base, overlapped) == 997) {
+  const XOverlapped o(base, overlapped);
+  if (o.internal_low() == 997) {
     uint32_t r3 = 258;
     if (wait != 0) {
-      const uint32_t event = Load(base, overlapped + 12);
+      const uint32_t event = o.event();
       if (event != 0) {
         CallSite site = at;
         site.sp = sp;
@@ -172,19 +183,20 @@ uint32_t XGetOverlappedResult(uint8_t* base, uint32_t overlapped, uint32_t resul
     }
   }
   if (result != 0) {
-    Store(base, result, Load(base, overlapped + 4));
+    Store(base, result, o.internal_high());
   }
-  return Load(base, overlapped);
+  return o.internal_low();
 }
 
 uint32_t GetOverlappedResult(uint8_t* base, uint32_t handle, uint32_t overlapped, uint32_t bytes,
                              uint32_t wait, const CallSite& at, const KernelCalls& kernel) {
   ITC_NATIVE_RUNNING("sub_82295F20 GetOverlappedResult");
   const uint32_t sp = WritePrologue(base, at, 112, 30);
-  if (Load(base, overlapped) == 259) {
+  const schema::CrtOverlapped o(base, overlapped);
+  if (o.internal() == 259) {
     uint32_t r3 = 258;
     if (wait != 0) {
-      const uint32_t event = Load(base, overlapped + 16);
+      const uint32_t event = o.event();
       CallSite site = at;
       site.sp = sp;
       site.lr = 0x82295F68;
@@ -200,8 +212,8 @@ uint32_t GetOverlappedResult(uint8_t* base, uint32_t handle, uint32_t overlapped
       return 0;
     }
   }
-  Store(base, bytes, Load(base, overlapped + 4));
-  const uint32_t status = Load(base, overlapped);
+  Store(base, bytes, o.internal_high());
+  const uint32_t status = o.internal();
   if (int32_t(status) < 0) {
     last_error::SetFromStatus(base, kernel.pcr, status);
     return 0;
@@ -243,9 +255,9 @@ int32_t PollOverlapped(uint8_t* base, uint32_t overlapped, int32_t error, uint32
 int32_t PollFile(uint8_t* base, uint32_t slot, int32_t error, int32_t full, uint32_t lr,
                  const CallSite& at, const KernelCalls& kernel) {
   const uint32_t sp = WritePrologue(base, at, 112, 30);
-  const uint32_t overlapped = slot + 472;
+  const uint32_t overlapped = SaveSlot(base, slot).file_overlapped_address();
   const uint32_t done =
-      GetOverlappedResult(base, Load(base, slot + 496), overlapped, slot + 500, 0,
+      GetOverlappedResult(base, SaveSlot(base, slot).file_handle(), overlapped, SaveSlot(base, slot).file_bytes_address(), 0,
                           From(at, sp, lr, at.r29, at.r30, overlapped), kernel);
   const uint32_t last = last_error::Get(base, kernel.pcr);
   if (done != 0) {
@@ -260,10 +272,10 @@ int32_t PollFile(uint8_t* base, uint32_t slot, int32_t error, int32_t full, uint
 // The machines' claim on the save devices' +72: true when this slot holds
 // it.
 bool Claim(uint8_t* base, uint32_t devices, uint32_t slot) {
-  if (Load(base, devices + 72) == 0) {
-    Store(base, devices + 72, slot);
+  if (schema::SaveDevices(base, devices).busy_slot() == 0) {
+    schema::SaveDevices(base, devices).set_busy_slot(slot);
   }
-  return Load(base, devices + 72) == slot;
+  return schema::SaveDevices(base, devices).busy_slot() == slot;
 }
 
 }  // namespace
@@ -271,19 +283,19 @@ bool Claim(uint8_t* base, uint32_t devices, uint32_t slot) {
 int32_t SlotWaitCloseItem(uint8_t* base, uint32_t slot, const CallSite& at,
                           const KernelCalls& kernel) {
   ITC_NATIVE_RUNNING("sub_820A4C08 SaveSlot::WaitCloseItem");
-  return PollOverlapped(base, slot + 100, -8, 0x820A4C28, at, kernel);
+  return PollOverlapped(base, SaveSlot(base, slot).open_address(), -8, 0x820A4C28, at, kernel);
 }
 
 int32_t SlotWaitDelete(uint8_t* base, uint32_t slot, const CallSite& at,
                        const KernelCalls& kernel) {
   ITC_NATIVE_RUNNING("sub_820A5290 SaveSlot::WaitDelete");
-  return PollOverlapped(base, slot + 136, -12, 0x820A52B0, at, kernel);
+  return PollOverlapped(base, SaveSlot(base, slot).content_op_address(), -12, 0x820A52B0, at, kernel);
 }
 
 int32_t SlotWaitThumbnail(uint8_t* base, uint32_t slot, const CallSite& at,
                           const KernelCalls& kernel) {
   ITC_NATIVE_RUNNING("sub_820A5190 SaveSlot::WaitThumbnail");
-  return PollOverlapped(base, slot + 136, -9, 0x820A51B0, at, kernel);
+  return PollOverlapped(base, SaveSlot(base, slot).content_op_address(), -9, 0x820A51B0, at, kernel);
 }
 
 int32_t SlotWaitClose(uint8_t* base, uint32_t slot, const CallSite& at,
@@ -294,17 +306,17 @@ int32_t SlotWaitClose(uint8_t* base, uint32_t slot, const CallSite& at,
   site.sp = sp;
   site.r31 = slot;
   site.lr = 0x820A5094;
-  const uint32_t r3 = XGetOverlappedResult(base, slot + 136, 0, 0, site, kernel);
+  const uint32_t r3 = XGetOverlappedResult(base, SaveSlot(base, slot).content_op_address(), 0, 0, site, kernel);
   if (r3 == 996) {
     return 0;
   }
   const bool done = r3 == 0;
-  const uint32_t file = Load(base, slot + 496);
+  const uint32_t file = SaveSlot(base, slot).file_handle();
   if (int32_t(file) != -1) {
     site.lr = done ? 0x820A50AC : 0x820A50DC;
     kernel.close(file, site);
   }
-  const uint32_t event = Load(base, slot + 492);
+  const uint32_t event = SaveSlot(base, slot).file_event();
   if (event != 0) {
     site.lr = done ? 0x820A50BC : 0x820A50EC;
     kernel.close(event, site);
@@ -330,22 +342,22 @@ uint32_t SlotCheckStep(uint8_t* base, uint32_t devices, uint32_t slot, const Cal
   if (!Claim(base, devices, slot)) {
     return 6;
   }
-  const auto next_item = [&] { Store(base, slot + 132, Load(base, slot + 132) + 1); };
-  switch (Load(base, slot + 128)) {
+  const auto next_item = [&] { SaveSlot(base, slot).set_check_item(SaveSlot(base, slot).check_item() + 1); };
+  switch (SaveSlot(base, slot).check_step()) {
     case 1: {
-      for (uint32_t i = 0; i < Load(base, slot + 984); i++) {
-        Store(base, Load(base, slot + 84) + 4 * i, 1);
+      for (uint32_t i = 0; i < SaveSlot(base, slot).enumerated_saves(); i++) {
+        Store(base, SaveSlot(base, slot).open_failed() + 4 * i, 1);
       }
-      Store(base, slot + 132, 0);
-      Store(base, slot + 128, 2);
+      SaveSlot(base, slot).set_check_item(0);
+      SaveSlot(base, slot).set_check_step(2);
       return 6;
     }
     case 2: {
-      const uint32_t item = Load(base, slot + 132);
-      if (item < Load(base, slot + 984)) {
+      const uint32_t item = SaveSlot(base, slot).check_item();
+      if (item < SaveSlot(base, slot).enumerated_saves()) {
         const int32_t r3 = saves::slot::OpenItem(base, slot, item);
         if (r3 == 1) {
-          Store(base, slot + 128, 3);
+          SaveSlot(base, slot).set_check_step(3);
           return 6;
         }
         if (r3 != -2) {
@@ -353,17 +365,17 @@ uint32_t SlotCheckStep(uint8_t* base, uint32_t devices, uint32_t slot, const Cal
           return 6;
         }
       }
-      Store(base, slot + 128, 0);
-      Store(base, devices + 72, 0);
+      SaveSlot(base, slot).set_check_step(0);
+      schema::SaveDevices(base, devices).set_busy_slot(0);
       return 3;
     }
     case 3: {
       const int32_t r3 = saves::slot::WaitOpenItem(base, slot);
       if (r3 == 1) {
-        Store(base, Load(base, slot + 84) + 4 * Load(base, slot + 132), 0);
-        Store(base, slot + 128, 4);
+        Store(base, SaveSlot(base, slot).open_failed() + 4 * SaveSlot(base, slot).check_item(), 0);
+        SaveSlot(base, slot).set_check_step(4);
       } else if (r3 == -7) {
-        Store(base, slot + 128, 2);
+        SaveSlot(base, slot).set_check_step(2);
         next_item();
       }
       return 6;
@@ -371,7 +383,7 @@ uint32_t SlotCheckStep(uint8_t* base, uint32_t devices, uint32_t slot, const Cal
     case 4: {
       if (SlotWaitCloseItem(base, slot, From(at, sp, 0x820A5AEC, 6, devices, slot), kernel) !=
           0) {
-        Store(base, slot + 128, 2);
+        SaveSlot(base, slot).set_check_step(2);
         next_item();
       }
       return 6;
@@ -390,57 +402,57 @@ uint32_t SlotSaveStep(uint8_t* base, uint32_t devices, uint32_t slot, const Call
   }
   const auto site = [&](uint32_t lr) { return From(at, sp, lr, devices, 7, slot); };
   // The end of a step that failed or finished: the state given back.
-  const auto release = [&] { Store(base, devices + 72, 0); };
+  const auto release = [&] { schema::SaveDevices(base, devices).set_busy_slot(0); };
   // A file step's error: +952 (1 failed, 2 no room), then the close.
   const auto to_close = [&](uint32_t error) {
-    Store(base, slot + 952, error);
-    Store(base, slot + 948, 5);
+    SaveSlot(base, slot).set_step_error(error);
+    SaveSlot(base, slot).set_step(5);
     return 7u;
   };
   // After the close's or the thumbnail's wait (`r3` its answer, not 0):
   // the enumeration asked for again and the machine left (`thumbnail`:
   // with no error and a thumbnail (+940), on to it instead).
   const auto finish = [&](int32_t r3, bool thumbnail) -> uint32_t {
-    if (r3 != 1 && int32_t(Load(base, slot + 952)) == 0) {
-      Store(base, slot + 952, 1);
+    if (r3 != 1 && int32_t(SaveSlot(base, slot).step_error()) == 0) {
+      SaveSlot(base, slot).set_step_error(1);
     }
-    const int32_t error = int32_t(Load(base, slot + 952));
-    if (thumbnail && error == 0 && Load(base, slot + 940) != 0) {
-      Store(base, slot + 948, 7);
+    const int32_t error = int32_t(SaveSlot(base, slot).step_error());
+    if (thumbnail && error == 0 && SaveSlot(base, slot).thumbnail() != 0) {
+      SaveSlot(base, slot).set_step(7);
       return 7;
     }
-    Store(base, slot + 964, 1);
-    Store(base, slot + 948, 0);
+    SaveSlot(base, slot).set_request_enumeration(1);
+    SaveSlot(base, slot).set_step(0);
     if (error == 0) {
       release();
       return 3;
     }
-    Store(base, slot + 992, error == 1 ? 2 : 3);
+    SaveSlot(base, slot).set_failure_reason(error == 1 ? 2 : 3);
     release();
     return 2;
   };
-  switch (Load(base, slot + 948)) {
+  switch (SaveSlot(base, slot).step()) {
     case 1: {
       const int32_t r3 = saves::slot::Create(base, devices, slot, 1);
-      Store(base, slot + 952, 0);
+      SaveSlot(base, slot).set_step_error(0);
       if (r3 == 1) {
-        Store(base, slot + 948, 2);
+        SaveSlot(base, slot).set_step(2);
         return 7;
       }
       if (r3 == -2) {
-        Store(base, slot + 948, 0);
+        SaveSlot(base, slot).set_step(0);
         release();
         return 3;
       }
       if (r3 == -5 || r3 == -99) {
-        Store(base, slot + 948, 0);
-        Store(base, slot + 992, 2);
+        SaveSlot(base, slot).set_step(0);
+        SaveSlot(base, slot).set_failure_reason(2);
         release();
         return 2;
       }
       if (r3 == -10) {
-        Store(base, slot + 992, 3);
-        Store(base, slot + 948, 0);
+        SaveSlot(base, slot).set_failure_reason(3);
+        SaveSlot(base, slot).set_step(0);
         release();
         return 2;
       }
@@ -449,7 +461,7 @@ uint32_t SlotSaveStep(uint8_t* base, uint32_t devices, uint32_t slot, const Call
     case 2: {
       const int32_t r3 = saves::slot::WriteFile(base, slot);
       if (r3 == 1) {
-        Store(base, slot + 948, 3);
+        SaveSlot(base, slot).set_step(3);
         return 7;
       }
       if (r3 == -3 || r3 == -7 || r3 == -99) {
@@ -460,7 +472,7 @@ uint32_t SlotSaveStep(uint8_t* base, uint32_t devices, uint32_t slot, const Call
     case 3: {
       const int32_t r3 = SlotWaitWrite(base, slot, site(0x820A5D90), kernel);
       if (r3 == 1) {
-        Store(base, slot + 948, 5);
+        SaveSlot(base, slot).set_step(5);
         return 7;
       }
       if (r3 == -9) {
@@ -472,8 +484,8 @@ uint32_t SlotSaveStep(uint8_t* base, uint32_t devices, uint32_t slot, const Call
       return 7;
     }
     case 5:
-      saves::slot::ContentClose(base, slot + 136);
-      Store(base, slot + 948, 6);
+      saves::slot::ContentClose(base, SaveSlot(base, slot).content_op_address());
+      SaveSlot(base, slot).set_step(6);
       return 7;
     case 6: {
       const int32_t r3 = SlotWaitClose(base, slot, site(0x820A5D08), kernel);
@@ -481,11 +493,11 @@ uint32_t SlotSaveStep(uint8_t* base, uint32_t devices, uint32_t slot, const Call
     }
     case 7: {
       if (saves::slot::SetThumbnail(base, slot) == 1) {
-        Store(base, slot + 948, 8);
+        SaveSlot(base, slot).set_step(8);
         return 7;
       }
-      Store(base, slot + 948, 0);
-      Store(base, slot + 992, 2);
+      SaveSlot(base, slot).set_step(0);
+      SaveSlot(base, slot).set_failure_reason(2);
       release();
       return 2;
     }
@@ -507,30 +519,30 @@ uint32_t SlotLoadStep(uint8_t* base, uint32_t devices, uint32_t slot, const Call
   }
   const auto site = [&](uint32_t lr) { return From(at, sp, lr, 8, devices, slot); };
   const auto failed = [&] {
-    Store(base, slot + 992, 4);
-    Store(base, devices + 72, 0);
+    SaveSlot(base, slot).set_failure_reason(4);
+    schema::SaveDevices(base, devices).set_busy_slot(0);
     return 2u;
   };
   const auto to_close = [&] {
-    Store(base, slot + 948, 5);
-    Store(base, slot + 952, 1);
+    SaveSlot(base, slot).set_step(5);
+    SaveSlot(base, slot).set_step_error(1);
     return 8u;
   };
-  switch (Load(base, slot + 948)) {
+  switch (SaveSlot(base, slot).step()) {
     case 1: {
       const int32_t r3 = saves::slot::Create(base, devices, slot, 0);
-      Store(base, slot + 952, 0);
+      SaveSlot(base, slot).set_step_error(0);
       if (r3 == 1) {
-        Store(base, slot + 948, 2);
+        SaveSlot(base, slot).set_step(2);
         return 8;
       }
       if (r3 == -2) {
-        Store(base, slot + 948, 0);
-        Store(base, devices + 72, 0);
+        SaveSlot(base, slot).set_step(0);
+        schema::SaveDevices(base, devices).set_busy_slot(0);
         return 3;
       }
       if (r3 == -5 || r3 == -99) {
-        Store(base, slot + 948, 0);
+        SaveSlot(base, slot).set_step(0);
         return failed();
       }
       return 8;
@@ -538,7 +550,7 @@ uint32_t SlotLoadStep(uint8_t* base, uint32_t devices, uint32_t slot, const Call
     case 2: {
       const int32_t r3 = saves::slot::ReadFile(base, slot);
       if (r3 == 1) {
-        Store(base, slot + 948, 4);
+        SaveSlot(base, slot).set_step(4);
         return 8;
       }
       return r3 == -3 || r3 == -7 || r3 == -99 ? to_close() : 8;
@@ -546,25 +558,25 @@ uint32_t SlotLoadStep(uint8_t* base, uint32_t devices, uint32_t slot, const Call
     case 4: {
       const int32_t r3 = SlotWaitRead(base, slot, site(0x820A5F40), kernel);
       if (r3 == 1) {
-        Store(base, slot + 948, 5);
+        SaveSlot(base, slot).set_step(5);
         return 8;
       }
       return r3 == -11 ? to_close() : 8;
     }
     case 5:
-      saves::slot::ContentClose(base, slot + 136);
-      Store(base, slot + 948, 6);
+      saves::slot::ContentClose(base, SaveSlot(base, slot).content_op_address());
+      SaveSlot(base, slot).set_step(6);
       return 8;
     case 6: {
       const int32_t r3 = SlotWaitClose(base, slot, site(0x820A5ED4), kernel);
-      if (r3 == -8 && int32_t(Load(base, slot + 952)) == 0) {
-        Store(base, slot + 952, 1);
+      if (r3 == -8 && int32_t(SaveSlot(base, slot).step_error()) == 0) {
+        SaveSlot(base, slot).set_step_error(1);
       } else if (r3 == 0) {
         return 8;
       }
-      Store(base, slot + 948, 0);
-      if (int32_t(Load(base, slot + 952)) == 0) {
-        Store(base, devices + 72, 0);
+      SaveSlot(base, slot).set_step(0);
+      if (int32_t(SaveSlot(base, slot).step_error()) == 0) {
+        schema::SaveDevices(base, devices).set_busy_slot(0);
         return 3;
       }
       return failed();
@@ -582,25 +594,25 @@ uint32_t SlotDeleteStep(uint8_t* base, uint32_t devices, uint32_t slot, const Ca
     return 9;
   }
   const auto failed = [&] {
-    Store(base, slot + 992, 5);
-    Store(base, devices + 72, 0);
+    SaveSlot(base, slot).set_failure_reason(5);
+    schema::SaveDevices(base, devices).set_busy_slot(0);
     return 2u;
   };
-  switch (Load(base, slot + 948)) {
+  switch (SaveSlot(base, slot).step()) {
     case 9: {
       const int32_t r3 = saves::slot::Delete(base, slot);
-      Store(base, slot + 952, 0);
+      SaveSlot(base, slot).set_step_error(0);
       if (r3 == 1) {
-        Store(base, slot + 948, 10);
+        SaveSlot(base, slot).set_step(10);
         return 9;
       }
       if (r3 == -2) {
-        Store(base, slot + 948, 0);
-        Store(base, devices + 72, 0);
+        SaveSlot(base, slot).set_step(0);
+        schema::SaveDevices(base, devices).set_busy_slot(0);
         return 3;
       }
       if (r3 == -12) {
-        Store(base, slot + 948, 0);
+        SaveSlot(base, slot).set_step(0);
         return failed();
       }
       return 9;
@@ -608,14 +620,14 @@ uint32_t SlotDeleteStep(uint8_t* base, uint32_t devices, uint32_t slot, const Ca
     case 10: {
       const int32_t r3 =
           SlotWaitDelete(base, slot, From(at, sp, 0x820A6064, 9, devices, slot), kernel);
-      if (r3 == -12 && int32_t(Load(base, slot + 952)) == 0) {
-        Store(base, slot + 952, 1);
+      if (r3 == -12 && int32_t(SaveSlot(base, slot).step_error()) == 0) {
+        SaveSlot(base, slot).set_step_error(1);
       } else if (r3 == 0) {
         return 9;
       }
-      Store(base, slot + 948, 0);
-      if (int32_t(Load(base, slot + 952)) == 0) {
-        Store(base, devices + 72, 0);
+      SaveSlot(base, slot).set_step(0);
+      if (int32_t(SaveSlot(base, slot).step_error()) == 0) {
+        schema::SaveDevices(base, devices).set_busy_slot(0);
         return 3;
       }
       return failed();
@@ -630,7 +642,7 @@ uint64_t DevicesUpdate(uint8_t* base, uint64_t self, uint64_t r4, const CallSite
   ITC_NATIVE_RUNNING("sub_820A4610 SaveDevices::Update");
   const uint32_t devices = uint32_t(self);
   const uint32_t sp = WritePrologue(base, at, 144, 27);
-  if (Load(base, devices + 56) == 0) {
+  if (schema::SaveDevices(base, devices).listener() == 0) {
     return self;
   }
   // The registers the original holds at each call: r27 to r30 as it sets
@@ -650,7 +662,7 @@ uint64_t DevicesUpdate(uint8_t* base, uint64_t self, uint64_t r4, const CallSite
   const auto method = [&](uint32_t object, uint32_t offset) {
     return Load(base, Load(base, object) + offset);
   };
-  const uint32_t source = Load(base, devices + 12);
+  const uint32_t source = schema::SaveDevices(base, devices).device_list();
   const uint32_t list_function = method(source, 4);
   const uint64_t list64 = list_function == 0x820908D8
                               ? FrameworkDeviceList(base, source)
@@ -659,7 +671,7 @@ uint64_t DevicesUpdate(uint8_t* base, uint64_t self, uint64_t r4, const CallSite
   r29 = 0;
   r30 = list64;
   r28 = 0;
-  if (int32_t(Load(base, devices + 48)) > 0) {
+  if (int32_t(schema::SaveDevices(base, devices).slot_count()) > 0) {
     r27 = 0;
     do {
       const uint32_t index = uint32_t(r28);
@@ -667,36 +679,46 @@ uint64_t DevicesUpdate(uint8_t* base, uint64_t self, uint64_t r4, const CallSite
       const uint32_t user = function == kUsersSignedIn
                                 ? uint32_t(UsersSignedIn(base, list, index))
                                 : uint32_t(call(function, list, index, site(0x820A4674)));
-      const uint32_t slot = Load(base, devices + 44) + uint32_t(r27);
+      const uint32_t slot = schema::SaveDevices(base, devices).slots<schema::View>().address + uint32_t(r27);
       r28++;
       r27 += 1000;
-      Store(base, slot + 956, user);
-    } while (int32_t(r28) < int32_t(Load(base, devices + 48)));
+      SaveSlot(base, slot).set_user(user);
+    } while (int32_t(r28) < int32_t(schema::SaveDevices(base, devices).slot_count()));
   }
   // XNotifyGetNext (r1 + 80 and + 84 its outputs) left out: no notification
   // is sent; its answer, 0, is what r3 holds next.
   uint64_t r3 = 0;
   r28 = r29;
-  if (int32_t(Load(base, devices + 48)) <= 0) {
+  if (int32_t(schema::SaveDevices(base, devices).slot_count()) <= 0) {
     return r3;
   }
   r30 = r29;
   do {
     const uint32_t index = uint32_t(r28);
     const uint32_t offset = uint32_t(r30);
-    const int32_t user = int32_t(Load(base, Load(base, devices + 44) + offset + 956));
+    const int32_t user =
+        int32_t(SaveSlot(base, schema::SaveDevices(base, devices).slots<schema::View>().address + offset).user());
     if (user < 0 || user > 3) {
       const uint32_t function = method(devices, 28);
       r3 = function == kSlotState ? SlotState(base, devices, index)
                                   : call(function, devices, index, site(0x820A4758));
       if (uint32_t(r3) < 5) {
-        for (uint32_t at_word : {36u, 988u, 984u, 960u, 964u, 968u, 972u}) {
-          Store(base, Load(base, devices + 44) + offset + at_word, uint32_t(r29));
-        }
+        // The slot's base re-read from the devices' +44 before every store.
+        const auto cleared = [&] {
+          return SaveSlot(base, schema::SaveDevices(base, devices).slots<schema::View>().address + offset);
+        };
+        const uint32_t zero = uint32_t(r29);
+        cleared().set_device(zero);
+        cleared().set_state(zero);
+        cleared().set_enumerated_saves(zero);
+        cleared().set_request_device_selector(zero);
+        cleared().set_request_enumeration(zero);
+        cleared().set_request_save(zero);
+        cleared().set_request_load(zero);
       }
     }
-    const uint32_t slot = Load(base, devices + 44) + offset;
-    const uint32_t function = Load(base, (Load(base, slot + 988) + 19) * 4 + devices);
+    const uint32_t slot = schema::SaveDevices(base, devices).slots<schema::View>().address + offset;
+    const uint32_t function = Load(base, schema::SaveDevices(base, devices).wait_for_user_address() + SaveSlot(base, slot).state() * 4);
     const CallSite handler_site = site(0x820A47D8);
     switch (function) {
       case kSlotWaitForUser: r3 = SlotWaitForUser(base, slot); break;
@@ -713,11 +735,11 @@ uint64_t DevicesUpdate(uint8_t* base, uint64_t self, uint64_t r4, const CallSite
       case kSlotDeleteStep: r3 = SlotDeleteStep(base, devices, slot, handler_site, kernel); break;
       default: r3 = call(function, devices, slot, handler_site); break;
     }
-    const uint32_t stored = Load(base, devices + 44) + offset;
+    const uint32_t stored = schema::SaveDevices(base, devices).slots<schema::View>().address + offset;
     r28++;
     r30 += 1000;
-    Store(base, stored + 988, uint32_t(r3));
-  } while (int32_t(r28) < int32_t(Load(base, devices + 48)));
+    SaveSlot(base, stored).set_state(uint32_t(r3));
+  } while (int32_t(r28) < int32_t(schema::SaveDevices(base, devices).slot_count()));
   return r3;
 }
 

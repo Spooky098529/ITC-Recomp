@@ -8,6 +8,7 @@
 #include "base/log.h"
 #include "c_runtime/strings.h"
 #include "guest.h"
+#include "schema/c_runtime.h"
 
 #include <algorithm>
 #include <vector>
@@ -16,12 +17,12 @@ namespace c_runtime {
 
 namespace {
 
-// _output_l's tables and the C runtime's data it reads.
-constexpr uint32_t kStates = 0x820734D8;      // character classes, then the states
-constexpr uint32_t kNarrowNull = 0x820734CC;  // [] = "(null)"
-constexpr uint32_t kWideNull = 0x820734D0;    // [] = L"(null)"
-constexpr uint32_t kFloatTable = 0x8266BA5C;  // the float conversions (+24 _cfltcvt_l)
-constexpr uint32_t kCfltcvt = 0x825AEB20;     // _cfltcvt_l
+// _output_l's tables and the C runtime's data it reads: CRuntimeGlobals'
+// format_states (character classes, then the states), narrow_null,
+// wide_null and float_conversions.
+using schema::CRuntimeGlobals;
+constexpr uint32_t kStates = CRuntimeGlobals::format_states_address();
+constexpr uint32_t kCfltcvt = 0x825AEB20;  // _cfltcvt_l
 // _output_l's frame: 1,328 bytes.
 constexpr uint32_t kFrameBytes = 1328;
 
@@ -73,6 +74,11 @@ class NarrowOutput {
   uint8_t U8(uint32_t a) { return guest::LoadU8(base_, a); }
   uint16_t U16(uint32_t a) { return guest::LoadU16(base_, a); }
   uint32_t U32(uint32_t a) { return guest::LoadU32(base_, a); }
+  // The float conversion table's _cfltcvt_l (+24).
+  uint32_t CfltcvtL() {
+    return schema::FloatConversionTable(base_, CRuntimeGlobals::float_conversions_address())
+        .cfltcvt_l();
+  }
   // The next argument's slot (8 bytes, aligned): its address.
   uint32_t NextSlot() {
     args_ = ((args_ + 7) & ~7u) + 8;
@@ -245,7 +251,7 @@ bool NarrowOutput::Run(int32_t* result) {
                 Read(string, uint64_t(string) + 8);
               }
               if (string == 0 || U32(string + 4) == 0) {
-                text = U32(kNarrowNull);
+                text = CRuntimeGlobals::narrow_null(base_).address;
                 uint32_t p = text;
                 while (U8(p) != 0) p++;
                 Read(text, uint64_t(p) + 1);
@@ -270,7 +276,7 @@ bool NarrowOutput::Run(int32_t* result) {
               int32_t most = precision == -1 ? 0x7FFFFFFF : precision;
               text = U32(NextSlot() + 4);
               if (flags & (kLong | kWide)) {
-                if (text == 0) text = U32(kWideNull);
+                if (text == 0) text = CRuntimeGlobals::wide_null(base_).address;
                 wide_text = true;
                 uint32_t p = text;
                 for (; most != 0; most--) {
@@ -284,7 +290,7 @@ bool NarrowOutput::Run(int32_t* result) {
                 Read(text, p);
                 text_length = uint32_t(int32_t(p - text) >> 1);
               } else {
-                if (text == 0) text = U32(kNarrowNull);
+                if (text == 0) text = CRuntimeGlobals::narrow_null(base_).address;
                 uint32_t p = text;
                 for (; most != 0; most--) {
                   if (U8(p) == 0) {
@@ -315,7 +321,7 @@ bool NarrowOutput::Run(int32_t* result) {
               // _cftof_l), with no buffer from the heap (precision 163 or
               // less) and no forced point ('#' with precision 0).
               if (type != 'f' || precision > 163 || ((flags & kAlternate) && precision == 0) ||
-                  U32(kFloatTable + 24) != kCfltcvt) {
+                  CfltcvtL() != kCfltcvt) {
                 return false;
               }
               const uint32_t slot = NextSlot();

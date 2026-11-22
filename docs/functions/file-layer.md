@@ -60,6 +60,10 @@ the path object's constructor and destructor (`sub_82593C28`,
 `sub_82593C48`) and the path buffer's (`sub_820A6BE0`). Those are native since the B7 loop (2026-10-28, `src/file_layer/`, `--native_file_layer`, harness `file_layer`). Then (the same run) sprintf with `_output_l`, as swprintf's `_woutput_l` (a step-by-step translation over guest arguments, `src/c_runtime/narrow_format.cpp`, `c-runtime.md`), and with it `Path::Build`, `GamePath::SetGame`, the open by name and the loose read; the formats in play are `"game:\%s"` (kind 0) and, elsewhere, `"%s%s"`, `"%s%s%d"` and `"data\audio\%s.xgs"` (logged 2026-10-28). Left recompiled: the file objects' other users (the debug font, `BankPair::Load`, `TXR_XACT.xgs`'s open, `Movie::Open`). The other opens by name, the deleting
 destructors and the vtable-only methods never ran in play.
 
+The objects' layout (E5's step 2, 2026-11-17): `itc_recomp/schema/file-layer.toml`
+(`GameFile`, the file object through its derived classes; `File`, its base,
+is `files-and-saves.toml`'s), its views used by `src/file_layer/`.
+
 Status:
 
 - **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
@@ -101,6 +105,11 @@ Status:
   calls direct or through the dispatch table. While the SDK or code not
   native yet still reaches it, its entry for them is an override in
   `src/lifted/` (deleted when nothing reaches it that way).
+- **Host**: E5 (`docs/e5-native.md`, steps 3 to 5): our C++ whose objects
+  are host structs (host byte order, host pointers, made with `new` or
+  kept in containers), read and written as C++ members instead of by
+  offset in guest memory. A Native or Lifted function becomes Host when
+  its area's objects move to the host.
 
 A function usually moves from recompiled or Wrapped to Overridden to
 Native as the `ctx` edge moves up through its callers, or straight to

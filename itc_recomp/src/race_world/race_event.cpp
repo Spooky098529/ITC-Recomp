@@ -9,6 +9,8 @@
 #include "base/log.h"
 #include "car_physics/float_ops.h"
 #include "guest.h"
+#include "schema/race_event.h"
+#include "schema/track_route.h"
 #include "track_route/track_route.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -48,13 +50,23 @@ void StoreDouble(uint8_t* base, uint32_t address, uint64_t bits) {
   guest::StoreU32(base, address + 4, uint32_t(bits));
 }
 
+using Group = schema::EventGroup;
+using GroupEntry = schema::EventGroupEntry;
+using Position = schema::TrackRoutePosition;
+
 int32_t Count(uint8_t* base, uint32_t list) {
-  return int16_t(guest::LoadU16(base, list));
+  return int16_t(Group(base, list).open());
 }
 
-// A group's list: the event + 12 x (group + 3).
+// A group's list: the event's +36 + 12 x group (the original's
+// event + 12 x (group + 3)).
 uint32_t GroupList(uint8_t* base, uint32_t event, uint32_t group) {
-  return (guest::LoadU32(base, group) + 3) * 12 + event;
+  return schema::RaceEvent(base, event).groups_address() + guest::LoadU32(base, group) * Group::kSize;
+}
+
+// Entry `i`'s list index (+2), PlaceEntry's `index`.
+uint32_t ListIndex(uint32_t entries, uint32_t i) {
+  return GroupEntry(nullptr, entries + GroupEntry::kSize * i).list_index_address();
 }
 
 }  // namespace
@@ -69,7 +81,7 @@ void PlaceGroup(uint8_t* base, uint32_t event, uint32_t position, uint32_t step,
   const uint32_t masks = ai_drivers::BranchMasksFor(base, group);
   const uint32_t start = guest::LoadU32(base, position);
   const int32_t flagged = int32_t(guest::LoadU32(base, flag));
-  const uint32_t entries = guest::LoadU32(base, list + 4);
+  const uint32_t entries = Group(base, list).entries().address;
   guest::StoreU32(base, copy, start);
   int32_t first = Count(base, list);
   if (flagged != 0 && first > 0) {
@@ -78,19 +90,19 @@ void PlaceGroup(uint8_t* base, uint32_t event, uint32_t position, uint32_t step,
   int32_t i = 0;
   if (first > 0) {
     for (int32_t k = 0; k < first; k++) {
-      PlaceEntry(base, event, kRoute, entries + 2 + 4 * uint32_t(k), copy, step_at, masks);
+      PlaceEntry(base, event, kRoute, ListIndex(entries, uint32_t(k)), copy, step_at, masks);
     }
     i = first;
   }
   if (int32_t(guest::LoadU32(base, flag)) != 0) {
     const uint16_t back = uint16_t(-int32_t(int16_t(step)));
-    guest::StoreU32(base, copy, guest::LoadU32(base, position));
-    const uint16_t slice = guest::LoadU16(base, copy + 2);
+    guest::StoreU32(base, copy, Position(base, position).packed());
+    const uint16_t slice = Position(base, copy).slice();
     guest::StoreU16(base, step_at, back);
-    guest::StoreU16(base, copy + 2, uint16_t(slice + back));
+    Position(base, copy).set_slice(uint16_t(slice + back));
   }
   for (; i < Count(base, list); i++) {
-    PlaceEntry(base, event, kRoute, (uint32_t(i) << 2) + entries + 2, copy, step_at, masks);
+    PlaceEntry(base, event, kRoute, ListIndex(entries, uint32_t(i)), copy, step_at, masks);
   }
 }
 
@@ -103,14 +115,14 @@ void PlaceGroupTwoRows(uint8_t* base, uint32_t event, uint32_t first, uint32_t s
   guest::StoreU32(base, one, first);
   guest::StoreU32(base, two, second);
   const uint32_t masks = ai_drivers::BranchMasksFor(base, group);
-  const uint32_t entries = guest::LoadU32(base, list + 4);
+  const uint32_t entries = Group(base, list).entries().address;
   track_route::ToMainRoad(base, kRoute, one, 0, frame - 144);
   track_route::ToMainRoad(base, kRoute, two, 0, frame - 144);
   for (int32_t i = 0; i < Count(base, list); i += 2) {
-    PlaceEntry(base, event, kRoute, entries + 2 + 4 * uint32_t(i), one, step, masks);
+    PlaceEntry(base, event, kRoute, ListIndex(entries, uint32_t(i)), one, step, masks);
   }
   for (int32_t i = 1; i < Count(base, list); i += 2) {
-    PlaceEntry(base, event, kRoute, entries + 2 + 4 * uint32_t(i), two, step, masks);
+    PlaceEntry(base, event, kRoute, ListIndex(entries, uint32_t(i)), two, step, masks);
   }
 }
 
@@ -121,23 +133,23 @@ void PlaceGroupSplit(uint8_t* base, uint32_t event, uint32_t position, uint32_t 
   const uint32_t copy = frame + 204;
   guest::StoreU32(base, copy, position);
   const uint32_t masks = ai_drivers::BranchMasksFor(base, group);
-  const uint32_t entries = guest::LoadU32(base, list + 4);
+  const uint32_t entries = Group(base, list).entries().address;
   const int32_t first = (Count(base, list) + 1) / 2;
   int32_t i = 0;
   if (first > 0) {
     for (int32_t k = 0; k < first; k++) {
-      PlaceEntry(base, event, kRoute, entries + 2 + 4 * uint32_t(k), copy, step, masks);
+      PlaceEntry(base, event, kRoute, ListIndex(entries, uint32_t(k)), copy, step, masks);
     }
     i = first;
   }
   // The row's section from the two tables, slice 0, on the main road.
   const int32_t index =
       int16_t(guest::LoadU16(base, (guest::LoadU32(base, row) << 1) + kRows));
-  guest::StoreU16(base, copy + 2, 0);
-  guest::StoreU16(base, copy, guest::LoadU16(base, (uint32_t(index) << 1) + kSplitSections));
+  Position(base, copy).set_slice(0);
+  Position(base, copy).set_section(guest::LoadU16(base, (uint32_t(index) << 1) + kSplitSections));
   track_route::ToMainRoad(base, kRoute, copy, 0, frame - 144);
   for (; i < Count(base, list); i++) {
-    PlaceEntry(base, event, kRoute, (uint32_t(i) << 2) + entries + 2, copy, step, masks);
+    PlaceEntry(base, event, kRoute, ListIndex(entries, uint32_t(i)), copy, step, masks);
   }
 }
 
@@ -177,26 +189,26 @@ void PlaceGroupFixed(uint8_t* base, uint32_t event, uint32_t step, uint32_t grou
 
 void PlaceStarts(uint8_t* base, uint32_t event, uint32_t kind, uint32_t player, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_82144798 RaceEvent::PlaceStarts");
-  const uint32_t file = guest::LoadU32(base, kRoute);
+  const schema::TrackRouteFile file = schema::TrackRoute(base, kRoute).file();
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   const uint32_t position = frame + 92;
   const uint32_t step_at = frame + 80;
   const uint32_t row_at = frame + 84;
   const uint32_t group_at = frame + 88;
   const uint32_t flag_at = frame + 96;
-  guest::StoreU32(base, position, guest::LoadU32(base, player));
+  guest::StoreU32(base, position, Position(base, player).packed());
   const int32_t unset = int32_t(FirstUnsetFlag(base, save));
-  const double length = Lfs(base, file + 8);
-  const uint16_t slice = guest::LoadU16(base, position + 2);
+  const double length = double(file.slice_length());
+  const uint16_t slice = Position(base, position).slice();
   const double back_step = Lfs(base, kBackStep);
   guest::StoreU32(base, group_at, 0);
-  const double back = Fdivs(back_step, Lfs(base, file + 8));
+  const double back = Fdivs(back_step, double(file.slice_length()));
   guest::StoreU32(base, row_at, 0xFFFFFFFF);
   const double between = Fdivs(Lfs(base, kGroupStep), length);
   StoreDouble(base, frame + 96, FctiwzBits(back));
   const uint16_t moved = uint16_t(slice - guest::LoadU16(base, frame + 102));
   StoreDouble(base, frame + 104, FctiwzBits(between));
-  guest::StoreU16(base, position + 2, moved);
+  Position(base, position).set_slice(moved);
   const uint16_t step = guest::LoadU16(base, frame + 110);
   guest::StoreU16(base, step_at, step);
   track_route::ToMainRoad(base, kRoute, position, 1, frame - 144);

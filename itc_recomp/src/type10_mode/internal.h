@@ -5,6 +5,14 @@
 #include <cstdint>
 
 #include "guest.h"
+#include "schema/game_modes.h"
+#include "schema/boot_mode.h"
+#include "schema/menu_helpers.h"
+#include "schema/race_screens.h"
+#include "schema/save_interface.h"
+#include "schema/save_screen.h"
+#include "schema/tuning_screen.h"
+#include "schema/type10_mode.h"
 #include "type10_mode/type10_mode.h"
 #include "ui_movies/game.h"
 
@@ -14,6 +22,10 @@ inline uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(ba
 inline void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
+
+using G = schema::Type10ModeGlobals;
+using Machine = schema::ReplayTheaterMachine;
+using PageObject = schema::PageObject;
 
 constexpr uint32_t kNone = 0xFFFFFFFFu;
 constexpr uint32_t kMemRelease = 0x8000;
@@ -32,30 +44,38 @@ inline uint32_t FindMovie(uint8_t* base, uint32_t key) {
   return Load(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, key));
 }
 
-inline uint32_t Pages(uint8_t* base) { return Load(base, kPages); }
-inline uint32_t Data(uint8_t* base) { return Load(base, kData); }
+inline PageObject Pages(uint8_t* base) { return G::pages(base); }
+inline schema::ReplayTheaterData Data(uint8_t* base) { return G::data(base); }
+// The replay list ([0x828161E4], race-screens.toml's MenuList).
+inline schema::MenuList List(uint8_t* base) { return G::list(base); }
+inline schema::SaveBuffers SaveBuffers(uint8_t* base) { return G::save_buffers(base); }
+// The `index`th of the replays' 36-byte records from `records`.
+inline schema::SaveReplayRecord Record(uint8_t* base, uint32_t records, uint32_t index) {
+  return schema::SaveReplayRecord(base, records + index * 36);
+}
+using Node = schema::UiMovieNode;
 
-// Posts the message (id, 0, 0) on the ring at `ring` (its count +600, start
-// +604, 50 slots of 12 bytes), as the originals do inline.
-inline void PostRing(uint8_t* base, uint32_t ring, uint32_t id) {
-  const uint32_t count = Load(base, ring + 600) + 1;
-  const uint32_t start = Load(base, ring + 604);
-  Store(base, ring + 600, count);
-  const uint32_t slot = ring + 12 * ((start + count - 1) % 50);
-  Store(base, slot + 0, id);
-  Store(base, slot + 4, 0);
-  Store(base, slot + 8, 0);
-}
-// On a dispatcher's ring (+204).
+// Posts the message (id, 0, 0) on the dispatcher's ring (boot-mode.toml's
+// ModeDispatcher: its count +804, start +808, 50 slots of 12 bytes from
+// +204), as the originals do inline.
 inline void Post(uint8_t* base, uint32_t dispatcher, uint32_t id) {
-  PostRing(base, dispatcher + 204, id);
+  const schema::ModeDispatcher d(base, dispatcher);
+  const uint32_t count = d.ring_count() + 1;
+  const uint32_t start = d.ring_start();
+  d.set_ring_count(count);
+  const schema::ModeMessage slot(base, d.ring_address() + 12 * ((start + count - 1) % 50));
+  slot.set_id(id);
+  slot.set_arg0(0);
+  slot.set_arg1(0);
 }
+// On the ring at `ring` (a dispatcher's +204).
+inline void PostRing(uint8_t* base, uint32_t ring, uint32_t id) { Post(base, ring - 204, id); }
 
 // The page object's +8 = its page unless that is `unless`.
-inline void KeepPage(uint8_t* base, uint32_t pages, uint32_t unless) {
-  const uint32_t page = Load(base, pages + 0);
+inline void KeepPage(const PageObject& pages, uint32_t unless) {
+  const uint32_t page = pages.page();
   if (page != unless) {
-    Store(base, pages + 8, page);
+    pages.set_previous_page(page);
   }
 }
 

@@ -84,6 +84,42 @@ node gets the user's ACL from udev.
   `race_test.jsonl`, 24.5 s after the boot mark is the tuning shop with the
   car and its floor reflection (2026-11-04, the front end's car draw).
 
+## By tick (the state digest)
+
+The virtual pad presses by the clock, so a press lands a tick early or late
+from run to run: two runs of the same build drift apart within seconds of
+a race, and a missed menu press sometimes leaves a run in the front end.
+For checks that need the same game twice (E5's step 3, `docs/e5-native.md`
+"Checks"), the pad is replayed by tick instead (2026-11-22):
+
+- `--pad_ticks_record=<file>` writes every pad read the game makes (once a
+  tick per user, `input::PhysicalPad_Read` through `XInput_GetState`) as a
+  line, and a line `race <n>` when the game enters a race
+  (`src/input/pad_ticks.cpp`).
+- `--pad_ticks_play=<file>` answers the game's reads from such a file, in
+  order, with no virtual pad (only user 0 connected, rumble ignored). The
+  number of ticks before a race varies with load times, so playback lines
+  up on each race's mark: reads left before it are skipped when the game
+  enters the race sooner, the last read repeated while it hasn't yet. Each
+  race then gets its recorded input from its first tick.
+- `--state_digest` logs a line each race tick (`src/debug/state_digest.cpp`):
+  the racers' count, a hash of each racer's body matrix and squared speed,
+  a hash of user 0's last pad read, and the player's position.
+- `itc_recomp/tools/tick_replay.sh [ticks] [baseline]` plays
+  `itc_recomp/pad_recordings/race_test.ticks`, stops after it ends, and
+  compares the digest with `race_test.digest`, printing each race's first
+  differing tick. A change meant to change the game makes a new baseline
+  (the run's `<log>.digest`).
+
+`race_test.ticks` was recorded from `race_test.jsonl` with
+`scripted_run.sh ... --pad_ticks_record` (user 0's lines kept). Checked
+2026-11-22: the recording run and three playbacks matched in both races,
+all 124 and 1,196 ticks (a playback skipped 47 or 58 reads at the first
+race, 0 at the second). Tried and dropped: waiting for the archive's
+loads before each logic tick (so loads end on a fixed tick) deadlocked the
+boot (the main thread waiting on the frame driver while its draw thread
+looped in the render replay); the race marks made it unnecessary.
+
 ## Recordings
 
 - `race_test.jsonl` (2026-10-22, 121 s): the title, the menus, a race.

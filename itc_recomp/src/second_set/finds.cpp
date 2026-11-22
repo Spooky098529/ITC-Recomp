@@ -13,6 +13,10 @@
 #include "scene/scene.h"
 #include "scene_loaders/model_point.h"
 #include "second_set/points.h"
+#include "schema/second_set.h"
+#include "schema/car_draw.h"
+#include "schema/car_models.h"
+#include "schema/model_animation.h"
 
 #include <cstdlib>
 
@@ -28,8 +32,11 @@ void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
 
-constexpr uint32_t kFive = 0x82005FE4;   // 5.0
-constexpr uint32_t kThree = 0x82006420;  // 3.0
+using G = schema::SecondSetGlobals;
+using Record = schema::SecondSetPointRecord;
+
+constexpr uint32_t kFive = G::five_address();    // 5.0
+constexpr uint32_t kThree = G::three_address();  // 3.0
 constexpr uint32_t R = kPointRecordBytes;
 
 // ModelPoint::Find from a frame at `sp`.
@@ -45,8 +52,8 @@ uint32_t NodeFind(uint8_t* base, uint32_t record, uint32_t model, uint32_t sp, F
 // PartModel::ScaleBlended(record +4, record +228, the float at `factor`).
 uint32_t Scale(uint8_t* base, uint32_t record, uint32_t factor, uint32_t sp, FindCalls& calls) {
   const double f = double(guest::LoadFloat(base, factor));
-  const uint32_t r3 = material_passes::ScaleBlended(base, Load(base, record + 4),
-                                                    Load(base, record + 228), f, sp);
+  const Record r(base, record);
+  const uint32_t r3 = material_passes::ScaleBlended(base, r.model(), r.shape_index(), f, sp);
   calls.flush = false;
   return r3;
 }
@@ -81,9 +88,9 @@ uint32_t PartsFindFrontBumper(uint8_t* base, uint32_t group, uint32_t model, uin
   const uint32_t sp = stack - 128;
   FindRecords(base, group, model, 0, 11, 0, sp, calls);
   const uint32_t r3 = ScaleRecords(base, group, 3, 5, kFive, sp, calls);
-  const uint32_t found = Load(base, group + 8 * R + 4);
-  if (found != 0) {
-    Store(base, found + 456, Load(base, group + 2644));
+  const schema::SecondSetPlateModel found(base, Record(base, group + 8 * R).model());
+  if (found) {
+    found.set_texture(schema::PartsPoints(base, group).front_plate_texture());
   }
   return r3;
 }
@@ -95,9 +102,9 @@ uint32_t PartsFindRearBumper(uint8_t* base, uint32_t group, uint32_t model, uint
   FindRecords(base, group, model, 0, 7, 0, sp, calls);
   Scale(base, group + R, kOne, sp, calls);
   const uint32_t r3 = ScaleRecords(base, group, 2, 4, kFive, sp, calls);
-  const uint32_t found = Load(base, group + 6 * R + 4);
-  if (found != 0) {
-    Store(base, found + 456, Load(base, group + 1684));
+  const schema::SecondSetPlateModel found(base, Record(base, group + 6 * R).model());
+  if (found) {
+    found.set_texture(schema::PartsPoints(base, group).rear_plate_texture());
   }
   return r3;
 }
@@ -144,11 +151,13 @@ uint32_t PartsFindHeadlights(uint8_t* base, uint32_t group, uint32_t model, uint
   ITC_NATIVE_RUNNING("sub_820DF7F0 PartsPoints::FindHeadlights");
   const uint32_t sp = stack - 128;
   const uint32_t r3 = FindRecords(base, group, model, 0, 13, 7, sp, calls);
-  if (Load(base, group + 4) == 0) {
+  const Record first(base, group);
+  if (first.model() == 0) {
     return r3;
   }
-  const uint32_t entries = Load(base, Load(base, group + 0) + 136);
-  CopyWord(base, Load(base, group + 224) * 144 + entries + 16, group + 3184);
+  const uint32_t entries = schema::Skeleton(base, first.skeleton()).node_states();
+  CopyWord(base, first.node_index() * 144 + entries + 16,
+           schema::PartsPoints(base, group).headlights_popup_max_address());
   calls.flush = false;
   return ScaleRecords(base, group, 7, 10, kFive, sp, calls);
 }
@@ -183,9 +192,9 @@ uint32_t PartsFindMufflers(uint8_t* base, uint32_t group, uint32_t model, uint32
   const uint32_t sp = stack - 192;
   const uint32_t records = group + 256;
   for (uint32_t i = 0; i < 4; i++) {
-    const uint32_t record = records + R * i;
-    NodeFind(base, record, model, sp, calls);
-    if (!native::Buffers_Memcpy(base, sp + 80, record + 16, 64, 0x820E00C0)) {
+    const Record record(base, records + R * i);
+    NodeFind(base, record.address, model, sp, calls);
+    if (!native::Buffers_Memcpy(base, sp + 80, record.matrix_address(), 64, 0x820E00C0)) {
       ITC_LOG_ERROR("Second set: FindMufflers' memcpy refused after its checks");
       std::abort();
     }
@@ -201,25 +210,26 @@ uint32_t PartsFind(uint8_t* base, uint32_t block, uint32_t models, uint32_t stac
                    FindCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820E0258 PartsPoints::Find");
   const uint32_t sp = stack - 176;
-  const uint32_t scene_word = block + 37088;
-  const uint32_t w37076 = Load(base, block + 37076);
-  const uint32_t car_loads = Load(base, block + 37084);
-  const uint32_t scene = Load(base, scene_word);
-  Store(base, block + 2648, w37076);
-  Store(base, block + 2644, Load(base, Load(base, car_loads + 24) + 6700));
-  Store(base, block + 4580, Load(base, Load(base, car_loads + 24) + 6708));
-  if (Load(base, scene + 4) == 0) {
-    Store(base, block + 12112, w37076);
-    Store(base, block + 18208, w37076);
-    const uint32_t w37080 = Load(base, block + 37080);
-    const uint32_t w37092 = Load(base, block + 37092);
-    Store(base, block + 12116, w37080);
-    Store(base, block + 12032, w37092);
-    Store(base, block + 18212, w37080);
-    Store(base, block + 18128, w37092);
+  const schema::PartsPoints b(base, block);
+  const uint32_t w37076 = b.car_record();
+  const schema::CarModel car_loads(base, b.car_model());
+  const schema::CarScene scene = b.scene();
+  b.set_front_car_record(w37076);
+  b.set_front_plate_texture(car_loads.linked_car_model().plate_texture_a());
+  b.set_block_rear_plate_texture(car_loads.linked_car_model().plate_texture_b());
+  if (scene.model_set() == 0) {
+    b.set_block_left_door_car_record(w37076);
+    b.set_block_right_door_car_record(w37076);
+    const uint32_t w37080 = b.parts_record().address;
+    const uint32_t w37092 = b.skeleton();
+    b.set_block_left_door_parts_record(w37080);
+    b.set_block_left_door_skeleton(w37092);
+    b.set_block_right_door_parts_record(w37080);
+    b.set_block_right_door_skeleton(w37092);
   } else {
-    const uint32_t w37080 = Load(base, block + 37080);
-    Store(base, block + 23744, w37080);
+    const uint32_t w37080 = b.parts_record().address;
+    b.set_block_doors_parts_record(w37080);
+    // The shadows' group's (+36096) +960.
     Store(base, block + 37056, w37080);
   }
   uint32_t r3 = block;
@@ -233,7 +243,7 @@ uint32_t PartsFind(uint8_t* base, uint32_t block, uint32_t models, uint32_t stac
     if (model == 0) {
       continue;
     }
-    const bool set_a = Load(base, Load(base, scene_word) + 4) == 0;
+    const bool set_a = b.scene().model_set() == 0;
     switch (kind) {
       case 0: r3 = PartsFindFrontBumper(base, block, model, sp, calls); break;
       case 1: shapes(2656, 1, model); break;
@@ -285,27 +295,29 @@ uint32_t CockpitFind(uint8_t* base, uint32_t block, uint32_t models, uint32_t st
                      FindCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820DBC88 CockpitPoints::Find");
   const uint32_t sp = stack - 128;
+  const schema::SecondSetCockpitPoints b(base, block);
   auto shapes = [&](uint32_t at, uint32_t count, uint32_t model) {
     for (uint32_t i = 0; i < count; i++) {
-      ModelPointFindShape(base, block + at + R * i, model, sp);
+      ModelPointFindShape(base, at + R * i, model, sp);
     }
   };
-  shapes(0, 3, Load(base, models + 16));
-  shapes(720, 2, Load(base, models + 20));
-  ModelPointFindShape(base, block + 1200, Load(base, models + 0), sp);
-  shapes(1440, 2, Load(base, models + 4));
-  ModelPointFindShape(base, block + 1920, Load(base, models + 8), sp);
-  return CockpitFindHeadlights(base, block + 2160, Load(base, models + 12), sp, calls);
+  shapes(b.fenders_address(), 3, Load(base, models + 16));
+  shapes(b.cabin_address(), 2, Load(base, models + 20));
+  ModelPointFindShape(base, b.bonnet_address(), Load(base, models + 0), sp);
+  shapes(b.doors_address(), 2, Load(base, models + 4));
+  ModelPointFindShape(base, b.mirror_address(), Load(base, models + 8), sp);
+  return CockpitFindHeadlights(base, b.headlights_address(), Load(base, models + 12), sp, calls);
 }
 
 uint32_t InteriorFindDials(uint8_t* base, uint32_t group, uint32_t model, uint32_t stack,
                            FindCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820E30C0 InteriorPoints::FindDials");
   const uint32_t sp = stack - 128;
-  const uint32_t records = group + 16;
+  const schema::SecondSetInteriorPoints g(base, group);
+  const uint32_t records = g.group_records_address();
   FindRecords(base, records, model, 0, 12, 2, sp, calls);
-  if (material_passes::IsBlockSetB(int32_t(Load(base, group + 4))) == 0 &&
-      material_passes::IsBlockSetA(int32_t(Load(base, group + 4))) == 0) {
+  if (material_passes::IsBlockSetB(int32_t(g.group_word_4())) == 0 &&
+      material_passes::IsBlockSetA(int32_t(g.group_word_4())) == 0) {
     return 0;
   }
   return ScaleRecords(base, records, 9, 11, kOne, sp, calls);
@@ -314,43 +326,50 @@ uint32_t InteriorFindDials(uint8_t* base, uint32_t group, uint32_t model, uint32
 uint32_t InteriorFindMeters(uint8_t* base, uint32_t group, uint32_t model, uint32_t stack,
                             FindCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820E3298 InteriorPoints::FindMeters");
-  return FindRecords(base, group + 16, model, 0, 22, 7, stack - 112, calls);
+  return FindRecords(base, schema::SecondSetInteriorPoints(base, group).group_records_address(),
+                     model, 0, 22, 7, stack - 112, calls);
 }
 
 uint32_t InteriorFindSeats(uint8_t* base, uint32_t group, uint32_t model, uint32_t stack,
                            FindCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820E34A8 InteriorPoints::FindSeats");
-  return FindRecords(base, group + 16, model, 0, 4, 2, stack - 112, calls);
+  return FindRecords(base, schema::SecondSetInteriorPoints(base, group).group_records_address(),
+                     model, 0, 4, 2, stack - 112, calls);
 }
 
 uint32_t InteriorFind(uint8_t* base, uint32_t block, uint32_t models, uint32_t stack,
                       FindCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820E3660 InteriorPoints::Find");
   const uint32_t sp = stack - 144;
-  const uint32_t record = Load(base, block + 11444);
-  const uint32_t w11440 = Load(base, block + 11440);
-  Store(base, block + 240, record);
-  Store(base, block + 9492, w11440);
-  Store(base, block + 3152, record);
-  Store(base, block + 8512, record);
-  Store(base, block + 9488, record);
-  const uint32_t index = Load(base, record + 100);
+  const schema::SecondSetInteriorPoints b(base, block);
+  // A group's records at its +16.
+  auto records = [&](uint32_t group) {
+    return schema::SecondSetInteriorPoints(base, group).group_records_address();
+  };
+  const schema::InteriorRecord record = b.record();
+  const uint32_t w11440 = b.seat_position_source();
+  b.set_dials_record(record);
+  b.set_seat_position(w11440);
+  b.set_meters_record(record);
+  b.set_steering_record(record);
+  b.set_seats_record(record);
+  const uint32_t index = record.seat_model();
   if (index != 0) {
-    Store(base, block + 9496, index * 464 + Load(base, scene::kScene) + 784);
+    b.set_seat_model(index * 464 + G::scene<schema::View>(base).address + 784);
   }
-  Store(base, block + 10464, record);
-  ModelPointFindShape(base, block + 0, Load(base, models + 8), sp);
-  InteriorFindDials(base, block + 240, Load(base, models + 12), sp, calls);
-  InteriorFindMeters(base, block + 3152, Load(base, models + 0), sp, calls);
+  b.set_roll_cage_record(record);
+  ModelPointFindShape(base, b.body_address(), Load(base, models + 8), sp);
+  InteriorFindDials(base, b.dials_address(), Load(base, models + 12), sp, calls);
+  InteriorFindMeters(base, b.meters_address(), Load(base, models + 0), sp, calls);
   const uint32_t steering = Load(base, models + 20);
   for (uint32_t i = 0; i < 4; i++) {
-    ModelPointFindShape(base, block + 8528 + R * i, steering, sp);
+    ModelPointFindShape(base, records(b.steering_address()) + R * i, steering, sp);
   }
-  InteriorFindSeats(base, block + 9488, Load(base, models + 16), sp, calls);
+  InteriorFindSeats(base, b.seats_address(), Load(base, models + 16), sp, calls);
   const uint32_t cage = Load(base, models + 4);
   uint32_t r3 = 0;
   for (uint32_t i = 0; i < 4; i++) {
-    r3 = ModelPointFindShape(base, block + 10480 + R * i, cage, sp);
+    r3 = ModelPointFindShape(base, records(b.roll_cage_address()) + R * i, cage, sp);
   }
   return r3;
 }

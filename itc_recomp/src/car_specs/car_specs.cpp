@@ -6,6 +6,9 @@
 #include "c_runtime/strings.h"
 #include "memory/c_runtime_heap.h"
 #include "guest.h"
+#include "schema/car_specs.h"
+#include "schema/garage_screen.h"
+#include "schema/race_setup.h"
 
 #include <bit>
 #include <climits>
@@ -13,6 +16,18 @@
 #include <cstdlib>
 
 namespace car_specs {
+
+using G = schema::CarSpecsGlobals;
+using schema::AeroPartRecord;
+using schema::CarEngineStage;
+using schema::CarPaintSlot;
+using schema::CarPaints;
+using schema::CarParams;
+using schema::CarPartTables;
+using schema::CarTire;
+using schema::CarWheelRecord;
+using schema::CarSpec;
+using schema::Car;
 
 namespace {
 
@@ -30,7 +45,7 @@ void SwapHalf(uint8_t* base, uint32_t address) {
 }
 
 // The parameter object.
-uint32_t Params(uint8_t* base) { return guest::LoadU32(base, kParams); }
+uint32_t Params(uint8_t* base) { return G::params(base).address; }
 
 // An asset's size from its TOC entry: the unpacked size, or the stored size
 // when that's 0.
@@ -50,7 +65,8 @@ bool CopyFits(uint32_t destination, uint32_t source, uint32_t size) {
 }
 
 void CountDown(uint8_t* base, uint32_t object) {
-  guest::StoreU32(base, object, guest::LoadU32(base, object) - 1);
+  const CarParams params(base, object);
+  params.set_loads_pending(params.loads_pending() - 1);
 }
 
 }  // namespace
@@ -58,7 +74,7 @@ void CountDown(uint8_t* base, uint32_t object) {
 uint32_t SwapVector(uint8_t* base, uint32_t p) {
   ITC_NATIVE_RUNNING("sub_820C9750 CarSpec::SwapVector");
   // +12 = the float at 0x82000A30 (1.0), stored as loaded.
-  const uint32_t w = guest::LoadU32(base, 0x82000A30);
+  const uint32_t w = G::float_one(base);
   SwapWords(base, p, 3);
   guest::StoreU32(base, p + 12, w);
   return p;
@@ -105,14 +121,14 @@ uint32_t SwapRecord83(uint8_t* base, uint32_t p) {
 uint32_t SwapEngineStage(uint8_t* base, uint32_t p) {
   ITC_NATIVE_RUNNING("sub_820CAAB0 EngineStage::Swap");
   // Words +8 to +196; +0 to +7 and +200 to +203 left.
-  SwapWords(base, p + 8, 48);
+  SwapWords(base, CarEngineStage(base, p).unknown_8_address(), 48);
   return p;
 }
 
 uint32_t SwapTire(uint8_t* base, uint32_t p) {
   ITC_NATIVE_RUNNING("sub_820CAD78 Tire::Swap");
   // Words +8 to +88; +0 to +7 left.
-  SwapWords(base, p + 8, 21);
+  SwapWords(base, CarTire(base, p).unknown_8_address(), 21);
   return p;
 }
 
@@ -125,7 +141,7 @@ uint32_t SwapBlock1At368(uint8_t* base, uint32_t p) {
 uint32_t SwapBlock2At8(uint8_t* base, uint32_t p) {
   ITC_NATIVE_RUNNING("sub_820CAFF0 CarSpec::SwapBlock2At8");
   // +20 to +52 = the float at 0x82000A34 (0.0), stored as loaded.
-  const uint32_t w = guest::LoadU32(base, 0x82000A34);
+  const uint32_t w = G::float_zero(base);
   SwapWords(base, p, 5);
   for (uint32_t i = 0; i < 9; i++) {
     guest::StoreU32(base, p + 20 + 4 * i, w);
@@ -136,33 +152,36 @@ uint32_t SwapBlock2At8(uint8_t* base, uint32_t p) {
 
 uint32_t SwapPaints(uint8_t* base, uint32_t p) {
   ITC_NATIVE_RUNNING("sub_820CB458 Paint::Swap");
-  for (uint32_t slot = p + 8, n = 0; n < 13; n++, slot += 20) {
+  const CarPaints paints(base, p);
+  for (uint32_t slot = paints.slots_address(), n = 0; n < 13; n++, slot += CarPaintSlot::kSize) {
+    const CarPaintSlot s(base, slot);
     for (uint32_t offset = 0; offset <= 16; offset += 4) {
       SwapHalf(base, slot + offset);
     }
     // The second shade at +12 by the type (+0).
-    const uint16_t type = guest::LoadU16(base, slot);
+    const uint16_t type = s.type();
     if (type == 0) {
-      guest::StoreU16(base, slot + 12, 0);
-      guest::StoreU8(base, slot + 14, 0);
-      guest::StoreU8(base, slot + 15, 25);
+      s.set_hue2(0);
+      s.set_saturation2(0);
+      s.set_value2(25);
     } else if (type == 1) {
-      const int32_t saturation = guest::LoadU8(base, slot + 6);
-      guest::StoreU16(base, slot + 12, guest::LoadU16(base, slot + 4));
-      guest::StoreU8(base, slot + 14, uint8_t(saturation * 60 / 100));
-      guest::StoreU8(base, slot + 15, 204);
+      const int32_t saturation = s.saturation0();
+      s.set_hue2(s.hue0());
+      s.set_saturation2(uint8_t(saturation * 60 / 100));
+      s.set_value2(204);
     }
   }
-  SwapWords(base, p + 268, 1);
+  SwapWords(base, paints.count_address(), 1);
   return p;
 }
 
 uint32_t SwapWheel(uint8_t* base, uint32_t p) {
   ITC_NATIVE_RUNNING("sub_820CB588 Wheel::Swap");
-  SwapColor(base, p + 8);
-  SwapColor(base, p + 20);
-  SwapWords(base, p + 32, 4);
-  return p + 20;
+  const CarWheelRecord wheel(base, p);
+  SwapColor(base, wheel.color_a_half0_address());
+  SwapColor(base, wheel.color_b_half0_address());
+  SwapWords(base, wheel.unknown_32_address(), 4);
+  return wheel.color_b_half0_address();
 }
 
 uint32_t SwapBlock1At264(uint8_t* base, uint32_t p) {
@@ -213,31 +232,32 @@ uint32_t SwapBlock2(uint8_t* base, uint32_t p) {
 uint32_t SwapCarSpec(uint8_t* base, uint32_t p) {
   ITC_NATIVE_RUNNING("sub_820CC168 CarSpec::Swap");
   SwapBlock1(base, p);
-  SwapBlock2(base, p + 640);
+  const CarSpec spec(base, p);
+  SwapBlock2(base, spec.block2_id_address());
   for (uint32_t i = 0; i < 16; i++) {
-    SwapEngineStage(base, p + 980 + 204 * i);
+    SwapEngineStage(base, spec.engine_stages_address() + 204 * i);
   }
   for (uint32_t i = 0; i < 21; i++) {
-    SwapTire(base, p + 4244 + 92 * i);
-    SwapTire(base, p + 6176 + 92 * i);
+    SwapTire(base, spec.front_tires_address() + 92 * i);
+    SwapTire(base, spec.rear_tires_address() + 92 * i);
   }
-  SwapPaints(base, p + 8108);
-  return SwapWheel(base, p + 8380);
+  SwapPaints(base, spec.paints_address());
+  return SwapWheel(base, spec.stock_wheel_address());
 }
 
 uint32_t SwapCarSpecs(uint8_t* base, uint32_t r3) {
   ITC_NATIVE_RUNNING("sub_820CC1F0 Params::SwapCarSpecs");
   // The count and the table read from the global each time, as the original.
-  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, Params(base) + 56)); i++) {
-    r3 = SwapCarSpec(base, guest::LoadU32(base, Params(base) + 12) + kSpecBytes * uint32_t(i));
+  for (int32_t i = 0; i < int32_t(G::params(base).spec_count()); i++) {
+    r3 = SwapCarSpec(base, G::params(base).specs() + kSpecBytes * uint32_t(i));
   }
   return r3;
 }
 
 uint32_t SwapWheels(uint8_t* base, uint32_t r3) {
   ITC_NATIVE_RUNNING("sub_820CBE10 Params::SwapWheels");
-  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, Params(base) + 60)); i++) {
-    r3 = guest::LoadU32(base, Params(base) + 8) + kWheelBytes * uint32_t(i);
+  for (int32_t i = 0; i < int32_t(G::params(base).wheel_count()); i++) {
+    r3 = G::params(base).wheels().address + kWheelBytes * uint32_t(i);
     if (r3 != 0) {
       r3 = SwapWheel(base, r3);
     }
@@ -247,7 +267,7 @@ uint32_t SwapWheels(uint8_t* base, uint32_t r3) {
 
 uint32_t OnCarSpecsLoaded(uint8_t* base, uint32_t object, uint32_t toc) {
   ITC_NATIVE_RUNNING("sub_820CC248 Params::OnCarSpecsLoaded");
-  guest::StoreU32(base, object + 56, AssetSize(base, toc, 72) / kSpecBytes);
+  CarParams(base, object).set_spec_count(AssetSize(base, toc, 72) / kSpecBytes);
   const uint32_t r3 = SwapCarSpecs(base, toc);
   CountDown(base, object);
   return r3;
@@ -255,22 +275,23 @@ uint32_t OnCarSpecsLoaded(uint8_t* base, uint32_t object, uint32_t toc) {
 
 uint32_t OnWheelsLoaded(uint8_t* base, uint32_t object, uint32_t toc) {
   ITC_NATIVE_RUNNING("sub_820CC0A8 Params::OnWheelsLoaded");
-  guest::StoreU32(base, object + 60, AssetSize(base, toc, 73) / kWheelBytes);
+  const CarParams params(base, object);
+  params.set_wheel_count(AssetSize(base, toc, 73) / kWheelBytes);
   const uint32_t r3 = SwapWheels(base, toc);
   // Each record's model (+40) up by one, and the first record of each
   // model at +64 + 4 × model (model 1's at +68 = 0 from the start).
   uint32_t model = 1;
-  guest::StoreU32(base, object + 68, 0);
-  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, object + 60)); i++) {
-    const uint32_t record = guest::LoadU32(base, object + 8) + kWheelBytes * uint32_t(i);
-    const uint32_t m = guest::LoadU32(base, record + 40) + 1;
-    guest::StoreU32(base, record + 40, m);
+  params.set_model1_first_wheel(0);
+  for (int32_t i = 0; i < int32_t(params.wheel_count()); i++) {
+    const CarWheelRecord record(base, params.wheels().address + kWheelBytes * uint32_t(i));
+    const uint32_t m = record.model() + 1;
+    record.set_model(m);
     if (m != model) {
       model = m;
-      guest::StoreU32(base, object + 4 * (m + 16), uint32_t(i));
+      guest::StoreU32(base, params.first_wheels_address() + 4 * m, uint32_t(i));
     }
   }
-  guest::StoreU32(base, object + 464, model + 1);
+  params.set_model_end(model + 1);
   CountDown(base, object);
   return r3;
 }
@@ -286,7 +307,7 @@ uint32_t OnTable83Loaded(uint8_t* base, uint32_t object, uint32_t toc) {
   const uint32_t count = AssetSize(base, toc, 83) / 40;
   if (int32_t(count) > 0) {
     for (uint32_t i = 0; i < count; i++) {
-      r3 = SwapRecord83(base, i * 40 + guest::LoadU32(base, object + 52));
+      r3 = SwapRecord83(base, i * 40 + CarParams(base, object).table83());
     }
   }
   CountDown(base, object);
@@ -295,7 +316,7 @@ uint32_t OnTable83Loaded(uint8_t* base, uint32_t object, uint32_t toc) {
 
 uint32_t GetCarSpec(uint8_t* base, uint32_t id) {
   ITC_NATIVE_RUNNING("sub_820C9E98 Params::GetCarSpec");
-  return guest::LoadU32(base, Params(base) + 12) + kSpecBytes * id;
+  return G::params(base).specs() + kSpecBytes * id;
 }
 
 uint32_t GetWheel(uint8_t* base, int32_t n) {
@@ -303,7 +324,7 @@ uint32_t GetWheel(uint8_t* base, int32_t n) {
   if (n < 1) {
     return 0;
   }
-  return guest::LoadU32(base, Params(base) + 8) + kWheelBytes * uint32_t(n) - kWheelBytes;
+  return G::params(base).wheels().address + kWheelBytes * uint32_t(n) - kWheelBytes;
 }
 
 uint32_t FirstWheelOfModel(uint8_t* base, int32_t m) {
@@ -311,15 +332,15 @@ uint32_t FirstWheelOfModel(uint8_t* base, int32_t m) {
   if (m < 1) {
     return 0;
   }
-  return guest::LoadU32(base, Params(base) + 4 * (uint32_t(m) + 16)) + 1;
+  return guest::LoadU32(base, G::params(base).first_wheels_address() + 4 * uint32_t(m)) + 1;
 }
 
 void GetCarParts(uint8_t* base, uint32_t car, uint32_t parts[9]) {
   ITC_NATIVE_RUNNING("sub_820C9E00 Params::GetCarParts");
   static constexpr uint32_t kStrides[9] = {280, 280, 280, 280, 168, 168, 84, 108, 72};
-  const uint32_t params = Params(base);
+  const CarParams params = G::params(base);
   for (uint32_t i = 0; i < 9; i++) {
-    parts[i] = guest::LoadU32(base, params + 16 + 4 * i) + kStrides[i] * car;
+    parts[i] = guest::LoadU32(base, params.aero74_address() + 4 * i) + kStrides[i] * car;
   }
 }
 
@@ -368,17 +389,19 @@ bool AeroPart(uint8_t* base, uint32_t out, const uint32_t parts[9], int32_t leve
   }
   // The defaults: the floats at 0x82000A34 (0.0) and 0x82000A30 (1.0),
   // stored as loaded.
-  const uint32_t zero = guest::LoadU32(base, 0x82000A34);
-  const uint32_t one = guest::LoadU32(base, 0x82000A30);
-  for (uint32_t offset = 0; offset < 16; offset += 4) {
-    guest::StoreU32(base, out + offset, zero);
-  }
-  guest::StoreU32(base, out + 16, one);
-  guest::StoreU32(base, out + 20, one);
-  guest::StoreU32(base, out + 24, 0);
+  const AeroPartRecord record(base, out);
+  const uint32_t zero = G::float_zero(base);
+  const uint32_t one = G::float_one(base);
+  guest::StoreU32(base, record.weight_change_address(), zero);
+  guest::StoreU32(base, record.weight_change_2_address(), zero);
+  guest::StoreU32(base, record.lift_address(), zero);
+  guest::StoreU32(base, record.lift_2_address(), zero);
+  guest::StoreU32(base, record.factor_16_address(), one);
+  guest::StoreU32(base, record.factor_20_address(), one);
+  record.set_flags(0);
   if (size == 36) {
-    guest::StoreU32(base, out + 28, 0);
-    guest::StoreU32(base, out + 32, 0);
+    guest::StoreU32(base, record.extra_28_address(), 0);
+    guest::StoreU32(base, record.extra_32_address(), 0);
   }
   return true;
 }
@@ -407,10 +430,11 @@ uint32_t CountBodyKits(uint8_t* base, uint32_t parts) {
   ITC_NATIVE_RUNNING("sub_820CBD20 CountBodyKits");
   // The original copies each record to the stack and swaps it there; only
   // the first float is read.
-  const float zero = std::bit_cast<float>(guest::LoadU32(base, 0x82000A34));
+  const float zero = std::bit_cast<float>(G::float_zero(base));
   uint32_t count = 0;
   for (uint32_t offset = 0; offset < 72; offset += 36) {
-    const uint32_t word = guest::LoadU32(base, guest::LoadU32(base, parts + 32) + offset);
+    const uint32_t word =
+        guest::LoadU32(base, CarPartTables(base, parts).table82().address + offset);
     if (double(std::bit_cast<float>(std::byteswap(word))) != double(zero)) {
       count++;
     }
@@ -459,12 +483,13 @@ void InchUp(uint8_t* base, uint32_t tire, int32_t n) {
     return;
   }
   // The registers' steps, in the original's order (f0 to f13 as named there).
-  double f0 = LoadSingle(base, tire + 48);   // the width
-  double f13 = LoadSingle(base, tire + 80);  // the rim
-  double f11 = LoadSingle(base, tire + 84);  // the aspect
+  const CarTire t(base, tire);
+  double f0 = t.width();
+  double f13 = t.rim();
+  double f11 = t.aspect();
   f11 = Single(f0 * f11);
-  double f4 = LoadSingle(base, tire + 44);  // the radius
-  double f3 = LoadSingle(base, tire + 64);  // the grip
+  double f4 = t.radius();
+  double f3 = t.grip();
   double f10 = Constant(base, 8708);
   const double f9 = Constant(base, 8148);
   const double f8 = Constant(base, 11536);
@@ -477,7 +502,7 @@ void InchUp(uint8_t* base, uint32_t tire, int32_t n) {
   f11 = Constant(base, 2608);
   double f12 = Single(double(int64_t(n)));
   f13 = Single(f12 + f13);
-  StoreSingle(base, tire + 80, f13);
+  t.set_rim(float(f13));
   f12 = Single(std::fma(f12, f10, f11));
   f10 = Single(f2 * f0);
   f12 = Single(f12 * f0);
@@ -500,9 +525,9 @@ void InchUp(uint8_t* base, uint32_t tire, int32_t n) {
   f3 = Single(double(int64_t(width5)));
   f0 = Constant(base, 10712);
   f0 = Single(f3 * f0);
-  StoreSingle(base, tire + 48, f0);
+  t.set_width(float(f0));
   f3 = Single(f1 / f0);
-  StoreSingle(base, tire + 84, f3);
+  t.set_aspect(float(f3));
   const bool below = f0 < Constant(base, 11556);
   f3 = ConstantDouble(base, 8888);
   f1 = Constant(base, 11552);
@@ -514,10 +539,10 @@ void InchUp(uint8_t* base, uint32_t tire, int32_t n) {
     f10 = f10 - f3;
   }
   f10 = Single(f10);
-  StoreSingle(base, tire + 88, f10);
+  t.set_rim_width(float(f10));
   f13 = Single(f13 * f6);
   f10 = Single(f10 * f7);
-  f7 = LoadSingle(base, tire + 84);
+  f7 = t.aspect();
   f7 = Single(f0 * f7);
   const int32_t rim = Fctiwz(f10);
   f13 = Single(std::fma(f7, f9, f13));
@@ -529,75 +554,76 @@ void InchUp(uint8_t* base, uint32_t tire, int32_t n) {
   // extended word, then divw).
   const int32_t rim5 = int32_t(uint32_t(uint64_t(uint32_t(rim)) * 5u)) / 10;
   f0 = Single(f0 * f12);
-  StoreSingle(base, tire + 88, Single(double(int64_t(rim5))));
+  t.set_rim_width(float(Single(double(int64_t(rim5)))));
   f0 = Single(f0 * f2);
   f0 = Single(f0 * f4);
-  StoreSingle(base, tire + 64, f0);
-  StoreSingle(base, tire + 68, f0);
+  t.set_grip(float(f0));
+  t.set_grip_2(float(f0));
 }
 
 uint32_t CopySpec(uint8_t* base, uint32_t car, uint32_t spec) {
   ITC_NATIVE_RUNNING("sub_820C4888 Car::CopySpec");
-  const uint32_t zero = guest::LoadU32(base, 0x82000A34);
-  guest::StoreU32(base, car + 3876, zero);
-  guest::StoreU32(base, car + 3880, zero);
-  c_runtime::Memcpy(base, car + 2240, spec, 640);
-  c_runtime::Memcpy(base, car + 1888, spec + 640, 340);
-  c_runtime::Memcpy(base, car + 2880,
-                    guest::LoadU32(base, car + 1656) * 204 + spec + 980, 204);
-  c_runtime::Memcpy(base, car + 3364, spec + 8108, 272);
-  c_runtime::Memcpy(base, car + 3084,
-                    GetTire(spec, int32_t(guest::LoadU32(base, car + 1712)),
-                            guest::LoadU32(base, car + 1716), 0),
+  const Car c(base, car);
+  const CarSpec s(base, spec);
+  const uint32_t zero = G::float_zero(base);
+  guest::StoreU32(base, c.front_tire_widening_address(), zero);
+  guest::StoreU32(base, c.rear_tire_widening_address(), zero);
+  c_runtime::Memcpy(base, c.block1_address(), spec, 640);
+  c_runtime::Memcpy(base, c.block2_address(), s.block2_id_address(), 340);
+  c_runtime::Memcpy(base, c.engine_address(),
+                    c.engine_stage() * 204 + s.engine_stages_address(), 204);
+  c_runtime::Memcpy(base, c.paints_address(), s.paints_address(), 272);
+  c_runtime::Memcpy(base, c.front_tire_address(),
+                    GetTire(spec, int32_t(c.front_tire_type()), c.front_tire_grade(), 0),
                     92);
-  c_runtime::Memcpy(base, car + 3176,
-                    GetTire(spec, int32_t(guest::LoadU32(base, car + 1720)),
-                            guest::LoadU32(base, car + 1724), 1),
+  c_runtime::Memcpy(base, c.rear_tire_address(),
+                    GetTire(spec, int32_t(c.rear_tire_type()), c.rear_tire_grade(), 1),
                     92);
-  const double front = LoadSingle(base, car + 3132);
-  const double rear = LoadSingle(base, car + 3224);
-  InchUp(base, car + 3084, int32_t(guest::LoadU32(base, car + 1732)));
-  InchUp(base, car + 3176, int32_t(guest::LoadU32(base, car + 1740)));
-  StoreSingle(base, car + 3876, Single(LoadSingle(base, car + 3132) - front));
-  StoreSingle(base, car + 3880, Single(LoadSingle(base, car + 3224) - rear));
-  return car + 3176;
+  const double front = double(c.front_tire_width());
+  const double rear = double(c.rear_tire_width());
+  InchUp(base, c.front_tire_address(), int32_t(c.front_inch_up()));
+  InchUp(base, c.rear_tire_address(), int32_t(c.rear_inch_up()));
+  c.set_front_tire_widening(float(Single(double(c.front_tire_width()) - front)));
+  c.set_rear_tire_widening(float(Single(double(c.rear_tire_width()) - rear)));
+  return c.rear_tire_address();
 }
 
 uint32_t CopyAeroParts(uint8_t* base, uint32_t car, const uint32_t parts[9]) {
   ITC_NATIVE_RUNNING("sub_820C4568 Car::CopyAeroParts");
-  auto level = [&](uint32_t offset) { return int32_t(guest::LoadU32(base, car + offset)); };
-  AeroPart74(base, car + 3636, parts, level(1744));
-  AeroPart75(base, car + 3664, parts, level(1748));
-  AeroPart76(base, car + 3692, parts, level(1752));
-  AeroPart77(base, car + 3720, parts, level(1756) == -1 ? 0 : level(1756));
-  AeroPart80(base, car + 3776, parts, level(1768));
-  AeroPart81(base, car + 3804, parts, level(1780));
-  AeroPart82(base, car + 3840, parts, level(1784));
-  if (guest::LoadU32(base, car + 1764) == 0) {
-    AeroPart78(base, car + 3748, parts, level(1760));
+  const Car c(base, car);
+  AeroPart74(base, c.aero_parts_address() + 0, parts, int32_t(c.aero_0()));
+  AeroPart75(base, c.aero_parts_address() + 28, parts, int32_t(c.aero_1()));
+  AeroPart76(base, c.aero_parts_address() + 56, parts, int32_t(c.aero_2()));
+  AeroPart77(base, c.aero_parts_address() + 84, parts, int32_t(c.aero_3()) == -1 ? 0 : int32_t(c.aero_3()));
+  AeroPart80(base, c.aero_parts_address() + 140, parts, int32_t(c.aero_6()));
+  AeroPart81(base, c.aero_parts_address() + 168, parts, int32_t(c.aero_9()));
+  AeroPart82(base, c.aero_parts_address() + 204, parts, int32_t(c.aero_10()));
+  if (c.bonnet_color_kind() == 0) {
+    AeroPart78(base, c.aero_parts_address() + 112, parts, int32_t(c.bonnet()));
   } else {
-    AeroPart79(base, car + 3748, parts, level(1760));
+    AeroPart79(base, c.aero_parts_address() + 112, parts, int32_t(c.bonnet()));
   }
-  return car + 3748;
+  return c.aero_parts_address() + 112;
 }
 
 namespace {
 
-// A wheel record for the car's wheel number at `offset`: the spec's stock
-// wheel for 0, else Params::GetWheel's.
-uint32_t WheelOf(uint8_t* base, uint32_t car, uint32_t offset, uint32_t spec) {
-  const int32_t n = int32_t(guest::LoadU32(base, car + offset));
-  return n == 0 ? spec + 8380 : GetWheel(base, n);
+// A wheel record for the car's wheel number at `number` (its address): the
+// spec's stock wheel for 0, else Params::GetWheel's.
+uint32_t WheelOf(uint8_t* base, uint32_t number, uint32_t spec) {
+  const int32_t n = int32_t(guest::LoadU32(base, number));
+  return n == 0 ? CarSpec(base, spec).stock_wheel_address() : GetWheel(base, n);
 }
 
 }  // namespace
 
 bool CarRefresh(uint8_t* base, uint32_t car, uint32_t* r3) {
   ITC_NATIVE_RUNNING("sub_820C4998 Car::Refresh");
-  const uint32_t spec = GetCarSpec(base, guest::LoadU32(base, car + 12));
+  const Car c(base, car);
+  const uint32_t spec = GetCarSpec(base, c.car_id());
+  const CarSpec s(base, spec);
   uint32_t parts[9];
-  GetCarParts(base, guest::LoadU8(base, spec + 771) != 0 ? 0 : guest::LoadU32(base, car + 12),
-              parts);
+  GetCarParts(base, s.list_kind() != 0 ? 0 : c.car_id(), parts);
   // Every copy's ranges first (the original's order of reads only differs
   // from these where the car's written span, +1888 to +3884, shares memory
   // with what's read after it, which is checked too).
@@ -607,33 +633,32 @@ bool CarRefresh(uint8_t* base, uint32_t car, uint32_t* r3) {
   auto aero = [&](uint32_t to, uint32_t table, uint32_t size, int32_t level, bool use) {
     return Copy{to, use ? parts[table] + size * uint32_t(level) - size : to, use ? size : 0};
   };
-  auto level = [&](uint32_t offset) { return int32_t(guest::LoadU32(base, car + offset)); };
-  const int32_t level77 = level(1756) == -1 ? 0 : level(1756);
-  const bool use79 = guest::LoadU32(base, car + 1764) != 0;
+  const int32_t level77 = int32_t(c.aero_3()) == -1 ? 0 : int32_t(c.aero_3());
+  const bool use79 = c.bonnet_color_kind() != 0;
   const Copy copies[] = {
-      {car + 2240, spec, 640},
-      {car + 1888, spec + 640, 340},
-      {car + 2880, guest::LoadU32(base, car + 1656) * 204 + spec + 980, 204},
-      {car + 3364, spec + 8108, 272},
-      {car + 3084,
-       GetTire(spec, level(1712), guest::LoadU32(base, car + 1716), 0), 92},
-      {car + 3176,
-       GetTire(spec, level(1720), guest::LoadU32(base, car + 1724), 1), 92},
-      aero(car + 3636, 0, 28, level(1744), level(1744) != 0),
-      aero(car + 3664, 1, 28, level(1748), level(1748) != 0),
-      aero(car + 3692, 2, 28, level(1752), level(1752) != 0),
-      aero(car + 3720, 3, 28, level77, level77 > 0),
-      aero(car + 3776, 6, 28, level(1768), level(1768) != 0),
-      aero(car + 3804, 7, 36, level(1780), level(1780) != 0),
-      aero(car + 3840, 8, 36, level(1784), level(1784) != 0),
-      aero(car + 3748, use79 ? 5 : 4, 28, level(1760), level(1760) != 0),
-      {car + 3268, WheelOf(base, car, 1728, spec), 48},
-      {car + 3316, WheelOf(base, car, 1736, spec), 48},
+      {c.block1_address(), spec, 640},
+      {c.block2_address(), s.block2_id_address(), 340},
+      {c.engine_address(), c.engine_stage() * 204 + s.engine_stages_address(), 204},
+      {c.paints_address(), s.paints_address(), 272},
+      {c.front_tire_address(),
+       GetTire(spec, int32_t(c.front_tire_type()), c.front_tire_grade(), 0), 92},
+      {c.rear_tire_address(),
+       GetTire(spec, int32_t(c.rear_tire_type()), c.rear_tire_grade(), 1), 92},
+      aero(c.aero_parts_address() + 0, 0, 28, int32_t(c.aero_0()), int32_t(c.aero_0()) != 0),
+      aero(c.aero_parts_address() + 28, 1, 28, int32_t(c.aero_1()), int32_t(c.aero_1()) != 0),
+      aero(c.aero_parts_address() + 56, 2, 28, int32_t(c.aero_2()), int32_t(c.aero_2()) != 0),
+      aero(c.aero_parts_address() + 84, 3, 28, level77, level77 > 0),
+      aero(c.aero_parts_address() + 140, 6, 28, int32_t(c.aero_6()), int32_t(c.aero_6()) != 0),
+      aero(c.aero_parts_address() + 168, 7, 36, int32_t(c.aero_9()), int32_t(c.aero_9()) != 0),
+      aero(c.aero_parts_address() + 204, 8, 36, int32_t(c.aero_10()), int32_t(c.aero_10()) != 0),
+      aero(c.aero_parts_address() + 112, use79 ? 5 : 4, 28, int32_t(c.bonnet()), int32_t(c.bonnet()) != 0),
+      {c.front_wheel_spec_address(), WheelOf(base, c.front_wheel_address(), spec), 48},
+      {c.rear_wheel_spec_address(), WheelOf(base, c.rear_wheel_address(), spec), 48},
   };
-  const uint32_t span = car + 1888, span_bytes = 3884 - 1888;
+  const uint32_t span = c.block2_address(), span_bytes = 3884 - 1888;
   if (span >= 0xA0000000u || !c_runtime::InOneView(span, span_bytes) ||
       c_runtime::MayShare(span, span_bytes, spec, kSpecBytes) ||
-      c_runtime::MayShare(span, span_bytes, Params(base), 468)) {
+      c_runtime::MayShare(span, span_bytes, Params(base), CarParams::kSize)) {
     return false;
   }
   for (const Copy& copy : copies) {
@@ -644,9 +669,9 @@ bool CarRefresh(uint8_t* base, uint32_t car, uint32_t* r3) {
   }
   CopySpec(base, car, spec);
   CopyAeroParts(base, car, parts);
-  c_runtime::Memcpy(base, car + 3268, WheelOf(base, car, 1728, spec), 48);
-  c_runtime::Memcpy(base, car + 3316, WheelOf(base, car, 1736, spec), 48);
-  *r3 = car + 3316;
+  c_runtime::Memcpy(base, c.front_wheel_spec_address(), WheelOf(base, c.front_wheel_address(), spec), 48);
+  c_runtime::Memcpy(base, c.rear_wheel_spec_address(), WheelOf(base, c.rear_wheel_address(), spec), 48);
+  *r3 = c.rear_wheel_spec_address();
   return true;
 }
 
@@ -670,39 +695,43 @@ bool ParamsInit(uint8_t* base, const uint32_t tocs[12], uint32_t* r3) {
     std::abort();
   }
   const uint32_t object = *made;
-  guest::StoreU32(base, kParams, object);
-  guest::StoreU32(base, object + 4, 0);
-  guest::StoreU32(base, Params(base) + 56, 0);
-  guest::StoreU32(base, Params(base) + 60, 0);
-  for (uint32_t offset = 64; offset < 464; offset += 4) {
-    guest::StoreU32(base, Params(base) + offset, 0xFFFFFFFFu);
+  G::set_params(base, object);
+  CarParams(base, object).set_block(0);
+  G::params(base).set_spec_count(0);
+  G::params(base).set_wheel_count(0);
+  for (uint32_t i = 0; i < 100; i++) {
+    guest::StoreU32(base, G::params(base).first_wheels_address() + 4 * i, 0xFFFFFFFFu);
   }
-  guest::StoreU32(base, Params(base) + 0, 0);
+  G::params(base).set_loads_pending(0);
   // Two passes (the original's loop until the block is made): the first
   // with no block (every pointer 0) for the total, the second with it.
   // The table pointers' slots by asset: 72 at +12, 73 at +8, 74 to 82 at
   // +16 to +48, 83 at +52.
-  static constexpr uint32_t kSlots[12] = {12, 8, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52};
+  static constexpr uint32_t (CarParams::*kSlots[12])() const = {
+      &CarParams::specs_address,  &CarParams::wheels_address, &CarParams::aero74_address,
+      &CarParams::aero75_address, &CarParams::aero76_address, &CarParams::aero77_address,
+      &CarParams::aero78_address, &CarParams::aero79_address, &CarParams::aero80_address,
+      &CarParams::aero81_address, &CarParams::aero82_address, &CarParams::table83_address};
   uint32_t r30 = 0;
-  while (guest::LoadU32(base, Params(base) + 4) == 0) {
+  while (G::params(base).block() == 0) {
     if (r30 != 0) {
       const auto block = memory::crt::OperatorNewArray(base, r30);
       if (!block) {
         ITC_LOG_ERROR("car specs: operator new[]({}) failed after its checks", r30);
         std::abort();
       }
-      guest::StoreU32(base, Params(base) + 4, *block);
+      G::params(base).set_block(*block);
     }
-    r30 = guest::LoadU32(base, Params(base) + 4);
-    guest::StoreU32(base, Params(base) + 0, 0);
+    r30 = G::params(base).block();
+    G::params(base).set_loads_pending(0);
     uint32_t sum = 0;
     for (uint32_t k = 0; k < 12; k++) {
       if (k > 0) {
-        r30 = r30 != 0 ? guest::LoadU32(base, Params(base) + 4) + sum : 0;
+        r30 = r30 != 0 ? G::params(base).block() + sum : 0;
       }
-      const uint32_t params = Params(base);
-      guest::StoreU32(base, params + 0, guest::LoadU32(base, params + 0) + 1);
-      guest::StoreU32(base, params + kSlots[k], r30);
+      const CarParams params = G::params(base);
+      params.set_loads_pending(params.loads_pending() + 1);
+      guest::StoreU32(base, (params.*kSlots[k])(), r30);
       sum += sizes[k];
     }
     r30 = sum;
@@ -714,18 +743,21 @@ bool ParamsInit(uint8_t* base, const uint32_t tocs[12], uint32_t* r3) {
 int64_t ParamsLoad(uint8_t* base, const archive::LoadCall& load) {
   ITC_NATIVE_RUNNING("sub_820CC2A8 Params::Load");
   struct Asset {
-    uint32_t offset;
+    uint32_t (CarParams::*slot)() const;  // the table's pointer
     uint32_t callback;
   };
   static constexpr Asset kAssets[12] = {
-      {12, 0x820CC248}, {8, 0x820CC0A8},  {16, 0x820C9DF0}, {20, 0x820C9DF0},
-      {24, 0x820C9DF0}, {28, 0x820C9DF0}, {32, 0x820C9DF0}, {36, 0x820C9DF0},
-      {40, 0x820C9DF0}, {44, 0x820C9DF0}, {48, 0x820C9DF0}, {52, 0x820CBD90}};
+      {&CarParams::specs_address, 0x820CC248},  {&CarParams::wheels_address, 0x820CC0A8},
+      {&CarParams::aero74_address, 0x820C9DF0}, {&CarParams::aero75_address, 0x820C9DF0},
+      {&CarParams::aero76_address, 0x820C9DF0}, {&CarParams::aero77_address, 0x820C9DF0},
+      {&CarParams::aero78_address, 0x820C9DF0}, {&CarParams::aero79_address, 0x820C9DF0},
+      {&CarParams::aero80_address, 0x820C9DF0}, {&CarParams::aero81_address, 0x820C9DF0},
+      {&CarParams::aero82_address, 0x820C9DF0}, {&CarParams::table83_address, 0x820CBD90}};
   int64_t serial = 0;
   for (uint32_t k = 0; k < 12; k++) {
-    const uint32_t params = Params(base);
-    serial = load(72 + k, guest::LoadU32(base, params + kAssets[k].offset), kAssets[k].callback,
-                  params);
+    const CarParams params = G::params(base);
+    serial = load(72 + k, guest::LoadU32(base, (params.*kAssets[k].slot)()), kAssets[k].callback,
+                  params.address);
   }
   return serial;
 }

@@ -10,6 +10,8 @@
 
 #include "base/log.h"
 #include "hooks/lifted_call.h"
+#include "schema/menu_sounds.h"
+#include "schema/sound_cues.h"
 
 namespace sound_cues {
 
@@ -22,9 +24,8 @@ constexpr uint32_t kForEach = 0x82118F50;        // std::for_each over a list
 constexpr uint32_t kDeleteIfStopped = 0x821185C8;  // AudioManager::DeleteIfStopped
 constexpr uint32_t kSoundUpdate = 0x82117438;    // Sound::Update
 
-constexpr uint32_t kBanksBegin = 1516;  // the bank pairs' vector: begin, end
-constexpr uint32_t kBanksEnd = 1520;
-constexpr uint32_t kSounds = 1528;  // the Sounds' list
+// The Sounds' list: AudioManager (menu-sounds.toml) has no field for it yet.
+constexpr uint32_t kSounds = 1528;
 
 // A doubleword on the frame (ld).
 uint64_t LoadDoubleword(uint8_t* base, uint32_t address) {
@@ -40,7 +41,7 @@ uint32_t Count(uint32_t begin, uint32_t end) {
 // The original's bounds check before an element's read: a trap (logged, run
 // past) when the vector is empty or `i` is past its end.
 uint32_t CheckedBegin(uint8_t* base, uint32_t manager, uint32_t end, uint32_t i) {
-  const uint32_t begin = guest::LoadU32(base, manager + kBanksBegin);
+  const uint32_t begin = schema::AudioManager(base, manager).bank_pairs_first();
   if (begin == 0 || i >= Count(begin, end)) {
     lifted::Trap(22);
   }
@@ -52,9 +53,9 @@ uint32_t CheckedBegin(uint8_t* base, uint32_t manager, uint32_t end, uint32_t i)
 uint64_t AudioEngineDoWork(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t engine) {
   ITC_NATIVE_RUNNING("sub_8259D1A8 AudioEngine::DoWork");
   // A tail call: slot +16 of the XACT engine (+8), from this stack pointer.
-  const uint32_t xact = guest::LoadU32(base, engine + 8);
-  const uint32_t work = guest::LoadU32(base, guest::LoadU32(base, xact) + 16);
-  return lifted_call::Call(base, work, sp, r13, {xact}).r3;
+  const schema::XactEngine xact = schema::AudioEngine(base, engine).xact_engine();
+  const uint32_t work = xact.vtable().do_work();
+  return lifted_call::Call(base, work, sp, r13, {xact.address}).r3;
 }
 
 uint64_t ManagerFreeReleasedBanks(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t manager) {
@@ -62,28 +63,28 @@ uint64_t ManagerFreeReleasedBanks(uint8_t* base, uint32_t sp, uint64_t r13, uint
   const uint32_t frame = lifted_call::PushFrame(base, sp, 112);
   uint64_t r3 = manager;
   for (uint32_t i = 0, offset = 0;; i++, offset += 4) {
-    const uint32_t begin = guest::LoadU32(base, manager + kBanksBegin);
+    const uint32_t begin = schema::AudioManager(base, manager).bank_pairs_first();
     if (begin == 0) {
       break;
     }
-    const uint32_t end = guest::LoadU32(base, manager + kBanksEnd);
+    const uint32_t end = schema::AudioManager(base, manager).bank_pairs_end();
     if (i >= Count(begin, end)) {
       break;
     }
     // Each read of an element re-reads the vector and checks the index.
-    if (guest::LoadU32(base, CheckedBegin(base, manager, end, i) + offset) == 0) {
+    if (!schema::BankPairSlot(base, CheckedBegin(base, manager, end, i) + offset).pair()) {
       continue;
     }
     const uint32_t pair_begin =
-        CheckedBegin(base, manager, guest::LoadU32(base, manager + kBanksEnd), i);
+        CheckedBegin(base, manager, schema::AudioManager(base, manager).bank_pairs_end(), i);
     r3 = lifted_call::Call(base, kCanFree, frame, r13,
-                           {guest::LoadU32(base, pair_begin + offset)})
+                           {schema::BankPairSlot(base, pair_begin + offset).pair().address})
              .r3;
     if ((r3 & 0xFF) == 0) {
       continue;
     }
     const uint32_t slot_begin =
-        CheckedBegin(base, manager, guest::LoadU32(base, manager + kBanksEnd), i);
+        CheckedBegin(base, manager, schema::AudioManager(base, manager).bank_pairs_end(), i);
     r3 = lifted_call::Call(base, kDeletePair, frame, r13, {slot_begin + offset}).r3;
   }
   return r3;
@@ -111,8 +112,8 @@ uint64_t ManagerUpdateSounds(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t 
   // (list, node) built on the frame as the original does, the result (the
   // function) left at +80.
   const uint32_t list = manager + kSounds;
-  const uint32_t head = guest::LoadU32(base, list + 4);
-  const uint32_t first = guest::LoadU32(base, head);
+  const uint32_t head = schema::SoundList(base, list).head().address;
+  const uint32_t first = schema::SoundListNode(base, head).next().address;
   guest::StoreU32(base, frame + 88, list);
   guest::StoreU32(base, frame + 80, list);
   guest::StoreU32(base, frame + 84, head);

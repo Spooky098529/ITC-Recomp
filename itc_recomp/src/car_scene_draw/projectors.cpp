@@ -12,6 +12,7 @@
 #include "c_runtime/math.h"
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
+#include "schema/car_scene_draw.h"
 
 namespace car_scene_draw {
 
@@ -19,9 +20,8 @@ namespace {
 
 using namespace ops;
 
-constexpr uint32_t kHalfFov = 0x82001BE4;   // the field of view's factor (probably 0.5)
-constexpr uint32_t kOrthoScale = 0x820021E8;  // BuildOrtho's (probably 2.0)
-constexpr uint32_t kBias = 0x8265EED0;      // the bias matrix both projectors end with
+using G = schema::CarSceneDrawGlobals;
+using Point = schema::CarScenePoint;
 
 constexpr uint32_t kPerspectiveFrame = 128;
 constexpr uint32_t kBuildFrame = 256;
@@ -50,20 +50,21 @@ void LookAt(uint8_t* base, uint32_t out, uint32_t eye, uint32_t target, uint32_t
             uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_82597378 Matrix::LookAt");
   const uint32_t s = stack;
+  const Point pe(base, eye), pt(base, target);
   // forward = target - eye (x, y, z; w 1.0) at s - 32.
   {
-    const double ex = Lfs(base, eye + 0);
-    const double tx = Lfs(base, target + 0);
+    const double ex = double(pe.x());
+    const double tx = double(pt.x());
     Stfs(base, s - 32, Fsubs(tx, ex));
   }
   {
-    const double ty = Lfs(base, target + 4);
-    const double ey = Lfs(base, eye + 4);
+    const double ty = double(pt.y());
+    const double ey = double(pe.y());
     Stfs(base, s - 28, Fsubs(ty, ey));
   }
-  const double tz = Lfs(base, target + 8);
-  const double ez = Lfs(base, eye + 8);
-  const double one = Lfs(base, kOne);
+  const double tz = double(pt.z());
+  const double ez = double(pe.z());
+  const double one = double(G::one(base));
   Stfs(base, s - 24, Fsubs(tz, ez));
   Stfs(base, s - 20, one);
   const simde__m128 vup = Lvx(base, up);
@@ -94,7 +95,7 @@ void LookAt(uint8_t* base, uint32_t out, uint32_t eye, uint32_t target, uint32_t
     v12 = Dot3(v13, v13);
     Stvx(base, s - 32, v13);
   }
-  const double zero = Lfs(base, kZero);
+  const double zero = double(G::zero(base));
   Stfs(base, out + 12, zero);
   Stfs(base, out + 28, zero);
   Stfs(base, out + 44, zero);
@@ -157,20 +158,20 @@ void LookAt(uint8_t* base, uint32_t out, uint32_t eye, uint32_t target, uint32_t
 
 bool PerspectiveDeclines(uint8_t* base, double fov) {
   double t;
-  return !Tangent(Fmuls(fov, Lfs(base, kHalfFov)), &t);
+  return !Tangent(Fmuls(fov, double(G::half(base))), &t);
 }
 
 bool Perspective(uint8_t* base, uint32_t out, double fov, double aspect, double near_plane,
                  double far_plane, uint32_t stack) {
   double t;
-  if (!Tangent(Fmuls(fov, Lfs(base, kHalfFov)), &t)) {
+  if (!Tangent(Fmuls(fov, double(G::half(base))), &t)) {
     return false;
   }
   ITC_NATIVE_RUNNING("sub_825972A8 Matrix::Perspective");
   Store(base, stack - kPerspectiveFrame, stack);  // the back chain, as stwu
   const double depth = Fsubs(far_plane, near_plane);
   double offset = Fmuls(near_plane, far_plane);
-  const double zero = Lfs(base, kZero);
+  const double zero = double(G::zero(base));
   Stfs(base, out + 4, zero);
   Stfs(base, out + 8, zero);
   Stfs(base, out + 12, zero);
@@ -185,7 +186,7 @@ bool Perspective(uint8_t* base, uint32_t out, double fov, double aspect, double 
   Stfs(base, out + 52, zero);
   Stfs(base, out + 60, zero);
   const double tangent = Frsp(t);
-  const double one = Lfs(base, kOne);
+  const double one = double(G::one(base));
   Stfs(base, out + 40, scale);
   Stfs(base, out + 44, one);
   Stfs(base, out + 56, Fneg(offset));
@@ -204,14 +205,14 @@ bool ProjectorBuild(uint8_t* base, uint32_t out, uint32_t eye, uint32_t target, 
   ITC_NATIVE_RUNNING("sub_82597610 Projector::Build");
   const uint32_t f = stack - kBuildFrame;
   Store(base, f, stack);  // the back chain, as stwu
-  const double one = Lfs(base, kOne);
+  const double one = double(G::one(base));
   for (uint32_t at : {156u, 172u, 188u, 204u, 92u, 108u, 124u, 140u}) {
     Stfs(base, f + at, one);
   }
   LookAt(base, f + 144, eye, target, up, f);
   Perspective(base, f + 80, fov, aspect, near_plane, far_plane, f);
   Multiply(base, out, f + 144, f + 80, kBuildMultiply1);
-  Multiply(base, out, out, kBias, kBuildMultiply2);
+  Multiply(base, out, out, G::bias_matrix_address(), kBuildMultiply2);
   return true;
 }
 
@@ -221,7 +222,7 @@ void ProjectorBuildOrtho(uint8_t* base, uint32_t out, uint32_t eye, uint32_t tar
   ITC_NATIVE_RUNNING("sub_82597518 Projector::BuildOrtho");
   const uint32_t f = stack - kBuildOrthoFrame;
   Store(base, f, stack);  // the back chain, as stwu
-  const double one = Lfs(base, kOne);
+  const double one = double(G::one(base));
   for (uint32_t at : {156u, 172u, 188u, 204u}) {
     Stfs(base, f + at, one);
   }
@@ -230,10 +231,10 @@ void ProjectorBuildOrtho(uint8_t* base, uint32_t out, uint32_t eye, uint32_t tar
   const double far_minus_near = Fsubs(far_plane, near_plane);
   const double near_minus_far = Fsubs(near_plane, far_plane);
   Stfs(base, f + 140, one);
-  const double scale = Lfs(base, kOrthoScale);
+  const double scale = double(G::two(base));
   Stfs(base, f + 80, Fdivs(scale, width));
   Stfs(base, f + 100, Fdivs(scale, height));
-  const double zero = Lfs(base, kZero);
+  const double zero = double(G::zero(base));
   const double depth = Fdivs(one, far_minus_near);
   for (uint32_t at : {84u, 88u, 92u, 96u, 104u, 108u, 112u, 116u, 124u, 128u, 132u}) {
     Stfs(base, f + at, zero);
@@ -242,7 +243,7 @@ void ProjectorBuildOrtho(uint8_t* base, uint32_t out, uint32_t eye, uint32_t tar
   Stfs(base, f + 120, depth);
   Stfs(base, f + 136, offset);
   Multiply(base, out, f + 144, f + 80, kOrthoMultiply1);
-  Multiply(base, out, out, kBias, kOrthoMultiply2);
+  Multiply(base, out, out, G::bias_matrix_address(), kOrthoMultiply2);
 }
 
 }  // namespace car_scene_draw

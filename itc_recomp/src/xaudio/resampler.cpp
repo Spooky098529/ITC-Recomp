@@ -10,6 +10,7 @@
 #include "base/log.h"
 #include "c_runtime/math.h"
 #include "guest.h"
+#include "schema/xaudio_objects.h"
 #include "xaudio/ppc_float.h"
 
 #include "base/float_mode.h"
@@ -21,6 +22,8 @@
 #include <cmath>
 
 namespace xaudio {
+
+using schema::ConverterState;
 
 namespace {
 
@@ -111,13 +114,14 @@ uint32_t Frames(uint32_t bytes, uint32_t channels) {
 // The end of each kernel: the position (+8, at most the end), the frames
 // written (+28, at most the output's) from the input and output pointers.
 void StorePositions(uint8_t* base, uint32_t state, uint64_t input, uint64_t output) {
-  const uint32_t channels = guest::LoadU8(base, state + 13);
-  const uint32_t frames = Frames(uint32_t(input - guest::LoadU32(base, state + 0)), channels);
-  const uint32_t end = guest::LoadU32(base, state + 4);
-  guest::StoreU32(base, state + 8, frames < end ? frames : end);
-  const uint32_t written = uint32_t(output - guest::LoadU32(base, state + 20)) >> 2;
-  const uint32_t limit = guest::LoadU32(base, state + 24);
-  guest::StoreU32(base, state + 28, written < limit ? written : limit);
+  const ConverterState s(base, state);
+  const uint32_t channels = s.channels();
+  const uint32_t frames = Frames(uint32_t(input - s.input()), channels);
+  const uint32_t end = s.input_end();
+  s.set_position(frames < end ? frames : end);
+  const uint32_t written = uint32_t(output - s.output()) >> 2;
+  const uint32_t limit = s.output_frames();
+  s.set_frames_written(written < limit ? written : limit);
 }
 
 }  // namespace
@@ -136,19 +140,20 @@ namespace {
 // float x 2^-32 goes to +48).
 uint64_t ResampleMonoVector(uint8_t* base, uint64_t r3, uint64_t r5, uint64_t r6, uint32_t state,
                             uint32_t sp) {
+  const ConverterState s(base, state);
   ITC_NATIVE_RUNNING("sub_8246E208 the mono resampler's vector path");
   const uint32_t frame = sp - 176;
   Mode mode;
   mode.Scalar();
   uint64_t r11 = r3;
-  const double f11 = LoadSingle(base, state + 44);
-  double f10 = LoadSingle(base, state + 48);
-  double f0 = LoadSingle(base, state + 36);
+  const double f11 = double(s.ratio());
+  double f10 = double(s.fraction());
+  double f0 = double(s.volume());
   const uint64_t r10 = Ext(uint32_t(r6));
-  double f13 = LoadSingle(base, state + 40);
-  CopyFloat(base, frame + 80, state + 36);
+  double f13 = double(s.target_volume());
+  CopyFloat(base, frame + 80, s.volume_address());
   f0 = double(float(f13 - f0));
-  CopyFloat(base, state + 36, state + 40);
+  CopyFloat(base, s.volume_address(), s.target_volume_address());
   Vec v0 = Zero();
   const Vec v4 = simde_mm_set1_epi32(1);
   StoreU64(base, frame + 88, r10);
@@ -251,7 +256,7 @@ uint64_t ResampleMonoVector(uint8_t* base, uint64_t r3, uint64_t r5, uint64_t r6
   mode.Scalar();
   f0 = f1 * LoadDouble(base, 0x820022B0);
   f0 = double(float(f0));
-  guest::StoreFloat(base, state + 48, float(f0));
+  s.set_fraction(float(f0));
   return std::bit_cast<uint64_t>(f1);
 }
 
@@ -260,19 +265,20 @@ uint64_t ResampleMonoVector(uint8_t* base, uint64_t r3, uint64_t r5, uint64_t r6
 // bytes after the first's).
 uint64_t ResampleStereoVector(uint8_t* base, uint64_t r3, uint64_t r5, uint64_t r6,
                               uint32_t state, uint32_t sp) {
+  const ConverterState s(base, state);
   ITC_NATIVE_RUNNING("sub_8246E4C8 the stereo resampler's vector path");
   const uint32_t frame = sp - 176;
   Mode mode;
   mode.Scalar();
   uint64_t r10 = r3;
-  const double f11 = LoadSingle(base, state + 44);
-  double f10 = LoadSingle(base, state + 48);
-  double f0 = LoadSingle(base, state + 36);
+  const double f11 = double(s.ratio());
+  double f10 = double(s.fraction());
+  double f0 = double(s.volume());
   const uint64_t r11 = Ext(uint32_t(r6));
-  double f13 = LoadSingle(base, state + 40);
-  CopyFloat(base, frame + 80, state + 36);
+  double f13 = double(s.target_volume());
+  CopyFloat(base, frame + 80, s.volume_address());
   f0 = double(float(f13 - f0));
-  CopyFloat(base, state + 36, state + 40);
+  CopyFloat(base, s.volume_address(), s.target_volume_address());
   Vec v0 = Zero();
   const Vec v2 = simde_mm_set1_epi32(1);
   StoreU64(base, frame + 88, r11);
@@ -397,7 +403,7 @@ uint64_t ResampleStereoVector(uint8_t* base, uint64_t r3, uint64_t r5, uint64_t 
   mode.Scalar();
   f0 = f1 * LoadDouble(base, 0x820022B0);
   f0 = double(float(f0));
-  guest::StoreFloat(base, state + 48, float(f0));
+  s.set_fraction(float(f0));
   return std::bit_cast<uint64_t>(f1);
 }
 
@@ -408,27 +414,28 @@ uint64_t ResampleStereoVector(uint8_t* base, uint64_t r3, uint64_t r5, uint64_t 
 // fraction not below 0.0 (the float at 0x82000A34); else the scalar path.
 template <bool stereo>
 uint64_t Resample(uint8_t* base, uint32_t state, uint32_t sp) {
+  const ConverterState s(base, state);
   const uint32_t frame = sp - 112;
   Mode mode;
   mode.Scalar();
-  const uint64_t written = guest::LoadU32(base, state + 28);
-  const double f13 = LoadSingle(base, state + 48);
-  const uint64_t frames = guest::LoadU32(base, state + 24);
-  const uint64_t position = guest::LoadU32(base, state + 8);
+  const uint64_t written = s.frames_written();
+  const double f13 = double(s.fraction());
+  const uint64_t frames = s.output_frames();
+  const uint64_t position = s.position();
   uint64_t r5 = uint64_t(uint32_t(written) << 2);
-  const uint32_t channels = guest::LoadU8(base, state + 13);
+  const uint32_t channels = s.channels();
   const uint64_t r6 = frames - written;
-  const uint64_t end = guest::LoadU32(base, state + 4);
+  const uint64_t end = s.input_end();
   const int64_t offset = int64_t(int32_t(channels)) * int64_t(int32_t(uint32_t(position)));
-  const uint64_t input = guest::LoadU32(base, state + 0);
-  const uint64_t output = guest::LoadU32(base, state + 20);
+  const uint64_t input = s.input();
+  const uint64_t output = s.output();
   const uint64_t r4 = end - position;
   const uint64_t r3 = uint64_t(uint32_t(uint64_t(offset)) << 1) + input;
   r5 = r5 + output;
   bool vector = (((uint32_t(r6) & 7) | uint32_t(r5)) & 0xF) == 0;
   if (vector) {
     const uint64_t left = Ext(uint32_t(r6));
-    const double ratio = LoadSingle(base, state + 44);
+    const double ratio = double(s.ratio());
     const uint64_t last = Ext(uint32_t(r4 - 1));
     StoreU64(base, frame + 80, left);
     StoreU64(base, frame + 88, last);
@@ -464,19 +471,20 @@ uint64_t ResampleStereo(uint8_t* base, uint32_t state, uint32_t sp) {
 // before the first), the volume ramp added a frame at a time; their words
 // below `sp` as the original leaves them.
 uint64_t ResampleMonoScalar(uint8_t* base, uint32_t state, uint32_t sp) {
+  const ConverterState s(base, state);
   ITC_NATIVE_RUNNING("sub_82473E48 the mono resampler's scalar path");
   Mode mode;
   mode.Scalar();
-  const uint32_t input = guest::LoadU32(base, state + 0);
-  const double f13_ratio = LoadSingle(base, state + 44);
-  const uint32_t written = guest::LoadU32(base, state + 28);
-  uint64_t r7 = uint64_t(uint32_t(written << 2)) + guest::LoadU32(base, state + 20);
-  const uint32_t position = guest::LoadU32(base, state + 8);
-  const uint32_t channels = guest::LoadU8(base, state + 13);
-  const uint64_t frames = guest::LoadU32(base, state + 24);
+  const uint32_t input = s.input();
+  const double f13_ratio = double(s.ratio());
+  const uint32_t written = s.frames_written();
+  uint64_t r7 = uint64_t(uint32_t(written << 2)) + s.output();
+  const uint32_t position = s.position();
+  const uint32_t channels = s.channels();
+  const uint64_t frames = s.output_frames();
   const int64_t offset = int64_t(int32_t(channels)) * int64_t(int32_t(position));
-  const uint64_t end = guest::LoadU32(base, state + 4);
-  const double f12_fraction = LoadSingle(base, state + 48);
+  const uint64_t end = s.input_end();
+  const double f12_fraction = double(s.fraction());
   uint64_t r8 = frames - written;
   const uint64_t r25 = end - position;
   const uint64_t r9 = uint64_t(uint32_t(uint64_t(offset)) << 1) + input;
@@ -484,11 +492,11 @@ uint64_t ResampleMonoScalar(uint8_t* base, uint32_t state, uint32_t sp) {
   Vec v13 = Lvlx(base, sp - 144);
   mode.Vector();
   v13 = ToFloat(v13);
-  Vec v12 = Lvlx(base, state + 40);
+  Vec v12 = Lvlx(base, s.target_volume_address());
   StoreU64(base, sp - 136, 1ull << 32);
   mode.Scalar();
   double f0 = double(int64_t(LoadU64(base, sp - 136)));
-  Vec v0 = Lvlx(base, state + 36);
+  Vec v0 = Lvlx(base, s.volume_address());
   mode.Vector();
   v12 = Sub(v12, v0);
   Vec v9 = Reciprocal(v13);
@@ -520,7 +528,7 @@ uint64_t ResampleMonoScalar(uint8_t* base, uint32_t state, uint32_t sp) {
       Vec v6 = v13;
       Vec v5 = v0, v4 = v0, v3 = v0;
       Vec v8 = Lvlx(base, uint32_t(r9));
-      Vec v7 = Lvlx(base, state + 52);
+      Vec v7 = Lvlx(base, s.last_sample_0_address());
       v6 = Vsr(v6, ones);
       v12 = Splat0(v7);
       mode.Vector();
@@ -590,7 +598,7 @@ uint64_t ResampleMonoScalar(uint8_t* base, uint32_t state, uint32_t sp) {
       const double f13 = double(int64_t(LoadU64(base, sp - 136)));
       const double f12s = double(float(f13));
       const double scaled = double(float(f12s * LoadSingle(base, 0x8204D160)));
-      guest::StoreFloat(base, state + 52, float(scaled));
+      s.set_last_sample_0(float(scaled));
     } else {
       const int64_t r8s = int64_t(int32_t(uint32_t(r25)));
       if (int64_t(r10) > r8s) {
@@ -599,33 +607,34 @@ uint64_t ResampleMonoScalar(uint8_t* base, uint32_t state, uint32_t sp) {
     }
   }
   const uint64_t r6 = r10 << 32;
-  Stvewx(base, state + 36, v0);
+  Stvewx(base, s.volume_address(), v0);
   const uint64_t at = uint64_t(uint32_t(uint32_t(r10) << 1)) + r9;
   r11 = r11 - r6;
   StoreU64(base, sp - 136, r11);
   mode.Scalar();
   const double f13 = double(int64_t(LoadU64(base, sp - 136)));
-  guest::StoreFloat(base, state + 48, float(double(float(f13 * f0))));
+  s.set_fraction(float(double(float(f13 * f0))));
   StorePositions(base, state, at, r7);
   return state;
 }
 
 uint64_t ResampleStereoScalar(uint8_t* base, uint32_t state, uint32_t sp) {
+  const ConverterState s(base, state);
   ITC_NATIVE_RUNNING("sub_82474188 the stereo resampler's scalar path");
   Mode mode;
   mode.Scalar();
-  const uint32_t input = guest::LoadU32(base, state + 0);
-  const double f13_ratio = LoadSingle(base, state + 44);
-  const uint32_t written = guest::LoadU32(base, state + 28);
-  const uint32_t output = guest::LoadU32(base, state + 20);
+  const uint32_t input = s.input();
+  const double f13_ratio = double(s.ratio());
+  const uint32_t written = s.frames_written();
+  const uint32_t output = s.output();
   uint64_t r8 = uint64_t(uint32_t(written << 2)) + output;
-  const uint32_t position = guest::LoadU32(base, state + 8);
-  const uint32_t channels = guest::LoadU8(base, state + 13);
-  const uint32_t kept = state + 52;
-  const uint64_t frames = guest::LoadU32(base, state + 24);
+  const uint32_t position = s.position();
+  const uint32_t channels = s.channels();
+  const uint32_t kept = s.last_sample_0_address();
+  const uint64_t frames = s.output_frames();
   const int64_t offset = int64_t(int32_t(channels)) * int64_t(int32_t(position));
-  const uint64_t end = guest::LoadU32(base, state + 4);
-  const double f12_fraction = LoadSingle(base, state + 48);
+  const uint64_t end = s.input_end();
+  const double f12_fraction = double(s.fraction());
   uint64_t r7 = frames - written;
   const uint64_t r25 = end - position;
   const uint64_t r9 = uint64_t(uint32_t(uint64_t(offset)) << 1) + input;
@@ -633,11 +642,11 @@ uint64_t ResampleStereoScalar(uint8_t* base, uint32_t state, uint32_t sp) {
   Vec v13 = Lvlx(base, sp - 160);
   mode.Vector();
   v13 = ToFloat(v13);
-  Vec v12 = Lvlx(base, state + 40);
+  Vec v12 = Lvlx(base, s.target_volume_address());
   StoreU64(base, sp - 152, 1ull << 32);
   mode.Scalar();
   double f0 = double(int64_t(LoadU64(base, sp - 152)));
-  Vec v0 = Lvlx(base, state + 36);
+  Vec v0 = Lvlx(base, s.volume_address());
   mode.Vector();
   v12 = Sub(v12, v0);
   Vec v9 = Reciprocal(v13);
@@ -791,13 +800,13 @@ uint64_t ResampleStereoScalar(uint8_t* base, uint32_t state, uint32_t sp) {
     }
   }
   const uint64_t r6 = r10 << 32;
-  Stvewx(base, state + 36, v0);
+  Stvewx(base, s.volume_address(), v0);
   const uint64_t at = uint64_t(uint32_t(uint32_t(r10) << 2)) + r9;
   r11 = r11 - r6;
   StoreU64(base, sp - 152, r11);
   mode.Scalar();
   const double f13 = double(int64_t(LoadU64(base, sp - 152)));
-  guest::StoreFloat(base, state + 48, float(double(float(f13 * f0))));
+  s.set_fraction(float(double(float(f13 * f0))));
   StorePositions(base, state, at, r8);
   return state;
 }
@@ -805,23 +814,24 @@ uint64_t ResampleStereoScalar(uint8_t* base, uint32_t state, uint32_t sp) {
 // --- Equal rates (entries 107 and 32) ---
 
 uint64_t CopyStereoScalar(uint8_t* base, uint32_t state, uint32_t sp) {
+  const ConverterState s(base, state);
   ITC_NATIVE_RUNNING("sub_82478E60 the stereo copy's scalar path");
   Mode mode;
-  const uint32_t position = guest::LoadU32(base, state + 8);
+  const uint32_t position = s.position();
   mode.Scalar();
-  double f0 = LoadSingle(base, state + 36);
-  const uint32_t channels = guest::LoadU8(base, state + 13);
-  const uint32_t written = guest::LoadU32(base, state + 28);
-  uint64_t r9 = uint64_t(guest::LoadU32(base, state + 4)) - position;
-  const uint64_t r6 = uint64_t(guest::LoadU32(base, state + 24)) - written;
+  double f0 = double(s.volume());
+  const uint32_t channels = s.channels();
+  const uint32_t written = s.frames_written();
+  uint64_t r9 = uint64_t(s.input_end()) - position;
+  const uint64_t r6 = uint64_t(s.output_frames()) - written;
   const int64_t offset = int64_t(int32_t(channels)) * int64_t(int32_t(position));
-  uint64_t r11 = uint64_t(uint32_t(uint64_t(offset)) << 1) + guest::LoadU32(base, state + 0);
-  uint64_t r8 = uint64_t(uint32_t(written << 2)) + guest::LoadU32(base, state + 20);
+  uint64_t r11 = uint64_t(uint32_t(uint64_t(offset)) << 1) + s.input();
+  uint64_t r8 = uint64_t(uint32_t(written << 2)) + s.output();
   if (!(int32_t(r9) < int32_t(r6))) {
     r9 = r6;
   }
   const uint64_t left = Ext(uint32_t(r6));
-  double f13 = LoadSingle(base, state + 40);
+  double f13 = double(s.target_volume());
   f13 = double(float(f13 - f0));
   StoreU64(base, sp - 16, left);
   double f12 = double(int64_t(LoadU64(base, sp - 16)));
@@ -849,22 +859,23 @@ uint64_t CopyStereoScalar(uint8_t* base, uint32_t state, uint32_t sp) {
     f0 = double(float(f12 + f0));
   } while (int32_t(r9) != 0);
   StorePositions(base, state, r11, r8);
-  guest::StoreFloat(base, state + 36, float(f0));
+  s.set_volume(float(f0));
   return state;
 }
 
 uint64_t CopyStereo(uint8_t* base, uint32_t state, uint32_t sp) {
+  const ConverterState s(base, state);
   ITC_NATIVE_RUNNING("sub_8247F558 the stereo copy");
   const uint32_t frame = sp - 160;
-  const uint32_t position = guest::LoadU32(base, state + 8);
-  const uint64_t end = guest::LoadU32(base, state + 4);
-  const uint32_t channels = guest::LoadU8(base, state + 13);
-  const uint32_t written = guest::LoadU32(base, state + 28);
+  const uint32_t position = s.position();
+  const uint64_t end = s.input_end();
+  const uint32_t channels = s.channels();
+  const uint32_t written = s.frames_written();
   uint64_t r9 = end - position;
-  const uint64_t frames = guest::LoadU32(base, state + 24);
+  const uint64_t frames = s.output_frames();
   const int64_t offset = int64_t(int32_t(channels)) * int64_t(int32_t(position));
-  const uint64_t input = guest::LoadU32(base, state + 0);
-  const uint64_t output = guest::LoadU32(base, state + 20);
+  const uint64_t input = s.input();
+  const uint64_t output = s.output();
   uint64_t r7 = frames - written;
   uint64_t r11 = uint64_t(uint32_t(uint64_t(offset)) << 1) + input;
   uint64_t r8 = uint64_t(uint32_t(written << 2)) + output;
@@ -879,12 +890,12 @@ uint64_t CopyStereo(uint8_t* base, uint32_t state, uint32_t sp) {
   Vec v0 = Zero();
   r7 = Ext(uint32_t(r9) << 1);
   mode.Scalar();
-  double f0 = LoadSingle(base, state + 36);
-  double f13 = LoadSingle(base, state + 40);
+  double f0 = double(s.volume());
+  double f13 = double(s.target_volume());
   f13 = double(float(f13 - f0));
   StoreU64(base, frame + 80, left);
   double f12 = double(int64_t(LoadU64(base, frame + 80)));
-  CopyFloat(base, frame + 80, state + 36);
+  CopyFloat(base, frame + 80, s.volume_address());
   StoreU64(base, frame + 88, r7);
   Stvx(base, frame + 96, v0);
   f12 = double(float(f12));
@@ -893,7 +904,7 @@ uint64_t CopyStereo(uint8_t* base, uint32_t state, uint32_t sp) {
   Stvx(base, frame + 96, v0);
   f11 = double(float(f11));
   f0 = double(float(std::fma(f11, f13, f0)));
-  guest::StoreFloat(base, state + 36, float(f0));
+  s.set_volume(float(f0));
   f0 = LoadSingle(base, 0x820021F8);
   v0 = Lvlx(base, frame + 80);
   f0 = double(float(f13 * f0));
@@ -949,29 +960,30 @@ uint64_t CopyStereo(uint8_t* base, uint32_t state, uint32_t sp) {
   }
   // The position and the frames written from the words loaded first.
   const uint32_t used = Frames(uint32_t(r11 - input), channels);
-  guest::StoreU32(base, state + 8, used < uint32_t(end) ? used : uint32_t(end));
+  s.set_position(used < uint32_t(end) ? used : uint32_t(end));
   const uint32_t made = uint32_t(r8 - output) >> 2;
-  guest::StoreU32(base, state + 28, made < uint32_t(frames) ? made : uint32_t(frames));
+  s.set_frames_written(made < uint32_t(frames) ? made : uint32_t(frames));
   return state;
 }
 
 uint64_t ResamplerProcess(uint8_t* base, uint32_t state, uint32_t frame, const GuestCall& call) {
+  const ConverterState s(base, state);
   ITC_NATIVE_RUNNING("sub_8246F140 Resampler::Process");
-  const uint32_t end = guest::LoadU32(base, state + 4);
-  const uint32_t start = guest::LoadU32(base, state + 8);
+  const uint32_t end = s.input_end();
+  const uint32_t start = s.position();
   if (!(start < end)) {
     return 0;
   }
-  if (!(guest::LoadU32(base, state + 28) < guest::LoadU32(base, state + 24))) {
+  if (!(s.frames_written() < s.output_frames())) {
     return 0;
   }
-  const uint32_t changed = guest::LoadU32(base, state + 80);
+  const uint32_t changed = s.changed();
   if (changed != 0) {
     if ((changed & 3) != 0) {
       Mode mode;
-      const uint32_t out_rate = guest::LoadU32(base, state + 32);
-      const uint32_t in_rate = guest::LoadU32(base, state + 16);
-      const uint32_t flags = guest::LoadU32(base, state + 84);
+      const uint32_t out_rate = s.output_rate();
+      const uint32_t in_rate = s.input_rate();
+      const uint32_t flags = s.flags();
       StoreU64(base, frame + 80, in_rate);
       StoreU64(base, frame + 88, out_rate);
       mode.Scalar();
@@ -980,7 +992,7 @@ uint64_t ResamplerProcess(uint8_t* base, uint32_t state, uint32_t frame, const G
       f0 = double(float(f0));
       f13 = double(float(f13));
       f0 = double(float(f0 / f13));
-      guest::StoreFloat(base, state + 44, float(f0));
+      s.set_ratio(float(f0));
       // The case: 3 any ratio, 4 equal rates, 5 two to one (with flags bit
       // 0); 3 less with bit 7 (the scalar set).
       const uint64_t scalar = (flags & 0x80) != 0 ? 0xFFFFFFFFFFFFFFFDull : 0;
@@ -992,8 +1004,8 @@ uint64_t ResamplerProcess(uint8_t* base, uint32_t state, uint32_t frame, const G
           kind = scalar + 5;
         }
       }
-      const uint64_t channels = guest::LoadU8(base, state + 13);
-      const uint64_t format = guest::LoadU8(base, state + 12);
+      const uint64_t channels = s.channels();
+      const uint64_t format = s.format();
       uint64_t code = 0;
       switch (uint32_t(channels - 1)) {
         case 0:
@@ -1007,12 +1019,12 @@ uint64_t ResamplerProcess(uint8_t* base, uint32_t state, uint32_t frame, const G
       }
       uint64_t index = kind * 5 + format;
       index = index * 5 + code;
-      const uint32_t entry = uint32_t(index << 2) + kResamplerKernels;
-      guest::StoreU32(base, state + 76, guest::LoadU32(base, entry));
+      const uint32_t entry = uint32_t(index << 2) + schema::XaudioObjectsGlobals::resampler_kernels_address();
+      s.set_kernel(guest::LoadU32(base, entry));
     }
-    guest::StoreU32(base, state + 80, 0);
+    s.set_changed(0);
   }
-  const uint32_t kernel = guest::LoadU32(base, state + 76);
+  const uint32_t kernel = s.kernel();
   switch (kernel) {
     case 0x8247E188:
       ResampleMono(base, state, frame);
@@ -1039,7 +1051,7 @@ uint64_t ResamplerProcess(uint8_t* base, uint32_t state, uint32_t frame, const G
     call(kernel, 0x8246F2DC, regs);
       break;
   }
-  return uint64_t(guest::LoadU32(base, state + 8)) - uint64_t(start);
+  return uint64_t(s.position()) - uint64_t(start);
 }
 
 }  // namespace xaudio

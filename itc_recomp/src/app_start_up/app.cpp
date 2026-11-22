@@ -8,6 +8,8 @@
 #include "framework/framework.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/app_start_up.h"
+#include "schema/app_states.h"
 
 ITC_FLAG_DECLARE(bool, native_app_start_up);
 ITC_FLAG_DECLARE(bool, native_framework);
@@ -36,39 +38,45 @@ constexpr uint32_t kSoundName = 0x82000EAC;    // "txr_xact"
 uint32_t AppConstruct(uint8_t* base, uint32_t app, uint32_t block, uint32_t frame,
                       const AppCalls& calls) {
   ITC_NATIVE_RUNNING("sub_82094590 App::App");
+  const schema::App self(base, app);
   // The base classes' vtables, then the app's own.
-  Store(base, app + 4, 0x82000ABC);
-  Store(base, app + 8, 0x82000A74);
-  Store(base, app + 12, 0x82000D48);
-  Store(base, app + 16, 0x82000DD0);
-  Store(base, app + 20, 0x82000DA0);
-  Store(base, app + 12, 0x82000E70);
-  Store(base, app + 0, 0x82000EA0);
-  Store(base, app + 4, 0x82000E94);
-  Store(base, app + 8, 0x82000E80);
-  Store(base, app + 16, 0x82000E38);
-  Store(base, app + 20, 0x82000E08);
+  self.set_vtable_4(0x82000ABC);
+  self.set_vtable_8(0x82000A74);
+  self.set_vtable_12(0x82000D48);
+  self.set_vtable_16(0x82000DD0);
+  self.set_interface_vtable(0x82000DA0);
+  self.set_vtable_12(0x82000E70);
+  self.set_vtable(0x82000EA0);
+  self.set_vtable_4(0x82000E94);
+  self.set_vtable_8(0x82000E80);
+  self.set_vtable_16(0x82000E38);
+  self.set_interface_vtable(0x82000E08);
   // The four handler maps (r30 still the +12 vtable).
-  calls.call(kHandlerMap, app + 28, 0x82000E80, 0x82094644, 0x82000E70, {});  // r4 as left
-  calls.call(kHandlerMap, app + 40, {}, 0x8209464C, 0x82000E70, {});
-  calls.call(kHandlerMap, app + 52, {}, 0x82094654, 0x82000E70, {});
-  calls.call(kHandlerMap, app + 64, {}, 0x8209465C, 0x82000E70, {});
+  calls.call(kHandlerMap, self.handlers_address(), 0x82000E80, 0x82094644, 0x82000E70,
+             {});  // r4 as left
+  calls.call(kHandlerMap, self.toggled_handlers_address(), {}, 0x8209464C, 0x82000E70, {});
+  calls.call(kHandlerMap, self.always_handlers_address(), {}, 0x82094654, 0x82000E70, {});
+  calls.call(kHandlerMap, self.listeners_address(), {}, 0x8209465C, 0x82000E70, {});
   // The tick handler (key 8, App::Update) on the run loop's slot 2.
   Store(base, frame + 116, app);
   Store(base, frame + 84, 0);
   Store(base, frame + 112, kMemberDelegateVtable);
   Store(base, frame + 80, 0x82093DC0);
-  for (const uint32_t at : {80u, 84u, 88u, 100u, 104u, 108u}) {
-    Store(base, app + at, 0);
-  }
+  self.set_messages_first(0u);
+  self.set_messages_last(0u);
+  self.set_messages_end(0u);
+  self.set_requests_first(0);
+  self.set_requests_last(0);
+  self.set_requests_end(0);
   Store(base, frame + 120, 0x82093DC0);
   Store(base, frame + 124, 0);
   Store(base, frame + 80, 8);
-  guest::StoreU8(base, app + 112, 0);
-  guest::StoreU8(base, app + 114, 0);
-  guest::StoreU8(base, app + 113, 0);
-  Store(base, app + 24, Load(base, block + 4));
-  calls.virtual_call(Load(base, block + 0), 8, frame + 80, frame + 112, 0x820946D8);
+  self.set_toggled(0);
+  self.set_unknown_114(0);
+  self.set_step(0);
+  const schema::AppSetUpBlock set_up(base, block);
+  self.set_framework_input(set_up.framework_interface().address);
+  calls.virtual_call(set_up.run_loop().address, 8, frame + 80, frame + 112, 0x820946D8);
   // The run-loop listener (key 9, App::OnRunLoopEvent) on its slot 1.
   Store(base, frame + 84, 0);
   Store(base, frame + 132, app);
@@ -78,14 +86,14 @@ uint32_t AppConstruct(uint8_t* base, uint32_t app, uint32_t block, uint32_t fram
   Store(base, frame + 136, 0x82092DE0);
   Store(base, frame + 140, 0);
   Store(base, frame + 80, 9);
-  calls.virtual_call(Load(base, block + 0), 4, frame + 80, frame + 128, 0x82094730);
+  calls.virtual_call(set_up.run_loop().address, 4, frame + 80, frame + 128, 0x82094730);
   // The state stack, from {the app} on the frame.
   Store(base, frame + 88, app);
   Store(base, frame + 128, 0x82000ABC);
   const uint32_t states = calls.call(kStatesCreate, frame + 88, {}, 0x82094748, 0, {});
-  Store(base, frame + 96, app + 20);
-  Store(base, frame + 100, app + 4);
-  Store(base, app + 116, states);
+  Store(base, frame + 96, self.interface_vtable_address());
+  Store(base, frame + 100, self.vtable_4_address());
+  self.set_states(states);
   // The second camera class, from {app + 20, app + 4}.
   uint32_t camera = 0;
   const auto camera_block = memory::crt::OperatorNew(base, kAppCameraBytes);
@@ -95,9 +103,9 @@ uint32_t AppConstruct(uint8_t* base, uint32_t app, uint32_t block, uint32_t fram
     camera = calls.call(kAppCamera, camera_at, frame + 96, 0x82094770, 0, {});
   }
   // The movie class, from {app + 20, app + 8}.
-  Store(base, frame + 104, app + 20);
-  Store(base, frame + 108, app + 8);
-  Store(base, app + 120, camera);
+  Store(base, frame + 104, self.interface_vtable_address());
+  Store(base, frame + 108, self.vtable_8_address());
+  self.set_camera(camera);
   uint32_t movie = 0;
   const auto movie_block = memory::crt::OperatorNew(base, kMovieBytes);
   const uint32_t movie_at =
@@ -105,13 +113,14 @@ uint32_t AppConstruct(uint8_t* base, uint32_t app, uint32_t block, uint32_t fram
   if (movie_at != 0) {
     movie = calls.call(kMovie, movie_at, frame + 104, 0x820947A0, 0, {});
   }
-  Store(base, app + 128, movie);
+  self.set_movie(movie);
   // The sound manager, "txr_xact" with 3 banks (the count on the frame).
   Store(base, frame + 80, 3);
   const uint32_t sound =
-      calls.call(kAudioManagerCreate, app + 12, kSoundName, 0x820947C4, movie, frame + 80);
-  Store(base, app + 124, sound);
-  calls.call(kStartUp, app + 16, {}, 0x820947D4, movie, {});
+      calls.call(kAudioManagerCreate, self.vtable_12_address(), kSoundName, 0x820947C4, movie,
+                 frame + 80);
+  self.set_sound_manager(sound);
+  calls.call(kStartUp, self.vtable_16_address(), {}, 0x820947D4, movie, {});
   return app;
 }
 
@@ -138,7 +147,8 @@ std::optional<DirectSlot> RenderManagerCall(uint8_t* base, uint32_t function, ui
 }
 
 std::optional<uint32_t> RenderManagerScene(uint8_t* base, uint32_t manager) {
-  const auto slot = RenderManagerCall(base, Load(base, Load(base, manager) + 32), manager);
+  const auto slot = RenderManagerCall(
+      base, Load(base, schema::AppInterface16(base, manager).vtable() + 32), manager);
   if (!slot) {
     return std::nullopt;
   }
@@ -146,7 +156,8 @@ std::optional<uint32_t> RenderManagerScene(uint8_t* base, uint32_t manager) {
 }
 
 std::optional<uint32_t> RenderManagerFrameDriver(uint8_t* base, uint32_t manager) {
-  const auto slot = RenderManagerCall(base, Load(base, Load(base, manager) + 28), manager);
+  const auto slot = RenderManagerCall(
+      base, Load(base, schema::AppInterface16(base, manager).vtable() + 28), manager);
   if (!slot) {
     return std::nullopt;
   }
@@ -171,18 +182,18 @@ std::optional<uint32_t> AppCreate(uint8_t* base, uint32_t block,
 
 uint32_t InterfaceWord108(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82379338 (the word at +108)");
-  return Load(base, object + 108);
+  return schema::AppInterface16(base, object).sound_manager();
 }
 
 uint32_t InterfaceWord112(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82379350 (the word at +112)");
-  return Load(base, object + 112);
+  return schema::AppInterface16(base, object).movie();
 }
 
 SlotCall AppPoolSlot(uint8_t* base, uint32_t interface8) {
   ITC_NATIVE_RUNNING("sub_82094368 (the framework interface's slot 4)");
-  const uint32_t object = Load(base, interface8 + 16);
-  return {object, Load(base, Load(base, object) + 16)};
+  const auto object = schema::AppInterface8(base, interface8).framework_interface();
+  return {object.address, object.vtable().slot_4_worker_pool()};
 }
 
 SlotCall AppPoolSlotFromInterface16(uint8_t* base, uint32_t interface16) {
@@ -192,8 +203,8 @@ SlotCall AppPoolSlotFromInterface16(uint8_t* base, uint32_t interface16) {
 
 SlotCall SceneSlot(uint8_t* base, uint32_t interface8) {
   ITC_NATIVE_RUNNING("sub_82094338 App::SceneFromInterface8");
-  const uint32_t object = Load(base, interface8 + 16);
-  return {object, Load(base, Load(base, object) + 12)};
+  const auto object = schema::AppInterface8(base, interface8).framework_interface();
+  return {object.address, object.vtable().slot_3_scene()};
 }
 
 SlotCall SceneSlotFromInterface16(uint8_t* base, uint32_t interface16) {
@@ -203,8 +214,9 @@ SlotCall SceneSlotFromInterface16(uint8_t* base, uint32_t interface16) {
 
 SlotCall FrameDriverSlot(uint8_t* base, uint32_t interface4) {
   ITC_NATIVE_RUNNING("sub_82094320 App::FrameDriver");
-  const uint32_t object = Load(base, interface4 + 20);
-  return {object, Load(base, Load(base, object) + 8)};
+  // interface4 is app + 4: the App's framework_input (app + 24).
+  const uint32_t object = schema::App(base, interface4 - 4).framework_input().address;
+  return {object, schema::AppFrameworkInterface(base, object).vtable().slot_2_frame_driver()};
 }
 
 SlotCall FrameDriverSlotFromInterface16(uint8_t* base, uint32_t interface16) {

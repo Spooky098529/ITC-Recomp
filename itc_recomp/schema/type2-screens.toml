@@ -1,0 +1,458 @@
+# The schema of docs/functions/type2-screens.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# Four of the type 2 mode's screen machines (src/type2_screens/): the hub
+# (the mode block's +0, UI movie 0), the spec sheet (+56624, movie 9), the
+# build screen's machine (+0x1BF20, movie 6) and the license plate editor
+# (+0x20A70, movie 26). Each machine's blocks are VirtualAlloc'ed by its
+# Create:
+# - its page object (28 bytes) is a PageObject (menu-helpers.toml); the
+#   measure files them as "new<28>@Type2Hub::Create",
+#   "new<28>@PlateEditor::Create", "new<28>@BuildScreen::Create" and
+#   "new<28>@PowerGraphScreen::Create" (to add to PageObject's measures);
+# - the hub's and the spec sheet's menus (68 bytes) are FrontEndMenu
+#   (menu-helpers.toml): "new<68>@Type2Hub::Create" and
+#   "new<68>@PowerGraphScreen::Create";
+# - the plate editor's and the build screen's menu lists (72 bytes) are
+#   MenuList (race-screens.toml): "new<72>@PlateEditor::Create",
+#   "new<72>@BuildScreen::Create" and "new<72>@BuildScreen::Create#2";
+# - the garage car the hub copies for the spec sheet's car data
+#   ("sub_8218D708.r3": +12 the id, +1568, +1892) is car-makers.toml's
+#   GarageCar.
+# The spec sheet's machine is also power-graph.toml's SpecSheetMachine
+# ("sub_821B8F60.r3"): one object, described here as SpecSheet.
+
+# The hub's machine: a StateMachine (game-modes.toml) with a word of its own
+# after it, as the type 2 mode's other machines. The measure also files
+# under "Type2Hub" the hub's data (Type2HubData: +0 to +447, through the
+# helpers given it in r3): it fits `transitions` but isn't the machine's (a
+# measure fault).
+[Type2Hub]
+measure = "Type2Hub"
+size = 9620
+origin = "embedded"
+fields = [
+  { name = "transitions", offset = 0, type = "bytes", count = 9600, note = "200 transitions, 48 bytes each (StateMachine's); the measure also files Type2HubData's words here" },
+  { name = "transition_count", offset = 9600, type = "u32" },
+  { name = "state", offset = 9604, type = "u32" },
+  { name = "loaded", offset = 9608, type = "u32", note = "1 once movies 0, 9, 10 and both image lists are loaded (WaitForLoad)" },
+  { name = "reenter", offset = 9612, type = "u32", note = "nonzero: Create and WaitForLoad go to state 9; the mode's Init sets 1" },
+  { name = "delete_movie", offset = 9616, type = "u32", note = "nonzero: Unload deletes movie 0 (UiMovies::Delete) and clears `loaded`" },
+]
+
+# The hub's data ([0x826D8418]: VirtualAlloc'ed for 68 bytes, used up to
+# +447; docs/known-data.md). The measure joins it with the machine
+# ("Type2Hub"), so this type has no measure name of its own.
+[Type2HubData]
+size = 448
+origin = "allocated"
+fields = [
+  { name = "set_up", offset = 0, type = "u32", note = "1 once set up (SetUpStatus); Reenter's transition 4 when set, else 0" },
+  { name = "quitting", offset = 4, type = "u32", note = "set by Choose for item 7 (the quit question); the machine to state 14 on the destroy" },
+  { name = "stand_model", offset = 8, type = "u32", note = "GarageStage::ReloadModel's answer (Update): the stand drawn when set" },
+  { name = "car_refused", offset = 12, type = "u32", note = "1 when the selected garage car's spec has byte +771 1 (items 1 and 2 refused; FillMenu)" },
+  { name = "busy_shown", offset = 16, type = "u32", note = "the stand's busy marker shown (ShowBusy, HideBusy)" },
+  { name = "unknown_20", offset = 20, type = "u32", note = "0 from Create, Start, Unload, Destroy; 1 from message 48" },
+  { name = "dialog_step", offset = 24, type = "u32", note = "the dialogs' step (OnDialogDone)" },
+  { name = "dialog_answer", offset = 28, type = "u32", note = "the dialog's answer: 0 OnYes, 1 OnNo" },
+  { name = "images", offset = 32, type = "bytes", count = 184, note = "the first list: 46 pointers to Type2HubImage (assets 22696 +)" },
+  { name = "image_count", offset = 216, type = "u32" },
+  { name = "images2", offset = 220, type = "bytes", count = 184, note = "the second list: 46 pointers to Type2HubImage (assets 22741 +)" },
+  { name = "image2_count", offset = 404, type = "u32" },
+  { name = "image_bits", offset = 408, type = "u32", note = "the images' bit set (46 bits, two words; MarkNoticeImages)" },
+  { name = "image_bits2", offset = 412, type = "u32" },
+  { name = "notice2", offset = 416, type = "bytes", count = 12, note = "the second list's notice found (NextNotice2: a 12-byte save entry)" },
+  { name = "notice2_read", offset = 416, type = "u32" },
+  { name = "notice2_table", offset = 420, type = "u32" },
+  { name = "record_string", offset = 424, type = "u32", note = "the notice2's third word: the record's string (7527 + it, SetRecordText); -1 from Create" },
+  { name = "notice", offset = 428, type = "bytes", count = 12, note = "the first list's notice found (NextNotice: a 12-byte save entry)" },
+  { name = "notice_read", offset = 428, type = "u32" },
+  { name = "notice_table", offset = 432, type = "u32", note = "the data table (DataTables::Entry56)" },
+  { name = "notice_entry", offset = 436, type = "u32", note = "the entry; -1 none (Create)" },
+  { name = "movie_image", offset = 440, type = "u32", note = "movie 0's object's +36, kept by Start, put back by Unload and Close" },
+  { name = "movie_image2", offset = 444, type = "u32", note = "movie 0's object's +32, kept and put back with it" },
+]
+
+# A notice image's texture record (12 bytes, VirtualAlloc'ed by ImageLoaded).
+[Type2HubTexture]
+measure = "new<12>@Type2Hub::ImageLoaded"
+size = 12
+origin = "allocated"
+fields = [
+  { name = "texture", offset = 0, type = "u32", note = "XPR::GetTexture(0)" },
+  { name = "width", offset = 4, type = "u32", note = "level 0's (Texture::GetLevelDesc)" },
+  { name = "height", offset = 8, type = "u32" },
+]
+
+# A notice image record (16 bytes, VirtualAlloc'ed by LoadNoticeImage, one
+# a list; the archive's callback ImageLoaded fills it).
+[Type2HubImage]
+measures = ["new<16>@Type2Hub::LoadNoticeImage", "new<16>@Type2Hub::LoadNoticeImage#2", "Type2Hub::ImageLoaded.r6", "Type2Hub.+32", "Type2Hub.+220", "Type2Hub.+220.+4"]
+size = 16
+origin = "allocated"
+fields = [
+  { name = "loaded", offset = 0, type = "u32", note = "1 once ImageLoaded ran" },
+  { name = "index", offset = 4, type = "u32", note = "the image (0 to 45)" },
+  { name = "texture", offset = 8, type = "ptr", to = "Type2HubTexture" },
+  { name = "xpr", offset = 12, type = "u32", note = "XPR::Create's 24-byte block" },
+]
+
+# The type 2 mode (type2-mode.md) as these machines' handlers see it (r4):
+# only its message ring, which they post to.
+[Type2ScreensMode]
+measures = ["Type2Hub::OpenSelected.r4", "Type2Hub::Close.r4", "Type2Hub::OnDialogDone.r4", "PlateEditor::Close.r4", "BuildScreen::Close.r4", "PowerGraphScreen::Close.r4", "Screen::LeaveToHub.r4"]
+size = 812
+origin = "embedded"
+fields = [
+  { name = "messages", offset = 204, type = "bytes", count = 600, note = "50 messages of 12 bytes (id, two words)" },
+  { name = "message_count", offset = 804, type = "u32" },
+  { name = "message_start", offset = 808, type = "u32", note = "the ring's first slot" },
+]
+
+# The license plate editor's machine: a StateMachine with its words after
+# it. The measure also files under "PlateEditor" its data (PlateEditorData,
+# +0 to +72), the plate RandomPlate writes (r4: bytes +1 to +11), the menu
+# list's +20 and the page handlers' mode (+804, +808): they fit
+# `transitions` but aren't the machine's (a measure fault).
+[PlateEditor]
+measure = "PlateEditor"
+size = 9616
+origin = "embedded"
+fields = [
+  { name = "transitions", offset = 0, type = "bytes", count = 9600, note = "200 transitions, 48 bytes each (StateMachine's)" },
+  { name = "transition_count", offset = 9600, type = "u32" },
+  { name = "state", offset = 9604, type = "u32", note = "UpdatePage sets the data's next_state here" },
+  { name = "loaded", offset = 9608, type = "u32", note = "1 once movie 26 is loaded (WaitForLoad)" },
+  { name = "reenter", offset = 9612, type = "u32", note = "nonzero: Create and WaitForLoad go to state 9" },
+]
+
+# A license plate (20 bytes): the plate editor's two in its data, a garage
+# car's +1568 (the dealer copies the editor's into the bought car's +1780).
+# The measure meets it only through the editor's data, so this type has no
+# measure name of its own.
+[Type2Plate]
+size = 20
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u8" },
+  { name = "region", offset = 1, type = "u8", note = "0 to 13 (strings 5411 +)" },
+  { name = "digits", offset = 2, type = "bytes", count = 3, note = "0 to 9, 10 blank" },
+  { name = "chars", offset = 5, type = "bytes", count = 7, note = "0 to 37 (strings 5425 +; 10 probably a separator)" },
+]
+
+# The license plate editor's data ([0x826D8438], 76 bytes, VirtualAlloc'ed
+# by PlateEditor::Create; docs/known-data.md). Joined with the machine by
+# the measure ("PlateEditor"), so no measure name of its own.
+[PlateEditorData]
+size = 76
+origin = "allocated"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32", note = "0 from Create" },
+  { name = "plate", offset = 4, type = "bytes", count = 20, note = "the plate being edited (a Type2Plate)" },
+  { name = "region", offset = 5, type = "u8", note = "plate +1" },
+  { name = "digits", offset = 6, type = "bytes", count = 3, note = "plate +2 to +4" },
+  { name = "chars", offset = 9, type = "bytes", count = 7, note = "plate +5 to +11" },
+  { name = "confirm_selection", offset = 20, type = "u32", note = "the confirmation's selection (plate +16)" },
+  { name = "start_plate", offset = 24, type = "bytes", count = 20, note = "the plate it starts from (a Type2Plate)" },
+  { name = "car_class", offset = 44, type = "u32", note = "CarDealer::CheckLimits' class (RandomPlate's r3, not read)" },
+  { name = "make_random", offset = 48, type = "u32", note = "LoadPlate makes the start plate at random when set" },
+  { name = "column", offset = 52, type = "u32", note = "the cursor's column" },
+  { name = "edited", offset = 56, type = "u32", note = "the digit or character edited" },
+  { name = "char_line_kind", offset = 60, type = "u32", note = "CharLineKind's answer (ShowCharLine)" },
+  { name = "region_rows", offset = 64, type = "u32", note = "the region menu's rows (5)" },
+  { name = "char_rows", offset = 68, type = "u32", note = "the character menu's rows (4)" },
+  { name = "next_state", offset = 72, type = "u32", note = "the state UpdatePage puts the machine in; 21 none" },
+]
+
+# The build screen's machine: a StateMachine with its words after it. The
+# measure also files the page handlers' mode (+804, +808) here.
+[BuildScreen]
+measure = "BuildScreen"
+size = 9620
+origin = "embedded"
+fields = [
+  { name = "transitions", offset = 0, type = "bytes", count = 9600, note = "200 transitions, 48 bytes each (StateMachine's)" },
+  { name = "transition_count", offset = 9600, type = "u32" },
+  { name = "state", offset = 9604, type = "u32" },
+  { name = "loaded", offset = 9608, type = "u32", note = "1 once movie 6 is loaded (WaitForLoad)" },
+  { name = "reenter", offset = 9612, type = "u32", note = "nonzero: Create and WaitForLoad go to state 9" },
+  { name = "delete_movie", offset = 9616, type = "u32", note = "nonzero: Unload deletes movie 6 and clears `loaded`" },
+]
+
+# The build screen's data ([0x826D8448], 0x3266C bytes, VirtualAlloc'ed by
+# BuildScreen::Create; docs/known-data.md). The measure names it
+# "BuildList" (BuildList::Insert's and RemoveAt's r3, a list inside it, is
+# joined with it: their list-relative +1600 to +1608 fit `groups`).
+[BuildScreenData]
+measure = "BuildList"
+size = 206444
+origin = "allocated"
+fields = [
+  { name = "set_up", offset = 0, type = "u32", note = "1 once set up (SetUpStatus)" },
+  { name = "name", offset = 4, type = "bytes", count = 20, note = "the player's name (save data +8)" },
+  { name = "money", offset = 24, type = "u32", note = "save data +6116" },
+  { name = "weekday", offset = 28, type = "u32", note = "the day mod 7" },
+  { name = "day", offset = 32, type = "u32", note = "save data +6100, at most 999" },
+  { name = "groups", offset = 36, type = "bytes", count = 182112, note = "56 BuildGroup of 3,252 bytes" },
+  { name = "builds", offset = 182148, type = "bytes", count = 20800, note = "400 BuildRecord of 52 bytes (+0x2C784)" },
+  { name = "shown_groups", offset = 202948, type = "bytes", count = 224, note = "pointers to the category's groups shown (+0x318C4)" },
+  { name = "shown_group_count", offset = 203172, type = "u32", note = "+0x319A4" },
+  { name = "build_list", offset = 203176, type = "bytes", count = 3212, note = "the chosen group's builds (a BuildSlotList, +0x319A8)" },
+  { name = "category", offset = 206388, type = "u32", note = "+0x32634" },
+  { name = "group_selection", offset = 206392, type = "u32", note = "the groups' list's selection kept" },
+  { name = "group_scroll", offset = 206396, type = "u32" },
+  { name = "build_selection", offset = 206400, type = "u32", note = "the builds' list's selection kept" },
+  { name = "build_scroll", offset = 206404, type = "u32" },
+  { name = "stand_selection", offset = 206408, type = "u32", note = "the stand's list's (for the details)" },
+  { name = "stand_scroll", offset = 206412, type = "u32" },
+  { name = "unknown_206416", offset = 206416, type = "u32" },
+  { name = "number", offset = 206420, type = "u32", note = "the state-2 builds as a percentage (probably), shown in digits (+0x32654)" },
+  { name = "opened", offset = 206424, type = "u32", note = "Fill: whether a kind-3 group has builds; 0: animation 81 played on opening (+0x32658)" },
+  { name = "car_shown", offset = 206428, type = "u32", note = "a car shown on the stand (1 on level 2; +0x3265C)" },
+  { name = "stand_model", offset = 206432, type = "u32", note = "GarageStage::ReloadModel's answer, then the stand drawn (+0x32660)" },
+  { name = "build_shown", offset = 206436, type = "u32", note = "+0x32664" },
+  { name = "busy_shown", offset = 206440, type = "u32", note = "the stand's busy marker shown (+0x32668)" },
+]
+
+# A group of builds (3,252 bytes, the screen data's +36 + 3,252j; its
+# summary filled by BuildScreen::Fill). The measure meets it through the
+# shown groups' pointers ("BuildList.+202948").
+[BuildGroup]
+measure = "new<206444>@BuildScreen::Create.+202948"
+size = 3252
+origin = "embedded"
+fields = [
+  { name = "index", offset = 0, type = "u32", note = "the group's index (string ids 5355 + it and 5299 + it; a frame)" },
+  { name = "category", offset = 4, type = "u32", note = "0 to 4 (its builds' +24)" },
+  { name = "level", offset = 8, type = "u32", note = "its last build's +28" },
+  { name = "value", offset = 12, type = "u32", note = "its builds' common +20 (0 to 9, BuildScreen::ValueText), -2 mixed, -1 none" },
+  { name = "percent", offset = 16, type = "u32", note = "the state-2 builds' share, scaled by [0x82002A0C]" },
+  { name = "count", offset = 20, type = "u32", note = "its builds (0 when none)" },
+  { name = "owned", offset = 24, type = "u32", note = "its state-2 builds" },
+  { name = "all_owned", offset = 28, type = "u32", note = "1 when every build is state 2 (a row's node)" },
+  { name = "mark", offset = 32, type = "u32", note = "set when any of its builds has +32 not +36 (Fill, BuildScreen::MarkGroups)" },
+  { name = "kind", offset = 36, type = "u32", note = "2 for groups 48 to 51, 1 for 52 to 55, else 0" },
+  { name = "list", offset = 40, type = "bytes", count = 3212, note = "its builds (a BuildSlotList; the count at the group's +1648)" },
+  { name = "list_count", offset = 1648, type = "u16", note = "the list's count" },
+]
+
+# A build list (3,212 bytes: the screen data's +0x319A8 and each group's
+# +40; build-screen.md). The measure joins it with the screen data
+# ("BuildList"), so this type has no measure name of its own.
+[BuildSlotList]
+size = 3212
+origin = "embedded"
+fields = [
+  { name = "links", offset = 0, type = "bytes", count = 1600, note = "400 nodes, two halfwords each: +0 the next node's index (-1 the end), +2 the node's slot" },
+  { name = "free", offset = 1600, type = "u16", note = "the free list's head" },
+  { name = "unknown_1602", offset = 1602, type = "u16", note = "-1 (Fill)" },
+  { name = "head", offset = 1604, type = "u16", note = "-1 empty" },
+  { name = "unknown_1606", offset = 1606, type = "u16", note = "-1 (Fill)" },
+  { name = "count", offset = 1608, type = "u16" },
+  { name = "slots", offset = 1612, type = "bytes", count = 1600, note = "400 pointers to builds (BuildRecord)" },
+]
+
+# A build (52 bytes, the screen data's +0x2C784 + 52i; made on BuildScreen::
+# Fill's frame and copied in). The measure meets it only inside the screen
+# data, so it has no measure name of its own.
+[BuildRecord]
+size = 52
+origin = "embedded"
+fields = [
+  { name = "index", offset = 0, type = "u32", note = "the item's halfword +0" },
+  { name = "group", offset = 4, type = "u32", note = "the item's byte +34 (48 and 49 remapped by the kind)" },
+  { name = "state", offset = 8, type = "u32", note = "0 locked, 1 seen, 2 owned (which texts the details show)" },
+  { name = "unknown_12", offset = 12, type = "u32", note = "0 (Fill)" },
+  { name = "special", offset = 16, type = "u32", note = "2 for group 48, 1 for 49, else 0 (node 17 shown, frame +0 - 310)" },
+  { name = "value", offset = 20, type = "u32", note = "the item's byte +36 (0 to 9)" },
+  { name = "category", offset = 24, type = "u32", note = "by the item's halfword +40: 1 0, 2 1, 4 2, 7 3" },
+  { name = "level", offset = 28, type = "u32", note = "the item's halfword +42; builds above the player's stage + 1 left out" },
+  { name = "flags", offset = 32, type = "u32", note = "1, 3 or 7 by the state, | 8 when seen; bit 0x2 clear: the stand dark" },
+  { name = "saved_flags", offset = 36, type = "u32", note = "the save's build entry +8 (SaveBuildStates writes it back)" },
+  { name = "seen", offset = 40, type = "u32" },
+  { name = "unknown_44", offset = 44, type = "u32", note = "0 (Fill)" },
+  { name = "car_build", offset = 48, type = "u32", note = "the item's +160 (a car build, Car::FromBuild)" },
+]
+
+# The spec sheet's machine (PowerGraphScreen, the mode block's +56624): a
+# StateMachine with its words after it; power-graph.toml's SpecSheetMachine
+# (sub_821B8F60.r3) is the same object.
+[SpecSheet]
+measures = ["sub_821B8F60.r3"]  # from SpecSheetMachine (power-graph), merged at the integration
+measure = "PowerGraphScreen"
+size = 9616
+origin = "embedded"
+fields = [
+  { name = "transitions", offset = 0, type = "bytes", count = 9600, note = "200 transitions, 48 bytes each (StateMachine's)" },
+  { name = "transition_count", offset = 9600, type = "u32" },
+  { name = "state", offset = 9604, type = "u32" },
+  { name = "loaded", offset = 9608, type = "u32", note = "1 once movie 9 is loaded (WaitForLoad)" },
+  { name = "reenter", offset = 9612, type = "u32", note = "nonzero: Create goes to state 1" },
+]
+
+# The spec sheet's data ([0x826D846C], 1,968 bytes, VirtualAlloc'ed by
+# PowerGraphScreen::Create; docs/known-data.md). The record at +16 is laid
+# out as power-graph-screen.toml's PowerGraphScreenData's at +8 (filled by
+# GarageScreen::SetUpSpecSheet and sub_8218D708).
+[SpecSheetData]
+measure = "new<1968>@PowerGraphScreen::Create"
+size = 1968
+origin = "allocated"
+fields = [
+  { name = "movie_loaded", offset = 0, type = "u32", note = "1 once loaded (WaitForLoad)" },
+  { name = "graph_drawn", offset = 4, type = "u32", note = "the graph drawn when set" },
+  { name = "next_state", offset = 8, type = "u32", note = "the state to put the machine in (21 none)" },
+  { name = "sheet", offset = 16, type = "bytes", count = 1952, note = "cleared on loading (memset)" },
+  { name = "car_value", offset = 16, type = "u32", note = "record +0: int(the car's +1892 float)" },
+  { name = "rating", offset = 20, type = "u32", note = "record +4: the car data's power" },
+  { name = "spec_word_0", offset = 24, type = "u32", note = "record +8: the spec's +76" },
+  { name = "spec_word_1", offset = 28, type = "u32", note = "record +12: the spec's +84" },
+  { name = "spec_word_2", offset = 32, type = "u32", note = "record +16: the spec's +80" },
+  { name = "car_id", offset = 36, type = "u32", note = "record +20: the garage car's +12" },
+  { name = "spec_byte_0", offset = 40, type = "u32", note = "record +24: the spec's byte +129" },
+  { name = "spec_byte_1", offset = 44, type = "u32", note = "record +28: the spec's byte +130" },
+  { name = "engine_class", offset = 48, type = "u32", note = "record +32: the drive from the spec's byte +68" },
+  { name = "spec_flag", offset = 52, type = "u32", note = "record +36: the spec's byte +69 set, 1 or 0" },
+  { name = "spec_word_3", offset = 56, type = "u32", note = "record +40: the spec's +8" },
+  { name = "curve_value_0", offset = 60, type = "u32", note = "record +44: int(the power curve's +1056)" },
+  { name = "curve_value_1", offset = 64, type = "u32", note = "record +48: int(the curve's +1060)" },
+  { name = "peak_torque", offset = 68, type = "f32", note = "record +52" },
+  { name = "peak_index", offset = 72, type = "u32", note = "record +56: int(the curve's +1052)" },
+  { name = "parts", offset = 76, type = "bytes", count = 20, note = "record +60: the garage car's +1568 (its plate, five words)" },
+  { name = "parts_word_0", offset = 76, type = "u32" },
+  { name = "tab", offset = 96, type = "u32", note = "record +80: which buttons page 0 takes (2 from SetUpSpecSheet)" },
+  { name = "car_data", offset = 112, type = "bytes", count = 1856, note = "a car data (the vehicle: CarSetup::FromCar)" },
+  { name = "car_data_0", offset = 112, type = "f32", note = "the car data's +0" },
+  { name = "car_data_400", offset = 512, type = "f32", note = "the car data's +400" },
+  { name = "car_data_672", offset = 784, type = "f32", note = "the car data's +672" },
+]
+
+# A SYSTEMTIME (16 bytes) GetLocalTime fills on RandomPlate's frame (+80).
+[Type2SystemTime]
+measure = "GetLocalTime.r3"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "year", offset = 0, type = "u16", note = "probably, as in a SYSTEMTIME" },
+  { name = "month", offset = 2, type = "u16" },
+  { name = "weekday", offset = 4, type = "u16" },
+  { name = "day", offset = 6, type = "u16" },
+  { name = "hour", offset = 8, type = "u16" },
+  { name = "minute", offset = 10, type = "u16" },
+  { name = "second", offset = 12, type = "u16" },
+  { name = "milliseconds", offset = 14, type = "u16", note = "RandomPlate's factor" },
+]
+
+[globals]
+hub_pages = { address = 0x826D8410, type = "ptr", to = "PageObject", note = "pages 0 the menu, 3 the choice made, 4 the notices, 5 the record, 6 a save prompt; 13 transitions" }
+hub_menu = { address = 0x826D8414, type = "ptr", to = "FrontEndMenu", note = "items 0 to 7, wrapping" }
+hub_data = { address = 0x826D8418, type = "ptr", to = "Type2HubData" }
+hub_counter = { address = 0x826D841C, type = "u32", note = "Type2Hub::WaitForLoad's counter" }
+plate_pages = { address = 0x826D8430, type = "ptr", to = "PageObject", note = "pages 0 the region, 1 the number, 2 the characters, 3 a confirmation, 4 leaving; 20 transitions" }
+plate_list = { address = 0x826D8434, type = "ptr", to = "MenuList", note = "a MenuList (72 bytes, race-screens.toml)" }
+plate_data = { address = 0x826D8438, type = "ptr", to = "PlateEditorData" }
+build_pages = { address = 0x826D843C, type = "ptr", to = "PageObject", note = "the build screen's transition machine: pages 0 to 3 the levels, 4 leaving" }
+build_list = { address = 0x826D8440, type = "ptr", to = "MenuList", note = "the level's MenuList (72 bytes)" }
+build_group_list = { address = 0x826D8444, type = "ptr", to = "MenuList", note = "the groups' MenuList (72 bytes)" }
+build_screen = { address = 0x826D8448, type = "ptr", to = "BuildScreenData" }
+sheet_pages = { address = 0x826D8464, type = "ptr", to = "PageObject", note = "two pages" }
+sheet_menu = { address = 0x826D8468, type = "ptr", to = "FrontEndMenu" }
+sheet_data = { address = 0x826D846C, type = "ptr", to = "SpecSheetData" }
+record_screen = { address = 0x826D84CC, type = "u32", note = "the user info screen's data (user-info.md): +8 the player's record FillPlayerRecord fills" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from BuildScreenData.
+[BuildScreenDataPart]
+measure = "new<206444>@BuildScreen::Create"
+size = 204782
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_32", offset = 32, type = "u32" },
+  { name = "unknown_36", offset = 36, type = "u32" },
+  { name = "unknown_40", offset = 40, type = "u32" },
+  { name = "unknown_44", offset = 44, type = "u32" },
+  { name = "unknown_48", offset = 48, type = "u32" },
+  { name = "unknown_52", offset = 52, type = "u32" },
+  { name = "unknown_56", offset = 56, type = "u32" },
+  { name = "unknown_60", offset = 60, type = "u32" },
+  { name = "unknown_64", offset = 64, type = "u32" },
+  { name = "unknown_68", offset = 68, type = "u32" },
+  { name = "unknown_72", offset = 72, type = "u32" },
+  { name = "unknown_76", offset = 76, type = "u16" },
+  { name = "unknown_78", offset = 78, type = "u16" },
+  { name = "unknown_1672", offset = 1672, type = "u16" },
+  { name = "unknown_1676", offset = 1676, type = "u16" },
+  { name = "unknown_1678", offset = 1678, type = "u16" },
+  { name = "unknown_1680", offset = 1680, type = "u16" },
+  { name = "unknown_1682", offset = 1682, type = "u16" },
+  { name = "unknown_1684", offset = 1684, type = "u16" },
+  { name = "unknown_182152", offset = 182152, type = "u32" },
+  { name = "unknown_182156", offset = 182156, type = "u32" },
+  { name = "unknown_202948", offset = 202948, type = "u32" },
+  { name = "unknown_204780", offset = 204780, type = "u16" },
+]
+
+# Split from PlateEditor.
+[PlateEditorPart]
+measure = "new<76>@PlateEditor::Create"
+size = 76
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_5", offset = 5, type = "u8" },
+  { name = "unknown_6", offset = 6, type = "u8" },
+  { name = "unknown_9", offset = 9, type = "u8" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "unknown_44", offset = 44, type = "u32" },
+  { name = "unknown_48", offset = 48, type = "u32" },
+  { name = "unknown_52", offset = 52, type = "u32" },
+  { name = "unknown_56", offset = 56, type = "u32" },
+  { name = "unknown_60", offset = 60, type = "u32" },
+  { name = "unknown_64", offset = 64, type = "u32" },
+  { name = "unknown_68", offset = 68, type = "u32" },
+  { name = "unknown_72", offset = 72, type = "u32" },
+]
+
+# Split from PlateEditor.
+[PlateEditorAt24]
+measure = "new<76>@PlateEditor::Create@+24"
+size = 2
+origin = "embedded"
+fields = [
+  { name = "unknown_1", offset = 1, type = "u8" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from BuildScreenData.
+[BuildScreenDataAt76]
+measure = "new<206444>@BuildScreen::Create@+76"
+size = 1610
+origin = "embedded"
+fields = [
+  { name = "unknown_1600", offset = 1600, type = "u16" },
+  { name = "unknown_1604", offset = 1604, type = "u16" },
+  { name = "unknown_1608", offset = 1608, type = "u16" },
+]
+
+# Split from PlateEditor.
+[PlateEditorAt4]
+measure = "new<76>@PlateEditor::Create@+4"
+size = 2
+origin = "embedded"
+fields = [
+  { name = "unknown_1", offset = 1, type = "u8" },
+]

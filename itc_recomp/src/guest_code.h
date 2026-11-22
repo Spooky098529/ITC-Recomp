@@ -42,28 +42,9 @@ using f64 = double;
 #define REX_FUNC_PROLOGUE() ((void)0)
 #endif
 
-// Guest memory: big-endian, `base` + the 32-bit guest address. The physical
-// range above 0xE0000000 is mapped at physical + 4 KB, which the views'
-// layout gives (src/memory/mapping.cpp, as the SDK mapped it on Linux): no
-// offset to add here.
-#define REX_PHYS_HOST_OFFSET(addr) 0u
-
-#define REX_RAW_ADDR(x) (base + (u32)(x) + REX_PHYS_HOST_OFFSET(x))
-
-#define REX_LOAD_U8(x) (*(volatile u8*)(base + (u32)(x) + REX_PHYS_HOST_OFFSET(x)))
-#define REX_LOAD_U16(x) __builtin_bswap16(*(volatile u16*)(base + (u32)(x) + REX_PHYS_HOST_OFFSET(x)))
-#define REX_LOAD_U32(x) __builtin_bswap32(*(volatile u32*)(base + (u32)(x) + REX_PHYS_HOST_OFFSET(x)))
-#define REX_LOAD_U64(x) __builtin_bswap64(*(volatile u64*)(base + (u32)(x) + REX_PHYS_HOST_OFFSET(x)))
-#define REX_LOAD_STRING(x, len) \
-  std::string_view(reinterpret_cast<const char*>(base + (u32)(x) + REX_PHYS_HOST_OFFSET(x)), (len))
-
-#define REX_STORE_U8(x, y) (*(volatile u8*)(base + (u32)(x) + REX_PHYS_HOST_OFFSET(x)) = (y))
-#define REX_STORE_U16(x, y) \
-  (*(volatile u16*)(base + (u32)(x) + REX_PHYS_HOST_OFFSET(x)) = __builtin_bswap16(y))
-#define REX_STORE_U32(x, y) \
-  (*(volatile u32*)(base + (u32)(x) + REX_PHYS_HOST_OFFSET(x)) = __builtin_bswap32(y))
-#define REX_STORE_U64(x, y) \
-  (*(volatile u64*)(base + (u32)(x) + REX_PHYS_HOST_OFFSET(x)) = __builtin_bswap64(y))
+// Guest memory is read and written through guest.h's guest::Load*,
+// guest::Store* and guest::Pointer (docs/e5-native.md, step 0: one spelling
+// for lifted code and hand ports).
 
 // The guest's time base (mftb): our performance counter at the 360's 50 MHz
 // (helpers/clock.h), the SDK's guest clock's rate when its runtime set it.

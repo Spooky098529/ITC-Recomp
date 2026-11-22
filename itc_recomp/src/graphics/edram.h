@@ -17,11 +17,9 @@
 
 namespace graphics::edram {
 
-constexpr uint32_t kAllocator = 0x82953E20;  // the allocator's pointer
+// The object's fields are schema::EdramAllocator's and its pointer
+// GraphicsResourcesGlobals::edram_allocator (src/schema/graphics_resources.h).
 constexpr uint32_t kObjectBytes = 804;
-constexpr uint32_t kFree = 28;                // the tiles free
-constexpr uint32_t kBitmap = 32;
-constexpr uint32_t kBitmapEnd = 800;          // the sentinel
 constexpr uint32_t kSentinel = 0x55555555;
 constexpr uint32_t kTiles = 6144;
 

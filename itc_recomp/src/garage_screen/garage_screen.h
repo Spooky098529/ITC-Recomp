@@ -42,20 +42,10 @@ using Calls = race_hud_object::Calls;
 // data, +44 the selected row and +48 the list's scroll, +72 the stand
 // shown, +76 the stand's model, +84 the busy marker shown). The stand's
 // holder ([0x826D83E0]: +0 the garage stage's holder, whose +0 is the
-// stage).
-constexpr uint32_t kPages = 0x826D8420;
-constexpr uint32_t kList = 0x826D8424;
-constexpr uint32_t kList2 = 0x826D8428;
-constexpr uint32_t kData = 0x826D842C;
-constexpr uint32_t kStandHolder = 0x826D83E0;
+// stage). Their views: itc_recomp/schema/garage-screen.toml
+// (schema::GarageScreenGlobals, GarageScreenData, the machine GarageScreen).
 constexpr uint32_t kMovie = 5;
 constexpr uint32_t kAsset = 22579;
-
-// The machine's words.
-constexpr uint32_t kMachineState = 9604;
-constexpr uint32_t kMachineLoaded = 9608;
-constexpr uint32_t kMachineReenter = 9612;
-constexpr uint32_t kMachineDelete = 9616;
 
 // The callees by address.
 constexpr uint32_t kVirtualAlloc = 0x82295398;

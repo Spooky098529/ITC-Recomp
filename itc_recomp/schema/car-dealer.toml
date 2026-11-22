@@ -1,0 +1,144 @@
+# The schema of docs/functions/car-dealer.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The car dealer: the type 2 mode's screen machine at its block's +0x19978
+# where the player buys a car (src/car_dealer/). Its page object
+# ([0x826D83E8]) is a PageObject (menu-helpers.toml); its two menus
+# ([0x826D83EC], [0x826D83F0]) are menu lists (MenuList, race-screens.md's);
+# its color records (32 bytes, OpenColors) are material-passes.md's.
+
+# The dealer's machine: a StateMachine (game-modes.toml) with a word of its
+# own after it. The measure also files under "CarDealer" the transitions'
+# started word (r3 = the page object's +24) and SetSpecTexts' stack record
+# at +0 to +20, and the page handlers' mode (r3) at +804 and +808: they fit
+# `transitions` but aren't the machine's (a measure fault). Leave's
+# "RaceMenu::StartPage.ret" is this machine (r3 kept across no call).
+[CarDealer]
+measures = ["CarDealer", "RaceMenu::StartPage.ret"]
+size = 9620
+origin = "embedded"
+fields = [
+  { name = "transitions", offset = 0, type = "bytes", count = 9600, note = "200 transitions, 48 bytes each (StateMachine's)" },
+  { name = "transition_count", offset = 9600, type = "u32" },
+  { name = "state", offset = 9604, type = "u32" },
+  { name = "loaded", offset = 9608, type = "u32", note = "1 once movie 4 is loaded (WaitForLoad)" },
+  { name = "reenter", offset = 9612, type = "u32", note = "nonzero: Create and WaitForLoad go to state 9 (ScreenMachine::Reenter)" },
+  { name = "delete_movie", offset = 9616, type = "u32", note = "nonzero: Unload deletes movie 4 (UiMovies::Delete) and clears `loaded`" },
+]
+
+# The type 2 mode (type2-mode.md) as the dealer's handlers see it (r4): only
+# its message ring, which they post to.
+[CarDealerMode]
+measures = ["CarDealer::Close.r4", "CarDealer::OnDialogDone.r4"]
+size = 812
+origin = "embedded"
+fields = [
+  { name = "messages", offset = 204, type = "bytes", count = 600, note = "50 messages of 12 bytes (id, two words)" },
+  { name = "message_count", offset = 804, type = "u32" },
+  { name = "message_start", offset = 808, type = "u32", note = "the ring's first slot" },
+]
+
+# A list of cars in the dealer's data (+104 and +620): an embedded part of
+# CarDealerData the measure doesn't split off (it files shown_list's
+# pointee as the data itself). Before CarDealerData: its shown_list points
+# here.
+[CarDealerList]
+size = 516
+origin = "embedded"
+fields = [
+  { name = "entries", offset = 0, type = "bytes", count = 512, note = "128 pointers to CarDealerEntry" },
+  { name = "count", offset = 512, type = "u32" },
+]
+
+# The colors in the data (+1140): pointers to 32-byte color records
+# (VirtualAlloc by OpenColors; +0 to +8 red, green, blue; +16 to +24 the HSV
+# floats).
+[CarDealerColors]
+size = 56
+origin = "embedded"
+fields = [
+  { name = "records", offset = 0, type = "bytes", count = 52, note = "13 pointers to color records" },
+  { name = "count", offset = 52, type = "u32" },
+]
+
+# The dealer's data ([0x826D83F4], 1,196 bytes, VirtualAlloc by
+# CarDealer::Create, freed by CarDealer::Destroy; docs/known-data.md).
+[CarDealerData]
+measure = "new<1196>@CarDealer::Create"
+measures = ["new<1196>@CarDealer::Create.+1136"]
+size = 1196
+origin = "allocated"
+fields = [
+  { name = "started", offset = 0, type = "u32", note = "1 once started (FillStatus)" },
+  { name = "first_car", offset = 4, type = "u32", note = "1 with an empty garage (the first car's purchase)" },
+  { name = "leaving_bought", offset = 8, type = "u32", note = "1 when leaving after a purchase (Destroy: the machine to state 14)" },
+  { name = "detail_open", offset = 12, type = "u32", note = "the car detail open (CarDetail::Open 1, message 30 0)" },
+  { name = "answer", offset = 16, type = "u32", note = "a dialog's answer (messages 38 1, 39 and 41 0)" },
+  { name = "busy_shown", offset = 20, type = "u32", note = "the stand's busy marker shown" },
+  { name = "select_bought", offset = 24, type = "u32", note = "the second answer: the bought car made the selected one" },
+  { name = "car_shown", offset = 28, type = "u32", note = "a car shown on the stand" },
+  { name = "stand_model", offset = 32, type = "u32", note = "GarageStage::ReloadModel's answer" },
+  { name = "buy_step", offset = 36, type = "u32", note = "the buy dialogs' step, 0 to 3 (CarDetail::Open 2)" },
+  { name = "kind_selection", offset = 40, type = "u32", note = "the list menu's selection kept (which list)" },
+  { name = "list_shown", offset = 44, type = "u32", note = "the list shown, 0 or 1" },
+  { name = "car_selection", offset = 48, type = "u32", note = "the car list's selection (+ car_scroll: the index into shown_list)" },
+  { name = "car_scroll", offset = 52, type = "u32" },
+  { name = "color_selection", offset = 56, type = "u32" },
+  { name = "color_scroll", offset = 60, type = "u32" },
+  { name = "pick", offset = 64, type = "bytes", count = 20, note = "the career's pick (save data +8, 20 bytes)" },
+  { name = "money", offset = 84, type = "u32", note = "save data +6116" },
+  { name = "weekday", offset = 88, type = "u32", note = "the day % 7" },
+  { name = "day", offset = 92, type = "u32", note = "save data +6100, at most 999" },
+  { name = "garage_count", offset = 96, type = "u32", note = "save data +6328" },
+  { name = "garage_size", offset = 100, type = "u32", note = "save data +0x1991C (probably the garage's size)" },
+  { name = "first_list", offset = 104, type = "bytes", count = 516, note = "a CarDealerList (128 entries, count at +616)" },
+  { name = "second_list", offset = 620, type = "bytes", count = 516, note = "a CarDealerList (count at +1132)" },
+  { name = "shown_list", offset = 1136, type = "ptr", to = "CarDealerList", note = "first_list or second_list" },
+  { name = "colors", offset = 1140, type = "bytes", count = 56, note = "a CarDealerColors (13 records, count at +1192)" },
+]
+
+# A car in a list (8,448 bytes, VirtualAlloc by BuildLists): a copy of the
+# car's spec (Params::GetCarSpec, 8,432 bytes; car-specs.md) and its id.
+[CarDealerEntry]
+measure = "new<8448>@CarDealer::BuildLists"
+size = 8448
+origin = "allocated"
+fields = [
+  { name = "unknown_648", offset = 648, type = "u32", note = "shown by SetSpecTexts; CheckLimits: at most 2000" },
+  { name = "unknown_652", offset = 652, type = "f32", note = "shown by SetSpecTexts (truncated)" },
+  { name = "unknown_660", offset = 660, type = "u32", note = "shown by SetSpecTexts (a float)" },
+  { name = "unknown_709", offset = 709, type = "u8", note = "shown by SetSpecTexts (nonzero or not)" },
+  { name = "weight", offset = 712, type = "u32", note = "shown by SetSpecTexts (scaled by the double at 0x82009F00)" },
+  { name = "unknown_716", offset = 716, type = "u32", note = "CheckLimits: at most 4700" },
+  { name = "unknown_720", offset = 720, type = "u32", note = "CheckLimits: at most 2000" },
+  { name = "unknown_724", offset = 724, type = "u32", note = "CheckLimits: at most 1700" },
+  { name = "price", offset = 744, type = "u32" },
+  { name = "maker", offset = 769, type = "u8", note = "string 1934 + it (the maker's name)" },
+  { name = "unknown_770", offset = 770, type = "u8", note = "shown by SetSpecTexts (string 421 + it)" },
+  { name = "list_kind", offset = 771, type = "u8", note = "0 the first list, 1 the second, others not sold" },
+  { name = "color_records", offset = 8116, type = "bytes", count = 260, note = "13 CarDealerSpecColor records of 20 bytes" },
+  { name = "color_count", offset = 8376, type = "u32" },
+  { name = "car_id", offset = 8432, type = "u32" },
+]
+
+# A color in a car's spec (20 bytes, the entry's color_records; read by
+# OpenColors into the 32-byte color records).
+[CarDealerSpecColor]
+size = 20
+origin = "embedded"
+fields = [
+  { name = "kind", offset = 0, type = "u16", note = "1 picks the value's offset at 0x82002FF4, else 0x82002FF8" },
+  { name = "hue", offset = 4, type = "u16" },
+  { name = "saturation", offset = 6, type = "u8" },
+  { name = "value", offset = 7, type = "u8", note = "plus the kind's offset, clamped to 0 to 255" },
+]
+
+[globals]
+stand_holder = { address = 0x826D83E0, type = "ptr", note = "the stand scene's holder (StandScene::Create): +0 the garage stage" }
+pages = { address = 0x826D83E8, type = "ptr", to = "PageObject", note = "6 pages (CarDealer::UpdatePage), 22 transitions (CarDealer::Update)" }
+list_menu = { address = 0x826D83EC, type = "ptr", to = "MenuList", note = "a menu list (72 bytes): the page's menu" }
+color_menu = { address = 0x826D83F0, type = "ptr", to = "MenuList", note = "a menu list (72 bytes): the car list's selection on page 2, the colors' on page 3" }
+data = { address = 0x826D83F4, type = "ptr", to = "CarDealerData" }

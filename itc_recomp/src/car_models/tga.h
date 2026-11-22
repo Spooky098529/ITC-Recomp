@@ -25,12 +25,10 @@
 
 namespace car_models {
 
-// TGA::CreateImage's stack frame, and where its reader, header and image
-// sit in it.
+// TGA::CreateImage's stack frame, and where its reader sits in it (the
+// reader's header and image: schema::TgaReader).
 constexpr uint32_t kTgaCreateImageFrameBytes = 208;
 constexpr uint32_t kTgaReaderInFrame = 80;
-constexpr uint32_t kTgaReaderHeader = 36;
-constexpr uint32_t kTgaReaderImage = 56;
 // The text the reader's string is assigned (with a count of 0).
 constexpr uint32_t kTgaReaderText = 0x820021F0;
 

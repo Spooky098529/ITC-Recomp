@@ -18,12 +18,8 @@
 
 namespace texture_compression {
 
-// The blit object (12 bytes, on XGCompressSurface's stack).
-namespace blit {
-constexpr uint32_t kSource = 0;       // the source's codec
-constexpr uint32_t kDestination = 4;  // the destination's codec
-constexpr uint32_t kFilter = 8;       // the filter flags
-}  // namespace blit
+// The blit object (12 bytes, on XGCompressSurface's stack): the schema's
+// Blitter (schema/texture_compression.h).
 
 // The stack frames the blitter's functions set up (their callees run below).
 constexpr uint32_t kReleaseFrameBytes = 96;

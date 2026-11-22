@@ -18,44 +18,26 @@
 
 namespace boot_mode {
 
-// The boot movies' globals (0x826C5BA4 to 0x826C5BC8).
-constexpr uint32_t kPaused = 0x826C5BA4;      // the movie paused (1)
-constexpr uint32_t kModeAsked = 0x826C5BA8;   // the mode asked for (13: none)
-constexpr uint32_t kMovieTable = 0x826C5BAC;  // up to five movie ids, 11 ending
-constexpr uint32_t kNextType = 0x826C5BC0;    // the mode after the list
-constexpr uint32_t kSkippable = 0x826C5BC4;   // the movie can be skipped
-constexpr uint32_t kMovieIndex = 0x826C5BC8;  // the table's next entry
+// The boot movies' globals (0x826C5BA4 to 0x826C5BC8), the pad blocked
+// words and the start fade's passes word: schema::BootModeGlobals
+// (itc_recomp/schema/boot-mode.toml). The mode asked for's none, and the
+// movie id ending the list.
 constexpr uint32_t kNoModeAsked = 13;
 constexpr uint32_t kEndOfList = 11;
-// The pad blocked (known-data.md): either word set.
-constexpr uint32_t kPadBlocked0 = 0x826C7960;
-constexpr uint32_t kPadBlocked1 = 0x826C7964;
-// The movie class (Movies::Set) and the movies' path table.
-constexpr uint32_t kMovieClass = 0x826C1CDC;
+// The movies' path table (no schema describes it). The movie class is
+// schema::MoviesGlobals::movie_class (movies.toml); the action mappers'
+// entries and the player's entry index schema::RacerControllersGlobals
+// (PlayerMapperEntry, racer-controllers.toml).
 constexpr uint32_t kMoviePaths = 0x82600BEC;
-// The action mappers' entries (8 bytes each: the mapper, blocked) and the
-// current player.
-constexpr uint32_t kActionMappers = 0x826BAB80;
-constexpr uint32_t kCurrentPlayer = 0x826BABA4;
 constexpr uint32_t kSkipAction = 152;
-// The screen fades' passes word FadeIn is given at a movie's start.
-constexpr uint32_t kStartFadePasses = 0x82001BEC;
 
-// The boot mode's layout.
-constexpr uint32_t kMode3Bytes = 10460;
-constexpr uint32_t kDispatcher = 36;      // the mode's message dispatcher
-constexpr uint32_t kMachine = 848;        // the boot machine (a state machine)
-constexpr uint32_t kMovieStarted = 9608;  // the machine's: Movies::Start called
-constexpr uint32_t kMachineState = 848 + 9604;
-// A dispatcher's handlers (+0, count +200), its own ring (+204, count +804,
-// start +808) and the ring the mode's +240 holds (count +840, start +844:
-// mode-relative, the dispatcher's +204 again from +36).
-constexpr uint32_t kHandlerCount = 200;
-constexpr uint32_t kRing = 204;
+// The boot mode's layout: schema::BootMode, BootMachine, ModeDispatcher (the
+// mode's +36) and ModeAnswer. The boot machine's offset, for the adapters'
+// register arithmetic, and the message rings' shape (50 messages of 12
+// bytes).
+constexpr uint32_t kMachine = 848;
 constexpr uint32_t kRingSlots = 50;
 constexpr uint32_t kRingMessageBytes = 12;
-constexpr uint32_t kRingCount = 600;  // from the ring
-constexpr uint32_t kRingStart = 604;
 
 // The vtables.
 constexpr uint32_t kBootModeVtable = 0x82006B70;

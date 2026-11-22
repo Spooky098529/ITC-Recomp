@@ -18,6 +18,7 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "memory/heap.h"
+#include "schema/heap.h"
 
 #include <atomic>
 #include <cstdint>
@@ -34,12 +35,6 @@ ITC_FLAG_BOOL(native_heap, true, "ITC",
 namespace hooks {
 
 namespace {
-
-// The process heap's handle (GetProcessHeap, sub_8229B670, reads it).
-constexpr uint32_t kProcessHeapHandle = 0x8297149C;
-// Read by XPhysicalAlloc and XPhysicalAllocEx: when not 0, they clear
-// X_MEM_LARGE_PAGES from the protection (not read further).
-constexpr uint32_t kNoLargePhysicalPages = 0x829537B0;
 
 constexpr uint32_t kMemCommit = 0x1000;
 constexpr uint32_t kMemRelease = 0x8000;
@@ -64,7 +59,7 @@ void LogOnce(uint32_t kind, uint32_t value, const char* what, uint32_t caller) {
 }
 
 bool IsProcessHeap(uint8_t* base, uint32_t heap, uint32_t caller) {
-  if (heap == guest::LoadU32(base, kProcessHeapHandle)) {
+  if (heap == schema::HeapGlobals::process_heap(base).address) {
     return true;
   }
   LogOnce(0, heap, "a heap other than the process heap's", caller);
@@ -72,7 +67,7 @@ bool IsProcessHeap(uint8_t* base, uint32_t heap, uint32_t caller) {
 }
 
 uint32_t PhysicalProtection(uint8_t* base, uint32_t protection) {
-  if (guest::LoadU32(base, kNoLargePhysicalPages) != 0) {
+  if (schema::HeapGlobals::no_large_physical_pages(base) != 0) {
     protection &= ~kMemLargePages;
   }
   return protection;

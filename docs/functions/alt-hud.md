@@ -74,6 +74,23 @@ front end). Two rows were corrected on the way: `MenuList::PressedX`
 answers 1 when +24 is 0 (so X flips the toggle), and `MenuList::Release`
 returns 0 when there's no block.
 
+The schema (E5 step 2, 2026-11-17): `itc_recomp/schema/alt-hud.toml`
+names the object (`AltHud`: +0 `shown`, +4 `tach_curve` with +104
+`tach_output`, +116 `boost_curve` with +216 `boost_output`, +228 `bar`,
++232 `bar_high`, +236 `bar_low`, +240 `car`, +244 to +252 `slot0` to
+`slot2`, +256 `big_view`, +260 `player`), the holder's two words
+(`AltHudHolder`: `object`, `menu_list`) and the image words read
+(`AltHudGlobals`); `src/alt_hud/` reads them through those views.
+Its second pass (2026-11-21) reads other areas' objects through
+theirs too: the `Vehicle` (`car-physics.toml`: gear, nitrous, boost,
+car) with its `VehicleStatus` (`vehicle.toml`: the +6252 to +6260
+gauges), the racer's `Car` (`race-setup.toml`: car id, the five
+entries from +1832, +3892), the `CarInput` (`ai-drivers.toml`), the
+`MenuList` (`race-screens.toml`) and the `PlayerMapperEntry`
+(`racer-controllers.toml`). The UI movie nodes' words (+12, +28, +36,
++80, +100, +104, +108) and the car spec's block 2 +12 stay offsets: no
+schema type names them yet.
+
 Status:
 
 - **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
@@ -115,6 +132,11 @@ Status:
   calls direct or through the dispatch table. While the SDK or code not
   native yet still reaches it, its entry for them is an override in
   `src/lifted/` (deleted when nothing reaches it that way).
+- **Host**: E5 (`docs/e5-native.md`, steps 3 to 5): our C++ whose objects
+  are host structs (host byte order, host pointers, made with `new` or
+  kept in containers), read and written as C++ members instead of by
+  offset in guest memory. A Native or Lifted function becomes Host when
+  its area's objects move to the host.
 
 A function usually moves from recompiled or Wrapped to Overridden to
 Native as the `ctx` edge moves up through its callers, or straight to

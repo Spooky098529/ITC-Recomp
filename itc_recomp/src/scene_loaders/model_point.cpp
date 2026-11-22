@@ -11,6 +11,11 @@
 #include "model_animation/model_animation.h"
 #include "native/buffers.h"
 #include "scene_loaders/pools.h"
+#include "schema/material_passes.h"
+#include "schema/model_animation.h"
+#include "schema/models.h"
+#include "schema/scene_loaders.h"
+#include "schema/second_set.h"
 
 #include <bit>
 #include <cstdlib>
@@ -33,8 +38,7 @@ void Move8(uint8_t* base, uint32_t from, uint32_t to) {
   Store(base, to + 4, lo);
 }
 
-constexpr uint32_t kQuarterTurn = 0x82002A50;  // -pi / 2
-constexpr uint32_t kTenth = 0x82001FBC;        // 0.1
+using G = schema::SceneLoadersGlobals;
 
 // The identity (vupkd3d128's rows, stored aligned) at `at`.
 void Identity(uint8_t* base, uint32_t at) {
@@ -51,16 +55,18 @@ uint32_t ModelPointFind(uint8_t* base, uint32_t point, uint32_t model, uint32_t 
                         const UpdateMatricesCall& update_matrices) {
   ITC_NATIVE_RUNNING("sub_820D02D0 ModelPoint::Find");
   const uint32_t f = stack - kModelPointFrameBytes;
-  Store(base, point + 228, 0xFFFFFFFFu);
-  Store(base, point + 0, 0);
-  Store(base, point + 8, 0);
-  Store(base, point + 4, 0);
+  // The point record (second-set.md's SecondSetPointRecord).
+  const schema::SecondSetPointRecord p(base, point);
+  p.set_shape_index(0xFFFFFFFFu);
+  p.set_skeleton(0);
+  p.set_shape(0);
+  p.set_model(0);
   Identity(base, f + 80);
-  if (!native::Buffers_Memcpy(base, point + 16, f + 80, 64, 0x820D0350)) {
+  if (!native::Buffers_Memcpy(base, p.matrix_address(), f + 80, 64, 0x820D0350)) {
     ITC_LOG_ERROR("Scene loaders: ModelPoint::Find's memcpy refused after its checks");
     std::abort();
   }
-  if (Load(base, model + 408) == 0) {
+  if (schema::PartModel(base, model).file_08() == 0) {
     return 0;
   }
   Identity(base, f + 80);
@@ -68,9 +74,10 @@ uint32_t ModelPointFind(uint8_t* base, uint32_t point, uint32_t model, uint32_t 
     Move8(base, f + 80 + 8 * w, f + 160 + 8 * w);
   }
   const uint32_t turn = f + 160;
-  CopyWord(base, kQuarterTurn, f + 144);
+  CopyWord(base, G::quarter_turn_address(), f + 144);
   matrix_math::RotateY(base, turn, turn, f + 144, f - 80);
-  const uint32_t skeleton = model + 112;
+  const uint32_t skeleton = schema::Model(base, model).skeleton_address();
+  const schema::Skeleton sk(base, skeleton);
   model_animation::SkeletonResetPose(base, skeleton);
   model_animation::SkeletonLocalMatrices(base, skeleton, f);
   if (model_animation::SkeletonUpdateMatrices(base, skeleton) ==
@@ -80,37 +87,37 @@ uint32_t ModelPointFind(uint8_t* base, uint32_t point, uint32_t model, uint32_t 
   const int32_t nodes = int32_t(model_animation::SkeletonNodeCount(base, skeleton));
   int32_t n = 0;
   for (; n < nodes; n++) {
-    if (NameMatches(base, Load(base, skeleton + 84) + 160 * uint32_t(n), point + 160) != 0) {
+    if (NameMatches(base, sk.node_records() + 160 * uint32_t(n), p.node_name_address()) != 0) {
       break;
     }
   }
   if (n >= nodes) {
     return 0;
   }
-  Store(base, point + 4, model);
-  Store(base, point + 0, skeleton);
-  const uint32_t matrix = point + 16;
-  const uint32_t from = Load(base, skeleton + 148) + (uint32_t(n) << 6);
+  p.set_model(model);
+  p.set_skeleton(skeleton);
+  const uint32_t matrix = p.matrix_address();
+  const uint32_t from = sk.matrices() + (uint32_t(n) << 6);
   matrix_math::Copy(base, matrix, from);
   interpolation::BlendState_OnCopy(base, matrix, from, 0x820D045C);
-  const double x = Lfs(base, point + 64);
-  const double y = Lfs(base, point + 68);
-  const double z = Lfs(base, point + 72);
+  const double x = Lfs(base, p.matrix_row3_x_address());
+  const double y = Lfs(base, p.matrix_row3_y_address());
+  const double z = Lfs(base, p.matrix_row3_z_address());
   for (const uint32_t at : {92u, 108u, 124u, 140u}) {
     CopyWord(base, kOne, f + at);
   }
-  const double tenth = Lfs(base, kTenth);
-  Stfs(base, point + 64, Fmuls(x, tenth));
-  Stfs(base, point + 68, Fmuls(y, tenth));
-  Stfs(base, point + 72, Fmuls(z, tenth));
+  const double tenth = Lfs(base, G::tenth_address());
+  Stfs(base, p.matrix_row3_x_address(), Fmuls(x, tenth));
+  Stfs(base, p.matrix_row3_y_address(), Fmuls(y, tenth));
+  Stfs(base, p.matrix_row3_z_address(), Fmuls(z, tenth));
   matrix_math::Multiply(base, f + 80, matrix, turn);
   interpolation::BlendState_OnMultiply(base, f + 80, matrix, turn, 0x820D04B0);
   matrix_math::Copy(base, matrix, f + 80);
   interpolation::BlendState_OnCopy(base, matrix, f + 80, 0x820D04BC);
-  Move8(base, point + 64, point + 144);
-  Move8(base, point + 72, point + 152);
-  matrix_math::Inverse(base, point + 80, matrix);
-  Store(base, point + 224, uint32_t(n));
+  Move8(base, p.matrix_row3_xy_address(), p.position_xy_address());
+  Move8(base, p.matrix_row3_zw_address(), p.position_zw_address());
+  matrix_math::Inverse(base, p.inverse_address(), matrix);
+  p.set_node_index(uint32_t(n));
   return 1;
 }
 

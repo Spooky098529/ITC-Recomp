@@ -10,18 +10,18 @@ namespace save_screen {
 uint64_t StoreSettings(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821A24B0 SaveScreen::StoreSettings");
   Fn f(base, sp, 224, calls);
-  const uint32_t data = Data(base);
-  if (int32_t(Load(base, data + 60)) != 0) {
+  const auto data = Data(base);
+  if (int32_t(data.settings_stored()) != 0) {
     return 1;
   }
-  if (Load(base, kProfileWanted) != 0) {
-    if (Load(base, kProfileRead) == 997) {
+  if (G::profile_wanted(base) != 0) {
+    if (G::profile_read(base) == 997) {
       return 0;
     }
-    const uint32_t save = uint32_t(f.Call(kSaveDataOf, 0x821A2500, 0)) + 0x1F85C;
-    const uint32_t profile = Load(base, Load(base, kProfileReader) + 4);
-    Store(base, save + 20, Load(base, profile + 632) == 0 ? 1 : 0);
-    const uint32_t control = Load(base, profile + 672);
+    const schema::SaveData save(base, uint32_t(f.Call(kSaveDataOf, 0x821A2500, 0)));
+    const auto profile = G::profile_reader(base).settings();
+    save.set_profile_option(profile.setting15_value() == 0 ? 1 : 0);
+    const uint32_t control = profile.setting16_value();
     uint32_t word = 0;
     if (control == 0) {
       word = 2;
@@ -32,22 +32,23 @@ uint64_t StoreSettings(uint8_t* base, uint32_t sp, const Calls& calls) {
     } else {
       word = Load(base, f.frame + 80);  // the caller's leftover
     }
-    Store(base, save + 24, word);
-    const uint32_t block = save + 44, copy = f.frame + 96;
-    const bool first = int32_t(Load(base, profile + 712)) == 0;
+    save.set_camera_view(word);
+    // The options' +44 to +103 (no field yet: SaveData's 129160).
+    const uint32_t block = save.options_address() + 44, copy = f.frame + 96;
+    const bool first = int32_t(profile.setting17_value()) == 0;
     f.Call(kMemcpy, 0x821A2590, copy, block, 60);
     Store(base, f.frame + 104, first ? 13 : 9);
     Store(base, f.frame + 108, first ? 9 : 13);
     f.Call(kMemcpy, 0x821A25A8, block, copy, 60);
-    const bool second = int32_t(Load(base, profile + 752)) == 0;
+    const bool second = int32_t(profile.setting18_value()) == 0;
     f.Call(kMemcpy, 0x821A25D8, copy, block, 60);
     Store(base, f.frame + 100, second ? 14 : 7);
     Store(base, f.frame + 132, second ? 7 : 14);
     f.Call(kMemcpy, 0x821A25F0, block, copy, 60);
-    Store(base, Data(base) + 60, 1);
+    Data(base).set_settings_stored(1);
     return 1;
   }
-  Store(base, data + 60, 1);
+  data.set_settings_stored(1);
   return 1;
 }
 
@@ -58,8 +59,8 @@ uint64_t Page6(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
     Jump(base, 8);
     f.Call(kRequestDevice, 0x821A33D0, 0);
   };
-  Store(base, Data(base) + 24, Load(base, Data(base) + 24) + 1);
-  if (int32_t(Load(base, Data(base) + 24)) >= 45 && int32_t(Load(base, Data(base) + 12)) == 0) {
+  Data(base).set_wait(Data(base).wait() + 1);
+  if (int32_t(Data(base).wait()) >= 45 && int32_t(Data(base).message()) == 0) {
     f.r3 = StoreSettings(base, f.frame, calls);
     if (int32_t(uint32_t(f.r3)) != 0) {
       to_device();
@@ -70,7 +71,7 @@ uint64_t Page6(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
     return f.r3;
   }
   f.Call(kMenuSoundPlay, 0x821A3328, 0);
-  switch (int32_t(Load(base, Data(base) + 12))) {
+  switch (int32_t(Data(base).message())) {
     case 0:
       f.r3 = StoreSettings(base, f.frame, calls);
       if (int32_t(uint32_t(f.r3)) != 0) {
@@ -93,11 +94,11 @@ uint64_t Page7(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821A33E8 SaveScreen::Page7");
   Fn f(base, sp, 96, calls, mode);
   const int32_t state = f.CallInt(kSlotState, 0x821A3400, 0);
-  Store(base, Data(base) + 24, Load(base, Data(base) + 24) + 1);
-  if (int32_t(Load(base, Data(base) + 24)) < 90) {
+  Data(base).set_wait(Data(base).wait() + 1);
+  if (int32_t(Data(base).wait()) < 90) {
     return f.r3;
   }
-  const int32_t message = int32_t(Load(base, Data(base) + 12));
+  const int32_t message = int32_t(Data(base).message());
   if (message == 10) {
     if (state == 1) {
       Go(base, 5, 2, 3);
@@ -143,7 +144,7 @@ uint64_t Page7(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
     } else if (state == 3) {
       if (uint32_t(f.Call(kSlotPending, 0x821A36A4, 0)) == 0) {
         const uint64_t save = f.Call(kSaveDataOf, 0x821A36B0, f.r3);
-        f.Call(kMemcpy, 0x821A36C8, save, Load(base, Load(base, kSaveBuffers) + 0), kGameDataBytes);
+        f.Call(kMemcpy, 0x821A36C8, save, G::save_buffers(base).game_data(), kGameDataBytes);
         Go(base, 6, 2, 3);
         Message(base, 6, 1);
       }

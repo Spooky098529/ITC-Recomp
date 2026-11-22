@@ -1,0 +1,288 @@
+# The schema of docs/functions/c-runtime.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The game's C runtime (Microsoft's, statically linked): its locale and
+# multibyte data, the streams the printf engines write to, the float
+# conversion's records (_strflt, the FOS, the 12-byte long double), the
+# per-thread data rand reads, atexit's table, and the strings and buffers
+# its string functions walk (described as byte runs: they're arrays, not
+# objects). Names from docs/known-data.md and the rows, and Microsoft's
+# CRT sources where the layout matches theirs ("probably" then).
+#
+# Left out: the measure's types of the lifted functions sub_82466DD0,
+# sub_8246A940 and sub_8246E7F8 to sub_8247EAF0 (57 types of 44 functions: a 52- to
+# 76-byte record with +13 a byte and floats from +36, probably D3DX's or
+# XGraphics' image filters, not read): filed under the C runtime only
+# because their one non-lifted callee is __ultod (sub_825A9DB0) or log
+# (sub_825A9C00); not the C runtime's (a measure fault, reported to the
+# lead).
+
+# A thread's C runtime data (_tiddata, 196 bytes, calloc'ed by _mtinit or
+# _getptd_noexit; docs/known-data.md, c-runtime-core.md's per-thread data).
+# The measure meets it as _getptd's result, through _dosmaperr and rand.
+[ThreadData]
+measure = "_dosmaperr.ret"
+size = 196
+origin = "allocated"
+fields = [
+  { name = "thread_id", offset = 0, type = "u32" },
+  { name = "thread_handle", offset = 4, type = "u32", note = "-1" },
+  { name = "errno_value", offset = 8, type = "s32", note = "errno (_errno returns its address)" },
+  { name = "doserrno", offset = 12, type = "u32", note = "_doserrno" },
+  { name = "rand_seed", offset = 20, type = "u32", note = "rand's seed, 1 at first" },
+  { name = "exception_actions", offset = 92, type = "u32", note = "the exception action table (0x8266BE60, _XcptActTab, unless copied)" },
+  { name = "exception_pointers", offset = 96, type = "u32", note = "raise saves it, clears it and puts it back around an FPE handler (_tpxcptinfoptrs, probably)" },
+  { name = "fpe_code", offset = 100, type = "u32", note = "raise saves it, sets 140 and puts it back around an FPE handler, which is given it (_tfpecode, probably)" },
+  { name = "terminate_handler", offset = 108, type = "fn" },
+]
+
+# A locale's data (threadlocinfo, probably): the C locale's at 0x8266BB48,
+# the current one's through [0x8266BC28].
+[Locale]
+measure = "[8266BC28]"
+size = 204
+origin = "image"
+fields = [
+  { name = "mb_cur_max", offset = 172, type = "s32", note = "the longest multibyte character (above 1 goes to sub_825AFD98, never seen)" },
+  { name = "ctype_table", offset = 200, type = "u32", note = "the character type table: halfwords, 1 upper, 2 lower, 4 digit, 8 space, 0x100 alpha, 0x8000 lead byte" },
+]
+
+# The numeric formatting (struct lconv, probably), through [0x8266C024].
+[Lconv]
+measure = "[8266C024]"
+size = 4
+origin = "image"
+fields = [
+  { name = "decimal_point", offset = 0, type = "ptr", to = "CString", note = "the decimal point's text ('.')" },
+]
+
+# The multibyte info (threadmbcinfo, probably): the C locale's at
+# 0x8266C028, the current one through [0x8266C450] (the same at boot);
+# setSBCS clears it and copies the C locale's tables into it.
+[MbcInfo]
+size = 541
+origin = "image"
+fields = [
+  { name = "ref_count", offset = 0, type = "u32", note = "probably" },
+  { name = "code_page", offset = 4, type = "u32", note = "probably (mbcodepage); 0 after setSBCS" },
+  { name = "is_mb_code_page", offset = 8, type = "u32", note = "probably; 0 after setSBCS" },
+  { name = "lcid", offset = 12, type = "u32", note = "probably; 0 after setSBCS" },
+  { name = "lead_byte_ranges", offset = 16, type = "bytes", count = 12, note = "six halfwords (mbulinfo, probably), cleared by setSBCS" },
+  { name = "mbctype", offset = 28, type = "bytes", count = 257, note = "the multibyte character types" },
+  { name = "mbcasemap", offset = 285, type = "bytes", count = 256, note = "the case map" },
+]
+
+# The float conversion table (_cfltcvt_tab, 0x8266BA5C): ten function
+# pointers _cfltcvt_init (sub_825A6DB0) fills at start-up; the names are
+# MSVC's order for the table (probably).
+[FloatConversionTable]
+size = 40
+origin = "image"
+fields = [
+  { name = "cfltcvt", offset = 0, type = "fn", note = "0x825AEB70" },
+  { name = "cropzeros", offset = 4, type = "fn", note = "0x825ADF20" },
+  { name = "fassign", offset = 8, type = "fn", note = "0x825ADF10" },
+  { name = "forcdecpt", offset = 12, type = "fn", note = "0x825ADF18" },
+  { name = "positive", offset = 16, type = "fn", note = "0x825ADE90" },
+  { name = "cldcvt", offset = 20, type = "fn", note = "0x825AEB70 (_cfltcvt again)" },
+  { name = "cfltcvt_l", offset = 24, type = "fn", note = "0x825AEB20, _cfltcvt_l: the printf engines call through it" },
+  { name = "fassign_l", offset = 28, type = "fn", note = "0x825ADEB0" },
+  { name = "cropzeros_l", offset = 32, type = "fn", note = "0x825ADDD8: cuts zeros for %g" },
+  { name = "forcdecpt_l", offset = 36, type = "fn", note = "0x825ADD38: forces the point for # with precision 0" },
+]
+
+# A stream (FILE, 32 bytes): the _iob table's (0x8266B7D0: stdin, stdout,
+# stderr first) or a string stream on sprintf's stack (flags 66).
+[Stream]
+measures = ["_output_l.r3", "_woutput_l.r3"]
+size = 32
+origin = "embedded"
+fields = [
+  { name = "pointer", offset = 0, type = "u32", note = "where the next character goes" },
+  { name = "room", offset = 4, type = "u32", note = "the room left (_cnt)" },
+  { name = "buffer", offset = 8, type = "u32", note = "the buffer's base" },
+  { name = "flags", offset = 12, type = "u32", note = "0x40 a string" },
+  { name = "file", offset = 16, type = "u32", note = "the file handle (_file)" },
+  { name = "buffer_size", offset = 24, type = "u32", note = "the buffer's size (_bufsiz)" },
+  { name = "temp_name", offset = 28, type = "u32", note = "a temporary file's name, freed at close (_tmpfname)" },
+]
+
+# _fltout2's result (_strflt): the sign, the decimal exponent and the digits.
+[FloatStrings]
+measures = ["_fltout2.r4", "_cftof2_l.r6", "_fptostr.r6"]
+size = 16
+origin = "embedded"
+fields = [
+  { name = "sign", offset = 0, type = "u32", note = "the sign character" },
+  { name = "decimal_exponent", offset = 4, type = "s32" },
+  { name = "flag", offset = 8, type = "u32", note = "$I10_OUTPUT's result (0 for an infinity or NaN)" },
+  { name = "mantissa", offset = 12, type = "ptr", to = "CString", note = "the digits' buffer" },
+]
+
+# $I10_OUTPUT's FOS (_FloatOutStruct, 26 bytes).
+[FloatOutput]
+measure = "sub_825B8B48.r7"
+size = 26
+origin = "embedded"
+fields = [
+  { name = "exponent", offset = 0, type = "s16", note = "the decimal exponent" },
+  { name = "sign", offset = 2, type = "u8", note = "'-' or ' '" },
+  { name = "count", offset = 3, type = "u8", note = "the digits' count" },
+  { name = "digits", offset = 4, type = "bytes", count = 22, note = "the digits and a terminator" },
+]
+
+# A 12-byte long double (_LDOUBLE, the guest's layout), as ___dtold writes it.
+[Ld12]
+measure = "___dtold.r3"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "sign_exponent", offset = 0, type = "u16", note = "the sign and 15-bit exponent" },
+  { name = "mantissa_high", offset = 2, type = "u32" },
+  { name = "mantissa_low", offset = 6, type = "u32" },
+]
+
+# A double in memory: ___dtold's source, _cftof_l's argument (r3, the
+# double's address), the result sub_825B0470 writes back.
+[DoubleValue]
+measures = ["___dtold.r4", "_cftof_l.r3", "sub_825B0470.r4"]
+size = 8
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "f64" },
+  { name = "bits", offset = 0, type = "u64" },
+  { name = "high", offset = 0, type = "u32", note = "the sign, exponent and the mantissa's top 20 bits" },
+  { name = "sign_exponent", offset = 0, type = "u16" },
+  { name = "low", offset = 4, type = "u32" },
+]
+
+# sub_825B0068's (probably _raise_exc: not read) operands, r7 and r8: a
+# float or a double.
+[FpOperand]
+measures = ["sub_825B0068.r7", "sub_825B0068.r8"]
+size = 8
+origin = "embedded"
+fields = [
+  { name = "as_double", offset = 0, type = "f64" },
+  { name = "as_float", offset = 0, type = "f32" },
+]
+
+# sub_825B0068's r3 (probably _raise_exc's _FPIEEE_RECORD: not read).
+[FpIeeeRecord]
+measure = "sub_825B0068.r3"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32", note = "probably the rounding mode, precision and operation" },
+  { name = "cause", offset = 4, type = "u32", note = "probably (the exception's cause bits)" },
+  { name = "enable", offset = 8, type = "u32", note = "probably" },
+  { name = "status", offset = 12, type = "u32", note = "probably" },
+]
+
+# sub_825B0068's r4: probably the control word (read and masked 21 times).
+[FpControlWord]
+measure = "sub_825B0068.r4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "u32" },
+]
+
+# _decomp's r4: where the exponent goes.
+[ExponentOut]
+measure = "_decomp.r4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "exponent", offset = 0, type = "s32" },
+]
+
+# strtoxl's r5: where the end pointer goes.
+[EndPointerOut]
+measure = "strtoxl.r5"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "end", offset = 0, type = "ptr", to = "CString" },
+]
+
+# atexit's table (calloc(32, 4) at boot, grown by realloc): the functions
+# registered, begin at [0x82978334], one past the last at [0x82978330].
+[ExitTable]
+measure = "[82978330]"
+size = 128
+origin = "allocated"
+fields = [
+  { name = "unknown_m4", offset = -4, type = "u32", note = "read 4 bytes below the table by the exit path (sub_825AA218, never run; probably its walk down from the end)" },
+  { name = "first", offset = 0, type = "fn", note = "the first function registered (0 when made)" },
+]
+
+# A narrow string or character buffer (the functions walk it byte by byte):
+# the string functions' arguments, the printf format, "(null)", the decimal
+# point's text, the digits' buffer, the float conversion's buffer malloc'ed
+# for a precision above 163.
+[CString]
+measures = ["strncmp.r3", "strncmp.r4", "strstr.r4", "strncpy.r4", "_stricmp.r3",
+            "mbtowc.r4", "_cftof_l.r4", "strtoxl.r4", "_output_l.r4", "_fltout2.r5",
+            "new<861>@_output_l", "new<861>@_woutput_l", "[820734CC]", "[8266C024].+0",
+            "lstrcmpA.r3", "lstrcmpA.r4", "CompareStringA.r6"]
+size = 0
+origin = "embedded"
+fields = [
+  { name = "chars", offset = 0, type = "bytes", count = 861 },
+]
+
+# A UTF-16 string (the wide string functions' arguments, the wide printf
+# format, L"(null)").
+[WideString]
+measures = ["wcscmp.r3", "wcscmp.r4", "wcscat.r3", "wcscat.r4", "wcscpy.r3", "wcscpy.r4",
+            "wcslen.r3", "mbtowc.r3", "_woutput_l.r4", "[820734D0]"]
+size = 0
+origin = "embedded"
+fields = [
+  { name = "units", offset = 0, type = "bytes", count = 16, note = "halfwords" },
+]
+
+# Memory copied or filled by memcpy, XMemCpy and XMemSet (bytes, words or
+# doublewords at a time); XPR::Create's +12 block is one memcpy copies.
+[ByteBuffer]
+measure = "memcpy_825A7410.r3"
+measures = ["memcpy_825A7410.r4", "memcpy_825A7830.r3", "memcpy_825A7830.r4", "XMemCpy_82295890.r3", "XMemCpy_82295890.r4", "XMemCpy_82296FE0.r3", "XMemCpy_82296FE0.r4", "XMemSet.r3", "XPR.+16.+12"]
+size = 0
+origin = "embedded"
+fields = [
+  { name = "bytes", offset = 0, type = "bytes", count = 16 },
+]
+
+[globals]
+narrow_null = { address = 0x820734CC, type = "ptr", to = "CString", note = "\"(null)\", printed for a null %s" }
+wide_null = { address = 0x820734D0, type = "ptr", to = "WideString", note = "L\"(null)\"" }
+format_states = { address = 0x820734D8, type = "bytes", count = 128, note = "the printf engines' table: a character's class (from ' ', the low nibble) and, at class × 8 + state, the next state (the high nibble)" }
+qnan_text = { address = 0x82074490, type = "bytes", count = 8, note = "\"1#QNAN\" (probably)" }
+inf_text = { address = 0x82074498, type = "bytes", count = 8, note = "\"1#INF\" (probably)" }
+ind_text = { address = 0x820744A0, type = "bytes", count = 8, note = "\"1#IND\" (probably)" }
+snan_text = { address = 0x820744A8, type = "bytes", count = 8, note = "\"1#SNAN\" (probably)" }
+xmemcpy_step = { address = 0x82638308, type = "u32", note = "XMemCpy's byte loop's step (1)" }
+xmemset_stride = { address = 0x8263830C, type = "u32", note = "XMemSet's step (16)" }
+aexit_rtn = { address = 0x8266B7B0, type = "fn", note = "_aexit_rtn: a KeBugCheck, then _exit (0x825AA378) once _init_pointers ran" }
+streams = { address = 0x8266B7D0, type = "bytes", count = 640, note = "_iob: 20 Streams of 32 bytes (stdin, stdout, stderr first); __iob_func returns it" }
+float_conversions = { address = 0x8266BA5C, type = "bytes", count = 40, note = "_cfltcvt_tab: a FloatConversionTable" }
+c_locale = { address = 0x8266BB48, type = "bytes", count = 204, note = "the C locale's data: a Locale" }
+current_locale = { address = 0x8266BC28, type = "ptr", to = "Locale" }
+lconv = { address = 0x8266C024, type = "ptr", to = "Lconv", note = "__lconv (probably): its decimal point" }
+c_mbc_info = { address = 0x8266C028, type = "bytes", count = 541, note = "the C locale's multibyte info: an MbcInfo" }
+mbc_info = { address = 0x8266C450, type = "ptr", to = "MbcInfo", note = "the current multibyte info (the C locale's at boot)" }
+pow10_positive = { address = 0x8266C548, type = "bytes", count = 352, note = "_pow10pos: 12-byte long doubles in rows of seven by the exponent's three-bit groups" }
+pow10_negative = { address = 0x8266C6A8, type = "bytes", count = 352, note = "_pow10neg" }
+unknown_82971178 = { address = 0x82971178, type = "fn", note = "a C runtime handler pointer (sub_825AEE18 sets it; 0 at boot)" }
+default_critical_section_initializer = { address = 0x82971328, type = "fn", note = "probably: 0x825B3498, stored by sub_825B3548" }
+critical_section_initializer = { address = 0x8297132C, type = "fn", note = "probably: read by sub_825B35A0; 0 at boot" }
+mbc_is_set = { address = 0x8297135C, type = "u32", note = "probably __ismbcodepage: 0 from __initmbctable" }
+mbc_code_page = { address = 0x8297136C, type = "s32", note = "probably __mbcodepage: -3 (_MB_CP_ANSI) from __initmbctable" }
+invalid_parameter_handler = { address = 0x82978320, type = "fn", note = "_invalid_parameter's handler, cleared at boot, never set" }
+exit_table_end = { address = 0x82978330, type = "u32", note = "atexit's table: one past the last function" }
+exit_table_begin = { address = 0x82978334, type = "ptr", to = "ExitTable" }
+mbctable_done = { address = 0x82978338, type = "u32", note = "__initmbctable's done flag" }

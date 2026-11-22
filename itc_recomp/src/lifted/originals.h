@@ -9,6 +9,10 @@
 
 namespace lifted::original {
 
+// sub_82090000's original.
+Result e82090000(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82090000).
+inline void c82090000(Regs& regs, uint8_t* base) { regs.Apply(e82090000(base, regs.ToArgs())); }
 // sub_82090108's original.
 Result e82090108(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82090108).
@@ -21,6 +25,14 @@ inline void c820902B0(Regs& regs, uint8_t* base) { regs.Apply(e820902B0(base, re
 Result e820902C8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820902C8).
 inline void c820902C8(Regs& regs, uint8_t* base) { regs.Apply(e820902C8(base, regs.ToArgs())); }
+// sub_82090378's original.
+Result e82090378(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82090378).
+inline void c82090378(Regs& regs, uint8_t* base) { regs.Apply(e82090378(base, regs.ToArgs())); }
+// sub_82090420's original.
+Result e82090420(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82090420).
+inline void c82090420(Regs& regs, uint8_t* base) { regs.Apply(e82090420(base, regs.ToArgs())); }
 // sub_82090760's original.
 Result e82090760(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82090760).
@@ -33,6 +45,10 @@ inline void c82090768(Regs& regs, uint8_t* base) { regs.Apply(e82090768(base, re
 Result e82090770(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82090770).
 inline void c82090770(Regs& regs, uint8_t* base) { regs.Apply(e82090770(base, regs.ToArgs())); }
+// sub_82090778's original.
+Result e82090778(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82090778).
+inline void c82090778(Regs& regs, uint8_t* base) { regs.Apply(e82090778(base, regs.ToArgs())); }
 // sub_82090788's original.
 Result e82090788(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82090788).
@@ -77,6 +93,10 @@ inline void c820909B8(Regs& regs, uint8_t* base) { regs.Apply(e820909B8(base, re
 Result e82090CC0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82090CC0).
 inline void c82090CC0(Regs& regs, uint8_t* base) { regs.Apply(e82090CC0(base, regs.ToArgs())); }
+// sub_82090EA8's original.
+Result e82090EA8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82090EA8).
+inline void c82090EA8(Regs& regs, uint8_t* base) { regs.Apply(e82090EA8(base, regs.ToArgs())); }
 // sub_82091050's original.
 Result e82091050(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82091050).
@@ -89,6 +109,10 @@ inline void c82091160(Regs& regs, uint8_t* base) { regs.Apply(e82091160(base, re
 Result e82091328(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82091328).
 inline void c82091328(Regs& regs, uint8_t* base) { regs.Apply(e82091328(base, regs.ToArgs())); }
+// sub_82091540's original.
+Result e82091540(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82091540).
+inline void c82091540(Regs& regs, uint8_t* base) { regs.Apply(e82091540(base, regs.ToArgs())); }
 // sub_82091720's original.
 Result e82091720(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82091720).
@@ -105,6 +129,10 @@ inline void c82091A60(Regs& regs, uint8_t* base) { regs.Apply(e82091A60(base, re
 Result e82091A98(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82091A98).
 inline void c82091A98(Regs& regs, uint8_t* base) { regs.Apply(e82091A98(base, regs.ToArgs())); }
+// sub_82091AE8's original.
+Result e82091AE8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82091AE8).
+inline void c82091AE8(Regs& regs, uint8_t* base) { regs.Apply(e82091AE8(base, regs.ToArgs())); }
 // sub_82091E58's original.
 Result e82091E58(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82091E58).
@@ -133,6 +161,14 @@ inline void c82092878(Regs& regs, uint8_t* base) { regs.Apply(e82092878(base, re
 Result e82092968(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82092968).
 inline void c82092968(Regs& regs, uint8_t* base) { regs.Apply(e82092968(base, regs.ToArgs())); }
+// sub_82092A00's original.
+Result e82092A00(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82092A00).
+inline void c82092A00(Regs& regs, uint8_t* base) { regs.Apply(e82092A00(base, regs.ToArgs())); }
+// sub_82092B10's original.
+Result e82092B10(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82092B10).
+inline void c82092B10(Regs& regs, uint8_t* base) { regs.Apply(e82092B10(base, regs.ToArgs())); }
 // sub_82092B78's original.
 Result e82092B78(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82092B78).
@@ -141,10 +177,18 @@ inline void c82092B78(Regs& regs, uint8_t* base) { regs.Apply(e82092B78(base, re
 Result e82092E70(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82092E70).
 inline void c82092E70(Regs& regs, uint8_t* base) { regs.Apply(e82092E70(base, regs.ToArgs())); }
+// sub_82092EF8's original.
+Result e82092EF8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82092EF8).
+inline void c82092EF8(Regs& regs, uint8_t* base) { regs.Apply(e82092EF8(base, regs.ToArgs())); }
 // sub_82092F98's original.
 Result e82092F98(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82092F98).
 inline void c82092F98(Regs& regs, uint8_t* base) { regs.Apply(e82092F98(base, regs.ToArgs())); }
+// sub_82093400's original.
+Result e82093400(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82093400).
+inline void c82093400(Regs& regs, uint8_t* base) { regs.Apply(e82093400(base, regs.ToArgs())); }
 // sub_82093740's original.
 Result e82093740(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82093740).
@@ -197,6 +241,10 @@ inline void c82094AB8(Regs& regs, uint8_t* base) { regs.Apply(e82094AB8(base, re
 Result e82094B10(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82094B10).
 inline void c82094B10(Regs& regs, uint8_t* base) { regs.Apply(e82094B10(base, regs.ToArgs())); }
+// sub_820958B8's original.
+Result e820958B8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820958B8).
+inline void c820958B8(Regs& regs, uint8_t* base) { regs.Apply(e820958B8(base, regs.ToArgs())); }
 // sub_82095958's original.
 Result e82095958(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82095958).
@@ -261,6 +309,10 @@ inline void c82098CB8(Regs& regs, uint8_t* base) { regs.Apply(e82098CB8(base, re
 Result e82098CD0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82098CD0).
 inline void c82098CD0(Regs& regs, uint8_t* base) { regs.Apply(e82098CD0(base, regs.ToArgs())); }
+// sub_82098D60's original.
+Result e82098D60(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82098D60).
+inline void c82098D60(Regs& regs, uint8_t* base) { regs.Apply(e82098D60(base, regs.ToArgs())); }
 // sub_82098E80's original.
 Result e82098E80(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82098E80).
@@ -293,6 +345,14 @@ inline void c82099B18(Regs& regs, uint8_t* base) { regs.Apply(e82099B18(base, re
 Result e82099C08(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82099C08).
 inline void c82099C08(Regs& regs, uint8_t* base) { regs.Apply(e82099C08(base, regs.ToArgs())); }
+// sub_82099D50's original.
+Result e82099D50(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82099D50).
+inline void c82099D50(Regs& regs, uint8_t* base) { regs.Apply(e82099D50(base, regs.ToArgs())); }
+// sub_82099E88's original.
+Result e82099E88(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82099E88).
+inline void c82099E88(Regs& regs, uint8_t* base) { regs.Apply(e82099E88(base, regs.ToArgs())); }
 // sub_82099FB0's original.
 Result e82099FB0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82099FB0).
@@ -305,6 +365,10 @@ inline void c8209A080(Regs& regs, uint8_t* base) { regs.Apply(e8209A080(base, re
 Result e8209A458(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8209A458).
 inline void c8209A458(Regs& regs, uint8_t* base) { regs.Apply(e8209A458(base, regs.ToArgs())); }
+// sub_8209A600's original.
+Result e8209A600(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8209A600).
+inline void c8209A600(Regs& regs, uint8_t* base) { regs.Apply(e8209A600(base, regs.ToArgs())); }
 // sub_8209A930's original.
 Result e8209A930(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8209A930).
@@ -321,6 +385,30 @@ inline void c8209AAA8(Regs& regs, uint8_t* base) { regs.Apply(e8209AAA8(base, re
 Result e8209AB48(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8209AB48).
 inline void c8209AB48(Regs& regs, uint8_t* base) { regs.Apply(e8209AB48(base, regs.ToArgs())); }
+// sub_8209AC30's original.
+Result e8209AC30(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8209AC30).
+inline void c8209AC30(Regs& regs, uint8_t* base) { regs.Apply(e8209AC30(base, regs.ToArgs())); }
+// sub_8209AC50's original.
+Result e8209AC50(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8209AC50).
+inline void c8209AC50(Regs& regs, uint8_t* base) { regs.Apply(e8209AC50(base, regs.ToArgs())); }
+// sub_8209AE48's original.
+Result e8209AE48(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8209AE48).
+inline void c8209AE48(Regs& regs, uint8_t* base) { regs.Apply(e8209AE48(base, regs.ToArgs())); }
+// sub_8209AF40's original.
+Result e8209AF40(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8209AF40).
+inline void c8209AF40(Regs& regs, uint8_t* base) { regs.Apply(e8209AF40(base, regs.ToArgs())); }
+// sub_8209B058's original.
+Result e8209B058(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8209B058).
+inline void c8209B058(Regs& regs, uint8_t* base) { regs.Apply(e8209B058(base, regs.ToArgs())); }
+// sub_8209B070's original.
+Result e8209B070(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8209B070).
+inline void c8209B070(Regs& regs, uint8_t* base) { regs.Apply(e8209B070(base, regs.ToArgs())); }
 // sub_8209B378's original.
 Result e8209B378(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8209B378).
@@ -337,6 +425,10 @@ inline void c8209BD50(Regs& regs, uint8_t* base) { regs.Apply(e8209BD50(base, re
 Result e8209BE88(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8209BE88).
 inline void c8209BE88(Regs& regs, uint8_t* base) { regs.Apply(e8209BE88(base, regs.ToArgs())); }
+// sub_8209C1A0's original.
+Result e8209C1A0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8209C1A0).
+inline void c8209C1A0(Regs& regs, uint8_t* base) { regs.Apply(e8209C1A0(base, regs.ToArgs())); }
 // sub_8209C6E0's original.
 Result e8209C6E0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8209C6E0).
@@ -353,6 +445,14 @@ inline void c8209CE68(Regs& regs, uint8_t* base) { regs.Apply(e8209CE68(base, re
 Result e8209D130(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8209D130).
 inline void c8209D130(Regs& regs, uint8_t* base) { regs.Apply(e8209D130(base, regs.ToArgs())); }
+// sub_8209D490's original.
+Result e8209D490(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8209D490).
+inline void c8209D490(Regs& regs, uint8_t* base) { regs.Apply(e8209D490(base, regs.ToArgs())); }
+// sub_8209D688's original.
+Result e8209D688(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8209D688).
+inline void c8209D688(Regs& regs, uint8_t* base) { regs.Apply(e8209D688(base, regs.ToArgs())); }
 // sub_8209D730's original.
 Result e8209D730(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8209D730).
@@ -361,10 +461,22 @@ inline void c8209D730(Regs& regs, uint8_t* base) { regs.Apply(e8209D730(base, re
 Result e8209D7B0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8209D7B0).
 inline void c8209D7B0(Regs& regs, uint8_t* base) { regs.Apply(e8209D7B0(base, regs.ToArgs())); }
+// sub_8209D818's original.
+Result e8209D818(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8209D818).
+inline void c8209D818(Regs& regs, uint8_t* base) { regs.Apply(e8209D818(base, regs.ToArgs())); }
 // sub_8209D868's original.
 Result e8209D868(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8209D868).
 inline void c8209D868(Regs& regs, uint8_t* base) { regs.Apply(e8209D868(base, regs.ToArgs())); }
+// sub_8209D8D8's original.
+Result e8209D8D8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8209D8D8).
+inline void c8209D8D8(Regs& regs, uint8_t* base) { regs.Apply(e8209D8D8(base, regs.ToArgs())); }
+// sub_8209D950's original.
+Result e8209D950(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8209D950).
+inline void c8209D950(Regs& regs, uint8_t* base) { regs.Apply(e8209D950(base, regs.ToArgs())); }
 // sub_8209DB20's original.
 Result e8209DB20(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8209DB20).
@@ -373,6 +485,10 @@ inline void c8209DB20(Regs& regs, uint8_t* base) { regs.Apply(e8209DB20(base, re
 Result e8209DB90(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8209DB90).
 inline void c8209DB90(Regs& regs, uint8_t* base) { regs.Apply(e8209DB90(base, regs.ToArgs())); }
+// sub_8209DC18's original.
+Result e8209DC18(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8209DC18).
+inline void c8209DC18(Regs& regs, uint8_t* base) { regs.Apply(e8209DC18(base, regs.ToArgs())); }
 // sub_8209DD80's original.
 Result e8209DD80(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8209DD80).
@@ -389,18 +505,34 @@ inline void c8209DE48(Regs& regs, uint8_t* base) { regs.Apply(e8209DE48(base, re
 Result e8209DFA8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8209DFA8).
 inline void c8209DFA8(Regs& regs, uint8_t* base) { regs.Apply(e8209DFA8(base, regs.ToArgs())); }
+// sub_8209ED58's original.
+Result e8209ED58(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8209ED58).
+inline void c8209ED58(Regs& regs, uint8_t* base) { regs.Apply(e8209ED58(base, regs.ToArgs())); }
 // sub_8209EEC8's original.
 Result e8209EEC8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8209EEC8).
 inline void c8209EEC8(Regs& regs, uint8_t* base) { regs.Apply(e8209EEC8(base, regs.ToArgs())); }
+// sub_8209F228's original.
+Result e8209F228(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8209F228).
+inline void c8209F228(Regs& regs, uint8_t* base) { regs.Apply(e8209F228(base, regs.ToArgs())); }
 // sub_8209F430's original.
 Result e8209F430(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8209F430).
 inline void c8209F430(Regs& regs, uint8_t* base) { regs.Apply(e8209F430(base, regs.ToArgs())); }
+// sub_8209F580's original.
+Result e8209F580(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8209F580).
+inline void c8209F580(Regs& regs, uint8_t* base) { regs.Apply(e8209F580(base, regs.ToArgs())); }
 // sub_8209F5E0's original.
 Result e8209F5E0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8209F5E0).
 inline void c8209F5E0(Regs& regs, uint8_t* base) { regs.Apply(e8209F5E0(base, regs.ToArgs())); }
+// sub_8209F6B8's original.
+Result e8209F6B8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8209F6B8).
+inline void c8209F6B8(Regs& regs, uint8_t* base) { regs.Apply(e8209F6B8(base, regs.ToArgs())); }
 // sub_8209F718's original.
 Result e8209F718(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8209F718).
@@ -421,6 +553,10 @@ inline void c8209F8A0(Regs& regs, uint8_t* base) { regs.Apply(e8209F8A0(base, re
 Result e8209F900(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8209F900).
 inline void c8209F900(Regs& regs, uint8_t* base) { regs.Apply(e8209F900(base, regs.ToArgs())); }
+// sub_8209F960's original.
+Result e8209F960(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8209F960).
+inline void c8209F960(Regs& regs, uint8_t* base) { regs.Apply(e8209F960(base, regs.ToArgs())); }
 // sub_8209F9B8's original.
 Result e8209F9B8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8209F9B8).
@@ -541,6 +677,14 @@ inline void c820A3978(Regs& regs, uint8_t* base) { regs.Apply(e820A3978(base, re
 Result e820A3DB0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820A3DB0).
 inline void c820A3DB0(Regs& regs, uint8_t* base) { regs.Apply(e820A3DB0(base, regs.ToArgs())); }
+// sub_820A4360's original.
+Result e820A4360(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820A4360).
+inline void c820A4360(Regs& regs, uint8_t* base) { regs.Apply(e820A4360(base, regs.ToArgs())); }
+// sub_820A43D8's original.
+Result e820A43D8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820A43D8).
+inline void c820A43D8(Regs& regs, uint8_t* base) { regs.Apply(e820A43D8(base, regs.ToArgs())); }
 // sub_820A4450's original.
 Result e820A4450(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820A4450).
@@ -589,6 +733,14 @@ inline void c820A6BF0(Regs& regs, uint8_t* base) { regs.Apply(e820A6BF0(base, re
 Result e820A6F60(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820A6F60).
 inline void c820A6F60(Regs& regs, uint8_t* base) { regs.Apply(e820A6F60(base, regs.ToArgs())); }
+// sub_820A75E8's original.
+Result e820A75E8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820A75E8).
+inline void c820A75E8(Regs& regs, uint8_t* base) { regs.Apply(e820A75E8(base, regs.ToArgs())); }
+// sub_820A8958's original.
+Result e820A8958(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820A8958).
+inline void c820A8958(Regs& regs, uint8_t* base) { regs.Apply(e820A8958(base, regs.ToArgs())); }
 // sub_820A8B88's original.
 Result e820A8B88(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820A8B88).
@@ -605,6 +757,10 @@ inline void c820A9198(Regs& regs, uint8_t* base) { regs.Apply(e820A9198(base, re
 Result e820A98C0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820A98C0).
 inline void c820A98C0(Regs& regs, uint8_t* base) { regs.Apply(e820A98C0(base, regs.ToArgs())); }
+// sub_820A9E28's original.
+Result e820A9E28(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820A9E28).
+inline void c820A9E28(Regs& regs, uint8_t* base) { regs.Apply(e820A9E28(base, regs.ToArgs())); }
 // sub_820AA1A8's original.
 Result e820AA1A8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820AA1A8).
@@ -617,6 +773,10 @@ inline void c820AA2D0(Regs& regs, uint8_t* base) { regs.Apply(e820AA2D0(base, re
 Result e820AA368(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820AA368).
 inline void c820AA368(Regs& regs, uint8_t* base) { regs.Apply(e820AA368(base, regs.ToArgs())); }
+// sub_820AA378's original.
+Result e820AA378(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820AA378).
+inline void c820AA378(Regs& regs, uint8_t* base) { regs.Apply(e820AA378(base, regs.ToArgs())); }
 // sub_820AA430's original.
 Result e820AA430(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820AA430).
@@ -625,6 +785,10 @@ inline void c820AA430(Regs& regs, uint8_t* base) { regs.Apply(e820AA430(base, re
 Result e820AA4A8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820AA4A8).
 inline void c820AA4A8(Regs& regs, uint8_t* base) { regs.Apply(e820AA4A8(base, regs.ToArgs())); }
+// sub_820AA550's original.
+Result e820AA550(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820AA550).
+inline void c820AA550(Regs& regs, uint8_t* base) { regs.Apply(e820AA550(base, regs.ToArgs())); }
 // sub_820AAE40's original.
 Result e820AAE40(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820AAE40).
@@ -637,14 +801,38 @@ inline void c820AAE48(Regs& regs, uint8_t* base) { regs.Apply(e820AAE48(base, re
 Result e820AAE90(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820AAE90).
 inline void c820AAE90(Regs& regs, uint8_t* base) { regs.Apply(e820AAE90(base, regs.ToArgs())); }
+// sub_820AAF68's original.
+Result e820AAF68(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820AAF68).
+inline void c820AAF68(Regs& regs, uint8_t* base) { regs.Apply(e820AAF68(base, regs.ToArgs())); }
+// sub_820AAFF0's original.
+Result e820AAFF0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820AAFF0).
+inline void c820AAFF0(Regs& regs, uint8_t* base) { regs.Apply(e820AAFF0(base, regs.ToArgs())); }
 // sub_820AB358's original.
 Result e820AB358(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820AB358).
 inline void c820AB358(Regs& regs, uint8_t* base) { regs.Apply(e820AB358(base, regs.ToArgs())); }
+// sub_820AB498's original.
+Result e820AB498(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820AB498).
+inline void c820AB498(Regs& regs, uint8_t* base) { regs.Apply(e820AB498(base, regs.ToArgs())); }
 // sub_820AB560's original.
 Result e820AB560(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820AB560).
 inline void c820AB560(Regs& regs, uint8_t* base) { regs.Apply(e820AB560(base, regs.ToArgs())); }
+// sub_820ABDA8's original.
+Result e820ABDA8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820ABDA8).
+inline void c820ABDA8(Regs& regs, uint8_t* base) { regs.Apply(e820ABDA8(base, regs.ToArgs())); }
+// sub_820AC060's original.
+Result e820AC060(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820AC060).
+inline void c820AC060(Regs& regs, uint8_t* base) { regs.Apply(e820AC060(base, regs.ToArgs())); }
+// sub_820AC1D0's original.
+Result e820AC1D0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820AC1D0).
+inline void c820AC1D0(Regs& regs, uint8_t* base) { regs.Apply(e820AC1D0(base, regs.ToArgs())); }
 // sub_820AC248's original.
 Result e820AC248(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820AC248).
@@ -669,6 +857,14 @@ inline void c820AC8F8(Regs& regs, uint8_t* base) { regs.Apply(e820AC8F8(base, re
 Result e820ACA48(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820ACA48).
 inline void c820ACA48(Regs& regs, uint8_t* base) { regs.Apply(e820ACA48(base, regs.ToArgs())); }
+// sub_820ACAA8's original.
+Result e820ACAA8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820ACAA8).
+inline void c820ACAA8(Regs& regs, uint8_t* base) { regs.Apply(e820ACAA8(base, regs.ToArgs())); }
+// sub_820ACC08's original.
+Result e820ACC08(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820ACC08).
+inline void c820ACC08(Regs& regs, uint8_t* base) { regs.Apply(e820ACC08(base, regs.ToArgs())); }
 // sub_820ACF10's original.
 Result e820ACF10(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820ACF10).
@@ -693,6 +889,22 @@ inline void c820AD0B8(Regs& regs, uint8_t* base) { regs.Apply(e820AD0B8(base, re
 Result e820AD118(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820AD118).
 inline void c820AD118(Regs& regs, uint8_t* base) { regs.Apply(e820AD118(base, regs.ToArgs())); }
+// sub_820AD3A0's original.
+Result e820AD3A0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820AD3A0).
+inline void c820AD3A0(Regs& regs, uint8_t* base) { regs.Apply(e820AD3A0(base, regs.ToArgs())); }
+// sub_820AD440's original.
+Result e820AD440(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820AD440).
+inline void c820AD440(Regs& regs, uint8_t* base) { regs.Apply(e820AD440(base, regs.ToArgs())); }
+// sub_820AD4E0's original.
+Result e820AD4E0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820AD4E0).
+inline void c820AD4E0(Regs& regs, uint8_t* base) { regs.Apply(e820AD4E0(base, regs.ToArgs())); }
+// sub_820AD680's original.
+Result e820AD680(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820AD680).
+inline void c820AD680(Regs& regs, uint8_t* base) { regs.Apply(e820AD680(base, regs.ToArgs())); }
 // sub_820AD768's original.
 Result e820AD768(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820AD768).
@@ -741,18 +953,138 @@ inline void c820AE958(Regs& regs, uint8_t* base) { regs.Apply(e820AE958(base, re
 Result e820AEA88(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820AEA88).
 inline void c820AEA88(Regs& regs, uint8_t* base) { regs.Apply(e820AEA88(base, regs.ToArgs())); }
+// sub_820AEE98's original.
+Result e820AEE98(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820AEE98).
+inline void c820AEE98(Regs& regs, uint8_t* base) { regs.Apply(e820AEE98(base, regs.ToArgs())); }
+// sub_820AF018's original.
+Result e820AF018(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820AF018).
+inline void c820AF018(Regs& regs, uint8_t* base) { regs.Apply(e820AF018(base, regs.ToArgs())); }
+// sub_820AF1C0's original.
+Result e820AF1C0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820AF1C0).
+inline void c820AF1C0(Regs& regs, uint8_t* base) { regs.Apply(e820AF1C0(base, regs.ToArgs())); }
+// sub_820AFAE8's original.
+Result e820AFAE8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820AFAE8).
+inline void c820AFAE8(Regs& regs, uint8_t* base) { regs.Apply(e820AFAE8(base, regs.ToArgs())); }
+// sub_820AFBD8's original.
+Result e820AFBD8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820AFBD8).
+inline void c820AFBD8(Regs& regs, uint8_t* base) { regs.Apply(e820AFBD8(base, regs.ToArgs())); }
+// sub_820AFD30's original.
+Result e820AFD30(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820AFD30).
+inline void c820AFD30(Regs& regs, uint8_t* base) { regs.Apply(e820AFD30(base, regs.ToArgs())); }
+// sub_820AFDA8's original.
+Result e820AFDA8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820AFDA8).
+inline void c820AFDA8(Regs& regs, uint8_t* base) { regs.Apply(e820AFDA8(base, regs.ToArgs())); }
+// sub_820AFE90's original.
+Result e820AFE90(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820AFE90).
+inline void c820AFE90(Regs& regs, uint8_t* base) { regs.Apply(e820AFE90(base, regs.ToArgs())); }
+// sub_820B0668's original.
+Result e820B0668(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B0668).
+inline void c820B0668(Regs& regs, uint8_t* base) { regs.Apply(e820B0668(base, regs.ToArgs())); }
+// sub_820B0718's original.
+Result e820B0718(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B0718).
+inline void c820B0718(Regs& regs, uint8_t* base) { regs.Apply(e820B0718(base, regs.ToArgs())); }
+// sub_820B0838's original.
+Result e820B0838(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B0838).
+inline void c820B0838(Regs& regs, uint8_t* base) { regs.Apply(e820B0838(base, regs.ToArgs())); }
+// sub_820B0908's original.
+Result e820B0908(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B0908).
+inline void c820B0908(Regs& regs, uint8_t* base) { regs.Apply(e820B0908(base, regs.ToArgs())); }
 // sub_820B0E70's original.
 Result e820B0E70(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820B0E70).
 inline void c820B0E70(Regs& regs, uint8_t* base) { regs.Apply(e820B0E70(base, regs.ToArgs())); }
+// sub_820B0EE8's original.
+Result e820B0EE8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B0EE8).
+inline void c820B0EE8(Regs& regs, uint8_t* base) { regs.Apply(e820B0EE8(base, regs.ToArgs())); }
+// sub_820B1790's original.
+Result e820B1790(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B1790).
+inline void c820B1790(Regs& regs, uint8_t* base) { regs.Apply(e820B1790(base, regs.ToArgs())); }
 // sub_820B18B8's original.
 Result e820B18B8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820B18B8).
 inline void c820B18B8(Regs& regs, uint8_t* base) { regs.Apply(e820B18B8(base, regs.ToArgs())); }
+// sub_820B1B00's original.
+Result e820B1B00(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B1B00).
+inline void c820B1B00(Regs& regs, uint8_t* base) { regs.Apply(e820B1B00(base, regs.ToArgs())); }
+// sub_820B1FB8's original.
+Result e820B1FB8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B1FB8).
+inline void c820B1FB8(Regs& regs, uint8_t* base) { regs.Apply(e820B1FB8(base, regs.ToArgs())); }
 // sub_820B2100's original.
 Result e820B2100(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820B2100).
 inline void c820B2100(Regs& regs, uint8_t* base) { regs.Apply(e820B2100(base, regs.ToArgs())); }
+// sub_820B22D8's original.
+Result e820B22D8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B22D8).
+inline void c820B22D8(Regs& regs, uint8_t* base) { regs.Apply(e820B22D8(base, regs.ToArgs())); }
+// sub_820B24A8's original.
+Result e820B24A8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B24A8).
+inline void c820B24A8(Regs& regs, uint8_t* base) { regs.Apply(e820B24A8(base, regs.ToArgs())); }
+// sub_820B2748's original.
+Result e820B2748(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B2748).
+inline void c820B2748(Regs& regs, uint8_t* base) { regs.Apply(e820B2748(base, regs.ToArgs())); }
+// sub_820B2808's original.
+Result e820B2808(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B2808).
+inline void c820B2808(Regs& regs, uint8_t* base) { regs.Apply(e820B2808(base, regs.ToArgs())); }
+// sub_820B2A48's original.
+Result e820B2A48(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B2A48).
+inline void c820B2A48(Regs& regs, uint8_t* base) { regs.Apply(e820B2A48(base, regs.ToArgs())); }
+// sub_820B2CC0's original.
+Result e820B2CC0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B2CC0).
+inline void c820B2CC0(Regs& regs, uint8_t* base) { regs.Apply(e820B2CC0(base, regs.ToArgs())); }
+// sub_820B35C8's original.
+Result e820B35C8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B35C8).
+inline void c820B35C8(Regs& regs, uint8_t* base) { regs.Apply(e820B35C8(base, regs.ToArgs())); }
+// sub_820B3788's original.
+Result e820B3788(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B3788).
+inline void c820B3788(Regs& regs, uint8_t* base) { regs.Apply(e820B3788(base, regs.ToArgs())); }
+// sub_820B39C8's original.
+Result e820B39C8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B39C8).
+inline void c820B39C8(Regs& regs, uint8_t* base) { regs.Apply(e820B39C8(base, regs.ToArgs())); }
+// sub_820B3E98's original.
+Result e820B3E98(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B3E98).
+inline void c820B3E98(Regs& regs, uint8_t* base) { regs.Apply(e820B3E98(base, regs.ToArgs())); }
+// sub_820B3F80's original.
+Result e820B3F80(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B3F80).
+inline void c820B3F80(Regs& regs, uint8_t* base) { regs.Apply(e820B3F80(base, regs.ToArgs())); }
+// sub_820B4420's original.
+Result e820B4420(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B4420).
+inline void c820B4420(Regs& regs, uint8_t* base) { regs.Apply(e820B4420(base, regs.ToArgs())); }
+// sub_820B4778's original.
+Result e820B4778(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B4778).
+inline void c820B4778(Regs& regs, uint8_t* base) { regs.Apply(e820B4778(base, regs.ToArgs())); }
+// sub_820B4AA8's original.
+Result e820B4AA8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B4AA8).
+inline void c820B4AA8(Regs& regs, uint8_t* base) { regs.Apply(e820B4AA8(base, regs.ToArgs())); }
 // sub_820B5670's original.
 Result e820B5670(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820B5670).
@@ -769,30 +1101,186 @@ inline void c820B5FD8(Regs& regs, uint8_t* base) { regs.Apply(e820B5FD8(base, re
 Result e820B62E8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820B62E8).
 inline void c820B62E8(Regs& regs, uint8_t* base) { regs.Apply(e820B62E8(base, regs.ToArgs())); }
+// sub_820B6328's original.
+Result e820B6328(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B6328).
+inline void c820B6328(Regs& regs, uint8_t* base) { regs.Apply(e820B6328(base, regs.ToArgs())); }
+// sub_820B6430's original.
+Result e820B6430(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B6430).
+inline void c820B6430(Regs& regs, uint8_t* base) { regs.Apply(e820B6430(base, regs.ToArgs())); }
 // sub_820B6498's original.
 Result e820B6498(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820B6498).
 inline void c820B6498(Regs& regs, uint8_t* base) { regs.Apply(e820B6498(base, regs.ToArgs())); }
+// sub_820B6640's original.
+Result e820B6640(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B6640).
+inline void c820B6640(Regs& regs, uint8_t* base) { regs.Apply(e820B6640(base, regs.ToArgs())); }
+// sub_820B6698's original.
+Result e820B6698(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B6698).
+inline void c820B6698(Regs& regs, uint8_t* base) { regs.Apply(e820B6698(base, regs.ToArgs())); }
+// sub_820B67E0's original.
+Result e820B67E0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B67E0).
+inline void c820B67E0(Regs& regs, uint8_t* base) { regs.Apply(e820B67E0(base, regs.ToArgs())); }
+// sub_820B6888's original.
+Result e820B6888(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B6888).
+inline void c820B6888(Regs& regs, uint8_t* base) { regs.Apply(e820B6888(base, regs.ToArgs())); }
+// sub_820B6950's original.
+Result e820B6950(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B6950).
+inline void c820B6950(Regs& regs, uint8_t* base) { regs.Apply(e820B6950(base, regs.ToArgs())); }
+// sub_820B6C78's original.
+Result e820B6C78(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B6C78).
+inline void c820B6C78(Regs& regs, uint8_t* base) { regs.Apply(e820B6C78(base, regs.ToArgs())); }
+// sub_820B6D48's original.
+Result e820B6D48(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B6D48).
+inline void c820B6D48(Regs& regs, uint8_t* base) { regs.Apply(e820B6D48(base, regs.ToArgs())); }
+// sub_820B7280's original.
+Result e820B7280(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B7280).
+inline void c820B7280(Regs& regs, uint8_t* base) { regs.Apply(e820B7280(base, regs.ToArgs())); }
 // sub_820B72C8's original.
 Result e820B72C8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820B72C8).
 inline void c820B72C8(Regs& regs, uint8_t* base) { regs.Apply(e820B72C8(base, regs.ToArgs())); }
+// sub_820B75B8's original.
+Result e820B75B8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B75B8).
+inline void c820B75B8(Regs& regs, uint8_t* base) { regs.Apply(e820B75B8(base, regs.ToArgs())); }
+// sub_820B77D0's original.
+Result e820B77D0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B77D0).
+inline void c820B77D0(Regs& regs, uint8_t* base) { regs.Apply(e820B77D0(base, regs.ToArgs())); }
+// sub_820B7928's original.
+Result e820B7928(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B7928).
+inline void c820B7928(Regs& regs, uint8_t* base) { regs.Apply(e820B7928(base, regs.ToArgs())); }
 // sub_820B7998's original.
 Result e820B7998(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820B7998).
 inline void c820B7998(Regs& regs, uint8_t* base) { regs.Apply(e820B7998(base, regs.ToArgs())); }
+// sub_820B7B60's original.
+Result e820B7B60(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B7B60).
+inline void c820B7B60(Regs& regs, uint8_t* base) { regs.Apply(e820B7B60(base, regs.ToArgs())); }
+// sub_820B7CC8's original.
+Result e820B7CC8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B7CC8).
+inline void c820B7CC8(Regs& regs, uint8_t* base) { regs.Apply(e820B7CC8(base, regs.ToArgs())); }
+// sub_820B7CF0's original.
+Result e820B7CF0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B7CF0).
+inline void c820B7CF0(Regs& regs, uint8_t* base) { regs.Apply(e820B7CF0(base, regs.ToArgs())); }
+// sub_820B7D18's original.
+Result e820B7D18(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B7D18).
+inline void c820B7D18(Regs& regs, uint8_t* base) { regs.Apply(e820B7D18(base, regs.ToArgs())); }
+// sub_820B7D28's original.
+Result e820B7D28(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B7D28).
+inline void c820B7D28(Regs& regs, uint8_t* base) { regs.Apply(e820B7D28(base, regs.ToArgs())); }
+// sub_820B7D38's original.
+Result e820B7D38(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B7D38).
+inline void c820B7D38(Regs& regs, uint8_t* base) { regs.Apply(e820B7D38(base, regs.ToArgs())); }
+// sub_820B7D48's original.
+Result e820B7D48(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B7D48).
+inline void c820B7D48(Regs& regs, uint8_t* base) { regs.Apply(e820B7D48(base, regs.ToArgs())); }
+// sub_820B7D58's original.
+Result e820B7D58(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B7D58).
+inline void c820B7D58(Regs& regs, uint8_t* base) { regs.Apply(e820B7D58(base, regs.ToArgs())); }
+// sub_820B7D68's original.
+Result e820B7D68(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B7D68).
+inline void c820B7D68(Regs& regs, uint8_t* base) { regs.Apply(e820B7D68(base, regs.ToArgs())); }
+// sub_820B7D70's original.
+Result e820B7D70(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B7D70).
+inline void c820B7D70(Regs& regs, uint8_t* base) { regs.Apply(e820B7D70(base, regs.ToArgs())); }
+// sub_820B7ED0's original.
+Result e820B7ED0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B7ED0).
+inline void c820B7ED0(Regs& regs, uint8_t* base) { regs.Apply(e820B7ED0(base, regs.ToArgs())); }
 // sub_820B81C8's original.
 Result e820B81C8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820B81C8).
 inline void c820B81C8(Regs& regs, uint8_t* base) { regs.Apply(e820B81C8(base, regs.ToArgs())); }
+// sub_820B86B8's original.
+Result e820B86B8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B86B8).
+inline void c820B86B8(Regs& regs, uint8_t* base) { regs.Apply(e820B86B8(base, regs.ToArgs())); }
+// sub_820B8768's original.
+Result e820B8768(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B8768).
+inline void c820B8768(Regs& regs, uint8_t* base) { regs.Apply(e820B8768(base, regs.ToArgs())); }
+// sub_820B8778's original.
+Result e820B8778(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B8778).
+inline void c820B8778(Regs& regs, uint8_t* base) { regs.Apply(e820B8778(base, regs.ToArgs())); }
+// sub_820B8788's original.
+Result e820B8788(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B8788).
+inline void c820B8788(Regs& regs, uint8_t* base) { regs.Apply(e820B8788(base, regs.ToArgs())); }
+// sub_820B8A88's original.
+Result e820B8A88(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B8A88).
+inline void c820B8A88(Regs& regs, uint8_t* base) { regs.Apply(e820B8A88(base, regs.ToArgs())); }
 // sub_820B8BA8's original.
 Result e820B8BA8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820B8BA8).
 inline void c820B8BA8(Regs& regs, uint8_t* base) { regs.Apply(e820B8BA8(base, regs.ToArgs())); }
+// sub_820B8D30's original.
+Result e820B8D30(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B8D30).
+inline void c820B8D30(Regs& regs, uint8_t* base) { regs.Apply(e820B8D30(base, regs.ToArgs())); }
+// sub_820B9198's original.
+Result e820B9198(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B9198).
+inline void c820B9198(Regs& regs, uint8_t* base) { regs.Apply(e820B9198(base, regs.ToArgs())); }
+// sub_820B9570's original.
+Result e820B9570(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B9570).
+inline void c820B9570(Regs& regs, uint8_t* base) { regs.Apply(e820B9570(base, regs.ToArgs())); }
+// sub_820B9658's original.
+Result e820B9658(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B9658).
+inline void c820B9658(Regs& regs, uint8_t* base) { regs.Apply(e820B9658(base, regs.ToArgs())); }
+// sub_820B9660's original.
+Result e820B9660(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B9660).
+inline void c820B9660(Regs& regs, uint8_t* base) { regs.Apply(e820B9660(base, regs.ToArgs())); }
+// sub_820B9670's original.
+Result e820B9670(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B9670).
+inline void c820B9670(Regs& regs, uint8_t* base) { regs.Apply(e820B9670(base, regs.ToArgs())); }
+// sub_820B9678's original.
+Result e820B9678(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B9678).
+inline void c820B9678(Regs& regs, uint8_t* base) { regs.Apply(e820B9678(base, regs.ToArgs())); }
+// sub_820B99D0's original.
+Result e820B99D0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820B99D0).
+inline void c820B99D0(Regs& regs, uint8_t* base) { regs.Apply(e820B99D0(base, regs.ToArgs())); }
 // sub_820B9C40's original.
 Result e820B9C40(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820B9C40).
 inline void c820B9C40(Regs& regs, uint8_t* base) { regs.Apply(e820B9C40(base, regs.ToArgs())); }
+// sub_820BA3B0's original.
+Result e820BA3B0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820BA3B0).
+inline void c820BA3B0(Regs& regs, uint8_t* base) { regs.Apply(e820BA3B0(base, regs.ToArgs())); }
+// sub_820BAB30's original.
+Result e820BAB30(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820BAB30).
+inline void c820BAB30(Regs& regs, uint8_t* base) { regs.Apply(e820BAB30(base, regs.ToArgs())); }
 // sub_820BADF8's original.
 Result e820BADF8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820BADF8).
@@ -801,26 +1289,122 @@ inline void c820BADF8(Regs& regs, uint8_t* base) { regs.Apply(e820BADF8(base, re
 Result e820BAE38(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820BAE38).
 inline void c820BAE38(Regs& regs, uint8_t* base) { regs.Apply(e820BAE38(base, regs.ToArgs())); }
+// sub_820BAE78's original.
+Result e820BAE78(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820BAE78).
+inline void c820BAE78(Regs& regs, uint8_t* base) { regs.Apply(e820BAE78(base, regs.ToArgs())); }
 // sub_820BB140's original.
 Result e820BB140(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820BB140).
 inline void c820BB140(Regs& regs, uint8_t* base) { regs.Apply(e820BB140(base, regs.ToArgs())); }
+// sub_820BB188's original.
+Result e820BB188(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820BB188).
+inline void c820BB188(Regs& regs, uint8_t* base) { regs.Apply(e820BB188(base, regs.ToArgs())); }
 // sub_820BB218's original.
 Result e820BB218(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820BB218).
 inline void c820BB218(Regs& regs, uint8_t* base) { regs.Apply(e820BB218(base, regs.ToArgs())); }
+// sub_820BB688's original.
+Result e820BB688(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820BB688).
+inline void c820BB688(Regs& regs, uint8_t* base) { regs.Apply(e820BB688(base, regs.ToArgs())); }
 // sub_820BB758's original.
 Result e820BB758(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820BB758).
 inline void c820BB758(Regs& regs, uint8_t* base) { regs.Apply(e820BB758(base, regs.ToArgs())); }
+// sub_820BB868's original.
+Result e820BB868(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820BB868).
+inline void c820BB868(Regs& regs, uint8_t* base) { regs.Apply(e820BB868(base, regs.ToArgs())); }
 // sub_820BBE30's original.
 Result e820BBE30(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820BBE30).
 inline void c820BBE30(Regs& regs, uint8_t* base) { regs.Apply(e820BBE30(base, regs.ToArgs())); }
+// sub_820BC318's original.
+Result e820BC318(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820BC318).
+inline void c820BC318(Regs& regs, uint8_t* base) { regs.Apply(e820BC318(base, regs.ToArgs())); }
+// sub_820BC360's original.
+Result e820BC360(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820BC360).
+inline void c820BC360(Regs& regs, uint8_t* base) { regs.Apply(e820BC360(base, regs.ToArgs())); }
+// sub_820BC3A8's original.
+Result e820BC3A8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820BC3A8).
+inline void c820BC3A8(Regs& regs, uint8_t* base) { regs.Apply(e820BC3A8(base, regs.ToArgs())); }
+// sub_820BC3F0's original.
+Result e820BC3F0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820BC3F0).
+inline void c820BC3F0(Regs& regs, uint8_t* base) { regs.Apply(e820BC3F0(base, regs.ToArgs())); }
+// sub_820BC530's original.
+Result e820BC530(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820BC530).
+inline void c820BC530(Regs& regs, uint8_t* base) { regs.Apply(e820BC530(base, regs.ToArgs())); }
+// sub_820BC538's original.
+Result e820BC538(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820BC538).
+inline void c820BC538(Regs& regs, uint8_t* base) { regs.Apply(e820BC538(base, regs.ToArgs())); }
+// sub_820BC540's original.
+Result e820BC540(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820BC540).
+inline void c820BC540(Regs& regs, uint8_t* base) { regs.Apply(e820BC540(base, regs.ToArgs())); }
+// sub_820BC548's original.
+Result e820BC548(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820BC548).
+inline void c820BC548(Regs& regs, uint8_t* base) { regs.Apply(e820BC548(base, regs.ToArgs())); }
+// sub_820BC848's original.
+Result e820BC848(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820BC848).
+inline void c820BC848(Regs& regs, uint8_t* base) { regs.Apply(e820BC848(base, regs.ToArgs())); }
+// sub_820BC908's original.
+Result e820BC908(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820BC908).
+inline void c820BC908(Regs& regs, uint8_t* base) { regs.Apply(e820BC908(base, regs.ToArgs())); }
+// sub_820BCDD0's original.
+Result e820BCDD0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820BCDD0).
+inline void c820BCDD0(Regs& regs, uint8_t* base) { regs.Apply(e820BCDD0(base, regs.ToArgs())); }
+// sub_820BCE80's original.
+Result e820BCE80(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820BCE80).
+inline void c820BCE80(Regs& regs, uint8_t* base) { regs.Apply(e820BCE80(base, regs.ToArgs())); }
+// sub_820BD1C8's original.
+Result e820BD1C8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820BD1C8).
+inline void c820BD1C8(Regs& regs, uint8_t* base) { regs.Apply(e820BD1C8(base, regs.ToArgs())); }
+// sub_820BD508's original.
+Result e820BD508(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820BD508).
+inline void c820BD508(Regs& regs, uint8_t* base) { regs.Apply(e820BD508(base, regs.ToArgs())); }
+// sub_820BD6E0's original.
+Result e820BD6E0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820BD6E0).
+inline void c820BD6E0(Regs& regs, uint8_t* base) { regs.Apply(e820BD6E0(base, regs.ToArgs())); }
+// sub_820BE150's original.
+Result e820BE150(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820BE150).
+inline void c820BE150(Regs& regs, uint8_t* base) { regs.Apply(e820BE150(base, regs.ToArgs())); }
+// sub_820BE490's original.
+Result e820BE490(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820BE490).
+inline void c820BE490(Regs& regs, uint8_t* base) { regs.Apply(e820BE490(base, regs.ToArgs())); }
+// sub_820BEBF0's original.
+Result e820BEBF0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820BEBF0).
+inline void c820BEBF0(Regs& regs, uint8_t* base) { regs.Apply(e820BEBF0(base, regs.ToArgs())); }
+// sub_820BECA0's original.
+Result e820BECA0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820BECA0).
+inline void c820BECA0(Regs& regs, uint8_t* base) { regs.Apply(e820BECA0(base, regs.ToArgs())); }
 // sub_820BF038's original.
 Result e820BF038(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820BF038).
 inline void c820BF038(Regs& regs, uint8_t* base) { regs.Apply(e820BF038(base, regs.ToArgs())); }
+// sub_820BF320's original.
+Result e820BF320(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820BF320).
+inline void c820BF320(Regs& regs, uint8_t* base) { regs.Apply(e820BF320(base, regs.ToArgs())); }
 // sub_820BFB28's original.
 Result e820BFB28(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820BFB28).
@@ -833,6 +1417,18 @@ inline void c820BFD30(Regs& regs, uint8_t* base) { regs.Apply(e820BFD30(base, re
 Result e820C0118(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820C0118).
 inline void c820C0118(Regs& regs, uint8_t* base) { regs.Apply(e820C0118(base, regs.ToArgs())); }
+// sub_820C0170's original.
+Result e820C0170(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820C0170).
+inline void c820C0170(Regs& regs, uint8_t* base) { regs.Apply(e820C0170(base, regs.ToArgs())); }
+// sub_820C05C8's original.
+Result e820C05C8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820C05C8).
+inline void c820C05C8(Regs& regs, uint8_t* base) { regs.Apply(e820C05C8(base, regs.ToArgs())); }
+// sub_820C0D28's original.
+Result e820C0D28(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820C0D28).
+inline void c820C0D28(Regs& regs, uint8_t* base) { regs.Apply(e820C0D28(base, regs.ToArgs())); }
 // sub_820C1D08's original.
 Result e820C1D08(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820C1D08).
@@ -841,6 +1437,10 @@ inline void c820C1D08(Regs& regs, uint8_t* base) { regs.Apply(e820C1D08(base, re
 Result e820C20E0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820C20E0).
 inline void c820C20E0(Regs& regs, uint8_t* base) { regs.Apply(e820C20E0(base, regs.ToArgs())); }
+// sub_820C21E0's original.
+Result e820C21E0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820C21E0).
+inline void c820C21E0(Regs& regs, uint8_t* base) { regs.Apply(e820C21E0(base, regs.ToArgs())); }
 // sub_820C23E8's original.
 Result e820C23E8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820C23E8).
@@ -849,6 +1449,10 @@ inline void c820C23E8(Regs& regs, uint8_t* base) { regs.Apply(e820C23E8(base, re
 Result e820C27E8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820C27E8).
 inline void c820C27E8(Regs& regs, uint8_t* base) { regs.Apply(e820C27E8(base, regs.ToArgs())); }
+// sub_820C30D8's original.
+Result e820C30D8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820C30D8).
+inline void c820C30D8(Regs& regs, uint8_t* base) { regs.Apply(e820C30D8(base, regs.ToArgs())); }
 // sub_820C3608's original.
 Result e820C3608(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820C3608).
@@ -865,10 +1469,18 @@ inline void c820C3BD0(Regs& regs, uint8_t* base) { regs.Apply(e820C3BD0(base, re
 Result e820C3C40(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820C3C40).
 inline void c820C3C40(Regs& regs, uint8_t* base) { regs.Apply(e820C3C40(base, regs.ToArgs())); }
+// sub_820C3C80's original.
+Result e820C3C80(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820C3C80).
+inline void c820C3C80(Regs& regs, uint8_t* base) { regs.Apply(e820C3C80(base, regs.ToArgs())); }
 // sub_820C3CA0's original.
 Result e820C3CA0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820C3CA0).
 inline void c820C3CA0(Regs& regs, uint8_t* base) { regs.Apply(e820C3CA0(base, regs.ToArgs())); }
+// sub_820C3CE0's original.
+Result e820C3CE0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820C3CE0).
+inline void c820C3CE0(Regs& regs, uint8_t* base) { regs.Apply(e820C3CE0(base, regs.ToArgs())); }
 // sub_820C3CF8's original.
 Result e820C3CF8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820C3CF8).
@@ -877,6 +1489,10 @@ inline void c820C3CF8(Regs& regs, uint8_t* base) { regs.Apply(e820C3CF8(base, re
 Result e820C3DA0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820C3DA0).
 inline void c820C3DA0(Regs& regs, uint8_t* base) { regs.Apply(e820C3DA0(base, regs.ToArgs())); }
+// sub_820C3F50's original.
+Result e820C3F50(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820C3F50).
+inline void c820C3F50(Regs& regs, uint8_t* base) { regs.Apply(e820C3F50(base, regs.ToArgs())); }
 // sub_820C3FD8's original.
 Result e820C3FD8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820C3FD8).
@@ -885,6 +1501,14 @@ inline void c820C3FD8(Regs& regs, uint8_t* base) { regs.Apply(e820C3FD8(base, re
 Result e820C4488(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820C4488).
 inline void c820C4488(Regs& regs, uint8_t* base) { regs.Apply(e820C4488(base, regs.ToArgs())); }
+// sub_820C4568's original.
+Result e820C4568(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820C4568).
+inline void c820C4568(Regs& regs, uint8_t* base) { regs.Apply(e820C4568(base, regs.ToArgs())); }
+// sub_820C4888's original.
+Result e820C4888(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820C4888).
+inline void c820C4888(Regs& regs, uint8_t* base) { regs.Apply(e820C4888(base, regs.ToArgs())); }
 // sub_820C4998's original.
 Result e820C4998(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820C4998).
@@ -901,6 +1525,10 @@ inline void c820C4C80(Regs& regs, uint8_t* base) { regs.Apply(e820C4C80(base, re
 Result e820C4D88(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820C4D88).
 inline void c820C4D88(Regs& regs, uint8_t* base) { regs.Apply(e820C4D88(base, regs.ToArgs())); }
+// sub_820C4DD8's original.
+Result e820C4DD8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820C4DD8).
+inline void c820C4DD8(Regs& regs, uint8_t* base) { regs.Apply(e820C4DD8(base, regs.ToArgs())); }
 // sub_820C4EB8's original.
 Result e820C4EB8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820C4EB8).
@@ -925,6 +1553,10 @@ inline void c820C52A0(Regs& regs, uint8_t* base) { regs.Apply(e820C52A0(base, re
 Result e820C5A60(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820C5A60).
 inline void c820C5A60(Regs& regs, uint8_t* base) { regs.Apply(e820C5A60(base, regs.ToArgs())); }
+// sub_820C5C20's original.
+Result e820C5C20(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820C5C20).
+inline void c820C5C20(Regs& regs, uint8_t* base) { regs.Apply(e820C5C20(base, regs.ToArgs())); }
 // sub_820C5C88's original.
 Result e820C5C88(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820C5C88).
@@ -937,6 +1569,10 @@ inline void c820C5DE8(Regs& regs, uint8_t* base) { regs.Apply(e820C5DE8(base, re
 Result e820C8480(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820C8480).
 inline void c820C8480(Regs& regs, uint8_t* base) { regs.Apply(e820C8480(base, regs.ToArgs())); }
+// sub_820C8528's original.
+Result e820C8528(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820C8528).
+inline void c820C8528(Regs& regs, uint8_t* base) { regs.Apply(e820C8528(base, regs.ToArgs())); }
 // sub_820C89A8's original.
 Result e820C89A8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820C89A8).
@@ -957,6 +1593,10 @@ inline void c820C8DE8(Regs& regs, uint8_t* base) { regs.Apply(e820C8DE8(base, re
 Result e820C9110(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820C9110).
 inline void c820C9110(Regs& regs, uint8_t* base) { regs.Apply(e820C9110(base, regs.ToArgs())); }
+// sub_820C9170's original.
+Result e820C9170(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820C9170).
+inline void c820C9170(Regs& regs, uint8_t* base) { regs.Apply(e820C9170(base, regs.ToArgs())); }
 // sub_820C9960's original.
 Result e820C9960(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820C9960).
@@ -977,10 +1617,26 @@ inline void c820C9E00(Regs& regs, uint8_t* base) { regs.Apply(e820C9E00(base, re
 Result e820C9E98(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820C9E98).
 inline void c820C9E98(Regs& regs, uint8_t* base) { regs.Apply(e820C9E98(base, regs.ToArgs())); }
+// sub_820C9EB0's original.
+Result e820C9EB0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820C9EB0).
+inline void c820C9EB0(Regs& regs, uint8_t* base) { regs.Apply(e820C9EB0(base, regs.ToArgs())); }
 // sub_820C9EE0's original.
 Result e820C9EE0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820C9EE0).
 inline void c820C9EE0(Regs& regs, uint8_t* base) { regs.Apply(e820C9EE0(base, regs.ToArgs())); }
+// sub_820CB658's original.
+Result e820CB658(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820CB658).
+inline void c820CB658(Regs& regs, uint8_t* base) { regs.Apply(e820CB658(base, regs.ToArgs())); }
+// sub_820CB6C8's original.
+Result e820CB6C8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820CB6C8).
+inline void c820CB6C8(Regs& regs, uint8_t* base) { regs.Apply(e820CB6C8(base, regs.ToArgs())); }
+// sub_820CB7E8's original.
+Result e820CB7E8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820CB7E8).
+inline void c820CB7E8(Regs& regs, uint8_t* base) { regs.Apply(e820CB7E8(base, regs.ToArgs())); }
 // sub_820CB9E0's original.
 Result e820CB9E0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820CB9E0).
@@ -997,10 +1653,18 @@ inline void c820CBD20(Regs& regs, uint8_t* base) { regs.Apply(e820CBD20(base, re
 Result e820CBD90(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820CBD90).
 inline void c820CBD90(Regs& regs, uint8_t* base) { regs.Apply(e820CBD90(base, regs.ToArgs())); }
+// sub_820CBE10's original.
+Result e820CBE10(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820CBE10).
+inline void c820CBE10(Regs& regs, uint8_t* base) { regs.Apply(e820CBE10(base, regs.ToArgs())); }
 // sub_820CC0A8's original.
 Result e820CC0A8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820CC0A8).
 inline void c820CC0A8(Regs& regs, uint8_t* base) { regs.Apply(e820CC0A8(base, regs.ToArgs())); }
+// sub_820CC1F0's original.
+Result e820CC1F0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820CC1F0).
+inline void c820CC1F0(Regs& regs, uint8_t* base) { regs.Apply(e820CC1F0(base, regs.ToArgs())); }
 // sub_820CC248's original.
 Result e820CC248(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820CC248).
@@ -1013,10 +1677,42 @@ inline void c820CC2A8(Regs& regs, uint8_t* base) { regs.Apply(e820CC2A8(base, re
 Result e820CC470(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820CC470).
 inline void c820CC470(Regs& regs, uint8_t* base) { regs.Apply(e820CC470(base, regs.ToArgs())); }
+// sub_820CCCC0's original.
+Result e820CCCC0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820CCCC0).
+inline void c820CCCC0(Regs& regs, uint8_t* base) { regs.Apply(e820CCCC0(base, regs.ToArgs())); }
+// sub_820CCCE0's original.
+Result e820CCCE0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820CCCE0).
+inline void c820CCCE0(Regs& regs, uint8_t* base) { regs.Apply(e820CCCE0(base, regs.ToArgs())); }
+// sub_820CCCF0's original.
+Result e820CCCF0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820CCCF0).
+inline void c820CCCF0(Regs& regs, uint8_t* base) { regs.Apply(e820CCCF0(base, regs.ToArgs())); }
+// sub_820CCD00's original.
+Result e820CCD00(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820CCD00).
+inline void c820CCD00(Regs& regs, uint8_t* base) { regs.Apply(e820CCD00(base, regs.ToArgs())); }
+// sub_820CCD10's original.
+Result e820CCD10(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820CCD10).
+inline void c820CCD10(Regs& regs, uint8_t* base) { regs.Apply(e820CCD10(base, regs.ToArgs())); }
+// sub_820CCD68's original.
+Result e820CCD68(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820CCD68).
+inline void c820CCD68(Regs& regs, uint8_t* base) { regs.Apply(e820CCD68(base, regs.ToArgs())); }
 // sub_820CCDC0's original.
 Result e820CCDC0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820CCDC0).
 inline void c820CCDC0(Regs& regs, uint8_t* base) { regs.Apply(e820CCDC0(base, regs.ToArgs())); }
+// sub_820CE8D8's original.
+Result e820CE8D8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820CE8D8).
+inline void c820CE8D8(Regs& regs, uint8_t* base) { regs.Apply(e820CE8D8(base, regs.ToArgs())); }
+// sub_820CE900's original.
+Result e820CE900(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820CE900).
+inline void c820CE900(Regs& regs, uint8_t* base) { regs.Apply(e820CE900(base, regs.ToArgs())); }
 // sub_820CE928's original.
 Result e820CE928(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820CE928).
@@ -1045,6 +1741,10 @@ inline void c820D0270(Regs& regs, uint8_t* base) { regs.Apply(e820D0270(base, re
 Result e820D02D0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820D02D0).
 inline void c820D02D0(Regs& regs, uint8_t* base) { regs.Apply(e820D02D0(base, regs.ToArgs())); }
+// sub_820D04E8's original.
+Result e820D04E8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820D04E8).
+inline void c820D04E8(Regs& regs, uint8_t* base) { regs.Apply(e820D04E8(base, regs.ToArgs())); }
 // sub_820D06F0's original.
 Result e820D06F0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820D06F0).
@@ -1069,14 +1769,26 @@ inline void c820D09A0(Regs& regs, uint8_t* base) { regs.Apply(e820D09A0(base, re
 Result e820D1CB0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820D1CB0).
 inline void c820D1CB0(Regs& regs, uint8_t* base) { regs.Apply(e820D1CB0(base, regs.ToArgs())); }
+// sub_820D1D70's original.
+Result e820D1D70(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820D1D70).
+inline void c820D1D70(Regs& regs, uint8_t* base) { regs.Apply(e820D1D70(base, regs.ToArgs())); }
 // sub_820D1EB8's original.
 Result e820D1EB8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820D1EB8).
 inline void c820D1EB8(Regs& regs, uint8_t* base) { regs.Apply(e820D1EB8(base, regs.ToArgs())); }
+// sub_820D3250's original.
+Result e820D3250(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820D3250).
+inline void c820D3250(Regs& regs, uint8_t* base) { regs.Apply(e820D3250(base, regs.ToArgs())); }
 // sub_820D3318's original.
 Result e820D3318(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820D3318).
 inline void c820D3318(Regs& regs, uint8_t* base) { regs.Apply(e820D3318(base, regs.ToArgs())); }
+// sub_820D3658's original.
+Result e820D3658(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820D3658).
+inline void c820D3658(Regs& regs, uint8_t* base) { regs.Apply(e820D3658(base, regs.ToArgs())); }
 // sub_820D3688's original.
 Result e820D3688(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820D3688).
@@ -1093,6 +1805,14 @@ inline void c820D3B58(Regs& regs, uint8_t* base) { regs.Apply(e820D3B58(base, re
 Result e820D3C70(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820D3C70).
 inline void c820D3C70(Regs& regs, uint8_t* base) { regs.Apply(e820D3C70(base, regs.ToArgs())); }
+// sub_820D3C80's original.
+Result e820D3C80(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820D3C80).
+inline void c820D3C80(Regs& regs, uint8_t* base) { regs.Apply(e820D3C80(base, regs.ToArgs())); }
+// sub_820D3CF8's original.
+Result e820D3CF8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820D3CF8).
+inline void c820D3CF8(Regs& regs, uint8_t* base) { regs.Apply(e820D3CF8(base, regs.ToArgs())); }
 // sub_820D3DE0's original.
 Result e820D3DE0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820D3DE0).
@@ -1109,6 +1829,10 @@ inline void c820D3E98(Regs& regs, uint8_t* base) { regs.Apply(e820D3E98(base, re
 Result e820D4048(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820D4048).
 inline void c820D4048(Regs& regs, uint8_t* base) { regs.Apply(e820D4048(base, regs.ToArgs())); }
+// sub_820D4078's original.
+Result e820D4078(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820D4078).
+inline void c820D4078(Regs& regs, uint8_t* base) { regs.Apply(e820D4078(base, regs.ToArgs())); }
 // sub_820D4508's original.
 Result e820D4508(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820D4508).
@@ -1141,6 +1865,18 @@ inline void c820D5890(Regs& regs, uint8_t* base) { regs.Apply(e820D5890(base, re
 Result e820D5988(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820D5988).
 inline void c820D5988(Regs& regs, uint8_t* base) { regs.Apply(e820D5988(base, regs.ToArgs())); }
+// sub_820D59D8's original.
+Result e820D59D8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820D59D8).
+inline void c820D59D8(Regs& regs, uint8_t* base) { regs.Apply(e820D59D8(base, regs.ToArgs())); }
+// sub_820D5AC0's original.
+Result e820D5AC0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820D5AC0).
+inline void c820D5AC0(Regs& regs, uint8_t* base) { regs.Apply(e820D5AC0(base, regs.ToArgs())); }
+// sub_820D5B50's original.
+Result e820D5B50(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820D5B50).
+inline void c820D5B50(Regs& regs, uint8_t* base) { regs.Apply(e820D5B50(base, regs.ToArgs())); }
 // sub_820D5D20's original.
 Result e820D5D20(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820D5D20).
@@ -1269,6 +2005,10 @@ inline void c820D7690(Regs& regs, uint8_t* base) { regs.Apply(e820D7690(base, re
 Result e820D76D8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820D76D8).
 inline void c820D76D8(Regs& regs, uint8_t* base) { regs.Apply(e820D76D8(base, regs.ToArgs())); }
+// sub_820D7730's original.
+Result e820D7730(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820D7730).
+inline void c820D7730(Regs& regs, uint8_t* base) { regs.Apply(e820D7730(base, regs.ToArgs())); }
 // sub_820D7840's original.
 Result e820D7840(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820D7840).
@@ -1341,6 +2081,14 @@ inline void c820D8AA8(Regs& regs, uint8_t* base) { regs.Apply(e820D8AA8(base, re
 Result e820D8B58(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820D8B58).
 inline void c820D8B58(Regs& regs, uint8_t* base) { regs.Apply(e820D8B58(base, regs.ToArgs())); }
+// sub_820D8BA8's original.
+Result e820D8BA8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820D8BA8).
+inline void c820D8BA8(Regs& regs, uint8_t* base) { regs.Apply(e820D8BA8(base, regs.ToArgs())); }
+// sub_820D8C50's original.
+Result e820D8C50(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820D8C50).
+inline void c820D8C50(Regs& regs, uint8_t* base) { regs.Apply(e820D8C50(base, regs.ToArgs())); }
 // sub_820D8E68's original.
 Result e820D8E68(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820D8E68).
@@ -1389,6 +2137,10 @@ inline void c820D95E8(Regs& regs, uint8_t* base) { regs.Apply(e820D95E8(base, re
 Result e820D9638(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820D9638).
 inline void c820D9638(Regs& regs, uint8_t* base) { regs.Apply(e820D9638(base, regs.ToArgs())); }
+// sub_820D97B8's original.
+Result e820D97B8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820D97B8).
+inline void c820D97B8(Regs& regs, uint8_t* base) { regs.Apply(e820D97B8(base, regs.ToArgs())); }
 // sub_820D9870's original.
 Result e820D9870(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820D9870).
@@ -1405,6 +2157,10 @@ inline void c820D9C50(Regs& regs, uint8_t* base) { regs.Apply(e820D9C50(base, re
 Result e820D9D10(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820D9D10).
 inline void c820D9D10(Regs& regs, uint8_t* base) { regs.Apply(e820D9D10(base, regs.ToArgs())); }
+// sub_820D9D48's original.
+Result e820D9D48(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820D9D48).
+inline void c820D9D48(Regs& regs, uint8_t* base) { regs.Apply(e820D9D48(base, regs.ToArgs())); }
 // sub_820D9EA0's original.
 Result e820D9EA0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820D9EA0).
@@ -1493,6 +2249,10 @@ inline void c820DB9E8(Regs& regs, uint8_t* base) { regs.Apply(e820DB9E8(base, re
 Result e820DBAA0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820DBAA0).
 inline void c820DBAA0(Regs& regs, uint8_t* base) { regs.Apply(e820DBAA0(base, regs.ToArgs())); }
+// sub_820DBB08's original.
+Result e820DBB08(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820DBB08).
+inline void c820DBB08(Regs& regs, uint8_t* base) { regs.Apply(e820DBB08(base, regs.ToArgs())); }
 // sub_820DBC10's original.
 Result e820DBC10(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820DBC10).
@@ -1529,10 +2289,18 @@ inline void c820DC138(Regs& regs, uint8_t* base) { regs.Apply(e820DC138(base, re
 Result e820DC190(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820DC190).
 inline void c820DC190(Regs& regs, uint8_t* base) { regs.Apply(e820DC190(base, regs.ToArgs())); }
+// sub_820DC258's original.
+Result e820DC258(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820DC258).
+inline void c820DC258(Regs& regs, uint8_t* base) { regs.Apply(e820DC258(base, regs.ToArgs())); }
 // sub_820DC2F8's original.
 Result e820DC2F8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820DC2F8).
 inline void c820DC2F8(Regs& regs, uint8_t* base) { regs.Apply(e820DC2F8(base, regs.ToArgs())); }
+// sub_820DC350's original.
+Result e820DC350(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820DC350).
+inline void c820DC350(Regs& regs, uint8_t* base) { regs.Apply(e820DC350(base, regs.ToArgs())); }
 // sub_820DC3E8's original.
 Result e820DC3E8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820DC3E8).
@@ -1557,6 +2325,10 @@ inline void c820DC7A0(Regs& regs, uint8_t* base) { regs.Apply(e820DC7A0(base, re
 Result e820DC7F8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820DC7F8).
 inline void c820DC7F8(Regs& regs, uint8_t* base) { regs.Apply(e820DC7F8(base, regs.ToArgs())); }
+// sub_820DC850's original.
+Result e820DC850(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820DC850).
+inline void c820DC850(Regs& regs, uint8_t* base) { regs.Apply(e820DC850(base, regs.ToArgs())); }
 // sub_820DC8A8's original.
 Result e820DC8A8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820DC8A8).
@@ -1589,10 +2361,26 @@ inline void c820DCBC0(Regs& regs, uint8_t* base) { regs.Apply(e820DCBC0(base, re
 Result e820DDA60(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820DDA60).
 inline void c820DDA60(Regs& regs, uint8_t* base) { regs.Apply(e820DDA60(base, regs.ToArgs())); }
+// sub_820DDAE8's original.
+Result e820DDAE8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820DDAE8).
+inline void c820DDAE8(Regs& regs, uint8_t* base) { regs.Apply(e820DDAE8(base, regs.ToArgs())); }
+// sub_820DDB98's original.
+Result e820DDB98(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820DDB98).
+inline void c820DDB98(Regs& regs, uint8_t* base) { regs.Apply(e820DDB98(base, regs.ToArgs())); }
+// sub_820DDC48's original.
+Result e820DDC48(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820DDC48).
+inline void c820DDC48(Regs& regs, uint8_t* base) { regs.Apply(e820DDC48(base, regs.ToArgs())); }
 // sub_820DDCF8's original.
 Result e820DDCF8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820DDCF8).
 inline void c820DDCF8(Regs& regs, uint8_t* base) { regs.Apply(e820DDCF8(base, regs.ToArgs())); }
+// sub_820DDD90's original.
+Result e820DDD90(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820DDD90).
+inline void c820DDD90(Regs& regs, uint8_t* base) { regs.Apply(e820DDD90(base, regs.ToArgs())); }
 // sub_820DDE00's original.
 Result e820DDE00(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820DDE00).
@@ -1613,42 +2401,82 @@ inline void c820DE090(Regs& regs, uint8_t* base) { regs.Apply(e820DE090(base, re
 Result e820DE0E0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820DE0E0).
 inline void c820DE0E0(Regs& regs, uint8_t* base) { regs.Apply(e820DE0E0(base, regs.ToArgs())); }
+// sub_820DE140's original.
+Result e820DE140(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820DE140).
+inline void c820DE140(Regs& regs, uint8_t* base) { regs.Apply(e820DE140(base, regs.ToArgs())); }
 // sub_820DE2C8's original.
 Result e820DE2C8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820DE2C8).
 inline void c820DE2C8(Regs& regs, uint8_t* base) { regs.Apply(e820DE2C8(base, regs.ToArgs())); }
+// sub_820DE328's original.
+Result e820DE328(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820DE328).
+inline void c820DE328(Regs& regs, uint8_t* base) { regs.Apply(e820DE328(base, regs.ToArgs())); }
 // sub_820DE498's original.
 Result e820DE498(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820DE498).
 inline void c820DE498(Regs& regs, uint8_t* base) { regs.Apply(e820DE498(base, regs.ToArgs())); }
+// sub_820DE4E8's original.
+Result e820DE4E8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820DE4E8).
+inline void c820DE4E8(Regs& regs, uint8_t* base) { regs.Apply(e820DE4E8(base, regs.ToArgs())); }
 // sub_820DE548's original.
 Result e820DE548(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820DE548).
 inline void c820DE548(Regs& regs, uint8_t* base) { regs.Apply(e820DE548(base, regs.ToArgs())); }
+// sub_820DE5B0's original.
+Result e820DE5B0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820DE5B0).
+inline void c820DE5B0(Regs& regs, uint8_t* base) { regs.Apply(e820DE5B0(base, regs.ToArgs())); }
 // sub_820DE600's original.
 Result e820DE600(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820DE600).
 inline void c820DE600(Regs& regs, uint8_t* base) { regs.Apply(e820DE600(base, regs.ToArgs())); }
+// sub_820DE668's original.
+Result e820DE668(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820DE668).
+inline void c820DE668(Regs& regs, uint8_t* base) { regs.Apply(e820DE668(base, regs.ToArgs())); }
 // sub_820DE7E8's original.
 Result e820DE7E8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820DE7E8).
 inline void c820DE7E8(Regs& regs, uint8_t* base) { regs.Apply(e820DE7E8(base, regs.ToArgs())); }
+// sub_820DE878's original.
+Result e820DE878(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820DE878).
+inline void c820DE878(Regs& regs, uint8_t* base) { regs.Apply(e820DE878(base, regs.ToArgs())); }
 // sub_820DE9D0's original.
 Result e820DE9D0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820DE9D0).
 inline void c820DE9D0(Regs& regs, uint8_t* base) { regs.Apply(e820DE9D0(base, regs.ToArgs())); }
+// sub_820DEA20's original.
+Result e820DEA20(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820DEA20).
+inline void c820DEA20(Regs& regs, uint8_t* base) { regs.Apply(e820DEA20(base, regs.ToArgs())); }
 // sub_820DEBF0's original.
 Result e820DEBF0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820DEBF0).
 inline void c820DEBF0(Regs& regs, uint8_t* base) { regs.Apply(e820DEBF0(base, regs.ToArgs())); }
+// sub_820DEC58's original.
+Result e820DEC58(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820DEC58).
+inline void c820DEC58(Regs& regs, uint8_t* base) { regs.Apply(e820DEC58(base, regs.ToArgs())); }
 // sub_820DECD0's original.
 Result e820DECD0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820DECD0).
 inline void c820DECD0(Regs& regs, uint8_t* base) { regs.Apply(e820DECD0(base, regs.ToArgs())); }
+// sub_820DED20's original.
+Result e820DED20(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820DED20).
+inline void c820DED20(Regs& regs, uint8_t* base) { regs.Apply(e820DED20(base, regs.ToArgs())); }
 // sub_820DEE88's original.
 Result e820DEE88(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820DEE88).
 inline void c820DEE88(Regs& regs, uint8_t* base) { regs.Apply(e820DEE88(base, regs.ToArgs())); }
+// sub_820DEED8's original.
+Result e820DEED8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820DEED8).
+inline void c820DEED8(Regs& regs, uint8_t* base) { regs.Apply(e820DEED8(base, regs.ToArgs())); }
 // sub_820DF020's original.
 Result e820DF020(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820DF020).
@@ -1661,6 +2489,18 @@ inline void c820DF0C0(Regs& regs, uint8_t* base) { regs.Apply(e820DF0C0(base, re
 Result e820DF128(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820DF128).
 inline void c820DF128(Regs& regs, uint8_t* base) { regs.Apply(e820DF128(base, regs.ToArgs())); }
+// sub_820DF180's original.
+Result e820DF180(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820DF180).
+inline void c820DF180(Regs& regs, uint8_t* base) { regs.Apply(e820DF180(base, regs.ToArgs())); }
+// sub_820DF190's original.
+Result e820DF190(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820DF190).
+inline void c820DF190(Regs& regs, uint8_t* base) { regs.Apply(e820DF190(base, regs.ToArgs())); }
+// sub_820DF1A0's original.
+Result e820DF1A0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820DF1A0).
+inline void c820DF1A0(Regs& regs, uint8_t* base) { regs.Apply(e820DF1A0(base, regs.ToArgs())); }
 // sub_820DF250's original.
 Result e820DF250(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820DF250).
@@ -1673,6 +2513,14 @@ inline void c820DF410(Regs& regs, uint8_t* base) { regs.Apply(e820DF410(base, re
 Result e820DF570(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820DF570).
 inline void c820DF570(Regs& regs, uint8_t* base) { regs.Apply(e820DF570(base, regs.ToArgs())); }
+// sub_820DF5B8's original.
+Result e820DF5B8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820DF5B8).
+inline void c820DF5B8(Regs& regs, uint8_t* base) { regs.Apply(e820DF5B8(base, regs.ToArgs())); }
+// sub_820DF610's original.
+Result e820DF610(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820DF610).
+inline void c820DF610(Regs& regs, uint8_t* base) { regs.Apply(e820DF610(base, regs.ToArgs())); }
 // sub_820DF668's original.
 Result e820DF668(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820DF668).
@@ -1689,6 +2537,18 @@ inline void c820DF6F8(Regs& regs, uint8_t* base) { regs.Apply(e820DF6F8(base, re
 Result e820DF740(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820DF740).
 inline void c820DF740(Regs& regs, uint8_t* base) { regs.Apply(e820DF740(base, regs.ToArgs())); }
+// sub_820DF7F0's original.
+Result e820DF7F0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820DF7F0).
+inline void c820DF7F0(Regs& regs, uint8_t* base) { regs.Apply(e820DF7F0(base, regs.ToArgs())); }
+// sub_820E0010's original.
+Result e820E0010(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820E0010).
+inline void c820E0010(Regs& regs, uint8_t* base) { regs.Apply(e820E0010(base, regs.ToArgs())); }
+// sub_820E0080's original.
+Result e820E0080(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820E0080).
+inline void c820E0080(Regs& regs, uint8_t* base) { regs.Apply(e820E0080(base, regs.ToArgs())); }
 // sub_820E00F0's original.
 Result e820E00F0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E00F0).
@@ -1709,14 +2569,34 @@ inline void c820E0590(Regs& regs, uint8_t* base) { regs.Apply(e820E0590(base, re
 Result e820E05E0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E05E0).
 inline void c820E05E0(Regs& regs, uint8_t* base) { regs.Apply(e820E05E0(base, regs.ToArgs())); }
+// sub_820E08B0's original.
+Result e820E08B0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820E08B0).
+inline void c820E08B0(Regs& regs, uint8_t* base) { regs.Apply(e820E08B0(base, regs.ToArgs())); }
 // sub_820E0908's original.
 Result e820E0908(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E0908).
 inline void c820E0908(Regs& regs, uint8_t* base) { regs.Apply(e820E0908(base, regs.ToArgs())); }
+// sub_820E1388's original.
+Result e820E1388(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820E1388).
+inline void c820E1388(Regs& regs, uint8_t* base) { regs.Apply(e820E1388(base, regs.ToArgs())); }
+// sub_820E2448's original.
+Result e820E2448(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820E2448).
+inline void c820E2448(Regs& regs, uint8_t* base) { regs.Apply(e820E2448(base, regs.ToArgs())); }
+// sub_820E2760's original.
+Result e820E2760(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820E2760).
+inline void c820E2760(Regs& regs, uint8_t* base) { regs.Apply(e820E2760(base, regs.ToArgs())); }
 // sub_820E2A10's original.
 Result e820E2A10(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E2A10).
 inline void c820E2A10(Regs& regs, uint8_t* base) { regs.Apply(e820E2A10(base, regs.ToArgs())); }
+// sub_820E2C10's original.
+Result e820E2C10(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820E2C10).
+inline void c820E2C10(Regs& regs, uint8_t* base) { regs.Apply(e820E2C10(base, regs.ToArgs())); }
 // sub_820E2E10's original.
 Result e820E2E10(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E2E10).
@@ -1745,10 +2625,18 @@ inline void c820E2FC8(Regs& regs, uint8_t* base) { regs.Apply(e820E2FC8(base, re
 Result e820E3040(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E3040).
 inline void c820E3040(Regs& regs, uint8_t* base) { regs.Apply(e820E3040(base, regs.ToArgs())); }
+// sub_820E30C0's original.
+Result e820E30C0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820E30C0).
+inline void c820E30C0(Regs& regs, uint8_t* base) { regs.Apply(e820E30C0(base, regs.ToArgs())); }
 // sub_820E3200's original.
 Result e820E3200(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E3200).
 inline void c820E3200(Regs& regs, uint8_t* base) { regs.Apply(e820E3200(base, regs.ToArgs())); }
+// sub_820E3298's original.
+Result e820E3298(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820E3298).
+inline void c820E3298(Regs& regs, uint8_t* base) { regs.Apply(e820E3298(base, regs.ToArgs())); }
 // sub_820E32E8's original.
 Result e820E32E8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E32E8).
@@ -1761,6 +2649,10 @@ inline void c820E33F0(Regs& regs, uint8_t* base) { regs.Apply(e820E33F0(base, re
 Result e820E3440(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E3440).
 inline void c820E3440(Regs& regs, uint8_t* base) { regs.Apply(e820E3440(base, regs.ToArgs())); }
+// sub_820E34A8's original.
+Result e820E34A8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820E34A8).
+inline void c820E34A8(Regs& regs, uint8_t* base) { regs.Apply(e820E34A8(base, regs.ToArgs())); }
 // sub_820E34F8's original.
 Result e820E34F8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E34F8).
@@ -1789,6 +2681,10 @@ inline void c820E3938(Regs& regs, uint8_t* base) { regs.Apply(e820E3938(base, re
 Result e820E39B0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E39B0).
 inline void c820E39B0(Regs& regs, uint8_t* base) { regs.Apply(e820E39B0(base, regs.ToArgs())); }
+// sub_820E4078's original.
+Result e820E4078(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820E4078).
+inline void c820E4078(Regs& regs, uint8_t* base) { regs.Apply(e820E4078(base, regs.ToArgs())); }
 // sub_820E4140's original.
 Result e820E4140(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E4140).
@@ -1797,14 +2693,26 @@ inline void c820E4140(Regs& regs, uint8_t* base) { regs.Apply(e820E4140(base, re
 Result e820E4250(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E4250).
 inline void c820E4250(Regs& regs, uint8_t* base) { regs.Apply(e820E4250(base, regs.ToArgs())); }
+// sub_820E4258's original.
+Result e820E4258(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820E4258).
+inline void c820E4258(Regs& regs, uint8_t* base) { regs.Apply(e820E4258(base, regs.ToArgs())); }
 // sub_820E4FD8's original.
 Result e820E4FD8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E4FD8).
 inline void c820E4FD8(Regs& regs, uint8_t* base) { regs.Apply(e820E4FD8(base, regs.ToArgs())); }
+// sub_820E50C0's original.
+Result e820E50C0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820E50C0).
+inline void c820E50C0(Regs& regs, uint8_t* base) { regs.Apply(e820E50C0(base, regs.ToArgs())); }
 // sub_820E5178's original.
 Result e820E5178(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E5178).
 inline void c820E5178(Regs& regs, uint8_t* base) { regs.Apply(e820E5178(base, regs.ToArgs())); }
+// sub_820E5220's original.
+Result e820E5220(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820E5220).
+inline void c820E5220(Regs& regs, uint8_t* base) { regs.Apply(e820E5220(base, regs.ToArgs())); }
 // sub_820E5340's original.
 Result e820E5340(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E5340).
@@ -1821,14 +2729,26 @@ inline void c820E53F0(Regs& regs, uint8_t* base) { regs.Apply(e820E53F0(base, re
 Result e820E54E8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E54E8).
 inline void c820E54E8(Regs& regs, uint8_t* base) { regs.Apply(e820E54E8(base, regs.ToArgs())); }
+// sub_820E5538's original.
+Result e820E5538(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820E5538).
+inline void c820E5538(Regs& regs, uint8_t* base) { regs.Apply(e820E5538(base, regs.ToArgs())); }
 // sub_820E56D0's original.
 Result e820E56D0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E56D0).
 inline void c820E56D0(Regs& regs, uint8_t* base) { regs.Apply(e820E56D0(base, regs.ToArgs())); }
+// sub_820E5738's original.
+Result e820E5738(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820E5738).
+inline void c820E5738(Regs& regs, uint8_t* base) { regs.Apply(e820E5738(base, regs.ToArgs())); }
 // sub_820E57A0's original.
 Result e820E57A0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E57A0).
 inline void c820E57A0(Regs& regs, uint8_t* base) { regs.Apply(e820E57A0(base, regs.ToArgs())); }
+// sub_820E5808's original.
+Result e820E5808(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820E5808).
+inline void c820E5808(Regs& regs, uint8_t* base) { regs.Apply(e820E5808(base, regs.ToArgs())); }
 // sub_820E5880's original.
 Result e820E5880(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E5880).
@@ -1853,10 +2773,18 @@ inline void c820E5A68(Regs& regs, uint8_t* base) { regs.Apply(e820E5A68(base, re
 Result e820E61D0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E61D0).
 inline void c820E61D0(Regs& regs, uint8_t* base) { regs.Apply(e820E61D0(base, regs.ToArgs())); }
+// sub_820E6820's original.
+Result e820E6820(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820E6820).
+inline void c820E6820(Regs& regs, uint8_t* base) { regs.Apply(e820E6820(base, regs.ToArgs())); }
 // sub_820E68E8's original.
 Result e820E68E8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E68E8).
 inline void c820E68E8(Regs& regs, uint8_t* base) { regs.Apply(e820E68E8(base, regs.ToArgs())); }
+// sub_820E69F0's original.
+Result e820E69F0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820E69F0).
+inline void c820E69F0(Regs& regs, uint8_t* base) { regs.Apply(e820E69F0(base, regs.ToArgs())); }
 // sub_820E6A40's original.
 Result e820E6A40(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E6A40).
@@ -1873,22 +2801,50 @@ inline void c820E6ED8(Regs& regs, uint8_t* base) { regs.Apply(e820E6ED8(base, re
 Result e820E7328(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E7328).
 inline void c820E7328(Regs& regs, uint8_t* base) { regs.Apply(e820E7328(base, regs.ToArgs())); }
+// sub_820E7378's original.
+Result e820E7378(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820E7378).
+inline void c820E7378(Regs& regs, uint8_t* base) { regs.Apply(e820E7378(base, regs.ToArgs())); }
+// sub_820E7380's original.
+Result e820E7380(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820E7380).
+inline void c820E7380(Regs& regs, uint8_t* base) { regs.Apply(e820E7380(base, regs.ToArgs())); }
+// sub_820E7470's original.
+Result e820E7470(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820E7470).
+inline void c820E7470(Regs& regs, uint8_t* base) { regs.Apply(e820E7470(base, regs.ToArgs())); }
 // sub_820E74B8's original.
 Result e820E74B8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E74B8).
 inline void c820E74B8(Regs& regs, uint8_t* base) { regs.Apply(e820E74B8(base, regs.ToArgs())); }
+// sub_820E7598's original.
+Result e820E7598(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820E7598).
+inline void c820E7598(Regs& regs, uint8_t* base) { regs.Apply(e820E7598(base, regs.ToArgs())); }
 // sub_820E7918's original.
 Result e820E7918(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E7918).
 inline void c820E7918(Regs& regs, uint8_t* base) { regs.Apply(e820E7918(base, regs.ToArgs())); }
+// sub_820E79C8's original.
+Result e820E79C8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820E79C8).
+inline void c820E79C8(Regs& regs, uint8_t* base) { regs.Apply(e820E79C8(base, regs.ToArgs())); }
 // sub_820E7C08's original.
 Result e820E7C08(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E7C08).
 inline void c820E7C08(Regs& regs, uint8_t* base) { regs.Apply(e820E7C08(base, regs.ToArgs())); }
+// sub_820E7CA0's original.
+Result e820E7CA0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820E7CA0).
+inline void c820E7CA0(Regs& regs, uint8_t* base) { regs.Apply(e820E7CA0(base, regs.ToArgs())); }
 // sub_820E7F90's original.
 Result e820E7F90(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E7F90).
 inline void c820E7F90(Regs& regs, uint8_t* base) { regs.Apply(e820E7F90(base, regs.ToArgs())); }
+// sub_820E8028's original.
+Result e820E8028(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820E8028).
+inline void c820E8028(Regs& regs, uint8_t* base) { regs.Apply(e820E8028(base, regs.ToArgs())); }
 // sub_820E85C8's original.
 Result e820E85C8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820E85C8).
@@ -1929,10 +2885,22 @@ inline void c820EA8E8(Regs& regs, uint8_t* base) { regs.Apply(e820EA8E8(base, re
 Result e820EB320(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820EB320).
 inline void c820EB320(Regs& regs, uint8_t* base) { regs.Apply(e820EB320(base, regs.ToArgs())); }
+// sub_820ECA30's original.
+Result e820ECA30(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820ECA30).
+inline void c820ECA30(Regs& regs, uint8_t* base) { regs.Apply(e820ECA30(base, regs.ToArgs())); }
+// sub_820ECB68's original.
+Result e820ECB68(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820ECB68).
+inline void c820ECB68(Regs& regs, uint8_t* base) { regs.Apply(e820ECB68(base, regs.ToArgs())); }
 // sub_820ECC48's original.
 Result e820ECC48(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820ECC48).
 inline void c820ECC48(Regs& regs, uint8_t* base) { regs.Apply(e820ECC48(base, regs.ToArgs())); }
+// sub_820ECCB8's original.
+Result e820ECCB8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820ECCB8).
+inline void c820ECCB8(Regs& regs, uint8_t* base) { regs.Apply(e820ECCB8(base, regs.ToArgs())); }
 // sub_820ECDD0's original.
 Result e820ECDD0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820ECDD0).
@@ -1961,14 +2929,54 @@ inline void c820ECFC8(Regs& regs, uint8_t* base) { regs.Apply(e820ECFC8(base, re
 Result e820ED020(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820ED020).
 inline void c820ED020(Regs& regs, uint8_t* base) { regs.Apply(e820ED020(base, regs.ToArgs())); }
+// sub_820ED090's original.
+Result e820ED090(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820ED090).
+inline void c820ED090(Regs& regs, uint8_t* base) { regs.Apply(e820ED090(base, regs.ToArgs())); }
+// sub_820ED1E8's original.
+Result e820ED1E8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820ED1E8).
+inline void c820ED1E8(Regs& regs, uint8_t* base) { regs.Apply(e820ED1E8(base, regs.ToArgs())); }
+// sub_820ED528's original.
+Result e820ED528(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820ED528).
+inline void c820ED528(Regs& regs, uint8_t* base) { regs.Apply(e820ED528(base, regs.ToArgs())); }
+// sub_820ED630's original.
+Result e820ED630(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820ED630).
+inline void c820ED630(Regs& regs, uint8_t* base) { regs.Apply(e820ED630(base, regs.ToArgs())); }
 // sub_820ED6D0's original.
 Result e820ED6D0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820ED6D0).
 inline void c820ED6D0(Regs& regs, uint8_t* base) { regs.Apply(e820ED6D0(base, regs.ToArgs())); }
+// sub_820EE0C8's original.
+Result e820EE0C8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820EE0C8).
+inline void c820EE0C8(Regs& regs, uint8_t* base) { regs.Apply(e820EE0C8(base, regs.ToArgs())); }
 // sub_820EE638's original.
 Result e820EE638(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820EE638).
 inline void c820EE638(Regs& regs, uint8_t* base) { regs.Apply(e820EE638(base, regs.ToArgs())); }
+// sub_820EEA78's original.
+Result e820EEA78(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820EEA78).
+inline void c820EEA78(Regs& regs, uint8_t* base) { regs.Apply(e820EEA78(base, regs.ToArgs())); }
+// sub_820EEAE8's original.
+Result e820EEAE8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820EEAE8).
+inline void c820EEAE8(Regs& regs, uint8_t* base) { regs.Apply(e820EEAE8(base, regs.ToArgs())); }
+// sub_820EEB58's original.
+Result e820EEB58(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820EEB58).
+inline void c820EEB58(Regs& regs, uint8_t* base) { regs.Apply(e820EEB58(base, regs.ToArgs())); }
+// sub_820EEF08's original.
+Result e820EEF08(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820EEF08).
+inline void c820EEF08(Regs& regs, uint8_t* base) { regs.Apply(e820EEF08(base, regs.ToArgs())); }
+// sub_820EF310's original.
+Result e820EF310(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820EF310).
+inline void c820EF310(Regs& regs, uint8_t* base) { regs.Apply(e820EF310(base, regs.ToArgs())); }
 // sub_820EF368's original.
 Result e820EF368(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820EF368).
@@ -1977,6 +2985,14 @@ inline void c820EF368(Regs& regs, uint8_t* base) { regs.Apply(e820EF368(base, re
 Result e820EF660(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820EF660).
 inline void c820EF660(Regs& regs, uint8_t* base) { regs.Apply(e820EF660(base, regs.ToArgs())); }
+// sub_820EFB30's original.
+Result e820EFB30(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820EFB30).
+inline void c820EFB30(Regs& regs, uint8_t* base) { regs.Apply(e820EFB30(base, regs.ToArgs())); }
+// sub_820EFFD8's original.
+Result e820EFFD8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820EFFD8).
+inline void c820EFFD8(Regs& regs, uint8_t* base) { regs.Apply(e820EFFD8(base, regs.ToArgs())); }
 // sub_820F0070's original.
 Result e820F0070(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820F0070).
@@ -1985,6 +3001,14 @@ inline void c820F0070(Regs& regs, uint8_t* base) { regs.Apply(e820F0070(base, re
 Result e820F0820(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820F0820).
 inline void c820F0820(Regs& regs, uint8_t* base) { regs.Apply(e820F0820(base, regs.ToArgs())); }
+// sub_820F0988's original.
+Result e820F0988(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F0988).
+inline void c820F0988(Regs& regs, uint8_t* base) { regs.Apply(e820F0988(base, regs.ToArgs())); }
+// sub_820F09E0's original.
+Result e820F09E0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F09E0).
+inline void c820F09E0(Regs& regs, uint8_t* base) { regs.Apply(e820F09E0(base, regs.ToArgs())); }
 // sub_820F0A90's original.
 Result e820F0A90(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820F0A90).
@@ -1993,10 +3017,38 @@ inline void c820F0A90(Regs& regs, uint8_t* base) { regs.Apply(e820F0A90(base, re
 Result e820F0AD8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820F0AD8).
 inline void c820F0AD8(Regs& regs, uint8_t* base) { regs.Apply(e820F0AD8(base, regs.ToArgs())); }
+// sub_820F0B58's original.
+Result e820F0B58(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F0B58).
+inline void c820F0B58(Regs& regs, uint8_t* base) { regs.Apply(e820F0B58(base, regs.ToArgs())); }
+// sub_820F0BF0's original.
+Result e820F0BF0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F0BF0).
+inline void c820F0BF0(Regs& regs, uint8_t* base) { regs.Apply(e820F0BF0(base, regs.ToArgs())); }
+// sub_820F0D30's original.
+Result e820F0D30(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F0D30).
+inline void c820F0D30(Regs& regs, uint8_t* base) { regs.Apply(e820F0D30(base, regs.ToArgs())); }
+// sub_820F0DB8's original.
+Result e820F0DB8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F0DB8).
+inline void c820F0DB8(Regs& regs, uint8_t* base) { regs.Apply(e820F0DB8(base, regs.ToArgs())); }
+// sub_820F0E50's original.
+Result e820F0E50(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F0E50).
+inline void c820F0E50(Regs& regs, uint8_t* base) { regs.Apply(e820F0E50(base, regs.ToArgs())); }
 // sub_820F0EB8's original.
 Result e820F0EB8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820F0EB8).
 inline void c820F0EB8(Regs& regs, uint8_t* base) { regs.Apply(e820F0EB8(base, regs.ToArgs())); }
+// sub_820F0F48's original.
+Result e820F0F48(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F0F48).
+inline void c820F0F48(Regs& regs, uint8_t* base) { regs.Apply(e820F0F48(base, regs.ToArgs())); }
+// sub_820F0F90's original.
+Result e820F0F90(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F0F90).
+inline void c820F0F90(Regs& regs, uint8_t* base) { regs.Apply(e820F0F90(base, regs.ToArgs())); }
 // sub_820F0FE0's original.
 Result e820F0FE0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820F0FE0).
@@ -2021,14 +3073,50 @@ inline void c820F11A8(Regs& regs, uint8_t* base) { regs.Apply(e820F11A8(base, re
 Result e820F1208(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820F1208).
 inline void c820F1208(Regs& regs, uint8_t* base) { regs.Apply(e820F1208(base, regs.ToArgs())); }
+// sub_820F1258's original.
+Result e820F1258(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F1258).
+inline void c820F1258(Regs& regs, uint8_t* base) { regs.Apply(e820F1258(base, regs.ToArgs())); }
 // sub_820F12F8's original.
 Result e820F12F8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820F12F8).
 inline void c820F12F8(Regs& regs, uint8_t* base) { regs.Apply(e820F12F8(base, regs.ToArgs())); }
+// sub_820F1360's original.
+Result e820F1360(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F1360).
+inline void c820F1360(Regs& regs, uint8_t* base) { regs.Apply(e820F1360(base, regs.ToArgs())); }
+// sub_820F1480's original.
+Result e820F1480(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F1480).
+inline void c820F1480(Regs& regs, uint8_t* base) { regs.Apply(e820F1480(base, regs.ToArgs())); }
+// sub_820F1490's original.
+Result e820F1490(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F1490).
+inline void c820F1490(Regs& regs, uint8_t* base) { regs.Apply(e820F1490(base, regs.ToArgs())); }
+// sub_820F14E8's original.
+Result e820F14E8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F14E8).
+inline void c820F14E8(Regs& regs, uint8_t* base) { regs.Apply(e820F14E8(base, regs.ToArgs())); }
+// sub_820F1A70's original.
+Result e820F1A70(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F1A70).
+inline void c820F1A70(Regs& regs, uint8_t* base) { regs.Apply(e820F1A70(base, regs.ToArgs())); }
+// sub_820F1C68's original.
+Result e820F1C68(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F1C68).
+inline void c820F1C68(Regs& regs, uint8_t* base) { regs.Apply(e820F1C68(base, regs.ToArgs())); }
 // sub_820F1CE8's original.
 Result e820F1CE8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820F1CE8).
 inline void c820F1CE8(Regs& regs, uint8_t* base) { regs.Apply(e820F1CE8(base, regs.ToArgs())); }
+// sub_820F1D20's original.
+Result e820F1D20(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F1D20).
+inline void c820F1D20(Regs& regs, uint8_t* base) { regs.Apply(e820F1D20(base, regs.ToArgs())); }
+// sub_820F1F68's original.
+Result e820F1F68(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F1F68).
+inline void c820F1F68(Regs& regs, uint8_t* base) { regs.Apply(e820F1F68(base, regs.ToArgs())); }
 // sub_820F22B8's original.
 Result e820F22B8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820F22B8).
@@ -2041,6 +3129,10 @@ inline void c820F22F8(Regs& regs, uint8_t* base) { regs.Apply(e820F22F8(base, re
 Result e820F23C0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820F23C0).
 inline void c820F23C0(Regs& regs, uint8_t* base) { regs.Apply(e820F23C0(base, regs.ToArgs())); }
+// sub_820F2478's original.
+Result e820F2478(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F2478).
+inline void c820F2478(Regs& regs, uint8_t* base) { regs.Apply(e820F2478(base, regs.ToArgs())); }
 // sub_820F2520's original.
 Result e820F2520(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820F2520).
@@ -2049,6 +3141,10 @@ inline void c820F2520(Regs& regs, uint8_t* base) { regs.Apply(e820F2520(base, re
 Result e820F2638(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820F2638).
 inline void c820F2638(Regs& regs, uint8_t* base) { regs.Apply(e820F2638(base, regs.ToArgs())); }
+// sub_820F2720's original.
+Result e820F2720(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F2720).
+inline void c820F2720(Regs& regs, uint8_t* base) { regs.Apply(e820F2720(base, regs.ToArgs())); }
 // sub_820F2AF8's original.
 Result e820F2AF8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820F2AF8).
@@ -2077,14 +3173,30 @@ inline void c820F3020(Regs& regs, uint8_t* base) { regs.Apply(e820F3020(base, re
 Result e820F34C8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820F34C8).
 inline void c820F34C8(Regs& regs, uint8_t* base) { regs.Apply(e820F34C8(base, regs.ToArgs())); }
+// sub_820F3B70's original.
+Result e820F3B70(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F3B70).
+inline void c820F3B70(Regs& regs, uint8_t* base) { regs.Apply(e820F3B70(base, regs.ToArgs())); }
 // sub_820F4128's original.
 Result e820F4128(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820F4128).
 inline void c820F4128(Regs& regs, uint8_t* base) { regs.Apply(e820F4128(base, regs.ToArgs())); }
+// sub_820F4888's original.
+Result e820F4888(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F4888).
+inline void c820F4888(Regs& regs, uint8_t* base) { regs.Apply(e820F4888(base, regs.ToArgs())); }
+// sub_820F4BA8's original.
+Result e820F4BA8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F4BA8).
+inline void c820F4BA8(Regs& regs, uint8_t* base) { regs.Apply(e820F4BA8(base, regs.ToArgs())); }
 // sub_820F51A8's original.
 Result e820F51A8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820F51A8).
 inline void c820F51A8(Regs& regs, uint8_t* base) { regs.Apply(e820F51A8(base, regs.ToArgs())); }
+// sub_820F5238's original.
+Result e820F5238(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F5238).
+inline void c820F5238(Regs& regs, uint8_t* base) { regs.Apply(e820F5238(base, regs.ToArgs())); }
 // sub_820F52A8's original.
 Result e820F52A8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820F52A8).
@@ -2097,6 +3209,10 @@ inline void c820F5740(Regs& regs, uint8_t* base) { regs.Apply(e820F5740(base, re
 Result e820F6068(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820F6068).
 inline void c820F6068(Regs& regs, uint8_t* base) { regs.Apply(e820F6068(base, regs.ToArgs())); }
+// sub_820F6898's original.
+Result e820F6898(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F6898).
+inline void c820F6898(Regs& regs, uint8_t* base) { regs.Apply(e820F6898(base, regs.ToArgs())); }
 // sub_820F68E8's original.
 Result e820F68E8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820F68E8).
@@ -2105,14 +3221,62 @@ inline void c820F68E8(Regs& regs, uint8_t* base) { regs.Apply(e820F68E8(base, re
 Result e820F6940(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820F6940).
 inline void c820F6940(Regs& regs, uint8_t* base) { regs.Apply(e820F6940(base, regs.ToArgs())); }
+// sub_820F6A38's original.
+Result e820F6A38(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F6A38).
+inline void c820F6A38(Regs& regs, uint8_t* base) { regs.Apply(e820F6A38(base, regs.ToArgs())); }
+// sub_820F6BE8's original.
+Result e820F6BE8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F6BE8).
+inline void c820F6BE8(Regs& regs, uint8_t* base) { regs.Apply(e820F6BE8(base, regs.ToArgs())); }
 // sub_820F8618's original.
 Result e820F8618(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820F8618).
 inline void c820F8618(Regs& regs, uint8_t* base) { regs.Apply(e820F8618(base, regs.ToArgs())); }
+// sub_820F8EF0's original.
+Result e820F8EF0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F8EF0).
+inline void c820F8EF0(Regs& regs, uint8_t* base) { regs.Apply(e820F8EF0(base, regs.ToArgs())); }
 // sub_820F9768's original.
 Result e820F9768(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820F9768).
 inline void c820F9768(Regs& regs, uint8_t* base) { regs.Apply(e820F9768(base, regs.ToArgs())); }
+// sub_820F9B48's original.
+Result e820F9B48(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820F9B48).
+inline void c820F9B48(Regs& regs, uint8_t* base) { regs.Apply(e820F9B48(base, regs.ToArgs())); }
+// sub_820FB8B8's original.
+Result e820FB8B8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820FB8B8).
+inline void c820FB8B8(Regs& regs, uint8_t* base) { regs.Apply(e820FB8B8(base, regs.ToArgs())); }
+// sub_820FB998's original.
+Result e820FB998(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820FB998).
+inline void c820FB998(Regs& regs, uint8_t* base) { regs.Apply(e820FB998(base, regs.ToArgs())); }
+// sub_820FB9A8's original.
+Result e820FB9A8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820FB9A8).
+inline void c820FB9A8(Regs& regs, uint8_t* base) { regs.Apply(e820FB9A8(base, regs.ToArgs())); }
+// sub_820FBB20's original.
+Result e820FBB20(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820FBB20).
+inline void c820FBB20(Regs& regs, uint8_t* base) { regs.Apply(e820FBB20(base, regs.ToArgs())); }
+// sub_820FDF38's original.
+Result e820FDF38(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820FDF38).
+inline void c820FDF38(Regs& regs, uint8_t* base) { regs.Apply(e820FDF38(base, regs.ToArgs())); }
+// sub_820FE598's original.
+Result e820FE598(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820FE598).
+inline void c820FE598(Regs& regs, uint8_t* base) { regs.Apply(e820FE598(base, regs.ToArgs())); }
+// sub_820FE830's original.
+Result e820FE830(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820FE830).
+inline void c820FE830(Regs& regs, uint8_t* base) { regs.Apply(e820FE830(base, regs.ToArgs())); }
+// sub_820FE8F8's original.
+Result e820FE8F8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820FE8F8).
+inline void c820FE8F8(Regs& regs, uint8_t* base) { regs.Apply(e820FE8F8(base, regs.ToArgs())); }
 // sub_820FEBD0's original.
 Result e820FEBD0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820FEBD0).
@@ -2129,18 +3293,38 @@ inline void c820FF1B0(Regs& regs, uint8_t* base) { regs.Apply(e820FF1B0(base, re
 Result e820FF250(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820FF250).
 inline void c820FF250(Regs& regs, uint8_t* base) { regs.Apply(e820FF250(base, regs.ToArgs())); }
+// sub_820FF808's original.
+Result e820FF808(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820FF808).
+inline void c820FF808(Regs& regs, uint8_t* base) { regs.Apply(e820FF808(base, regs.ToArgs())); }
 // sub_820FF860's original.
 Result e820FF860(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820FF860).
 inline void c820FF860(Regs& regs, uint8_t* base) { regs.Apply(e820FF860(base, regs.ToArgs())); }
+// sub_820FF978's original.
+Result e820FF978(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820FF978).
+inline void c820FF978(Regs& regs, uint8_t* base) { regs.Apply(e820FF978(base, regs.ToArgs())); }
 // sub_820FFD88's original.
 Result e820FFD88(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_820FFD88).
 inline void c820FFD88(Regs& regs, uint8_t* base) { regs.Apply(e820FFD88(base, regs.ToArgs())); }
+// sub_820FFE08's original.
+Result e820FFE08(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_820FFE08).
+inline void c820FFE08(Regs& regs, uint8_t* base) { regs.Apply(e820FFE08(base, regs.ToArgs())); }
+// sub_82101630's original.
+Result e82101630(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82101630).
+inline void c82101630(Regs& regs, uint8_t* base) { regs.Apply(e82101630(base, regs.ToArgs())); }
 // sub_821017C0's original.
 Result e821017C0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821017C0).
 inline void c821017C0(Regs& regs, uint8_t* base) { regs.Apply(e821017C0(base, regs.ToArgs())); }
+// sub_82101860's original.
+Result e82101860(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82101860).
+inline void c82101860(Regs& regs, uint8_t* base) { regs.Apply(e82101860(base, regs.ToArgs())); }
 // sub_82101990's original.
 Result e82101990(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82101990).
@@ -2165,10 +3349,18 @@ inline void c82101D50(Regs& regs, uint8_t* base) { regs.Apply(e82101D50(base, re
 Result e82101E90(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82101E90).
 inline void c82101E90(Regs& regs, uint8_t* base) { regs.Apply(e82101E90(base, regs.ToArgs())); }
+// sub_82101EB0's original.
+Result e82101EB0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82101EB0).
+inline void c82101EB0(Regs& regs, uint8_t* base) { regs.Apply(e82101EB0(base, regs.ToArgs())); }
 // sub_82101F68's original.
 Result e82101F68(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82101F68).
 inline void c82101F68(Regs& regs, uint8_t* base) { regs.Apply(e82101F68(base, regs.ToArgs())); }
+// sub_82101FD0's original.
+Result e82101FD0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82101FD0).
+inline void c82101FD0(Regs& regs, uint8_t* base) { regs.Apply(e82101FD0(base, regs.ToArgs())); }
 // sub_82102048's original.
 Result e82102048(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82102048).
@@ -2185,6 +3377,18 @@ inline void c821021A8(Regs& regs, uint8_t* base) { regs.Apply(e821021A8(base, re
 Result e82102208(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82102208).
 inline void c82102208(Regs& regs, uint8_t* base) { regs.Apply(e82102208(base, regs.ToArgs())); }
+// sub_82102258's original.
+Result e82102258(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82102258).
+inline void c82102258(Regs& regs, uint8_t* base) { regs.Apply(e82102258(base, regs.ToArgs())); }
+// sub_82102300's original.
+Result e82102300(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82102300).
+inline void c82102300(Regs& regs, uint8_t* base) { regs.Apply(e82102300(base, regs.ToArgs())); }
+// sub_821044D8's original.
+Result e821044D8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821044D8).
+inline void c821044D8(Regs& regs, uint8_t* base) { regs.Apply(e821044D8(base, regs.ToArgs())); }
 // sub_821046F8's original.
 Result e821046F8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821046F8).
@@ -2193,6 +3397,14 @@ inline void c821046F8(Regs& regs, uint8_t* base) { regs.Apply(e821046F8(base, re
 Result e82104898(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82104898).
 inline void c82104898(Regs& regs, uint8_t* base) { regs.Apply(e82104898(base, regs.ToArgs())); }
+// sub_82104AB8's original.
+Result e82104AB8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82104AB8).
+inline void c82104AB8(Regs& regs, uint8_t* base) { regs.Apply(e82104AB8(base, regs.ToArgs())); }
+// sub_82104C20's original.
+Result e82104C20(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82104C20).
+inline void c82104C20(Regs& regs, uint8_t* base) { regs.Apply(e82104C20(base, regs.ToArgs())); }
 // sub_82104D40's original.
 Result e82104D40(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82104D40).
@@ -2201,6 +3413,14 @@ inline void c82104D40(Regs& regs, uint8_t* base) { regs.Apply(e82104D40(base, re
 Result e82104E68(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82104E68).
 inline void c82104E68(Regs& regs, uint8_t* base) { regs.Apply(e82104E68(base, regs.ToArgs())); }
+// sub_82104EA8's original.
+Result e82104EA8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82104EA8).
+inline void c82104EA8(Regs& regs, uint8_t* base) { regs.Apply(e82104EA8(base, regs.ToArgs())); }
+// sub_821054A8's original.
+Result e821054A8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821054A8).
+inline void c821054A8(Regs& regs, uint8_t* base) { regs.Apply(e821054A8(base, regs.ToArgs())); }
 // sub_82105508's original.
 Result e82105508(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82105508).
@@ -2213,6 +3433,10 @@ inline void c82105560(Regs& regs, uint8_t* base) { regs.Apply(e82105560(base, re
 Result e821055D8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821055D8).
 inline void c821055D8(Regs& regs, uint8_t* base) { regs.Apply(e821055D8(base, regs.ToArgs())); }
+// sub_821056C0's original.
+Result e821056C0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821056C0).
+inline void c821056C0(Regs& regs, uint8_t* base) { regs.Apply(e821056C0(base, regs.ToArgs())); }
 // sub_82105740's original.
 Result e82105740(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82105740).
@@ -2225,6 +3449,14 @@ inline void c821057C8(Regs& regs, uint8_t* base) { regs.Apply(e821057C8(base, re
 Result e82105868(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82105868).
 inline void c82105868(Regs& regs, uint8_t* base) { regs.Apply(e82105868(base, regs.ToArgs())); }
+// sub_82105940's original.
+Result e82105940(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82105940).
+inline void c82105940(Regs& regs, uint8_t* base) { regs.Apply(e82105940(base, regs.ToArgs())); }
+// sub_82105D08's original.
+Result e82105D08(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82105D08).
+inline void c82105D08(Regs& regs, uint8_t* base) { regs.Apply(e82105D08(base, regs.ToArgs())); }
 // sub_82106548's original.
 Result e82106548(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82106548).
@@ -2237,10 +3469,50 @@ inline void c82106618(Regs& regs, uint8_t* base) { regs.Apply(e82106618(base, re
 Result e82106868(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82106868).
 inline void c82106868(Regs& regs, uint8_t* base) { regs.Apply(e82106868(base, regs.ToArgs())); }
+// sub_82106A00's original.
+Result e82106A00(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82106A00).
+inline void c82106A00(Regs& regs, uint8_t* base) { regs.Apply(e82106A00(base, regs.ToArgs())); }
 // sub_82106AF0's original.
 Result e82106AF0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82106AF0).
 inline void c82106AF0(Regs& regs, uint8_t* base) { regs.Apply(e82106AF0(base, regs.ToArgs())); }
+// sub_82106C20's original.
+Result e82106C20(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82106C20).
+inline void c82106C20(Regs& regs, uint8_t* base) { regs.Apply(e82106C20(base, regs.ToArgs())); }
+// sub_82106C80's original.
+Result e82106C80(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82106C80).
+inline void c82106C80(Regs& regs, uint8_t* base) { regs.Apply(e82106C80(base, regs.ToArgs())); }
+// sub_82106DB8's original.
+Result e82106DB8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82106DB8).
+inline void c82106DB8(Regs& regs, uint8_t* base) { regs.Apply(e82106DB8(base, regs.ToArgs())); }
+// sub_82106E88's original.
+Result e82106E88(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82106E88).
+inline void c82106E88(Regs& regs, uint8_t* base) { regs.Apply(e82106E88(base, regs.ToArgs())); }
+// sub_82106F08's original.
+Result e82106F08(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82106F08).
+inline void c82106F08(Regs& regs, uint8_t* base) { regs.Apply(e82106F08(base, regs.ToArgs())); }
+// sub_82106F88's original.
+Result e82106F88(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82106F88).
+inline void c82106F88(Regs& regs, uint8_t* base) { regs.Apply(e82106F88(base, regs.ToArgs())); }
+// sub_82107008's original.
+Result e82107008(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82107008).
+inline void c82107008(Regs& regs, uint8_t* base) { regs.Apply(e82107008(base, regs.ToArgs())); }
+// sub_82107088's original.
+Result e82107088(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82107088).
+inline void c82107088(Regs& regs, uint8_t* base) { regs.Apply(e82107088(base, regs.ToArgs())); }
+// sub_821073B8's original.
+Result e821073B8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821073B8).
+inline void c821073B8(Regs& regs, uint8_t* base) { regs.Apply(e821073B8(base, regs.ToArgs())); }
 // sub_821077A8's original.
 Result e821077A8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821077A8).
@@ -2253,14 +3525,50 @@ inline void c82107910(Regs& regs, uint8_t* base) { regs.Apply(e82107910(base, re
 Result e82107C58(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82107C58).
 inline void c82107C58(Regs& regs, uint8_t* base) { regs.Apply(e82107C58(base, regs.ToArgs())); }
+// sub_821081A0's original.
+Result e821081A0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821081A0).
+inline void c821081A0(Regs& regs, uint8_t* base) { regs.Apply(e821081A0(base, regs.ToArgs())); }
+// sub_82108210's original.
+Result e82108210(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82108210).
+inline void c82108210(Regs& regs, uint8_t* base) { regs.Apply(e82108210(base, regs.ToArgs())); }
+// sub_82108368's original.
+Result e82108368(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82108368).
+inline void c82108368(Regs& regs, uint8_t* base) { regs.Apply(e82108368(base, regs.ToArgs())); }
+// sub_82108568's original.
+Result e82108568(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82108568).
+inline void c82108568(Regs& regs, uint8_t* base) { regs.Apply(e82108568(base, regs.ToArgs())); }
+// sub_821087D8's original.
+Result e821087D8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821087D8).
+inline void c821087D8(Regs& regs, uint8_t* base) { regs.Apply(e821087D8(base, regs.ToArgs())); }
 // sub_82108860's original.
 Result e82108860(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82108860).
 inline void c82108860(Regs& regs, uint8_t* base) { regs.Apply(e82108860(base, regs.ToArgs())); }
+// sub_82108FE0's original.
+Result e82108FE0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82108FE0).
+inline void c82108FE0(Regs& regs, uint8_t* base) { regs.Apply(e82108FE0(base, regs.ToArgs())); }
 // sub_82109498's original.
 Result e82109498(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82109498).
 inline void c82109498(Regs& regs, uint8_t* base) { regs.Apply(e82109498(base, regs.ToArgs())); }
+// sub_82109560's original.
+Result e82109560(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82109560).
+inline void c82109560(Regs& regs, uint8_t* base) { regs.Apply(e82109560(base, regs.ToArgs())); }
+// sub_82109A00's original.
+Result e82109A00(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82109A00).
+inline void c82109A00(Regs& regs, uint8_t* base) { regs.Apply(e82109A00(base, regs.ToArgs())); }
+// sub_82109AA8's original.
+Result e82109AA8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82109AA8).
+inline void c82109AA8(Regs& regs, uint8_t* base) { regs.Apply(e82109AA8(base, regs.ToArgs())); }
 // sub_82109EF0's original.
 Result e82109EF0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82109EF0).
@@ -2281,14 +3589,30 @@ inline void c8210A538(Regs& regs, uint8_t* base) { regs.Apply(e8210A538(base, re
 Result e8210A5E8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8210A5E8).
 inline void c8210A5E8(Regs& regs, uint8_t* base) { regs.Apply(e8210A5E8(base, regs.ToArgs())); }
+// sub_8210A680's original.
+Result e8210A680(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8210A680).
+inline void c8210A680(Regs& regs, uint8_t* base) { regs.Apply(e8210A680(base, regs.ToArgs())); }
 // sub_8210A758's original.
 Result e8210A758(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8210A758).
 inline void c8210A758(Regs& regs, uint8_t* base) { regs.Apply(e8210A758(base, regs.ToArgs())); }
+// sub_8210A768's original.
+Result e8210A768(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8210A768).
+inline void c8210A768(Regs& regs, uint8_t* base) { regs.Apply(e8210A768(base, regs.ToArgs())); }
+// sub_8210A800's original.
+Result e8210A800(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8210A800).
+inline void c8210A800(Regs& regs, uint8_t* base) { regs.Apply(e8210A800(base, regs.ToArgs())); }
 // sub_8210A850's original.
 Result e8210A850(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8210A850).
 inline void c8210A850(Regs& regs, uint8_t* base) { regs.Apply(e8210A850(base, regs.ToArgs())); }
+// sub_8210A860's original.
+Result e8210A860(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8210A860).
+inline void c8210A860(Regs& regs, uint8_t* base) { regs.Apply(e8210A860(base, regs.ToArgs())); }
 // sub_8210A8D0's original.
 Result e8210A8D0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8210A8D0).
@@ -2309,6 +3633,14 @@ inline void c8210ADD0(Regs& regs, uint8_t* base) { regs.Apply(e8210ADD0(base, re
 Result e8210ADF8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8210ADF8).
 inline void c8210ADF8(Regs& regs, uint8_t* base) { regs.Apply(e8210ADF8(base, regs.ToArgs())); }
+// sub_8210AEB0's original.
+Result e8210AEB0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8210AEB0).
+inline void c8210AEB0(Regs& regs, uint8_t* base) { regs.Apply(e8210AEB0(base, regs.ToArgs())); }
+// sub_8210AF00's original.
+Result e8210AF00(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8210AF00).
+inline void c8210AF00(Regs& regs, uint8_t* base) { regs.Apply(e8210AF00(base, regs.ToArgs())); }
 // sub_8210AF08's original.
 Result e8210AF08(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8210AF08).
@@ -2317,10 +3649,18 @@ inline void c8210AF08(Regs& regs, uint8_t* base) { regs.Apply(e8210AF08(base, re
 Result e8210B018(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8210B018).
 inline void c8210B018(Regs& regs, uint8_t* base) { regs.Apply(e8210B018(base, regs.ToArgs())); }
+// sub_8210B140's original.
+Result e8210B140(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8210B140).
+inline void c8210B140(Regs& regs, uint8_t* base) { regs.Apply(e8210B140(base, regs.ToArgs())); }
 // sub_8210B270's original.
 Result e8210B270(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8210B270).
 inline void c8210B270(Regs& regs, uint8_t* base) { regs.Apply(e8210B270(base, regs.ToArgs())); }
+// sub_8210B438's original.
+Result e8210B438(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8210B438).
+inline void c8210B438(Regs& regs, uint8_t* base) { regs.Apply(e8210B438(base, regs.ToArgs())); }
 // sub_8210B568's original.
 Result e8210B568(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8210B568).
@@ -2333,6 +3673,10 @@ inline void c8210B5B8(Regs& regs, uint8_t* base) { regs.Apply(e8210B5B8(base, re
 Result e8210B698(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8210B698).
 inline void c8210B698(Regs& regs, uint8_t* base) { regs.Apply(e8210B698(base, regs.ToArgs())); }
+// sub_8210B8A8's original.
+Result e8210B8A8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8210B8A8).
+inline void c8210B8A8(Regs& regs, uint8_t* base) { regs.Apply(e8210B8A8(base, regs.ToArgs())); }
 // sub_8210BA28's original.
 Result e8210BA28(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8210BA28).
@@ -2369,6 +3713,14 @@ inline void c8210BFA8(Regs& regs, uint8_t* base) { regs.Apply(e8210BFA8(base, re
 Result e8210C010(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8210C010).
 inline void c8210C010(Regs& regs, uint8_t* base) { regs.Apply(e8210C010(base, regs.ToArgs())); }
+// sub_8210C0E0's original.
+Result e8210C0E0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8210C0E0).
+inline void c8210C0E0(Regs& regs, uint8_t* base) { regs.Apply(e8210C0E0(base, regs.ToArgs())); }
+// sub_8210C180's original.
+Result e8210C180(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8210C180).
+inline void c8210C180(Regs& regs, uint8_t* base) { regs.Apply(e8210C180(base, regs.ToArgs())); }
 // sub_8210C370's original.
 Result e8210C370(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8210C370).
@@ -2385,10 +3737,86 @@ inline void c82110258(Regs& regs, uint8_t* base) { regs.Apply(e82110258(base, re
 Result e82110448(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82110448).
 inline void c82110448(Regs& regs, uint8_t* base) { regs.Apply(e82110448(base, regs.ToArgs())); }
+// sub_82110590's original.
+Result e82110590(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82110590).
+inline void c82110590(Regs& regs, uint8_t* base) { regs.Apply(e82110590(base, regs.ToArgs())); }
+// sub_82110850's original.
+Result e82110850(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82110850).
+inline void c82110850(Regs& regs, uint8_t* base) { regs.Apply(e82110850(base, regs.ToArgs())); }
+// sub_82110AC0's original.
+Result e82110AC0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82110AC0).
+inline void c82110AC0(Regs& regs, uint8_t* base) { regs.Apply(e82110AC0(base, regs.ToArgs())); }
+// sub_82110B18's original.
+Result e82110B18(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82110B18).
+inline void c82110B18(Regs& regs, uint8_t* base) { regs.Apply(e82110B18(base, regs.ToArgs())); }
+// sub_82111780's original.
+Result e82111780(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82111780).
+inline void c82111780(Regs& regs, uint8_t* base) { regs.Apply(e82111780(base, regs.ToArgs())); }
+// sub_82111818's original.
+Result e82111818(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82111818).
+inline void c82111818(Regs& regs, uint8_t* base) { regs.Apply(e82111818(base, regs.ToArgs())); }
+// sub_821118B0's original.
+Result e821118B0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821118B0).
+inline void c821118B0(Regs& regs, uint8_t* base) { regs.Apply(e821118B0(base, regs.ToArgs())); }
+// sub_82111940's original.
+Result e82111940(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82111940).
+inline void c82111940(Regs& regs, uint8_t* base) { regs.Apply(e82111940(base, regs.ToArgs())); }
+// sub_821119D0's original.
+Result e821119D0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821119D0).
+inline void c821119D0(Regs& regs, uint8_t* base) { regs.Apply(e821119D0(base, regs.ToArgs())); }
+// sub_82111A60's original.
+Result e82111A60(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82111A60).
+inline void c82111A60(Regs& regs, uint8_t* base) { regs.Apply(e82111A60(base, regs.ToArgs())); }
+// sub_82111AE0's original.
+Result e82111AE0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82111AE0).
+inline void c82111AE0(Regs& regs, uint8_t* base) { regs.Apply(e82111AE0(base, regs.ToArgs())); }
+// sub_82111B30's original.
+Result e82111B30(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82111B30).
+inline void c82111B30(Regs& regs, uint8_t* base) { regs.Apply(e82111B30(base, regs.ToArgs())); }
+// sub_82111BA8's original.
+Result e82111BA8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82111BA8).
+inline void c82111BA8(Regs& regs, uint8_t* base) { regs.Apply(e82111BA8(base, regs.ToArgs())); }
+// sub_82111CB0's original.
+Result e82111CB0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82111CB0).
+inline void c82111CB0(Regs& regs, uint8_t* base) { regs.Apply(e82111CB0(base, regs.ToArgs())); }
+// sub_82111D20's original.
+Result e82111D20(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82111D20).
+inline void c82111D20(Regs& regs, uint8_t* base) { regs.Apply(e82111D20(base, regs.ToArgs())); }
+// sub_82111D98's original.
+Result e82111D98(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82111D98).
+inline void c82111D98(Regs& regs, uint8_t* base) { regs.Apply(e82111D98(base, regs.ToArgs())); }
 // sub_82111FC8's original.
 Result e82111FC8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82111FC8).
 inline void c82111FC8(Regs& regs, uint8_t* base) { regs.Apply(e82111FC8(base, regs.ToArgs())); }
+// sub_82112088's original.
+Result e82112088(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82112088).
+inline void c82112088(Regs& regs, uint8_t* base) { regs.Apply(e82112088(base, regs.ToArgs())); }
+// sub_82112148's original.
+Result e82112148(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82112148).
+inline void c82112148(Regs& regs, uint8_t* base) { regs.Apply(e82112148(base, regs.ToArgs())); }
+// sub_821128E0's original.
+Result e821128E0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821128E0).
+inline void c821128E0(Regs& regs, uint8_t* base) { regs.Apply(e821128E0(base, regs.ToArgs())); }
 // sub_82112950's original.
 Result e82112950(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82112950).
@@ -2397,6 +3825,14 @@ inline void c82112950(Regs& regs, uint8_t* base) { regs.Apply(e82112950(base, re
 Result e82112DB0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82112DB0).
 inline void c82112DB0(Regs& regs, uint8_t* base) { regs.Apply(e82112DB0(base, regs.ToArgs())); }
+// sub_821133A8's original.
+Result e821133A8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821133A8).
+inline void c821133A8(Regs& regs, uint8_t* base) { regs.Apply(e821133A8(base, regs.ToArgs())); }
+// sub_82113898's original.
+Result e82113898(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82113898).
+inline void c82113898(Regs& regs, uint8_t* base) { regs.Apply(e82113898(base, regs.ToArgs())); }
 // sub_82113E60's original.
 Result e82113E60(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82113E60).
@@ -2405,6 +3841,22 @@ inline void c82113E60(Regs& regs, uint8_t* base) { regs.Apply(e82113E60(base, re
 Result e82114268(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82114268).
 inline void c82114268(Regs& regs, uint8_t* base) { regs.Apply(e82114268(base, regs.ToArgs())); }
+// sub_82114A88's original.
+Result e82114A88(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82114A88).
+inline void c82114A88(Regs& regs, uint8_t* base) { regs.Apply(e82114A88(base, regs.ToArgs())); }
+// sub_82114B08's original.
+Result e82114B08(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82114B08).
+inline void c82114B08(Regs& regs, uint8_t* base) { regs.Apply(e82114B08(base, regs.ToArgs())); }
+// sub_82114B88's original.
+Result e82114B88(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82114B88).
+inline void c82114B88(Regs& regs, uint8_t* base) { regs.Apply(e82114B88(base, regs.ToArgs())); }
+// sub_82114C08's original.
+Result e82114C08(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82114C08).
+inline void c82114C08(Regs& regs, uint8_t* base) { regs.Apply(e82114C08(base, regs.ToArgs())); }
 // sub_82115190's original.
 Result e82115190(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82115190).
@@ -2429,6 +3881,10 @@ inline void c82116588(Regs& regs, uint8_t* base) { regs.Apply(e82116588(base, re
 Result e82116AF0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82116AF0).
 inline void c82116AF0(Regs& regs, uint8_t* base) { regs.Apply(e82116AF0(base, regs.ToArgs())); }
+// sub_82116C38's original.
+Result e82116C38(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82116C38).
+inline void c82116C38(Regs& regs, uint8_t* base) { regs.Apply(e82116C38(base, regs.ToArgs())); }
 // sub_82116DA8's original.
 Result e82116DA8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82116DA8).
@@ -2505,6 +3961,18 @@ inline void c82117578(Regs& regs, uint8_t* base) { regs.Apply(e82117578(base, re
 Result e821175B8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821175B8).
 inline void c821175B8(Regs& regs, uint8_t* base) { regs.Apply(e821175B8(base, regs.ToArgs())); }
+// sub_82117670's original.
+Result e82117670(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82117670).
+inline void c82117670(Regs& regs, uint8_t* base) { regs.Apply(e82117670(base, regs.ToArgs())); }
+// sub_82117760's original.
+Result e82117760(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82117760).
+inline void c82117760(Regs& regs, uint8_t* base) { regs.Apply(e82117760(base, regs.ToArgs())); }
+// sub_82117770's original.
+Result e82117770(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82117770).
+inline void c82117770(Regs& regs, uint8_t* base) { regs.Apply(e82117770(base, regs.ToArgs())); }
 // sub_82117AD8's original.
 Result e82117AD8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82117AD8).
@@ -2565,10 +4033,18 @@ inline void c82118C18(Regs& regs, uint8_t* base) { regs.Apply(e82118C18(base, re
 Result e82118FB0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82118FB0).
 inline void c82118FB0(Regs& regs, uint8_t* base) { regs.Apply(e82118FB0(base, regs.ToArgs())); }
+// sub_821193C0's original.
+Result e821193C0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821193C0).
+inline void c821193C0(Regs& regs, uint8_t* base) { regs.Apply(e821193C0(base, regs.ToArgs())); }
 // sub_821194A0's original.
 Result e821194A0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821194A0).
 inline void c821194A0(Regs& regs, uint8_t* base) { regs.Apply(e821194A0(base, regs.ToArgs())); }
+// sub_821197E0's original.
+Result e821197E0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821197E0).
+inline void c821197E0(Regs& regs, uint8_t* base) { regs.Apply(e821197E0(base, regs.ToArgs())); }
 // sub_82119B38's original.
 Result e82119B38(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82119B38).
@@ -2601,6 +4077,10 @@ inline void c8211A6C0(Regs& regs, uint8_t* base) { regs.Apply(e8211A6C0(base, re
 Result e8211A708(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211A708).
 inline void c8211A708(Regs& regs, uint8_t* base) { regs.Apply(e8211A708(base, regs.ToArgs())); }
+// sub_8211A788's original.
+Result e8211A788(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8211A788).
+inline void c8211A788(Regs& regs, uint8_t* base) { regs.Apply(e8211A788(base, regs.ToArgs())); }
 // sub_8211A818's original.
 Result e8211A818(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211A818).
@@ -2621,6 +4101,10 @@ inline void c8211A9E8(Regs& regs, uint8_t* base) { regs.Apply(e8211A9E8(base, re
 Result e8211AAA8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211AAA8).
 inline void c8211AAA8(Regs& regs, uint8_t* base) { regs.Apply(e8211AAA8(base, regs.ToArgs())); }
+// sub_8211AB28's original.
+Result e8211AB28(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8211AB28).
+inline void c8211AB28(Regs& regs, uint8_t* base) { regs.Apply(e8211AB28(base, regs.ToArgs())); }
 // sub_8211AB90's original.
 Result e8211AB90(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211AB90).
@@ -2645,6 +4129,10 @@ inline void c8211AC90(Regs& regs, uint8_t* base) { regs.Apply(e8211AC90(base, re
 Result e8211AD00(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211AD00).
 inline void c8211AD00(Regs& regs, uint8_t* base) { regs.Apply(e8211AD00(base, regs.ToArgs())); }
+// sub_8211AE18's original.
+Result e8211AE18(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8211AE18).
+inline void c8211AE18(Regs& regs, uint8_t* base) { regs.Apply(e8211AE18(base, regs.ToArgs())); }
 // sub_8211AE68's original.
 Result e8211AE68(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211AE68).
@@ -2653,6 +4141,14 @@ inline void c8211AE68(Regs& regs, uint8_t* base) { regs.Apply(e8211AE68(base, re
 Result e8211AED0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211AED0).
 inline void c8211AED0(Regs& regs, uint8_t* base) { regs.Apply(e8211AED0(base, regs.ToArgs())); }
+// sub_8211AF90's original.
+Result e8211AF90(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8211AF90).
+inline void c8211AF90(Regs& regs, uint8_t* base) { regs.Apply(e8211AF90(base, regs.ToArgs())); }
+// sub_8211B018's original.
+Result e8211B018(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8211B018).
+inline void c8211B018(Regs& regs, uint8_t* base) { regs.Apply(e8211B018(base, regs.ToArgs())); }
 // sub_8211B080's original.
 Result e8211B080(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211B080).
@@ -2661,6 +4157,14 @@ inline void c8211B080(Regs& regs, uint8_t* base) { regs.Apply(e8211B080(base, re
 Result e8211B0E8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211B0E8).
 inline void c8211B0E8(Regs& regs, uint8_t* base) { regs.Apply(e8211B0E8(base, regs.ToArgs())); }
+// sub_8211B230's original.
+Result e8211B230(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8211B230).
+inline void c8211B230(Regs& regs, uint8_t* base) { regs.Apply(e8211B230(base, regs.ToArgs())); }
+// sub_8211B298's original.
+Result e8211B298(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8211B298).
+inline void c8211B298(Regs& regs, uint8_t* base) { regs.Apply(e8211B298(base, regs.ToArgs())); }
 // sub_8211B310's original.
 Result e8211B310(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211B310).
@@ -2673,10 +4177,18 @@ inline void c8211B370(Regs& regs, uint8_t* base) { regs.Apply(e8211B370(base, re
 Result e8211B3F0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211B3F0).
 inline void c8211B3F0(Regs& regs, uint8_t* base) { regs.Apply(e8211B3F0(base, regs.ToArgs())); }
+// sub_8211B458's original.
+Result e8211B458(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8211B458).
+inline void c8211B458(Regs& regs, uint8_t* base) { regs.Apply(e8211B458(base, regs.ToArgs())); }
 // sub_8211B4D0's original.
 Result e8211B4D0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211B4D0).
 inline void c8211B4D0(Regs& regs, uint8_t* base) { regs.Apply(e8211B4D0(base, regs.ToArgs())); }
+// sub_8211B540's original.
+Result e8211B540(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8211B540).
+inline void c8211B540(Regs& regs, uint8_t* base) { regs.Apply(e8211B540(base, regs.ToArgs())); }
 // sub_8211B660's original.
 Result e8211B660(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211B660).
@@ -2689,6 +4201,22 @@ inline void c8211B720(Regs& regs, uint8_t* base) { regs.Apply(e8211B720(base, re
 Result e8211B770(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211B770).
 inline void c8211B770(Regs& regs, uint8_t* base) { regs.Apply(e8211B770(base, regs.ToArgs())); }
+// sub_8211B7B8's original.
+Result e8211B7B8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8211B7B8).
+inline void c8211B7B8(Regs& regs, uint8_t* base) { regs.Apply(e8211B7B8(base, regs.ToArgs())); }
+// sub_8211B800's original.
+Result e8211B800(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8211B800).
+inline void c8211B800(Regs& regs, uint8_t* base) { regs.Apply(e8211B800(base, regs.ToArgs())); }
+// sub_8211B940's original.
+Result e8211B940(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8211B940).
+inline void c8211B940(Regs& regs, uint8_t* base) { regs.Apply(e8211B940(base, regs.ToArgs())); }
+// sub_8211B9B8's original.
+Result e8211B9B8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8211B9B8).
+inline void c8211B9B8(Regs& regs, uint8_t* base) { regs.Apply(e8211B9B8(base, regs.ToArgs())); }
 // sub_8211BA00's original.
 Result e8211BA00(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211BA00).
@@ -2697,6 +4225,10 @@ inline void c8211BA00(Regs& regs, uint8_t* base) { regs.Apply(e8211BA00(base, re
 Result e8211BB18(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211BB18).
 inline void c8211BB18(Regs& regs, uint8_t* base) { regs.Apply(e8211BB18(base, regs.ToArgs())); }
+// sub_8211BC18's original.
+Result e8211BC18(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8211BC18).
+inline void c8211BC18(Regs& regs, uint8_t* base) { regs.Apply(e8211BC18(base, regs.ToArgs())); }
 // sub_8211BD10's original.
 Result e8211BD10(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211BD10).
@@ -2757,10 +4289,22 @@ inline void c8211C7E8(Regs& regs, uint8_t* base) { regs.Apply(e8211C7E8(base, re
 Result e8211C8A0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211C8A0).
 inline void c8211C8A0(Regs& regs, uint8_t* base) { regs.Apply(e8211C8A0(base, regs.ToArgs())); }
+// sub_8211C930's original.
+Result e8211C930(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8211C930).
+inline void c8211C930(Regs& regs, uint8_t* base) { regs.Apply(e8211C930(base, regs.ToArgs())); }
+// sub_8211C9C0's original.
+Result e8211C9C0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8211C9C0).
+inline void c8211C9C0(Regs& regs, uint8_t* base) { regs.Apply(e8211C9C0(base, regs.ToArgs())); }
 // sub_8211CA18's original.
 Result e8211CA18(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211CA18).
 inline void c8211CA18(Regs& regs, uint8_t* base) { regs.Apply(e8211CA18(base, regs.ToArgs())); }
+// sub_8211CAA0's original.
+Result e8211CAA0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8211CAA0).
+inline void c8211CAA0(Regs& regs, uint8_t* base) { regs.Apply(e8211CAA0(base, regs.ToArgs())); }
 // sub_8211CBD8's original.
 Result e8211CBD8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211CBD8).
@@ -2781,6 +4325,14 @@ inline void c8211CD28(Regs& regs, uint8_t* base) { regs.Apply(e8211CD28(base, re
 Result e8211CD90(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211CD90).
 inline void c8211CD90(Regs& regs, uint8_t* base) { regs.Apply(e8211CD90(base, regs.ToArgs())); }
+// sub_8211D1B8's original.
+Result e8211D1B8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8211D1B8).
+inline void c8211D1B8(Regs& regs, uint8_t* base) { regs.Apply(e8211D1B8(base, regs.ToArgs())); }
+// sub_8211D210's original.
+Result e8211D210(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8211D210).
+inline void c8211D210(Regs& regs, uint8_t* base) { regs.Apply(e8211D210(base, regs.ToArgs())); }
 // sub_8211D280's original.
 Result e8211D280(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211D280).
@@ -2813,6 +4365,10 @@ inline void c8211DAC8(Regs& regs, uint8_t* base) { regs.Apply(e8211DAC8(base, re
 Result e8211DBE0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211DBE0).
 inline void c8211DBE0(Regs& regs, uint8_t* base) { regs.Apply(e8211DBE0(base, regs.ToArgs())); }
+// sub_8211DCE8's original.
+Result e8211DCE8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8211DCE8).
+inline void c8211DCE8(Regs& regs, uint8_t* base) { regs.Apply(e8211DCE8(base, regs.ToArgs())); }
 // sub_8211DDD8's original.
 Result e8211DDD8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211DDD8).
@@ -2861,6 +4417,14 @@ inline void c8211E1C0(Regs& regs, uint8_t* base) { regs.Apply(e8211E1C0(base, re
 Result e8211E258(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211E258).
 inline void c8211E258(Regs& regs, uint8_t* base) { regs.Apply(e8211E258(base, regs.ToArgs())); }
+// sub_8211E2C8's original.
+Result e8211E2C8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8211E2C8).
+inline void c8211E2C8(Regs& regs, uint8_t* base) { regs.Apply(e8211E2C8(base, regs.ToArgs())); }
+// sub_8211E318's original.
+Result e8211E318(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8211E318).
+inline void c8211E318(Regs& regs, uint8_t* base) { regs.Apply(e8211E318(base, regs.ToArgs())); }
 // sub_8211E370's original.
 Result e8211E370(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211E370).
@@ -2881,6 +4445,14 @@ inline void c8211E798(Regs& regs, uint8_t* base) { regs.Apply(e8211E798(base, re
 Result e8211E808(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8211E808).
 inline void c8211E808(Regs& regs, uint8_t* base) { regs.Apply(e8211E808(base, regs.ToArgs())); }
+// sub_8211F118's original.
+Result e8211F118(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8211F118).
+inline void c8211F118(Regs& regs, uint8_t* base) { regs.Apply(e8211F118(base, regs.ToArgs())); }
+// sub_82123240's original.
+Result e82123240(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82123240).
+inline void c82123240(Regs& regs, uint8_t* base) { regs.Apply(e82123240(base, regs.ToArgs())); }
 // sub_82124EE0's original.
 Result e82124EE0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82124EE0).
@@ -2893,10 +4465,58 @@ inline void c821252D0(Regs& regs, uint8_t* base) { regs.Apply(e821252D0(base, re
 Result e82125B60(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82125B60).
 inline void c82125B60(Regs& regs, uint8_t* base) { regs.Apply(e82125B60(base, regs.ToArgs())); }
+// sub_821268C8's original.
+Result e821268C8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821268C8).
+inline void c821268C8(Regs& regs, uint8_t* base) { regs.Apply(e821268C8(base, regs.ToArgs())); }
+// sub_821268F0's original.
+Result e821268F0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821268F0).
+inline void c821268F0(Regs& regs, uint8_t* base) { regs.Apply(e821268F0(base, regs.ToArgs())); }
+// sub_82126908's original.
+Result e82126908(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82126908).
+inline void c82126908(Regs& regs, uint8_t* base) { regs.Apply(e82126908(base, regs.ToArgs())); }
+// sub_82126920's original.
+Result e82126920(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82126920).
+inline void c82126920(Regs& regs, uint8_t* base) { regs.Apply(e82126920(base, regs.ToArgs())); }
+// sub_82126958's original.
+Result e82126958(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82126958).
+inline void c82126958(Regs& regs, uint8_t* base) { regs.Apply(e82126958(base, regs.ToArgs())); }
+// sub_82126998's original.
+Result e82126998(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82126998).
+inline void c82126998(Regs& regs, uint8_t* base) { regs.Apply(e82126998(base, regs.ToArgs())); }
+// sub_821269B0's original.
+Result e821269B0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821269B0).
+inline void c821269B0(Regs& regs, uint8_t* base) { regs.Apply(e821269B0(base, regs.ToArgs())); }
+// sub_82126A70's original.
+Result e82126A70(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82126A70).
+inline void c82126A70(Regs& regs, uint8_t* base) { regs.Apply(e82126A70(base, regs.ToArgs())); }
+// sub_82126A78's original.
+Result e82126A78(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82126A78).
+inline void c82126A78(Regs& regs, uint8_t* base) { regs.Apply(e82126A78(base, regs.ToArgs())); }
+// sub_82126AC0's original.
+Result e82126AC0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82126AC0).
+inline void c82126AC0(Regs& regs, uint8_t* base) { regs.Apply(e82126AC0(base, regs.ToArgs())); }
+// sub_82126AD0's original.
+Result e82126AD0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82126AD0).
+inline void c82126AD0(Regs& regs, uint8_t* base) { regs.Apply(e82126AD0(base, regs.ToArgs())); }
 // sub_821270E8's original.
 Result e821270E8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821270E8).
 inline void c821270E8(Regs& regs, uint8_t* base) { regs.Apply(e821270E8(base, regs.ToArgs())); }
+// sub_82127140's original.
+Result e82127140(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82127140).
+inline void c82127140(Regs& regs, uint8_t* base) { regs.Apply(e82127140(base, regs.ToArgs())); }
 // sub_821281A8's original.
 Result e821281A8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821281A8).
@@ -2917,18 +4537,66 @@ inline void c82129280(Regs& regs, uint8_t* base) { regs.Apply(e82129280(base, re
 Result e821292E8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821292E8).
 inline void c821292E8(Regs& regs, uint8_t* base) { regs.Apply(e821292E8(base, regs.ToArgs())); }
+// sub_82129598's original.
+Result e82129598(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82129598).
+inline void c82129598(Regs& regs, uint8_t* base) { regs.Apply(e82129598(base, regs.ToArgs())); }
+// sub_821299D8's original.
+Result e821299D8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821299D8).
+inline void c821299D8(Regs& regs, uint8_t* base) { regs.Apply(e821299D8(base, regs.ToArgs())); }
+// sub_8212A218's original.
+Result e8212A218(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8212A218).
+inline void c8212A218(Regs& regs, uint8_t* base) { regs.Apply(e8212A218(base, regs.ToArgs())); }
+// sub_8212A840's original.
+Result e8212A840(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8212A840).
+inline void c8212A840(Regs& regs, uint8_t* base) { regs.Apply(e8212A840(base, regs.ToArgs())); }
+// sub_8212A868's original.
+Result e8212A868(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8212A868).
+inline void c8212A868(Regs& regs, uint8_t* base) { regs.Apply(e8212A868(base, regs.ToArgs())); }
+// sub_8212A998's original.
+Result e8212A998(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8212A998).
+inline void c8212A998(Regs& regs, uint8_t* base) { regs.Apply(e8212A998(base, regs.ToArgs())); }
 // sub_8212AA78's original.
 Result e8212AA78(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8212AA78).
 inline void c8212AA78(Regs& regs, uint8_t* base) { regs.Apply(e8212AA78(base, regs.ToArgs())); }
+// sub_8212B1B0's original.
+Result e8212B1B0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8212B1B0).
+inline void c8212B1B0(Regs& regs, uint8_t* base) { regs.Apply(e8212B1B0(base, regs.ToArgs())); }
+// sub_8212B288's original.
+Result e8212B288(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8212B288).
+inline void c8212B288(Regs& regs, uint8_t* base) { regs.Apply(e8212B288(base, regs.ToArgs())); }
 // sub_8212B358's original.
 Result e8212B358(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8212B358).
 inline void c8212B358(Regs& regs, uint8_t* base) { regs.Apply(e8212B358(base, regs.ToArgs())); }
+// sub_8212B3E8's original.
+Result e8212B3E8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8212B3E8).
+inline void c8212B3E8(Regs& regs, uint8_t* base) { regs.Apply(e8212B3E8(base, regs.ToArgs())); }
+// sub_8212B4A8's original.
+Result e8212B4A8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8212B4A8).
+inline void c8212B4A8(Regs& regs, uint8_t* base) { regs.Apply(e8212B4A8(base, regs.ToArgs())); }
 // sub_8212B748's original.
 Result e8212B748(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8212B748).
 inline void c8212B748(Regs& regs, uint8_t* base) { regs.Apply(e8212B748(base, regs.ToArgs())); }
+// sub_8212BA70's original.
+Result e8212BA70(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8212BA70).
+inline void c8212BA70(Regs& regs, uint8_t* base) { regs.Apply(e8212BA70(base, regs.ToArgs())); }
+// sub_8212BF88's original.
+Result e8212BF88(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8212BF88).
+inline void c8212BF88(Regs& regs, uint8_t* base) { regs.Apply(e8212BF88(base, regs.ToArgs())); }
 // sub_8212C070's original.
 Result e8212C070(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8212C070).
@@ -2945,22 +4613,54 @@ inline void c8212D818(Regs& regs, uint8_t* base) { regs.Apply(e8212D818(base, re
 Result e8212DDC8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8212DDC8).
 inline void c8212DDC8(Regs& regs, uint8_t* base) { regs.Apply(e8212DDC8(base, regs.ToArgs())); }
+// sub_8212F0B8's original.
+Result e8212F0B8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8212F0B8).
+inline void c8212F0B8(Regs& regs, uint8_t* base) { regs.Apply(e8212F0B8(base, regs.ToArgs())); }
+// sub_8212FF68's original.
+Result e8212FF68(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8212FF68).
+inline void c8212FF68(Regs& regs, uint8_t* base) { regs.Apply(e8212FF68(base, regs.ToArgs())); }
 // sub_82130198's original.
 Result e82130198(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82130198).
 inline void c82130198(Regs& regs, uint8_t* base) { regs.Apply(e82130198(base, regs.ToArgs())); }
+// sub_821301F0's original.
+Result e821301F0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821301F0).
+inline void c821301F0(Regs& regs, uint8_t* base) { regs.Apply(e821301F0(base, regs.ToArgs())); }
+// sub_82130290's original.
+Result e82130290(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82130290).
+inline void c82130290(Regs& regs, uint8_t* base) { regs.Apply(e82130290(base, regs.ToArgs())); }
 // sub_82130978's original.
 Result e82130978(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82130978).
 inline void c82130978(Regs& regs, uint8_t* base) { regs.Apply(e82130978(base, regs.ToArgs())); }
+// sub_82132778's original.
+Result e82132778(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82132778).
+inline void c82132778(Regs& regs, uint8_t* base) { regs.Apply(e82132778(base, regs.ToArgs())); }
 // sub_821329B8's original.
 Result e821329B8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821329B8).
 inline void c821329B8(Regs& regs, uint8_t* base) { regs.Apply(e821329B8(base, regs.ToArgs())); }
+// sub_82132F58's original.
+Result e82132F58(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82132F58).
+inline void c82132F58(Regs& regs, uint8_t* base) { regs.Apply(e82132F58(base, regs.ToArgs())); }
 // sub_82132FC8's original.
 Result e82132FC8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82132FC8).
 inline void c82132FC8(Regs& regs, uint8_t* base) { regs.Apply(e82132FC8(base, regs.ToArgs())); }
+// sub_82133070's original.
+Result e82133070(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82133070).
+inline void c82133070(Regs& regs, uint8_t* base) { regs.Apply(e82133070(base, regs.ToArgs())); }
+// sub_82133190's original.
+Result e82133190(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82133190).
+inline void c82133190(Regs& regs, uint8_t* base) { regs.Apply(e82133190(base, regs.ToArgs())); }
 // sub_821332F0's original.
 Result e821332F0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821332F0).
@@ -2985,6 +4685,10 @@ inline void c82133C60(Regs& regs, uint8_t* base) { regs.Apply(e82133C60(base, re
 Result e82133D00(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82133D00).
 inline void c82133D00(Regs& regs, uint8_t* base) { regs.Apply(e82133D00(base, regs.ToArgs())); }
+// sub_82133D70's original.
+Result e82133D70(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82133D70).
+inline void c82133D70(Regs& regs, uint8_t* base) { regs.Apply(e82133D70(base, regs.ToArgs())); }
 // sub_82133DD8's original.
 Result e82133DD8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82133DD8).
@@ -2993,18 +4697,46 @@ inline void c82133DD8(Regs& regs, uint8_t* base) { regs.Apply(e82133DD8(base, re
 Result e82133F58(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82133F58).
 inline void c82133F58(Regs& regs, uint8_t* base) { regs.Apply(e82133F58(base, regs.ToArgs())); }
+// sub_82135008's original.
+Result e82135008(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82135008).
+inline void c82135008(Regs& regs, uint8_t* base) { regs.Apply(e82135008(base, regs.ToArgs())); }
+// sub_821351A8's original.
+Result e821351A8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821351A8).
+inline void c821351A8(Regs& regs, uint8_t* base) { regs.Apply(e821351A8(base, regs.ToArgs())); }
 // sub_821351F0's original.
 Result e821351F0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821351F0).
 inline void c821351F0(Regs& regs, uint8_t* base) { regs.Apply(e821351F0(base, regs.ToArgs())); }
+// sub_82135AA8's original.
+Result e82135AA8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82135AA8).
+inline void c82135AA8(Regs& regs, uint8_t* base) { regs.Apply(e82135AA8(base, regs.ToArgs())); }
 // sub_82135B50's original.
 Result e82135B50(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82135B50).
 inline void c82135B50(Regs& regs, uint8_t* base) { regs.Apply(e82135B50(base, regs.ToArgs())); }
+// sub_82136130's original.
+Result e82136130(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82136130).
+inline void c82136130(Regs& regs, uint8_t* base) { regs.Apply(e82136130(base, regs.ToArgs())); }
+// sub_82136390's original.
+Result e82136390(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82136390).
+inline void c82136390(Regs& regs, uint8_t* base) { regs.Apply(e82136390(base, regs.ToArgs())); }
 // sub_821363F0's original.
 Result e821363F0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821363F0).
 inline void c821363F0(Regs& regs, uint8_t* base) { regs.Apply(e821363F0(base, regs.ToArgs())); }
+// sub_82136E30's original.
+Result e82136E30(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82136E30).
+inline void c82136E30(Regs& regs, uint8_t* base) { regs.Apply(e82136E30(base, regs.ToArgs())); }
+// sub_82136FA8's original.
+Result e82136FA8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82136FA8).
+inline void c82136FA8(Regs& regs, uint8_t* base) { regs.Apply(e82136FA8(base, regs.ToArgs())); }
 // sub_821379D8's original.
 Result e821379D8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821379D8).
@@ -3017,6 +4749,10 @@ inline void c82138570(Regs& regs, uint8_t* base) { regs.Apply(e82138570(base, re
 Result e821385C0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821385C0).
 inline void c821385C0(Regs& regs, uint8_t* base) { regs.Apply(e821385C0(base, regs.ToArgs())); }
+// sub_82138610's original.
+Result e82138610(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82138610).
+inline void c82138610(Regs& regs, uint8_t* base) { regs.Apply(e82138610(base, regs.ToArgs())); }
 // sub_821389C8's original.
 Result e821389C8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821389C8).
@@ -3029,6 +4765,14 @@ inline void c82138A18(Regs& regs, uint8_t* base) { regs.Apply(e82138A18(base, re
 Result e82138C38(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82138C38).
 inline void c82138C38(Regs& regs, uint8_t* base) { regs.Apply(e82138C38(base, regs.ToArgs())); }
+// sub_82138F00's original.
+Result e82138F00(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82138F00).
+inline void c82138F00(Regs& regs, uint8_t* base) { regs.Apply(e82138F00(base, regs.ToArgs())); }
+// sub_821394F0's original.
+Result e821394F0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821394F0).
+inline void c821394F0(Regs& regs, uint8_t* base) { regs.Apply(e821394F0(base, regs.ToArgs())); }
 // sub_82139628's original.
 Result e82139628(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82139628).
@@ -3037,6 +4781,14 @@ inline void c82139628(Regs& regs, uint8_t* base) { regs.Apply(e82139628(base, re
 Result e821399A8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821399A8).
 inline void c821399A8(Regs& regs, uint8_t* base) { regs.Apply(e821399A8(base, regs.ToArgs())); }
+// sub_8213AD48's original.
+Result e8213AD48(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8213AD48).
+inline void c8213AD48(Regs& regs, uint8_t* base) { regs.Apply(e8213AD48(base, regs.ToArgs())); }
+// sub_8213AD98's original.
+Result e8213AD98(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8213AD98).
+inline void c8213AD98(Regs& regs, uint8_t* base) { regs.Apply(e8213AD98(base, regs.ToArgs())); }
 // sub_8213ADF8's original.
 Result e8213ADF8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8213ADF8).
@@ -3049,6 +4801,74 @@ inline void c8213B1E0(Regs& regs, uint8_t* base) { regs.Apply(e8213B1E0(base, re
 Result e8213B2B8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8213B2B8).
 inline void c8213B2B8(Regs& regs, uint8_t* base) { regs.Apply(e8213B2B8(base, regs.ToArgs())); }
+// sub_8213B310's original.
+Result e8213B310(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8213B310).
+inline void c8213B310(Regs& regs, uint8_t* base) { regs.Apply(e8213B310(base, regs.ToArgs())); }
+// sub_8213CB30's original.
+Result e8213CB30(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8213CB30).
+inline void c8213CB30(Regs& regs, uint8_t* base) { regs.Apply(e8213CB30(base, regs.ToArgs())); }
+// sub_8213CD50's original.
+Result e8213CD50(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8213CD50).
+inline void c8213CD50(Regs& regs, uint8_t* base) { regs.Apply(e8213CD50(base, regs.ToArgs())); }
+// sub_8213F530's original.
+Result e8213F530(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8213F530).
+inline void c8213F530(Regs& regs, uint8_t* base) { regs.Apply(e8213F530(base, regs.ToArgs())); }
+// sub_8213F700's original.
+Result e8213F700(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8213F700).
+inline void c8213F700(Regs& regs, uint8_t* base) { regs.Apply(e8213F700(base, regs.ToArgs())); }
+// sub_82140308's original.
+Result e82140308(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82140308).
+inline void c82140308(Regs& regs, uint8_t* base) { regs.Apply(e82140308(base, regs.ToArgs())); }
+// sub_82140400's original.
+Result e82140400(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82140400).
+inline void c82140400(Regs& regs, uint8_t* base) { regs.Apply(e82140400(base, regs.ToArgs())); }
+// sub_82142F20's original.
+Result e82142F20(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82142F20).
+inline void c82142F20(Regs& regs, uint8_t* base) { regs.Apply(e82142F20(base, regs.ToArgs())); }
+// sub_82142F68's original.
+Result e82142F68(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82142F68).
+inline void c82142F68(Regs& regs, uint8_t* base) { regs.Apply(e82142F68(base, regs.ToArgs())); }
+// sub_821434C8's original.
+Result e821434C8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821434C8).
+inline void c821434C8(Regs& regs, uint8_t* base) { regs.Apply(e821434C8(base, regs.ToArgs())); }
+// sub_821434F8's original.
+Result e821434F8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821434F8).
+inline void c821434F8(Regs& regs, uint8_t* base) { regs.Apply(e821434F8(base, regs.ToArgs())); }
+// sub_82143620's original.
+Result e82143620(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82143620).
+inline void c82143620(Regs& regs, uint8_t* base) { regs.Apply(e82143620(base, regs.ToArgs())); }
+// sub_821436C8's original.
+Result e821436C8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821436C8).
+inline void c821436C8(Regs& regs, uint8_t* base) { regs.Apply(e821436C8(base, regs.ToArgs())); }
+// sub_82144170's original.
+Result e82144170(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82144170).
+inline void c82144170(Regs& regs, uint8_t* base) { regs.Apply(e82144170(base, regs.ToArgs())); }
+// sub_821441D8's original.
+Result e821441D8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821441D8).
+inline void c821441D8(Regs& regs, uint8_t* base) { regs.Apply(e821441D8(base, regs.ToArgs())); }
+// sub_821444D0's original.
+Result e821444D0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821444D0).
+inline void c821444D0(Regs& regs, uint8_t* base) { regs.Apply(e821444D0(base, regs.ToArgs())); }
+// sub_82144950's original.
+Result e82144950(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82144950).
+inline void c82144950(Regs& regs, uint8_t* base) { regs.Apply(e82144950(base, regs.ToArgs())); }
 // sub_82144A50's original.
 Result e82144A50(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82144A50).
@@ -3061,10 +4881,50 @@ inline void c82144DF0(Regs& regs, uint8_t* base) { regs.Apply(e82144DF0(base, re
 Result e82144E58(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82144E58).
 inline void c82144E58(Regs& regs, uint8_t* base) { regs.Apply(e82144E58(base, regs.ToArgs())); }
+// sub_821451B8's original.
+Result e821451B8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821451B8).
+inline void c821451B8(Regs& regs, uint8_t* base) { regs.Apply(e821451B8(base, regs.ToArgs())); }
+// sub_82145408's original.
+Result e82145408(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82145408).
+inline void c82145408(Regs& regs, uint8_t* base) { regs.Apply(e82145408(base, regs.ToArgs())); }
+// sub_82145B08's original.
+Result e82145B08(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82145B08).
+inline void c82145B08(Regs& regs, uint8_t* base) { regs.Apply(e82145B08(base, regs.ToArgs())); }
+// sub_82146408's original.
+Result e82146408(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82146408).
+inline void c82146408(Regs& regs, uint8_t* base) { regs.Apply(e82146408(base, regs.ToArgs())); }
+// sub_82146AA8's original.
+Result e82146AA8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82146AA8).
+inline void c82146AA8(Regs& regs, uint8_t* base) { regs.Apply(e82146AA8(base, regs.ToArgs())); }
+// sub_82146B20's original.
+Result e82146B20(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82146B20).
+inline void c82146B20(Regs& regs, uint8_t* base) { regs.Apply(e82146B20(base, regs.ToArgs())); }
 // sub_82146BD0's original.
 Result e82146BD0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82146BD0).
 inline void c82146BD0(Regs& regs, uint8_t* base) { regs.Apply(e82146BD0(base, regs.ToArgs())); }
+// sub_82147850's original.
+Result e82147850(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82147850).
+inline void c82147850(Regs& regs, uint8_t* base) { regs.Apply(e82147850(base, regs.ToArgs())); }
+// sub_82147958's original.
+Result e82147958(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82147958).
+inline void c82147958(Regs& regs, uint8_t* base) { regs.Apply(e82147958(base, regs.ToArgs())); }
+// sub_82147B18's original.
+Result e82147B18(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82147B18).
+inline void c82147B18(Regs& regs, uint8_t* base) { regs.Apply(e82147B18(base, regs.ToArgs())); }
+// sub_82147D18's original.
+Result e82147D18(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82147D18).
+inline void c82147D18(Regs& regs, uint8_t* base) { regs.Apply(e82147D18(base, regs.ToArgs())); }
 // sub_82147D88's original.
 Result e82147D88(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82147D88).
@@ -3081,6 +4941,22 @@ inline void c82148428(Regs& regs, uint8_t* base) { regs.Apply(e82148428(base, re
 Result e82148528(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82148528).
 inline void c82148528(Regs& regs, uint8_t* base) { regs.Apply(e82148528(base, regs.ToArgs())); }
+// sub_82148650's original.
+Result e82148650(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82148650).
+inline void c82148650(Regs& regs, uint8_t* base) { regs.Apply(e82148650(base, regs.ToArgs())); }
+// sub_82148658's original.
+Result e82148658(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82148658).
+inline void c82148658(Regs& regs, uint8_t* base) { regs.Apply(e82148658(base, regs.ToArgs())); }
+// sub_82148810's original.
+Result e82148810(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82148810).
+inline void c82148810(Regs& regs, uint8_t* base) { regs.Apply(e82148810(base, regs.ToArgs())); }
+// sub_82148868's original.
+Result e82148868(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82148868).
+inline void c82148868(Regs& regs, uint8_t* base) { regs.Apply(e82148868(base, regs.ToArgs())); }
 // sub_8214AA70's original.
 Result e8214AA70(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8214AA70).
@@ -3093,10 +4969,30 @@ inline void c8214AB48(Regs& regs, uint8_t* base) { regs.Apply(e8214AB48(base, re
 Result e8214E190(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8214E190).
 inline void c8214E190(Regs& regs, uint8_t* base) { regs.Apply(e8214E190(base, regs.ToArgs())); }
+// sub_8214F1C0's original.
+Result e8214F1C0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8214F1C0).
+inline void c8214F1C0(Regs& regs, uint8_t* base) { regs.Apply(e8214F1C0(base, regs.ToArgs())); }
+// sub_82150098's original.
+Result e82150098(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82150098).
+inline void c82150098(Regs& regs, uint8_t* base) { regs.Apply(e82150098(base, regs.ToArgs())); }
+// sub_82150100's original.
+Result e82150100(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82150100).
+inline void c82150100(Regs& regs, uint8_t* base) { regs.Apply(e82150100(base, regs.ToArgs())); }
+// sub_82150300's original.
+Result e82150300(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82150300).
+inline void c82150300(Regs& regs, uint8_t* base) { regs.Apply(e82150300(base, regs.ToArgs())); }
 // sub_82150350's original.
 Result e82150350(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82150350).
 inline void c82150350(Regs& regs, uint8_t* base) { regs.Apply(e82150350(base, regs.ToArgs())); }
+// sub_82150590's original.
+Result e82150590(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82150590).
+inline void c82150590(Regs& regs, uint8_t* base) { regs.Apply(e82150590(base, regs.ToArgs())); }
 // sub_821507D8's original.
 Result e821507D8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821507D8).
@@ -3105,6 +5001,10 @@ inline void c821507D8(Regs& regs, uint8_t* base) { regs.Apply(e821507D8(base, re
 Result e82150878(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82150878).
 inline void c82150878(Regs& regs, uint8_t* base) { regs.Apply(e82150878(base, regs.ToArgs())); }
+// sub_82150960's original.
+Result e82150960(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82150960).
+inline void c82150960(Regs& regs, uint8_t* base) { regs.Apply(e82150960(base, regs.ToArgs())); }
 // sub_82150A10's original.
 Result e82150A10(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82150A10).
@@ -3125,18 +5025,38 @@ inline void c82152108(Regs& regs, uint8_t* base) { regs.Apply(e82152108(base, re
 Result e82152548(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82152548).
 inline void c82152548(Regs& regs, uint8_t* base) { regs.Apply(e82152548(base, regs.ToArgs())); }
+// sub_821525F8's original.
+Result e821525F8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821525F8).
+inline void c821525F8(Regs& regs, uint8_t* base) { regs.Apply(e821525F8(base, regs.ToArgs())); }
 // sub_82152698's original.
 Result e82152698(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82152698).
 inline void c82152698(Regs& regs, uint8_t* base) { regs.Apply(e82152698(base, regs.ToArgs())); }
+// sub_82152788's original.
+Result e82152788(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82152788).
+inline void c82152788(Regs& regs, uint8_t* base) { regs.Apply(e82152788(base, regs.ToArgs())); }
+// sub_82152CD8's original.
+Result e82152CD8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82152CD8).
+inline void c82152CD8(Regs& regs, uint8_t* base) { regs.Apply(e82152CD8(base, regs.ToArgs())); }
 // sub_82152D38's original.
 Result e82152D38(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82152D38).
 inline void c82152D38(Regs& regs, uint8_t* base) { regs.Apply(e82152D38(base, regs.ToArgs())); }
+// sub_82152D80's original.
+Result e82152D80(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82152D80).
+inline void c82152D80(Regs& regs, uint8_t* base) { regs.Apply(e82152D80(base, regs.ToArgs())); }
 // sub_82152E08's original.
 Result e82152E08(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82152E08).
 inline void c82152E08(Regs& regs, uint8_t* base) { regs.Apply(e82152E08(base, regs.ToArgs())); }
+// sub_82152E78's original.
+Result e82152E78(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82152E78).
+inline void c82152E78(Regs& regs, uint8_t* base) { regs.Apply(e82152E78(base, regs.ToArgs())); }
 // sub_82153290's original.
 Result e82153290(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82153290).
@@ -3157,6 +5077,26 @@ inline void c82153A50(Regs& regs, uint8_t* base) { regs.Apply(e82153A50(base, re
 Result e82153E58(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82153E58).
 inline void c82153E58(Regs& regs, uint8_t* base) { regs.Apply(e82153E58(base, regs.ToArgs())); }
+// sub_82154108's original.
+Result e82154108(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82154108).
+inline void c82154108(Regs& regs, uint8_t* base) { regs.Apply(e82154108(base, regs.ToArgs())); }
+// sub_82154378's original.
+Result e82154378(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82154378).
+inline void c82154378(Regs& regs, uint8_t* base) { regs.Apply(e82154378(base, regs.ToArgs())); }
+// sub_821543E8's original.
+Result e821543E8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821543E8).
+inline void c821543E8(Regs& regs, uint8_t* base) { regs.Apply(e821543E8(base, regs.ToArgs())); }
+// sub_82154458's original.
+Result e82154458(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82154458).
+inline void c82154458(Regs& regs, uint8_t* base) { regs.Apply(e82154458(base, regs.ToArgs())); }
+// sub_821544E0's original.
+Result e821544E0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821544E0).
+inline void c821544E0(Regs& regs, uint8_t* base) { regs.Apply(e821544E0(base, regs.ToArgs())); }
 // sub_82154548's original.
 Result e82154548(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82154548).
@@ -3185,6 +5125,10 @@ inline void c82155E58(Regs& regs, uint8_t* base) { regs.Apply(e82155E58(base, re
 Result e821562F8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821562F8).
 inline void c821562F8(Regs& regs, uint8_t* base) { regs.Apply(e821562F8(base, regs.ToArgs())); }
+// sub_82156B68's original.
+Result e82156B68(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82156B68).
+inline void c82156B68(Regs& regs, uint8_t* base) { regs.Apply(e82156B68(base, regs.ToArgs())); }
 // sub_82156CC0's original.
 Result e82156CC0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82156CC0).
@@ -3205,6 +5149,22 @@ inline void c821594B8(Regs& regs, uint8_t* base) { regs.Apply(e821594B8(base, re
 Result e821597F0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821597F0).
 inline void c821597F0(Regs& regs, uint8_t* base) { regs.Apply(e821597F0(base, regs.ToArgs())); }
+// sub_8215AC70's original.
+Result e8215AC70(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8215AC70).
+inline void c8215AC70(Regs& regs, uint8_t* base) { regs.Apply(e8215AC70(base, regs.ToArgs())); }
+// sub_8215B0E0's original.
+Result e8215B0E0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8215B0E0).
+inline void c8215B0E0(Regs& regs, uint8_t* base) { regs.Apply(e8215B0E0(base, regs.ToArgs())); }
+// sub_8215B1A0's original.
+Result e8215B1A0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8215B1A0).
+inline void c8215B1A0(Regs& regs, uint8_t* base) { regs.Apply(e8215B1A0(base, regs.ToArgs())); }
+// sub_8215B238's original.
+Result e8215B238(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8215B238).
+inline void c8215B238(Regs& regs, uint8_t* base) { regs.Apply(e8215B238(base, regs.ToArgs())); }
 // sub_8215B4F8's original.
 Result e8215B4F8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8215B4F8).
@@ -3217,6 +5177,14 @@ inline void c8215B790(Regs& regs, uint8_t* base) { regs.Apply(e8215B790(base, re
 Result e8215B878(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8215B878).
 inline void c8215B878(Regs& regs, uint8_t* base) { regs.Apply(e8215B878(base, regs.ToArgs())); }
+// sub_8215D548's original.
+Result e8215D548(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8215D548).
+inline void c8215D548(Regs& regs, uint8_t* base) { regs.Apply(e8215D548(base, regs.ToArgs())); }
+// sub_8215D738's original.
+Result e8215D738(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8215D738).
+inline void c8215D738(Regs& regs, uint8_t* base) { regs.Apply(e8215D738(base, regs.ToArgs())); }
 // sub_8215D790's original.
 Result e8215D790(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8215D790).
@@ -3237,10 +5205,42 @@ inline void c8215F678(Regs& regs, uint8_t* base) { regs.Apply(e8215F678(base, re
 Result e8215F728(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8215F728).
 inline void c8215F728(Regs& regs, uint8_t* base) { regs.Apply(e8215F728(base, regs.ToArgs())); }
+// sub_8215F968's original.
+Result e8215F968(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8215F968).
+inline void c8215F968(Regs& regs, uint8_t* base) { regs.Apply(e8215F968(base, regs.ToArgs())); }
+// sub_821604C8's original.
+Result e821604C8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821604C8).
+inline void c821604C8(Regs& regs, uint8_t* base) { regs.Apply(e821604C8(base, regs.ToArgs())); }
+// sub_82162230's original.
+Result e82162230(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82162230).
+inline void c82162230(Regs& regs, uint8_t* base) { regs.Apply(e82162230(base, regs.ToArgs())); }
+// sub_821622A8's original.
+Result e821622A8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821622A8).
+inline void c821622A8(Regs& regs, uint8_t* base) { regs.Apply(e821622A8(base, regs.ToArgs())); }
 // sub_82162330's original.
 Result e82162330(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82162330).
 inline void c82162330(Regs& regs, uint8_t* base) { regs.Apply(e82162330(base, regs.ToArgs())); }
+// sub_82162D80's original.
+Result e82162D80(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82162D80).
+inline void c82162D80(Regs& regs, uint8_t* base) { regs.Apply(e82162D80(base, regs.ToArgs())); }
+// sub_82162E08's original.
+Result e82162E08(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82162E08).
+inline void c82162E08(Regs& regs, uint8_t* base) { regs.Apply(e82162E08(base, regs.ToArgs())); }
+// sub_82162F78's original.
+Result e82162F78(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82162F78).
+inline void c82162F78(Regs& regs, uint8_t* base) { regs.Apply(e82162F78(base, regs.ToArgs())); }
+// sub_82163140's original.
+Result e82163140(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82163140).
+inline void c82163140(Regs& regs, uint8_t* base) { regs.Apply(e82163140(base, regs.ToArgs())); }
 // sub_821635D0's original.
 Result e821635D0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821635D0).
@@ -3249,10 +5249,22 @@ inline void c821635D0(Regs& regs, uint8_t* base) { regs.Apply(e821635D0(base, re
 Result e82163920(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82163920).
 inline void c82163920(Regs& regs, uint8_t* base) { regs.Apply(e82163920(base, regs.ToArgs())); }
+// sub_82163930's original.
+Result e82163930(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82163930).
+inline void c82163930(Regs& regs, uint8_t* base) { regs.Apply(e82163930(base, regs.ToArgs())); }
+// sub_82163C50's original.
+Result e82163C50(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82163C50).
+inline void c82163C50(Regs& regs, uint8_t* base) { regs.Apply(e82163C50(base, regs.ToArgs())); }
 // sub_82164090's original.
 Result e82164090(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82164090).
 inline void c82164090(Regs& regs, uint8_t* base) { regs.Apply(e82164090(base, regs.ToArgs())); }
+// sub_82164228's original.
+Result e82164228(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82164228).
+inline void c82164228(Regs& regs, uint8_t* base) { regs.Apply(e82164228(base, regs.ToArgs())); }
 // sub_82164458's original.
 Result e82164458(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82164458).
@@ -3261,10 +5273,34 @@ inline void c82164458(Regs& regs, uint8_t* base) { regs.Apply(e82164458(base, re
 Result e821648E0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821648E0).
 inline void c821648E0(Regs& regs, uint8_t* base) { regs.Apply(e821648E0(base, regs.ToArgs())); }
+// sub_82164A90's original.
+Result e82164A90(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82164A90).
+inline void c82164A90(Regs& regs, uint8_t* base) { regs.Apply(e82164A90(base, regs.ToArgs())); }
 // sub_82164DC0's original.
 Result e82164DC0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82164DC0).
 inline void c82164DC0(Regs& regs, uint8_t* base) { regs.Apply(e82164DC0(base, regs.ToArgs())); }
+// sub_82164E18's original.
+Result e82164E18(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82164E18).
+inline void c82164E18(Regs& regs, uint8_t* base) { regs.Apply(e82164E18(base, regs.ToArgs())); }
+// sub_82164F08's original.
+Result e82164F08(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82164F08).
+inline void c82164F08(Regs& regs, uint8_t* base) { regs.Apply(e82164F08(base, regs.ToArgs())); }
+// sub_821650A0's original.
+Result e821650A0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821650A0).
+inline void c821650A0(Regs& regs, uint8_t* base) { regs.Apply(e821650A0(base, regs.ToArgs())); }
+// sub_82165AB0's original.
+Result e82165AB0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82165AB0).
+inline void c82165AB0(Regs& regs, uint8_t* base) { regs.Apply(e82165AB0(base, regs.ToArgs())); }
+// sub_82165C78's original.
+Result e82165C78(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82165C78).
+inline void c82165C78(Regs& regs, uint8_t* base) { regs.Apply(e82165C78(base, regs.ToArgs())); }
 // sub_82167610's original.
 Result e82167610(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82167610).
@@ -3321,6 +5357,14 @@ inline void c8216C658(Regs& regs, uint8_t* base) { regs.Apply(e8216C658(base, re
 Result e8216C6D8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8216C6D8).
 inline void c8216C6D8(Regs& regs, uint8_t* base) { regs.Apply(e8216C6D8(base, regs.ToArgs())); }
+// sub_8216C820's original.
+Result e8216C820(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8216C820).
+inline void c8216C820(Regs& regs, uint8_t* base) { regs.Apply(e8216C820(base, regs.ToArgs())); }
+// sub_8216C938's original.
+Result e8216C938(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8216C938).
+inline void c8216C938(Regs& regs, uint8_t* base) { regs.Apply(e8216C938(base, regs.ToArgs())); }
 // sub_8216CA28's original.
 Result e8216CA28(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8216CA28).
@@ -3349,6 +5393,10 @@ inline void c8216CFE0(Regs& regs, uint8_t* base) { regs.Apply(e8216CFE0(base, re
 Result e8216D198(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8216D198).
 inline void c8216D198(Regs& regs, uint8_t* base) { regs.Apply(e8216D198(base, regs.ToArgs())); }
+// sub_8216D3F0's original.
+Result e8216D3F0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8216D3F0).
+inline void c8216D3F0(Regs& regs, uint8_t* base) { regs.Apply(e8216D3F0(base, regs.ToArgs())); }
 // sub_8216D450's original.
 Result e8216D450(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8216D450).
@@ -3393,6 +5441,10 @@ inline void c8216E150(Regs& regs, uint8_t* base) { regs.Apply(e8216E150(base, re
 Result e8216E5B0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8216E5B0).
 inline void c8216E5B0(Regs& regs, uint8_t* base) { regs.Apply(e8216E5B0(base, regs.ToArgs())); }
+// sub_82170578's original.
+Result e82170578(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82170578).
+inline void c82170578(Regs& regs, uint8_t* base) { regs.Apply(e82170578(base, regs.ToArgs())); }
 // sub_82170668's original.
 Result e82170668(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82170668).
@@ -3413,6 +5465,14 @@ inline void c821715B8(Regs& regs, uint8_t* base) { regs.Apply(e821715B8(base, re
 Result e82171718(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82171718).
 inline void c82171718(Regs& regs, uint8_t* base) { regs.Apply(e82171718(base, regs.ToArgs())); }
+// sub_82172F90's original.
+Result e82172F90(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82172F90).
+inline void c82172F90(Regs& regs, uint8_t* base) { regs.Apply(e82172F90(base, regs.ToArgs())); }
+// sub_82173050's original.
+Result e82173050(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82173050).
+inline void c82173050(Regs& regs, uint8_t* base) { regs.Apply(e82173050(base, regs.ToArgs())); }
 // sub_82173A90's original.
 Result e82173A90(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82173A90).
@@ -3421,6 +5481,10 @@ inline void c82173A90(Regs& regs, uint8_t* base) { regs.Apply(e82173A90(base, re
 Result e821743A8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821743A8).
 inline void c821743A8(Regs& regs, uint8_t* base) { regs.Apply(e821743A8(base, regs.ToArgs())); }
+// sub_82178B28's original.
+Result e82178B28(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82178B28).
+inline void c82178B28(Regs& regs, uint8_t* base) { regs.Apply(e82178B28(base, regs.ToArgs())); }
 // sub_82178B40's original.
 Result e82178B40(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82178B40).
@@ -3517,6 +5581,14 @@ inline void c82179818(Regs& regs, uint8_t* base) { regs.Apply(e82179818(base, re
 Result e821798D8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821798D8).
 inline void c821798D8(Regs& regs, uint8_t* base) { regs.Apply(e821798D8(base, regs.ToArgs())); }
+// sub_82179998's original.
+Result e82179998(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82179998).
+inline void c82179998(Regs& regs, uint8_t* base) { regs.Apply(e82179998(base, regs.ToArgs())); }
+// sub_821799D8's original.
+Result e821799D8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821799D8).
+inline void c821799D8(Regs& regs, uint8_t* base) { regs.Apply(e821799D8(base, regs.ToArgs())); }
 // sub_82179A18's original.
 Result e82179A18(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82179A18).
@@ -3529,6 +5601,18 @@ inline void c82179A60(Regs& regs, uint8_t* base) { regs.Apply(e82179A60(base, re
 Result e82179BE0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82179BE0).
 inline void c82179BE0(Regs& regs, uint8_t* base) { regs.Apply(e82179BE0(base, regs.ToArgs())); }
+// sub_82179C48's original.
+Result e82179C48(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82179C48).
+inline void c82179C48(Regs& regs, uint8_t* base) { regs.Apply(e82179C48(base, regs.ToArgs())); }
+// sub_82179C88's original.
+Result e82179C88(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82179C88).
+inline void c82179C88(Regs& regs, uint8_t* base) { regs.Apply(e82179C88(base, regs.ToArgs())); }
+// sub_82179D78's original.
+Result e82179D78(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82179D78).
+inline void c82179D78(Regs& regs, uint8_t* base) { regs.Apply(e82179D78(base, regs.ToArgs())); }
 // sub_82179DF0's original.
 Result e82179DF0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82179DF0).
@@ -3541,6 +5625,10 @@ inline void c82179EA8(Regs& regs, uint8_t* base) { regs.Apply(e82179EA8(base, re
 Result e8217A370(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8217A370).
 inline void c8217A370(Regs& regs, uint8_t* base) { regs.Apply(e8217A370(base, regs.ToArgs())); }
+// sub_8217AA98's original.
+Result e8217AA98(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8217AA98).
+inline void c8217AA98(Regs& regs, uint8_t* base) { regs.Apply(e8217AA98(base, regs.ToArgs())); }
 // sub_8217AEA8's original.
 Result e8217AEA8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8217AEA8).
@@ -3549,6 +5637,10 @@ inline void c8217AEA8(Regs& regs, uint8_t* base) { regs.Apply(e8217AEA8(base, re
 Result e8217AFE8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8217AFE8).
 inline void c8217AFE8(Regs& regs, uint8_t* base) { regs.Apply(e8217AFE8(base, regs.ToArgs())); }
+// sub_8217B508's original.
+Result e8217B508(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8217B508).
+inline void c8217B508(Regs& regs, uint8_t* base) { regs.Apply(e8217B508(base, regs.ToArgs())); }
 // sub_8217BA20's original.
 Result e8217BA20(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8217BA20).
@@ -3557,6 +5649,10 @@ inline void c8217BA20(Regs& regs, uint8_t* base) { regs.Apply(e8217BA20(base, re
 Result e8217BE98(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8217BE98).
 inline void c8217BE98(Regs& regs, uint8_t* base) { regs.Apply(e8217BE98(base, regs.ToArgs())); }
+// sub_8217C348's original.
+Result e8217C348(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8217C348).
+inline void c8217C348(Regs& regs, uint8_t* base) { regs.Apply(e8217C348(base, regs.ToArgs())); }
 // sub_8217C368's original.
 Result e8217C368(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8217C368).
@@ -3581,6 +5677,10 @@ inline void c8217D120(Regs& regs, uint8_t* base) { regs.Apply(e8217D120(base, re
 Result e8217D2B0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8217D2B0).
 inline void c8217D2B0(Regs& regs, uint8_t* base) { regs.Apply(e8217D2B0(base, regs.ToArgs())); }
+// sub_8217D7D0's original.
+Result e8217D7D0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8217D7D0).
+inline void c8217D7D0(Regs& regs, uint8_t* base) { regs.Apply(e8217D7D0(base, regs.ToArgs())); }
 // sub_8217DBC0's original.
 Result e8217DBC0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8217DBC0).
@@ -3621,6 +5721,10 @@ inline void c8217FDC8(Regs& regs, uint8_t* base) { regs.Apply(e8217FDC8(base, re
 Result e8217FE60(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8217FE60).
 inline void c8217FE60(Regs& regs, uint8_t* base) { regs.Apply(e8217FE60(base, regs.ToArgs())); }
+// sub_821800B0's original.
+Result e821800B0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821800B0).
+inline void c821800B0(Regs& regs, uint8_t* base) { regs.Apply(e821800B0(base, regs.ToArgs())); }
 // sub_82180108's original.
 Result e82180108(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82180108).
@@ -3629,6 +5733,10 @@ inline void c82180108(Regs& regs, uint8_t* base) { regs.Apply(e82180108(base, re
 Result e82180738(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82180738).
 inline void c82180738(Regs& regs, uint8_t* base) { regs.Apply(e82180738(base, regs.ToArgs())); }
+// sub_82180AA0's original.
+Result e82180AA0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82180AA0).
+inline void c82180AA0(Regs& regs, uint8_t* base) { regs.Apply(e82180AA0(base, regs.ToArgs())); }
 // sub_82180B00's original.
 Result e82180B00(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82180B00).
@@ -3637,6 +5745,22 @@ inline void c82180B00(Regs& regs, uint8_t* base) { regs.Apply(e82180B00(base, re
 Result e82180CE8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82180CE8).
 inline void c82180CE8(Regs& regs, uint8_t* base) { regs.Apply(e82180CE8(base, regs.ToArgs())); }
+// sub_82181330's original.
+Result e82181330(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82181330).
+inline void c82181330(Regs& regs, uint8_t* base) { regs.Apply(e82181330(base, regs.ToArgs())); }
+// sub_82182620's original.
+Result e82182620(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82182620).
+inline void c82182620(Regs& regs, uint8_t* base) { regs.Apply(e82182620(base, regs.ToArgs())); }
+// sub_82182B30's original.
+Result e82182B30(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82182B30).
+inline void c82182B30(Regs& regs, uint8_t* base) { regs.Apply(e82182B30(base, regs.ToArgs())); }
+// sub_82182C28's original.
+Result e82182C28(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82182C28).
+inline void c82182C28(Regs& regs, uint8_t* base) { regs.Apply(e82182C28(base, regs.ToArgs())); }
 // sub_82182C90's original.
 Result e82182C90(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82182C90).
@@ -3645,10 +5769,126 @@ inline void c82182C90(Regs& regs, uint8_t* base) { regs.Apply(e82182C90(base, re
 Result e82182D30(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82182D30).
 inline void c82182D30(Regs& regs, uint8_t* base) { regs.Apply(e82182D30(base, regs.ToArgs())); }
+// sub_82184488's original.
+Result e82184488(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82184488).
+inline void c82184488(Regs& regs, uint8_t* base) { regs.Apply(e82184488(base, regs.ToArgs())); }
+// sub_82184650's original.
+Result e82184650(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82184650).
+inline void c82184650(Regs& regs, uint8_t* base) { regs.Apply(e82184650(base, regs.ToArgs())); }
+// sub_821847A0's original.
+Result e821847A0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821847A0).
+inline void c821847A0(Regs& regs, uint8_t* base) { regs.Apply(e821847A0(base, regs.ToArgs())); }
+// sub_8218DD78's original.
+Result e8218DD78(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8218DD78).
+inline void c8218DD78(Regs& regs, uint8_t* base) { regs.Apply(e8218DD78(base, regs.ToArgs())); }
+// sub_8218F530's original.
+Result e8218F530(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8218F530).
+inline void c8218F530(Regs& regs, uint8_t* base) { regs.Apply(e8218F530(base, regs.ToArgs())); }
+// sub_821903D0's original.
+Result e821903D0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821903D0).
+inline void c821903D0(Regs& regs, uint8_t* base) { regs.Apply(e821903D0(base, regs.ToArgs())); }
 // sub_82196EC0's original.
 Result e82196EC0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82196EC0).
 inline void c82196EC0(Regs& regs, uint8_t* base) { regs.Apply(e82196EC0(base, regs.ToArgs())); }
+// sub_821990D0's original.
+Result e821990D0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821990D0).
+inline void c821990D0(Regs& regs, uint8_t* base) { regs.Apply(e821990D0(base, regs.ToArgs())); }
+// sub_82199488's original.
+Result e82199488(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82199488).
+inline void c82199488(Regs& regs, uint8_t* base) { regs.Apply(e82199488(base, regs.ToArgs())); }
+// sub_82199688's original.
+Result e82199688(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82199688).
+inline void c82199688(Regs& regs, uint8_t* base) { regs.Apply(e82199688(base, regs.ToArgs())); }
+// sub_82199898's original.
+Result e82199898(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82199898).
+inline void c82199898(Regs& regs, uint8_t* base) { regs.Apply(e82199898(base, regs.ToArgs())); }
+// sub_821998F0's original.
+Result e821998F0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821998F0).
+inline void c821998F0(Regs& regs, uint8_t* base) { regs.Apply(e821998F0(base, regs.ToArgs())); }
+// sub_82199990's original.
+Result e82199990(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82199990).
+inline void c82199990(Regs& regs, uint8_t* base) { regs.Apply(e82199990(base, regs.ToArgs())); }
+// sub_82199AA8's original.
+Result e82199AA8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82199AA8).
+inline void c82199AA8(Regs& regs, uint8_t* base) { regs.Apply(e82199AA8(base, regs.ToArgs())); }
+// sub_82199C10's original.
+Result e82199C10(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82199C10).
+inline void c82199C10(Regs& regs, uint8_t* base) { regs.Apply(e82199C10(base, regs.ToArgs())); }
+// sub_82199CC8's original.
+Result e82199CC8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82199CC8).
+inline void c82199CC8(Regs& regs, uint8_t* base) { regs.Apply(e82199CC8(base, regs.ToArgs())); }
+// sub_82199D88's original.
+Result e82199D88(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82199D88).
+inline void c82199D88(Regs& regs, uint8_t* base) { regs.Apply(e82199D88(base, regs.ToArgs())); }
+// sub_8219BFE8's original.
+Result e8219BFE8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8219BFE8).
+inline void c8219BFE8(Regs& regs, uint8_t* base) { regs.Apply(e8219BFE8(base, regs.ToArgs())); }
+// sub_8219C078's original.
+Result e8219C078(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8219C078).
+inline void c8219C078(Regs& regs, uint8_t* base) { regs.Apply(e8219C078(base, regs.ToArgs())); }
+// sub_8219CE08's original.
+Result e8219CE08(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8219CE08).
+inline void c8219CE08(Regs& regs, uint8_t* base) { regs.Apply(e8219CE08(base, regs.ToArgs())); }
+// sub_8219CF08's original.
+Result e8219CF08(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8219CF08).
+inline void c8219CF08(Regs& regs, uint8_t* base) { regs.Apply(e8219CF08(base, regs.ToArgs())); }
+// sub_8219D1B0's original.
+Result e8219D1B0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8219D1B0).
+inline void c8219D1B0(Regs& regs, uint8_t* base) { regs.Apply(e8219D1B0(base, regs.ToArgs())); }
+// sub_8219D248's original.
+Result e8219D248(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8219D248).
+inline void c8219D248(Regs& regs, uint8_t* base) { regs.Apply(e8219D248(base, regs.ToArgs())); }
+// sub_8219D3E8's original.
+Result e8219D3E8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8219D3E8).
+inline void c8219D3E8(Regs& regs, uint8_t* base) { regs.Apply(e8219D3E8(base, regs.ToArgs())); }
+// sub_8219D440's original.
+Result e8219D440(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8219D440).
+inline void c8219D440(Regs& regs, uint8_t* base) { regs.Apply(e8219D440(base, regs.ToArgs())); }
+// sub_8219D4B8's original.
+Result e8219D4B8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8219D4B8).
+inline void c8219D4B8(Regs& regs, uint8_t* base) { regs.Apply(e8219D4B8(base, regs.ToArgs())); }
+// sub_8219D550's original.
+Result e8219D550(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8219D550).
+inline void c8219D550(Regs& regs, uint8_t* base) { regs.Apply(e8219D550(base, regs.ToArgs())); }
+// sub_8219D6F0's original.
+Result e8219D6F0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8219D6F0).
+inline void c8219D6F0(Regs& regs, uint8_t* base) { regs.Apply(e8219D6F0(base, regs.ToArgs())); }
+// sub_8219D7B0's original.
+Result e8219D7B0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8219D7B0).
+inline void c8219D7B0(Regs& regs, uint8_t* base) { regs.Apply(e8219D7B0(base, regs.ToArgs())); }
+// sub_8219D820's original.
+Result e8219D820(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8219D820).
+inline void c8219D820(Regs& regs, uint8_t* base) { regs.Apply(e8219D820(base, regs.ToArgs())); }
 // sub_8219ED10's original.
 Result e8219ED10(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8219ED10).
@@ -3657,10 +5897,66 @@ inline void c8219ED10(Regs& regs, uint8_t* base) { regs.Apply(e8219ED10(base, re
 Result e8219EDB0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8219EDB0).
 inline void c8219EDB0(Regs& regs, uint8_t* base) { regs.Apply(e8219EDB0(base, regs.ToArgs())); }
+// sub_8219FA28's original.
+Result e8219FA28(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8219FA28).
+inline void c8219FA28(Regs& regs, uint8_t* base) { regs.Apply(e8219FA28(base, regs.ToArgs())); }
+// sub_821A0128's original.
+Result e821A0128(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821A0128).
+inline void c821A0128(Regs& regs, uint8_t* base) { regs.Apply(e821A0128(base, regs.ToArgs())); }
+// sub_821A0D38's original.
+Result e821A0D38(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821A0D38).
+inline void c821A0D38(Regs& regs, uint8_t* base) { regs.Apply(e821A0D38(base, regs.ToArgs())); }
+// sub_821A51C8's original.
+Result e821A51C8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821A51C8).
+inline void c821A51C8(Regs& regs, uint8_t* base) { regs.Apply(e821A51C8(base, regs.ToArgs())); }
+// sub_821A52C0's original.
+Result e821A52C0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821A52C0).
+inline void c821A52C0(Regs& regs, uint8_t* base) { regs.Apply(e821A52C0(base, regs.ToArgs())); }
+// sub_821A8210's original.
+Result e821A8210(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821A8210).
+inline void c821A8210(Regs& regs, uint8_t* base) { regs.Apply(e821A8210(base, regs.ToArgs())); }
+// sub_821B9DB8's original.
+Result e821B9DB8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821B9DB8).
+inline void c821B9DB8(Regs& regs, uint8_t* base) { regs.Apply(e821B9DB8(base, regs.ToArgs())); }
 // sub_821B9E70's original.
 Result e821B9E70(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821B9E70).
 inline void c821B9E70(Regs& regs, uint8_t* base) { regs.Apply(e821B9E70(base, regs.ToArgs())); }
+// sub_821BA550's original.
+Result e821BA550(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821BA550).
+inline void c821BA550(Regs& regs, uint8_t* base) { regs.Apply(e821BA550(base, regs.ToArgs())); }
+// sub_821BA7E0's original.
+Result e821BA7E0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821BA7E0).
+inline void c821BA7E0(Regs& regs, uint8_t* base) { regs.Apply(e821BA7E0(base, regs.ToArgs())); }
+// sub_821BA890's original.
+Result e821BA890(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821BA890).
+inline void c821BA890(Regs& regs, uint8_t* base) { regs.Apply(e821BA890(base, regs.ToArgs())); }
+// sub_821BAB58's original.
+Result e821BAB58(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821BAB58).
+inline void c821BAB58(Regs& regs, uint8_t* base) { regs.Apply(e821BAB58(base, regs.ToArgs())); }
+// sub_821BABD8's original.
+Result e821BABD8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821BABD8).
+inline void c821BABD8(Regs& regs, uint8_t* base) { regs.Apply(e821BABD8(base, regs.ToArgs())); }
+// sub_821BAC78's original.
+Result e821BAC78(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821BAC78).
+inline void c821BAC78(Regs& regs, uint8_t* base) { regs.Apply(e821BAC78(base, regs.ToArgs())); }
+// sub_821BAD08's original.
+Result e821BAD08(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821BAD08).
+inline void c821BAD08(Regs& regs, uint8_t* base) { regs.Apply(e821BAD08(base, regs.ToArgs())); }
 // sub_821BB120's original.
 Result e821BB120(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821BB120).
@@ -3677,6 +5973,58 @@ inline void c821BB9A8(Regs& regs, uint8_t* base) { regs.Apply(e821BB9A8(base, re
 Result e821BE5A8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821BE5A8).
 inline void c821BE5A8(Regs& regs, uint8_t* base) { regs.Apply(e821BE5A8(base, regs.ToArgs())); }
+// sub_821BE988's original.
+Result e821BE988(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821BE988).
+inline void c821BE988(Regs& regs, uint8_t* base) { regs.Apply(e821BE988(base, regs.ToArgs())); }
+// sub_821BEAC8's original.
+Result e821BEAC8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821BEAC8).
+inline void c821BEAC8(Regs& regs, uint8_t* base) { regs.Apply(e821BEAC8(base, regs.ToArgs())); }
+// sub_821BEFE8's original.
+Result e821BEFE8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821BEFE8).
+inline void c821BEFE8(Regs& regs, uint8_t* base) { regs.Apply(e821BEFE8(base, regs.ToArgs())); }
+// sub_821BF0F0's original.
+Result e821BF0F0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821BF0F0).
+inline void c821BF0F0(Regs& regs, uint8_t* base) { regs.Apply(e821BF0F0(base, regs.ToArgs())); }
+// sub_821BF158's original.
+Result e821BF158(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821BF158).
+inline void c821BF158(Regs& regs, uint8_t* base) { regs.Apply(e821BF158(base, regs.ToArgs())); }
+// sub_821BF520's original.
+Result e821BF520(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821BF520).
+inline void c821BF520(Regs& regs, uint8_t* base) { regs.Apply(e821BF520(base, regs.ToArgs())); }
+// sub_821BF630's original.
+Result e821BF630(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821BF630).
+inline void c821BF630(Regs& regs, uint8_t* base) { regs.Apply(e821BF630(base, regs.ToArgs())); }
+// sub_821BF698's original.
+Result e821BF698(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821BF698).
+inline void c821BF698(Regs& regs, uint8_t* base) { regs.Apply(e821BF698(base, regs.ToArgs())); }
+// sub_821BFA68's original.
+Result e821BFA68(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821BFA68).
+inline void c821BFA68(Regs& regs, uint8_t* base) { regs.Apply(e821BFA68(base, regs.ToArgs())); }
+// sub_821C9430's original.
+Result e821C9430(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821C9430).
+inline void c821C9430(Regs& regs, uint8_t* base) { regs.Apply(e821C9430(base, regs.ToArgs())); }
+// sub_821C9918's original.
+Result e821C9918(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821C9918).
+inline void c821C9918(Regs& regs, uint8_t* base) { regs.Apply(e821C9918(base, regs.ToArgs())); }
+// sub_821CB090's original.
+Result e821CB090(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821CB090).
+inline void c821CB090(Regs& regs, uint8_t* base) { regs.Apply(e821CB090(base, regs.ToArgs())); }
+// sub_821CB6E8's original.
+Result e821CB6E8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821CB6E8).
+inline void c821CB6E8(Regs& regs, uint8_t* base) { regs.Apply(e821CB6E8(base, regs.ToArgs())); }
 // sub_821CC890's original.
 Result e821CC890(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821CC890).
@@ -3685,6 +6033,38 @@ inline void c821CC890(Regs& regs, uint8_t* base) { regs.Apply(e821CC890(base, re
 Result e821CCA38(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821CCA38).
 inline void c821CCA38(Regs& regs, uint8_t* base) { regs.Apply(e821CCA38(base, regs.ToArgs())); }
+// sub_821CCD38's original.
+Result e821CCD38(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821CCD38).
+inline void c821CCD38(Regs& regs, uint8_t* base) { regs.Apply(e821CCD38(base, regs.ToArgs())); }
+// sub_821CCDB0's original.
+Result e821CCDB0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821CCDB0).
+inline void c821CCDB0(Regs& regs, uint8_t* base) { regs.Apply(e821CCDB0(base, regs.ToArgs())); }
+// sub_821CCE30's original.
+Result e821CCE30(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821CCE30).
+inline void c821CCE30(Regs& regs, uint8_t* base) { regs.Apply(e821CCE30(base, regs.ToArgs())); }
+// sub_821CD160's original.
+Result e821CD160(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821CD160).
+inline void c821CD160(Regs& regs, uint8_t* base) { regs.Apply(e821CD160(base, regs.ToArgs())); }
+// sub_821CD868's original.
+Result e821CD868(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821CD868).
+inline void c821CD868(Regs& regs, uint8_t* base) { regs.Apply(e821CD868(base, regs.ToArgs())); }
+// sub_821CDC38's original.
+Result e821CDC38(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821CDC38).
+inline void c821CDC38(Regs& regs, uint8_t* base) { regs.Apply(e821CDC38(base, regs.ToArgs())); }
+// sub_821CE188's original.
+Result e821CE188(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821CE188).
+inline void c821CE188(Regs& regs, uint8_t* base) { regs.Apply(e821CE188(base, regs.ToArgs())); }
+// sub_821CE1D0's original.
+Result e821CE1D0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821CE1D0).
+inline void c821CE1D0(Regs& regs, uint8_t* base) { regs.Apply(e821CE1D0(base, regs.ToArgs())); }
 // sub_821DF2F8's original.
 Result e821DF2F8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821DF2F8).
@@ -3693,14 +6073,58 @@ inline void c821DF2F8(Regs& regs, uint8_t* base) { regs.Apply(e821DF2F8(base, re
 Result e821DFA78(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821DFA78).
 inline void c821DFA78(Regs& regs, uint8_t* base) { regs.Apply(e821DFA78(base, regs.ToArgs())); }
+// sub_821E1B48's original.
+Result e821E1B48(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821E1B48).
+inline void c821E1B48(Regs& regs, uint8_t* base) { regs.Apply(e821E1B48(base, regs.ToArgs())); }
+// sub_821E1DB0's original.
+Result e821E1DB0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821E1DB0).
+inline void c821E1DB0(Regs& regs, uint8_t* base) { regs.Apply(e821E1DB0(base, regs.ToArgs())); }
+// sub_821E3AD0's original.
+Result e821E3AD0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821E3AD0).
+inline void c821E3AD0(Regs& regs, uint8_t* base) { regs.Apply(e821E3AD0(base, regs.ToArgs())); }
 // sub_821E7368's original.
 Result e821E7368(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821E7368).
 inline void c821E7368(Regs& regs, uint8_t* base) { regs.Apply(e821E7368(base, regs.ToArgs())); }
+// sub_821E7DA0's original.
+Result e821E7DA0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821E7DA0).
+inline void c821E7DA0(Regs& regs, uint8_t* base) { regs.Apply(e821E7DA0(base, regs.ToArgs())); }
+// sub_821E9488's original.
+Result e821E9488(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821E9488).
+inline void c821E9488(Regs& regs, uint8_t* base) { regs.Apply(e821E9488(base, regs.ToArgs())); }
+// sub_821EA130's original.
+Result e821EA130(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821EA130).
+inline void c821EA130(Regs& regs, uint8_t* base) { regs.Apply(e821EA130(base, regs.ToArgs())); }
+// sub_821EAE68's original.
+Result e821EAE68(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821EAE68).
+inline void c821EAE68(Regs& regs, uint8_t* base) { regs.Apply(e821EAE68(base, regs.ToArgs())); }
+// sub_821F6DD8's original.
+Result e821F6DD8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821F6DD8).
+inline void c821F6DD8(Regs& regs, uint8_t* base) { regs.Apply(e821F6DD8(base, regs.ToArgs())); }
 // sub_821FE628's original.
 Result e821FE628(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_821FE628).
 inline void c821FE628(Regs& regs, uint8_t* base) { regs.Apply(e821FE628(base, regs.ToArgs())); }
+// sub_821FEA68's original.
+Result e821FEA68(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_821FEA68).
+inline void c821FEA68(Regs& regs, uint8_t* base) { regs.Apply(e821FEA68(base, regs.ToArgs())); }
+// sub_82208130's original.
+Result e82208130(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82208130).
+inline void c82208130(Regs& regs, uint8_t* base) { regs.Apply(e82208130(base, regs.ToArgs())); }
+// sub_822081D8's original.
+Result e822081D8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822081D8).
+inline void c822081D8(Regs& regs, uint8_t* base) { regs.Apply(e822081D8(base, regs.ToArgs())); }
 // sub_82208738's original.
 Result e82208738(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82208738).
@@ -3721,6 +6145,10 @@ inline void c8220BBB0(Regs& regs, uint8_t* base) { regs.Apply(e8220BBB0(base, re
 Result e8220BC28(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8220BC28).
 inline void c8220BC28(Regs& regs, uint8_t* base) { regs.Apply(e8220BC28(base, regs.ToArgs())); }
+// sub_8220C020's original.
+Result e8220C020(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8220C020).
+inline void c8220C020(Regs& regs, uint8_t* base) { regs.Apply(e8220C020(base, regs.ToArgs())); }
 // sub_8220C1E0's original.
 Result e8220C1E0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8220C1E0).
@@ -3737,6 +6165,18 @@ inline void c8220D040(Regs& regs, uint8_t* base) { regs.Apply(e8220D040(base, re
 Result e8220D7E8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8220D7E8).
 inline void c8220D7E8(Regs& regs, uint8_t* base) { regs.Apply(e8220D7E8(base, regs.ToArgs())); }
+// sub_8220D890's original.
+Result e8220D890(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8220D890).
+inline void c8220D890(Regs& regs, uint8_t* base) { regs.Apply(e8220D890(base, regs.ToArgs())); }
+// sub_8220F638's original.
+Result e8220F638(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8220F638).
+inline void c8220F638(Regs& regs, uint8_t* base) { regs.Apply(e8220F638(base, regs.ToArgs())); }
+// sub_8220FA88's original.
+Result e8220FA88(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8220FA88).
+inline void c8220FA88(Regs& regs, uint8_t* base) { regs.Apply(e8220FA88(base, regs.ToArgs())); }
 // sub_8220FC98's original.
 Result e8220FC98(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8220FC98).
@@ -3745,6 +6185,14 @@ inline void c8220FC98(Regs& regs, uint8_t* base) { regs.Apply(e8220FC98(base, re
 Result e82210868(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82210868).
 inline void c82210868(Regs& regs, uint8_t* base) { regs.Apply(e82210868(base, regs.ToArgs())); }
+// sub_82211848's original.
+Result e82211848(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82211848).
+inline void c82211848(Regs& regs, uint8_t* base) { regs.Apply(e82211848(base, regs.ToArgs())); }
+// sub_822118E0's original.
+Result e822118E0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822118E0).
+inline void c822118E0(Regs& regs, uint8_t* base) { regs.Apply(e822118E0(base, regs.ToArgs())); }
 // sub_82211A28's original.
 Result e82211A28(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82211A28).
@@ -3761,18 +6209,166 @@ inline void c82211B98(Regs& regs, uint8_t* base) { regs.Apply(e82211B98(base, re
 Result e82211C90(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82211C90).
 inline void c82211C90(Regs& regs, uint8_t* base) { regs.Apply(e82211C90(base, regs.ToArgs())); }
+// sub_82211D08's original.
+Result e82211D08(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82211D08).
+inline void c82211D08(Regs& regs, uint8_t* base) { regs.Apply(e82211D08(base, regs.ToArgs())); }
+// sub_82211D10's original.
+Result e82211D10(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82211D10).
+inline void c82211D10(Regs& regs, uint8_t* base) { regs.Apply(e82211D10(base, regs.ToArgs())); }
 // sub_82211D18's original.
 Result e82211D18(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82211D18).
 inline void c82211D18(Regs& regs, uint8_t* base) { regs.Apply(e82211D18(base, regs.ToArgs())); }
+// sub_82211DA0's original.
+Result e82211DA0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82211DA0).
+inline void c82211DA0(Regs& regs, uint8_t* base) { regs.Apply(e82211DA0(base, regs.ToArgs())); }
 // sub_82211F40's original.
 Result e82211F40(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82211F40).
 inline void c82211F40(Regs& regs, uint8_t* base) { regs.Apply(e82211F40(base, regs.ToArgs())); }
+// sub_82211FB8's original.
+Result e82211FB8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82211FB8).
+inline void c82211FB8(Regs& regs, uint8_t* base) { regs.Apply(e82211FB8(base, regs.ToArgs())); }
+// sub_82212118's original.
+Result e82212118(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82212118).
+inline void c82212118(Regs& regs, uint8_t* base) { regs.Apply(e82212118(base, regs.ToArgs())); }
+// sub_822121C0's original.
+Result e822121C0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822121C0).
+inline void c822121C0(Regs& regs, uint8_t* base) { regs.Apply(e822121C0(base, regs.ToArgs())); }
+// sub_82212270's original.
+Result e82212270(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82212270).
+inline void c82212270(Regs& regs, uint8_t* base) { regs.Apply(e82212270(base, regs.ToArgs())); }
+// sub_822122A0's original.
+Result e822122A0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822122A0).
+inline void c822122A0(Regs& regs, uint8_t* base) { regs.Apply(e822122A0(base, regs.ToArgs())); }
+// sub_822122B0's original.
+Result e822122B0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822122B0).
+inline void c822122B0(Regs& regs, uint8_t* base) { regs.Apply(e822122B0(base, regs.ToArgs())); }
+// sub_82212668's original.
+Result e82212668(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82212668).
+inline void c82212668(Regs& regs, uint8_t* base) { regs.Apply(e82212668(base, regs.ToArgs())); }
+// sub_82212690's original.
+Result e82212690(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82212690).
+inline void c82212690(Regs& regs, uint8_t* base) { regs.Apply(e82212690(base, regs.ToArgs())); }
+// sub_82212718's original.
+Result e82212718(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82212718).
+inline void c82212718(Regs& regs, uint8_t* base) { regs.Apply(e82212718(base, regs.ToArgs())); }
+// sub_82212768's original.
+Result e82212768(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82212768).
+inline void c82212768(Regs& regs, uint8_t* base) { regs.Apply(e82212768(base, regs.ToArgs())); }
+// sub_82212878's original.
+Result e82212878(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82212878).
+inline void c82212878(Regs& regs, uint8_t* base) { regs.Apply(e82212878(base, regs.ToArgs())); }
+// sub_822128A8's original.
+Result e822128A8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822128A8).
+inline void c822128A8(Regs& regs, uint8_t* base) { regs.Apply(e822128A8(base, regs.ToArgs())); }
+// sub_822129A8's original.
+Result e822129A8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822129A8).
+inline void c822129A8(Regs& regs, uint8_t* base) { regs.Apply(e822129A8(base, regs.ToArgs())); }
+// sub_82212A48's original.
+Result e82212A48(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82212A48).
+inline void c82212A48(Regs& regs, uint8_t* base) { regs.Apply(e82212A48(base, regs.ToArgs())); }
+// sub_82212AC8's original.
+Result e82212AC8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82212AC8).
+inline void c82212AC8(Regs& regs, uint8_t* base) { regs.Apply(e82212AC8(base, regs.ToArgs())); }
+// sub_82212AF8's original.
+Result e82212AF8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82212AF8).
+inline void c82212AF8(Regs& regs, uint8_t* base) { regs.Apply(e82212AF8(base, regs.ToArgs())); }
+// sub_82212B08's original.
+Result e82212B08(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82212B08).
+inline void c82212B08(Regs& regs, uint8_t* base) { regs.Apply(e82212B08(base, regs.ToArgs())); }
+// sub_82212B68's original.
+Result e82212B68(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82212B68).
+inline void c82212B68(Regs& regs, uint8_t* base) { regs.Apply(e82212B68(base, regs.ToArgs())); }
+// sub_82212C50's original.
+Result e82212C50(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82212C50).
+inline void c82212C50(Regs& regs, uint8_t* base) { regs.Apply(e82212C50(base, regs.ToArgs())); }
+// sub_822135B0's original.
+Result e822135B0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822135B0).
+inline void c822135B0(Regs& regs, uint8_t* base) { regs.Apply(e822135B0(base, regs.ToArgs())); }
+// sub_82213638's original.
+Result e82213638(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82213638).
+inline void c82213638(Regs& regs, uint8_t* base) { regs.Apply(e82213638(base, regs.ToArgs())); }
+// sub_82213C40's original.
+Result e82213C40(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82213C40).
+inline void c82213C40(Regs& regs, uint8_t* base) { regs.Apply(e82213C40(base, regs.ToArgs())); }
+// sub_82213C90's original.
+Result e82213C90(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82213C90).
+inline void c82213C90(Regs& regs, uint8_t* base) { regs.Apply(e82213C90(base, regs.ToArgs())); }
+// sub_82213DB0's original.
+Result e82213DB0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82213DB0).
+inline void c82213DB0(Regs& regs, uint8_t* base) { regs.Apply(e82213DB0(base, regs.ToArgs())); }
+// sub_822141A0's original.
+Result e822141A0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822141A0).
+inline void c822141A0(Regs& regs, uint8_t* base) { regs.Apply(e822141A0(base, regs.ToArgs())); }
+// sub_82214238's original.
+Result e82214238(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82214238).
+inline void c82214238(Regs& regs, uint8_t* base) { regs.Apply(e82214238(base, regs.ToArgs())); }
+// sub_82214790's original.
+Result e82214790(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82214790).
+inline void c82214790(Regs& regs, uint8_t* base) { regs.Apply(e82214790(base, regs.ToArgs())); }
+// sub_822153A0's original.
+Result e822153A0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822153A0).
+inline void c822153A0(Regs& regs, uint8_t* base) { regs.Apply(e822153A0(base, regs.ToArgs())); }
+// sub_82215488's original.
+Result e82215488(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82215488).
+inline void c82215488(Regs& regs, uint8_t* base) { regs.Apply(e82215488(base, regs.ToArgs())); }
+// sub_822157A8's original.
+Result e822157A8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822157A8).
+inline void c822157A8(Regs& regs, uint8_t* base) { regs.Apply(e822157A8(base, regs.ToArgs())); }
+// sub_82215820's original.
+Result e82215820(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82215820).
+inline void c82215820(Regs& regs, uint8_t* base) { regs.Apply(e82215820(base, regs.ToArgs())); }
+// sub_82216B08's original.
+Result e82216B08(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82216B08).
+inline void c82216B08(Regs& regs, uint8_t* base) { regs.Apply(e82216B08(base, regs.ToArgs())); }
 // sub_82216BA8's original.
 Result e82216BA8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82216BA8).
 inline void c82216BA8(Regs& regs, uint8_t* base) { regs.Apply(e82216BA8(base, regs.ToArgs())); }
+// sub_82217AC8's original.
+Result e82217AC8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82217AC8).
+inline void c82217AC8(Regs& regs, uint8_t* base) { regs.Apply(e82217AC8(base, regs.ToArgs())); }
+// sub_82217C70's original.
+Result e82217C70(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82217C70).
+inline void c82217C70(Regs& regs, uint8_t* base) { regs.Apply(e82217C70(base, regs.ToArgs())); }
 // sub_82217CD0's original.
 Result e82217CD0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82217CD0).
@@ -3781,6 +6377,14 @@ inline void c82217CD0(Regs& regs, uint8_t* base) { regs.Apply(e82217CD0(base, re
 Result e82217D70(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82217D70).
 inline void c82217D70(Regs& regs, uint8_t* base) { regs.Apply(e82217D70(base, regs.ToArgs())); }
+// sub_82218838's original.
+Result e82218838(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82218838).
+inline void c82218838(Regs& regs, uint8_t* base) { regs.Apply(e82218838(base, regs.ToArgs())); }
+// sub_82218918's original.
+Result e82218918(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82218918).
+inline void c82218918(Regs& regs, uint8_t* base) { regs.Apply(e82218918(base, regs.ToArgs())); }
 // sub_82218C10's original.
 Result e82218C10(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82218C10).
@@ -3793,6 +6397,18 @@ inline void c82219138(Regs& regs, uint8_t* base) { regs.Apply(e82219138(base, re
 Result e82219170(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82219170).
 inline void c82219170(Regs& regs, uint8_t* base) { regs.Apply(e82219170(base, regs.ToArgs())); }
+// sub_8221A090's original.
+Result e8221A090(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8221A090).
+inline void c8221A090(Regs& regs, uint8_t* base) { regs.Apply(e8221A090(base, regs.ToArgs())); }
+// sub_8221A1F0's original.
+Result e8221A1F0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8221A1F0).
+inline void c8221A1F0(Regs& regs, uint8_t* base) { regs.Apply(e8221A1F0(base, regs.ToArgs())); }
+// sub_8221A2F8's original.
+Result e8221A2F8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8221A2F8).
+inline void c8221A2F8(Regs& regs, uint8_t* base) { regs.Apply(e8221A2F8(base, regs.ToArgs())); }
 // sub_8221A3E8's original.
 Result e8221A3E8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8221A3E8).
@@ -3805,6 +6421,18 @@ inline void c8221A498(Regs& regs, uint8_t* base) { regs.Apply(e8221A498(base, re
 Result e8221B1F0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8221B1F0).
 inline void c8221B1F0(Regs& regs, uint8_t* base) { regs.Apply(e8221B1F0(base, regs.ToArgs())); }
+// sub_8221B5C8's original.
+Result e8221B5C8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8221B5C8).
+inline void c8221B5C8(Regs& regs, uint8_t* base) { regs.Apply(e8221B5C8(base, regs.ToArgs())); }
+// sub_8221BA68's original.
+Result e8221BA68(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8221BA68).
+inline void c8221BA68(Regs& regs, uint8_t* base) { regs.Apply(e8221BA68(base, regs.ToArgs())); }
+// sub_8221BD20's original.
+Result e8221BD20(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8221BD20).
+inline void c8221BD20(Regs& regs, uint8_t* base) { regs.Apply(e8221BD20(base, regs.ToArgs())); }
 // sub_8221BDD0's original.
 Result e8221BDD0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8221BDD0).
@@ -3845,6 +6473,10 @@ inline void c82224AB8(Regs& regs, uint8_t* base) { regs.Apply(e82224AB8(base, re
 Result e822271F8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_822271F8).
 inline void c822271F8(Regs& regs, uint8_t* base) { regs.Apply(e822271F8(base, regs.ToArgs())); }
+// sub_82227690's original.
+Result e82227690(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82227690).
+inline void c82227690(Regs& regs, uint8_t* base) { regs.Apply(e82227690(base, regs.ToArgs())); }
 // sub_82227708's original.
 Result e82227708(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82227708).
@@ -3861,10 +6493,22 @@ inline void c822279A8(Regs& regs, uint8_t* base) { regs.Apply(e822279A8(base, re
 Result e82228588(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82228588).
 inline void c82228588(Regs& regs, uint8_t* base) { regs.Apply(e82228588(base, regs.ToArgs())); }
+// sub_82229108's original.
+Result e82229108(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82229108).
+inline void c82229108(Regs& regs, uint8_t* base) { regs.Apply(e82229108(base, regs.ToArgs())); }
+// sub_82229158's original.
+Result e82229158(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82229158).
+inline void c82229158(Regs& regs, uint8_t* base) { regs.Apply(e82229158(base, regs.ToArgs())); }
 // sub_82229238's original.
 Result e82229238(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82229238).
 inline void c82229238(Regs& regs, uint8_t* base) { regs.Apply(e82229238(base, regs.ToArgs())); }
+// sub_8222A150's original.
+Result e8222A150(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8222A150).
+inline void c8222A150(Regs& regs, uint8_t* base) { regs.Apply(e8222A150(base, regs.ToArgs())); }
 // sub_8222A470's original.
 Result e8222A470(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8222A470).
@@ -3877,6 +6521,10 @@ inline void c8222A718(Regs& regs, uint8_t* base) { regs.Apply(e8222A718(base, re
 Result e8222A978(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8222A978).
 inline void c8222A978(Regs& regs, uint8_t* base) { regs.Apply(e8222A978(base, regs.ToArgs())); }
+// sub_8222AC18's original.
+Result e8222AC18(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8222AC18).
+inline void c8222AC18(Regs& regs, uint8_t* base) { regs.Apply(e8222AC18(base, regs.ToArgs())); }
 // sub_8222AE00's original.
 Result e8222AE00(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8222AE00).
@@ -3885,6 +6533,10 @@ inline void c8222AE00(Regs& regs, uint8_t* base) { regs.Apply(e8222AE00(base, re
 Result e8222B048(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8222B048).
 inline void c8222B048(Regs& regs, uint8_t* base) { regs.Apply(e8222B048(base, regs.ToArgs())); }
+// sub_8222B200's original.
+Result e8222B200(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8222B200).
+inline void c8222B200(Regs& regs, uint8_t* base) { regs.Apply(e8222B200(base, regs.ToArgs())); }
 // sub_8222B438's original.
 Result e8222B438(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8222B438).
@@ -3897,6 +6549,18 @@ inline void c8222B8A8(Regs& regs, uint8_t* base) { regs.Apply(e8222B8A8(base, re
 Result e8222BBD0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8222BBD0).
 inline void c8222BBD0(Regs& regs, uint8_t* base) { regs.Apply(e8222BBD0(base, regs.ToArgs())); }
+// sub_8222BFE8's original.
+Result e8222BFE8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8222BFE8).
+inline void c8222BFE8(Regs& regs, uint8_t* base) { regs.Apply(e8222BFE8(base, regs.ToArgs())); }
+// sub_8222C058's original.
+Result e8222C058(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8222C058).
+inline void c8222C058(Regs& regs, uint8_t* base) { regs.Apply(e8222C058(base, regs.ToArgs())); }
+// sub_8222C0C8's original.
+Result e8222C0C8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8222C0C8).
+inline void c8222C0C8(Regs& regs, uint8_t* base) { regs.Apply(e8222C0C8(base, regs.ToArgs())); }
 // sub_8222C188's original.
 Result e8222C188(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8222C188).
@@ -3961,6 +6625,18 @@ inline void c8222F0B0(Regs& regs, uint8_t* base) { regs.Apply(e8222F0B0(base, re
 Result e8222FB90(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8222FB90).
 inline void c8222FB90(Regs& regs, uint8_t* base) { regs.Apply(e8222FB90(base, regs.ToArgs())); }
+// sub_822309C8's original.
+Result e822309C8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822309C8).
+inline void c822309C8(Regs& regs, uint8_t* base) { regs.Apply(e822309C8(base, regs.ToArgs())); }
+// sub_822329A8's original.
+Result e822329A8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822329A8).
+inline void c822329A8(Regs& regs, uint8_t* base) { regs.Apply(e822329A8(base, regs.ToArgs())); }
+// sub_822330F0's original.
+Result e822330F0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822330F0).
+inline void c822330F0(Regs& regs, uint8_t* base) { regs.Apply(e822330F0(base, regs.ToArgs())); }
 // sub_82233870's original.
 Result e82233870(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82233870).
@@ -3969,6 +6645,10 @@ inline void c82233870(Regs& regs, uint8_t* base) { regs.Apply(e82233870(base, re
 Result e822339F0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_822339F0).
 inline void c822339F0(Regs& regs, uint8_t* base) { regs.Apply(e822339F0(base, regs.ToArgs())); }
+// sub_82233B70's original.
+Result e82233B70(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82233B70).
+inline void c82233B70(Regs& regs, uint8_t* base) { regs.Apply(e82233B70(base, regs.ToArgs())); }
 // sub_82233C80's original.
 Result e82233C80(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82233C80).
@@ -3977,6 +6657,22 @@ inline void c82233C80(Regs& regs, uint8_t* base) { regs.Apply(e82233C80(base, re
 Result e822340B0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_822340B0).
 inline void c822340B0(Regs& regs, uint8_t* base) { regs.Apply(e822340B0(base, regs.ToArgs())); }
+// sub_822343A8's original.
+Result e822343A8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822343A8).
+inline void c822343A8(Regs& regs, uint8_t* base) { regs.Apply(e822343A8(base, regs.ToArgs())); }
+// sub_82234428's original.
+Result e82234428(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82234428).
+inline void c82234428(Regs& regs, uint8_t* base) { regs.Apply(e82234428(base, regs.ToArgs())); }
+// sub_822344A8's original.
+Result e822344A8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822344A8).
+inline void c822344A8(Regs& regs, uint8_t* base) { regs.Apply(e822344A8(base, regs.ToArgs())); }
+// sub_822346A8's original.
+Result e822346A8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822346A8).
+inline void c822346A8(Regs& regs, uint8_t* base) { regs.Apply(e822346A8(base, regs.ToArgs())); }
 // sub_82234C20's original.
 Result e82234C20(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82234C20).
@@ -3989,6 +6685,18 @@ inline void c82234D50(Regs& regs, uint8_t* base) { regs.Apply(e82234D50(base, re
 Result e82234E38(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82234E38).
 inline void c82234E38(Regs& regs, uint8_t* base) { regs.Apply(e82234E38(base, regs.ToArgs())); }
+// sub_82235138's original.
+Result e82235138(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82235138).
+inline void c82235138(Regs& regs, uint8_t* base) { regs.Apply(e82235138(base, regs.ToArgs())); }
+// sub_82235BD8's original.
+Result e82235BD8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82235BD8).
+inline void c82235BD8(Regs& regs, uint8_t* base) { regs.Apply(e82235BD8(base, regs.ToArgs())); }
+// sub_82235E88's original.
+Result e82235E88(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82235E88).
+inline void c82235E88(Regs& regs, uint8_t* base) { regs.Apply(e82235E88(base, regs.ToArgs())); }
 // sub_822366F0's original.
 Result e822366F0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_822366F0).
@@ -3997,6 +6705,22 @@ inline void c822366F0(Regs& regs, uint8_t* base) { regs.Apply(e822366F0(base, re
 Result e82236880(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82236880).
 inline void c82236880(Regs& regs, uint8_t* base) { regs.Apply(e82236880(base, regs.ToArgs())); }
+// sub_82236C30's original.
+Result e82236C30(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82236C30).
+inline void c82236C30(Regs& regs, uint8_t* base) { regs.Apply(e82236C30(base, regs.ToArgs())); }
+// sub_822403A0's original.
+Result e822403A0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822403A0).
+inline void c822403A0(Regs& regs, uint8_t* base) { regs.Apply(e822403A0(base, regs.ToArgs())); }
+// sub_82242420's original.
+Result e82242420(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82242420).
+inline void c82242420(Regs& regs, uint8_t* base) { regs.Apply(e82242420(base, regs.ToArgs())); }
+// sub_82242BE8's original.
+Result e82242BE8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82242BE8).
+inline void c82242BE8(Regs& regs, uint8_t* base) { regs.Apply(e82242BE8(base, regs.ToArgs())); }
 // sub_82243E08's original.
 Result e82243E08(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82243E08).
@@ -4005,10 +6729,30 @@ inline void c82243E08(Regs& regs, uint8_t* base) { regs.Apply(e82243E08(base, re
 Result e82243F58(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82243F58).
 inline void c82243F58(Regs& regs, uint8_t* base) { regs.Apply(e82243F58(base, regs.ToArgs())); }
+// sub_822440D8's original.
+Result e822440D8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822440D8).
+inline void c822440D8(Regs& regs, uint8_t* base) { regs.Apply(e822440D8(base, regs.ToArgs())); }
 // sub_822441D8's original.
 Result e822441D8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_822441D8).
 inline void c822441D8(Regs& regs, uint8_t* base) { regs.Apply(e822441D8(base, regs.ToArgs())); }
+// sub_82244818's original.
+Result e82244818(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82244818).
+inline void c82244818(Regs& regs, uint8_t* base) { regs.Apply(e82244818(base, regs.ToArgs())); }
+// sub_822448B0's original.
+Result e822448B0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822448B0).
+inline void c822448B0(Regs& regs, uint8_t* base) { regs.Apply(e822448B0(base, regs.ToArgs())); }
+// sub_82244930's original.
+Result e82244930(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82244930).
+inline void c82244930(Regs& regs, uint8_t* base) { regs.Apply(e82244930(base, regs.ToArgs())); }
+// sub_82244AB8's original.
+Result e82244AB8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82244AB8).
+inline void c82244AB8(Regs& regs, uint8_t* base) { regs.Apply(e82244AB8(base, regs.ToArgs())); }
 // sub_82244E70's original.
 Result e82244E70(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82244E70).
@@ -4021,10 +6765,22 @@ inline void c82244FC0(Regs& regs, uint8_t* base) { regs.Apply(e82244FC0(base, re
 Result e822450A8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_822450A8).
 inline void c822450A8(Regs& regs, uint8_t* base) { regs.Apply(e822450A8(base, regs.ToArgs())); }
+// sub_822454B8's original.
+Result e822454B8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822454B8).
+inline void c822454B8(Regs& regs, uint8_t* base) { regs.Apply(e822454B8(base, regs.ToArgs())); }
+// sub_82245FF8's original.
+Result e82245FF8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82245FF8).
+inline void c82245FF8(Regs& regs, uint8_t* base) { regs.Apply(e82245FF8(base, regs.ToArgs())); }
 // sub_82246038's original.
 Result e82246038(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82246038).
 inline void c82246038(Regs& regs, uint8_t* base) { regs.Apply(e82246038(base, regs.ToArgs())); }
+// sub_82246340's original.
+Result e82246340(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82246340).
+inline void c82246340(Regs& regs, uint8_t* base) { regs.Apply(e82246340(base, regs.ToArgs())); }
 // sub_82246B28's original.
 Result e82246B28(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82246B28).
@@ -4041,10 +6797,30 @@ inline void c82247AA0(Regs& regs, uint8_t* base) { regs.Apply(e82247AA0(base, re
 Result e82247B98(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82247B98).
 inline void c82247B98(Regs& regs, uint8_t* base) { regs.Apply(e82247B98(base, regs.ToArgs())); }
+// sub_82248E10's original.
+Result e82248E10(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82248E10).
+inline void c82248E10(Regs& regs, uint8_t* base) { regs.Apply(e82248E10(base, regs.ToArgs())); }
+// sub_8224A978's original.
+Result e8224A978(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8224A978).
+inline void c8224A978(Regs& regs, uint8_t* base) { regs.Apply(e8224A978(base, regs.ToArgs())); }
+// sub_8224B248's original.
+Result e8224B248(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8224B248).
+inline void c8224B248(Regs& regs, uint8_t* base) { regs.Apply(e8224B248(base, regs.ToArgs())); }
 // sub_8224C450's original.
 Result e8224C450(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8224C450).
 inline void c8224C450(Regs& regs, uint8_t* base) { regs.Apply(e8224C450(base, regs.ToArgs())); }
+// sub_8224C560's original.
+Result e8224C560(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8224C560).
+inline void c8224C560(Regs& regs, uint8_t* base) { regs.Apply(e8224C560(base, regs.ToArgs())); }
+// sub_8224CD00's original.
+Result e8224CD00(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8224CD00).
+inline void c8224CD00(Regs& regs, uint8_t* base) { regs.Apply(e8224CD00(base, regs.ToArgs())); }
 // sub_8224CF18's original.
 Result e8224CF18(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8224CF18).
@@ -4053,6 +6829,26 @@ inline void c8224CF18(Regs& regs, uint8_t* base) { regs.Apply(e8224CF18(base, re
 Result e8224CF20(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8224CF20).
 inline void c8224CF20(Regs& regs, uint8_t* base) { regs.Apply(e8224CF20(base, regs.ToArgs())); }
+// sub_8224D010's original.
+Result e8224D010(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8224D010).
+inline void c8224D010(Regs& regs, uint8_t* base) { regs.Apply(e8224D010(base, regs.ToArgs())); }
+// sub_8224D1F0's original.
+Result e8224D1F0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8224D1F0).
+inline void c8224D1F0(Regs& regs, uint8_t* base) { regs.Apply(e8224D1F0(base, regs.ToArgs())); }
+// sub_8224DED8's original.
+Result e8224DED8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8224DED8).
+inline void c8224DED8(Regs& regs, uint8_t* base) { regs.Apply(e8224DED8(base, regs.ToArgs())); }
+// sub_8224DF30's original.
+Result e8224DF30(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8224DF30).
+inline void c8224DF30(Regs& regs, uint8_t* base) { regs.Apply(e8224DF30(base, regs.ToArgs())); }
+// sub_8224F5E8's original.
+Result e8224F5E8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8224F5E8).
+inline void c8224F5E8(Regs& regs, uint8_t* base) { regs.Apply(e8224F5E8(base, regs.ToArgs())); }
 // sub_8224FB10's original.
 Result e8224FB10(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8224FB10).
@@ -4065,14 +6861,42 @@ inline void c82250670(Regs& regs, uint8_t* base) { regs.Apply(e82250670(base, re
 Result e82250700(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82250700).
 inline void c82250700(Regs& regs, uint8_t* base) { regs.Apply(e82250700(base, regs.ToArgs())); }
+// sub_822515A0's original.
+Result e822515A0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822515A0).
+inline void c822515A0(Regs& regs, uint8_t* base) { regs.Apply(e822515A0(base, regs.ToArgs())); }
+// sub_82259128's original.
+Result e82259128(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82259128).
+inline void c82259128(Regs& regs, uint8_t* base) { regs.Apply(e82259128(base, regs.ToArgs())); }
 // sub_8225D590's original.
 Result e8225D590(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8225D590).
 inline void c8225D590(Regs& regs, uint8_t* base) { regs.Apply(e8225D590(base, regs.ToArgs())); }
+// sub_8225FB70's original.
+Result e8225FB70(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8225FB70).
+inline void c8225FB70(Regs& regs, uint8_t* base) { regs.Apply(e8225FB70(base, regs.ToArgs())); }
+// sub_8225FFC8's original.
+Result e8225FFC8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8225FFC8).
+inline void c8225FFC8(Regs& regs, uint8_t* base) { regs.Apply(e8225FFC8(base, regs.ToArgs())); }
 // sub_82277DB0's original.
 Result e82277DB0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82277DB0).
 inline void c82277DB0(Regs& regs, uint8_t* base) { regs.Apply(e82277DB0(base, regs.ToArgs())); }
+// sub_82277E10's original.
+Result e82277E10(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82277E10).
+inline void c82277E10(Regs& regs, uint8_t* base) { regs.Apply(e82277E10(base, regs.ToArgs())); }
+// sub_82277EE0's original.
+Result e82277EE0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82277EE0).
+inline void c82277EE0(Regs& regs, uint8_t* base) { regs.Apply(e82277EE0(base, regs.ToArgs())); }
+// sub_82277FF0's original.
+Result e82277FF0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82277FF0).
+inline void c82277FF0(Regs& regs, uint8_t* base) { regs.Apply(e82277FF0(base, regs.ToArgs())); }
 // sub_82288898's original.
 Result e82288898(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82288898).
@@ -4081,10 +6905,22 @@ inline void c82288898(Regs& regs, uint8_t* base) { regs.Apply(e82288898(base, re
 Result e8228B500(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8228B500).
 inline void c8228B500(Regs& regs, uint8_t* base) { regs.Apply(e8228B500(base, regs.ToArgs())); }
+// sub_8228B608's original.
+Result e8228B608(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8228B608).
+inline void c8228B608(Regs& regs, uint8_t* base) { regs.Apply(e8228B608(base, regs.ToArgs())); }
+// sub_8228BC18's original.
+Result e8228BC18(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8228BC18).
+inline void c8228BC18(Regs& regs, uint8_t* base) { regs.Apply(e8228BC18(base, regs.ToArgs())); }
 // sub_8228E788's original.
 Result e8228E788(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8228E788).
 inline void c8228E788(Regs& regs, uint8_t* base) { regs.Apply(e8228E788(base, regs.ToArgs())); }
+// sub_8228F0B0's original.
+Result e8228F0B0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8228F0B0).
+inline void c8228F0B0(Regs& regs, uint8_t* base) { regs.Apply(e8228F0B0(base, regs.ToArgs())); }
 // sub_8228F5C0's original.
 Result e8228F5C0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8228F5C0).
@@ -4149,6 +6985,18 @@ inline void c822902A0(Regs& regs, uint8_t* base) { regs.Apply(e822902A0(base, re
 Result e82290378(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82290378).
 inline void c82290378(Regs& regs, uint8_t* base) { regs.Apply(e82290378(base, regs.ToArgs())); }
+// sub_82290788's original.
+Result e82290788(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82290788).
+inline void c82290788(Regs& regs, uint8_t* base) { regs.Apply(e82290788(base, regs.ToArgs())); }
+// sub_82290A30's original.
+Result e82290A30(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82290A30).
+inline void c82290A30(Regs& regs, uint8_t* base) { regs.Apply(e82290A30(base, regs.ToArgs())); }
+// sub_82290B30's original.
+Result e82290B30(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82290B30).
+inline void c82290B30(Regs& regs, uint8_t* base) { regs.Apply(e82290B30(base, regs.ToArgs())); }
 // sub_822912A0's original.
 Result e822912A0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_822912A0).
@@ -4157,14 +7005,70 @@ inline void c822912A0(Regs& regs, uint8_t* base) { regs.Apply(e822912A0(base, re
 Result e82291328(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82291328).
 inline void c82291328(Regs& regs, uint8_t* base) { regs.Apply(e82291328(base, regs.ToArgs())); }
+// sub_822914A8's original.
+Result e822914A8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822914A8).
+inline void c822914A8(Regs& regs, uint8_t* base) { regs.Apply(e822914A8(base, regs.ToArgs())); }
+// sub_82292710's original.
+Result e82292710(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82292710).
+inline void c82292710(Regs& regs, uint8_t* base) { regs.Apply(e82292710(base, regs.ToArgs())); }
+// sub_822927B0's original.
+Result e822927B0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822927B0).
+inline void c822927B0(Regs& regs, uint8_t* base) { regs.Apply(e822927B0(base, regs.ToArgs())); }
+// sub_82293460's original.
+Result e82293460(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82293460).
+inline void c82293460(Regs& regs, uint8_t* base) { regs.Apply(e82293460(base, regs.ToArgs())); }
+// sub_82293880's original.
+Result e82293880(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82293880).
+inline void c82293880(Regs& regs, uint8_t* base) { regs.Apply(e82293880(base, regs.ToArgs())); }
+// sub_82294298's original.
+Result e82294298(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82294298).
+inline void c82294298(Regs& regs, uint8_t* base) { regs.Apply(e82294298(base, regs.ToArgs())); }
 // sub_82294330's original.
 Result e82294330(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82294330).
 inline void c82294330(Regs& regs, uint8_t* base) { regs.Apply(e82294330(base, regs.ToArgs())); }
+// sub_82294340's original.
+Result e82294340(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82294340).
+inline void c82294340(Regs& regs, uint8_t* base) { regs.Apply(e82294340(base, regs.ToArgs())); }
+// sub_82294470's original.
+Result e82294470(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82294470).
+inline void c82294470(Regs& regs, uint8_t* base) { regs.Apply(e82294470(base, regs.ToArgs())); }
+// sub_82294518's original.
+Result e82294518(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82294518).
+inline void c82294518(Regs& regs, uint8_t* base) { regs.Apply(e82294518(base, regs.ToArgs())); }
 // sub_82294610's original.
 Result e82294610(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82294610).
 inline void c82294610(Regs& regs, uint8_t* base) { regs.Apply(e82294610(base, regs.ToArgs())); }
+// sub_822947F8's original.
+Result e822947F8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822947F8).
+inline void c822947F8(Regs& regs, uint8_t* base) { regs.Apply(e822947F8(base, regs.ToArgs())); }
+// sub_82294B68's original.
+Result e82294B68(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82294B68).
+inline void c82294B68(Regs& regs, uint8_t* base) { regs.Apply(e82294B68(base, regs.ToArgs())); }
+// sub_82294B80's original.
+Result e82294B80(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82294B80).
+inline void c82294B80(Regs& regs, uint8_t* base) { regs.Apply(e82294B80(base, regs.ToArgs())); }
+// sub_82294C00's original.
+Result e82294C00(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82294C00).
+inline void c82294C00(Regs& regs, uint8_t* base) { regs.Apply(e82294C00(base, regs.ToArgs())); }
+// sub_82294E20's original.
+Result e82294E20(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82294E20).
+inline void c82294E20(Regs& regs, uint8_t* base) { regs.Apply(e82294E20(base, regs.ToArgs())); }
 // sub_82294E58's original.
 Result e82294E58(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82294E58).
@@ -4185,6 +7089,26 @@ inline void c82295508(Regs& regs, uint8_t* base) { regs.Apply(e82295508(base, re
 Result e82295890(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82295890).
 inline void c82295890(Regs& regs, uint8_t* base) { regs.Apply(e82295890(base, regs.ToArgs())); }
+// sub_82295D30's original.
+Result e82295D30(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82295D30).
+inline void c82295D30(Regs& regs, uint8_t* base) { regs.Apply(e82295D30(base, regs.ToArgs())); }
+// sub_82295D48's original.
+Result e82295D48(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82295D48).
+inline void c82295D48(Regs& regs, uint8_t* base) { regs.Apply(e82295D48(base, regs.ToArgs())); }
+// sub_82295D50's original.
+Result e82295D50(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82295D50).
+inline void c82295D50(Regs& regs, uint8_t* base) { regs.Apply(e82295D50(base, regs.ToArgs())); }
+// sub_82295F20's original.
+Result e82295F20(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82295F20).
+inline void c82295F20(Regs& regs, uint8_t* base) { regs.Apply(e82295F20(base, regs.ToArgs())); }
+// sub_82295FC8's original.
+Result e82295FC8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82295FC8).
+inline void c82295FC8(Regs& regs, uint8_t* base) { regs.Apply(e82295FC8(base, regs.ToArgs())); }
 // sub_822964C8's original.
 Result e822964C8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_822964C8).
@@ -4197,6 +7121,22 @@ inline void c82296550(Regs& regs, uint8_t* base) { regs.Apply(e82296550(base, re
 Result e822965C8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_822965C8).
 inline void c822965C8(Regs& regs, uint8_t* base) { regs.Apply(e822965C8(base, regs.ToArgs())); }
+// sub_822965E0's original.
+Result e822965E0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822965E0).
+inline void c822965E0(Regs& regs, uint8_t* base) { regs.Apply(e822965E0(base, regs.ToArgs())); }
+// sub_82296EC0's original.
+Result e82296EC0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82296EC0).
+inline void c82296EC0(Regs& regs, uint8_t* base) { regs.Apply(e82296EC0(base, regs.ToArgs())); }
+// sub_82296FE0's original.
+Result e82296FE0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82296FE0).
+inline void c82296FE0(Regs& regs, uint8_t* base) { regs.Apply(e82296FE0(base, regs.ToArgs())); }
+// sub_822972E0's original.
+Result e822972E0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822972E0).
+inline void c822972E0(Regs& regs, uint8_t* base) { regs.Apply(e822972E0(base, regs.ToArgs())); }
 // sub_822976F8's original.
 Result e822976F8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_822976F8).
@@ -4205,14 +7145,50 @@ inline void c822976F8(Regs& regs, uint8_t* base) { regs.Apply(e822976F8(base, re
 Result e82297790(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82297790).
 inline void c82297790(Regs& regs, uint8_t* base) { regs.Apply(e82297790(base, regs.ToArgs())); }
+// sub_822977B0's original.
+Result e822977B0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822977B0).
+inline void c822977B0(Regs& regs, uint8_t* base) { regs.Apply(e822977B0(base, regs.ToArgs())); }
+// sub_82297888's original.
+Result e82297888(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82297888).
+inline void c82297888(Regs& regs, uint8_t* base) { regs.Apply(e82297888(base, regs.ToArgs())); }
+// sub_82297F48's original.
+Result e82297F48(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82297F48).
+inline void c82297F48(Regs& regs, uint8_t* base) { regs.Apply(e82297F48(base, regs.ToArgs())); }
+// sub_82297F90's original.
+Result e82297F90(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82297F90).
+inline void c82297F90(Regs& regs, uint8_t* base) { regs.Apply(e82297F90(base, regs.ToArgs())); }
 // sub_82298FF8's original.
 Result e82298FF8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82298FF8).
 inline void c82298FF8(Regs& regs, uint8_t* base) { regs.Apply(e82298FF8(base, regs.ToArgs())); }
+// sub_8229DBF0's original.
+Result e8229DBF0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8229DBF0).
+inline void c8229DBF0(Regs& regs, uint8_t* base) { regs.Apply(e8229DBF0(base, regs.ToArgs())); }
+// sub_8229DFB8's original.
+Result e8229DFB8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8229DFB8).
+inline void c8229DFB8(Regs& regs, uint8_t* base) { regs.Apply(e8229DFB8(base, regs.ToArgs())); }
+// sub_8229E0C0's original.
+Result e8229E0C0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8229E0C0).
+inline void c8229E0C0(Regs& regs, uint8_t* base) { regs.Apply(e8229E0C0(base, regs.ToArgs())); }
+// sub_8229E100's original.
+Result e8229E100(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8229E100).
+inline void c8229E100(Regs& regs, uint8_t* base) { regs.Apply(e8229E100(base, regs.ToArgs())); }
 // sub_8229E308's original.
 Result e8229E308(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8229E308).
 inline void c8229E308(Regs& regs, uint8_t* base) { regs.Apply(e8229E308(base, regs.ToArgs())); }
+// sub_8229E908's original.
+Result e8229E908(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8229E908).
+inline void c8229E908(Regs& regs, uint8_t* base) { regs.Apply(e8229E908(base, regs.ToArgs())); }
 // sub_8229EB10's original.
 Result e8229EB10(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8229EB10).
@@ -4221,6 +7197,14 @@ inline void c8229EB10(Regs& regs, uint8_t* base) { regs.Apply(e8229EB10(base, re
 Result e8229EC00(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8229EC00).
 inline void c8229EC00(Regs& regs, uint8_t* base) { regs.Apply(e8229EC00(base, regs.ToArgs())); }
+// sub_8229ED60's original.
+Result e8229ED60(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8229ED60).
+inline void c8229ED60(Regs& regs, uint8_t* base) { regs.Apply(e8229ED60(base, regs.ToArgs())); }
+// sub_8229EDA8's original.
+Result e8229EDA8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8229EDA8).
+inline void c8229EDA8(Regs& regs, uint8_t* base) { regs.Apply(e8229EDA8(base, regs.ToArgs())); }
 // sub_8229EF48's original.
 Result e8229EF48(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8229EF48).
@@ -4241,6 +7225,10 @@ inline void c8229F1B0(Regs& regs, uint8_t* base) { regs.Apply(e8229F1B0(base, re
 Result e8229F228(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8229F228).
 inline void c8229F228(Regs& regs, uint8_t* base) { regs.Apply(e8229F228(base, regs.ToArgs())); }
+// sub_8229F680's original.
+Result e8229F680(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8229F680).
+inline void c8229F680(Regs& regs, uint8_t* base) { regs.Apply(e8229F680(base, regs.ToArgs())); }
 // sub_822A0F80's original.
 Result e822A0F80(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_822A0F80).
@@ -4257,10 +7245,42 @@ inline void c822A3758(Regs& regs, uint8_t* base) { regs.Apply(e822A3758(base, re
 Result e822A3908(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_822A3908).
 inline void c822A3908(Regs& regs, uint8_t* base) { regs.Apply(e822A3908(base, regs.ToArgs())); }
+// sub_822A3D30's original.
+Result e822A3D30(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822A3D30).
+inline void c822A3D30(Regs& regs, uint8_t* base) { regs.Apply(e822A3D30(base, regs.ToArgs())); }
+// sub_822A4348's original.
+Result e822A4348(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822A4348).
+inline void c822A4348(Regs& regs, uint8_t* base) { regs.Apply(e822A4348(base, regs.ToArgs())); }
+// sub_822A45B8's original.
+Result e822A45B8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822A45B8).
+inline void c822A45B8(Regs& regs, uint8_t* base) { regs.Apply(e822A45B8(base, regs.ToArgs())); }
+// sub_822A4A40's original.
+Result e822A4A40(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822A4A40).
+inline void c822A4A40(Regs& regs, uint8_t* base) { regs.Apply(e822A4A40(base, regs.ToArgs())); }
+// sub_822A4F60's original.
+Result e822A4F60(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822A4F60).
+inline void c822A4F60(Regs& regs, uint8_t* base) { regs.Apply(e822A4F60(base, regs.ToArgs())); }
 // sub_822A4FF0's original.
 Result e822A4FF0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_822A4FF0).
 inline void c822A4FF0(Regs& regs, uint8_t* base) { regs.Apply(e822A4FF0(base, regs.ToArgs())); }
+// sub_822A5578's original.
+Result e822A5578(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822A5578).
+inline void c822A5578(Regs& regs, uint8_t* base) { regs.Apply(e822A5578(base, regs.ToArgs())); }
+// sub_822A5608's original.
+Result e822A5608(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822A5608).
+inline void c822A5608(Regs& regs, uint8_t* base) { regs.Apply(e822A5608(base, regs.ToArgs())); }
+// sub_822A5910's original.
+Result e822A5910(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822A5910).
+inline void c822A5910(Regs& regs, uint8_t* base) { regs.Apply(e822A5910(base, regs.ToArgs())); }
 // sub_822A5B78's original.
 Result e822A5B78(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_822A5B78).
@@ -4305,6 +7325,14 @@ inline void c822A6830(Regs& regs, uint8_t* base) { regs.Apply(e822A6830(base, re
 Result e822A6968(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_822A6968).
 inline void c822A6968(Regs& regs, uint8_t* base) { regs.Apply(e822A6968(base, regs.ToArgs())); }
+// sub_822A8568's original.
+Result e822A8568(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822A8568).
+inline void c822A8568(Regs& regs, uint8_t* base) { regs.Apply(e822A8568(base, regs.ToArgs())); }
+// sub_822A85B8's original.
+Result e822A85B8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822A85B8).
+inline void c822A85B8(Regs& regs, uint8_t* base) { regs.Apply(e822A85B8(base, regs.ToArgs())); }
 // sub_822A8740's original.
 Result e822A8740(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_822A8740).
@@ -4321,10 +7349,18 @@ inline void c822A8980(Regs& regs, uint8_t* base) { regs.Apply(e822A8980(base, re
 Result e822A8A60(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_822A8A60).
 inline void c822A8A60(Regs& regs, uint8_t* base) { regs.Apply(e822A8A60(base, regs.ToArgs())); }
+// sub_822A9EA8's original.
+Result e822A9EA8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822A9EA8).
+inline void c822A9EA8(Regs& regs, uint8_t* base) { regs.Apply(e822A9EA8(base, regs.ToArgs())); }
 // sub_822A9EE8's original.
 Result e822A9EE8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_822A9EE8).
 inline void c822A9EE8(Regs& regs, uint8_t* base) { regs.Apply(e822A9EE8(base, regs.ToArgs())); }
+// sub_822A9FD8's original.
+Result e822A9FD8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822A9FD8).
+inline void c822A9FD8(Regs& regs, uint8_t* base) { regs.Apply(e822A9FD8(base, regs.ToArgs())); }
 // sub_822AA018's original.
 Result e822AA018(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_822AA018).
@@ -4333,6 +7369,10 @@ inline void c822AA018(Regs& regs, uint8_t* base) { regs.Apply(e822AA018(base, re
 Result e822AC470(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_822AC470).
 inline void c822AC470(Regs& regs, uint8_t* base) { regs.Apply(e822AC470(base, regs.ToArgs())); }
+// sub_822ACB90's original.
+Result e822ACB90(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822ACB90).
+inline void c822ACB90(Regs& regs, uint8_t* base) { regs.Apply(e822ACB90(base, regs.ToArgs())); }
 // sub_822ADC08's original.
 Result e822ADC08(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_822ADC08).
@@ -4361,6 +7401,14 @@ inline void c822AE340(Regs& regs, uint8_t* base) { regs.Apply(e822AE340(base, re
 Result e822AFA58(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_822AFA58).
 inline void c822AFA58(Regs& regs, uint8_t* base) { regs.Apply(e822AFA58(base, regs.ToArgs())); }
+// sub_822B5EA8's original.
+Result e822B5EA8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822B5EA8).
+inline void c822B5EA8(Regs& regs, uint8_t* base) { regs.Apply(e822B5EA8(base, regs.ToArgs())); }
+// sub_822B5EF8's original.
+Result e822B5EF8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822B5EF8).
+inline void c822B5EF8(Regs& regs, uint8_t* base) { regs.Apply(e822B5EF8(base, regs.ToArgs())); }
 // sub_822B6780's original.
 Result e822B6780(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_822B6780).
@@ -4381,22 +7429,54 @@ inline void c822B6AD8(Regs& regs, uint8_t* base) { regs.Apply(e822B6AD8(base, re
 Result e822B6BF8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_822B6BF8).
 inline void c822B6BF8(Regs& regs, uint8_t* base) { regs.Apply(e822B6BF8(base, regs.ToArgs())); }
+// sub_822B6D70's original.
+Result e822B6D70(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822B6D70).
+inline void c822B6D70(Regs& regs, uint8_t* base) { regs.Apply(e822B6D70(base, regs.ToArgs())); }
 // sub_822B80D8's original.
 Result e822B80D8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_822B80D8).
 inline void c822B80D8(Regs& regs, uint8_t* base) { regs.Apply(e822B80D8(base, regs.ToArgs())); }
+// sub_822B8230's original.
+Result e822B8230(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822B8230).
+inline void c822B8230(Regs& regs, uint8_t* base) { regs.Apply(e822B8230(base, regs.ToArgs())); }
+// sub_822B8DA0's original.
+Result e822B8DA0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_822B8DA0).
+inline void c822B8DA0(Regs& regs, uint8_t* base) { regs.Apply(e822B8DA0(base, regs.ToArgs())); }
 // sub_822B8F10's original.
 Result e822B8F10(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_822B8F10).
 inline void c822B8F10(Regs& regs, uint8_t* base) { regs.Apply(e822B8F10(base, regs.ToArgs())); }
+// sub_8235A720's original.
+Result e8235A720(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8235A720).
+inline void c8235A720(Regs& regs, uint8_t* base) { regs.Apply(e8235A720(base, regs.ToArgs())); }
 // sub_8235A920's original.
 Result e8235A920(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8235A920).
 inline void c8235A920(Regs& regs, uint8_t* base) { regs.Apply(e8235A920(base, regs.ToArgs())); }
+// sub_8235A990's original.
+Result e8235A990(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8235A990).
+inline void c8235A990(Regs& regs, uint8_t* base) { regs.Apply(e8235A990(base, regs.ToArgs())); }
+// sub_82379328's original.
+Result e82379328(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82379328).
+inline void c82379328(Regs& regs, uint8_t* base) { regs.Apply(e82379328(base, regs.ToArgs())); }
 // sub_82379D50's original.
 Result e82379D50(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82379D50).
 inline void c82379D50(Regs& regs, uint8_t* base) { regs.Apply(e82379D50(base, regs.ToArgs())); }
+// sub_823EA070's original.
+Result e823EA070(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_823EA070).
+inline void c823EA070(Regs& regs, uint8_t* base) { regs.Apply(e823EA070(base, regs.ToArgs())); }
+// sub_823EA770's original.
+Result e823EA770(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_823EA770).
+inline void c823EA770(Regs& regs, uint8_t* base) { regs.Apply(e823EA770(base, regs.ToArgs())); }
 // sub_823F2620's original.
 Result e823F2620(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_823F2620).
@@ -4413,6 +7493,42 @@ inline void c823F6B70(Regs& regs, uint8_t* base) { regs.Apply(e823F6B70(base, re
 Result e823F6BC0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_823F6BC0).
 inline void c823F6BC0(Regs& regs, uint8_t* base) { regs.Apply(e823F6BC0(base, regs.ToArgs())); }
+// sub_82420F50's original.
+Result e82420F50(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82420F50).
+inline void c82420F50(Regs& regs, uint8_t* base) { regs.Apply(e82420F50(base, regs.ToArgs())); }
+// sub_82459CF8's original.
+Result e82459CF8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82459CF8).
+inline void c82459CF8(Regs& regs, uint8_t* base) { regs.Apply(e82459CF8(base, regs.ToArgs())); }
+// sub_82459D18's original.
+Result e82459D18(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82459D18).
+inline void c82459D18(Regs& regs, uint8_t* base) { regs.Apply(e82459D18(base, regs.ToArgs())); }
+// sub_82459E80's original.
+Result e82459E80(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82459E80).
+inline void c82459E80(Regs& regs, uint8_t* base) { regs.Apply(e82459E80(base, regs.ToArgs())); }
+// sub_8245A050's original.
+Result e8245A050(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8245A050).
+inline void c8245A050(Regs& regs, uint8_t* base) { regs.Apply(e8245A050(base, regs.ToArgs())); }
+// sub_8245A168's original.
+Result e8245A168(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8245A168).
+inline void c8245A168(Regs& regs, uint8_t* base) { regs.Apply(e8245A168(base, regs.ToArgs())); }
+// sub_8245A1B0's original.
+Result e8245A1B0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8245A1B0).
+inline void c8245A1B0(Regs& regs, uint8_t* base) { regs.Apply(e8245A1B0(base, regs.ToArgs())); }
+// sub_8245A208's original.
+Result e8245A208(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8245A208).
+inline void c8245A208(Regs& regs, uint8_t* base) { regs.Apply(e8245A208(base, regs.ToArgs())); }
+// sub_8245B720's original.
+Result e8245B720(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8245B720).
+inline void c8245B720(Regs& regs, uint8_t* base) { regs.Apply(e8245B720(base, regs.ToArgs())); }
 // sub_8245BE08's original.
 Result e8245BE08(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8245BE08).
@@ -4421,6 +7537,10 @@ inline void c8245BE08(Regs& regs, uint8_t* base) { regs.Apply(e8245BE08(base, re
 Result e8245BED0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8245BED0).
 inline void c8245BED0(Regs& regs, uint8_t* base) { regs.Apply(e8245BED0(base, regs.ToArgs())); }
+// sub_8245DC88's original.
+Result e8245DC88(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8245DC88).
+inline void c8245DC88(Regs& regs, uint8_t* base) { regs.Apply(e8245DC88(base, regs.ToArgs())); }
 // sub_8245DCF0's original.
 Result e8245DCF0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8245DCF0).
@@ -4433,6 +7553,10 @@ inline void c8245EF80(Regs& regs, uint8_t* base) { regs.Apply(e8245EF80(base, re
 Result e8245EF90(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8245EF90).
 inline void c8245EF90(Regs& regs, uint8_t* base) { regs.Apply(e8245EF90(base, regs.ToArgs())); }
+// sub_8245F6D0's original.
+Result e8245F6D0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8245F6D0).
+inline void c8245F6D0(Regs& regs, uint8_t* base) { regs.Apply(e8245F6D0(base, regs.ToArgs())); }
 // sub_8245F750's original.
 Result e8245F750(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8245F750).
@@ -4449,6 +7573,10 @@ inline void c8245FA10(Regs& regs, uint8_t* base) { regs.Apply(e8245FA10(base, re
 Result e8245FA28(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8245FA28).
 inline void c8245FA28(Regs& regs, uint8_t* base) { regs.Apply(e8245FA28(base, regs.ToArgs())); }
+// sub_824602F8's original.
+Result e824602F8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_824602F8).
+inline void c824602F8(Regs& regs, uint8_t* base) { regs.Apply(e824602F8(base, regs.ToArgs())); }
 // sub_824605E8's original.
 Result e824605E8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_824605E8).
@@ -4457,6 +7585,18 @@ inline void c824605E8(Regs& regs, uint8_t* base) { regs.Apply(e824605E8(base, re
 Result e82460688(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82460688).
 inline void c82460688(Regs& regs, uint8_t* base) { regs.Apply(e82460688(base, regs.ToArgs())); }
+// sub_82460778's original.
+Result e82460778(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82460778).
+inline void c82460778(Regs& regs, uint8_t* base) { regs.Apply(e82460778(base, regs.ToArgs())); }
+// sub_82460B50's original.
+Result e82460B50(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82460B50).
+inline void c82460B50(Regs& regs, uint8_t* base) { regs.Apply(e82460B50(base, regs.ToArgs())); }
+// sub_82461240's original.
+Result e82461240(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82461240).
+inline void c82461240(Regs& regs, uint8_t* base) { regs.Apply(e82461240(base, regs.ToArgs())); }
 // sub_824657E0's original.
 Result e824657E0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_824657E0).
@@ -4469,6 +7609,22 @@ inline void c82465870(Regs& regs, uint8_t* base) { regs.Apply(e82465870(base, re
 Result e824658C8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_824658C8).
 inline void c824658C8(Regs& regs, uint8_t* base) { regs.Apply(e824658C8(base, regs.ToArgs())); }
+// sub_82466EA0's original.
+Result e82466EA0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82466EA0).
+inline void c82466EA0(Regs& regs, uint8_t* base) { regs.Apply(e82466EA0(base, regs.ToArgs())); }
+// sub_82469960's original.
+Result e82469960(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82469960).
+inline void c82469960(Regs& regs, uint8_t* base) { regs.Apply(e82469960(base, regs.ToArgs())); }
+// sub_82469AF8's original.
+Result e82469AF8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82469AF8).
+inline void c82469AF8(Regs& regs, uint8_t* base) { regs.Apply(e82469AF8(base, regs.ToArgs())); }
+// sub_82469E58's original.
+Result e82469E58(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82469E58).
+inline void c82469E58(Regs& regs, uint8_t* base) { regs.Apply(e82469E58(base, regs.ToArgs())); }
 // sub_82469EF8's original.
 Result e82469EF8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82469EF8).
@@ -4481,18 +7637,66 @@ inline void c8246A1C0(Regs& regs, uint8_t* base) { regs.Apply(e8246A1C0(base, re
 Result e8246A860(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8246A860).
 inline void c8246A860(Regs& regs, uint8_t* base) { regs.Apply(e8246A860(base, regs.ToArgs())); }
+// sub_8246AAD0's original.
+Result e8246AAD0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8246AAD0).
+inline void c8246AAD0(Regs& regs, uint8_t* base) { regs.Apply(e8246AAD0(base, regs.ToArgs())); }
 // sub_8246CEB8's original.
 Result e8246CEB8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8246CEB8).
 inline void c8246CEB8(Regs& regs, uint8_t* base) { regs.Apply(e8246CEB8(base, regs.ToArgs())); }
+// sub_8246CF50's original.
+Result e8246CF50(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8246CF50).
+inline void c8246CF50(Regs& regs, uint8_t* base) { regs.Apply(e8246CF50(base, regs.ToArgs())); }
+// sub_8246E060's original.
+Result e8246E060(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8246E060).
+inline void c8246E060(Regs& regs, uint8_t* base) { regs.Apply(e8246E060(base, regs.ToArgs())); }
+// sub_8246E0E8's original.
+Result e8246E0E8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8246E0E8).
+inline void c8246E0E8(Regs& regs, uint8_t* base) { regs.Apply(e8246E0E8(base, regs.ToArgs())); }
 // sub_82480710's original.
 Result e82480710(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82480710).
 inline void c82480710(Regs& regs, uint8_t* base) { regs.Apply(e82480710(base, regs.ToArgs())); }
+// sub_82480918's original.
+Result e82480918(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82480918).
+inline void c82480918(Regs& regs, uint8_t* base) { regs.Apply(e82480918(base, regs.ToArgs())); }
+// sub_82480BA8's original.
+Result e82480BA8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82480BA8).
+inline void c82480BA8(Regs& regs, uint8_t* base) { regs.Apply(e82480BA8(base, regs.ToArgs())); }
+// sub_82480E90's original.
+Result e82480E90(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82480E90).
+inline void c82480E90(Regs& regs, uint8_t* base) { regs.Apply(e82480E90(base, regs.ToArgs())); }
+// sub_82481390's original.
+Result e82481390(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82481390).
+inline void c82481390(Regs& regs, uint8_t* base) { regs.Apply(e82481390(base, regs.ToArgs())); }
 // sub_82481880's original.
 Result e82481880(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82481880).
 inline void c82481880(Regs& regs, uint8_t* base) { regs.Apply(e82481880(base, regs.ToArgs())); }
+// sub_82481998's original.
+Result e82481998(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82481998).
+inline void c82481998(Regs& regs, uint8_t* base) { regs.Apply(e82481998(base, regs.ToArgs())); }
+// sub_824819B8's original.
+Result e824819B8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_824819B8).
+inline void c824819B8(Regs& regs, uint8_t* base) { regs.Apply(e824819B8(base, regs.ToArgs())); }
+// sub_824819E0's original.
+Result e824819E0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_824819E0).
+inline void c824819E0(Regs& regs, uint8_t* base) { regs.Apply(e824819E0(base, regs.ToArgs())); }
+// sub_82481A18's original.
+Result e82481A18(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82481A18).
+inline void c82481A18(Regs& regs, uint8_t* base) { regs.Apply(e82481A18(base, regs.ToArgs())); }
 // sub_82487C48's original.
 Result e82487C48(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82487C48).
@@ -4513,22 +7717,102 @@ inline void c82488598(Regs& regs, uint8_t* base) { regs.Apply(e82488598(base, re
 Result e82488A10(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82488A10).
 inline void c82488A10(Regs& regs, uint8_t* base) { regs.Apply(e82488A10(base, regs.ToArgs())); }
+// sub_824892F8's original.
+Result e824892F8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_824892F8).
+inline void c824892F8(Regs& regs, uint8_t* base) { regs.Apply(e824892F8(base, regs.ToArgs())); }
 // sub_8248F030's original.
 Result e8248F030(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8248F030).
 inline void c8248F030(Regs& regs, uint8_t* base) { regs.Apply(e8248F030(base, regs.ToArgs())); }
+// sub_824935D8's original.
+Result e824935D8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_824935D8).
+inline void c824935D8(Regs& regs, uint8_t* base) { regs.Apply(e824935D8(base, regs.ToArgs())); }
+// sub_82493680's original.
+Result e82493680(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82493680).
+inline void c82493680(Regs& regs, uint8_t* base) { regs.Apply(e82493680(base, regs.ToArgs())); }
 // sub_824960E0's original.
 Result e824960E0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_824960E0).
 inline void c824960E0(Regs& regs, uint8_t* base) { regs.Apply(e824960E0(base, regs.ToArgs())); }
+// sub_8257C858's original.
+Result e8257C858(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8257C858).
+inline void c8257C858(Regs& regs, uint8_t* base) { regs.Apply(e8257C858(base, regs.ToArgs())); }
+// sub_8257EB68's original.
+Result e8257EB68(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8257EB68).
+inline void c8257EB68(Regs& regs, uint8_t* base) { regs.Apply(e8257EB68(base, regs.ToArgs())); }
+// sub_8257F388's original.
+Result e8257F388(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8257F388).
+inline void c8257F388(Regs& regs, uint8_t* base) { regs.Apply(e8257F388(base, regs.ToArgs())); }
+// sub_825896C0's original.
+Result e825896C0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825896C0).
+inline void c825896C0(Regs& regs, uint8_t* base) { regs.Apply(e825896C0(base, regs.ToArgs())); }
+// sub_82589728's original.
+Result e82589728(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82589728).
+inline void c82589728(Regs& regs, uint8_t* base) { regs.Apply(e82589728(base, regs.ToArgs())); }
+// sub_82589970's original.
+Result e82589970(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82589970).
+inline void c82589970(Regs& regs, uint8_t* base) { regs.Apply(e82589970(base, regs.ToArgs())); }
 // sub_82589990's original.
 Result e82589990(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82589990).
 inline void c82589990(Regs& regs, uint8_t* base) { regs.Apply(e82589990(base, regs.ToArgs())); }
+// sub_82589A78's original.
+Result e82589A78(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82589A78).
+inline void c82589A78(Regs& regs, uint8_t* base) { regs.Apply(e82589A78(base, regs.ToArgs())); }
+// sub_82589B58's original.
+Result e82589B58(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82589B58).
+inline void c82589B58(Regs& regs, uint8_t* base) { regs.Apply(e82589B58(base, regs.ToArgs())); }
+// sub_82589E78's original.
+Result e82589E78(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82589E78).
+inline void c82589E78(Regs& regs, uint8_t* base) { regs.Apply(e82589E78(base, regs.ToArgs())); }
+// sub_8258A9E8's original.
+Result e8258A9E8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8258A9E8).
+inline void c8258A9E8(Regs& regs, uint8_t* base) { regs.Apply(e8258A9E8(base, regs.ToArgs())); }
+// sub_8258B578's original.
+Result e8258B578(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8258B578).
+inline void c8258B578(Regs& regs, uint8_t* base) { regs.Apply(e8258B578(base, regs.ToArgs())); }
+// sub_8258B678's original.
+Result e8258B678(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8258B678).
+inline void c8258B678(Regs& regs, uint8_t* base) { regs.Apply(e8258B678(base, regs.ToArgs())); }
+// sub_8258B980's original.
+Result e8258B980(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8258B980).
+inline void c8258B980(Regs& regs, uint8_t* base) { regs.Apply(e8258B980(base, regs.ToArgs())); }
 // sub_8258BD28's original.
 Result e8258BD28(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8258BD28).
 inline void c8258BD28(Regs& regs, uint8_t* base) { regs.Apply(e8258BD28(base, regs.ToArgs())); }
+// sub_8258BD58's original.
+Result e8258BD58(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8258BD58).
+inline void c8258BD58(Regs& regs, uint8_t* base) { regs.Apply(e8258BD58(base, regs.ToArgs())); }
+// sub_8258BE08's original.
+Result e8258BE08(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8258BE08).
+inline void c8258BE08(Regs& regs, uint8_t* base) { regs.Apply(e8258BE08(base, regs.ToArgs())); }
+// sub_8258BE48's original.
+Result e8258BE48(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8258BE48).
+inline void c8258BE48(Regs& regs, uint8_t* base) { regs.Apply(e8258BE48(base, regs.ToArgs())); }
+// sub_8258C5F8's original.
+Result e8258C5F8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8258C5F8).
+inline void c8258C5F8(Regs& regs, uint8_t* base) { regs.Apply(e8258C5F8(base, regs.ToArgs())); }
 // sub_8258C688's original.
 Result e8258C688(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8258C688).
@@ -4565,6 +7849,14 @@ inline void c8258CB98(Regs& regs, uint8_t* base) { regs.Apply(e8258CB98(base, re
 Result e8258CC30(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8258CC30).
 inline void c8258CC30(Regs& regs, uint8_t* base) { regs.Apply(e8258CC30(base, regs.ToArgs())); }
+// sub_8258CD28's original.
+Result e8258CD28(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8258CD28).
+inline void c8258CD28(Regs& regs, uint8_t* base) { regs.Apply(e8258CD28(base, regs.ToArgs())); }
+// sub_8258CE60's original.
+Result e8258CE60(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8258CE60).
+inline void c8258CE60(Regs& regs, uint8_t* base) { regs.Apply(e8258CE60(base, regs.ToArgs())); }
 // sub_8258CEB0's original.
 Result e8258CEB0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8258CEB0).
@@ -4577,6 +7869,10 @@ inline void c8258CEE0(Regs& regs, uint8_t* base) { regs.Apply(e8258CEE0(base, re
 Result e8258CF10(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8258CF10).
 inline void c8258CF10(Regs& regs, uint8_t* base) { regs.Apply(e8258CF10(base, regs.ToArgs())); }
+// sub_8258D958's original.
+Result e8258D958(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8258D958).
+inline void c8258D958(Regs& regs, uint8_t* base) { regs.Apply(e8258D958(base, regs.ToArgs())); }
 // sub_8258D998's original.
 Result e8258D998(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8258D998).
@@ -4601,10 +7897,22 @@ inline void c8258DFF0(Regs& regs, uint8_t* base) { regs.Apply(e8258DFF0(base, re
 Result e8258E098(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8258E098).
 inline void c8258E098(Regs& regs, uint8_t* base) { regs.Apply(e8258E098(base, regs.ToArgs())); }
+// sub_8258E138's original.
+Result e8258E138(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8258E138).
+inline void c8258E138(Regs& regs, uint8_t* base) { regs.Apply(e8258E138(base, regs.ToArgs())); }
 // sub_8258E1D8's original.
 Result e8258E1D8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8258E1D8).
 inline void c8258E1D8(Regs& regs, uint8_t* base) { regs.Apply(e8258E1D8(base, regs.ToArgs())); }
+// sub_8258E410's original.
+Result e8258E410(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8258E410).
+inline void c8258E410(Regs& regs, uint8_t* base) { regs.Apply(e8258E410(base, regs.ToArgs())); }
+// sub_8258E498's original.
+Result e8258E498(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8258E498).
+inline void c8258E498(Regs& regs, uint8_t* base) { regs.Apply(e8258E498(base, regs.ToArgs())); }
 // sub_8258E580's original.
 Result e8258E580(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8258E580).
@@ -4637,6 +7945,14 @@ inline void c8258EAD0(Regs& regs, uint8_t* base) { regs.Apply(e8258EAD0(base, re
 Result e8258EAE0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8258EAE0).
 inline void c8258EAE0(Regs& regs, uint8_t* base) { regs.Apply(e8258EAE0(base, regs.ToArgs())); }
+// sub_8258EB38's original.
+Result e8258EB38(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8258EB38).
+inline void c8258EB38(Regs& regs, uint8_t* base) { regs.Apply(e8258EB38(base, regs.ToArgs())); }
+// sub_8258EB88's original.
+Result e8258EB88(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8258EB88).
+inline void c8258EB88(Regs& regs, uint8_t* base) { regs.Apply(e8258EB88(base, regs.ToArgs())); }
 // sub_8258ED78's original.
 Result e8258ED78(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8258ED78).
@@ -4761,10 +8077,18 @@ inline void c82590A68(Regs& regs, uint8_t* base) { regs.Apply(e82590A68(base, re
 Result e82590AD0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82590AD0).
 inline void c82590AD0(Regs& regs, uint8_t* base) { regs.Apply(e82590AD0(base, regs.ToArgs())); }
+// sub_82590B38's original.
+Result e82590B38(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82590B38).
+inline void c82590B38(Regs& regs, uint8_t* base) { regs.Apply(e82590B38(base, regs.ToArgs())); }
 // sub_82590EF0's original.
 Result e82590EF0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82590EF0).
 inline void c82590EF0(Regs& regs, uint8_t* base) { regs.Apply(e82590EF0(base, regs.ToArgs())); }
+// sub_825911C8's original.
+Result e825911C8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825911C8).
+inline void c825911C8(Regs& regs, uint8_t* base) { regs.Apply(e825911C8(base, regs.ToArgs())); }
 // sub_82591540's original.
 Result e82591540(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82591540).
@@ -4777,10 +8101,30 @@ inline void c825915E0(Regs& regs, uint8_t* base) { regs.Apply(e825915E0(base, re
 Result e82591798(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82591798).
 inline void c82591798(Regs& regs, uint8_t* base) { regs.Apply(e82591798(base, regs.ToArgs())); }
+// sub_82591838's original.
+Result e82591838(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82591838).
+inline void c82591838(Regs& regs, uint8_t* base) { regs.Apply(e82591838(base, regs.ToArgs())); }
+// sub_82591858's original.
+Result e82591858(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82591858).
+inline void c82591858(Regs& regs, uint8_t* base) { regs.Apply(e82591858(base, regs.ToArgs())); }
+// sub_825918F0's original.
+Result e825918F0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825918F0).
+inline void c825918F0(Regs& regs, uint8_t* base) { regs.Apply(e825918F0(base, regs.ToArgs())); }
 // sub_82591B30's original.
 Result e82591B30(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82591B30).
 inline void c82591B30(Regs& regs, uint8_t* base) { regs.Apply(e82591B30(base, regs.ToArgs())); }
+// sub_82591B38's original.
+Result e82591B38(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82591B38).
+inline void c82591B38(Regs& regs, uint8_t* base) { regs.Apply(e82591B38(base, regs.ToArgs())); }
+// sub_82591B68's original.
+Result e82591B68(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82591B68).
+inline void c82591B68(Regs& regs, uint8_t* base) { regs.Apply(e82591B68(base, regs.ToArgs())); }
 // sub_82592188's original.
 Result e82592188(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82592188).
@@ -4789,6 +8133,14 @@ inline void c82592188(Regs& regs, uint8_t* base) { regs.Apply(e82592188(base, re
 Result e825924E0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825924E0).
 inline void c825924E0(Regs& regs, uint8_t* base) { regs.Apply(e825924E0(base, regs.ToArgs())); }
+// sub_82592500's original.
+Result e82592500(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82592500).
+inline void c82592500(Regs& regs, uint8_t* base) { regs.Apply(e82592500(base, regs.ToArgs())); }
+// sub_82592520's original.
+Result e82592520(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82592520).
+inline void c82592520(Regs& regs, uint8_t* base) { regs.Apply(e82592520(base, regs.ToArgs())); }
 // sub_82592670's original.
 Result e82592670(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82592670).
@@ -4797,6 +8149,10 @@ inline void c82592670(Regs& regs, uint8_t* base) { regs.Apply(e82592670(base, re
 Result e825926E8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825926E8).
 inline void c825926E8(Regs& regs, uint8_t* base) { regs.Apply(e825926E8(base, regs.ToArgs())); }
+// sub_82592970's original.
+Result e82592970(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82592970).
+inline void c82592970(Regs& regs, uint8_t* base) { regs.Apply(e82592970(base, regs.ToArgs())); }
 // sub_82593040's original.
 Result e82593040(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82593040).
@@ -4817,6 +8173,10 @@ inline void c82593248(Regs& regs, uint8_t* base) { regs.Apply(e82593248(base, re
 Result e82593278(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82593278).
 inline void c82593278(Regs& regs, uint8_t* base) { regs.Apply(e82593278(base, regs.ToArgs())); }
+// sub_825932E8's original.
+Result e825932E8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825932E8).
+inline void c825932E8(Regs& regs, uint8_t* base) { regs.Apply(e825932E8(base, regs.ToArgs())); }
 // sub_82593500's original.
 Result e82593500(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82593500).
@@ -4829,6 +8189,22 @@ inline void c82593568(Regs& regs, uint8_t* base) { regs.Apply(e82593568(base, re
 Result e82593908(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82593908).
 inline void c82593908(Regs& regs, uint8_t* base) { regs.Apply(e82593908(base, regs.ToArgs())); }
+// sub_82593B00's original.
+Result e82593B00(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82593B00).
+inline void c82593B00(Regs& regs, uint8_t* base) { regs.Apply(e82593B00(base, regs.ToArgs())); }
+// sub_82593C28's original.
+Result e82593C28(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82593C28).
+inline void c82593C28(Regs& regs, uint8_t* base) { regs.Apply(e82593C28(base, regs.ToArgs())); }
+// sub_82593C48's original.
+Result e82593C48(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82593C48).
+inline void c82593C48(Regs& regs, uint8_t* base) { regs.Apply(e82593C48(base, regs.ToArgs())); }
+// sub_82593CA0's original.
+Result e82593CA0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82593CA0).
+inline void c82593CA0(Regs& regs, uint8_t* base) { regs.Apply(e82593CA0(base, regs.ToArgs())); }
 // sub_82593DC0's original.
 Result e82593DC0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82593DC0).
@@ -4837,14 +8213,30 @@ inline void c82593DC0(Regs& regs, uint8_t* base) { regs.Apply(e82593DC0(base, re
 Result e82593FC0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82593FC0).
 inline void c82593FC0(Regs& regs, uint8_t* base) { regs.Apply(e82593FC0(base, regs.ToArgs())); }
+// sub_82594188's original.
+Result e82594188(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82594188).
+inline void c82594188(Regs& regs, uint8_t* base) { regs.Apply(e82594188(base, regs.ToArgs())); }
+// sub_825942B8's original.
+Result e825942B8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825942B8).
+inline void c825942B8(Regs& regs, uint8_t* base) { regs.Apply(e825942B8(base, regs.ToArgs())); }
 // sub_825943E0's original.
 Result e825943E0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825943E0).
 inline void c825943E0(Regs& regs, uint8_t* base) { regs.Apply(e825943E0(base, regs.ToArgs())); }
+// sub_82594570's original.
+Result e82594570(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82594570).
+inline void c82594570(Regs& regs, uint8_t* base) { regs.Apply(e82594570(base, regs.ToArgs())); }
 // sub_82594718's original.
 Result e82594718(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82594718).
 inline void c82594718(Regs& regs, uint8_t* base) { regs.Apply(e82594718(base, regs.ToArgs())); }
+// sub_825947D0's original.
+Result e825947D0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825947D0).
+inline void c825947D0(Regs& regs, uint8_t* base) { regs.Apply(e825947D0(base, regs.ToArgs())); }
 // sub_82594850's original.
 Result e82594850(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82594850).
@@ -4857,10 +8249,26 @@ inline void c825948C0(Regs& regs, uint8_t* base) { regs.Apply(e825948C0(base, re
 Result e82594970(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82594970).
 inline void c82594970(Regs& regs, uint8_t* base) { regs.Apply(e82594970(base, regs.ToArgs())); }
+// sub_82594AC0's original.
+Result e82594AC0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82594AC0).
+inline void c82594AC0(Regs& regs, uint8_t* base) { regs.Apply(e82594AC0(base, regs.ToArgs())); }
+// sub_82594B00's original.
+Result e82594B00(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82594B00).
+inline void c82594B00(Regs& regs, uint8_t* base) { regs.Apply(e82594B00(base, regs.ToArgs())); }
+// sub_82594B60's original.
+Result e82594B60(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82594B60).
+inline void c82594B60(Regs& regs, uint8_t* base) { regs.Apply(e82594B60(base, regs.ToArgs())); }
 // sub_82594D10's original.
 Result e82594D10(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82594D10).
 inline void c82594D10(Regs& regs, uint8_t* base) { regs.Apply(e82594D10(base, regs.ToArgs())); }
+// sub_82594E88's original.
+Result e82594E88(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82594E88).
+inline void c82594E88(Regs& regs, uint8_t* base) { regs.Apply(e82594E88(base, regs.ToArgs())); }
 // sub_82594F58's original.
 Result e82594F58(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82594F58).
@@ -4881,6 +8289,10 @@ inline void c82595550(Regs& regs, uint8_t* base) { regs.Apply(e82595550(base, re
 Result e825960D0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825960D0).
 inline void c825960D0(Regs& regs, uint8_t* base) { regs.Apply(e825960D0(base, regs.ToArgs())); }
+// sub_825963F0's original.
+Result e825963F0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825963F0).
+inline void c825963F0(Regs& regs, uint8_t* base) { regs.Apply(e825963F0(base, regs.ToArgs())); }
 // sub_82596920's original.
 Result e82596920(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82596920).
@@ -4913,10 +8325,18 @@ inline void c82597118(Regs& regs, uint8_t* base) { regs.Apply(e82597118(base, re
 Result e82597148(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82597148).
 inline void c82597148(Regs& regs, uint8_t* base) { regs.Apply(e82597148(base, regs.ToArgs())); }
+// sub_82597210's original.
+Result e82597210(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82597210).
+inline void c82597210(Regs& regs, uint8_t* base) { regs.Apply(e82597210(base, regs.ToArgs())); }
 // sub_825972A8's original.
 Result e825972A8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825972A8).
 inline void c825972A8(Regs& regs, uint8_t* base) { regs.Apply(e825972A8(base, regs.ToArgs())); }
+// sub_82597378's original.
+Result e82597378(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82597378).
+inline void c82597378(Regs& regs, uint8_t* base) { regs.Apply(e82597378(base, regs.ToArgs())); }
 // sub_82597518's original.
 Result e82597518(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82597518).
@@ -4925,6 +8345,14 @@ inline void c82597518(Regs& regs, uint8_t* base) { regs.Apply(e82597518(base, re
 Result e82597610(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82597610).
 inline void c82597610(Regs& regs, uint8_t* base) { regs.Apply(e82597610(base, regs.ToArgs())); }
+// sub_82597878's original.
+Result e82597878(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82597878).
+inline void c82597878(Regs& regs, uint8_t* base) { regs.Apply(e82597878(base, regs.ToArgs())); }
+// sub_82597E58's original.
+Result e82597E58(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_82597E58).
+inline void c82597E58(Regs& regs, uint8_t* base) { regs.Apply(e82597E58(base, regs.ToArgs())); }
 // sub_82598158's original.
 Result e82598158(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_82598158).
@@ -4993,10 +8421,30 @@ inline void c8259A9D0(Regs& regs, uint8_t* base) { regs.Apply(e8259A9D0(base, re
 Result e8259A9E0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8259A9E0).
 inline void c8259A9E0(Regs& regs, uint8_t* base) { regs.Apply(e8259A9E0(base, regs.ToArgs())); }
+// sub_8259C3A8's original.
+Result e8259C3A8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8259C3A8).
+inline void c8259C3A8(Regs& regs, uint8_t* base) { regs.Apply(e8259C3A8(base, regs.ToArgs())); }
+// sub_8259C818's original.
+Result e8259C818(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8259C818).
+inline void c8259C818(Regs& regs, uint8_t* base) { regs.Apply(e8259C818(base, regs.ToArgs())); }
+// sub_8259C868's original.
+Result e8259C868(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8259C868).
+inline void c8259C868(Regs& regs, uint8_t* base) { regs.Apply(e8259C868(base, regs.ToArgs())); }
+// sub_8259C898's original.
+Result e8259C898(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8259C898).
+inline void c8259C898(Regs& regs, uint8_t* base) { regs.Apply(e8259C898(base, regs.ToArgs())); }
 // sub_8259C9B0's original.
 Result e8259C9B0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8259C9B0).
 inline void c8259C9B0(Regs& regs, uint8_t* base) { regs.Apply(e8259C9B0(base, regs.ToArgs())); }
+// sub_8259CC80's original.
+Result e8259CC80(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8259CC80).
+inline void c8259CC80(Regs& regs, uint8_t* base) { regs.Apply(e8259CC80(base, regs.ToArgs())); }
 // sub_8259CE10's original.
 Result e8259CE10(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8259CE10).
@@ -5013,10 +8461,30 @@ inline void c8259D3D8(Regs& regs, uint8_t* base) { regs.Apply(e8259D3D8(base, re
 Result e8259D418(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8259D418).
 inline void c8259D418(Regs& regs, uint8_t* base) { regs.Apply(e8259D418(base, regs.ToArgs())); }
+// sub_8259D438's original.
+Result e8259D438(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8259D438).
+inline void c8259D438(Regs& regs, uint8_t* base) { regs.Apply(e8259D438(base, regs.ToArgs())); }
 // sub_8259D478's original.
 Result e8259D478(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8259D478).
 inline void c8259D478(Regs& regs, uint8_t* base) { regs.Apply(e8259D478(base, regs.ToArgs())); }
+// sub_8259D550's original.
+Result e8259D550(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8259D550).
+inline void c8259D550(Regs& regs, uint8_t* base) { regs.Apply(e8259D550(base, regs.ToArgs())); }
+// sub_8259D588's original.
+Result e8259D588(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8259D588).
+inline void c8259D588(Regs& regs, uint8_t* base) { regs.Apply(e8259D588(base, regs.ToArgs())); }
+// sub_8259D5A8's original.
+Result e8259D5A8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8259D5A8).
+inline void c8259D5A8(Regs& regs, uint8_t* base) { regs.Apply(e8259D5A8(base, regs.ToArgs())); }
+// sub_8259D600's original.
+Result e8259D600(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8259D600).
+inline void c8259D600(Regs& regs, uint8_t* base) { regs.Apply(e8259D600(base, regs.ToArgs())); }
 // sub_8259D7B0's original.
 Result e8259D7B0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8259D7B0).
@@ -5033,6 +8501,10 @@ inline void c8259DAD0(Regs& regs, uint8_t* base) { regs.Apply(e8259DAD0(base, re
 Result e8259E098(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8259E098).
 inline void c8259E098(Regs& regs, uint8_t* base) { regs.Apply(e8259E098(base, regs.ToArgs())); }
+// sub_8259E6C8's original.
+Result e8259E6C8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8259E6C8).
+inline void c8259E6C8(Regs& regs, uint8_t* base) { regs.Apply(e8259E6C8(base, regs.ToArgs())); }
 // sub_8259EBE8's original.
 Result e8259EBE8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8259EBE8).
@@ -5045,14 +8517,26 @@ inline void c8259ED40(Regs& regs, uint8_t* base) { regs.Apply(e8259ED40(base, re
 Result e8259F348(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8259F348).
 inline void c8259F348(Regs& regs, uint8_t* base) { regs.Apply(e8259F348(base, regs.ToArgs())); }
+// sub_8259F700's original.
+Result e8259F700(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8259F700).
+inline void c8259F700(Regs& regs, uint8_t* base) { regs.Apply(e8259F700(base, regs.ToArgs())); }
 // sub_8259F770's original.
 Result e8259F770(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8259F770).
 inline void c8259F770(Regs& regs, uint8_t* base) { regs.Apply(e8259F770(base, regs.ToArgs())); }
+// sub_8259F848's original.
+Result e8259F848(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8259F848).
+inline void c8259F848(Regs& regs, uint8_t* base) { regs.Apply(e8259F848(base, regs.ToArgs())); }
 // sub_8259FA00's original.
 Result e8259FA00(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8259FA00).
 inline void c8259FA00(Regs& regs, uint8_t* base) { regs.Apply(e8259FA00(base, regs.ToArgs())); }
+// sub_8259FA20's original.
+Result e8259FA20(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8259FA20).
+inline void c8259FA20(Regs& regs, uint8_t* base) { regs.Apply(e8259FA20(base, regs.ToArgs())); }
 // sub_8259FB30's original.
 Result e8259FB30(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8259FB30).
@@ -5061,6 +8545,10 @@ inline void c8259FB30(Regs& regs, uint8_t* base) { regs.Apply(e8259FB30(base, re
 Result e8259FC18(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_8259FC18).
 inline void c8259FC18(Regs& regs, uint8_t* base) { regs.Apply(e8259FC18(base, regs.ToArgs())); }
+// sub_8259FE68's original.
+Result e8259FE68(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_8259FE68).
+inline void c8259FE68(Regs& regs, uint8_t* base) { regs.Apply(e8259FE68(base, regs.ToArgs())); }
 // sub_825A0548's original.
 Result e825A0548(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825A0548).
@@ -5105,10 +8593,58 @@ inline void c825A1BE8(Regs& regs, uint8_t* base) { regs.Apply(e825A1BE8(base, re
 Result e825A1E08(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825A1E08).
 inline void c825A1E08(Regs& regs, uint8_t* base) { regs.Apply(e825A1E08(base, regs.ToArgs())); }
+// sub_825A1F08's original.
+Result e825A1F08(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825A1F08).
+inline void c825A1F08(Regs& regs, uint8_t* base) { regs.Apply(e825A1F08(base, regs.ToArgs())); }
 // sub_825A2068's original.
 Result e825A2068(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825A2068).
 inline void c825A2068(Regs& regs, uint8_t* base) { regs.Apply(e825A2068(base, regs.ToArgs())); }
+// sub_825A2090's original.
+Result e825A2090(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825A2090).
+inline void c825A2090(Regs& regs, uint8_t* base) { regs.Apply(e825A2090(base, regs.ToArgs())); }
+// sub_825A20E8's original.
+Result e825A20E8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825A20E8).
+inline void c825A20E8(Regs& regs, uint8_t* base) { regs.Apply(e825A20E8(base, regs.ToArgs())); }
+// sub_825A21A8's original.
+Result e825A21A8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825A21A8).
+inline void c825A21A8(Regs& regs, uint8_t* base) { regs.Apply(e825A21A8(base, regs.ToArgs())); }
+// sub_825A6508's original.
+Result e825A6508(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825A6508).
+inline void c825A6508(Regs& regs, uint8_t* base) { regs.Apply(e825A6508(base, regs.ToArgs())); }
+// sub_825A6518's original.
+Result e825A6518(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825A6518).
+inline void c825A6518(Regs& regs, uint8_t* base) { regs.Apply(e825A6518(base, regs.ToArgs())); }
+// sub_825A6528's original.
+Result e825A6528(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825A6528).
+inline void c825A6528(Regs& regs, uint8_t* base) { regs.Apply(e825A6528(base, regs.ToArgs())); }
+// sub_825A6540's original.
+Result e825A6540(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825A6540).
+inline void c825A6540(Regs& regs, uint8_t* base) { regs.Apply(e825A6540(base, regs.ToArgs())); }
+// sub_825A6558's original.
+Result e825A6558(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825A6558).
+inline void c825A6558(Regs& regs, uint8_t* base) { regs.Apply(e825A6558(base, regs.ToArgs())); }
+// sub_825A6670's original.
+Result e825A6670(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825A6670).
+inline void c825A6670(Regs& regs, uint8_t* base) { regs.Apply(e825A6670(base, regs.ToArgs())); }
+// sub_825A6690's original.
+Result e825A6690(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825A6690).
+inline void c825A6690(Regs& regs, uint8_t* base) { regs.Apply(e825A6690(base, regs.ToArgs())); }
+// sub_825A66D8's original.
+Result e825A66D8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825A66D8).
+inline void c825A66D8(Regs& regs, uint8_t* base) { regs.Apply(e825A66D8(base, regs.ToArgs())); }
 // sub_825A6880's original.
 Result e825A6880(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825A6880).
@@ -5121,6 +8657,10 @@ inline void c825A6940(Regs& regs, uint8_t* base) { regs.Apply(e825A6940(base, re
 Result e825A6F00(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825A6F00).
 inline void c825A6F00(Regs& regs, uint8_t* base) { regs.Apply(e825A6F00(base, regs.ToArgs())); }
+// sub_825A6F60's original.
+Result e825A6F60(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825A6F60).
+inline void c825A6F60(Regs& regs, uint8_t* base) { regs.Apply(e825A6F60(base, regs.ToArgs())); }
 // sub_825A7068's original.
 Result e825A7068(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825A7068).
@@ -5129,6 +8669,10 @@ inline void c825A7068(Regs& regs, uint8_t* base) { regs.Apply(e825A7068(base, re
 Result e825A70E8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825A70E8).
 inline void c825A70E8(Regs& regs, uint8_t* base) { regs.Apply(e825A70E8(base, regs.ToArgs())); }
+// sub_825A70F0's original.
+Result e825A70F0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825A70F0).
+inline void c825A70F0(Regs& regs, uint8_t* base) { regs.Apply(e825A70F0(base, regs.ToArgs())); }
 // sub_825A71B0's original.
 Result e825A71B0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825A71B0).
@@ -5149,6 +8693,18 @@ inline void c825A7348(Regs& regs, uint8_t* base) { regs.Apply(e825A7348(base, re
 Result e825A7410(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825A7410).
 inline void c825A7410(Regs& regs, uint8_t* base) { regs.Apply(e825A7410(base, regs.ToArgs())); }
+// sub_825A7EB0's original.
+Result e825A7EB0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825A7EB0).
+inline void c825A7EB0(Regs& regs, uint8_t* base) { regs.Apply(e825A7EB0(base, regs.ToArgs())); }
+// sub_825A81E0's original.
+Result e825A81E0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825A81E0).
+inline void c825A81E0(Regs& regs, uint8_t* base) { regs.Apply(e825A81E0(base, regs.ToArgs())); }
+// sub_825A82C8's original.
+Result e825A82C8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825A82C8).
+inline void c825A82C8(Regs& regs, uint8_t* base) { regs.Apply(e825A82C8(base, regs.ToArgs())); }
 // sub_825A85C0's original.
 Result e825A85C0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825A85C0).
@@ -5165,6 +8721,10 @@ inline void c825A8A50(Regs& regs, uint8_t* base) { regs.Apply(e825A8A50(base, re
 Result e825A93D0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825A93D0).
 inline void c825A93D0(Regs& regs, uint8_t* base) { regs.Apply(e825A93D0(base, regs.ToArgs())); }
+// sub_825A9A80's original.
+Result e825A9A80(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825A9A80).
+inline void c825A9A80(Regs& regs, uint8_t* base) { regs.Apply(e825A9A80(base, regs.ToArgs())); }
 // sub_825A9A90's original.
 Result e825A9A90(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825A9A90).
@@ -5173,6 +8733,10 @@ inline void c825A9A90(Regs& regs, uint8_t* base) { regs.Apply(e825A9A90(base, re
 Result e825A9B58(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825A9B58).
 inline void c825A9B58(Regs& regs, uint8_t* base) { regs.Apply(e825A9B58(base, regs.ToArgs())); }
+// sub_825A9DD8's original.
+Result e825A9DD8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825A9DD8).
+inline void c825A9DD8(Regs& regs, uint8_t* base) { regs.Apply(e825A9DD8(base, regs.ToArgs())); }
 // sub_825AA840's original.
 Result e825AA840(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825AA840).
@@ -5181,18 +8745,34 @@ inline void c825AA840(Regs& regs, uint8_t* base) { regs.Apply(e825AA840(base, re
 Result e825AAD20(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825AAD20).
 inline void c825AAD20(Regs& regs, uint8_t* base) { regs.Apply(e825AAD20(base, regs.ToArgs())); }
+// sub_825AAF18's original.
+Result e825AAF18(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825AAF18).
+inline void c825AAF18(Regs& regs, uint8_t* base) { regs.Apply(e825AAF18(base, regs.ToArgs())); }
 // sub_825AB010's original.
 Result e825AB010(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825AB010).
 inline void c825AB010(Regs& regs, uint8_t* base) { regs.Apply(e825AB010(base, regs.ToArgs())); }
+// sub_825AB0C0's original.
+Result e825AB0C0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825AB0C0).
+inline void c825AB0C0(Regs& regs, uint8_t* base) { regs.Apply(e825AB0C0(base, regs.ToArgs())); }
 // sub_825AB1C0's original.
 Result e825AB1C0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825AB1C0).
 inline void c825AB1C0(Regs& regs, uint8_t* base) { regs.Apply(e825AB1C0(base, regs.ToArgs())); }
+// sub_825AC248's original.
+Result e825AC248(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825AC248).
+inline void c825AC248(Regs& regs, uint8_t* base) { regs.Apply(e825AC248(base, regs.ToArgs())); }
 // sub_825AC320's original.
 Result e825AC320(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825AC320).
 inline void c825AC320(Regs& regs, uint8_t* base) { regs.Apply(e825AC320(base, regs.ToArgs())); }
+// sub_825AC6B0's original.
+Result e825AC6B0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825AC6B0).
+inline void c825AC6B0(Regs& regs, uint8_t* base) { regs.Apply(e825AC6B0(base, regs.ToArgs())); }
 // sub_825AC710's original.
 Result e825AC710(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825AC710).
@@ -5201,6 +8781,10 @@ inline void c825AC710(Regs& regs, uint8_t* base) { regs.Apply(e825AC710(base, re
 Result e825ADEB0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825ADEB0).
 inline void c825ADEB0(Regs& regs, uint8_t* base) { regs.Apply(e825ADEB0(base, regs.ToArgs())); }
+// sub_825AE708's original.
+Result e825AE708(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825AE708).
+inline void c825AE708(Regs& regs, uint8_t* base) { regs.Apply(e825AE708(base, regs.ToArgs())); }
 // sub_825AE8E0's original.
 Result e825AE8E0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825AE8E0).
@@ -5221,6 +8805,22 @@ inline void c825AF000(Regs& regs, uint8_t* base) { regs.Apply(e825AF000(base, re
 Result e825AF098(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825AF098).
 inline void c825AF098(Regs& regs, uint8_t* base) { regs.Apply(e825AF098(base, regs.ToArgs())); }
+// sub_825AF130's original.
+Result e825AF130(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825AF130).
+inline void c825AF130(Regs& regs, uint8_t* base) { regs.Apply(e825AF130(base, regs.ToArgs())); }
+// sub_825AFE80's original.
+Result e825AFE80(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825AFE80).
+inline void c825AFE80(Regs& regs, uint8_t* base) { regs.Apply(e825AFE80(base, regs.ToArgs())); }
+// sub_825AFF80's original.
+Result e825AFF80(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825AFF80).
+inline void c825AFF80(Regs& regs, uint8_t* base) { regs.Apply(e825AFF80(base, regs.ToArgs())); }
+// sub_825B0B30's original.
+Result e825B0B30(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825B0B30).
+inline void c825B0B30(Regs& regs, uint8_t* base) { regs.Apply(e825B0B30(base, regs.ToArgs())); }
 // sub_825B32D0's original.
 Result e825B32D0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825B32D0).
@@ -5229,6 +8829,10 @@ inline void c825B32D0(Regs& regs, uint8_t* base) { regs.Apply(e825B32D0(base, re
 Result e825B3430(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825B3430).
 inline void c825B3430(Regs& regs, uint8_t* base) { regs.Apply(e825B3430(base, regs.ToArgs())); }
+// sub_825B36B8's original.
+Result e825B36B8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825B36B8).
+inline void c825B36B8(Regs& regs, uint8_t* base) { regs.Apply(e825B36B8(base, regs.ToArgs())); }
 // sub_825B6098's original.
 Result e825B6098(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825B6098).
@@ -5237,6 +8841,34 @@ inline void c825B6098(Regs& regs, uint8_t* base) { regs.Apply(e825B6098(base, re
 Result e825B6140(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825B6140).
 inline void c825B6140(Regs& regs, uint8_t* base) { regs.Apply(e825B6140(base, regs.ToArgs())); }
+// sub_825B61E8's original.
+Result e825B61E8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825B61E8).
+inline void c825B61E8(Regs& regs, uint8_t* base) { regs.Apply(e825B61E8(base, regs.ToArgs())); }
+// sub_825B6458's original.
+Result e825B6458(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825B6458).
+inline void c825B6458(Regs& regs, uint8_t* base) { regs.Apply(e825B6458(base, regs.ToArgs())); }
+// sub_825B69B8's original.
+Result e825B69B8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825B69B8).
+inline void c825B69B8(Regs& regs, uint8_t* base) { regs.Apply(e825B69B8(base, regs.ToArgs())); }
+// sub_825B7EC8's original.
+Result e825B7EC8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825B7EC8).
+inline void c825B7EC8(Regs& regs, uint8_t* base) { regs.Apply(e825B7EC8(base, regs.ToArgs())); }
+// sub_825B9DD8's original.
+Result e825B9DD8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825B9DD8).
+inline void c825B9DD8(Regs& regs, uint8_t* base) { regs.Apply(e825B9DD8(base, regs.ToArgs())); }
+// sub_825BA118's original.
+Result e825BA118(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825BA118).
+inline void c825BA118(Regs& regs, uint8_t* base) { regs.Apply(e825BA118(base, regs.ToArgs())); }
+// sub_825BA158's original.
+Result e825BA158(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825BA158).
+inline void c825BA158(Regs& regs, uint8_t* base) { regs.Apply(e825BA158(base, regs.ToArgs())); }
 // sub_825BA558's original.
 Result e825BA558(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825BA558).
@@ -5273,10 +8905,18 @@ inline void c825BFC50(Regs& regs, uint8_t* base) { regs.Apply(e825BFC50(base, re
 Result e825BFE28(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825BFE28).
 inline void c825BFE28(Regs& regs, uint8_t* base) { regs.Apply(e825BFE28(base, regs.ToArgs())); }
+// sub_825C0360's original.
+Result e825C0360(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825C0360).
+inline void c825C0360(Regs& regs, uint8_t* base) { regs.Apply(e825C0360(base, regs.ToArgs())); }
 // sub_825C0408's original.
 Result e825C0408(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825C0408).
 inline void c825C0408(Regs& regs, uint8_t* base) { regs.Apply(e825C0408(base, regs.ToArgs())); }
+// sub_825C04D8's original.
+Result e825C04D8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825C04D8).
+inline void c825C04D8(Regs& regs, uint8_t* base) { regs.Apply(e825C04D8(base, regs.ToArgs())); }
 // sub_825C0598's original.
 Result e825C0598(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825C0598).
@@ -5285,6 +8925,14 @@ inline void c825C0598(Regs& regs, uint8_t* base) { regs.Apply(e825C0598(base, re
 Result e825C05B0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825C05B0).
 inline void c825C05B0(Regs& regs, uint8_t* base) { regs.Apply(e825C05B0(base, regs.ToArgs())); }
+// sub_825C0708's original.
+Result e825C0708(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825C0708).
+inline void c825C0708(Regs& regs, uint8_t* base) { regs.Apply(e825C0708(base, regs.ToArgs())); }
+// sub_825C0748's original.
+Result e825C0748(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825C0748).
+inline void c825C0748(Regs& regs, uint8_t* base) { regs.Apply(e825C0748(base, regs.ToArgs())); }
 // sub_825C1518's original.
 Result e825C1518(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825C1518).
@@ -5297,6 +8945,10 @@ inline void c825C1F30(Regs& regs, uint8_t* base) { regs.Apply(e825C1F30(base, re
 Result e825C2060(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825C2060).
 inline void c825C2060(Regs& regs, uint8_t* base) { regs.Apply(e825C2060(base, regs.ToArgs())); }
+// sub_825C2128's original.
+Result e825C2128(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825C2128).
+inline void c825C2128(Regs& regs, uint8_t* base) { regs.Apply(e825C2128(base, regs.ToArgs())); }
 // sub_825C21B0's original.
 Result e825C21B0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825C21B0).
@@ -5373,14 +9025,30 @@ inline void c825C2CC8(Regs& regs, uint8_t* base) { regs.Apply(e825C2CC8(base, re
 Result e825C31D8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825C31D8).
 inline void c825C31D8(Regs& regs, uint8_t* base) { regs.Apply(e825C31D8(base, regs.ToArgs())); }
+// sub_825C3508's original.
+Result e825C3508(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825C3508).
+inline void c825C3508(Regs& regs, uint8_t* base) { regs.Apply(e825C3508(base, regs.ToArgs())); }
 // sub_825C3548's original.
 Result e825C3548(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825C3548).
 inline void c825C3548(Regs& regs, uint8_t* base) { regs.Apply(e825C3548(base, regs.ToArgs())); }
+// sub_825C3B68's original.
+Result e825C3B68(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825C3B68).
+inline void c825C3B68(Regs& regs, uint8_t* base) { regs.Apply(e825C3B68(base, regs.ToArgs())); }
 // sub_825C3EE0's original.
 Result e825C3EE0(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825C3EE0).
 inline void c825C3EE0(Regs& regs, uint8_t* base) { regs.Apply(e825C3EE0(base, regs.ToArgs())); }
+// sub_825C3F90's original.
+Result e825C3F90(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825C3F90).
+inline void c825C3F90(Regs& regs, uint8_t* base) { regs.Apply(e825C3F90(base, regs.ToArgs())); }
+// sub_825C4000's original.
+Result e825C4000(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825C4000).
+inline void c825C4000(Regs& regs, uint8_t* base) { regs.Apply(e825C4000(base, regs.ToArgs())); }
 // sub_825C4070's original.
 Result e825C4070(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825C4070).
@@ -5397,14 +9065,26 @@ inline void c825C4FC0(Regs& regs, uint8_t* base) { regs.Apply(e825C4FC0(base, re
 Result e825C5758(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825C5758).
 inline void c825C5758(Regs& regs, uint8_t* base) { regs.Apply(e825C5758(base, regs.ToArgs())); }
+// sub_825C5960's original.
+Result e825C5960(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825C5960).
+inline void c825C5960(Regs& regs, uint8_t* base) { regs.Apply(e825C5960(base, regs.ToArgs())); }
 // sub_825C5E28's original.
 Result e825C5E28(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825C5E28).
 inline void c825C5E28(Regs& regs, uint8_t* base) { regs.Apply(e825C5E28(base, regs.ToArgs())); }
+// sub_825C5E58's original.
+Result e825C5E58(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825C5E58).
+inline void c825C5E58(Regs& regs, uint8_t* base) { regs.Apply(e825C5E58(base, regs.ToArgs())); }
 // sub_825C6040's original.
 Result e825C6040(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825C6040).
 inline void c825C6040(Regs& regs, uint8_t* base) { regs.Apply(e825C6040(base, regs.ToArgs())); }
+// sub_825C60C0's original.
+Result e825C60C0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825C60C0).
+inline void c825C60C0(Regs& regs, uint8_t* base) { regs.Apply(e825C60C0(base, regs.ToArgs())); }
 // sub_825C6140's original.
 Result e825C6140(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825C6140).
@@ -5425,6 +9105,18 @@ inline void c825C6A20(Regs& regs, uint8_t* base) { regs.Apply(e825C6A20(base, re
 Result e825C7218(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825C7218).
 inline void c825C7218(Regs& regs, uint8_t* base) { regs.Apply(e825C7218(base, regs.ToArgs())); }
+// sub_825C72B0's original.
+Result e825C72B0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825C72B0).
+inline void c825C72B0(Regs& regs, uint8_t* base) { regs.Apply(e825C72B0(base, regs.ToArgs())); }
+// sub_825C7448's original.
+Result e825C7448(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825C7448).
+inline void c825C7448(Regs& regs, uint8_t* base) { regs.Apply(e825C7448(base, regs.ToArgs())); }
+// sub_825C76A0's original.
+Result e825C76A0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825C76A0).
+inline void c825C76A0(Regs& regs, uint8_t* base) { regs.Apply(e825C76A0(base, regs.ToArgs())); }
 // sub_825C7758's original.
 Result e825C7758(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825C7758).
@@ -5445,6 +9137,10 @@ inline void c825C79B8(Regs& regs, uint8_t* base) { regs.Apply(e825C79B8(base, re
 Result e825C7AA8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825C7AA8).
 inline void c825C7AA8(Regs& regs, uint8_t* base) { regs.Apply(e825C7AA8(base, regs.ToArgs())); }
+// sub_825C7AB0's original.
+Result e825C7AB0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825C7AB0).
+inline void c825C7AB0(Regs& regs, uint8_t* base) { regs.Apply(e825C7AB0(base, regs.ToArgs())); }
 // sub_825C7B70's original.
 Result e825C7B70(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825C7B70).
@@ -5501,6 +9197,10 @@ inline void c825C85E8(Regs& regs, uint8_t* base) { regs.Apply(e825C85E8(base, re
 Result e825C8690(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825C8690).
 inline void c825C8690(Regs& regs, uint8_t* base) { regs.Apply(e825C8690(base, regs.ToArgs())); }
+// sub_825C9B60's original.
+Result e825C9B60(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825C9B60).
+inline void c825C9B60(Regs& regs, uint8_t* base) { regs.Apply(e825C9B60(base, regs.ToArgs())); }
 // sub_825C9C40's original.
 Result e825C9C40(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825C9C40).
@@ -5513,6 +9213,14 @@ inline void c825CA448(Regs& regs, uint8_t* base) { regs.Apply(e825CA448(base, re
 Result e825CA980(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825CA980).
 inline void c825CA980(Regs& regs, uint8_t* base) { regs.Apply(e825CA980(base, regs.ToArgs())); }
+// sub_825CAC48's original.
+Result e825CAC48(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825CAC48).
+inline void c825CAC48(Regs& regs, uint8_t* base) { regs.Apply(e825CAC48(base, regs.ToArgs())); }
+// sub_825CB0C8's original.
+Result e825CB0C8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825CB0C8).
+inline void c825CB0C8(Regs& regs, uint8_t* base) { regs.Apply(e825CB0C8(base, regs.ToArgs())); }
 // sub_825CB470's original.
 Result e825CB470(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825CB470).
@@ -5541,14 +9249,78 @@ inline void c825CC320(Regs& regs, uint8_t* base) { regs.Apply(e825CC320(base, re
 Result e825CC380(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825CC380).
 inline void c825CC380(Regs& regs, uint8_t* base) { regs.Apply(e825CC380(base, regs.ToArgs())); }
+// sub_825CC620's original.
+Result e825CC620(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825CC620).
+inline void c825CC620(Regs& regs, uint8_t* base) { regs.Apply(e825CC620(base, regs.ToArgs())); }
 // sub_825CC9C8's original.
 Result e825CC9C8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825CC9C8).
 inline void c825CC9C8(Regs& regs, uint8_t* base) { regs.Apply(e825CC9C8(base, regs.ToArgs())); }
+// sub_825CEBE0's original.
+Result e825CEBE0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825CEBE0).
+inline void c825CEBE0(Regs& regs, uint8_t* base) { regs.Apply(e825CEBE0(base, regs.ToArgs())); }
+// sub_825CED88's original.
+Result e825CED88(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825CED88).
+inline void c825CED88(Regs& regs, uint8_t* base) { regs.Apply(e825CED88(base, regs.ToArgs())); }
+// sub_825CED98's original.
+Result e825CED98(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825CED98).
+inline void c825CED98(Regs& regs, uint8_t* base) { regs.Apply(e825CED98(base, regs.ToArgs())); }
+// sub_825CEDF8's original.
+Result e825CEDF8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825CEDF8).
+inline void c825CEDF8(Regs& regs, uint8_t* base) { regs.Apply(e825CEDF8(base, regs.ToArgs())); }
+// sub_825CEE00's original.
+Result e825CEE00(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825CEE00).
+inline void c825CEE00(Regs& regs, uint8_t* base) { regs.Apply(e825CEE00(base, regs.ToArgs())); }
+// sub_825CEE10's original.
+Result e825CEE10(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825CEE10).
+inline void c825CEE10(Regs& regs, uint8_t* base) { regs.Apply(e825CEE10(base, regs.ToArgs())); }
+// sub_825CEE28's original.
+Result e825CEE28(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825CEE28).
+inline void c825CEE28(Regs& regs, uint8_t* base) { regs.Apply(e825CEE28(base, regs.ToArgs())); }
+// sub_825CEE70's original.
+Result e825CEE70(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825CEE70).
+inline void c825CEE70(Regs& regs, uint8_t* base) { regs.Apply(e825CEE70(base, regs.ToArgs())); }
+// sub_825CEEA0's original.
+Result e825CEEA0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825CEEA0).
+inline void c825CEEA0(Regs& regs, uint8_t* base) { regs.Apply(e825CEEA0(base, regs.ToArgs())); }
+// sub_825CF080's original.
+Result e825CF080(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825CF080).
+inline void c825CF080(Regs& regs, uint8_t* base) { regs.Apply(e825CF080(base, regs.ToArgs())); }
+// sub_825CF210's original.
+Result e825CF210(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825CF210).
+inline void c825CF210(Regs& regs, uint8_t* base) { regs.Apply(e825CF210(base, regs.ToArgs())); }
+// sub_825CF288's original.
+Result e825CF288(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825CF288).
+inline void c825CF288(Regs& regs, uint8_t* base) { regs.Apply(e825CF288(base, regs.ToArgs())); }
+// sub_825D0110's original.
+Result e825D0110(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825D0110).
+inline void c825D0110(Regs& regs, uint8_t* base) { regs.Apply(e825D0110(base, regs.ToArgs())); }
 // sub_825D0268's original.
 Result e825D0268(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825D0268).
 inline void c825D0268(Regs& regs, uint8_t* base) { regs.Apply(e825D0268(base, regs.ToArgs())); }
+// sub_825D02B0's original.
+Result e825D02B0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825D02B0).
+inline void c825D02B0(Regs& regs, uint8_t* base) { regs.Apply(e825D02B0(base, regs.ToArgs())); }
+// sub_825D02F8's original.
+Result e825D02F8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825D02F8).
+inline void c825D02F8(Regs& regs, uint8_t* base) { regs.Apply(e825D02F8(base, regs.ToArgs())); }
 // sub_825D0428's original.
 Result e825D0428(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825D0428).
@@ -5577,22 +9349,94 @@ inline void c825D0AA0(Regs& regs, uint8_t* base) { regs.Apply(e825D0AA0(base, re
 Result e825D0BF8(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825D0BF8).
 inline void c825D0BF8(Regs& regs, uint8_t* base) { regs.Apply(e825D0BF8(base, regs.ToArgs())); }
+// sub_825D0EF0's original.
+Result e825D0EF0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825D0EF0).
+inline void c825D0EF0(Regs& regs, uint8_t* base) { regs.Apply(e825D0EF0(base, regs.ToArgs())); }
 // sub_825D0F00's original.
 Result e825D0F00(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825D0F00).
 inline void c825D0F00(Regs& regs, uint8_t* base) { regs.Apply(e825D0F00(base, regs.ToArgs())); }
+// sub_825D1358's original.
+Result e825D1358(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825D1358).
+inline void c825D1358(Regs& regs, uint8_t* base) { regs.Apply(e825D1358(base, regs.ToArgs())); }
+// sub_825D13F0's original.
+Result e825D13F0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825D13F0).
+inline void c825D13F0(Regs& regs, uint8_t* base) { regs.Apply(e825D13F0(base, regs.ToArgs())); }
+// sub_825D1760's original.
+Result e825D1760(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825D1760).
+inline void c825D1760(Regs& regs, uint8_t* base) { regs.Apply(e825D1760(base, regs.ToArgs())); }
+// sub_825D1C78's original.
+Result e825D1C78(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825D1C78).
+inline void c825D1C78(Regs& regs, uint8_t* base) { regs.Apply(e825D1C78(base, regs.ToArgs())); }
+// sub_825D1DF8's original.
+Result e825D1DF8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825D1DF8).
+inline void c825D1DF8(Regs& regs, uint8_t* base) { regs.Apply(e825D1DF8(base, regs.ToArgs())); }
 // sub_825D2170's original.
 Result e825D2170(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825D2170).
 inline void c825D2170(Regs& regs, uint8_t* base) { regs.Apply(e825D2170(base, regs.ToArgs())); }
+// sub_825D23F0's original.
+Result e825D23F0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825D23F0).
+inline void c825D23F0(Regs& regs, uint8_t* base) { regs.Apply(e825D23F0(base, regs.ToArgs())); }
+// sub_825D24D8's original.
+Result e825D24D8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825D24D8).
+inline void c825D24D8(Regs& regs, uint8_t* base) { regs.Apply(e825D24D8(base, regs.ToArgs())); }
+// sub_825D2778's original.
+Result e825D2778(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825D2778).
+inline void c825D2778(Regs& regs, uint8_t* base) { regs.Apply(e825D2778(base, regs.ToArgs())); }
+// sub_825D28D0's original.
+Result e825D28D0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825D28D0).
+inline void c825D28D0(Regs& regs, uint8_t* base) { regs.Apply(e825D28D0(base, regs.ToArgs())); }
+// sub_825D29E8's original.
+Result e825D29E8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825D29E8).
+inline void c825D29E8(Regs& regs, uint8_t* base) { regs.Apply(e825D29E8(base, regs.ToArgs())); }
 // sub_825D3820's original.
 Result e825D3820(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825D3820).
 inline void c825D3820(Regs& regs, uint8_t* base) { regs.Apply(e825D3820(base, regs.ToArgs())); }
+// sub_825D53D8's original.
+Result e825D53D8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825D53D8).
+inline void c825D53D8(Regs& regs, uint8_t* base) { regs.Apply(e825D53D8(base, regs.ToArgs())); }
+// sub_825D55E0's original.
+Result e825D55E0(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825D55E0).
+inline void c825D55E0(Regs& regs, uint8_t* base) { regs.Apply(e825D55E0(base, regs.ToArgs())); }
+// sub_825D5678's original.
+Result e825D5678(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825D5678).
+inline void c825D5678(Regs& regs, uint8_t* base) { regs.Apply(e825D5678(base, regs.ToArgs())); }
+// sub_825D5838's original.
+Result e825D5838(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825D5838).
+inline void c825D5838(Regs& regs, uint8_t* base) { regs.Apply(e825D5838(base, regs.ToArgs())); }
+// sub_825D5980's original.
+Result e825D5980(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825D5980).
+inline void c825D5980(Regs& regs, uint8_t* base) { regs.Apply(e825D5980(base, regs.ToArgs())); }
+// sub_825D5D18's original.
+Result e825D5D18(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825D5D18).
+inline void c825D5D18(Regs& regs, uint8_t* base) { regs.Apply(e825D5D18(base, regs.ToArgs())); }
 // sub_825D5E58's original.
 Result e825D5E58(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825D5E58).
 inline void c825D5E58(Regs& regs, uint8_t* base) { regs.Apply(e825D5E58(base, regs.ToArgs())); }
+// sub_825D82E8's original.
+Result e825D82E8(uint8_t* base, const Args& a);
+// The same on a register view (in place of __imp__sub_825D82E8).
+inline void c825D82E8(Regs& regs, uint8_t* base) { regs.Apply(e825D82E8(base, regs.ToArgs())); }
 // sub_825D8660's original.
 Result e825D8660(uint8_t* base, const Args& a);
 // The same on a register view (in place of __imp__sub_825D8660).

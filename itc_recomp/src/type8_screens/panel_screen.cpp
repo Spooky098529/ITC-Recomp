@@ -7,6 +7,9 @@
 #include "base/log.h"
 #include "guest.h"
 #include "mode_tick/mode_tick.h"
+#include "schema/tuning_screen.h"
+#include "schema/type67_screens.h"
+#include "schema/type8_screens.h"
 #include "ui_movies/game.h"
 
 namespace type8_screens {
@@ -17,6 +20,7 @@ using guest::LoadU32;
 using guest::StoreU32;
 
 namespace ts = type67_screens;
+using G = schema::Type8ScreensGlobals;
 
 constexpr uint32_t kPlayNamed = 0x8211DAC8;
 constexpr uint32_t kDialogMovie = 16, kDialogCursor = 40960;
@@ -35,7 +39,7 @@ uint64_t Play(const Calls& calls, uint32_t movie, uint32_t named, uint32_t frame
 // ScreenFades::FadeOut([0x82001BF0], 0, 0, 0, 0): its plain C++, r4 left 0
 // as the original sets it; FadeOut's r3 (the passes).
 uint64_t FadeOut(uint8_t* base, const Calls& calls) {
-  const uint32_t passes = LoadU32(base, kFadeOutPasses);
+  const uint32_t passes = G::fade_out_passes(base);
   mode_tick::ScreenFadesFadeOut(base, passes, 0, 0, 0, 0);
   calls.set_r4(0);
   return passes;
@@ -48,10 +52,11 @@ uint64_t FadeOut(uint8_t* base, const Calls& calls) {
 uint64_t InitWords(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_82238420 Type8PanelScreen::InitWords");
   const uint32_t screen = uint32_t(r3);
-  StoreU32(base, screen + 13192, 3);
-  StoreU32(base, screen + 15164, 3);
-  StoreU32(base, screen + 13200, 4);
-  StoreU32(base, screen + 15172, 4);
+  const schema::Type8PanelScreen s(base, screen);
+  s.set_list0_rows_shown(3);
+  s.set_list1_rows_shown(3);
+  s.set_list0_colors_shown(4);
+  s.set_list1_colors_shown(4);
   return r3;
 }
 
@@ -71,52 +76,47 @@ uint64_t DeleteMovies(uint32_t sp, uint32_t lr, const Calls& calls) {
 }
 
 uint64_t SetWord(uint8_t* base, uint64_t r3, uint32_t function) {
-  uint32_t at = 0, value = 0;
+  const schema::Type8PanelScreen s(base, uint32_t(r3));
   switch (function) {
     case 0x82238458:
       ITC_NATIVE_RUNNING("sub_82238458 Type8PanelScreen::OnMessage2");
-      at = 15228;
-      value = 1;
+      s.set_message2_got(1);
       break;
     case 0x82238530:
       ITC_NATIVE_RUNNING("sub_82238530 Type8PanelScreen::OnSaveLoaded");
-      at = 15232;
-      value = 0;
+      s.set_load_asked(0);
       break;
     case 0x82238540:
       ITC_NATIVE_RUNNING("sub_82238540 Type8PanelScreen::OnAnswer0");
-      at = 15244;
-      value = 0;
+      s.set_dialog_answer(0);
       break;
     case 0x82238550:
       ITC_NATIVE_RUNNING("sub_82238550 Type8PanelScreen::OnAnswer1");
-      at = 15244;
-      value = 1;
+      s.set_dialog_answer(1);
       break;
     default:
       ITC_NATIVE_RUNNING("sub_82238560 Type8PanelScreen::OnAnswer2");
-      at = 15244;
-      value = 2;
+      s.set_dialog_answer(2);
       break;
   }
-  StoreU32(base, uint32_t(r3) + at, value);
   return r3;
 }
 
 uint64_t Leave(uint8_t* base, uint64_t r3, uint64_t r4) {
   ITC_NATIVE_RUNNING("sub_82238B10 Type8PanelScreen::Leave");
   const uint32_t screen = uint32_t(r3);
-  if ((LoadU32(base, type67_screens::kFadeCountA) | LoadU32(base, type67_screens::kFadeCountB)) !=
-      0) {
+  const schema::Type8PanelScreen s(base, screen);
+  if ((schema::Type67ScreensGlobals::fade_out_count(base) |
+       schema::Type67ScreensGlobals::fade_in_count(base)) != 0) {
     return r3;
   }
   uint32_t message = 4;
-  if (LoadU32(base, screen + 15240) == 0) {
-    StoreU32(base, screen + 9608, 9);
+  if (s.loaded_this_visit() == 0) {
+    s.set_state(9);
     message = 6;
   }
   type67_screens::Post(base, uint32_t(r4), message);
-  StoreU32(base, screen + 9656, 0);
+  s.set_draw_mode(0);
   return r3;
 }
 
@@ -126,15 +126,16 @@ uint64_t ShowPlayerNodes(uint8_t* base, uint64_t r3, uint64_t first, uint64_t se
                          uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82238570 Type8PanelScreen::ShowPlayerNodes");
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 128);
-  const uint32_t m = uint32_t(ts::PanelGroupMovie(base, screen + kGroup, frame));
+  const schema::Type8PanelScreen s(base, screen);
+  const uint32_t m = uint32_t(ts::PanelGroupMovie(base, s.group_address(), frame));
   // The node and its first child, read again for each call as the original
   // does.
-  auto node = [&] { return LoadU32(base, screen + 11256); };
-  auto child = [&](uint32_t k) { return LoadU32(base, screen + 11260) + k; };
+  auto node = [&] { return s.player_node(); };
+  auto child = [&](uint32_t k) { return s.player_child() + k; };
   uint64_t result = 0;
   auto shown = [&](uint32_t sub_scene, uint32_t c, uint32_t on) {
     const uint32_t found = ui_movies::FindNode(base, m, sub_scene, c);
-    StoreU32(base, found + 80, on);
+    schema::UiMovieNode(base, found).set_visible(on);
     result = found;
   };
   auto texture = [&](uint32_t sub_scene, uint32_t c, uint32_t t) {
@@ -168,19 +169,20 @@ uint64_t ShowPlayerNodes(uint8_t* base, uint64_t r3, uint64_t first, uint64_t se
 uint64_t FadeInGroup(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82238468 Type8PanelScreen::FadeInGroup");
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 112);
-  if (LoadU32(base, screen + 15228) == 0 || LoadU32(base, screen + 15236) != 0) {
+  const schema::Type8PanelScreen s(base, screen);
+  if (s.message2_got() == 0 || s.opening_played() != 0) {
     return r3;
   }
-  ts::PanelFadeIn(base, LoadU32(base, kFadeInPasses), frame, 0x822384A4, calls);
-  const uint32_t m = uint32_t(ts::PanelGroupMovie(base, screen + kGroup, frame));
-  calls.call(kFinishNamed, frame, 0x822384B8, m, LoadU32(base, screen + 11264));
-  Play(calls, m, LoadU32(base, screen + 11264), frame, 0x822384D4);
-  uint64_t result = ui_movies::IsNamedActive(base, m, LoadU32(base, screen + 11268));
+  ts::PanelFadeIn(base, G::fade_in_passes(base), frame, 0x822384A4, calls);
+  const uint32_t m = uint32_t(ts::PanelGroupMovie(base, s.group_address(), frame));
+  calls.call(kFinishNamed, frame, 0x822384B8, m, s.open_anim());
+  Play(calls, m, s.open_anim(), frame, 0x822384D4);
+  uint64_t result = ui_movies::IsNamedActive(base, m, s.loop_anim());
   if (uint32_t(result) == 0) {
-    Play(calls, m, LoadU32(base, screen + 11268), frame, 0x82238504);
-    result = calls.call(kLoopNamed, frame, 0x82238510, m, LoadU32(base, screen + 11268));
+    Play(calls, m, s.loop_anim(), frame, 0x82238504);
+    result = calls.call(kLoopNamed, frame, 0x82238510, m, s.loop_anim());
   }
-  StoreU32(base, screen + 15236, 1);
+  s.set_opening_played(1);
   return result;
 }
 
@@ -188,7 +190,8 @@ uint64_t UpdateOpening(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
                        const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82238A00 Type8PanelScreen::UpdateOpening");
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 112);
-  if (LoadU32(base, screen + 15228) == 0) {
+  const schema::Type8PanelScreen s(base, screen);
+  if (s.message2_got() == 0) {
     return r3;
   }
   ShowPlayerNodes(base, r3, 1, 0, frame);
@@ -196,34 +199,35 @@ uint64_t UpdateOpening(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
   // only r3: r4 as ShowPlayerNodes leaves it (the node +11256, its last
   // HideNode's), then as the first slot leaves it.
   const uint64_t holder = r3 + kHolder;
-  ts::Slot(base, holder, 8, uint64_t(LoadU32(base, screen + 11256)), frame, 0x82238A44, calls);
+  ts::Slot(base, holder, 8, uint64_t(s.player_node()), frame, 0x82238A44, calls);
   uint64_t result = ts::Slot(base, holder, 4, std::nullopt, frame, 0x82238A58, calls);
-  if (LoadU32(base, screen + 15232) != 0) {
+  if (s.load_asked() != 0) {
     return result;
   }
-  const uint32_t m = uint32_t(ts::PanelGroupMovie(base, screen + kGroup, frame));
-  result = ui_movies::IsNamedActive(base, m, LoadU32(base, screen + 11264));
-  if (uint32_t(result) != 0 || LoadU32(base, ts::kFadeWait) != 0) {
+  const uint32_t m = uint32_t(ts::PanelGroupMovie(base, s.group_address(), frame));
+  result = ui_movies::IsNamedActive(base, m, s.open_anim());
+  if (uint32_t(result) != 0 || schema::Type67ScreensGlobals::fade_wait(base) != 0) {
     return result;
   }
-  if (LoadU32(base, kModeBefore) == 1) {
-    StoreU32(base, screen + 9608, 9);
-    StoreU32(base, screen + 15240, 0);
+  if (G::mode_before(base) == 1) {
+    s.set_state(9);
+    s.set_loaded_this_visit(0);
     return result;
   }
   ts::Post(base, uint32_t(r4), 29);
-  StoreU32(base, screen + 15232, 1);
-  StoreU32(base, screen + 15240, 1);
+  s.set_load_asked(1);
+  s.set_loaded_this_visit(1);
   return result;
 }
 
 uint64_t Show(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82238928 Type8PanelScreen::Show");
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 96);
+  const schema::Type8PanelScreen s(base, screen);
   ts::PanelScreenShow(base, r3, r4, frame, calls);
-  if (LoadU32(base, screen + 15240) == 0) {
+  if (s.loaded_this_visit() == 0) {
     // ScreenFades::FadeIn([0x82001BEC], 0, 0, 0, 0): its plain C++.
-    mode_tick::ScreenFadesFadeIn(base, LoadU32(base, kFadeInPasses), 0, 0, 0, 0);
+    mode_tick::ScreenFadesFadeIn(base, G::fade_in_passes(base), 0, 0, 0, 0);
     calls.set_r4(0);
   }
   return ShowPlayerNodes(base, r3, 0, 0, frame);
@@ -233,6 +237,7 @@ uint64_t AskQuit(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t player, uint3
                  const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82238BA0 Type8PanelScreen::AskQuit");
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 128);
+  const schema::Type8PanelScreen s(base, screen);
   StoreU32(base, frame + 80, kDialogMovie);
   const uint32_t movie =
       LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
@@ -240,27 +245,28 @@ uint64_t AskQuit(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t player, uint3
   calls.set_text(frame, 0x82238BFC, movie, 1, 3, 2);
   calls.set_text(frame, 0x82238C10, movie, 1, 4, 3);
   StoreU32(base, movie + kDialogCursor, 1);
-  StoreU32(base, kDialogPlayer, player);
+  G::set_dialog_player(base, player);
   ts::Post(base, uint32_t(r4), 7);
-  StoreU32(base, screen + 9656, 1);
-  StoreU32(base, screen + 15244, 0xFFFFFFFFu);
+  s.set_draw_mode(1);
+  s.set_dialog_answer(0xFFFFFFFFu);
   return ~uint64_t(0);
 }
 
 uint64_t DrawList(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82238DC8 Type8PanelScreen::DrawList");
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 112);
+  const schema::Type8PanelScreen s(base, screen);
   const uint64_t result = ts::PanelScreenDrawList(base, r3, r4, frame, calls);
   for (uint32_t player = 0; player < 2; player++) {
-    if (LoadU32(base, screen + 13220 + 1972 * player) == 0) {
+    if ((player == 0 ? s.list0_cancelled() : s.list1_cancelled()) == 0) {
       continue;
     }
-    if (LoadU32(base, screen + 15240) != 0) {
+    if (s.loaded_this_visit() != 0) {
       AskQuit(base, r3, r4, player, frame, calls);
       return ShowPlayerNodes(base, r3, 1, 1, frame);
     }
     const uint64_t passes = FadeOut(base, calls);
-    StoreU32(base, screen + 9656, 2);
+    s.set_draw_mode(2);
     return passes;
   }
   return result;
@@ -268,7 +274,7 @@ uint64_t DrawList(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, const Ca
 
 uint64_t Draw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82238E78 Type8PanelScreen::Draw");
-  const int32_t quit = int32_t(LoadU32(base, uint32_t(r3) + 9656));
+  const int32_t quit = int32_t(schema::Type8PanelScreen(base, uint32_t(r3)).draw_mode());
   if (quit == 0) {
     return DrawList(base, r3, r4, sp, calls);
   }
@@ -281,12 +287,13 @@ uint64_t Draw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, const Calls&
 uint64_t OnDialogClosed(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82238990 Type8PanelScreen::OnDialogClosed");
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 96);
+  const schema::Type8PanelScreen s(base, screen);
   uint32_t dialog = 0;
-  if (LoadU32(base, screen + 15244) == 0) {
+  if (s.dialog_answer() == 0) {
     FadeOut(base, calls);
     dialog = 2;
   }
-  StoreU32(base, screen + 9656, dialog);
+  s.set_draw_mode(dialog);
   return ShowPlayerNodes(base, r3, 0, 0, frame);
 }
 

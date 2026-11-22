@@ -8,6 +8,8 @@
 
 #include "base/log.h"
 #include "collision/collision.h"
+#include "schema/collision_world.h"
+#include "schema/race_states.h"
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -26,21 +28,10 @@ namespace va = vehicle_accessors;
 namespace {
 
 using Fpscr = ::base::FloatMode;
+using G = schema::CollisionWorldGlobals;
+using Query = schema::WallQuery;
 
-constexpr uint32_t kRaceData = 0x826C5B2C;     // the race data's pointer
-constexpr uint32_t kRaceMode = 0xA3AF4;        // its word: the race mode
-constexpr uint32_t kStageFlags = 0x59620 + 1220;  // the stage list's flags
-constexpr uint32_t kGameState = 0x826D82E8;    // a pointer: its +6100 read for mode 5
-constexpr uint32_t kCornerOrder = 0x82006900;  // bytes: the corners' order (the first 8)
-constexpr uint32_t kCornerReach = 0x82002CB0;
-constexpr uint32_t kCornerMargin = 0x82001FBC;
 constexpr uint32_t kWallHit = 0x01000000;      // the hit's surface bits
-constexpr uint32_t kHalf = 0x82001BE4;         // 0.5
-constexpr uint32_t kOutward = 0x8200690C;      // the faces' normals scaled by this
-constexpr uint32_t kSlopeFloor = 0x82006908;   // the ends' moves toward the wall at least this
-constexpr uint32_t kMinusOne = 0x82001BE0;     // -1.0 (the direction negated)
-constexpr uint32_t kUp = 0x82640000u - 32080;  // 0x826382B0: the up axis
-constexpr uint32_t kTwo = 0x820021E8;          // 2.0
 constexpr uint32_t kWallLimit = 128;           // the walls kept in the tested list
 
 // The shape record's template and copies are boxes (the wall query's
@@ -106,8 +97,8 @@ void Copy16(uint8_t* base, uint32_t from, uint32_t to) {
 }
 
 // The stage list's flags with 0x20 or 0x40: 0, else 1.
-uint32_t StageFlagsSkip(uint8_t* base, uint32_t race) {
-  const uint32_t flags = guest::LoadU32(base, race + kStageFlags);
+uint32_t StageFlagsSkip(const schema::RaceData& race) {
+  const uint32_t flags = race.flags();
   return (flags & 0x20) != 0 || (flags & 0x40) != 0 ? 0 : 1;
 }
 
@@ -168,13 +159,13 @@ bool EndsInsideSides(uint8_t* base, uint32_t current, uint32_t query, uint32_t f
     const uint32_t face = co::BoxFace(current, j);
     if (*a) {
       const double distance = Lfs(base, face + 0);
-      if (distance < DotTo(base, face + 16, query + 16, frame + at_a)) {
+      if (distance < DotTo(base, face + 16, Query(base, query).wall_a_x_address(), frame + at_a)) {
         *a = false;
       }
     }
     if (*b) {
       const double distance = Lfs(base, face + 0);
-      if (distance < DotTo(base, face + 16, query + 32, frame + at_b)) {
+      if (distance < DotTo(base, face + 16, Query(base, query).wall_b_x_address(), frame + at_b)) {
         *b = false;
       }
     }
@@ -192,24 +183,23 @@ uint32_t WallQueryModeSkips(uint8_t* base, uint32_t word) {
   if (guest::LoadU32(base, word) == 2) {
     return 1;
   }
-  const uint32_t race = guest::LoadU32(base, kRaceData);
-  const int32_t mode = int32_t(guest::LoadU32(base, race + kRaceMode));
+  const schema::RaceData race = G::race_data(base);
+  const int32_t mode = int32_t(race.race_mode());
   if (mode < 3) {
     return 1;
   }
   if (mode <= 4) {
-    return StageFlagsSkip(base, race);
+    return StageFlagsSkip(race);
   }
   if (mode == 5) {
-    const int32_t state =
-        int32_t(guest::LoadU32(base, guest::LoadU32(base, kGameState) + 6100));
-    return state == 1 || state == 3 ? StageFlagsSkip(base, race) : 1;
+    const int32_t state = int32_t(G::race_progress(base).stage_type());
+    return state == 1 || state == 3 ? StageFlagsSkip(race) : 1;
   }
   if (mode <= 6) {
     return 1;
   }
   if (mode <= 8) {
-    return StageFlagsSkip(base, race);
+    return StageFlagsSkip(race);
   }
   return 1;
 }
@@ -228,11 +218,11 @@ uint32_t WallQueryIgnoresWall(uint8_t* base, uint32_t kind, uint32_t a, uint32_t
       if (guest::LoadU16(base, a) != 0) {
         return 0;
       }
-      const uint32_t race = guest::LoadU32(base, kRaceData);
-      if (int32_t(guest::LoadU32(base, race + kRaceMode)) != 2) {
+      const schema::RaceData race = G::race_data(base);
+      if (int32_t(race.race_mode()) != 2) {
         return 0;
       }
-      const uint32_t flags = guest::LoadU32(base, race + kStageFlags);
+      const uint32_t flags = race.flags();
       if ((flags & 0x20) != 0 || (flags & 0x40) != 0) {
         return 0;
       }
@@ -244,11 +234,11 @@ uint32_t WallQueryIgnoresWall(uint8_t* base, uint32_t kind, uint32_t a, uint32_t
       if (guest::LoadU16(base, a) == 2) {
         return 1;
       }
-      const uint32_t race = guest::LoadU32(base, kRaceData);
-      if (int32_t(guest::LoadU32(base, race + kRaceMode)) != 2) {
+      const schema::RaceData race = G::race_data(base);
+      if (int32_t(race.race_mode()) != 2) {
         return 1;
       }
-      const uint32_t w = guest::LoadU32(base, race + 20);
+      const uint32_t w = race.branch_flags();
       if (k == 8) {
         return (w & 0x10) != 0 ? 1 : 0;
       }
@@ -262,7 +252,7 @@ uint32_t WallQueryIgnoresWall(uint8_t* base, uint32_t kind, uint32_t a, uint32_t
       if (WallQueryModeSkips(base, frame + 80) != 0) {
         return 1;
       }
-      const int32_t v = int32_t(guest::LoadU32(base, guest::LoadU32(base, kRaceData) + 4));
+      const int32_t v = int32_t(G::race_data(base).route_course());
       if (v < 4) {
         return 1;
       }
@@ -279,7 +269,7 @@ uint32_t WallQueryIgnoresWall(uint8_t* base, uint32_t kind, uint32_t a, uint32_t
     if (WallQueryModeSkips(base, frame + 80) != 0) {
       return 1;
     }
-    const uint32_t v = guest::LoadU32(base, guest::LoadU32(base, kRaceData) + 4);
+    const uint32_t v = G::race_data(base).route_course();
     return v - uint32_t(offset) != 0 ? 1 : 0;
   }
   if (k >= 50) {
@@ -287,7 +277,7 @@ uint32_t WallQueryIgnoresWall(uint8_t* base, uint32_t kind, uint32_t a, uint32_t
     // bit is set.
     const uint32_t bit = k - 50;
     const uint32_t word =
-        guest::LoadU32(base, guest::LoadU32(base, kRaceData) + ((bit >> 5) + 6) * 4);
+        guest::LoadU32(base, G::race_data(base).drawn_entries_address() + (bit >> 5) * 4);
     return (word & (1u << (bit & 31))) != 0 ? 0 : 1;
   }
   return 1;
@@ -295,7 +285,8 @@ uint32_t WallQueryIgnoresWall(uint8_t* base, uint32_t kind, uint32_t a, uint32_t
 
 bool WallQueryCornersThroughWall(uint8_t* base, uint32_t query, uint32_t frame, uint32_t* hit) {
   ITC_NATIVE_RUNNING("sub_820FC3C8 WallQuery::CornersThroughWall");
-  const uint32_t record = guest::LoadU32(base, query + 12);
+  const Query wq(base, query);
+  const uint32_t record = wq.record().address;
   uint32_t previous = 0, current = 0;
   if (!co::CollisionShapePrevious(base, record, &previous) ||
       !co::CollisionShapeCurrent(base, record, &current) || !co::IsBox(base, previous) ||
@@ -303,7 +294,7 @@ bool WallQueryCornersThroughWall(uint8_t* base, uint32_t query, uint32_t frame, 
     return false;
   }
   const uint32_t f = frame;
-  const uint32_t normal = query + 1440;
+  const uint32_t normal = wq.normal_x_address();
   const double one = Lfs(base, kOne);
   *hit = 0;
   Stfs(base, f + 92, one);
@@ -312,11 +303,11 @@ bool WallQueryCornersThroughWall(uint8_t* base, uint32_t query, uint32_t frame, 
     return true;
   }
   Stfs(base, f + 108, one);
-  const double reach = Lfs(base, kCornerReach);
-  const double margin = Lfs(base, kCornerMargin);
+  const double reach = double(G::corner_reach(base));
+  const double margin = double(G::corner_margin(base));
   const double zero = Lfs(base, kZero);
   for (uint32_t i = 0; i < co::BoxCornerCount(); i++) {
-    const uint32_t index = i < 8 ? guest::LoadU8(base, kCornerOrder + i) : (i & 0xFF);
+    const uint32_t index = i < 8 ? guest::LoadU8(base, G::corner_order_address() + i) : (i & 0xFF);
     const uint32_t from = co::BoxCorner(previous, index);
     const uint32_t to = co::BoxCorner(current, index);
     const double cx = Lfs(base, to + 0), cy = Lfs(base, to + 4), cz = Lfs(base, to + 8);
@@ -336,7 +327,7 @@ bool WallQueryCornersThroughWall(uint8_t* base, uint32_t query, uint32_t frame, 
       continue;
     }
     // Ending behind the wall.
-    const double distance = Lfs(base, query + 1464);
+    const double distance = double(wq.normal_distance());
     const double depth = Fsubs(Fsubs(DotTo(base, normal, to, f + 144), distance), margin);
     if (!(depth < zero)) {
       continue;
@@ -352,11 +343,11 @@ bool WallQueryCornersThroughWall(uint8_t* base, uint32_t query, uint32_t frame, 
     const double nx = Lfs(base, normal + 0), ny = Lfs(base, normal + 4),
                  nz = Lfs(base, normal + 8);
     Stfs(base, f + 92, one);
-    const double lo = Lfs(base, query + 1456), hi = Lfs(base, query + 1460);
+    const double lo = double(wq.span_a()), hi = double(wq.span_b());
     Stfs(base, f + 80, Fadds(cx, Fmuls(nx, push)));
     Stfs(base, f + 84, Fadds(cy, Fmuls(ny, push)));
     Stfs(base, f + 88, Fadds(cz, Fmuls(nz, push)));
-    const double along = DotTo(base, f + 80, query + 1408, f + 112);
+    const double along = DotTo(base, f + 80, wq.direction_x_address(), f + 112);
     if (lo < hi) {
       if (lo > along || !(hi >= along)) {
         continue;
@@ -364,13 +355,13 @@ bool WallQueryCornersThroughWall(uint8_t* base, uint32_t query, uint32_t frame, 
     } else if (lo < along || hi > along) {
       continue;
     }
-    Copy16(base, f + 80, query + 48);
-    Copy16(base, normal, query + 64);
-    Copy16(base, query + 64, query + 80);
-    const uint32_t tested = guest::LoadU32(base, query + 624);
-    Stfs(base, query + 96, push);
-    Stfs(base, query + 100, push);
-    guest::StoreU32(base, query + 104, tested);
+    Copy16(base, f + 80, wq.hit_point_x_address());
+    Copy16(base, normal, wq.hit_normal_x_address());
+    Copy16(base, wq.hit_normal_x_address(), wq.hit_push_x_address());
+    const uint32_t tested = wq.walls_tested();
+    wq.set_hit_depth(float(push));
+    wq.set_hit_depth_again(float(push));
+    wq.set_hit_wall(tested);
     WallQueryAddHit(base, query, kWallHit);
     *hit = 1;
   }
@@ -379,7 +370,8 @@ bool WallQueryCornersThroughWall(uint8_t* base, uint32_t query, uint32_t frame, 
 
 bool WallQueryEdgesAcrossWall(uint8_t* base, uint32_t query, uint32_t frame, uint32_t* hit) {
   ITC_NATIVE_RUNNING("sub_820FC900 WallQuery::EdgesAcrossWall");
-  const uint32_t record = guest::LoadU32(base, query + 12);
+  const Query wq(base, query);
+  const uint32_t record = wq.record().address;
   uint32_t previous = 0, current = 0;
   if (!co::CollisionShapePrevious(base, record, &previous) ||
       !co::CollisionShapeCurrent(base, record, &current) || !co::IsBox(base, previous) ||
@@ -388,7 +380,8 @@ bool WallQueryEdgesAcrossWall(uint8_t* base, uint32_t query, uint32_t frame, uin
   }
   const uint32_t f = frame;
   const uint32_t q = query;
-  const uint32_t end_a = q + 16, end_b = q + 32, direction = q + 1408, normal = q + 1440;
+  const uint32_t end_a = wq.wall_a_x_address(), end_b = wq.wall_b_x_address();
+  const uint32_t direction = wq.direction_x_address(), normal = wq.normal_x_address();
   const double one = Lfs(base, kOne);
   Stfs(base, f + 188, one);
   Stfs(base, f + 172, one);
@@ -403,9 +396,9 @@ bool WallQueryEdgesAcrossWall(uint8_t* base, uint32_t query, uint32_t frame, uin
   if (co::BoxEdgeCount() == 0) {
     return true;
   }
-  const double half = Lfs(base, kHalf);
-  const double outward = Lfs(base, kOutward);
-  const double slope_floor = Lfs(base, kSlopeFloor);
+  const double half = double(G::half(base));
+  const double outward = double(G::outward(base));
+  const double slope_floor = double(G::slope_floor(base));
   for (uint32_t e = 0; e < co::BoxEdgeCount(); e++) {
     if (e == 1 || e == 3 || e == 9 || e == 10) {
       continue;
@@ -417,7 +410,7 @@ bool WallQueryEdgesAcrossWall(uint8_t* base, uint32_t query, uint32_t frame, uin
     const double was_s = DotTo(base, normal, from_s, f + 368);
     const double was_t = DotTo(base, normal, from_t, f + 336);
     const double now_s = DotTo(base, normal, to_s, f + 496);
-    const double distance = Lfs(base, q + 1464);
+    const double distance = double(wq.normal_distance());
     const double now_t = DotTo(base, normal, to_t, f + 304);
     if (distance < was_s && distance < was_t && distance < now_s) {
       continue;
@@ -441,7 +434,7 @@ bool WallQueryEdgesAcrossWall(uint8_t* base, uint32_t query, uint32_t frame, uin
     double depth = zero;
     if (SegmentsIntersect2D(base, f + 224, f + 144) != 0) {
       // The edge across the wall in x and z: an end gone through it.
-      const double distance2 = Lfs(base, q + 1464);
+      const double distance2 = double(wq.normal_distance());
       const double depth_s = Fsubs(distance2, now_s);
       const double depth_t = Fsubs(distance2, now_t);
       if (move_s > slope_floor && move_s < zero) {
@@ -450,10 +443,10 @@ bool WallQueryEdgesAcrossWall(uint8_t* base, uint32_t query, uint32_t frame, uin
       if (move_t > slope_floor && move_t < zero) {
         move_t = slope_floor;
       }
-      uint32_t low = q + 1456, high = q + 1460;
+      uint32_t low = wq.span_a_address(), high = wq.span_b_address();
       if (Lfs(base, low) > Lfs(base, high)) {
-        low = q + 1460;
-        high = q + 1456;
+        low = wq.span_b_address();
+        high = wq.span_a_address();
       }
       DotTo(base, direction, to_s, f + 624);
       DotTo(base, direction, to_t, f + 400);
@@ -680,14 +673,14 @@ bool WallQueryEdgesAcrossWall(uint8_t* base, uint32_t query, uint32_t frame, uin
       continue;
     }
     // The hit: the point at the edge's mean height.
-    Copy16(base, point, q + 48);
-    Stfs(base, q + 52, Fmuls(Fadds(Lfs(base, to_t + 4), Lfs(base, to_s + 4)), half));
-    Copy16(base, normal, q + 64);
-    Copy16(base, push, q + 80);
-    const uint32_t tested = guest::LoadU32(base, q + 624);
-    Stfs(base, q + 96, depth);
-    Stfs(base, q + 100, depth);
-    guest::StoreU32(base, q + 104, tested);
+    Copy16(base, point, wq.hit_point_x_address());
+    wq.set_hit_point_y(float(Fmuls(Fadds(Lfs(base, to_t + 4), Lfs(base, to_s + 4)), half)));
+    Copy16(base, normal, wq.hit_normal_x_address());
+    Copy16(base, push, wq.hit_push_x_address());
+    const uint32_t tested = wq.walls_tested();
+    wq.set_hit_depth(float(depth));
+    wq.set_hit_depth_again(float(depth));
+    wq.set_hit_wall(tested);
     WallQueryAddHit(base, q, kWallHit);
     *hit = 1;
   }
@@ -698,50 +691,52 @@ bool WallQueryTestCell(uint8_t* base, uint32_t query, uint32_t mesh, uint32_t ce
                        uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820FDC18 WallQuery::TestCell");
   const uint32_t q = query;
-  if (!Boxes(base, guest::LoadU32(base, q + 12))) {
+  const Query wq(base, q);
+  if (!Boxes(base, wq.record().address)) {
     return false;
   }
   const uint32_t f = frame;
   // The cell in the caller's frame (+36), as the original keeps it.
   guest::StoreU32(base, f + 292, cell);
-  const uint32_t table = guest::LoadU32(base, guest::LoadU32(base, mesh + 4) + 4);
+  const uint32_t table = schema::TrackMesh(base, mesh).file().sections();
   const uint32_t section_number = guest::LoadU16(base, f + 292);
   const int32_t slice = int16_t(guest::LoadU16(base, f + 294));
   const uint32_t section =
       guest::LoadU32(base, uint32_t(int32_t(int16_t(section_number))) * 4 + table);
-  const uint32_t slice_at = uint32_t(slice) * 28 + guest::LoadU32(base, section + 72) + section;
-  const uint32_t vertices = guest::LoadU32(base, section + 64) + section;
-  const uint32_t first = guest::LoadU16(base, slice_at + 6);
-  uint32_t walls = guest::LoadU16(base, slice_at + 4);
-  uint32_t wall = (first << 3) + guest::LoadU32(base, section + 80) + section;
+  const schema::TrackMeshSection sec(base, section);
+  const schema::TrackMeshSlice slice_at(base, uint32_t(slice) * 28 + sec.slices() + section);
+  const uint32_t vertices = sec.vertices() + section;
+  const uint32_t first = slice_at.first_wall();
+  uint32_t walls = slice_at.wall_count();
+  uint32_t wall = (first << 3) + sec.walls() + section;
   if (walls == 0) {
     return true;
   }
   guest::StoreU16(base, f + 84, uint16_t(section_number));
-  const double minus_one = Lfs(base, kMinusOne);
+  const double minus_one = double(G::minus_one(base));
   const double one = Lfs(base, kOne);
   const double zero = Lfs(base, kZero);
   for (; walls != 0; walls--, wall += 8) {
-    const uint32_t tested = guest::LoadU32(base, q + 624);
+    const schema::TrackMeshWall w(base, wall);
+    const uint32_t tested = wq.walls_tested();
     const uint32_t listed = tested > kWallLimit ? kWallLimit : tested;
-    const uint32_t a = guest::LoadU16(base, wall + 0), b = guest::LoadU16(base, wall + 2);
+    const uint32_t a = w.vertex_0(), b = w.vertex_1();
     guest::StoreU16(base, f + 86, uint16_t(a));
     guest::StoreU16(base, f + 88, uint16_t(b));
     // A wall with a kind the race skips.
-    if (guest::LoadU16(base, wall + 4) != 0) {
-      const uint32_t shape = guest::LoadU32(base, guest::LoadU32(base, q + 12));
+    if (w.kind() != 0) {
+      const uint32_t shape = wq.record().template_shape();
       guest::StoreU16(base, f + 80, uint16_t(va::ObjectHalf114(base, shape)));
       guest::StoreU16(base, f + 82, uint16_t(va::ObjectHalf112(base, shape)));
-      if (WallQueryIgnoresWall(base, wall + 4, f + 82, f + 80, f - 96) != 0) {
+      if (WallQueryIgnoresWall(base, w.kind_address(), f + 82, f + 80, f - 96) != 0) {
         continue;
       }
     }
     // One already tested (another cell's), else listed.
     bool seen = false;
     for (uint32_t i = 0; i < listed && int32_t(listed) > 0; i++) {
-      const uint32_t entry = q + 628 + 6 * i;
-      if (guest::LoadU16(base, entry + 0) == section_number &&
-          guest::LoadU16(base, entry + 2) == a && guest::LoadU16(base, entry + 4) == b) {
+      const schema::TrackTestedWall entry(base, wq.walls_address() + 6 * i);
+      if (entry.section() == section_number && entry.vertex_0() == a && entry.vertex_1() == b) {
         seen = true;
         break;
       }
@@ -749,32 +744,34 @@ bool WallQueryTestCell(uint8_t* base, uint32_t query, uint32_t mesh, uint32_t ce
     if (seen) {
       continue;
     }
-    if (guest::LoadU32(base, q + 624) < kWallLimit) {
-      const uint32_t entry = guest::LoadU32(base, q + 624) * 6 + q + 628;
-      guest::StoreU16(base, entry + 0, guest::LoadU16(base, f + 84));
-      guest::StoreU16(base, entry + 2, guest::LoadU16(base, f + 86));
-      guest::StoreU16(base, entry + 4, guest::LoadU16(base, f + 88));
-      guest::StoreU32(base, q + 624, guest::LoadU32(base, q + 624) + 1);
+    if (wq.walls_tested() < kWallLimit) {
+      const schema::TrackTestedWall entry(base, wq.walls_address() + wq.walls_tested() * 6);
+      entry.set_section(guest::LoadU16(base, f + 84));
+      entry.set_vertex_0(guest::LoadU16(base, f + 86));
+      entry.set_vertex_1(guest::LoadU16(base, f + 88));
+      wq.set_walls_tested(wq.walls_tested() + 1);
     }
     // The wall: its ends, direction, normal and spans.
     for (uint32_t i = 0; i < 12; i += 4) {
-      Stfs(base, q + 16 + i, Lfs(base, guest::LoadU16(base, wall + 0) * 12 + vertices + i));
+      Stfs(base, wq.wall_a_x_address() + i, Lfs(base, w.vertex_0() * 12 + vertices + i));
     }
     for (uint32_t i = 0; i < 12; i += 4) {
-      Stfs(base, q + 32 + i, Lfs(base, guest::LoadU16(base, wall + 2) * 12 + vertices + i));
+      Stfs(base, wq.wall_b_x_address() + i, Lfs(base, w.vertex_1() * 12 + vertices + i));
     }
-    if (double(vl::Vec3Direction(base, q + 1408, q + 16, q + 32)) == zero) {
+    if (double(vl::Vec3Direction(base, wq.direction_x_address(), wq.wall_a_x_address(),
+                                 wq.wall_b_x_address())) == zero) {
       continue;
     }
-    Stfs(base, q + 1420, one);
-    Stfs(base, q + 1424, Fmuls(Lfs(base, q + 1408), minus_one));
-    Stfs(base, q + 1428, Fmuls(Lfs(base, q + 1412), minus_one));
-    Stfs(base, q + 1432, Fmuls(Lfs(base, q + 1416), minus_one));
-    CrossVector(base, q + 1408, kUp, q + 1440);
-    Stfs(base, q + 1452, one);
-    Stfs(base, q + 1456, DotTo(base, q + 1408, q + 16, f + 96));
-    Stfs(base, q + 1460, DotTo(base, q + 1408, q + 32, f + 112));
-    Stfs(base, q + 1464, DotTo(base, q + 1440, q + 32, f + 128));
+    wq.set_direction_w(float(one));
+    wq.set_negated_x(float(Fmuls(double(wq.direction_x()), minus_one)));
+    wq.set_negated_y(float(Fmuls(double(wq.direction_y()), minus_one)));
+    wq.set_negated_z(float(Fmuls(double(wq.direction_z()), minus_one)));
+    CrossVector(base, wq.direction_x_address(), G::up_too_address(), wq.normal_x_address());
+    wq.set_normal_w(float(one));
+    wq.set_span_a(float(DotTo(base, wq.direction_x_address(), wq.wall_a_x_address(), f + 96)));
+    wq.set_span_b(float(DotTo(base, wq.direction_x_address(), wq.wall_b_x_address(), f + 112)));
+    wq.set_normal_distance(
+        float(DotTo(base, wq.normal_x_address(), wq.wall_b_x_address(), f + 128)));
     uint32_t hit = 0;
     WallQueryCornersThroughWall(base, q, f - 304, &hit);
     if (hit == 0) {
@@ -786,14 +783,15 @@ bool WallQueryTestCell(uint8_t* base, uint32_t query, uint32_t mesh, uint32_t ce
 
 bool TrackCollisionQueryWalls(uint8_t* base, uint32_t query, uint32_t mesh, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820FDF38 TrackCollision::QueryWalls");
-  if (!Boxes(base, guest::LoadU32(base, query + 12))) {
+  const Query wq(base, query);
+  if (!Boxes(base, wq.record().address)) {
     return false;
   }
-  guest::StoreU32(base, query + 624, 0);
+  wq.set_walls_tested(0);
   uint32_t count = 0;
   WallQueryGatherCells(base, query, mesh, frame - 192, &count);
-  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, query + 108)); i++) {
-    WallQueryTestCell(base, query, mesh, guest::LoadU32(base, query + 112 + 4 * uint32_t(i)),
+  for (int32_t i = 0; i < int32_t(wq.cell_count()); i++) {
+    WallQueryTestCell(base, query, mesh, guest::LoadU32(base, wq.cells_address() + 4 * uint32_t(i)),
                       frame - 256);
   }
   return true;
@@ -814,14 +812,15 @@ bool TrackCollisionWallHits(uint8_t* base, uint32_t hits, uint32_t record, uint3
     Stfs(base, f + at, one);
   }
   co::CollisionShapeUpdateBounds(base, record);
-  guest::StoreU32(base, f + 88, hits);
-  guest::StoreU32(base, f + 92, record);
-  const double two = Lfs(base, kTwo);
+  const Query wq(base, f + 80);
+  wq.set_hits(hits);
+  wq.set_record(record);
+  const double two = double(G::two(base));
   Stfs(base, hits + 64, two);
-  Stfs(base, f + 84, two);
-  guest::StoreU32(base, f + 80, 0);
-  TrackCollisionQueryWalls(base, f + 80, kMesh, f - 128);
-  *count = guest::LoadU32(base, f + 80);
+  wq.set_time(float(two));
+  wq.set_hit_count(0);
+  TrackCollisionQueryWalls(base, wq.address, kMesh, f - 128);
+  *count = wq.hit_count();
   return true;
 }
 

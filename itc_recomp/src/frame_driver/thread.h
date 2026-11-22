@@ -17,14 +17,12 @@
 
 namespace frame_driver {
 
+// A Thread's fields (+4 the handle, +8 the object whose slot 1 runs, +12
+// the processor, +16 the priority index) are schema::FrameDriver's
+// (itc_recomp/schema/frame-driver.toml: the frame driver is a Thread).
 constexpr uint32_t kThreadVtable = 0x8206CB30;
-constexpr uint32_t kThreadHandle = 4;     // -1 for none
-constexpr uint32_t kThreadObject = 8;     // the object whose slot 1 runs
-constexpr uint32_t kThreadProcessor = 12;
-constexpr uint32_t kThreadPriority = 16;  // an index into {2, 1, 0, -1, -2}
 constexpr uint32_t kThreadStart = 0x8258DE50;      // Thread::Start
 constexpr uint32_t kXapiThreadStart = 0x825BA558;  // CreateThread's start routine
-constexpr uint32_t kThreadObjectType = 0x820007FC; // [it]: the thread object type
 
 enum class Import {
   kExCreateThread,
@@ -64,7 +62,7 @@ uint32_t CreateThread(uint8_t* base, uint32_t stack, uint32_t entry, uint32_t pa
                       const ThreadCalls& calls);
 
 // sub_822977B0 SetThreadPriority: from a 112-byte frame, the thread object
-// (ObReferenceObjectByHandle with [kThreadObjectType]), its base priority
+// (ObReferenceObjectByHandle with [0x820007FC], the thread object type), its base priority
 // (15 and -15 as 16 and -16), dereferenced; 1, or 0 with the last error set
 // when the handle fails.
 uint32_t SetThreadPriority(uint8_t* base, uint32_t handle, int32_t priority,

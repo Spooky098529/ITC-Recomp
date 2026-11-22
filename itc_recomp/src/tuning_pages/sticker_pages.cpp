@@ -11,6 +11,14 @@
 #include "base/log.h"
 #include "debug/pause_menu_log.h"
 #include "guest.h"
+#include "schema/action_mappers.h"
+#include "schema/career.h"
+#include "schema/menu_helpers.h"
+#include "schema/racer_controllers.h"
+#include "schema/sticker_editor.h"
+#include "schema/tuning_pages.h"
+#include "schema/tuning_screen.h"
+#include "schema/ui_movies_game.h"
 #include "mode_tick/mode_tick.h"
 #include "native/buffers.h"
 #include "strings_and_font/steps.h"
@@ -40,27 +48,31 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
 
 constexpr uint32_t kAll = 0xFFFFFFFFu;  // sub-scene -1: the scene itself
 constexpr uint32_t kStickerMovie = 14;
-constexpr uint32_t kTable = 0x8200B630;    // T: 61 words, 1 the sticker on the slot's second node
-constexpr uint32_t kLayouts = 0x8200B728;  // 16 bytes a car id and area
-constexpr uint32_t kHalf = 0x82001BE4;     // 0.5f
-constexpr uint32_t kFirstNodeScale = 0x8200C548;
+// The image words and tables (T, G, the layouts, the bounds, the constants).
+using G = schema::StickerEditorGlobals;
 
-// The screen's fields.
-constexpr uint32_t kArea = 30724;
-constexpr uint32_t kSolo = 33500;
-constexpr uint32_t kPreview = 33504;
+// The screen (tuning-screen.toml's TuningScreen).
+schema::TuningScreen Screen(uint8_t* base, uint32_t s) { return schema::TuningScreen(base, s); }
 
-// The players' action mapper entries (8 bytes each: the mapper, blocked
-// when +4 is 1) and their indices (a word a player).
-constexpr uint32_t kMapperEntries = 0x826BAB80;
-constexpr uint32_t kControllerEntries = 0x826BABA4;
+// A field's address as the originals work it out from all 64 bits of the
+// screen's register: `screen` plus the field's offset.
+uint64_t Wide(uint64_t screen, uint32_t field_address) {
+  return screen + (field_address - uint32_t(screen));
+}
+
+// The players' action mapper entries (racer-controllers.toml's
+// PlayerMapperEntry: the mapper, blocked when +4 is 1) and their indices (a
+// word a player).
+using Controllers = schema::RacerControllersGlobals;
+using Entry = schema::PlayerMapperEntry;
 constexpr uint32_t kHeldSlot = 0x8210BE70;     // ActionMapper::Held (slot 8, +32)
 constexpr uint32_t kPressedSlot = 0x8210BF40;  // ActionMapper::Pressed (slot 10, +40)
 constexpr uint32_t kFiredSlot = 0x8210C010;    // ActionMapper::Fired (slot 12, +48)
 
 // The player's mapper entry (0x826BAB80 + 8 × [0x826BABA4]).
 uint32_t PlayerEntry(uint8_t* base) {
-  return (Load(base, kControllerEntries) << 3) + kMapperEntries;
+  return (Load(base, Controllers::player_entries_address()) << 3) +
+         Controllers::mapper_entries_address();
 }
 
 // The mapper's read slot at `offset` on `action`, as the original's bctrl
@@ -98,11 +110,11 @@ uint64_t ReadSlot(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t 
 // (skipped, false, while the entry's +4 is 1).
 bool Asked(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t offset,
            uint64_t action, uint32_t frame, uint32_t lr, bool native_slots) {
-  const uint32_t entry = PlayerEntry(base);
-  if (int32_t(Load(base, entry + 4)) == 1) {
+  const Entry entry(base, PlayerEntry(base));
+  if (int32_t(entry.unread()) == 1) {
     return false;
   }
-  return (ReadSlot(base, call, Load(base, entry), offset, action, frame, lr, native_slots) &
+  return (ReadSlot(base, call, entry.mapper().address, offset, action, frame, lr, native_slots) &
           0xFF) != 0;
 }
 
@@ -110,14 +122,14 @@ bool Asked(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t offset,
 // +80 set; the node.
 uint32_t SetShown(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child,
                   uint32_t shown) {
-  const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
-  Store(base, node + 80, shown);
-  return node;
+  const schema::UiMovieNode node(base, ui_movies::FindNode(base, movie, sub_scene, child));
+  node.set_visible(shown);
+  return node.address;
 }
 
 // T[id] is 1 (id below 61, signed; the word read at 0x8200B630 + 4 × id).
 bool OnSecondNode(uint8_t* base, uint32_t id) {
-  return int32_t(id) < 61 && int32_t(Load(base, kTable + (id << 2))) == 1;
+  return int32_t(id) < 61 && int32_t(Load(base, G::second_node_address() + (id << 2))) == 1;
 }
 
 // A doubleword at `at` (an int sign-extended through the stack for fcfid).
@@ -127,17 +139,25 @@ void StoreDoubleword(uint8_t* base, uint32_t at, int64_t value) {
 }
 
 constexpr uint32_t kStageCommand = 0x82180108;  // GarageStage::Command(holder, command)
-constexpr uint32_t kStandHolder = 0x826D83E0;   // the stand scene's holder's word
 constexpr uint32_t kUnloopNamed = 0x8211DE30;   // UiMovie::UnloopNamed(movie, named)
 constexpr uint32_t kUnloop = 0x8211DE28;        // UiMovie::Unloop(movie, sub, index)
-constexpr uint32_t kGroups = 0x8200B5E8;        // G: 6 records of 12 bytes (+0 first id, +4 last)
+// G's record g (G::groups(): 6 records of 12 bytes, +0 the first id, +4 the last).
+schema::StickerGroup Group(uint8_t* base, uint32_t g) {
+  return schema::StickerGroup(base, g * 12 + G::groups_address());
+}
+
+// The sticker menu [+10044].
+schema::FrontEndMenu Menu(uint8_t* base, uint32_t s) { return Screen(base, s).sticker_menu(); }
 
 // The sticker menu [+10044]'s cursor.
-uint32_t Cursor(uint8_t* base, uint32_t s) { return Load(base, Load(base, s + 10044)); }
+uint32_t Cursor(uint8_t* base, uint32_t s) { return Menu(base, s).cursor(); }
 
 // id(j): the placed sticker of slot j in the area: s + 33320 + 20a + 4j.
+uint32_t IdAt(uint8_t* base, uint32_t s, uint32_t area, uint32_t j) {
+  return Screen(base, s).sticker_ids_address() + ((area * 5 + j) << 2);
+}
 uint32_t PlacedId(uint8_t* base, uint32_t s, uint32_t j) {
-  return Load(base, (((Load(base, s + kArea) + 1666) * 5 + j) << 2) + s);
+  return Load(base, IdAt(base, s, Screen(base, s).editor_page(), j));
 }
 
 // The calls on movie 14 the movie sides make from `frame`.
@@ -181,12 +201,11 @@ struct Movie {
   }
 };
 
-// The hold toggles: `flag` 0 -> 1 with `action` held, 1 -> 0 without.
-uint32_t UpdateHold(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t s,
-                    uint32_t sp, bool native_slots, uint32_t action, uint32_t flag,
-                    uint32_t lr) {
+// The hold toggles: the flag at `at` 0 -> 1 with `action` held, 1 -> 0
+// without.
+uint32_t UpdateHold(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t sp,
+                    bool native_slots, uint32_t action, uint32_t at, uint32_t lr) {
   const uint32_t frame = Frame(base, sp, 96);
-  const uint32_t at = s + flag;
   if (Asked(base, call, 32, action, frame, lr, native_slots)) {
     if (int32_t(Load(base, at)) == 0) {
       Store(base, at, 1);
@@ -206,13 +225,12 @@ constexpr uint32_t kMenuPressed = 0x821864C8;    // Menu::Pressed(menu, action)
 constexpr uint32_t kMenuSoundPlay = 0x821103F0;  // MenuSound::Play(cue)
 constexpr uint32_t kCameraCommand = 0x821808F0;  // GarageStage::CameraCommand(holder, command)
 constexpr uint32_t kMemcpy = 0x825A7410;
-constexpr uint32_t kResetAngle = 0x82000A34;  // 0.0f
-constexpr uint32_t kResetScale = 0x82000A30;  // 1.0f
-constexpr uint32_t kSlot = 30732;             // l
-constexpr uint32_t kDecal = 30832;            // D
+// l is the screen's layer_cursor (the slot), D its edited_x to edited_word.
 
-// The stand holder [[0x826D83E0]].
-uint32_t Holder(uint8_t* base) { return Load(base, Load(base, kStandHolder)); }
+// The stand holder [[0x826D83E0]] (tuning-screen.toml's StandHolder's +0).
+uint32_t Holder(uint8_t* base) {
+  return schema::StandHolder(base, G::stand_holder(base).address).stage_block_0();
+}
 
 // The page's reads of the player's mapper entry, each skipped while its +4
 // is 1; the last read's r3 kept.
@@ -224,10 +242,11 @@ struct Reads {
   bool native_slots;
   uint64_t r3;
   bool operator()(uint32_t offset, uint64_t action, uint32_t lr) {
-    if (int32_t(Load(base, entry + 4)) == 1) {
+    const Entry e(base, entry);
+    if (int32_t(e.unread()) == 1) {
       return false;
     }
-    r3 = ReadSlot(base, call, Load(base, entry), offset, action, frame, lr, native_slots);
+    r3 = ReadSlot(base, call, e.mapper().address, offset, action, frame, lr, native_slots);
     return (r3 & 0xFF) != 0;
   }
 };
@@ -236,20 +255,20 @@ struct Reads {
 // q+12 = c, q+0 = -1 (q = [+10036]; the originals' store orders vary,
 // nothing reads between them).
 void Queue(uint8_t* base, uint32_t s, uint32_t state, uint32_t command) {
-  const uint32_t queue = Load(base, s + 10036);
-  const uint32_t current = Load(base, queue + 0);
+  const schema::TuningCommandQueue queue = Screen(base, s).queue();
+  const uint32_t current = queue.page();
   if (int32_t(state) != int32_t(current)) {
-    Store(base, queue + 8, current);
+    queue.set_previous_page(current);
   }
-  Store(base, queue + 4, state);
-  Store(base, queue + 16, kNone);
-  Store(base, queue + 12, command);
-  Store(base, queue + 0, kNone);
+  queue.set_resume(state);
+  queue.set_next(kNone);
+  queue.set_current(command);
+  queue.set_page(kNone);
 }
 
 // Go(st, c): +9652 = st, then Queue(st, c).
 void Go(uint8_t* base, uint32_t s, uint32_t state, uint32_t command) {
-  Store(base, s + 9652, state);
+  Screen(base, s).set_state(state);
   Queue(base, s, state, command);
 }
 
@@ -266,8 +285,9 @@ uint64_t Memcpy(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t de
 // rec(l) as the originals work it out: (5a + l) × 24 + s + 32360, all 64
 // bits of the screen.
 uint64_t SlotRecord(uint8_t* base, uint64_t screen) {
-  const uint32_t s = uint32_t(screen);
-  return (uint64_t(Load(base, s + kArea)) * 5 + Load(base, s + kSlot)) * 24 + screen + 32360;
+  const schema::TuningScreen sc = Screen(base, uint32_t(screen));
+  return (uint64_t(sc.editor_page()) * 5 + sc.layer_cursor()) * 24 +
+         Wide(screen, sc.stickers_address());
 }
 
 // A float constant through lfs and stfs (the recompiled conversions).
@@ -278,12 +298,13 @@ void CopyFloat(uint8_t* base, uint32_t from, uint32_t to) {
 
 // D reset: x, y, the flip and +20 0, the angle 0.0 and the scale 1.0.
 void ResetDecal(uint8_t* base, uint32_t s) {
-  Store(base, s + kDecal + 0, 0);
-  Store(base, s + kDecal + 4, 0);
-  Store(base, s + kDecal + 16, 0);
-  Store(base, s + kDecal + 20, 0);
-  CopyFloat(base, kResetAngle, s + kDecal + 8);
-  CopyFloat(base, kResetScale, s + kDecal + 12);
+  const schema::TuningScreen sc = Screen(base, s);
+  sc.set_edited_x(0);
+  sc.set_edited_y(0);
+  sc.set_edited_flip(0);
+  sc.set_edited_word(0);
+  CopyFloat(base, G::zero_address(), sc.edited_angle_address());
+  CopyFloat(base, G::one_address(), sc.edited_scale_address());
 }
 
 // The pages' start: Menu::Step on the sticker menu, then UpdateSoloHold
@@ -291,53 +312,54 @@ void ResetDecal(uint8_t* base, uint32_t s) {
 // the cursor or l by `by_slot`).
 void StepAndSolo(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t s, uint32_t frame,
                  uint32_t step_lr, bool by_slot, bool native_slots) {
-  call(kMenuStep, {Load(base, s + 10044)}, frame, step_lr);
+  call(kMenuStep, {Menu(base, s).address}, frame, step_lr);
   if (UpdateSoloHold(base, call, s, frame, native_slots) == 0) {
     return;
   }
   for (uint32_t j = 0; j < 5; j++) {
-    const uint32_t current = by_slot ? Load(base, s + kSlot) : Cursor(base, s);
+    const uint32_t current = by_slot ? Screen(base, s).layer_cursor() : Cursor(base, s);
     ShowSlotNode(base, s, PlacedId(base, s, j), j, current, frame);
   }
 }
 
 // The two-button row's side step (m's row 5 with m+36 set) on the word at
-// `at`: below 5 -> 5; -1 or +1 by m+36; below 5 -> 6, above 6 -> 5.
+// `at` (the screen's layer_cursor or edit_cursor): below 5 -> 5; -1 or +1
+// by m+36; below 5 -> 6, above 6 -> 5.
 void StepButtons(uint8_t* base, uint32_t s, uint32_t at) {
-  if (int32_t(Load(base, s + at)) < 5) {
-    Store(base, s + at, 5);
+  if (int32_t(Load(base, at)) < 5) {
+    Store(base, at, 5);
   }
-  const int32_t side = int32_t(Load(base, Load(base, s + 10044) + 36));
-  int32_t v = int32_t(Load(base, s + at));
+  const int32_t side = Menu(base, s).side();
+  int32_t v = int32_t(Load(base, at));
   v = side == -1 ? v - 1 : v + 1;
-  Store(base, s + at, uint32_t(v));
+  Store(base, at, uint32_t(v));
   if (v < 5) {
     v = 6;
   }
-  Store(base, s + at, uint32_t(v));
+  Store(base, at, uint32_t(v));
   if (v > 6) {
     v = 5;
   }
-  Store(base, s + at, uint32_t(v));
+  Store(base, at, uint32_t(v));
 }
 
 // The word at `at` from A on m: the cursor below 5, else 5 unless it's 6.
 void PickRow(uint8_t* base, uint32_t s, uint32_t at) {
   const uint32_t k = Cursor(base, s);
   if (int32_t(k) < 5) {
-    Store(base, s + at, k);
-  } else if (int32_t(Load(base, s + at)) != 6) {
-    Store(base, s + at, 5);
+    Store(base, at, k);
+  } else if (int32_t(Load(base, at)) != 6) {
+    Store(base, at, 5);
   }
 }
 
 // B on the two-button pages: the word at `at` 6, m+0 = 5, m+4 = the cursor.
 void BackToButton(uint8_t* base, uint32_t s, uint32_t at) {
-  Store(base, s + at, 6);
-  const uint32_t menu = Load(base, s + 10044);
-  const uint32_t k = Load(base, menu + 0);
-  Store(base, menu + 0, 5);
-  Store(base, menu + 4, k);
+  Store(base, at, 6);
+  const schema::FrontEndMenu menu = Menu(base, s);
+  const uint32_t k = menu.cursor();
+  menu.set_cursor(5);
+  menu.set_previous(k);
 }
 
 // UpdateSoloHold answering 1: ShowSlotNode(s, id(j), j, l) for j 0 to 4.
@@ -349,21 +371,24 @@ uint64_t SoloBySlot(uint8_t* base, const tuning_screen::GuestCall& call, uint32_
     return r3;
   }
   for (uint32_t j = 0; j < 5; j++) {
-    r3 = ShowSlotNode(base, s, PlacedId(base, s, j), j, Load(base, s + kSlot), frame);
+    r3 = ShowSlotNode(base, s, PlacedId(base, s, j), j, Screen(base, s).layer_cursor(), frame);
   }
   return r3;
 }
 
 // L[i]: the order list's word i (s + 33480 + 4i).
-uint32_t OrderAt(uint32_t s, uint32_t i) { return ((i + 8370) << 2) + s; }
+uint32_t OrderAt(uint8_t* base, uint32_t s, uint32_t i) {
+  return Screen(base, s).sticker_order_address() + (i << 2);
+}
 
 // owned(i): i not negative and its bit set in the save data's sticker words.
 bool Owned(uint8_t* base, uint32_t s, uint32_t i) {
   if (int32_t(i) < 0) {
     return false;
   }
-  const uint32_t save = Load(base, s + 18904);
-  const uint32_t word = Load(base, ((uint32_t(int32_t(i) >> 5) + 26218) << 2) + save);
+  const schema::CareerSave save(base, Screen(base, s).save_data().address);
+  const uint32_t word =
+      Load(base, save.reward_set_40_address() + (uint32_t(int32_t(i) >> 5) << 2));
   return (word & (1u << (i & 31))) != 0;
 }
 
@@ -377,21 +402,21 @@ uint32_t ScanGroup(uint8_t* base, uint32_t s, uint32_t i, uint32_t last) {
       break;
     }
     i += 1;
-    last = Load(base, Load(base, s + 30768) * 12 + kGroups + 4);
+    last = uint32_t(Group(base, Screen(base, s).image_group()).last_id());
   }
   return i;
 }
 
 uint32_t ScanBack(uint8_t* base, uint32_t s) {
   for (;;) {
-    const uint32_t g = Load(base, s + 30768) - 1;
-    Store(base, s + 30768, g);
+    const uint32_t g = Screen(base, s).image_group() - 1;
+    Screen(base, s).set_image_group(g);
     if (int32_t(g) < 0) {
-      Store(base, s + 30768, 5);
+      Screen(base, s).set_image_group(5);
     }
-    const uint32_t i = Load(base, Load(base, s + 30768) * 12 + kGroups);
+    const uint32_t i = uint32_t(Group(base, Screen(base, s).image_group()).first_id());
     const uint32_t found =
-        ScanGroup(base, s, i, Load(base, Load(base, s + 30768) * 12 + kGroups + 4));
+        ScanGroup(base, s, i, uint32_t(Group(base, Screen(base, s).image_group()).last_id()));
     if (Owned(base, s, found)) {
       return found;
     }
@@ -399,14 +424,14 @@ uint32_t ScanBack(uint8_t* base, uint32_t s) {
 }
 
 uint32_t ScanForward(uint8_t* base, uint32_t s) {
-  uint32_t group = Load(base, s + 30768);
+  uint32_t group = Screen(base, s).image_group();
   for (;;) {
     // (g + 1) mod 6 as divw leaves it (negative for a negative g + 1).
     const uint32_t n = group + 1;
     const uint32_t g = n - uint32_t(int32_t(n) / 6) * 6;
-    Store(base, s + 30768, g);
-    const uint32_t found = ScanGroup(base, s, Load(base, g * 12 + kGroups),
-                                     Load(base, g * 12 + kGroups + 4));
+    Screen(base, s).set_image_group(g);
+    const uint32_t found = ScanGroup(base, s, uint32_t(Group(base, g).first_id()),
+                                     uint32_t(Group(base, g).last_id()));
     if (Owned(base, s, found)) {
       return found;
     }
@@ -433,21 +458,19 @@ constexpr StickerEditCalls kScaleCalls = {
     {0x821FA048, 0x821FA074, 0x821FA0A0, 0x821FA0CC}, 0x821FA0F8, 0x821FA11C, 0x821FA16C,
     0x821FA190, 0x821FA1A4};
 
-constexpr uint32_t kStickerBounds = 0x8200C2A8;  // 16 bytes an area: x min, x max, y min, y max
-constexpr uint32_t kAngleMax = 0x8200C54C;       // 359.0f
-constexpr uint32_t kScaleStep = 0x8200222C;
-constexpr uint32_t kScaleMin = 0x82001FBC;
-constexpr uint32_t kScaleMax = 0x820021E8;
 
 // One step of D: `move` 0 up, 1 down, 2 left, 3 right (the position, inside
 // the area's bounds), or 0 left (minus), 1 right (plus) for the angle (1.0,
 // wrapped between 0.0 and 359.0) and the scale (clamped).
 void StepSticker(uint8_t* base, uint32_t s, StickerEdit edit, uint32_t move) {
   if (edit == StickerEdit::kMove) {
-    const uint32_t bounds = (Load(base, s + kArea) << 4) + kStickerBounds;
-    const uint32_t at = s + kDecal + (move < 2 ? 4 : 0);
+    const schema::StickerMoveBounds bounds(
+        base, (Screen(base, s).editor_page() << 4) + G::move_bounds_address());
+    const schema::TuningScreen sc = Screen(base, s);
+    const uint32_t at = move < 2 ? sc.edited_y_address() : sc.edited_x_address();
     const bool minus = move % 2 == 0;
-    const int32_t limit = int32_t(Load(base, bounds + (move < 2 ? 8 : 0) + (minus ? 0 : 4)));
+    const int32_t limit = move < 2 ? (minus ? bounds.y_min() : bounds.y_max())
+                                   : (minus ? bounds.x_min() : bounds.x_max());
     const int32_t value = int32_t(Load(base, at));
     if (minus ? limit < value : limit > value) {
       Store(base, at, uint32_t(value) + (minus ? 0xFFFFFFFFu : 1u));
@@ -456,17 +479,19 @@ void StepSticker(uint8_t* base, uint32_t s, StickerEdit edit, uint32_t move) {
   }
   const bool plus = move == 1;
   const bool angle = edit == StickerEdit::kRotate;
-  const uint32_t at = s + kDecal + (angle ? 8 : 12);
+  const schema::TuningScreen sc = Screen(base, s);
+  const uint32_t at = angle ? sc.edited_angle_address() : sc.edited_scale_address();
   const double old = fs::Lfs(base, at);
-  const double step = fs::Lfs(base, angle ? kResetScale : kScaleStep);
+  const double step = fs::Lfs(base, angle ? G::one_address() : G::scale_step_address());
   const double value = fs::Single(plus ? old + step : old - step);
   fs::Stfs(base, at, value);
   if (angle) {
-    if (plus ? value > fs::Lfs(base, kAngleMax) : value < fs::Lfs(base, kResetAngle)) {
-      fs::Stfs(base, at, fs::Lfs(base, plus ? kResetAngle : kAngleMax));
+    if (plus ? value > fs::Lfs(base, G::angle_max_address())
+             : value < fs::Lfs(base, G::zero_address())) {
+      fs::Stfs(base, at, fs::Lfs(base, plus ? G::zero_address() : G::angle_max_address()));
     }
   } else {
-    const double limit = fs::Lfs(base, plus ? kScaleMax : kScaleMin);
+    const double limit = fs::Lfs(base, plus ? G::scale_max_address() : G::scale_min_address());
     if (plus ? value > limit : value < limit) {
       fs::Stfs(base, at, limit);
     }
@@ -496,7 +521,7 @@ uint64_t InputStickerTransform(uint8_t* base, const tuning_screen::GuestCall& ca
       const uint32_t command = edit == StickerEdit::kMove     ? 46
                                : edit == StickerEdit::kRotate ? 48
                                                               : 50;
-      Queue(base, s, Load(base, s + 9652), command);
+      Queue(base, s, Screen(base, s).state(), command);
       return asked.r3;
     }
   }
@@ -504,15 +529,16 @@ uint64_t InputStickerTransform(uint8_t* base, const tuning_screen::GuestCall& ca
   if (!a && !asked(40, 158, lr.b)) {
     return asked.r3;
   }
-  if (int32_t(Load(base, s + kSolo)) != 0) {
+  if (int32_t(Screen(base, s).holding_164()) != 0) {
     return asked.r3;
   }
   // A keeps D, B puts its backup (+33512) back; then the edit page.
   uint64_t r3 = call(kMenuSoundPlay, {a ? 0u : 2u}, frame, a ? lr.a_sound : lr.b_sound);
   if (!a) {
-    r3 = Memcpy(base, call, screen + kDecal, screen + 33512, 24, frame, lr.memcpy);
+    r3 = Memcpy(base, call, Wide(screen, Screen(base, s).edited_x_address()),
+                Wide(screen, Screen(base, s).sticker_backup_address()), 24, frame, lr.memcpy);
   }
-  Store(base, s + 9720, 1);
+  Screen(base, s).set_command_end_after_setup(1);
   Go(base, s, 41, 38);
   return r3;
 }
@@ -522,13 +548,15 @@ uint64_t InputStickerTransform(uint8_t* base, const tuning_screen::GuestCall& ca
 uint32_t UpdateSoloHold(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
                         uint32_t sp, bool native_slots) {
   ITC_NATIVE_RUNNING("sub_821F7298 TuningScreen::UpdateSoloHold");
-  return UpdateHold(base, call, screen, sp, native_slots, 164, kSolo, 0x821F72E8);
+  return UpdateHold(base, call, sp, native_slots, 164, Screen(base, screen).holding_164_address(),
+                    0x821F72E8);
 }
 
 uint32_t UpdatePreviewHold(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
                            uint32_t sp, bool native_slots) {
   ITC_NATIVE_RUNNING("sub_821F7348 TuningScreen::UpdatePreviewHold");
-  return UpdateHold(base, call, screen, sp, native_slots, 163, kPreview, 0x821F7398);
+  return UpdateHold(base, call, sp, native_slots, 163, Screen(base, screen).holding_163_address(),
+                    0x821F7398);
 }
 
 uint64_t StepUnlockedSticker(uint8_t* base, uint32_t screen, uint64_t id, uint64_t n) {
@@ -549,8 +577,8 @@ uint64_t StepUnlockedSticker(uint8_t* base, uint32_t screen, uint64_t id, uint64
     bool owned = false;
     if (int32_t(uint32_t(r)) >= 0) {
       const int32_t i = int32_t(uint32_t(r));
-      const uint32_t save = Load(base, screen + 18904);
-      const uint32_t word = Load(base, uint32_t(((i >> 5) + 26218) << 2) + save);
+      const schema::CareerSave save(base, Screen(base, screen).save_data().address);
+      const uint32_t word = Load(base, save.reward_set_40_address() + (uint32_t(i >> 5) << 2));
       owned = (word & (1u << (i & 31))) != 0;
     }
     if (owned) {
@@ -567,7 +595,7 @@ uint32_t ShowSlotNode(uint8_t* base, uint32_t screen, uint32_t id, uint32_t j, u
   const uint32_t frame = Frame(base, sp, 128);
   const uint32_t movie = Load(base, tuning_screen::MovieEntry(base, frame, kStickerMovie));
   const uint32_t first = (j << 1) + 19, second = (j + 10) << 1;
-  if (int32_t(Load(base, screen + kSolo)) != 0 && int32_t(j) != int32_t(current) &&
+  if (int32_t(Screen(base, screen).holding_164()) != 0 && int32_t(j) != int32_t(current) &&
       int32_t(current) < 5) {
     SetShown(base, movie, kAll, first, 0);
     return SetShown(base, movie, kAll, second, 0);
@@ -587,24 +615,30 @@ uint32_t PlaceStickerNode(uint8_t* base, uint32_t screen, uint32_t id, uint32_t 
   const uint32_t movie = Load(base, tuning_screen::MovieEntry(base, frame, kStickerMovie));
   // The selected garage car's layout for the area, copied into the frame.
   const uint32_t car = tuning_screen::SelectedGarageCar(base, screen);
-  const uint32_t area = Load(base, screen + kArea);
-  const uint32_t layout = (((Load(base, car + 224) << 3) + area) << 4) + kLayouts;
-  const uint32_t words[4] = {Load(base, layout), Load(base, layout + 4), Load(base, layout + 8),
-                             Load(base, layout + 12)};
+  const uint32_t area = Screen(base, screen).editor_page();
+  const schema::StickerLayout layout(base,
+                                     (((Load(base, car + 224) << 3) + area) << 4) +
+                                         G::layouts_address());
+  const uint32_t words[4] = {uint32_t(layout.x()), uint32_t(layout.y()),
+                             Load(base, layout.size_address()),
+                             Load(base, layout.position_scale_address())};
   for (uint32_t k = 0; k < 4; k++) {
     Store(base, frame + 112 + 4 * k, words[k]);
   }
   const bool second = OnSecondNode(base, id);
   const uint32_t child = second ? (j + 10) << 1 : (j << 1) + 19;
-  const uint32_t looked = ui_movies::FindNode(base, movie, kAll, child);
-  const uint32_t node = ui_movies::FindNode(base, movie, kAll, child);
+  const schema::UiMovieNode looked(base, ui_movies::FindNode(base, movie, kAll, child));
+  const schema::UiMovieNode node(base, ui_movies::FindNode(base, movie, kAll, child));
+  const schema::StickerRecord sticker(base, record);
   const double scale = fs::Lfs(base, frame + 124);
   const int64_t ox = int32_t(Load(base, frame + 112) + (second ? 816 : 824));
   const int64_t oy = int32_t(Load(base, frame + 116) + (second ? 284 : 252));
-  const int64_t x = int32_t(Load(base, record));
-  const int64_t y = int32_t(Load(base, record + 4));
-  fs::Stfs(base, node + 12, fs::Single(std::fma(fs::ToSingle(x), scale, fs::ToSingle(ox))));
-  fs::Stfs(base, node + 16, fs::Single(std::fma(fs::ToSingle(y), scale, fs::ToSingle(oy))));
+  const int64_t x = sticker.x();
+  const int64_t y = sticker.y();
+  fs::Stfs(base, node.x_address(),
+           fs::Single(std::fma(fs::ToSingle(x), scale, fs::ToSingle(ox))));
+  fs::Stfs(base, node.y_address(),
+           fs::Single(std::fma(fs::ToSingle(y), scale, fs::ToSingle(oy))));
   // The conversions' doublewords as each path leaves them.
   if (second) {
     StoreDoubleword(base, frame + 80, oy);
@@ -614,23 +648,27 @@ uint32_t PlaceStickerNode(uint8_t* base, uint32_t screen, uint32_t id, uint32_t 
     StoreDoubleword(base, frame + 88, ox);
   }
   StoreDoubleword(base, frame + 96, y);
-  const double half = fs::Lfs(base, kHalf);
-  Store(base, node + 20, uint32_t(fs::Fctiwz(fs::Single(fs::Lfs(base, looked + 100) * half))));
-  Store(base, node + 24, uint32_t(fs::Fctiwz(fs::Single(fs::Lfs(base, looked + 104) * half))));
-  fs::Stfs(base, node + 36, fs::Lfs(base, record + 8));
+  const double half = fs::Lfs(base, G::half_address());
+  node.set_pivot_x(
+      uint32_t(fs::Fctiwz(fs::Single(fs::Lfs(base, looked.width_address()) * half))));
+  node.set_pivot_y(
+      uint32_t(fs::Fctiwz(fs::Single(fs::Lfs(base, looked.height_address()) * half))));
+  fs::Stfs(base, node.rotation_address(), fs::Lfs(base, sticker.angle_address()));
   const double size = fs::Lfs(base, frame + 120);
   if (second) {
-    fs::Stfs(base, node + 28, fs::Single(size * fs::Lfs(base, record + 12)));
-    fs::Stfs(base, node + 32, fs::Single(size * fs::Lfs(base, record + 12)));
+    fs::Stfs(base, node.scale_x_address(),
+             fs::Single(size * fs::Lfs(base, sticker.scale_address())));
+    fs::Stfs(base, node.scale_y_address(),
+             fs::Single(size * fs::Lfs(base, sticker.scale_address())));
   } else {
-    const double factor = fs::Lfs(base, kFirstNodeScale);
-    fs::Stfs(base, node + 28,
-             fs::Single(fs::Single(size * fs::Lfs(base, record + 12)) * factor));
-    fs::Stfs(base, node + 32,
-             fs::Single(fs::Single(size * fs::Lfs(base, record + 12)) * factor));
+    const double factor = fs::Lfs(base, G::first_node_scale_address());
+    fs::Stfs(base, node.scale_x_address(),
+             fs::Single(fs::Single(size * fs::Lfs(base, sticker.scale_address())) * factor));
+    fs::Stfs(base, node.scale_y_address(),
+             fs::Single(fs::Single(size * fs::Lfs(base, sticker.scale_address())) * factor));
   }
-  Store(base, looked + 132, Load(base, record + 16));
-  return node;
+  looked.set_flip_x(sticker.flip());
+  return node.address;
 }
 
 uint32_t SetSlot(uint8_t* base, uint32_t images, uint32_t sub, uint32_t first, uint32_t second,
@@ -642,8 +680,9 @@ uint32_t SetSlot(uint8_t* base, uint32_t images, uint32_t sub, uint32_t first, u
   if (int32_t(i) < 0) {
     SetShown(base, movie, sub, first, 1);
     const uint32_t node = SetShown(base, movie, sub, second, 0);
-    const uint32_t texture = Load(base, Load(base, movie + 28) + (first_slot << 2));
-    Store(base, texture, Load(base, images + 7192));
+    const schema::UiMovieTexture texture = MovieTexture(base, movie, first_slot);
+    // The last entry's (199) texture header.
+    texture.set_texture(DecalEntryAt(base, images, 199).texture_header());
     return node;
   }
   uint32_t node, slot;
@@ -656,8 +695,8 @@ uint32_t SetSlot(uint8_t* base, uint32_t images, uint32_t sub, uint32_t first, u
     node = SetShown(base, movie, sub, second, 1);
     slot = second_slot;
   }
-  const uint32_t texture = Load(base, Load(base, movie + 28) + (slot << 2));
-  Store(base, texture, Load(base, i * 36 + images + 28));
+  const schema::UiMovieTexture texture = MovieTexture(base, movie, slot);
+  texture.set_texture(DecalEntryAt(base, images, i).texture_header());
   return node;
 }
 
@@ -674,25 +713,26 @@ uint64_t SetStickerEditTexts(uint8_t* base, const tuning_screen::GuestCall& call
   text(45, 457, 0, 0x821F7F90);
   text(46, 458, 0, 0x821F7FA4);
   text(47, 459, 0, 0x821F7FB8);
-  text(36, 8, Load(base, screen + 30832), 0x821F7FD0);
-  text(37, 8, Load(base, screen + 30836), 0x821F7FE8);
+  text(36, 8, Screen(base, screen).edited_x(), 0x821F7FD0);
+  text(37, 8, Screen(base, screen).edited_y(), 0x821F7FE8);
   // The angle truncated through the frame's +80 (fctiwz, stfiwx).
-  Store(base, frame + 80, uint32_t(fs::Fctiwz(fs::Lfs(base, screen + 30840))));
+  Store(base, frame + 80,
+        uint32_t(fs::Fctiwz(fs::Lfs(base, Screen(base, screen).edited_angle_address()))));
   text(38, 8, Load(base, frame + 80), 0x821F8010);
   // The scale as a double (f1), its bits in r7 through the frame's +48.
-  const double scale = fs::Lfs(base, screen + 30844);
+  const double scale = fs::Lfs(base, Screen(base, screen).edited_scale_address());
   const uint64_t bits = std::bit_cast<uint64_t>(scale);
   Store(base, frame + 48, uint32_t(bits >> 32));
   Store(base, frame + 52, uint32_t(bits));
   text(39, 452, bits, 0x821F8030);
-  return text(40, int32_t(Load(base, screen + 30848)) == 0 ? 1 : 0, 0, 0x821F8054);
+  return text(40, int32_t(Screen(base, screen).edited_flip()) == 0 ? 1 : 0, 0, 0x821F8054);
 }
 
 uint32_t ShowSlotImage(uint8_t* base, uint32_t screen, uint32_t id, uint32_t j, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821FA408 TuningScreen::ShowSlotImage");
   const uint32_t flag = OnSecondNode(base, id) ? 0 : 1;
-  return SetSlot(base, screen + 10048, kAll, (j << 1) + 19, (j + 10) << 1, (j + 95) << 1,
-                 (j << 1) + 191, id, flag, sp);
+  return SetSlot(base, Screen(base, screen).decal_images_address(), kAll, (j << 1) + 19,
+                 (j + 10) << 1, (j + 95) << 1, (j << 1) + 191, id, flag, sp);
 }
 
 uint32_t ShowStickerListImage(uint8_t* base, uint32_t screen, uint32_t id, uint32_t n,
@@ -700,10 +740,11 @@ uint32_t ShowStickerListImage(uint8_t* base, uint32_t screen, uint32_t id, uint3
   ITC_NATIVE_RUNNING("sub_821FA460 TuningScreen::ShowStickerListImage");
   const uint32_t flag = OnSecondNode(base, id) ? 0 : 1;
   if (int32_t(n) == 0) {
-    return SetSlot(base, screen + 10048, 30, 14, 15, 173, 174, id, flag, sp);
+    return SetSlot(base, Screen(base, screen).decal_images_address(), 30, 14, 15, 173, 174, id,
+                   flag, sp);
   }
-  return SetSlot(base, screen + 10048, 30, n * 5 + 14, (n + 3) * 5, (n + 87) << 1,
-                 (n << 1) + 175, id, flag, sp);
+  return SetSlot(base, Screen(base, screen).decal_images_address(), 30, n * 5 + 14, (n + 3) * 5,
+                 (n + 87) << 1, (n << 1) + 175, id, flag, sp);
 }
 
 uint64_t AnimateStickerAreas(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
@@ -715,7 +756,7 @@ uint64_t AnimateStickerAreas(uint8_t* base, const tuning_screen::GuestCall& call
   const uint32_t k = Cursor(base, s);
   Movie m{base, call, Load(base, entry), frame};
   uint64_t r3 =
-      call(kStageCommand, {Load(base, Load(base, kStandHolder)), uint64_t(int64_t(int32_t(k)) + 42)},
+      call(kStageCommand, {Holder(base), uint64_t(int64_t(int32_t(k)) + 42)},
            frame, 0x821FA558);
   for (uint32_t i = 6; i < 14; i++) {
     r3 = m.Stop(i, 0x821FA56C, 0x821FA578);
@@ -723,7 +764,7 @@ uint64_t AnimateStickerAreas(uint8_t* base, const tuning_screen::GuestCall& call
   if (int32_t(show) == 0) {
     return r3;
   }
-  if (int32_t(Load(base, s + 33508)) != 0 && (int32_t(k) == 6 || int32_t(k) == 7)) {
+  if (int32_t(Screen(base, s).no_car_id()) != 0 && (int32_t(k) == 6 || int32_t(k) == 7)) {
     m.Play(30, 0x821FA5CC, 0, 0);
     m.Finish(30, 0x821FA5D8);
     m.Play(31, 0x821FA5F4, 1, 1);
@@ -750,8 +791,9 @@ uint64_t AnimateStickerOperate(uint8_t* base, const tuning_screen::GuestCall& ca
   }
   if (int32_t(show) == 0) {
     // l + 173 passed as Unloop's sub-scene index, as written.
-    m.Finish(uint64_t(int64_t(int32_t(Load(base, s + 30732))) + 173), 0x821F7594);
-    return call(kUnloop, {m.movie, uint64_t(int64_t(int32_t(Load(base, s + 30732))) + 173), 1},
+    m.Finish(uint64_t(int64_t(int32_t(Screen(base, s).layer_cursor())) + 173), 0x821F7594);
+    return call(kUnloop,
+                {m.movie, uint64_t(int64_t(int32_t(Screen(base, s).layer_cursor())) + 173), 1},
                 frame, 0x821F75A8);
   }
   const uint64_t named = uint64_t(int64_t(int32_t(k)) + 49);
@@ -781,7 +823,7 @@ uint64_t AnimateStickerSlots(uint8_t* base, const tuning_screen::GuestCall& call
     m.PlayLooped(uint64_t(int64_t(int32_t(k)) + 168), 0x821F8B44, 0x821F8B50);
     m.Play(46, 0x821F8B6C);
     m.Loop(46, 0x821F8BF0);
-  } else if (int32_t(Load(base, s + 30732)) <= 5) {
+  } else if (int32_t(Screen(base, s).layer_cursor()) <= 5) {
     m.PlayLooped(178, 0x821F8B88, 0x821F8B94);
     m.Play(44, 0x821F8BB0);
     m.Loop(44, 0x821F8BF0);
@@ -812,15 +854,15 @@ uint64_t AnimateStickerEditMenu(uint8_t* base, const tuning_screen::GuestCall& c
   m.Stop(136, 0x821F8E24, 0x821F8E30);
   uint64_t r3 = m.Stop(137, 0x821F8E3C, 0x821F8E48);
   if (int32_t(show) == 0) {
-    m.Finish(uint64_t(int64_t(int32_t(Load(base, s + 30732))) + 173), 0x821F8E60);
-    return m.Unloop(uint64_t(int64_t(int32_t(Load(base, s + 30732))) + 173), 0x821F8E70);
+    m.Finish(uint64_t(int64_t(int32_t(Screen(base, s).layer_cursor())) + 173), 0x821F8E60);
+    return m.Unloop(uint64_t(int64_t(int32_t(Screen(base, s).layer_cursor())) + 173), 0x821F8E70);
   }
   const int64_t ks = int32_t(k);
   if (ks < 5) {
     m.PlayLooped(uint64_t(ks + 92), 0x821F8E98, 0x821F8EA4);
     m.Play(uint64_t(ks + 130), 0x821F8EC4);
     m.Loop(uint64_t(ks + 130), 0x821F8F4C);
-  } else if (int32_t(Load(base, s + 30748)) <= 5) {
+  } else if (int32_t(Screen(base, s).edit_cursor()) <= 5) {
     m.PlayLooped(98, 0x821F8EE0, 0x821F8EEC);
     m.Play(136, 0x821F8F08);
     m.Loop(136, 0x821F8F4C);
@@ -835,7 +877,7 @@ uint64_t AnimateStickerEditMenu(uint8_t* base, const tuning_screen::GuestCall& c
   } else if (ks == 4) {
     id = 838;
   } else {
-    id = int32_t(Load(base, s + 30748)) > 5 ? 840 : 839;
+    id = int32_t(Screen(base, s).edit_cursor()) > 5 ? 840 : 839;
   }
   m.Help(id, {0x821F8F5C, 0x821F8F9C, 0x821F8FB0});
   r3 = SetStickerEditTexts(base, call, s, frame);
@@ -852,15 +894,16 @@ uint32_t ShowStickerOrder(uint8_t* base, uint32_t screen, uint32_t show, uint32_
     return entry;
   }
   const uint32_t k = Cursor(base, s);
-  SetShown(base, movie, 30, (Load(base, s + 30756) << 1) + 47, int32_t(k) > 0 ? 1 : 0);
-  SetShown(base, movie, 30, (Load(base, s + 30756) + 24) << 1, int32_t(k) < 4 ? 1 : 0);
+  SetShown(base, movie, 30, (Screen(base, s).order_position() << 1) + 47, int32_t(k) > 0 ? 1 : 0);
+  SetShown(base, movie, 30, (Screen(base, s).order_position() + 24) << 1, int32_t(k) < 4 ? 1 : 0);
   uint32_t r3 = 0;
   for (uint32_t j = 0; j < 5; j++) {
-    const uint32_t order = Load(base, s + 33480 + 4 * j);
-    const uint32_t id = Load(base, (((Load(base, s + kArea) + 1666) * 5 + order) << 2) + s);
+    const uint32_t order = Load(base, OrderAt(base, s, j));
+    const uint32_t id = Load(base, IdAt(base, s, Screen(base, s).editor_page(), order));
     ShowSlotImage(base, s, id, j, frame);
-    const uint32_t record = (Load(base, s + kArea) * 5 + Load(base, s + 33480 + 4 * j)) * 24 + s +
-                            32360;
+    const uint32_t record =
+        (Screen(base, s).editor_page() * 5 + Load(base, OrderAt(base, s, j))) * 24 +
+        Screen(base, s).stickers_address();
     PlaceStickerNode(base, s, id, j, record, frame);
     r3 = ShowSlotNode(base, s, id, j, k, frame);
   }
@@ -874,30 +917,32 @@ uint64_t ShowStickerPicker(uint8_t* base, const tuning_screen::GuestCall& call, 
   const uint32_t frame = Frame(base, sp, 160);
   Movie m{base, call, Load(base, tuning_screen::MovieEntry(base, frame, kStickerMovie)), frame};
   if (int32_t(show) == 0) {
-    m.Stop(uint64_t(int64_t(int32_t(Load(base, s + 30732))) + 173), 0x821FBBA8, 0x821FBBB8);
+    m.Stop(uint64_t(int64_t(int32_t(Screen(base, s).layer_cursor())) + 173), 0x821FBBA8,
+           0x821FBBB8);
     return m.Stop(159, 0x821FBBC4, 0x821FBBD0);
   }
   const uint32_t k = Cursor(base, s);
-  ShowSlotImage(base, s, k, Load(base, s + 30732), frame);
-  PlaceStickerNode(base, s, k, Load(base, s + 30732), s + 30832, frame);
+  ShowSlotImage(base, s, k, Screen(base, s).layer_cursor(), frame);
+  PlaceStickerNode(base, s, k, Screen(base, s).layer_cursor(), Screen(base, s).edited_x_address(),
+                   frame);
   for (uint32_t t = 0; t < 6; t++) {
     const uint64_t i = StepUnlockedSticker(base, s, Cursor(base, s), uint64_t(int64_t(t) - 2));
     const uint32_t flag = OnSecondNode(base, uint32_t(i)) ? 0 : 1;
-    SetSlot(base, s + 10048, 29, 22 + 4 * t, 23 + 4 * t, 159 + 2 * t, 160 + 2 * t, uint32_t(i),
-            flag, frame);
+    SetSlot(base, Screen(base, s).decal_images_address(), 29, 22 + 4 * t, 23 + 4 * t, 159 + 2 * t,
+            160 + 2 * t, uint32_t(i), flag, frame);
   }
   const uint32_t cursor = Cursor(base, s);
   const int64_t c = int32_t(cursor);
   m.Text(29, 1, uint64_t(c + 1447), 0, 0x821FBCA0);
   // +30768: the first group whose last id isn't below the cursor, else 5.
-  Store(base, s + 30768, 5);
+  Screen(base, s).set_image_group(5);
   for (uint32_t g = 0; g < 6; g++) {
-    if (int32_t(cursor) <= int32_t(Load(base, kGroups + 12 * g + 4))) {
-      Store(base, s + 30768, g);
+    if (int32_t(cursor) <= Group(base, g).last_id()) {
+      Screen(base, s).set_image_group(g);
       break;
     }
   }
-  m.Text(29, 9, uint64_t(int64_t(int32_t(Load(base, s + 30768))) + 1242), 0, 0x821FBCF0);
+  m.Text(29, 9, uint64_t(int64_t(int32_t(Screen(base, s).image_group())) + 1242), 0, 0x821FBCF0);
   m.Text(29, 6, 449, 0, 0x821FBD04);
   m.Text(29, 7, 8, uint64_t(c + 1), 0x821FBD1C);
   return m.Text(29, 8, 8, 199, 0x821FBD34);
@@ -908,56 +953,56 @@ uint64_t InputStickerAreas(uint8_t* base, const tuning_screen::GuestCall& call, 
   ITC_NATIVE_RUNNING("sub_821FBD40 TuningScreen::InputStickerAreas");
   const uint32_t s = uint32_t(screen);
   const uint32_t frame = Frame(base, sp, 96);
-  call(kMenuStep, {Load(base, s + 10044)}, frame, 0x821FBD5C);
-  const uint32_t menu = Load(base, s + 10044);
-  if (int32_t(Load(base, menu + 8)) != 0) {
+  call(kMenuStep, {Menu(base, s).address}, frame, 0x821FBD5C);
+  const schema::FrontEndMenu menu = Menu(base, s);
+  if (int32_t(menu.moved()) != 0) {
     const uint64_t r3 = call(kMenuSoundPlay, {4}, frame, 0x821FBD74);
-    Queue(base, s, Load(base, s + 9652), 33);
+    Queue(base, s, Screen(base, s).state(), 33);
     return r3;
   }
-  uint64_t r3 = call(kMenuPressed, {menu, 159}, frame, 0x821FBDB0);
+  uint64_t r3 = call(kMenuPressed, {menu.address, 159}, frame, 0x821FBDB0);
   if (int32_t(r3) != 0) {
     // A: rows 6 and 7 refused without the garage car's id.
     const int32_t k = int32_t(Cursor(base, s));
-    if (int32_t(Load(base, s + 33508)) != 0 && (k == 6 || k == 7)) {
+    if (int32_t(Screen(base, s).no_car_id()) != 0 && (k == 6 || k == 7)) {
       return call(kMenuSoundPlay, {3}, frame, 0x821FBDEC);
     }
     call(kMenuSoundPlay, {0}, frame, 0x821FBDF8);
     const uint32_t area = Cursor(base, s);
-    Store(base, s + kSlot, 0);
-    Store(base, s + 9652, 39);
-    Store(base, s + kSolo, 0);
-    Store(base, s + kArea, area);
+    Screen(base, s).set_layer_cursor(0);
+    Screen(base, s).set_state(39);
+    Screen(base, s).set_holding_164(0);
+    Screen(base, s).set_editor_page(area);
     Queue(base, s, 39, 34);
     AnimateStickerAreas(base, call, s, 0, frame);
-    r3 = RestoreAreaDecals(base, call, screen, Load(base, s + kArea), frame);
-    Store(base, s + 10012, 1);
+    r3 = RestoreAreaDecals(base, call, screen, Screen(base, s).editor_page(), frame);
+    Screen(base, s).set_stand_action(1);
     return r3;
   }
-  r3 = call(kMenuPressed, {Load(base, s + 10044), 158}, frame, 0x821FBE7C);
+  r3 = call(kMenuPressed, {Menu(base, s).address, 158}, frame, 0x821FBE7C);
   if (int32_t(r3) == 0) {
     return r3;
   }
   // B: state 61 (leaving the editor) with no command, as the vinyl
   // editor's state 23, and the fade out.
   call(kMenuSoundPlay, {2}, frame, 0x821FBE8C);
-  uint32_t queue = Load(base, s + 10036);
-  Store(base, s + 9652, 61);
-  Store(base, queue + 4, 61);
-  Store(base, queue + 0, 61);
-  Store(base, queue + 8, 61);
-  Store(base, queue + 20, kNone);
-  Store(base, queue + 12, kNone);
-  Store(base, queue + 24, 0);
-  queue = Load(base, s + 10036);
-  const uint32_t state = Load(base, s + 9652);
-  const uint32_t current = Load(base, queue + 0);
+  schema::TuningCommandQueue queue = Screen(base, s).queue();
+  Screen(base, s).set_state(61);
+  queue.set_resume(61);
+  queue.set_page(61);
+  queue.set_previous_page(61);
+  queue.set_step(kNone);
+  queue.set_current(kNone);
+  queue.set_started(0);
+  queue = Screen(base, s).queue();
+  const uint32_t state = Screen(base, s).state();
+  const uint32_t current = queue.page();
   if (int32_t(state) != int32_t(current)) {
-    Store(base, queue + 8, current);
+    queue.set_previous_page(current);
   }
-  Store(base, queue + 0, state);
-  Store(base, queue + 12, kNone);
-  Store(base, queue + 16, kNone);
+  queue.set_page(state);
+  queue.set_current(kNone);
+  queue.set_next(kNone);
   mode_tick::ScreenFadesFadeOut(base, 15, 0, 0, 0, 0);
   return AnimateStickerAreas(base, call, s, 0, frame);
 }
@@ -968,39 +1013,39 @@ uint64_t InputStickerSlots(uint8_t* base, const tuning_screen::GuestCall& call, 
   const uint32_t s = uint32_t(screen);
   const uint32_t frame = Frame(base, sp, 112);
   StepAndSolo(base, call, s, frame, 0x821F9068, false, flags.native_slots);
-  const uint32_t menu = Load(base, s + 10044);
-  if (int32_t(Load(base, menu + 8)) != 0) {
+  const schema::FrontEndMenu menu = Menu(base, s);
+  if (int32_t(menu.moved()) != 0) {
     const uint64_t r3 = call(kMenuSoundPlay, {4}, frame, 0x821F90D0);
-    Queue(base, s, Load(base, s + 9652), 35);
+    Queue(base, s, Screen(base, s).state(), 35);
     return r3;
   }
-  if (int32_t(Load(base, menu + 0)) == 5 && int32_t(Load(base, menu + 36)) != 0) {
+  if (int32_t(menu.cursor()) == 5 && menu.side() != 0) {
     // The two buttons (l 5 and 6) swapped.
     const uint64_t r3 = call(kMenuSoundPlay, {4}, frame, 0x821F90F4);
-    StepButtons(base, s, kSlot);
-    Queue(base, s, Load(base, s + 9652), 35);
+    StepButtons(base, s, Screen(base, s).layer_cursor_address());
+    Queue(base, s, Screen(base, s).state(), 35);
     return r3;
   }
-  uint64_t r3 = call(kMenuPressed, {menu, 159}, frame, 0x821F915C);
+  uint64_t r3 = call(kMenuPressed, {menu.address, 159}, frame, 0x821F915C);
   if (int32_t(r3) != 0) {
-    if (int32_t(Load(base, s + kSolo)) != 0) {
+    if (int32_t(Screen(base, s).holding_164()) != 0) {
       return r3;
     }
     r3 = call(kMenuSoundPlay, {0}, frame, 0x821F9180);
-    PickRow(base, s, kSlot);
-    const int32_t l = int32_t(Load(base, s + kSlot));
+    PickRow(base, s, Screen(base, s).layer_cursor_address());
+    const int32_t l = int32_t(Screen(base, s).layer_cursor());
     if (l < 5) {
       if (int32_t(PlacedId(base, s, uint32_t(l))) == -1) {
         // An empty slot: D reset, the picker (state 43).
         ResetDecal(base, s);
-        Store(base, s + 30764, 0);
-        Store(base, s + 30768, 0);
-        Store(base, s + 9652, 43);
-        Store(base, s + 33536, 0);
+        Screen(base, s).set_picked_image(0);
+        Screen(base, s).set_image_group(0);
+        Screen(base, s).set_state(43);
+        Screen(base, s).set_picker_wait(0);
         Queue(base, s, 43, 43);
       } else {
         // A sticker: its operations (state 40).
-        Store(base, s + 30740, 0);
+        Screen(base, s).set_operation_cursor(0);
         Go(base, s, 40, 36);
       }
       return AnimateStickerSlots(base, call, s, 0, frame);
@@ -1009,13 +1054,13 @@ uint64_t InputStickerSlots(uint8_t* base, const tuning_screen::GuestCall& call, 
     Go(base, s, l == 5 ? 50 : 51, 52);
     return r3;
   }
-  r3 = call(kMenuPressed, {Load(base, s + 10044), 158}, frame, 0x821F92C0);
+  r3 = call(kMenuPressed, {Menu(base, s).address, 158}, frame, 0x821F92C0);
   if (int32_t(r3) == 0) {
     return r3;
   }
   r3 = call(kMenuSoundPlay, {2}, frame, 0x821F92D0);
-  BackToButton(base, s, kSlot);
-  Queue(base, s, Load(base, s + 9652), 35);
+  BackToButton(base, s, Screen(base, s).layer_cursor_address());
+  Queue(base, s, Screen(base, s).state(), 35);
   return r3;
 }
 
@@ -1025,60 +1070,61 @@ uint64_t InputStickerOperate(uint8_t* base, const tuning_screen::GuestCall& call
   const uint32_t s = uint32_t(screen);
   const uint32_t frame = Frame(base, sp, 112);
   StepAndSolo(base, call, s, frame, 0x821F9340, true, flags.native_slots);
-  const uint32_t menu = Load(base, s + 10044);
-  if (int32_t(Load(base, menu + 8)) != 0) {
+  const schema::FrontEndMenu menu = Menu(base, s);
+  if (int32_t(menu.moved()) != 0) {
     const uint64_t r3 = call(kMenuSoundPlay, {4}, frame, 0x821F93A4);
-    Queue(base, s, Load(base, s + 9652), 37);
+    Queue(base, s, Screen(base, s).state(), 37);
     return r3;
   }
-  uint64_t r3 = call(kMenuPressed, {menu, 159}, frame, 0x821F93E0);
+  uint64_t r3 = call(kMenuPressed, {menu.address, 159}, frame, 0x821F93E0);
   if (int32_t(r3) != 0) {
-    if (int32_t(Load(base, s + kSolo)) != 0) {
+    if (int32_t(Screen(base, s).holding_164()) != 0) {
       return r3;
     }
     r3 = call(kMenuSoundPlay, {0}, frame, 0x821F9404);
     const int32_t k = int32_t(Cursor(base, s));
-    Store(base, s + 30740, uint32_t(k));
+    Screen(base, s).set_operation_cursor(uint32_t(k));
     if (k == 0) {
       // Edit: the record into D.
-      r3 = Memcpy(base, call, screen + kDecal, SlotRecord(base, screen), 24, frame, 0x821F9440);
-      Store(base, s + 30748, 0);
+      r3 = Memcpy(base, call, Wide(screen, Screen(base, s).edited_x_address()),
+                  SlotRecord(base, screen), 24, frame, 0x821F9440);
+      Screen(base, s).set_edit_cursor(0);
       Go(base, s, 41, 38);
     } else if (k == 1) {
       // Order: the order list 0 to 4.
-      Store(base, s + 30756, Load(base, s + kSlot));
+      Screen(base, s).set_order_position(Screen(base, s).layer_cursor());
       for (uint32_t i = 0; i < 5; i++) {
-        Store(base, s + 33480 + 4 * i, i);
+        Store(base, OrderAt(base, s, i), i);
       }
       Go(base, s, 42, 40);
     } else if (k == 2) {
       // Image: D reset, the picker from the placed sticker.
       ResetDecal(base, s);
-      const uint32_t id = PlacedId(base, s, Load(base, s + kSlot));
-      Store(base, s + 30768, 0);
-      Store(base, s + 30764, 0);
+      const uint32_t id = PlacedId(base, s, Screen(base, s).layer_cursor());
+      Screen(base, s).set_image_group(0);
+      Screen(base, s).set_picked_image(0);
       if (int32_t(id) > -1) {
-        Store(base, s + 30764, id);
+        Screen(base, s).set_picked_image(id);
       }
-      Store(base, s + 9652, 43);
-      Store(base, s + 33536, 0);
+      Screen(base, s).set_state(43);
+      Screen(base, s).set_picker_wait(0);
       Queue(base, s, 43, 43);
     } else {
       // Remove: the dialog.
-      Store(base, s + 30780, 0);
+      Screen(base, s).set_before_state_37(0);
       Go(base, s, 52, 52);
     }
-    if (int32_t(Load(base, s + 30740)) == 3) {
+    if (int32_t(Screen(base, s).operation_cursor()) == 3) {
       return r3;
     }
     return AnimateStickerOperate(base, call, s, 0, frame);
   }
-  r3 = call(kMenuPressed, {Load(base, s + 10044), 158}, frame, 0x821F9594);
-  if (int32_t(r3) == 0 || int32_t(Load(base, s + kSolo)) != 0) {
+  r3 = call(kMenuPressed, {Menu(base, s).address, 158}, frame, 0x821F9594);
+  if (int32_t(r3) == 0 || int32_t(Screen(base, s).holding_164()) != 0) {
     return r3;
   }
   call(kMenuSoundPlay, {2}, frame, 0x821F95B8);
-  Store(base, s + 9720, 1);
+  Screen(base, s).set_command_end_after_setup(1);
   Go(base, s, 39, 34);
   return AnimateStickerOperate(base, call, s, 0, frame);
 }
@@ -1089,66 +1135,69 @@ uint64_t InputStickerEdit(uint8_t* base, const tuning_screen::GuestCall& call, u
   const uint32_t s = uint32_t(screen);
   const uint32_t frame = Frame(base, sp, 112);
   StepAndSolo(base, call, s, frame, 0x821F9620, true, flags.native_slots);
-  const uint32_t menu = Load(base, s + 10044);
-  if (int32_t(Load(base, menu + 8)) != 0) {
+  const schema::FrontEndMenu menu = Menu(base, s);
+  if (int32_t(menu.moved()) != 0) {
     const uint64_t r3 = call(kMenuSoundPlay, {4}, frame, 0x821F9680);
-    Queue(base, s, Load(base, s + 9652), 39);
+    Queue(base, s, Screen(base, s).state(), 39);
     return r3;
   }
-  if (int32_t(Load(base, menu + 0)) == 5 && int32_t(Load(base, menu + 36)) != 0) {
+  if (int32_t(menu.cursor()) == 5 && menu.side() != 0) {
     const uint64_t r3 = call(kMenuSoundPlay, {4}, frame, 0x821F96A4);
-    StepButtons(base, s, 30748);
-    Queue(base, s, Load(base, s + 9652), 39);
+    StepButtons(base, s, Screen(base, s).edit_cursor_address());
+    Queue(base, s, Screen(base, s).state(), 39);
     return r3;
   }
-  uint64_t r3 = call(kMenuPressed, {menu, 159}, frame, 0x821F970C);
+  uint64_t r3 = call(kMenuPressed, {menu.address, 159}, frame, 0x821F970C);
   if (int32_t(r3) != 0) {
-    if (int32_t(Load(base, s + kSolo)) != 0) {
+    if (int32_t(Screen(base, s).holding_164()) != 0) {
       return r3;
     }
     call(kMenuSoundPlay, {0}, frame, 0x821F9730);
-    PickRow(base, s, 30748);
+    PickRow(base, s, Screen(base, s).edit_cursor_address());
     // D's backup, put back by states 44 to 46's B.
-    Memcpy(base, call, screen + 33512, screen + kDecal, 24, frame, 0x821F976C);
-    switch (int32_t(Load(base, s + 30748))) {
+    Memcpy(base, call, Wide(screen, Screen(base, s).sticker_backup_address()),
+           Wide(screen, Screen(base, s).edited_x_address()), 24, frame, 0x821F976C);
+    switch (int32_t(Screen(base, s).edit_cursor())) {
       case 0: Go(base, s, 44, 45); break;
       case 1: Go(base, s, 45, 47); break;
       case 2: Go(base, s, 46, 49); break;
       case 3: {
         // The flip toggled and the node placed again.
-        const uint32_t flip = Load(base, s + kDecal + 16);
-        Store(base, s + kDecal + 16, flip == 0 ? 1 : 0);
-        const uint32_t l = Load(base, s + kSlot);
-        PlaceStickerNode(base, s, PlacedId(base, s, l), l, s + kDecal, frame);
+        const uint32_t flip = Screen(base, s).edited_flip();
+        Screen(base, s).set_edited_flip(flip == 0 ? 1 : 0);
+        const uint32_t l = Screen(base, s).layer_cursor();
+        PlaceStickerNode(base, s, PlacedId(base, s, l), l, Screen(base, s).edited_x_address(),
+                         frame);
         break;
       }
       case 4:
         // The free look (state 49).
         Go(base, s, 49, 51);
-        Store(base, s + 10012, 3);
+        Screen(base, s).set_stand_action(3);
         break;
       case 5:
         // The edit kept.
-        Store(base, s + 9720, 1);
+        Screen(base, s).set_command_end_after_setup(1);
         Go(base, s, 39, 34);
-        Memcpy(base, call, SlotRecord(base, screen), screen + kDecal, 24, frame, 0x821F98E8);
+        Memcpy(base, call, SlotRecord(base, screen),
+               Wide(screen, Screen(base, s).edited_x_address()), 24, frame, 0x821F98E8);
         break;
       default:
-        Store(base, s + 9720, 1);
+        Screen(base, s).set_command_end_after_setup(1);
         Go(base, s, 40, 36);
         break;
     }
-    return AnimateStickerEditMenu(base, call, s, int32_t(Load(base, s + 30748)) == 3 ? 1 : 0,
-                                  frame);
+    return AnimateStickerEditMenu(base, call, s,
+                                  int32_t(Screen(base, s).edit_cursor()) == 3 ? 1 : 0, frame);
   }
-  r3 = call(kMenuPressed, {Load(base, s + 10044), 158}, frame, 0x821F9944);
+  r3 = call(kMenuPressed, {Menu(base, s).address, 158}, frame, 0x821F9944);
   if (int32_t(r3) == 0) {
     return r3;
   }
   // B (not refused while solo here).
   r3 = call(kMenuSoundPlay, {2}, frame, 0x821F9954);
-  BackToButton(base, s, 30748);
-  Queue(base, s, Load(base, s + 9652), 39);
+  BackToButton(base, s, Screen(base, s).edit_cursor_address());
+  Queue(base, s, Screen(base, s).state(), 39);
   return r3;
 }
 
@@ -1161,9 +1210,9 @@ uint64_t InputStickerView(uint8_t* base, const tuning_screen::GuestCall& call, u
   if (asked(40, 159, 0x821F7054) || asked(40, 158, 0x821F7080)) {
     // A or B: back to the edit page (state 41), the stand's decals applied.
     asked.r3 = call(kMenuSoundPlay, {2}, frame, 0x821F7090);
-    Store(base, s + 9720, 1);
+    Screen(base, s).set_command_end_after_setup(1);
     Go(base, s, 41, 38);
-    Store(base, s + 10012, 4);
+    Screen(base, s).set_stand_action(4);
   }
   // The held buttons: the distance, the turns and the tilt.
   if (asked(32, 163, 0x821F70FC)) {
@@ -1196,79 +1245,82 @@ uint64_t InputStickerOrder(uint8_t* base, const tuning_screen::GuestCall& call, 
   ITC_NATIVE_RUNNING("sub_821FBF18 TuningScreen::InputStickerOrder");
   const uint32_t s = uint32_t(screen);
   const uint32_t frame = Frame(base, sp, 272);
-  if (int32_t(Load(base, s + 9720)) != 0) {
+  if (int32_t(Screen(base, s).command_end_after_setup()) != 0) {
     // The command's end asked: the order page again while the slot isn't
     // in its own place, else the operations (state 40).
-    const uint32_t moving = Load(base, s + 30756);
-    if (int32_t(moving) != int32_t(Load(base, OrderAt(s, moving)))) {
-      Queue(base, s, Load(base, s + 9652), 42);
+    const uint32_t moving = Screen(base, s).order_position();
+    if (int32_t(moving) != int32_t(Load(base, OrderAt(base, s, moving)))) {
+      Queue(base, s, Screen(base, s).state(), 42);
     } else {
       Go(base, s, 40, 36);
     }
     return screen;
   }
-  call(kMenuStep, {Load(base, s + 10044)}, frame, 0x821FBF94);
+  call(kMenuStep, {Menu(base, s).address}, frame, 0x821FBF94);
   if (UpdateSoloHold(base, call, s, frame, flags.native_slots) != 0) {
     for (uint32_t j = 0; j < 5; j++) {
-      ShowSlotNode(base, s, PlacedId(base, s, Load(base, OrderAt(s, j))), j, Cursor(base, s),
+      ShowSlotNode(base, s, PlacedId(base, s, Load(base, OrderAt(base, s, j))), j, Cursor(base, s),
                    frame);
     }
   }
-  const uint32_t menu = Load(base, s + 10044);
-  if (int32_t(Load(base, menu + 8)) != 0) {
+  const schema::FrontEndMenu menu = Menu(base, s);
+  if (int32_t(menu.moved()) != 0) {
     // Moved: L[previous] = L[k], L[k] = the moving slot.
     const uint64_t r3 = call(kMenuSoundPlay, {4}, frame, 0x821FC00C);
-    uint32_t m = Load(base, s + 10044);
-    const uint32_t k = Load(base, m + 0), previous = Load(base, m + 4);
-    Store(base, OrderAt(s, previous), Load(base, OrderAt(s, k)));
-    m = Load(base, s + 10044);
-    const uint32_t moving = Load(base, s + 30756);
-    Store(base, OrderAt(s, Load(base, m + 0)), moving);
-    Queue(base, s, Load(base, s + 9652), 41);
+    schema::FrontEndMenu m = Menu(base, s);
+    const uint32_t k = m.cursor(), previous = m.previous();
+    Store(base, OrderAt(base, s, previous), Load(base, OrderAt(base, s, k)));
+    m = Menu(base, s);
+    const uint32_t moving = Screen(base, s).order_position();
+    Store(base, OrderAt(base, s, m.cursor()), moving);
+    Queue(base, s, Screen(base, s).state(), 41);
     return r3;
   }
-  uint64_t r3 = call(kMenuPressed, {menu, 159}, frame, 0x821FC084);
+  uint64_t r3 = call(kMenuPressed, {menu.address, 159}, frame, 0x821FC084);
   if (int32_t(r3) != 0) {
-    if (int32_t(Load(base, s + kSolo)) != 0) {
+    if (int32_t(Screen(base, s).holding_164()) != 0) {
       return r3;
     }
     call(kMenuSoundPlay, {0}, frame, 0x821FC0A8);
     // A: the area reordered by L, through copies of its five records (the
     // frame's +112) and ids (+80).
-    const uint32_t area = Load(base, s + kArea);
+    const uint32_t area = Screen(base, s).editor_page();
     const uint32_t k = Cursor(base, s);
-    Store(base, s + 30756, k);
-    Store(base, s + kSlot, k);
-    const uint32_t records = uint32_t(uint64_t(area) * 120 + screen + 32360);
+    Screen(base, s).set_order_position(k);
+    Screen(base, s).set_layer_cursor(k);
+    const uint32_t records =
+        uint32_t(uint64_t(area) * 120 + Wide(screen, Screen(base, s).stickers_address()));
     for (uint32_t b = 0; b < 120; b += 4) {
       Store(base, frame + 112 + b, Load(base, records + b));
     }
-    const uint32_t ids = uint32_t((uint64_t(area) + 1666) * 20 + screen);
+    const uint32_t ids =
+        uint32_t(uint64_t(area) * 20 + Wide(screen, Screen(base, s).sticker_ids_address()));
     for (uint32_t b = 0; b < 20; b += 4) {
       Store(base, frame + 80 + b, Load(base, ids + b));
     }
     for (uint32_t j = 0; j < 5; j++) {
-      const uint32_t id = Load(base, (Load(base, OrderAt(s, j)) << 2) + frame + 80);
-      Store(base, (((Load(base, s + kArea) + 1666) * 5 + j) << 2) + s, id);
-      const uint64_t destination = (uint64_t(Load(base, s + kArea)) * 5 + j) * 24 + screen + 32360;
-      const uint64_t source = uint64_t(Load(base, OrderAt(s, j))) * 24 + frame + 112;
+      const uint32_t id = Load(base, (Load(base, OrderAt(base, s, j)) << 2) + frame + 80);
+      Store(base, IdAt(base, s, Screen(base, s).editor_page(), j), id);
+      const uint64_t destination = (uint64_t(Screen(base, s).editor_page()) * 5 + j) * 24 +
+                                   Wide(screen, Screen(base, s).stickers_address());
+      const uint64_t source = uint64_t(Load(base, OrderAt(base, s, j))) * 24 + frame + 112;
       Memcpy(base, call, destination, source, 24, frame, 0x821FC174);
     }
-    Store(base, s + 9720, 1);
+    Screen(base, s).set_command_end_after_setup(1);
     Go(base, s, 39, 34);
     return ShowStickerOrder(base, s, 0, frame);
   }
-  r3 = call(kMenuPressed, {Load(base, s + 10044), 158}, frame, 0x821FC1BC);
-  if (int32_t(r3) == 0 || int32_t(Load(base, s + kSolo)) != 0) {
+  r3 = call(kMenuPressed, {Menu(base, s).address, 158}, frame, 0x821FC1BC);
+  if (int32_t(r3) == 0 || int32_t(Screen(base, s).holding_164()) != 0) {
     return r3;
   }
   // B: the slot back at the cursor, then as the command's end.
   call(kMenuSoundPlay, {2}, frame, 0x821FC1E0);
   const uint32_t k = Cursor(base, s);
-  Store(base, s + 9720, 1);
-  Store(base, s + 30756, k);
-  if (int32_t(k) != int32_t(Load(base, OrderAt(s, k)))) {
-    Queue(base, s, Load(base, s + 9652), 42);
+  Screen(base, s).set_command_end_after_setup(1);
+  Screen(base, s).set_order_position(k);
+  if (int32_t(k) != int32_t(Load(base, OrderAt(base, s, k)))) {
+    Queue(base, s, Screen(base, s).state(), 42);
   } else {
     Go(base, s, 40, 36);
   }
@@ -1281,17 +1333,17 @@ uint64_t InputStickerPicker(uint8_t* base, const tuning_screen::GuestCall& call,
   const uint32_t s = uint32_t(screen);
   const uint32_t frame = Frame(base, sp, 128);
   const uint32_t entry = PlayerEntry(base);
-  const uint32_t wait = s + 33536;
+  const uint32_t wait = Screen(base, s).picker_wait_address();
   if (int32_t(Load(base, wait)) > 0) {
     Store(base, wait, Load(base, wait) - 1);
     return screen;
   }
-  call(kMenuStep, {Load(base, s + 10044)}, frame, 0x821FC2C0);
+  call(kMenuStep, {Menu(base, s).address}, frame, 0x821FC2C0);
   uint64_t r3 = UpdateSoloHold(base, call, s, frame, flags.native_slots);
   if (r3 != 0) {
     for (uint32_t j = 0; j < 5; j++) {
       // The slot being picked shows the cursor's sticker.
-      const uint32_t l = Load(base, s + kSlot);
+      const uint32_t l = Screen(base, s).layer_cursor();
       const uint32_t id = int32_t(l) == int32_t(j) ? Cursor(base, s) : PlacedId(base, s, j);
       r3 = ShowSlotNode(base, s, id, j, l, frame);
     }
@@ -1299,12 +1351,14 @@ uint64_t InputStickerPicker(uint8_t* base, const tuning_screen::GuestCall& call,
   r3 = UpdatePreviewHold(base, call, s, frame, flags.native_slots);
   if (r3 != 0) {
     // 163 held: the slot's placed record previewed, else D reset.
-    if (int32_t(Load(base, s + kPreview)) == 1) {
-      Memcpy(base, call, screen + kDecal, SlotRecord(base, screen), 24, frame, 0x821FC370);
+    if (int32_t(Screen(base, s).holding_163()) == 1) {
+      Memcpy(base, call, Wide(screen, Screen(base, s).edited_x_address()), SlotRecord(base, screen),
+             24, frame, 0x821FC370);
     } else {
       ResetDecal(base, s);
     }
-    r3 = PlaceStickerNode(base, s, Cursor(base, s), Load(base, s + kSlot), s + kDecal, frame);
+    r3 = PlaceStickerNode(base, s, Cursor(base, s), Screen(base, s).layer_cursor(),
+                          Screen(base, s).edited_x_address(), frame);
   }
   Reads asked{base, call, entry, frame, flags.native_slots, r3};
   const bool back = asked(48, 161, 0x821FC3D8);
@@ -1312,53 +1366,53 @@ uint64_t InputStickerPicker(uint8_t* base, const tuning_screen::GuestCall& call,
     // The group before or after: the cursor on its first owned sticker.
     const uint32_t i = back ? ScanBack(base, s) : ScanForward(base, s);
     call(kMenuSoundPlay, {4}, frame, 0x821FC4C8);
-    uint32_t m = Load(base, s + 10044);
-    const uint32_t k = Load(base, m + 0);
-    Store(base, m + 0, i);
-    Store(base, m + 4, k);
-    m = Load(base, s + 10044);
-    Store(base, m + 24, 1);
-    Store(base, m + 28, 1);
-    Store(base, m + 32, 0);
+    schema::FrontEndMenu m = Menu(base, s);
+    const uint32_t k = m.cursor();
+    m.set_cursor(i);
+    m.set_previous(k);
+    m = Menu(base, s);
+    m.set_up_down_locked(1);
+    m.set_left_right_steps(1);
+    m.set_shoulders_step(0);
     Store(base, wait, 2);
     return ShowStickerPicker(base, call, s, 1, frame);
   }
-  const uint32_t menu = Load(base, s + 10044);
-  if (int32_t(Load(base, menu + 8)) != 0) {
+  const schema::FrontEndMenu menu = Menu(base, s);
+  if (int32_t(menu.moved()) != 0) {
     r3 = call(kMenuSoundPlay, {4}, frame, 0x821FC62C);
-    const uint32_t state = Load(base, s + 9652);
+    const uint32_t state = Screen(base, s).state();
     Store(base, wait, 2);
     Queue(base, s, state, 44);
     return r3;
   }
-  r3 = call(kMenuPressed, {menu, 159}, frame, 0x821FC670);
+  r3 = call(kMenuPressed, {menu.address, 159}, frame, 0x821FC670);
   if (int32_t(r3) != 0) {
-    if (int32_t(Load(base, s + kSolo)) != 0) {
+    if (int32_t(Screen(base, s).holding_164()) != 0) {
       return r3;
     }
     // A: the sticker placed in slot l, the edit page (state 41).
     call(kMenuSoundPlay, {0}, frame, 0x821FC694);
     const uint32_t k = Cursor(base, s);
-    Store(base, s + 30748, 0);
-    Store(base, s + 9652, 41);
-    Store(base, s + 30764, k);
+    Screen(base, s).set_edit_cursor(0);
+    Screen(base, s).set_state(41);
+    Screen(base, s).set_picked_image(k);
     Queue(base, s, 41, 38);
-    Store(base, (((Load(base, s + kArea) + 1666) * 5 + Load(base, s + kSlot)) << 2) + s,
-          Load(base, s + 30764));
+    Store(base, IdAt(base, s, Screen(base, s).editor_page(), Screen(base, s).layer_cursor()),
+          Screen(base, s).picked_image());
     return ShowStickerPicker(base, call, s, 0, frame);
   }
-  r3 = call(kMenuPressed, {Load(base, s + 10044), 158}, frame, 0x821FC708);
-  if (int32_t(r3) == 0 || int32_t(Load(base, s + kSolo)) != 0) {
+  r3 = call(kMenuPressed, {Menu(base, s).address, 158}, frame, 0x821FC708);
+  if (int32_t(r3) == 0 || int32_t(Screen(base, s).holding_164()) != 0) {
     return r3;
   }
   // B: back to the page the picker came from (q+8: 40 or 39).
   call(kMenuSoundPlay, {2}, frame, 0x821FC72C);
-  const int32_t from = int32_t(Load(base, Load(base, s + 10036) + 8));
+  const int32_t from = int32_t(Screen(base, s).queue().previous_page());
   if (from == 40) {
-    Store(base, s + 9720, 1);
+    Screen(base, s).set_command_end_after_setup(1);
     Go(base, s, 40, 36);
   } else if (from == 39) {
-    Store(base, s + 9720, 1);
+    Screen(base, s).set_command_end_after_setup(1);
     Go(base, s, 39, 34);
   }
   return ShowStickerPicker(base, call, s, 0, frame);

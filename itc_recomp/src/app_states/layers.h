@@ -30,13 +30,6 @@ constexpr uint32_t kLayerVtable = 0x820028E0;
 constexpr uint32_t kLayerStateVtable = 0x820028B0;
 constexpr uint32_t kStateBaseVtable = 0x82002880;
 constexpr uint32_t kStatesVtable = 0x820028F8;
-constexpr uint32_t kLayerBytes = 48;
-constexpr uint32_t kStatesBytes = 12;
-// A layer: +8 the app's interface (the app + 16), +12 the children, +24 the
-// states (lists of pointers), +36 the operations.
-constexpr uint32_t kLayerOwner = 8;
-constexpr uint32_t kLayerChildren = 12;
-constexpr uint32_t kLayerStates = 24;
 
 // The targets ours in play.
 constexpr uint32_t kAddLayer = 0x820AE130;
@@ -85,8 +78,6 @@ std::optional<uint32_t> StatesCreate(uint8_t* base, uint32_t setup, uint32_t fra
 // bytes. Its r3 (the slot's), or nullopt.
 std::optional<uint32_t> AppStart(uint8_t* base, uint32_t interface, uint32_t frame,
                                  const AppCalls& calls);
-constexpr uint32_t kBootMovies = 0x826C5BAC;
-constexpr uint32_t kStartFlag = 0x826364EC;
 
 // --- The layers' walks ---
 

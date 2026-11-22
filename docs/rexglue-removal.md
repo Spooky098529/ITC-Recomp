@@ -6940,3 +6940,14 @@ fresh translations (byte-identical) clean. `boundary_status.py` reads the
 docs' function rows, not the running code, so its figures don't move:
 overridden 128, Native (with Lifted) 204, Dropped 24, never called 20, live
 73; imports: 186 called, 30 with a live caller.
+
+**2026-11-16, E5's step 0 (branch `e5-native-16-11-26`,
+`docs/e5-native.md`):** calls by constant address made direct (13,731 to
+hand ports' entries, 215 to lifted functions, 227 in the hand ports), the
+game's functions called by their names from the rows (`game::`, 4,423), and
+one spelling for guest memory (`guest::Load*`, `Store*`, `Pointer`; the
+`REX_LOAD_*`, `REX_STORE_*` and `REX_RAW_ADDR` macros gone). Attract races,
+the pad replay (127 s) and frame dumps clean. `boundary_status.py` reads the
+docs' function rows, so its figures don't move: overridden 128, Native (with
+Lifted) 204, Dropped 24, never called 20, live 73; imports: 186 called, 30
+with a live caller.

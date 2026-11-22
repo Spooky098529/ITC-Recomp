@@ -30,22 +30,9 @@ namespace type2_mode {
 
 using Calls = race_hud_object::Calls;
 
-// The mode's fields: the delegate's holder (+4) and the delegate (+8: its
-// vtable, the mode, the function, the adjustment), the dispatcher (+36: the
-// handlers, the count +236), the message ring (+240: 50 entries of 12
-// bytes, the count +840, the start +844) and the block (+848).
-constexpr uint32_t kDispatcher = 36;
-constexpr uint32_t kRing = 240;
-constexpr uint32_t kBlock = 848;
-// The block's words: the save screen's state, the loading flag
-// AllLoaded tests, the shown screen (FindShown's index) and the first one,
-// and the next mode's 8-byte answer.
-constexpr uint32_t kSaveScreenState = 0x27B44;
-constexpr uint32_t kBlockLoaded = 0x27B48;
-constexpr uint32_t kShown = 0x27B68;
-constexpr uint32_t kFirstShown = 0x27B6C;
-constexpr uint32_t kNextAnswer = 0x27B74;
-constexpr uint32_t kBlockBytes = 162688;
+// The mode's fields and its block's words are schema::ModeType2's and
+// schema::Type2ModeBlock's (itc_recomp/schema/type2-mode.toml); each
+// machine's words schema::Type2ScreenMachine's.
 
 // The delegate's vtable (ModeDelegate::Invoke) and the thunks.
 constexpr uint32_t kDelegateVtable = 0x82010FA0;
@@ -56,17 +43,6 @@ constexpr uint32_t kSlot10Thunk = 0x8223D4A0;
 constexpr uint32_t kSlot11Thunk = 0x8222FC60;
 constexpr uint32_t kSlot12Thunk = 0x8222FC70;
 constexpr uint32_t kSlot13Thunk = 0x8222FC80;
-
-// Globals: the pad blocked (two words: the system UI, probably), the
-// front-end menu to show on return, the mode before, the race data, the
-// options settings and the dialog's status.
-constexpr uint32_t kPadBlocked0 = 0x826C7960;
-constexpr uint32_t kPadBlocked1 = 0x826C7964;
-constexpr uint32_t kLeavingFlag = 0x826364EC;
-constexpr uint32_t kModeBefore = 0x826032E0;
-constexpr uint32_t kRaceData = 0x826C5B2C;
-constexpr uint32_t kOptionsSettings = 0x826D8478;
-constexpr uint32_t kDialogStatus = 0x82636204;
 
 // The callees by address.
 constexpr uint32_t kDispatch = 0x821062E8;

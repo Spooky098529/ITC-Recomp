@@ -14,11 +14,10 @@
 
 namespace movies::movie {
 
-constexpr uint32_t kCommandStatus = 24;  // 3 once the open's command is done
-constexpr uint32_t kPath = 48;           // 260 bytes
+// The object's fields: schema::Movie (schema/movies.h): command_status
+// (+24), path (+48), state (+308).
 constexpr uint32_t kPathBytes = 260;
-constexpr uint32_t kState = 308;
-constexpr uint32_t kCommandDone = 3;
+constexpr uint32_t kCommandDone = 3;  // command_status once the open's command is done
 
 enum State : uint32_t { kNone = 0, kLoaded = 1, kPlaying = 2, kPaused = 3 };
 

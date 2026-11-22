@@ -1,0 +1,247 @@
+# The schema of docs/functions/race-screens-unseen.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The in-race screens never seen in play (src/race_screens/unseen.h). Kind
+# 4's pause menu's page object (new<28>@PauseMenu4::Create) is a PageObject
+# (menu-helpers.toml) and its menu list (new<72>@PauseMenu4::Create) a
+# MenuList (race-screens.toml): their measures belong there. The embedded
+# page objects, front-end menus and menu lists below are spelled out field
+# by field with a prefix (the schema has no embedded types). The measure's
+# Kind6Menu::RankingTime.r4 to r6 and RaceResults::Open.r4 are the
+# callers' frame words, not objects.
+#
+# Measure faults (left as they are): Kind6Menu::ShowReplay's r3 is a replay
+# record (36 bytes, the replay list's), joined to Kind6Menu (its halfword
+# loads +0, +2, +6, +8 and +10 fit no field); the transitions' r3 (the page
+# object's step word, Kind6Menu +64 or +232, PauseMenu4's page object's +24)
+# is taken for the screen's +0.
+
+# Kind 6's screen after the race ([0x82814E10], 360 bytes): race kind 6 is
+# the Xbox Live mode's race. Two page objects run together: A (+40) the
+# menu and the steps, B (+208) a message box over it.
+[Kind6Menu]
+measure = "Kind6Menu"
+size = 360
+origin = "allocated"
+fields = [
+  { name = "block_0", offset = 0, type = "u32", note = "the block's +0 (ShowKind6Results leaves its frame's leftover)" },
+  { name = "time", offset = 4, type = "u32", note = "the block's +4: the result's +20, a time packed as minutes << 16 | seconds << 10 | thousandths, capped at 59:59.999 by Open" },
+  { name = "time_high", offset = 4, type = "u16", note = "time's high halfword (the sign bit and the minutes)" },
+  { name = "block_16", offset = 16, type = "u32", note = "the block's +16 (not written by ShowKind6Results)" },
+  { name = "block_20", offset = 20, type = "u32", note = "the block's +20 (not written by ShowKind6Results)" },
+  { name = "menu_movie", offset = 24, type = "ptr", note = "UI movie 17, the menu" },
+  { name = "question_movie", offset = 28, type = "ptr", note = "UI movie 20, the question box" },
+  { name = "message_movie", offset = 32, type = "ptr", note = "UI movie 21, the message box" },
+  { name = "waiting_movie", offset = 36, type = "ptr", note = "UI movie 14, the waiting box" },
+  { name = "pages_a_page", offset = 40, type = "u32", note = "the page Update runs; -1 while a transition runs" },
+  { name = "pages_a_next_page", offset = 44, type = "u32" },
+  { name = "pages_a_previous_page", offset = 48, type = "u32" },
+  { name = "pages_a_step", offset = 52, type = "u32", note = "the transition Draw runs; -1 none" },
+  { name = "pages_a_queued_step", offset = 56, type = "u32" },
+  { name = "pages_a_unknown_20", offset = 60, type = "u32" },
+  { name = "pages_a_step_started", offset = 64, type = "u32", note = "the transition's step word" },
+  { name = "main_menu_cursor", offset = 68, type = "u32" },
+  { name = "main_menu_previous", offset = 72, type = "u32" },
+  { name = "main_menu_moved", offset = 76, type = "u32" },
+  { name = "main_menu_first_item", offset = 80, type = "u32" },
+  { name = "main_menu_last_item", offset = 84, type = "u32" },
+  { name = "main_menu_wraps", offset = 88, type = "u32" },
+  { name = "main_menu_up_down_locked", offset = 92, type = "u32" },
+  { name = "main_menu_left_right_steps", offset = 96, type = "u32" },
+  { name = "main_menu_shoulders_step", offset = 100, type = "u32" },
+  { name = "main_menu_side", offset = 104, type = "s32" },
+  { name = "main_menu_wrapped", offset = 108, type = "u32" },
+  { name = "main_menu_list_wrapped", offset = 112, type = "u32" },
+  { name = "main_menu_visible_row", offset = 116, type = "u32" },
+  { name = "main_menu_previous_row", offset = 120, type = "u32" },
+  { name = "main_menu_first_row", offset = 124, type = "u32" },
+  { name = "main_menu_rows_shown", offset = 128, type = "u32" },
+  { name = "main_menu_player", offset = 132, type = "u32" },
+  { name = "slot_list_count", offset = 136, type = "u32" },
+  { name = "slot_list_scroll", offset = 140, type = "u32" },
+  { name = "slot_list_scroll_before", offset = 144, type = "u32" },
+  { name = "slot_list_shown", offset = 148, type = "u32" },
+  { name = "slot_list_selection", offset = 152, type = "u32" },
+  { name = "slot_list_selection_before", offset = 156, type = "u32" },
+  { name = "slot_list_move", offset = 160, type = "u32" },
+  { name = "slot_list_side", offset = 164, type = "u32" },
+  { name = "slot_list_wrapped", offset = 168, type = "u32" },
+  { name = "slot_list_down", offset = 172, type = "u32" },
+  { name = "slot_list_up", offset = 176, type = "u32" },
+  { name = "slot_list_left", offset = 180, type = "u32" },
+  { name = "slot_list_right", offset = 184, type = "u32" },
+  { name = "slot_list_accept", offset = 188, type = "u32" },
+  { name = "slot_list_back", offset = 192, type = "u32" },
+  { name = "slot_list_player", offset = 196, type = "u32" },
+  { name = "slot_list_wraps", offset = 200, type = "u32" },
+  { name = "slot_list_block", offset = 204, type = "u32" },
+  { name = "pages_b_page", offset = 208, type = "u32", note = "the page Update runs; -1 while a transition runs" },
+  { name = "pages_b_next_page", offset = 212, type = "u32" },
+  { name = "pages_b_previous_page", offset = 216, type = "u32" },
+  { name = "pages_b_step", offset = 220, type = "u32", note = "the transition Draw runs; -1 none" },
+  { name = "pages_b_queued_step", offset = 224, type = "u32" },
+  { name = "pages_b_unknown_20", offset = 228, type = "u32" },
+  { name = "pages_b_step_started", offset = 232, type = "u32", note = "the transition's step word" },
+  { name = "question_menu_cursor", offset = 236, type = "u32" },
+  { name = "question_menu_previous", offset = 240, type = "u32" },
+  { name = "question_menu_moved", offset = 244, type = "u32" },
+  { name = "question_menu_first_item", offset = 248, type = "u32" },
+  { name = "question_menu_last_item", offset = 252, type = "u32" },
+  { name = "question_menu_wraps", offset = 256, type = "u32" },
+  { name = "question_menu_up_down_locked", offset = 260, type = "u32" },
+  { name = "question_menu_left_right_steps", offset = 264, type = "u32" },
+  { name = "question_menu_shoulders_step", offset = 268, type = "u32" },
+  { name = "question_menu_side", offset = 272, type = "s32" },
+  { name = "question_menu_wrapped", offset = 276, type = "u32" },
+  { name = "question_menu_list_wrapped", offset = 280, type = "u32" },
+  { name = "question_menu_visible_row", offset = 284, type = "u32" },
+  { name = "question_menu_previous_row", offset = 288, type = "u32" },
+  { name = "question_menu_first_row", offset = 292, type = "u32" },
+  { name = "question_menu_rows_shown", offset = 296, type = "u32" },
+  { name = "question_menu_player", offset = 300, type = "u32" },
+  { name = "unknown_304", offset = 304, type = "u32", note = "cleared by Open" },
+  { name = "rank", offset = 308, type = "u32", note = "the player's rank (the network manager's sub_822914A8)" },
+  { name = "rows_read", offset = 312, type = "u32", note = "the leaderboard's rows read" },
+  { name = "rows_shown", offset = 316, type = "u32", note = "set: the time attack's rows or record shown" },
+  { name = "read_started", offset = 320, type = "u32", note = "a leaderboard read started" },
+  { name = "box_message", offset = 324, type = "u32", note = "the box's message, a string id: 44, 48 to 52, 57" },
+  { name = "message_which", offset = 328, type = "u32", note = "which message (0 to 3)" },
+  { name = "question_which", offset = 332, type = "u32", note = "which question (1 or 2)" },
+  { name = "menu_movie_running", offset = 336, type = "u32", note = "the menu's movie run by Draw" },
+  { name = "input_on", offset = 340, type = "u32", note = "the menu's input on (0 while a box opens or shows)" },
+  { name = "upload_request", offset = 344, type = "u32", note = "a request from sub_82211E90" },
+  { name = "box_shown", offset = 348, type = "u32", note = "0 the question, 1 the message, 2 the waiting box, 3 none" },
+  { name = "reset_request", offset = 352, type = "u32", note = "a request from sub_82211F18 (to page 7 with message 44)" },
+  { name = "ranking_skipped", offset = 356, type = "u32" },
+  { name = "fault_replay_0", offset = 0, type = "u16", note = "measure fault: Kind6Menu::ShowReplay's r3 is a replay record (as AfterRaceMenu::ShowReplay's, race-screens.toml), joined with the menu" },
+  { name = "fault_replay_2", offset = 2, type = "u16", note = "measure fault: the replay record's +2 (ShowReplay)" },
+  { name = "fault_replay_6", offset = 6, type = "u16", note = "measure fault: the replay record's +6 (ShowReplay)" },
+  { name = "fault_replay_8", offset = 8, type = "u16", note = "measure fault: the replay record's +8 (ShowReplay)" },
+  { name = "fault_replay_10", offset = 10, type = "u16", note = "measure fault: the replay record's +10 (ShowReplay)" },
+]
+
+# Kind 4's pause menu's screen ([0x826D84E0], 4 bytes).
+[PauseMenu4]
+measure = "PauseMenu4"
+size = 4
+origin = "allocated"
+fields = [
+  { name = "movie", offset = 0, type = "ptr", note = "UI movie 5" },
+]
+
+# Kind 4's pause menu's data ([0x826D84E4], 80 bytes).
+[PauseMenu4Data]
+measure = "new<80>@PauseMenu4::Create"
+size = 80
+origin = "allocated"
+fields = [
+  { name = "music_volume", offset = 0, type = "u32", note = "player 0's save data's byte +0x1F878, sign-extended" },
+  { name = "effects_volume", offset = 4, type = "u32", note = "player 0's save data's byte +0x1F879, sign-extended" },
+  { name = "music_edit", offset = 8, type = "u32", note = "the volume page's edit, 0 to 15" },
+  { name = "effects_edit", offset = 12, type = "u32", note = "the volume page's edit, 0 to 15" },
+  { name = "music_default", offset = 16, type = "u32", note = "15" },
+  { name = "effects_default", offset = 20, type = "u32", note = "15" },
+  { name = "item_count", offset = 52, type = "u32" },
+  { name = "answer", offset = 56, type = "u32", note = "what Update answers on the answer page" },
+  { name = "volume_toggle", offset = 60, type = "u32", note = "the volume page's last item's choice, 0 or 1" },
+  { name = "main_selection", offset = 64, type = "u32", note = "the main list's selection kept" },
+  { name = "run_count", offset = 68, type = "u32", note = "RunTen's counter, done at 10" },
+  { name = "player", offset = 72, type = "u32", note = "the player who paused, 0 or 1" },
+  { name = "kind", offset = 76, type = "u32", note = "the items' kind: 0 or 1 (the replay bit)" },
+]
+
+# The results at the in-race screens' holder's +1028 ([0x82814E18], 52
+# bytes): +0 to +16 the 20-byte block RaceHudMachine::ShowResults passes.
+[RaceResults]
+measure = "RaceResults"
+size = 52
+origin = "allocated"
+fields = [
+  { name = "shown_flag", offset = 0, type = "u32", note = "the block's +0: 1 from ShowResults; Intro and Show pick their animations by it" },
+  { name = "time", offset = 4, type = "u32", note = "the result's +20, a time packed as minutes << 16 | seconds << 10 | thousandths" },
+  { name = "place", offset = 8, type = "u32", note = "the result's +3892: item 7's string from a table (395 to 411) by it" },
+  { name = "race_word_60", offset = 12, type = "u32", note = "the race data's +60: item 8's string 1718 + it" },
+  { name = "players_word_2196", offset = 16, type = "u32", note = "[0x826D82E8]'s +2196: item 9's string by it (0 to 10)" },
+  { name = "movie", offset = 20, type = "ptr", note = "UI movie 7" },
+  { name = "pages_page", offset = 24, type = "u32", note = "the page Update runs; -1 while a transition runs" },
+  { name = "pages_next_page", offset = 28, type = "u32" },
+  { name = "pages_previous_page", offset = 32, type = "u32" },
+  { name = "pages_step", offset = 36, type = "u32", note = "the transition Draw runs; -1 none" },
+  { name = "pages_queued_step", offset = 40, type = "u32" },
+  { name = "pages_unknown_20", offset = 44, type = "u32" },
+  { name = "pages_step_started", offset = 48, type = "u32", note = "the transition's step word" },
+]
+
+# The results of race kinds 4 and 6 at the holder's +1032 ([0x82814E1C], 40
+# bytes).
+[SplitResults]
+measure = "SplitResults"
+size = 40
+origin = "allocated"
+fields = [
+  { name = "outcome", offset = 0, type = "u32", note = "0 to 2" },
+  { name = "mode", offset = 4, type = "u32", note = "0 to 2" },
+  { name = "movie", offset = 8, type = "ptr", note = "UI movie 8" },
+  { name = "pages_page", offset = 12, type = "u32", note = "the page Update runs; -1 while a transition runs" },
+  { name = "pages_next_page", offset = 16, type = "u32" },
+  { name = "pages_previous_page", offset = 20, type = "u32" },
+  { name = "pages_step", offset = 24, type = "u32", note = "the transition Draw runs; -1 none" },
+  { name = "pages_queued_step", offset = 28, type = "u32" },
+  { name = "pages_unknown_20", offset = 32, type = "u32" },
+  { name = "pages_step_started", offset = 36, type = "u32", note = "the transition's step word" },
+]
+
+# The leaderboard read's spec in the image (XUSER_STATS_SPEC, at 0x826C6410).
+[Kind6StatsSpec]
+size = 16
+origin = "image"
+fields = [
+  { name = "view_id", offset = 0, type = "u32" },
+  { name = "column_count", offset = 4, type = "u32" },
+  { name = "column_0", offset = 8, type = "u16" },
+  { name = "column_1", offset = 10, type = "u16" },
+  { name = "column_2", offset = 12, type = "u16" },
+]
+
+[globals]
+pause4_screen = { address = 0x826D84E0, type = "ptr", to = "PauseMenu4", note = "kind 4's pause menu (the holder's +1016)" }
+pause4_data = { address = 0x826D84E4, type = "ptr", to = "PauseMenu4Data" }
+pause4_pages = { address = 0x826D84E8, type = "ptr", to = "PageObject" }
+pause4_list = { address = 0x826D84EC, type = "ptr", to = "MenuList", note = "a MenuList (72 bytes, race-screens.toml)" }
+pause4_items = { address = 0x8200CD08, type = "bytes", count = 48, note = "the items by kind: six words a kind, -1 ends them" }
+kind6_menu = { address = 0x82814E10, type = "ptr", to = "Kind6Menu" }
+kind6_answer = { address = 0x82814E14, type = "u32", note = "Kind6Menu's answer, 1 to 3 (0 to 2 also open it with its movies' poses reset)" }
+race_results = { address = 0x82814E18, type = "ptr", to = "RaceResults" }
+split_results = { address = 0x82814E1C, type = "ptr", to = "SplitResults" }
+split_ticks = { address = 0x82814E20, type = "u32", note = "SplitResults' tick count" }
+split_exchanged = { address = 0x82814E24, type = "u32", note = "set once the other console's result came" }
+kind6_session = { address = 0x82816E3C, type = "ptr", to = "Session", note = "the network session (network-mode.toml's Session)" }
+kind6_course = { address = 0x82816660, type = "u32", note = "the course, 0 to 7" }
+kind6_course_flag = { address = 0x82816680, type = "u32" }
+kind6_replays = { address = 0x828161F0, type = "ptr", to = "SaveBuffers", note = "the replay list (save-interface.toml's SaveBuffers: +12 the 36-byte records, +20 their count)" }
+kind6_results = { address = 0x826C6AD4, type = "ptr", note = "the leaderboard read's results (an XUSER_STATS_READ_RESULTS)" }
+kind6_read_spec = { address = 0x826C72F4, type = "u32", note = "the leaderboard read's view id" }
+kind6_stats_spec = { address = 0x826C6410, type = "bytes", count = 16, note = "a Kind6StatsSpec" }
+sign_in_watch_state = { address = 0x826BAB3C, type = "u32" }
+sign_in_watch_reason = { address = 0x826BAB5C, type = "u32" }
+net_peers = { address = 0x826C7308, type = "bytes", count = 12, note = "the network manager's peer list (+4 begin, +8 end, 384-byte entries)" }
+net_peer_mode = { address = 0x826C7824, type = "u32", note = "set: the peer list used" }
+net_answer = { address = 0x826C6B0C, type = "u8", note = "the other console's answer, 255 none yet" }
+net_answer_word = { address = 0x826C6B04, type = "u32" }
+race_data = { address = 0x826C5B2C, type = "ptr", to = "RaceData", note = "the race data (race-states.toml): +60, +0x59620 the stages, +0x59AE8 the results records, +0xA3AF0 the kind" }
+net_players = { address = 0x826D82E8, type = "ptr", to = "RaceProgress", note = "the race's progress (race-states.toml): its +7244 is the id sent" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from Kind6Menu.
+[Kind6MenuPart]
+measure = "new<360>@Kind6Menu::Create"
+size = 344
+origin = "embedded"
+fields = [
+  { name = "unknown_340", offset = 340, type = "u32" },
+]

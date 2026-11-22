@@ -1,0 +1,60 @@
+# The schema of docs/functions/scene-target.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+
+# The scene target ([0x8266D08C], docs/known-data.md): 32 bytes made once at
+# boot by SceneTarget::Create and SceneTarget::SceneTarget (app-start-up.md),
+# deleted by sub_8209BCB8; the surfaces the 3D scene is drawn into and the
+# 1280 x 720 texture it's resolved into.
+[SceneTarget]
+measure = "SceneTarget"
+size = 32
+origin = "allocated"
+# 6 functions; areas: app-start-up.md, boot-mode.md, mode-tick.md, scene-target.md
+fields = [
+  { name = "depth", offset = 0, type = "ptr", to = "SurfaceHeader", note = "the 1024 x 576 depth surface (SceneTarget::RecordTargets' command 24)" },
+  { name = "color", offset = 4, type = "ptr", to = "SurfaceHeader", note = "the 1024 x 576 color surface (render targets 0-3)" },
+  { name = "tile_depth", offset = 8, type = "ptr", to = "SurfaceHeader", note = "the depth surface at the display's largest tile (1280 x 256, multisampled), for the menus' predicated tiling" },
+  { name = "tile_color", offset = 12, type = "ptr", to = "SurfaceHeader", note = "the color surface at the largest tile" },
+  { name = "width", offset = 16, type = "u32", note = "1024" },
+  { name = "height", offset = 20, type = "u32", note = "576" },
+  { name = "texture", offset = 24, type = "u32", note = "the 1280 x 720 texture the passes resolve into and draw back (Device::CreateTexture's, sub_822A5D08)" },
+  { name = "mode", offset = 28, type = "u32", note = "Modes::SetSceneTargetMode's (mode-tick.md): 0 gives the pass bits 7, 1 4, 2 0, 3 1, 4 8, above 4 0" },
+]
+
+# A textured screen rectangle (120 bytes; TexturedRect::Record sub_8217C368
+# and TexturedRect::RecordFlat sub_8217AA98): ColorRect's layout
+# (mode-tick.md) with texture coordinates, a texture and a blend flag; built
+# by SceneTarget::RecordPasses in its frame (r1 + 96, + 224, + 352).
+[TexturedRect]
+measure = "TexturedRect"
+size = 120
+origin = "embedded"
+# 1 functions; areas: scene-target.md
+fields = [
+  { name = "matrix", offset = 0, type = "bytes", count = 64, note = "an identity matrix (RecordPasses' vector unit); not read by the recorder" },
+  { name = "kind", offset = 64, type = "u32", note = "0 from RecordPasses; not read by the recorder (probably ColorRect's kind)" },
+  { name = "unknown_68", offset = 68, type = "u32", note = "0 from RecordPasses" },
+  { name = "unknown_72", offset = 72, type = "u32", note = "2 from RecordPasses" },
+  { name = "x", offset = 80, type = "s32" },
+  { name = "y", offset = 84, type = "s32" },
+  { name = "width", offset = 88, type = "u32" },
+  { name = "height", offset = 92, type = "u32" },
+  { name = "u0", offset = 96, type = "f32" },
+  { name = "v0", offset = 100, type = "f32" },
+  { name = "u1", offset = 104, type = "f32" },
+  { name = "v1", offset = 108, type = "f32" },
+  { name = "texture", offset = 112, type = "u32", note = "the texture (SetTexture, sampler 0)" },
+  { name = "blend", offset = 116, type = "u32", note = "not 0: blending on" },
+]
+
+[globals]
+scene_target = { address = 0x8266D08C, type = "ptr", to = "SceneTarget" }
+rect_queue = { address = 0x826D83D0, type = "u32", note = "the textured and color rectangles' render queue (ColorRect::SetTargets, frame-driver.md)" }
+rect_list = { address = 0x826D83D4, type = "u32", note = "the rectangles' command list" }
+display_tiling = { address = 0x8260034C, type = "ptr", to = "Tiling", note = "the display's tiling block (app-start-up.md's Tiling): its tile count and tiles" }
+one = { address = 0x82000A30, type = "f32", note = "1.0" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0" }
+four_fifths = { address = 0x82001070, type = "f32", note = "0.8 (1024 / 1280, 576 / 720): the upscale draw's texture coordinates" }

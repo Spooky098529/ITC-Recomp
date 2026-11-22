@@ -1,0 +1,313 @@
+# The schema of docs/functions/scene-loaders.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The first set of the scene's object pools ([0x826C2E40]) and the loading
+# objects it holds, one class a pool (docs/known-data.md "the first set of
+# scene object pools", "pool node", "car parts", "cockpit body", "car
+# interior", "pool 4 object"; src/scene_loaders/).
+#
+# Left to other files (the measure's names to add there, not copied here):
+# - "Wheels" (pool 5) is car-models.toml's CarWheels; "CarModel" (pool 0)
+#   car-models.toml's CarModel; "TrafficCar" (pool 6) and the measure's
+#   "TrafficCar::OnFileLoaded.r6" (the same object, r6 of its file-loaded
+#   callback) and "SceneModel.+5100.+16780" (TrafficCar::ApplyPalette's r3:
+#   a traffic body, +4124 a slot's state) the traffic body's owner's.
+# - "CarModelLoads.+320", "Cockpit.+496", "WheelsLoads.+2048",
+#   "TrafficCar.+4064" (+8 read: slot 2) and
+#   "TrafficCar::OnFileLoaded.r6.+4064" (+16: slot 4) are a texture
+#   provider's vtable word: models.toml's TextureProviderVtable.
+# - "Cockpit.+24" is the car model (car-models.toml's CarModel: +32 the
+#   block); "Cockpit::OnFileLoaded.r6.+3472" a node's matrix
+#   (models.toml's SkeletonMatrix: +48, +56 its translation row).
+# - "ModelPoint::Find.r4" is a part model (material-passes.toml's
+#   PartModel; +196, +260 its skeleton's (+112) node names and matrices,
+#   +408 the skeleton's set).
+# - "PoolNode.+8.+12.+8" (+7) is a measure fault: ~PoolNode's r10, the
+#   previous node on one path and the list's count less one on the others
+#   (its store is the previous node's +8, next).
+# - car-models.toml's CarModelsFirstSet ("CarInterior.+3092") is
+#   ScenePools; its CarInterior joins the interior and the cockpit body
+#   (Interior and Cockpit here).
+
+# The first set of scene pools ([0x826C2E40], 140 bytes, ScenePools::MakeA;
+# filled by ScenePools::CreateA).
+[ScenePools]
+# measures from CarModelsFirstSet (car-models), merged at the integration
+measures = ["ScenePools", "new<140>@sub_820C3C40",
+            "new<140>@ScenePools::MakeA", "CarInterior.+3092", "TrafficCar.+576"]
+size = 140
+origin = "allocated"
+fields = [
+  { name = "teardown_count", offset = 0, type = "u32", note = "the teardown's count (2, ScenePools::StartTeardownA); the measure's store here is AllocPages' (sub_820D0960) into its out word, the set's +52" },
+  { name = "state", offset = 4, type = "u32", note = "0 when made, 3 once filled, 4 tearing down" },
+  { name = "model_set", offset = 8, type = "u32", note = "0 set a, 1 set b (the loading objects read it as [[their first set] + 8])" },
+  { name = "car_model_count", offset = 12, type = "u32", note = "pool 0's count" },
+  { name = "car_parts_count", offset = 16, type = "u32", note = "pool 1's" },
+  { name = "interior_count", offset = 20, type = "u32", note = "pool 3's" },
+  { name = "cockpit_count", offset = 24, type = "u32", note = "pool 2's" },
+  { name = "pool4_count", offset = 28, type = "u32", note = "pool 4's" },
+  { name = "wheels_count", offset = 32, type = "u32", note = "pool 5's" },
+  { name = "unused_sum", offset = 36, type = "u32", note = "the record's +32 + +28, not used as a count" },
+  { name = "traffic_count", offset = 40, type = "u32", note = "pool 6's" },
+  { name = "deferred_releases", offset = 52, type = "ptr", to = "CarModelsDeferredRelease", note = "4 x (+12 + +40) records of 20 bytes" },
+  { name = "pools", offset = 56, type = "bytes", count = 84, note = "seven lists of PoolNodes (PoolList), 12 bytes each, by pool" },
+  { name = "car_scene_pool7_count", offset = 5036, type = "u32", note = "a measure fault: ScenePools::FindModel's r3 is the car scene ([0x826C2E44]), whose +5036 is pool 7's count" },
+]
+
+# ScenePools::CreateA's 36-byte record (its r4): the pools' counts.
+[ScenePoolsCreateRecord]
+measure = "ScenePools::CreateA.r4"
+size = 36
+origin = "file"
+fields = [
+  { name = "model_set", offset = 0, type = "u32" },
+  { name = "car_models", offset = 4, type = "u32", note = "pool 0" },
+  { name = "car_parts", offset = 8, type = "u32", note = "pool 1" },
+  { name = "interiors", offset = 12, type = "u32", note = "pool 3's count is +12 + +16 + +32" },
+  { name = "cockpits", offset = 16, type = "u32", note = "pool 2" },
+  { name = "pool4", offset = 20, type = "u32", note = "pool 4" },
+  { name = "wheels", offset = 24, type = "u32", note = "pool 5's count is +24 + +32 + +28" },
+  { name = "extra_wheels", offset = 28, type = "u32", note = "added to the wheels' count and to the set's +36" },
+  { name = "traffic", offset = 32, type = "u32", note = "pool 6; added to the interiors' and the wheels' counts" },
+]
+
+# The base of the scene pools' objects (PoolNode::PoolNode sub_82594050,
+# ~PoolNode sub_825940B0). The measure's other names are the nodes ~PoolNode
+# and PoolNode::PoolNode reach through the links.
+[PoolNode]
+measures = ["PoolNode", "PoolNode::PoolNode.r4.+4", "PoolNode.+4.+8.+7", "PoolNode.+8.+12.+0", "PoolNode.+8.+12.+4"]
+size = 24
+origin = "embedded"
+vtable = 0x8206CCB0
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x8206CCB0 for the node itself; each class's own, then 0x82004F90 before the node's destructor" },
+  { name = "list", offset = 4, type = "ptr", to = "PoolList" },
+  { name = "next", offset = 8, type = "ptr", to = "PoolNode" },
+  { name = "previous", offset = 12, type = "ptr", to = "PoolNode" },
+  { name = "state", offset = 16, type = "u32", note = "the pool object's: 0 free, 3 in use" },
+  { name = "index", offset = 20, type = "u32", note = "the pool object's index in its pool (-1 from the constructors)" },
+]
+
+# A pool's list of PoolNodes (12 bytes, the set's +56 + 12 x pool).
+[PoolList]
+measures = ["PoolNode::PoolNode.r4", "PoolNode.+8.+12"]
+size = 12
+origin = "embedded"
+fields = [
+  { name = "first", offset = 0, type = "ptr", to = "PoolNode" },
+  { name = "last", offset = 4, type = "ptr", to = "PoolNode" },
+  { name = "count", offset = 8, type = "u32" },
+]
+
+# A name the helpers compare (NameMatches' two strings, the skeletons' node
+# names, 160-byte records): NUL-terminated bytes.
+[SceneLoadersName]
+measures = ["NameMatches.r3", "NameMatches.r4", "Cockpit::OnFileLoaded.r6.+292", "TrafficCar::OnFileLoaded.r6.+3860"]
+size = 160
+origin = "file"
+fields = [
+  { name = "text", offset = 0, type = "bytes", count = 160, note = "NUL-terminated" },
+]
+
+# The car parts (pool 1, 106,016 bytes, vtable 0x82005094; CarParts::CarParts
+# sub_820D7428). SceneModel.+5060.+104 is CarParts::ApplyPalette's r3.
+[CarParts]
+measures = ["CarParts", "SceneModel.+5060.+104",
+            "CarParts::OnPartLoadedA.r6", "CarParts::OnPartLoadedB.r6"]
+size = 106016
+origin = "allocated"
+vtable = 0x82005094
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82005094 (the pool node's 0x82004F90 while it's torn down)" },
+  { name = "state", offset = 16, type = "u32", note = "the pool object's: 3 in use" },
+  { name = "index", offset = 20, type = "u32", note = "its index in the pool" },
+  { name = "car_model", offset = 24, type = "ptr", to = "CarModel" },
+  { name = "record", offset = 28, type = "bytes", count = 60, note = "a copy of its record (CarParts::LoadSetB reads +28 to +76)" },
+  { name = "loads", offset = 96, type = "bytes", count = 105904, note = "the loads (CarPartsLoads)" },
+  { name = "slots", offset = 96, type = "bytes", count = 5184, note = "216 LoadSlots of 24 bytes (+116 + 24i their states); set b uses the first 17" },
+  { name = "part_models", offset = 5280, type = "bytes", count = 100224, note = "216 PartModels of 464 bytes (the measure's +412 is a model's shape count, +5328 the first's +48, its texture provider)" },
+  { name = "first_set", offset = 106000, type = "ptr", to = "ScenePools" },
+]
+
+# The car parts' loads (the car parts' +96; CarPartsLoads::CarPartsLoads
+# sub_820D6F88).
+[CarPartsLoads]
+measure = "CarParts@+96"
+size = 105904
+origin = "embedded"
+fields = [
+  { name = "slots", offset = 0, type = "bytes", count = 5184, note = "216 LoadSlots" },
+  { name = "part_models", offset = 5184, type = "bytes", count = 100224, note = "216 PartModels of 464 bytes" },
+  { name = "points", offset = 105424, type = "bytes", count = 480, note = "30 float4s, w (+105436 + 16i) 1.0 from the constructor" },
+]
+
+# The cockpit body (pool 2, 3,520 bytes, vtable 0x82005020; Cockpit::Cockpit
+# sub_820D63A0); Cockpit::OnFileLoaded's r6.
+[Cockpit]
+measures = ["Cockpit", "Cockpit::OnFileLoaded.r6"]
+size = 3520
+origin = "allocated"
+vtable = 0x82005020
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82005020 (the pool node's 0x82004F90 while it's torn down)" },
+  { name = "state", offset = 16, type = "u32", note = "the pool object's: 3 in use" },
+  { name = "index", offset = 20, type = "u32", note = "its index in the pool" },
+  { name = "car_model", offset = 24, type = "ptr", to = "CarModel", note = "its +32 the block" },
+  { name = "record", offset = 28, type = "bytes", count = 144, note = "a copy of its 144-byte record" },
+  { name = "texture_number", offset = 48, type = "u32", note = "the record's +20: 0 names the texture \"%s_inte_on\", else \"%s_inte_on_0%d\" with it" },
+  { name = "loads", offset = 176, type = "bytes", count = 3296, note = "the loads (CockpitLoads: CarModelLoads' members, then six part models from +512)" },
+  { name = "node_file_slot", offset = 176, type = "bytes", count = 24, note = "the node file's LoadSlot" },
+  { name = "node_file_request", offset = 180, type = "u32" },
+  { name = "node_file_buffer", offset = 192, type = "u32" },
+  { name = "node_file_state", offset = 196, type = "u32", note = "2 loading, 3 arrived" },
+  { name = "skeleton", offset = 208, type = "bytes", count = 240, note = "the node file's Skeleton (+176 its node values)" },
+  { name = "skeleton_node_names", offset = 292, type = "ptr", to = "SceneLoadersName", note = "the skeleton's +84: 160-byte names" },
+  { name = "skeleton_node_matrices", offset = 356, type = "ptr", to = "SkeletonMatrix", note = "the skeleton's +148: 64 bytes a node" },
+  { name = "xpr_slots", offset = 400, type = "bytes", count = 48, note = "the two XPR2s' LoadSlots" },
+  { name = "xpr_slot_request", offset = 404, type = "u32", note = "the first's request (+24i)" },
+  { name = "xpr_slot_state", offset = 420, type = "u32", note = "the first's state (+24i)" },
+  { name = "xprs", offset = 448, type = "bytes", count = 48, note = "two XPR objects, 24 bytes each" },
+  { name = "providers", offset = 496, type = "bytes", count = 40, note = "two texture providers, 20 bytes each" },
+  { name = "provider_vtable", offset = 496, type = "ptr", to = "TextureProviderVtable", note = "the first provider's vtable word" },
+  { name = "part_slots", offset = 536, type = "bytes", count = 144, note = "the six parts' LoadSlots" },
+  { name = "part_slot_request", offset = 540, type = "u32", note = "the first's request (+24i)" },
+  { name = "part_slot_buffer", offset = 552, type = "u32", note = "the first's buffer (+24i)" },
+  { name = "part_slot_state", offset = 556, type = "u32", note = "the first's state (+24i)" },
+  { name = "part_models", offset = 688, type = "bytes", count = 2784, note = "six PartModels of 464 bytes" },
+  { name = "part_provider", offset = 736, type = "ptr", to = "TextureProvider", note = "the first part model's +48, its texture provider (+496; +464i)" },
+  { name = "part_texture", offset = 1140, type = "u32", note = "the first part model's +452, the texture from the formatted name (+464i)" },
+  { name = "accessory_node", offset = 3472, type = "ptr", to = "SkeletonMatrix", note = "the matrix of the node named \"acce_null\" (0x82004FDC), probably the accessory point" },
+  { name = "accessory_point", offset = 3488, type = "bytes", count = 16, note = "its position: row 3, x, y, z times 0.1, w 1.0, turned a quarter about y" },
+  { name = "accessory_point_w", offset = 3500, type = "f32" },
+  { name = "texture", offset = 3504, type = "u32", note = "a texture from the first XPR by the formatted name" },
+  { name = "first_set", offset = 3508, type = "ptr", to = "ScenePools" },
+]
+
+# The interior (pool 3, 3,104 bytes, vtable 0x8200509C; Interior::Interior
+# sub_820D78B8); Interior::OnPartLoaded's r6.
+[Interior]
+measures = ["Interior", "Interior::OnPartLoaded.r6"]
+size = 3104
+origin = "allocated"
+vtable = 0x8200509C
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x8200509C (the pool node's 0x82004F90 while it's torn down)" },
+  { name = "state", offset = 16, type = "u32", note = "the pool object's: 3 in use" },
+  { name = "index", offset = 20, type = "u32", note = "its index in the pool" },
+  { name = "car_model", offset = 24, type = "ptr", to = "CarModel" },
+  { name = "record", offset = 28, type = "bytes", count = 120, note = "a copy of its 120-byte record" },
+  { name = "accessory", offset = 140, type = "u32", note = "the record's +112: the accessory picked (set b)" },
+  { name = "accessory_arg", offset = 144, type = "u32", note = "the record's +116" },
+  { name = "part_slots", offset = 160, type = "bytes", count = 144, note = "the six parts' LoadSlots" },
+  { name = "part_slot_request", offset = 164, type = "u32", note = "the first's request (+24i)" },
+  { name = "part_slot_state", offset = 180, type = "u32", note = "the first's state (+24i)" },
+  { name = "part_models", offset = 304, type = "bytes", count = 2784, note = "six PartModels of 464 bytes" },
+  { name = "cockpit", offset = 3088, type = "u32", note = "nonzero: the cockpit set (c)" },
+  { name = "first_set", offset = 3092, type = "ptr", to = "ScenePools" },
+]
+
+# Pool 4's object (592 bytes, vtable 0x82005064; Pool4Object::Pool4Object
+# sub_820D6A70): one model.
+[Pool4Object]
+measure = "Pool4Object"
+measures = ["sub_820D69B8.r6", "SceneLights.+13152"]
+size = 592
+origin = "allocated"
+vtable = 0x82005064
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82005064 (the pool node's 0x82004F90 while it's torn down)" },
+  { name = "state", offset = 16, type = "u32", note = "the pool object's: 3 in use" },
+  { name = "index", offset = 20, type = "u32", note = "its index in the pool" },
+  { name = "car_model", offset = 24, type = "ptr", to = "CarModel" },
+  { name = "record", offset = 28, type = "bytes", count = 52, note = "a copy of its 52-byte record (Pool4Object::SetRecord); the measure's +48 store is SceneLights::Finish's on the model's +48 (a measure fault)" },
+  { name = "slot", offset = 80, type = "bytes", count = 24, note = "the model's LoadSlot" },
+  { name = "slot_state", offset = 100, type = "u32", note = "2 loading" },
+  { name = "model", offset = 112, type = "bytes", count = 464, note = "a PartModel" },
+  { name = "first_set", offset = 576, type = "ptr", to = "ScenePools" },
+]
+
+# The car model's loads (the car model's +3728; CarModelLoads::CarModelLoads
+# sub_820D3DE0, Reset sub_820D3B58). Its end isn't known.
+[CarModelLoads]
+measure = "CarModel@+3728"
+size = 2988
+origin = "embedded"
+fields = [
+  { name = "node_file_slot", offset = 0, type = "bytes", count = 24, note = "the node file's LoadSlot" },
+  { name = "skeleton", offset = 32, type = "bytes", count = 240, note = "a Skeleton (+176 its node values)" },
+  { name = "xpr_slots", offset = 224, type = "bytes", count = 48, note = "the two XPR2s' LoadSlots" },
+  { name = "xprs", offset = 272, type = "bytes", count = 48, note = "two XPR objects" },
+  { name = "providers", offset = 320, type = "bytes", count = 40, note = "two texture providers, 20 bytes each" },
+  { name = "provider_vtable", offset = 320, type = "ptr", to = "TextureProviderVtable", note = "the first provider's vtable word" },
+  { name = "decals_state", offset = 360, type = "u32", note = "the car model's +4088: 2 loading, 3 done, 0 reset" },
+  { name = "layer_slots", offset = 364, type = "bytes", count = 288, note = "six layers, two 24-byte LoadSlots each (the reset clears the first three)" },
+  { name = "sticker_slots", offset = 652, type = "bytes", count = 2304, note = "48 stickers, two LoadSlots each (the reset clears the first six)" },
+  { name = "vinyl_sheet", offset = 2956, type = "u32", note = "the car model's +6684: the vinyl sheet's texture" },
+  { name = "vinyl_sheet_data", offset = 2960, type = "u32", note = "its pixels" },
+  { name = "vinyl_sheet_second", offset = 2964, type = "u32", note = "passed with them (the car model's +6692)" },
+  { name = "vinyl_sheet_second_data", offset = 2968, type = "u32" },
+  { name = "plate_first", offset = 2972, type = "u32", note = "the plate's first texture (the car model's +6700)" },
+  { name = "plate_first_data", offset = 2976, type = "u32" },
+  { name = "plate_second", offset = 2980, type = "u32", note = "the plate's second texture" },
+  { name = "plate_second_data", offset = 2984, type = "u32" },
+]
+
+# The wheels' loads (the wheels' +192; WheelsLoads::WheelsLoads sub_820D8F60):
+# front and rear 24 bytes (slots) or 464 bytes (models) apart.
+[WheelsLoads]
+measure = "Wheels@+192"
+size = 3072
+origin = "embedded"
+fields = [
+  { name = "tire_slots", offset = 0, type = "bytes", count = 48 },
+  { name = "tires", offset = 48, type = "bytes", count = 928, note = "two PartModels" },
+  { name = "rim_slots", offset = 976, type = "bytes", count = 48, note = "rims or brakes" },
+  { name = "rims", offset = 1024, type = "bytes", count = 928 },
+  { name = "xpr_slots", offset = 1952, type = "bytes", count = 48 },
+  { name = "xprs", offset = 2000, type = "bytes", count = 48 },
+  { name = "providers", offset = 2048, type = "bytes", count = 40, note = "two texture providers, 20 bytes each" },
+  { name = "provider_vtable", offset = 2048, type = "ptr", to = "TextureProviderVtable", note = "the front provider's vtable word" },
+  { name = "caliper_slots", offset = 2088, type = "bytes", count = 48 },
+  { name = "calipers", offset = 2144, type = "bytes", count = 928 },
+]
+
+[globals]
+first_set = { address = 0x826C2E40, type = "ptr", to = "ScenePools" }
+one = { address = 0x82000A30, type = "u32", note = "1.0's bits" }
+zero = { address = 0x82000A34, type = "u32", note = "0.0's bits" }
+tenth = { address = 0x82001FBC, type = "f32", note = "0.1" }
+quarter_turn = { address = 0x82002A50, type = "f32", note = "-pi / 2" }
+two_strings = { address = 0x82004FE8, type = "bytes", count = 5, note = "\"%s%s\"" }
+numbered = { address = 0x82004FA4, type = "bytes", count = 7, note = "\"%s%s%d\"" }
+inte_on = { address = 0x82005008, type = "bytes", count = 9, note = "\"_inte_on\"" }
+inte_on_numbered = { address = 0x82004FFC, type = "bytes", count = 11, note = "\"_inte_on_0\"" }
+traffic_suffix = { address = 0x820050AC, type = "bytes", count = 6, note = "\"_ex_0\"" }
+traffic_file_suffix = { address = 0x820050B8, type = "bytes", count = 1, note = "the traffic body's file name's suffix" }
+accessory_node_name = { address = 0x82004FDC, type = "bytes", count = 10, note = "\"acce_null\"" }
+tire_names = { address = 0x82004FAC, type = "bytes", count = 32, note = "\"tire_fl\", \"tire_fr\", \"tire_rl\", \"tire_rr\", 8 bytes apart" }
+cockpit_names = { address = 0x826018C8, type = "bytes", count = 180, note = "the cars' names by block (45 pointers)" }
+traffic_names = { address = 0x82601980, type = "bytes", count = 4, note = "the traffic cars' names by number (pointers)" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from CarParts.
+[CarPartsAt5280]
+measure = "CarParts@+5280"
+size = 416
+origin = "embedded"
+fields = [
+  { name = "unknown_412", offset = 412, type = "u32" },
+]
+
+# Split from ScenePools.
+[ScenePoolsAt52]
+measure = "ScenePools@+52"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]

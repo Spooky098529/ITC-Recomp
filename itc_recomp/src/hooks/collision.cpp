@@ -13,6 +13,7 @@
 #include "base/log.h"
 #include "collision/collision.h"
 #include "hooks/heap.h"
+#include "schema/collision.h"
 
 ITC_FLAG_BOOL(native_collision, true, "ITC",
               "Run the collision world's narrow phase and its shapes "
@@ -83,7 +84,7 @@ ITC_COLLISION(820B9F00,
               ctx.r3.u64 = BoxFaceDirection(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 208))
 // r4 = the offset; r3 comes back as the box + 48.
 ITC_COLLISION(820BA2F0, ctx.f1.f64 = BoxTranslate(base, ctx.r3.u32, ctx.r4.u32);
-              ctx.r3.u64 = ctx.r3.u32 + 48)
+              ctx.r3.u64 = schema::BoxShape(base, ctx.r3.u32).center_x_address())
 ITC_COLLISION(822BE2C8, ctx.r3.u64 = WordAt8(base, ctx.r3.u32))
 
 // --- The constructors and the placement ---
@@ -102,7 +103,7 @@ ITC_NATIVE_ENTRY(820B9C40, ITC_FLAG(native_collision)) {
     lifted::original::c820B9C40(ctx, base);
     return;
   }
-  ctx.r3.u64 = ctx.r3.u32 + 96;
+  ctx.r3.u64 = schema::BoxShape(base, ctx.r3.u32).axis2_x_address();
 }
 
 // --- The shape record ---
@@ -174,7 +175,7 @@ ITC_NATIVE_ENTRY(820BF038, ITC_FLAG(native_collision)) {
     lifted::original::c820BF038(ctx, base);
     return;
   }
-  ctx.r3.u64 = ctx.r3.u32 + 64;
+  ctx.r3.u64 = schema::CollisionQuery(base, ctx.r3.u32).contact_push_x_address();
 }
 // Query::FindImpact (sub_820BCE80) has no adapter: its caller in play,
 // CollisionPair::Solve, is native.

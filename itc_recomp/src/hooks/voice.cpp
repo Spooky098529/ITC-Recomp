@@ -19,6 +19,7 @@
 #include "hooks/native_entry.h"
 
 #include "guest.h"
+#include "schema/system_services.h"
 
 #include "base/log.h"
 #include "helpers/clock.h"
@@ -32,9 +33,10 @@ namespace voice {
 // Returns the tick count (the original's r3).
 uint32_t SetUpWithoutEngine(uint8_t* base, uint32_t manager, uint32_t machine_id) {
   ITC_NATIVE_RUNNING("sub_8214F6E8 Network::SetUpVoice (no engine)");
-  guest::StoreU32(base, manager + 456, machine_id);
+  const schema::NetworkManager network(base, manager);
+  network.set_machine_id(machine_id);
   const uint32_t ticks = helpers::TickCount();
-  guest::StoreU32(base, manager + 444, ticks);
+  network.set_voice_ticks(ticks);
   return ticks;
 }
 

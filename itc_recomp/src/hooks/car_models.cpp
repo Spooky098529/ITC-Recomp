@@ -3,6 +3,8 @@
 // shares (hooks/car_models.h).
 
 #include "hooks/car_models.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
@@ -24,6 +26,9 @@
 #include "hooks/scene_loaders.h"
 #include "hooks/texture_compression.h"
 #include "native/buffers.h"
+#include "schema/accessories.h"
+#include "schema/car_models.h"
+#include "schema/models.h"
 #include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_car_models, true, "ITC",
@@ -105,7 +110,8 @@ ITC_REGS_STEP(CarModelsLoadExterior) {
 }
 
 ITC_REGS_STEP(CarModelsReloadDecals) {
-  if (!hooks::NativeHeapActive() || int32_t(guest::LoadU32(base, ctx.r3.u32 + 3724)) == 1) {
+  if (!hooks::NativeHeapActive() ||
+      int32_t(schema::CarModel(base, ctx.r3.u32).extra_image()) == 1) {
     lifted::original::c820D5D20(ctx, base);
     return;
   }
@@ -148,8 +154,8 @@ ITC_REGS_STEP(CarModelsInteriorLoad) {
                             ctx.r4.u64 = r4;
                             ctx.r5.u64 = r5;
                             ctx.lr = which == 0 ? 0x820D7A40 : 0x820D7A94;
-                            lifted::CallFromContext(ctx, base, 
-                                guest::LoadU32(base, guest::LoadU32(base, set) + 4));
+                            lifted::CallFromContext(
+                                ctx, base, schema::Accessories(base, set).vtable().acquire());
                             return ctx.r3.u32;
                           });
   });
@@ -178,7 +184,7 @@ ITC_REGS_STEP(CarModelsMakePlate) {
                        [&ctx, base](uint32_t surface) {
                          ctx.r3.u64 = surface;
                          ctx.lr = 0x820ED8E4;
-                         lifted::CallFromContext(ctx, base, 0x822A67B0);
+                         lifted::Enter(ctx, base, game::Resource::Release);
                        });
   });
   ctx.lr = lr;
@@ -228,13 +234,13 @@ void CarModelsFileLoaded(lifted::Regs& ctx, uint8_t* base, cm::FileLoadedSet set
       ctx.r4.u64 = 0;
       ctx.r5.u64 = xpr;
       ctx.lr = a ? 0x820D4DEC : 0x820D55C4;
-      lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, provider) + 16));
+      lifted::CallFromContext(ctx, base, schema::TextureProvider(base, provider).vtable().set());
     };
     calls.plate_release = [&](uint32_t surface) {
       // From MakePlate's frame (944 bytes below this one).
       guest_call::InFrame(ctx, base, cm::kPlateFrameBytes, 0x820ED8E4, [&](uint32_t) {
         ctx.r3.u64 = surface;
-        lifted::CallFromContext(ctx, base, 0x822A67B0);
+        lifted::Enter(ctx, base, game::Resource::Release);
       });
     };
     cm::FileLoaded(base, set, request, buffer, car, stack, calls);
@@ -290,7 +296,7 @@ uint32_t CarModelsVinylCompressAt(lifted::Regs& ctx, uint8_t* base, uint32_t wid
                                [&ctx, base](uint32_t surface, int which) {
                                  ctx.r3.u64 = surface;
                                  ctx.lr = which == 0 ? 0x820ED1C0 : 0x820ED1C8;
-                                 lifted::CallFromContext(ctx, base, 0x822A67B0);
+                                 lifted::Enter(ctx, base, game::Resource::Release);
                                }};
     r3 = cm::VinylCompress(base, width, height, header_in, data_in, stack, calls);
   });

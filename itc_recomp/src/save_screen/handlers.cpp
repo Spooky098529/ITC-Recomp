@@ -10,28 +10,29 @@ namespace save_screen {
 uint64_t OnEnter(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821A2608 SaveScreen::OnEnter");
   Fn f(base, sp, 112, calls);
-  Store(base, machine + kMachineLoaded, 0);
-  const uint32_t pages = uint32_t(f.Call(kVirtualAlloc, 0x821A263C, 0, 28, 4096, 4));
-  Store(base, kPages, pages);
-  Store(base, pages + 4, 0);
-  Store(base, pages + 0, 0);
-  Store(base, pages + 8, 0);
-  Store(base, pages + 24, 0);
-  Store(base, pages + 20, kNone);
-  Store(base, pages + 12, kNone);
+  Machine(base, machine).set_loaded(0);
+  const schema::PageObject pages(base, uint32_t(f.Call(kVirtualAlloc, 0x821A263C, 0, 28, 4096, 4)));
+  G::set_pages(base, pages);
+  pages.set_next_page(0);
+  pages.set_page(0);
+  pages.set_previous_page(0);
+  pages.set_step_started(0);
+  pages.set_unknown_20(kNone);
+  pages.set_step(kNone);
   const uint32_t list = uint32_t(f.Call(kVirtualAlloc, 0x821A2678, 0, 72, 4096, 4));
-  Store(base, kList, list);
+  G::set_list(base, list);
   if (list != 0) {
-    Store(base, list + 68, 0);
-    Store(base, list + 60, 0);
+    const schema::MenuList view(base, list);
+    view.set_enabled(0);
+    view.set_player(0);
   }
-  const uint32_t data = uint32_t(f.Call(kVirtualAlloc, 0x821A26A4, 0, 68, 4096, 4));
-  Store(base, kData, data);
-  Store(base, data + 0, 0);
-  Store(base, data + 60, 0);
-  Store(base, data + 56, 0);
-  Store(base, data + 32, 21);
-  Store(base, machine + kMachineState, int32_t(Load(base, machine + kMachineAtOnce)) != 0 ? 1 : 9);
+  const schema::SaveScreenData data(base, uint32_t(f.Call(kVirtualAlloc, 0x821A26A4, 0, 68, 4096, 4)));
+  G::set_data(base, data);
+  data.set_set_up(0);
+  data.set_settings_stored(0);
+  data.set_prompts(0);
+  data.set_next_state(21);
+  Machine(base, machine).set_state(int32_t(Machine(base, machine).load_at_once()) != 0 ? 1 : 9);
   return f.r3;
 }
 
@@ -44,15 +45,14 @@ uint64_t WaitMovie(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821A26F0 SaveScreen::WaitMovie");
   const uint32_t machine = uint32_t(r3);
   Store(base, sp - 96, sp);
-  if (int32_t(Load(base, machine + kMachineLoaded)) == 0) {
+  if (int32_t(Machine(base, machine).loaded()) == 0) {
     r3 = ui_movies::IsLoaded(base, 44);
     if (int32_t(uint32_t(r3)) != 0) {
-      Store(base, machine + kMachineLoaded, 1);
+      Machine(base, machine).set_loaded(1);
     }
   }
-  if (int32_t(Load(base, machine + kMachineLoaded)) != 0) {
-    Store(base, machine + kMachineState,
-          int32_t(Load(base, machine + kMachineAtOnce)) != 0 ? 9 : 4);
+  if (int32_t(Machine(base, machine).loaded()) != 0) {
+    Machine(base, machine).set_state(int32_t(Machine(base, machine).load_at_once()) != 0 ? 9 : 4);
   }
   return r3;
 }
@@ -92,8 +92,8 @@ void OpenKind(uint8_t* base, uint32_t machine, uint32_t kind) {
       break;
     }
   }
-  Store(base, Data(base) + 36, kind);
-  Store(base, machine + kMachineState, int32_t(Load(base, machine + kMachineLoaded)) != 0 ? 4 : 1);
+  Data(base).set_kind(kind);
+  Machine(base, machine).set_state(int32_t(Machine(base, machine).loaded()) != 0 ? 4 : 1);
 }
 
 namespace {
@@ -103,11 +103,11 @@ namespace {
 uint64_t ShowWith(uint8_t* base, uint32_t sp, uint32_t page, uint32_t step, uint32_t answer,
                   uint32_t lr, const Calls& calls) {
   Fn f(base, sp, 128, calls);
-  Store(base, Data(base) + 28, 0);
+  Data(base).set_cancel(0);
   Go(base, page, step, kNone);
   Store(base, f.frame + 92, 158);
   Store(base, f.frame + 84, 159);
-  Store(base, Data(base) + 4, answer);
+  Data(base).set_answer(answer);
   const uint64_t args[8] = {List(base), 1, 1, 0, 154, 153, 155, 156};
   f.r3 = calls.CallArgs(kMenuListInit, f.frame, lr, args);
   return f.r3;
@@ -117,28 +117,28 @@ uint64_t ShowWith(uint8_t* base, uint32_t sp, uint32_t page, uint32_t step, uint
 
 uint64_t ShowKind2(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821A1D38 SaveScreen::ShowKind2");
-  Store(base, Data(base) + 12, 2);
-  Store(base, Data(base) + 16, 1);
-  Store(base, Data(base) + 24, 0);
+  Data(base).set_message(2);
+  Data(base).set_dialog_state(1);
+  Data(base).set_wait(0);
   const uint64_t r3 = ShowWith(base, sp, 13, 4, 0, 0x821A1DF0, calls);
-  Store(base, Data(base) + 8, 1);
-  Store(base, Data(base) + 56, 1);
+  Data(base).set_kind2_flag(1);
+  Data(base).set_prompts(1);
   return r3;
 }
 
 uint64_t ShowKind7(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821A2138 SaveScreen::ShowKind7");
-  Store(base, Data(base) + 12, 0);
-  Store(base, Data(base) + 16, 0);
+  Data(base).set_message(0);
+  Data(base).set_dialog_state(0);
   const uint64_t r3 = ShowWith(base, sp, 24, 6, 1, 0x821A21E4, calls);
-  Store(base, Data(base) + 56, 1);
+  Data(base).set_prompts(1);
   return r3;
 }
 
 uint64_t Show(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821A6608 SaveScreen::Show");
   Fn f(base, sp, 96, calls, r3);
-  const uint32_t kind = Load(base, Data(base) + 36);
+  const uint32_t kind = Data(base).kind();
   switch (kind) {
     case 0: {  // ShowCheck sub_821A6650, split off by the recompiler
       f.Call(kSaveBuffersCreate, 0x821A6654);
@@ -176,17 +176,17 @@ uint64_t Show(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
 
 void Cancel(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_821A1D20 SaveScreen::Cancel");
-  Store(base, Data(base) + 28, 1);
+  Data(base).set_cancel(1);
 }
 
 uint64_t Leave(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821A4C58 SaveScreen::Leave");
   Fn f(base, sp, 112, calls);
-  Store(base, machine + kMachineState, 7);
+  Machine(base, machine).set_state(7);
   const uint32_t movie = FindMovie(base, 44, f.frame + 80);
   f.Call(kFinishAll, 0x821A4C98, movie);
   f.Call(kMoviesDelete, 0x821A4CA0, 44);
-  const int32_t type = int32_t(Load(base, kModeType));
+  const int32_t type = int32_t(G::mode_type(base));
   if (type == 2 || type == 4 || type == 6 || type == 8 || type == 10) {
     Post(base, mode, 4);
   }
@@ -197,12 +197,12 @@ uint64_t OnLeft(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821A1CA0 SaveScreen::OnLeft");
   Fn f(base, sp, 112, calls);
   f.Call(kMenuListRelease, 0x821A1CB8, List(base));
-  f.Call(kVirtualFree, 0x821A1CD4, Pages(base), 0, kMemRelease);
+  f.Call(kVirtualFree, 0x821A1CD4, Pages(base).address, 0, kMemRelease);
   f.Call(kVirtualFree, 0x821A1CE4, List(base), 0, kMemRelease);
-  f.Call(kVirtualFree, 0x821A1CF8, Data(base), 0, kMemRelease);
-  Store(base, kPages, 0);
-  Store(base, kList, 0);
-  Store(base, kData, 0);
+  f.Call(kVirtualFree, 0x821A1CF8, Data(base).address, 0, kMemRelease);
+  G::set_pages(base, 0u);
+  G::set_list(base, 0u);
+  G::set_data(base, 0u);
   return f.r3;
 }
 

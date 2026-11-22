@@ -22,14 +22,17 @@ using namespace car_physics::ops;
 using namespace steps;
 namespace va = vehicle_accessors;
 
+using G = schema::RaceStatesGlobals;
+using Machine = schema::RaceStates;
+using Progress = schema::RaceProgress;
+using Slot = schema::RaceProgressSlot;
+
 namespace {
 
-constexpr uint32_t kInputRecords = 0x826C5B30;  // the cars' input records (pointers)
-constexpr uint32_t kKm = 0x820029D8;            // 0.001
-
 uint32_t Out(uint8_t* base, uint32_t out, uint32_t end, uint32_t reason) {
-  Store(base, out + 0, end);
-  Store(base, out + 4, reason);
+  const schema::RaceCheckResult r(base, out);
+  r.set_end(end);
+  r.set_reason(reason);
   return out;
 }
 
@@ -38,7 +41,7 @@ uint32_t Out(uint8_t* base, uint32_t out, uint32_t end, uint32_t reason) {
 uint32_t SectionsJoin(uint8_t* base, uint32_t a, uint32_t b, uint32_t out_a, uint32_t out_b,
                       uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82163000 (two sections joined by a forward link's side link)");
-  const uint32_t file = Load(base, race_world::kRoute);
+  const uint32_t file = G::route(base);
   Store(base, sp - 84, 0xFFFFFFFFu);
   Store(base, sp - 64, 0xFFFFFFFFu);
   Store(base, sp - 96, 0);
@@ -48,7 +51,7 @@ uint32_t SectionsJoin(uint8_t* base, uint32_t a, uint32_t b, uint32_t out_a, uin
   Store(base, sp - 76, 7);
   Store(base, sp - 72, 8);
   Store(base, sp - 68, 9);
-  const uint32_t table = Load(base, file + 12);
+  const uint32_t table = RouteFile(base, file).sections();
   const uint32_t ra = Load(base, table + ((a << 2) & 0x3FFFC));
   const uint32_t rb = Load(base, table + ((b << 2) & 0x3FFFC));
   for (uint32_t i = 0, link = 0;;) {
@@ -56,7 +59,7 @@ uint32_t SectionsJoin(uint8_t* base, uint32_t a, uint32_t b, uint32_t out_a, uin
     if (forward == -1) {
       break;
     }
-    const uint32_t rf = Load(base, Load(base, file + 12) + ((uint32_t(forward) << 2) & 0x3FFFC));
+    const uint32_t rf = Load(base, RouteFile(base, file).sections() + ((uint32_t(forward) << 2) & 0x3FFFC));
     for (uint32_t m = 0, side = 6;;) {
       const int32_t beside = Link(base, rf, side);
       if (beside != -1) {
@@ -66,8 +69,8 @@ uint32_t SectionsJoin(uint8_t* base, uint32_t a, uint32_t b, uint32_t out_a, uin
             break;
           }
           if (forward == target || beside == target) {
-            Store(base, out_a, uint32_t(forward));
-            Store(base, out_b, uint32_t(target));
+            schema::SectionsJoinLink(base, out_a).set_link(uint32_t(forward));
+            schema::SectionsJoinLink(base, out_b).set_link(uint32_t(target));
             return 1;
           }
           k++;
@@ -89,25 +92,26 @@ uint32_t SectionsJoin(uint8_t* base, uint32_t a, uint32_t b, uint32_t out_a, uin
       break;
     }
   }
-  Store(base, out_a, 0xFFFFFFFFu);
-  Store(base, out_b, 0xFFFFFFFFu);
+  schema::SectionsJoinLink(base, out_a).set_link(0xFFFFFFFFu);
+  schema::SectionsJoinLink(base, out_b).set_link(0xFFFFFFFFu);
   return 0;
 }
 
 uint32_t FollowRoute(uint8_t* base, uint32_t out, uint32_t progress, uint32_t index,
                      uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_82163C50 RaceProgress::FollowRoute");
-  const uint32_t slot = index * kSlotBytes + progress + 40;
-  const uint32_t vehicle = va::VehicleGet(base, Load(base, Load(base, slot + 8) + 20));
+  const Progress p(base, progress);
+  const Slot slot(base, index * Slot::kSize + p.slots_address());
+  const uint32_t vehicle = va::VehicleGet(base, slot.entry().vehicle_index());
   // The car's input record (20 bytes) copied to the frame's +96.
   {
-    const uint32_t car = Load(base, Load(base, slot + 8) + 20);
-    const uint32_t from = Load(base, kInputRecords + ((car << 2) & 0x3FC));
+    const uint32_t car = slot.entry().vehicle_index();
+    const uint32_t from = Load(base, G::input_records_address() + ((car << 2) & 0x3FC));
     for (uint32_t k = 0; k < 20; k += 4) {
       Store(base, frame + 96 + k, Load(base, from + k));
     }
   }
-  const uint32_t e = index * kEntryBytes + progress;  // + 2188: the entry
+  const uint32_t e = index * kEntryBytes;  // entry `index`'s offset from entry 0
   const double zero = Lfs(base, kZero);
   const auto nonzero = [&](uint32_t at) {
     const int64_t v = S16(base, at);
@@ -115,38 +119,41 @@ uint32_t FollowRoute(uint8_t* base, uint32_t out, uint32_t progress, uint32_t in
     return double(float(double(v))) != zero;
   };
   if (nonzero(frame + 102) || nonzero(frame + 106)) {
-    Store(base, e + 3156, 1);
+    Store(base, p.e0_input_seen_address() + e, 1);
   }
-  if (guest::LoadU8(base, vehicle + 2424) != 0) {
-    Store(base, e + 2968, Load(base, e + 2968) + 1);
+  if (VehicleView(base, vehicle).nitrous_on() != 0) {
+    const uint32_t ticks = p.e0_vehicle_byte_ticks_address() + e;
+    Store(base, ticks, Load(base, ticks) + 1);
   }
-  race_setup::RunningMeanAdd(base, e + 2980, double(Vehicle_GetSpeedKmh(base, vehicle)), 1);
+  race_setup::RunningMeanAdd(base, p.e0_mean_speed_address() + e,
+                             double(Vehicle_GetSpeedKmh(base, vehicle)), 1);
   {
-    double top = Lfs(base, e + 2988);
+    double top = Lfs(base, p.e0_top_speed_address() + e);
     const double kmh = double(Vehicle_GetSpeedKmh(base, vehicle));
     if (top < kmh) {
       top = double(Vehicle_GetSpeedKmh(base, vehicle));
     }
-    Stfs(base, e + 2988, top);
+    Stfs(base, p.e0_top_speed_address() + e, top);
   }
   {
     const double per_frame = double(va::VehicleDistancePerFrame(base, vehicle));
-    const double km = Lfs(base, kKm);
-    Stfs(base, e + 3004, Fmadds(per_frame, km, Lfs(base, e + 3004)));
+    const double km = Lfs(base, G::km_address());
+    const uint32_t driven = p.e0_distance_km_address() + e;
+    Stfs(base, driven, Fmadds(per_frame, km, Lfs(base, driven)));
   }
   bool along = true;  // r26
   Store(base, frame + 80, Load(base, va::VehicleIdentity(vehicle) + 4));
-  int32_t count = int32_t(Load(base, slot + 524));  // r30
+  int32_t count = int32_t(slot.section_count());  // r30
   uint32_t car = guest::LoadU16(base, frame + 80);  // r25
   const int32_t section = int16_t(car);              // r28
-  const int32_t last = S16(base, slot + 2 * uint32_t(count + 5));
-  const auto list = [&](int32_t k) { return slot + 2 * uint32_t(k + 6); };
+  const auto list = [&](int32_t k) { return slot.sections_address() + 2 * uint32_t(k); };
+  const int32_t last = S16(base, list(count - 1));
   const auto off_route = [&] { return Out(base, out, 1, 3); };
   if (SectionsBeside(base, uint32_t(section), uint32_t(last), frame) != 0) {
     if (MapToSection(base, uint32_t(last), frame + 80, frame) != 0) {
       car = guest::LoadU16(base, frame + 80);
     } else {
-      const int32_t k = int32_t(Load(base, slot + 524)) - 1;
+      const int32_t k = int32_t(slot.section_count()) - 1;
       if (!(k < 256)) {
         return off_route();
       }
@@ -161,24 +168,24 @@ uint32_t FollowRoute(uint8_t* base, uint32_t out, uint32_t progress, uint32_t in
       if (r3 != last && count - 1 < 256) {
         guest::StoreU16(base, list(count - 1), uint16_t(r3));
       }
-      int32_t n = int32_t(Load(base, slot + 524));
+      int32_t n = int32_t(slot.section_count());
       if (!(n < 256)) {
         return off_route();
       }
       guest::StoreU16(base, list(n), uint16_t(car));
       n++;
-      Store(base, slot + 524, uint32_t(n));
-      const int32_t race = int32_t(Load(base, progress + 6632));
+      slot.set_section_count(uint32_t(n));
+      const int32_t race = int32_t(p.sections_passed_count());
       if (race < n) {
         if (!(race < 256)) {
           return off_route();
         }
-        guest::StoreU16(base, progress + 2 * uint32_t(race + 3060), uint16_t(car));
-        Store(base, progress + 6632, Load(base, progress + 6632) + 1);
+        guest::StoreU16(base, p.sections_passed_address() + 2 * uint32_t(race), uint16_t(car));
+        p.set_sections_passed_count(p.sections_passed_count() + 1);
       } else {
         const int32_t k = n - 1;
-        const uint32_t at = k == -1 ? uint32_t(race + 3059) : uint32_t(k + 3060);
-        const int32_t theirs = S16(base, progress + 2 * at);
+        const uint32_t at = k == -1 ? uint32_t(race - 1) : uint32_t(k);
+        const int32_t theirs = S16(base, p.sections_passed_address() + 2 * at);
         if (SectionsBeside(base, uint32_t(theirs), uint32_t(section), frame) == 0 &&
             SectionsJoin(base, uint32_t(theirs), uint32_t(section), frame + 88, frame + 84,
                          frame) == 0) {
@@ -219,25 +226,25 @@ uint32_t FollowRoute(uint8_t* base, uint32_t out, uint32_t progress, uint32_t in
             return off_route();
           }
           guest::StoreU16(base, list(count + 1), uint16_t(car));
-          if (int32_t(Load(base, slot + 524)) != count + 2) {
-            Store(base, slot + 524, uint32_t(count + 2));
+          if (int32_t(slot.section_count()) != count + 2) {
+            slot.set_section_count(uint32_t(count + 2));
           }
           along = true;
           break;
         }
       }
       if (found) {
-        Store(base, slot + 524, uint32_t(count + 1));
+        slot.set_section_count(uint32_t(count + 1));
         along = true;
       }
       // Not found: a debug print (the empty sub_82106540), not made.
     }
   }
   // Still at the start: one section, the start's, and the slice before it.
-  if (int32_t(Load(base, slot + 524)) == 1) {
-    Store(base, frame + 84, Load(base, progress + 7152));
+  if (int32_t(slot.section_count()) == 1) {
+    Store(base, frame + 84, p.start());
     if (int32_t(int16_t(car)) == S16(base, frame + 84)) {
-      const uint32_t start = Load(base, progress + 7152);
+      const uint32_t start = p.start();
       const int32_t slice = S16(base, frame + 82);
       Store(base, frame + 84, start);
       if (slice < S16(base, frame + 86)) {
@@ -246,60 +253,65 @@ uint32_t FollowRoute(uint8_t* base, uint32_t out, uint32_t progress, uint32_t in
     }
   }
   if (along) {
-    const uint32_t start = Load(base, progress + 7152);
-    const double ahead = Lfs(base, vehicle + 6228);
+    const uint32_t start = p.start();
+    const double ahead =
+        Lfs(base, CarStatus(base, VehicleView(base, vehicle).status_address()).along_address());
     const uint32_t at = Load(base, frame + 80);
     Store(base, frame + 84, start);
-    Stfs(base, e + 3012, ahead);
-    const uint32_t first = guest::LoadU16(base, slot + 12);
-    const int32_t n = int32_t(Load(base, slot + 524));
+    Stfs(base, p.e0_route_distance_address() + e, ahead);
+    const uint32_t first = guest::LoadU16(base, slot.sections_address());
+    const int32_t n = int32_t(slot.section_count());
     guest::StoreU16(base, frame + 84, uint16_t(first));
-    const double path = track_route::PathDistance(base, race_world::kRoute, Load(base, frame + 84),
-                                                  at, slot + 12, n, frame - 288);
-    const double distance = Fadds(path, Lfs(base, e + 3012));
-    Stfs(base, e + 3012, distance);
+    const double path = track_route::PathDistance(base, G::route_address(), Load(base, frame + 84),
+                                                  at, slot.sections_address(), n, frame - 288);
+    const double distance = Fadds(path, Lfs(base, p.e0_route_distance_address() + e));
+    Stfs(base, p.e0_route_distance_address() + e, distance);
     if (distance < zero) {
-      Stfs(base, e + 3012, zero);
+      Stfs(base, p.e0_route_distance_address() + e, zero);
     }
   } else {
-    Stfs(base, e + 3012, zero);
+    Stfs(base, p.e0_route_distance_address() + e, zero);
   }
   return Out(base, out, 0, 0);
 }
 
 bool RaceTickNative(uint8_t* base, uint32_t machine, uint32_t frame) {
-  const uint32_t progress = Load(base, machine + 9624);
-  if (Load(base, progress + 7220) & 0x8) {
+  const Progress p = Machine(base, machine).progress();
+  if (p.race_checks() & 0x8) {
     return false;  // sub_821653E8 (never seen in play): the original's
   }
-  return !(Load(base, progress + 7224) & 0x4) || CheckLapNative(base, progress, frame - 544);
+  return !(p.entry_checks() & 0x4) || CheckLapNative(base, p.address, frame - 544);
 }
 
 void RaceTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_82167610 RaceStates::RaceTick");
-  const auto progress = [&] { return Load(base, machine + 9624); };
+  const Machine m(base, machine);
+  const auto progress = [&] { return m.progress().address; };
+  const auto P = [&] { return m.progress(); };
   // The debug prints (the empty sub_82106540) aren't made; the doubles they
   // were handed stay in the frame.
   {
-    const uint32_t p = progress();
-    Store64(base, frame + 56, std::bit_cast<uint64_t>(Lfs(base, p + 7156)));
-    Store64(base, frame + 48, std::bit_cast<uint64_t>(Lfs(base, p + 3012)));
+    const Progress p = P();
+    Store64(base, frame + 56, std::bit_cast<uint64_t>(Lfs(base, p.race_length_address())));
+    Store64(base, frame + 48, std::bit_cast<uint64_t>(Lfs(base, p.e0_route_distance_address())));
   }
   // The laps' times printed: each through Time::Clamp (sub_820FF790), whose
   // only store is the time at its frame's +132 (this frame's +20).
   {
     uint32_t p = progress();
-    if (Load(base, p + 7224) & 0x4) {
-      const uint32_t lap = Load(base, p + 6096) != 0 ? Load(base, p + 3020) : 0;
-      const uint32_t record = lap * 76;
-      if (Load(base, record + p + 2268) != 0) {
+    if (Progress(base, p).entry_checks() & 0x4) {
+      const uint32_t lap =
+          Progress(base, p).lap_records_on() != 0 ? Progress(base, p).e0_lap_record() : 0;
+      const uint32_t record = lap * kLapRecordBytes;
+      if (Load(base, Progress(base, p).e0_lap_time_count_address() + record) != 0) {
         for (uint32_t k = 0;;) {
-          const uint32_t time = Load(base, p + record + 2208 + 4 * k);
+          const uint32_t time =
+              Load(base, Progress(base, p).e0_lap_times_address() + record + 4 * k);
           Store(base, frame + 80, time);
           Store(base, frame + 20, time);
           p = progress();
           k++;
-          if (!(k < Load(base, record + p + 2268))) {
+          if (!(k < Load(base, Progress(base, p).e0_lap_time_count_address() + record))) {
             break;
           }
         }
@@ -308,8 +320,8 @@ void RaceTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t fra
   }
   Store(base, frame + 84, 0);
   {
-    const uint32_t p = progress();
-    Store(base, p + 6116, Load(base, p + 6116) + 1);
+    const Progress p = P();
+    p.set_ticks(p.ticks() + 1);
   }
   uint32_t end = 0;
   // An out pair copied to the frame's +80; true when it ends the race.
@@ -319,31 +331,31 @@ void RaceTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t fra
     return int32_t(end) != 0;
   };
   bool done = false;
-  if (int32_t(Load(base, progress() + 2184)) > 0) {
+  if (int32_t(P().results_count()) > 0) {
     for (uint32_t i = 0;;) {
       FollowRoute(base, frame + 88, progress(), i, frame - 240);
       if (ends(frame + 88)) {
         done = true;
         break;
       }
-      if (Load(base, progress() + 7224) & 0x1) {
+      if (P().entry_checks() & 0x1) {
         CountTime(base, frame + 96, progress(), i);
       }
-      if (Load(base, progress() + 7224) & 0x4) {
+      if (P().entry_checks() & 0x4) {
         CheckLap(base, frame + 104, progress(), i, frame - 544);
       }
-      const uint32_t checks = Load(base, progress() + 7224);
+      const uint32_t checks = P().entry_checks();
       if ((checks & 0x200) || (checks & 0x400) || (checks & 0x800)) {
         CountHits(base, frame + 112, progress(), i);
       }
-      if (Load(base, progress() + 7224) & 0x10) {
+      if (P().entry_checks() & 0x10) {
         CheckFinish(base, frame + 120, progress(), i, frame - 144);
         if (ends(frame + 120)) {
           done = true;
           break;
         }
       }
-      if (Load(base, progress() + 7224) & 0x80) {
+      if (P().entry_checks() & 0x80) {
         Damage(base, frame + 128, progress(), i, frame - 160);
         if (ends(frame + 128)) {
           done = true;
@@ -351,44 +363,45 @@ void RaceTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t fra
         }
       }
       i++;
-      if (!(int32_t(i) < int32_t(Load(base, progress() + 2184)))) {
+      if (!(int32_t(i) < int32_t(P().results_count()))) {
         break;
       }
     }
   }
-  if (!done && (Load(base, progress() + 7220) & 0x2)) {
+  if (!done && (P().race_checks() & 0x2)) {
     DrainSp(base, frame + 128, progress(), frame - 224);
     done = ends(frame + 128);
   }
   // 0x8 (sub_821653E8): RaceTickNative leaves it to the original.
-  if (!done && (Load(base, progress() + 7220) & 0x10)) {
+  if (!done && (P().race_checks() & 0x10)) {
     Rank(base, progress(), frame - 1728);
   }
   const uint32_t reason = Load(base, frame + 84);
-  Store(base, progress() + 6104, end);
-  Store(base, progress() + 6108, reason);
+  P().set_end(end);
+  P().set_end_reason(reason);
   if (int32_t(end) != 0) {
-    Post(base, dispatcher, int32_t(Load(base, progress() + 6104)) == 9 ? 24 : 34);
+    Post(base, dispatcher, int32_t(P().end()) == 9 ? 24 : 34);
     ai_drivers::ClearAll(base, frame - 128);
   }
 }
 
 bool OnGoNative(uint8_t* base, uint32_t machine, uint32_t frame) {
-  const int32_t type = int32_t(Load(base, Load(base, machine + 9624) + 6100));
+  const int32_t type = int32_t(Machine(base, machine).progress().stage_type());
   return type == 3 || type == 2 || StartRouteNative(base, machine, frame - 496);
 }
 
 void OnGo(uint8_t* base, uint32_t machine, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_82164458 RaceStates::OnGo");
-  const int32_t type = int32_t(Load(base, Load(base, machine + 9624) + 6100));
+  const Machine m(base, machine);
+  const int32_t type = int32_t(m.progress().stage_type());
   if (type != 3 && type != 2) {
     StartRoute(base, machine, frame - 496);
   }
-  if (int32_t(Load(base, Load(base, machine + 9624) + 2184)) > 0) {
+  if (int32_t(m.progress().results_count()) > 0) {
     for (uint32_t i = 0;;) {
-      FollowRoute(base, frame + 80, Load(base, machine + 9624), i, frame - 240);
+      FollowRoute(base, frame + 80, m.progress().address, i, frame - 240);
       i++;
-      if (!(int32_t(i) < int32_t(Load(base, Load(base, machine + 9624) + 2184)))) {
+      if (!(int32_t(i) < int32_t(m.progress().results_count()))) {
         break;
       }
     }

@@ -4,6 +4,9 @@
 // functions, called as guest code. See B3 in docs/rexglue-removal.md.
 
 #include "guest.h"
+#include "lifted/names.h"
+#include "lifted/functions.h"
+#include "lifted/entries.h"
 #include "hooks/native_entry.h"
 #include "guest_call.h"
 
@@ -107,7 +110,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822ACE00) {
       ctx.r9.u64 = 0;
       ctx.r10.u64 = 3;
       ctx.lr = 0x822ACEC8;
-      lifted::CallFromContext(ctx, base, 0x822A5D08);  // a texture
+      lifted::Enter(ctx, base, game::Device::CreateTexture);  // a texture
       if (!ctx.r3.u32) {
         made = false;
         return;
@@ -121,7 +124,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822ACE00) {
       ctx.r6.u64 = parameter(16);
       ctx.r7.u64 = 0;
       ctx.lr = 0x822ACF00;
-      lifted::CallFromContext(ctx, base, 0x822A5E28);  // a surface
+      lifted::Enter(ctx, base, game::Device::CreateSurface);  // a surface
       const uint32_t surface = ctx.r3.u32;
       if (!surface) {
         made = false;
@@ -148,7 +151,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822ACE00) {
       ctx.r6.u64 = parameter(16);
       ctx.r7.u64 = 0;
       ctx.lr = 0x822ACF3C;
-      lifted::CallFromContext(ctx, base, 0x822A5E28);
+      lifted::Enter(ctx, base, game::Device::CreateSurface);
       const uint32_t surface = ctx.r3.u32;
       if (!surface) {
         made = false;
@@ -163,7 +166,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822ACE00) {
         ctx.r3.u64 = device;
         ctx.r4.u64 = surface;
         ctx.lr = 0x822ACF50;
-        lifted::CallFromContext(ctx, base, 0x822A4060);
+        lifted::Enter(ctx, base, game::Device::SetDepthStencilSurface);
       }
     }
     // Through the game's memcpy, as the original (it's wrapped for the
@@ -172,12 +175,12 @@ ITC_NATIVE_ENTRY_ALWAYS(822ACE00) {
     ctx.r4.u64 = parameters;
     ctx.r5.u64 = 124;
     ctx.lr = 0x822ACF60;
-    lifted::CallFromContext(ctx, base, 0x825A7410);
+    lifted::Enter(ctx, base, game::memcpy_825A7410);
     guest::StoreU32(base, device + kDeviceFrontBufferFormat, StoredFrontBufferFormat(format));
     ctx.r3.u64 = device;
     ctx.r4.u64 = parameters + 96;
     ctx.lr = 0x822ACFA0;
-    lifted::CallFromContext(ctx, base, 0x822B42D0);  // the scaler's parameters
+    lifted::Enter(ctx, base, lifted::e822B42D0);  // the scaler's parameters
     // The display mode is set (sub_822AD0B0) at the next Swap.
     guest::StoreU8(base, device + kDeviceFlags,
                    guest::LoadU8(base, device + kDeviceFlags) | 0x10);
@@ -200,7 +203,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822AD298) {
   InFrame(ctx, base, 128, 0x822AD2B8, [&](uint32_t) {
     ctx.r3.u64 = device;
     ctx.lr = 0x822AD2B8;
-    lifted::CallFromContext(ctx, base, 0x822AD228);  // the device's fields and a physical block
+    lifted::Enter(ctx, base, lifted::e822AD228);  // the device's fields and a physical block
     if (!ctx.r3.u32) {
       return;
     }
@@ -216,7 +219,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822AD298) {
     ctx.r3.u64 = device;
     ctx.r4.u64 = parameters + 72;
     ctx.lr = 0x822AD338;
-    lifted::CallFromContext(ctx, base, 0x8229F280);  // the ring and command buffer
+    lifted::Enter(ctx, base, game::Device::SetUpRing);  // the ring and command buffer
     if (ctx.r3.u32) {
       return;
     }
@@ -236,11 +239,11 @@ ITC_NATIVE_ENTRY_ALWAYS(822AD298) {
     guest::StoreU32(base, device + 20012, 0xFFFFFFFF);
     ctx.r3.u64 = device;
     ctx.lr = 0x822AD364;
-    lifted::CallFromContext(ctx, base, 0x822AC2A0);
+    lifted::Enter(ctx, base, lifted::e822AC2A0);
     ctx.r3.u64 = device;
     ctx.r4.u64 = parameters;
     ctx.lr = 0x822AD370;
-    lifted::CallFromContext(ctx, base, 0x822ACE00);  // Device::SetUpDisplay
+    lifted::Enter(ctx, base, game::Device::SetUpDisplay);  // Device::SetUpDisplay
     if (!ctx.r3.u32) {
       return;
     }
@@ -261,32 +264,32 @@ ITC_NATIVE_ENTRY_ALWAYS(822AD298) {
     ctx.r3.u64 = 0;
     ctx.r4.u64 = 0xB1800000;
     ctx.lr = 0x822AD38C;
-    lifted::CallFromContext(ctx, base, 0x82297790);
+    lifted::Enter(ctx, base, game::XMemFree);
     ctx.r3.u64 = device;
     ctx.lr = 0x822AD3E8;
-    lifted::CallFromContext(ctx, base, 0x8229EF48);  // ends the command segment
+    lifted::Enter(ctx, base, game::Device::EndSegment);  // ends the command segment
     // The performance counter's rate, and its period, as floats.
     const float rate = float(double(helpers::kPerformanceFrequency));
     guest::StoreU32(base, device + kDeviceTimerRate, std::bit_cast<uint32_t>(rate));
     guest::StoreU32(base, device + kDeviceTimerPeriod, std::bit_cast<uint32_t>(1.0f / rate));
     ctx.lr = 0x822AD41C;
-    lifted::CallFromContext(ctx, base, 0x822B1E70);  // hands debug callbacks to the debug monitor
+    lifted::Enter(ctx, base, lifted::e822B1E70);  // hands debug callbacks to the debug monitor
     ctx.r3.u64 = device;
     ctx.r4.u64 = 0;
     ctx.lr = 0x822AD438;
-    lifted::CallFromContext(ctx, base, 0x822A3B90);
+    lifted::Enter(ctx, base, game::Device::DirtyAllState);
     if (guest::LoadU32(base, kTrainingFailed)) {
       ctx.r3.u64 = kTrainingFailedMessage;
       ctx.lr = 0x822AD468;
-      lifted::CallFromContext(ctx, base, 0x822AC530);  // prints it
+      lifted::Enter(ctx, base, lifted::e822AC530);  // prints it
     }
     ctx.r3.u64 = device;
     ctx.lr = 0x822AD470;
-    lifted::CallFromContext(ctx, base, 0x822B43C0);
+    lifted::Enter(ctx, base, lifted::e822B43C0);
     if (!ctx.r3.u32) {
       ctx.r3.u64 = kCheckFailedMessage;
       ctx.lr = 0x822AD484;
-      lifted::CallFromContext(ctx, base, 0x822AC530);
+      lifted::Enter(ctx, base, lifted::e822AC530);
     }
     made = true;
   });
@@ -305,7 +308,7 @@ void Free(lifted::Regs& ctx, uint8_t* base, uint32_t block, uint32_t return_addr
   ctx.r3.u64 = block;
   ctx.r4.u64 = 0xB1800000;
   ctx.lr = return_address;
-  lifted::CallFromContext(ctx, base, 0x82297790);
+  lifted::Enter(ctx, base, game::XMemFree);
 }
 
 uint32_t Allocate(lifted::Regs& ctx, uint8_t* base, uint32_t bytes, uint32_t flags,
@@ -313,7 +316,7 @@ uint32_t Allocate(lifted::Regs& ctx, uint8_t* base, uint32_t bytes, uint32_t fla
   ctx.r3.u64 = bytes;
   ctx.r4.u64 = flags;
   ctx.lr = return_address;
-  lifted::CallFromContext(ctx, base, 0x822976F8);
+  lifted::Enter(ctx, base, game::XMemAlloc);
   return ctx.r3.u32;
 }
 
@@ -359,13 +362,13 @@ ITC_NATIVE_ENTRY_ALWAYS(8229F280) {
     if (field(kDeviceCommandPosition)) {
       ctx.r3.u64 = device;
       ctx.lr = 0x8229F2A4;
-      lifted::CallFromContext(ctx, base, 0x8229F1B0);  // waits for the GPU
+      lifted::Enter(ctx, base, game::Device::WaitForIdle);  // waits for the GPU
     }
     if (const uint32_t buffer = field(kDeviceCommandBuffer)) {
       ctx.r3.u64 = PhysicalAddress(buffer) - 0x40000000;
       ctx.r4.u64 = PhysicalAddress(field(kDeviceCommandLast)) - 0x40000000;
       ctx.lr = 0x8229F2F4;
-      lifted::CallFromContext(ctx, base, 0x822AC470);
+      lifted::Enter(ctx, base, lifted::entry::e822AC470);
     }
     Free(ctx, base, field(kDeviceRingAllocated), 0x8229F304);
     Free(ctx, base, field(kDeviceCommandAllocated), 0x8229F310);
@@ -444,7 +447,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8229F280) {
     if (write > field(kDeviceSegmentLimit)) {
       ctx.r3.u64 = device;
       ctx.lr = 0x8229F5E8;
-      lifted::CallFromContext(ctx, base, 0x8229EF48);  // ends the segment, returns where to write
+      lifted::Enter(ctx, base, game::Device::EndSegment);  // ends the segment, returns where to write
       write = ctx.r3.u32;
     }
     const uint32_t words[] = {
@@ -460,7 +463,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8229F280) {
     set(kDeviceCommandWrite, write);
     ctx.r3.u64 = device;
     ctx.lr = 0x8229F668;
-    lifted::CallFromContext(ctx, base, 0x8229F0E0);  // WAIT_UNTIL and register 0xD04
+    lifted::Enter(ctx, base, game::Device::WriteIdlePackets);  // WAIT_UNTIL and register 0xD04
     result = 0;
   });
   ctx.r3.u64 = result;
@@ -552,13 +555,13 @@ ITC_NATIVE_ENTRY_ALWAYS(822A08A0) {
     ctx.r4.u64 = front_buffer;
     ctx.r5.u64 = 52;
     ctx.lr = 0x822A08C4;
-    lifted::CallFromContext(ctx, base, 0x825A7410);
+    lifted::Enter(ctx, base, game::memcpy_825A7410);
     if (guest::LoadU8(base, device + kDeviceFlags) & 0x10) {
       ctx.r3.u64 = device;
       ctx.r4.u64 = device + kDeviceParameters;
       ctx.r5.u64 = 1;
       ctx.lr = 0x822A0AAC;
-      lifted::CallFromContext(ctx, base, 0x822AD0B0);  // Device::SetDisplayMode
+      lifted::Enter(ctx, base, game::Device::SetDisplayMode);  // Device::SetDisplayMode
       clear_bits(kDeviceFlags, 0x10);
     }
     if (guest::LoadU8(base, device + kDeviceFlags2) & 0x20) {
@@ -571,7 +574,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822A08A0) {
     const uint32_t position = field(kDeviceCommandPosition);
     ctx.r3.u64 = device;
     ctx.lr = 0x822A0DFC;
-    lifted::CallFromContext(ctx, base, 0x8229EF48);  // ends the command segment
+    lifted::Enter(ctx, base, game::Device::EndSegment);  // ends the command segment
     ctx.r3.u64 = device;
     ctx.r4.u64 = field(kDeviceSegmentBytes) >> 2;
     ctx.lr = 0x822A0E1C;
@@ -583,6 +586,6 @@ ITC_NATIVE_ENTRY_ALWAYS(822A08A0) {
     ctx.r3.u64 = device;
     ctx.r4.u64 = 0;
     ctx.lr = 0x822A0E48;
-    lifted::CallFromContext(ctx, base, 0x822A3B90);  // every register block dirty
+    lifted::Enter(ctx, base, game::Device::DirtyAllState);  // every register block dirty
   });
 }

@@ -3,6 +3,8 @@
 // (hooks/car_sounds.h).
 
 #include "hooks/car_sounds.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -101,7 +103,7 @@ ITC_REGS_STEP(CarSoundsSetUp) {
     matrix = *made;
   } else {
     ctx.r3.u64 = 24;
-    lifted::CallFromContext(ctx, base, 0x825A6940);
+    lifted::Enter(ctx, base, lifted::entry::e825A6940);
     matrix = ctx.r3.u32;
   }
   ctx.r3.u64 = cs::SetUp(base, sound, matrix);
@@ -157,7 +159,7 @@ ITC_REGS_STEP(CarSoundsX3DCurves) {
   // The original's prologue: lr at r1 - 8, r31 at r1 - 16, the back chain.
   const uint32_t frame = ctx.r1.u32 - 128;
   guest::StoreU32(base, ctx.r1.u32 - 8, uint32_t(ctx.lr));
-  REX_STORE_U64(ctx.r1.u32 - 16, 0);  // (the caller's r31: not carried by the view)
+  guest::StoreU64(base, ctx.r1.u32 - 16, 0);  // (the caller's r31: not carried by the view)
   guest::StoreU32(base, frame, ctx.r1.u32);
   if (const uint32_t r3 = x3daudio::Curves(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, frame)) {
     ctx.r3.u64 = r3;
@@ -184,7 +186,7 @@ x3daudio::TanResult GuestTan(void* user, uint32_t sp, double x) {
   ctx.r1.u64 = sp;
   ctx.lr = 0x8248133C;
   ctx.f1.f64 = x;
-  lifted::CallFromContext(ctx, u.base, 0x825A8A50);
+  lifted::Enter(ctx, u.base, game::tan);
   ctx.r1.u64 = stack;
   ctx.lr = lr;
   ctx.fpscr.disableFlushMode();
@@ -215,12 +217,12 @@ ITC_REGS_STEP(CarSoundsX3DMatrix) {
   const uint32_t sp = ctx.r1.u32;
   const uint64_t gprs[6] = {};
   for (uint32_t i = 0; i < 6; i++) {
-    REX_STORE_U64(sp - 56 + 8 * i, gprs[i]);
+    guest::StoreU64(base, sp - 56 + 8 * i, gprs[i]);
   }
   guest::StoreU32(base, sp - 8, uint32_t(ctx.lr));
   const uint64_t fprs[9] = {};
   for (uint32_t i = 0; i < 9; i++) {
-    REX_STORE_U64(sp - 128 + 8 * i, fprs[i]);
+    guest::StoreU64(base, sp - 128 + 8 * i, fprs[i]);
   }
   const uint32_t frame = sp - 304;
   guest::StoreU32(base, frame, sp);

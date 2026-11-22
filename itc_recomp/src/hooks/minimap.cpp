@@ -5,6 +5,9 @@
 // (src/frame_pacing/per_frame_logic.cpp), which runs them.
 
 #include "hooks/minimap.h"
+#include "lifted/names.h"
+#include "lifted/functions.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -15,6 +18,8 @@
 #include "hooks/guest_call.h"
 #include "hooks/scenery_lists.h"
 #include "minimap/minimap.h"
+#include "schema/device_shaders.h"
+#include "schema/minimap.h"
 #include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_minimap, true, "ITC",
@@ -129,14 +134,14 @@ ITC_REGS_STEP(MinimapTriangleRecordFlat) {
   const uint64_t lr = ctx.lr;
   guest_call::InFrame(ctx, base, minimap::kRecordFlatFrame, 0x8217C4B8, [&](uint32_t) {
     // The render queue's slot 4 (sub_8258EDC8 in play): r4 = the chunk, r5 =
-    // the key, f1 = 0.0 (0x82000A34).
-    const uint32_t queue = guest::LoadU32(base, minimap::kTriangleLists);
+    // the key, f1 = 0.0.
+    const uint32_t queue = schema::MinimapGlobals::triangle_queue(base);
     ctx.r3.u64 = queue;
     ctx.r4.u64 = *chunk;
     ctx.r5.u64 = key;
     ctx.fpscr.disableFlushMode();
-    ctx.f1.f64 = double(guest::LoadFloat(base, 0x82000A34));
-    lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, queue) + 16));
+    ctx.f1.f64 = double(schema::MinimapGlobals::zero(base));
+    lifted::CallFromContext(ctx, base, schema::RenderQueue(base, queue).vtable().add());
   });
   ctx.lr = lr;
 }
@@ -147,7 +152,7 @@ ITC_REGS_STEP(MinimapTriangleRecord) {
       MinimapTriangleRecordFlat(ctx, base);
       return;
     case minimap::TriangleRecording::kOther:
-      lifted::CallFromContext(ctx, base, 0x8217C4C0);
+      lifted::Enter(ctx, base, lifted::e8217C4C0);
       return;
     case minimap::TriangleRecording::kNone:
       return;
@@ -174,7 +179,7 @@ struct MarkerContext {
     m.ctx.r3.u64 = triangle;
     m.ctx.r4.u64 = pass;
     m.ctx.r5.u64 = key;
-    lifted::CallFromContext(m.ctx, m.base, 0x8217DAA0);
+    lifted::Enter(m.ctx, m.base, game::Triangle::Record);
     m.ctx.r1.u64 = stack;
   }
   static void Memcpy(void* self, uint32_t to, uint32_t from, uint32_t size) {
@@ -185,7 +190,7 @@ struct MarkerContext {
     m.ctx.r3.u64 = to;
     m.ctx.r4.u64 = from;
     m.ctx.r5.u64 = size;
-    lifted::CallFromContext(m.ctx, m.base, 0x825A7410);
+    lifted::Enter(m.ctx, m.base, game::memcpy_825A7410);
     m.ctx.r1.u64 = stack;
   }
 };

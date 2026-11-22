@@ -18,10 +18,8 @@ namespace scene_models {
 
 // --- Getters and links ---
 
-// The accessories' set (probably), made once by sub_820F1038.
-constexpr uint32_t kAccessories = 0x826C5510;
-
-// sub_820F0E50: [0x826C5510].
+// sub_820F0E50: [0x826C5510], the accessories' set (probably), made once by
+// sub_820F1038 (SceneModelsGlobals::accessories).
 uint32_t Accessories(uint8_t* base);
 
 // SceneModel::Accessory (sub_820D97B8, probably): an interior's loading
@@ -31,9 +29,8 @@ uint32_t Accessory(uint8_t* base, uint32_t interior);
 
 // sub_82175EE0, Archive::Load's callback for SceneModel::SetUp's two sound
 // assets: `context` holds the slot i; byte 0x826D8350 + i up by one (wrapping
-// at 256), and when it's then 2 (i read again), 0x826D83AC + 4i = 1.
-constexpr uint32_t kSoundLoadsDone = 0x826D8350;
-constexpr uint32_t kSoundLoaded = 0x826D83AC;
+// at 256), and when it's then 2 (i read again), 0x826D83AC + 4i = 1
+// (SceneModelsGlobals' sound_files_arrived and sound_loaded).
 void OnSoundLoaded(uint8_t* base, uint32_t context);
 
 // sub_820E7378: the wheels' +16776 = value.
@@ -59,7 +56,6 @@ void SetWord11452(uint8_t* base, uint32_t object, uint32_t value);
 // in the physical views, where memcpy's override records copies for the
 // renderer's mirrors, or ranges c_runtime::Memcpy refuses); the original runs
 // there.
-constexpr uint32_t kCarRecordBytes = 3696;
 bool CarModelSetRecord(uint8_t* base, uint32_t car_model, uint32_t record);
 
 // CarRecord::Copy (sub_820D7EE8): the 3,696-byte car record `from` into

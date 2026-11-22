@@ -1,0 +1,1717 @@
+# The schema of docs/functions/xaudio-objects.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# XAudio's factory objects (the game's own copy of XAudio, translated): the
+# factory's object base and descriptor, the source codecs (PCM and XMA)
+# with their codec base, packet queue and entries, the sample rate
+# converter, the output matrix, the volume meter, the reverb (its I3DL2
+# side at +16, its delay lines and filters at +208) and the stages its
+# hand port works on, and the out words and allocator the factory's
+# functions take. Names from docs/functions/xaudio-objects.md,
+# docs/known-data.md and the hand port (src/xaudio/); the reverb's
+# parameters by XAudio2's XAUDIO2FX_REVERB_PARAMETERS and I3DL2's listener
+# properties, which their conversion matches ("probably" there).
+#
+# No embedded types in the schema: an object holding another (a codec's
+# base at +16, its converter at +184, the reverb's I3DL2 side and core)
+# repeats the inner one's fields at their offsets, named for what they are.
+#
+# Measure faults (tools/type_map.py), each kept as a field with its own
+# name and a note so every access fits: a callee's pointer parameter taken
+# for the caller's object at offset 0 (the reverb core's stages,
+# ReverbCore::Defaults and FilterCoefficient; I3dl2::ToNative's input;
+# ReverbCore::Apply's parameters as the reverb; Reverb::Run's core as the
+# reverb), the factory's descriptor joined with the object it describes
+# (the Size functions' r3), and the codec's inner object joined with the
+# outer codec (XAudioCodec::GetState, EndOfStream). The render driver's
+# set-up (sub_824657C8) meets AudioRenderDriver, audio.md's: left there.
+
+# Every object the factory makes (docs/known-data.md, "XAudio factory object"):
+# an outer interface at +0 over an inner object at +4 (vtable, reference
+# count, owner). XAudioObject::Release and Free read it; shared with
+# xaudio.md's voices (they hold and release these).
+[XAudioObject]
+measure = "XAudioObject"
+measures = ["sub_82466410.r3@-4"]
+size = 16
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "the outer vtable (the class's methods: +0 AddRef, +4 Release, +8 the info, +24 the pass)" },
+  { name = "inner_vtable", offset = 4, type = "ptr", to = "XAudioInnerVtable", note = "the inner object's vtable (first 0x8204AA58, the shared base)" },
+  { name = "ref_count", offset = 8, type = "u32" },
+  { name = "owner", offset = 12, type = "u32", note = "the descriptor's +4 (probably the voice: the callbacks' first argument)" },
+]
+
+# The inner object's vtable (the object's +4).
+[XAudioInnerVtable]
+measure = "Reverb::Reverb.ret.+4"
+measures = ["XmaCodec::XmaCodec.ret.+4", "sub_8246D308.r3@-4.+4"]
+size = 20
+origin = "image"
+fields = [
+  { name = "destructor", offset = 0, type = "fn" },
+  { name = "delete_object", offset = 12, type = "fn", note = "the deleting call (sub_8245AAB8, xaudio-engine.md)" },
+  { name = "count", offset = 16, type = "fn", note = "sub_820911F8, shared" },
+]
+
+# The factory's descriptor (the class tables' size and create functions'
+# r3): +0 the class id, +4 the owner, then the class's own words, a union
+# by class: a codec's 56-byte source format at +8 and its packets, the
+# matrix's entries and default matrix, the meter's channels and history.
+[XAudioObjectDescriptor]
+measures = ["XAudioCodec::Construct.r4", "XAudioCodec::Init.r4", "PcmCodec::PcmCodec.r4", "XmaCodec::XmaCodec.r4", "XAudioMatrix::Init.r4", "VolumeMeter::Init.r4", "Reverb::Reverb.r4", "sub_825A50E0.r3", "sub_825A5DB8.r3", "sub_824657C8.r4"]
+size = 80
+origin = "embedded"
+fields = [
+  { name = "class_id", offset = 0, type = "u32" },
+  { name = "owner", offset = 4, type = "u32", note = "copied to the object's +12" },
+  { name = "format_type", offset = 8, type = "u8", note = "a codec's format type: 0-3 PCM, 4 XMA (the format's +0)" },
+  { name = "matrix_entries", offset = 8, type = "u8", note = "the matrix's entry count" },
+  { name = "meter_channels", offset = 8, type = "u32", note = "the meter's channels (probably)" },
+  { name = "render_device", offset = 8, type = "u32", note = "the render driver's r4 to its Register (audio.md)" },
+  { name = "matrix_overwrite", offset = 9, type = "u8", note = "the matrix's overwrite flag (SetOverwrite)" },
+  { name = "format_channels", offset = 12, type = "u8", note = "a codec's channels, or an XMA format's streams" },
+  { name = "matrix_default", offset = 12, type = "ptr", to = "MatrixLevels", note = "the matrix's default levels (0: none)" },
+  { name = "meter_history_length", offset = 12, type = "u32", note = "the meter's history length (probably)" },
+  { name = "format_rate", offset = 16, type = "u32", note = "a PCM format's sample rate" },
+  { name = "xma_block_scale", offset = 64, type = "f32", note = "the XMA codec's block size: 2^x x 16, rounded up to 16ths (XmaCodec::XmaCodec)" },
+  { name = "packet_count", offset = 68, type = "u8", note = "the codec's packet entries" },
+  { name = "converter_flags", offset = 69, type = "u8", note = "copied to the codec's +268 (PCM, the converter's flags) or +252 (XMA)" },
+  { name = "packet_done_callback", offset = 72, type = "fn" },
+  { name = "loop_end_callback", offset = 76, type = "fn" },
+]
+
+# XAudioAllocator: merged into xaudio-engine.toml's XAudioBumpAllocator at the integration (the same object).
+
+# XAudioAllocatorVtable: merged into xaudio-engine.toml's XAudioBumpAllocatorVtable at the integration (the same object).
+
+# The word a class's size function writes (its r4: the factory's).
+[FactorySizeOut]
+measures = ["AudioRenderDriver::Size.r4", "PcmCodec::Size.r4", "XmaCodec::Size.r4", "Reverb::Size.r4", "VolumeMeter::Size.r4", "XAudioMatrix::Size.r4", "sub_825A2360.r4", "sub_825A5828.r4"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "size", offset = 0, type = "u32" },
+]
+
+# The word a create function writes the object to (its r5), or a query's out word.
+[FactoryObjectOut]
+measures = ["AudioRenderDriver::Create.r5", "PcmCodec::Create.r5", "XmaCodec::Create.r5", "Reverb::Create.r5", "VolumeMeter::Create.r5", "XAudioMatrix::Create.r5", "sub_825A50E0.r5", "sub_825A5DB8.r5", "sub_82465868.r4", "sub_82465418.r4"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "object", offset = 0, type = "u32" },
+]
+
+# The info an object's slot +8 writes (a byte and a half-word).
+[FactoryInfoOut]
+# measures from XAudioEngineInfoOut (xaudio-engine), merged at the integration
+measures = ["XAudioCodec::GetInfo.r4", "XAudioMatrix::GetInfo.r4", "VolumeMeter::GetInfo.r4",
+  "sub_82461EF8.r4"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "info_byte", offset = 0, type = "u8", note = "4 a codec, 6 a matrix or the reverb, 1 the meter" },
+  { name = "info_halfword", offset = 2, type = "u16", note = "10 a codec, 0 a matrix, 3,750 the reverb, 1 the meter" },
+]
+
+# XAudioCodec::GetState's out byte.
+[CodecStateOut]
+measure = "XAudioCodec::GetState.r4"
+size = 1
+origin = "embedded"
+fields = [
+  { name = "state", offset = 0, type = "u8" },
+]
+
+# A packet list's node (an entry's +0 at the lists' node offset).
+[PacketNode]
+measure = "PacketList.+0"
+measures = ["XAudioCodec::Init.r3@+12@+4.+24"]
+size = 8
+origin = "allocated"
+fields = [
+  { name = "next", offset = 0, type = "u32" },
+  { name = "prev", offset = 4, type = "u32" },
+]
+
+# A packet list's head: next, prev and the node's offset into an entry
+# (PacketList::Next and Clear).
+[PacketList]
+measure = "PacketList"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "next", offset = 0, type = "ptr", to = "PacketNode" },
+  { name = "prev", offset = 4, type = "u32" },
+  { name = "node_offset", offset = 8, type = "u32" },
+]
+
+# The codec base's two packet lists and their entries (the base's +4;
+# PacketLists::Init, Alloc).
+[PacketLists]
+measure = "XAudioCodec::Init.r3@+12@+4"
+measures = ["XAudioCodec::Construct.r3@+12@+4"]
+size = 28
+origin = "embedded"
+fields = [
+  { name = "queued_next", offset = 0, type = "u32" },
+  { name = "queued_prev", offset = 4, type = "u32" },
+  { name = "queued_node_offset", offset = 8, type = "u32" },
+  { name = "free_next", offset = 12, type = "u32" },
+  { name = "free_prev", offset = 16, type = "u32" },
+  { name = "free_node_offset", offset = 20, type = "u32" },
+  { name = "entries", offset = 24, type = "ptr", to = "PacketEntry", note = "the packet entries (120 bytes each, from the allocator)" },
+]
+
+# A packet entry (120 bytes, the codec base's +28; docs/known-data.md).
+[PacketEntry]
+measures = ["CodecBase::OnSubmit.r4", "CodecBase::RetirePacket.ret"]
+size = 120
+origin = "allocated"
+fields = [
+  { name = "node_next", offset = 0, type = "u32", note = "the list node (at the lists' node offset, 0)" },
+  { name = "node_prev", offset = 4, type = "u32" },
+  { name = "data", offset = 8, type = "u32" },
+  { name = "length", offset = 12, type = "u32", note = "in blocks" },
+  { name = "loop_count", offset = 16, type = "u32", note = "-1 forever" },
+  { name = "loop_start", offset = 20, type = "u32", note = "in blocks" },
+  { name = "loop_end", offset = 24, type = "u32", note = "in blocks" },
+  { name = "play_begin", offset = 28, type = "u32" },
+  { name = "play_end", offset = 32, type = "u32", note = "0: the length" },
+  { name = "context", offset = 36, type = "u32", note = "handed to the callbacks" },
+  { name = "xma_region", offset = 40, type = "bytes", count = 72, note = "an XMA packet's region (72 bytes)" },
+  { name = "sequence", offset = 112, type = "u32" },
+  { name = "retired", offset = 116, type = "u8", note = "0 when retired (RetirePacket)" },
+  { name = "begun", offset = 117, type = "u8", note = "1 once played from its start" },
+  { name = "unknown_118", offset = 118, type = "u8" },
+  { name = "unknown_119", offset = 119, type = "u8" },
+]
+
+# A packet submitted to a codec (CodecBase::SubmitPacket's r4: XAudio's
+# packet; docs/functions/xaudio-objects.md).
+[XAudioPacket]
+measures = ["CodecBase::SubmitPacket.r4", "XmaCodec::SubmitPacket.r4"]
+size = 88
+origin = "embedded"
+fields = [
+  { name = "data", offset = 0, type = "u32" },
+  { name = "size", offset = 4, type = "u32", note = "in bytes" },
+  { name = "loop_count", offset = 8, type = "u32" },
+  { name = "loop_start", offset = 12, type = "u32", note = "in bytes" },
+  { name = "loop_length", offset = 16, type = "u32", note = "in bytes (0: to the end)" },
+  { name = "xma_region", offset = 12, type = "bytes", count = 72, note = "with flags 0x20, 72 bytes copied to the entry's +40" },
+  { name = "context", offset = 84, type = "u32" },
+]
+
+# A packet with a sample region (CodecBase::SubmitRegion's r4, 8 words:
+# +8 to +28 copied to the entry's +16 to +36).
+[XAudioRegionPacket]
+measures = ["CodecBase::SubmitRegion.r4", "XmaCodec::SubmitRegion.r4"]
+size = 32
+origin = "embedded"
+fields = [
+  { name = "data", offset = 0, type = "u32" },
+  { name = "size", offset = 4, type = "u32", note = "in bytes" },
+  { name = "loop_count", offset = 8, type = "u32" },
+  { name = "loop_start", offset = 12, type = "u32" },
+  { name = "loop_end", offset = 16, type = "u32" },
+  { name = "play_begin", offset = 20, type = "u32" },
+  { name = "play_end", offset = 24, type = "u32" },
+  { name = "context", offset = 28, type = "u32" },
+]
+
+# The codec base (+16 of both source codecs; CodecBase::CodecBase; the
+# packet queue, the format, the state). Its functions get it as r3.
+[CodecBase]
+measure = "CodecBase"
+measures = ["sub_82469A88.r3", "CodecBase::SubmitPacket.r3", "CodecBase::SetFormat.r3", "CodecBase::~CodecBase.r3"]
+size = 168
+origin = "embedded"
+vtable = 0x8204B958
+fields = [
+  { name = "codec_owner", offset = -4, type = "u32", note = "the codec's +12 (CompletePacket hands it to the callback)" },
+  { name = "vtable", offset = 0, type = "ptr", to = "CodecBaseVtable" },
+  { name = "queued_next", offset = 4, type = "u32", note = "the queued packets' list head (PacketLists)" },
+  { name = "queued_prev", offset = 8, type = "u32" },
+  { name = "queued_node_offset", offset = 12, type = "u32" },
+  { name = "free_next", offset = 16, type = "u32", note = "the free entries' list head" },
+  { name = "free_prev", offset = 20, type = "u32" },
+  { name = "free_node_offset", offset = 24, type = "u32" },
+  { name = "entries", offset = 28, type = "ptr", to = "PacketEntry", note = "the 120-byte packet entries" },
+  { name = "next_sequence", offset = 32, type = "u32", note = "the last sequence number given (never 0)" },
+  { name = "format", offset = 36, type = "bytes", count = 56, note = "the 56-byte source format" },
+  { name = "format_type", offset = 36, type = "u8", note = "0-3 PCM with 4, 2, 1, 2 bytes a sample; 4 XMA" },
+  { name = "channels", offset = 40, type = "u8", note = "the channels, or an XMA format's streams" },
+  { name = "sample_rate", offset = 44, type = "u32", note = "a PCM format's; an XMA format's first stream's (its streams 8 bytes each from here: the rate, then the channels)" },
+  { name = "stream_channels", offset = 48, type = "u8", note = "an XMA format's first stream's channels" },
+  { name = "block_size", offset = 92, type = "u16", note = "bytes a block (a PCM frame)" },
+  { name = "block_size_2", offset = 94, type = "u16", note = "1 (probably the frames a block)" },
+  { name = "volume", offset = 96, type = "f32", note = "1.0 at first" },
+  { name = "frequency_ratio", offset = 100, type = "f32", note = "1.0 at first" },
+  { name = "packet_state", offset = 104, type = "bytes", count = 48, note = "the current packet's state (cleared by RetirePacket)" },
+  { name = "position", offset = 104, type = "u32", note = "the position in the current packet (a PCM codec's)" },
+  { name = "frames_played", offset = 152, type = "u32" },
+  { name = "state", offset = 156, type = "u8", note = "bit 0 playing, 1 just started, 2 stopping, 3 end of stream after the last packet, 4 starved, 5 queue empty" },
+  { name = "format_extra", offset = 157, type = "u8", note = "SetFormat's r5" },
+  { name = "fade_passes", offset = 158, type = "u16", note = "the fade-out's passes left (10 at a stop)" },
+  { name = "packet_done_callback", offset = 160, type = "fn" },
+  { name = "loop_end_callback", offset = 164, type = "fn" },
+]
+
+# The codec base's vtable (0x8204BAC0 PCM, 0x8204B9B8 XMA, 0x8204B958 its own).
+[CodecBaseVtable]
+measure = "CodecBase.+0"
+measures = ["PcmCodec.+16", "CodecBase::SetFormat.r3.+0", "sub_8246D738.r3@-16.+16"]
+size = 96
+origin = "image"
+fields = [
+  { name = "submit_packet", offset = 8, type = "fn" },
+  { name = "submit_region", offset = 12, type = "fn" },
+  { name = "set_frequency_ratio", offset = 80, type = "fn", note = "PcmCodec::SetFrequencyRatioBase (SetFormat calls it with 1.0)" },
+  { name = "set_flags", offset = 84, type = "fn", note = "CodecBase::SetFlags" },
+  { name = "complete_packet", offset = 92, type = "fn", note = "CodecBase::CompletePacket" },
+]
+
+# A source codec's outer vtable (0x8204BB48 PCM, 0x8204BA40 XMA; the
+# source voice's calls, xaudio.md).
+[CodecVtable]
+measures = ["PcmCodec.+0", "XmaCodec::XmaCodec.ret.+0"]
+size = 124
+origin = "image"
+fields = [
+  { name = "add_ref", offset = 0, type = "fn" },
+  { name = "release", offset = 4, type = "fn" },
+  { name = "get_info", offset = 8, type = "fn" },
+  { name = "allocator", offset = 20, type = "fn" },
+  { name = "process", offset = 24, type = "fn" },
+  { name = "submit_packet", offset = 28, type = "fn" },
+  { name = "flush", offset = 32, type = "fn" },
+  { name = "submit_region", offset = 36, type = "fn" },
+  { name = "flush_again", offset = 40, type = "fn" },
+  { name = "get_state", offset = 44, type = "fn" },
+  { name = "start", offset = 48, type = "fn" },
+  { name = "stop", offset = 52, type = "fn" },
+  { name = "end_of_stream", offset = 56, type = "fn" },
+  { name = "set_volume", offset = 88, type = "fn" },
+  { name = "set_pitch", offset = 96, type = "fn" },
+  { name = "set_frequency_ratio", offset = 104, type = "fn" },
+  { name = "set_format", offset = 112, type = "fn" },
+  { name = "query", offset = 116, type = "fn" },
+  { name = "xma_set_up", offset = 120, type = "fn", note = "the XMA codec's only (sub_8246AEE0, audio.md)" },
+]
+
+# XAudio's sample rate converter state (88 bytes: the PCM codec's +184,
+# each XMA stream's; Resampler::Process and its kernels; docs/known-data.md
+# said 96 until 2026-11-22, but the PCM codec ends at +272 and the XMA
+# streams are 88 apart).
+[ConverterState]
+measure = "sub_82478E60.r3"
+measures = ["sub_8247E188.r3", "sub_8247E260.r3", "sub_8247F558.r3", "sub_82473E48.r3", "sub_82474188.r3", "sub_8246E208.r7", "sub_8246E4C8.r7", "XmaCodec.+188", "PcmCodec@+184"]
+size = 88
+origin = "embedded"
+fields = [
+  { name = "input", offset = 0, type = "u32", note = "the input samples" },
+  { name = "input_end", offset = 4, type = "u32", note = "its end, in frames" },
+  { name = "position", offset = 8, type = "u32", note = "in frames" },
+  { name = "format", offset = 12, type = "u8", note = "the sample format (the codec's format type; 1 for XMA)" },
+  { name = "channels", offset = 13, type = "u8" },
+  { name = "input_rate", offset = 16, type = "u32", note = "the input rate x the frequency ratio" },
+  { name = "output", offset = 20, type = "u32", note = "planar: a channel every 1,024 bytes" },
+  { name = "output_frames", offset = 24, type = "u32", note = "256" },
+  { name = "frames_written", offset = 28, type = "u32" },
+  { name = "output_rate", offset = 32, type = "u32", note = "48,000" },
+  { name = "volume", offset = 36, type = "f32", note = "the volume ramp's start (the last pass's end)" },
+  { name = "target_volume", offset = 40, type = "f32", note = "the volume ramp's end (an XMA stream's volume)" },
+  { name = "ratio", offset = 44, type = "f32", note = "the rates' quotient" },
+  { name = "fraction", offset = 48, type = "f32", note = "the position's fraction" },
+  { name = "last_sample_0", offset = 52, type = "f32", note = "the last input frame's samples by channel (cleared at a start: six words)" },
+  { name = "last_sample_1", offset = 56, type = "f32" },
+  { name = "last_sample_2", offset = 60, type = "f32" },
+  { name = "last_sample_3", offset = 64, type = "f32" },
+  { name = "last_sample_4", offset = 68, type = "f32" },
+  { name = "last_sample_5", offset = 72, type = "f32" },
+  { name = "kernel", offset = 76, type = "fn", note = "from the table at 0x8204CF08" },
+  { name = "changed", offset = 80, type = "u32", note = "bit 0 the format, bit 1 the rate: the kernel and ratio picked again" },
+  { name = "flags", offset = 84, type = "u32", note = "the descriptor's +69" },
+]
+
+# The PCM codec (272 + 120 x the packets; PcmCodec::PcmCodec): the
+# factory object, its codec base at +16, its converter at +184.
+[PcmCodec]
+measure = "PcmCodec"
+measures = ["PcmCodec::~PcmCodec.r3"]
+size = 272
+origin = "allocated"
+vtable = 0x8204BB48
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "CodecVtable" },
+  { name = "inner_vtable", offset = 4, type = "ptr", to = "XAudioInnerVtable" },
+  { name = "ref_count", offset = 8, type = "u32" },
+  { name = "owner", offset = 12, type = "u32", note = "the descriptor's +4" },
+  { name = "base_vtable", offset = 16, type = "ptr", to = "CodecBaseVtable", note = "the codec base's (+16)" },
+  { name = "queued_next", offset = 20, type = "u32", note = "the queued packets' list head (PacketLists)" },
+  { name = "queued_prev", offset = 24, type = "u32" },
+  { name = "queued_node_offset", offset = 28, type = "u32" },
+  { name = "free_next", offset = 32, type = "u32", note = "the free entries' list head" },
+  { name = "free_prev", offset = 36, type = "u32" },
+  { name = "free_node_offset", offset = 40, type = "u32" },
+  { name = "entries", offset = 44, type = "ptr", to = "PacketEntry", note = "the 120-byte packet entries" },
+  { name = "next_sequence", offset = 48, type = "u32", note = "the last sequence number given (never 0)" },
+  { name = "format", offset = 52, type = "bytes", count = 56, note = "the 56-byte source format" },
+  { name = "format_type", offset = 52, type = "u8", note = "0-3 PCM with 4, 2, 1, 2 bytes a sample; 4 XMA" },
+  { name = "channels", offset = 56, type = "u8", note = "the channels, or an XMA format's streams" },
+  { name = "sample_rate", offset = 60, type = "u32", note = "a PCM format's; an XMA format's first stream's (its streams 8 bytes each from here: the rate, then the channels)" },
+  { name = "stream_channels", offset = 64, type = "u8", note = "an XMA format's first stream's channels" },
+  { name = "block_size", offset = 108, type = "u16", note = "bytes a block (a PCM frame)" },
+  { name = "block_size_2", offset = 110, type = "u16", note = "1 (probably the frames a block)" },
+  { name = "volume", offset = 112, type = "f32", note = "1.0 at first" },
+  { name = "frequency_ratio", offset = 116, type = "f32", note = "1.0 at first" },
+  { name = "packet_state", offset = 120, type = "bytes", count = 48, note = "the current packet's state (cleared by RetirePacket)" },
+  { name = "position", offset = 120, type = "u32", note = "the position in the current packet (a PCM codec's)" },
+  { name = "frames_played", offset = 168, type = "u32" },
+  { name = "state", offset = 172, type = "u8", note = "bit 0 playing, 1 just started, 2 stopping, 3 end of stream after the last packet, 4 starved, 5 queue empty" },
+  { name = "format_extra", offset = 173, type = "u8", note = "SetFormat's r5" },
+  { name = "fade_passes", offset = 174, type = "u16", note = "the fade-out's passes left (10 at a stop)" },
+  { name = "packet_done_callback", offset = 176, type = "fn" },
+  { name = "loop_end_callback", offset = 180, type = "fn" },
+  { name = "size_packet_count", offset = 68, type = "u8", note = "measure fault: PcmCodec::Size's r3 is the descriptor (+68 its packet count), not a codec" },
+  { name = "converter_input", offset = 184, type = "u32", note = "the input samples" },
+  { name = "converter_input_end", offset = 188, type = "u32", note = "its end, in frames" },
+  { name = "converter_position", offset = 192, type = "u32", note = "in frames" },
+  { name = "converter_format", offset = 196, type = "u8", note = "the sample format (the codec's format type; 1 for XMA)" },
+  { name = "converter_channels", offset = 197, type = "u8" },
+  { name = "converter_input_rate", offset = 200, type = "u32", note = "the input rate x the frequency ratio" },
+  { name = "converter_output", offset = 204, type = "u32", note = "planar: a channel every 1,024 bytes" },
+  { name = "converter_output_frames", offset = 208, type = "u32", note = "256" },
+  { name = "converter_frames_written", offset = 212, type = "u32" },
+  { name = "converter_output_rate", offset = 216, type = "u32", note = "48,000" },
+  { name = "converter_volume", offset = 220, type = "f32", note = "the volume ramp's start (the last pass's end)" },
+  { name = "converter_target_volume", offset = 224, type = "f32", note = "the volume ramp's end (an XMA stream's volume)" },
+  { name = "converter_ratio", offset = 228, type = "f32", note = "the rates' quotient" },
+  { name = "converter_fraction", offset = 232, type = "f32", note = "the position's fraction" },
+  { name = "converter_last_sample_0", offset = 236, type = "f32", note = "the last input frame's samples by channel (cleared at a start: six words)" },
+  { name = "converter_last_sample_1", offset = 240, type = "f32" },
+  { name = "converter_last_sample_2", offset = 244, type = "f32" },
+  { name = "converter_last_sample_3", offset = 248, type = "f32" },
+  { name = "converter_last_sample_4", offset = 252, type = "f32" },
+  { name = "converter_last_sample_5", offset = 256, type = "f32" },
+  { name = "converter_kernel", offset = 260, type = "fn", note = "from the table at 0x8204CF08" },
+  { name = "converter_changed", offset = 264, type = "u32", note = "bit 0 the format, bit 1 the rate: the kernel and ratio picked again" },
+  { name = "converter_flags", offset = 268, type = "u32", note = "the descriptor's +69" },
+]
+
+# The XMA codec (284 + 120 x the packets + 88 x the streams;
+# XmaCodec::XmaCodec): as the PCM codec to +184, then its XMA object and
+# streams (each a ConverterState).
+[XmaCodec]
+measure = "XmaCodec"
+measures = ["XmaCodec::XmaCodec.ret", "sub_8246B3F8.r3@-16"]
+size = 284
+origin = "allocated"
+vtable = 0x8204BA40
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "CodecVtable" },
+  { name = "inner_vtable", offset = 4, type = "ptr", to = "XAudioInnerVtable" },
+  { name = "ref_count", offset = 8, type = "u32" },
+  { name = "owner", offset = 12, type = "u32", note = "the descriptor's +4" },
+  { name = "base_vtable", offset = 16, type = "ptr", to = "CodecBaseVtable", note = "the codec base's (+16)" },
+  { name = "size_streams", offset = 12, type = "u8", note = "measure fault: XmaCodec::Size's r3 is the descriptor (+12 its stream count), not a codec" },
+  { name = "queued_next", offset = 20, type = "u32", note = "the queued packets' list head (PacketLists)" },
+  { name = "queued_prev", offset = 24, type = "u32" },
+  { name = "queued_node_offset", offset = 28, type = "u32" },
+  { name = "free_next", offset = 32, type = "u32", note = "the free entries' list head" },
+  { name = "free_prev", offset = 36, type = "u32" },
+  { name = "free_node_offset", offset = 40, type = "u32" },
+  { name = "entries", offset = 44, type = "ptr", to = "PacketEntry", note = "the 120-byte packet entries" },
+  { name = "next_sequence", offset = 48, type = "u32", note = "the last sequence number given (never 0)" },
+  { name = "format", offset = 52, type = "bytes", count = 56, note = "the 56-byte source format" },
+  { name = "format_type", offset = 52, type = "u8", note = "0-3 PCM with 4, 2, 1, 2 bytes a sample; 4 XMA" },
+  { name = "channels", offset = 56, type = "u8", note = "the channels, or an XMA format's streams" },
+  { name = "sample_rate", offset = 60, type = "u32", note = "a PCM format's; an XMA format's first stream's (its streams 8 bytes each from here: the rate, then the channels)" },
+  { name = "stream_channels", offset = 64, type = "u8", note = "an XMA format's first stream's channels" },
+  { name = "block_size", offset = 108, type = "u16", note = "bytes a block (a PCM frame)" },
+  { name = "block_size_2", offset = 110, type = "u16", note = "1 (probably the frames a block)" },
+  { name = "volume", offset = 112, type = "f32", note = "1.0 at first" },
+  { name = "frequency_ratio", offset = 116, type = "f32", note = "1.0 at first" },
+  { name = "packet_state", offset = 120, type = "bytes", count = 48, note = "the current packet's state (cleared by RetirePacket)" },
+  { name = "position", offset = 120, type = "u32", note = "the position in the current packet (a PCM codec's)" },
+  { name = "frames_played", offset = 168, type = "u32" },
+  { name = "state", offset = 172, type = "u8", note = "bit 0 playing, 1 just started, 2 stopping, 3 end of stream after the last packet, 4 starved, 5 queue empty" },
+  { name = "format_extra", offset = 173, type = "u8", note = "SetFormat's r5" },
+  { name = "fade_passes", offset = 174, type = "u16", note = "the fade-out's passes left (10 at a stop)" },
+  { name = "packet_done_callback", offset = 176, type = "fn" },
+  { name = "loop_end_callback", offset = 180, type = "fn" },
+  { name = "size_packet_count", offset = 68, type = "u8", note = "measure fault: XmaCodec::Size's r3 is the descriptor (+68 its packet count), not a codec" },
+  { name = "xma_object", offset = 184, type = "u32", note = "audio.md's XMA object (sub_8246AEE0 sets it up)" },
+  { name = "streams", offset = 188, type = "ptr", to = "ConverterState", note = "88 bytes each" },
+  { name = "xma_block_size", offset = 192, type = "u32", note = "from the descriptor's float +64" },
+  { name = "format_copy", offset = 196, type = "bytes", count = 56, note = "a copy of the format" },
+  { name = "converter_flags", offset = 252, type = "u8", note = "the descriptor's +69" },
+  { name = "submit_mode", offset = 266, type = "u8", note = "0 none yet, 1 plain packets, 2 sample regions" },
+  { name = "unknown_268", offset = 268, type = "u32", note = "cleared" },
+  { name = "unknown_272", offset = 272, type = "u32", note = "cleared" },
+  { name = "unknown_276", offset = 276, type = "u32", note = "cleared" },
+  { name = "unknown_280", offset = 280, type = "u8", note = "cleared" },
+]
+
+# A codec's inner object (the codec's +4; XAudioCodec::Construct, Init,
+# Destruct): vtable, reference count, owner, then the codec base at +12.
+[XAudioCodec]
+measure = "XAudioCodec"
+measures = ["XAudioSourceVoice.+76", "sub_82466C40.r3@-12", "XAudioCodec::Construct.r3", "XAudioCodec::Destruct.r3", "XAudioCodec::Init.r3"]
+# measures from XAudioSourceCodec (xaudio), merged at the integration
+size = 180
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x8204AA58, then 0x8204ABD0" },
+  { name = "ref_count", offset = 4, type = "u32" },
+  { name = "owner", offset = 8, type = "u32" },
+  { name = "size_format_type", offset = 8, type = "u8", note = "measure fault: XAudioCodec::Size's and Create's r3 is the descriptor (+8 its format type)" },
+  { name = "base_vtable", offset = 12, type = "u32", note = "the codec base's (0x8204AB70)" },
+  { name = "queued_next", offset = 16, type = "u32", note = "the codec base's +4 (EndOfStream reads it on the outer codec: measure fault: its r3 is the codec, +16 the base's vtable)" },
+  { name = "queued_prev", offset = 20, type = "u32", note = "EndOfStream's +20: the outer codec's queued list head" },
+  { name = "free_next", offset = 28, type = "u32", note = "EndOfStream's +28: the outer codec's queued list's node offset" },
+  { name = "packet_done_callback", offset = 172, type = "fn", note = "the codec base's +160" },
+  { name = "outer_state", offset = 172, type = "u8", note = "measure fault: XAudioCodec::GetState's r3 is the outer codec (+172 its state byte)" },
+  { name = "loop_end_callback", offset = 176, type = "fn", note = "the codec base's +164" },
+]
+
+# The output matrix (28 + 12 x the entries; XAudioMatrix::Create).
+[XAudioMatrix]
+# measures from XAudioOutputMatrix (xaudio), merged at the integration
+measures = ["XAudioVoice.+72.+4"]
+measure = "XAudioMatrix"
+size = 28
+origin = "allocated"
+vtable = 0x8204AB30
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "MatrixVtable" },
+  { name = "inner_vtable", offset = 4, type = "ptr", to = "XAudioInnerVtable" },
+  { name = "ref_count", offset = 8, type = "u32" },
+  { name = "size_entries", offset = 8, type = "u8", note = "measure fault: XAudioMatrix::Size's r3 is the descriptor (+8 its entry count)" },
+  { name = "owner", offset = 12, type = "u32", note = "(XAudioMatrix::Size reads the descriptor's +12 here: measure fault: its default matrix)" },
+  { name = "entries_set", offset = 16, type = "u8" },
+  { name = "entries", offset = 20, type = "ptr", to = "MatrixEntry" },
+  { name = "entries_allowed", offset = 24, type = "u8" },
+  { name = "output_channels", offset = 25, type = "u8", note = "the highest output channel used + 1" },
+  { name = "overwrite", offset = 26, type = "u8", note = "1: the target's channels overwritten, else added" },
+]
+
+# The matrix's outer vtable (0x8204AB30).
+[MatrixVtable]
+measure = "XAudioMatrix.+0"
+size = 64
+origin = "image"
+fields = [
+  { name = "set_overwrite", offset = 32, type = "fn" },
+  { name = "set_matrix", offset = 40, type = "fn" },
+  { name = "init", offset = 52, type = "fn" },
+  { name = "query", offset = 60, type = "fn" },
+]
+
+# A matrix entry (12 bytes, the matrix's +20).
+[MatrixEntry]
+measure = "XAudioMatrix.+20"
+size = 12
+origin = "allocated"
+fields = [
+  { name = "input_channel", offset = 0, type = "u8" },
+  { name = "output_channel", offset = 1, type = "u8" },
+  { name = "level", offset = 4, type = "f32", note = "the current level" },
+  { name = "target_level", offset = 8, type = "f32" },
+]
+
+# Levels given to a matrix (SetMatrix, SetLevels; the descriptor's
+# default matrix): a count and its 8-byte levels.
+[MatrixLevels]
+measures = ["XAudioMatrix::SetMatrix.r4", "XAudioMatrix::SetLevels.r4", "XAudioMatrix::Init.r4.+12", "XAudioMatrix.+12"]
+size = 8
+origin = "embedded"
+fields = [
+  { name = "count", offset = 0, type = "u8" },
+  { name = "levels", offset = 4, type = "ptr", to = "MatrixLevel" },
+]
+
+# One level given (8 bytes).
+[MatrixLevel]
+measures = ["XAudioMatrix::SetMatrix.r4.+4", "XAudioMatrix::SetLevels.r4.+4"]
+size = 8
+origin = "allocated"
+fields = [
+  { name = "input_channel", offset = 0, type = "u8", note = "SetLevels: the entry's index" },
+  { name = "output_channel", offset = 1, type = "u8" },
+  { name = "level", offset = 4, type = "f32" },
+]
+
+# The volume meter (52 bytes; VolumeMeter::Create, Init, Process).
+[VolumeMeter]
+# measures from XAudioMeterView (xaudio), merged at the integration
+measures = ["sub_825A5E28.r3"]
+measure = "VolumeMeter"
+size = 52
+origin = "allocated"
+vtable = 0x8207229C
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "ref_count", offset = 4, type = "u32" },
+  { name = "class_id", offset = 8, type = "u32", note = "the descriptor's 16 bytes from here (measure fault: VolumeMeter::Size reads its descriptor's +8 and +12 here)" },
+  { name = "owner", offset = 12, type = "u32" },
+  { name = "channels", offset = 16, type = "u32", note = "probably" },
+  { name = "history_length", offset = 20, type = "u32", note = "probably" },
+  { name = "history_slot", offset = 24, type = "u32" },
+  { name = "threshold_sums", offset = 28, type = "ptr", to = "MeterHistory", note = "channels x length floats" },
+  { name = "peaks", offset = 32, type = "ptr", to = "MeterHistory" },
+  { name = "rms", offset = 36, type = "u32", note = "channels x length floats" },
+  { name = "unknown_40", offset = 40, type = "u32" },
+  { name = "filled", offset = 44, type = "u32", note = "1 once the history has filled" },
+  { name = "allocator", offset = 48, type = "ptr", to = "XAudioBumpAllocator" },
+]
+
+# One of the meter's arrays (floats, by the slot and the channel).
+[MeterHistory]
+# measures from XAudioMeterHistoryView (xaudio), merged at the integration
+measures = ["VolumeMeter.+28", "VolumeMeter.+32",
+  "sub_825A5E28.r3.+28", "sub_825A5E28.r3.+32", "sub_825A5E28.r3.+36"]
+size = 32
+origin = "allocated"
+fields = [
+  { name = "values", offset = 0, type = "bytes", count = 32, note = "the first slot's 8 channels (Process's fold-downs write 6 and 7)" },
+  { name = "first", offset = 0, type = "f32", note = "channels x length floats (from XAudioMeterHistoryView, xaudio)" },
+]
+
+# The reverb's native parameters (84 bytes: ReverbCore::Defaults,
+# I3dl2::ToNative's out, ReverbCore::Apply's r4): 13 words, then 8
+# floats. Matched to XAudio2's XAUDIO2FX_REVERB_PARAMETERS by
+# I3dl2::ToNative and Reverb::SetParameters ("probably" for the names).
+[NativeReverbParams]
+measure = "I3dl2::ToNative.r5"
+size = 84
+origin = "embedded"
+fields = [
+  { name = "reflections_delay", offset = 0, type = "u32", note = "probably (XAudio2's names, in its order but rear_delay last)" },
+  { name = "reverb_delay", offset = 4, type = "u32" },
+  { name = "position_left", offset = 8, type = "u32" },
+  { name = "position_right", offset = 12, type = "u32" },
+  { name = "position_matrix_left", offset = 16, type = "u32" },
+  { name = "position_matrix_right", offset = 20, type = "u32" },
+  { name = "early_diffusion", offset = 24, type = "u32" },
+  { name = "late_diffusion", offset = 28, type = "u32" },
+  { name = "low_eq_gain", offset = 32, type = "u32" },
+  { name = "low_eq_cutoff", offset = 36, type = "u32" },
+  { name = "high_eq_gain", offset = 40, type = "u32" },
+  { name = "high_eq_cutoff", offset = 44, type = "u32" },
+  { name = "rear_delay", offset = 48, type = "u32" },
+  { name = "room_filter_freq", offset = 52, type = "f32" },
+  { name = "room_filter_main", offset = 56, type = "f32" },
+  { name = "room_filter_hf", offset = 60, type = "f32" },
+  { name = "reflections_gain", offset = 64, type = "f32" },
+  { name = "reverb_gain", offset = 68, type = "f32" },
+  { name = "decay_time", offset = 72, type = "f32" },
+  { name = "density", offset = 76, type = "f32" },
+  { name = "room_size", offset = 80, type = "f32", note = "probably" },
+]
+
+# The reverb's I3DL2 side (the reverb's +16, its "core" in
+# docs/known-data.md; I3dl2Params::I3dl2Params, I3dl2::SetParameter): the
+# 12 I3DL2 parameters (I3DL2's listener properties, in their order), the
+# changes pending, then its delay lines and filters (+192, ReverbCore).
+[I3dl2Reverb]
+measure = "Reverb@+16"
+size = 196
+origin = "embedded"
+vtable = 0x8204AA8C
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "I3dl2ReverbVtable", note = "(I3dl2::ToNative reads its input's room here: measure fault: its r3 is this object's +4)" },
+  { name = "room", offset = 4, type = "s32", note = "millibels" },
+  { name = "room_hf", offset = 8, type = "s32", note = "millibels" },
+  { name = "room_rolloff_factor", offset = 12, type = "f32" },
+  { name = "decay_time", offset = 16, type = "f32" },
+  { name = "decay_hf_ratio", offset = 20, type = "f32" },
+  { name = "reflections", offset = 24, type = "s32", note = "millibels" },
+  { name = "reflections_delay", offset = 28, type = "f32" },
+  { name = "reverb", offset = 32, type = "s32", note = "millibels" },
+  { name = "reverb_delay", offset = 36, type = "f32" },
+  { name = "diffusion", offset = 40, type = "f32" },
+  { name = "density", offset = 44, type = "f32" },
+  { name = "hf_reference", offset = 48, type = "f32" },
+  { name = "pending_reflections_delay", offset = 52, type = "u32" },
+  { name = "pending_reverb_delay", offset = 56, type = "u32" },
+  { name = "pending_position_left", offset = 60, type = "u32" },
+  { name = "pending_position_right", offset = 64, type = "u32" },
+  { name = "pending_position_matrix_left", offset = 68, type = "u32" },
+  { name = "pending_position_matrix_right", offset = 72, type = "u32" },
+  { name = "pending_early_diffusion", offset = 76, type = "u32" },
+  { name = "pending_late_diffusion", offset = 80, type = "u32" },
+  { name = "pending_low_eq_gain", offset = 84, type = "u32" },
+  { name = "pending_low_eq_cutoff", offset = 88, type = "u32" },
+  { name = "pending_high_eq_gain", offset = 92, type = "u32" },
+  { name = "pending_high_eq_cutoff", offset = 96, type = "u32" },
+  { name = "pending_rear_delay", offset = 100, type = "u32" },
+  { name = "pending_room_filter_freq", offset = 104, type = "f32" },
+  { name = "pending_room_filter_main", offset = 108, type = "f32" },
+  { name = "pending_room_filter_hf", offset = 112, type = "f32" },
+  { name = "pending_reflections_gain", offset = 116, type = "f32" },
+  { name = "pending_reverb_gain", offset = 120, type = "f32" },
+  { name = "pending_decay_time", offset = 124, type = "f32" },
+  { name = "pending_density", offset = 128, type = "f32" },
+  { name = "pending_room_size", offset = 132, type = "f32" },
+  { name = "pending_i3dl2", offset = 136, type = "bytes", count = 48, note = "12 I3DL2 parameters pending (SetParameters kind 1)" },
+  { name = "pending_gain", offset = 184, type = "f32" },
+  { name = "gain_changed", offset = 188, type = "u8" },
+  { name = "parameters_changed", offset = 189, type = "u8" },
+  { name = "i3dl2_changed", offset = 190, type = "u8" },
+  { name = "core_vtable", offset = 192, type = "u32", note = "ReverbCore's (0x8204A868)" },
+]
+
+# The I3DL2 side's vtable (0x8204AA8C; 0x8204B948 standalone): +4 the
+# offset of its second base, the core proper.
+[I3dl2ReverbVtable]
+measure = "Reverb.+16"
+measures = ["Reverb@+16.+0"]
+size = 8
+origin = "image"
+fields = [
+  { name = "base_offset", offset = 4, type = "u32", note = "192 in the reverb (measure fault: Reverb.+0 is Reverb::Run's core's vtable)" },
+]
+
+# The reverb's outer vtable (0x8204AAB0).
+[ReverbVtable]
+measure = "Reverb::Reverb.ret.+0"
+size = 32
+origin = "image"
+fields = [
+  { name = "set_parameters", offset = 16, type = "fn" },
+  { name = "process", offset = 24, type = "fn" },
+  { name = "init", offset = 28, type = "fn" },
+]
+
+# The reverb (309,936 bytes; Reverb::Reverb): the factory object, its
+# I3DL2 side at +16 (I3dl2Reverb's fields 16 bytes on), its core at +208
+# (ReverbCore) and the pass timers. ReverbCore::Apply's parameters (r4)
+# are taken for the reverb by the measure (measure fault): its loads
+# of +0 to +80 land on the fields below.
+[Reverb]
+measures = ["Reverb", "Reverb::Reverb.ret"]
+size = 309936
+origin = "allocated"
+vtable = 0x8204AAB0
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "ReverbVtable" },
+  { name = "inner_vtable", offset = 4, type = "ptr", to = "XAudioInnerVtable" },
+  { name = "ref_count", offset = 8, type = "u32" },
+  { name = "owner", offset = 12, type = "u32" },
+  { name = "core_vtable", offset = 16, type = "ptr", to = "I3dl2ReverbVtable", note = "the I3DL2 side's" },
+  { name = "room", offset = 20, type = "s32", note = "millibels" },
+  { name = "room_hf", offset = 24, type = "s32", note = "millibels" },
+  { name = "room_rolloff_factor", offset = 28, type = "f32" },
+  { name = "decay_time", offset = 32, type = "f32" },
+  { name = "decay_hf_ratio", offset = 36, type = "f32" },
+  { name = "reflections", offset = 40, type = "s32", note = "millibels" },
+  { name = "reflections_delay", offset = 44, type = "f32" },
+  { name = "reverb", offset = 48, type = "s32", note = "millibels" },
+  { name = "reverb_delay", offset = 52, type = "f32" },
+  { name = "diffusion", offset = 56, type = "f32" },
+  { name = "density", offset = 60, type = "f32" },
+  { name = "hf_reference", offset = 64, type = "f32" },
+  { name = "pending_reflections_delay", offset = 68, type = "u32" },
+  { name = "pending_reverb_delay", offset = 72, type = "u32" },
+  { name = "pending_position_left", offset = 76, type = "u32" },
+  { name = "pending_position_right", offset = 80, type = "u32" },
+  { name = "pending_position_matrix_left", offset = 84, type = "u32" },
+  { name = "pending_position_matrix_right", offset = 88, type = "u32" },
+  { name = "pending_early_diffusion", offset = 92, type = "u32" },
+  { name = "pending_late_diffusion", offset = 96, type = "u32" },
+  { name = "pending_low_eq_gain", offset = 100, type = "u32" },
+  { name = "pending_low_eq_cutoff", offset = 104, type = "u32" },
+  { name = "pending_high_eq_gain", offset = 108, type = "u32" },
+  { name = "pending_high_eq_cutoff", offset = 112, type = "u32" },
+  { name = "pending_rear_delay", offset = 116, type = "u32" },
+  { name = "pending_room_filter_freq", offset = 120, type = "f32" },
+  { name = "pending_room_filter_main", offset = 124, type = "f32" },
+  { name = "pending_room_filter_hf", offset = 128, type = "f32" },
+  { name = "pending_reflections_gain", offset = 132, type = "f32" },
+  { name = "pending_reverb_gain", offset = 136, type = "f32" },
+  { name = "pending_decay_time", offset = 140, type = "f32" },
+  { name = "pending_density", offset = 144, type = "f32" },
+  { name = "pending_room_size", offset = 148, type = "f32" },
+  { name = "pending_i3dl2", offset = 152, type = "bytes", count = 48, note = "12 I3DL2 parameters pending (SetParameters kind 1)" },
+  { name = "run_pending_gain", offset = 184, type = "f32", note = "measure fault: Reverb::Run's r3 is the I3DL2 side (+16): its +184, the reverb's +200" },
+  { name = "run_gain_changed", offset = 188, type = "u8", note = "measure fault: Reverb::Run's: the I3DL2 side's +188 (the reverb's +204)" },
+  { name = "run_parameters_changed", offset = 189, type = "u8", note = "measure fault: Reverb::Run's: the I3DL2 side's +189" },
+  { name = "run_i3dl2_changed", offset = 190, type = "u8", note = "measure fault: Reverb::Run's: the I3DL2 side's +190" },
+  { name = "pending_gain", offset = 200, type = "f32", note = "SetParameters kind 2: the gain x 0.01 (probably)" },
+  { name = "gain_changed", offset = 204, type = "u8" },
+  { name = "parameters_changed", offset = 205, type = "u8" },
+  { name = "i3dl2_changed", offset = 206, type = "u8" },
+  { name = "lines_vtable", offset = 208, type = "u32", note = "ReverbCore's (0x8204A868)" },
+  { name = "time_spent", offset = 309920, type = "u64", note = "the passes' time (QueryPerformanceCounter); read by nothing found" },
+  { name = "passes", offset = 309928, type = "u64" },
+]
+
+# Reverb::SetParameters's r6.
+[ReverbParameterData]
+measure = "Reverb::SetParameters.r6"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "u32", note = "kinds 0 and 1: the parameters' address; kind 2: the gain (a float)" },
+]
+
+# ReverbCore::Process's input channels (in Reverb::Process's frame).
+[ReverbInputs]
+measure = "ReverbCore::Process.r4"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "left", offset = 0, type = "u32" },
+  { name = "right", offset = 4, type = "u32", note = "1,024 bytes on" },
+]
+
+# ReverbCore::Process's output channels (in Reverb::Process's frame: the
+# 6-channel buffer's 0, 1, 2, 4 and 5).
+[ReverbOutputs]
+measure = "ReverbCore::Process.r5"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "front_left", offset = 0, type = "u32", note = "probably (channel 0)" },
+  { name = "front_right", offset = 4, type = "u32", note = "probably (channel 1)" },
+  { name = "center", offset = 8, type = "u32", note = "probably (channel 2; not read)" },
+  { name = "back_left", offset = 12, type = "u32", note = "probably (channel 4)" },
+  { name = "back_right", offset = 16, type = "u32", note = "probably (channel 5)" },
+]
+
+# QueryPerformanceCounter's out word (the reverb's timers).
+[PerformanceCounterOut]
+measure = "QueryPerformanceCounter.r3"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "count", offset = 0, type = "u64" },
+]
+
+# A block of 256 floats (and one past) a reverb stage reads or writes:
+# the stages' buffers in ReverbCore::Process's frame (an array, not an
+# object: a byte run).
+[ReverbBlock]
+measures = ["sub_824624F8.r4", "sub_824624F8.r5", "sub_82462BC8.r4", "sub_82462BC8.r5", "sub_82462CF8.r4", "sub_82462CF8.r5", "sub_82462CF8.r6", "sub_82462DC8.r4", "sub_82463060.r4", "sub_82463060.r5", "sub_82463060.r6", "sub_82463130.r4", "sub_824632A0.r4", "sub_82463410.r4", "sub_82463410.r5", "sub_82463578.r4", "sub_82463578.r5", "sub_82463578.r6", "sub_82463620.r4", "sub_82463620.r5"]
+size = 1028
+origin = "embedded"
+fields = [
+  { name = "samples", offset = 0, type = "bytes", count = 1028 },
+]
+
+# A crossfading delay line's state (sub_824624F8, 16,384 entries; sub_82463620,
+# 256: the count below): the line after the header.
+[ReverbCrossfade]
+measure = "sub_82463620.r3"
+size = 1056
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "position", offset = 4, type = "f32", note = "the crossfade's position (1.0 down to 0.0)" },
+  { name = "tap_to", offset = 8, type = "u32", note = "the tap faded to" },
+  { name = "tap_from", offset = 12, type = "u32", note = "the tap faded from" },
+  { name = "tap_asked", offset = 16, type = "u32", note = "the tap asked for" },
+  { name = "last_output", offset = 20, type = "f32" },
+  { name = "write_index", offset = 24, type = "u32", note = "(FillDelayLine's: +0 the index, +4 the fill, then the line)" },
+  { name = "fill", offset = 28, type = "f32" },
+  { name = "line", offset = 32, type = "bytes", count = 1024, note = "the line's floats" },
+]
+
+# A one-pole low-pass (sub_82462BC8), its coefficients from FilterCoefficient.
+# Filed under ReverbCore by the measure until its offset fix (2026-11-22).
+[ReverbLowPass]
+measure = "sub_82462BC8.r3"
+size = 32
+origin = "embedded"
+fields = [
+  { name = "rate", offset = 0, type = "f32", note = "probably the sample rate (FilterCoefficient: +4 x 2 pi / +0, a cos's angle)" },
+  { name = "frequency", offset = 4, type = "f32", note = "probably the cutoff frequency" },
+  { name = "level_a", offset = 8, type = "f32", note = "a level FilterCoefficient sums with +12 (probably the room filter's main)" },
+  { name = "level_b", offset = 12, type = "f32", note = "probably the room filter's HF level" },
+  { name = "state", offset = 16, type = "f32" },
+  { name = "last_output", offset = 20, type = "f32" },
+  { name = "gain", offset = 24, type = "f32", note = "FilterCoefficient's" },
+  { name = "coefficient", offset = 28, type = "f32", note = "FilterCoefficient's (1 - it the input's weight)" },
+]
+
+# A three-tap delay line (sub_82462CF8, 512 entries; sub_82463060, 2,048:
+# the count below). Filed under ReverbCore until the measure's offset fix.
+[ReverbDelayLine]
+measures = ["sub_82462CF8.r3", "sub_82463060.r3"]
+size = 8236
+origin = "embedded"
+fields = [
+  { name = "tap_1", offset = 0, type = "u32", note = "out_a = the line at the write index less tap_2, x gain_2, + the line less tap_1, x gain_1 (fmadds)" },
+  { name = "gain_1", offset = 4, type = "f32" },
+  { name = "last_a", offset = 8, type = "f32", note = "out_a's first frame (the last block's)" },
+  { name = "tap_2", offset = 12, type = "u32" },
+  { name = "gain_2", offset = 16, type = "f32" },
+  { name = "unknown_20", offset = 20, type = "f32" },
+  { name = "tap_3", offset = 24, type = "u32", note = "out_b = tap 3 x gain_3" },
+  { name = "gain_3", offset = 28, type = "f32" },
+  { name = "last_b", offset = 32, type = "f32", note = "out_b's first frame" },
+  { name = "write_index", offset = 36, type = "u32" },
+  { name = "fill", offset = 40, type = "f32" },
+  { name = "line", offset = 44, type = "bytes", count = 8192, note = "the line's floats" },
+]
+
+# An all-pass (sub_82462DC8 128 entries, sub_82463130 256, sub_824632A0 and
+# sub_82463410 512: the count below).
+[ReverbAllPass]
+measure = "sub_824632A0.r3"
+measures = ["sub_82462DC8.r3", "sub_82463130.r3", "sub_82463410.r3"]
+size = 2072
+origin = "embedded"
+fields = [
+  { name = "tap", offset = 0, type = "u32", note = "the line read at the write index less it" },
+  { name = "gain_output", offset = 4, type = "f32", note = "the output: gain_output x v + d" },
+  { name = "gain_feedback", offset = 8, type = "f32", note = "v = gain_feedback x d + x, written to the line" },
+  { name = "last_output", offset = 12, type = "f32", note = "the output a frame late" },
+  { name = "write_index", offset = 16, type = "u32" },
+  { name = "fill", offset = 20, type = "f32" },
+  { name = "line", offset = 24, type = "bytes", count = 2048, note = "the line's floats" },
+]
+
+# A two-tap 1,024-entry delay line (sub_82463578). No measure name (filed
+# under ReverbCore).
+[ReverbDelay1024]
+size = 4128
+origin = "embedded"
+fields = [
+  { name = "tap_a", offset = 0, type = "u32", note = "out_a = the line at the write index less tap_a x gain_a" },
+  { name = "gain_a", offset = 4, type = "f32" },
+  { name = "last_a", offset = 8, type = "f32" },
+  { name = "tap_b", offset = 12, type = "u32", note = "out_b = ... tap_b x gain_b" },
+  { name = "gain_b", offset = 16, type = "f32" },
+  { name = "last_b", offset = 20, type = "f32" },
+  { name = "write_index", offset = 24, type = "u32" },
+  { name = "fill", offset = 28, type = "f32" },
+  { name = "line", offset = 32, type = "bytes", count = 4096, note = "the line's floats" },
+]
+
+# The reverb's delay lines and filters (the reverb's +208, the I3DL2
+# side's +192, "the core proper": ReverbCore::Init, Apply, Process;
+# vtable 0x8204A868): the native parameters applied (+4), the rate and
+# gains, then each input channel's early chain (reverb_core.h's stages,
+# by channel a and b), the frame-at-a-time network (167,544 to 299,311:
+# not read in detail, its words unknown), four all-passes and two
+# crossfading lines. The measure files the stages' own states
+# (sub_824624F8, sub_82462BC8, sub_82462CF8), ReverbCore::Defaults's
+# output and FilterCoefficient's filter here at offset 0 (measure fault):
+# their accesses land on the words below.
+[ReverbCore]
+measure = "ReverbCore"
+measures = ["ReverbCore::Init.r3", "ReverbCore::FilterCoefficient.r3"]
+size = 309712
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x8204A868 (ReverbCore::Init)" },
+  { name = "reflections_delay", offset = 4, type = "u32", note = "probably (XAudio2's names, in its order but rear_delay last)" },
+  { name = "reverb_delay", offset = 8, type = "u32" },
+  { name = "position_left", offset = 12, type = "u32" },
+  { name = "position_right", offset = 16, type = "u32" },
+  { name = "position_matrix_left", offset = 20, type = "u32" },
+  { name = "position_matrix_right", offset = 24, type = "u32" },
+  { name = "early_diffusion", offset = 28, type = "u32" },
+  { name = "late_diffusion", offset = 32, type = "u32" },
+  { name = "low_eq_gain", offset = 36, type = "u32" },
+  { name = "low_eq_cutoff", offset = 40, type = "u32" },
+  { name = "high_eq_gain", offset = 44, type = "u32" },
+  { name = "high_eq_cutoff", offset = 48, type = "u32" },
+  { name = "rear_delay", offset = 52, type = "u32" },
+  { name = "room_filter_freq", offset = 56, type = "f32" },
+  { name = "room_filter_main", offset = 60, type = "f32" },
+  { name = "room_filter_hf", offset = 64, type = "f32" },
+  { name = "reflections_gain", offset = 68, type = "f32" },
+  { name = "reverb_gain", offset = 72, type = "f32" },
+  { name = "decay_time", offset = 76, type = "f32" },
+  { name = "density", offset = 80, type = "f32" },
+  { name = "room_size", offset = 84, type = "f32", note = "probably" },
+  { name = "sample_rate", offset = 88, type = "u32", note = "the delays' lengths are the parameters times it (probably the rate)" },
+  { name = "gain", offset = 92, type = "f32", note = "ReverbCore::SetGain's (the reverb's +200 x 0.01); weights the outputs" },
+  { name = "chain_mix_level", offset = 96, type = "f32", note = "the two chains' mix scaled by it" },
+  { name = "stereo", offset = 100, type = "u32", note = "1: the first input channel twice; 2: the second twice; else both (SetStereo)" },
+  { name = "unknown_104", offset = 104, type = "f32" },
+  { name = "early_a_crossfade_position", offset = 108, type = "f32" },
+  { name = "early_a_crossfade_tap_to", offset = 112, type = "u32" },
+  { name = "early_a_crossfade_tap_from", offset = 116, type = "u32" },
+  { name = "early_a_crossfade_tap_asked", offset = 120, type = "u32" },
+  { name = "early_a_crossfade_last_output", offset = 124, type = "f32" },
+  { name = "early_a_crossfade_write_index", offset = 128, type = "u32" },
+  { name = "early_a_crossfade_fill", offset = 132, type = "f32" },
+  { name = "early_a_crossfade_line", offset = 136, type = "bytes", count = 65536 },
+  { name = "unknown_65672", offset = 65672, type = "f32" },
+  { name = "early_b_crossfade_position", offset = 65676, type = "f32" },
+  { name = "early_b_crossfade_tap_to", offset = 65680, type = "u32" },
+  { name = "early_b_crossfade_tap_from", offset = 65684, type = "u32" },
+  { name = "early_b_crossfade_tap_asked", offset = 65688, type = "u32" },
+  { name = "early_b_crossfade_last_output", offset = 65692, type = "f32" },
+  { name = "early_b_crossfade_write_index", offset = 65696, type = "u32" },
+  { name = "early_b_crossfade_fill", offset = 65700, type = "f32" },
+  { name = "early_b_crossfade_line", offset = 65704, type = "bytes", count = 65536 },
+  { name = "early_a_low_pass_rate", offset = 131240, type = "f32" },
+  { name = "early_a_low_pass_frequency", offset = 131244, type = "f32" },
+  { name = "early_a_low_pass_level_a", offset = 131248, type = "f32" },
+  { name = "early_a_low_pass_level_b", offset = 131252, type = "f32" },
+  { name = "early_a_low_pass_state", offset = 131256, type = "f32" },
+  { name = "early_a_low_pass_last_output", offset = 131260, type = "f32" },
+  { name = "early_a_low_pass_gain", offset = 131264, type = "f32" },
+  { name = "early_a_low_pass_coefficient", offset = 131268, type = "f32" },
+  { name = "early_b_low_pass_rate", offset = 131272, type = "f32" },
+  { name = "early_b_low_pass_frequency", offset = 131276, type = "f32" },
+  { name = "early_b_low_pass_level_a", offset = 131280, type = "f32" },
+  { name = "early_b_low_pass_level_b", offset = 131284, type = "f32" },
+  { name = "early_b_low_pass_state", offset = 131288, type = "f32" },
+  { name = "early_b_low_pass_last_output", offset = 131292, type = "f32" },
+  { name = "early_b_low_pass_gain", offset = 131296, type = "f32" },
+  { name = "early_b_low_pass_coefficient", offset = 131300, type = "f32" },
+  { name = "early_a_delay_512_tap_1", offset = 131312, type = "u32" },
+  { name = "early_a_delay_512_gain_1", offset = 131316, type = "f32" },
+  { name = "early_a_delay_512_last_a", offset = 131320, type = "f32" },
+  { name = "early_a_delay_512_tap_2", offset = 131324, type = "u32" },
+  { name = "early_a_delay_512_gain_2", offset = 131328, type = "f32" },
+  { name = "unknown_131332", offset = 131332, type = "f32" },
+  { name = "early_a_delay_512_tap_3", offset = 131336, type = "u32" },
+  { name = "early_a_delay_512_gain_3", offset = 131340, type = "f32" },
+  { name = "early_a_delay_512_last_b", offset = 131344, type = "f32" },
+  { name = "early_a_delay_512_write_index", offset = 131348, type = "u32" },
+  { name = "early_a_delay_512_fill", offset = 131352, type = "f32" },
+  { name = "early_a_delay_512_line", offset = 131356, type = "bytes", count = 2048 },
+  { name = "early_a_all_pass_128_tap", offset = 133404, type = "u32" },
+  { name = "early_a_all_pass_128_gain_output", offset = 133408, type = "f32" },
+  { name = "early_a_all_pass_128_gain_feedback", offset = 133412, type = "f32" },
+  { name = "early_a_all_pass_128_last_output", offset = 133416, type = "f32" },
+  { name = "early_a_all_pass_128_write_index", offset = 133420, type = "u32" },
+  { name = "early_a_all_pass_128_fill", offset = 133424, type = "f32" },
+  { name = "early_a_all_pass_128_line", offset = 133428, type = "bytes", count = 512 },
+  { name = "early_a_delay_2048_tap_1", offset = 133940, type = "u32" },
+  { name = "early_a_delay_2048_gain_1", offset = 133944, type = "f32" },
+  { name = "early_a_delay_2048_last_a", offset = 133948, type = "f32" },
+  { name = "early_a_delay_2048_tap_2", offset = 133952, type = "u32" },
+  { name = "early_a_delay_2048_gain_2", offset = 133956, type = "f32" },
+  { name = "unknown_133960", offset = 133960, type = "f32" },
+  { name = "early_a_delay_2048_tap_3", offset = 133964, type = "u32" },
+  { name = "early_a_delay_2048_gain_3", offset = 133968, type = "f32" },
+  { name = "early_a_delay_2048_last_b", offset = 133972, type = "f32" },
+  { name = "early_a_delay_2048_write_index", offset = 133976, type = "u32" },
+  { name = "early_a_delay_2048_fill", offset = 133980, type = "f32" },
+  { name = "early_a_delay_2048_line", offset = 133984, type = "bytes", count = 8192 },
+  { name = "early_a_all_pass_256_tap", offset = 142176, type = "u32" },
+  { name = "early_a_all_pass_256_gain_output", offset = 142180, type = "f32" },
+  { name = "early_a_all_pass_256_gain_feedback", offset = 142184, type = "f32" },
+  { name = "early_a_all_pass_256_last_output", offset = 142188, type = "f32" },
+  { name = "early_a_all_pass_256_write_index", offset = 142192, type = "u32" },
+  { name = "early_a_all_pass_256_fill", offset = 142196, type = "f32" },
+  { name = "early_a_all_pass_256_line", offset = 142200, type = "bytes", count = 1024 },
+  { name = "early_a_all_pass_512_tap", offset = 143224, type = "u32" },
+  { name = "early_a_all_pass_512_gain_output", offset = 143228, type = "f32" },
+  { name = "early_a_all_pass_512_gain_feedback", offset = 143232, type = "f32" },
+  { name = "early_a_all_pass_512_last_output", offset = 143236, type = "f32" },
+  { name = "early_a_all_pass_512_write_index", offset = 143240, type = "u32" },
+  { name = "early_a_all_pass_512_fill", offset = 143244, type = "f32" },
+  { name = "early_a_all_pass_512_line", offset = 143248, type = "bytes", count = 2048 },
+  { name = "early_a_delay_1024_tap_a", offset = 145296, type = "u32" },
+  { name = "early_a_delay_1024_gain_a", offset = 145300, type = "f32" },
+  { name = "early_a_delay_1024_last_a", offset = 145304, type = "f32" },
+  { name = "early_a_delay_1024_tap_b", offset = 145308, type = "u32" },
+  { name = "early_a_delay_1024_gain_b", offset = 145312, type = "f32" },
+  { name = "early_a_delay_1024_last_b", offset = 145316, type = "f32" },
+  { name = "early_a_delay_1024_write_index", offset = 145320, type = "u32" },
+  { name = "early_a_delay_1024_fill", offset = 145324, type = "f32" },
+  { name = "early_a_delay_1024_line", offset = 145328, type = "bytes", count = 4096 },
+  { name = "early_b_delay_512_tap_1", offset = 149432, type = "u32" },
+  { name = "early_b_delay_512_gain_1", offset = 149436, type = "f32" },
+  { name = "early_b_delay_512_last_a", offset = 149440, type = "f32" },
+  { name = "early_b_delay_512_tap_2", offset = 149444, type = "u32" },
+  { name = "early_b_delay_512_gain_2", offset = 149448, type = "f32" },
+  { name = "unknown_149452", offset = 149452, type = "f32" },
+  { name = "early_b_delay_512_tap_3", offset = 149456, type = "u32" },
+  { name = "early_b_delay_512_gain_3", offset = 149460, type = "f32" },
+  { name = "early_b_delay_512_last_b", offset = 149464, type = "f32" },
+  { name = "early_b_delay_512_write_index", offset = 149468, type = "u32" },
+  { name = "early_b_delay_512_fill", offset = 149472, type = "f32" },
+  { name = "early_b_delay_512_line", offset = 149476, type = "bytes", count = 2048 },
+  { name = "early_b_all_pass_128_tap", offset = 151524, type = "u32" },
+  { name = "early_b_all_pass_128_gain_output", offset = 151528, type = "f32" },
+  { name = "early_b_all_pass_128_gain_feedback", offset = 151532, type = "f32" },
+  { name = "early_b_all_pass_128_last_output", offset = 151536, type = "f32" },
+  { name = "early_b_all_pass_128_write_index", offset = 151540, type = "u32" },
+  { name = "early_b_all_pass_128_fill", offset = 151544, type = "f32" },
+  { name = "early_b_all_pass_128_line", offset = 151548, type = "bytes", count = 512 },
+  { name = "early_b_delay_2048_tap_1", offset = 152060, type = "u32" },
+  { name = "early_b_delay_2048_gain_1", offset = 152064, type = "f32" },
+  { name = "early_b_delay_2048_last_a", offset = 152068, type = "f32" },
+  { name = "early_b_delay_2048_tap_2", offset = 152072, type = "u32" },
+  { name = "early_b_delay_2048_gain_2", offset = 152076, type = "f32" },
+  { name = "unknown_152080", offset = 152080, type = "f32" },
+  { name = "early_b_delay_2048_tap_3", offset = 152084, type = "u32" },
+  { name = "early_b_delay_2048_gain_3", offset = 152088, type = "f32" },
+  { name = "early_b_delay_2048_last_b", offset = 152092, type = "f32" },
+  { name = "early_b_delay_2048_write_index", offset = 152096, type = "u32" },
+  { name = "early_b_delay_2048_fill", offset = 152100, type = "f32" },
+  { name = "early_b_delay_2048_line", offset = 152104, type = "bytes", count = 8192 },
+  { name = "early_b_all_pass_256_tap", offset = 160296, type = "u32" },
+  { name = "early_b_all_pass_256_gain_output", offset = 160300, type = "f32" },
+  { name = "early_b_all_pass_256_gain_feedback", offset = 160304, type = "f32" },
+  { name = "early_b_all_pass_256_last_output", offset = 160308, type = "f32" },
+  { name = "early_b_all_pass_256_write_index", offset = 160312, type = "u32" },
+  { name = "early_b_all_pass_256_fill", offset = 160316, type = "f32" },
+  { name = "early_b_all_pass_256_line", offset = 160320, type = "bytes", count = 1024 },
+  { name = "early_b_all_pass_512_tap", offset = 161344, type = "u32" },
+  { name = "early_b_all_pass_512_gain_output", offset = 161348, type = "f32" },
+  { name = "early_b_all_pass_512_gain_feedback", offset = 161352, type = "f32" },
+  { name = "early_b_all_pass_512_last_output", offset = 161356, type = "f32" },
+  { name = "early_b_all_pass_512_write_index", offset = 161360, type = "u32" },
+  { name = "early_b_all_pass_512_fill", offset = 161364, type = "f32" },
+  { name = "early_b_all_pass_512_line", offset = 161368, type = "bytes", count = 2048 },
+  { name = "early_b_delay_1024_tap_a", offset = 163416, type = "u32" },
+  { name = "early_b_delay_1024_gain_a", offset = 163420, type = "f32" },
+  { name = "early_b_delay_1024_last_a", offset = 163424, type = "f32" },
+  { name = "early_b_delay_1024_tap_b", offset = 163428, type = "u32" },
+  { name = "early_b_delay_1024_gain_b", offset = 163432, type = "f32" },
+  { name = "early_b_delay_1024_last_b", offset = 163436, type = "f32" },
+  { name = "early_b_delay_1024_write_index", offset = 163440, type = "u32" },
+  { name = "early_b_delay_1024_fill", offset = 163444, type = "f32" },
+  { name = "early_b_delay_1024_line", offset = 163448, type = "bytes", count = 4096 },
+  { name = "late_all_pass_1_tap", offset = 299312, type = "u32" },
+  { name = "late_all_pass_1_gain_output", offset = 299316, type = "f32" },
+  { name = "late_all_pass_1_gain_feedback", offset = 299320, type = "f32" },
+  { name = "late_all_pass_1_last_output", offset = 299324, type = "f32" },
+  { name = "late_all_pass_1_write_index", offset = 299328, type = "u32" },
+  { name = "late_all_pass_1_fill", offset = 299332, type = "f32" },
+  { name = "late_all_pass_1_line", offset = 299336, type = "bytes", count = 2048 },
+  { name = "late_all_pass_2_tap", offset = 301384, type = "u32" },
+  { name = "late_all_pass_2_gain_output", offset = 301388, type = "f32" },
+  { name = "late_all_pass_2_gain_feedback", offset = 301392, type = "f32" },
+  { name = "late_all_pass_2_last_output", offset = 301396, type = "f32" },
+  { name = "late_all_pass_2_write_index", offset = 301400, type = "u32" },
+  { name = "late_all_pass_2_fill", offset = 301404, type = "f32" },
+  { name = "late_all_pass_2_line", offset = 301408, type = "bytes", count = 2048 },
+  { name = "late_all_pass_3_tap", offset = 303456, type = "u32" },
+  { name = "late_all_pass_3_gain_output", offset = 303460, type = "f32" },
+  { name = "late_all_pass_3_gain_feedback", offset = 303464, type = "f32" },
+  { name = "late_all_pass_3_last_output", offset = 303468, type = "f32" },
+  { name = "late_all_pass_3_write_index", offset = 303472, type = "u32" },
+  { name = "late_all_pass_3_fill", offset = 303476, type = "f32" },
+  { name = "late_all_pass_3_line", offset = 303480, type = "bytes", count = 2048 },
+  { name = "late_all_pass_4_tap", offset = 305528, type = "u32" },
+  { name = "late_all_pass_4_gain_output", offset = 305532, type = "f32" },
+  { name = "late_all_pass_4_gain_feedback", offset = 305536, type = "f32" },
+  { name = "late_all_pass_4_last_output", offset = 305540, type = "f32" },
+  { name = "late_all_pass_4_write_index", offset = 305544, type = "u32" },
+  { name = "late_all_pass_4_fill", offset = 305548, type = "f32" },
+  { name = "late_all_pass_4_line", offset = 305552, type = "bytes", count = 2048 },
+  { name = "unknown_307600", offset = 307600, type = "f32" },
+  { name = "late_crossfade_1_position", offset = 307604, type = "f32" },
+  { name = "late_crossfade_1_tap_to", offset = 307608, type = "u32" },
+  { name = "late_crossfade_1_tap_from", offset = 307612, type = "u32" },
+  { name = "late_crossfade_1_tap_asked", offset = 307616, type = "u32" },
+  { name = "late_crossfade_1_last_output", offset = 307620, type = "f32" },
+  { name = "late_crossfade_1_write_index", offset = 307624, type = "u32" },
+  { name = "late_crossfade_1_fill", offset = 307628, type = "f32" },
+  { name = "late_crossfade_1_line", offset = 307632, type = "bytes", count = 1024 },
+  { name = "unknown_308656", offset = 308656, type = "f32" },
+  { name = "late_crossfade_2_position", offset = 308660, type = "f32" },
+  { name = "late_crossfade_2_tap_to", offset = 308664, type = "u32" },
+  { name = "late_crossfade_2_tap_from", offset = 308668, type = "u32" },
+  { name = "late_crossfade_2_tap_asked", offset = 308672, type = "u32" },
+  { name = "late_crossfade_2_last_output", offset = 308676, type = "f32" },
+  { name = "late_crossfade_2_write_index", offset = 308680, type = "u32" },
+  { name = "late_crossfade_2_fill", offset = 308684, type = "f32" },
+  { name = "late_crossfade_2_line", offset = 308688, type = "bytes", count = 1024 },
+  { name = "chain_mix_gain_1", offset = 131304, type = "f32", note = "the chains' mix gains (Process reads +0x247B0, +0x200EC, +0x247B4, +0x200E8)" },
+  { name = "chain_mix_gain_2", offset = 131308, type = "f32" },
+  { name = "chain_mix_gain_3", offset = 149424, type = "f32" },
+  { name = "chain_mix_gain_4", offset = 149428, type = "f32" },
+  { name = "unknown_167544", offset = 167544, type = "u32" },
+  { name = "unknown_167548", offset = 167548, type = "f32" },
+  { name = "unknown_167552", offset = 167552, type = "f32" },
+  { name = "unknown_167556", offset = 167556, type = "f32" },
+  { name = "unknown_167560", offset = 167560, type = "u32" },
+  { name = "unknown_167564", offset = 167564, type = "f32" },
+  { name = "unknown_169616", offset = 169616, type = "u32" },
+  { name = "unknown_169620", offset = 169620, type = "f32" },
+  { name = "unknown_169624", offset = 169624, type = "f32" },
+  { name = "unknown_169628", offset = 169628, type = "f32" },
+  { name = "unknown_169632", offset = 169632, type = "u32" },
+  { name = "unknown_169636", offset = 169636, type = "f32" },
+  { name = "unknown_171688", offset = 171688, type = "u32" },
+  { name = "unknown_171692", offset = 171692, type = "f32" },
+  { name = "unknown_171696", offset = 171696, type = "f32" },
+  { name = "unknown_171700", offset = 171700, type = "f32" },
+  { name = "unknown_171704", offset = 171704, type = "f32" },
+  { name = "unknown_171708", offset = 171708, type = "f32" },
+  { name = "unknown_171712", offset = 171712, type = "u32" },
+  { name = "unknown_171716", offset = 171716, type = "f32" },
+  { name = "unknown_171720", offset = 171720, type = "f32" },
+  { name = "unknown_171724", offset = 171724, type = "f32" },
+  { name = "unknown_171728", offset = 171728, type = "f32" },
+  { name = "unknown_171732", offset = 171732, type = "f32" },
+  { name = "unknown_171736", offset = 171736, type = "f32" },
+  { name = "unknown_171740", offset = 171740, type = "f32" },
+  { name = "unknown_171744", offset = 171744, type = "u32" },
+  { name = "unknown_171748", offset = 171748, type = "f32" },
+  { name = "unknown_171752", offset = 171752, type = "f32" },
+  { name = "unknown_171756", offset = 171756, type = "f32" },
+  { name = "unknown_171760", offset = 171760, type = "f32" },
+  { name = "unknown_171764", offset = 171764, type = "f32" },
+  { name = "unknown_171768", offset = 171768, type = "f32" },
+  { name = "unknown_171772", offset = 171772, type = "u32" },
+  { name = "unknown_171776", offset = 171776, type = "f32" },
+  { name = "unknown_171780", offset = 171780, type = "f32" },
+  { name = "unknown_171784", offset = 171784, type = "u32" },
+  { name = "unknown_171788", offset = 171788, type = "f32" },
+  { name = "unknown_171792", offset = 171792, type = "f32" },
+  { name = "unknown_171796", offset = 171796, type = "u32" },
+  { name = "unknown_171800", offset = 171800, type = "f32" },
+  { name = "unknown_188188", offset = 188188, type = "u32" },
+  { name = "unknown_188192", offset = 188192, type = "f32" },
+  { name = "unknown_188196", offset = 188196, type = "f32" },
+  { name = "unknown_188200", offset = 188200, type = "f32" },
+  { name = "unknown_188204", offset = 188204, type = "f32" },
+  { name = "unknown_188208", offset = 188208, type = "f32" },
+  { name = "unknown_188212", offset = 188212, type = "u32" },
+  { name = "unknown_188216", offset = 188216, type = "f32" },
+  { name = "unknown_188220", offset = 188220, type = "f32" },
+  { name = "unknown_188224", offset = 188224, type = "f32" },
+  { name = "unknown_188228", offset = 188228, type = "u32" },
+  { name = "unknown_188232", offset = 188232, type = "f32" },
+  { name = "unknown_190284", offset = 190284, type = "u32" },
+  { name = "unknown_190288", offset = 190288, type = "f32" },
+  { name = "unknown_190292", offset = 190292, type = "f32" },
+  { name = "unknown_190296", offset = 190296, type = "f32" },
+  { name = "unknown_190300", offset = 190300, type = "u32" },
+  { name = "unknown_190304", offset = 190304, type = "f32" },
+  { name = "unknown_192356", offset = 192356, type = "u32" },
+  { name = "unknown_192360", offset = 192360, type = "f32" },
+  { name = "unknown_192364", offset = 192364, type = "f32" },
+  { name = "unknown_192368", offset = 192368, type = "f32" },
+  { name = "unknown_192372", offset = 192372, type = "f32" },
+  { name = "unknown_192376", offset = 192376, type = "f32" },
+  { name = "unknown_192380", offset = 192380, type = "u32" },
+  { name = "unknown_192384", offset = 192384, type = "f32" },
+  { name = "unknown_192388", offset = 192388, type = "f32" },
+  { name = "unknown_192392", offset = 192392, type = "f32" },
+  { name = "unknown_192396", offset = 192396, type = "f32" },
+  { name = "unknown_192400", offset = 192400, type = "f32" },
+  { name = "unknown_192404", offset = 192404, type = "f32" },
+  { name = "unknown_192408", offset = 192408, type = "f32" },
+  { name = "unknown_192412", offset = 192412, type = "u32" },
+  { name = "unknown_192416", offset = 192416, type = "f32" },
+  { name = "unknown_192420", offset = 192420, type = "f32" },
+  { name = "unknown_192424", offset = 192424, type = "f32" },
+  { name = "unknown_192428", offset = 192428, type = "f32" },
+  { name = "unknown_192432", offset = 192432, type = "f32" },
+  { name = "unknown_192436", offset = 192436, type = "f32" },
+  { name = "unknown_192440", offset = 192440, type = "u32" },
+  { name = "unknown_192444", offset = 192444, type = "f32" },
+  { name = "unknown_192448", offset = 192448, type = "f32" },
+  { name = "unknown_192452", offset = 192452, type = "u32" },
+  { name = "unknown_192456", offset = 192456, type = "f32" },
+  { name = "unknown_192460", offset = 192460, type = "f32" },
+  { name = "unknown_192464", offset = 192464, type = "u32" },
+  { name = "unknown_192468", offset = 192468, type = "f32" },
+  { name = "unknown_208856", offset = 208856, type = "u32" },
+  { name = "unknown_208860", offset = 208860, type = "f32" },
+  { name = "unknown_208864", offset = 208864, type = "f32" },
+  { name = "unknown_208868", offset = 208868, type = "f32" },
+  { name = "unknown_208872", offset = 208872, type = "f32" },
+  { name = "unknown_208876", offset = 208876, type = "f32" },
+  { name = "unknown_208880", offset = 208880, type = "u32" },
+  { name = "unknown_208884", offset = 208884, type = "f32" },
+  { name = "unknown_208888", offset = 208888, type = "f32" },
+  { name = "unknown_208892", offset = 208892, type = "f32" },
+  { name = "unknown_208896", offset = 208896, type = "u32" },
+  { name = "unknown_208900", offset = 208900, type = "f32" },
+  { name = "unknown_217096", offset = 217096, type = "u32" },
+  { name = "unknown_217100", offset = 217100, type = "f32" },
+  { name = "unknown_217104", offset = 217104, type = "f32" },
+  { name = "unknown_217108", offset = 217108, type = "f32" },
+  { name = "unknown_217112", offset = 217112, type = "f32" },
+  { name = "unknown_217116", offset = 217116, type = "u32" },
+  { name = "unknown_217120", offset = 217120, type = "f32" },
+  { name = "unknown_225316", offset = 225316, type = "u32" },
+  { name = "unknown_225320", offset = 225320, type = "f32" },
+  { name = "unknown_225324", offset = 225324, type = "f32" },
+  { name = "unknown_225328", offset = 225328, type = "f32" },
+  { name = "unknown_225332", offset = 225332, type = "u32" },
+  { name = "unknown_225336", offset = 225336, type = "f32" },
+  { name = "unknown_233532", offset = 233532, type = "u32" },
+  { name = "unknown_233536", offset = 233536, type = "f32" },
+  { name = "unknown_233540", offset = 233540, type = "f32" },
+  { name = "unknown_233544", offset = 233544, type = "f32" },
+  { name = "unknown_233548", offset = 233548, type = "u32" },
+  { name = "unknown_233552", offset = 233552, type = "f32" },
+  { name = "unknown_237652", offset = 237652, type = "u32" },
+  { name = "unknown_237656", offset = 237656, type = "f32" },
+  { name = "unknown_237660", offset = 237660, type = "f32" },
+  { name = "unknown_237664", offset = 237664, type = "u32" },
+  { name = "unknown_237668", offset = 237668, type = "f32" },
+  { name = "unknown_237672", offset = 237672, type = "f32" },
+  { name = "unknown_237676", offset = 237676, type = "u32" },
+  { name = "unknown_237680", offset = 237680, type = "f32" },
+  { name = "unknown_254068", offset = 254068, type = "u32" },
+  { name = "unknown_254072", offset = 254072, type = "f32" },
+  { name = "unknown_254076", offset = 254076, type = "f32" },
+  { name = "unknown_254080", offset = 254080, type = "f32" },
+  { name = "unknown_254084", offset = 254084, type = "f32" },
+  { name = "unknown_254088", offset = 254088, type = "f32" },
+  { name = "unknown_254092", offset = 254092, type = "f32" },
+  { name = "unknown_254096", offset = 254096, type = "u32" },
+  { name = "unknown_254100", offset = 254100, type = "f32" },
+  { name = "unknown_254104", offset = 254104, type = "f32" },
+  { name = "unknown_254108", offset = 254108, type = "f32" },
+  { name = "unknown_254112", offset = 254112, type = "u32" },
+  { name = "unknown_254116", offset = 254116, type = "f32" },
+  { name = "unknown_262312", offset = 262312, type = "u32" },
+  { name = "unknown_262316", offset = 262316, type = "f32" },
+  { name = "unknown_262320", offset = 262320, type = "f32" },
+  { name = "unknown_262324", offset = 262324, type = "f32" },
+  { name = "unknown_262328", offset = 262328, type = "f32" },
+  { name = "unknown_262332", offset = 262332, type = "u32" },
+  { name = "unknown_262336", offset = 262336, type = "f32" },
+  { name = "unknown_270532", offset = 270532, type = "u32" },
+  { name = "unknown_270536", offset = 270536, type = "f32" },
+  { name = "unknown_270540", offset = 270540, type = "f32" },
+  { name = "unknown_270544", offset = 270544, type = "f32" },
+  { name = "unknown_270548", offset = 270548, type = "u32" },
+  { name = "unknown_270552", offset = 270552, type = "f32" },
+  { name = "unknown_278748", offset = 278748, type = "u32" },
+  { name = "unknown_278752", offset = 278752, type = "f32" },
+  { name = "unknown_278756", offset = 278756, type = "f32" },
+  { name = "unknown_278760", offset = 278760, type = "f32" },
+  { name = "unknown_278764", offset = 278764, type = "u32" },
+  { name = "unknown_278768", offset = 278768, type = "f32" },
+  { name = "unknown_282868", offset = 282868, type = "u32" },
+  { name = "unknown_282872", offset = 282872, type = "f32" },
+  { name = "unknown_282876", offset = 282876, type = "f32" },
+  { name = "unknown_282880", offset = 282880, type = "u32" },
+  { name = "unknown_282884", offset = 282884, type = "f32" },
+  { name = "unknown_282888", offset = 282888, type = "f32" },
+  { name = "unknown_282892", offset = 282892, type = "u32" },
+  { name = "unknown_282896", offset = 282896, type = "f32" },
+  { name = "unknown_299284", offset = 299284, type = "u32" },
+  { name = "unknown_299288", offset = 299288, type = "f32" },
+  { name = "unknown_299292", offset = 299292, type = "f32" },
+  { name = "unknown_299296", offset = 299296, type = "f32" },
+  { name = "unknown_299300", offset = 299300, type = "f32" },
+  { name = "unknown_299304", offset = 299304, type = "f32" },
+  { name = "unknown_299308", offset = 299308, type = "f32" },
+]
+
+# Class 5's effect (332 bytes; sub_825A5DB8, sub_825A5CC0; not seen in play, not read).
+[Effect5]
+measures = ["sub_825A5BF0.r3", "sub_825A5CC0.r3"]
+size = 332
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "probably" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_292", offset = 292, type = "u32" },
+]
+
+# Class 6's effect (2,092 bytes; sub_825A50E0 over sub_825A5020; not seen in play, not read).
+[Effect6]
+measure = "sub_825A5020.r3"
+size = 2092
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "probably" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_2060", offset = 2060, type = "u32" },
+]
+
+# The image words the area's code reads (XAudio's own; the compiler's shared
+# float constants at 0x82000000-0x82005FFF are left out).
+[globals]
+reverb_reflections_delay_limit = { address = 0x8204ABFC, type = "u32", note = "I3dl2::ToNative clamps the reflections delay below it" }
+reverb_reverb_delay_limit = { address = 0x8204AC00, type = "u32", note = "I3dl2::ToNative clamps the reverb delay below it" }
+reverb_default_position = { address = 0x8204AC04, type = "u32", note = "I3dl2::ToNative's position left and right" }
+reverb_default_position_matrix = { address = 0x8204AC08, type = "u32", note = "I3dl2::ToNative's position matrix left and right" }
+reverb_default_rear_delay = { address = 0x8204AC0C, type = "u32" }
+reverb_default_room_filter_freq = { address = 0x8204AC10, type = "f32", note = "ReverbCore::Defaults's first float" }
+reverb_default_gain = { address = 0x8204AC14, type = "f32", note = "0.0 (probably): the room filter's, reflections' and reverb's default gains; FilterCoefficient's zero" }
+reverb_default_decay_time = { address = 0x8204AC18, type = "f32", note = "1.0 (probably; FilterCoefficient's one)" }
+reverb_default_density = { address = 0x8204AC1C, type = "f32", note = "also the room size" }
+reverb_room_size_scale = { address = 0x8204AA80, type = "f32", note = "Reverb::SetParameters's room size scale" }
+filter_limit = { address = 0x8204B8B0, type = "f32", note = "FilterCoefficient: a gain at or above it skips the cos" }
+two_pi = { address = 0x8204B8B8, type = "f64", note = "probably (FilterCoefficient's angle)" }
+decay_scale_low = { address = 0x8204B938, type = "f64", note = "the decay HF ratio's step scale below 1" }
+decay_scale_high = { address = 0x8204B940, type = "f64", note = "the decay HF ratio's step scale from 1" }
+codec_info_halfword = { address = 0x8204B950, type = "u16", note = "10: the codecs' info half-word and the stop's fade passes" }
+fade_step = { address = 0x8204B954, type = "f32", note = "0.5: a stopping codec's volume each pass" }
+sample_bytes = { address = 0x8204BBC0, type = "bytes", count = 16, note = "bytes a sample by the format type (words: 4, 2, 1, 2)" }
+primes = { address = 0x8204BBD0, type = "bytes", count = 4916, note = "LargestPrimeBelow's 1,229 primes (words)" }
+resampler_kernels = { address = 0x8204CF08, type = "bytes", count = 400, note = "Resampler::Process's 100 kernels (words)" }
+meter_threshold = { address = 0x82072298, type = "f32", note = "VolumeMeter::Process: samples past it counted" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from I3dl2Reverb.
+[I3dl2ReverbAt4]
+measure = "Reverb@+16@+4"
+size = 48
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+  { name = "unknown_16", offset = 16, type = "f32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "f32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_32", offset = 32, type = "f32" },
+  { name = "unknown_36", offset = 36, type = "f32" },
+  { name = "unknown_40", offset = 40, type = "f32" },
+  { name = "unknown_44", offset = 44, type = "f32" },
+]
+
+# Split from Reverb.
+[ReverbAt52]
+measure = "Reverb@+16@+52"
+size = 84
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_32", offset = 32, type = "u32" },
+  { name = "unknown_36", offset = 36, type = "u32" },
+  { name = "unknown_40", offset = 40, type = "u32" },
+  { name = "unknown_44", offset = 44, type = "u32" },
+  { name = "unknown_48", offset = 48, type = "u32" },
+  { name = "unknown_52", offset = 52, type = "f32" },
+  { name = "unknown_56", offset = 56, type = "f32" },
+  { name = "unknown_60", offset = 60, type = "f32" },
+  { name = "unknown_64", offset = 64, type = "f32" },
+  { name = "unknown_68", offset = 68, type = "f32" },
+  { name = "unknown_72", offset = 72, type = "f32" },
+  { name = "unknown_76", offset = 76, type = "f32" },
+  { name = "unknown_80", offset = 80, type = "f32" },
+]
+
+# What the eight fills (sub_82467720 to sub_82467990, from ReverbCore::Init)
+# are handed: a delay line's or crossfade's write index and what follows it
+# (ReverbDelayLine +36, ReverbCrossfade +24). Filed under ReverbCore until
+# the measure's offset fix (2026-11-22).
+[ReverbLineFill]
+measure = "sub_82467720.r3"
+measures = ["sub_82467788.r3", "sub_824677F0.r3", "sub_82467858.r3", "sub_824678C0.r3", "sub_82467928.r3", "sub_82467990.r3"]
+size = 8
+origin = "embedded"
+fields = [
+  { name = "write_index", offset = 0, type = "u32", note = "set to 0" },
+  { name = "fill", offset = 4, type = "f32", note = "the value the line is filled with" },
+  { name = "line", offset = 8, type = "bytes", count = 32, note = "the line's floats (stored eight at a time)" },
+]
+
+# A stage of ReverbCore::Process (sub_824624F8; probably the early
+# reflections' taps). Not read in detail. Filed under ReverbCore until the
+# measure's offset fix (2026-11-22).
+[ReverbEarlyStage]
+measure = "sub_824624F8.r3"
+size = 28
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "f32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+]
+
+# A stage of ReverbCore::Process (sub_82463578): a 256-frame delay line with
+# two taps and gains, its write index +24. Not read in detail. Filed under
+# ReverbCore until the measure's offset fix (2026-11-22).
+[ReverbTwoTapLine]
+measure = "sub_82463578.r3"
+size = 28
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "f32" },
+  { name = "unknown_20", offset = 20, type = "f32" },
+  { name = "write_index", offset = 24, type = "u32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from ReverbCore.
+[ReverbCoreAt68]
+measure = "Reverb@+68"
+size = 84
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_32", offset = 32, type = "u32" },
+  { name = "unknown_36", offset = 36, type = "u32" },
+  { name = "unknown_40", offset = 40, type = "u32" },
+  { name = "unknown_44", offset = 44, type = "u32" },
+  { name = "unknown_48", offset = 48, type = "u32" },
+  { name = "unknown_52", offset = 52, type = "f32" },
+  { name = "unknown_56", offset = 56, type = "f32" },
+  { name = "unknown_60", offset = 60, type = "f32" },
+  { name = "unknown_64", offset = 64, type = "f32" },
+  { name = "unknown_68", offset = 68, type = "f32" },
+  { name = "unknown_72", offset = 72, type = "f32" },
+  { name = "unknown_76", offset = 76, type = "f32" },
+  { name = "unknown_80", offset = 80, type = "f32" },
+]
+
+# Split from CodecBase.
+[CodecBaseAt12]
+measure = "XAudioCodec::Construct.ret@+12"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from CodecBase.
+[CodecBaseAt12_2]
+measure = "XAudioCodec::Init.r3@+12"
+size = 157
+origin = "embedded"
+fields = [
+  { name = "unknown_92", offset = 92, type = "u16" },
+  { name = "unknown_94", offset = 94, type = "u16" },
+  { name = "unknown_96", offset = 96, type = "f32" },
+  { name = "unknown_100", offset = 100, type = "f32" },
+  { name = "unknown_152", offset = 152, type = "u32" },
+  { name = "unknown_156", offset = 156, type = "u8" },
+]
+
+# Split from Reverb.
+[ReverbOuter4]
+measure = "sub_82465410.r3@-4"
+size = 212
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_208", offset = 208, type = "u32" },
+]
+
+# Split from I3dl2ReverbVtable.
+[I3dl2ReverbVtablePart]
+measure = "sub_82465410.r3@-4.+16"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+]
+
+# Split from XAudioMatrix.
+[XAudioMatrixOuter4]
+measure = "sub_82465BD8.r3@-4"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+]
+
+# Split from XmaCodec.
+[XmaCodecOuter16]
+measure = "sub_8246A908.r3@-16"
+size = 267
+origin = "embedded"
+fields = [
+  { name = "unknown_266", offset = 266, type = "u8" },
+]
+
+# Split from XmaCodec.
+[XmaCodecOuter16_2]
+measure = "sub_8246A910.r3@-16"
+size = 267
+origin = "embedded"
+fields = [
+  { name = "unknown_266", offset = 266, type = "u8" },
+]
+
+# Split from XAudioCodec.
+[XAudioCodecOuter16]
+measure = "sub_8246B418.r3@-16"
+size = 173
+origin = "embedded"
+fields = [
+  { name = "unknown_172", offset = 172, type = "u8" },
+]
+
+# Split from XmaCodec.
+[XmaCodecOuter16_3]
+measure = "sub_8246B420.r3@-16"
+size = 192
+origin = "embedded"
+fields = [
+  { name = "unknown_56", offset = 56, type = "u8" },
+  { name = "unknown_112", offset = 112, type = "f32" },
+  { name = "unknown_188", offset = 188, type = "u32" },
+]
+
+# Split from XmaCodec.
+[XmaCodecOuter16_4]
+measure = "sub_8246B438.r3@-16"
+size = 192
+origin = "embedded"
+fields = [
+  { name = "unknown_56", offset = 56, type = "u8" },
+  { name = "unknown_116", offset = 116, type = "f32" },
+  { name = "unknown_188", offset = 188, type = "u32" },
+]
+
+# Split from CodecBase.
+[CodecBaseAt16]
+measure = "sub_8246CEC0.r3@+16"
+size = 94
+origin = "embedded"
+fields = [
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "unknown_32", offset = 32, type = "u32" },
+  { name = "unknown_92", offset = 92, type = "u16" },
+]
+
+# Split from PcmCodec.
+[PcmCodecOuter16]
+measure = "sub_8246D2F0.r3@-16"
+size = 228
+origin = "embedded"
+fields = [
+  { name = "unknown_112", offset = 112, type = "f32" },
+  { name = "unknown_224", offset = 224, type = "f32" },
+]
+
+# Split from XAudioObject.
+[XAudioObjectOuter4]
+measure = "sub_8246D308.r3@-4"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Split from PcmCodec.
+[PcmCodecOuter16_2]
+measure = "sub_8246D310.r3@-16"
+size = 268
+origin = "embedded"
+fields = [
+  { name = "unknown_52", offset = 52, type = "u8" },
+  { name = "unknown_56", offset = 56, type = "u8" },
+  { name = "unknown_60", offset = 60, type = "u32" },
+  { name = "unknown_116", offset = 116, type = "f32" },
+  { name = "unknown_196", offset = 196, type = "u8" },
+  { name = "unknown_197", offset = 197, type = "u8" },
+  { name = "unknown_264", offset = 264, type = "u32" },
+]
+
+# Split from PcmCodec.
+[PcmCodecOuter16_3]
+measure = "sub_8246D320.r3@-16"
+size = 268
+origin = "embedded"
+fields = [
+  { name = "unknown_52", offset = 52, type = "u8" },
+  { name = "unknown_56", offset = 56, type = "u8" },
+  { name = "unknown_60", offset = 60, type = "u32" },
+  { name = "unknown_116", offset = 116, type = "f32" },
+  { name = "unknown_196", offset = 196, type = "u8" },
+  { name = "unknown_197", offset = 197, type = "u8" },
+  { name = "unknown_264", offset = 264, type = "u32" },
+]
+
+# Split from PcmCodec.
+[PcmCodecOuter16_4]
+measure = "sub_8246D338.r3@-16"
+size = 198
+origin = "embedded"
+fields = [
+  { name = "unknown_108", offset = 108, type = "u16" },
+  { name = "unknown_110", offset = 110, type = "u16" },
+  { name = "unknown_196", offset = 196, type = "u8" },
+  { name = "unknown_197", offset = 197, type = "u8" },
+]
+
+# Split from XAudioCodec.
+[XAudioCodecOuter16_2]
+measure = "sub_8246D738.r3@-16"
+size = 32
+origin = "embedded"
+fields = [
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+]
+
+# Split from PcmCodec.
+[PcmCodecOuter16_5]
+measure = "sub_8246D740.r3@-16"
+size = 176
+origin = "embedded"
+fields = [
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_172", offset = 172, type = "u8" },
+  { name = "unknown_174", offset = 174, type = "u16" },
+]
+
+# Split from CodecBaseVtable.
+[CodecBaseVtablePart]
+measure = "sub_8246D740.r3@-16.+16"
+size = 88
+origin = "embedded"
+fields = [
+  { name = "unknown_84", offset = 84, type = "u32" },
+]
+
+# Split from PcmCodec.
+[PcmCodecOuter16_6]
+measure = "sub_8246D748.r3@-16"
+size = 173
+origin = "embedded"
+fields = [
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_172", offset = 172, type = "u8" },
+]
+
+# Split from CodecBaseVtable.
+[CodecBaseVtablePart_2]
+measure = "sub_8246D748.r3@-16.+16"
+size = 88
+origin = "embedded"
+fields = [
+  { name = "unknown_84", offset = 84, type = "u32" },
+]

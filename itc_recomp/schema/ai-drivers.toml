@@ -1,0 +1,679 @@
+# The schema of docs/functions/ai-drivers.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The AI drivers: a table of 7 drivers of 6,160 bytes at [0x826C6074], each
+# with its path (+512: a ring of 80 entries and up to 8 corner records), its
+# records of the other racers (+172) and its skill (+6048); the course
+# route's corners and slices as the drivers read them (layouts in
+# docs/known-data.md: "AI driver", "AI path", "AI corner record", "AI
+# other-racer record", "AI skill", "car input record", and the course's route
+# at 0x826C5B10). Names and meanings are mostly guesses, as in the docs.
+#
+# Fields named `fault_*` are accesses the measure files under the type
+# though they're another object's (a measure fault, reported to the lead):
+# kept so the check passes, to be dropped when the measure is fixed.
+#
+# Left out (not objects): the measure's 4-byte types of a float or word
+# passed by address (`AiDriver::LimitSpeed.r4`, `Angle`, `AiPath::SpreadOffset.r5`
+# and the like: stack slots of the callers' frames or constants) and the
+# 2-byte route positions passed by address (`AiPath::NormalizeByLane.r5`),
+# which are RoutePosition's.
+
+[AiDriver]
+measure = "AiDriver"
+measures = ["AiDriver::Of.ret", "[826C6074]", "sub_8213A200.r3", "sub_82138FA8.r3", "sub_82139A08.r3", "sub_8213F868.ret", "sub_8213F7E0.r3", "sub_8213F868.r3", "AiOther::Mirror.r4", "AiPath::JoinCorners.r5.+0", "AiPath::ChooseSideForOther.r5", "AiPath::JoinCornerPair.r5.+0", "AiDriver::Setup.r3"]
+size = 6160
+origin = "allocated"
+fields = [
+  { name = "index", offset = 0, type = "u32", note = "the racer's index (the driver's in the table)" },
+  { name = "fault_corner_count", offset = 0, type = "u16", note = "measure fault: a route corner's +0 (AiPath::JoinCorners, KeepBranch, TrackRoute::LocateAt)" },
+  { name = "route_position", offset = 4, type = "u32", note = "the route position (section, slice) as one word (-1 none)" },
+  { name = "route_section", offset = 4, type = "u16" },
+  { name = "route_slice", offset = 6, type = "u16" },
+  { name = "lane", offset = 8, type = "u16", note = "the lane (AiDriver::UpdateLane; -1 none)" },
+  { name = "fault_point_z", offset = 8, type = "f32", note = "measure fault: a point's z or a record's +8 (AiOther::Mirror, AiPath::DropPassed, Extend, LeftEntry, TargetPoint)" },
+  { name = "cruise_speed", offset = 12, type = "f32", note = "a speed: 73.0, or the skill's +4 (500.0 when cleared)" },
+  { name = "flags", offset = 16, type = "u32", note = "bit 1 the vehicle's box +114, bit 2 set by AiDriver::StartRace, bit 5 stuck (reversing)" },
+  { name = "fault_input_kind", offset = 17, type = "u8", note = "measure fault: a car input record's +17 (AiDriver::DriveCar)" },
+  { name = "fault_corner_speed", offset = 20, type = "f32", note = "measure fault: a corner record's +20 (AiDriver::LimitForCorner) or an other-racer record's +20 (AiOther::Mirror)" },
+  { name = "fault_other_state", offset = 24, type = "u16", note = "measure fault: an other-racer record's +24 (AiOther::Mirror, AiPath::ChooseSideForOther)" },
+  { name = "fault_other_ring_index", offset = 26, type = "u16", note = "measure fault: an other-racer record's +26 (AiPath::ChooseSideForOther)" },
+  { name = "fault_corner_slope", offset = 28, type = "f32", note = "measure fault: a corner's +28 (AiPath::JoinCorners)" },
+  { name = "plan", offset = 32, type = "bytes", count = 48, note = "the 48 bytes AiDriver::ClearPlan sets to their defaults (+32 to +79)" },
+  { name = "state", offset = 32, type = "u32", note = "0 to 6" },
+  { name = "fault_other_flag_a", offset = 32, type = "u8", note = "measure fault: an other-racer record's +32 (AiOther::Mirror)" },
+  { name = "fault_other_flag_b", offset = 33, type = "u8", note = "measure fault: an other-racer record's +33 (AiOther::Mirror)" },
+  { name = "previous_state", offset = 36, type = "u32" },
+  { name = "racer_mask", offset = 40, type = "u16", note = "a mask of racers (the ones to chase or hold off)" },
+  { name = "plan_word", offset = 42, type = "u32", note = "-1 when cleared (written as a word at a halfword's alignment)" },
+  { name = "plan_point_a", offset = 48, type = "bytes", count = 16, note = "four floats, the last 1.0 when cleared" },
+  { name = "plan_a_x", offset = 48, type = "f32" },
+  { name = "plan_a_y", offset = 52, type = "f32" },
+  { name = "fault_corner_apex", offset = 52, type = "u16", note = "measure fault: a route corner's +52 (AiPath::CornerToApex, JoinCorners)" },
+  { name = "fault_corner_exit", offset = 54, type = "u16", note = "measure fault: a route corner's +54 (AiPath::CornerToExit, JoinCorners)" },
+  { name = "plan_a_z", offset = 56, type = "f32" },
+  { name = "plan_a_w", offset = 60, type = "f32" },
+  { name = "plan_b_x", offset = 64, type = "f32", note = "four floats, the last 1.0 when cleared" },
+  { name = "plan_b_y", offset = 68, type = "f32" },
+  { name = "plan_b_z", offset = 72, type = "f32" },
+  { name = "plan_b_w", offset = 76, type = "f32" },
+  { name = "point_x", offset = 80, type = "f32", note = "the car's point (its track position's), w 1.0" },
+  { name = "point_xy", offset = 80, type = "u64", note = "x and y copied as one doubleword (AiDriver::ReadVehicle)" },
+  { name = "point_y", offset = 84, type = "f32" },
+  { name = "point_z", offset = 88, type = "f32" },
+  { name = "point_zw", offset = 88, type = "u64", note = "z and w copied as one doubleword (AiDriver::ReadVehicle)" },
+  { name = "point_w", offset = 92, type = "f32" },
+  { name = "heading", offset = 96, type = "f32", note = "atan2 of the body's orientation x and z" },
+  { name = "speed_kmh", offset = 100, type = "f32" },
+  { name = "yaw_rate", offset = 104, type = "f32" },
+  { name = "steer_limit_a", offset = 108, type = "f32", note = "its steering limits (AiDriver::UpdateSteering scales by one or the other)" },
+  { name = "steer_limit_b", offset = 112, type = "f32" },
+  { name = "half_width", offset = 116, type = "f32", note = "across the road: |cos(+148)| x +120 + |sin(+148)| x +124 (AiDriver::UpdateHalfWidth)" },
+  { name = "car_half_width", offset = 120, type = "f32", note = "from the vehicle's bounds (AiDriver::ReadCar)" },
+  { name = "car_half_length", offset = 124, type = "f32" },
+  { name = "car_radius", offset = 128, type = "f32", note = "sqrt(half width^2 + half length^2)" },
+  { name = "corner_grip", offset = 132, type = "f32", note = "a handling factor from the vehicle's +3900 (AiDriver::CornerFactor)" },
+  { name = "distance_factor", offset = 136, type = "f32", note = "AiDriver::SpeedOverDistance's factor" },
+  { name = "steer_factor", offset = 140, type = "f32", note = "a handling factor from the vehicle's +3444, at most 1.0 (probably)" },
+  { name = "road_offset", offset = 144, type = "f32", note = "its offset across the road" },
+  { name = "road_angle", offset = 148, type = "f32", note = "its angle to the road (the slice's direction less the heading)" },
+  { name = "steer_shift", offset = 152, type = "f32", note = "written by AiDriver::SteerToTarget; AiPath::SetRanges' shift (x 0.2)" },
+  { name = "slice_offset", offset = 156, type = "f32", note = "its offset along its slice" },
+  { name = "vehicle", offset = 160, type = "ptr", to = "Vehicle", note = "its vehicle (Vehicle::Get)" },
+  { name = "speed_limit", offset = 164, type = "f32", note = "500.0 none" },
+  { name = "speed_limit_other", offset = 168, type = "f32", note = "500.0 none (lowered for a racer ahead, AiDriver::AdjustForOther)" },
+  { name = "others", offset = 172, type = "bytes", count = 280, note = "seven AiOther, one per other racer by its index" },
+  { name = "reacting", offset = 452, type = "bytes", count = 28, note = "seven words: the racers to react to (-1 ends)" },
+  { name = "watched", offset = 480, type = "u32", note = "the racer watched (-1 none)" },
+  { name = "passes_a", offset = 484, type = "u16", note = "passes counted (AiDriver::UpdateAgainstPlayer)" },
+  { name = "passes_b", offset = 486, type = "u16" },
+  { name = "player_gap", offset = 488, type = "f32", note = "the gap to the player's car" },
+  { name = "stuck_count", offset = 492, type = "u16" },
+  { name = "in_corner", offset = 496, type = "u32", note = "1 when the look-ahead is inside a corner" },
+  { name = "profile", offset = 500, type = "ptr", to = "AiProfile", note = "the AI profile, or 0" },
+  { name = "path", offset = 512, type = "bytes", count = 5536, note = "its AiPath" },
+  { name = "path_entry0_w", offset = 540, type = "f32", note = "the path's first ring entry's +12" },
+  { name = "path_entry0_section", offset = 544, type = "u16" },
+  { name = "path_entry0_slice", offset = 546, type = "u16" },
+  { name = "path_entry_count", offset = 5648, type = "u16", note = "the path's +5136" },
+  { name = "path_first", offset = 5650, type = "u16", note = "the path's +5138" },
+  { name = "path_look_ahead", offset = 5654, type = "u16", note = "the path's +5142" },
+  { name = "path_corner_count", offset = 5674, type = "u16", note = "the path's +5162" },
+  { name = "path_corner0_data", offset = 5676, type = "ptr", to = "RouteCorner", note = "the path's first corner record's +0" },
+  { name = "path_corner1_data", offset = 5716, type = "ptr", to = "RouteCorner", note = "the path's second corner record's +0" },
+  { name = "path_mode", offset = 6032, type = "u32", note = "the path's +5520" },
+  { name = "path_branch_kind", offset = 6036, type = "u32", note = "the path's +5524" },
+  { name = "path_leader_branch_kind", offset = 6040, type = "u32", note = "the path's +5528" },
+  { name = "skill", offset = 6048, type = "bytes", count = 40, note = "its AiSkill" },
+  { name = "skill_speed", offset = 6052, type = "u16", note = "the skill's +4" },
+  { name = "skill_throttle_cap", offset = 6054, type = "u16", note = "the skill's +6" },
+  { name = "skill_corner", offset = 6056, type = "u16", note = "the skill's +8" },
+  { name = "skill_speed_scale", offset = 6058, type = "u16", note = "the skill's +10" },
+  { name = "skill_caps_target", offset = 6060, type = "u16", note = "the skill's +12" },
+  { name = "skill_percentage", offset = 6068, type = "f32", note = "the skill's +20" },
+  { name = "skill_flag", offset = 6084, type = "u32", note = "the word AiDriver::SetSkill is given (0 in ResetToMode0 and 1)" },
+  { name = "target_speed", offset = 6088, type = "f32" },
+  { name = "target_x", offset = 6096, type = "f32", note = "the target point (w 1.0)" },
+  { name = "target_y", offset = 6100, type = "f32" },
+  { name = "target_z", offset = 6104, type = "f32" },
+  { name = "target_w", offset = 6108, type = "f32" },
+  { name = "slide_angle", offset = 6112, type = "f32", note = "an angle to the target (AiDriver::EaseThrottleForSlide's)" },
+  { name = "target_angle", offset = 6116, type = "f32", note = "the angle to the target" },
+  { name = "steering", offset = 6120, type = "f32", note = "-1.0 to 1.0" },
+  { name = "throttle", offset = 6124, type = "f32", note = "0.0 to 1.0" },
+  { name = "brake", offset = 6128, type = "f32", note = "0.0 to 1.0" },
+  { name = "handbrake", offset = 6132, type = "u8", note = "probably" },
+  { name = "steer_request", offset = 6136, type = "f32" },
+  { name = "throttle_request", offset = 6140, type = "f32" },
+  { name = "brake_request", offset = 6144, type = "f32" },
+  { name = "update", offset = 6148, type = "fn", note = "AiDriver::UpdateStarting (0x821398C0), then AiDriver::UpdateTrack (0x8213A1B8)" },
+]
+
+# The driver's +512.
+[AiPath]
+measure = "AiPath"
+measures = ["AiPath::SpreadOffset.ret", "AiPath::LeftEntry.r5", "AiPath::JoinCorners.r5", "AiPath::JoinCornerPair.r5", "AiPathEntry::NarrowToOtherEx.r4", "AiDriver.+500", "AiPathEntry::NarrowToOther.r6", "AiPath::NarrowBehind.r4", "AiPath::AddCornersAt.r4"]
+size = 5536
+origin = "embedded"
+fields = [
+  { name = "driver", offset = 0, type = "ptr", to = "AiDriver" },
+  { name = "fault_corner_table", offset = 4, type = "ptr", to = "RouteCornerEntry", note = "measure fault: a corner record's +4 (AiPath::ApproachCorner, JoinCornerPair, JoinCorners)" },
+  { name = "fault_corner_offset", offset = 10, type = "u16", note = "measure fault: a corner record's +10 (the corner steps, AiPath::JoinCornerPair)" },
+  { name = "fault_corner_position", offset = 14, type = "u16", note = "measure fault: a corner record's +14 (AiPath::JoinCorners)" },
+  { name = "entries", offset = 16, type = "bytes", count = 5120, note = "the ring: 80 AiPathEntry of 64 bytes (the corner steps' records are also filed here: a measure fault)" },
+  { name = "entry_count", offset = 5136, type = "u16" },
+  { name = "first", offset = 5138, type = "u16", note = "the first entry's index" },
+  { name = "plan_count", offset = 5140, type = "u16", note = "how many entries to plan (the look-ahead's end)" },
+  { name = "look_ahead", offset = 5142, type = "u16", note = "the look-ahead (entries)" },
+  { name = "section_count", offset = 5144, type = "u16" },
+  { name = "sections", offset = 5146, type = "bytes", count = 16, note = "eight halfwords: the sections the path runs through (-1 none)" },
+  { name = "corner_count", offset = 5162, type = "u16" },
+  { name = "corners", offset = 5164, type = "bytes", count = 352, note = "eight AiCorner of 44 bytes" },
+  { name = "largest_step", offset = 5516, type = "f32", note = "the largest step between entries" },
+  { name = "mode", offset = 5520, type = "u32", note = "1 by lane, 0 by branch" },
+  { name = "branch_kind", offset = 5524, type = "u32", note = "-1 none" },
+  { name = "leader_branch_kind", offset = 5528, type = "u32", note = "-1 none (AiPath::FollowLeaderBranch)" },
+  { name = "normalizer", offset = 5532, type = "fn", note = "AiPath::NormalizeByLane (0x8213B428) or NormalizeByBranch (0x8213C908)" },
+]
+
+# A ring entry of the path (64 bytes from the path's +16), one a slice.
+[AiPathEntry]
+measure = "AiPathEntry"
+measures = ["AiPath::NormalizeByLane.r4", "AiPath::NormalizeByBranch.r4",
+            "AiPathEntry::NarrowToOther.r4", "AiPath::ClampOffset.r4", "AiPath::ContinueLine.r4",
+            "AiPath::ApproachCorner.r6.+0", "AiPath::CornerToEntry.r6.+0",
+            "AiPath::CornerToApex.r6.+0", "AiPath::CornerToExit.r6.+0",
+            "AiDriver::LimitByCurve.r7"]
+size = 64
+origin = "embedded"
+fields = [
+  { name = "x", offset = 0, type = "f32", note = "the point on the line" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "z", offset = 8, type = "f32" },
+  { name = "w", offset = 12, type = "f32", note = "1.0" },
+  { name = "route_position", offset = 16, type = "u32", note = "the route position as one word (-1 none)" },
+  { name = "section", offset = 16, type = "u16" },
+  { name = "slice", offset = 18, type = "u16" },
+  { name = "lane", offset = 20, type = "u32" },
+  { name = "offset", offset = 24, type = "f32", note = "the line's offset across the road" },
+  { name = "step", offset = 28, type = "f32", note = "the shift from the entry before" },
+  { name = "range_low", offset = 32, type = "f32", note = "the road's range" },
+  { name = "range_high", offset = 36, type = "f32" },
+  { name = "room_low", offset = 40, type = "f32", note = "the range left (narrowed by the others)" },
+  { name = "room_high", offset = 44, type = "f32" },
+  { name = "target_offset", offset = 48, type = "f32" },
+  { name = "slice_record", offset = 52, type = "ptr", to = "RouteSlice" },
+  { name = "unknown_56", offset = 56, type = "f32" },
+  { name = "unknown_60", offset = 60, type = "f32" },
+]
+
+# A corner record (44 bytes, the path's +5164 + 44i; AiCorner::Init).
+[AiCorner]
+measure = "AiCorner"
+measures = ["sub_8213A200.r4", "sub_8213AB40.r4", "sub_8213BDF0.r4", "sub_8213BDF0.r5",
+            "sub_8213BE80.r4", "sub_8213BE80.r5", "AiPath::JoinCornersShort.r4",
+            "AiPath::JoinCornersShort.r5"]
+size = 44
+origin = "embedded"
+fields = [
+  { name = "data", offset = 0, type = "ptr", to = "RouteCorner", note = "the corner (the route file's +16 table)" },
+  { name = "table", offset = 4, type = "ptr", to = "RouteCornerEntry", note = "its table (the corner's +56)" },
+  { name = "number", offset = 8, type = "u16", note = "the corner's number" },
+  { name = "entry_offset", offset = 10, type = "u16", note = "its offset in entries" },
+  { name = "end", offset = 12, type = "u16" },
+  { name = "position", offset = 14, type = "u16", note = "a position in its table" },
+  { name = "direction", offset = 16, type = "f32", note = "1.0 or -1.0" },
+  { name = "speed", offset = 20, type = "f32", note = "from the driver's +144 (AiDriver::LimitForCorner)" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "slope_before", offset = 28, type = "f32", note = "joining it to the corner before" },
+  { name = "slope_after", offset = 32, type = "f32", note = "joining it to the corner after" },
+  { name = "joined_before", offset = 36, type = "u8" },
+  { name = "joined_after", offset = 37, type = "u8" },
+  { name = "kind", offset = 40, type = "u32", note = "1 to 3: how the driver steers" },
+]
+
+# A record of another racer (40 bytes, the driver's +172 + 40 x its index).
+[AiOther]
+measure = "AiOther"
+measures = ["AiDriver::AdjustForOther.r4"]
+size = 40
+origin = "embedded"
+fields = [
+  { name = "gap", offset = 0, type = "f32", note = "along the route (200.0 far)" },
+  { name = "closing_rate", offset = 4, type = "f32" },
+  { name = "last_change", offset = 8, type = "f32" },
+  { name = "factor", offset = 12, type = "f32" },
+  { name = "speed", offset = 16, type = "f32", note = "the other's speed" },
+  { name = "ticks_to_meet", offset = 20, type = "f32", note = "-1.0 none" },
+  { name = "state", offset = 24, type = "u16", note = "0 far, 1 behind, 2 beside, 3 ahead (guesses)" },
+  { name = "ring_index", offset = 26, type = "u16" },
+  { name = "action_flags", offset = 28, type = "u16", note = "what to do" },
+  { name = "timer", offset = 30, type = "u16" },
+  { name = "flag_a", offset = 32, type = "u8" },
+  { name = "flag_b", offset = 33, type = "u8" },
+  { name = "history_flags", offset = 34, type = "u16", note = "0x8 was ahead, 0x10 was behind, 0x2 and 0x4 a change between them" },
+  { name = "unknown_36", offset = 36, type = "u16" },
+]
+
+# The skill (40 bytes, the driver's +6048).
+[AiSkill]
+measure = "AiSkill"
+size = 40
+origin = "embedded"
+fields = [
+  { name = "source", offset = 0, type = "ptr", to = "AiSkillSource", note = "the profile's +120, or 0" },
+  { name = "speed", offset = 4, type = "u16", note = "seven halfwords (defaults 500, 80, -100, 0)" },
+  { name = "throttle_cap", offset = 6, type = "u16", note = "percent" },
+  { name = "corner", offset = 8, type = "u16", note = "passed to the corners" },
+  { name = "speed_scale", offset = 10, type = "u16", note = "percent" },
+  { name = "caps_target", offset = 12, type = "u16", note = "whether the target speed is capped" },
+  { name = "reaction_a", offset = 14, type = "u16", note = "a percentage AiOther::PlanReaction reads" },
+  { name = "reaction_b", offset = 16, type = "u16", note = "a percentage AiOther::PlanReaction reads" },
+  { name = "percentage", offset = 20, type = "f32", note = "100.0; x 0.01 into the vehicle's +2432" },
+  { name = "triggers", offset = 24, type = "bytes", count = 12, note = "three trigger states of 4 bytes: halfword a timer, byte active" },
+  { name = "trigger0_timer", offset = 24, type = "u16" },
+  { name = "trigger0_active", offset = 26, type = "u8" },
+  { name = "runs_triggers", offset = 36, type = "u32", note = "1 runs the triggers" },
+]
+
+# The skill's source (the AI profile's +120): seven halfwords, then three
+# 8-byte triggers.
+[AiSkillSource]
+measure = "AiDriver@+6048.+0"
+size = 40
+origin = "file"
+fields = [
+  { name = "speed", offset = 0, type = "u16", note = "the skill's +4 to +16 copied from here" },
+  { name = "throttle_cap", offset = 2, type = "u16" },
+  { name = "corner", offset = 4, type = "u16" },
+  { name = "speed_scale", offset = 6, type = "u16" },
+  { name = "caps_target", offset = 8, type = "u16" },
+  { name = "reaction_a", offset = 10, type = "u16" },
+  { name = "reaction_b", offset = 12, type = "u16" },
+  { name = "triggers", offset = 16, type = "bytes", count = 24, note = "three triggers of 8 bytes: a kind, a halfword value" },
+  { name = "trigger0_kind", offset = 16, type = "u32" },
+  { name = "trigger0_value", offset = 20, type = "u16" },
+]
+
+# A trigger of the skill's source (8 bytes from its +16).
+[AiSkillTrigger]
+measure = "AiSkill::TriggerEnds.r5"
+size = 8
+origin = "file"
+fields = [
+  { name = "kind", offset = 0, type = "u32" },
+  { name = "value", offset = 4, type = "u16", note = "signed" },
+]
+
+# The AI profile (the driver's +500).
+[AiProfile]
+measures = ["sub_8213F7E0.r3.+500", "sub_8213F868.r3.+500"]
+size = 124
+origin = "file"
+fields = [
+  { name = "key", offset = 0, type = "u16", note = "matched against the race state's records' word +8 (AiSkill::EntryWord)" },
+  { name = "branch_byte", offset = 36, type = "u8", note = "signed: AiPath::BranchMasksFor's, and AiPath::PreferredSections' a (4 to 9)" },
+  { name = "branch_kind", offset = 88, type = "u16", note = "signed: 4 or 5 picks a preferred sections list (AiPath::CompareBranches, NormalizeByBranch)" },
+  { name = "preferred_byte", offset = 90, type = "u8", note = "signed: AiPath::PreferredSections' b" },
+  { name = "skill_source", offset = 120, type = "ptr", to = "AiSkillSource" },
+]
+
+# A car input record (18 bytes used of 20; 0x826C5B30's records, filled by
+# AiDriver::Drive or the pad).
+[CarInput]
+# measures from CarInputRecord (car-sounds), merged at the integration
+# measures from VehicleCarInput (vehicle), merged at the integration
+measure = "CarInput"
+measures = ["AiDriver::Drive.r4",
+            "AiDriver::DriveCar.ret",
+  "Vehicle::ApplyInput.r4",
+  "new<20>@CarInputs::Create"]
+size = 20
+origin = "embedded"
+fields = [
+  { name = "flags", offset = 0, type = "u32", note = "0x200 set by a stuck AI driver (probably reverse); the pad's in known-data.md" },
+  { name = "throttle", offset = 4, type = "u16", note = "signed, out of 32,767" },
+  { name = "brake", offset = 6, type = "u16", note = "signed, out of 32,767" },
+  { name = "steering", offset = 8, type = "u16", note = "signed, out of 32,767" },
+  { name = "handbrake", offset = 10, type = "u16", note = "32,767 for the handbrake, probably" },
+  { name = "camera", offset = 12, type = "u16", note = "signed: probably the camera (from the pad)" },
+  { name = "throttle_rate", offset = 14, type = "u8", note = "from the pad: the player's settings byte +1; signed: the throttle's curve (Vehicle::ApplyInput)" },
+  { name = "brake_rate", offset = 15, type = "u8", note = "the settings byte +2; signed: the brake's curve" },
+  { name = "steering_rate", offset = 16, type = "u8", note = "the settings byte +0; signed: the pad's or wheel's steering rate" },
+  { name = "kind", offset = 17, type = "u8", note = "0 the pad, 1 a wheel, 2 an AI driver" },
+  { name = "settings", offset = 14, type = "bytes", count = 3, note = "the player's three settings bytes (from the pad) (from CarInputRecord, car-sounds)" },
+]
+
+# A corner of the course's route (the route file's +16 table, by number).
+[RouteCorner]
+measure = "AiCorner.+0"
+measures = ["AiPath.+5164", "AiCorner::Init.r4", "sub_8213AB40.r4.+0", "sub_8213BDF0.r4.+0", "sub_8213BDF0.r5.+0", "sub_8213BE80.r4.+0", "sub_8213BE80.r5.+0", "AiPath::JoinCornersShort.r4.+0", "AiPath::JoinCornersShort.r5.+0", "AiPath::SharesSections.r4", "AiDriver::LimitSpeedBlend.r5", "AiDriver@+5676.+0@+8"]
+size = 64
+origin = "file"
+fields = [
+  { name = "entry_count", offset = 0, type = "u16", note = "the count of its table's entries" },
+  { name = "fault_word_0", offset = 0, type = "f32", note = "measure fault: AiDriver::LimitSpeedBlend's pair (filed as the driver's +0's)" },
+  { name = "section_count", offset = 2, type = "u16", note = "the count of its sections (+36)" },
+  { name = "direction", offset = 4, type = "f32", note = "its sign gives the direction" },
+  { name = "direction_bits", offset = 4, type = "u32", note = "+4 read as a word (AiCorner::Init)" },
+  { name = "speed_a", offset = 8, type = "f32", note = "+8 to +24: speeds at its points, probably" },
+  { name = "speed_b", offset = 12, type = "f32" },
+  { name = "speed_c", offset = 16, type = "f32" },
+  { name = "speed_d", offset = 20, type = "f32" },
+  { name = "speed_e", offset = 24, type = "f32" },
+  { name = "length", offset = 28, type = "f32", note = "compared with 100.0 when corners overlap (probably)" },
+  { name = "sections", offset = 36, type = "bytes", count = 12, note = "halfwords: the sections it runs through" },
+  { name = "start", offset = 48, type = "u16", note = "slices from its start: where it begins" },
+  { name = "turn_in", offset = 50, type = "u16" },
+  { name = "apex", offset = 52, type = "u16" },
+  { name = "exit", offset = 54, type = "u16" },
+  { name = "table", offset = 56, type = "bytes", count = 8, note = "its table of RouteCornerEntry (entry_count of them)" },
+]
+
+# An entry of a route corner's table (8 bytes from its +56).
+[RouteCornerEntry]
+measures = ["AiPath.+4", "AiPath::JoinCornersShort.r4.+4"]
+size = 8
+origin = "file"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "offset", offset = 4, type = "f32", note = "an offset across the road" },
+]
+
+# A slice's record of the course's route (84 bytes, a section's +124 + 84i).
+[RouteSlice]
+measure = "AiPathEntry.+52"
+measures = ["AiDriver::ReadVehicle.r4", "AiPath::LeftEntry.r5.+52", "AiPath::AddCornersAt.r4.+52", "AiPath::AddCornersAt.r4.+52@+64"]
+size = 84
+origin = "file"
+fields = [
+  { name = "center_x", offset = 0, type = "f32" },
+  { name = "fault_corner_number", offset = 0, type = "u16", note = "measure fault: the slice's corner entry (+60 + 4i) read by AiCorner::Init" },
+  { name = "fault_corner_slice", offset = 2, type = "u16", note = "measure fault: the slice's corner entry (+62 + 4i) read by AiCorner::Init" },
+  { name = "center_y", offset = 4, type = "f32" },
+  { name = "center_z", offset = 8, type = "f32" },
+  { name = "width", offset = 12, type = "f32" },
+  { name = "margin_left", offset = 16, type = "f32", note = "beyond each side" },
+  { name = "margin_right", offset = 20, type = "f32" },
+  { name = "route_bit_a", offset = 24, type = "f32", note = "the route bits raise and lower these" },
+  { name = "route_bit_b", offset = 28, type = "f32" },
+  { name = "mesh_section", offset = 32, type = "u16", note = "the collision mesh's section and slice" },
+  { name = "mesh_slice", offset = 34, type = "u16" },
+  { name = "side_x", offset = 36, type = "f32", note = "the side direction" },
+  { name = "side_z", offset = 40, type = "f32" },
+  { name = "forward_x", offset = 44, type = "f32", note = "the forward direction" },
+  { name = "forward_z", offset = 48, type = "f32" },
+  { name = "lanes", offset = 56, type = "u8", note = "low four bits the lanes' count" },
+  { name = "kind", offset = 57, type = "u8" },
+  { name = "corner_count", offset = 58, type = "u16", note = "the corners listed on the slice" },
+  { name = "corners", offset = 60, type = "bytes", count = 24, note = "4-byte entries: a corner's number, a slice" },
+  { name = "corner0_number", offset = 60, type = "u16" },
+  { name = "corner0_slice", offset = 62, type = "u16" },
+]
+
+# A section of the course's route (the route file's +12 table).
+[RouteSection]
+measures = ["AiPath::CompareBranches.r4", "AiPath::CompareBranches.r5"]
+size = 124
+origin = "file"
+fields = [
+  { name = "slice_count", offset = 0, type = "u16" },
+  { name = "kind", offset = 2, type = "u8", note = "low four bits, 0 to 4" },
+  { name = "branch", offset = 3, type = "u8", note = "a bit in the branch masks" },
+]
+
+# What AiPath::MeasureOthers writes for each racer listed at the driver's
+# +452 (20 bytes a racer, in the caller's frame), read by the avoidance.
+[AiOtherSpan]
+measure = "AiPath::MeasureOthers.r4"
+measures = ["AiPath::AvoidOnLeft.r4", "AiPath::AvoidOnRight.r4",
+            "AiPath::ChooseSideForOther.r4", "sub_8213D898.r4"]
+size = 20
+origin = "stack"
+fields = [
+  { name = "first_entry", offset = 0, type = "u16", note = "the driver's record of it's ring index (+26)" },
+  { name = "end_entry", offset = 2, type = "u16", note = "the entry after it (or the look-ahead +5140)" },
+  { name = "other_offset", offset = 4, type = "f32", note = "the other's offset across the road" },
+  { name = "step_sum", offset = 8, type = "f32", note = "the entries' +28 summed up to it" },
+  { name = "widths", offset = 12, type = "f32", note = "the two drivers' +116 added" },
+  { name = "side_offset", offset = 16, type = "f32", note = "0.0, then the offset to keep (AiPath::ChooseSideForOther)" },
+]
+
+[globals]
+drivers = { address = 0x826C6074, type = "ptr", to = "AiDriver", note = "7 drivers of 6,160 bytes (AiDrivers::Create)" }
+race_data = { address = 0x826C5B2C, type = "ptr", to = "RaceData", note = "the race data (+20 the branch flags, +4 a word, +0xA3AF0 and +0xA3AF4)" }
+inputs = { address = 0x826C5B30, type = "u32", note = "a word a racer: its input (probably)" }
+race_state = { address = 0x826D82E8, type = "ptr", to = "RaceProgress", note = "+6100 read by AiPath::RaceAllowsSides, +2184 the skill entries" }
+race = { address = 0x826D82F4, type = "ptr", to = "RaceManager", note = "the race: +2308 its racers" }
+branch_mask_lists = { address = 0x82008970, type = "bytes", count = 80, note = "lists of words ending with 0, 16 bytes apart" }
+section_lists = { address = 0x82008A08, type = "bytes", count = 768, note = "AiPath::PreferredSections' lists, 64 bytes each" }
+hundred = { address = 0x82002A0C, type = "f32", note = "100.0" }
+five_hundred = { address = 0x82001FC0, type = "f32", note = "500.0" }
+pi = { address = 0x82002240, type = "f32" }
+minus_pi = { address = 0x820029C4, type = "f32" }
+two_pi = { address = 0x82001FA8, type = "f32" }
+thirty = { address = 0x82000D44, type = "f32", note = "30.0" }
+ten = { address = 0x82001FD8, type = "f32", note = "10.0" }
+half = { address = 0x82001BE4, type = "f32", note = "0.5" }
+tenth = { address = 0x82001FBC, type = "f32", note = "0.1" }
+minus_one = { address = 0x82001BE0, type = "f32", note = "-1.0" }
+other_gap = { address = 0x820027A4, type = "f32", note = "200.0: a reset record's gap, how far ahead the ring reaches" }
+twenty = { address = 0x82002568, type = "f32", note = "20.0" }
+fifth = { address = 0x82002208, type = "f32", note = "0.2" }
+four_fifths = { address = 0x82001070, type = "f32", note = "0.8" }
+leader_gap = { address = 0x82008D40, type = "f32", note = "-50.0" }
+hundredth = { address = 0x8200222C, type = "f32", note = "0.01: the percentages' scale" }
+react_gap = { address = 0x8200277C, type = "f32", note = "states 1 and 3's gap limit" }
+react_speed = { address = 0x82000F14, type = "f32", note = "state 1's speed limit" }
+react_rate = { address = 0x820029F8, type = "f32", note = "state 1's rate limit" }
+tick = { address = 0x82617730, type = "f32", note = "1/30 s" }
+per_kmh = { address = 0x82002BD8, type = "f32", note = "1/3.6" }
+minus_hundred = { address = 0x8200895C, type = "f32", note = "-100.0: AiPath::LeaderBranchKind's first best" }
+yaw_scale = { address = 0x82008E60, type = "f32", note = "-1/60 (probably)" }
+look_ahead = { address = 0x82008D44, type = "f32", note = "-20.0" }
+twelve = { address = 0x82002C78, type = "f32", note = "12.0" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from AiDriver.
+[AiDriverAt4]
+measure = "AiDriver@+4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u16" },
+  { name = "unknown_2", offset = 2, type = "u16" },
+]
+
+# Split from AiDriver.
+[AiDriverAt6096]
+measure = "AiDriver@+6096"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+]
+
+# Split from AiDriver.
+[AiDriverAt80]
+measure = "AiDriver@+80"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+]
+
+# Split from AiPath.
+[AiPathAt90]
+measure = "AiPath.+0.+500@+90"
+size = 1
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u8" },
+]
+
+# Split from AiDriver.
+[AiDriverAt4_2]
+measure = "AiPath.+0@+4"
+size = 2
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u16" },
+]
+
+# Split from AiDriver.
+[AiDriverAt80_2]
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+]
+
+# Split from AiPath.
+[AiPathAt5136]
+measure = "AiPath@+5136"
+size = 2
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u16" },
+]
+
+# Split from AiPath.
+[AiPathAt5164]
+measure = "AiPath@+5164"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_10", offset = 10, type = "u16" },
+  { name = "unknown_16", offset = 16, type = "f32" },
+]
+
+# Split from AiDriver.
+[AiDriverPart]
+measure = "AiPath@+5164.+0"
+size = 56
+origin = "embedded"
+fields = [
+  { name = "unknown_50", offset = 50, type = "u16" },
+  { name = "unknown_52", offset = 52, type = "u16" },
+  { name = "unknown_54", offset = 54, type = "u16" },
+]
+
+# Split from RouteCornerEntry.
+[RouteCornerEntryPart]
+measure = "AiPath@+5164.+4"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "f32" },
+]
+
+# Split from AiSkillSource.
+[AiSkillSourceAt16]
+measure = "AiDriver@+6048.+0@+16"
+size = 6
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u16" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from AiPath.
+[AiPathAt512]
+measure = "AiDriver@+512"
+size = 5536
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_5136", offset = 5136, type = "u16" },
+  { name = "unknown_5138", offset = 5138, type = "u16" },
+  { name = "unknown_5140", offset = 5140, type = "u16" },
+  { name = "unknown_5142", offset = 5142, type = "u16" },
+  { name = "unknown_5144", offset = 5144, type = "u16" },
+  { name = "unknown_5146", offset = 5146, type = "u16" },
+  { name = "unknown_5162", offset = 5162, type = "u16" },
+  { name = "unknown_5164", offset = 5164, type = "u32" },
+  { name = "unknown_5172", offset = 5172, type = "u16" },
+  { name = "unknown_5174", offset = 5174, type = "u16" },
+  { name = "unknown_5204", offset = 5204, type = "u32" },
+  { name = "unknown_5516", offset = 5516, type = "f32" },
+  { name = "unknown_5520", offset = 5520, type = "u32" },
+  { name = "unknown_5524", offset = 5524, type = "u32" },
+  { name = "unknown_5528", offset = 5528, type = "u32" },
+  { name = "unknown_5532", offset = 5532, type = "u32" },
+]
+
+# Split from AiDriverAt80.
+[AiDriverAt80At80]
+measure = "AiDriver@+512.+0@+80"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+]
+
+# Split from RouteCorner.
+[RouteCornerPart]
+measure = "AiDriver@+512.+5164"
+size = 56
+origin = "embedded"
+fields = [
+  { name = "unknown_48", offset = 48, type = "u16" },
+  { name = "unknown_54", offset = 54, type = "u16" },
+]
+
+# Split from AiPathAt5164.
+[AiPathAt5164At5164]
+measure = "AiDriver@+512@+5164"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "unknown_10", offset = 10, type = "u16" },
+  { name = "unknown_16", offset = 16, type = "f32" },
+]
+
+# Split from AiPath.
+[AiPathAt5676]
+measure = "AiDriver@+5676"
+size = 44
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "corner_table", offset = 4, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): a corner record's +4 (AiPath::ApproachCorner, JoinCornerPair, JoinCorners)" },
+  { name = "corner_offset", offset = 10, type = "u16", note = "the owner's fault_ field before the measure's fixes (2026-11-22): a corner record's +10 (the corner steps, AiPath::JoinCornerPair)" },
+  { name = "unknown_16", offset = 16, type = "f32" },
+  { name = "unknown_20", offset = 20, type = "f32" },
+  { name = "unknown_40", offset = 40, type = "u32" },
+]
+
+# Split from AiDriver.
+[AiDriverPart_2]
+measure = "AiDriver@+5676.+0"
+size = 56
+origin = "embedded"
+fields = [
+  { name = "corner_count", offset = 0, type = "u16", note = "the owner's fault_ field before the measure's fixes (2026-11-22): a route corner's +0 (AiPath::JoinCorners, KeepBranch, TrackRoute::LocateAt)" },
+  { name = "corner_turn_in", offset = 50, type = "u16", note = "the owner's fault_ field before the measure's fixes (2026-11-22): a route corner's +50 (AiPath::CornerToEntry)" },
+  { name = "corner_apex", offset = 52, type = "u16", note = "the owner's fault_ field before the measure's fixes (2026-11-22): a route corner's +52 (AiPath::CornerToApex, JoinCorners)" },
+  { name = "corner_exit", offset = 54, type = "u16", note = "the owner's fault_ field before the measure's fixes (2026-11-22): a route corner's +54 (AiPath::CornerToExit, JoinCorners)" },
+]
+
+# Split from AiSkill.
+[AiSkillAt6048]
+measure = "AiDriver@+6048"
+size = 40
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u16" },
+  { name = "unknown_14", offset = 14, type = "u16" },
+  { name = "unknown_16", offset = 16, type = "u16" },
+  { name = "unknown_20", offset = 20, type = "f32" },
+  { name = "unknown_24", offset = 24, type = "u16" },
+  { name = "unknown_26", offset = 26, type = "u8" },
+  { name = "unknown_36", offset = 36, type = "u32" },
+]
+
+# Split from AiPath.
+[AiPathAt36]
+measure = "AiPath.+0.+500@+36"
+size = 1
+origin = "embedded"
+fields = [
+  { name = "byte_0", offset = 0, type = "u8", note = "the owner's fault_ field before the measure's fixes (2026-11-22): AiPath::PreferredSections' signed byte" },
+]

@@ -1,0 +1,25 @@
+# The schema of docs/functions/race-hud.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The area's objects are the race HUD (RaceHud, race-hud-object's: +448 the
+# state, +456, +604, +624, +632 and +636 the movies RaceHud::RunMovie picks)
+# and the rival logo's entry (camera-modes.toml's RivalLogo). The measure
+# gives the area only the type below.
+
+# A measure fault: in RaceHud::RunMovie (sub_822141E8) the tail call
+# `b 0x82212958` (state 3) is followed by the label of states 2 and 4
+# (`lwz r3,632(r3)`), and the measure took r3 there as sub_82212958's
+# return value. It is the HUD (RaceHud, r3 as the function came): its +632,
+# the movie run in states 2 and 4. To merge into RaceHud once
+# tools/type_map.py stops falling through tail calls.
+[RaceHudRunMovieTail]
+measure = "sub_82212958.ret"
+size = 636
+origin = "embedded"
+# 1 functions; areas: race-hud.md
+fields = [
+  { name = "state2_movie", offset = 632, type = "u32", note = "really RaceHud's +632: the UI movie run in states 2 and 4 (RaceHud::RunMovie)" },
+]

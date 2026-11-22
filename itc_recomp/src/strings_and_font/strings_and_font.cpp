@@ -10,6 +10,7 @@
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "models/xpr.h"
+#include "schema/strings_and_font.h"
 
 #include "strings_and_font/steps.h"
 
@@ -21,6 +22,17 @@ namespace strings_and_font {
 using namespace steps;
 
 namespace {
+
+using G = schema::StringsAndFontGlobals;
+using schema::Font;
+using schema::FontDrawParams;
+using schema::FontPage;
+using schema::Strings;
+
+// The string table's file i: its pointer, loaded flag and count of loads.
+uint32_t FileSlot(const Strings& t, uint32_t i) { return t.files_address() + 4 * i; }
+uint32_t FlagSlot(const Strings& t, uint32_t i) { return t.loaded_flags_address() + 4 * i; }
+uint32_t CountSlot(const Strings& t, uint32_t i) { return t.load_counts_address() + 4 * i; }
 
 constexpr uint32_t kPageBreak = 0xFFD1;
 
@@ -37,33 +49,34 @@ float StartCoordinate(double scale_less_one, int32_t position, int32_t origin) {
 
 uint32_t StringsInit(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_8210A860 Strings::Init");
-  if (guest::LoadU32(base, kStrings) != 0) {
+  if (G::strings(base).address != 0) {
     return 0;
   }
-  const uint32_t table = memory::AllocPages(kStringsBytes, 4096);
-  guest::StoreU32(base, kStrings, table);
+  const Strings table(base, memory::AllocPages(kStringsBytes, 4096));
+  G::set_strings(base, table);
   for (uint32_t i = 0; i < kStringFiles; i++) {
-    guest::StoreU32(base, table + 4 * i, 0);
-    guest::StoreU32(base, table + 4236 + 4 * i, 0);
+    guest::StoreU32(base, FileSlot(table, i), 0);
+    guest::StoreU32(base, CountSlot(table, i), 0);
   }
-  guest::StoreU32(base, table + 136, 0);
-  return table;
+  table.set_files_asked(0);
+  return table.address;
 }
 
 void StringsOnLoaded(uint8_t* base, uint32_t flag) {
   ITC_NATIVE_RUNNING("sub_8210A850 Strings::OnLoaded");
-  guest::StoreU32(base, flag, 1);
+  schema::StringsLoadedFlag(base, flag).set_loaded(1);
 }
 
-bool StringsRelease(uint8_t* base, uint32_t table, uint32_t mask) {
+bool StringsRelease(uint8_t* base, uint32_t table_address, uint32_t mask) {
   ITC_NATIVE_RUNNING("sub_8210A538 Strings::Release");
+  const Strings table(base, table_address);
   // The files it would free, checked before anything is written.
   for (uint32_t i = 0; i < kStringFiles; i++) {
     if (!(mask & (1u << i))) {
       continue;
     }
-    const uint32_t file = guest::LoadU32(base, table + 4 * i);
-    if (file != 0 && guest::LoadU32(base, table + 4236 + 4 * i) == 1 &&
+    const uint32_t file = guest::LoadU32(base, FileSlot(table, i));
+    if (file != 0 && guest::LoadU32(base, CountSlot(table, i)) == 1 &&
         !memory::IsPages(file)) {
       return false;
     }
@@ -73,48 +86,50 @@ bool StringsRelease(uint8_t* base, uint32_t table, uint32_t mask) {
     if (!(bit & mask)) {
       continue;
     }
-    const uint32_t file = guest::LoadU32(base, table + 4 * i);
+    const uint32_t file = guest::LoadU32(base, FileSlot(table, i));
     if (file == 0) {
       continue;
     }
-    const uint32_t count = guest::LoadU32(base, table + 4236 + 4 * i) - 1;
-    guest::StoreU32(base, table + 4236 + 4 * i, count);
+    const uint32_t count = guest::LoadU32(base, CountSlot(table, i)) - 1;
+    guest::StoreU32(base, CountSlot(table, i), count);
     if (count != 0) {
       continue;
     }
     memory::FreePages(file);
-    guest::StoreU32(base, table + 4 * i, 0);
-    guest::StoreU32(base, table + 68 + 4 * i, 0);
-    guest::StoreU32(base, table + 136, guest::LoadU32(base, table + 136) & ~bit);
+    guest::StoreU32(base, FileSlot(table, i), 0);
+    guest::StoreU32(base, FlagSlot(table, i), 0);
+    table.set_files_asked(table.files_asked() & ~bit);
   }
   return true;
 }
 
-uint32_t FontIsLoaded(uint8_t* base, uint32_t font) {
+uint32_t FontIsLoaded(uint8_t* base, uint32_t font_address) {
   ITC_NATIVE_RUNNING("sub_821081A0 Font::IsLoaded");
-  const uint32_t mask = guest::LoadU32(base, font + 12);
+  const Font font(base, font_address);
+  const uint32_t mask = font.pages_asked();
   uint32_t asked = 0;
   for (uint32_t i = 0; i < 4; i++) {
     if (!(mask & (1u << i))) {
       continue;
     }
     asked++;
-    const uint32_t page = guest::LoadU32(base, font + 20 + 4 * i);
-    if (guest::LoadU32(base, page + 24) == 0) {
+    const FontPage page(base, guest::LoadU32(base, font.pages_address() + 4 * i));
+    if (page.loaded() == 0) {
       return 0;
     }
   }
   return asked != 0 ? 1 : 0;
 }
 
-uint32_t StringsIsLoaded(uint8_t* base, uint32_t table) {
+uint32_t StringsIsLoaded(uint8_t* base, uint32_t table_address) {
   ITC_NATIVE_RUNNING("sub_8210A768 Strings::IsLoaded");
-  const uint32_t mask = guest::LoadU32(base, table + 136);
+  const Strings table(base, table_address);
+  const uint32_t mask = table.files_asked();
   bool all = true;
   uint32_t asked = 0;
   for (uint32_t i = 0; i < kStringFiles; i++) {
     const uint32_t bit = (1u << i) & mask;
-    if (bit != 0 && guest::LoadU32(base, table + 68 + 4 * i) == 0) {
+    if (bit != 0 && guest::LoadU32(base, FlagSlot(table, i)) == 0) {
       all = false;
     }
     if (bit != 0) {
@@ -124,15 +139,15 @@ uint32_t StringsIsLoaded(uint8_t* base, uint32_t table) {
   if (asked == 0 || !all) {
     return 0;
   }
-  return FontIsLoaded(base, guest::LoadU32(base, kFont)) != 0 ? 1 : 0;
+  return FontIsLoaded(base, G::font(base).address) != 0 ? 1 : 0;
 }
 
 uint32_t TextIsLoaded(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82211C90 Text::IsLoaded");
-  if (StringsIsLoaded(base, guest::LoadU32(base, kStrings)) == 0) {
+  if (StringsIsLoaded(base, G::strings(base).address) == 0) {
     return 0;
   }
-  return FontIsLoaded(base, guest::LoadU32(base, kFont)) != 0 ? 1 : 0;
+  return FontIsLoaded(base, G::font(base).address) != 0 ? 1 : 0;
 }
 
 bool Swprintf(uint8_t* base, uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
@@ -154,9 +169,6 @@ void SwprintfOne(uint8_t* base, uint32_t buffer, uint32_t format, uint64_t argum
   Swprintf(base, buffer, format, frame + 32, frame - 96 - 144 - 2336, &count);
 }
 
-constexpr uint32_t kGroupedFormat = 0x82007E9C;  // L",%03d"
-constexpr uint32_t kPlainFormat = 0x82007E94;    // L"%d"
-constexpr uint32_t kMinusFormat = 0x82007E8C;    // L"-%s"
 
 void FormatGrouped(uint8_t* base, int32_t value, uint32_t out, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_8210A680 Strings::FormatGrouped");
@@ -168,17 +180,17 @@ void FormatGrouped(uint8_t* base, int32_t value, uint32_t out, uint32_t frame) {
   const uint32_t buffer = frame + 96;
   const int32_t magnitude = int32_t(uint32_t(v));
   const double thousands =
-      Single(ToSingle(magnitude) * Lfs(base, 0x820029D8));  // x 0.001
-  if (thousands < Lfs(base, 0x82000A30)) {                  // below 1.0
-    SwprintfOne(base, buffer, kPlainFormat, v, frame);
+      Single(ToSingle(magnitude) * Lfs(base, G::thousandth_address()));
+  if (thousands < Lfs(base, G::one_address())) {
+    SwprintfOne(base, buffer, G::plain_format_address(), v, frame);
   } else {
     const int32_t rest = int32_t(uint32_t(v) - uint32_t(magnitude / 1000) * 1000);
     FormatGrouped(base, int32_t(uint32_t(v) - uint32_t(rest)) / 1000, out, frame - 640);
-    SwprintfOne(base, buffer, kGroupedFormat, uint64_t(int64_t(rest)), frame);
+    SwprintfOne(base, buffer, G::grouped_format_address(), uint64_t(int64_t(rest)), frame);
   }
   c_runtime::Wcscat(base, out, buffer);
   if (negative) {
-    SwprintfOne(base, buffer, kMinusFormat, out, frame);
+    SwprintfOne(base, buffer, G::minus_format_address(), out, frame);
     c_runtime::Wcscpy(base, out, buffer);
   }
 }
@@ -206,9 +218,6 @@ bool StringsFormatGrouped(uint8_t* base, int32_t value, uint32_t out, uint32_t f
 namespace {
 
 constexpr uint32_t kFormatFrame = 4800;
-constexpr uint32_t kIntFormat = 0x82007EA8;     // L"%%%dd"
-constexpr uint32_t kFloatFormat = 0x82007EB4;   // L"%%.%df"
-constexpr uint32_t kZeroedFormat = 0x82007EC4;  // L"%%0%dd"
 constexpr uint32_t kSwprintf = 0x8210A490;
 constexpr uint32_t kFormatGroupedFunction = 0x8210A680;
 constexpr uint32_t kFontNumber = 0x82108A70;
@@ -265,7 +274,7 @@ uint32_t FormatText(uint8_t* base, const FormatCalls& calls, uint32_t frame, uin
                     uint32_t out, uint32_t text, uint32_t args, const FormatSite& site) {
   const uint32_t buffer = frame + 608;
   const uint32_t format = frame + 96;
-  for (uint32_t c; (c = guest::LoadU16(base, text)) != 0; text += 2) {
+  for (uint32_t c; (c = schema::FontText(base, text).unit()) != 0; text += 2) {
     uint32_t append = buffer;
     if (c == 0xFFD7) {
       const uint32_t slot = NextSlot(args);
@@ -275,7 +284,7 @@ uint32_t FormatText(uint8_t* base, const FormatCalls& calls, uint32_t frame, uin
     } else if (c > 0xFFEB && c <= 0xFFF5) {
       const uint32_t slot = NextSlot(args);
       const uint32_t value = guest::LoadU32(base, slot + 4);
-      FormatSwprintf(base, calls, frame, format, kIntFormat, (0xFFF5 - c) & 0xFFFF,
+      FormatSwprintf(base, calls, frame, format, G::int_format_address(), (0xFFF5 - c) & 0xFFFF,
                      site.int_lr[0]);
       FormatSwprintf(base, calls, frame, buffer, format, value, site.int_lr[1]);
     } else if (c > 0xFFE1 && c <= 0xFFEB) {
@@ -283,7 +292,7 @@ uint32_t FormatText(uint8_t* base, const FormatCalls& calls, uint32_t frame, uin
       const double value =
           std::bit_cast<double>((uint64_t(guest::LoadU32(base, slot)) << 32) |
                                 guest::LoadU32(base, slot + 4));
-      FormatSwprintf(base, calls, frame, format, kFloatFormat, (0xFFEB - c) & 0xFFFF,
+      FormatSwprintf(base, calls, frame, format, G::float_format_address(), (0xFFEB - c) & 0xFFFF,
                      site.double_lr[0]);
       const double rounded = double(float(value));
       FormatSwprintf(base, calls, frame, buffer, format, std::bit_cast<uint64_t>(rounded),
@@ -291,7 +300,7 @@ uint32_t FormatText(uint8_t* base, const FormatCalls& calls, uint32_t frame, uin
     } else if (c > 0xFFD7 && c <= 0xFFE1) {
       const uint32_t slot = NextSlot(args);
       const uint32_t value = guest::LoadU32(base, slot + 4);
-      FormatSwprintf(base, calls, frame, format, kZeroedFormat, (0xFFE1 - c) & 0xFFFF,
+      FormatSwprintf(base, calls, frame, format, G::zeroed_format_address(), (0xFFE1 - c) & 0xFFFF,
                      site.int_lr[0]);
       FormatSwprintf(base, calls, frame, buffer, format, value, site.int_lr[1]);
     } else if (c == 0xFFD3) {
@@ -305,7 +314,7 @@ uint32_t FormatText(uint8_t* base, const FormatCalls& calls, uint32_t frame, uin
     } else if (c == 0xFFD2 && site.font_number) {
       const uint32_t slot = NextSlot(args);
       ClearBuffer(base, buffer);
-      calls.call(calls.user, kFontNumber, guest::LoadU32(base, kFont), buffer,
+      calls.call(calls.user, kFontNumber, G::font(base).address, buffer,
                  guest::LoadU32(base, slot + 4), frame, 0x8210AB84);
     } else {
       guest::StoreU16(base, frame + 80, uint16_t(c));
@@ -349,7 +358,7 @@ uint32_t StringsFormat(uint8_t* base, const FormatCalls& calls, uint32_t stack, 
 uint32_t StringsPageCount(uint8_t* base, uint32_t text) {
   ITC_NATIVE_RUNNING("sub_8210A5C0 Strings::PageCount");
   uint32_t count = 0;
-  for (uint32_t c; (c = guest::LoadU16(base, text)) != 0; text += 2) {
+  for (uint32_t c; (c = schema::FontText(base, text).unit()) != 0; text += 2) {
     if (c == kPageBreak) {
       count++;
     }
@@ -360,7 +369,7 @@ uint32_t StringsPageCount(uint8_t* base, uint32_t text) {
 uint32_t StringsCopyPage(uint8_t* base, uint32_t out, uint32_t text, int32_t page, int32_t skip) {
   ITC_NATIVE_RUNNING("sub_8210A5E8 Strings::CopyPage");
   while (page > 0) {
-    const uint32_t c = guest::LoadU16(base, text);
+    const uint32_t c = schema::FontText(base, text).unit();
     if (c == 0) {
       break;
     }
@@ -369,7 +378,7 @@ uint32_t StringsCopyPage(uint8_t* base, uint32_t out, uint32_t text, int32_t pag
     }
     text += 2;
   }
-  for (uint32_t c; (c = guest::LoadU16(base, text)) != 0; text += 2) {
+  for (uint32_t c; (c = schema::FontText(base, text).unit()) != 0; text += 2) {
     if (c == kPageBreak) {
       break;
     }
@@ -379,7 +388,7 @@ uint32_t StringsCopyPage(uint8_t* base, uint32_t out, uint32_t text, int32_t pag
       guest::StoreU16(base, end, uint16_t(c));
       guest::StoreU16(base, end + 2, 0);
     }
-    if (guest::LoadU16(base, text) == '\n') {
+    if (schema::FontText(base, text).unit() == '\n') {
       skip--;
     }
   }
@@ -391,8 +400,8 @@ void InitShaderEntries(uint8_t* base) {
   // The stores in the original's order (each length after the next source).
   uint32_t lengths[4];
   for (uint32_t i = 0; i < 4; i++) {
-    const uint32_t entry = kShaderEntries + 12 * i;
-    const uint32_t source = guest::LoadU32(base, 0x8260333C + 4 * i);
+    const uint32_t entry = G::shader_entries_address() + 12 * i;
+    const uint32_t source = guest::LoadU32(base, G::pixel_shader_sources_address() + 4 * i);
     if (i > 0) {
       guest::StoreU32(base, entry - 4, 0);
     }
@@ -406,35 +415,36 @@ void InitShaderEntries(uint8_t* base) {
     }
     lengths[i] = end - source;
   }
-  guest::StoreU32(base, kShaderEntries + 44, 0);
-  guest::StoreU32(base, kShaderEntries + 40, lengths[3]);
+  guest::StoreU32(base, G::shader_entries_address() + 44, 0);
+  guest::StoreU32(base, G::shader_entries_address() + 40, lengths[3]);
 }
 
-void FontSetParams(uint8_t* base, uint32_t font, uint32_t params) {
+void FontSetParams(uint8_t* base, uint32_t font_address, uint32_t params_address) {
   ITC_NATIVE_RUNNING("sub_82108368 Font::SetParams");
-  guest::StoreU32(base, font + 16, params);
-  const double one = Lfd(base, 0x82002250);
-  const int32_t x = int32_t(guest::LoadU32(base, params + 0));
-  const double scale_x = double(guest::LoadFloat(base, params + 28)) - one;
-  const int32_t origin_x = int32_t(guest::LoadU32(base, params + 8));
-  guest::StoreFloat(base, font + 56, StartCoordinate(scale_x, x, origin_x));
-  const int32_t y = int32_t(guest::LoadU32(base, params + 4));
-  const double scale_y = double(guest::LoadFloat(base, params + 32)) - one;
-  const int32_t origin_y = int32_t(guest::LoadU32(base, params + 12));
-  guest::StoreFloat(base, font + 60, StartCoordinate(scale_y, y, origin_y));
-  guest::StoreFloat(base, font + 16448,
-                    float(ToSingle(int32_t(guest::LoadU32(base, params + 84)))));
-  guest::StoreFloat(base, font + 16452,
-                    float(ToSingle(int32_t(guest::LoadU32(base, params + 88)))));
+  const Font font(base, font_address);
+  const FontDrawParams params(base, params_address);
+  font.set_params(params);
+  const double one = Lfd(base, G::one_double_address());
+  const int32_t x = params.x();
+  const double scale_x = double(params.scale_x()) - one;
+  const int32_t origin_x = params.origin_x();
+  font.set_start_x(StartCoordinate(scale_x, x, origin_x));
+  const int32_t y = params.y();
+  const double scale_y = double(params.scale_y()) - one;
+  const int32_t origin_y = params.origin_y();
+  font.set_start_y(StartCoordinate(scale_y, y, origin_y));
+  font.set_letter_spacing(float(ToSingle(params.letter_spacing())));
+  font.set_line_spacing(float(ToSingle(params.line_spacing())));
 }
 
 std::optional<uint32_t> StringsGet(uint8_t* base, uint32_t table, uint32_t id) {
   ITC_NATIVE_RUNNING("sub_8210A800 Strings::Get");
-  constexpr uint32_t kBounds = 0x82007E18;
+  const uint32_t bounds = G::string_bounds_address();
   for (uint32_t i = 0; i < 17; i++) {
-    if (int32_t(id) < int32_t(guest::LoadU32(base, kBounds + 4 + 4 * i))) {
-      const uint32_t bound = guest::LoadU32(base, kBounds + 4 * i);
-      return game_data::GetEntry(base, guest::LoadU32(base, table + 4 * i), id - bound, false);
+    if (int32_t(id) < int32_t(guest::LoadU32(base, bounds + 4 + 4 * i))) {
+      const uint32_t bound = guest::LoadU32(base, bounds + 4 * i);
+      return game_data::GetEntry(base, guest::LoadU32(base, FileSlot(Strings(base, table), i)),
+                                 id - bound, false);
     }
   }
   return std::nullopt;
@@ -456,13 +466,16 @@ std::optional<uint32_t> ReleaseXprSlot(uint8_t* base, uint32_t slot) {
 
 // --- The loads ---
 
-FontLoadResult FontLoad(uint8_t* base, uint32_t font, uint32_t mask,
+FontLoadResult FontLoad(uint8_t* base, uint32_t font_address, uint32_t mask,
                         const archive::LoadCall& load) {
   ITC_NATIVE_RUNNING("sub_82109498 Font::Load");
+  const Font font(base, font_address);
   FontLoadResult result{false, std::nullopt};
-  guest::StoreU32(base, font + 12, mask | guest::LoadU32(base, font + 12));
+  font.set_pages_asked(mask | font.pages_asked());
   for (uint32_t i = 0; i < 4; i++) {
-    const uint32_t file_slot = font + 40 + 4 * i;
+    const uint32_t file_slot = font.page_files_address() + 4 * i;
+    const uint32_t page_slot = font.pages_address() + 4 * i;
+    const uint32_t id_slot = G::font_page_ids_address() + 4 * i;
     if ((mask & (1u << i)) == 0 || guest::LoadU32(base, file_slot) != 0) {
       continue;
     }
@@ -471,35 +484,37 @@ FontLoadResult FontLoad(uint8_t* base, uint32_t font, uint32_t mask,
       result.handed_back = true;
       return result;
     }
-    guest::StoreU32(base, font + 20 + 4 * i, *page);
-    const uint32_t asset = guest::LoadU32(base, kFontPageIds + 4 * i);
+    guest::StoreU32(base, page_slot, *page);
+    const uint32_t asset = guest::LoadU32(base, id_slot);
     guest::StoreU32(base, file_slot, memory::AllocPages(archive::AssetSize(base, asset), 4096));
-    guest::StoreU32(base, guest::LoadU32(base, font + 20 + 4 * i) + 24, 0);
-    result.last = load(guest::LoadU32(base, kFontPageIds + 4 * i), guest::LoadU32(base, file_slot),
-                       kFontPageLoaded, guest::LoadU32(base, font + 20 + 4 * i));
+    FontPage(base, guest::LoadU32(base, page_slot)).set_loaded(0);
+    result.last = load(guest::LoadU32(base, id_slot), guest::LoadU32(base, file_slot),
+                       kFontPageLoaded, guest::LoadU32(base, page_slot));
   }
   return result;
 }
 
-LastLoad StringsLoad(uint8_t* base, uint32_t table, uint32_t mask,
+LastLoad StringsLoad(uint8_t* base, uint32_t table_address, uint32_t mask,
                      const archive::LoadCall& load) {
   ITC_NATIVE_RUNNING("sub_8210A8D0 Strings::Load");
+  const Strings table(base, table_address);
   LastLoad last;
-  guest::StoreU32(base, table + 136, mask | guest::LoadU32(base, table + 136));
+  table.set_files_asked(mask | table.files_asked());
   for (uint32_t i = 0; i < kStringFiles; i++) {
     if ((mask & (1u << i)) == 0) {
       continue;
     }
-    const uint32_t flag = table + 68 + 4 * i;
-    guest::StoreU32(base, table + 4236 + 4 * i, guest::LoadU32(base, table + 4236 + 4 * i) + 1);
-    if (guest::LoadU32(base, table + 4 * i) != 0) {
+    const uint32_t flag = FlagSlot(table, i);
+    const uint32_t id_slot = G::string_file_ids_address() + 4 * i;
+    guest::StoreU32(base, CountSlot(table, i), guest::LoadU32(base, CountSlot(table, i)) + 1);
+    if (guest::LoadU32(base, FileSlot(table, i)) != 0) {
       continue;
     }
-    guest::StoreU32(base, flag, 0);
+    schema::StringsLoadedFlag(base, flag).set_loaded(0);
     const uint32_t buffer = memory::AllocPages(
-        archive::AssetSize(base, guest::LoadU32(base, kStringFileIds + 4 * i)), 4096);
-    guest::StoreU32(base, table + 4 * i, buffer);
-    last = load(guest::LoadU32(base, kStringFileIds + 4 * i), buffer, kStringsLoaded, flag);
+        archive::AssetSize(base, guest::LoadU32(base, id_slot)), 4096);
+    guest::StoreU32(base, FileSlot(table, i), buffer);
+    last = load(guest::LoadU32(base, id_slot), buffer, kStringsLoaded, flag);
   }
   return last;
 }
@@ -507,11 +522,11 @@ LastLoad StringsLoad(uint8_t* base, uint32_t table, uint32_t mask,
 int64_t TextLoad(uint8_t* base, const archive::LoadCall& load,
                  const FontFallback& font_fallback) {
   ITC_NATIVE_RUNNING("sub_8210ADF8 Text::Load");
-  const uint32_t font = guest::LoadU32(base, kFont);
+  const uint32_t font = G::font(base).address;
   if (FontLoad(base, font, 15, load).handed_back) {
     font_fallback(font, 15);
   }
-  const uint32_t table = guest::LoadU32(base, kStrings);
+  const uint32_t table = G::strings(base).address;
   const LastLoad last = StringsLoad(base, table, 0x8001, load);
   return last ? *last : int64_t(table);
 }

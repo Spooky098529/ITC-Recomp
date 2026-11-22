@@ -4,6 +4,8 @@
 // their adapters stay until every caller is native.
 
 #include "guest.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -16,6 +18,7 @@
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "lifted/sdk.h"
+#include "schema/action_mappers.h"
 
 ITC_FLAG_BOOL(native_action_mappers, true, "ITC",
               "Run the action mappers (docs/functions/action-mappers.md: the repeat and "
@@ -63,7 +66,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825924E0) {
   
   const uint32_t caller = uint32_t(ctx.lr);
   const uint32_t listener = ctx.r3.u32;
-  const uint32_t mask = guest::LoadU32(base, ctx.r4.u32);
+  const uint32_t mask = schema::ActionButtonMask(base, ctx.r4.u32).mask();
   if (ITC_FLAG(native_action_mappers)) {
     ctx.r3.u64 = ListenerHeld(base, listener, mask);
   } else {
@@ -78,7 +81,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258CF10) {
   
   const uint32_t caller = uint32_t(ctx.lr);
   const uint32_t listener = ctx.r3.u32;
-  const uint32_t mask = guest::LoadU32(base, ctx.r4.u32);
+  const uint32_t mask = schema::ActionButtonMask(base, ctx.r4.u32).mask();
   if (!ITC_FLAG(native_action_mappers)) {
     lifted::original::c8258CF10(ctx, base);  // its call to sub_825924E0 is counted there
     if (frame_pacing::GameMessages_LogInputReads()) {
@@ -211,10 +214,10 @@ ITC_NATIVE_ENTRY_ALWAYS(8210AF08) {
   guest_call::InFrame(ctx, base, 112, 0x8210AF58, [&](uint32_t) {
     for (uint32_t i = 0; i < ClientListCount(base, list, 2, 0); i++) {
       const uint32_t mapper = ClientListFind(base, 2, i);
-      const uint32_t owner = guest::LoadU32(base, list + 36);
-      ctx.r3.u64 = owner;
+      const schema::ActionMappersOwner owner = schema::InputClientList(base, list).manager();
+      ctx.r3.u64 = owner.address;
       ctx.lr = 0x8210AF58;
-      lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, owner) + 36));
+      lifted::CallFromContext(ctx, base, owner.vtable().get_input_manager());
       const uint32_t object = ctx.r3.u32;
       if (hooks::NativeHeapActive() && MapperBindKnown(base, mapper, object)) {
         MapperBind(base, mapper, object);
@@ -252,7 +255,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209F430) {
   const uint64_t saved_lr = ctx.lr;
   guest_call::InFrame(ctx, base, 112, 0x8209F56C, [&](uint32_t) {
     ctx.r3.u64 = list;
-    lifted::CallFromContext(ctx, base, 0x8210AF08);
+    lifted::Enter(ctx, base, game::InputClientList::BindAll);
     if (ConfigureKnown(base)) {
       double f[3] = {ctx.f1.f64, ctx.f2.f64, ctx.f3.f64};
       ctx.r3.u64 = Configure(base, index, f);

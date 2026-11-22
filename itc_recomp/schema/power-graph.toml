@@ -1,0 +1,19 @@
+# The schema of docs/functions/power-graph.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# Left out (other areas describe them; their measure names belong there):
+# "PowerGraph::Draw.r6" is a car data (CarData, car-physics.toml: +1280
+# rev_limit, +1292 torque_curve, +1420 torque); "CarList" is a car list
+# entry (CarListEntry, car-list.toml: +8432 car_id).
+
+# LineSprite: merged into race-overlays.toml's OverlaySprite at the integration (the same object).
+
+[globals]
+line_queue = { address = 0x826D83D8, type = "u32", note = "the line recorder's render queue, stored by every Line::RecordFlat" }
+line_list = { address = 0x826D83DC, type = "u32", note = "the line recorder's command list, stored by every Line::RecordFlat" }
+transform_list = { address = 0x826D83D4, type = "u32", note = "Primitive::RecordTransform's command list" }
+stand_holder = { address = 0x826D83E0, type = "u32", note = "the front end's car holder; its +0 word is PowerGraph::Draw's r3" }
+graph_shown = { address = 0x82815EC0, type = "u32", note = "the car list's graph drawn while set (power-graph-screen.md)" }

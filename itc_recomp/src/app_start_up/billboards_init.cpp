@@ -6,6 +6,7 @@
 #include "base/log.h"
 #include "graphics/video_output.h"
 #include "guest.h"
+#include "schema/app_start_up.h"
 
 namespace app_start_up {
 
@@ -23,28 +24,20 @@ uint32_t Strlen(uint8_t* base, uint32_t string) {
   return length;
 }
 
-constexpr uint32_t kRingIndex = 0x826A5098;
-constexpr uint32_t kRingCount = 0x826A509C;
-constexpr uint32_t kVertexShader = 0x826A50A0;
-constexpr uint32_t kPixelShader = 0x826A50A4;
-constexpr uint32_t kDeclaration = 0x826A50A8;
-constexpr uint32_t kVertexSource = 0x82600A54;  // a pointer to the HLSL
-constexpr uint32_t kPixelSource = 0x82600A60;   // a pointer to the HLSL
-constexpr uint32_t kElements = 0x82600A64;
+using Globals = schema::AppStartUpGlobals;
+
 constexpr uint32_t kEntry = 0x82001BCC;          // "main"
 constexpr uint32_t kVertexProfile = 0x82001BD4;  // "vs_3_0"
 constexpr uint32_t kPixelProfile = 0x82001BC4;   // "ps_3_0"
-constexpr uint32_t kGlowScale = 0x8266D090;
-constexpr uint32_t kZero = 0x82000A34;
 
 }  // namespace
 
 void BillboardsInit(uint8_t* base, uint32_t frame, const BillboardCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8209BE88 Billboards::Init");
   namespace vo = graphics::video_output;
-  const uint32_t ring = Load(base, kRingIndex);
-  Store(base, kRingCount, 0);
-  Store(base, kRingIndex, ring == 0 ? 1 : 0);
+  const uint32_t ring = Globals::billboard_ring_index(base);
+  Globals::set_billboard_vertex_count(base, 0);
+  Globals::set_billboard_ring_index(base, ring == 0 ? 1 : 0);
 
   // The two shaders: compiled, made under the device lock, their buffers
   // released.
@@ -54,11 +47,13 @@ void BillboardsInit(uint8_t* base, uint32_t frame, const BillboardCalls& calls) 
     uint32_t buffer;  // frame offsets
     uint32_t errors;
     uint32_t lock;
-    uint32_t global;
+    uint32_t global;  // the shader's word
   };
   const Shader shaders[2] = {
-      {Load(base, kVertexSource), kVertexProfile, 96, 104, 108, kVertexShader},
-      {Load(base, kPixelSource), kPixelProfile, 100, 112, 116, kPixelShader},
+      {Globals::billboard_vertex_source(base).address, kVertexProfile, 96, 104, 108,
+       Globals::billboard_vertex_shader_address()},
+      {Globals::billboard_pixel_source(base).address, kPixelProfile, 100, 112, 116,
+       Globals::billboard_pixel_shader_address()},
   };
   for (int i = 0; i < 2; i++) {
     const Shader& s = shaders[i];
@@ -79,10 +74,11 @@ void BillboardsInit(uint8_t* base, uint32_t frame, const BillboardCalls& calls) 
   }
 
   Store(base, frame + 116, vo::LockDevice(base, calls.video_output(4)));
-  const auto declaration = CreateVertexDeclaration(base, kElements, calls.memcpy_call);
-  Store(base, kDeclaration, declaration.value_or(0));
+  const auto declaration =
+      CreateVertexDeclaration(base, Globals::billboard_elements_address(), calls.memcpy_call);
+  Globals::set_billboard_declaration(base, declaration.value_or(0));
   vo::UnlockDevice(base, calls.video_output(5), frame + 116);
-  Store(base, kGlowScale, Load(base, kZero));
+  Globals::set_billboard_float_8266D090(base, Globals::float_zero(base));
 }
 
 }  // namespace app_start_up

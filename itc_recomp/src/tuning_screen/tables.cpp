@@ -15,11 +15,10 @@ namespace tuning_screen {
 namespace {
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-uint32_t Byte(uint8_t* base, uint32_t address) { return guest::LoadU8(base, address); }
 int32_t CategoryOf(uint8_t* base, uint32_t screen) {
-  return int32_t(Load(base, screen + kCategory));
+  return int32_t(TS(base, screen).category());
 }
-uint32_t ItemOf(uint8_t* base, uint32_t screen) { return Byte(base, screen + kItem); }
+uint32_t ItemOf(uint8_t* base, uint32_t screen) { return uint32_t(TS(base, screen).item()); }
 // The screen's word at word index `index`.
 uint32_t Word(uint8_t* base, uint32_t screen, uint32_t index) {
   return Load(base, screen + index * 4);
@@ -30,7 +29,7 @@ uint32_t Word(uint8_t* base, uint32_t screen, uint32_t index) {
 uint32_t CategoryItemCount(uint8_t* base, uint32_t screen) {
   ITC_NATIVE_RUNNING("sub_821CC6C0 TuningScreen::CategoryItemCount");
   static constexpr uint32_t kCounts[7] = {4, 5, 1, 3, 10, 8, 4};
-  const uint32_t m = Load(base, screen + kCategory);
+  const uint32_t m = TS(base, screen).category();
   return m < 7 ? kCounts[m] : 0;
 }
 
@@ -40,14 +39,14 @@ uint32_t IsItemAvailable(uint8_t* base, uint32_t screen, uint64_t item) {
   std::optional<uint32_t> index;
   const int32_t m = CategoryOf(base, screen);
   if (m == 0) {
-    if (int32_t(Load(base, screen + kState)) != 5) {
+    if (int32_t(TS(base, screen).state()) != 5) {
       return 1;
     }
     const uint32_t p = ItemOf(base, screen);
     if (p == 0) {
-      index = Load(base, screen + kPartSet) * 10 + r4 + 8526;
+      index = TS(base, screen).price_class() * 10 + r4 + 8526;
     } else if (p == 1) {
-      index = (Load(base, screen + kPartSet) + 1238) * 7 + r4;
+      index = (TS(base, screen).price_class() + 1238) * 7 + r4;
     } else if (p == 2) {
       index = r4 + 8748;
     } else if (p == 3) {
@@ -84,17 +83,17 @@ uint64_t WheelNumber(uint64_t brand, uint64_t model) {
 
 uint32_t GetPrice(uint8_t* base, uint32_t screen) {
   ITC_NATIVE_RUNNING("sub_821CD160 TuningScreen::GetPrice");
-  guest::StoreU32(base, screen + kPrice, 0);
+  TS(base, screen).set_price(0);
   std::optional<uint32_t> index;
   const int32_t m = CategoryOf(base, screen);
   const uint32_t p = ItemOf(base, screen);
-  auto level = [&] { return Byte(base, screen + kLevel); };
-  auto type = [&] { return Byte(base, screen + kType); };
+  auto level = [&] { return uint32_t(TS(base, screen).level()); };
+  auto type = [&] { return uint32_t(TS(base, screen).type()); };
   if (m == 0) {
     if (p == 0) {
-      index = level() + Load(base, screen + kPartSet) * 10 + 8476;
+      index = level() + TS(base, screen).price_class() * 10 + 8476;
     } else if (p == 1) {
-      index = (Load(base, screen + kPartSet) + 1233) * 7 + level();
+      index = (TS(base, screen).price_class() + 1233) * 7 + level();
     } else if (p == 2) {
       index = level() + 8741;
     } else if (p == 3) {
@@ -110,21 +109,21 @@ uint32_t GetPrice(uint8_t* base, uint32_t screen) {
   } else if (m == 3) {
     static constexpr uint32_t kRows[3] = {8935, 8972, 9004};
     if (p < 3) {
-      index = level() * 3 + Byte(base, screen + kOption) + kRows[p];
+      index = level() * 3 + uint32_t(TS(base, screen).option()) + kRows[p];
     }
   } else if (m == 4) {
     static constexpr uint32_t kRows[10] = {9036, 9047, 9058, 9069, 0,
                                            9105, 9114, 9123, 9132, 9141};
     if (p == 4) {
-      index = (type() + 4541) * 2 + Byte(base, screen + kType2);
+      index = (type() + 4541) * 2 + uint32_t(TS(base, screen).bonnet_choice());
     } else if (p <= 9) {
       index = type() + kRows[p];
     }
   } else if (m == 5) {
     if (p == 0) {
-      index = Load(base, screen + 25204) * 38 + Load(base, screen + 25220) + 6312;
+      index = TS(base, screen).part_group() * 38 + TS(base, screen).list_cursor() + 6312;
     } else if (p == 1) {
-      index = Byte(base, screen + kOption) + 9151;
+      index = uint32_t(TS(base, screen).option()) + 9151;
     } else if (p == 2) {
       index = type() + 9156;
     } else if (p == 3) {
@@ -138,18 +137,19 @@ uint32_t GetPrice(uint8_t* base, uint32_t screen) {
     } else if (p == 2) {
       index = type() + 9193;
     } else if (p == 3) {
-      const int32_t kind = int32_t(Load(base, screen + 33540));
+      const int32_t kind = int32_t(TS(base, screen).interior_mode());
       if (kind == 0) {
-        index = Load(base, screen + 33548) + 8396;
+        index = TS(base, screen).interior_pick() + 8396;
       } else if (kind == 1) {
-        index = (Load(base, screen + 33564) + 1682) * 5 + Load(base, screen + 33572);
+        index = (TS(base, screen).interior_page_mode() + 1682) * 5 +
+                TS(base, screen).interior_pair_index();
       }
     }
   }
   if (index) {
-    guest::StoreU32(base, screen + kPrice, Word(base, screen, *index));
+    TS(base, screen).set_price(Word(base, screen, *index));
   }
-  return Load(base, screen + kPrice);
+  return TS(base, screen).price();
 }
 
 uint32_t GetCurrentChoice(uint8_t* base, uint32_t screen) {
@@ -159,9 +159,9 @@ uint32_t GetCurrentChoice(uint8_t* base, uint32_t screen) {
   const uint32_t p = ItemOf(base, screen);
   if (m == 0) {
     if (p == 0) {
-      offset = (Load(base, screen + kPartSet) + 8576) * 4;
+      offset = (TS(base, screen).price_class() + 8576) * 4;
     } else if (p == 1) {
-      offset = (Load(base, screen + kPartSet) + 8701) * 4;
+      offset = (TS(base, screen).price_class() + 8701) * 4;
     } else if (p == 2) {
       offset = 35020;
     } else if (p == 3) {
@@ -187,7 +187,7 @@ uint32_t GetCurrentChoice(uint8_t* base, uint32_t screen) {
     }
   } else if (m == 5) {
     if (p == 0) {
-      offset = (Load(base, screen + 25196) + 6958) * 4;
+      offset = (TS(base, screen).wheel_part_cursor() + 6958) * 4;
     } else if (p == 1) {
       offset = 36612;
     } else if (p == 2) {
@@ -202,7 +202,7 @@ uint32_t GetCurrentChoice(uint8_t* base, uint32_t screen) {
       offset = 36752;
     } else if (p == 2) {
       offset = 36796;
-    } else if (p == 3 && int32_t(Load(base, screen + 33540)) == 0) {
+    } else if (p == 3 && int32_t(TS(base, screen).interior_mode()) == 0) {
       offset = 33616;
     }
   }
@@ -217,9 +217,9 @@ uint32_t GetChoiceFlag(uint8_t* base, uint32_t screen, uint64_t choice) {
   if (m == 0) {
     const uint32_t p = ItemOf(base, screen);
     if (p == 0) {
-      index = Load(base, screen + kPartSet) * 10 + r4 + 8581;
+      index = TS(base, screen).price_class() * 10 + r4 + 8581;
     } else if (p == 1) {
-      index = Load(base, screen + kPartSet) * 7 + r4 + 8706;
+      index = TS(base, screen).price_class() * 7 + r4 + 8706;
     } else if (p == 2) {
       index = r4 + 8757;
     } else if (p == 3) {
@@ -236,25 +236,25 @@ uint32_t GetChoiceFlag(uint8_t* base, uint32_t screen, uint64_t choice) {
   } else if (m == 3) {
     const uint32_t p = ItemOf(base, screen);
     if (p == 0) {
-      index = Byte(base, screen + kLevel) * 3 + r4 + 8957;
+      index = uint32_t(TS(base, screen).level()) * 3 + r4 + 8957;
     } else if (p == 1) {
-      index = Byte(base, screen + kLevel) * 3 + r4 + 8989;
+      index = uint32_t(TS(base, screen).level()) * 3 + r4 + 8989;
     } else if (p == 2) {
-      index = (Byte(base, screen + kLevel) + 3007) * 3 + r4;
+      index = (uint32_t(TS(base, screen).level()) + 3007) * 3 + r4;
     }
   } else if (m == 4) {
     static constexpr uint32_t kRows[10] = {9042, 9053, 9064, 9076, 0,
                                            9110, 9119, 9128, 9137, 9148};
     const uint32_t p = ItemOf(base, screen);
     if (p == 4) {
-      index = Byte(base, screen + kType) * 2 + r4 + 9095;
+      index = uint32_t(TS(base, screen).type()) * 2 + r4 + 9095;
     } else if (p <= 9) {
       index = r4 + kRows[p];
     }
   } else if (m == 5) {
     const uint32_t p = ItemOf(base, screen);
     if (p == 0) {
-      index = Load(base, screen + 25204) * 38 + r4 + 6964;
+      index = TS(base, screen).part_group() * 38 + r4 + 6964;
     } else if (p == 1) {
       index = r4 + 9154;
     } else if (p == 2) {
@@ -271,11 +271,11 @@ uint32_t GetChoiceFlag(uint8_t* base, uint32_t screen, uint64_t choice) {
     } else if (p == 2) {
       index = r4 + 9200;
     } else if (p == 3) {
-      const int32_t kind = int32_t(Load(base, screen + 33540));
+      const int32_t kind = int32_t(TS(base, screen).interior_mode());
       if (kind == 0) {
         index = r4 + 8406;
       } else if (kind == 1) {
-        index = (Load(base, screen + 33564) + 1691) * 5 + r4;
+        index = (TS(base, screen).interior_page_mode() + 1691) * 5 + r4;
       }
     }
   }

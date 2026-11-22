@@ -5,6 +5,9 @@
 // exit lock in src/c_runtime/exit.cpp.
 
 #include "guest.h"
+#include "lifted/names.h"
+#include "lifted/functions.h"
+#include "lifted/entries.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
 #include "hooks/c_runtime.h"
@@ -18,6 +21,7 @@
 #include "c_runtime/random.h"
 #include "c_runtime/start_up.h"
 #include "c_runtime/strings.h"
+#include "schema/c_runtime.h"
 
 #include "base/flags.h"
 
@@ -253,7 +257,7 @@ ITC_NATIVE_ENTRY(825AA840, ITC_FLAG(native_c_runtime)) {
     return;
   }
   if (ctx.r3.s32 < ctx.r4.s32) {
-    lifted::CallFromContext(ctx, base, 0x825A7410);
+    lifted::Enter(ctx, base, game::memcpy_825A7410);
     return;
   }
   if (!c_runtime::MemmoveDown(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
@@ -297,7 +301,7 @@ ITC_NATIVE_ENTRY(825A7270, ITC_FLAG(native_c_runtime)) {
   ctx.r4.u64 = ctx.r5.u64;
   ctx.r5.u64 = ctx.r6.u64;
   ctx.lr = 0x825A72F0;
-  lifted::CallFromContext(ctx, base, 0x825A7410);
+  lifted::Enter(ctx, base, game::memcpy_825A7410);
   ctx.lr = lr;
   ctx.r3.u64 = 0;
 }
@@ -343,7 +347,7 @@ bool StrToXl(uint8_t* base, uint32_t string, uint32_t end_out, int32_t radix, ui
     return false;
   }
   if (end_out != 0) {
-    guest::StoreU32(base, end_out, end);
+    schema::EndPointerOut(base, end_out).set_end(end);
   }
   return true;
 }
@@ -398,7 +402,8 @@ ITC_NATIVE_ENTRY_ALWAYS(825AB1C0) {
 // result and digits, is below the caller's stack pointer: not written.)
 namespace {
 ITC_REGS_STEP(CftofL) {
-  if (!c_runtime::Cftof(base, REX_LOAD_U64(ctx.r3.u32), ctx.r4.u32, ctx.r5.u32, ctx.r6.s32)) {
+  if (!c_runtime::Cftof(base, schema::DoubleValue(base, ctx.r3.u32).bits(), ctx.r4.u32, ctx.r5.u32,
+                        ctx.r6.s32)) {
     lifted::original::c825AE8E0(ctx, base);
     return;
   }
@@ -420,14 +425,14 @@ ITC_NATIVE_ENTRY(825AEB20, ITC_FLAG(native_c_runtime)) {
   ctx.r7.u64 = ctx.r8.u64;
   ctx.r8.u64 = ctx.r9.u64;
   if (format == 'e' || format == 'E') {
-    lifted::CallFromContext(ctx, base, 0x825AE1A8);
+    lifted::Enter(ctx, base, game::_cftoe_l);
   } else if (format == 'f') {
     ctx.r7.u64 = ctx.r8.u64;
     CftofL(ctx, base);
   } else if (format == 'a' || format == 'A') {
-    lifted::CallFromContext(ctx, base, 0x825AE2C0);
+    lifted::Enter(ctx, base, lifted::e825AE2C0);
   } else {
-    lifted::CallFromContext(ctx, base, 0x825AE9D0);
+    lifted::Enter(ctx, base, game::_cftog_l);
   }
 }
 

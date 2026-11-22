@@ -6,6 +6,17 @@
 
 #include "race_world/race_world.h"
 
+#include "schema/car_physics.h"
+#include "schema/collision_world.h"
+#include "schema/minimap.h"
+#include "schema/race_event.h"
+#include "schema/race_setup.h"
+#include "schema/race_states.h"
+#include "schema/race_world.h"
+#include "schema/track_route.h"
+#include "schema/vehicle.h"
+#include "schema/vehicle_accessors.h"
+
 #include "ai_drivers/ai_drivers.h"
 #include "base/log.h"
 #include "car_physics/float_ops.h"
@@ -24,6 +35,15 @@
 
 namespace race_world {
 
+using M = schema::RaceManager;
+using G = schema::RaceWorldGlobals;
+using L = schema::RaceSortedList;
+using N = schema::RaceSortedNode;
+using E = schema::MinimapRacerEntry;
+using RD = schema::RaceData;
+using Car = schema::Car;
+using Section = schema::TrackRouteSection;
+
 using namespace car_physics::ops;
 namespace va = vehicle_accessors;
 namespace vl = vector_library;
@@ -38,8 +58,6 @@ constexpr uint32_t kBehind = 0x82001070;      // Neighbours 2: one behind
 constexpr uint32_t kBoth = 0x820029F0;        // Neighbours 3: both
 constexpr uint32_t kGiveVehicle = 0x821706E8;
 constexpr uint32_t kRemoveFromWorld = 0x820C20E0;
-constexpr uint32_t kFlagsOffset = 0x59AE4;     // the race data's flags
-constexpr uint32_t kSpacingOffset = 0xA3AE0;   // the race data's traffic numbers' base
 constexpr uint32_t kSlowFactor = 0x820027A8;   // 1.5: the km/h scaled against the speed below
 constexpr uint32_t kTrafficSpeed = 0x82009974;  // the traffic's speed placed (and its limit)
 constexpr uint32_t kTooNear = 0x82002568;      // 20.0: a racer this near the spot refuses it
@@ -60,9 +78,17 @@ uint32_t S16(uint32_t value) {
 uint32_t LoadS16(uint8_t* base, uint32_t address) {
   return S16(guest::LoadU16(base, address));
 }
+// The racer record `number` (the race data's +48 + 3,936 x number).
+Car CarOf(uint8_t* base, uint32_t number) {
+  return Car(base, number * Car::kSize + RD(base, Load(base, kRaceData)).racer_records_address());
+}
+// A vehicle's status (+6160).
+schema::VehicleStatus StatusOf(uint8_t* base, uint32_t vehicle) {
+  return schema::VehicleStatus(base, schema::Vehicle(base, vehicle).status_address());
+}
 // A section's record in the route's table.
 uint32_t SectionRecord(uint8_t* base, uint32_t file, uint32_t section) {
-  return Load(base, Load(base, file + 12) + (section << 2));
+  return Load(base, schema::TrackRouteFile(base, file).sections() + (section << 2));
 }
 
 // An entry loses its vehicle (when it has one and its slot word is above
@@ -71,28 +97,31 @@ uint32_t SectionRecord(uint8_t* base, uint32_t file, uint32_t section) {
 // 0 and +20 = -1.
 void Lose(uint8_t* base, uint32_t manager, uint32_t entry, uint32_t frame, bool heap,
           const OriginalCall& original) {
-  const uint32_t which = Load(base, entry + 20);
-  if (int32_t(which) == -1 || int32_t(Load(base, manager + ((which + 584) << 2))) <= 0) {
+  const uint32_t which = E(base, entry).vehicle_index();
+  if (int32_t(which) == -1 || int32_t(Load(base, M(base, manager).vehicle_slots_address() + (which << 2))) <= 0) {
     return;
   }
-  Store(base, entry, Load(base, entry) & ~0x40u);
+  E(base, entry).set_flags(E(base, entry).flags() & ~0x40u);
   const uint32_t car = va::VehicleGet(base, which);
   uint32_t removed = 0;
   if (!heap || !vehicle::VehicleRemoveFromWorld(base, car, &removed)) {
     original(kRemoveFromWorld, frame, car, 0, 0);
   }
-  Store(base, manager + ((Load(base, entry + 20) + 584) << 2), 0);
-  Store(base, entry + 20, 0xFFFFFFFFu);
+  Store(base, M(base, manager).vehicle_slots_address() + (E(base, entry).vehicle_index() << 2), 0);
+  E(base, entry).set_vehicle_index(0xFFFFFFFFu);
 }
 
 // An entry with a vehicle put in the racers' list (+2308): +2364 and
-// `counter` (+2372 the opponents', +2376 the traffic's) count.
-void List(uint8_t* base, uint32_t manager, uint32_t entry, uint32_t counter = 2372) {
-  Store(base, manager + ((Load(base, manager + 2364) + 577) << 2), entry);
-  const uint32_t listed = Load(base, manager + 2364);
-  const uint32_t racers = Load(base, manager + counter);
-  Store(base, manager + 2364, listed + 1);
-  Store(base, manager + counter, racers + 1);
+// the opponents' (+2372) or with `traffic` the traffic's (+2376) count.
+void List(uint8_t* base, uint32_t manager, uint32_t entry, bool traffic = false) {
+  const M m(base, manager);
+  const uint32_t counter =
+      traffic ? m.traffic_with_vehicle_address() : m.opponents_with_vehicle_address();
+  Store(base, m.racers_address() + (m.racer_count() << 2), entry);
+  const uint32_t listed = m.racer_count();
+  const uint32_t racers = Load(base, counter);
+  m.set_racer_count(listed + 1);
+  Store(base, counter, racers + 1);
 }
 
 // fctiwz's low word, as the translation leaves it (stfiwx).
@@ -126,26 +155,27 @@ void StreamOpponents(uint8_t* base, uint32_t manager, uint32_t player, double sp
   ITC_NATIVE_RUNNING("sub_82172118 RaceManager::StreamOpponents");
   // The player's route position (its vehicle's identity +4) at + 80, its
   // section's record.
-  const uint32_t identity = va::VehicleIdentity(va::VehicleGet(base, Load(base, player + 20)));
-  const uint32_t position = Load(base, identity + 4);
-  const int32_t count = int32_t(Load(base, manager + 2368));
+  const uint32_t identity = va::VehicleIdentity(va::VehicleGet(base, E(base, player).vehicle_index()));
+  const uint32_t position = schema::TrackPosition(base, identity).route_position();
+  const int32_t count = int32_t(M(base, manager).entry_count());
   const uint32_t file = Load(base, kRoute);
   Store(base, frame + 80, position);
   const uint32_t player_section = guest::LoadU16(base, frame + 80);
   const uint32_t player_record = SectionRecord(base, file, player_section);
   // The sorted list at + 176 emptied (+1776 to +1784).
-  Store(base, manager + 2372, 0);
-  Store(base, frame + 1780, 0);
-  Store(base, frame + 1784, 0);
-  Store(base, frame + 1776, 0);
-  const uint32_t list = frame + 176;
+  const L sorted(base, frame + 176);
+  M(base, manager).set_opponents_with_vehicle(0);
+  sorted.set_last_inserted(0);
+  sorted.set_count(0);
+  sorted.set_first(0);
+  const uint32_t list = sorted.address;
   if (count > 0) {
     const double one = Lfs(base, kOne);
     const double far_key = Lfs(base, kFarKey);
     const double zero = Lfs(base, kZero);
     for (int32_t i = 0;;) {
-      const uint32_t entry = manager + 4 + 28 * uint32_t(i);
-      const uint32_t flags = Load(base, entry);
+      const uint32_t entry = M(base, manager).entries_address() + E::kSize * uint32_t(i);
+      const uint32_t flags = E(base, entry).flags();
       bool lose = (flags & 0x20) != 0 || (flags & 0x80) != 0;
       double key = 0.0;
       if (lose) {
@@ -154,12 +184,12 @@ void StreamOpponents(uint8_t* base, uint32_t manager, uint32_t player, double sp
       } else if ((flags & 0x10) != 0 || (flags & 0x400) != 0) {
         key = far_key;
       } else {
-        const uint32_t word = Load(base, entry + 8);
+        const uint32_t word = E(base, entry).position();
         const uint32_t now = Load(base, kRoute);
-        const uint32_t a = guest::LoadU8(base, player_record + 3);
+        const uint32_t a = Section(base, player_record).branch();
         Store(base, frame + 84, word);
         const uint32_t section = guest::LoadU16(base, frame + 84);
-        const uint32_t b = guest::LoadU8(base, SectionRecord(base, now, section) + 3);
+        const uint32_t b = Section(base, SectionRecord(base, now, section)).branch();
         if (BranchesMeet(a, b) == 0) {
           lose = true;
         } else {
@@ -181,30 +211,30 @@ void StreamOpponents(uint8_t* base, uint32_t manager, uint32_t player, double sp
         SortedListInsert(base, list, entry, key);
       }
       i++;
-      if (!(i < int32_t(Load(base, manager + 2368)))) {
+      if (!(i < int32_t(M(base, manager).entry_count()))) {
         break;
       }
     }
   }
   // Past the fourth, the vehicle removed.
   uint32_t n = 0;
-  for (uint32_t node = Load(base, frame + 1776); node != 0; node = Load(base, node + 12), n++) {
-    const uint32_t entry = Load(base, node);
+  for (uint32_t node = L(base, frame + 176).first().address; node != 0; node = N(base, node).next().address, n++) {
+    const uint32_t entry = N(base, node).item();
     if (n >= 4) {
       Lose(base, manager, entry, frame, heap, original);
     }
   }
   // Up to four: nearer than `spawn` given a vehicle (or keeping theirs),
   // beyond `despawn` losing theirs, between keeping theirs.
-  for (uint32_t node = Load(base, frame + 1776); node != 0; node = Load(base, node + 12)) {
-    const uint32_t entry = Load(base, node);
-    if (Load(base, manager + 2372) >= 4) {
+  for (uint32_t node = L(base, frame + 176).first().address; node != 0; node = N(base, node).next().address) {
+    const uint32_t entry = N(base, node).item();
+    if (M(base, manager).opponents_with_vehicle() >= 4) {
       Lose(base, manager, entry, frame, heap, original);
       continue;
     }
-    const double key = Lfs(base, node + 4);
+    const double key = double(N(base, node).key());
     if (key < spawn) {
-      if (int32_t(Load(base, entry + 20)) != -1) {
+      if (int32_t(E(base, entry).vehicle_index()) != -1) {
         List(base, manager, entry);
         continue;
       }
@@ -217,17 +247,17 @@ void StreamOpponents(uint8_t* base, uint32_t manager, uint32_t player, double sp
       }
       List(base, manager, entry);
       ai_drivers::ClearCarInput(base, frame + 144);
-      const uint32_t to = Load(base, kInputs + ((Load(base, entry + 20) << 2) & 0x3FC));
+      const uint32_t to = Load(base, kInputs + ((E(base, entry).vehicle_index() << 2) & 0x3FC));
       for (uint32_t w = 0; w < 5; w++) {
         Store(base, to + 4 * w, Load(base, frame + 144 + 4 * w));
       }
-      const uint32_t number = Load(base, entry + 24);
-      const uint32_t id = number * 3936 + Load(base, kRaceData) + 3960;
+      const uint32_t number = E(base, entry).record();
+      const uint32_t id = CarOf(base, number).item_id_address();
       Store(base, frame + 80, 1);
-      racer_controllers::Setup(base, entry + 20, id, frame + 80, frame);
+      racer_controllers::Setup(base, E(base, entry).vehicle_index_address(), id, frame + 80, frame);
     } else if (key > despawn) {
       Lose(base, manager, entry, frame, heap, original);
-    } else if (int32_t(Load(base, entry + 20)) != -1) {
+    } else if (int32_t(E(base, entry).vehicle_index()) != -1) {
       List(base, manager, entry);
     }
   }
@@ -239,41 +269,42 @@ void Refresh(uint8_t* base, uint32_t manager, uint32_t frame, bool heap,
   // The player's entry: the first flagged 0x4 (the count read again each
   // pass), or none (0: its +20 read at 20).
   uint32_t player = 0;
-  if (int32_t(Load(base, manager + 2368)) > 0) {
+  if (int32_t(M(base, manager).entry_count()) > 0) {
     for (int32_t i = 0;;) {
-      if ((Load(base, manager + 4 + 28 * uint32_t(i)) & 0x4) != 0) {
-        player = manager + 4 + 28 * uint32_t(i);
+      if ((E(base, M(base, manager).entries_address() + E::kSize * uint32_t(i)).flags() & 0x4) != 0) {
+        player = M(base, manager).entries_address() + E::kSize * uint32_t(i);
         break;
       }
       i++;
-      if (!(i < int32_t(Load(base, manager + 2368)))) {
+      if (!(i < int32_t(M(base, manager).entry_count()))) {
         break;
       }
     }
   }
   // Its route position (its vehicle's identity +4) at + 80, its section's
   // record and its slice's center at + 112.
-  const uint32_t identity = va::VehicleIdentity(va::VehicleGet(base, Load(base, player + 20)));
-  Store(base, frame + 80, Load(base, identity + 4));
+  const uint32_t identity = va::VehicleIdentity(va::VehicleGet(base, E(base, player).vehicle_index()));
+  Store(base, frame + 80, schema::TrackPosition(base, identity).route_position());
   const uint32_t player_section = guest::LoadU16(base, frame + 80);
   const uint32_t player_record = SectionRecord(base, Load(base, kRoute), player_section);
   const uint32_t player_slice = LoadS16(base, frame + 82);
   // The sorted list at + 176 emptied and the counts +2364, +2372, +2376 = 0.
-  Store(base, frame + 1776, 0);
-  Store(base, manager + 2364, 0);
-  Store(base, frame + 1780, 0);
-  Store(base, manager + 2372, 0);
-  Store(base, frame + 1784, 0);
-  Store(base, manager + 2376, 0);
+  const L sorted(base, frame + 176);
+  sorted.set_first(0);
+  M(base, manager).set_racer_count(0);
+  sorted.set_last_inserted(0);
+  M(base, manager).set_opponents_with_vehicle(0);
+  sorted.set_count(0);
+  M(base, manager).set_traffic_with_vehicle(0);
   track_route::SlicePoint(base, frame + 112, 0, S16(player_section), player_slice);
-  const uint32_t list = frame + 176;
-  if (int32_t(Load(base, manager + 2368)) > 0) {
+  const uint32_t list = sorted.address;
+  if (int32_t(M(base, manager).entry_count()) > 0) {
     const double one = Lfs(base, kOne);
     const double far_key = Lfs(base, kFarKey);
     const double zero = Lfs(base, kZero);
     for (int32_t i = 0;;) {
-      const uint32_t entry = manager + 4 + 28 * uint32_t(i);
-      const uint32_t flags = Load(base, entry);
+      const uint32_t entry = M(base, manager).entries_address() + E::kSize * uint32_t(i);
+      const uint32_t flags = E(base, entry).flags();
       bool lose = (flags & 0x20) != 0 || (flags & 0x80) != 0;
       double key = 0.0;
       if (lose) {
@@ -283,12 +314,12 @@ void Refresh(uint8_t* base, uint32_t manager, uint32_t frame, bool heap,
         key = far_key;
       } else {
         // The entry's position at + 80 (StreamOpponents': + 84).
-        const uint32_t word = Load(base, entry + 8);
+        const uint32_t word = E(base, entry).position();
         const uint32_t now = Load(base, kRoute);
-        const uint32_t a = guest::LoadU8(base, player_record + 3);
+        const uint32_t a = Section(base, player_record).branch();
         Store(base, frame + 80, word);
         const uint32_t section = guest::LoadU16(base, frame + 80);
-        const uint32_t b = guest::LoadU8(base, SectionRecord(base, now, section) + 3);
+        const uint32_t b = Section(base, SectionRecord(base, now, section)).branch();
         if (BranchesMeet(a, b) == 0) {
           lose = true;
         } else {
@@ -308,30 +339,30 @@ void Refresh(uint8_t* base, uint32_t manager, uint32_t frame, bool heap,
         SortedListInsert(base, list, entry, key);
       }
       i++;
-      if (!(i < int32_t(Load(base, manager + 2368)))) {
+      if (!(i < int32_t(M(base, manager).entry_count()))) {
         break;
       }
     }
   }
   // Past the fourth, the vehicle removed.
   uint32_t n = 0;
-  for (uint32_t node = Load(base, frame + 1776); node != 0; node = Load(base, node + 12), n++) {
-    const uint32_t entry = Load(base, node);
+  for (uint32_t node = L(base, frame + 176).first().address; node != 0; node = N(base, node).next().address, n++) {
+    const uint32_t entry = N(base, node).item();
     if (n >= 4) {
       Lose(base, manager, entry, frame, heap, original);
     }
   }
   // Up to four: nearer than [0x8200996C] given a vehicle (or keeping
   // theirs), beyond [0x82009970] losing theirs, between keeping theirs.
-  for (uint32_t node = Load(base, frame + 1776); node != 0; node = Load(base, node + 12)) {
-    const uint32_t entry = Load(base, node);
-    if (Load(base, manager + 2372) >= 4) {
+  for (uint32_t node = L(base, frame + 176).first().address; node != 0; node = N(base, node).next().address) {
+    const uint32_t entry = N(base, node).item();
+    if (M(base, manager).opponents_with_vehicle() >= 4) {
       Lose(base, manager, entry, frame, heap, original);
       continue;
     }
-    const double key = Lfs(base, node + 4);
+    const double key = double(N(base, node).key());
     if (key < Lfs(base, kRefreshSpawn)) {
-      if (int32_t(Load(base, entry + 20)) != -1) {
+      if (int32_t(E(base, entry).vehicle_index()) != -1) {
         List(base, manager, entry);
         continue;
       }
@@ -344,42 +375,42 @@ void Refresh(uint8_t* base, uint32_t manager, uint32_t frame, bool heap,
       }
       List(base, manager, entry);
       ai_drivers::ClearCarInput(base, frame + 144);
-      const uint32_t to = Load(base, kInputs + ((Load(base, entry + 20) << 2) & 0x3FC));
+      const uint32_t to = Load(base, kInputs + ((E(base, entry).vehicle_index() << 2) & 0x3FC));
       for (uint32_t w = 0; w < 5; w++) {
         Store(base, to + 4 * w, Load(base, frame + 144 + 4 * w));
       }
-      const uint32_t number = Load(base, entry + 24);
-      const uint32_t id = number * 3936 + Load(base, kRaceData) + 3960;
+      const uint32_t number = E(base, entry).record();
+      const uint32_t id = CarOf(base, number).item_id_address();
       Store(base, frame + 80, 1);
-      racer_controllers::Setup(base, entry + 20, id, frame + 80, frame);
+      racer_controllers::Setup(base, E(base, entry).vehicle_index_address(), id, frame + 80, frame);
     } else if (key > Lfs(base, kRefreshDespawn)) {
       Lose(base, manager, entry, frame, heap, original);
-    } else if (int32_t(Load(base, entry + 20)) != -1) {
+    } else if (int32_t(E(base, entry).vehicle_index()) != -1) {
       List(base, manager, entry);
     }
   }
   // The traffic (the three entries at +2160) in use: with the race data's
   // flags 0x4000 each loses its vehicle (+0 = 0, the slot word 0, +20 =
   // -1; no slot word check), else each is listed.
-  if ((Load(base, Load(base, kRaceData) + kFlagsOffset) & 0x4000) != 0) {
+  if ((RD(base, Load(base, kRaceData)).flags() & 0x4000) != 0) {
     for (uint32_t t = 0; t < 3; t++) {
-      const uint32_t entry = manager + 2160 + 28 * t;
-      if (Load(base, entry) == 0) {
+      const uint32_t entry = M(base, manager).traffic_entries_address() + E::kSize * t;
+      if (E(base, entry).flags() == 0) {
         continue;
       }
-      RemoveFromWorld(base, va::VehicleGet(base, Load(base, entry + 20)), frame, heap,
+      RemoveFromWorld(base, va::VehicleGet(base, E(base, entry).vehicle_index()), frame, heap,
                       original);
-      const uint32_t which = Load(base, entry + 20);
-      Store(base, entry, 0);
-      Store(base, manager + ((which + 584) << 2), 0);
-      Store(base, entry + 20, 0xFFFFFFFFu);
+      const uint32_t which = E(base, entry).vehicle_index();
+      E(base, entry).set_flags(0);
+      Store(base, M(base, manager).vehicle_slots_address() + (which << 2), 0);
+      E(base, entry).set_vehicle_index(0xFFFFFFFFu);
     }
     return;
   }
   for (uint32_t t = 0; t < 3; t++) {
-    const uint32_t entry = manager + 2160 + 28 * t;
-    if (Load(base, entry) != 0) {
-      List(base, manager, entry, 2376);
+    const uint32_t entry = M(base, manager).traffic_entries_address() + E::kSize * t;
+    if (E(base, entry).flags() != 0) {
+      List(base, manager, entry, true);
     }
   }
 }
@@ -390,39 +421,40 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
   // The player's route position (its vehicle's identity +4) at + 84, its
   // body's position at + 160, its velocity (+6176) at + 176; the position
   // again at + 80, the second player's there when there's one.
-  const uint32_t car = va::VehicleGet(base, Load(base, player + 20));
-  const uint32_t position = Load(base, va::VehicleIdentity(car) + 4);
+  const uint32_t car = va::VehicleGet(base, E(base, player).vehicle_index());
+  const uint32_t position = schema::TrackPosition(base, va::VehicleIdentity(car)).route_position();
   Store(base, frame + 84, position);
-  const uint32_t at = va::RigidBodyPosition(Load(base, car + 336));
+  const schema::VectorLibVector at(base, va::RigidBodyPosition(schema::Vehicle(base, car).body().address));
+  Store(base, frame + 160, at.x_bits());
+  Store(base, frame + 164, at.y_bits());
+  Store(base, frame + 168, at.z_bits());
+  Store(base, frame + 172, at.w_bits());
   for (uint32_t w = 0; w < 4; w++) {
-    Store(base, frame + 160 + 4 * w, Load(base, at + 4 * w));
-  }
-  for (uint32_t w = 0; w < 4; w++) {
-    Store(base, frame + 176 + 4 * w, Load(base, car + 6176 + 4 * w));
+    Store(base, frame + 176 + 4 * w, Load(base, StatusOf(base, car).heading_address() + 4 * w));
   }
   // Vehicle::Get of the player's +20 again and RigidBody::Position, their
   // answers unused.
-  Store(base, frame + 80, Load(base, va::VehicleIdentity(car) + 4));
-  const double slice_length = Lfs(base, Load(base, kRoute) + 8);
+  Store(base, frame + 80, schema::TrackPosition(base, va::VehicleIdentity(car)).route_position());
+  const double slice_length = double(schema::TrackRoute(base, kRoute).file().slice_length());
   if (second != 0) {
-    const uint32_t other = va::VehicleGet(base, Load(base, second + 20));
-    Store(base, frame + 80, Load(base, va::VehicleIdentity(other) + 4));
+    const uint32_t other = va::VehicleGet(base, E(base, second).vehicle_index());
+    Store(base, frame + 80, schema::TrackPosition(base, va::VehicleIdentity(other)).route_position());
   }
-  Store(base, manager + 2376, 0);
+  M(base, manager).set_traffic_with_vehicle(0);
   // With the race data's flags 0x4000: every traffic car (the entries at
   // +2160) loses its vehicle.
-  if ((Load(base, Load(base, kRaceData) + kFlagsOffset) & 0x4000) != 0) {
+  if ((RD(base, Load(base, kRaceData)).flags() & 0x4000) != 0) {
     for (uint32_t t = 0; t < 3; t++) {
-      const uint32_t entry = manager + 2160 + 28 * t;
-      if (Load(base, entry) == 0) {
+      const uint32_t entry = M(base, manager).traffic_entries_address() + E::kSize * t;
+      if (E(base, entry).flags() == 0) {
         continue;
       }
-      RemoveFromWorld(base, va::VehicleGet(base, Load(base, entry + 20)), frame, heap,
+      RemoveFromWorld(base, va::VehicleGet(base, E(base, entry).vehicle_index()), frame, heap,
                       calls.original);
-      const uint32_t which = Load(base, entry + 20);
-      Store(base, entry, 0);
-      Store(base, manager + ((which + 584) << 2), 0);
-      Store(base, entry + 20, 0xFFFFFFFFu);
+      const uint32_t which = E(base, entry).vehicle_index();
+      E(base, entry).set_flags(0);
+      Store(base, M(base, manager).vehicle_slots_address() + (which << 2), 0);
+      E(base, entry).set_vehicle_index(0xFFFFFFFFu);
     }
     return;
   }
@@ -440,18 +472,18 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
   // loses its vehicle when its slot word is above 0; else it's listed.
   const double zero = Lfs(base, kZero);
   for (uint32_t t = 0; t < 3; t++) {
-    const uint32_t entry = manager + 2160 + 28 * t;
-    if (Load(base, entry) == 0) {
+    const uint32_t entry = M(base, manager).traffic_entries_address() + E::kSize * t;
+    if (E(base, entry).flags() == 0) {
       continue;
     }
-    const uint32_t vehicle = va::VehicleGet(base, Load(base, entry + 20));
-    const uint32_t slot = manager + ((Load(base, entry + 20) + 584) << 2);
+    const uint32_t vehicle = va::VehicleGet(base, E(base, entry).vehicle_index());
+    const uint32_t slot = M(base, manager).vehicle_slots_address() + (E(base, entry).vehicle_index() << 2);
     Store(base, slot, Load(base, slot) + 1);
-    const uint32_t again = manager + ((Load(base, entry + 20) + 584) << 2);
+    const uint32_t again = M(base, manager).vehicle_slots_address() + (E(base, entry).vehicle_index() << 2);
     if (int32_t(Load(base, again)) > 216000) {
       Store(base, again, 60);
     }
-    Store(base, frame + 84, Load(base, va::VehicleIdentity(vehicle) + 4));
+    Store(base, frame + 84, schema::TrackPosition(base, va::VehicleIdentity(vehicle)).route_position());
     track_route::SlicePoint(base, frame + 144, 0, LoadS16(base, frame + 84),
                             LoadS16(base, frame + 86));
     vl::Vec3Sub(base, frame + 96, frame + 144, frame + 208);
@@ -464,32 +496,32 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
       other = double(vl::Vec3Normalize(base, frame + 96, frame + 96));
     }
     if (first > outer && other > outer &&
-        int32_t(Load(base, manager + ((Load(base, entry + 20) + 584) << 2))) > 0) {
+        int32_t(Load(base, M(base, manager).vehicle_slots_address() + (E(base, entry).vehicle_index() << 2))) > 0) {
       RemoveFromWorld(base, vehicle, frame, heap, calls.original);
-      const uint32_t which = Load(base, entry + 20);
-      Store(base, entry, 0);
-      Store(base, manager + ((which + 584) << 2), 0);
-      Store(base, entry + 20, 0xFFFFFFFFu);
+      const uint32_t which = E(base, entry).vehicle_index();
+      E(base, entry).set_flags(0);
+      Store(base, M(base, manager).vehicle_slots_address() + (which << 2), 0);
+      E(base, entry).set_vehicle_index(0xFFFFFFFFu);
     } else {
       // (The original also counts the entries flagged 0x800, for the
       // neighbor search below, which never runs.)
-      List(base, manager, entry, 2376);
+      List(base, manager, entry, true);
     }
   }
-  if ((Load(base, Load(base, kRaceData) + kFlagsOffset) & 0x2000) != 0) {
+  if ((RD(base, Load(base, kRaceData)).flags() & 0x2000) != 0) {
     return;
   }
   // A new traffic car every 90 ticks at most (+2388 counts them), while
   // there are fewer than +2380.
-  if (!(int32_t(Load(base, manager + 2376)) < int32_t(Load(base, manager + 2380))) ||
-      Load(base, manager + 2388) < 90) {
-    const uint32_t ticks = Load(base, manager + 2388);
+  if (!(int32_t(M(base, manager).traffic_with_vehicle()) < int32_t(M(base, manager).traffic_allowed())) ||
+      M(base, manager).traffic_ticks() < 90) {
+    const uint32_t ticks = M(base, manager).traffic_ticks();
     if (ticks < 90) {
-      Store(base, manager + 2388, ticks + 1);
+      M(base, manager).set_traffic_ticks(ticks + 1);
     }
     return;
   }
-  Store(base, manager + 2388, 0);
+  M(base, manager).set_traffic_ticks(0);
   // The first free traffic entry (+0 0) with a free vehicle slot (its word
   // 0 or -1; the slots scanned for each free entry).
   uint32_t t = 0, which = 0xFFFFFFFFu;
@@ -497,11 +529,11 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
     if (t >= 3) {
       return;
     }
-    if (Load(base, manager + 2160 + 28 * t) != 0) {
+    if (E(base, M(base, manager).traffic_entries_address() + E::kSize * t).flags() != 0) {
       continue;
     }
     for (uint32_t k = 0; k < 7; k++) {
-      const uint32_t word = Load(base, manager + 2336 + 4 * k);
+      const uint32_t word = Load(base, M(base, manager).vehicle_slots_address() + 4 * k);
       if (word == 0 || word == 0xFFFFFFFFu) {
         which = k;
         break;
@@ -511,7 +543,7 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
       break;
     }
   }
-  const uint32_t entry = manager + 2160 + 28 * t;
+  const uint32_t entry = M(base, manager).traffic_entries_address() + E::kSize * t;
   // The spot: the original first looks on a section beside the player's
   // (RaceManager::BuildNeighbors' table, +2392) only while its count of the
   // listed traffic cars flagged 0x800 is below 0, which never holds (it
@@ -525,7 +557,7 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
   // player's.
   guest::StoreU16(base, frame + 88, 0xFFFF);
   guest::StoreU16(base, frame + 90, 0xFFFF);
-  const uint32_t flag6168 = Load(base, car + 6168);
+  const uint32_t flag6168 = StatusOf(base, car).wrong_way();
   Store(base, frame + 88, position);
   bool less = false;  // the steps 1 - f13
   double f13 = 0.0;
@@ -535,7 +567,7 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
     }
     f13 = Fdivs(outer, slice_length);
     less = true;
-  } else if ((Load(base, Load(base, kRaceData) + kFlagsOffset) & 0x1000) == 0) {
+  } else if ((RD(base, Load(base, kRaceData)).flags() & 0x1000) == 0) {
     const double kmh = Fmuls(double(Vehicle_GetSpeedKmh(base, car)), Lfs(base, kSlowFactor));
     if (kmh < Lfs(base, kTrafficSpeed)) {
       if (second != 0) {
@@ -559,23 +591,24 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
                           LoadS16(base, frame + 90));
   Stfs(base, frame + 132, zero);
   {
-    uint32_t global = Load(base, kManager);
-    if (int32_t(Load(base, global + 2364)) > 0) {
+    uint32_t global = G::racers_manager(base).address;
+    if (int32_t(M(base, global).racer_count()) > 0) {
       const double too_near = Lfs(base, kTooNear);
       for (int32_t i = 0;;) {
-        const uint32_t listed = Load(base, global + 2308 + 4 * uint32_t(i));
-        const uint32_t body = Load(base, va::VehicleGet(base, Load(base, listed + 20)) + 336);
-        const uint32_t point = va::RigidBodyPosition(body);
-        for (uint32_t w = 0; w < 4; w++) {
-          Store(base, frame + 96 + 4 * w, Load(base, point + 4 * w));
-        }
+        const uint32_t listed = Load(base, M(base, global).racers_address() + 4 * uint32_t(i));
+        const uint32_t body = schema::Vehicle(base, va::VehicleGet(base, E(base, listed).vehicle_index())).body().address;
+        const schema::VectorLibVector point(base, va::RigidBodyPosition(body));
+        Store(base, frame + 96, point.x_bits());
+        Store(base, frame + 100, point.y_bits());
+        Store(base, frame + 104, point.z_bits());
+        Store(base, frame + 108, point.w_bits());
         Stfs(base, frame + 100, zero);
         if (double(vl::Vec3Direction(base, frame + 256, frame + 128, frame + 96)) < too_near) {
           return;
         }
-        global = Load(base, kManager);
+        global = G::racers_manager(base).address;
         i++;
-        if (!(i < int32_t(Load(base, global + 2364)))) {
+        if (!(i < int32_t(M(base, global).racer_count()))) {
           break;
         }
       }
@@ -587,19 +620,19 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
   // lane by the player's car's +6224 (0 below 0.0, else 1).
   const uint32_t file = Load(base, kRoute);
   const uint32_t branch =
-      guest::LoadU8(base, SectionRecord(base, file, guest::LoadU16(base, frame + 88)) + 3);
+      Section(base, SectionRecord(base, file, guest::LoadU16(base, frame + 88))).branch();
   const uint32_t number =
-      Load(base, Load(base, kRaceData) + kSpacingOffset) + Load(base, entry + 16) + t;
+      RD(base, Load(base, kRaceData)).random_10() + E(base, entry).traffic_number() + t;
   const uint32_t model = uint32_t(PickModel(base, number, branch, frame));
-  const uint32_t record = Load(base, manager + ((model + 561) << 2));
-  Store(base, entry + 4, model);
-  Store(base, entry + 0, 578);
-  Store(base, entry + 24, record);
-  const uint32_t lane = Lfs(base, car + 6224) < zero ? 0 : 1;
-  Store(base, entry + 16, number);
+  const uint32_t record = Load(base, M(base, manager).traffic_models_address() + (model << 2));
+  E(base, entry).set_number(model);
+  E(base, entry).set_flags(578);
+  E(base, entry).set_record(record);
+  const uint32_t lane = double(StatusOf(base, car).across()) < zero ? 0 : 1;
+  E(base, entry).set_traffic_number(number);
   for (int32_t n = int32_t(number); n > 42;) {
-    n = int32_t(Load(base, entry + 16)) - 42;
-    Store(base, entry + 16, uint32_t(n));
+    n = int32_t(E(base, entry).traffic_number()) - 42;
+    E(base, entry).set_traffic_number(uint32_t(n));
   }
   // Its vehicle: Vehicle::SetUp (slot word -1) or ResetForCar with its
   // record (the race data + 48 + 3,936 x +24), the slot 1,
@@ -608,10 +641,10 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
   // racer's, VehicleStatus's speed record (+6160), one physics step
   // ([0x826193C8]) and VehicleStatus::Update(+6160, it, 0, 1); its driver
   // (AiDriver::Setup: -1 at + 80, 1 at + 84); listed.
-  Store(base, entry + 20, which);
+  E(base, entry).set_vehicle_index(which);
   const uint32_t given = va::VehicleGet(base, which);
-  const uint32_t slot = manager + ((which + 584) << 2);
-  const uint32_t car_record = Load(base, kRaceData) + Load(base, entry + 24) * 3936 + 48;
+  const uint32_t slot = M(base, manager).vehicle_slots_address() + (which << 2);
+  const uint32_t car_record = CarOf(base, E(base, entry).record()).address;
   double f1 = 0.0;
   vehicle::VehicleSetUp(base, given, car_record, frame - 224, int32_t(Load(base, slot)) != -1,
                         heap, calls.setup_original, &f1);
@@ -631,12 +664,12 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
   }
   ai_drivers::ClearCarInput(base, frame + 224);
   {
-    const uint32_t to = Load(base, kInputs + ((Load(base, entry + 20) << 2) & 0x3FC));
+    const uint32_t to = Load(base, kInputs + ((E(base, entry).vehicle_index() << 2) & 0x3FC));
     for (uint32_t w = 0; w < 5; w++) {
       Store(base, to + 4 * w, Load(base, frame + 224 + 4 * w));
     }
   }
-  const uint32_t status = given + 6160;
+  const uint32_t status = schema::Vehicle(base, given).status_address();
   va::VehicleSpeedRecord(base, status, given);
   {
     const double dt = Lfs(base, kTrafficStep);
@@ -663,30 +696,30 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
   }
   Store(base, frame + 84, 1);
   Store(base, frame + 80, 0xFFFFFFFFu);
-  racer_controllers::Setup(base, entry + 20, frame + 80, frame + 84, frame);
-  List(base, manager, entry, 2376);
+  racer_controllers::Setup(base, E(base, entry).vehicle_index_address(), frame + 80, frame + 84, frame);
+  List(base, manager, entry, true);
 }
 
 void MoveUnseen(uint8_t* base, uint32_t manager, uint32_t player, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_82173E28 RaceManager::MoveUnseen");
-  const uint32_t vehicle = va::VehicleGet(base, Load(base, player + 20));
+  const uint32_t vehicle = va::VehicleGet(base, E(base, player).vehicle_index());
   const uint32_t identity = va::VehicleIdentity(vehicle);
-  const uint32_t body = Load(base, vehicle + 336);
-  Store(base, frame + 88, Load(base, identity + 4));
-  const uint32_t at = va::RigidBodyPosition(body);
-  const uint32_t racers = Load(base, manager + 2372);
+  const uint32_t body = schema::Vehicle(base, vehicle).body().address;
+  Store(base, frame + 88, schema::TrackPosition(base, identity).route_position());
+  const schema::VectorLibVector at(base, va::RigidBodyPosition(body));
+  const uint32_t racers = M(base, manager).opponents_with_vehicle();
   const uint32_t player_section = guest::LoadU16(base, frame + 88);
-  const uint32_t race_flags = Load(base, Load(base, kRaceData) + 20);
+  const uint32_t race_flags = RD(base, Load(base, kRaceData)).branch_flags();
   const uint32_t file = Load(base, kRoute);
-  const uint32_t table = Load(base, file + 12);
-  const double slice_length = Lfs(base, file + 8);
+  const uint32_t table = schema::TrackRouteFile(base, file).sections();
+  const double slice_length = double(schema::TrackRouteFile(base, file).slice_length());
   uint32_t flag20 = (race_flags >> 5) & 1;
   const uint32_t player_record = Load(base, (player_section << 2) + table);
   const bool four = racers == 4;
-  uint32_t hi[2] = {Load(base, at + 8), Load(base, at + 12)};
+  uint32_t hi[2] = {at.z_bits(), at.w_bits()};
   Store(base, frame + 80, flag20);
-  Store(base, frame + 92, guest::LoadU8(base, player_record + 3));
-  uint32_t lo[2] = {Load(base, at + 0), Load(base, at + 4)};
+  Store(base, frame + 92, Section(base, player_record).branch());
+  uint32_t lo[2] = {at.x_bits(), at.y_bits()};
   uint32_t flag10 = (race_flags >> 4) & 1;
   // The player's position (RigidBody::Position) at + 96.
   Store(base, frame + 96, lo[0]);
@@ -697,14 +730,15 @@ void MoveUnseen(uint8_t* base, uint32_t manager, uint32_t player, uint32_t frame
   // With the race data's flags 0x10 or 0x20: whether an entry of item kind
   // 2 (sections 200 to 203, 258 to 261; clears + 84) or 3 (187, 188, 193,
   // 194, 251 to 253; clears + 80) is already there.
-  if ((flag10 != 0 || flag20 != 0) && int32_t(Load(base, manager + 2368)) > 0) {
+  if ((flag10 != 0 || flag20 != 0) && int32_t(M(base, manager).entry_count()) > 0) {
     for (int32_t i = 0;;) {
-      const uint32_t entry = manager + 4 + 28 * uint32_t(i);
-      const uint32_t number = Load(base, entry + 24);
+      const uint32_t entry = M(base, manager).entries_address() + E::kSize * uint32_t(i);
+      const uint32_t number = E(base, entry).record();
       const uint32_t race = Load(base, kRaceData);
-      const int32_t id = int32_t(S16(Load(base, number * 3936 + race + 3960)));
-      if (id >= 0 && (Load(base, entry) & 0xAC) == 0) {
-        const int32_t s = int32_t(LoadS16(base, entry + 8));
+      const int32_t id = int32_t(
+          S16(Car(base, number * Car::kSize + RD(base, race).racer_records_address()).item_id()));
+      if (id >= 0 && (E(base, entry).flags() & 0xAC) == 0) {
+        const int32_t s = int32_t(S16(E(base, entry).section()));
         uint32_t which = 0;
         if (s > 203) {
           if (s >= 251) {
@@ -722,11 +756,11 @@ void MoveUnseen(uint8_t* base, uint32_t manager, uint32_t player, uint32_t frame
           }
         }
         if (which == 3 && flag20 != 0 &&
-            guest::LoadU8(base, data_tables::Item(base, uint32_t(id)) + 36) == 3) {
+            schema::OpponentItem(base, data_tables::Item(base, uint32_t(id))).location() == 3) {
           flag20 = 0;
           Store(base, frame + 80, flag20);
         } else if (which == 2 && flag10 != 0 &&
-                   guest::LoadU8(base, data_tables::Item(base, uint32_t(id)) + 36) == 2) {
+                   schema::OpponentItem(base, data_tables::Item(base, uint32_t(id))).location() == 2) {
           flag10 = 0;
           Store(base, frame + 84, flag10);
         }
@@ -735,14 +769,14 @@ void MoveUnseen(uint8_t* base, uint32_t manager, uint32_t player, uint32_t frame
         break;
       }
       i++;
-      if (!(i < int32_t(Load(base, manager + 2368)))) {
+      if (!(i < int32_t(M(base, manager).entry_count()))) {
         break;
       }
     }
   }
   // Each entry not flagged 0x20 or 0x80 (its index at + 88).
   Store(base, frame + 88, 0);
-  if (!(int32_t(Load(base, manager + 2368)) > 0)) {
+  if (!(int32_t(M(base, manager).entry_count()) > 0)) {
     return;
   }
   const double ahead = Lfs(base, kAhead);
@@ -752,41 +786,41 @@ void MoveUnseen(uint8_t* base, uint32_t manager, uint32_t player, uint32_t frame
   const double one = Lfs(base, kOne);
   const double zero = Lfs(base, kZero);
   for (uint32_t i = 0;;) {
-    const uint32_t entry = manager + 4 + 28 * i;
-    const uint32_t flags = Load(base, entry);
+    const uint32_t entry = M(base, manager).entries_address() + E::kSize * i;
+    const uint32_t flags = E(base, entry).flags();
     if ((flags & 0x20) != 0 || (flags & 0x80) != 0) {
     } else if ((flags & 0x40) != 0) {
       // With a vehicle: +8 its track position, +12 0.0, its slot word
       // counting its ticks (to 216,000, then 60).
-      const uint32_t own = va::VehicleIdentity(va::VehicleGet(base, Load(base, entry + 20)));
-      const uint32_t slot = manager + ((Load(base, entry + 20) + 584) << 2);
-      guest::StoreU16(base, entry + 8, guest::LoadU16(base, own + 4));
-      guest::StoreU16(base, entry + 10, guest::LoadU16(base, own + 6));
-      Stfs(base, entry + 12, zero);
+      const uint32_t own = va::VehicleIdentity(va::VehicleGet(base, E(base, entry).vehicle_index()));
+      const uint32_t slot = M(base, manager).vehicle_slots_address() + (E(base, entry).vehicle_index() << 2);
+      E(base, entry).set_section(schema::TrackPosition(base, own).route_section());
+      E(base, entry).set_slice(schema::TrackPosition(base, own).route_slice());
+      Stfs(base, E(base, entry).slice_ticks_address(), zero);
       Store(base, slot, Load(base, slot) + 1);
-      const uint32_t again = manager + ((Load(base, entry + 20) + 584) << 2);
+      const uint32_t again = M(base, manager).vehicle_slots_address() + (E(base, entry).vehicle_index() << 2);
       if (int32_t(Load(base, again)) > 216000) {
         Store(base, again, 60);
       }
     } else {
       // Without: +12 counts ticks; once it reaches a slice's ticks, a slice
       // on along the route.
-      const uint32_t number = Load(base, entry + 24);
-      const double ticks_so_far = Lfs(base, entry + 12);
+      const uint32_t number = E(base, entry).record();
+      const double ticks_so_far = double(E(base, entry).slice_ticks());
       const uint32_t race = Load(base, kRaceData);
-      Stfs(base, entry + 12, Fadds(ticks_so_far, one));
-      const uint32_t record = number * 3936 + race;
+      Stfs(base, E(base, entry).slice_ticks_address(), Fadds(ticks_so_far, one));
+      const Car record(base, number * Car::kSize + RD(base, race).racer_records_address());
       JumpSections(base, entry, frame + 96, frame + 92, frame + 84, frame + 80, frame - 176);
       double ticks = 0.0;
       bool met = false;
-      if (four && (Load(base, player) & 0x10) != 0) {
+      if (four && (E(base, player).flags() & 0x10) != 0) {
         const uint32_t now = Load(base, kRoute);
-        const uint32_t section = guest::LoadU16(base, entry + 8);
-        const uint32_t a = guest::LoadU8(base, player_record + 3);
-        const uint32_t b = guest::LoadU8(base, SectionRecord(base, now, section) + 3);
+        const uint32_t section = E(base, entry).section();
+        const uint32_t a = Section(base, player_record).branch();
+        const uint32_t b = Section(base, SectionRecord(base, now, section)).branch();
         if (BranchesMeet(a, b) != 0) {
           met = true;
-          if (int32_t(Load(base, vehicle + 6168)) != 0 ||
+          if (int32_t(StatusOf(base, vehicle).wrong_way()) != 0 ||
               double(va::VehicleDistancePerFrame(base, vehicle)) == zero) {
             ticks = Fmuls(slice_length, scale);
           } else {
@@ -810,18 +844,18 @@ void MoveUnseen(uint8_t* base, uint32_t manager, uint32_t player, uint32_t frame
             break;
         }
       }
-      if (!(Lfs(base, entry + 12) < ticks)) {
-        const uint32_t item = Load(base, record + 3960);
+      if (!(double(E(base, entry).slice_ticks()) < ticks)) {
+        const uint32_t item = record.item_id();
         const uint32_t kind =
             int32_t(item) < 0
                 ? 0xFFFFFFFFu
-                : uint32_t(int32_t(int8_t(guest::LoadU8(base, data_tables::Item(base, item) + 36))));
-        vehicle::RoutePositionStep(base, entry + 8, 1, S16(kind), frame - 112);
-        Stfs(base, entry + 12, Fsubs(Lfs(base, entry + 12), ticks));
+                : uint32_t(int32_t(int8_t(schema::OpponentItem(base, data_tables::Item(base, item)).location())));
+        vehicle::RoutePositionStep(base, E(base, entry).position_address(), 1, S16(kind), frame - 112);
+        Stfs(base, E(base, entry).slice_ticks_address(), Fsubs(double(E(base, entry).slice_ticks()), ticks));
       }
     }
     i++;
-    const int32_t count = int32_t(Load(base, manager + 2368));
+    const int32_t count = int32_t(M(base, manager).entry_count());
     Store(base, frame + 88, i);
     if (!(int32_t(i) < count)) {
       break;
@@ -840,11 +874,8 @@ constexpr uint32_t kFarBase = 0x82008914;        // the far radii's base
 constexpr uint32_t kFarCap = 0x82003384;         // the far radii's cap
 constexpr uint32_t kOpponentNearCap = 0x820099CC;  // the opponents' near radius when capped
 constexpr uint32_t kTrafficNearCap = 0x820099C8;   // the traffic's near radius when capped
-constexpr uint32_t kKindOffset = 0xA3AF4;          // the race data's kind
 constexpr uint32_t kRecorded = 0x821743A8;         // sub_821743A8 (never seen in play)
-constexpr uint32_t kStart = 0x826C6B0C;            // a byte: which racers' words are cleared
-constexpr uint32_t kStartObject = 0x826C7824;      // a word: picks 0x1 or 0x80 by the byte
-constexpr uint32_t kRacerData = 0x826D82E8;        // 972-byte records from +2972 (a pointer)
+constexpr uint32_t kRacerData = 0x826D82E8;        // the race's progress (a pointer)
 
 // The callees' originals with RaceManager::RefreshVehicles' signature.
 Original RefreshOriginal(const StartCalls& calls) {
@@ -859,19 +890,19 @@ void StreamAround(uint8_t* base, uint32_t manager, uint32_t sp, bool cruise, boo
   const uint32_t frame = sp - 160;
   // The player's entry: the first flagged 0x4, or none (0).
   uint32_t player = 0;
-  if (int32_t(Load(base, manager + 2368)) > 0) {
+  if (int32_t(M(base, manager).entry_count()) > 0) {
     for (int32_t i = 0;;) {
-      if ((Load(base, manager + 4 + 28 * uint32_t(i)) & 0x4) != 0) {
-        player = manager + 4 + 28 * uint32_t(i);
+      if ((E(base, M(base, manager).entries_address() + E::kSize * uint32_t(i)).flags() & 0x4) != 0) {
+        player = M(base, manager).entries_address() + E::kSize * uint32_t(i);
         break;
       }
       i++;
-      if (!(i < int32_t(Load(base, manager + 2368)))) {
+      if (!(i < int32_t(M(base, manager).entry_count()))) {
         break;
       }
     }
   }
-  const uint32_t car = va::VehicleGet(base, Load(base, player + 20));
+  const uint32_t car = va::VehicleGet(base, E(base, player).vehicle_index());
   // The radii, each from Vehicle::Speed again.
   double f31 = Lfs(base, kTrafficScale);
   double f30 = Lfs(base, kNearBase);
@@ -890,7 +921,7 @@ void StreamAround(uint8_t* base, uint32_t manager, uint32_t sp, bool cruise, boo
       f27 = Lfs(base, kTrafficNearCap);
     }
   }
-  Store(base, manager + 2364, 0);
+  M(base, manager).set_racer_count(0);
   StreamOpponents(base, manager, player, f30, f2, frame - 1920, heap,
                   make(frame - 1920 - 224).original);
   StreamTraffic(base, manager, player, f27, f28, 0, frame - 464, heap, make(frame - 464 - 224));
@@ -918,16 +949,17 @@ void StreamTwoPlayers(uint8_t* base, uint32_t manager, uint32_t sp, bool heap,
   const uint32_t frame = sp - 128;
   // The one ahead: the second entry when the race data's flags have 0x20
   // or 0x40 and [0x826D82E8]'s +3012 is below its +3984.
-  const uint32_t flags = Load(base, Load(base, kRaceData) + kFlagsOffset);
+  const uint32_t flags = RD(base, Load(base, kRaceData)).flags();
   bool second_ahead = false;
   if ((flags & 0x20) != 0 || (flags & 0x40) != 0) {
     const uint32_t data = Load(base, kRacerData);
-    second_ahead = Lfs(base, data + 3012) < Lfs(base, data + 3984);
+    second_ahead = double(schema::RaceProgress(base, data).e0_route_distance()) <
+                   double(schema::RaceProgress(base, data).e1_route_distance());
   }
-  const uint32_t ahead = second_ahead ? manager + 32 : manager + 4;
-  const uint32_t other = second_ahead ? manager + 4 : manager + 32;
-  const double f31 = double(va::VehicleSpeed(base, va::VehicleGet(base, Load(base, ahead + 20))));
-  double f13 = double(va::VehicleSpeed(base, va::VehicleGet(base, Load(base, other + 20))));
+  const uint32_t ahead = second_ahead ? M(base, manager).entries_address() + E::kSize : M(base, manager).entries_address();
+  const uint32_t other = second_ahead ? M(base, manager).entries_address() : M(base, manager).entries_address() + E::kSize;
+  const double f31 = double(va::VehicleSpeed(base, va::VehicleGet(base, E(base, ahead).vehicle_index())));
+  double f13 = double(va::VehicleSpeed(base, va::VehicleGet(base, E(base, other).vehicle_index())));
   if (!(f31 < f13)) {
     f13 = f31;
   }
@@ -948,7 +980,7 @@ void StreamTwoPlayers(uint8_t* base, uint32_t manager, uint32_t sp, bool heap,
       f30 = Lfs(base, kTrafficNearCap);
     }
   }
-  Store(base, manager + 2364, 0);
+  M(base, manager).set_racer_count(0);
   StreamOpponents(base, manager, ahead, f1, f2, frame - 1920, heap,
                   make(frame - 1920 - 224).original);
   StreamTraffic(base, manager, ahead, f30, f31b, other, frame - 464, heap,
@@ -957,7 +989,7 @@ void StreamTwoPlayers(uint8_t* base, uint32_t manager, uint32_t sp, bool heap,
 
 void Stream(uint8_t* base, uint32_t manager, uint32_t sp, bool heap, const MakeCalls& make) {
   ITC_NATIVE_RUNNING("sub_82174338 RaceManager::Stream");
-  const uint32_t kind = Load(base, Load(base, kRaceData) + kKindOffset);
+  const uint32_t kind = RD(base, Load(base, kRaceData)).race_mode();
   switch (kind) {
     case 2:
     case 3:
@@ -982,10 +1014,10 @@ void Stream(uint8_t* base, uint32_t manager, uint32_t sp, bool heap, const MakeC
 void Tick(uint8_t* base, uint32_t world, uint32_t frame, bool heap, const MakeCalls& make) {
   ITC_NATIVE_RUNNING("sub_82174BC0 RaceWorld::Tick");
   const StartCalls calls = make(frame - 224);
-  if (Load(base, world + 9608) != 0) {
+  if (schema::RaceWorld(base, world).two_humans() != 0) {
     const uint32_t race = Load(base, kRaceData);
-    const uint32_t start = guest::LoadU8(base, kStart);
-    if ((Load(base, race + kFlagsOffset) & 0x20) == 0 || start == 255) {
+    const uint32_t start = G::start_byte(base);
+    if ((RD(base, race).flags() & 0x20) == 0 || start == 255) {
       // sub_821743A8 (never seen in play): its original.
       calls.original(kRecorded, frame, world, 0, 0);
     } else {
@@ -995,20 +1027,22 @@ void Tick(uint8_t* base, uint32_t world, uint32_t frame, bool heap, const MakeCa
       uint32_t want = 0;
       const bool either = start != 0 && start != 1;
       if (start == 0) {
-        want = Load(base, kStartObject) != 0 ? 0x1 : 0x80;
+        want = G::human_flag(base) != 0 ? 0x1 : 0x80;
       } else if (start == 1) {
-        want = Load(base, kStartObject) != 0 ? 0x80 : 0x1;
+        want = G::human_flag(base) != 0 ? 0x80 : 0x1;
       }
-      const uint32_t records = race + 48;
-      const uint32_t count = records + 0x595E0;
+      const uint32_t records = RD(base, race).racer_records_address();
+      const uint32_t count = RD(base, race).car_count_address();
       if (int32_t(Load(base, count)) > 0) {
         for (int32_t i = 0;;) {
-          const uint32_t flags = Load(base, records + 3888 + 3936 * uint32_t(i));
+          const uint32_t flags = Car(base, records + Car::kSize * uint32_t(i)).flags();
           const bool match =
               either ? ((flags & 0x1) != 0 || (flags & 0x80) != 0) : (flags & want) == want;
           if (match) {
             const uint32_t entry = EntryOfRecord(base, uint32_t(i));
-            Store(base, Load(base, entry + 24) * 972 + data + 2972, 0);
+            // Its results entry's +784 (972 bytes each).
+            Store(base, E(base, entry).record() * 972 + schema::RaceProgress(base, data).e0_sp_address(),
+                  0);
           }
           i++;
           if (!(i < int32_t(Load(base, count)))) {
@@ -1018,7 +1052,7 @@ void Tick(uint8_t* base, uint32_t world, uint32_t frame, bool heap, const MakeCa
       }
     }
   }
-  Stream(base, Load(base, kManager), frame, heap, make);
+  Stream(base, G::racers_manager(base).address, frame, heap, make);
   calls.update_drivers(frame, 0x82174D04);
   TickVehicles(base, frame - 128, calls.tick);
   track_collision::TrackCollisionTick(base, frame - 144, calls.collision);

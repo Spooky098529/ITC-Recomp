@@ -6,12 +6,14 @@
 
 #include "base/float_mode.h"
 #include "type67_modes/type67_modes.h"
+#include "type67_modes/views.h"
 
 #include "base/log.h"
 #include "c_runtime/math.h"
 #include "c_runtime/strings.h"
 #include "guest.h"
 #include "matrix_math/matrix_math.h"
+#include "schema/front_end_car_draw.h"
 #include "xaudio/ppc_float.h"
 
 #include <bit>
@@ -22,6 +24,7 @@ namespace {
 
 namespace pf = xaudio::ppc_float;
 using pf::Vec;
+using FCD = schema::FrontEndCarDrawGlobals;
 
 // lfs and stfs as the translated code's doubles.
 double Lfs(uint8_t* base, uint32_t address) { return double(guest::LoadFloat(base, address)); }
@@ -64,7 +67,7 @@ void QuaternionFromAngles(uint8_t* base, uint32_t out, double f1, double f2, dou
   Stfs(base, sp - 32, f3);
   Stfs(base, sp - 28, f1);
   Stfs(base, sp - 20, f2);
-  Stfs(base, sp - 24, Lfs(base, 0x82000A34));
+  Stfs(base, sp - 24, Lfs(base, FCD::zero_address()));
   const Vec v5 = simde_mm_setzero_si128();
   Vec v9 = pf::Lvlx(base, sp - 28);
   Vec v0 = pf::Lvlx(base, sp - 20);
@@ -175,12 +178,13 @@ void QuaternionFromAngles(uint8_t* base, uint32_t out, double f1, double f2, dou
 
 void GarageCameraReset(uint8_t* base, uint32_t camera, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_8217D888 GarageCamera::Reset");
+  const schema::GarageCamera cam(base, camera);
   pf::Mode mode;
   mode.Scalar();
   const uint32_t f = frame;
-  const double zero = Lfs(base, 0x82000A34), one = Lfs(base, 0x82000A30);
+  const double zero = Lfs(base, FCD::zero_address()), one = Lfs(base, FCD::one_address());
   // The vectors built in the frame, in the original's store order.
-  Stfs(base, f + 100, Lfs(base, 0x82002240));
+  Stfs(base, f + 100, Lfs(base, FCD::pi_address()));
   Stfs(base, f + 144, zero);
   Stfs(base, f + 148, zero);
   Stfs(base, f + 152, zero);
@@ -192,15 +196,15 @@ void GarageCameraReset(uint8_t* base, uint32_t camera, uint32_t frame) {
   Stfs(base, f + 160, Lfs(base, 0x82009EE4));
   Stfs(base, f + 140, one);
   // The eye's start (+16) and the target (+32).
-  StoreU64(base, camera + 16, LoadU64(base, f + 144));
+  StoreU64(base, cam.eye_address(), LoadU64(base, f + 144));
   Stfs(base, f + 176, zero);
-  StoreU64(base, camera + 24, LoadU64(base, f + 152));
-  StoreU64(base, camera + 32, LoadU64(base, f + 112));
+  StoreU64(base, cam.eye_address() + 8, LoadU64(base, f + 152));
+  StoreU64(base, cam.target_address(), LoadU64(base, f + 112));
   Stfs(base, f + 180, zero);
-  StoreU64(base, camera + 40, LoadU64(base, f + 120));
-  Stfs(base, f + 128, double(float(Lfs(base, camera + 16) - Lfs(base, camera + 32))));
-  Stfs(base, f + 132, double(float(Lfs(base, camera + 20) - Lfs(base, camera + 36))));
-  Stfs(base, f + 136, double(float(Lfs(base, camera + 24) - Lfs(base, camera + 40))));
+  StoreU64(base, cam.target_address() + 8, LoadU64(base, f + 120));
+  Stfs(base, f + 128, double(float(Lfs(base, cam.eye_x_address()) - Lfs(base, cam.target_x_address()))));
+  Stfs(base, f + 132, double(float(Lfs(base, cam.eye_y_address()) - Lfs(base, cam.target_y_address()))));
+  Stfs(base, f + 136, double(float(Lfs(base, cam.eye_z_address()) - Lfs(base, cam.target_z_address()))));
   const uint64_t d0 = LoadU64(base, f + 128);
   Stfs(base, f + 184, zero);
   const uint64_t d1 = LoadU64(base, f + 136);
@@ -211,30 +215,30 @@ void GarageCameraReset(uint8_t* base, uint32_t camera, uint32_t frame) {
   Stfs(base, f + 84, zero);
   Stfs(base, f + 88, zero);
   Stfs(base, f + 92, one);
-  StoreU64(base, camera + 48, d0);
+  StoreU64(base, cam.eye_offset_address(), d0);
   const uint64_t g0 = LoadU64(base, f + 80);
   Stfs(base, f + 96, zero);
-  StoreU64(base, camera + 56, d1);
+  StoreU64(base, cam.eye_offset_address() + 8, d1);
   const uint64_t g1 = LoadU64(base, f + 88);
   Stfs(base, f + 104, zero);
   Stfs(base, f + 108, one);
-  StoreU64(base, camera + 64, e0);
+  StoreU64(base, cam.vector_64_address(), e0);
   const uint64_t a0 = LoadU64(base, f + 96);
-  StoreU64(base, camera + 72, e1);
+  StoreU64(base, cam.vector_64_address() + 8, e1);
   const uint64_t a1 = LoadU64(base, f + 104);
-  StoreU64(base, camera + 80, g0);
-  StoreU64(base, camera + 88, g1);
-  StoreU64(base, camera + 240, a0);
-  StoreU64(base, camera + 248, a1);
+  StoreU64(base, cam.vector_80_address(), g0);
+  StoreU64(base, cam.vector_80_address() + 8, g1);
+  StoreU64(base, cam.angles_address(), a0);
+  StoreU64(base, cam.angles_address() + 8, a1);
   Stfs(base, f + 172, one);
   Stfs(base, f + 164, Lfs(base, 0x82002A10));
   Stfs(base, f + 168, zero);
-  StoreU64(base, camera + 256, LoadU64(base, f + 160));
-  StoreU64(base, camera + 264, LoadU64(base, f + 168));
-  Stfs(base, camera + 96, zero);
-  Stfs(base, camera + 100, Lfs(base, 0x82009EE0));
-  Stfs(base, camera + 104, zero);
-  Stfs(base, camera + 224, Lfs(base, 0x82000F14));
+  StoreU64(base, cam.translation_address(), LoadU64(base, f + 160));
+  StoreU64(base, cam.translation_address() + 8, LoadU64(base, f + 168));
+  Stfs(base, cam.unknown_96_address(), zero);
+  Stfs(base, cam.tilt_address(), Lfs(base, 0x82009EE0));
+  Stfs(base, cam.unknown_104_address(), zero);
+  Stfs(base, cam.fov_address(), Lfs(base, FCD::sixty_address()));
   // The zoom: 640 / tan(pi / 3), tan in nearest rounding as its _ctrlfp
   // sets it (put back after, as the original's second _ctrlfp does).
   double tangent = 0.0;
@@ -248,31 +252,31 @@ void GarageCameraReset(uint8_t* base, uint32_t camera, uint32_t frame) {
     Fpscr::setcsr(csr);
   }
   mode.Scalar();
-  Stfs(base, camera + 108, double(float(Lfs(base, 0x82009EB8) / double(float(tangent)))));
+  Stfs(base, cam.zoom_address(), double(float(Lfs(base, FCD::focal_address()) / double(float(tangent)))));
   // The identity at the frame's +192, copied to +112 (memcpy).
   for (uint32_t row = 0; row < 4; row++) {
     for (uint32_t column = 0; column < 4; column++) {
       guest::StoreU32(base, f + 192 + 16 * row + 4 * column, row == column ? 0x3F800000u : 0);
     }
   }
-  if (!c_runtime::Memcpy(base, camera + 112, f + 192, 64)) {
+  if (!c_runtime::Memcpy(base, cam.rotation_address(), f + 192, 64)) {
     for (uint32_t i = 0; i < 64; i += 4) {
-      guest::StoreU32(base, camera + 112 + i, guest::LoadU32(base, f + 192 + i));
+      guest::StoreU32(base, cam.rotation_address() + i, guest::LoadU32(base, f + 192 + i));
     }
   }
-  Stfs(base, camera + 176, zero);
-  Stfs(base, camera + 180, Lfs(base, 0x82009ED0));
-  QuaternionFromAngles(base, camera + 192, zero, zero, zero, f);
+  Stfs(base, cam.orbit_address(), zero);
+  Stfs(base, cam.distance_address(), Lfs(base, 0x82009ED0));
+  QuaternionFromAngles(base, cam.quaternion_address(), zero, zero, zero, f);
 }
 
 namespace {
 
 // GarageCamera::Command's constants (floats).
 constexpr uint32_t kTiltStep = 0x82001FBC;   // the tilt's step and its low bound
-constexpr uint32_t kTiltHigh = 0x82000A30;   // the tilt's high bound
-constexpr uint32_t kStep = 0x82002948;       // the turns' step
-constexpr uint32_t kTurnLow = 0x820029C4;    // a turn's low bound (wraps to the high)
-constexpr uint32_t kTurnHigh = 0x82002240;   // its high bound (wraps to the low)
+constexpr uint32_t kTiltHigh = FCD::one_address();   // the tilt's high bound
+constexpr uint32_t kStep = FCD::degree_address();       // the turns' step
+constexpr uint32_t kTurnLow = FCD::minus_pi_address();    // a turn's low bound (wraps to the high)
+constexpr uint32_t kTurnHigh = FCD::pi_address();   // its high bound (wraps to the low)
 constexpr uint32_t kZoomStep = 0x8200222C;   // +180's step
 constexpr uint32_t kZoomLow = 0x820021F8;
 constexpr uint32_t kZoomHigh = 0x820035B0;
@@ -307,10 +311,12 @@ uint64_t GarageCameraCommand(uint8_t* base, uint32_t camera, uint32_t command, u
   pf::Mode mode;
   mode.Scalar();
   const uint32_t c = camera;
+  const schema::GarageCamera cam(base, camera);
   const uint32_t frame = sp - 192;
   guest::StoreU32(base, frame, sp);
+  // `field` the field's address.
   auto add = [&](uint32_t field, uint32_t step, bool up) {
-    const double v = Lfs(base, c + field), d = Lfs(base, step);
+    const double v = Lfs(base, field), d = Lfs(base, step);
     return pf::Round(up ? v + d : v - d);
   };
   // The commands that mark the camera moved (+272 = 1).
@@ -318,41 +324,45 @@ uint64_t GarageCameraCommand(uint8_t* base, uint32_t camera, uint32_t command, u
   switch (command) {
     case 0:  // the tilt up and down (sub_821803A0, the recompiler's piece, for 0)
     case 1:
-      Stfs(base, c + 100, Clamp(base, add(100, kStep, command == 0), kTiltStep, kTiltHigh));
+      Stfs(base, cam.tilt_address(),
+           Clamp(base, add(cam.tilt_address(), kStep, command == 0), kTiltStep, kTiltHigh));
       break;
     case 2:  // the turn about the car
     case 3:
-      Stfs(base, c + 176, Wrap(base, add(176, kStep, command == 2)));
+      Stfs(base, cam.orbit_address(), Wrap(base, add(cam.orbit_address(), kStep, command == 2)));
       break;
     case 4:  // the distance
     case 5:
-      Stfs(base, c + 180, Clamp(base, add(180, kZoomStep, command == 5), kZoomLow, kZoomHigh));
+      Stfs(base, cam.distance_address(),
+           Clamp(base, add(cam.distance_address(), kZoomStep, command == 5), kZoomLow, kZoomHigh));
       break;
     case 6:  // the field of view
     case 7:
-      Stfs(base, c + 224, Clamp(base, add(224, kTiltStep, command == 6), kFovLow, kFovHigh));
+      Stfs(base, cam.fov_address(),
+           Clamp(base, add(cam.fov_address(), kTiltStep, command == 6), kFovLow, kFovHigh));
       moved = false;
       break;
     case 8: case 9: case 10: case 11: case 12: case 13: {  // the angles +240 to +248
-      const uint32_t field = 240 + 4 * ((command - 8) / 2) ;
-      Stfs(base, c + field, Wrap(base, add(field, kStep, command % 2 == 0)));
+      const uint32_t field = cam.angle_x_address() + 4 * ((command - 8) / 2);
+      Stfs(base, field, Wrap(base, add(field, kStep, command % 2 == 0)));
       moved = false;
       break;
     }
     case 14: case 15: case 16: case 17: case 18: case 19: {  // the offsets
-      static constexpr uint32_t kFields[3] = {260, 256, 264};
-      const uint32_t field = kFields[(command - 14) / 2];
-      Stfs(base, c + field, add(field, kMoveStep, command % 2 == 0));
+      const uint32_t fields[3] = {cam.translation_y_address(), cam.translation_x_address(),
+                                  cam.translation_z_address()};
+      const uint32_t field = fields[(command - 14) / 2];
+      Stfs(base, field, add(field, kMoveStep, command % 2 == 0));
       moved = false;
       break;
     }
     case 20: {  // reset
-      if (int32_t(guest::LoadU32(base, c + 272)) == 1) {
-        guest::StoreU32(base, c + 272, 2);
+      if (int32_t(cam.moved()) == 1) {
+        cam.set_moved(2);
       }
       GarageCameraReset(base, c, frame - kGarageCameraResetFrame);
       mode.Scalar();
-      guest::StoreU32(base, c + 272, 0);
+      cam.set_moved(0);
       moved = false;
       break;
     }
@@ -361,36 +371,38 @@ uint64_t GarageCameraCommand(uint8_t* base, uint32_t camera, uint32_t command, u
       break;
   }
   if (moved) {
-    guest::StoreU32(base, c + 272, 1);
+    cam.set_moved(1);
   }
   // The quaternion from the turn (+176) and the tilt (+100); the rotation
   // (+112) the identity (built at the frame's +96, memcpy) turned about x
   // by the tilt (the angle at the frame's +80).
-  QuaternionFromAngles(base, c + 192, Lfs(base, c + 176), Lfs(base, c + 100),
-                       Lfs(base, 0x82000A34), frame);
+  QuaternionFromAngles(base, cam.quaternion_address(), Lfs(base, cam.orbit_address()),
+                       Lfs(base, cam.tilt_address()), Lfs(base, FCD::zero_address()), frame);
   mode.Scalar();
   for (uint32_t row = 0; row < 4; row++) {
     for (uint32_t column = 0; column < 4; column++) {
       guest::StoreU32(base, frame + 96 + 16 * row + 4 * column, row == column ? 0x3F800000u : 0);
     }
   }
-  if (!c_runtime::Memcpy(base, c + 112, frame + 96, 64)) {
+  if (!c_runtime::Memcpy(base, cam.rotation_address(), frame + 96, 64)) {
     for (uint32_t i = 0; i < 64; i += 4) {
-      guest::StoreU32(base, c + 112 + i, guest::LoadU32(base, frame + 96 + i));
+      guest::StoreU32(base, cam.rotation_address() + i, guest::LoadU32(base, frame + 96 + i));
     }
   }
-  Stfs(base, frame + 80, Lfs(base, c + 100));
-  matrix_math::RotateX(base, c + 112, c + 112, frame + 80, frame - 80);
-  return c + 112;
+  Stfs(base, frame + 80, Lfs(base, cam.tilt_address()));
+  matrix_math::RotateX(base, cam.rotation_address(), cam.rotation_address(), frame + 80,
+                       frame - 80);
+  return cam.rotation_address();
 }
 
 uint64_t GarageStageCameraCommand(uint8_t* base, uint64_t r3, uint32_t command, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821808F0 GarageStage::CameraCommand");
-  const uint32_t stage = guest::LoadU32(base, uint32_t(r3));
-  if (int32_t(guest::LoadU32(base, stage + 384)) == 2 && int32_t(command) != 20) {
+  const schema::GarageStage stage = schema::StandSlot(base, uint32_t(r3)).stage();
+  const schema::GarageCamera camera(base, stage.camera_address());
+  if (int32_t(camera.moved()) == 2 && int32_t(command) != 20) {
     return r3;
   }
-  return GarageCameraCommand(base, stage + 112, command, sp);
+  return GarageCameraCommand(base, camera.address, command, sp);
 }
 
 void GarageLightsInit(uint8_t* base, uint32_t lights, uint32_t frame) {
@@ -402,10 +414,10 @@ void GarageLightsInit(uint8_t* base, uint32_t lights, uint32_t frame) {
     StoreU64(base, lights + 16 + i, LoadU64(base, kGarageLightsTable + i));
   }
   // The ambient (0.08, 0.08, 0.08, 1.0) through the frame to +1072 and
-  // 0x8265ED00.
+  // 0x8265ED00 (front-end-car-draw's ambient).
   mode.Scalar();
   const double ambient = Lfs(base, 0x82002A1C);
-  const double one = Lfs(base, 0x82000A30);
+  const double one = Lfs(base, FCD::one_address());
   Stfs(base, f + 80, ambient);
   Stfs(base, f + 84, ambient);
   Stfs(base, f + 88, ambient);
@@ -414,15 +426,15 @@ void GarageLightsInit(uint8_t* base, uint32_t lights, uint32_t frame) {
     StoreU64(base, lights + 1072 + i, LoadU64(base, f + 80 + i));
   }
   for (uint32_t i = 0; i < 16; i += 8) {
-    StoreU64(base, 0x8265ED00 + i, LoadU64(base, lights + 1072 + i));
+    StoreU64(base, FCD::ambient_address() + i, LoadU64(base, lights + 1072 + i));
   }
   // The three lights' constants.
   for (uint32_t i = 0; i < 3; i++) {
     const uint32_t light = lights + 32 + 96 * i;
     for (uint32_t w = 0; w < 16; w += 8) {
-      StoreU64(base, 0x8296B950 + 16 * i + w, LoadU64(base, light + w));
-      StoreU64(base, 0x8296B980 + 16 * i + w, LoadU64(base, light + 16 + w));
-      StoreU64(base, 0x8296B9B0 + 16 * i + w, LoadU64(base, light + 32 + w));
+      StoreU64(base, FCD::light_a_address() + 16 * i + w, LoadU64(base, light + w));
+      StoreU64(base, FCD::light_b_address() + 16 * i + w, LoadU64(base, light + 16 + w));
+      StoreU64(base, FCD::light_c_address() + 16 * i + w, LoadU64(base, light + 32 + w));
     }
   }
   // The four spots (q = +304 + 96i).
@@ -431,8 +443,8 @@ void GarageLightsInit(uint8_t* base, uint32_t lights, uint32_t frame) {
                                          simde_mm_castsi128_ps(simde_mm_set1_epi32(0x3F000000))));
   const Vec zeros = simde_mm_setzero_si128();
   mode.Scalar();
-  Stfs(base, f + 108, Lfs(base, 0x82009EB4));
-  const double radians = Lfs(base, 0x82002948), scale = Lfs(base, 0x82001BE4);
+  Stfs(base, f + 108, Lfs(base, FCD::third_pi_address()));
+  const double radians = Lfs(base, FCD::degree_address()), scale = Lfs(base, FCD::half_address());
   for (uint32_t i = 0; i < 4; i++) {
     const uint32_t q = lights + 304 + 96 * i, at = 16 * i;
     mode.Scalar();
@@ -460,12 +472,12 @@ void GarageLightsInit(uint8_t* base, uint32_t lights, uint32_t frame) {
     mode.Scalar();
     Stfs(base, f + 104, double(float(one / difference)));
     Stfs(base, f + 96, double(float(c3)));
-    StoreU64(base, 0x8296B9E0 + at, LoadU64(base, q));
+    StoreU64(base, FCD::spot_positions_address() + at, LoadU64(base, q));
     mode.Vector();
     Vec v13 = pf::I(simde_mm_div_ps(simde_mm_set1_ps(1), simde_mm_sqrt_ps(pf::F(v0))));
     const Vec v9 = pf::Mul(v0, half);
     const Vec equal = pf::I(simde_mm_cmpeq_ps(pf::F(v0), pf::F(zeros)));
-    StoreU64(base, 0x8296B9E0 + at + 8, LoadU64(base, q + 8));
+    StoreU64(base, FCD::spot_positions_address() + at + 8, LoadU64(base, q + 8));
     const Vec v8 = pf::Mul(v13, v13);
     // vnmsubfp: -(v9 v8 - 0.5), one Newton step.
     const Vec v10 = pf::I(simde_mm_xor_ps(pf::F(pf::Sub(pf::Mul(v9, v8), half)),
@@ -475,16 +487,16 @@ void GarageLightsInit(uint8_t* base, uint32_t lights, uint32_t frame) {
     const Vec v11 = simde_mm_or_si128(simde_mm_andnot_si128(equal, v13), simde_mm_and_si128(equal, v0));
     pf::Stvx(base, f + 80, v11);
     mode.Scalar();
-    StoreU64(base, 0x8296BBE0 + at, LoadU64(base, f + 80));
-    StoreU64(base, 0x8296BBE0 + at + 8, LoadU64(base, f + 88));
-    StoreU64(base, 0x8296BAE0 + at, LoadU64(base, q + 32));
-    StoreU64(base, 0x8296BAE0 + at + 8, LoadU64(base, q + 40));
-    StoreU64(base, 0x8296BB60 + at, LoadU64(base, q + 48));
-    StoreU64(base, 0x8296BB60 + at + 8, LoadU64(base, q + 56));
-    StoreU64(base, 0x8296BC60 + at, LoadU64(base, f + 96));
-    StoreU64(base, 0x8296BA60 + at, LoadU64(base, f + 112));
-    StoreU64(base, 0x8296BC60 + at + 8, LoadU64(base, f + 104));
-    StoreU64(base, 0x8296BA60 + at + 8, LoadU64(base, f + 120));
+    StoreU64(base, FCD::spot_directions_address() + at, LoadU64(base, f + 80));
+    StoreU64(base, FCD::spot_directions_address() + at + 8, LoadU64(base, f + 88));
+    StoreU64(base, FCD::spot_a_address() + at, LoadU64(base, q + 32));
+    StoreU64(base, FCD::spot_a_address() + at + 8, LoadU64(base, q + 40));
+    StoreU64(base, FCD::spot_b_address() + at, LoadU64(base, q + 48));
+    StoreU64(base, FCD::spot_b_address() + at + 8, LoadU64(base, q + 56));
+    StoreU64(base, FCD::spot_cones_address() + at, LoadU64(base, f + 96));
+    StoreU64(base, FCD::spot_colors_address() + at, LoadU64(base, f + 112));
+    StoreU64(base, FCD::spot_cones_address() + at + 8, LoadU64(base, f + 104));
+    StoreU64(base, FCD::spot_colors_address() + at + 8, LoadU64(base, f + 120));
   }
 }
 

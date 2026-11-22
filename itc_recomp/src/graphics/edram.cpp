@@ -7,6 +7,7 @@
 
 #include "base/log.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/graphics_resources.h"
 
 #include <atomic>
 #include <mutex>
@@ -21,6 +22,9 @@ constexpr uint32_t kObjectAttributes = 0x64800000;
 // In place of the object's critical section.
 std::mutex g_mutex;
 
+using G = schema::GraphicsResourcesGlobals;
+using schema::EdramAllocator;
+
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
@@ -33,7 +37,7 @@ uint32_t From(uint32_t shift) { return (shift & 0x20) ? 0 : 0xFFFFFFFFu >> (shif
 
 // The allocator, made on first use (nullopt if XMemAlloc fails).
 std::optional<uint32_t> Allocator(uint8_t* base) {
-  uint32_t allocator = Load(base, kAllocator);
+  uint32_t allocator = G::edram_allocator(base).address;
   if (allocator != 0) {
     return allocator;
   }
@@ -41,16 +45,17 @@ std::optional<uint32_t> Allocator(uint8_t* base) {
   if (allocator == 0) {
     return std::nullopt;
   }
-  Store(base, allocator + kFree, kTiles);
-  Store(base, allocator + kBitmapEnd, kSentinel);
+  const EdramAllocator made(base, allocator);
+  made.set_free_tiles(kTiles);
+  made.set_sentinel(kSentinel);
   // The original's lwarx/stwcx: set the pointer if it's still 0.
-  uint32_t* word = reinterpret_cast<uint32_t*>(REX_RAW_ADDR(kAllocator));
+  uint32_t* word = reinterpret_cast<uint32_t*>(guest::Pointer(base, G::edram_allocator_address()));
   uint32_t expected = 0;
   if (!__atomic_compare_exchange_n(word, &expected, __builtin_bswap32(allocator), false,
                                    __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
     // Another thread made one first: this one goes.
     memory::crt::XMemFree(allocator, kObjectAttributes);
-    allocator = Load(base, kAllocator);
+    allocator = G::edram_allocator(base).address;
   }
   return allocator;
 }
@@ -59,8 +64,9 @@ std::optional<uint32_t> Allocator(uint8_t* base) {
 
 uint32_t NextRun(uint8_t* base, uint32_t allocator, uint32_t& position) {
   ITC_NATIVE_RUNNING("sub_822B5C90 Edram::NextRun");
-  const uint32_t bitmap = allocator + kBitmap;
-  const uint32_t end = allocator + kBitmapEnd;
+  const EdramAllocator a(base, allocator);
+  const uint32_t bitmap = a.bitmap_address();
+  const uint32_t end = a.sentinel_address();
   uint32_t word = ((position >> 3) & 0x1FFFFFFC) + bitmap;
   if (word == end) {
     return 0;
@@ -98,8 +104,9 @@ void Mark(uint8_t* base, uint32_t allocator, uint32_t start, uint32_t end, bool 
   ITC_NATIVE_RUNNING("sub_822B5D70 Edram::Mark");
   const uint32_t start_index = start >> 5;
   const uint32_t end_index = end >> 5;
-  uint32_t word = ((start_index + 8) << 2) + allocator;
-  const uint32_t end_word = ((end_index + 8) << 2) + allocator;
+  const uint32_t bitmap = EdramAllocator(base, allocator).bitmap_address();
+  uint32_t word = (start_index << 2) + bitmap;
+  const uint32_t end_word = (end_index << 2) + bitmap;
   const uint32_t start_bit = start & 0x1F;
   const uint32_t end_bit = end & 0x1F;
   if (start_index == end_index) {
@@ -129,7 +136,8 @@ std::optional<Allocation> Alloc(uint8_t* base, uint32_t tiles) {
   uint32_t found = 0xFFFFFFFF;
   {
     std::lock_guard<std::mutex> lock(g_mutex);
-    if (tiles <= Load(base, allocator + kFree)) {
+    const EdramAllocator a(base, allocator);
+    if (tiles <= a.free_tiles()) {
       // The smallest free run that fits (the first of them).
       uint32_t best_start = 0;
       uint32_t best_length = 0xFFFFFFFF;
@@ -144,7 +152,7 @@ std::optional<Allocation> Alloc(uint8_t* base, uint32_t tiles) {
         length = NextRun(base, allocator, position);
       }
       if (best_length != 0xFFFFFFFF) {
-        Store(base, allocator + kFree, Load(base, allocator + kFree) - tiles);
+        a.set_free_tiles(a.free_tiles() - tiles);
         Mark(base, allocator, best_start, best_start + tiles, true);
         found = best_start;
       }
@@ -155,9 +163,10 @@ std::optional<Allocation> Alloc(uint8_t* base, uint32_t tiles) {
 
 void Free(uint8_t* base, uint32_t start, uint32_t tiles) {
   ITC_NATIVE_RUNNING("sub_822B5EA8 Edram::Free");
-  const uint32_t allocator = Load(base, kAllocator);
+  const EdramAllocator a = G::edram_allocator(base);
+  const uint32_t allocator = a.address;
   std::lock_guard<std::mutex> lock(g_mutex);
-  Store(base, allocator + kFree, tiles + Load(base, allocator + kFree));
+  a.set_free_tiles(tiles + a.free_tiles());
   Mark(base, allocator, start, start + tiles, false);
 }
 

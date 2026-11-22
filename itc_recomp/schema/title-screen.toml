@@ -1,0 +1,239 @@
+# The schema of docs/functions/title-screen.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The type 4 front-end mode (ModeType4::, the title screen the boot leads
+# to): the mode (852 bytes), its block (48,220 bytes, five screen
+# machines), the title load's and the title screen's blocks
+# (src/title_screen/).
+#
+# Seeded types not described here (another area's type; the lead adds the
+# measure names there):
+# - "new<28>@TitleScreen::Create" ([0x82814E2C], the page object) is
+#   menu-helpers.toml's PageObject;
+# - "new<68>@TitleScreen::Create" ([0x82814E38], Menu4's menu) is
+#   menu-helpers.toml's FrontEndMenu;
+# - "new<72>@TitleScreen::Create" ([0x82814E30], the menu list) is
+#   race-screens.toml's MenuList;
+# - the handlers' r4 "TitleLoad::OpenTitle.r4", "TitleLoad::Leave.r4",
+#   "TitleLoad::Update.r4", "TitleScreen::OpenNext.r4",
+#   "TitleScreen::Leave.r4" (812 bytes: +804 the ring count, +808 its
+#   start) are boot-mode.toml's ModeDispatcher (the mode's +36);
+#   "TitleScreen::LeavePage.r4" (+9604) is the title screen's machine
+#   (r4 the machine there), this file's Type4Machine.
+
+# The type 4 mode (852 bytes, made by the modes' factory; vtable
+# 0x82006BE0, 14 slots; known-data.md: "type 6 and 7 modes" has the same
+# shape). The base (0 to 848) is boot-mode.toml's GameMode's, then the
+# block. The measure joins with it: the next-mode answer (the delegate
+# functions' r3: the byte +0 and +4), the +32 interface (Interrupt,
+# ForceExit, Resume: r3 the mode + 32, the fault_interface_* fields) and the
+# block AllLoaded gets (fault_block_*).
+[ModeType4]
+measures = ["ModeType4", "ModeType4::Restart.r4", "ModeType4::WaitForLeave.r4",
+            "ModeType4::LeaveScreen.r4", "ModeType4::NextMode.r4", "ModeType4::Leaving.r4",
+            "ModeType4::NextModeAnswer.r4"]
+size = 852
+origin = "allocated"
+vtable = 0x82006BE0
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82006BE0" },
+  { name = "answer_changed", offset = 0, type = "u8", note = "measure fault: the next-mode answer's byte +0 (ModeAnswer, the delegate functions' r3), not the mode's" },
+  { name = "delegate_ptr", offset = 4, type = "ptr", to = "ModeDelegate", note = "the delegate at +8; 0 when its address wraps (never). Also the answer's next type +4 by the measure's join" },
+  { name = "delegate_vtable", offset = 8, type = "u32", note = "0x82010FA0 (ModeDelegate::Invoke)" },
+  { name = "delegate_object", offset = 12, type = "u32", note = "the mode" },
+  { name = "delegate_function", offset = 16, type = "fn", note = "Mode::Slot8Thunk (Restart) after Init, then NextModeThunk, Slot10Thunk, Slot11Thunk or Slot12Thunk" },
+  { name = "delegate_adjustment", offset = 20, type = "u32", note = "0" },
+  { name = "vtable32", offset = 32, type = "u32", note = "0x82006BD4: Interrupt, ForceExit, Resume" },
+  { name = "handlers", offset = 36, type = "bytes", count = 200, note = "the dispatcher (+36, ModeDispatcher): 50 handler pointers (the five machines, in Init's order)" },
+  { name = "handler_count", offset = 236, type = "u32" },
+  { name = "ring", offset = 240, type = "bytes", count = 600, note = "the dispatcher's ring: 50 messages of 12 bytes (ModeMessage)" },
+  { name = "ring_count", offset = 840, type = "u32" },
+  { name = "ring_start", offset = 844, type = "u32" },
+  { name = "block", offset = 848, type = "ptr", to = "Type4Block", note = "VirtualAlloc'ed by Init (48,220 bytes)" },
+  { name = "fault_interface_delegate_ptr", offset = -28, type = "u32", note = "measure fault: the +32 interface's -28 (ForceExit), the mode's +4" },
+  { name = "fault_interface_ring_count", offset = 808, type = "u32", note = "measure fault: the +32 interface's +808 (ModeType4Interface32), the mode's +840" },
+  { name = "fault_interface_ring_start", offset = 812, type = "u32", note = "measure fault: the +32 interface's +812, the mode's +844" },
+  { name = "fault_interface_block", offset = 816, type = "u32", note = "measure fault: the +32 interface's +816, the mode's +848" },
+  { name = "fault_block_options_loaded", offset = 9608, type = "u32", note = "measure fault: AllLoaded's block (Type4Block.options_loaded), not the mode's" },
+  { name = "fault_block_save_screen_loaded", offset = 28888, type = "u32", note = "measure fault: AllLoaded's block (Type4Block.save_screen_loaded), not the mode's" },
+]
+
+# The type 4 mode seen through its +32 interface (vtable 0x82006BD4; r3 the
+# mode + 32): Interrupt, ForceExit and Resume (none seen in play). The
+# measure joins it with ModeType4 (its fault_interface_* fields).
+[ModeType4Interface32]
+size = 820
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82006BD4" },
+  { name = "ring", offset = 208, type = "bytes", count = 600, note = "the mode's ring (+240)" },
+  { name = "ring_count", offset = 808, type = "u32", note = "the mode's +840" },
+  { name = "ring_start", offset = 812, type = "u32", note = "the mode's +844" },
+  { name = "block", offset = 816, type = "ptr", to = "Type4Block", note = "the mode's +848" },
+]
+
+# The type 4 mode's block (48,220 bytes, VirtualAlloc'ed by ModeType4::Init
+# at the mode's +848): five screen machines of 9,640 bytes, each a
+# StateMachine (game-modes.toml) with its owner's words from +9608: +9608
+# its movie loaded, +9612 open at once (reenter), +9616 delete the movie
+# when unloaded. The measure ("TitleScreen") joins the title screen's
+# machine (the TitleScreen:: handlers' r3: the words at +9604 to +9616 are
+# the options' then), its transitions' started word (+0) and the pages' r3
+# (the mode's dispatcher: +804, +808) with it: those fall in `options`.
+[Type4Block]
+measures = ["TitleScreen", "ModeType4::NextModeAnswer.r4.+848", "ModeType4::NextMode.r4.+848"]
+size = 48220
+origin = "allocated"
+fields = [
+  { name = "options", offset = 0, type = "bytes", count = 9640, note = "the options' machine (Type4Options::Init, options-screen.md)" },
+  { name = "options_state", offset = 9604, type = "u32" },
+  { name = "options_loaded", offset = 9608, type = "u32" },
+  { name = "options_reenter", offset = 9612, type = "u32", note = "1 from Init" },
+  { name = "options_delete_movie", offset = 9616, type = "u32", note = "0 from Init" },
+  { name = "controller_options", offset = 9640, type = "bytes", count = 9640, note = "the controller options' machine (Type4ControllerOptions::Init, options-screen.md)" },
+  { name = "controller_options_state", offset = 19244, type = "u32" },
+  { name = "controller_options_loaded", offset = 19248, type = "u32" },
+  { name = "controller_options_reenter", offset = 19252, type = "u32", note = "0 from Init" },
+  { name = "controller_options_delete_movie", offset = 19256, type = "u32", note = "1 from Init" },
+  { name = "save_screen", offset = 19280, type = "bytes", count = 9640, note = "the save screen's machine (Type4SaveScreen::Init, save-screen.md)" },
+  { name = "save_screen_state", offset = 28884, type = "u32", note = "5 shown (Interrupt)" },
+  { name = "save_screen_loaded", offset = 28888, type = "u32" },
+  { name = "save_screen_reenter", offset = 28892, type = "u32", note = "1 from Init" },
+  { name = "save_screen_delete_movie", offset = 28896, type = "u32", note = "0 from Init" },
+  { name = "title_load", offset = 28920, type = "bytes", count = 9640, note = "the title load's machine (TitleLoad::Init, Type4Machine)" },
+  { name = "title_load_state", offset = 38524, type = "u32" },
+  { name = "title_load_loaded", offset = 38528, type = "u32" },
+  { name = "title_load_reenter", offset = 38532, type = "u32", note = "1 from Init" },
+  { name = "title_load_delete_movie", offset = 38536, type = "u32", note = "0 from Init" },
+  { name = "title_screen", offset = 38560, type = "bytes", count = 9640, note = "the title screen's machine (TitleScreen::Init, Type4Machine)" },
+  { name = "title_screen_state", offset = 48164, type = "u32" },
+  { name = "title_screen_loaded", offset = 48168, type = "u32" },
+  { name = "title_screen_reenter", offset = 48172, type = "u32", note = "1 from Init" },
+  { name = "title_screen_delete_movie", offset = 48176, type = "u32", note = "0 from Init" },
+  { name = "shown", offset = 48200, type = "u32", note = "the last machine (MachineOf's index, 0 to 4) in state 4 or 5 (FindShown)" },
+  { name = "next_answer", offset = 48212, type = "u32", note = "the next mode's 8-byte answer (NextMode, ForceExit; NextModeAnswer copies it): its first word, the byte 1 and three bytes" },
+  { name = "next_type", offset = 48216, type = "u32", note = "the answer's next mode type (1, 2, 3, 6, 7, 8, 10, 12; 4 or 12 from ForceExit)" },
+]
+
+# One of the type 4 block's screen machines (9,620 bytes and the owner's
+# words after; ModeType4::MachineOf's answer, the title load's machine): a
+# StateMachine (game-modes.toml) with the shared screen words. The measure
+# joins the title load's ("TitleLoad") with its debug steps' started word
+# (+0) and PostClose's r3 (the mode's dispatcher: +804, +808), all inside
+# `transitions`.
+[Type4Machine]
+measures = ["ModeType4::MachineOf.ret", "TitleLoad", "TitleScreen::LeavePage.r4"]
+size = 9620
+origin = "embedded"
+fields = [
+  { name = "transitions", offset = 0, type = "bytes", count = 9600, note = "200 transitions, 48 bytes each (StateTransition)" },
+  { name = "transition_count", offset = 9600, type = "u32" },
+  { name = "state", offset = 9604, type = "u32", note = "0 Create, 1 OpenMovie, 2 WaitForMovie, 4 to start, 5 running, 7 leaving, 8 unloading, 9 waiting (Reenter), 10 to leave, 11 and up the next mode (Destroy)" },
+  { name = "loaded", offset = 9608, type = "u32", note = "1 once its movie is loaded" },
+  { name = "reenter", offset = 9612, type = "u32", note = "open at once: Create goes to 1 (else 9), WaitForMovie to 9 (else 4)" },
+  { name = "delete_movie", offset = 9616, type = "u32", note = "Unload deletes the movie (and clears `loaded`)" },
+]
+
+# The title load's block (68 bytes, VirtualAlloc'ed by TitleLoad::Create;
+# [0x82814E28]; known-data.md).
+[TitleLoadBlock]
+measure = "new<68>@TitleLoad::Create"
+size = 68
+origin = "allocated"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32", note = "0 from Create; not read" },
+  { name = "tick_count", offset = 4, type = "u32", note = "the debug sequence's tick count" },
+  { name = "transition", offset = 8, type = "u32", note = "the transition Update runs (-1 none; 12 the logo)" },
+  { name = "page", offset = 12, type = "u32", note = "the page Draw runs (-1 none; 4 posts the close, 5 waits for the archive)" },
+  { name = "transition_started", offset = 16, type = "u32", note = "the transition's started word" },
+]
+
+# The title screen's words (68 bytes, VirtualAlloc'ed by TitleScreen::Create;
+# [0x82814E34]; known-data.md: "Title screen object").
+[TitleScreenData]
+measure = "new<68>@TitleScreen::Create#2"
+size = 68
+origin = "allocated"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32", note = "0 from Create; not read" },
+  { name = "main_item", offset = 4, type = "u32", note = "the main menu's item (0 to 6; 8 the attract race), which picks the next mode (Destroy)" },
+  { name = "can_continue", offset = 8, type = "u32", note = "player 0's day and garage count nonzero" },
+  { name = "career_third_item", offset = 12, type = "u32", note = "the career menu's third item shown (bit 0x20 of player 0's save +6092)" },
+  { name = "from_boot", offset = 16, type = "u32", note = "the intro and press start played (from [0x826364EC], Start)" },
+  { name = "career_selection", offset = 20, type = "u32", note = "the career menu's first selection" },
+  { name = "menu4_choice", offset = 24, type = "u32", note = "Menu4's choice" },
+  { name = "save_item_refused", offset = 28, type = "u32", note = "item 5 refused (SaveSlots::State(0) 0)" },
+  { name = "pad_item_state", offset = 32, type = "u32", note = "item 4's pad state (player 1's controller connected)" },
+  { name = "idle_ticks", offset = 36, type = "u32", note = "press start's idle ticks; 600 starts the attract race" },
+  { name = "interrupted", offset = 40, type = "u32", note = "set by message 17 (OnInterrupt), cleared by 18 (OnResume)" },
+]
+
+# A transition's started word (the page object's +24), as the transitions
+# never seen in play get it (r3).
+[TitleTransitionStarted]
+measures = ["sub_82222C90.r3", "sub_82223050.r3", "sub_822231B0.r3"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "started", offset = 0, type = "u32", note = "0 until the transition is set up, then 1" },
+]
+
+[globals]
+load_block = { address = 0x82814E28, type = "ptr", to = "TitleLoadBlock" }
+pages = { address = 0x82814E2C, type = "ptr", to = "PageObject", note = "the title screen's page object (28 bytes)" }
+list = { address = 0x82814E30, type = "ptr", to = "MenuList", note = "the title screen's menu list (72 bytes)" }
+data = { address = 0x82814E34, type = "ptr", to = "TitleScreenData" }
+menu = { address = 0x82814E38, type = "ptr", to = "FrontEndMenu", note = "Menu4's menu; Destroy frees it and leaves the pointer" }
+entered = { address = 0x826364EC, type = "u32", note = "how the title was entered: 0 the main menu at once, 1 from the boot (intro and press start), 2 the title load's message 6" }
+system_checks = { address = 0x826BAB40, type = "bytes", count = 16, note = "the mode's four system checks OnResume and SetUpMainMenu clear" }
+mapper_entries = { address = 0x826BAB80, type = "bytes", count = 32, note = "the players' mapper entries (8 bytes: the mapper, +4 blocked when 1)" }
+controllers = { address = 0x826BABA4, type = "bytes", count = 20, note = "the players' controllers (a word a player: its mapper entry's index; +16 a fifth slot)" }
+player1_controller = { address = 0x826BABA8, type = "u32", note = "controllers' word 1" }
+boot_data = { address = 0x826C5B60, type = "u32", note = "the object BootData::Load gets" }
+string_table = { address = 0x826C5C34, type = "u32", note = "the string table Strings::Load gets" }
+sound_manager = { address = 0x826C5C80, type = "u32", note = "the sound manager (slot 14 IsCuePlaying)" }
+profile_read = { address = 0x826C7938, type = "u32", note = "1 when a player's controller changes (the profile read asked for)" }
+pad_blocked0 = { address = 0x826C7960, type = "u32", note = "the pad blocked (known-data.md): either word set" }
+pad_blocked1 = { address = 0x826C7964, type = "u32" }
+pick_block = { address = 0x826D8454, type = "ptr", to = "SaveScreenData", note = "the save screen's data (save-screen.toml's; +52 the controller pick OnControllerPicked reads)" }
+options_settings = { address = 0x826D8478, type = "ptr", to = "OptionsSettings", note = "the options' settings (options-screen.toml's; +712 read by Interrupt)" }
+fades_passes = { address = 0x82001BEC, type = "u32", note = "the passes word ScreenFades::FadeIn gets" }
+menu4_wrap_up = { address = 0x82001FB0, type = "u32", note = "the cursor's position MoveMenu4Cursor copies when the menu wraps up" }
+menu4_wrap_down = { address = 0x82000A34, type = "u32", note = "its position when the menu wraps down" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from Type4Block.
+[Type4BlockPart]
+measure = "new<48220>@ModeType4::Init"
+size = 48180
+origin = "embedded"
+fields = [
+  { name = "unknown_9612", offset = 9612, type = "u32" },
+  { name = "unknown_9616", offset = 9616, type = "u32" },
+  { name = "unknown_19252", offset = 19252, type = "u32" },
+  { name = "unknown_19256", offset = 19256, type = "u32" },
+  { name = "unknown_28892", offset = 28892, type = "u32" },
+  { name = "unknown_28896", offset = 28896, type = "u32" },
+  { name = "unknown_38532", offset = 38532, type = "u32" },
+  { name = "unknown_38536", offset = 38536, type = "u32" },
+  { name = "unknown_48172", offset = 48172, type = "u32" },
+  { name = "unknown_48176", offset = 48176, type = "u32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from Type4Block.
+[Type4BlockAt38560]
+measure = "new<48220>@ModeType4::Init@+38560"
+size = 9608
+origin = "embedded"
+fields = [
+  { name = "unknown_9604", offset = 9604, type = "u32" },
+]

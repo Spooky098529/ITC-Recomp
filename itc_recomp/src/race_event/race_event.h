@@ -12,26 +12,9 @@
 
 namespace race_event {
 
-constexpr uint32_t kEvent = 0x826C6078;      // the race event (a pointer)
-constexpr uint32_t kModeMasks = 0x82008DF4;  // words by mode: the items' mode mask
-constexpr uint32_t kCaps = 0x82008E00;       // halfwords: locations 0 to 3's caps
-constexpr uint32_t kStages = 0x82008E08;     // bytes: the stage each location needs
-constexpr uint32_t kLocationGroups = 0x82008D74;  // halfwords: a location's group
-constexpr uint32_t kModeWords = 0x82008D88;       // words by mode (kinds 25, 26)
-constexpr uint32_t kRaceData = 0x826C5B2C;        // the race data (a pointer)
-constexpr uint32_t kRoute = 0x826C5B10;           // the course's route
-constexpr uint32_t kManager = 0x826D82F4;         // the racers' manager (a pointer)
-// The floats PlaceUnlocked and SectionRival step positions by.
-constexpr uint32_t kBackStep = 0x82001FB0;
-constexpr uint32_t kSliceUnit = 0x82000A30;
-constexpr uint32_t kBackScale = 0x82008E38;
-constexpr uint32_t kForwardScale = 0x82008E34;
-
-// The save data's parts read here.
-constexpr uint32_t kDay = 6100;
-constexpr uint32_t kGarage = 6120;
-constexpr uint32_t kSelectedCar = 0x19920;
-constexpr uint32_t kItemRecords = 0x199F8;  // 400 records of 12 bytes
+constexpr uint32_t kEvent = 0x826C6078;  // the race event (a pointer)
+// The event's objects, the image words and the save data's parts it reads are
+// views in schema/race_event.h (itc_recomp/schema/race-event.toml).
 
 // The tests the native code hands back to the recompiled code: kind 40
 // (EventCondition::Power, sub_82141668: never seen in play; its power curve's

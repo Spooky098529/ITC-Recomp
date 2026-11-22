@@ -1,6 +1,8 @@
 #include "std_string/std_string.h"
 
 #include "guest.h"
+#include "schema/file_layer.h"
+#include "schema/std_string.h"
 
 #include "base/log.h"
 #include "c_runtime/strings.h"
@@ -13,8 +15,8 @@ namespace std_string {
 
 namespace {
 
-uint32_t Load(uint8_t* base, uint32_t address) {
-  return guest::LoadU32(base, address);
+schema::StdString Str(uint8_t* base, uint32_t string) {
+  return schema::StdString(base, string);
 }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
@@ -78,7 +80,7 @@ bool CopyAfterGrowFits(uint8_t* base, uint32_t string, uint32_t new_length, uint
   if (count == 0) {
     return true;
   }
-  const uint32_t capacity = Load(base, string + kCapacity);
+  const uint32_t capacity = Str(base, string).capacity();
   if (capacity < new_length) {
     return source != 0 && c_runtime::InOneView(source, count);
   }
@@ -89,11 +91,12 @@ bool CopyAfterGrowFits(uint8_t* base, uint32_t string, uint32_t new_length, uint
 // its end), as assign's and append's checks.
 bool Inside(uint8_t* base, uint32_t string, uint32_t text) {
   const uint32_t own = TextOf(base, string);
-  return text >= own && own + Load(base, string + kLength) > text;
+  return text >= own && own + Str(base, string).length() > text;
 }
 
 uint32_t TextOf(uint8_t* base, uint32_t string) {
-  return Load(base, string + kCapacity) < kInPlace ? string + kText : Load(base, string + kText);
+  const schema::StdString s = Str(base, string);
+  return s.capacity() < kInPlace ? s.text_address() : s.block();
 }
 
 }  // namespace
@@ -104,20 +107,20 @@ uint32_t Text(uint8_t* base, uint32_t string) {
 
 bool Tidy(uint8_t* base, uint32_t string, bool built, uint32_t length) {
   ITC_NATIVE_RUNNING("sub_82091328 std::string::_Tidy");
-  if (built && Load(base, string + kCapacity) >= kInPlace) {
-    const uint32_t block = Load(base, string + kText);
+  if (built && Str(base, string).capacity() >= kInPlace) {
+    const uint32_t block = Str(base, string).block();
     if (!Deletable(block) ||
-        (length != 0 && !CopyFits(string + kText, kInPlace, block, length))) {
+        (length != 0 && !CopyFits(Str(base, string).text_address(), kInPlace, block, length))) {
       return false;
     }
     if (length != 0) {
-      c_runtime::Memcpy(base, string + kText, block, length);
+      c_runtime::Memcpy(base, Str(base, string).text_address(), block, length);
     }
     memory::crt::OperatorDelete(block);
   }
-  Store(base, string + kLength, length);
-  Store(base, string + kCapacity, 15);
-  guest::StoreU8(base, string + kText + length, 0);
+  Str(base, string).set_length(length);
+  Str(base, string).set_capacity(15);
+  guest::StoreU8(base, Str(base, string).text_address() + length, 0);
   return true;
 }
 
@@ -128,7 +131,7 @@ std::optional<uint32_t> Allocate(uint8_t* base, uint32_t count) {
 
 bool Copy(uint8_t* base, uint32_t string, uint32_t new_length, uint32_t keep) {
   ITC_NATIVE_RUNNING("sub_82091458 std::string::_Copy");
-  const uint32_t old_capacity = Load(base, string + kCapacity);
+  const uint32_t old_capacity = Str(base, string).capacity();
   uint32_t capacity = new_length | 15;
   if (capacity > 0xFFFFFFFEu) {
     capacity = new_length;
@@ -142,17 +145,17 @@ bool Copy(uint8_t* base, uint32_t string, uint32_t new_length, uint32_t keep) {
   const uint32_t old_text = Text(base, string);
   if (!Allocatable(base, size) ||
       (keep != 0 && (old_text == 0 || keep > size || !c_runtime::InOneView(old_text, keep))) ||
-      (old_capacity >= kInPlace && !Deletable(Load(base, string + kText)))) {
+      (old_capacity >= kInPlace && !Deletable(Str(base, string).block()))) {
     return false;
   }
   const auto block = Allocate(base, size);
   Require(block.has_value(), "_Copy's allocate");
   CopyChecked(base, *block, size, old_text, keep, "_Copy");
   Require(Tidy(base, string, true, 0), "_Copy's _Tidy");
-  Store(base, string + kCapacity, capacity);
-  Store(base, string + kText, *block);
-  const uint32_t text = capacity < kInPlace ? string + kText : *block;
-  Store(base, string + kLength, keep);
+  Str(base, string).set_capacity(capacity);
+  Str(base, string).set_block(*block);
+  const uint32_t text = capacity < kInPlace ? Str(base, string).text_address() : *block;
+  Str(base, string).set_length(keep);
   guest::StoreU8(base, text + keep, 0);
   return true;
 }
@@ -162,19 +165,20 @@ std::optional<bool> Grow(uint8_t* base, uint32_t string, uint32_t new_length, bo
   if (new_length > 0xFFFFFFFEu) {
     return std::nullopt;
   }
-  const uint32_t capacity = Load(base, string + kCapacity);
+  const uint32_t capacity = Str(base, string).capacity();
   if (capacity < new_length) {
-    if (!Copy(base, string, new_length, Load(base, string + kLength))) {
+    if (!Copy(base, string, new_length, Str(base, string).length())) {
       return std::nullopt;
     }
   } else if (trim && new_length < kInPlace) {
-    const uint32_t length = Load(base, string + kLength);
+    const uint32_t length = Str(base, string).length();
     if (!Tidy(base, string, true, new_length < length ? new_length : length)) {
       return std::nullopt;
     }
   } else if (new_length == 0) {
-    const uint32_t text = capacity < kInPlace ? string + kText : Load(base, string + kText);
-    Store(base, string + kLength, 0);
+    const uint32_t text =
+        capacity < kInPlace ? Str(base, string).text_address() : Str(base, string).block();
+    Str(base, string).set_length(0);
     guest::StoreU8(base, text, 0);
   }
   return new_length != 0;
@@ -183,7 +187,7 @@ std::optional<bool> Grow(uint8_t* base, uint32_t string, uint32_t new_length, bo
 bool AssignFrom(uint8_t* base, uint32_t string, uint32_t source, uint32_t offset,
                 uint32_t count) {
   ITC_NATIVE_RUNNING("sub_82091720 std::string::assign(const string&, size_t, size_t)");
-  const uint32_t source_length = Load(base, source + kLength);
+  const uint32_t source_length = Str(base, source).length();
   if (source_length < offset || string == source) {
     return false;
   }
@@ -201,8 +205,8 @@ bool AssignFrom(uint8_t* base, uint32_t string, uint32_t source, uint32_t offset
   if (*grown) {
     const uint32_t from = Text(base, source) + offset;
     const uint32_t text = Text(base, string);
-    CopyChecked(base, text, Load(base, string + kCapacity), from, n, "assign");
-    Store(base, string + kLength, n);
+    CopyChecked(base, text, Str(base, string).capacity(), from, n, "assign");
+    Str(base, string).set_length(n);
     guest::StoreU8(base, Text(base, string) + n, 0);
   }
   return true;
@@ -218,9 +222,9 @@ bool AssignText(uint8_t* base, uint32_t string, uint32_t text, uint32_t count) {
     return false;
   }
   if (*grown) {
-    CopyChecked(base, Text(base, string), Load(base, string + kCapacity), text, count,
+    CopyChecked(base, Text(base, string), Str(base, string).capacity(), text, count,
                 "assign");
-    Store(base, string + kLength, count);
+    Str(base, string).set_length(count);
     guest::StoreU8(base, Text(base, string) + count, 0);
   }
   return true;
@@ -231,7 +235,7 @@ bool Append(uint8_t* base, uint32_t string, uint32_t text, uint32_t count) {
   if (Inside(base, string, text)) {
     return false;
   }
-  const uint32_t length = Load(base, string + kLength);
+  const uint32_t length = Str(base, string).length();
   if (!(0xFFFFFFFFu - length > count) || length + count < length) {
     return false;
   }
@@ -247,11 +251,11 @@ bool Append(uint8_t* base, uint32_t string, uint32_t text, uint32_t count) {
     return false;
   }
   if (*grown) {
-    const uint32_t capacity = Load(base, string + kCapacity);
+    const uint32_t capacity = Str(base, string).capacity();
     const uint32_t own = Text(base, string);
-    const uint32_t kept = Load(base, string + kLength);
+    const uint32_t kept = Str(base, string).length();
     CopyChecked(base, kept + own, capacity - kept, text, count, "append");
-    Store(base, string + kLength, new_length);
+    Str(base, string).set_length(new_length);
     guest::StoreU8(base, Text(base, string) + new_length, 0);
   }
   return true;
@@ -377,10 +381,10 @@ uint32_t WildcardSearch(uint8_t* base, uint32_t text, uint32_t pattern, uint32_t
     }
     if (match != 0 && last != 0) {
       if (offset_out != 0) {
-        Store(base, offset_out, match - text);
+        schema::StdStringMatchWord(base, offset_out).set_value(match - text);
       }
       if (length_out != 0) {
-        Store(base, length_out, last - match + 1);
+        schema::StdStringMatchWord(base, length_out).set_value(last - match + 1);
       }
       return match;
     }
@@ -397,7 +401,7 @@ uint32_t WildcardSearch(uint8_t* base, uint32_t text, uint32_t pattern, uint32_t
 uint32_t Find(uint8_t* base, uint32_t string, uint32_t pattern, uint32_t offset_out,
               uint32_t length_out, uint32_t from) {
   ITC_NATIVE_RUNNING("sub_82592970 String::Find");
-  if (Load(base, string + kLength) == 0) {
+  if (Str(base, string).length() == 0) {
     return 0;
   }
   const uint32_t match =
@@ -406,7 +410,8 @@ uint32_t Find(uint8_t* base, uint32_t string, uint32_t pattern, uint32_t offset_
     return 0;
   }
   if (offset_out != 0) {
-    Store(base, offset_out, Load(base, offset_out) + from);
+    const schema::StdStringMatchWord offset(base, offset_out);
+    offset.set_value(offset.value() + from);
   }
   return match;
 }
@@ -424,7 +429,7 @@ std::optional<uint32_t> ReplaceAll(uint8_t* base, uint32_t string, uint32_t patt
 
 std::optional<int32_t> InitGlobalString8265EE7C(uint8_t* base, const c_runtime::AtexitCall& call) {
   ITC_NATIVE_RUNNING("sub_825DA540 (the string at 0x8265EE7C's static set-up)");
-  if (!AssignText(base, 0x8265EE7C, 0x8206CC74, 9)) {
+  if (!AssignText(base, schema::FileLayerGlobals::prefix_string_address(), 0x8206CC74, 9)) {
     return std::nullopt;
   }
   return c_runtime::AtexitFrom(base, 0x825DB328, call);
@@ -432,7 +437,7 @@ std::optional<int32_t> InitGlobalString8265EE7C(uint8_t* base, const c_runtime::
 
 std::optional<int32_t> InitGlobalString8265EE98(uint8_t* base, const c_runtime::AtexitCall& call) {
   ITC_NATIVE_RUNNING("sub_825DA580 (the string at 0x8265EE98's static set-up)");
-  if (!AssignText(base, 0x8265EE98, 0x8206CC80, 13)) {
+  if (!AssignText(base, schema::FileLayerGlobals::project_string_address(), 0x8206CC80, 13)) {
     return std::nullopt;
   }
   return c_runtime::AtexitFrom(base, 0x825DB380, call);

@@ -1,0 +1,690 @@
+# The schema of docs/functions/race-overlays.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The race overlays: the effects drawn around each car in a race (layouts in
+# known-data.md's "car overlays" and the rows after it; src/race_overlays/).
+# The children (Trail, Smoke, Sparks, ParticlesB, ParticlesC, Marker,
+# LightSprite, ModelSprite) aren't in the measure (allocated through
+# VirtualAlloc, reached through the car overlays' words): described from the
+# hand port and the docs.
+
+# The race overlays' list: 25 overlay pointers at the race scene owner's +9608
+# (game-modes.toml's RaceOverlaysMachine +9608).
+[RaceOverlays]
+measure = "RaceOverlays"
+size = 100
+origin = "embedded"
+fields = [
+  { name = "overlay_0", offset = 0, type = "ptr", to = "CarOverlays", note = "overlay 0: loads the texture set the others share" },
+  { name = "others", offset = 4, type = "bytes", count = 96, note = "overlays 1 to 24 (pointers; in races 1 to 6 are CarOverlays, the rest 0)" },
+]
+
+# The overlays' vtable (CarOverlays' 0x82008524 and the children's).
+[OverlayVtable]
+measure = "CarOverlays.+0"
+measures = ["sub_8215E6C0.r3@+9608.+8.+0"]
+size = 32
+origin = "image"
+fields = [
+  { name = "deleting_destructor", offset = 0, type = "fn", note = "slot 0 (r4 bit 0: free)" },
+  { name = "unknown_4", offset = 4, type = "fn" },
+  { name = "unknown_8", offset = 8, type = "fn" },
+  { name = "reset", offset = 12, type = "fn", note = "slot 3" },
+  { name = "update", offset = 16, type = "fn", note = "slot 4, once a tick" },
+  { name = "record", offset = 20, type = "fn", note = "slot 5 (the car overlays': each child's slot 7)" },
+  { name = "init", offset = 24, type = "fn", note = "slot 6: r4 a set-up (CarOverlays: 28 bytes; the children: 12), r5 a capacity" },
+  { name = "record_child", offset = 28, type = "fn", note = "slot 7: a child's recording, r4 the camera pass index (sprites.md)" },
+]
+
+# OverlayView's vtable (0x82010B5C).
+[OverlayViewVtable]
+measure = "CarOverlays.+4.+0"
+size = 4
+origin = "image"
+fields = [
+  { name = "deleting_destructor", offset = 0, type = "fn", note = "slot 0" },
+]
+
+# One car's overlays (848 bytes, CarOverlays::CarOverlays sub_82123350).
+[CarOverlays]
+measure = "CarOverlays"
+measures = ["sub_8215E6C0.r3@+9608.+8"]
+size = 848
+origin = "allocated"
+vtable = 0x82008524
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82008524 (OverlayVtable)" },
+  { name = "views", offset = 4, type = "bytes", count = 100, note = "25 OverlayView pointers, one a view slot (0 none)" },
+  { name = "textures", offset = 104, type = "u32", note = "the texture table (42 textures, loaded by overlay 0 and shared)" },
+  { name = "texture_set", offset = 108, type = "u32" },
+  { name = "loaded", offset = 112, type = "u32" },
+  { name = "viewport_entry", offset = 116, type = "u32", note = "an index into the 12-byte entries at 0x82008558 (the set-up's +0)" },
+  { name = "second_index", offset = 120, type = "u32", note = "an index into the pairs at 0x820085A0 (the set-up's +4)" },
+  { name = "unknown_124", offset = 124, type = "u32" },
+  { name = "view_slot", offset = 128, type = "u32", note = "the slot of the car's own view" },
+  { name = "race_word_4", offset = 132, type = "u32", note = "[0x826C5B2C] + 4 at the set-up" },
+  { name = "race_word_28", offset = 136, type = "u32", note = "[0x826C5B2C] + 28 at the set-up; the effects update with 0 or 3" },
+  { name = "race_word_32", offset = 140, type = "u32", note = "[0x826C5B2C] + 32 at the set-up" },
+  { name = "params", offset = 144, type = "ptr", to = "CarOverlaysParams", note = "the effects' parameter table 0x82616F50" },
+  { name = "trails", offset = 148, type = "bytes", count = 16, note = "4 Trail pointers, one a wheel" },
+  { name = "smokes", offset = 164, type = "bytes", count = 16, note = "4 Smoke pointers, one a wheel" },
+  { name = "unknown_180", offset = 180, type = "bytes", count = 20, note = "five words cleared by CreateChildren" },
+  { name = "light_sprites", offset = 200, type = "bytes", count = 16, note = "4 LightSprite pointers (model points 4-7)" },
+  { name = "unknown_216", offset = 216, type = "bytes", count = 56, note = "14 words cleared by CreateChildren" },
+  { name = "unknown_272", offset = 272, type = "bytes", count = 56, note = "14 words cleared by CreateChildren" },
+  { name = "sparks", offset = 328, type = "bytes", count = 32, note = "8 Sparks pointers" },
+  { name = "particles_b", offset = 360, type = "bytes", count = 16, note = "4 ParticlesB pointers (model points 4-7)" },
+  { name = "marker", offset = 376, type = "ptr", to = "Marker", note = "the marker above the car" },
+  { name = "particles_c", offset = 380, type = "bytes", count = 16, note = "4 ParticlesC pointers (model points 14-17; probably the exhausts)" },
+  { name = "model_sprites", offset = 396, type = "bytes", count = 36, note = "9 ModelSprite pointers" },
+  { name = "wheels", offset = 432, type = "bytes", count = 48, note = "4 CarOverlaysWheel (12 bytes a wheel)" },
+  { name = "unknown_480", offset = 480, type = "bytes", count = 48, note = "cleared by the reset (with the rates after it)" },
+  { name = "smoke_rates", offset = 528, type = "bytes", count = 192, note = "+48 x wheel: the wheel's smoke rate accumulator (f32), the rest of each 48 bytes cleared by the reset" },
+  { name = "vehicle_word_2252", offset = 720, type = "u32", note = "the vehicle's word +2252" },
+  { name = "unknown_748", offset = 748, type = "f32", note = "1.0 at construction" },
+  { name = "unknown_752", offset = 752, type = "bytes", count = 12, note = "probably a vector, 1.0 at construction" },
+  { name = "unknown_764", offset = 764, type = "f32", note = "1.0 at construction" },
+  { name = "color_r", offset = 768, type = "f32", note = "0.0 at construction and reset" },
+  { name = "color_g", offset = 772, type = "f32", note = "0.0 at construction and reset" },
+  { name = "color_b", offset = 776, type = "f32", note = "0.0 at construction and reset" },
+  { name = "color_a", offset = 780, type = "f32", note = "1.0 at construction and reset" },
+  { name = "view_mode", offset = 784, type = "u32", note = "the viewport's +1860: 1 and 2 turn some effects off" },
+  { name = "unknown_788", offset = 788, type = "u32", note = "6 at construction and reset" },
+  { name = "viewport_record", offset = 796, type = "u32", note = "the bound viewport's camera entry (CarOverlays::BindViewport's out +0)" },
+  { name = "camera_pass", offset = 800, type = "u32", note = "the bound camera pass (its eye at +400)" },
+  { name = "viewport_pair", offset = 804, type = "bytes", count = 8, note = "the two words at 0x820085A0 + 8 x the second index" },
+  { name = "sparks_updating", offset = 812, type = "u32", note = "1 during UpdateSparks (0 again in view modes 1 and 2)" },
+  { name = "marker_shown", offset = 816, type = "u32" },
+  { name = "unknown_820", offset = 820, type = "u32", note = "0 at the set-up; read by the marker's and model sprites' kinds" },
+  { name = "unknown_824", offset = 824, type = "u32", note = "0 at the set-up; read by the marker's kind" },
+  { name = "unknown_828", offset = 828, type = "u32", note = "0 at the set-up; read by the marker's and model sprites' kinds" },
+  { name = "last_vehicle", offset = 832, type = "u32" },
+  { name = "racer_id", offset = 836, type = "s32", note = "-1 none" },
+]
+
+# A wheel's counters (CarOverlays +432 + 12 x wheel).
+[CarOverlaysWheel]
+size = 12
+origin = "embedded"
+fields = [
+  { name = "trail_counter", offset = 0, type = "u32", note = "counts the slipping ticks against the table's +156 and +160" },
+  { name = "smoke_counter", offset = 4, type = "u32", note = "up to 25 on surface 8, then counts down while smoke is emitted" },
+  { name = "trail_added", offset = 8, type = "u32", note = "whether the last tick added a trail point" },
+]
+
+# CarOverlays' parameter table (0x82616F50: rates and thresholds of the trails and smoke).
+[CarOverlaysParams]
+size = 164
+origin = "image"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "debug_rate_scale", offset = 4, type = "f32", note = "scales the smoke rates when DebugSwitchOff is set" },
+  { name = "marks_rate", offset = 8, type = "f32", note = "smoke on marking surfaces: this plus +12 x slip" },
+  { name = "marks_rate_slip", offset = 12, type = "f32" },
+  { name = "marks_size", offset = 16, type = "f32", note = "the size draw on marking surfaces" },
+  { name = "smoke_slip_threshold", offset = 20, type = "f32", note = "WheelSlip's threshold for the smoke" },
+  { name = "surface8_rate", offset = 24, type = "f32", note = "times the rate on surface 8" },
+  { name = "counter_rate", offset = 28, type = "f32", note = "times the rate while the wheel's smoke counter runs" },
+  { name = "unknown_32", offset = 32, type = "bytes", count = 12 },
+  { name = "surface8_size", offset = 44, type = "f32", note = "the size draw on surface 8 and while the counter runs" },
+  { name = "unknown_48", offset = 48, type = "bytes", count = 20 },
+  { name = "surface12_rate", offset = 68, type = "f32", note = "times the rate on surfaces 1-2" },
+  { name = "unknown_72", offset = 72, type = "bytes", count = 8 },
+  { name = "surface12_size", offset = 80, type = "f32", note = "the size draw on surfaces 1-2" },
+  { name = "unknown_84", offset = 84, type = "bytes", count = 68 },
+  { name = "trail_slip_threshold", offset = 152, type = "f32", note = "WheelSlip's threshold for the trails" },
+  { name = "trail_least_count", offset = 156, type = "u32", note = "a trail point is due from this many slipping ticks" },
+  { name = "trail_most_count", offset = 160, type = "u32", note = "up to this many (the counter capped at twice it)" },
+]
+
+# A child overlay class's parameter table (0x82616E64 to 0x82616EE8, 16 bytes each).
+[OverlayParams]
+size = 16
+origin = "image"
+fields = [
+  { name = "life", offset = 0, type = "u32", note = "in ticks" },
+  { name = "size", offset = 4, type = "f32" },
+  { name = "alpha", offset = 8, type = "f32", note = "the alpha or brightness (the trails: the base width)" },
+  { name = "fade_ticks", offset = 12, type = "u32", note = "fades over this many ticks of life left" },
+]
+
+# A view (16 bytes, CarOverlays::NewView): a vehicle, its scene model and a viewport.
+[OverlayView]
+measures = ["OverlayView", "CarOverlays.+4"]
+size = 16
+origin = "allocated"
+vtable = 0x82010B5C
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82010B5C (OverlayViewVtable)" },
+  { name = "vehicle", offset = 4, type = "u32" },
+  { name = "model", offset = 8, type = "u32", note = "its scene model (0 none)" },
+  { name = "viewport", offset = 12, type = "u32" },
+]
+
+# A view's description on RaceOverlays::Bind's stack (ViewDesc::Clear clears +0 and +4).
+[ViewDesc]
+measures = ["ViewDesc", "OverlayView::Set.r4"]
+size = 12
+origin = "embedded"
+fields = [
+  { name = "vehicle", offset = 0, type = "u32" },
+  { name = "model", offset = 4, type = "u32" },
+  { name = "viewport", offset = 8, type = "u32" },
+]
+
+# CarOverlays::BindViewport's out (the car overlays' +796).
+[OverlayViewportBinding]
+size = 16
+origin = "embedded"
+fields = [
+  { name = "record", offset = 0, type = "u32", note = "[[0x826C2CE8] + 4 x entry.0] + 80 x entry.1" },
+  { name = "camera_pass", offset = 4, type = "u32", note = "0x826BAC00 + 592 x entry.2" },
+  { name = "pair_0", offset = 8, type = "u32" },
+  { name = "pair_1", offset = 12, type = "u32" },
+]
+
+# An entry of the table at 0x82008558 (12 bytes; pairs of words follow from 0x820085A0).
+[OverlayViewportEntry]
+size = 12
+origin = "image"
+fields = [
+  { name = "viewport", offset = 0, type = "u32", note = "an index into [0x826C2CE8]" },
+  { name = "record", offset = 4, type = "u32", note = "an 80-byte record of the viewport" },
+  { name = "camera_pass", offset = 8, type = "u32", note = "an index of the 592-byte camera passes at 0x826BAC00" },
+]
+
+# The overlays' base class.
+[Overlay]
+measure = "Overlay"
+size = 112
+origin = "embedded"
+vtable = 0x820085D8
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x820085D8 for the base class" },
+  { name = "textures", offset = 104, type = "u32", note = "SetTextures104 (the car overlays' texture table; particle effect C's texture)" },
+  { name = "textures_108", offset = 108, type = "u32", note = "SetTextures108 (the texture holder of the trails, smoke, sparks and particle effect B)" },
+]
+
+# A wheel's trail (64,160 bytes, Trail::Trail sub_8212A140; probably the skid marks).
+[Trail]
+size = 64160
+origin = "allocated"
+vtable = 0x820086C0
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "capacity", offset = 104, type = "u32", note = "the entries' capacity" },
+  { name = "texture_holder", offset = 108, type = "u32", note = "SetTextures108" },
+  { name = "params", offset = 112, type = "ptr", to = "OverlayParams" },
+  { name = "points", offset = 128, type = "bytes", count = 64000, note = "500 TrailPoint" },
+  { name = "oldest", offset = 64128, type = "u32", note = "the oldest point's index" },
+  { name = "tail", offset = 64132, type = "u32", note = "where the next point goes" },
+  { name = "count", offset = 64136, type = "u32" },
+  { name = "last_position", offset = 64144, type = "bytes", count = 16, note = "a vector" },
+]
+
+# A trail's point (128 bytes).
+[TrailPoint]
+size = 128
+origin = "embedded"
+fields = [
+  { name = "position", offset = 0, type = "bytes", count = 16, note = "a vector" },
+  { name = "last_position", offset = 16, type = "bytes", count = 16, note = "a vector: the trail's last position when added" },
+  { name = "red", offset = 32, type = "u32" },
+  { name = "green", offset = 36, type = "u32" },
+  { name = "blue", offset = 40, type = "u32" },
+  { name = "width_int", offset = 44, type = "u32", note = "the width (+56) as an integer" },
+  { name = "shown", offset = 48, type = "u32", note = "the value AddPoint is given; 1 once more than a tick old" },
+  { name = "side_width", offset = 52, type = "f32", note = "the width AddPoint is given (the edges' distance)" },
+  { name = "width", offset = 56, type = "f32", note = "fades from +124" },
+  { name = "age", offset = 60, type = "u32", note = "ticks left" },
+  { name = "difference", offset = 64, type = "bytes", count = 16, note = "a vector: position less last position" },
+  { name = "edge_minus", offset = 80, type = "bytes", count = 16, note = "a vector: the ribbon's edge (position less the side)" },
+  { name = "edge_plus", offset = 96, type = "bytes", count = 16, note = "a vector: the ribbon's other edge" },
+  { name = "state", offset = 112, type = "u32", note = "1 or 2 (2: joined to the one before)" },
+  { name = "broken", offset = 116, type = "u32", note = "set to 1 where the trail breaks" },
+  { name = "texture_coordinate", offset = 120, type = "u32" },
+  { name = "full_width", offset = 124, type = "f32" },
+]
+
+# A wheel's tire smoke (32,640 bytes, Smoke::Smoke sub_8212B2E8).
+[Smoke]
+size = 32640
+origin = "allocated"
+vtable = 0x820086F4
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "capacity", offset = 104, type = "u32", note = "the entries' capacity" },
+  { name = "texture_holder", offset = 108, type = "u32", note = "SetTextures108" },
+  { name = "params", offset = 112, type = "ptr", to = "OverlayParams" },
+  { name = "unknown_116", offset = 116, type = "u32", note = "0 at construction; the set-up's +0 at Init" },
+  { name = "puffs", offset = 128, type = "bytes", count = 32400, note = "45 SmokePuff" },
+  { name = "oldest", offset = 32528, type = "u32" },
+  { name = "head", offset = 32532, type = "u32", note = "where the next puff goes" },
+  { name = "count", offset = 32536, type = "u32" },
+  { name = "velocity", offset = 32544, type = "bytes", count = 16, note = "a vector (Smoke::SetVelocity)" },
+  { name = "region_start", offset = 32560, type = "bytes", count = 16, note = "a vector: with +32,576, the span puffs drift along when the region is on" },
+  { name = "region_end", offset = 32576, type = "bytes", count = 16, note = "a vector" },
+  { name = "region_rear", offset = 32592, type = "bytes", count = 16, note = "a vector: SetRegion's second point (the rear axle's), InRegion's a" },
+  { name = "region_front", offset = 32608, type = "bytes", count = 16, note = "a vector: SetRegion's first point (the front axle's), InRegion's b" },
+  { name = "region_on", offset = 32624, type = "u32", note = "the view mode SetRegion is given; 1 turns the region on" },
+]
+
+# One puff of a smoke (720 bytes).
+[SmokePuff]
+size = 720
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "bytes", count = 16, note = "a vector, (0, 0, 0, 1) at a reset" },
+  { name = "unknown_16", offset = 16, type = "bytes", count = 16, note = "a vector, (0, 0, 0, 1) at a reset" },
+  { name = "unknown_32", offset = 32, type = "bytes", count = 16, note = "a vector" },
+  { name = "position", offset = 48, type = "bytes", count = 16, note = "a vector" },
+  { name = "velocity", offset = 64, type = "bytes", count = 16, note = "a vector: the smoke's velocity (+32,544) at the emit" },
+  { name = "red", offset = 80, type = "u32" },
+  { name = "green", offset = 84, type = "u32" },
+  { name = "blue", offset = 88, type = "u32" },
+  { name = "alpha_int", offset = 92, type = "u32", note = "the alpha (+104) as an integer (fctiwz)" },
+  { name = "shown", offset = 96, type = "u32" },
+  { name = "size", offset = 100, type = "f32" },
+  { name = "alpha", offset = 104, type = "f32" },
+  { name = "life", offset = 108, type = "u32", note = "ticks left (an age counting up for the marker)" },
+  { name = "emit_size", offset = 112, type = "f32", note = "the size Smoke::Emit is given" },
+  { name = "growth", offset = 116, type = "f32" },
+  { name = "most_alpha", offset = 120, type = "f32" },
+  { name = "start_size", offset = 124, type = "f32" },
+  { name = "particle_count", offset = 128, type = "u32", note = "2 to 10" },
+  { name = "frame", offset = 144, type = "bytes", count = 64, note = "a 4x4 matrix (Smoke::SetFrame)" },
+  { name = "frame_position", offset = 208, type = "bytes", count = 16, note = "a vector: the frame's +64" },
+  { name = "frame_value", offset = 224, type = "u32", note = "the frame's +80 (a float's bits)" },
+  { name = "unknown_228", offset = 228, type = "f32" },
+  { name = "particles", offset = 240, type = "bytes", count = 480, note = "10 OverlayParticle" },
+]
+
+# A particle of a smoke puff or particle effect B's entry (48 bytes, Particle::Particle).
+[OverlayParticle]
+measure = "Particle"
+size = 48
+origin = "embedded"
+fields = [
+  { name = "position", offset = 0, type = "bytes", count = 16, note = "a vector (1.0 in its w at construction)" },
+  { name = "velocity", offset = 16, type = "bytes", count = 16, note = "a vector (1.0 in its w at construction)" },
+  { name = "pick_a", offset = 32, type = "u32", note = "rand() % 3 (probably a texture coordinate choice)" },
+  { name = "pick_b", offset = 36, type = "u32", note = "rand() % 4 (probably a texture coordinate choice)" },
+  { name = "shown", offset = 40, type = "u32" },
+]
+
+# A spark emitter (29,824 bytes, Sparks::Sparks sub_8212E9A0).
+[Sparks]
+size = 29824
+origin = "allocated"
+vtable = 0x820087BC
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "capacity", offset = 104, type = "u32", note = "the entries' capacity" },
+  { name = "texture_holder", offset = 108, type = "u32", note = "SetTextures108" },
+  { name = "params", offset = 112, type = "ptr", to = "OverlayParams" },
+  { name = "sparks", offset = 128, type = "bytes", count = 28800, note = "200 Spark" },
+  { name = "streak_counter", offset = 28928, type = "u32" },
+  { name = "oldest", offset = 28932, type = "u32" },
+  { name = "head", offset = 28936, type = "u32", note = "where the next spark goes" },
+  { name = "count", offset = 28940, type = "u32" },
+  { name = "spread", offset = 28944, type = "f32" },
+  { name = "position", offset = 28960, type = "bytes", count = 16, note = "a vector" },
+  { name = "streaking", offset = 28976, type = "u32" },
+  { name = "previous_position", offset = 28992, type = "bytes", count = 16, note = "a vector" },
+  { name = "latest_position", offset = 29008, type = "bytes", count = 16, note = "a vector" },
+  { name = "random_vectors", offset = 29024, type = "bytes", count = 800, note = "50 vectors" },
+]
+
+# A spark (144 bytes).
+[Spark]
+size = 144
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "bytes", count = 16, note = "a vector, (0, 0, 0, 1) at a reset" },
+  { name = "unknown_16", offset = 16, type = "bytes", count = 16, note = "a vector, (0, 0, 0, 1) at a reset" },
+  { name = "velocity", offset = 32, type = "bytes", count = 16, note = "a vector" },
+  { name = "position", offset = 48, type = "bytes", count = 16, note = "a vector" },
+  { name = "origin", offset = 64, type = "bytes", count = 16, note = "a vector: where it started (the emitter's position at the emit)" },
+  { name = "red", offset = 80, type = "u32" },
+  { name = "green", offset = 84, type = "u32" },
+  { name = "blue", offset = 88, type = "u32" },
+  { name = "alpha_int", offset = 92, type = "u32", note = "the alpha (+104) as an integer (fctiwz)" },
+  { name = "shown", offset = 96, type = "u32" },
+  { name = "size", offset = 100, type = "f32" },
+  { name = "alpha", offset = 104, type = "f32" },
+  { name = "life", offset = 108, type = "u32", note = "ticks left (an age counting up for the marker)" },
+  { name = "offset", offset = 112, type = "bytes", count = 16, note = "a vector: position less origin" },
+  { name = "state", offset = 128, type = "u32", note = "0 to 2" },
+  { name = "unknown_132", offset = 132, type = "u32" },
+  { name = "limit", offset = 136, type = "f32", note = "a streak's length limit" },
+]
+
+# Particle effect B (2,816 bytes, ParticlesB::ParticlesB sub_8212BFE8).
+[ParticlesB]
+size = 2816
+origin = "allocated"
+vtable = 0x82008720
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "capacity", offset = 104, type = "u32", note = "the entries' capacity" },
+  { name = "texture_holder", offset = 108, type = "u32", note = "SetTextures108" },
+  { name = "params", offset = 112, type = "ptr", to = "OverlayParams" },
+  { name = "unknown_116", offset = 116, type = "u32", note = "the set-up's +0 at Init" },
+  { name = "entries", offset = 128, type = "bytes", count = 2640, note = "15 ParticlesBEntry" },
+  { name = "oldest", offset = 2768, type = "u32" },
+  { name = "head", offset = 2772, type = "u32", note = "where the next entry goes" },
+  { name = "count", offset = 2776, type = "u32" },
+  { name = "position", offset = 2784, type = "bytes", count = 16, note = "a vector" },
+  { name = "moved", offset = 2800, type = "bytes", count = 16, note = "a vector: the last emit's position less the position before" },
+]
+
+# Particle effect B's entry (176 bytes).
+[ParticlesBEntry]
+size = 176
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "bytes", count = 16, note = "a vector, (0, 0, 0, 1) at a reset" },
+  { name = "unknown_16", offset = 16, type = "bytes", count = 16, note = "a vector, (0, 0, 0, 1) at a reset" },
+  { name = "velocity", offset = 32, type = "bytes", count = 16, note = "a vector" },
+  { name = "position", offset = 48, type = "bytes", count = 16, note = "a vector" },
+  { name = "origin", offset = 64, type = "bytes", count = 16, note = "a vector: where it started (the emitter's position at the emit)" },
+  { name = "red", offset = 80, type = "u32" },
+  { name = "green", offset = 84, type = "u32" },
+  { name = "blue", offset = 88, type = "u32" },
+  { name = "alpha_int", offset = 92, type = "u32", note = "the alpha (+104) as an integer (fctiwz)" },
+  { name = "shown", offset = 96, type = "u32" },
+  { name = "size", offset = 100, type = "f32" },
+  { name = "alpha", offset = 104, type = "f32" },
+  { name = "life", offset = 108, type = "u32", note = "ticks left (an age counting up for the marker)" },
+  { name = "most_alpha", offset = 112, type = "f32" },
+  { name = "particle_count", offset = 116, type = "u32" },
+  { name = "particle", offset = 128, type = "bytes", count = 48, note = "an OverlayParticle" },
+]
+
+# Particle effect C (2,720 bytes, ParticlesC::ParticlesC sub_8212CAF8; probably the exhausts).
+[ParticlesC]
+size = 2720
+origin = "allocated"
+vtable = 0x82008750
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "texture", offset = 104, type = "u32", note = "SetTextures104" },
+  { name = "params", offset = 108, type = "ptr", to = "OverlayParams" },
+  { name = "entries", offset = 112, type = "bytes", count = 2560, note = "20 ParticlesCEntry" },
+  { name = "position", offset = 2672, type = "bytes", count = 16, note = "a vector" },
+  { name = "oldest", offset = 2688, type = "u32" },
+  { name = "newest", offset = 2692, type = "u32", note = "where the next entry goes" },
+  { name = "count", offset = 2696, type = "u32" },
+  { name = "capacity", offset = 2700, type = "u32" },
+  { name = "speed", offset = 2704, type = "f32" },
+]
+
+# Particle effect C's entry (128 bytes).
+[ParticlesCEntry]
+size = 128
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "bytes", count = 16, note = "a vector, (0, 0, 0, 1) at a reset" },
+  { name = "unknown_16", offset = 16, type = "bytes", count = 16, note = "a vector, (0, 0, 0, 1) at a reset" },
+  { name = "velocity", offset = 32, type = "bytes", count = 16, note = "a vector" },
+  { name = "position", offset = 48, type = "bytes", count = 16, note = "a vector" },
+  { name = "origin", offset = 64, type = "bytes", count = 16, note = "a vector: where it started (the emitter's position at the emit)" },
+  { name = "red", offset = 80, type = "u32" },
+  { name = "green", offset = 84, type = "u32" },
+  { name = "blue", offset = 88, type = "u32" },
+  { name = "alpha_int", offset = 92, type = "u32", note = "the alpha (+104) as an integer (fctiwz)" },
+  { name = "shown", offset = 96, type = "u32" },
+  { name = "size", offset = 100, type = "f32" },
+  { name = "alpha", offset = 104, type = "f32" },
+  { name = "life", offset = 108, type = "u32", note = "ticks left (an age counting up for the marker)" },
+  { name = "unknown_112", offset = 112, type = "u32" },
+]
+
+# The sprite in the marker (+128), a light sprite (+144) and a car-model sprite (+224).
+[OverlaySpriteEntry]
+size = 132
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "bytes", count = 16, note = "a vector, (0, 0, 0, 1) at a reset" },
+  { name = "unknown_16", offset = 16, type = "bytes", count = 16, note = "a vector, (0, 0, 0, 1) at a reset" },
+  { name = "velocity", offset = 32, type = "bytes", count = 16, note = "a vector" },
+  { name = "position", offset = 48, type = "bytes", count = 16, note = "a vector" },
+  { name = "unknown_64", offset = 64, type = "bytes", count = 16, note = "a vector, (0, 0, 0, 1) at a reset" },
+  { name = "red", offset = 80, type = "u32" },
+  { name = "green", offset = 84, type = "u32" },
+  { name = "blue", offset = 88, type = "u32" },
+  { name = "alpha_int", offset = 92, type = "u32", note = "the alpha (+104) as an integer (fctiwz)" },
+  { name = "shown", offset = 96, type = "u32" },
+  { name = "size", offset = 100, type = "f32" },
+  { name = "alpha", offset = 104, type = "f32" },
+  { name = "life", offset = 108, type = "u32", note = "ticks left (an age counting up for the marker)" },
+  { name = "kind", offset = 112, type = "u32", note = "the texture: the marker's kind 0-3; the car-model sprite's state (1-8, +336); 0 for the light sprite" },
+  { name = "unknown_116", offset = 116, type = "u32", note = "4 at a reset; the light sprite's rand() % 4 when shown" },
+  { name = "unknown_120", offset = 120, type = "u32", note = "the car-model sprite's (9 at a reset)" },
+  { name = "unknown_124", offset = 124, type = "u32", note = "the car-model sprite's (12 at a reset)" },
+  { name = "unknown_128", offset = 128, type = "u32", note = "the car-model sprite's (0 at a reset)" },
+]
+
+# A light sprite (288 bytes, LightSprite::LightSprite sub_8211F060; probably the lights' glows).
+[LightSprite]
+size = 288
+origin = "allocated"
+vtable = 0x82008444
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "textures", offset = 104, type = "bytes", count = 36, note = "nine texture table entries' addresses" },
+  { name = "params", offset = 140, type = "ptr", to = "OverlayParams" },
+  { name = "sprite", offset = 144, type = "bytes", count = 128, note = "an OverlaySpriteEntry" },
+  { name = "unknown_272", offset = 272, type = "bytes", count = 16, note = "a vector, (0, 0, 0, 1) at a reset" },
+]
+
+# The marker above opponents (304 bytes, Marker::Marker sub_8212D620).
+[Marker]
+size = 304
+origin = "allocated"
+vtable = 0x82008784
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "textures", offset = 104, type = "bytes", count = 16, note = "four texture table entries' addresses" },
+  { name = "params", offset = 120, type = "ptr", to = "OverlayParams" },
+  { name = "sprite", offset = 128, type = "bytes", count = 128, note = "an OverlaySpriteEntry" },
+  { name = "view_mode", offset = 256, type = "u32" },
+  { name = "camera_position", offset = 272, type = "bytes", count = 16, note = "a vector" },
+  { name = "facing", offset = 288, type = "u32", note = "1 for the camera-facing quad" },
+]
+
+# A car-model sprite (576 bytes, ModelSprite::ModelSprite sub_82122880).
+[ModelSprite]
+size = 576
+origin = "allocated"
+vtable = 0x820084E8
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "unknown_104", offset = 104, type = "f32", note = "Init's r5 as a float" },
+  { name = "textures", offset = 108, type = "bytes", count = 100, note = "25 texture table entries' addresses" },
+  { name = "params", offset = 208, type = "ptr", to = "OverlayParams" },
+  { name = "sprite", offset = 224, type = "bytes", count = 132, note = "an OverlaySpriteEntry" },
+  { name = "unknown_368", offset = 368, type = "bytes", count = 16, note = "a vector, (0, 0, 0, 1) at a reset" },
+  { name = "unknown_384", offset = 384, type = "bytes", count = 16, note = "a vector, (0, 0, 0, 1) at a reset" },
+  { name = "unknown_404", offset = 404, type = "s32", note = "-1 at a reset" },
+  { name = "unknown_408", offset = 408, type = "s32", note = "-1 at a reset" },
+  { name = "unknown_416", offset = 416, type = "bytes", count = 160, note = "ten vectors, (0, 0, 0, 1) at a reset" },
+]
+
+# A single sprite, laid out as the sprite list (known-data.md) up to its four corners.
+[OverlaySprite]
+# measures from LineSprite (power-graph), merged at the integration
+measures = ["Line::RecordFlat.r4"]
+measure = "Sprite"
+size = 144
+origin = "embedded"
+fields = [
+  { name = "matrix", offset = 0, type = "bytes", count = 64, note = "a 4x4 matrix (identity at ResetStyle2)" },
+  { name = "skip", offset = 64, type = "u32", note = "drawn only when 0" },
+  { name = "blend_mode", offset = 68, type = "u32", note = "a render state mode, 0-5" },
+  { name = "address_mode", offset = 72, type = "u32", note = "a render state mode, 0-3 (2 at ResetStyle2)" },
+  { name = "corners", offset = 80, type = "bytes", count = 64, note = "four corners (x, y, z, w); 1.0 in the first two's w at ResetStyle2" },
+  { name = "end0_x", offset = 80, type = "f32", note = "from LineSprite (power-graph)" },
+  { name = "end0_y", offset = 84, type = "f32", note = "from LineSprite (power-graph)" },
+  { name = "end0_z", offset = 88, type = "f32", note = "from LineSprite (power-graph)" },
+  { name = "end1_x", offset = 96, type = "f32", note = "from LineSprite (power-graph)" },
+  { name = "end1_y", offset = 100, type = "f32", note = "from LineSprite (power-graph)" },
+  { name = "end1_z", offset = 104, type = "f32", note = "from LineSprite (power-graph)" },
+  { name = "end0_red", offset = 112, type = "u32", note = "0 to 255 (from LineSprite, power-graph)" },
+  { name = "end0_red_byte", offset = 115, type = "u8", note = "end0_red's low byte, as Line::RecordFlat reads it (from LineSprite, power-graph)" },
+  { name = "end0_green", offset = 116, type = "u32", note = "from LineSprite (power-graph)" },
+  { name = "end0_green_byte", offset = 119, type = "u8", note = "from LineSprite (power-graph)" },
+  { name = "end0_blue", offset = 120, type = "u32", note = "from LineSprite (power-graph)" },
+  { name = "end0_blue_byte", offset = 123, type = "u8", note = "from LineSprite (power-graph)" },
+  { name = "end0_alpha", offset = 124, type = "u32", note = "shifted into the vertex color's top byte (from LineSprite, power-graph)" },
+  { name = "end1_red", offset = 128, type = "u32", note = "from LineSprite (power-graph)" },
+  { name = "end1_red_byte", offset = 131, type = "u8", note = "from LineSprite (power-graph)" },
+  { name = "end1_green", offset = 132, type = "u32", note = "from LineSprite (power-graph)" },
+  { name = "end1_green_byte", offset = 135, type = "u8", note = "from LineSprite (power-graph)" },
+  { name = "end1_blue", offset = 136, type = "u32", note = "from LineSprite (power-graph)" },
+  { name = "end1_blue_byte", offset = 139, type = "u8", note = "from LineSprite (power-graph)" },
+  { name = "end1_alpha", offset = 140, type = "u32", note = "from LineSprite (power-graph)" },
+]
+
+[globals]
+zero = { address = 0x82000A34, type = "f32", note = "0.0" }
+one = { address = 0x82000A30, type = "f32", note = "1.0" }
+race_data = { address = 0x826C5B2C, type = "u32", note = "the race data (racer records from +48, the race mode at +0xA3AF4)" }
+viewport_entries = { address = 0x82008558, type = "u32", note = "OverlayViewportEntry, 12 bytes each" }
+viewport_pairs = { address = 0x820085A0, type = "u32", note = "pairs of words, 8 bytes each" }
+viewport_owners = { address = 0x826C2CE8, type = "u32", note = "the viewports (camera-modes.toml)" }
+camera_passes = { address = 0x826BAC00, type = "u32", note = "the camera passes (592 bytes each, cameras.toml)" }
+render_queue = { address = 0x826C5D5C, type = "u32", note = "the sprite recorders' render queue (Overlays::SetRenderTargets)" }
+command_list = { address = 0x826C5D60, type = "u32", note = "the sprite recorders' command list" }
+rand_seed = { address = 0x82638188, type = "u32", note = "the game's own rand's seed" }
+rand_scale = { address = 0x82002BD4, type = "f32", note = "probably 1/32,767" }
+axle_scale = { address = 0x82001FBC, type = "f32" }
+marker_slope = { address = 0x82002FB0, type = "f32" }
+marker_most_size = { address = 0x82002C3C, type = "f32" }
+marker_least_size = { address = 0x82002568, type = "f32" }
+trail_most_width = { address = 0x82000C44, type = "f32" }
+half = { address = 0x82001BE4, type = "f32", note = "the trails' side scale, particle effect B's spread, the sparks' size scale" }
+particles_b_size_scale = { address = 0x82008540, type = "f32" }
+angle_low = { address = 0x820029C4, type = "f32", note = "a random angle's low end" }
+angle_high = { address = 0x82002240, type = "f32", note = "a random angle's high end" }
+spread_low = { address = 0x82006908, type = "f32" }
+spread_high = { address = 0x82002208, type = "f32" }
+speed_scale = { address = 0x820029E4, type = "f32", note = "the sparks' spread and the smoke's growth from the speed" }
+sparks_most_spread = { address = 0x82002C50, type = "f32" }
+sparks_mode_factor = { address = 0x820035B0, type = "f32" }
+sparks_limit_high = { address = 0x820021E4, type = "f32" }
+frame_scale = { address = 0x820021E8, type = "f32", note = "the sparks' limit low end, the smoke's frame scale, the trails' width scale" }
+sparks_step = { address = 0x82002674, type = "f32" }
+sparks_speed_out = { address = 0x82002204, type = "f32" }
+sparks_speed_in = { address = 0x820087B8, type = "f32" }
+sparks_rise_state0 = { address = 0x820087B0, type = "f32" }
+sparks_rise_state2 = { address = 0x820087B4, type = "f32" }
+smoke_growth_high = { address = 0x82002C4C, type = "f32" }
+smoke_rise_high = { address = 0x820029D4, type = "f32" }
+smoke_drift_scale = { address = 0x820086F0, type = "f32" }
+smoke_drift_high = { address = 0x82002C48, type = "f32" }
+smoke_radius_base = { address = 0x8200222C, type = "f32" }
+smoke_count_scale = { address = 0x820029EC, type = "f32" }
+smoke_radius_scale = { address = 0x820086EC, type = "f32" }
+smoke_puff_size = { address = 0x82002A90, type = "f32", note = "a puff's size at a reset" }
+particles_b_most_speed = { address = 0x82002A34, type = "f32" }
+particles_b_least_speed = { address = 0x82002A3C, type = "f32" }
+particles_c_speed_scale = { address = 0x82002BF0, type = "f32" }
+particles_c_pull_scale = { address = 0x8200874C, type = "f32" }
+contact_offset = { address = 0x826C5D40, type = "f32", note = "a vector added to the wheels' contacts" }
+trail_lift = { address = 0x82616F40, type = "f32", note = "a vector added to the trails' points" }
+smoke_spin_scale = { address = 0x8200805C, type = "f32" }
+smoke_slip_scale = { address = 0x82008060, type = "f32" }
+smoke_spin_most = { address = 0x82002C38, type = "f32" }
+smoke_slip_most = { address = 0x820029D0, type = "f32" }
+model_sprite_kind1 = { address = 0x82616CC4, type = "u32", note = "ModelSprite::Entry's tables (9 words each)" }
+model_sprite_kind2 = { address = 0x82616CE8, type = "u32" }
+model_sprite_kind345 = { address = 0x82616D0C, type = "u32" }
+model_sprite_kind6 = { address = 0x82616D30, type = "u32" }
+model_sprite_kind7 = { address = 0x82616D54, type = "u32" }
+model_sprite_kind8 = { address = 0x82616D78, type = "u32" }
+model_sprite_other = { address = 0x826C5CF0, type = "u32" }
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from RaceOverlays.
+[RaceOverlaysAt157552]
+measure = "RaceMode@+157552"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from RaceOverlays.
+[RaceOverlaysAt9608]
+measure = "RaceOverlays::OnUpdate.r3@+9608"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from RaceOverlays.
+[RaceOverlaysAt9608_2]
+measure = "sub_8215E158.r3@+9608"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from RaceOverlays.
+[RaceOverlaysAt9608_3]
+measure = "sub_8215E680.r3@+9608"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+]
+
+# Split from RaceOverlays.
+[RaceOverlaysAt9608_4]
+measure = "sub_8215E6C0.r3@+9608"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Split from CarOverlays.
+[CarOverlaysPart]
+measure = "sub_8215E6C0.r3@+9608.+0"
+size = 108
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "unknown_104", offset = 104, type = "u32" },
+]
+
+# Split from CarOverlays.
+[CarOverlaysPart_2]
+measure = "sub_8215E6C0.r3@+9608.+4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from OverlayVtable.
+[OverlayVtablePart]
+measure = "sub_8215E6C0.r3@+9608.+4.+0"
+size = 28
+origin = "embedded"
+fields = [
+  { name = "unknown_24", offset = 24, type = "u32" },
+]

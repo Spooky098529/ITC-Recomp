@@ -28,6 +28,8 @@
 // refcount::AddRef, lock-free, either way).
 
 #include "native/refcount.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -58,7 +60,7 @@ thread_local std::chrono::steady_clock::time_point g_last_log;
 
 // Adds `delta` to the big-endian count at `address`; returns the new count.
 uint32_t AddToCount(uint8_t* base, uint32_t address, int32_t delta) {
-  uint32_t* word = reinterpret_cast<uint32_t*>(REX_RAW_ADDR(address));
+  uint32_t* word = reinterpret_cast<uint32_t*>(guest::Pointer(base, address));
   uint32_t old_raw = __atomic_load_n(word, __ATOMIC_RELAXED);
   uint32_t value;
   do {
@@ -136,10 +138,10 @@ ITC_NATIVE_ENTRY_ALWAYS(822A67B0) {
   if (HoldsChild(base, object)) {
     ctx.r3.u64 = guest::LoadU32(base, object + kChild);
     ctx.lr = 0x822A6810;
-    lifted::CallFromContext(ctx, base, 0x822A67B0);
+    lifted::Enter(ctx, base, game::Resource::Release);
   }
   ctx.r3.u64 = object;
   ctx.lr = 0x822A6818;
-  lifted::CallFromContext(ctx, base, 0x822A6210);
+  lifted::Enter(ctx, base, game::Resource::Destroy);
   ctx.r3.u64 = 0;
 }

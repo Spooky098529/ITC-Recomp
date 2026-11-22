@@ -8,6 +8,7 @@
 
 #include "base/flags.h"
 #include "debug/frame_state_diff.h"
+#include "schema/car_physics.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 ITC_FLAG_BOOL(native_vehicle_accessors, true, "ITC",
@@ -96,13 +97,13 @@ ITC_ACCESSOR_VOID(820B68C0, RigidBodyPointVelocity(base, ctx.r3.u32, ctx.r4.u32,
 ITC_ACCESSOR_WORD(820B6928, RigidBodyOrientation(ctx.r3.u32))
 ITC_ACCESSOR_WORD(820B6948, RigidBodyAngularVelocity(ctx.r3.u32))
 ITC_ACCESSOR_VOID(820B6958, RigidBodyAddForce(base, ctx.r3.u32, ctx.r4.u32);
-                  ctx.r3.u64 = ctx.r3.u32 + 64)
+                  ctx.r3.u64 = schema::RigidBody(nullptr, ctx.r3.u32).force_address())
 ITC_ACCESSOR_VOID(820B6960, RigidBodyAddTorque(base, ctx.r3.u32, ctx.r4.u32);
-                  ctx.r3.u64 = ctx.r3.u32 + 128)
+                  ctx.r3.u64 = schema::RigidBody(nullptr, ctx.r3.u32).torque_address())
 ITC_ACCESSOR_VOID(820B6968, RigidBodyAddForceAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
-                  ctx.r3.u64 = ctx.r3.u32 + 64)
+                  ctx.r3.u64 = schema::RigidBody(nullptr, ctx.r3.u32).force_address())
 ITC_ACCESSOR_VOID(820B69D8, RigidBodyAddTorqueAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
-                  ctx.r3.u64 = ctx.r3.u32 + 128)
+                  ctx.r3.u64 = schema::RigidBody(nullptr, ctx.r3.u32).torque_address())
 
 // The wheels' slip: r3 = the vehicle, f1 = a threshold. Vehicle::WheelSlip
 // (sub_820C0180) has no adapter: its callers in play, MaxWheelSlip and

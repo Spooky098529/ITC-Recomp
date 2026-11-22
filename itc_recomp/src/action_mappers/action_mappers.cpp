@@ -8,6 +8,9 @@
 #include "guest.h"
 #include "input/input_manager.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/action_mappers.h"
+#include "schema/app_states.h"
+#include "schema/input.h"
 #include "std_list/ptr_list.h"
 
 #include <immintrin.h>
@@ -21,13 +24,16 @@ namespace action_mappers {
 
 namespace {
 
-constexpr uint32_t kOne = 0x82000A30;       // the game's float 1.0
-constexpr uint32_t kZero = 0x82000A34;      // the game's float 0.0
-constexpr uint32_t kMinusOne = 0x82001BE0;  // probably -1.0
-
-inline double Lfs(uint8_t* base, uint32_t address) {
-  return double(guest::LoadFloat(base, address));
-}
+using G = schema::ActionMappersGlobals;
+using Mapper = schema::ActionMapper;
+using State = schema::ActionMapperState;
+using AnalogStage = schema::ActionMapperAnalog;
+using Threshold = schema::ActionThreshold;
+using Config = schema::ActionMapperConfig;
+using Repeat = schema::ActionRepeat;
+using Curve = schema::ActionCurve;
+using ClientList = schema::InputClientList;
+using ClientNode = schema::InputClientNode;
 inline double Fmuls(double a, double b) {
   return double(float(a * b));
 }
@@ -69,42 +75,44 @@ inline uint32_t Bit(uint32_t word, uint32_t i) {
 
 double CurveApply(uint8_t* base, uint32_t curve, double x) {
   ITC_NATIVE_RUNNING("sub_8210B5B8 ActionCurve::Apply");
-  const double maximum = Lfs(base, curve + 12);
-  const double k = Lfs(base, kMinusOne);
+  const Curve c(base, curve);
+  const double maximum = double(c.maximum());
+  const double k = double(G::minus_one(base));
   const double low = Fmuls(maximum, k);
   if (x < low) {
     return k;
   }
   if (x > maximum) {
-    return Lfs(base, kOne);
+    return double(G::one(base));
   }
-  double center = Lfs(base, curve + 4);
-  const double dead = Lfs(base, curve + 8);
+  double center = double(c.center());
+  const double dead = double(c.dead_zone());
   if (x < Fsubs(center, dead)) {
     center = Fsubs(center, dead);
     return Fmuls(Fdivs(Fsubs(x, center), Fsubs(low, center)), k);
   }
   if (x > Fadds(dead, center)) {
-    const double edge = Fadds(Lfs(base, curve + 4), Lfs(base, curve + 8));
+    const double edge = Fadds(double(c.center()), double(c.dead_zone()));
     return Fdivs(Fsubs(x, edge), Fsubs(maximum, edge));
   }
-  return Lfs(base, kZero);
+  return double(G::zero(base));
 }
 
 uint32_t RepeatUpdate(uint8_t* base, uint32_t repeat, uint32_t held) {
   ITC_NATIVE_RUNNING("sub_8210B568 ActionRepeat::Update");
+  const Repeat r(base, repeat);
   if ((held & 0xFF) == 0) {
-    guest::StoreU32(base, repeat + 4, 0);
+    r.set_count(0);
     return 0;
   }
   uint32_t fires = 0;
-  const uint32_t delay = guest::LoadU32(base, repeat + 8);
-  const uint32_t count = guest::LoadU32(base, repeat + 4);
-  if (count >= delay && count == guest::LoadU32(base, repeat + 12) + delay) {
+  const uint32_t delay = r.delay();
+  const uint32_t count = r.count();
+  if (count >= delay && count == r.period() + delay) {
     fires = 1;
-    guest::StoreU32(base, repeat + 4, delay);
+    r.set_count(delay);
   }
-  guest::StoreU32(base, repeat + 4, guest::LoadU32(base, repeat + 4) + 1);
+  r.set_count(r.count() + 1);
   return fires;
 }
 
@@ -116,7 +124,7 @@ uint32_t IndexOf(uint32_t id) {
 
 uint32_t ListenerHeld(uint8_t* base, uint32_t listener, uint32_t mask) {
   ITC_NATIVE_RUNNING("sub_825924E0 InputProcessor::AllHeld");
-  return (guest::LoadU32(base, listener + 272) & mask) == mask ? 1 : 0;
+  return (schema::InputProcessor(base, listener).held() & mask) == mask ? 1 : 0;
 }
 
 uint32_t ListenerTestValue(uint8_t* base, uint32_t listener, uint32_t mask) {
@@ -125,7 +133,7 @@ uint32_t ListenerTestValue(uint8_t* base, uint32_t listener, uint32_t mask) {
 }
 
 uint32_t ListenerTest(uint8_t* base, uint32_t listener, uint32_t mask_address) {
-  return ListenerTestValue(base, listener, guest::LoadU32(base, mask_address));
+  return ListenerTestValue(base, listener, schema::ActionButtonMask(base, mask_address).mask());
 }
 
 void NoteListenerTest(uint32_t caller, uint32_t listener, uint32_t mask, uint32_t result) {
@@ -138,36 +146,38 @@ void NoteListenerTest(uint32_t caller, uint32_t listener, uint32_t mask, uint32_
 
 void ClientNodeConstruct(uint8_t* base, uint32_t node, uint32_t type) {
   ITC_NATIVE_RUNNING("sub_8259C6D0 ClientNode::ClientNode");
-  guest::StoreU32(base, node + 4, type);
-  guest::StoreU32(base, node + 8, 0);
-  guest::StoreU32(base, node + 0, 0x82071380);
+  const ClientNode n(base, node);
+  n.set_type(type);
+  n.set_next(0u);
+  n.set_vtable(0x82071380);
 }
 
 void ClientListConstruct(uint8_t* base, uint32_t list) {
   ITC_NATIVE_RUNNING("sub_8259C7B8 ClientList::ClientList");
-  guest::StoreU32(base, list + 4, 0);
-  guest::StoreU32(base, list + 0, 0x820713C0);
-  guest::StoreU32(base, list + 8, 0);
+  const ClientList l(base, list);
+  l.set_first(0u);
+  l.set_vtable(0x820713C0);
+  l.set_last(0u);
   for (uint32_t i = 0; i < 3; i++) {
-    guest::StoreU32(base, list + 12 + 4 * i, 0);
-    guest::StoreU32(base, list + 24 + 4 * i, 0);
+    guest::StoreU32(base, l.added_counts_address() + 4 * i, 0);
+    guest::StoreU32(base, l.bound_counts_address() + 4 * i, 0);
   }
-  guest::StoreU32(base, kClientList, list);
+  G::set_the_client_list(base, list);
 }
 
 void ClientListAdd(uint8_t* base, uint32_t node) {
   ITC_NATIVE_RUNNING("sub_8259C960 ClientList::Add");
-  const uint32_t list = guest::LoadU32(base, kClientList);
-  if (list == 0) {
+  const ClientList list = G::the_client_list(base);
+  if (!list) {
     return;
   }
-  if (guest::LoadU32(base, list + 4) == 0) {
-    guest::StoreU32(base, list + 4, node);
+  if (!list.first()) {
+    list.set_first(node);
   } else {
-    guest::StoreU32(base, guest::LoadU32(base, list + 8) + 8, node);
+    list.last().set_next(node);
   }
-  guest::StoreU32(base, list + 8, node);
-  const uint32_t count = list + 4 * (guest::LoadU32(base, node + 4) + 3);
+  list.set_last(node);
+  const uint32_t count = list.added_counts_address() + 4 * ClientNode(base, node).type();
   guest::StoreU32(base, count, guest::LoadU32(base, count) + 1);
 }
 
@@ -184,25 +194,24 @@ uint32_t Counter(uint8_t* base, uint32_t address, uint32_t bump) {
 
 uint32_t ClientListCount(uint8_t* base, uint32_t list, uint32_t type, uint32_t bump) {
   ITC_NATIVE_RUNNING("sub_8259C868 ClientList::Count");
-  return Counter(base, list + 4 * (type + 3), bump);
+  return Counter(base, ClientList(base, list).added_counts_address() + 4 * type, bump);
 }
 
 uint32_t ClientListBoundCount(uint8_t* base, uint32_t list, uint32_t type, uint32_t bump) {
   ITC_NATIVE_RUNNING("sub_8259C898 ClientList::BoundCount");
-  return Counter(base, list + 4 * (type + 6), bump);
+  return Counter(base, ClientList(base, list).bound_counts_address() + 4 * type, bump);
 }
 
 uint32_t ClientListFind(uint8_t* base, uint32_t type, uint32_t n) {
   ITC_NATIVE_RUNNING("sub_8259C818 ClientList::Find");
-  const uint32_t list = guest::LoadU32(base, kClientList);
-  if (list == 0) {
+  const ClientList list = G::the_client_list(base);
+  if (!list) {
     return 0;
   }
-  for (uint32_t node = guest::LoadU32(base, list + 4); node != 0;
-       node = guest::LoadU32(base, node + 8)) {
-    if (int32_t(type) == int32_t(guest::LoadU32(base, node + 4))) {
+  for (ClientNode node = list.first(); node; node = node.next()) {
+    if (int32_t(type) == int32_t(node.type())) {
       if (n == 0) {
-        return node;
+        return node.address;
       }
       n--;
     }
@@ -213,9 +222,10 @@ uint32_t ClientListFind(uint8_t* base, uint32_t type, uint32_t n) {
 // --- The update ---
 
 bool RepeatsKnown(uint8_t* base, uint32_t mapper) {
+  const Mapper m(base, mapper);
   for (uint32_t i = 0; i < kActions; i++) {
-    const uint32_t object = guest::LoadU32(base, mapper + kRepeatPointers + 4 * i);
-    if (guest::LoadU32(base, guest::LoadU32(base, object) + 4) != kRepeatUpdateFunction) {
+    const Repeat object(base, guest::LoadU32(base, m.repeat_pointers_address() + 4 * i));
+    if (object.vtable().update() != kRepeatUpdateFunction) {
       return false;
     }
   }
@@ -223,9 +233,10 @@ bool RepeatsKnown(uint8_t* base, uint32_t mapper) {
 }
 
 bool CurvesKnown(uint8_t* base, uint32_t mapper) {
+  const Mapper m(base, mapper);
   for (uint32_t i = 0; i < kActions; i++) {
-    const uint32_t object = guest::LoadU32(base, mapper + kCurvePointers + 4 * i);
-    if (guest::LoadU32(base, guest::LoadU32(base, object) + 4) != kCurveApplyFunction) {
+    const Curve object(base, guest::LoadU32(base, m.curve_pointers_address() + 4 * i));
+    if (object.vtable().update() != kCurveApplyFunction) {
       return false;
     }
   }
@@ -238,39 +249,45 @@ bool MapperCallsKnown(uint8_t* base, uint32_t mapper) {
 
 double CurveUnsigned(uint8_t* base, uint32_t analog, uint32_t index, uint32_t raw) {
   ITC_NATIVE_RUNNING("sub_8210B4A8 ActionMapper::CurveUnsigned");
-  const uint32_t curve = guest::LoadU32(base, analog + 4 * (index + 45));
-  const double x = Fmuls(double(float(double(int64_t(raw & 0xFFFF)))), Lfs(base, 0x82002BD4));
+  const uint32_t curve =
+      guest::LoadU32(base, AnalogStage(base, analog).curve_pointers_address() + 4 * index);
+  const double x =
+      Fmuls(double(float(double(int64_t(raw & 0xFFFF)))), double(G::unsigned_scale(base)));
   return CurveApply(base, curve, x);
 }
 
 double CurveCentered(uint8_t* base, uint32_t analog, uint32_t index, uint32_t raw) {
   ITC_NATIVE_RUNNING("sub_8210B500 ActionMapper::CurveCentered");
-  const uint32_t curve = guest::LoadU32(base, analog + 4 * (index + 45));
+  const uint32_t curve =
+      guest::LoadU32(base, AnalogStage(base, analog).curve_pointers_address() + 4 * index);
   const double value = double(float(double(int64_t(raw & 0xFFFF))));
-  const double x = Fmuls(Fsubs(value, Lfs(base, 0x82007F64)), Lfs(base, 0x82007F60));
+  const double x = Fmuls(Fsubs(value, double(G::centered_offset(base))),
+                         double(G::centered_scale(base)));
   return CurveApply(base, curve, x);
 }
 
 uint32_t Analog(uint8_t* base, uint32_t analog, uint32_t config, uint32_t raw, double* f1) {
   ITC_NATIVE_RUNNING("sub_8210B7D0 ActionMapper::Analog");
+  const AnalogStage a(base, analog);
+  const Config c(base, config);
   uint32_t r3 = analog;
-  const double zero = Lfs(base, kZero);
+  const double zero = double(G::zero(base));
   for (uint32_t i = 0; i < kActions; i++) {
-    const uint32_t link = guest::LoadU32(base, guest::LoadU32(base, config + 4) + 4 * i);
-    uint32_t kind = guest::LoadU32(base, guest::LoadU32(base, config) + 4 * i);
+    const uint32_t link = guest::LoadU32(base, c.links() + 4 * i);
+    uint32_t kind = guest::LoadU32(base, c.kinds() + 4 * i);
     const uint16_t value = guest::LoadU16(base, raw + 2 * i);
     if (link < i && guest::LoadU16(base, raw + 2 * link) != 0) {
       kind = 0;
     }
     if (kind == 0) {
-      guest::StoreU16(base, analog + 2 * i, 0);
-      guest::StoreFloat(base, analog + 60 + 4 * i, float(zero));
+      guest::StoreU16(base, a.raw_address() + 2 * i, 0);
+      guest::StoreFloat(base, a.values_address() + 4 * i, float(zero));
     } else if (kind == 1 || kind == 2) {
-      guest::StoreU16(base, analog + 2 * i, value);
+      guest::StoreU16(base, a.raw_address() + 2 * i, value);
       const double result = kind == 1 ? CurveUnsigned(base, analog, i, value)
                                       : CurveCentered(base, analog, i, value);
-      guest::StoreFloat(base, analog + 60 + 4 * i, float(result));
-      r3 = guest::LoadU32(base, analog + 4 * (i + 45));
+      guest::StoreFloat(base, a.values_address() + 4 * i, float(result));
+      r3 = guest::LoadU32(base, a.curve_pointers_address() + 4 * i);
       *f1 = result;
     }
   }
@@ -280,33 +297,34 @@ uint32_t Analog(uint8_t* base, uint32_t analog, uint32_t config, uint32_t raw, d
 uint32_t Hysteresis(uint8_t* base, uint32_t words, uint32_t index, double value,
                     uint32_t config) {
   ITC_NATIVE_RUNNING("sub_8210B718 ActionMapper::Hysteresis");
+  const State s(base, words);
   double x = value;
-  if (x < Lfs(base, kZero)) {
-    x = Fmuls(x, Lfs(base, kMinusOne));
+  if (x < double(G::zero(base))) {
+    x = Fmuls(x, double(G::minus_one(base)));
   }
-  const uint32_t entry = words + 1404 + 20 * index;
-  const double on = Lfs(base, entry);
-  const double off = Lfs(base, entry + 4);
+  const Threshold entry(base, s.thresholds_address() + Threshold::kSize * index);
+  const double on = double(entry.on());
+  const double off = double(entry.off());
   if (on == off) {
-    guest::StoreU8(base, entry + 16, off < x ? 1 : 0);
+    entry.set_state(off < x ? 1 : 0);
   } else if (!(on > x)) {
-    guest::StoreU8(base, entry + 16, 1);
+    entry.set_state(1);
   } else if (!(off < x)) {
-    guest::StoreU8(base, entry + 16, 0);
+    entry.set_state(0);
   }
-  const uint32_t counter = guest::LoadU32(base, entry + 12);
+  const uint32_t counter = entry.counter();
   if (counter != 0) {
-    guest::StoreU8(base, entry + 16, 0);
-    guest::StoreU32(base, entry + 12, counter - 1);
+    entry.set_state(0);
+    entry.set_counter(counter - 1);
   }
-  if (guest::LoadU8(base, entry + 16) != 0) {
-    const uint32_t link = guest::LoadU32(base, guest::LoadU32(base, config + 4) + 4 * index);
+  if (entry.state() != 0) {
+    const uint32_t link = guest::LoadU32(base, Config(base, config).links() + 4 * index);
     if (link != 30) {
-      const uint32_t linked = words + 20 * link;
-      guest::StoreU32(base, linked + 1416, guest::LoadU32(base, linked + 1412));
+      const Threshold linked(base, s.thresholds_address() + Threshold::kSize * link);
+      linked.set_counter(linked.suppress_ticks());
     }
   }
-  return guest::LoadU8(base, entry + 16);
+  return entry.state();
 }
 
 namespace {
@@ -314,33 +332,34 @@ namespace {
 uint32_t WordsFromState(uint8_t* base, uint32_t words, uint32_t config, uint32_t state_word,
                         uint32_t stack_word) {
   ITC_NATIVE_RUNNING("sub_8210BBA0 ActionMapper::Words");
+  const State s(base, words);
+  const Config c(base, config);
   uint32_t held = stack_word;
   for (uint32_t i = 0; i < kActions; i++) {
     bool set = false;
-    if (Bit(state_word, i) &&
-        guest::LoadU32(base, guest::LoadU32(base, config) + 4 * i) == 1) {
-      const uint32_t link = guest::LoadU32(base, guest::LoadU32(base, config + 4) + 4 * i);
+    if (Bit(state_word, i) && guest::LoadU32(base, c.kinds() + 4 * i) == 1) {
+      const uint32_t link = guest::LoadU32(base, c.links() + 4 * i);
       // A linked action before this one already held suppresses it.
       set = !(link < i && int32_t(link) >= 0 && Bit(held, link & 31));
     }
     held = set ? held | (1u << i) : held & ~(1u << i);
   }
-  const uint32_t before = guest::LoadU32(base, words) | guest::LoadU32(base, words + 20);
-  guest::StoreU32(base, words, before);
-  guest::StoreU32(base, words + 4, before);
-  guest::StoreU32(base, words, held);
-  const uint32_t changed = guest::LoadU32(base, words + 4) ^ held;
-  guest::StoreU32(base, words + 8, guest::LoadU32(base, words) & changed);
-  guest::StoreU32(base, words + 8, guest::LoadU32(base, words + 8) | guest::LoadU32(base, words + 20));
-  guest::StoreU32(base, words + 12, changed & ~guest::LoadU32(base, words));
-  guest::StoreU32(base, words + 16, guest::LoadU32(base, words + 8));
-  guest::StoreU32(base, words + 20, 0);
+  const uint32_t before = s.held() | s.pending();
+  s.set_held(before);
+  s.set_held_before(before);
+  s.set_held(held);
+  const uint32_t changed = s.held_before() ^ held;
+  s.set_pressed(s.held() & changed);
+  s.set_pressed(s.pressed() | s.pending());
+  s.set_released(changed & ~s.held());
+  s.set_fired(s.pressed());
+  s.set_pending(0);
   uint32_t result = 0;
   for (uint32_t i = 0; i < kActions; i++) {
-    const uint32_t repeat = guest::LoadU32(base, words + 24 + 4 * i);
-    result = RepeatUpdate(base, repeat, Bit(guest::LoadU32(base, words), i));
+    const uint32_t repeat = guest::LoadU32(base, s.repeat_pointers_address() + 4 * i);
+    result = RepeatUpdate(base, repeat, Bit(s.held(), i));
     if ((result & 0xFF) != 0) {
-      guest::StoreU32(base, words + 16, guest::LoadU32(base, words + 16) | (1u << i));
+      s.set_fired(s.fired() | (1u << i));
     }
   }
   return result;
@@ -356,13 +375,15 @@ uint32_t Words(uint8_t* base, uint32_t words, uint32_t config, uint32_t states,
 uint32_t Rebuild(uint8_t* base, uint32_t words, uint32_t config, uint32_t raw,
                  uint32_t stack_word, double* f1) {
   ITC_NATIVE_RUNNING("sub_8210C0E0 ActionMapper::Rebuild");
-  Analog(base, words + 624, config + 8, raw, f1);
+  const State s(base, words);
+  // The analog stage's config follows the digital one's.
+  Analog(base, s.analog_address(), config + Config::kSize, raw, f1);
   // The hysteresis states, a local word of the original's (bits 30 and 31
   // never read).
   uint32_t states = 0;
   double value = 0;
   for (uint32_t i = 0; i < kActions; i++) {
-    value = Lfs(base, words + 684 + 4 * i);
+    value = double(guest::LoadFloat(base, s.analog_values_address() + 4 * i));
     if ((Hysteresis(base, words, i, value, config) & 0xFF) != 0) {
       states |= 1u << i;
     } else {
@@ -375,48 +396,49 @@ uint32_t Rebuild(uint8_t* base, uint32_t words, uint32_t config, uint32_t raw,
 
 uint32_t MapperUpdate(uint8_t* base, uint32_t mapper, uint32_t stack_word, double* f1) {
   ITC_NATIVE_RUNNING("sub_8210C370 ActionMapper::Update");
-  const uint32_t raw = mapper + kRaw;
+  const Mapper m(base, mapper);
+  const uint32_t raw = m.raw_address();
   for (uint32_t i = 0; i < kActions; i++) {
     guest::StoreU16(base, raw + 2 * i, 0);
   }
-  const double zero = Lfs(base, kZero);
-  const double scale = Lfs(base, 0x82007F58);
+  const double zero = double(G::zero(base));
+  const double scale = double(G::pad_scale(base));
+  using Pad = schema::ActionPadValues;
   // A stick's direction: its magnitude scaled, into one raw value or the
   // other by its sign (NaN: neither).
-  auto direction = [&](uint32_t value, uint32_t positive, uint32_t negative) {
-    const double v = Lfs(base, guest::LoadU32(base, mapper + kPadValues) + value);
+  auto direction = [&](float (Pad::*value)() const, uint32_t positive, uint32_t negative) {
+    const double v = double((m.pad_values().*value)());
     if (v > zero) {
-      guest::StoreU16(base, mapper + positive, FctidzLow16(Fabs(Fmuls(v, scale))));
+      guest::StoreU16(base, positive, FctidzLow16(Fabs(Fmuls(v, scale))));
     } else if (v < zero) {
-      guest::StoreU16(base, mapper + negative, FctidzLow16(Fabs(Fmuls(v, scale))));
+      guest::StoreU16(base, negative, FctidzLow16(Fabs(Fmuls(v, scale))));
     }
   };
-  direction(4, 420, 422);
-  direction(0, 426, 424);
-  direction(20, 428, 430);
-  direction(16, 434, 432);
+  direction(&Pad::left_y, m.raw_left_y_plus_address(), m.raw_left_y_minus_address());
+  direction(&Pad::left_x, m.raw_left_x_plus_address(), m.raw_left_x_minus_address());
+  direction(&Pad::right_y, m.raw_right_y_plus_address(), m.raw_right_y_minus_address());
+  direction(&Pad::right_x, m.raw_right_x_plus_address(), m.raw_right_x_minus_address());
   // The triggers.
-  const uint32_t pad = guest::LoadU32(base, mapper + kPadValues);
-  guest::StoreU16(base, mapper + 412, FctidzLow16(Fabs(Fmuls(Lfs(base, pad + 8), scale))));
-  guest::StoreU16(base, mapper + 414,
-                  FctidzLow16(Fabs(Fmuls(Lfs(base, guest::LoadU32(base, mapper + kPadValues) + 24),
-                                         scale))));
+  const Pad pad = m.pad_values();
+  m.set_raw_left_trigger(FctidzLow16(Fabs(Fmuls(double(pad.left_trigger()), scale))));
+  m.set_raw_right_trigger(
+      FctidzLow16(Fabs(Fmuls(double(m.pad_values().right_trigger()), scale))));
   // The buttons: each mask held on the listener sets its action's raw value.
   static constexpr uint32_t kMasks[14] = {1,    2,     4,     8,      16,      32,      64,
                                           128,  4096,  65536, 16384,  262144,  1048576, 2097152};
   static constexpr uint32_t kIds[14] = {153, 154, 155, 156, 159, 158, 160,
                                         157, 161, 162, 165, 166, 152, 151};
-  const uint32_t listener = mapper + kListener;
+  const uint32_t listener = m.listener_address();
   for (int b = 0; b < 14; b++) {
     const uint32_t held = ListenerTestValue(base, listener, kMasks[b]);
     NoteListenerTest(0x8210C624, listener, kMasks[b], held);
     if ((held & 0xFF) != 0) {
-      guest::StoreU16(base, mapper + 2 * (IndexOf(kIds[b]) + 194), 32767);
+      guest::StoreU16(base, raw + 2 * IndexOf(kIds[b]), 32767);
     }
   }
   // The axes, from the directions' raw values.
-  const double k1 = Lfs(base, 0x82007F5C);
-  const double k2 = Lfs(base, 0x82001BE4);
+  const double k1 = double(G::axis_scale(base));
+  const double k2 = double(G::half(base));
   auto axis = [&](uint32_t minus, uint32_t plus) {
     const double from = Fnmsubs(FromU16(base, raw + 2 * minus), k1, k2);
     return Fmadds(FromU16(base, raw + 2 * plus), k1, from);
@@ -425,19 +447,19 @@ uint32_t MapperUpdate(uint8_t* base, uint32_t mapper, uint32_t stack_word, doubl
   const double a24 = Fmuls(axis(4, 5), scale);
   const double a27 = Fmuls(axis(16, 17), scale);
   const double a26 = axis(18, 19);
-  guest::StoreU16(base, mapper + 438, FctidzLow16(a25));
-  guest::StoreU16(base, mapper + 436, FctidzLow16(a24));
-  guest::StoreU16(base, mapper + 442, FctidzLow16(a27));
-  guest::StoreU16(base, mapper + 440, FctidzLow16(Fmuls(a26, scale)));
+  m.set_raw_dpad_y(FctidzLow16(a25));
+  m.set_raw_dpad_x(FctidzLow16(a24));
+  m.set_raw_left_y(FctidzLow16(a27));
+  m.set_raw_left_x(FctidzLow16(Fmuls(a26, scale)));
   const double a29 = Fmuls(axis(20, 21), scale);
   const double a28 = Fmuls(axis(22, 23), scale);
-  guest::StoreU16(base, mapper + 446, FctidzLow16(a29));
-  guest::StoreU16(base, mapper + 444, FctidzLow16(a28));
-  return Rebuild(base, mapper + kWords, mapper + kConfig, raw, stack_word, f1);
+  m.set_raw_right_y(FctidzLow16(a29));
+  m.set_raw_right_x(FctidzLow16(a28));
+  return Rebuild(base, m.held_address(), m.config_address(), raw, stack_word, f1);
 }
 
 bool UpdateAllKnown(uint8_t* base, uint32_t list) {
-  const uint32_t count = guest::LoadU32(base, list + 4 * (2 + 6));
+  const uint32_t count = ClientList(base, list).bound_count_2();
   for (uint32_t i = 0; i < count; i++) {
     if (!MapperCallsKnown(base, ClientListFind(base, 2, i))) {
       return false;
@@ -462,46 +484,49 @@ uint32_t UpdateAll(uint8_t* base, uint32_t list, uint32_t stack_word, double* f1
 
 namespace {
 
-uint32_t WordBit(uint8_t* base, uint32_t mapper, uint32_t id, uint32_t word) {
+// Bit `IndexOf(id)` of the word at `word`, 0 for an id out of range.
+uint32_t WordBit(uint8_t* base, uint32_t id, uint32_t word) {
   const uint32_t index = IndexOf(id);
   if (index == 30) {
     return 0;
   }
-  return Bit(guest::LoadU32(base, mapper + word), index);
+  return Bit(guest::LoadU32(base, word), index);
 }
 
 }  // namespace
 
 uint32_t Held(uint8_t* base, uint32_t mapper, uint32_t id) {
   ITC_NATIVE_RUNNING("sub_8210BE70 ActionMapper::Held");
-  return WordBit(base, mapper, id, kWords);
+  return WordBit(base, id, Mapper(base, mapper).held_address());
 }
 
 uint32_t Pressed(uint8_t* base, uint32_t mapper, uint32_t id) {
   ITC_NATIVE_RUNNING("sub_8210BF40 ActionMapper::Pressed");
-  return WordBit(base, mapper, id, kWords + 8);
+  return WordBit(base, id, Mapper(base, mapper).pressed_address());
 }
 
 uint32_t Fired(uint8_t* base, uint32_t mapper, uint32_t id) {
   ITC_NATIVE_RUNNING("sub_8210C010 ActionMapper::Fired");
-  return WordBit(base, mapper, id, kWords + 16);
+  return WordBit(base, id, Mapper(base, mapper).fired_address());
 }
 
 uint32_t HeldBefore(uint8_t* base, uint32_t mapper, uint32_t id) {
   ITC_NATIVE_RUNNING("sub_8210BED8 ActionMapper::HeldBefore");
-  return WordBit(base, mapper, id, kWords + 4);
+  return WordBit(base, id, Mapper(base, mapper).held_before_address());
 }
 
 uint32_t Released(uint8_t* base, uint32_t mapper, uint32_t id) {
   ITC_NATIVE_RUNNING("sub_8210BFA8 ActionMapper::Released");
-  return WordBit(base, mapper, id, kWords + 12);
+  return WordBit(base, id, Mapper(base, mapper).released_address());
 }
 
 uint32_t AnalogValue(uint8_t* base, uint32_t mapper, uint32_t id, double* f1) {
   ITC_NATIVE_RUNNING("sub_8210BA68 ActionMapper::AnalogValue");
-  constexpr uint32_t kOutOfRange = 0x82000A34;  // the float an id out of range reads
   const uint32_t index = IndexOf(id);
-  *f1 = double(guest::LoadFloat(base, index == 30 ? kOutOfRange : mapper + kAnalog + 60 + 4 * index));
+  // An id out of range reads the float at 0x82000A34.
+  *f1 = double(guest::LoadFloat(base, index == 30 ? G::zero_address()
+                                                  : Mapper(base, mapper).analog_values_address() +
+                                                        4 * index));
   return index;
 }
 
@@ -511,7 +536,7 @@ uint32_t AnalogRaw(uint8_t* base, uint32_t mapper, uint32_t id) {
   if (index == 30) {
     return 0;
   }
-  return guest::LoadU16(base, mapper + kAnalog + 2 * index);
+  return guest::LoadU16(base, Mapper(base, mapper).analog_raw_address() + 2 * index);
 }
 
 uint32_t SetThreshold(uint8_t* base, uint32_t mapper, uint32_t id, double on, double off,
@@ -521,12 +546,12 @@ uint32_t SetThreshold(uint8_t* base, uint32_t mapper, uint32_t id, double on, do
   if (index == 30) {
     return index;
   }
-  const uint32_t entry = mapper + kThresholds + 20 * index;
-  guest::StoreFloat(base, entry, float(on));
-  guest::StoreU32(base, entry + 8, ticks);
-  guest::StoreFloat(base, entry + 4, float(off));
-  guest::StoreU32(base, entry + 12, 0);
-  guest::StoreU8(base, entry + 16, 0);
+  const Threshold entry(base, Mapper(base, mapper).thresholds_address() + Threshold::kSize * index);
+  entry.set_on(float(on));
+  entry.set_suppress_ticks(ticks);
+  entry.set_off(float(off));
+  entry.set_counter(0);
+  entry.set_state(0);
   return index;
 }
 
@@ -537,9 +562,9 @@ uint32_t SetRepeat(uint8_t* base, uint32_t mapper, uint32_t id, uint32_t delay,
   if (index == 30) {
     return index;
   }
-  const uint32_t repeat = mapper + 592 + 16 * index;
-  guest::StoreU32(base, repeat + 8, delay);
-  guest::StoreU32(base, repeat + 12, period);
+  const Repeat repeat(base, Mapper(base, mapper).repeats_address() + Repeat::kSize * index);
+  repeat.set_delay(delay);
+  repeat.set_period(period);
   return index;
 }
 
@@ -550,28 +575,36 @@ uint32_t SetCurve(uint8_t* base, uint32_t mapper, uint32_t id, double center, do
   if (index == 30) {
     return index;
   }
-  const uint32_t curve = mapper + 1372 + 16 * index;
-  guest::StoreFloat(base, curve + 4, float(center));
-  guest::StoreFloat(base, curve + 8, float(dead));
-  guest::StoreFloat(base, curve + 12, float(maximum));
+  const Curve curve(base, Mapper(base, mapper).curves_address() + Curve::kSize * index);
+  curve.set_center(float(center));
+  curve.set_dead_zone(float(dead));
+  curve.set_maximum(float(maximum));
   return index;
 }
 
 namespace {
 
-constexpr uint32_t kMappers = 0x826BAB80;
-constexpr uint32_t kSettingsIndex = 0x82600B84;
-constexpr uint32_t kSettings = 0x82600B88;
+// The mapper table's entries (8 bytes: +0 the mapper, +4 a word the menus
+// test).
+uint32_t MapperEntry(uint32_t j) {
+  return G::mappers_address() + 8 * j;
+}
+
+// The settings' entry the index picks.
+schema::ActionSettings SettingsEntry(uint8_t* base) {
+  return schema::ActionSettings(
+      base, G::settings_address() + schema::ActionSettings::kSize * G::settings_index(base));
+}
 
 }  // namespace
 
 bool ConfigureKnown(uint8_t* base) {
   for (uint32_t j = 0; j < 4; j++) {
-    const uint32_t mapper = guest::LoadU32(base, kMappers + 8 * j);
+    const uint32_t mapper = guest::LoadU32(base, MapperEntry(j));
     if (mapper == 0) {
       return false;
     }
-    const uint32_t vtable = guest::LoadU32(base, mapper);
+    const uint32_t vtable = Mapper(base, mapper).vtable();
     if (guest::LoadU32(base, vtable + 8) != 0x8210B698 ||
         guest::LoadU32(base, vtable + 16) != 0x8210BDF0 ||
         guest::LoadU32(base, vtable + 28) != 0x8210BE30) {
@@ -583,23 +616,23 @@ bool ConfigureKnown(uint8_t* base) {
 
 uint32_t Configure(uint8_t* base, uint32_t index, double f[3]) {
   ITC_NATIVE_RUNNING("sub_8209F228 ActionMappers::Configure");
-  guest::StoreU32(base, kSettingsIndex, index);
+  G::set_settings_index(base, index);
   uint32_t r3 = 0;
   for (uint32_t j = 0; j < 4; j++) {
     for (uint32_t id = 151; id < 181; id++) {
-      const uint32_t mapper = guest::LoadU32(base, kMappers + 8 * j);
-      uint32_t entry = kSettings + 32 * guest::LoadU32(base, kSettingsIndex);
-      f[1] = Lfs(base, entry + 4);
-      f[0] = Lfs(base, entry);
-      SetThreshold(base, mapper, id, f[0], f[1], guest::LoadU32(base, entry + 8));
-      entry = kSettings + 32 * guest::LoadU32(base, kSettingsIndex);
-      SetRepeat(base, guest::LoadU32(base, kMappers + 8 * j), id, guest::LoadU32(base, entry + 12),
-                guest::LoadU32(base, entry + 16));
-      entry = kSettings + 32 * guest::LoadU32(base, kSettingsIndex);
-      f[2] = Lfs(base, entry + 28);
-      f[1] = Lfs(base, entry + 24);
-      f[0] = Lfs(base, entry + 20);
-      r3 = SetCurve(base, guest::LoadU32(base, kMappers + 8 * j), id, f[0], f[1], f[2]);
+      const uint32_t mapper = guest::LoadU32(base, MapperEntry(j));
+      schema::ActionSettings entry = SettingsEntry(base);
+      f[1] = double(entry.off());
+      f[0] = double(entry.on());
+      SetThreshold(base, mapper, id, f[0], f[1], entry.suppress_ticks());
+      entry = SettingsEntry(base);
+      SetRepeat(base, guest::LoadU32(base, MapperEntry(j)), id, entry.repeat_delay(),
+                entry.repeat_period());
+      entry = SettingsEntry(base);
+      f[2] = double(entry.curve_maximum());
+      f[1] = double(entry.curve_dead_zone());
+      f[0] = double(entry.curve_center());
+      r3 = SetCurve(base, guest::LoadU32(base, MapperEntry(j)), id, f[0], f[1], f[2]);
     }
   }
   return r3;
@@ -609,8 +642,9 @@ uint32_t Configure(uint8_t* base, uint32_t index, double f[3]) {
 
 namespace {
 
+// An object's slot 0 (the reset), through its vtable.
 uint32_t Slot0(uint8_t* base, uint32_t object) {
-  return guest::LoadU32(base, guest::LoadU32(base, object));
+  return Repeat(base, object).vtable().reset();
 }
 
 bool PointersKnown(uint8_t* base, uint32_t pointers, uint32_t function) {
@@ -648,67 +682,75 @@ bool CurveObjectsResetKnown(uint8_t* base, uint32_t objects) {
 
 uint32_t ResetWords(uint8_t* base, uint32_t words) {
   ITC_NATIVE_RUNNING("sub_8210B8A8 ActionMapper::ResetWords");
+  const State s(base, words);
   uint32_t object = 0;
   for (uint32_t i = 0; i < kActions; i++) {
-    object = guest::LoadU32(base, words + 24 + 4 * i);
-    guest::StoreU32(base, object + 4, 0);  // sub_8243DC88
+    object = guest::LoadU32(base, s.repeat_pointers_address() + 4 * i);
+    Repeat(base, object).set_count(0);  // sub_8243DC88
   }
-  for (uint32_t k = 0; k < 6; k++) {
-    guest::StoreU32(base, words + 4 * k, 0);
-  }
+  s.set_held(0);
+  s.set_held_before(0);
+  s.set_pressed(0);
+  s.set_released(0);
+  s.set_fired(0);
+  s.set_pending(0);
   return object;
 }
 
 uint32_t ResetAnalog(uint8_t* base, uint32_t analog) {
   ITC_NATIVE_RUNNING("sub_8210B438 ActionMapper::ResetAnalog");
+  const AnalogStage a(base, analog);
   // Each curve's slot 0 (sub_82106540) does nothing.
-  const uint32_t object = guest::LoadU32(base, analog + 180 + 4 * (kActions - 1));
-  const double zero = Lfs(base, kZero);
+  const uint32_t object = guest::LoadU32(base, a.curve_pointers_address() + 4 * (kActions - 1));
+  const double zero = double(G::zero(base));
   for (uint32_t i = 0; i < kActions; i++) {
-    guest::StoreU16(base, analog + 2 * i, 0);
-    guest::StoreFloat(base, analog + 60 + 4 * i, float(zero));
+    guest::StoreU16(base, a.raw_address() + 2 * i, 0);
+    guest::StoreFloat(base, a.values_address() + 4 * i, float(zero));
   }
   return object;
 }
 
 uint32_t InitRepeats(uint8_t* base, uint32_t words) {
   ITC_NATIVE_RUNNING("sub_8210BB38 ActionMapper::InitRepeats");
+  const State s(base, words);
   for (uint32_t i = 0; i < kActions; i++) {
-    const uint32_t object = words + 144 + 16 * i;
-    guest::StoreU32(base, words + 24 + 4 * i, object);
-    guest::StoreU32(base, object + 4, 0);  // sub_8243DC88
-    guest::StoreU32(base, object + 8, 20);
-    guest::StoreU32(base, object + 12, 10);
+    const Repeat object(base, s.repeats_address() + Repeat::kSize * i);
+    guest::StoreU32(base, s.repeat_pointers_address() + 4 * i, object.address);
+    object.set_count(0);  // sub_8243DC88
+    object.set_delay(20);
+    object.set_period(10);
   }
   return ResetWords(base, words);
 }
 
 uint32_t InitCurves(uint8_t* base, uint32_t analog) {
   ITC_NATIVE_RUNNING("sub_8210BAB0 ActionMapper::InitCurves");
-  const double one = Lfs(base, kOne);
-  const double zero = Lfs(base, kZero);
+  const AnalogStage a(base, analog);
+  const double one = double(G::one(base));
+  const double zero = double(G::zero(base));
   for (uint32_t i = 0; i < kActions; i++) {
-    const uint32_t object = analog + 300 + 16 * i;
-    guest::StoreU32(base, analog + 180 + 4 * i, object);
-    guest::StoreFloat(base, object + 4, float(zero));
-    guest::StoreFloat(base, object + 8, float(zero));
-    guest::StoreFloat(base, object + 12, float(one));
+    const Curve object(base, a.curves_address() + Curve::kSize * i);
+    guest::StoreU32(base, a.curve_pointers_address() + 4 * i, object.address);
+    object.set_center(float(zero));
+    object.set_dead_zone(float(zero));
+    object.set_maximum(float(one));
   }
   return ResetAnalog(base, analog);
 }
 
 uint32_t ResetStages(uint8_t* base, uint32_t words) {
   ITC_NATIVE_RUNNING("sub_8210C078 ActionMapper::ResetStages");
+  const State s(base, words);
   InitRepeats(base, words);
-  const uint32_t r3 = InitCurves(base, words + 624);
-  const double zero = Lfs(base, kZero);
+  const uint32_t r3 = InitCurves(base, s.analog_address());
+  const double zero = double(G::zero(base));
   for (uint32_t i = 0; i < kActions; i++) {
-    const uint32_t entry = words + 1404 + 20 * i;
-    guest::StoreFloat(base, entry, float(zero));
-    guest::StoreU32(base, entry + 8, 0);
-    guest::StoreFloat(base, entry + 4, float(zero));
-    guest::StoreU32(base, entry + 12, 0);
-    guest::StoreU8(base, entry + 16, 0);
+    const Threshold entry(base, s.thresholds_address() + Threshold::kSize * i);
+    entry.set_on(float(zero));
+    entry.set_suppress_ticks(0);
+    entry.set_off(float(zero));
+    entry.set_counter(0);
+    entry.set_state(0);
   }
   return r3;
 }
@@ -716,14 +758,15 @@ uint32_t ResetStages(uint8_t* base, uint32_t words) {
 void InputClientListConstruct(uint8_t* base, uint32_t list, uint32_t manager) {
   ITC_NATIVE_RUNNING("sub_8210AEB0 InputClientList::InputClientList");
   ClientListConstruct(base, list);
-  guest::StoreU32(base, list + 36, manager);
-  guest::StoreU32(base, list, 0x82007F18);
+  const ClientList l(base, list);
+  l.set_manager(manager);
+  l.set_vtable(ClientList::kVtable);
 }
 
 void InputClientConstruct(uint8_t* base, uint32_t node, uint32_t type) {
   ITC_NATIVE_RUNNING("sub_8210AE60 InputClient::InputClient");
   ClientNodeConstruct(base, node, type);
-  guest::StoreU32(base, node, 0x82007ED8);
+  ClientNode(base, node).set_vtable(ClientNode::kVtable);
 }
 
 void InputClientListAdd(uint8_t* base, uint32_t node) {
@@ -733,11 +776,6 @@ void InputClientListAdd(uint8_t* base, uint32_t node) {
 
 namespace {
 
-constexpr uint32_t kMapperVtable = 0x82007F78;
-constexpr uint32_t kRepeatVtable = 0x82007F68;
-constexpr uint32_t kCurveVtable = 0x82007F70;
-constexpr uint32_t kThresholdOn = 0x82002A10;
-constexpr uint32_t kThresholdOff = 0x8200296C;
 // The links of actions 2-23 (the byte table at 0x82007F40 picks the case):
 // each direction's opposite, or 30 (none).
 constexpr uint32_t kLinks[22] = {3,  2,  5,  4,  30, 30, 30, 30, 30, 30, 30,
@@ -746,55 +784,56 @@ constexpr uint32_t kLinks[22] = {3,  2,  5,  4,  30, 30, 30, 30, 30, 30, 30,
 }  // namespace
 
 bool MapperConstructKnown(uint8_t* base) {
-  return guest::LoadU32(base, kRepeatVtable) == kRepeatResetFunction &&
-         guest::LoadU32(base, kCurveVtable) == kCurveResetFunction;
+  return schema::ActionObjectVtable(base, Repeat::kVtable).reset() == kRepeatResetFunction &&
+         schema::ActionObjectVtable(base, Curve::kVtable).reset() == kCurveResetFunction;
 }
 
 void MapperConstruct(uint8_t* base, uint32_t mapper, uint32_t player) {
   ITC_NATIVE_RUNNING("sub_8210C180 ActionMapper::ActionMapper");
+  const Mapper m(base, mapper);
   InputClientConstruct(base, mapper, 2);
-  const uint32_t words = mapper + kWords;
-  guest::StoreU32(base, mapper, kMapperVtable);
+  const uint32_t words = m.held_address();
+  m.set_vtable(Mapper::kVtable);
   for (uint32_t i = 0; i < kActions; i++) {
-    guest::StoreU32(base, words + 144 + 16 * i, kRepeatVtable);
+    Repeat(base, m.repeats_address() + Repeat::kSize * i).set_vtable(Repeat::kVtable);
   }
   for (uint32_t i = 0; i < kActions; i++) {
-    guest::StoreU32(base, words + 924 + 16 * i, kCurveVtable);
+    Curve(base, m.curves_address() + Curve::kSize * i).set_vtable(Curve::kVtable);
   }
-  input::InputProcessorConstruct(base, mapper + kListener);
-  guest::StoreU32(base, mapper + 2888, player);
-  guest::StoreU8(base, mapper + 2884, 0);
+  input::InputProcessorConstruct(base, m.listener_address());
+  m.set_player(player);
+  m.set_bound(0);
   ResetStages(base, words);
 
-  const double one = Lfs(base, kOne);
-  const double zero = Lfs(base, kZero);
-  const double off = Lfs(base, kThresholdOff);
-  const double on = Lfs(base, kThresholdOn);
+  const double one = double(G::one(base));
+  const double zero = double(G::zero(base));
+  const double off = double(G::threshold_off(base));
+  const double on = double(G::threshold_on(base));
   for (uint32_t i = 0; i < kActions; i++) {
-    guest::StoreU32(base, mapper + 12 + 4 * i, 1);
-    guest::StoreU32(base, mapper + 132 + 4 * i, i >= 24 ? 2 : 1);
+    guest::StoreU32(base, m.kinds_address() + 4 * i, 1);
+    guest::StoreU32(base, m.analog_kinds_address() + 4 * i, i >= 24 ? 2 : 1);
     const uint32_t c = i - 2;  // the switch's case, unsigned
-    guest::StoreU32(base, mapper + 252 + 4 * i, c <= 21 ? kLinks[c] : 30);
-    const uint32_t entry = mapper + kThresholds + 20 * i;
-    guest::StoreFloat(base, entry, float(on));
-    guest::StoreU32(base, entry + 8, 0);
-    guest::StoreFloat(base, entry + 4, float(off));
-    guest::StoreU32(base, entry + 12, 0);
-    guest::StoreU8(base, entry + 16, 0);
-    const uint32_t repeat = mapper + 592 + 16 * i;
-    guest::StoreU32(base, repeat + 8, 20);
-    guest::StoreU32(base, repeat + 12, 3);
-    const uint32_t curve = mapper + 1372 + 16 * i;
-    guest::StoreFloat(base, curve + 4, float(zero));
-    guest::StoreFloat(base, curve + 8, float(zero));
-    guest::StoreFloat(base, curve + 12, float(one));
+    guest::StoreU32(base, m.links_address() + 4 * i, c <= 21 ? kLinks[c] : 30);
+    const Threshold entry(base, m.thresholds_address() + Threshold::kSize * i);
+    entry.set_on(float(on));
+    entry.set_suppress_ticks(0);
+    entry.set_off(float(off));
+    entry.set_counter(0);
+    entry.set_state(0);
+    const Repeat repeat(base, m.repeats_address() + Repeat::kSize * i);
+    repeat.set_delay(20);
+    repeat.set_period(3);
+    const Curve curve(base, m.curves_address() + Curve::kSize * i);
+    curve.set_center(float(zero));
+    curve.set_dead_zone(float(zero));
+    curve.set_maximum(float(one));
   }
-  guest::StoreU32(base, mapper + 376, mapper + 252);
-  guest::StoreU32(base, mapper + 384, mapper + 252);
-  guest::StoreU32(base, mapper + 372, mapper + 12);
-  guest::StoreU32(base, mapper + 380, mapper + 132);
+  m.set_config_links(m.links_address());
+  m.set_analog_config_links(m.links_address());
+  m.set_config(m.kinds_address());
+  m.set_analog_config(m.analog_kinds_address());
   ResetWords(base, words);
-  ResetAnalog(base, mapper + kAnalog);
+  ResetAnalog(base, m.analog_raw_address());
 }
 
 namespace {
@@ -803,63 +842,52 @@ constexpr uint32_t kGetLogicalPad = 0x82098CD0;  // the manager's slot 2
 constexpr uint32_t kAddListener = 0x82099430;    // its slot 3
 constexpr uint32_t kLogicalPadValues = 0x82591B30;  // the pad's slot 1
 
-uint32_t VtableSlot(uint8_t* base, uint32_t object, uint32_t offset) {
-  return guest::LoadU32(base, guest::LoadU32(base, object) + offset);
-}
-
 }  // namespace
 
 bool MapperBindKnown(uint8_t* base, uint32_t mapper, uint32_t object) {
   if (mapper == 0) {
     return false;
   }
-  const uint32_t player = guest::LoadU32(base, mapper + 2888);
+  const uint32_t player = Mapper(base, mapper).player();
   if (player > 3) {
     return true;
   }
-  if (object == 0 || VtableSlot(base, object, 12) != kAddListener ||
-      VtableSlot(base, object, 8) != kGetLogicalPad) {
+  const schema::ActionMapperInputManager manager(base, object);
+  if (object == 0 || manager.vtable().add_listener() != kAddListener ||
+      manager.vtable().get_logical_pad() != kGetLogicalPad) {
     return false;
   }
-  const uint32_t list =
-      object + input::kManagerListeners + input::kListenerListBytes * player;
-  const uint32_t pad = input::ManagerLogicalPad(object, player);
-  return guest::LoadU32(base, list + std_list::kSize) == 0 &&
-         std_list::CanAllocate(base, 1) && VtableSlot(base, pad, 4) == kLogicalPadValues;
+  const schema::PtrList list(base, schema::InputManager(base, object).listener_lists_address() +
+                                       schema::PtrList::kSize * player);
+  const schema::LogicalPad pad(base, input::ManagerLogicalPad(object, player));
+  return list.size() == 0 && std_list::CanAllocate(base, 1) &&
+         pad.vtable().values() == kLogicalPadValues;
 }
 
 uint32_t MapperBind(uint8_t* base, uint32_t mapper, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_8210B270 ActionMapper::Bind");
-  const uint32_t player = guest::LoadU32(base, mapper + 2888);
-  guest::StoreU32(base, mapper + 2892, object);
+  const Mapper m(base, mapper);
+  const uint32_t player = m.player();
+  m.set_input_manager(object);
   if (player <= 3) {
-    if (!input::ManagerAddListener(base, object, player, mapper + kListener)) {
+    if (!input::ManagerAddListener(base, object, player, m.listener_address())) {
       ITC_LOG_ERROR("ActionMapper::Bind: AddListener refused after its checks");
       std::abort();
     }
-    const uint32_t pad = input::ManagerLogicalPad(guest::LoadU32(base, mapper + 2892), player);
-    guest::StoreU32(base, mapper + kPadValues, input::LogicalPadValues(pad));
+    const uint32_t pad = input::ManagerLogicalPad(m.input_manager().address, player);
+    m.set_pad_values(input::LogicalPadValues(pad));
   }
-  guest::StoreU8(base, mapper + 2884, 1);
+  m.set_bound(1);
   return 1;
 }
-
-namespace {
-
-constexpr uint32_t kInitManager = 0x826BAB78;
-constexpr uint32_t kInitList = 0x826BAB7C;
-constexpr uint32_t kListBytes = 52;
-constexpr uint32_t kMapperBytes = 2896;
-
-}  // namespace
 
 bool InitCreate(uint8_t* base, uint32_t manager, uint32_t* list) {
   ITC_NATIVE_RUNNING("sub_8209F430 ActionMappers::Init");
   // operator new's error paths are the original's: every block made first
   // (in the original's order: the list, then mappers 0-3; the constructors
   // allocate nothing), then built and stored.
-  constexpr uint32_t kSizes[5] = {kListBytes, kMapperBytes, kMapperBytes, kMapperBytes,
-                                  kMapperBytes};
+  constexpr uint32_t kSizes[5] = {ClientList::kSize, Mapper::kSize, Mapper::kSize,
+                                  Mapper::kSize, Mapper::kSize};
   uint32_t blocks[5];
   for (int i = 0; i < 5; i++) {
     const auto block = memory::crt::OperatorNew(base, kSizes[i]);
@@ -871,17 +899,17 @@ bool InitCreate(uint8_t* base, uint32_t manager, uint32_t* list) {
     }
     blocks[i] = *block;
   }
-  guest::StoreU32(base, kInitManager, manager);
-  InputClientListConstruct(base, blocks[0], guest::LoadU32(base, kInitManager));
-  guest::StoreU32(base, kInitList, blocks[0]);
+  G::set_owner(base, manager);
+  InputClientListConstruct(base, blocks[0], G::owner(base).address);
+  G::set_client_list(base, blocks[0]);
   for (uint32_t j = 0; j < 4; j++) {
     MapperConstruct(base, blocks[1 + j], j);
-    guest::StoreU32(base, kMappers + 8 * j, blocks[1 + j]);
+    guest::StoreU32(base, MapperEntry(j), blocks[1 + j]);
   }
   for (uint32_t j = 0; j < 4; j++) {
-    InputClientListAdd(base, guest::LoadU32(base, kMappers + 8 * j));
+    InputClientListAdd(base, guest::LoadU32(base, MapperEntry(j)));
   }
-  *list = guest::LoadU32(base, kInitList);
+  *list = G::client_list(base).address;
   return true;
 }
 

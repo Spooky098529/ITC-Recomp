@@ -30,18 +30,10 @@ namespace save_screen {
 
 using Calls = race_hud_object::Calls;
 
-// The screen's blocks: the page block (28 bytes: +0 the page Draw runs, -1
-// while a step runs; +4 the page after the step; +8 the page before; +12
-// the step Update runs, -1 none; +16 the step queued after it; +24 the
-// step's started word), the menu list (72 bytes) and the screen's data (68
-// bytes: +4 the end's answer, +12 the dialog's message, +16 its state, +20
-// the state after the close, +24 the wait counter, +28 the cancel, +32 the
-// machine's next state, 21 none, +36 the kind).
-constexpr uint32_t kPages = 0x826D844C;
-constexpr uint32_t kList = 0x826D8450;
-constexpr uint32_t kData = 0x826D8454;
-// The mode type (Modes::), which the end pages post by.
-constexpr uint32_t kModeType = 0x826032DC;
+// The screen's blocks (the page block, the menu list and the screen's data
+// at [0x826D844C] to [0x826D8454]), the machine's words, the mode's ring and
+// the image words the pages read are views: itc_recomp/schema/save-screen.toml
+// (SaveScreen, SaveScreenMode, SaveScreenData, SaveScreenGlobals).
 
 // The callees by address.
 constexpr uint32_t kMenuListUpdate = 0x8220C1E0;
@@ -85,28 +77,10 @@ constexpr uint32_t kShowKind4 = 0x821A1ED8;
 constexpr uint32_t kShowKind5 = 0x821A1FA8;
 constexpr uint32_t kShowKind6 = 0x821A2070;
 
-// The machine's words: +9604 the state, +9608 the movie loaded, +9612 load
-// the movie at once.
-constexpr uint32_t kMachineState = 9604;
-constexpr uint32_t kMachineLoaded = 9608;
-constexpr uint32_t kMachineAtOnce = 9612;
 constexpr uint32_t kSaveDataOf = 0x82105620;
 
-// The save buffers' header (+0 the game data's buffer, +4 a replay's, +20
-// the replays' count), the replay kept for the replay screen, the profile's
-// read (997 while pending), whether to read it, and the profile reader
-// (its +4 the results).
-constexpr uint32_t kSaveBuffers = 0x828161F0;
-constexpr uint32_t kKeptReplay = 0x826C5B50;
-constexpr uint32_t kProfileRead = 0x826C6080;
-constexpr uint32_t kProfileWanted = 0x826C7958;
-constexpr uint32_t kProfileReader = 0x826C6AD0;
+// The game data's bytes (Page7's copy).
 constexpr uint32_t kGameDataBytes = 0x1F978;
-// The players' controllers and their action mappers' entries (8 bytes: +0
-// the mapper, +4 1 when the controller isn't read).
-constexpr uint32_t kControllers = 0x826BABA4;
-constexpr uint32_t kMapperEntries = 0x826BAB80;
-
 // --- The state machine Inits (inits.cpp): each adds the machine's
 // transitions through StateMachine::Add's plain C++, as the original builds
 // them in its frame (the step tables in init_tables.h, from

@@ -13,7 +13,9 @@
 
 namespace graphics::command_buffer {
 
-// The device's fields used here.
+// The device's fields (schema::Device, itc_recomp/schema/device-state.toml).
+// This area's code reads them through the view; the constants stay for
+// src/graphics/predicated_tiling.cpp until it does too.
 constexpr uint32_t kWritePosition = 40;    // the last word written (pre-increment)
 constexpr uint32_t kSegmentEnd = 44;
 constexpr uint32_t kSoftEnd = 48;           // the end less 160: writers end the segment past it
@@ -48,8 +50,11 @@ constexpr uint32_t kPendingKicks = 10868;   // kicks deferred until the GPU's in
 constexpr uint32_t kTrainingFailed = 0x829537BCu;  // a global, never set (Device::Init leaves it 0)
 
 // A chain of 4 KB blocks (predicated tiling's segments and draws, at device
-// +13016, +12976 and +12996): +0 its first block, +4 the current block, +8
-// the write cursor, +12 the block's end, +16 the device.
+// +13016, +12976 and +12996), schema::CommandChain
+// (itc_recomp/schema/command-buffer.toml): +0 its first block, +4 the
+// current block, +8 the write cursor, +12 the block's end, +16 the device.
+// The constants stay for src/graphics/predicated_tiling.cpp until it uses
+// the view.
 constexpr uint32_t kChainFirst = 0;
 constexpr uint32_t kChainBlock = 4;
 constexpr uint32_t kChainCursor = 8;

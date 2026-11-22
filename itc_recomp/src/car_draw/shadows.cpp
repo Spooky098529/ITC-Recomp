@@ -11,6 +11,10 @@
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
 #include "native/buffers.h"
+#include "schema/cameras.h"
+#include "schema/car_draw.h"
+#include "schema/models.h"
+#include "schema/second_set.h"
 
 #include <array>
 
@@ -20,10 +24,12 @@ namespace {
 
 namespace sl = scenery_lists;
 
-constexpr uint32_t kScene = 0x826C2E44;
-constexpr uint32_t kCameraPasses = 0x826BAC00;
-constexpr uint32_t kDepthKey = 0x8296B8FC;
-constexpr uint32_t kOtherKey = 0x8296B8F8;
+using G = schema::CarDrawGlobals;
+using Scene = schema::CarScene;
+// A key of the scene's pass description.
+using Key = uint32_t (Scene::*)() const;
+
+constexpr uint32_t kCameraPasses = schema::CamerasGlobals::passes_address();
 constexpr uint32_t kOne = 0x82000A30;  // 1.0
 constexpr uint32_t kDrawShapeDepth = 0x82596D48;
 // r28 through the draws: the keys' page (lis r28,-32106, sign-extended).
@@ -56,8 +62,8 @@ Left Memcpy(uint8_t* base, const Calls& calls, uint32_t to, uint32_t from, uint3
 // A camera pass by its index: 0 (as the original's) when the address's low
 // word is 0 or the pass isn't enabled (+588).
 uint32_t EnabledPass(uint8_t* base, uint32_t index) {
-  const uint32_t camera = kCameraPasses + index * 592;
-  if (camera == 0 || int32_t(Load(base, camera + 588)) == 0) {
+  const uint32_t camera = kCameraPasses + index * schema::CameraPass::kSize;
+  if (camera == 0 || int32_t(schema::CameraPass(base, camera).enabled()) == 0) {
     return 0;
   }
   return camera;
@@ -114,29 +120,28 @@ Left PartsDrawShadows(uint8_t* base, const Calls& calls, uint32_t stack, uint32_
   // In a race, which of up to three nearby lights cast a shadow (+1040 to
   // +1048) and their planar shadows (+1088 + 64i). Outside one those words
   // are what the stack held, read as the original does.
-  if (int32_t(Load(base, Load(base, kScene) + 4)) == 1) {
+  if (int32_t(G::scene(base).model_set()) == 1) {
     left = Left{false, CarLightingGather(base, calls, frame, frame + 1040, block + 16, 1)};
   }
-  const uint32_t scene = Load(base, kScene);
-  const uint32_t model = Load(base, group + 4);
-  if (model == 0 || Load(base, group + 724) == 0) {
+  const Scene d = G::scene(base);  // the pass description at its +5072
+  const schema::PartsPoints points(base, group);
+  const uint32_t model = points.record0_model();
+  if (model == 0 || points.record3_model() == 0) {
     return left;
   }
   left = Memcpy(base, calls, frame + 80, block + 16, 64, frame, 0x820E1E1C);
   const uint32_t world = frame + 80;
-  const uint32_t d = scene + 5072;  // the pass description
   // Each set under its key: the keys saved to d +76 and +80, both set to
   // it, put back after; `saved` the depth key the original keeps in r27.
   uint32_t saved;
-  auto draws = [&](uint32_t key_at, uint32_t view_projection, uint32_t light,
-                   const SetSites& sites) {
-    Store(base, d + 76, saved);
-    Store(base, d + 80, Load(base, kOtherKey));
-    const uint32_t key = Load(base, d + key_at);
-    Store(base, kDepthKey, key);
-    Store(base, kOtherKey, key);
+  auto draws = [&](Key key_of, uint32_t view_projection, uint32_t light, const SetSites& sites) {
+    d.set_pass_saved_depth_key(saved);
+    d.set_pass_saved_other_key(G::other_key(base));
+    const uint32_t key = (d.*key_of)();
+    G::set_depth_key(base, key);
+    G::set_other_key(base, key);
     for (uint32_t i = 0; i < 4; i++) {
-      const uint32_t shape = Load(base, group + (i < 2 ? 228 : 948));
+      const uint32_t shape = i < 2 ? points.record0_shape() : points.record3_shape();
       uint32_t drawn = world;
       if (light != 0) {
         // The products at +592, +336, +720, +464 (light 0), +912, +208,
@@ -155,46 +160,46 @@ Left PartsDrawShadows(uint8_t* base, const Calls& calls, uint32_t stack, uint32_
       left = ShapeDepth(base, calls, frame, model, view_projection, drawn, shape, i & 1,
                         sites.draw[i]);
     }
-    Store(base, kOtherKey, Load(base, d + 80));
-    saved = Load(base, d + 76);
-    Store(base, kDepthKey, saved);
+    G::set_other_key(base, d.pass_saved_other_key());
+    saved = d.pass_saved_depth_key();
+    G::set_depth_key(base, saved);
   };
   // Set 1: the camera pass at d +4 (bit 0x4 of d +60), its view-projection
   // at +976, key d +32.
-  if (EnabledPass(base, Load(base, d + 4)) != 0 && (Load(base, d + 60) & 0x4) != 0) {
-    const uint32_t camera = EnabledPass(base, Load(base, d + 4));
-    left = Memcpy(base, calls, frame + 976, camera + 144, 64, frame, 0x820E1E90);
-    saved = Load(base, kDepthKey);
-    draws(32, frame + 976, 0,
+  if (EnabledPass(base, d.pass_shadow_camera_a()) != 0 && (d.pass_mask() & 0x4) != 0) {
+    const uint32_t camera = EnabledPass(base, d.pass_shadow_camera_a());
+    left = Memcpy(base, calls, frame + 976, schema::CameraPass(base, camera).view_projection_address(), 64, frame, 0x820E1E90);
+    saved = G::depth_key(base);
+    draws(&Scene::pass_shadow_key_a, frame + 976, 0,
           SetSites{{0, 0, 0, 0}, {0x820E1ECC, 0x820E1EEC, 0x820E1F0C, 0x820E1F2C}});
   } else {
-    saved = Load(base, kDepthKey);
+    saved = G::depth_key(base);
   }
   // The rest with the camera pass at d +8's view-projection (+144).
-  if (EnabledPass(base, Load(base, d + 8)) == 0) {
+  if (EnabledPass(base, d.pass_shadow_camera_b()) == 0) {
     return left;
   }
-  const uint32_t camera = EnabledPass(base, Load(base, d + 8));
-  left = Memcpy(base, calls, frame + 144, camera + 144, 64, frame, 0x820E1F98);
+  const uint32_t camera = EnabledPass(base, d.pass_shadow_camera_b());
+  left = Memcpy(base, calls, frame + 144, schema::CameraPass(base, camera).view_projection_address(), 64, frame, 0x820E1F98);
   // Set 2 (bit 0x10, key d +36): the block's world.
-  if ((Load(base, d + 60) & 0x10) != 0) {
-    draws(36, frame + 144, 0,
+  if ((d.pass_mask() & 0x10) != 0) {
+    draws(&Scene::pass_shadow_key_b, frame + 144, 0,
           SetSites{{0, 0, 0, 0}, {0x820E1FDC, 0x820E1FFC, 0x820E201C, 0x820E203C}});
   }
   // Sets 3 to 5 (bits 0x20, 0x40, 0x80, keys d +40, +44, +48): flattened
   // away from each light the gather found casting a shadow.
-  if (int32_t(Load(base, frame + 1040)) != 0 && (Load(base, d + 60) & 0x20) != 0) {
-    draws(40, frame + 144, frame + 1088,
+  if (int32_t(Load(base, frame + 1040)) != 0 && (d.pass_mask() & 0x20) != 0) {
+    draws(&Scene::pass_light0_shadow_key, frame + 144, frame + 1088,
           SetSites{{0x820E20A0, 0x820E20E4, 0x820E2128, 0x820E216C},
                    {0x820E20C0, 0x820E2104, 0x820E2148, 0x820E218C}});
   }
-  if (int32_t(Load(base, frame + 1044)) != 0 && (Load(base, d + 60) & 0x40) != 0) {
-    draws(44, frame + 144, frame + 1152,
+  if (int32_t(Load(base, frame + 1044)) != 0 && (d.pass_mask() & 0x40) != 0) {
+    draws(&Scene::pass_light1_shadow_key, frame + 144, frame + 1152,
           SetSites{{0x820E21F0, 0x820E2234, 0x820E2278, 0x820E22BC},
                    {0x820E2210, 0x820E2254, 0x820E2298, 0x820E22DC}});
   }
-  if (int32_t(Load(base, frame + 1048)) != 0 && (Load(base, d + 60) & 0x80) != 0) {
-    draws(48, frame + 144, frame + 1216,
+  if (int32_t(Load(base, frame + 1048)) != 0 && (d.pass_mask() & 0x80) != 0) {
+    draws(&Scene::pass_light2_shadow_key, frame + 144, frame + 1216,
           SetSites{{0x820E2340, 0x820E2384, 0x820E23C8, 0x820E240C},
                    {0x820E2360, 0x820E23A4, 0x820E23E8, 0x820E242C}});
   }
@@ -221,11 +226,11 @@ Left SceneTrafficDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_
   // In a race, which of up to three nearby lights cast a shadow (+464 to
   // +472) and their planar shadows (+512 + 64i). Outside one those words are
   // what the stack held, read as the original does.
-  if (int32_t(Load(base, Load(base, traffic + 9796) + 4)) == 1) {
+  if (int32_t(schema::SceneTraffic(base, traffic).scene().model_set()) == 1) {
     left = Left{false, CarLightingGather(base, calls, frame, frame + 464, block + 16, 1)};
   }
-  left = TrafficPointsDraw(base, calls, frame, traffic + 3728, block, caller_r24);
-  const uint32_t d = Load(base, kScene) + 5072;  // the pass description
+  left = TrafficPointsDraw(base, calls, frame, schema::SceneTraffic(base, traffic).points_address(), block, caller_r24);
+  const Scene d = G::scene(base);  // the pass description at its +5072
   // The world: the identity times the block's world, in place.
   matrix_math::Multiply(base, frame + 144, frame + 144, block + 16);
   interpolation::BlendState_OnMultiply(base, frame + 144, frame + 144, block + 16, 0x820E6B28);
@@ -233,41 +238,43 @@ Left SceneTrafficDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_
   const uint32_t world = frame + 144;
   // Each draw under its key: the keys saved to d +76 and +80, both set to
   // it, put back after; `saved` the depth key the original keeps in r30.
-  uint32_t saved = Load(base, kDepthKey);
-  auto keys = [&](uint32_t key_at) {
-    Store(base, d + 76, saved);
-    const uint32_t other = Load(base, kOtherKey);
-    const uint32_t key = Load(base, d + key_at);
-    Store(base, d + 80, other);
-    Store(base, kDepthKey, key);
-    Store(base, kOtherKey, key);
+  uint32_t saved = G::depth_key(base);
+  auto keys = [&](Key key_of) {
+    d.set_pass_saved_depth_key(saved);
+    const uint32_t other = G::other_key(base);
+    const uint32_t key = (d.*key_of)();
+    d.set_pass_saved_other_key(other);
+    G::set_depth_key(base, key);
+    G::set_other_key(base, key);
   };
   auto restore = [&]() {
-    Store(base, kOtherKey, Load(base, d + 80));
-    saved = Load(base, d + 76);
-    Store(base, kDepthKey, saved);
+    G::set_other_key(base, d.pass_saved_other_key());
+    saved = d.pass_saved_depth_key();
+    G::set_depth_key(base, saved);
   };
   // The lights' sets: the gathered word, d +60's bit, the key, the product
   // (its 1.0 w's written first), the light's shadow matrix and the sites.
   struct Light {
-    uint32_t word, bit, key_at, product, shadow, multiply, draw;
+    uint32_t word, bit;
+    Key key_of;
+    uint32_t product, shadow, multiply, draw;
   };
   static constexpr Light kLights[3] = {
-      {464, 0x20, 40, 80, 512, 0x820E6D18, 0x820E6D38},
-      {468, 0x40, 44, 272, 576, 0x820E6D98, 0x820E6DB8},
-      {472, 0x80, 48, 208, 640, 0x820E6E18, 0x820E6E38},
+      {464, 0x20, &Scene::pass_light0_shadow_key, 80, 512, 0x820E6D18, 0x820E6D38},
+      {468, 0x40, &Scene::pass_light1_shadow_key, 272, 576, 0x820E6D98, 0x820E6DB8},
+      {472, 0x80, &Scene::pass_light2_shadow_key, 208, 640, 0x820E6E18, 0x820E6E38},
   };
   for (uint32_t m = 0; m < 6; m++) {
-    const uint32_t models = traffic + 9768 + 4 * m;
-    const int32_t shapes = int32_t(Load(base, Load(base, models) + 412));
+    const uint32_t models = schema::SceneTraffic(base, traffic).part_models_address() + 4 * m;
+    const int32_t shapes = int32_t(schema::Model(base, Load(base, models)).shape_count());
     for (int32_t s = 0; s < shapes; s++) {
       const uint32_t shape = uint32_t(s);
       // The camera pass at d +4 (bit 0x4 of d +60): its view-projection at
       // +400, groups 0 and 1, key d +32.
-      if (EnabledPass(base, Load(base, d + 4)) != 0 && (Load(base, d + 60) & 0x4) != 0) {
-        const uint32_t camera = EnabledPass(base, Load(base, d + 4));
-        left = Memcpy(base, calls, frame + 400, camera + 144, 64, frame, 0x820E6BB8);
-        keys(32);
+      if (EnabledPass(base, d.pass_shadow_camera_a()) != 0 && (d.pass_mask() & 0x4) != 0) {
+        const uint32_t camera = EnabledPass(base, d.pass_shadow_camera_a());
+        left = Memcpy(base, calls, frame + 400, schema::CameraPass(base, camera).view_projection_address(), 64, frame, 0x820E6BB8);
+        keys(&Scene::pass_shadow_key_a);
         left = ShapeDepth(base, calls, frame, Load(base, models), frame + 400, world, shape, 0,
                           0x820E6BF0);
         left = ShapeDepth(base, calls, frame, Load(base, models), frame + 400, world, shape, 1,
@@ -275,14 +282,14 @@ Left SceneTrafficDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_
         restore();
       }
       // The rest with the camera pass at d +8's view-projection (+336).
-      const uint32_t camera = EnabledPass(base, Load(base, d + 8));
+      const uint32_t camera = EnabledPass(base, d.pass_shadow_camera_b());
       if (camera == 0) {
         continue;
       }
-      left = Memcpy(base, calls, frame + 336, camera + 144, 64, frame, 0x820E6C74);
+      left = Memcpy(base, calls, frame + 336, schema::CameraPass(base, camera).view_projection_address(), 64, frame, 0x820E6C74);
       // Bit 0x10, key d +36: the block's world.
-      if ((Load(base, d + 60) & 0x10) != 0) {
-        keys(36);
+      if ((d.pass_mask() & 0x10) != 0) {
+        keys(&Scene::pass_shadow_key_b);
         left = ShapeDepth(base, calls, frame, Load(base, models), frame + 336, world, shape, 0,
                           0x820E6CB8);
         restore();
@@ -291,10 +298,10 @@ Left SceneTrafficDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_
       // found casting a shadow.
       for (const Light& light : kLights) {
         if (int32_t(Load(base, frame + light.word)) == 0 ||
-            (Load(base, d + 60) & light.bit) == 0) {
+            (d.pass_mask() & light.bit) == 0) {
           continue;
         }
-        keys(light.key_at);
+        keys(light.key_of);
         const uint32_t product = frame + light.product;
         for (uint32_t at = 12; at < 64; at += 16) {
           guest::StoreFloat(base, product + at, one);

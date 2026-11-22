@@ -19,6 +19,7 @@
 #include "frame_driver/scene_set_up.h"
 #include "frame_driver/thread.h"
 #include "lifted/sdk.h"
+#include "schema/frame_driver.h"
 
 ITC_FLAG_DECLARE(bool, native_video_output);
 ITC_FLAG_DECLARE(bool, native_device_state);
@@ -74,7 +75,9 @@ ITC_REGS_STEP(FrameDriverAddListener) {
   const app_states::AppCalls calls = AppStatesCalls(ctx, base);
   guest_call::InFrame(ctx, base, 112, 0x820922F0, [&](uint32_t frame) {
     const uint32_t request = frame + 80;
-    const uint32_t vector = interface + (fd::kDriverRequests - fd::kDriverInterface);
+    const schema::FrameDriver driver(
+        base, interface - schema::FrameDriver(base, 0).interface_address());
+    const uint32_t vector = driver.requests_address();
     const auto inserted = fd::AddListener(base, interface, key, delegate, request, calls);
     if (!inserted) {
       ctx.r3.u64 = vector;
@@ -97,8 +100,8 @@ ITC_REGS_STEP(FrameDriverApplyRequest) {
     lifted::original::c82091FF0(ctx, base);
     return;
   }
-  REX_STORE_U64(ctx.r1.u32 + 32, ctx.r4.u64);
-  REX_STORE_U64(ctx.r1.u32 + 40, ctx.r5.u64);
+  guest::StoreU64(base, ctx.r1.u32 + 32, ctx.r4.u64);
+  guest::StoreU64(base, ctx.r1.u32 + 40, ctx.r5.u64);
   if (*inserted) {
     ctx.r3.u64 = ctx.r1.u32 - 32;
   }

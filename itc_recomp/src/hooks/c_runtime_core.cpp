@@ -3,6 +3,8 @@
 // originals call them (B7's goal, the user's call, 2026-11-14).
 
 #include "hooks/c_runtime_core.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -18,6 +20,7 @@
 #include "hooks/last_error.h"
 #include "memory/c_runtime_heap.h"
 #include "lifted/sdk.h"
+#include "schema/c_runtime_core.h"
 
 ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "Run the C runtime's core natively instead of through the translated code "
@@ -168,7 +171,7 @@ cc::Calls hooks::CRuntimeCoreCalls(lifted::Regs& ctx, uint8_t* base) {
     const uint64_t lr = ctx.lr;
     ctx.r3.u64 = count;
     ctx.r4.u64 = size;
-    lifted::CallFromContext(ctx, base, 0x825AC320);
+    lifted::Enter(ctx, base, game::calloc);
     ctx.lr = lr;
     return ctx.r3.u32;
   };
@@ -180,7 +183,7 @@ cc::Calls hooks::CRuntimeCoreCalls(lifted::Regs& ctx, uint8_t* base) {
     }
     const uint64_t lr = ctx.lr;
     ctx.r3.u64 = size;
-    lifted::CallFromContext(ctx, base, 0x825A9A90);
+    lifted::Enter(ctx, base, game::malloc);
     ctx.lr = lr;
     return ctx.r3.u32;
   };
@@ -190,7 +193,7 @@ cc::Calls hooks::CRuntimeCoreCalls(lifted::Regs& ctx, uint8_t* base) {
     }
     const uint64_t lr = ctx.lr;
     ctx.r3.u64 = block;
-    lifted::CallFromContext(ctx, base, 0x825A9B58);
+    lifted::Enter(ctx, base, game::free);
     ctx.lr = lr;
   };
   calls.thread_id = []() { return graphics::video_output::CurrentThreadId(); };
@@ -452,12 +455,14 @@ void hooks::CoreGetOsfhandle(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t handle = ctx.r3.u32;
   const uint32_t result = cc::GetOsfhandle(base, handle, CRuntimeCoreCalls(ctx, base));
   // The OS handle as loaded (lwz, zero-extended); -1 as `li` (sign-extended).
-  const bool loaded = int32_t(handle) >= 0 && handle != 0xFFFFFFFEu &&
-                      handle < guest::LoadU32(base, cc::kNhandle) &&
-                      (guest::LoadU8(base, guest::LoadU32(base, cc::kPioinfo +
-                                                                   4 * uint32_t(int32_t(handle) >> 5)) +
-                                               44 * (handle & 31) + 4) &
-                       1) != 0;
+  using G = schema::CRuntimeCoreGlobals;
+  const bool loaded =
+      int32_t(handle) >= 0 && handle != 0xFFFFFFFEu && handle < G::handle_count(base) &&
+      (schema::CrtIoInfo(base, guest::LoadU32(base, G::io_info_blocks_address() +
+                                                        4 * uint32_t(int32_t(handle) >> 5)) +
+                                   44 * (handle & 31))
+           .osfile() &
+       1) != 0;
   ctx.r3.u64 = loaded ? uint64_t(result) : uint64_t(int64_t(int32_t(result)));
 }
 

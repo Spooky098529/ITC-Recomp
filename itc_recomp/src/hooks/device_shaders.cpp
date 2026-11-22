@@ -14,6 +14,8 @@
 // C++.
 
 #include "guest.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -22,6 +24,7 @@
 #include "hooks/heap.h"
 #include "native/refcount.h"
 #include "lifted/sdk.h"
+#include "schema/device_state.h"
 
 ITC_FLAG_BOOL(native_device_shaders, true, "ITC",
               "Run the graphics device's shader setters (docs/functions/device-shaders.md: "
@@ -43,7 +46,7 @@ dsh::ShaderCalls Calls(lifted::Regs& ctx, uint8_t* base, uint32_t release_at) {
   calls.release = [&ctx, base, release_at](uint32_t resource) {
     ctx.r3.u64 = resource;
     ctx.lr = release_at;
-    lifted::CallFromContext(ctx, base, 0x822A67B0);
+    lifted::Enter(ctx, base, game::Resource::Release);
     return ctx.r3.u32;
   };
   calls.memcpy = [&ctx, base](uint32_t destination, uint32_t source, uint32_t size,
@@ -52,7 +55,7 @@ dsh::ShaderCalls Calls(lifted::Regs& ctx, uint8_t* base, uint32_t release_at) {
     ctx.r4.u64 = source;
     ctx.r5.u64 = size;
     ctx.lr = at;
-    lifted::CallFromContext(ctx, base, 0x825A7410);
+    lifted::Enter(ctx, base, game::memcpy_825A7410);
   };
   return calls;
 }
@@ -65,7 +68,7 @@ ITC_REGS_STEP(RecompiledSetVertexShader) {
     return;
   }
   const uint32_t shader = ctx.r4.u32;
-  const bool same = shader && shader == guest::LoadU32(base, ctx.r3.u32 + 12436);
+  const bool same = shader && shader == schema::Device(base, ctx.r3.u32).vertex_shader();
   refcount::NoteSetVertexShader(same);
   if (same) refcount::SetUnchangedShader(shader);
   lifted::original::c822A8808(ctx, base);
@@ -78,7 +81,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822A8958) {
   
   if (!ITC_FLAG(native_device_shaders)) {
     // The original's store, then its tail call with refcount.cpp's skip.
-    guest::StoreU32(base, ctx.r3.u32 + 13156, ctx.r4.u32);
+    schema::Device(base, ctx.r3.u32).set_entry_vertex_shader(ctx.r4.u32);
     RecompiledSetVertexShader(ctx, base);
     return;
   }

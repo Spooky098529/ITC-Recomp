@@ -5,11 +5,15 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/menu_helpers.h"
+#include "schema/race_event.h"
+#include "schema/race_screens.h"
+#include "schema/race_screens_unseen.h"
+#include "schema/tuning_screen.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
-#include <bit>
 
 namespace race_screens {
 
@@ -17,23 +21,25 @@ namespace {
 
 constexpr uint64_t kNone = ~uint64_t(0);
 
-uint32_t Get(uint8_t* base, uint32_t global) { return guest::LoadU32(base, global); }
+using Globals = schema::RaceScreensUnseenGlobals;
 
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   guest::StoreU32(base, sp - bytes, sp);
   return sp - bytes;
 }
 
-uint32_t Movie(uint8_t* base) { return Get(base, Get(base, kPause4Screen)); }
-uint32_t Data(uint8_t* base) { return Get(base, kPause4Data); }
-uint32_t List(uint8_t* base) { return Get(base, kPause4List); }
-uint32_t Pages(uint8_t* base) { return Get(base, kPause4Pages); }
+uint32_t Movie(uint8_t* base) { return Globals::pause4_screen(base).movie().address; }
+// The data, read again at each use.
+schema::PauseMenu4Data Data(uint8_t* base) { return Globals::pause4_data(base); }
+schema::MenuList ListView(uint8_t* base) { return Globals::pause4_list(base); }
+uint32_t List(uint8_t* base) { return ListView(base).address; }
+uint32_t Pages(uint8_t* base) { return Globals::pause4_pages(base).address; }
 uint32_t Selection(uint8_t* base) { return ListSelection(base, List(base)); }
 // MenuList::GetPreviousSelection (sub_8220BC28): the list's +20.
-uint32_t Previous(uint8_t* base) { return guest::LoadU32(base, List(base) + kListSelectionBefore); }
-uint32_t DataWord(uint8_t* base, uint32_t field) { return guest::LoadU32(base, Data(base) + field); }
-void SetData(uint8_t* base, uint32_t field, uint32_t value) {
-  guest::StoreU32(base, Data(base) + field, value);
+uint32_t Previous(uint8_t* base) { return ListView(base).selection_before(); }
+// The kind's item `index` (six words a kind).
+uint32_t Item(uint8_t* base, uint32_t kind, uint32_t index) {
+  return guest::LoadU32(base, Globals::pause4_items_address() + ((kind * 6 + index) << 2));
 }
 
 // UiMovie::Play(movie, sub_scene, index, chained, 0, 0, 0) through its
@@ -72,7 +78,7 @@ uint64_t Transition(uint8_t* base, uint32_t step, uint32_t frame, uint32_t lr, c
 // the data's +60 1, else 3.
 uint64_t VolumeRow(uint8_t* base, uint32_t item) {
   if (item < 2) return uint64_t(item) + 1;
-  return int32_t(DataWord(base, 60)) == 1 ? 4 : 3;
+  return int32_t(Data(base).volume_toggle()) == 1 ? 4 : 3;
 }
 
 // A word's low byte, sign-extended (the sound options' setters' argument).
@@ -85,23 +91,31 @@ uint64_t LowByte(uint32_t word) { return uint64_t(int64_t(int8_t(word & 0xFF)));
 uint32_t Pause4StepVolume(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82210488 PauseMenu4::StepVolume");
   Frame(base, sp, 96);
-  const int32_t side = int32_t(guest::LoadU32(base, List(base) + kListSide));
+  const int32_t side = int32_t(ListView(base).side());
   const uint32_t selection = Selection(base);
   if (side != -1 && side != 1) return 0;
   if (selection < 2) {
-    const uint32_t field = selection == 0 ? 8 : 12;
-    SetData(base, field, DataWord(base, field) + uint32_t(side));
-    const int32_t value = int32_t(DataWord(base, field));
+    // The music's edit for item 0, the effects' for item 1.
+    auto edit = [&] {
+      const schema::PauseMenu4Data data = Data(base);
+      return selection == 0 ? data.music_edit() : data.effects_edit();
+    };
+    auto set_edit = [&](uint32_t value) {
+      const schema::PauseMenu4Data data = Data(base);
+      selection == 0 ? data.set_music_edit(value) : data.set_effects_edit(value);
+    };
+    set_edit(edit() + uint32_t(side));
+    const int32_t value = int32_t(edit());
     if (side == -1 ? value < 0 : value > 15) {
-      SetData(base, field, side == -1 ? 0 : 15);
+      set_edit(side == -1 ? 0 : 15);
       return 0;
     }
     return 1;
   }
   if (selection != 2) return 0;
-  const int32_t toggle = int32_t(DataWord(base, 60));
+  const int32_t toggle = int32_t(Data(base).volume_toggle());
   if (side == -1 ? toggle != 1 : toggle != 0) return 0;
-  SetData(base, 60, side == -1 ? 0 : 1);
+  Data(base).set_volume_toggle(side == -1 ? 0 : 1);
   return 1;
 }
 
@@ -109,11 +123,14 @@ uint32_t Pause4LoadVolumes(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_822107B8 PauseMenu4::LoadVolumes");
   Frame(base, sp, 96);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const uint32_t options = save + 0x1F85C;
-  SetData(base, 0, uint32_t(int32_t(int8_t(guest::LoadU8(base, options + 28)))));
-  SetData(base, 4, uint32_t(int32_t(int8_t(guest::LoadU8(base, options + 29)))));
-  SetData(base, 16, 15);
-  SetData(base, 20, 15);
+  // The options' bytes +28 and +29 (race-event.toml's SaveData names +28
+  // effects_volume and +29 music_volume; this screen reads them the other way).
+  const uint32_t music = uint32_t(int32_t(int8_t(schema::SaveData(base, save).effects_volume())));
+  Data(base).set_music_volume(music);
+  const uint32_t effects = uint32_t(int32_t(int8_t(schema::SaveData(base, save).music_volume())));
+  Data(base).set_effects_volume(effects);
+  Data(base).set_music_default(15);
+  Data(base).set_effects_default(15);
   return save;
 }
 
@@ -121,9 +138,9 @@ uint32_t Pause4SaveVolumes(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82210820 PauseMenu4::SaveVolumes");
   Frame(base, sp, 96);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const uint32_t options = save + 0x1F85C;
-  guest::StoreU8(base, options + 28, uint8_t(DataWord(base, 0)));
-  guest::StoreU8(base, options + 29, uint8_t(DataWord(base, 4)));
+  // The options' bytes +28 and +29, as LoadVolumes reads them.
+  schema::SaveData(base, save).set_effects_volume(uint8_t(Data(base).music_volume()));
+  schema::SaveData(base, save).set_music_volume(uint8_t(Data(base).effects_volume()));
   return save;
 }
 
@@ -131,7 +148,7 @@ uint64_t Pause4AnswerPage(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82210910 PauseMenu4::AnswerPage");
   const uint32_t frame = Frame(base, sp, 96);
   Pause4SaveVolumes(base, frame);
-  return DataWord(base, 56);
+  return Data(base).answer();
 }
 
 uint64_t Pause4ShowItems(uint8_t* base, uint32_t sp, const Calls& calls) {
@@ -140,16 +157,18 @@ uint64_t Pause4ShowItems(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t movie = Movie(base);
   const uint32_t node = ui_movies::FindNode(base, movie, 4, 0);
   uint64_t r3 = node;
-  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, node + 104)); i++) {
-    const uint32_t kind = DataWord(base, 76);
-    const uint32_t item = guest::LoadU32(base, kPause4Items + ((kind * 6 + uint32_t(i)) << 2));
-    const uint64_t child = uint64_t(guest::LoadU32(base, node + 100) + uint32_t(i));
+  // The group's child count and first child index, read as words.
+  const schema::UiMovieNode group(base, node);
+  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, group.height_address())); i++) {
+    const uint32_t kind = Data(base).kind();
+    const uint32_t item = Item(base, kind, uint32_t(i));
+    const uint64_t child = uint64_t(guest::LoadU32(base, group.width_address()) + uint32_t(i));
     if (int32_t(item) != -1 && i < 6) {
       const uint64_t args[8] = {movie, 4, child, uint64_t(item) + 1989, 0, 0, 0, 0};
       r3 = calls.CallArgs(kSetText, frame, 0x822103E8, args);
     } else {
       const uint32_t hidden = ui_movies::FindNode(base, movie, 4, uint32_t(child));
-      guest::StoreU32(base, hidden + 80, 0);
+      schema::UiMovieNode(base, hidden).set_visible(0);
       r3 = hidden;
     }
   }
@@ -162,12 +181,14 @@ uint32_t Pause4ColorItems(uint8_t* base, uint32_t sp) {
   const uint32_t movie = Movie(base);
   const uint32_t node = ui_movies::FindNode(base, movie, 4, 0);
   uint32_t r3 = node;
-  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, node + 104)); i++) {
+  const schema::UiMovieNode group(base, node);
+  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, group.height_address())); i++) {
     const bool enabled = ListIsEnabled(base, List(base), uint32_t(i)) != 0;
     const uint32_t color[3] = {enabled ? 205u : 255u, enabled ? 235u : 255u, enabled ? 67u : 255u};
     for (uint32_t k = 0; k < 3; k++) {
-      r3 = ui_movies::FindNode(base, movie, 4, guest::LoadU32(base, node + 100) + uint32_t(i));
-      guest::StoreU32(base, r3 + 56 + 4 * k, color[k]);
+      r3 = ui_movies::FindNode(base, movie, 4, guest::LoadU32(base, group.width_address()) + uint32_t(i));
+      // red, green, blue
+      guest::StoreU32(base, schema::UiMovieNode(base, r3).red_address() + 4 * k, color[k]);
     }
   }
   return r3;
@@ -177,22 +198,21 @@ uint64_t Pause4SetUpMain(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82210C00 PauseMenu4::SetUpMain");
   const uint32_t frame = Frame(base, sp, 128);
   {
-    const uint32_t data = Data(base);
-    guest::StoreU32(base, data + 52, 6);
-    const uint32_t row = kPause4Items + guest::LoadU32(base, Data(base) + 76) * 24;
+    Data(base).set_item_count(6);
+    const uint32_t kind = Data(base).kind();
     for (uint32_t i = 0; i < 6; i++) {
-      if (int32_t(guest::LoadU32(base, row + 4 * i)) == -1) {
-        guest::StoreU32(base, Data(base) + 52, i);
+      if (int32_t(Item(base, kind, i)) == -1) {
+        Data(base).set_item_count(i);
         break;
       }
     }
   }
-  const uint64_t count = DataWord(base, 52);
+  const uint64_t count = Data(base).item_count();
   guest::StoreU32(base, frame + 84, 159);
   guest::StoreU32(base, frame + 92, 158);
   const uint64_t init[8] = {List(base), count, count, 1, 154, 153, 155, 156};
   calls.CallArgs(kListInit, frame, 0x82210CA0, init);
-  ListSetSelection(base, List(base), DataWord(base, 64));
+  ListSetSelection(base, List(base), Data(base).main_selection());
   return Pause4ShowItems(base, frame, calls);
 }
 
@@ -226,7 +246,7 @@ uint32_t Pause4ShowVolume(uint8_t* base, uint32_t node, uint64_t volume, uint32_
   uint32_t r3 = 0;
   for (int32_t i = 1; i <= 15; i++) {
     r3 = ui_movies::Child(base, node, uint32_t(i + 3));
-    guest::StoreU32(base, r3 + 80, i == int32_t(uint32_t(volume)) ? 1 : 0);
+    schema::UiMovieNode(base, r3).set_visible(i == int32_t(uint32_t(volume)) ? 1 : 0);
   }
   return r3;
 }
@@ -235,9 +255,10 @@ uint64_t Pause4ShowVolumes(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82210670 PauseMenu4::ShowVolumes");
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t movie = Movie(base);
-  Pause4ShowVolume(base, ui_movies::FindNode(base, movie, 6, 5), DataWord(base, 8), frame, calls);
-  return Pause4ShowVolume(base, ui_movies::FindNode(base, movie, 6, 6), DataWord(base, 12), frame,
-                          calls);
+  Pause4ShowVolume(base, ui_movies::FindNode(base, movie, 6, 5), Data(base).music_edit(), frame,
+                   calls);
+  return Pause4ShowVolume(base, ui_movies::FindNode(base, movie, 6, 6), Data(base).effects_edit(),
+                          frame, calls);
 }
 
 uint64_t Pause4ShowVolumesB(uint8_t* base, uint32_t sp, const Calls& calls) {
@@ -245,9 +266,9 @@ uint64_t Pause4ShowVolumesB(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t movie = Movie(base);
   calls.Call(kShowVolumeBar, frame, 0x82210E20, ui_movies::FindNode(base, movie, 6, 5),
-             DataWord(base, 8));
+             Data(base).music_edit());
   return calls.Call(kShowVolumeBar, frame, 0x82210E3C, ui_movies::FindNode(base, movie, 6, 6),
-                    DataWord(base, 12));
+                    Data(base).effects_edit());
 }
 
 uint32_t Pause4SetArrow(uint8_t* base, uint64_t value, uint32_t sp) {
@@ -258,7 +279,7 @@ uint32_t Pause4SetArrow(uint8_t* base, uint64_t value, uint32_t sp) {
   guest::StoreU32(base, frame + 80, uint32_t(uint64_t(word) >> 32));
   guest::StoreU32(base, frame + 84, uint32_t(word));
   const uint32_t child = ui_movies::Child(base, node, 0);
-  guest::StoreU32(base, child + 16, std::bit_cast<uint32_t>(float(double(word))));
+  schema::UiMovieNode(base, child).set_y(float(double(word)));
   return child;
 }
 
@@ -271,11 +292,11 @@ uint64_t Pause4SetUpVolume(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint64_t init[8] = {List(base), 3, 3, 1, 154, 153, 155, 156};
   calls.CallArgs(kListInit, frame, 0x822112A8, init);
   {
-    const uint32_t data = Data(base);
-    guest::StoreU32(base, data + 8, guest::LoadU32(base, data + 0));
-    guest::StoreU32(base, data + 12, guest::LoadU32(base, data + 4));
+    const schema::PauseMenu4Data data = Data(base);
+    data.set_music_edit(data.music_volume());
+    data.set_effects_edit(data.effects_volume());
   }
-  SetData(base, 60, 0);
+  Data(base).set_volume_toggle(0);
   Pause4RestoreNodes(base, 0xFFFFFFFFu, 6, frame, calls);
   auto text = [&](uint32_t lr, uint32_t node, uint64_t id) {
     calls.Call(kSetNodeText, frame, lr, movie, node, id);
@@ -297,12 +318,13 @@ uint64_t Pause4RunTen(uint8_t* base, uint32_t step, uint32_t sp, const Calls& ca
   const uint32_t frame = Frame(base, sp, 96);
   const uint32_t movie = Movie(base);
   if (guest::LoadU32(base, step) == 0) {
-    SetData(base, 68, 0);
+    Data(base).set_run_count(0);
     guest::StoreU32(base, step, 1);
   }
   Run(calls, frame, 0x8220FFD4, movie);
-  SetData(base, 68, DataWord(base, 68) + 1);
-  return int32_t(DataWord(base, 68)) >= 10 ? 1 : 0;
+  const uint32_t count = Data(base).run_count() + 1;
+  Data(base).set_run_count(count);
+  return int32_t(Data(base).run_count()) >= 10 ? 1 : 0;
 }
 
 uint64_t Pause4OpenMain(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
@@ -310,7 +332,7 @@ uint64_t Pause4OpenMain(uint8_t* base, uint32_t step, uint32_t sp, const Calls& 
   const uint32_t frame = Frame(base, sp, 112);
   const uint64_t run = Transition(base, step, frame, 0x82211114, calls, [&](uint32_t movie) {
     Play(calls, frame, 0x822110E8, movie, kNone, 1);
-    SetData(base, 64, 0);
+    Data(base).set_main_selection(0);
     Pause4SetUpMain(base, frame, calls);
     Pause4ColorItems(base, frame);
   });
@@ -366,7 +388,7 @@ uint64_t Pause4OpenVolume(uint8_t* base, uint32_t step, uint32_t sp, const Calls
   const uint32_t frame = Frame(base, sp, 112);
   const uint64_t run = Transition(base, step, frame, 0x8221156C, calls, [&](uint32_t movie) {
     const uint32_t selection = Selection(base);
-    SetData(base, 64, selection);
+    Data(base).set_main_selection(selection);
     calls.Call(kFinish, frame, 0x82211534, movie, 4, uint64_t(selection) + 1);
     Pause4SetUpVolume(base, frame, calls);
     Play(calls, frame, 0x82211558, movie, kNone, 3);
@@ -399,7 +421,7 @@ uint64_t Pause4MoveVolume(uint8_t* base, uint32_t step, uint32_t sp, const Calls
       } else if (selection == 1) {
         Pause4SetArrow(base, 40, frame);
       }
-      SetData(base, 60, 0);
+      Data(base).set_volume_toggle(0);
     }
     if (selection < 3) {
       Play(calls, frame, 0x82210A7C, movie, 6, VolumeRow(base, selection));
@@ -408,7 +430,7 @@ uint64_t Pause4MoveVolume(uint8_t* base, uint32_t step, uint32_t sp, const Calls
     calls.Call(kFinishNamed, frame, 0x82210A90, movie, 19);
     calls.Call(kFinishNamed, frame, 0x82210A9C, movie, 20);
     if (previous != 2 && selection != 2) {
-      const int32_t move = int32_t(guest::LoadU32(base, List(base) + kListMove));
+      const int32_t move = int32_t(ListView(base).move());
       if (move == 1) {
         PlayNamed(calls, frame, 0x82210AE8, movie, 20);
       } else if (move == -1) {
@@ -424,15 +446,15 @@ uint64_t Pause4SetVolume(uint8_t* base, uint32_t step, uint32_t sp, const Calls&
   const uint32_t frame = Frame(base, sp, 128);
   Transition(base, step, frame, 0x82210BF4, calls, [&](uint32_t movie) {
     if (int32_t(Selection(base)) == 2) {
-      const bool on = int32_t(DataWord(base, 60)) == 1;
+      const bool on = int32_t(Data(base).volume_toggle()) == 1;
       calls.Call(kFinish, frame, on ? 0x82210B68 : 0x82210B78, movie, 6, on ? 3 : 4);
       Play(calls, frame, 0x82210B98, movie, 6, on ? 4 : 3);
       calls.Call(kLoopLast, frame, 0x82210BA0, movie);
     } else {
-      const uint32_t effects = ui_movies::FindNode(base, movie, 6, 5);
-      const uint32_t music = ui_movies::FindNode(base, movie, 6, 6);
-      Pause4ShowVolume(base, music, DataWord(base, 12), frame, calls);
-      Pause4ShowVolume(base, effects, DataWord(base, 8), frame, calls);
+      const uint32_t node5 = ui_movies::FindNode(base, movie, 6, 5);
+      const uint32_t node6 = ui_movies::FindNode(base, movie, 6, 6);
+      Pause4ShowVolume(base, node6, Data(base).effects_edit(), frame, calls);
+      Pause4ShowVolume(base, node5, Data(base).music_edit(), frame, calls);
     }
   });
   return 1;
@@ -451,7 +473,7 @@ uint64_t Pause4CloseVolume(uint8_t* base, uint32_t step, uint32_t sp, const Call
   });
   if (uint32_t(run) == 0) {
     PagesGo(base, Pages(base), 0, 3, 0xFFFFFFFFu);
-    guest::StoreU32(base, Pages(base) + 24, 0);
+    Globals::pause4_pages(base).set_step_started(0);
   }
   return 0;
 }
@@ -469,7 +491,7 @@ uint64_t Pause4MainPage(uint8_t* base, uint32_t sp, const Calls& calls) {
     sound(0x8220FDA4, 4);
   } else if (uint32_t(calls.Call(kListCancelled, frame, 0x8220FDB0, List(base))) != 0 ||
              uint32_t(calls.Call(kListPressed152, frame, 0x8220FDC0, List(base))) != 0) {
-    SetData(base, 56, 1);
+    Data(base).set_answer(1);
     PagesGo(base, Pages(base), 3, 5, 0xFFFFFFFFu);
     sound(0x8220FF14, 2);
     return 0;
@@ -479,27 +501,27 @@ uint64_t Pause4MainPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   }
   sound(0x8220FDE0, 0);
   const uint32_t at = Selection(base);
-  const uint32_t data = Data(base);
-  const uint32_t kind = guest::LoadU32(base, data + 76);
-  const uint32_t item = guest::LoadU32(base, kPause4Items + ((kind * 6 + at) << 2));
+  const schema::PauseMenu4Data data = Data(base);
+  const uint32_t kind = data.kind();
+  const uint32_t item = Item(base, kind, at);
   // The items that end the race: the answer (+56), the confirm dialog in
   // `mode` for the player who paused (+72), page 2.
   auto confirm = [&](uint32_t answer, uint32_t mode) {
-    guest::StoreU32(base, data + 56, answer);
-    RaceDialogOpen(base, mode, DataWord(base, 72), frame, calls);
+    data.set_answer(answer);
+    RaceDialogOpen(base, mode, Data(base).player(), frame, calls);
     PagesGo(base, Pages(base), 2, 0xFFFFFFFFu, 0xFFFFFFFFu);
     return 0;
   };
   switch (item) {
     case 0:  // sub_8220FE3C, the resume (merged)
-      guest::StoreU32(base, data + 56, 1);
+      data.set_answer(1);
       PagesGo(base, Pages(base), 3, 5, 0xFFFFFFFFu);
       return 0;
     case 2:
       PagesGo(base, Pages(base), 1, 6, 7);
       return 0;
     case 4:
-      return confirm(guest::LoadU32(base, data + 72) == 0 ? 4 : 5, 4);
+      return confirm(data.player() == 0 ? 4 : 5, 4);
     case 5:
       return confirm(2, 1);
     case 6:
@@ -514,7 +536,7 @@ uint64_t Pause4MainPage(uint8_t* base, uint32_t sp, const Calls& calls) {
     case 3:
       return 0;
     default:  // 9 and past 10
-      guest::StoreU32(base, data + 56, 0);
+      data.set_answer(0);
       return 0;
   }
 }
@@ -522,45 +544,58 @@ uint64_t Pause4MainPage(uint8_t* base, uint32_t sp, const Calls& calls) {
 uint64_t Pause4VolumePage(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82210E58 PauseMenu4::VolumePage");
   const uint32_t frame = Frame(base, sp, 112);
-  // SoundOptions::SetEffectsVolume and SetMusicVolume with the data's words
-  // at `effects` and `music` (their low bytes sign-extended).
-  auto set_volumes = [&](uint32_t effects, uint32_t effects_lr, uint32_t music,
-                         uint32_t music_lr) {
-    calls.Call(kSetEffectsVolume, frame, effects_lr, LowByte(DataWord(base, effects)));
-    calls.Call(kSetMusicVolume, frame, music_lr, LowByte(DataWord(base, music)));
+  // SoundOptions::SetEffectsVolume and SetMusicVolume with the edits or the
+  // volumes (their low bytes sign-extended).
+  auto set_volumes = [&](bool edits, uint32_t effects_lr, uint32_t music_lr) {
+    const uint32_t effects = edits ? Data(base).effects_edit() : Data(base).effects_volume();
+    calls.Call(kSetEffectsVolume, frame, effects_lr, LowByte(effects));
+    const uint32_t music = edits ? Data(base).music_edit() : Data(base).music_volume();
+    calls.Call(kSetMusicVolume, frame, music_lr, LowByte(music));
   };
-  auto copy_two = [&](uint32_t to, uint32_t from) {
-    const uint32_t data = Data(base);
-    guest::StoreU32(base, data + to, guest::LoadU32(base, data + from));
-    guest::StoreU32(base, data + to + 4, guest::LoadU32(base, data + from + 4));
+  // The edits kept as the volumes, or put back from the volumes or the
+  // defaults (music first, then effects).
+  auto keep_edits = [&] {
+    const schema::PauseMenu4Data data = Data(base);
+    data.set_music_volume(data.music_edit());
+    data.set_effects_volume(data.effects_edit());
+  };
+  auto edits_from_defaults = [&] {
+    const schema::PauseMenu4Data data = Data(base);
+    data.set_music_edit(data.music_default());
+    data.set_effects_edit(data.effects_default());
+  };
+  auto edits_from_volumes = [&] {
+    const schema::PauseMenu4Data data = Data(base);
+    data.set_music_edit(data.music_volume());
+    data.set_effects_edit(data.effects_volume());
   };
   auto sound = [&](uint64_t cue) {
     calls.Call(kMenuSoundPlay, frame, 0x82211078, cue);
     return 0;
   };
   calls.Call(kListUpdate, frame, 0x82210E78, List(base));
-  if (guest::LoadU32(base, List(base) + kListMove) != 0) {
+  if (ListView(base).move() != 0) {
     PagesGo(base, Pages(base), 1, 8, 0xFFFFFFFFu);
     return sound(4);
   }
   if (Pause4StepVolume(base, frame) != 0) {
     PagesGo(base, Pages(base), 1, 9, 0xFFFFFFFFu);
-    set_volumes(12, 0x82210EE0, 8, 0x82210EF0);
+    set_volumes(true, 0x82210EE0, 0x82210EF0);
     return sound(4);
   }
   if (uint32_t(calls.Call(kListAccepted, frame, 0x82210EFC, List(base))) != 0) {
-    if (int32_t(Selection(base)) == 2 && DataWord(base, 60) == 0) {
-      copy_two(0, 8);
+    if (int32_t(Selection(base)) == 2 && Data(base).volume_toggle() == 0) {
+      keep_edits();
       Pause4ShowVolumesB(base, frame, calls);
       PagesGo(base, Pages(base), 0xFFFFFFFFu, 0, 10);
-      set_volumes(4, 0x82210F68, 0, 0x82210FD0);
-    } else if (int32_t(Selection(base)) == 2 && int32_t(DataWord(base, 60)) == 1) {
-      copy_two(8, 16);
+      set_volumes(false, 0x82210F68, 0x82210FD0);
+    } else if (int32_t(Selection(base)) == 2 && int32_t(Data(base).volume_toggle()) == 1) {
+      edits_from_defaults();
       Pause4ShowVolumes(base, frame, calls);
-      set_volumes(12, 0x82210FC0, 8, 0x82210FD0);
+      set_volumes(true, 0x82210FC0, 0x82210FD0);
     } else {
       ListSetSelection(base, List(base), 2);
-      SetData(base, 60, 0);
+      Data(base).set_volume_toggle(0);
       PagesGo(base, Pages(base), 1, 8, 0xFFFFFFFFu);
     }
     return sound(0);
@@ -568,10 +603,10 @@ uint64_t Pause4VolumePage(uint8_t* base, uint32_t sp, const Calls& calls) {
   if (uint32_t(calls.Call(kListCancelled, frame, 0x82211010, List(base))) == 0) {
     return 0;
   }
-  copy_two(8, 0);
+  edits_from_volumes();
   Pause4ShowVolumes(base, frame, calls);
   PagesGo(base, Pages(base), 0xFFFFFFFFu, 0, 10);
-  set_volumes(4, 0x82211060, 0, 0x82211070);
+  set_volumes(false, 0x82211060, 0x82211070);
   return sound(2);
 }
 
@@ -596,16 +631,17 @@ uint64_t Pause4Open(uint8_t* base, uint32_t screen, uint64_t player, uint64_t ki
   guest::StoreU32(base, frame + 80, 5);
   const uint32_t movie =
       guest::LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
-  guest::StoreU32(base, screen, movie);
+  const schema::PauseMenu4 view(base, screen);
+  view.set_movie(movie);
   calls.Call(kResetPose, frame, 0x822113CC, movie);
-  const uint32_t three = ui_movies::FindNode(base, guest::LoadU32(base, screen), 0xFFFFFFFFu, 3);
-  const uint32_t five = ui_movies::FindNode(base, guest::LoadU32(base, screen), 0xFFFFFFFFu, 5);
-  guest::StoreU32(base, five + 108, uint32_t(player));
-  guest::StoreU32(base, three + 108, uint32_t(player));
+  const uint32_t three = ui_movies::FindNode(base, view.movie().address, 0xFFFFFFFFu, 3);
+  const uint32_t five = ui_movies::FindNode(base, view.movie().address, 0xFFFFFFFFu, 5);
+  schema::UiMovieNode(base, five).set_texture_entry(uint32_t(player));
+  schema::UiMovieNode(base, three).set_texture_entry(uint32_t(player));
   const uint32_t other = int32_t(uint32_t(player)) != 0 ? 1 : 0;
-  guest::StoreU32(base, List(base) + kListPlayer, other);
-  SetData(base, 72, other);
-  SetData(base, 76, uint32_t(kind));
+  ListView(base).set_player(other);
+  Data(base).set_player(other);
+  Data(base).set_kind(uint32_t(kind));
   PagesGo(base, Pages(base), 0, 1, 2);
   calls.Call(kMenuSoundPlay, frame, 0x8221144C, 6);
   return Pause4LoadVolumes(base, frame);
@@ -617,7 +653,7 @@ uint64_t Pause4Update(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, cons
   // MainPage, VolumePage, ConfirmPage, AnswerPage.
   constexpr uint32_t kHandlers[4] = {0x8220FD48, 0x82210E58, 0x8220FF30, 0x82210910};
   for (uint32_t k = 0; k < 4; k++) guest::StoreU32(base, frame + 80 + 4 * k, kHandlers[k]);
-  const int32_t page = int32_t(guest::LoadU32(base, Pages(base)));
+  const int32_t page = int32_t(Globals::pause4_pages(base).page());
   switch (page) {
     case -1:
       return 0;
@@ -651,15 +687,15 @@ uint64_t Pause4Draw(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& ca
                                       0x82210940, 0x82210B08, 0x82211138};
   for (uint32_t k = 0; k < 11; k++) guest::StoreU32(base, frame + 80 + 4 * k, kHandlers[k]);
   const uint32_t pages = Pages(base);
-  const int32_t transition = int32_t(guest::LoadU32(base, pages + 12));
+  const int32_t transition = int32_t(schema::PageObject(base, pages).step());
   uint64_t r3;
   if (transition == -1) {
-    r3 = Run(calls, frame, 0x82211680, guest::LoadU32(base, screen));
+    r3 = Run(calls, frame, 0x82211680, schema::PauseMenu4(base, screen).movie().address);
   } else if (transition < 0) {
     PagesFinish(base, pages, 1);
     r3 = pages;
   } else {
-    const uint32_t step = pages + 24;
+    const uint32_t step = schema::PageObject(base, pages).step_started_address();
     uint64_t result;
     switch (transition) {
       case 0: result = Pause4RunTen(base, step, frame, calls); break;
@@ -688,7 +724,7 @@ uint64_t Pause4Draw(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& ca
     PagesFinish(base, now, uint32_t(result));
     r3 = now;
   }
-  if (int32_t(guest::LoadU32(base, Pages(base))) == 2) {
+  if (int32_t(Globals::pause4_pages(base).page()) == 2) {
     r3 = RaceDialogDraw(base, frame, calls);
   }
   return r3;

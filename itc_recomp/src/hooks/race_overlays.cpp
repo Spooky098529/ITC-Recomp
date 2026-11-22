@@ -8,6 +8,7 @@
 #include "base/flags.h"
 #include "hooks/heap.h"
 #include "race_overlays/race_overlays.h"
+#include "schema/race_overlays.h"
 
 ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
               "Run the race overlays' update helpers (the car overlays' view and vehicle "
@@ -51,7 +52,7 @@ ITC_OVERLAY_WORD(821264A8, ViewportEntry(ctx.r4.u32))
 ITC_NATIVE_ENTRY(821268C0, ITC_FLAG(native_race_overlays)) {
   ctx.fpscr.disableFlushMode();
   const uint32_t view = ctx.r3.u32;
-  ctx.r3.u64 = guest::LoadU32(base, view + 4);
+  ctx.r3.u64 = schema::OverlayView(base, view).vehicle();
   ctx.f1.f64 = double(SpeedKmh(base, view));
 }
 

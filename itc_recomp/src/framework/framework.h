@@ -36,9 +36,9 @@ uint32_t RendererFrom36(uint8_t* base, uint32_t self);        // sub_820908E0: -
 uint32_t WorkerPoolFrom36(uint8_t* base, uint32_t self);      // sub_820908E8: -12, Word44
 uint32_t SceneFrom36(uint8_t* base, uint32_t self);           // sub_82090908: -16, Word60
 
-// The debug font's cursor and line start (0x8296BCE0: +0, +4 and +8, +12)
-// set to (x, y) (sub_8258BE08, DebugFont::SetPosition).
-constexpr uint32_t kDebugFontPosition = 0x8296BCE0;
+// The debug font's cursor and line start (0x8296BCE0: +0, +4 and +8, +12;
+// FrameworkGlobals' debug_font_*) set to (x, y) (sub_8258BE08,
+// DebugFont::SetPosition).
 void DebugFontSetPosition(uint8_t* base, uint32_t x, uint32_t y);
 
 // The debug font's guest calls: `function` (through its override) with r3
@@ -52,7 +52,6 @@ using GuestCall = std::function<uint64_t(uint32_t function, uint32_t r1, uint32_
 // through `call` where it declines; XPR::XPR's plain C++ when not 0),
 // XPR::Create(it, `data`) through `call`, then +32 and +36 = the float at
 // 0x82001FAC. XPR::Create's r3.
-constexpr uint32_t kDebugFontFlag = 0x8265ED40;
 uint64_t DebugFontInit(uint8_t* base, uint32_t data, uint32_t sp, const GuestCall& call);
 // sub_82090CC0 DebugText::LoadFont (the debug text's load job): from a
 // 128-byte frame below `sp`, a GameFile at the frame's +96 (its plain
@@ -146,7 +145,6 @@ uint32_t FrameStartConstruct(uint8_t* base, uint32_t frame_start, uint32_t block
 // from its own frame, `stack_word`, never set: given here), +48 cleared,
 // itself into 0x8266D080, and the job posted to the worker pool (the block's
 // +4 interface's slot 1, `post`, a guest call with r5 = 1).
-constexpr uint32_t kDebugTextGlobal = 0x8266D080;
 uint32_t DebugTextConstruct(uint8_t* base, uint32_t text, uint32_t block, uint32_t stack_word,
                             const std::function<void(uint32_t interface, uint32_t job)>& post);
 // sub_82091160 DebugText::Create: operator new(52) and the debug text built

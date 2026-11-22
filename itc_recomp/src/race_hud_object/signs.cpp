@@ -5,6 +5,11 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/car_physics.h"
+#include "schema/race_hud_object.h"
+#include "schema/race_states.h"
+#include "schema/track_zones.h"
+#include "schema/vehicle.h"
 #include "track_zones/track_zones.h"
 #include "ui_movies/game.h"
 
@@ -18,9 +23,12 @@ constexpr uint32_t kNone = 0xFFFFFFFFu;  // a sub-scene index of -1
 // 12 bytes each).
 constexpr uint32_t kSignTable = 0x8200D838;
 
-uint32_t Dashboard(uint8_t* base, uint32_t hud) { return guest::LoadU32(base, hud + kHudDashboard); }
+using Hud = schema::RaceHud;
+using G = schema::RaceHudObjectGlobals;
 
-uint32_t Owner(uint8_t* base) { return guest::LoadU32(base, kTrackZones); }
+uint32_t Dashboard(uint8_t* base, uint32_t hud) { return Hud(base, hud).dashboard().address; }
+
+uint32_t Owner(uint8_t* base) { return G::track_zones(base).address; }
 
 // The sign's state as the original keeps it in registers.
 struct Sign {
@@ -96,15 +104,16 @@ uint64_t UpdateSign(uint8_t* base, uint32_t hud, uint32_t flag, uint32_t sp, con
   const uint32_t frame = sp - 224;
   guest::StoreU32(base, frame, sp);
   Sign sign{base, hud, frame, calls, hud};
-  const uint32_t car = guest::LoadU32(base, hud + kHudVehicle);
+  const Hud h(base, hud);
+  const schema::Vehicle car = h.vehicle();
   bool on = false;
-  if (guest::LoadU32(base, car + 6168) == 0 && guest::LoadU32(base, hud + 424) != 0) {
+  if (schema::VehicleStatus(base, car.status_address()).wrong_way() == 0 && h.signs_on() != 0) {
     on = true;
   }
   const bool mode6 =
-      int32_t(guest::LoadU32(base, guest::LoadU32(base, kRaceData) + kRaceMode)) == 6;
+      int32_t(schema::RaceData(base, G::race_data(base).address).race_mode()) == 6;
   const bool special = flag != 0 || mode6;  // a value of 13's color
-  const uint32_t zone = guest::LoadU32(base, hud + 416);
+  const uint32_t zone = h.sign_zone();
   int32_t first = -1, second = -1, third = -1;  // the old zone's panels' values
   if (int32_t(zone) != -1) {
     const uint32_t entry = zone * 12 + kSignTable + 24;
@@ -138,15 +147,15 @@ uint64_t UpdateSign(uint8_t* base, uint32_t hud, uint32_t flag, uint32_t sp, con
       }
     }
   }
-  if (now == int32_t(guest::LoadU32(base, hud + 416))) {
+  if (now == int32_t(h.sign_zone())) {
     return sign.r3;
   }
-  guest::StoreU32(base, hud + 416, uint32_t(now));
+  h.set_sign_zone(uint32_t(now));
   // The course's flags for the zone (the entry before the table's for none,
   // as the original reads it).
   uint32_t flag_first = 0, flag_second = 0, flag_third = 0;
   if (now < 26) {
-    const uint32_t flags = guest::LoadU32(base, hud + 420) + uint32_t(now) * 12;
+    const uint32_t flags = h.sign_flags() + uint32_t(now) * 12;
     flag_first = guest::LoadU32(base, flags + 0);
     flag_second = guest::LoadU32(base, flags + 4);
     flag_third = guest::LoadU32(base, flags + 8);
@@ -178,8 +187,9 @@ uint64_t UpdatePlaceName(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& 
   ITC_NATIVE_RUNNING("sub_82213510 RaceHud::UpdatePlaceName");
   const uint32_t frame = sp - 128;
   guest::StoreU32(base, frame, sp);
+  const Hud h(base, hud);
   uint64_t r3 = hud;
-  const uint32_t zone = guest::LoadU32(base, hud + 428);
+  const uint32_t zone = h.place_zone();
   if (int32_t(zone) != -1) {
     r3 = track_zones::OwnerIsInside(base, Owner(base), zone, frame, 0x82213538, zone_calls);
     if (uint32_t(r3) != 0) {
@@ -194,7 +204,7 @@ uint64_t UpdatePlaceName(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& 
       break;
     }
   }
-  if (now == int32_t(guest::LoadU32(base, hud + 428))) {
+  if (now == int32_t(h.place_zone())) {
     return r3;
   }
   if (now == -1) {
@@ -203,7 +213,7 @@ uint64_t UpdatePlaceName(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& 
     r3 = calls.Call(kSetText, frame, 0x822135A0, Dashboard(base, hud), ~0ull, 17,
                     uint64_t(int64_t(now) + 1980));
   }
-  guest::StoreU32(base, hud + 428, uint32_t(now));
+  h.set_place_zone(uint32_t(now));
   return r3;
 }
 
@@ -212,7 +222,8 @@ uint64_t UpdateSigns(uint8_t* base, uint32_t hud, uint32_t flag, uint32_t sp, co
   ITC_NATIVE_RUNNING("sub_82214718 RaceHud::UpdateSigns");
   const uint32_t frame = sp - 112;
   guest::StoreU32(base, frame, sp);
-  const int32_t course = int32_t(guest::LoadU32(base, guest::LoadU32(base, kRaceData) + 4));
+  const schema::RaceData data(base, G::race_data(base).address);
+  const int32_t course = int32_t(data.route_course());
   if (course == 8 || course == 9 || course == 10) {
     return hud;
   }

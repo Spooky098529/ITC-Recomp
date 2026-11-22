@@ -20,9 +20,6 @@ struct Calls;
 
 namespace power_graph {
 
-// The line recorder's render queue (+0) and command list (+4), stored by
-// every Line::RecordFlat.
-constexpr uint32_t kLineLists = 0x826D83D8;
 // The camera pass the lines are recorded with (pass 0).
 constexpr uint32_t kPass = 0x826BAC00;
 // The sort key the lines are queued with.
@@ -32,10 +29,10 @@ constexpr uint32_t kKey = 683;
 // Line::RecordFlat's (below PowerGraph::Draw's).
 constexpr uint32_t kDrawFrame = 9648;
 constexpr uint32_t kLineFrame = 128;
-// The two sets of sprites in PowerGraph::Draw's frame (144 bytes each).
+// The two sets of sprites in PowerGraph::Draw's frame (schema::OverlaySprite,
+// 144 bytes each).
 constexpr uint32_t kTorqueSprites = 4976;
 constexpr uint32_t kPowerSprites = 368;
-constexpr uint32_t kSpriteBytes = 144;
 // What PowerGraph::Draw leaves in r3: the last array destructor
 // iterator's first element (the torque set's sprite 0 + 80).
 constexpr uint32_t kDrawR3 = kTorqueSprites + 80;
@@ -61,7 +58,8 @@ struct LineCalls {
 // sub_8217B508 Line::RecordFlat: r4 = `sprite` (+0 its world matrix, +80
 // and +96 the ends' x, y, z, +112 and +128 their colors as words), r5 =
 // `pass`, r6 = `key`, its frame at `frame`. The list and queue from the
-// getters, stored at kLineLists + 4 and kLineLists; then on the list a
+// getters, stored at [0x826D83DC] and [0x826D83D8] (PowerGraphGlobals'
+// line_list and line_queue); then on the list a
 // chunk: OpenChunk, a header slot, Primitive::RecordTransform(pass, sprite)
 // with its product at `frame` - 80 (on [0x826D83D4]'s list), [13, 2, 1, 0],
 // the two vertices (AllocateVertices(2), with its header: x, y, z and the
@@ -134,11 +132,9 @@ constexpr uint32_t kEntryCarData = 80;
 // 0x826E: PowerGraph::Draw saves it in its frame).
 constexpr uint32_t kEntryDrawReturn = 0x822506E8;
 constexpr uint32_t kEntryR31 = 0x826E0000;
-// The word that says whether the car list's graph is shown.
-constexpr uint32_t kEntryShown = 0x82815EC0;
 // sub_82250670 CarList::DrawEntryPowerGraph's set-up, r3 = `entry` (an entry
 // of the car list screen's list), its frame at `frame`: false (nothing done)
-// when [kEntryShown] is 0; else the car object at frame + 1936
+// when [0x82815EC0] (graph_shown) is 0; else the car object at frame + 1936
 // (GarageCar::Reset, then Car::SetModelAndClass with the entry's +8432) and
 // the car data at frame + 80 (CarData::CarData, then CarData::FromGarageCar
 // from the car), each callee's frame below `frame` as the original's (the
@@ -158,8 +154,8 @@ TuningDraw CarListEntryDraw(uint8_t* base, uint32_t frame);
 constexpr uint32_t kCarFrame = 1952;
 constexpr uint32_t kCarDrawReturn = 0x82250764;
 // sub_82250700 CarList::DrawCarPowerGraph's set-up, r3 = `car` (a garage
-// car), its frame at `frame`: false (nothing done) when [kEntryShown] is 0;
-// else the car data at frame + 80 (CarData::CarData, then
+// car), its frame at `frame`: false (nothing done) when [0x82815EC0]
+// (graph_shown) is 0; else the car data at frame + 80 (CarData::CarData, then
 // CarData::FromGarageCar from the car), each callee's frame below `frame`
 // as the original's (FromGarageCar's callees through `calls` where their
 // plain C++ declines); true: PowerGraph::Draw is then called with
@@ -172,9 +168,8 @@ bool CarListCarSetUp(uint8_t* base, const front_end_car_draw::Calls& calls, uint
 // the frame `frame`, returning to `lr`.
 using SetFromCarCall = std::function<void(uint32_t function, uint64_t r3, uint64_t r4,
                                           uint64_t r5, uint32_t frame, uint32_t lr)>;
-// SetFromCar's frame (below its caller's r1) and its record's global.
+// SetFromCar's frame (below its caller's r1).
 constexpr uint32_t kSetFromCarFrame = 6960;
-constexpr uint32_t kPowerGraphScreen = 0x82815EBC;  // [it] + 8: the record
 // sub_82250488 PowerGraph::SetFromCar (r3 `car`, a garage car; r4 `tab`):
 // the power graph screen's record ([0x82815EBC] + 8) filled from the car,
 // as PowerGraph::SetEntry fills it from a car list entry. In its frame

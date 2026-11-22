@@ -7,6 +7,7 @@
 #include "base/log.h"
 
 #include "guest.h"
+#include "schema/c_runtime.h"
 
 namespace c_runtime {
 
@@ -15,10 +16,10 @@ namespace {
 using u128 = unsigned __int128;
 constexpr u128 kMask96 = (u128(1) << 96) - 1;
 
-// The globals the parsing reads (docs/known-data.md).
-constexpr uint32_t kDecimalPoint = 0x8266C024;  // a pointer to a pointer to the character
-constexpr uint32_t kPow10Positive = 0x8266C4E8;  // 12-byte powers of ten, less 96
-constexpr uint32_t kPow10Negative = 0x8266C648;
+// The powers of ten (docs/known-data.md), less 96: the walk adds a row (84)
+// before its first entry (index 1 to 7, 12 bytes each).
+constexpr uint32_t kPow10Positive = schema::CRuntimeGlobals::pow10_positive_address() - 96;
+constexpr uint32_t kPow10Negative = schema::CRuntimeGlobals::pow10_negative_address() - 96;
 
 // Big-endian bytes standing in for a function's stack frame: offsets are
 // from its r1 (in __strgtold12_l 80 the product, 96 the number, 112 a
@@ -259,9 +260,9 @@ bool Strgtold12(uint8_t* base, uint32_t string, uint32_t mult12, uint32_t scale,
     }
     p++;
   }
-  const uint32_t point_pointer = guest::LoadU32(base, kDecimalPoint);
+  const schema::Lconv lconv = schema::CRuntimeGlobals::lconv(base);
   auto point = [&] {
-    return int32_t(int8_t(guest::LoadU8(base, guest::LoadU32(base, point_pointer))));
+    return int32_t(int8_t(guest::LoadU8(base, lconv.decimal_point().address)));
   };
   auto nonzero_digit = [](int32_t c) { return c >= '1' && c <= '9'; };
   // After digits: d, D, e or E starts the exponent, anything else ends.
@@ -561,13 +562,12 @@ bool AtofL(uint8_t* base, uint32_t string, uint64_t* bits) {
   if (string == 0) {
     return false;  // EINVAL through _errno
   }
-  constexpr uint32_t kCurrentLocalePointer = 0x8266BC28;
-  const uint32_t locale = guest::LoadU32(base, kCurrentLocalePointer);
+  const schema::Locale locale = schema::CRuntimeGlobals::current_locale(base);
   for (;;) {
-    if (int32_t(guest::LoadU32(base, locale + 172)) > 1) {
+    if (locale.mb_cur_max() > 1) {
       return false;  // multibyte: sub_825AFD98
     }
-    const uint32_t table = guest::LoadU32(base, locale + 200);
+    const uint32_t table = locale.ctype_table();
     const uint32_t c = guest::LoadU8(base, string);
     if ((guest::LoadU16(base, table + 2 * c) & 8) == 0) {
       break;
@@ -581,16 +581,6 @@ bool AtofL(uint8_t* base, uint32_t string, uint64_t* bits) {
   *bits = parsed.bits;
   return true;
 }
-
-namespace {
-
-// The strings $I10_OUTPUT copies for the special values (constant data).
-constexpr uint32_t kQNan = 0x82074490;  // "1#QNAN"
-constexpr uint32_t kInf = 0x82074498;   // "1#INF"
-constexpr uint32_t kInd = 0x820744A0;   // "1#IND"
-constexpr uint32_t kSNan = 0x820744A8;  // "1#SNAN"
-
-}  // namespace
 
 bool I10Output(uint8_t* base, const LongDouble12& value, int32_t digits, uint32_t flags,
                FloatOut* out) {
@@ -625,19 +615,20 @@ bool I10Output(uint8_t* base, const LongDouble12& value, int32_t digits, uint32_
   }
   if (expn == 0x7FFF) {
     put16(0, 1);
-    uint32_t text;
+    uint32_t text;  // the strings $I10_OUTPUT copies for the special values
     uint8_t length;
     if ((manhi != 0x80000000u || manlo != 0) && (manhi & 0x40000000u) == 0) {
-      text = kSNan;
+      text = schema::CRuntimeGlobals::snan_text_address();
       length = 6;
     } else if (sign != 0 && manhi == 0xC0000000u) {
-      text = manlo != 0 ? kQNan : kInd;
+      text = manlo != 0 ? schema::CRuntimeGlobals::qnan_text_address()
+                        : schema::CRuntimeGlobals::ind_text_address();
       length = manlo != 0 ? 6 : 5;
     } else if (manhi == 0x80000000u && manlo == 0) {
-      text = kInf;
+      text = schema::CRuntimeGlobals::inf_text_address();
       length = 5;
     } else {
-      text = kQNan;
+      text = schema::CRuntimeGlobals::qnan_text_address();
       length = 6;
     }
     // strcpy_s into the 22 bytes at +4 (the strings fit).

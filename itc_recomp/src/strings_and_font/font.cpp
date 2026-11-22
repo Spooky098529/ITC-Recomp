@@ -6,6 +6,8 @@
 #include "c_runtime/strings.h"
 #include "command_list/command_list.h"
 #include "guest.h"
+#include "schema/command_list.h"
+#include "schema/strings_and_font.h"
 #include "strings_and_font/steps.h"
 
 #include <cmath>
@@ -16,15 +18,29 @@ using namespace steps;
 
 namespace {
 
+using G = schema::StringsAndFontGlobals;
+using schema::Font;
+using schema::FontDrawParams;
+using schema::FontGlyphRecord;
+using schema::FontGlyphTable;
+using schema::FontPage;
+using schema::FontText;
+using schema::FontVertex;
+
 constexpr uint32_t kPageBreak = 0xFFD1;
 constexpr uint32_t kColor = 0xFFD6;  // back to the text's color
-constexpr uint32_t kZero = 0x82000A34;  // the float 0.0
-constexpr uint32_t kHalf = 0x82001BE4;  // the float 0.5
+constexpr uint32_t kZero = G::zero_address();  // the float 0.0
+constexpr uint32_t kHalf = G::half_address();  // the float 0.5
 
 // The color codes (0xFFD6 and 0xFFF6-0xFFFF): not drawn, no width.
 bool IsColor(uint32_t c) { return (c > 0xFFF5 && c <= 0xFFFF) || c == kColor; }
 
-uint32_t Params(uint8_t* base, uint32_t font) { return guest::LoadU32(base, font + 16); }
+uint32_t Params(uint8_t* base, uint32_t font) { return Font(base, font).params().address; }
+
+// The glyph record of `c` in `page`'s records.
+FontGlyphRecord Record(uint8_t* base, uint32_t page, uint32_t c) {
+  return FontGlyphRecord(base, FontPage(base, page).records().address + (c << 2));
+}
 
 // A 16-bit integer kept from fctidz's result, as a float.
 double Low16(double value) { return ToSingle(uint16_t(Fctidz(value))); }
@@ -32,15 +48,14 @@ double Low16(double value) { return ToSingle(uint16_t(Fctidz(value))); }
 // A glyph's advance: its record's +2 >> 2 times the glyph scale, truncated
 // to 16 bits, plus the letter spacing unless justified (alignment 3).
 double Advance(uint8_t* base, uint32_t font, uint32_t params, uint32_t page, uint32_t c) {
-  const bool justified = guest::LoadU32(base, params + 76) == 3;
-  const double glyph_scale = Lfs(base, params + 36);
-  const uint32_t record = guest::LoadU32(base, page + 4) + (c << 2);
-  const uint32_t advance = uint32_t(guest::LoadU16(base, record + 2)) >> 2;
+  const bool justified = FontDrawParams(base, params).align_x() == 3;
+  const double glyph_scale = FontDrawParams(base, params).glyph_scale_x();
+  const uint32_t advance = uint32_t(Record(base, page, c).advance_and_channel()) >> 2;
   const double width = Low16(Single(ToSingle(advance) * glyph_scale));
   if (justified) {
     return width;
   }
-  return Single(width + Lfs(base, font + 16448));
+  return Single(width + Font(base, font).letter_spacing());
 }
 
 }  // namespace
@@ -51,10 +66,10 @@ double FontTextWidth(uint8_t* base, uint32_t font, uint32_t params, uint32_t tex
   double line = zero, widest = zero;
   FontSetParams(base, font, params);
   params = Params(base, font);
-  const uint32_t page =
-      guest::LoadU32(base, font + ((guest::LoadU32(base, params + 60) + 5) << 2));
-  guest::StoreU32(base, font + 36, page);
-  uint32_t c = guest::LoadU16(base, text);
+  const uint32_t page = guest::LoadU32(
+      base, Font(base, font).pages_address() + (FontDrawParams(base, params).page() << 2));
+  Font(base, font).set_page(page);
+  uint32_t c = FontText(base, text).unit();
   if (c != 0) {
     for (;;) {
       if (c == kPageBreak) {
@@ -71,7 +86,7 @@ double FontTextWidth(uint8_t* base, uint32_t font, uint32_t params, uint32_t tex
         line = Single(Advance(base, font, params, page, c) + line);
       }
       text += 2;
-      c = guest::LoadU16(base, text);
+      c = FontText(base, text).unit();
       if (c == 0) {
         break;
       }
@@ -80,14 +95,14 @@ double FontTextWidth(uint8_t* base, uint32_t font, uint32_t params, uint32_t tex
       widest = line;
     }
   }
-  const double spacing = Lfs(base, font + 16448);
-  return Single(Single(widest - spacing) * Lfs(base, params + 28));
+  const double spacing = Font(base, font).letter_spacing();
+  return Single(Single(widest - spacing) * FontDrawParams(base, params).scale_x());
 }
 
 double FontLineWidth(uint8_t* base, uint32_t font, uint32_t text) {
   ITC_NATIVE_RUNNING("sub_82108458 Font::LineWidth");
   double width = Lfs(base, kZero);
-  for (uint32_t c; (c = guest::LoadU16(base, text)) != 0; text += 2) {
+  for (uint32_t c; (c = FontText(base, text).unit()) != 0; text += 2) {
     if (c == kPageBreak || c == '\n') {
       break;
     }
@@ -95,20 +110,20 @@ double FontLineWidth(uint8_t* base, uint32_t font, uint32_t text) {
       continue;
     }
     const uint32_t params = Params(base, font);
-    const uint32_t page = guest::LoadU32(base, font + 36);
+    const uint32_t page = Font(base, font).page().address;
     width = Single(Advance(base, font, params, page, c) + width);
   }
-  const uint32_t params = Params(base, font);
-  if (guest::LoadU32(base, params + 76) == 3) {
+  const FontDrawParams params(base, Params(base, font));
+  if (params.align_x() == 3) {
     return width;
   }
-  return Single(Single(width - Lfs(base, font + 16448)) * Lfs(base, params + 28));
+  return Single(Single(width - Font(base, font).letter_spacing()) * params.scale_x());
 }
 
 uint32_t FontLineGlyphs(uint8_t* base, uint32_t text) {
   ITC_NATIVE_RUNNING("sub_82108810 Font::LineGlyphs");
   uint32_t count = 0;
-  for (uint32_t c; (c = guest::LoadU16(base, text)) != 0; text += 2) {
+  for (uint32_t c; (c = FontText(base, text).unit()) != 0; text += 2) {
     if (c == kPageBreak || c == '\n') {
       break;
     }
@@ -124,15 +139,15 @@ double FontLineX(uint8_t* base, uint32_t font, uint32_t text) {
   const double width = FontLineWidth(base, font, text);
   const uint32_t params = Params(base, font);
   const int32_t w = Fctiwz(width);
-  const uint32_t align = guest::LoadU32(base, params + 76);
+  const uint32_t align = FontDrawParams(base, params).align_x();
   switch (align) {
     case 0:
-      return Lfs(base, font + 56);
+      return double(Font(base, font).start_x());
     case 1: {
       // start + box width x scale x 0.5 - w x 0.5, truncated.
-      const int32_t box = int32_t(guest::LoadU32(base, params + 68));
-      const double scale = Lfs(base, params + 28);
-      const double start = Lfs(base, font + 56);
+      const int32_t box = int32_t(FontDrawParams(base, params).box_width());
+      const double scale = double(FontDrawParams(base, params).scale_x());
+      const double start = double(Font(base, font).start_x());
       const double half = Lfs(base, kHalf);
       const double scaled = Single(ToSingle(box) * scale);
       const double center = Single(std::fma(scaled, half, start));
@@ -141,20 +156,20 @@ double FontLineX(uint8_t* base, uint32_t font, uint32_t text) {
     }
     case 2: {
       // start + box width x scale - w, truncated.
-      const int32_t box = int32_t(guest::LoadU32(base, params + 68));
-      const double scale = Lfs(base, params + 28);
-      const double start = Lfs(base, font + 56);
+      const int32_t box = int32_t(FontDrawParams(base, params).box_width());
+      const double scale = double(FontDrawParams(base, params).scale_x());
+      const double start = double(Font(base, font).start_x());
       const double right = Single(std::fma(ToSingle(box), scale, start));
       return ToSingle(Fctiwz(Single(right - ToSingle(w))));
     }
     case 3: {
       const uint32_t glyphs = FontLineGlyphs(base, text);
-      const double start = Lfs(base, font + 56);
+      const double start = double(Font(base, font).start_x());
       if (glyphs > 1) {
-        const int32_t box = int32_t(guest::LoadU32(base, params + 68));
+        const int32_t box = int32_t(FontDrawParams(base, params).box_width());
         const double gaps = ToSingle(int32_t(glyphs - 1));
         const double spacing = Single(Single(ToSingle(box) - ToSingle(w)) / gaps);
-        Stfs(base, font + 16448, spacing);
+        Font(base, font).set_letter_spacing(float(spacing));
       }
       return start;
     }
@@ -167,14 +182,14 @@ double FontLineY(uint8_t* base, uint32_t font, uint32_t lines, uint32_t line, do
   ITC_NATIVE_RUNNING("sub_82108568 Font::LineY");
   lines &= 0xFFFF;
   line &= 0xFFFF;
-  const uint32_t page = guest::LoadU32(base, font + 36);
+  const uint32_t page = Font(base, font).page().address;
   const uint32_t params = Params(base, font);
-  const double spacing = Lfs(base, font + 16452);
-  const uint32_t table = guest::LoadU32(base, page + 0);
-  const double glyph_scale = Lfs(base, params + 40);
-  const uint32_t align = guest::LoadU32(base, params + 80);
-  const double scale = Lfs(base, params + 32);
-  const uint32_t cell = guest::LoadU16(base, table + 2);
+  const double spacing = double(Font(base, font).line_spacing());
+  const uint32_t table = FontPage(base, page).glyph_table().address;
+  const double glyph_scale = double(FontDrawParams(base, params).glyph_scale_y());
+  const uint32_t align = FontDrawParams(base, params).align_y();
+  const double scale = double(FontDrawParams(base, params).scale_y());
+  const uint32_t cell = FontGlyphTable(base, table).cell_height();
   // The line height (16 bits) and the block's height, scaled.
   const uint32_t height = uint16_t(Fctidz(Single(ToSingle(cell) * glyph_scale)));
   double block = Single(ToSingle(height) + spacing);
@@ -182,15 +197,15 @@ double FontLineY(uint8_t* base, uint32_t font, uint32_t lines, uint32_t line, do
   block = Single(block * scale);
   switch (align) {
     case 0: {
-      const double start = Lfs(base, font + 60);
+      const double start = double(Font(base, font).start_y());
       const double step = Single(ToSingle(height) + spacing);
       return Single(std::fma(Single(step * ToSingle(line)), scale, start));
     }
     case 1: {
-      const int32_t box = int32_t(guest::LoadU32(base, params + 72));
-      const double s = Lfs(base, params + 32);
-      const double start = Lfs(base, font + 60);
-      const double line_spacing = Lfs(base, font + 16452);
+      const int32_t box = int32_t(FontDrawParams(base, params).box_height());
+      const double s = double(FontDrawParams(base, params).scale_y());
+      const double start = double(Font(base, font).start_y());
+      const double line_spacing = double(Font(base, font).line_spacing());
       const double half = Lfs(base, kHalf);
       const double step = Single(ToSingle(height) + line_spacing);
       const double middle = Single(std::fma(ToSingle(box / 2), s, start));
@@ -198,10 +213,10 @@ double FontLineY(uint8_t* base, uint32_t font, uint32_t lines, uint32_t line, do
       return Single(std::fma(Single(step * ToSingle(line)), s, first));
     }
     case 2: {
-      const int32_t box = int32_t(guest::LoadU32(base, params + 72));
-      const double s = Lfs(base, params + 32);
-      const double start = Lfs(base, font + 60);
-      const double line_spacing = Lfs(base, font + 16452);
+      const int32_t box = int32_t(FontDrawParams(base, params).box_height());
+      const double s = double(FontDrawParams(base, params).scale_y());
+      const double start = double(Font(base, font).start_y());
+      const double line_spacing = double(Font(base, font).line_spacing());
       const double step = Single(ToSingle(height) + line_spacing);
       const double bottom = Single(std::fma(ToSingle(box), s, start));
       const double first = Single(bottom - block);
@@ -209,21 +224,21 @@ double FontLineY(uint8_t* base, uint32_t font, uint32_t lines, uint32_t line, do
     }
     case 3: {
       if (lines <= 1) {
-        return Lfs(base, font + 60);
+        return double(Font(base, font).start_y());
       }
-      const uint32_t table_again = guest::LoadU32(base, page + 0);
-      const double glyph_scale_again = Lfs(base, params + 40);
-      const uint32_t box = guest::LoadU32(base, params + 72);
-      const double start = Lfs(base, font + 60);
-      const uint32_t cell_again = guest::LoadU16(base, table_again + 2);
+      const uint32_t table_again = FontPage(base, page).glyph_table().address;
+      const double glyph_scale_again = double(FontDrawParams(base, params).glyph_scale_y());
+      const uint32_t box = FontDrawParams(base, params).box_height();
+      const double start = double(Font(base, font).start_y());
+      const uint32_t cell_again = FontGlyphTable(base, table_again).cell_height();
       const uint32_t h =
           uint16_t(Fctidz(Single(ToSingle(cell_again) * glyph_scale_again)));
       const int32_t left = int32_t(box - h * lines);
       const int32_t gaps = int32_t(lines - 1);
       const double line_spacing = ToSingle(left / gaps);
-      Stfs(base, font + 16452, line_spacing);
+      Font(base, font).set_line_spacing(float(line_spacing));
       const double step = Single(ToSingle(height) + line_spacing);
-      const double s = Lfs(base, params + 32);
+      const double s = double(FontDrawParams(base, params).scale_y());
       return Single(std::fma(Single(step * ToSingle(line)), s, start));
     }
     default:
@@ -235,13 +250,12 @@ uint32_t FontCountGlyphs(uint8_t* base, uint32_t font, uint32_t counts, uint32_t
   ITC_NATIVE_RUNNING("sub_82108210 Font::CountGlyphs");
   const uint32_t length = c_runtime::Wcslen(base, text);
   for (uint32_t left = length; left != 0; left--, text += 2) {
-    const uint32_t c = guest::LoadU16(base, text);
+    const uint32_t c = FontText(base, text).unit();
     if (c == '\n' || c == ' ' || IsColor(c)) {
       continue;
     }
-    const uint32_t page = guest::LoadU32(base, font + 36);
-    const uint32_t record = guest::LoadU32(base, page + 4) + (c << 2);
-    const uint32_t channel = (uint32_t(guest::LoadU16(base, record + 2)) << 2) & 0xC;
+    const uint32_t page = Font(base, font).page().address;
+    const uint32_t channel = (uint32_t(Record(base, page, c).advance_and_channel()) << 2) & 0xC;
     guest::StoreU32(base, counts + channel, guest::LoadU32(base, counts + channel) + 1);
   }
   return length;
@@ -251,20 +265,22 @@ uint32_t FontOutCode(uint8_t* base, uint32_t font, uint32_t vertex) {
   ITC_NATIVE_RUNNING("sub_821082A0 Font::OutCode");
   const uint32_t params = Params(base, font);
   uint32_t code;
-  const double x = Lfs(base, vertex + 0);
-  if (x < ToSingle(int32_t(guest::LoadU32(base, params + 44)))) {
+  const double x = FontVertex(base, vertex).x();
+  if (x < ToSingle(int32_t(FontDrawParams(base, params).clip_x()))) {
     code = 1;
   } else {
     const uint32_t p = Params(base, font);
-    const int32_t right = int32_t(guest::LoadU32(base, p + 52) + guest::LoadU32(base, p + 44));
+    const int32_t right =
+        int32_t(FontDrawParams(base, p).clip_width() + FontDrawParams(base, p).clip_x());
     code = x > ToSingle(right) ? 2 : 4;
   }
-  const double y = Lfs(base, vertex + 4);
-  if (y < ToSingle(int32_t(guest::LoadU32(base, params + 48)))) {
+  const double y = FontVertex(base, vertex).y();
+  if (y < ToSingle(int32_t(FontDrawParams(base, params).clip_y()))) {
     return code | 8;
   }
   const uint32_t p = Params(base, font);
-  const int32_t bottom = int32_t(guest::LoadU32(base, p + 56) + guest::LoadU32(base, p + 48));
+  const int32_t bottom =
+      int32_t(FontDrawParams(base, p).clip_height() + FontDrawParams(base, p).clip_y());
   return y > ToSingle(bottom) ? code | 16 : code | 32;
 }
 
@@ -280,80 +296,87 @@ int32_t Divw(int32_t a, int32_t b) {
 // An unsigned 32-bit integer through the stack and fcfid, then frsp.
 double UToSingle(uint32_t value) { return ToSingle(int64_t(value)); }
 
-constexpr uint32_t kCounts = kDrawGlobals;           // +0: the four counts
-constexpr uint32_t kWrite = kDrawGlobals + 16;       // the write pointers
-constexpr uint32_t kStarts = kDrawGlobals + 32;      // the vertices' starts
-constexpr uint32_t kChunk = kDrawGlobals + 48;       // the chunk's first slot
-constexpr uint32_t kTurn = 0x82007C78;               // the double 1/360
+constexpr uint32_t kCounts = G::glyph_counts_address();   // the four counts
+constexpr uint32_t kWrite = G::write_pointers_address();   // the write pointers
+constexpr uint32_t kStarts = G::vertex_starts_address();   // the vertices' starts
 
 }  // namespace
 
 bool FontRotated(uint8_t* base, uint32_t font) {
-  const double angle = Lfs(base, Params(base, font) + 16);
-  const double turns = Single(angle * Lfd(base, kTurn));
+  const double angle = double(FontDrawParams(base, Params(base, font)).angle());
+  const double turns = Single(angle * Lfd(base, G::turn_address()));
   return !(turns == ToSingle(Fctiwz(turns)));
 }
 
 uint32_t FontClipGlyph(uint8_t* base, uint32_t font, uint32_t v) {
   ITC_NATIVE_RUNNING("sub_82108C90 Font::ClipGlyph");
+  // The glyph's six vertices.
+  auto vertex_at = [&](uint32_t k) {
+    return FontVertex(base, schema::FontGlyphQuad(base, v).vertices_address() + 24 * k);
+  };
   const uint32_t params = Params(base, font);
-  const int32_t left = int32_t(guest::LoadU32(base, params + 44));
-  if (left == 0 && guest::LoadU32(base, params + 48) == 0 &&
-      guest::LoadU32(base, params + 52) == 0 && guest::LoadU32(base, params + 56) == 0) {
+  const int32_t left = int32_t(FontDrawParams(base, params).clip_x());
+  if (left == 0 && FontDrawParams(base, params).clip_y() == 0 &&
+      FontDrawParams(base, params).clip_width() == 0 &&
+      FontDrawParams(base, params).clip_height() == 0) {
     return 1;
   }
   // Wholly outside: the first vertex below the bottom, the third above the
   // top, the first right of the right edge, the second left of the left.
-  auto sum = [&](uint32_t a, uint32_t b) {
-    const uint32_t p = Params(base, font);
-    return ToSingle(int32_t(guest::LoadU32(base, p + a) + guest::LoadU32(base, p + b)));
+  auto bottom = [&] {
+    const FontDrawParams p(base, Params(base, font));
+    return ToSingle(int32_t(p.clip_height() + p.clip_y()));
   };
-  if (Lfs(base, v + 4) > sum(56, 48)) {
+  auto right = [&] {
+    const FontDrawParams p(base, Params(base, font));
+    return ToSingle(int32_t(p.clip_width() + p.clip_x()));
+  };
+  if (double(vertex_at(0).y()) > bottom()) {
     return 0;
   }
-  if (Lfs(base, v + 52) < ToSingle(int32_t(guest::LoadU32(base, params + 48)))) {
+  if (double(vertex_at(2).y()) < ToSingle(int32_t(FontDrawParams(base, params).clip_y()))) {
     return 0;
   }
-  if (Lfs(base, v + 0) > sum(52, 44)) {
+  if (double(vertex_at(0).x()) > right()) {
     return 0;
   }
-  if (Lfs(base, v + 24) < ToSingle(left)) {
+  if (double(vertex_at(1).x()) < ToSingle(left)) {
     return 0;
   }
   for (uint32_t k = 0; k < 6; k++) {
-    const uint32_t vertex = v + 24 * k;
-    const uint32_t code = FontOutCode(base, font, vertex) & 0xFF;
+    const FontVertex vertex = vertex_at(k);
+    const uint32_t code = FontOutCode(base, font, vertex.address) & 0xFF;
     if ((code & 4) && (code & 0x20)) {
       continue;
     }
     // x to the edge, u by the same distance / the scale / the texture's width.
     if (code & 3) {
-      const double x = Lfs(base, vertex + 0);
-      const double u = Lfs(base, vertex + 16);
+      const double x = vertex.x();
+      const double u = vertex.u();
       const double edge =
-          (code & 1) ? ToSingle(int32_t(guest::LoadU32(base, Params(base, font) + 44)))
-                     : sum(52, 44);
-      Stfs(base, vertex + 0, edge);
-      const uint32_t width = guest::LoadU32(base, guest::LoadU32(base, font + 36) + 16);
-      const double scale = Lfs(base, Params(base, font) + 28);
+          (code & 1) ? ToSingle(int32_t(FontDrawParams(base, Params(base, font)).clip_x()))
+                     : right();
+      vertex.set_x(float(edge));
+      const uint32_t width = Font(base, font).page().texture_width();
+      const double scale = double(FontDrawParams(base, Params(base, font)).scale_x());
       double d = Single((code & 1) ? edge - x : x - edge);
       d = Single(d / scale);
       d = Single(d / UToSingle(width));
-      Stfs(base, vertex + 16, Single((code & 1) ? d + u : u - d));
+      vertex.set_u(float(Single((code & 1) ? d + u : u - d)));
     }
     if (code & 0x18) {
-      const double y = Lfs(base, vertex + 4);
-      const double tv = Lfs(base, vertex + 20);
+      const double y = vertex.y();
+      const double tv = vertex.v();
       const double edge =
-          (code & 8) ? ToSingle(int32_t(guest::LoadU32(base, Params(base, font) + 48)))
-                     : sum(56, 48);
-      Stfs(base, vertex + 4, edge);
-      const uint32_t height = guest::LoadU32(base, guest::LoadU32(base, font + 36) + 20);
-      const double scale = Lfs(base, Params(base, font) + 32);
+          (code & 8) ? ToSingle(int32_t(FontDrawParams(base, Params(base, font)).clip_y()))
+                     : bottom();
+      vertex.set_y(float(edge));
+      const uint32_t height = Font(base, font).page().texture_height();
+      const double scale = double(FontDrawParams(base, Params(base, font)).scale_y());
       double d = Single((code & 8) ? edge - y : y - edge);
       d = Single(d / scale);
       d = Single(d / UToSingle(height));
-      Stfs(base, vertex + 20, Single((code & 8) ? d + tv : tv - d));
+      vertex.set_v(float(Single((code & 8) ? d + tv : tv - d)));
     }
   }
   return 1;
@@ -364,20 +387,21 @@ bool FontAddGlyph(uint8_t* base, uint32_t font, uint32_t c, uint32_t color, doub
     return false;
   }
   ITC_NATIVE_RUNNING("sub_82109560 Font::AddGlyph");
-  const uint32_t page = guest::LoadU32(base, font + 36);
-  const uint32_t texture_height = guest::LoadU32(base, page + 20);
-  const uint32_t record = guest::LoadU32(base, page + 4) + ((c << 2) & 0x3FFFC);
-  const uint32_t table = guest::LoadU32(base, page + 0);
-  const uint32_t texture_width = guest::LoadU32(base, page + 16);
+  const uint32_t page = Font(base, font).page().address;
+  const FontPage page_view(base, page);
+  const uint32_t texture_height = page_view.texture_height();
+  const FontGlyphRecord record(base, page_view.records().address + ((c << 2) & 0x3FFFC));
+  const FontGlyphTable table = page_view.glyph_table();
+  const uint32_t texture_width = page_view.texture_width();
   const uint32_t params = Params(base, font);
-  const uint32_t cell_width = guest::LoadU16(base, table + 0);
-  const uint32_t channel = (uint32_t(guest::LoadU16(base, record + 2)) << 2) & 0xC;
-  const uint32_t cell = guest::LoadU16(base, record + 0);
-  const double glyph_scale_x = Lfs(base, params + 36);
-  const uint32_t cell_height = guest::LoadU16(base, table + 2);
-  const double glyph_scale_y = Lfs(base, params + 40);
-  const double scale_y = Lfs(base, params + 32);
-  const double scale_x = Lfs(base, params + 28);
+  const uint32_t cell_width = table.cell_width();
+  const uint32_t channel = (uint32_t(record.advance_and_channel()) << 2) & 0xC;
+  const uint32_t cell = record.cell();
+  const double glyph_scale_x = double(FontDrawParams(base, params).glyph_scale_x());
+  const uint32_t cell_height = table.cell_height();
+  const double glyph_scale_y = double(FontDrawParams(base, params).glyph_scale_y());
+  const double scale_y = double(FontDrawParams(base, params).scale_y());
+  const double scale_x = double(FontDrawParams(base, params).scale_x());
   // The cell's place in the sheet: columns = texture width / cell width.
   const uint32_t columns = Divwu(texture_width, cell_width) & 0xFFFF;
   const double size_y = Single(glyph_scale_y * scale_y);
@@ -440,7 +464,7 @@ bool FontBuildVertices(uint8_t* base, uint32_t font, uint32_t text) {
   ITC_NATIVE_RUNNING("sub_82109AA8 Font::BuildVertices");
   const uint32_t length = c_runtime::Wcslen(base, text);
   uint32_t lines = 1;
-  for (uint32_t at = text, c; (c = guest::LoadU16(base, at)) != 0; at += 2) {
+  for (uint32_t at = text, c; (c = FontText(base, at).unit()) != 0; at += 2) {
     if (c == kPageBreak) {
       break;
     }
@@ -451,26 +475,27 @@ bool FontBuildVertices(uint8_t* base, uint32_t font, uint32_t text) {
   // The color: alpha (+24 x 255, the byte fctidz leaves lowest), then the
   // red, green and blue bytes (+20..+22).
   uint32_t params = Params(base, font);
-  const double alpha = Lfs(base, params + 24);
-  const uint32_t blue = guest::LoadU8(base, params + 22);
-  const double full = Lfs(base, 0x82000C44);
-  const uint32_t red = guest::LoadU8(base, params + 20);
+  const double alpha = double(FontDrawParams(base, params).alpha());
+  const uint32_t blue = FontDrawParams(base, params).blue();
+  const double full = Lfs(base, G::full_alpha_address());
+  const uint32_t red = FontDrawParams(base, params).red();
   const uint32_t a = uint8_t(Fctidz(Single(alpha * full)));
-  const uint32_t green = guest::LoadU8(base, params + 21);
+  const uint32_t green = FontDrawParams(base, params).green();
   const uint32_t alpha_bits = a << 8;
   uint32_t color = ((((red | alpha_bits) << 8) | green) << 8) | blue;
   uint32_t line = 0;
   double x = FontLineX(base, font, text);
   double y = FontLineY(base, font, lines, 0, x);
-  uint32_t pair = font + 68;  // the second pass's positions, 8 bytes a character
+  // The second pass's positions, 8 bytes a character (pair - 4 the x).
+  uint32_t pair = Font(base, font).second_pass_positions_address() + 4;
   for (uint32_t left = length; left != 0; left--, text += 2, pair += 8) {
-    const uint32_t page = guest::LoadU32(base, font + 36);
-    const uint32_t c = guest::LoadU16(base, text);
+    const uint32_t page = Font(base, font).page().address;
+    const uint32_t c = FontText(base, text).unit();
     params = Params(base, font);
-    const uint32_t record = guest::LoadU32(base, page + 4) + (c << 2);
-    const double glyph_scale = Lfs(base, params + 36);
+    const FontGlyphRecord record = Record(base, page, c);
+    const double glyph_scale = double(FontDrawParams(base, params).glyph_scale_x());
     const uint32_t advance =
-        uint16_t(Fctidz(Single(UToSingle(uint32_t(guest::LoadU16(base, record + 2)) >> 2) *
+        uint16_t(Fctidz(Single(UToSingle(uint32_t(record.advance_and_channel()) >> 2) *
                                glyph_scale)));
     if (c == '\n') {
       line = (line + 1) & 0xFFFF;
@@ -480,37 +505,39 @@ bool FontBuildVertices(uint8_t* base, uint32_t font, uint32_t text) {
     }
     if (c == kColor) {
       const uint32_t p = Params(base, font);
-      const uint32_t r = guest::LoadU8(base, p + 20);
-      const uint32_t g = guest::LoadU8(base, p + 21);
-      const uint32_t b = guest::LoadU8(base, p + 22);
+      const uint32_t r = FontDrawParams(base, p).red();
+      const uint32_t g = FontDrawParams(base, p).green();
+      const uint32_t b = FontDrawParams(base, p).blue();
       color = ((((r | alpha_bits) << 8) | g) << 8) | b;
       continue;
     }
     if (c > 0xFFF5 && c <= 0xFFFF) {
       // A color from the font's ten (3 bytes each at +16528).
       const uint32_t k = (0xFFFF - c) & 0xFFFF;
-      const uint32_t r = guest::LoadU8(base, font + 16528 + 3 * k);
-      const uint32_t g = guest::LoadU8(base, font + 16529 + 3 * k);
-      const uint32_t b = guest::LoadU8(base, font + (k + 5510) * 3);
+      const uint32_t colors = Font(base, font).colors_address();
+      const uint32_t r = guest::LoadU8(base, colors + 3 * k);
+      const uint32_t g = guest::LoadU8(base, colors + 1 + 3 * k);
+      const uint32_t b = guest::LoadU8(base, colors + 2 + 3 * k);
       color = ((((r | alpha_bits) << 8) | g) << 8) | b;
       continue;
     }
     if (c != ' ') {
       FontAddGlyph(base, font, c, color, x, y);
-      if (guest::LoadU32(base, Params(base, font) + 112) != 0) {
+      if (FontDrawParams(base, Params(base, font)).second_pass() != 0) {
         // The second pass's position (never in play).
         uint32_t p = Params(base, font);
-        const double sx = Lfs(base, p + 28);
-        Stfs(base, pair - 4, Single(std::fma(Lfs(base, p + 96), sx, x)));
+        const double sx = double(FontDrawParams(base, p).scale_x());
+        const double ox = double(FontDrawParams(base, p).second_offset_x());
+        Stfs(base, pair - 4, Single(std::fma(ox, sx, x)));
         p = Params(base, font);
-        const double oy = Lfs(base, p + 100);
-        Stfs(base, pair, Single(std::fma(oy, Lfs(base, p + 32), y)));
+        const double oy = double(FontDrawParams(base, p).second_offset_y());
+        Stfs(base, pair, Single(std::fma(oy, double(FontDrawParams(base, p).scale_y()), y)));
       }
       params = Params(base, font);
     }
     // x moves on by (the letter spacing + the advance) x the scale.
-    const double step = Single(Lfs(base, font + 16448) + ToSingle(advance));
-    x = Single(std::fma(step, Lfs(base, params + 28), x));
+    const double step = Single(double(Font(base, font).letter_spacing()) + ToSingle(advance));
+    x = Single(std::fma(step, double(FontDrawParams(base, params).scale_x()), x));
   }
   return true;
 }
@@ -525,7 +552,8 @@ DrawPassResult FontDrawPass(uint8_t* base, uint32_t font, uint32_t text) {
   if (FontCountGlyphs(base, font, kCounts, text) == 0) {
     return {DrawPassResult::kNothing, 0};
   }
-  const uint32_t list = guest::LoadU32(base, font + 4);
+  const schema::CommandList list_view = Font(base, font).command_list();
+  const uint32_t list = list_view.address;
   // What the original would do differently: rotated text (sub_821097F0),
   // or its command list calls printing a message (another chunk open, the
   // list full: the slots counted at most, as clipping only lowers the
@@ -533,8 +561,7 @@ DrawPassResult FontDrawPass(uint8_t* base, uint32_t font, uint32_t text) {
   if (FontRotated(base, font)) {
     return {DrawPassResult::kOriginal, 0};
   }
-  if (guest::LoadU8(base, list + 52) == 0 &&
-      guest::LoadU32(base, command_list::kOpenChunks) != 0) {
+  if (list_view.chunk_open() == 0 && schema::CommandListGlobals::open_chunks(base) != 0) {
     return {DrawPassResult::kOriginal, 0};
   }
   uint64_t slots = 19 + 3;
@@ -544,7 +571,7 @@ DrawPassResult FontDrawPass(uint8_t* base, uint32_t font, uint32_t text) {
       slots += 1 + ((vertices * 24 + 15) >> 4) + 4;
     }
   }
-  if (uint64_t(guest::LoadU32(base, list + 12)) + slots >= guest::LoadU32(base, list + 8)) {
+  if (uint64_t(list_view.used()) + slots >= list_view.capacity()) {
     return {DrawPassResult::kOriginal, 0};
   }
   ITC_NATIVE_RUNNING("sub_82109EF0 Font::DrawPass");
@@ -563,14 +590,14 @@ DrawPassResult FontDrawPass(uint8_t* base, uint32_t font, uint32_t text) {
     guest::StoreU32(base, at + 4, b);
   };
   const uint32_t chunk = slot();
-  guest::StoreU32(base, kChunk, chunk);
+  G::set_chunk(base, chunk);
   guest::StoreU16(base, chunk + 2, 5);
   guest::StoreU32(base, chunk + 4, 0);
   command(4, 1);  // SetTexture: sampler 0, the page's texture
   {
     const uint32_t at = slot();
     guest::StoreU32(base, at + 0, 0);
-    guest::StoreU32(base, at + 4, guest::LoadU32(base, guest::LoadU32(base, font + 36) + 12));
+    guest::StoreU32(base, at + 4, Font(base, font).page().texture().address);
   }
   command(1, 5);  // SetRenderState x 5
   pair(60, 1);    // blend enable
@@ -579,8 +606,9 @@ DrawPassResult FontDrawPass(uint8_t* base, uint32_t font, uint32_t text) {
   pair(304, 0);   // viewport transform off
   pair(56, 0);    // cull mode
   const uint32_t params = Params(base, font);
-  if (guest::LoadU32(base, params + 44) == 0 && guest::LoadU32(base, params + 48) == 0 &&
-      guest::LoadU32(base, params + 52) == 0 && guest::LoadU32(base, params + 56) == 0) {
+  if (FontDrawParams(base, params).clip_x() == 0 && FontDrawParams(base, params).clip_y() == 0 &&
+      FontDrawParams(base, params).clip_width() == 0 &&
+      FontDrawParams(base, params).clip_height() == 0) {
     command(1, 1);
     pair(200, 0);  // scissor off
   } else {
@@ -588,7 +616,9 @@ DrawPassResult FontDrawPass(uint8_t* base, uint32_t font, uint32_t text) {
     const uint32_t at = slot();
     for (uint32_t k = 0; k < 4; k++) {
       guest::StoreU16(base, at + 2 * k,
-                      uint16_t(guest::LoadU32(base, Params(base, font) + 44 + 4 * k)));
+                      uint16_t(guest::LoadU32(
+                          base,
+                          FontDrawParams(base, Params(base, font)).clip_x_address() + 4 * k)));
     }
   }
   {
@@ -607,9 +637,9 @@ DrawPassResult FontDrawPass(uint8_t* base, uint32_t font, uint32_t text) {
   triple(0, 20, 1);  // min filter 1
   triple(0, 16, 1);  // mag filter 1
   command(10, 1);    // SetVertexDeclaration
-  guest::StoreU32(base, slot() + 0, guest::LoadU32(base, font + 16560));
+  guest::StoreU32(base, slot() + 0, Font(base, font).vertex_declaration<schema::View>().address);
   command(8, 1);     // SetVertexShader
-  guest::StoreU32(base, slot() + 0, guest::LoadU32(base, font + 16564));
+  guest::StoreU32(base, slot() + 0, Font(base, font).vertex_shader<schema::View>().address);
   for (uint32_t i = 0; i < 4; i++) {
     const uint32_t vertices = guest::LoadU32(base, kCounts + 4 * i) * 6;
     uint32_t start = 0;
@@ -630,7 +660,8 @@ DrawPassResult FontDrawPass(uint8_t* base, uint32_t font, uint32_t text) {
       continue;
     }
     command(9, 1);  // SetPixelShader: the channel's
-    guest::StoreU32(base, slot() + 0, guest::LoadU32(base, font + 16568 + 4 * i));
+    guest::StoreU32(base, slot() + 0,
+                    guest::LoadU32(base, Font(base, font).pixel_shaders_address() + 4 * i));
     command(19, 1);  // DrawPrimitiveUP: a triangle list, 24-byte vertices
     const uint32_t at = slot();
     guest::StoreU32(base, at + 0, 4);
@@ -642,19 +673,19 @@ DrawPassResult FontDrawPass(uint8_t* base, uint32_t font, uint32_t text) {
   pair(304, 1);   // viewport transform back on
   command(36, 0);
   command_list::CloseChunk(base, list);
-  return {DrawPassResult::kRecorded, guest::LoadU32(base, kChunk)};
+  return {DrawPassResult::kRecorded, G::chunk(base)};
 }
 
 void FontDrawSetUp(uint8_t* base, uint32_t font, uint32_t params) {
   ITC_NATIVE_RUNNING("sub_8210A400 Font::Draw");
   FontSetParams(base, font, params);
-  const uint32_t page = guest::LoadU32(base, Params(base, font) + 60);
-  guest::StoreU32(base, font + 36, guest::LoadU32(base, font + ((page + 5) << 2)));
+  const uint32_t page = FontDrawParams(base, Params(base, font)).page();
+  Font(base, font).set_page(guest::LoadU32(base, Font(base, font).pages_address() + (page << 2)));
 }
 
 uint32_t TextDrawSetUp(uint8_t* base, uint32_t params) {
   ITC_NATIVE_RUNNING("sub_8210A758 Text::Draw");
-  const uint32_t font = guest::LoadU32(base, kFont);
+  const uint32_t font = G::font(base).address;
   FontDrawSetUp(base, font, params);
   return font;
 }

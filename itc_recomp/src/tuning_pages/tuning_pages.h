@@ -14,9 +14,30 @@
 #include <functional>
 #include <optional>
 
+#include "guest.h"
+#include "schema/tuning_pages.h"
+#include "schema/ui_movies_game.h"
 #include "tuning_screen/tuning_screen.h"
 
 namespace tuning_pages {
+
+// --- The schema's views (schema/tuning_pages.h) at their indexes ---
+
+// The decal images' entry i (DecalImages' +36i; the address math in 32 bits
+// as the originals').
+inline schema::DecalImageEntry DecalEntryAt(uint8_t* base, uint64_t images, uint64_t i) {
+  return schema::DecalImageEntry(base, uint32_t(i * 36 + images));
+}
+// The decal images' kept texture k (+7236 + 8k).
+inline schema::DecalImageKept DecalKeptAt(uint8_t* base, uint64_t images, uint32_t k) {
+  return schema::DecalImageKept(base,
+                                schema::DecalImages(base, uint32_t(images)).kept_address() + 8 * k);
+}
+// UI movie `movie`'s texture n: [[movie + 28] + 4n] (both loads, in order).
+inline schema::UiMovieTexture MovieTexture(uint8_t* base, uint32_t movie, uint32_t n) {
+  const schema::UiMovieTextureTable table(base, schema::UiMovie(base, movie).textures());
+  return schema::UiMovieTexture(base, guest::LoadU32(base, table.slots_address() + n * 4));
+}
 
 // --- The pages' counts and the owned flags (tables.cpp): leaves, no frame ---
 

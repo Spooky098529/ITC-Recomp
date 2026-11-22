@@ -7,6 +7,7 @@
 
 #include "base/log.h"
 #include "matrix_math/matrix_math.h"
+#include "schema/car_physics.h"
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -24,30 +25,30 @@ void RigidBodyUpdateOrigin(uint8_t* base, uint32_t body, uint32_t frame) {
   const uint32_t f = frame;
   // +16 = the fourth row of +224, w 0.0.
   CopyWord(base, kZero, f + 92);
-  CopyWord(base, body + 272, f + 80);
-  CopyWord(base, body + 276, f + 84);
-  CopyWord(base, body + 280, f + 88);
-  vl::Vec4Copy(base, body + 16, f + 80);
+  CopyWord(base, schema::RigidBody(base, body).orientation_matrix_address() + 48, f + 80);
+  CopyWord(base, schema::RigidBody(base, body).orientation_matrix_address() + 52, f + 84);
+  CopyWord(base, schema::RigidBody(base, body).orientation_matrix_address() + 56, f + 88);
+  vl::Vec4Copy(base, schema::RigidBody(base, body).center_of_mass_address(), f + 80);
   // +208 = +16 - +192 rotated by +224.
-  vl::MatrixRotate(base, f + 112, body + 224, body + 192);
-  vl::Vec3Difference(base, f + 128, body + 16, f + 112);
-  vl::Vec4Copy(base, body + 208, f + 128);
+  vl::MatrixRotate(base, f + 112, schema::RigidBody(base, body).orientation_matrix_address(), schema::RigidBody(base, body).center_of_mass_offset_address());
+  vl::Vec3Difference(base, f + 128, schema::RigidBody(base, body).center_of_mass_address(), f + 112);
+  vl::Vec4Copy(base, schema::RigidBody(base, body).origin_address(), f + 128);
   // The body matrix's fourth row = +208, w 1.0.
   CopyWord(base, kOne, f + 108);
-  CopyWord(base, body + 208, f + 96);
-  CopyWord(base, body + 212, f + 100);
-  CopyWord(base, body + 216, f + 104);
-  vl::Vec4Copy(base, body + 336, f + 96);
+  CopyWord(base, schema::RigidBody(base, body).origin_address(), f + 96);
+  CopyWord(base, schema::RigidBody(base, body).origin_address() + 4, f + 100);
+  CopyWord(base, schema::RigidBody(base, body).origin_address() + 8, f + 104);
+  vl::Vec4Copy(base, schema::RigidBody(base, body).matrix_address() + 48, f + 96);
 }
 
 uint32_t RigidBodyUpdateVelocity(uint8_t* base, uint32_t body, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820B70C8 RigidBody::UpdateVelocity");
   const uint32_t f = frame;
   // +32 = the momentum x the inverse mass.
-  vl::Vec4Scaled(base, f + 96, body + 176, Lfs(base, body + 8));
-  vl::Vec4Copy(base, body + 32, f + 96);
-  const double speed = double(vl::Vec3Length(base, body + 32));
-  Stfs(base, body + 160, speed);
+  vl::Vec4Scaled(base, f + 96, schema::RigidBody(base, body).momentum_address(), double(schema::RigidBody(base, body).inverse_mass()));
+  vl::Vec4Copy(base, schema::RigidBody(base, body).velocity_address(), f + 96);
+  const double speed = double(vl::Vec3Length(base, schema::RigidBody(base, body).velocity_address()));
+  schema::RigidBody(base, body).set_speed(float(speed));
   // +144 = the direction, (1, 0, 0, 0) when still.
   uint32_t direction;
   if (speed == Lfs(base, kZero)) {
@@ -58,37 +59,37 @@ uint32_t RigidBodyUpdateVelocity(uint8_t* base, uint32_t body, uint32_t frame) {
     direction = f + 80;
   } else {
     const double one = Lfs(base, kOne);
-    vl::Vec4Scaled(base, f + 96, body + 32, Fdivs(one, speed));
+    vl::Vec4Scaled(base, f + 96, schema::RigidBody(base, body).velocity_address(), Fdivs(one, speed));
     direction = f + 96;
   }
-  vl::Vec4Copy(base, body + 144, direction);
+  vl::Vec4Copy(base, schema::RigidBody(base, body).velocity_direction_address(), direction);
   // Above the speed cap: the velocity and momentum scaled down to it.
-  const double cap = Lfs(base, body + 48);
-  if (!(Lfs(base, body + 160) > cap)) {
-    return body + 144;
+  const double cap = double(schema::RigidBody(base, body).speed_cap());
+  if (!(double(schema::RigidBody(base, body).speed()) > cap)) {
+    return schema::RigidBody(base, body).velocity_direction_address();
   }
-  vl::Vec4ScaledFrom(base, f + 96, body + 144, cap);
-  vl::Vec4Copy(base, body + 32, f + 96);
-  vl::Vec4Scaled(base, f + 96, body + 32, Lfs(base, body + 4));
-  vl::Vec4Copy(base, body + 176, f + 96);
-  CopyWord(base, body + 48, body + 160);
-  return body + 176;
+  vl::Vec4ScaledFrom(base, f + 96, schema::RigidBody(base, body).velocity_direction_address(), cap);
+  vl::Vec4Copy(base, schema::RigidBody(base, body).velocity_address(), f + 96);
+  vl::Vec4Scaled(base, f + 96, schema::RigidBody(base, body).velocity_address(), double(schema::RigidBody(base, body).mass()));
+  vl::Vec4Copy(base, schema::RigidBody(base, body).momentum_address(), f + 96);
+  CopyWord(base, schema::RigidBody(base, body).speed_cap_address(), schema::RigidBody(base, body).speed_address());
+  return schema::RigidBody(base, body).momentum_address();
 }
 
 double RigidBodyUpdateAngularVelocity(uint8_t* base, uint32_t body, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820B7478 RigidBody::UpdateAngularVelocity");
   const uint32_t f = frame;
-  vl::MatrixRotate(base, f + 80, body + 416, body + 400);
-  vl::Vec4Copy(base, body + 96, f + 80);
-  const double spin2 = double(vl::Vec3Dot(base, body + 96, body + 96));
-  const double cap = Lfs(base, body + 112);
+  vl::MatrixRotate(base, f + 80, schema::RigidBody(base, body).world_inverse_inertia_address(), schema::RigidBody(base, body).angular_momentum_address());
+  vl::Vec4Copy(base, schema::RigidBody(base, body).angular_velocity_address(), f + 80);
+  const double spin2 = double(vl::Vec3Dot(base, schema::RigidBody(base, body).angular_velocity_address(), schema::RigidBody(base, body).angular_velocity_address()));
+  const double cap = double(schema::RigidBody(base, body).spin_cap());
   if (!(spin2 > Fmuls(cap, cap))) {
     return spin2;
   }
   const double spin = double(vl::Sqrtf(spin2));
-  const double scale = Fdivs(Lfs(base, body + 112), spin);
-  vl::Vec4ScaleBy(base, body + 400, scale);
-  vl::Vec4ScaleBy(base, body + 96, scale);
+  const double scale = Fdivs(double(schema::RigidBody(base, body).spin_cap()), spin);
+  vl::Vec4ScaleBy(base, schema::RigidBody(base, body).angular_momentum_address(), scale);
+  vl::Vec4ScaleBy(base, schema::RigidBody(base, body).angular_velocity_address(), scale);
   return scale;
 }
 
@@ -100,22 +101,22 @@ void RigidBodyUpdateOrientation(uint8_t* base, uint32_t body, uint32_t frame) {
   mm::SetIdentity(base, f + 80);
   mm::SetIdentity(base, f + 208);
   mm::SetIdentity(base, f + 144);
-  mm::FromQuaternion(base, body + 224, body + 80);
-  vl::Vec4Copy(base, body + 288, body + 224);
-  vl::Vec4Copy(base, body + 304, body + 240);
-  vl::Vec4Copy(base, body + 320, body + 256);
-  CopyWord(base, body + 368, f + 144);
-  CopyWord(base, body + 372, f + 164);
-  const uint32_t m00 = guest::LoadU32(base, body + 224);
-  const uint32_t m01 = guest::LoadU32(base, body + 228);
-  const uint32_t m02 = guest::LoadU32(base, body + 232);
-  const uint32_t m11 = guest::LoadU32(base, body + 244);
-  const uint32_t m12 = guest::LoadU32(base, body + 248);
-  const uint32_t m21 = guest::LoadU32(base, body + 260);
-  const uint32_t m22 = guest::LoadU32(base, body + 264);
-  const uint32_t i2 = guest::LoadU32(base, body + 376);
-  const uint32_t m10 = guest::LoadU32(base, body + 240);
-  const uint32_t m20 = guest::LoadU32(base, body + 256);
+  mm::FromQuaternion(base, schema::RigidBody(base, body).orientation_matrix_address(), schema::RigidBody(base, body).orientation_address());
+  vl::Vec4Copy(base, schema::RigidBody(base, body).matrix_address(), schema::RigidBody(base, body).orientation_matrix_address());
+  vl::Vec4Copy(base, schema::RigidBody(base, body).matrix_address() + 16, schema::RigidBody(base, body).orientation_matrix_address() + 16);
+  vl::Vec4Copy(base, schema::RigidBody(base, body).matrix_address() + 32, schema::RigidBody(base, body).orientation_matrix_address() + 32);
+  CopyWord(base, schema::RigidBody(base, body).inverse_inertia_address(), f + 144);
+  CopyWord(base, schema::RigidBody(base, body).inverse_inertia_address() + 4, f + 164);
+  const uint32_t m00 = guest::LoadU32(base, schema::RigidBody(base, body).orientation_matrix_address());
+  const uint32_t m01 = guest::LoadU32(base, schema::RigidBody(base, body).orientation_matrix_address() + 4);
+  const uint32_t m02 = guest::LoadU32(base, schema::RigidBody(base, body).orientation_matrix_address() + 8);
+  const uint32_t m11 = guest::LoadU32(base, schema::RigidBody(base, body).orientation_matrix_address() + 20);
+  const uint32_t m12 = guest::LoadU32(base, schema::RigidBody(base, body).orientation_matrix_address() + 24);
+  const uint32_t m21 = guest::LoadU32(base, schema::RigidBody(base, body).orientation_matrix_address() + 36);
+  const uint32_t m22 = guest::LoadU32(base, schema::RigidBody(base, body).orientation_matrix_address() + 40);
+  const uint32_t i2 = guest::LoadU32(base, schema::RigidBody(base, body).inverse_inertia_address() + 8);
+  const uint32_t m10 = guest::LoadU32(base, schema::RigidBody(base, body).orientation_matrix_address() + 16);
+  const uint32_t m20 = guest::LoadU32(base, schema::RigidBody(base, body).orientation_matrix_address() + 32);
   const uint32_t zero = guest::LoadU32(base, kZero);
   const uint32_t one = guest::LoadU32(base, kOne);
   for (uint32_t at : {92u, 108u, 124u, 128u, 132u, 136u}) {
@@ -155,8 +156,8 @@ void RigidBodyUpdateOrientation(uint8_t* base, uint32_t body, uint32_t frame) {
   guest::StoreU32(base, f + 244, m12);
   guest::StoreU32(base, f + 248, m22);
   // +416 = R^T (diag R).
-  mm::MultiplyReversed(base, body + 416, f + 80, f + 144);
-  mm::MultiplyReversed(base, body + 416, body + 416, f + 208);
+  mm::MultiplyReversed(base, schema::RigidBody(base, body).world_inverse_inertia_address(), f + 80, f + 144);
+  mm::MultiplyReversed(base, schema::RigidBody(base, body).world_inverse_inertia_address(), schema::RigidBody(base, body).world_inverse_inertia_address(), f + 208);
 }
 
 void RigidBodySetOrientation(uint8_t* base, uint32_t body, uint32_t quaternion, uint32_t frame) {
@@ -165,10 +166,10 @@ void RigidBodySetOrientation(uint8_t* base, uint32_t body, uint32_t quaternion, 
   for (uint32_t at : {0u, 8u}) {
     const uint32_t hi = guest::LoadU32(base, quaternion + at);
     const uint32_t lo = guest::LoadU32(base, quaternion + at + 4);
-    guest::StoreU32(base, body + 80 + at, hi);
-    guest::StoreU32(base, body + 84 + at, lo);
+    guest::StoreU32(base, schema::RigidBody(base, body).orientation_address() + at, hi);
+    guest::StoreU32(base, schema::RigidBody(base, body).orientation_address() + 4 + at, lo);
   }
-  mm::QuaternionNormalizeSelf(base, body + 80);
+  mm::QuaternionNormalizeSelf(base, schema::RigidBody(base, body).orientation_address());
   RigidBodyUpdateOrientation(base, body, frame - 320);
   RigidBodyUpdateOrigin(base, body, frame - 176);
 }
@@ -176,7 +177,7 @@ void RigidBodySetOrientation(uint8_t* base, uint32_t body, uint32_t quaternion, 
 void RigidBodySetCenterOfMassPosition(uint8_t* base, uint32_t body, uint32_t point,
                                       uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820B71B0 RigidBody::SetCenterOfMassPosition");
-  vl::MatrixSetTranslation(base, body + 224, point);
+  vl::MatrixSetTranslation(base, schema::RigidBody(base, body).orientation_matrix_address(), point);
   RigidBodyUpdateOrigin(base, body, frame - 176);
 }
 
@@ -185,32 +186,32 @@ void RigidBodySetPosition(uint8_t* base, uint32_t body, uint32_t position, uint3
   const uint32_t f = frame;
   const uint32_t zero = guest::LoadU32(base, kZero);
   guest::StoreU32(base, f + 124, zero);
-  vl::MatrixSetTranslation(base, body + 288, position);
+  vl::MatrixSetTranslation(base, schema::RigidBody(base, body).matrix_address(), position);
   // +208 = the body matrix's translation, w 0.0.
-  CopyWord(base, body + 336, f + 80);
-  CopyWord(base, body + 340, f + 84);
-  const uint32_t z = guest::LoadU32(base, body + 344);
+  CopyWord(base, schema::RigidBody(base, body).matrix_address() + 48, f + 80);
+  CopyWord(base, schema::RigidBody(base, body).matrix_address() + 52, f + 84);
+  const uint32_t z = guest::LoadU32(base, schema::RigidBody(base, body).matrix_address() + 56);
   guest::StoreU32(base, f + 92, zero);
   guest::StoreU32(base, f + 88, z);
-  vl::Vec4Copy(base, body + 208, f + 80);
+  vl::Vec4Copy(base, schema::RigidBody(base, body).origin_address(), f + 80);
   // +224's fourth row = the position + the offset rotated by +224.
-  vl::MatrixRotate(base, f + 128, body + 224, body + 192);
+  vl::MatrixRotate(base, f + 128, schema::RigidBody(base, body).orientation_matrix_address(), schema::RigidBody(base, body).center_of_mass_offset_address());
   vl::Vec4Copy(base, f + 112, f + 128);
   vl::Vec3Sum(base, f + 128, position, f + 112);
-  vl::MatrixSetTranslation(base, body + 224, f + 128);
+  vl::MatrixSetTranslation(base, schema::RigidBody(base, body).orientation_matrix_address(), f + 128);
   // +16 = that, w 0.0.
-  CopyWord(base, body + 272, f + 96);
-  CopyWord(base, body + 276, f + 100);
-  const uint32_t z2 = guest::LoadU32(base, body + 280);
+  CopyWord(base, schema::RigidBody(base, body).orientation_matrix_address() + 48, f + 96);
+  CopyWord(base, schema::RigidBody(base, body).orientation_matrix_address() + 52, f + 100);
+  const uint32_t z2 = guest::LoadU32(base, schema::RigidBody(base, body).orientation_matrix_address() + 56);
   guest::StoreU32(base, f + 108, zero);
   guest::StoreU32(base, f + 104, z2);
-  vl::Vec4Copy(base, body + 16, f + 96);
+  vl::Vec4Copy(base, schema::RigidBody(base, body).center_of_mass_address(), f + 96);
 }
 
 uint32_t RigidBodySetVelocity(uint8_t* base, uint32_t body, uint32_t velocity, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820B7238 RigidBody::SetVelocity");
-  vl::Vec4Scaled(base, frame + 80, velocity, Lfs(base, body + 4));
-  vl::Vec4Copy(base, body + 176, frame + 80);
+  vl::Vec4Scaled(base, frame + 80, velocity, double(schema::RigidBody(base, body).mass()));
+  vl::Vec4Copy(base, schema::RigidBody(base, body).momentum_address(), frame + 80);
   return RigidBodyUpdateVelocity(base, body, frame - 160);
 }
 
@@ -222,103 +223,103 @@ double RigidBodySetAngularVelocity(uint8_t* base, uint32_t body, uint32_t veloci
   guest::StoreU32(base, f + 92, zero);
   guest::StoreU32(base, f + 108, zero);
   // The velocity in the body's axes, times the inertia, back to the world.
-  mm::InverseRotate(base, f + 112, body + 224, velocity);
+  mm::InverseRotate(base, f + 112, schema::RigidBody(base, body).orientation_matrix_address(), velocity);
   vl::Vec4Copy(base, f + 80, f + 112);
   {
-    const double i0 = Lfs(base, body + 352);
+    const double i0 = Lfs(base, schema::RigidBody(base, body).inertia_address());
     const double v0 = Lfs(base, f + 80);
     Stfs(base, f + 96, Fmuls(i0, v0));
   }
   {
-    const double i1 = Lfs(base, body + 356);
+    const double i1 = Lfs(base, schema::RigidBody(base, body).inertia_address() + 4);
     const double v1 = Lfs(base, f + 84);
     Stfs(base, f + 100, Fmuls(i1, v1));
   }
   {
-    const double i2 = Lfs(base, body + 360);
+    const double i2 = Lfs(base, schema::RigidBody(base, body).inertia_address() + 8);
     const double v2 = Lfs(base, f + 88);
     Stfs(base, f + 104, Fmuls(i2, v2));
   }
-  vl::MatrixRotate(base, f + 112, body + 224, f + 96);
-  vl::Vec4Copy(base, body + 400, f + 112);
+  vl::MatrixRotate(base, f + 112, schema::RigidBody(base, body).orientation_matrix_address(), f + 96);
+  vl::Vec4Copy(base, schema::RigidBody(base, body).angular_momentum_address(), f + 112);
   return RigidBodyUpdateAngularVelocity(base, body, f - 144);
 }
 
 void RigidBodySetInertia(uint8_t* base, uint32_t body, uint32_t inertia, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820B7280 RigidBody::SetInertia");
-  CopyWord(base, inertia + 0, body + 352);
-  CopyWord(base, inertia + 4, body + 356);
-  CopyWord(base, inertia + 8, body + 360);
+  CopyWord(base, schema::PhysicsVector(base, inertia).x_address(), schema::RigidBody(base, body).inertia_address());
+  CopyWord(base, schema::PhysicsVector(base, inertia).y_address(), schema::RigidBody(base, body).inertia_address() + 4);
+  CopyWord(base, schema::PhysicsVector(base, inertia).z_address(), schema::RigidBody(base, body).inertia_address() + 8);
   const double one = Lfs(base, kOne);
-  const double x = Lfs(base, body + 352);
-  const double y = Lfs(base, body + 356);
+  const double x = Lfs(base, schema::RigidBody(base, body).inertia_address());
+  const double y = Lfs(base, schema::RigidBody(base, body).inertia_address() + 4);
   const double rx = Fdivs(one, x);
-  const double z = Lfs(base, body + 360);
+  const double z = Lfs(base, schema::RigidBody(base, body).inertia_address() + 8);
   const double ry = Fdivs(one, y);
   const double rz = Fdivs(one, z);
-  Stfs(base, body + 368, rx);
-  Stfs(base, body + 372, ry);
-  Stfs(base, body + 376, rz);
+  Stfs(base, schema::RigidBody(base, body).inverse_inertia_address(), rx);
+  Stfs(base, schema::RigidBody(base, body).inverse_inertia_address() + 4, ry);
+  Stfs(base, schema::RigidBody(base, body).inverse_inertia_address() + 8, rz);
   RigidBodyUpdateOrientation(base, body, frame);
 }
 
 uint32_t RigidBodyApplyImpulses(uint8_t* base, uint32_t body, double dt, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820B75B8 RigidBody::ApplyImpulses");
-  if (guest::LoadU8(base, body) != 0) {
+  if (schema::RigidBody(base, body).fixed() != 0) {
     return body;
   }
   const uint32_t f = frame;
-  vl::Vec4Scaled(base, f + 80, body + 128, dt);
-  vl::Vec3AddTo(base, body + 400, f + 80);
-  vl::Vec4Copy(base, body + 128, kZeroVector);
+  vl::Vec4Scaled(base, f + 80, schema::RigidBody(base, body).torque_address(), dt);
+  vl::Vec3AddTo(base, schema::RigidBody(base, body).angular_momentum_address(), f + 80);
+  vl::Vec4Copy(base, schema::RigidBody(base, body).torque_address(), kZeroVector);
   RigidBodyUpdateAngularVelocity(base, body, f - 144);
-  vl::Vec4Scaled(base, f + 80, body + 64, dt);
-  vl::Vec3AddTo(base, body + 176, f + 80);
-  vl::Vec4Copy(base, body + 64, kZeroVector);
+  vl::Vec4Scaled(base, f + 80, schema::RigidBody(base, body).force_address(), dt);
+  vl::Vec3AddTo(base, schema::RigidBody(base, body).momentum_address(), f + 80);
+  vl::Vec4Copy(base, schema::RigidBody(base, body).force_address(), kZeroVector);
   return RigidBodyUpdateVelocity(base, body, f - 160);
 }
 
 uint32_t RigidBodyIntegrate(uint8_t* base, uint32_t body, double dt, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820B7658 RigidBody::Integrate");
-  if (guest::LoadU8(base, body) != 0) {
+  if (schema::RigidBody(base, body).fixed() != 0) {
     return body;
   }
   const uint32_t f = frame;
   // The torque into the angular momentum, damped.
-  vl::Vec4Scaled(base, f + 80, body + 128, dt);
-  vl::Vec3AddTo(base, body + 400, f + 80);
-  const double angular_damping = Lfs(base, body + 384);
+  vl::Vec4Scaled(base, f + 80, schema::RigidBody(base, body).torque_address(), dt);
+  vl::Vec3AddTo(base, schema::RigidBody(base, body).angular_momentum_address(), f + 80);
+  const double angular_damping = double(schema::RigidBody(base, body).angular_damping());
   const double zero = Lfs(base, kZero);
   const double one = Lfs(base, kOne);
   if (angular_damping > zero) {
-    vl::Vec4ScaleBy(base, body + 400, Fnmsubs(angular_damping, dt, one));
+    vl::Vec4ScaleBy(base, schema::RigidBody(base, body).angular_momentum_address(), Fnmsubs(angular_damping, dt, one));
   }
-  vl::Vec4Copy(base, body + 128, kZeroVector);
+  vl::Vec4Copy(base, schema::RigidBody(base, body).torque_address(), kZeroVector);
   RigidBodyUpdateAngularVelocity(base, body, f - 144);
   // The orientation turned by the spin over dt.
-  const double spin = double(vl::Vec3Length(base, body + 96));
+  const double spin = double(vl::Vec3Length(base, schema::RigidBody(base, body).angular_velocity_address()));
   if (spin > zero) {
-    vl::Vec4Scaled(base, f + 80, body + 96, Fdivs(one, spin));
+    vl::Vec4Scaled(base, f + 80, schema::RigidBody(base, body).angular_velocity_address(), Fdivs(one, spin));
     mm::QuaternionFromAxisAngle(base, f + 96, f + 80, Fmuls(spin, dt), f - 32);
-    mm::QuaternionMultiply(base, f + 112, f + 96, body + 80);
+    mm::QuaternionMultiply(base, f + 112, f + 96, schema::RigidBody(base, body).orientation_address());
     RigidBodySetOrientation(base, body, f + 112, f - 96);
     RigidBodyUpdateOrientation(base, body, f - 320);
   }
   // Gravity into the force, the force into the momentum, damped.
-  vl::Vec3AddTo(base, body + 64, body + 496);
-  vl::Vec4Scaled(base, f + 112, body + 64, dt);
-  vl::Vec3AddTo(base, body + 176, f + 112);
-  const double damping = Lfs(base, body + 164);
+  vl::Vec3AddTo(base, schema::RigidBody(base, body).force_address(), schema::RigidBody(base, body).weight_address());
+  vl::Vec4Scaled(base, f + 112, schema::RigidBody(base, body).force_address(), dt);
+  vl::Vec3AddTo(base, schema::RigidBody(base, body).momentum_address(), f + 112);
+  const double damping = double(schema::RigidBody(base, body).linear_damping());
   if (damping > zero) {
-    vl::Vec4ScaleBy(base, body + 176, Fnmsubs(damping, dt, one));
+    vl::Vec4ScaleBy(base, schema::RigidBody(base, body).momentum_address(), Fnmsubs(damping, dt, one));
   }
-  vl::Vec4Copy(base, body + 64, kZeroVector);
+  vl::Vec4Copy(base, schema::RigidBody(base, body).force_address(), kZeroVector);
   RigidBodyUpdateVelocity(base, body, f - 160);
   // The center of mass moved by the velocity.
-  vl::Vec4Scaled(base, f + 112, body + 32, dt);
-  vl::Vec3AddTo(base, body + 272, f + 112);
+  vl::Vec4Scaled(base, f + 112, schema::RigidBody(base, body).velocity_address(), dt);
+  vl::Vec3AddTo(base, schema::RigidBody(base, body).orientation_matrix_address() + 48, f + 112);
   RigidBodyUpdateOrigin(base, body, f - 176);
-  return body + 336;
+  return schema::RigidBody(base, body).matrix_address() + 48;
 }
 
 void RigidBodyReset(uint8_t* base, uint32_t body, uint32_t frame) {
@@ -328,18 +329,18 @@ void RigidBodyReset(uint8_t* base, uint32_t body, uint32_t frame) {
   guest::ForEachHostPart(base, body, 528, [](uint8_t* host, uint32_t, uint32_t bytes) {
     std::memset(host, 0, bytes);
   });
-  guest::StoreU8(base, body, 0);
+  schema::RigidBody(base, body).set_fixed(uint8_t(0));
   constexpr uint32_t kCap = 0x82002A90;
   constexpr uint32_t kGravity = 0x82002A8C;
   constexpr uint32_t kInertia = 0x82002A10;
   constexpr uint32_t kIdentityQuaternion = 0x826381B0;
   const uint32_t cap = guest::LoadU32(base, kCap);
-  guest::StoreU32(base, body + 48, cap);
-  vl::Vec4Copy(base, body + 64, kZeroVector);
+  guest::StoreU32(base, schema::RigidBody(base, body).speed_cap_address(), cap);
+  vl::Vec4Copy(base, schema::RigidBody(base, body).force_address(), kZeroVector);
   const uint32_t zero = guest::LoadU32(base, kZero);
-  guest::StoreU32(base, body + 164, zero);
-  guest::StoreU32(base, body + 160, zero);
-  vl::Vec4Copy(base, body + 176, kZeroVector);
+  guest::StoreU32(base, schema::RigidBody(base, body).linear_damping_address(), zero);
+  guest::StoreU32(base, schema::RigidBody(base, body).speed_address(), zero);
+  vl::Vec4Copy(base, schema::RigidBody(base, body).momentum_address(), kZeroVector);
   va::RigidBodySetMass(base, body, Lfs(base, kOne));
   guest::StoreU32(base, f + 80, zero);
   guest::StoreU32(base, f + 88, zero);
@@ -347,12 +348,12 @@ void RigidBodyReset(uint8_t* base, uint32_t body, uint32_t frame) {
   CopyWord(base, kGravity, f + 84);
   va::RigidBodySetGravity(base, body, f + 80);
   RigidBodySetVelocity(base, body, kZeroVector, f - 112);
-  guest::StoreU32(base, body + 112, cap);
-  vl::Vec4Copy(base, body + 128, kZeroVector);
-  guest::StoreU32(base, body + 384, zero);
-  vl::Vec4Copy(base, body + 192, kZeroVector);
-  vl::Vec4Copy(base, body + 400, kZeroVector);
-  mm::SetIdentity(base, body + 224);
+  guest::StoreU32(base, schema::RigidBody(base, body).spin_cap_address(), cap);
+  vl::Vec4Copy(base, schema::RigidBody(base, body).torque_address(), kZeroVector);
+  guest::StoreU32(base, schema::RigidBody(base, body).angular_damping_address(), zero);
+  vl::Vec4Copy(base, schema::RigidBody(base, body).center_of_mass_offset_address(), kZeroVector);
+  vl::Vec4Copy(base, schema::RigidBody(base, body).angular_momentum_address(), kZeroVector);
+  mm::SetIdentity(base, schema::RigidBody(base, body).orientation_matrix_address());
   guest::StoreU32(base, f + 108, zero);
   const uint32_t inertia = guest::LoadU32(base, kInertia);
   guest::StoreU32(base, f + 96, inertia);
@@ -362,20 +363,32 @@ void RigidBodyReset(uint8_t* base, uint32_t body, uint32_t frame) {
   RigidBodySetInertia(base, body, f + 96, f - 320);
   RigidBodySetOrientation(base, body, kIdentityQuaternion, f - 96);
   va::RigidBodySetCenterOfMass(base, body, kZeroVector);
-  vl::MatrixSetTranslation(base, body + 224, kZeroVector);
+  vl::MatrixSetTranslation(base, schema::RigidBody(base, body).orientation_matrix_address(), kZeroVector);
   RigidBodyUpdateOrigin(base, body, f - 176);
   RigidBodySetAngularVelocity(base, body, kZeroVector, f - 160);
-  guest::StoreU32(base, body + 12, 0);
-  guest::StoreU32(base, body + 516, 0);
+  schema::RigidBody(base, body).set_vehicle_matrix(uint32_t(0));
+  schema::RigidBody(base, body).set_flags(uint32_t(0));
 }
 
 void RigidBodyConstruct(uint8_t* base, uint32_t body, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820B7928 RigidBody::RigidBody");
   const uint32_t zero = guest::LoadU32(base, kZero);
-  for (uint32_t at : {28u, 44u, 76u, 108u, 140u, 156u, 188u, 204u, 220u, 364u, 380u, 412u, 492u,
-                      508u}) {
-    guest::StoreU32(base, body + at, zero);
-  }
+  // The vectors' w words, in the original's order.
+  const schema::RigidBody rb(base, body);
+  guest::StoreU32(base, rb.center_of_mass_address() + 12, zero);
+  guest::StoreU32(base, rb.velocity_address() + 12, zero);
+  guest::StoreU32(base, rb.force_address() + 12, zero);
+  guest::StoreU32(base, rb.angular_velocity_address() + 12, zero);
+  guest::StoreU32(base, rb.torque_address() + 12, zero);
+  guest::StoreU32(base, rb.velocity_direction_address() + 12, zero);
+  guest::StoreU32(base, rb.momentum_address() + 12, zero);
+  guest::StoreU32(base, rb.center_of_mass_offset_address() + 12, zero);
+  guest::StoreU32(base, rb.origin_address() + 12, zero);
+  guest::StoreU32(base, rb.inertia_address() + 12, zero);
+  guest::StoreU32(base, rb.inverse_inertia_address() + 12, zero);
+  guest::StoreU32(base, rb.angular_momentum_address() + 12, zero);
+  guest::StoreU32(base, rb.gravity_address() + 12, zero);
+  guest::StoreU32(base, rb.weight_address() + 12, zero);
   RigidBodyReset(base, body, frame - 176);
 }
 
@@ -387,30 +400,30 @@ namespace {
 void ScaleByInverseInertia(uint8_t* base, uint32_t body, uint32_t cross, bool first) {
   if (first) {
     const double x = Lfs(base, cross + 0);
-    const double ix = Lfs(base, body + 368);
+    const double ix = Lfs(base, schema::RigidBody(base, body).inverse_inertia_address());
     const double sx = Fmuls(x, ix);
     const double y = Lfs(base, cross + 4);
-    const double iy = Lfs(base, body + 372);
+    const double iy = Lfs(base, schema::RigidBody(base, body).inverse_inertia_address() + 4);
     const double sy = Fmuls(y, iy);
     Stfs(base, cross + 0, sx);
     Stfs(base, cross + 4, sy);
     const double z = Lfs(base, cross + 8);
-    const double iz = Lfs(base, body + 376);
+    const double iz = Lfs(base, schema::RigidBody(base, body).inverse_inertia_address() + 8);
     Stfs(base, cross + 8, Fmuls(z, iz));
     return;
   }
   {
     const double x = Lfs(base, cross + 0);
-    const double ix = Lfs(base, body + 368);
+    const double ix = Lfs(base, schema::RigidBody(base, body).inverse_inertia_address());
     Stfs(base, cross + 0, Fmuls(x, ix));
   }
   {
     const double y = Lfs(base, cross + 4);
-    const double iy = Lfs(base, body + 372);
+    const double iy = Lfs(base, schema::RigidBody(base, body).inverse_inertia_address() + 4);
     Stfs(base, cross + 4, Fmuls(y, iy));
   }
   const double z = Lfs(base, cross + 8);
-  const double iz = Lfs(base, body + 376);
+  const double iz = Lfs(base, schema::RigidBody(base, body).inverse_inertia_address() + 8);
   Stfs(base, cross + 8, Fmuls(z, iz));
 }
 
@@ -431,7 +444,7 @@ double RigidBodyEffectiveMassAt(uint8_t* base, uint32_t body, uint32_t out, uint
   }
   const double unit = Lfs(base, kOne);
   // r = point - the center of mass, at f + 160.
-  vl::Vec3Difference(base, f + 160, point, body + 16);
+  vl::Vec3Difference(base, f + 160, point, schema::RigidBody(base, body).center_of_mass_address());
   struct Axis {
     uint32_t axis, cross, scaled, sum, out;
   };
@@ -443,7 +456,7 @@ double RigidBodyEffectiveMassAt(uint8_t* base, uint32_t body, uint32_t out, uint
   double dot = 0.0;
   for (int i = 0; i < 3; i++) {
     const Axis& a = axes[i];
-    vl::Vec4Scaled(base, a.scaled, a.axis, Lfs(base, body + 8));
+    vl::Vec4Scaled(base, a.scaled, a.axis, double(schema::RigidBody(base, body).inverse_mass()));
     vl::Vec3Cross(base, a.cross, f + 160, a.axis);
     ScaleByInverseInertia(base, body, a.cross, i == 0);
     vl::Vec3Cross(base, f + 224, a.cross, f + 160);
@@ -471,17 +484,17 @@ double RigidBodyContactImpulse(uint8_t* base, uint32_t body, uint32_t point, uin
   if (r3) {
     *r3 = f + 128;
   }
-  vl::Vec3Difference(base, f + 96, point, body + 16);
+  vl::Vec3Difference(base, f + 96, point, schema::RigidBody(base, body).center_of_mass_address());
   vl::Vec3Cross(base, f + 80, f + 96, normal);
-  vl::MatrixRotate(base, f + 144, body + 416, f + 80);
+  vl::MatrixRotate(base, f + 144, schema::RigidBody(base, body).world_inverse_inertia_address(), f + 80);
   vl::Vec4Copy(base, f + 80, f + 144);
   vl::Vec3Cross(base, f + 128, f + 80, f + 96);
   const double angular = double(vl::Vec3DotOf(base, f + 128, normal));
-  const double inverse_mass = Lfs(base, body + 8);
+  const double inverse_mass = double(schema::RigidBody(base, body).inverse_mass());
   const double sum = Fadds(inverse_mass, angular);
   const double one = Lfs(base, kOne);
   const double k = Fdivs(one, sum);
-  Stfs(base, body + 512, k);
+  schema::RigidBody(base, body).set_effective_mass(float(k));
   return Fmuls(k, vn);
 }
 
@@ -535,7 +548,7 @@ bool RigidBodyContactImpulseWith(uint8_t* base, uint32_t a, uint32_t point, uint
     *r3 = f + 160;
     return true;
   }
-  if (guest::LoadU8(base, a) == 1 || guest::LoadU8(base, b) == 1) {
+  if (schema::RigidBody(base, a).fixed() == 1 || schema::RigidBody(base, b).fixed() == 1) {
     return false;
   }
   // Each body's angular term, (I^-1 (r x n)) x r: a's at f + 80, b's at

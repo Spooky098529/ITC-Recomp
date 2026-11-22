@@ -11,6 +11,10 @@
 #include "guest.h"
 #include "location_screen/internal.h"
 #include "race_event/race_event.h"
+#include "schema/career.h"
+#include "schema/race_event.h"
+#include "schema/race_hud_machine.h"
+#include "schema/race_states.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <bit>
@@ -21,8 +25,11 @@ using namespace detail;
 
 namespace {
 
-// An item's record in the save data: save + kItemRecords + 12 id.
-uint32_t Record(uint32_t save, int32_t id) { return uint32_t(id) * 12 + save + kItemRecords; }
+// An item's record in the save data (+0x199F8 + 12 id).
+schema::CareerItemRecord Record(uint8_t* base, uint32_t save, int32_t id) {
+  return schema::CareerItemRecord(
+      base, schema::SaveData(base, save).item_records_address() + uint32_t(id) * 12);
+}
 
 // Transition23 and Transition33 (with and without the fade): `lrs` the
 // return addresses of memcpy, FinishNamed and Run.
@@ -36,35 +43,36 @@ uint32_t ResultText(uint8_t* base, uint32_t sp, uint32_t step, const Calls& call
   const uint32_t movie = Movie(base, frame, kMenusMovie);
   if (guest::LoadU32(base, step) == 0) {
     const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-    const uint32_t records = guest::LoadU32(base, kRaceData) + kRacerRecords;
-    const uint32_t human = vehicle_accessors::RacerRecordsAt(base, records, 0xFFFFFFFFu);
+    const uint32_t records = schema::RaceStatesGlobals::race_data(base).results_address();
+    const schema::RacerResultsRecord human(
+        base, vehicle_accessors::RacerRecordsAt(base, records, 0xFFFFFFFFu));
     const uint32_t id =
-        guest::LoadU32(base, vehicle_accessors::RacerRecordsAt(base, records, 0) + 980);
+        schema::RacerResultsRecord(base, vehicle_accessors::RacerRecordsAt(base, records, 0))
+            .e1_item();
     Copy(base, calls, frame, lrs.copy, frame + 96, data_tables::Item(base, id), 3008);
-    const uint32_t owner =
-        guest::LoadU16(base, frame + 184) == 3 ? guest::LoadU32(base, human + 980) : id;
+    const uint32_t owner = guest::LoadU16(base, frame + 184) == 3 ? human.e1_item() : id;
     uint32_t k = 12;
-    if (int32_t(guest::LoadU32(base, human + 3924)) == 1) {
-      if (guest::LoadU16(base, Record(save, int32_t(owner)) + 2) != 1) {
+    if (int32_t(human.finish()) == 1) {
+      if (Record(base, save, int32_t(owner)).wins() != 1) {
         k = 11;
       } else {
         k = 10;
         const int32_t kind = int8_t(guest::LoadU8(base, frame + 131));
         if (kind == 3 || kind == 4 || kind == 5) {
-          guest::StoreU32(base, Screen(base) + 820, 1);
+          Screen(base).set_won_card_item(1);
         }
       }
     }
     const int32_t found = data_tables::Find20(base, id, k);
-    const uint32_t entry =
-        data_tables::Entry20(base, guest::LoadU32(base, Screen(base) + 872) + uint32_t(found));
-    const uint32_t result = guest::LoadU32(base, Screen(base) + 872) + uint32_t(found) + 5918;
-    const uint32_t text = guest::LoadU32(base, entry + 12) + 4650;
+    const schema::LocationScreenEntry20 entry(
+        base, data_tables::Entry20(base, Screen(base).entry_offset() + uint32_t(found)));
+    const uint32_t result = Screen(base).entry_offset() + uint32_t(found) + 5918;
+    const uint32_t text = entry.text() + 4650;
     SetText(base, calls, frame, movie, 4, 2, result);
     SetText(base, calls, frame, movie, 4, 1, text);
     HideNode(base, movie, 4, 0);
-    SetPictureTexture(base, movie, 6, 1, PictureA(base, guest::LoadU32(base, entry + 16)));
-    SetPictureTexture(base, movie, 6, 0, PictureB(base, guest::LoadU32(base, entry + 16)));
+    SetPictureTexture(base, movie, 6, 1, PictureA(base, entry.picture()));
+    SetPictureTexture(base, movie, 6, 0, PictureB(base, entry.picture()));
     FinishNamed(calls, frame, lrs.finish, movie, 5);
     PlayNamed(base, movie, 5);
     LoopLast(base, frame, movie);
@@ -119,14 +127,14 @@ uint32_t Transition7(uint8_t* base, uint32_t sp, uint32_t step, const Calls& cal
     const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
     constexpr uint32_t kLocations = 0x1AD20;
     Copy(base, calls, frame, 0x8222AE74, frame + 96,
-         guest::LoadU32(base, Screen(base) + 852) * 100 + save + kLocations, 100);
-    const uint32_t entry = guest::LoadU32(base, guest::LoadU32(base, kListMenu)) * 12 + frame + 96;
+         Screen(base).location_index() * 100 + save + kLocations, 100);
+    const uint32_t entry = G::list_menu(base).cursor() * 12 + frame + 96;
     const uint32_t index = guest::LoadU32(base, entry + 8);
     const uint32_t table = guest::LoadU32(base, entry + 4);
-    const uint32_t e56 = data_tables::Entry56(base, table, index);
-    const uint32_t location = guest::LoadU32(base, Screen(base) + 852);
+    const schema::CareerEntry56 e56(base, data_tables::Entry56(base, table, index));
+    const uint32_t location = Screen(base).location_index();
     guest::StoreU32(base, entry, 1);
-    const uint32_t cursor = guest::LoadU32(base, guest::LoadU32(base, kListMenu));
+    const uint32_t cursor = G::list_menu(base).cursor();
     guest::StoreU32(base, location * 100 + cursor * 12 + save + kLocations, 1);
     const uint32_t flags = ((table * 192 + index + 27614) << 2) + save;
     bool marked = false;
@@ -138,14 +146,13 @@ uint32_t Transition7(uint8_t* base, uint32_t sp, uint32_t step, const Calls& cal
       guest::StoreU16(base, save + 6076, 0);
     }
     if (marked) {
-      career::ItemFlagsSet(base, save, guest::LoadU32(base, e56 + 48),
-                           guest::LoadU32(base, e56 + 52));
+      career::ItemFlagsSet(base, save, e56.unknown_48(), e56.unknown_52());
     }
     const uint32_t text = uint32_t(KindText(table, index));
     FinishNamed(calls, frame, 0x8222AF4C, movie,
-                guest::LoadU32(base, guest::LoadU32(base, kListMenu)) + 52);
+                G::list_menu(base).cursor() + 52);
     ui_movies::Play(base, movie, 0xFFFFFFFFu, 8, 0, 0, 0, 0);
-    SetText(base, calls, frame, movie, 4, 1, guest::LoadU32(base, e56 + 12) + 4650);
+    SetText(base, calls, frame, movie, 4, 1, e56.text() + 4650);
     SetText(base, calls, frame, movie, 4, 2, text);
     HideNode(base, movie, 4, 0);
     FinishNamed(calls, frame, 0x8222AFB4, movie, 5);
@@ -156,7 +163,7 @@ uint32_t Transition7(uint8_t* base, uint32_t sp, uint32_t step, const Calls& cal
   }
   const uint32_t done = uint32_t(Run(calls, frame, 0x8222AFEC, movie)) == 0 ? 1 : 0;
   if (done != 0) {
-    HideNode(base, movie, 0xFFFFFFFFu, guest::LoadU32(base, guest::LoadU32(base, kListMenu)) + 19);
+    HideNode(base, movie, 0xFFFFFFFFu, G::list_menu(base).cursor() + 19);
     if (Required(ui_movies::HasMoreText(base, movie, 4, 2), "sub_8211D8D8") != 0) {
       ShowNode(base, movie, 4, 0);
     }
@@ -178,19 +185,18 @@ uint32_t ShowOpponentPictures(uint8_t* base, uint32_t sp, const Calls& calls) {
   for (uint32_t i = 0; i < 7; i++) {
     r3 = HideNode(base, movie, 14, i);
   }
-  for (uint32_t i = 0; i < guest::LoadU32(base, Screen(base) + 808); i++) {
+  for (uint32_t i = 0; i < Screen(base).opponent_count(); i++) {
     guest::StoreU32(base, frame + 80, i);
     const uint32_t event = guest::LoadU32(base, race_event::kEvent);
     const uint32_t item = race_event::GroupItem(
-        base, event, guest::LoadU32(base, Screen(base) + 804), guest::LoadU32(base, frame + 80));
+        base, event, Screen(base).group_kind(), guest::LoadU32(base, frame + 80));
     Copy(base, calls, frame, 0x8222B2E4, frame + 128, item, 3008);
     ShowNode(base, movie, 14, i);
     const int32_t id = int16_t(guest::LoadU16(base, frame + 128));
-    const bool won = int16_t(guest::LoadU16(base, Record(save, id) + 2)) != 0;
+    const bool won = int16_t(Record(base, save, id).wins()) != 0;
     bool owned = false;
     uint32_t texture;
-    if (!won && guest::LoadU16(base, Record(save, id) + 4) == 0 &&
-        guest::LoadU16(base, Record(save, id)) == 0) {
+    if (!won && Record(base, save, id).outcome3() == 0 && Record(base, save, id).losses() == 0) {
       texture = 0;
     } else if (!won) {
       texture = 1;
@@ -218,7 +224,7 @@ uint32_t ShowOpponentPictures(uint8_t* base, uint32_t sp, const Calls& calls) {
       if (next == -1) {
         break;
       }
-      if (guest::LoadU16(base, Record(save, next) + 2) == 0) {
+      if (Record(base, save, next).wins() == 0) {
         r3 = ui_movies::SetNodeTexture(base, ui_movies::FindNode(base, movie, 14, child), 1);
         break;
       }
@@ -237,10 +243,13 @@ uint64_t UpdateView(uint8_t* base, uint32_t sp, const Calls& calls) {
     guest::StoreU32(base, frame + offset, one);
   }
   // The third camera animation's object, by the opponent menu's cursor.
-  const uint32_t cursor = guest::LoadU32(base, guest::LoadU32(base, kOpponentMenu));
-  const uint32_t time = guest::LoadU32(base, ((cursor << 2) & 0xFFFFFFFCu) + 0x82010780);
-  const uint32_t location = guest::LoadU32(base, Screen(base) + 852);
-  const uint32_t id = guest::LoadU32(base, ((location << 4) & 0xFFFFFFF0u) + 0x82636520);
+  const uint32_t cursor = G::opponent_menu(base).cursor();
+  const uint32_t time =
+      guest::LoadU32(base, ((cursor << 2) & 0xFFFFFFFCu) + G::opponent_times_address());
+  const uint32_t location = Screen(base).location_index();
+  const uint32_t id =
+      schema::LocationScreenLocation(base, ((location << 4) & 0xFFFFFFF0u) + G::locations_address())
+          .list_anim();
   const uint32_t out = frame + 208;
   if ((frame & 0xF) != 0) {
     calls.Call(0x82150A10, frame, 0x82227EA8, out, id, time);
@@ -252,8 +261,10 @@ uint64_t UpdateView(uint8_t* base, uint32_t sp, const Calls& calls) {
   }
   // The lights' three arrays of four vectors, each moved on by one, the
   // original's loads and stores in their order.
-  constexpr uint32_t kA = 0x8296B950, kB = 0x8296B980, kC = 0x8296B9B0, kED = 0x8265ED00;
-  constexpr uint32_t k6A0 = 0x826366A0, k6B0 = 0x826366B0, k6C0 = 0x826366C0;
+  constexpr uint32_t kA = G::light_array_a_address(), kB = G::light_array_b_address(),
+                     kC = G::light_array_c_address(), kED = G::light_view_address();
+  constexpr uint32_t k6A0 = G::light_source_a_address(), k6B0 = G::light_source_b_address(),
+                     k6C0 = G::light_source_c_address();
   uint64_t w0 = Load64(base, k6B0), w1 = Load64(base, k6B0 + 8);
   Store64(base, kC + 0, w0);
   Store64(base, kC + 8, w1);
@@ -316,10 +327,10 @@ uint64_t UpdateView(uint8_t* base, uint32_t sp, const Calls& calls) {
   for (uint32_t i = 0; i < 128; i += 16) {
     const uint64_t x0 = Load64(base, frame + 80), y0 = Load64(base, frame + 96);
     const uint64_t x1 = Load64(base, frame + 88), y1 = Load64(base, frame + 104);
-    Store64(base, 0x8296BAE0 + i, x0);
-    Store64(base, 0x8296BB60 + i, y0);
-    Store64(base, 0x8296BAE0 + i + 8, x1);
-    Store64(base, 0x8296BB60 + i + 8, y1);
+    Store64(base, G::light_zeros_a_address() + i, x0);
+    Store64(base, G::light_zeros_b_address() + i, y0);
+    Store64(base, G::light_zeros_a_address() + i + 8, x1);
+    Store64(base, G::light_zeros_b_address() + i + 8, y1);
   }
   // r3 the third array's address as the original made it (li, addi: sign-extended).
   return uint64_t(int64_t(int32_t(kC)));

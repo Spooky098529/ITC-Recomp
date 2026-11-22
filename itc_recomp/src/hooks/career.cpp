@@ -3,6 +3,8 @@
 // (hooks/career.h).
 
 #include "hooks/career.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -134,7 +136,7 @@ ITC_REGS_STEP(CareerGarageInsertCar) {
     ctx.r3.u64 = destination;
     ctx.r4.u64 = car;
     ctx.r5.u64 = 1968;
-    lifted::CallFromContext(ctx, base, 0x825A7410);  // memcpy
+    lifted::Enter(ctx, base, game::memcpy_825A7410);  // memcpy
     return;
   }
   ctx.r3.u64 = destination;
@@ -201,7 +203,7 @@ void PickNextThrough(void* user, uint32_t save) {
   guest_call::InFrame(ctx, guest.base, cr::kNextDayFrame, 0x82116BA8, [&](uint32_t) {
     ctx.r3.u64 = save;
     ctx.r4.u64 = 0;
-    lifted::CallFromContext(ctx, guest.base, 0x821159B0);
+    lifted::Enter(ctx, guest.base, game::Career::PickNext);
   });
 }
 
@@ -292,7 +294,7 @@ void CopyThrough(void* user, uint32_t destination, uint32_t car) {
     ctx.r3.u64 = destination;
     ctx.r4.u64 = car;
     ctx.r5.u64 = 1968;
-    lifted::CallFromContext(ctx, guest.base, 0x825A7410);  // memcpy
+    lifted::Enter(ctx, guest.base, game::memcpy_825A7410);  // memcpy
   });
   ctx.fpscr.disableFlushMode();
 }

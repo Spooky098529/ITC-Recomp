@@ -29,17 +29,11 @@ namespace race_hud_machine {
 
 using Calls = race_hud_object::Calls;
 
-// The machine's words.
-constexpr uint32_t kState = 9604;   // the state (0 at set-up)
-constexpr uint32_t kHolder = 9608;  // the in-race screens' holder
-constexpr uint32_t kKind = 9612;    // the race kind
-constexpr uint32_t kFlag = 9616;    // set by message 30
-// The holder's: +8 bit 0 the replay bit; +16 the race HUD; +1004 the
-// alternate HUD's; the HUD's +436 (the holder's +452) the countdown running.
-constexpr uint32_t kHolderFlags = 8;
+// The machine's and the holder's words are schema::RaceHudMachine's and
+// schema::RaceScreens' (itc_recomp/schema/race-hud-machine.toml). The
+// holder's embedded objects: +16 the race HUD, +1004 the alternate HUD's.
 constexpr uint32_t kHud = 16;
 constexpr uint32_t kAltHud = 1004;
-constexpr uint32_t kCountdownRunning = 16 + 436;
 
 // The callees, by address.
 constexpr uint32_t kHudTick = 0x822153A0;          // RaceHud::Tick(r3, r4 = flag)
@@ -84,9 +78,6 @@ constexpr uint32_t kHudStartCountdown = 0x82212270;    // RaceHud::StartCountdow
 // play: the originals).
 constexpr uint32_t k656SetMode = 0x82216810;
 constexpr uint32_t k656Start = 0x822159F0;
-// The in-race screens' holder ([0x826D84F0]), which the pause's update reads
-// instead of +9608.
-constexpr uint32_t kHolderGlobal = 0x826D84F0;
 
 // --- The set-up (race_hud_machine_init.cpp) ---
 

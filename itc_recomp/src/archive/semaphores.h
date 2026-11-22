@@ -19,21 +19,25 @@
 #include <cstdint>
 #include <mutex>
 
+#include "schema/archive.h"
+
 namespace archive {
 
-constexpr uint32_t kQueueLock = 0x826BAAE0;
-constexpr uint32_t kWork = 0x826BAAB8;
-constexpr uint32_t kRequestDone = 0x826BAA68;
-constexpr uint32_t kIdle = 0x826BAA90;
-// The count's offset in the game's Semaphore.
+constexpr uint32_t kQueueLock = schema::ArchiveGlobals::queue_lock_address();
+constexpr uint32_t kWork = schema::ArchiveGlobals::work_semaphore_address();
+constexpr uint32_t kRequestDone = schema::ArchiveGlobals::request_done_semaphore_address();
+constexpr uint32_t kIdle = schema::ArchiveGlobals::idle_semaphore_address();
+// The count's offset in the game's Semaphore (schema::Semaphore::count; only
+// the harnesses, not built, still use it).
 constexpr uint32_t kSemaphoreCount = 32;
 
 // A counting semaphore whose count can be read, its count mirrored to a
-// guest word (`mirror`, 0 for none) on every change.
+// guest Semaphore's count (`semaphore`, its address; 0 for none) on every
+// change.
 class HostSemaphore {
  public:
   // Starts at 1, as Semaphore::Init (sub_825925F0) makes them.
-  explicit HostSemaphore(uint32_t mirror, int32_t count = 1);
+  explicit HostSemaphore(uint32_t semaphore, int32_t count = 1);
 
   // Semaphore::Wait (sub_82592670): waits while the count is 0 or less, then
   // takes one.
@@ -57,15 +61,15 @@ class HostSemaphore {
   std::atomic<int32_t> count_;
   std::atomic<int> waiters_{0};
   std::atomic<bool> used_{false};
-  uint32_t mirror_;
+  uint32_t semaphore_;
 };
 
 // The four.
 struct Semaphores {
-  HostSemaphore queue_lock{kQueueLock + kSemaphoreCount};
-  HostSemaphore work{kWork + kSemaphoreCount};
-  HostSemaphore request_done{kRequestDone + kSemaphoreCount};
-  HostSemaphore idle{kIdle + kSemaphoreCount};
+  HostSemaphore queue_lock{kQueueLock};
+  HostSemaphore work{kWork};
+  HostSemaphore request_done{kRequestDone};
+  HostSemaphore idle{kIdle};
 
   // The one at a guest Semaphore's address, or null.
   HostSemaphore* At(uint32_t address);

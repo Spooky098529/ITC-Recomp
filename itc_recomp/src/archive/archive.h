@@ -21,9 +21,6 @@ namespace archive {
 
 // The first id of BUILD_CRS.DAT (its own table, id - 23011).
 constexpr uint32_t kFirstCrsId = 23011;
-// The TOCs' pointers: BUILD.TOC, BUILD_CRS.TOC.
-constexpr uint32_t kBuildToc = 0x826A5120;
-constexpr uint32_t kCrsToc = 0x826A5128;
 
 // Archive::Toc (sub_8209D868): the TOC an asset id is in, [0x826A5120] below
 // 23011, else [0x826A5128].
@@ -36,19 +33,11 @@ uint32_t AssetSize(uint8_t* base, uint32_t id);
 
 // --- The request queue's list and slots ---
 
-// The request queue (a 20-byte List: +0 the vtable, +4 whether it deletes
-// its nodes, +8 the count, +12 the head, +16 the tail; nodes linked by +4).
-constexpr uint32_t kQueue = 0x826BAB08;
-// The 960 request slots (92 bytes each, ListNodes: +0 the vtable, +4 the
-// link, +8 the serial or -1 when free).
-constexpr uint32_t kSlots = 0x826A5168;
+// The request queue (schema::ArchiveList at ArchiveGlobals::queue) and its
+// 960 request slots (schema::ArchiveRequestSlot at ArchiveGlobals::slots).
 constexpr uint32_t kSlotCount = 960;
-constexpr uint32_t kSlotBytes = 92;
-// The vtables the static set-ups store.
-constexpr uint32_t kListVtable = 0x820128C8;
+// The queue's own vtable, over the list's (schema::ArchiveList::kVtable).
 constexpr uint32_t kQueueVtable = 0x82001DD4;
-constexpr uint32_t kNodeVtable = 0x82010B5C;
-constexpr uint32_t kSlotVtable = 0x82001DD8;
 // The clean-ups the static set-ups register (atexit).
 constexpr uint32_t kQueueCleanUp = 0x825DACB8;
 constexpr uint32_t kSlotsCleanUp = 0x825DAD38;
@@ -83,22 +72,16 @@ int32_t SlotsStaticInit(uint8_t* base, const c_runtime::AtexitCall& call);
 
 // --- The loose files ---
 
-// The loose files' tables: (id, path) pairs of 8 bytes, the first for the
-// walk's first 23,011 steps, the second after (as the original picks them by
-// the step, not the id); a path of 0 ends them.
-constexpr uint32_t kLooseFiles = 0x82600AC8;
-constexpr uint32_t kCrsLooseFiles = 0x82678240;
+// The loose files' tables (schema::ArchiveLooseFile, ArchiveGlobals::
+// loose_files and crs_loose_files): the first for the walk's first 23,011
+// steps, the second after (as the original picks them by the step, not the
+// id); a path of 0 ends them.
 
 // Archive::FindLooseFile (sub_8209D8D8): the path of the first entry whose id
 // is `id`, or 0 at the first entry with no path.
 uint32_t FindLooseFile(uint8_t* base, uint32_t id);
 
 // --- The loader thread's pieces ---
-
-// The staging ring's half a compressed request read into (put back by the
-// finish), and the serial of the request whose callback runs last.
-constexpr uint32_t kStagingInUse = 0x826A511C;
-constexpr uint32_t kCallbackSerial = 0x82600AA4;
 
 // A request's finish's calls into the translated code: the request's
 // callback (+48, Archive::Load's function pointer: about 20 of the loads'
@@ -161,14 +144,6 @@ uint32_t UclUnpack(uint8_t* base, uint32_t dst, uint32_t stream, uint32_t expect
                    const UclCalls& calls);
 
 // --- The queue and the loader under the four semaphores ---
-
-// The next request's serial, the flag asking the loader to signal idle once
-// the queue is drained (Archive::WaitIdle), the count picking the staging
-// ring's half and the two halves.
-constexpr uint32_t kSerial = 0x826A5104;
-constexpr uint32_t kIdleWanted = 0x826A5108;
-constexpr uint32_t kStagingCount = 0x826A5110;
-constexpr uint32_t kStagingHalves = 0x826A5114;
 
 // The 40-byte request Archive::Load builds on its stack and the queueing
 // copies to a slot's +12 (big-endian words): +0 the flags, +4 the id, +8 the

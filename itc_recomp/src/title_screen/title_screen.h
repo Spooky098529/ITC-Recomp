@@ -30,37 +30,16 @@ namespace title_screen {
 
 using Calls = race_hud_object::Calls;
 
-// The title load's block (68 bytes: +4 a tick count, +8 the transition
-// Update runs, -1 none; +12 the page Draw runs, -1 none; +16 the
-// transition's started word).
-constexpr uint32_t kLoadBlock = 0x82814E28;
-// The title screen's blocks: the page object (28 bytes), the menu list (72),
-// the title's words (68) and a front-end menu (68).
-constexpr uint32_t kPages = 0x82814E2C;
-constexpr uint32_t kList = 0x82814E30;
-constexpr uint32_t kWords = 0x82814E34;
-constexpr uint32_t kMenu = 0x82814E38;
-// How the title was entered (1 from the boot).
-constexpr uint32_t kEntered = 0x826364EC;
-// The pad blocked (two words: the system UI, probably).
-constexpr uint32_t kPadBlocked0 = 0x826C7960;
-constexpr uint32_t kPadBlocked1 = 0x826C7964;
-// The boot data's object BootData::Load gets.
-constexpr uint32_t kBootData = 0x826C5B60;
-// The fades' passes ScreenFades::FadeIn gets.
-constexpr uint32_t kFadesPasses = 0x82001BEC;
+// The title load's block ([0x82814E28]), the title screen's page object,
+// menu list, words and menu ([0x82814E2C] to [0x82814E38]), the globals and
+// the machines' words: schema/title_screen.h (TitleScreenGlobals,
+// TitleLoadBlock, TitleScreenData, Type4Machine, Type4Block).
 
 // The UI movies and their assets.
 constexpr uint32_t kLoadMovie = 46;
 constexpr uint32_t kLoadAsset = 22592;
 constexpr uint32_t kTitleMovie = 0;
 constexpr uint32_t kTitleAsset = 22558;
-
-// The machine's words.
-constexpr uint32_t kMachineState = 9604;
-constexpr uint32_t kMachineLoaded = 9608;
-constexpr uint32_t kMachineReenter = 9612;
-constexpr uint32_t kMachineDelete = 9616;
 
 // The callees by address.
 constexpr uint32_t kVirtualAlloc = 0x82295398;
@@ -80,11 +59,8 @@ constexpr uint32_t kListRelease = 0x8220BBB0;
 constexpr uint32_t kSoundPlay = 0x82175850;
 constexpr uint32_t kResetPlayer = 0x82221D00;  // TitleScreen::ResetPlayer
 
-// The sound manager and its slot 14 (IsCuePlaying), bytes into its vtable.
-constexpr uint32_t kSoundManager = 0x826C5C80;
+// The sound manager's slot 14 (IsCuePlaying), bytes into its vtable.
 constexpr uint32_t kIsCuePlayingSlot = 56;
-// The mode's system checks (four words OnResume clears).
-constexpr uint32_t kSystemChecks = 0x826BAB40;
 
 // --- The title load's machine (title_load.cpp) ---
 

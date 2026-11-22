@@ -11,12 +11,15 @@
 // from TrackZones::Create.
 
 #include "guest.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/app_start_up.h"
 #include "hooks/guest_call.h"
+#include "schema/track_zones.h"
 #include "track_zones/track_zones.h"
 #include "lifted/sdk.h"
 
@@ -50,7 +53,19 @@ using namespace track_zones;
 namespace {
 
 Position LoadPosition(uint8_t* base, uint32_t address) {
-  return {guest::LoadU16(base, address), guest::LoadU16(base, address + 2)};
+  const schema::TrackZonePosition position(base, address);
+  return {position.section(), position.slice()};
+}
+
+// RouteRange::Init's ends: the start's, then the end's.
+Position LoadStart(uint8_t* base, uint32_t address) {
+  const schema::RouteRangeEnds ends(base, address);
+  return {ends.start_section(), ends.start_slice()};
+}
+
+Position LoadEnd(uint8_t* base, uint32_t address) {
+  const schema::RouteRangeEnds ends(base, address);
+  return {ends.end_section(), ends.end_slice()};
 }
 
 }  // namespace
@@ -59,14 +74,14 @@ Position LoadPosition(uint8_t* base, uint32_t address) {
 
 ITC_TRACK_ZONES(821531C0, List16Link(base, ctx.r3.u32, int16_t(ctx.r4.u16)))
 // r4 = &the word, r5 = the position.
-ITC_TRACK_ZONES(820FE330, List64Insert(base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32),
+ITC_TRACK_ZONES(820FE330, List64Insert(base, ctx.r3.u32, schema::TrackZonesListWord(base, ctx.r4.u32).value(),
                                        ctx.r5.u32))
 
 // --- The route ranges ---
 
 // RouteRange::Init: r3 = the range (left), r4 = &(the start, the end).
-ITC_TRACK_ZONES(820FE058, RangeInit(base, ctx.r3.u32, LoadPosition(base, ctx.r4.u32),
-                                    LoadPosition(base, ctx.r4.u32 + 4)))
+ITC_TRACK_ZONES(820FE058, RangeInit(base, ctx.r3.u32, LoadStart(base, ctx.r4.u32),
+                                    LoadEnd(base, ctx.r4.u32)))
 // RouteRange::AddBranch: r3 = the range, r4 = a section; r3 = the range's
 // list of sections to take (+12), as List64::Insert leaves it.
 ITC_TRACK_ZONES(820FE8C8, RangeAddBranch(base, ctx.r3.u32, ctx.r4.u32);
@@ -116,8 +131,8 @@ void CopyRange(void* user, uint32_t to, uint32_t from, uint32_t frame) {
   guest_call::InFrame(ctx, base, 112, 0x8228BC10, [&](uint32_t) {
     ctx.r3.u64 = to;
     ctx.r4.u64 = from;
-    ctx.r5.u64 = kRangeBytes;
-    lifted::CallFromContext(ctx, base, 0x825A7410);
+    ctx.r5.u64 = schema::RouteRange::kSize;
+    lifted::Enter(ctx, base, game::memcpy_825A7410);
   });
   ctx.r1.u64 = stack;
   ctx.lr = lr;
@@ -212,8 +227,9 @@ ITC_TRACK_ZONES(8228BDD0, {
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_track_zones)) { \
     GuestCalls user{&ctx, base};                                                        \
     const SetupCalls calls{&user, CopyRange};                                           \
-    ctx.r3.u64 = ZoneSetup(base, number, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32),  \
-                           guest::LoadU32(base, ctx.r4.u32 + 4), ctx.r1.u32, calls);    \
+    const schema::TrackZoneSetupArgs args(base, ctx.r4.u32);                             \
+    ctx.r3.u64 = ZoneSetup(base, number, ctx.r3.u32, args.index(), args.vehicle(),      \
+                           ctx.r1.u32, calls);                                          \
   }
 
 ITC_ZONE_SETUP(8228BE20, 0)

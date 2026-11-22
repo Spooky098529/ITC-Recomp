@@ -24,7 +24,7 @@ uint64_t Page0(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
     f.Call(kMenuSoundPlay, 0x821A291C, 0);
     const uint64_t selection = f.Call(kMenuListSelection, 0x821A2924, List(base));
     const bool first = int32_t(uint32_t(selection)) == 0;
-    switch (int32_t(Load(base, Data(base) + 12))) {
+    switch (int32_t(Data(base).message())) {
       case 1:
       case 5:
         if (first) {
@@ -64,7 +64,7 @@ uint64_t Page0(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
     }
   }
   f.Call(kMenuListCancelled, 0x821A2AAC, List(base));
-  if (Load(base, List(base) + 24) != 0) {
+  if (G::list(base).move() != 0) {
     f.Call(kMenuSoundPlay, 0x821A2AC4, 4);
     Go(base, 0, 1, kNone);
   }
@@ -74,8 +74,8 @@ uint64_t Page0(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
 uint64_t Page1(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821A2AF8 SaveScreen::Page1");
   Fn f(base, sp, 96, calls, mode);
-  Store(base, Data(base) + 24, Load(base, Data(base) + 24) + 1);
-  if (int32_t(Load(base, Data(base) + 24)) >= 45 && int32_t(Load(base, Data(base) + 12)) == 3) {
+  Data(base).set_wait(Data(base).wait() + 1);
+  if (int32_t(Data(base).wait()) >= 45 && int32_t(Data(base).message()) == 3) {
     ToDevicePage(f, 3, 0x821A2C48);
     return f.r3;
   }
@@ -83,7 +83,7 @@ uint64_t Page1(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
     return f.r3;
   }
   f.Call(kMenuSoundPlay, 0x821A2B54, 0);
-  switch (int32_t(Load(base, Data(base) + 12))) {
+  switch (int32_t(Data(base).message())) {
     case 2:
       Go(base, 4, 2, kNone);
       break;
@@ -97,7 +97,7 @@ uint64_t Page1(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
       break;
     case 9:
       Go(base, 4, 2, kNone);
-      Store(base, Data(base) + 4, 1);
+      Data(base).set_answer(1);
       break;
     default:
       break;
@@ -114,11 +114,11 @@ uint64_t Page2(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
     Message(base, 4, 0);
     return f.r3;
   }
-  Store(base, Data(base) + 24, Load(base, Data(base) + 24) + 1);
-  if (int32_t(Load(base, Data(base) + 24)) < 90) {
+  Data(base).set_wait(Data(base).wait() + 1);
+  if (int32_t(Data(base).wait()) < 90) {
     return f.r3;
   }
-  const int32_t message = int32_t(Load(base, Data(base) + 12));
+  const int32_t message = int32_t(Data(base).message());
   if (message == 0) {
     switch (uint32_t(f.Call(kGameDataCheck, 0x821A2E34, 0))) {
       case 0:
@@ -177,15 +177,15 @@ void End(uint8_t* base, uint32_t mode, uint32_t id) {
   if (id != 0) {
     Post(base, mode, id);
   }
-  Store(base, Data(base) + 32, 9);
+  Data(base).set_next_state(9);
 }
 
 }  // namespace
 
 uint64_t Page4(uint8_t* base, uint64_t mode) {
   ITC_NATIVE_RUNNING("sub_821A4D30 SaveScreen::Page4");
-  const bool yes = int32_t(Load(base, Data(base) + 4)) == 1;
-  const int32_t type = int32_t(Load(base, kModeType));
+  const bool yes = int32_t(Data(base).answer()) == 1;
+  const int32_t type = int32_t(G::mode_type(base));
   uint32_t id = 0;
   if (type == 2) {
     id = yes ? 44 : 45;
@@ -198,14 +198,14 @@ uint64_t Page4(uint8_t* base, uint64_t mode) {
 
 uint64_t Page9(uint8_t* base, uint64_t mode) {
   ITC_NATIVE_RUNNING("sub_821A4DE0 SaveScreen::Page9");
-  const int32_t type = int32_t(Load(base, kModeType));
+  const int32_t type = int32_t(G::mode_type(base));
   End(base, uint32_t(mode), type == 2 ? 47 : type == 4 ? 14 : 0);
   return mode;
 }
 
 uint64_t Page16(uint8_t* base, uint64_t mode) {
   ITC_NATIVE_RUNNING("sub_821A4E60 SaveScreen::Page16");
-  const int32_t answer = int32_t(Load(base, Data(base) + 4));
+  const int32_t answer = int32_t(Data(base).answer());
   End(base, uint32_t(mode), answer == 1 ? 11 : answer == 2 ? 13 : answer == 3 ? 14 : 12);
   return mode;
 }

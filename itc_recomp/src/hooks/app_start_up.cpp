@@ -2,6 +2,8 @@
 // (docs/functions/app-start-up.md).
 
 #include "hooks/app_start_up.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 #include "hooks/direct_slots.h"
@@ -11,6 +13,7 @@
 #include "guest.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
+#include "schema/app_start_up.h"
 #include "strings_and_font/strings_and_font.h"
 
 #include <cstddef>
@@ -70,7 +73,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822A8980) {
             ctx.r3.u64 = to;
             ctx.r4.u64 = from;
             ctx.r5.u64 = size;
-            lifted::CallFromContext(ctx, base, 0x825A7410);  // memcpy
+            lifted::Enter(ctx, base, game::memcpy_825A7410);  // memcpy
           });
         });
     if (declaration) {
@@ -97,7 +100,7 @@ asu::MemcpyCall XNetMemcpy(lifted::Regs& ctx, uint8_t* base) {
       ctx.r3.u64 = to;
       ctx.r4.u64 = from;
       ctx.r5.u64 = size;
-      lifted::CallFromContext(ctx, base, 0x825A7410);  // memcpy
+      lifted::Enter(ctx, base, game::memcpy_825A7410);  // memcpy
     });
   };
 }
@@ -126,10 +129,11 @@ namespace {
 // [0x8266D088]'s slot 7, then that object's slot 3: the video output, with
 // the original's return addresses.
 uint32_t VideoOutput(lifted::Regs& ctx, uint8_t* base, uint32_t first, uint32_t second) {
-  ctx.r3.u64 = guest::LoadU32(base, asu::kSceneTargetApp);
+  ctx.r3.u64 = schema::AppStartUpGlobals::scene_target_app(base).address;
   ctx.lr = first;
   // Slot 7's plain C++ where it's the game's (hooks::DirectSlotCall).
-  const uint32_t slot7 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
+  const uint32_t slot7 =
+      guest::LoadU32(base, schema::AppInterface16(base, ctx.r3.u32).vtable() + 28);
   if (!hooks::DirectSlotCall(ctx, base, slot7)) {
     lifted::CallFromContext(ctx, base, slot7);
   }
@@ -224,7 +228,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209BE88) {
       ctx.r9.u64 = 0;
       ctx.r10.u64 = out;
       ctx.lr = which == 0 ? 0x8209BF18 : 0x8209C01C;
-      lifted::CallFromContext(ctx, base, 0x822B8F10);  // D3DXCompileShader (the stored shaders)
+      lifted::Enter(ctx, base, game::D3DXCompileShader);  // D3DXCompileShader (the stored shaders)
       return ctx.r3.u32;
     };
     calls.buffer_data = [&](int which, uint32_t buffer) {
@@ -243,13 +247,13 @@ ITC_NATIVE_ENTRY_ALWAYS(8209BE88) {
     calls.vertex_shader = [&](uint32_t data) {
       ctx.r3.u64 = data;
       ctx.lr = 0x8209BF84;
-      lifted::CallFromContext(ctx, base, 0x822AA018);  // VertexShader::Create
+      lifted::Enter(ctx, base, game::VertexShader::Create);  // VertexShader::Create
       return ctx.r3.u32;
     };
     calls.pixel_shader = [&](uint32_t data) {
       ctx.r3.u64 = data;
       ctx.lr = 0x8209C084;
-      lifted::CallFromContext(ctx, base, 0x822A9EE8);  // PixelShader::Create
+      lifted::Enter(ctx, base, game::PixelShader::Create);  // PixelShader::Create
       return ctx.r3.u32;
     };
     calls.memcpy_call = [&](uint32_t to, uint32_t from, uint32_t size) {
@@ -257,7 +261,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209BE88) {
         ctx.r3.u64 = to;
         ctx.r4.u64 = from;
         ctx.r5.u64 = size;
-        lifted::CallFromContext(ctx, base, 0x825A7410);  // memcpy
+        lifted::Enter(ctx, base, game::memcpy_825A7410);  // memcpy
       });
     };
     asu::BillboardsInit(base, frame, calls);
@@ -294,8 +298,9 @@ asu::FontCalls FontCallsFor(lifted::Regs& ctx, uint8_t* base, uint32_t text_fram
   };
   calls.render_object = [&ctx, base, font_frame](int which) {
     return At(ctx, font_frame, [&] {
-      const uint32_t object = VirtualCall(ctx, base, guest::LoadU32(base, asu::kRenderApp), 32,
-                                          which == 0 ? 0x82109284 : 0x821092AC);
+      const uint32_t object =
+          VirtualCall(ctx, base, schema::AppStartUpGlobals::render_app(base).address, 32,
+                      which == 0 ? 0x82109284 : 0x821092AC);
       return VirtualCall(ctx, base, object, which == 0 ? 4 : 8,
                          which == 0 ? 0x82109294 : 0x821092BC);
     });
@@ -315,7 +320,7 @@ asu::FontCalls FontCallsFor(lifted::Regs& ctx, uint8_t* base, uint32_t text_fram
       ctx.r9.u64 = 0;
       ctx.r10.u64 = out;
       ctx.lr = which == 0 ? 0x8210893C : 0x821089B8;
-      lifted::CallFromContext(ctx, base, 0x822B8F10);  // D3DXCompileShader (the stored shaders)
+      lifted::Enter(ctx, base, game::D3DXCompileShader);  // D3DXCompileShader (the stored shaders)
       return ctx.r3.u32;
     });
   };
@@ -333,7 +338,7 @@ asu::FontCalls FontCallsFor(lifted::Regs& ctx, uint8_t* base, uint32_t text_fram
     return At(ctx, shaders_frame, [&] {
       ctx.r3.u64 = data;
       ctx.lr = 0x82108954;
-      lifted::CallFromContext(ctx, base, 0x822AA018);  // VertexShader::Create
+      lifted::Enter(ctx, base, game::VertexShader::Create);  // VertexShader::Create
       return ctx.r3.u32;
     });
   };
@@ -341,7 +346,7 @@ asu::FontCalls FontCallsFor(lifted::Regs& ctx, uint8_t* base, uint32_t text_fram
     return At(ctx, shaders_frame, [&] {
       ctx.r3.u64 = data;
       ctx.lr = 0x821089D0;
-      lifted::CallFromContext(ctx, base, 0x822A9EE8);  // PixelShader::Create
+      lifted::Enter(ctx, base, game::PixelShader::Create);  // PixelShader::Create
       return ctx.r3.u32;
     });
   };
@@ -351,7 +356,7 @@ asu::FontCalls FontCallsFor(lifted::Regs& ctx, uint8_t* base, uint32_t text_fram
         ctx.r3.u64 = to;
         ctx.r4.u64 = from;
         ctx.r5.u64 = size;
-        lifted::CallFromContext(ctx, base, 0x825A7410);  // memcpy
+        lifted::Enter(ctx, base, game::memcpy_825A7410);  // memcpy
       });
       return 0u;
     });
@@ -882,7 +887,7 @@ void hooks::AppCreateSteps(lifted::Regs& ctx, uint8_t* base) {
       ctx.r3.u64 = app;
       ctx.r4.u64 = entry_r3;
       ctx.lr = 0x82094AE4;
-      lifted::CallFromContext(ctx, base, 0x82094590);  // App::App (its adapter: the harness's recorder)
+      lifted::Enter(ctx, base, game::App::Ctor);  // App::App (its adapter: the harness's recorder)
       return ctx.r3.u32;
     });
   });

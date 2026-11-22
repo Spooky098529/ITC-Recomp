@@ -1,0 +1,666 @@
+# The schema of docs/functions/sound-cues.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The sound manager's objects below it (the manager itself, AudioManager, is
+# menu-sounds.toml's): its Sounds (PlayingSound) and their emitters
+# (SoundEmitter), the bank pairs and their holders, the listener, the audio
+# engine (the manager's +16: the game's XACT and X3DAudio state), XACT's
+# engine object as far as the wrapper and XACT3CreateEngine meet it, the
+# Sounds' list, the bank vector, the delegate clone and the words the
+# manager's methods are given by address. Left out (the measure files them
+# here, but they're the manager, menu-sounds.toml's AudioManager and its
+# vtable, split by the measure): sub_82119188.r3 and its +0 (the manager and
+# its vtable's slot +92), sub_82118930.r3 (+1516, +1520) and
+# sub_82119018.r3 (+1532).
+
+# --- The Sounds and their emitters ---
+
+# A playing cue (24 bytes, Sound::Sound sub_82117348; the game's Sound class).
+[PlayingSound]
+measure = "Sound"
+measures = ["Sound.+0"]
+size = 24
+origin = "allocated"
+fields = [
+  { name = "owner", offset = 0, type = "u32", note = "the manager's +8 interface (its slot +4 GetSoundBank; +8 and +12 the 3D state and the listener)" },
+  { name = "emitter", offset = 4, type = "ptr", to = "SoundEmitter", note = "its emitter (300 bytes)" },
+  { name = "flags", offset = 8, type = "u32", note = "bytes +8 to +11 as one word (Sound::Sound's clear)" },
+  { name = "is_3d", offset = 8, type = "u8", note = "3D: X3DAudio's calculation each update (never set in play)" },
+  { name = "loop", offset = 9, type = "u8", note = "played again once stopped" },
+  { name = "was_playing", offset = 10, type = "u8" },
+  { name = "start_requested", offset = 11, type = "u8", note = "Sound::Start; cleared when Sound::Update plays the cue" },
+  { name = "handle", offset = 12, type = "u32", note = "Sound::SetHandle (only the handle list's Sounds, menu-sounds.md)" },
+  { name = "bank_index", offset = 16, type = "u32" },
+  { name = "cue_index", offset = 20, type = "u32" },
+]
+
+# A Sound's emitter (300 bytes, Emitter::Emitter sub_8259C9B0): the XACT cue,
+# an X3DAudio emitter at +8 in the 360's layout (no inner radius; car-sounds'
+# X3DAudioEmitter), its cone at +100 and azimuth at +132, then from +136 a
+# block handed to the cue with each prepare.
+[SoundEmitter]
+measure = "Emitter"
+measures = ["Emitter.+8"]
+size = 300
+origin = "allocated"
+fields = [
+  { name = "cue", offset = 0, type = "ptr", to = "EmitterCue", note = "the XACT cue (0 none)" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "cone", offset = 8, type = "u32", note = "the X3DAudio emitter's cone pointer: this emitter's +100" },
+  { name = "front_x", offset = 12, type = "f32", note = "front (0, 0, 1)" },
+  { name = "front_y", offset = 16, type = "f32" },
+  { name = "front_z", offset = 20, type = "f32" },
+  { name = "top_x", offset = 24, type = "f32", note = "top (0, 1, 0)" },
+  { name = "top_y", offset = 28, type = "f32" },
+  { name = "top_z", offset = 32, type = "f32" },
+  { name = "position_x", offset = 36, type = "f32", note = "Sound::SetPosition's (sub_8259CC80)" },
+  { name = "position_y", offset = 40, type = "f32" },
+  { name = "position_z", offset = 44, type = "f32" },
+  { name = "velocity_x", offset = 48, type = "f32" },
+  { name = "velocity_y", offset = 52, type = "f32" },
+  { name = "velocity_z", offset = 56, type = "f32" },
+  { name = "channel_count", offset = 60, type = "u32", note = "1" },
+  { name = "channel_radius", offset = 64, type = "f32", note = "0" },
+  { name = "channel_azimuths", offset = 68, type = "u32", note = "this emitter's +132" },
+  { name = "volume_curve", offset = 72, type = "u32", note = "0: the library's default" },
+  { name = "lfe_curve", offset = 76, type = "u32" },
+  { name = "lpf_direct_curve", offset = 80, type = "u32" },
+  { name = "lpf_reverb_curve", offset = 84, type = "u32" },
+  { name = "reverb_curve", offset = 88, type = "u32" },
+  { name = "curve_distance_scaler", offset = 92, type = "f32", note = "1" },
+  { name = "doppler_scaler", offset = 96, type = "f32", note = "1" },
+  { name = "cone_inner_angle", offset = 100, type = "f32", note = "the cone (0, 0, 0, 1, 0, 1, 0, 1): probably no cone" },
+  { name = "cone_outer_angle", offset = 104, type = "f32" },
+  { name = "cone_inner_volume", offset = 108, type = "f32" },
+  { name = "cone_outer_volume", offset = 112, type = "f32" },
+  { name = "cone_inner_lpf", offset = 116, type = "f32" },
+  { name = "cone_outer_lpf", offset = 120, type = "f32" },
+  { name = "cone_inner_reverb", offset = 124, type = "f32" },
+  { name = "cone_outer_reverb", offset = 128, type = "f32" },
+  { name = "azimuth", offset = 132, type = "f32", note = "the one channel's azimuth (0)" },
+  { name = "cue_properties", offset = 136, type = "bytes", count = 14, note = "the cue's GetProperties (xact.md's sub_825C5790): category, track count, priority, the first wave's index, a duration, the channel count" },
+  { name = "unknown_152", offset = 152, type = "f32", note = "1.0 (not read)" },
+  { name = "unknown_156", offset = 156, type = "f32", note = "1.0 (not read)" },
+  { name = "map_0_index", offset = 164, type = "u8", note = "six (index byte, 1.0) pairs from +164 (not read: probably an output map)" },
+  { name = "map_0_gain", offset = 168, type = "f32" },
+  { name = "map_1_index", offset = 172, type = "u8" },
+  { name = "map_1_gain", offset = 176, type = "f32" },
+  { name = "map_2_index", offset = 180, type = "u8" },
+  { name = "map_2_gain", offset = 184, type = "f32" },
+  { name = "map_3_index", offset = 188, type = "u8" },
+  { name = "map_3_gain", offset = 192, type = "f32" },
+  { name = "map_4_index", offset = 196, type = "u8" },
+  { name = "map_4_gain", offset = 200, type = "f32" },
+  { name = "map_5_index", offset = 204, type = "u8" },
+  { name = "map_5_gain", offset = 208, type = "f32" },
+  { name = "map_count", offset = 212, type = "u8", note = "6: the map's count" },
+  { name = "map", offset = 216, type = "u32", note = "this emitter's +164: the map's pairs" },
+  { name = "single_map_index", offset = 220, type = "u8", note = "a one-pair map: index 0 (not read)" },
+  { name = "single_map_gain", offset = 224, type = "f32", note = "1.0" },
+  { name = "single_map_count", offset = 268, type = "u8", note = "1" },
+  { name = "single_map", offset = 272, type = "u32", note = "this emitter's +220" },
+  { name = "unknown_276", offset = 276, type = "u8", note = "0 (not read)" },
+  { name = "map_descriptor", offset = 280, type = "u32", note = "this emitter's +212 (not read)" },
+  { name = "unknown_284", offset = 284, type = "u8", note = "1 (not read)" },
+  { name = "single_map_descriptor", offset = 288, type = "u32", note = "this emitter's +268 (not read)" },
+  { name = "unknown_292", offset = 292, type = "u8", note = "1 (not read)" },
+  { name = "unknown_296", offset = 296, type = "u32", note = "this emitter's +276 (not read)" },
+]
+
+# The XACT cue as the emitter's methods meet it (xact.md's XACTCue). A
+# measure fault: the slots of the cue's vtable (cue +0) are filed on the cue
+# itself, one level up, so +4 to +60 below are the vtable's.
+[EmitterCue]
+measure = "Emitter.+0"
+size = 64
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "the cue's vtable (and, through the fault, its slot 0: probably Play)" },
+  { name = "fault_stop", offset = 4, type = "fn", note = "the vtable's slot +4: probably Stop (Emitter::Stop, with 1: at once)" },
+  { name = "fault_get_state", offset = 8, type = "fn", note = "the vtable's slot +8: probably GetState (Emitter::IsNotStopped, IsPrepared)" },
+  { name = "fault_destroy", offset = 12, type = "fn", note = "the vtable's slot +12: probably Destroy (Emitter::DestroyCue)" },
+  { name = "fault_get_properties", offset = 60, type = "fn", note = "the vtable's slot +60: GetProperties (Emitter::Prepare, into the emitter's +136)" },
+]
+
+# The XACT sound bank as Emitter::Prepare meets it (the holder's +8; xact.md's
+# XACTSoundBank).
+[EmitterSoundBank]
+measure = "Emitter::Prepare.r4.+8"
+size = 4
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "EmitterSoundBankVtable" },
+]
+
+[EmitterSoundBankVtable]
+measure = "Emitter::Prepare.r4.+8.+0"
+size = 8
+origin = "image"
+fields = [
+  { name = "prepare", offset = 4, type = "fn", note = "probably Prepare (the cue index, flags 0, time 0, the cue into the emitter's +0)" },
+]
+
+# Emitter::Prepare's cue index, by address (16 bits).
+[EmitterCueIndex16]
+measure = "Emitter::Prepare.r5"
+size = 2
+origin = "embedded"
+fields = [
+  { name = "index", offset = 0, type = "u16" },
+]
+
+# --- The bank pairs and their holders ---
+
+# A loaded wave bank and sound bank (112 bytes, BankPair::BankPair
+# sub_82117D08). Its first 36 bytes are the command base the manager's handler
+# at +1584 also is (menu-sounds.toml's AudioManager: handler_*).
+[SoundBankPair]
+measure = "BankPair"
+size = 112
+origin = "allocated"
+vtable = 0x820066DC
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x820066DC (0x82000EB8, the base's, first)" },
+  { name = "vtable2", offset = 4, type = "u32", note = "0x82002908 (0x82000AB4, then 0x82000BA8, first)" },
+  { name = "command_8", offset = 8, type = "u32", note = "the command base's +8, 0" },
+  { name = "command_12", offset = 12, type = "u32", note = "the command base's +12, 0 (the manager's handler runs sub_82094B10 at 3)" },
+  { name = "command_flag_16", offset = 16, type = "u8", note = "0" },
+  { name = "command_flag_17", offset = 17, type = "u8", note = "1" },
+  { name = "command_flag_18", offset = 18, type = "u8", note = "0" },
+  { name = "delegate_vtable", offset = 24, type = "u32", note = "0x82002850 (0x82000ABC first)" },
+  { name = "delegate_28", offset = 28, type = "u32", note = "0" },
+  { name = "delegate_32", offset = 32, type = "u32", note = "0" },
+  { name = "owner", offset = 36, type = "u32", note = "the manager's +4 interface (its slot +12 GetEngine)" },
+  { name = "name", offset = 40, type = "bytes", count = 28, note = "a std::string" },
+  { name = "skip_wave_bank", offset = 68, type = "u8", note = "1 skips the wave bank's load (probably one loaded elsewhere)" },
+  { name = "release_requested", offset = 69, type = "u8", note = "BankPair::Release" },
+  { name = "wave_bank_holder", offset = 72, type = "ptr", to = "WaveBankHolder" },
+  { name = "sound_bank_holder", offset = 76, type = "ptr", to = "SoundBankHolder" },
+  { name = "bank_index", offset = 80, type = "u32" },
+  { name = "wave_bank_file_id", offset = 84, type = "u32" },
+  { name = "sound_bank_file_id", offset = 88, type = "u32" },
+  { name = "wave_bank_size", offset = 92, type = "u32" },
+  { name = "sound_bank_size", offset = 96, type = "u32" },
+  { name = "wave_bank_buffer", offset = 100, type = "u32", note = "XPhysicalAlloc's (bank 2: [0x826C5C88])" },
+  { name = "sound_bank_buffer", offset = 104, type = "u32", note = "operator new[]'s (bank 2: [0x826C5C8C])" },
+  { name = "wave_bank_loaded", offset = 108, type = "u8" },
+  { name = "sound_bank_loaded", offset = 109, type = "u8" },
+]
+
+# A bank pair's wave bank holder (28 bytes, WaveBankHolder::WaveBankHolder
+# sub_8259D418).
+[WaveBankHolder]
+measures = ["WaveBankHolder", "BankPair.+72"]
+size = 28
+origin = "allocated"
+fields = [
+  { name = "buffer", offset = 0, type = "u32" },
+  { name = "size", offset = 4, type = "u32" },
+  { name = "wave_bank", offset = 8, type = "u32", note = "the XACT wave bank" },
+  { name = "handle", offset = 12, type = "u32", note = "a file handle, -1 for none (always, in play)" },
+]
+
+# A bank pair's sound bank holder (12 bytes, SoundBankHolder::SoundBankHolder
+# sub_8259D3D8; Emitter::Prepare's r4).
+[SoundBankHolder]
+measures = ["SoundBankHolder", "Emitter::Prepare.r4"]
+size = 12
+origin = "allocated"
+fields = [
+  { name = "buffer", offset = 0, type = "u32" },
+  { name = "size", offset = 4, type = "u32" },
+  { name = "sound_bank", offset = 8, type = "ptr", to = "EmitterSoundBank", note = "the XACT sound bank" },
+]
+
+# A slot of the manager's bank vector, by address (a bank pair or 0).
+[BankPairSlot]
+measures = ["sub_82118438.r3", "sub_82118930.r3.+1516"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "pair", offset = 0, type = "ptr", to = "SoundBankPair" },
+]
+
+# --- The listener ---
+
+# The manager's +1456 (56 bytes, Listener::Listener sub_8259D478): an X3DAudio
+# listener (car-sounds' X3DAudioListener) and two floats.
+[SoundListener]
+measure = "AudioManager@+1456"
+measures = ["AudioManager::SetListenerOrientation.r3@+1456", "AudioManager::SetListenerPosition.r3@+1456", "AudioManager::SetListenerParams.r3@+1456"]
+size = 56
+origin = "embedded"
+fields = [
+  { name = "front_x", offset = 0, type = "f32", note = "front (0, 0, 1)" },
+  { name = "front_y", offset = 4, type = "f32" },
+  { name = "front_z", offset = 8, type = "f32" },
+  { name = "top_x", offset = 12, type = "f32", note = "top (0, 1, 0)" },
+  { name = "top_y", offset = 16, type = "f32" },
+  { name = "top_z", offset = 20, type = "f32" },
+  { name = "position_x", offset = 24, type = "f32", note = "(0, 0, [0x82001FD8]) at first" },
+  { name = "position_y", offset = 28, type = "f32" },
+  { name = "position_z", offset = 32, type = "f32" },
+  { name = "velocity_x", offset = 36, type = "f32" },
+  { name = "velocity_y", offset = 40, type = "f32" },
+  { name = "velocity_z", offset = 44, type = "f32" },
+  { name = "param_0", offset = 48, type = "f32", note = "[0x82002A0C] at first; AudioManager::SetListenerParams's (slot 28, not seen in play)" },
+  { name = "param_1", offset = 52, type = "f32", note = "[0x820027A4] at first; Listener::SetFloat52's" },
+]
+
+# sub_8259CC80's r3: an emitter (+36 its position) or the listener (+36 its
+# velocity).
+[SoundVector36Target]
+measure = "sub_8259CC80.r3"
+size = 48
+origin = "embedded"
+fields = [
+  { name = "vector_x", offset = 36, type = "f32" },
+  { name = "vector_y", offset = 40, type = "f32" },
+  { name = "vector_z", offset = 44, type = "f32" },
+]
+
+# A vector (three floats) given by address to the listener's and emitter's
+# setters.
+[SoundVector3]
+measures = ["sub_8259CC80.r4", "Listener::SetOrientation.r4", "Listener::SetOrientation.r5", "Listener::SetPosition.r4"]
+size = 12
+origin = "embedded"
+fields = [
+  { name = "x", offset = 0, type = "f32" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "z", offset = 8, type = "f32" },
+]
+
+# --- The audio engine and XACT's engine ---
+
+# The manager's +16: the game's XACT and X3DAudio state (AudioEngine::Start3D
+# sub_8259CE10; the start-up sub_8259D1F0, files-and-saves.md). A measure
+# fault: X3DAudioInitialize's handle (r5, the engine's +12 or 0x826C5C90) is
+# joined with the engine at +0, so the handle's words show at +0 to +12 too
+# (fault_* below).
+[AudioEngine]
+measure = "sub_82118638.r3@+16"
+measures = ["sub_82118638.r3@+16@+8", "AudioManager@+16", "AudioManager::GetCategory.r3@+16", "AudioManager::SetCategoryVolume.r3@+16", "AudioManager::PauseCategory.r3@+16", "AudioManager::ResumeCategory.r3@+16", "AudioEngine::DoWork.r3"]
+size = 100
+origin = "embedded"
+fields = [
+  { name = "settings", offset = 0, type = "u32", note = "the global settings (TXR_XACT.xgs) read whole (also the fault's handle: speaker count)" },
+  { name = "settings_size", offset = 4, type = "u32", note = "its size (also the fault's handle: LFE speaker)" },
+  { name = "xact_engine", offset = 8, type = "ptr", to = "XactEngine", note = "XACT3CreateEngine's" },
+  { name = "x3d_speaker_count", offset = 12, type = "u32", note = "the X3DAudio handle (16 bytes, car-sounds' X3DAudioHandle): 6 (5.1)" },
+  { name = "x3d_lfe_speaker", offset = 16, type = "u32" },
+  { name = "x3d_speed_of_sound", offset = 20, type = "f32" },
+  { name = "x3d_doppler_limit", offset = 24, type = "f32" },
+  { name = "dsp_matrix", offset = 28, type = "u32", note = "the DSP settings' matrix pointer: this engine's +76" },
+  { name = "dsp_source_channels", offset = 36, type = "u32", note = "1" },
+  { name = "dsp_destination_channels", offset = 40, type = "u32", note = "6" },
+  { name = "matrix_0", offset = 76, type = "u32", note = "six 1.0 (written as words)" },
+  { name = "matrix_1", offset = 80, type = "u32" },
+  { name = "matrix_2", offset = 84, type = "u32" },
+  { name = "matrix_3", offset = 88, type = "u32" },
+  { name = "matrix_4", offset = 92, type = "u32" },
+  { name = "matrix_5", offset = 96, type = "u32" },
+]
+
+# XACT's engine (196 bytes, XACT3CreateEngine sub_825BF5C8 with its
+# constructor sub_825C09A8; kept at [0x82971478]; docs/known-data.md's "XACT's
+# engine"). The list heads are a word and a node's two links pointing at
+# themselves when empty.
+[XactEngine]
+measure = "new<196>@XACT3CreateEngine"
+measures = ["sub_82118638.r3@+16.+8", "AudioManager::GetCategory.r3@+16.+8", "AudioManager::SetCategoryVolume.r3@+16.+8", "AudioManager::PauseCategory.r3@+16.+8", "AudioManager::ResumeCategory.r3@+16.+8", "AudioEngine::DoWork.r3.+8", "AudioManager@+16.+8"]
+# measures from XactEngineRef (files-and-saves), merged at the integration
+size = 196
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "XactEngineInterface", note = "0x82075360" },
+  { name = "vtable2", offset = 4, type = "u32", note = "0x82075348" },
+  { name = "ref_count", offset = 8, type = "u32", note = "1 at first" },
+  { name = "renderer", offset = 12, type = "u32" },
+  { name = "notification_callback", offset = 16, type = "u32", note = "Initialize's parameters' +28" },
+  { name = "notification_thread", offset = 20, type = "u32", note = "the notification callback's thread id (-1)" },
+  { name = "callback_time", offset = 24, type = "u32", note = "the audio callback's time (the clock + [0x8266CDF4])" },
+  { name = "cues", offset = 28, type = "u32", note = "the cues' list (nodes at cue + 12)" },
+  { name = "cues_next", offset = 32, type = "u32" },
+  { name = "cues_previous", offset = 36, type = "u32" },
+  { name = "look_ahead", offset = 40, type = "u32", note = "the parameters' +0 (probably a look-ahead in ms)" },
+  { name = "sound_banks", offset = 44, type = "u32", note = "the sound banks' list (nodes at bank + 12)" },
+  { name = "sound_banks_next", offset = 48, type = "u32" },
+  { name = "sound_banks_previous", offset = 52, type = "u32" },
+  { name = "wave_banks", offset = 56, type = "u32", note = "the wave banks' list (nodes at bank + 8)" },
+  { name = "wave_banks_next", offset = 60, type = "u32" },
+  { name = "wave_banks_previous", offset = 64, type = "u32" },
+  { name = "initialized", offset = 68, type = "u32", note = "set by Initialize" },
+  { name = "unknown_72", offset = 72, type = "u32" },
+  { name = "deletes", offset = 76, type = "u32", note = "objects to delete in DoWork" },
+  { name = "deletes_next", offset = 80, type = "u32" },
+  { name = "deletes_previous", offset = 84, type = "u32" },
+  { name = "list_88", offset = 88, type = "u32", note = "a list head (not read)" },
+  { name = "list_88_next", offset = 92, type = "u32" },
+  { name = "list_88_previous", offset = 96, type = "u32" },
+  { name = "notifications", offset = 100, type = "u32", note = "the notification registrations" },
+  { name = "notifications_next", offset = 104, type = "u32" },
+  { name = "notifications_previous", offset = 108, type = "u32" },
+  { name = "deletes_2", offset = 112, type = "u32", note = "objects to delete in DoWork" },
+  { name = "deletes_2_next", offset = 116, type = "u32" },
+  { name = "deletes_2_previous", offset = 120, type = "u32" },
+  { name = "global_settings", offset = 124, type = "u32" },
+  { name = "waiting_cues", offset = 128, type = "u32", note = "cues waiting on an instance limit (never filled in play)" },
+  { name = "waiting_cues_next", offset = 132, type = "u32" },
+  { name = "waiting_cues_previous", offset = 136, type = "u32" },
+  { name = "unknown_140", offset = 140, type = "u32" },
+  { name = "lock", offset = 144, type = "bytes", count = 28, note = "a critical section (RtlInitializeCriticalSection)" },
+  { name = "start_time", offset = 172, type = "u32" },
+  { name = "unknown_176", offset = 176, type = "u32" },
+  { name = "callback_disabled", offset = 180, type = "u32", note = "the audio callback does nothing when set" },
+  { name = "deferred_voices", offset = 184, type = "u32", note = "deferred voices to start" },
+  { name = "file_callback_0", offset = 188, type = "fn", note = "the parameters' +20 (probably a file I/O callback; 0x82295FC8)" },
+  { name = "file_callback_1", offset = 192, type = "fn", note = "the parameters' +24 (0x82295F20)" },
+]
+
+# XACT's engine's vtable (0x82075360) as the wrapper calls it (files-and-saves'
+# XactEngineVtable is the same table, met from sub_8259D1F0).
+[XactEngineInterface]
+measure = "sub_82118638.r3@+16.+8.+0"
+measures = ["AudioManager::GetCategory.r3@+16.+8.+0", "AudioManager::SetCategoryVolume.r3@+16.+8.+0", "AudioManager::PauseCategory.r3@+16.+8.+0", "AudioManager::ResumeCategory.r3@+16.+8.+0", "AudioEngine::DoWork.r3.+8.+0", "AudioManager@+16.+8.+0"]
+# measures from XactEngineVtable (files-and-saves), merged at the integration
+size = 56
+origin = "image"
+fields = [
+  { name = "slot_1", offset = 4, type = "fn", note = "called by sub_8259D370; not read" },
+  { name = "initialize", offset = 8, type = "fn", note = "probably Initialize (sub_8259D1F0)" },
+  { name = "do_work", offset = 16, type = "fn", note = "probably DoWork (AudioEngine::DoWork)" },
+  { name = "create_sound_bank", offset = 20, type = "fn", note = "probably CreateSoundBank" },
+  { name = "create_in_memory_wave_bank", offset = 24, type = "fn", note = "probably CreateInMemoryWaveBank" },
+  { name = "get_category", offset = 40, type = "fn", note = "probably GetCategory" },
+  { name = "set_volume", offset = 48, type = "fn", note = "probably SetVolume (a category's)" },
+  { name = "pause", offset = 52, type = "fn", note = "probably Pause (a category's: 1 pause, 0 resume)" },
+]
+
+# --- The manager's owner, messages, lists and vectors ---
+
+# The manager's owner (its +12: the app's +12 interface).
+[AudioManagerOwner]
+measure = "AudioManager.+12"
+size = 4
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "AudioManagerOwnerVtable" },
+]
+
+[AudioManagerOwnerVtable]
+measure = "AudioManager.+12.+0"
+size = 12
+origin = "image"
+fields = [
+  { name = "handler_registry", offset = 4, type = "fn", note = "slot 1: the object the manager's delegates are registered with" },
+  { name = "command_queue", offset = 8, type = "fn", note = "slot 2: the object the manager's command (+1584) is queued on" },
+]
+
+# sub_82119188's r4: an object whose vtable it calls on message 6 (probably
+# subscribing the manager to messages 7, 1, 6 and 8).
+[AudioManagerMessageSource]
+measure = "sub_82119188.r4"
+size = 4
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "AudioManagerMessageSourceVtable" },
+]
+
+[AudioManagerMessageSourceVtable]
+measure = "sub_82119188.r4.+0"
+size = 36
+origin = "image"
+fields = [
+  { name = "slot_20", offset = 20, type = "fn", note = "with 8 (probably a subscription)" },
+  { name = "slot_24", offset = 24, type = "fn", note = "with 6" },
+  { name = "slot_28", offset = 28, type = "fn", note = "with 1" },
+  { name = "slot_32", offset = 32, type = "fn", note = "with 7" },
+]
+
+# sub_82119188's r5: the message, by address.
+[AudioManagerMessage]
+measure = "sub_82119188.r5"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "id", offset = 0, type = "u32", note = "5 or 6 handled" },
+]
+
+# A member-function delegate (16 bytes, vtable 0x8200833C): the manager's
+# handlers' (sub_82118720 clones one).
+[AudioManagerDelegate]
+measures = ["new<16>@sub_82118720", "sub_82118720.r3"]
+size = 16
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x8200833C" },
+  { name = "object", offset = 4, type = "u32", note = "the manager" },
+  { name = "method", offset = 8, type = "u32", note = "the member pointer's function" },
+  { name = "method_adjust", offset = 12, type = "u32", note = "the member pointer's this adjustment" },
+]
+
+# The list of playing Sounds (the manager's +1528, a std::list of pointers;
+# sub_82118850's r3).
+[SoundList]
+measure = "AudioManager::RemoveStoppedSounds.r3@+1528"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "allocator", offset = 0, type = "u32", note = "probably the allocator word" },
+  { name = "head", offset = 4, type = "ptr", to = "SoundListNode", note = "the sentinel node" },
+  { name = "size", offset = 8, type = "u32" },
+]
+
+# A node of the Sounds' list (12 bytes): next, previous, a Sound.
+[SoundListNode]
+measure = "AudioManager.+1532"
+measures = ["AudioManager.+1532.+0", "sub_82119018.r3.+1532", "AudioManager::RemoveStoppedSounds.r3@+1528.+4", "AudioManager::RemoveStoppedSounds.r3@+1528.+4.+0"]
+size = 12
+origin = "allocated"
+fields = [
+  { name = "next", offset = 0, type = "ptr", to = "SoundListNode" },
+  { name = "previous", offset = 4, type = "ptr", to = "SoundListNode" },
+  { name = "sound", offset = 8, type = "ptr", to = "PlayingSound" },
+]
+
+# std::for_each's result over the Sounds' list (sub_82118F50's r3: the
+# function, left on the caller's frame).
+[SoundForEachResult]
+measure = "sub_82118F50.r3"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "function", offset = 0, type = "fn" },
+]
+
+# A std::vector of words (16 bytes: the manager's bank pairs' vector at +1512,
+# WordVector::Fill sub_821194A0; cameras.md's too).
+[WordVector]
+measure = "WordVector"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "allocator", offset = 0, type = "u32", note = "probably the allocator word (never written here)" },
+  { name = "fault_0", offset = 0, type = "u64", note = "read as a doubleword (probably a measure fault: an iterator pair joined)" },
+  { name = "first", offset = 4, type = "u32", note = "MessageVector::Allocate's block (cameras' NewAny_MessageVector_Allocate)" },
+  { name = "last", offset = 8, type = "u32" },
+  { name = "end", offset = 12, type = "u32", note = "the capacity's end" },
+]
+
+# --- Words given by address ---
+
+# A bank index, by address (the manager's methods' r4, a Sound's).
+[SoundCuesBankIndex]
+# measures from SoundBankIndex (menu-sounds), merged at the integration
+measures = ["AudioManager::LoadBank.r4", "AudioManager::ReleaseBank.r4", "AudioManager::IsBankLoading.r4", "AudioManager::IsBankSlotEmpty.r4", "AudioManager::GetSoundBank.r4", "AudioManager::PlayCue.r4", "Sound::Sound.r4", "Sound::IsBank.r4", "AudioManager::FindFreeBankSlot.r4", "AudioManager::GetCueIndex.r4", "AudioManager::IsBankLoaded.r4", "AudioManager::PlayHandle.r4"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "index", offset = 0, type = "u32" },
+]
+
+# A cue index, by address.
+[SoundCuesCueIndex]
+# measures from SoundCueIndex (menu-sounds), merged at the integration
+measures = ["AudioManager::PlayCue.r5", "Sound::Sound.r5", "Sound::IsCue.r4",
+  "AudioManager::PlayHandle.r5"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "index", offset = 0, type = "u32" },
+]
+
+# A bank file's id, by address (AudioManager::LoadBank's r7 and r8: the wave
+# and sound banks').
+[BankFileId]
+measures = ["AudioManager::LoadBank.r7", "AudioManager::LoadBank.r8"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "id", offset = 0, type = "u32" },
+]
+
+# BankPair::BankPair's r5: the byte for +68 (skip the wave bank's load).
+[BankSkipWaveArg]
+measure = "BankPair::BankPair.r5"
+size = 1
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "u8" },
+]
+
+# AudioManager::AudioManager's r6: the bank count.
+[AudioManagerBankCount]
+measure = "AudioManager::AudioManager.r6"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "count", offset = 0, type = "u32" },
+]
+
+# WordVector::Fill's r5: the value its slots are filled with.
+[WordVectorFillValue]
+measure = "WordVector::Fill.r5"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "u32" },
+]
+
+# Sound::Set3D's r4: the 3D byte.
+[Sound3DArg]
+measure = "Sound::Set3D.r4"
+size = 1
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "u8" },
+]
+
+# A category, by address (AudioEngine::SetCategoryVolume, PauseCategory,
+# ResumeCategory's r4; XACT's 16-bit category in a word).
+[AudioCategoryArg]
+measures = ["AudioEngine::SetCategoryVolume.r4", "AudioEngine::PauseCategory.r4", "AudioEngine::ResumeCategory.r4"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "category", offset = 0, type = "u32" },
+]
+
+# AudioEngine::SetCategoryVolume's r5: the volume, by address.
+[AudioVolumeArg]
+measure = "AudioEngine::SetCategoryVolume.r5"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "volume", offset = 0, type = "f32" },
+]
+
+[globals]
+float_zero = { address = 0x82000A34, type = "u32", note = "0.0 (copied as a float)" }
+float_one = { address = 0x82000A30, type = "u32", note = "1.0 (copied as a float)" }
+listener_start_z = { address = 0x82001FD8, type = "f32", note = "the listener's first position's z" }
+listener_start_param_0 = { address = 0x82002A0C, type = "f32", note = "the listener's +48 at first" }
+listener_start_param_1 = { address = 0x820027A4, type = "f32", note = "the listener's +52 at first" }
+speed_of_sound = { address = 0x8207145C, type = "f32", note = "AudioEngine::Start3D's speed of sound" }
+bank2_wave_buffer = { address = 0x826C5C88, type = "u32", note = "bank pair 2's wave bank buffer (3 MiB, SoundGlobals::Init's)" }
+bank2_sound_buffer = { address = 0x826C5C8C, type = "u32", note = "bank pair 2's sound bank buffer (512 bytes)" }
+xact_engine = { address = 0x82971478, type = "ptr", to = "XactEngine", note = "XACT's engine, made once by XACT3CreateEngine" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from AudioEngine.
+[AudioEngineAt12]
+measure = "AudioManager@+16@+12"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]
+
+# Split from PlayingSound.
+[PlayingSoundAt8]
+measure = "AudioManager.+1544.+0@+8"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from SoundBankPair.
+[SoundBankPairAt72]
+measure = "BankPair@+72"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from SoundBankPair.
+[SoundBankPairAt76]
+measure = "BankPair@+76"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from PlayingSound.
+[PlayingSoundAt4]
+measure = "Sound@+4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from WordVector.
+[WordVectorAt1512]
+measure = "AudioManager@+1512"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+]
+
+# Split from SoundBankPair.
+[SoundBankPairOuter12]
+measure = "sub_82090858.r3@-12"
+size = 80
+origin = "embedded"
+fields = [
+  { name = "unknown_76", offset = 76, type = "u32" },
+]

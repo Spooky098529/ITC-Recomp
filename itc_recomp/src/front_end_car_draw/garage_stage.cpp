@@ -12,6 +12,13 @@
 #include "load_poll/load_poll.h"
 #include "menu_sounds/menu_sounds.h"
 #include "native/buffers.h"
+#include "schema/cameras.h"
+#include "schema/car_draw.h"
+#include "schema/front_end_car_draw.h"
+#include "schema/load_poll.h"
+#include "schema/scene_models.h"
+#include "schema/stand_models.h"
+#include "schema/type6_type7_modes.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 namespace front_end_car_draw {
@@ -20,23 +27,23 @@ namespace {
 
 using namespace car_scene_draw::ops;
 
-constexpr uint32_t kHalfDegree = 0x82009EA8;  // π/360 (0.5°)
-constexpr uint32_t kMinusPi = 0x820029C4;
-constexpr uint32_t kPi = 0x82002240;
-constexpr uint32_t kDegree = 0x82002948;      // π/180
-constexpr uint32_t kFocal = 0x82009EB8;       // 640.0
-constexpr uint32_t k360 = 0x82002244;         // 360.0
-constexpr uint32_t kSixty = 0x82000F14;       // 60.0
-constexpr uint32_t kTwenty = 0x82002568;      // 20.0
+using G = schema::FrontEndCarDrawGlobals;
+using Entry = schema::GarageAnimEntry;
+using List = schema::GarageAnimList;
+using Values = schema::GarageAnimValues;
+using Slot = schema::StandSlot;
+using Stage = schema::GarageStage;
+using Model = schema::SceneModel;
+using Camera = schema::GarageCamera;
+using Preset = schema::CameraPreset;
+using Kit = schema::LightKitRecord;
 
-constexpr uint32_t kMaxima = 0x82635E90;     // the cars' opening maxima (48 bytes a car)
 constexpr uint32_t kOpenCue = 15;             // MenuSound::Play's cue for the opening
 
 constexpr uint32_t kMemcpy = 0x825A7410;
 constexpr uint32_t kTan = 0x825A8A50;
 constexpr uint32_t kApplyRecord = 0x820DCBC0;
 constexpr uint32_t kDrawShape = 0x82596B18;
-constexpr uint32_t kCameraPasses = 0x826BAC00;
 constexpr uint32_t kOpenDoors = 0x8217B6B8;
 constexpr uint32_t kCloseDoors = 0x8217B740;
 
@@ -49,19 +56,22 @@ uint32_t Frame(uint8_t* base, uint32_t stack, uint32_t bytes) {
   return frame;
 }
 
+// The car scene ([0x826C2E44]).
+uint32_t Scene(uint8_t* base) { return schema::CarDrawGlobals::scene(base).address; }
+
 // The stage's scene model: ScenePools::GetB([0x826C2E44], 7, [[holder] + 8]).
 uint32_t StageModel(uint8_t* base, uint32_t holder) {
-  return vehicle_accessors::ScenePoolsGetB(base, Load(base, kScene), 7,
-                                           Load(base, Load(base, holder) + 8));
+  return vehicle_accessors::ScenePoolsGetB(base, Scene(base), 7,
+                                           Slot(base, holder).stage().model_index());
 }
 
 // A yaw or pitch wrapped: below -π to π, above π to -π (NaN kept).
 double Wrap(uint8_t* base, double v) {
-  const double minus_pi = Lfs(base, kMinusPi);
+  const double minus_pi = double(G::minus_pi(base));
   if (v < minus_pi) {
-    return Lfs(base, kPi);
+    return double(G::pi(base));
   }
-  if (v > Lfs(base, kPi)) {
+  if (v > double(G::pi(base))) {
     return minus_pi;
   }
   return v;
@@ -93,14 +103,16 @@ uint64_t Memcpy(uint8_t* base, const Calls& calls, uint32_t to, uint32_t from, u
 
 void PlatesHide(uint8_t* base, uint32_t points) {
   ITC_NATIVE_RUNNING("sub_820DF190 Plates::Hide");
-  Store(base, points + 2640, 0);
-  Store(base, points + 4576, 0);
+  const schema::FrontEndPlatePoints p(base, points);
+  p.set_front_plate_set(0);
+  p.set_rear_plate_set(0);
 }
 
 void PlatesShow(uint8_t* base, uint32_t points) {
   ITC_NATIVE_RUNNING("sub_820DF180 Plates::Show");
-  Store(base, points + 2640, 1);
-  Store(base, points + 4576, 1);
+  const schema::FrontEndPlatePoints p(base, points);
+  p.set_front_plate_set(1);
+  p.set_rear_plate_set(1);
 }
 
 uint32_t GarageStageIsBusy(uint8_t* base, const Calls& calls, uint32_t holder, uint32_t stack) {
@@ -111,7 +123,7 @@ uint32_t GarageStageIsBusy(uint8_t* base, const Calls& calls, uint32_t holder, u
   if (int32_t(loaded) == 0) {
     return 1;
   }
-  return LoadS(base, Load(base, holder) + 4) == -1 ? 0 : 1;
+  return int32_t(Slot(base, holder).stage().pending_block()) == -1 ? 0 : 1;
 }
 
 uint32_t GarageStageSyncPlates(uint8_t* base, const Calls& calls, uint32_t holder,
@@ -123,12 +135,12 @@ uint32_t GarageStageSyncPlates(uint8_t* base, const Calls& calls, uint32_t holde
   if (busy == 1) {
     return busy;
   }
-  const uint32_t parts = Load(base, model + 5060);
-  const uint32_t want = Load(base, Load(base, holder) + 6092);
-  if (want == Load(base, parts + 2816)) {
+  const schema::SceneParts parts = Model(base, model).parts();
+  const uint32_t want = Slot(base, holder).stage().plates_shown();
+  const uint32_t points = parts.points_address();
+  if (want == schema::PartsPoints(base, points).front_plate_set()) {
     return busy;
   }
-  const uint32_t points = parts + 176;
   if (want == 1) {
     PlatesShow(base, points);
   } else {
@@ -141,35 +153,37 @@ uint32_t GarageStageSetDrawWord(uint8_t* base, uint32_t holder, uint32_t word, u
   ITC_NATIVE_RUNNING("sub_82178B40 GarageStage::SetDrawWord");
   Frame(base, stack, 112);
   const uint32_t model = StageModel(base, holder);
-  Store(base, Load(base, holder) + 6056, word);
-  Store(base, model + 4296, word);
+  Slot(base, holder).stage().set_draw_word(word);
+  Model(base, model).set_draw_enabled(word);
   return model;
 }
 
 void GarageStageStepAngles(uint8_t* base, uint32_t command, uint32_t angles) {
   ITC_NATIVE_RUNNING("sub_82179C88 GarageStage::StepAngles");
-  const uint32_t a = angles + 48;
+  const Values a(base, angles);
   const int32_t c = int32_t(command);
   switch (c) {
     case 9:
     case 10: {
-      const double step = Lfs(base, kHalfDegree);
-      const double v = c == 9 ? Fadds(Lfs(base, a + 4), step) : Fsubs(Lfs(base, a + 4), step);
-      Stfs(base, a + 4, Wrap(base, v));
+      const double step = double(G::half_degree(base));
+      const double yaw = double(a.yaw());
+      const double v = c == 9 ? Fadds(yaw, step) : Fsubs(yaw, step);
+      a.set_yaw(float(Wrap(base, v)));
       return;
     }
     case 11:
     case 12: {
-      const double step = Lfs(base, kHalfDegree);
-      const double v = c == 11 ? Fadds(Lfs(base, a + 8), step) : Fsubs(Lfs(base, a + 8), step);
-      Stfs(base, a + 8, Wrap(base, v));
+      const double step = double(G::half_degree(base));
+      const double angle = double(a.angle_z());
+      const double v = c == 11 ? Fadds(angle, step) : Fsubs(angle, step);
+      a.set_angle_z(float(Wrap(base, v)));
       return;
     }
     case 13: {
-      const double zero = Lfs(base, kZero);
-      Stfs(base, a + 0, zero);
-      Stfs(base, a + 8, zero);
-      Stfs(base, a + 4, zero);
+      const double zero = double(G::zero(base));
+      a.set_angle_x(float(zero));
+      a.set_angle_z(float(zero));
+      a.set_yaw(float(zero));
       return;
     }
     default:
@@ -185,6 +199,7 @@ uint64_t GarageAnimsAdd(uint8_t* base, const Calls& calls, uint32_t list, uint32
   const uint32_t entry = f + 80;   // the entry looked at (28 bytes)
   const uint32_t kept = f + 112;   // type 1's kept entries
   const uint32_t kept_count = f + 560;
+  const List l(base, list);
   uint64_t r3 = list;
   auto copy = [&](uint32_t to, uint32_t from, uint32_t lr) {
     r3 = Memcpy(base, calls, to, from, 28, f, lr);
@@ -195,12 +210,12 @@ uint64_t GarageAnimsAdd(uint8_t* base, const Calls& calls, uint32_t list, uint32
     // them put back alone.
     // n is the original's r28: decremented from its register, the loop's
     // test reloading the count.
-    uint32_t n = Load(base, list + 448);
+    uint32_t n = l.count();
     uint32_t count = 0;
     if (n != 0) {
       do {
         n = n - 1;
-        Store(base, list + 448, n);
+        l.set_count(n);
         const uint32_t e = list + 28 * n;
         copy(entry, e, 0x8217FA48);
         if (LoadS(base, entry) != 0) {
@@ -208,19 +223,19 @@ uint64_t GarageAnimsAdd(uint8_t* base, const Calls& calls, uint32_t list, uint32
           copy(kept + 28 * count, e, 0x8217FA78);
           count = Load(base, kept_count);
         }
-      } while (Load(base, list + 448) != 0);
+      } while (l.count() != 0);
     }
-    Store(base, list + 448, 0);
+    l.set_count(0);
     if (count == 0) {
       return r3;
     }
     Store(base, kept_count, count - 1);
-    Store(base, list + 448, 1);
+    l.set_count(1);
     copy(list, kept + 28 * (count - 1), 0x8217FBC0);
     return r3;
   }
 
-  const uint32_t count = Load(base, list + 448);
+  const uint32_t count = l.count();
   // An entry of the same type: nothing.
   if (count != 0) {
     uint32_t i = 0, e = list;
@@ -231,25 +246,26 @@ uint64_t GarageAnimsAdd(uint8_t* base, const Calls& calls, uint32_t list, uint32
       }
       i++;
       e += 28;
-    } while (i < Load(base, list + 448));
+    } while (i < l.count());
   }
   // One of the opposite type: overwritten in place.
   if (count != 0) {
     uint32_t i = 0, e = list;
     do {
-      const int32_t t = LoadS(base, e);
+      const Entry en(base, e);
+      const int32_t t = en.type();
       const int32_t y = int32_t(type);
       if ((t == 2 && y == 3) || (t == 3 && y == 2) || (t == 4 && y == 5) || (t == 5 && y == 4)) {
-        Stfs(base, e + 4, steps);
-        Store(base, e + 0, type);
-        Store(base, e + 12, value);
-        Store(base, e + 8, word);
-        Store(base, e + 20, 0);
+        en.set_steps(float(steps));
+        en.set_type(int32_t(type));
+        en.set_value(value);
+        en.set_word(word);
+        en.set_done(0);
         return r3;
       }
       i++;
       e += 28;
-    } while (i < Load(base, list + 448));
+    } while (i < l.count());
   }
   // A new entry at the end.
   Stfs(base, entry + 4, steps);
@@ -257,14 +273,15 @@ uint64_t GarageAnimsAdd(uint8_t* base, const Calls& calls, uint32_t list, uint32
   Store(base, entry + 12, value);
   Store(base, entry + 8, word);
   Store(base, entry + 20, 0);
-  const double zero = Lfs(base, kZero);
+  const double zero = double(G::zero(base));
   Store(base, entry + 16, index);
   Stfs(base, entry + 24, zero);
   if (int32_t(type) == 6) {
-    const double angle = Fsubs(Lfs(base, k360), Lfs(base, value + 176));
+    // Type 6's value is the garage camera (the stage's +112).
+    const double angle = Fsubs(double(G::three_sixty(base)), double(Camera(base, value).orbit()));
     Stfs(base, entry + 24, Fdivs(angle, steps));
   }
-  Store(base, list + 448, count + 1);
+  l.set_count(count + 1);
   copy(list + 28 * count, entry, 0x8217FBC0);
   return r3;
 }
@@ -273,24 +290,25 @@ uint64_t GarageStageApplyPreset(uint8_t* base, const Calls& calls, uint64_t r3, 
                                 uint32_t stage, uint32_t index, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8217D2B0 GarageStage::ApplyPreset");
   const uint32_t f = Frame(base, stack, 128);
-  const uint32_t camera = stage + 112;
-  if (Load(base, camera) == 0) {
-    Store(base, stage + 6088, preset);
+  const Stage st(base, stage);
+  const Camera camera(base, st.camera_address());
+  if (camera.set_up() == 0) {
+    st.set_waiting_preset(preset);
     return r3;
   }
-  const uint32_t model =
-      vehicle_accessors::ScenePoolsGetB(base, Load(base, kScene), 7, index);
-  const uint64_t slot = uint64_t(Load(base, model + 48)) * 290 + preset;
-  uint32_t e = Load(base, Load(base, camera + 292) + uint32_t(slot << 2));
-  if (e >= Load(base, camera + 4392)) {
+  const uint32_t model = vehicle_accessors::ScenePoolsGetB(base, Scene(base), 7, index);
+  const uint64_t slot = uint64_t(Model(base, model).block()) * 290 + preset;
+  uint32_t e = Load(base, camera.preset_table() + uint32_t(slot << 2));
+  if (e >= camera.preset_count()) {
     e = 0xFFFFFFFFu;
   }
-  const uint32_t p = e == 0xFFFFFFFFu ? 0 : Load(base, camera + ((e + 74) << 2));
-  const uint32_t c = camera + 16;
-  Stfs(base, c + 84, Lfs(base, p + 4));
-  Stfs(base, c + 164, Lfs(base, p + 8));
-  Stfs(base, c + 208, Lfs(base, p + 12));
-  const double x = Fmuls(Lfs(base, p + 12), Lfs(base, kDegree));
+  // The presets' pointers (the camera's +296), indexed from the camera as
+  // the original does ((e + 74) << 2).
+  const Preset p(base, e == 0xFFFFFFFFu ? 0 : Load(base, camera.address + ((e + 74) << 2)));
+  camera.set_tilt(float(double(p.elevation())));
+  camera.set_distance(float(double(p.value_8())));
+  camera.set_fov(float(double(p.value_12())));
+  const double x = Fmuls(double(p.value_12()), double(G::degree(base)));
   // tan as its adapter gives it: nearest rounding (its _ctrlfp) and r3 its
   // second _ctrlfp's word (0 ^ 0xF8); else the call.
   double t;
@@ -299,26 +317,31 @@ uint64_t GarageStageApplyPreset(uint8_t* base, const Calls& calls, uint64_t r3, 
   } else {
     r3 = calls.call(kTan, nullptr, 0, &x, 1, f, 0x8217D368, &t);
   }
-  Stfs(base, c + 92, Fdivs(Lfs(base, kFocal), Frsp(t)));
-  const uint32_t w0 = Load(base, p + 32), w1 = Load(base, p + 36);
-  Store(base, c + 240, w0);
-  Store(base, c + 244, w1);
-  const uint32_t w2 = Load(base, p + 40), w3 = Load(base, p + 44);
-  Store(base, c + 248, w2);
-  Store(base, c + 252, w3);
-  const uint32_t w4 = Load(base, p + 16), w5 = Load(base, p + 20);
-  Store(base, c + 224, w4);
-  Store(base, c + 228, w5);
-  const uint32_t w6 = Load(base, p + 24), w7 = Load(base, p + 28);
-  Store(base, c + 232, w6);
-  Store(base, c + 236, w7);
-  const uint32_t w8 = Load(base, p + 48), w9 = Load(base, p + 52);
-  Store(base, stage + 80, w8);
-  Store(base, stage + 84, w9);
-  const uint32_t w10 = Load(base, p + 56), w11 = Load(base, p + 60);
-  Store(base, stage + 88, w10);
-  Store(base, stage + 92, w11);
-  Store(base, stage + 6088, 0xFFFFFFFFu);
+  camera.set_zoom(float(Fdivs(double(G::focal(base)), Frsp(t))));
+  // The preset's vectors as doublewords (ld, std): +32 to the camera's
+  // translation, +16 to its angles, +48 to the car's angles.
+  const uint32_t v32 = p.vector_32_address(), v16 = p.vector_16_address();
+  const uint32_t translation = camera.translation_address(), angles = camera.angles_address();
+  const uint32_t w0 = Load(base, v32), w1 = Load(base, v32 + 4);
+  Store(base, translation, w0);
+  Store(base, translation + 4, w1);
+  const uint32_t w2 = Load(base, v32 + 8), w3 = Load(base, v32 + 12);
+  Store(base, translation + 8, w2);
+  Store(base, translation + 12, w3);
+  const uint32_t w4 = Load(base, v16), w5 = Load(base, v16 + 4);
+  Store(base, angles, w4);
+  Store(base, angles + 4, w5);
+  const uint32_t w6 = Load(base, v16 + 8), w7 = Load(base, v16 + 12);
+  Store(base, angles + 8, w6);
+  Store(base, angles + 12, w7);
+  const uint32_t from = p.angles_address(), car = st.angle_x_address();
+  const uint32_t w8 = Load(base, from), w9 = Load(base, from + 4);
+  Store(base, car, w8);
+  Store(base, car + 4, w9);
+  const uint32_t w10 = Load(base, from + 8), w11 = Load(base, from + 12);
+  Store(base, car + 8, w10);
+  Store(base, car + 12, w11);
+  st.set_waiting_preset(0xFFFFFFFFu);
   return r3;
 }
 
@@ -328,51 +351,54 @@ uint64_t GarageStageCommand(uint8_t* base, const Calls& calls, uint64_t r3, uint
   const uint32_t f = Frame(base, stack, 112);
   const uint32_t holder = uint32_t(r3);
   const int32_t c = int32_t(command);
-  auto add = [&](uint32_t type, uint32_t value_offset, bool value_zero, uint32_t word,
-                 uint32_t steps_at) {
-    const uint32_t s = Load(base, holder);
-    const uint32_t value = value_zero ? 0 : s + value_offset;
-    return GarageAnimsAdd(base, calls, s + 5600, type, value, Load(base, s + 8), word,
+  const Slot slot(base, holder);
+  // `camera`: the value the garage camera (stage + 112), else the stage's
+  // values (GarageAnimValues, stage + 32).
+  auto add = [&](uint32_t type, bool camera, bool value_zero, uint32_t word, uint32_t steps_at) {
+    const Stage s = slot.stage();
+    const uint32_t value = value_zero ? 0 : camera ? s.camera_address() : s.bonnet_address();
+    return GarageAnimsAdd(base, calls, s.animations_address(), type, value, s.model_index(), word,
                           Lfs(base, steps_at), f);
   };
   if (c > 5) {
     if (c == 6 || c == 7) {
-      return add(uint32_t(c), 112, false, 0, kTwenty);
+      return add(uint32_t(c), true, false, 0, G::twenty_address());
     }
     if (c == 8) {
-      const uint32_t list = Load(base, holder) + 5600;
-      if (Load(base, list + 448) != 0) {
-        Store(base, list + 448, 0);
+      const List list(base, slot.stage().animations_address());
+      if (list.count() != 0) {
+        list.set_count(0);
       }
-      Store(base, list + 448, 0);
-      add(6, 112, false, 0, kTwenty);
-      return add(7, 32, false, 0, kTwenty);
+      list.set_count(0);
+      add(6, true, false, 0, G::twenty_address());
+      return add(7, false, false, 0, G::twenty_address());
     }
     if (c < 8) {
       return r3;
     }
     if (c <= 13) {
-      const uint32_t s = Load(base, holder);
-      GarageStageStepAngles(base, command, s + 32);
-      return s + 5600;
+      const Stage s = slot.stage();
+      GarageStageStepAngles(base, command, s.bonnet_address());
+      return s.animations_address();
     }
     if (c > 64) {
       return r3;
     }
-    const uint32_t s = Load(base, holder);
-    return GarageStageApplyPreset(base, calls, s + 5600, command - 14, s, Load(base, s + 8), f);
+    const Stage s = slot.stage();
+    return GarageStageApplyPreset(base, calls, s.animations_address(), command - 14, s.address,
+                                  s.model_index(), f);
   }
   switch (command) {
     case 0:
-      return add(0, 32, false, 1, kSixty);
+      return add(0, false, false, 1, G::sixty_address());
     case 1:
-      add(1, 0, true, 1, kSixty);
-      return add(1, 32, false, 0, kSixty);
+      add(1, false, true, 1, G::sixty_address());
+      return add(1, false, false, 0, G::sixty_address());
     case 2:
     case 3:
     case 4:
     case 5:
-      return add(command, 32, false, 0, kSixty);
+      return add(command, false, false, 0, G::sixty_address());
     default:
       return r3;  // negative: nothing
   }
@@ -380,73 +406,74 @@ uint64_t GarageStageCommand(uint8_t* base, const Calls& calls, uint64_t r3, uint
 
 uint32_t GarageAnimsTurn(uint8_t* base, uint32_t entry) {
   ITC_NATIVE_RUNNING("sub_82179D78 GarageAnims::Turn");
-  const uint32_t angles = Load(base, entry + 12) + 48;
-  const double yaw = Wrap(base, Fsubs(Lfs(base, angles + 4), Lfs(base, kHalfDegree)));
-  Stfs(base, angles + 4, yaw);
-  if (LoadS(base, entry + 8) != 0) {
+  const Entry en(base, entry);
+  const Values values = en.value();
+  const double yaw = Wrap(base, Fsubs(double(values.yaw()), double(G::half_degree(base))));
+  values.set_yaw(float(yaw));
+  if (int32_t(en.word()) != 0) {
     return 0;
   }
-  if (yaw != Lfs(base, kZero)) {
+  if (yaw != double(G::zero(base))) {
     return 0;
   }
-  Store(base, entry + 20, 1);
+  en.set_done(1);
   return 1;
 }
 
 uint32_t GarageAnimsOpen(uint8_t* base, const Calls& calls, uint32_t entry, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_82179DF0 GarageAnims::Open");
   const uint32_t f = Frame(base, stack, 128);
-  const uint32_t model =
-      vehicle_accessors::ScenePoolsGetB(base, Load(base, kScene), 7, Load(base, entry + 16));
-  const uint32_t car = Load(base, model + 48);
-  const double steps = Lfs(base, entry + 4);
-  const uint32_t value = Load(base, entry + 12);
-  const double now = Lfs(base, value);
-  const double max = Lfs(base, kMaxima + car * 48);
+  const Entry en(base, entry);
+  const uint32_t model = vehicle_accessors::ScenePoolsGetB(base, Scene(base), 7, en.model_index());
+  const uint32_t car = Model(base, model).block();
+  const double steps = double(en.steps());
+  const Values value = en.value();
+  const double now = double(value.bonnet());
+  const double max = Lfs(base, G::car_limits_address() + car * 48);
   const double step = Fdivs(max, steps);
   double v = Fadds(now, step);
-  const double zero = Lfs(base, kZero);
+  const double zero = double(G::zero(base));
   if (v < zero) {
     v = zero;
   } else if (v > max) {
     v = max;
   }
-  Stfs(base, value, v);
+  value.set_bonnet(float(v));
   if (!(v > step)) {
     PlayMenuSound(base, calls, kOpenCue, f);
   }
-  if (Lfs(base, value) < max) {
+  if (double(value.bonnet()) < max) {
     return 0;
   }
-  Store(base, entry + 20, 1);
-  Stfs(base, value, max);
+  en.set_done(1);
+  value.set_bonnet(float(max));
   return 1;
 }
 
 uint32_t GarageAnimsClose(uint8_t* base, const Calls& calls, uint32_t entry, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_82179EA8 GarageAnims::Close");
   const uint32_t f = Frame(base, stack, 112);
-  const uint32_t model =
-      vehicle_accessors::ScenePoolsGetB(base, Load(base, kScene), 7, Load(base, entry + 16));
-  const uint32_t car = Load(base, model + 48);
-  const double steps = Lfs(base, entry + 4);
-  const uint32_t value = Load(base, entry + 12);
-  const double now = Lfs(base, value);
-  const double max = Lfs(base, kMaxima + car * 48);
+  const Entry en(base, entry);
+  const uint32_t model = vehicle_accessors::ScenePoolsGetB(base, Scene(base), 7, en.model_index());
+  const uint32_t car = Model(base, model).block();
+  const double steps = double(en.steps());
+  const Values value = en.value();
+  const double now = double(value.bonnet());
+  const double max = Lfs(base, G::car_limits_address() + car * 48);
   const double v = Fsubs(now, Fdivs(max, steps));
-  const double zero = Lfs(base, kZero);
+  const double zero = double(G::zero(base));
   double stored = max;
   if (v < zero) {
     stored = zero;
   } else if (!(v > max)) {
     stored = v;
   }
-  Stfs(base, value, stored);
+  value.set_bonnet(float(stored));
   if (stored > zero) {
     return 0;
   }
-  Store(base, entry + 20, 1);
-  Stfs(base, value, zero);
+  en.set_done(1);
+  value.set_bonnet(float(zero));
   PlayMenuSound(base, calls, kOpenCue, f);
   return 1;
 }
@@ -454,13 +481,14 @@ uint32_t GarageAnimsClose(uint8_t* base, const Calls& calls, uint32_t entry, uin
 uint32_t GarageAnimsRun(uint8_t* base, const Calls& calls, uint32_t list, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8217D120 GarageAnims::Run");
   const uint32_t f = Frame(base, stack, 624);
+  const List l(base, list);
   uint32_t any = 0;
-  if (Load(base, list + 448) == 0) {
+  if (l.count() == 0) {
     return any;
   }
   uint32_t i = 0, e = list, count = 0;
   do {
-    const int32_t type = LoadS(base, e);
+    const int32_t type = Entry(base, e).type();
     bool ran = true;
     uint64_t r3 = 0;
     const uint64_t regs[2] = {list, e};
@@ -489,7 +517,7 @@ uint32_t GarageAnimsRun(uint8_t* base, const Calls& calls, uint32_t list, uint32
     }
     i++;
     e += 28;
-    count = Load(base, list + 448);
+    count = l.count();
   } while (i < count);
   if (any == 0) {
     return any;
@@ -501,7 +529,7 @@ uint32_t GarageAnimsRun(uint8_t* base, const Calls& calls, uint32_t list, uint32
   if (n != 0) {
     do {
       n = n - 1;
-      Store(base, list + 448, n);
+      l.set_count(n);
       const uint32_t from = list + 28 * n;
       Memcpy(base, calls, entry, from, 28, f, 0x8217D21C);
       if (LoadS(base, entry + 20) == 0) {
@@ -509,14 +537,14 @@ uint32_t GarageAnimsRun(uint8_t* base, const Calls& calls, uint32_t list, uint32
         Memcpy(base, calls, kept + 28 * k, from, 28, f, 0x8217D24C);
         k = Load(base, kept_count);
       }
-    } while (Load(base, list + 448) != 0);
+    } while (l.count() != 0);
   }
-  Store(base, list + 448, 0);
+  l.set_count(0);
   while (k != 0) {
     k = k - 1;
-    const uint32_t at = Load(base, list + 448);
+    const uint32_t at = l.count();
     Store(base, kept_count, k);
-    Store(base, list + 448, at + 1);
+    l.set_count(at + 1);
     Memcpy(base, calls, list + 28 * at, kept + 28 * k, 28, f, 0x8217D298);
   }
   return any;
@@ -525,10 +553,11 @@ uint32_t GarageAnimsRun(uint8_t* base, const Calls& calls, uint32_t list, uint32
 uint64_t SceneModelApplyLightKit(uint8_t* base, const Calls& calls, uint32_t model,
                                  uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820D9D10 SceneModel::ApplyLightKit");
-  if (LoadS(base, model + 5036) == 0 || LoadS(base, model + 32) == 3) {
+  const Model m(base, model);
+  if (int32_t(m.ready()) == 0 || int32_t(m.kind()) == 3) {
     return model;
   }
-  const uint32_t kit = Load(base, model + 5084);
+  const uint32_t kit = m.light_kit().address;
   if (kit == 0) {
     return 0;
   }
@@ -538,7 +567,8 @@ uint64_t SceneModelApplyLightKit(uint8_t* base, const Calls& calls, uint32_t mod
   }
   debug::FrameStateDiff_Before(base);
   Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask));
-  const uint64_t r3 = load_poll::SceneLightsApplyRecord(base, kit, model + 4224, stack, *calls.poll);
+  const uint64_t r3 = load_poll::SceneLightsApplyRecord(base, kit, m.light_kit_record_address(),
+                                                        stack, *calls.poll);
   Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask));
   debug::FrameStateDiff_After(base, "draw step part", kApplyRecord);
   return r3;
@@ -550,6 +580,7 @@ uint64_t GarageStageSetLightKit(uint8_t* base, const Calls& calls, uint32_t hold
   ITC_NATIVE_RUNNING("sub_82179678 GarageStage::SetLightKit");
   const uint32_t f = Frame(base, stack, 176);
   const uint32_t m = StageModel(base, holder);
+  const Kit k(base, Model(base, m).light_kit_record_address());
   const uint32_t table[8] = {0, 4, 3, 5, 2, 7, 1, 6};
   for (uint32_t i = 0; i < 8; i++) {
     Store(base, f + 80 + 4 * i, table[i]);
@@ -558,39 +589,39 @@ uint64_t GarageStageSetLightKit(uint8_t* base, const Calls& calls, uint32_t hold
   bool known = true;
   switch (g) {
     case 1:
-      Stfs(base, m + 4248, f1);
-      Store(base, m + 4244, word);
-      Stfs(base, m + 4252, f2);
-      Stfs(base, m + 4256, f3);
+      k.set_sides_on(float(f1));
+      k.set_sides_mode(word);
+      k.set_sides_fade(float(f2));
+      k.set_sides_rate(float(f3));
       break;
     case 2:
-      Stfs(base, m + 4264, f1);
-      Store(base, m + 4260, word);
-      Stfs(base, m + 4268, f2);
-      Stfs(base, m + 4272, f3);
+      k.set_rear_on(float(f1));
+      k.set_rear_mode(word);
+      k.set_rear_fade(float(f2));
+      k.set_rear_rate(float(f3));
       break;
     case 3:
-      Stfs(base, m + 4248, f1);
-      Store(base, m + 4244, word);
-      Stfs(base, m + 4252, f2);
-      Store(base, m + 4260, word);
-      Stfs(base, m + 4256, f3);
-      Stfs(base, m + 4264, f1);
-      Stfs(base, m + 4268, f2);
-      Stfs(base, m + 4272, f3);
+      k.set_sides_on(float(f1));
+      k.set_sides_mode(word);
+      k.set_sides_fade(float(f2));
+      k.set_rear_mode(word);
+      k.set_sides_rate(float(f3));
+      k.set_rear_on(float(f1));
+      k.set_rear_fade(float(f2));
+      k.set_rear_rate(float(f3));
       [[fallthrough]];
     case 0:
-      Stfs(base, m + 4240, f3);
-      Store(base, m + 4228, word);
-      Stfs(base, m + 4236, f2);
-      Stfs(base, m + 4232, f1);
+      k.set_front_rate(float(f3));
+      k.set_front_mode(word);
+      k.set_front_fade(float(f2));
+      k.set_front_on(float(f1));
       break;
     default:
       known = false;
       break;
   }
   if (known) {
-    Store(base, m + 4224, Load(base, f + 80 + (index << 2)));
+    k.set_texture(Load(base, f + 80 + (index << 2)));
   }
   return SceneModelApplyLightKit(base, calls, m, f);
 }
@@ -600,20 +631,21 @@ uint64_t GarageStageClearLightKit(uint8_t* base, const Calls& calls, uint32_t ho
   ITC_NATIVE_RUNNING("sub_821795E0 GarageStage::ClearLightKit");
   const uint32_t f = Frame(base, stack, 96);
   const uint32_t m = StageModel(base, holder);
+  const Kit k(base, Model(base, m).light_kit_record_address());
   switch (int32_t(group)) {
     case 0:
-      Store(base, m + 4228, 0);
+      k.set_front_mode(0);
       break;
     case 1:
-      Store(base, m + 4244, 0);
+      k.set_sides_mode(0);
       break;
     case 2:
-      Store(base, m + 4260, 0);
+      k.set_rear_mode(0);
       break;
     case 3:
-      Store(base, m + 4244, 0);
-      Store(base, m + 4260, 0);
-      Store(base, m + 4228, 0);
+      k.set_sides_mode(0);
+      k.set_rear_mode(0);
+      k.set_front_mode(0);
       break;
     default:
       break;
@@ -626,24 +658,29 @@ uint64_t FloorDraw(uint8_t* base, const Calls& calls, uint32_t scene, uint32_t m
   ITC_NATIVE_RUNNING("sub_820C8480 Floor::Draw");
   const uint32_t f = Frame(base, stack, 144);
   uint64_t r3 = scene;
-  if (int32_t(word) == 0 || LoadS(base, scene + 4) != 0) {
+  // The scene's +4572 (the floor's shape count) isn't in car-draw.toml's
+  // CarScene yet: FrontEndFloorScene's until it's merged there.
+  const schema::CarScene car_scene(base, scene);
+  const schema::FrontEndFloorScene floor_scene(base, scene);
+  if (int32_t(word) == 0 || int32_t(car_scene.model_set()) != 0) {
     return r3;
   }
   // The last row (0, 0, 0, 1) at +80, copied as two doublewords.
-  const double zero = Lfs(base, kZero);
+  const double zero = double(G::zero(base));
   Stfs(base, f + 80, zero);
   Stfs(base, f + 84, zero);
   Stfs(base, f + 88, zero);
-  Stfs(base, f + 92, Lfs(base, kOne));
+  Stfs(base, f + 92, double(G::one(base)));
   const uint32_t w0 = Load(base, f + 80), w1 = Load(base, f + 84);
   const uint32_t w2 = Load(base, f + 88), w3 = Load(base, f + 92);
   Store(base, matrix + 48, w0);
   Store(base, matrix + 52, w1);
   Store(base, matrix + 56, w2);
   Store(base, matrix + 60, w3);
-  const int32_t count = LoadS(base, scene + 4572);
+  const int32_t count = floor_scene.floor_shape_count();
   const uint32_t model = scene + 4160;
-  const uint32_t view_projection = kCameraPasses + 144;
+  const uint32_t view_projection =
+      schema::CameraPass(base, schema::CamerasGlobals::passes_address()).view_projection_address();
   for (int32_t i = 0; i < count; i++) {
     // Its back chain first (as its adapter: the plain C++ writes into the
     // frame), put back where it declines.

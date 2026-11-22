@@ -6,13 +6,20 @@
 #include "base/log.h"
 #include "guest.h"
 #include "memory/heap.h"
+#include "schema/menu_sounds.h"
+#include "schema/network_mode.h"
+#include "schema/strings_and_font.h"
+#include "schema/title_screen.h"
+#include "schema/todays_result.h"
+#include "schema/type10_mode.h"
+#include "schema/type2_mode.h"
+#include "schema/type5_mode.h"
 #include "type67_modes/type67_modes.h"
 
 namespace front_end_screen_helpers {
 
 namespace {
 
-uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
@@ -23,12 +30,14 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   return frame;
 }
 
-// The sound manager's slot (bytes into its vtable) with r4 = the bank's
-// word, r5 = the cue's.
+// The sound manager's slot (kStopCueSlot or kIsCuePlayingSlot) with r4 =
+// the bank's word, r5 = the cue's.
 uint64_t CallSlot(uint8_t* base, const Calls& calls, uint32_t slot, uint32_t frame, uint32_t lr,
                   uint32_t bank, uint32_t cue) {
-  const uint32_t manager = Load(base, kSoundManager);
-  return calls.Call(Load(base, Load(base, manager) + slot), frame, lr, manager, bank, cue);
+  const schema::AudioManager manager = schema::MenuSoundsGlobals::sound_manager(base);
+  const schema::AudioManagerVtable vtable = manager.vtable();
+  const uint32_t target = slot == kStopCueSlot ? vtable.stop_cue() : vtable.is_cue_playing();
+  return calls.Call(target, frame, lr, manager.address, bank, cue);
 }
 
 // The cue `cue` of bank 1 stopped when it's playing: its indexes at the
@@ -48,11 +57,12 @@ uint64_t StopIfPlaying(uint8_t* base, const Calls& calls, uint32_t frame, uint32
   return r3;
 }
 
-// VirtualFree(mode +848, 0, MEM_RELEASE) over the allocation layer, then
-// +848 = 0. VirtualFree's r3.
-uint64_t FreeBlock(uint8_t* base, uint32_t mode) {
-  const uint64_t r3 = memory::FreePages(Load(base, mode + kModeBlock)) ? 1 : 0;
-  Store(base, mode + kModeBlock, 0);
+// VirtualFree(the mode's block, 0, MEM_RELEASE) over the allocation layer,
+// then the block = 0. VirtualFree's r3. `Mode` the mode type's view.
+template <typename Mode>
+uint64_t FreeBlock(const Mode& mode) {
+  const uint64_t r3 = memory::FreePages(mode.template block<schema::View>().address) ? 1 : 0;
+  mode.set_block(0u);
   return r3;
 }
 
@@ -68,25 +78,27 @@ void StandSceneRelease(uint8_t* base, const Calls& calls, uint32_t frame, uint32
 // passes it). The jump's r3.
 uint64_t ReleaseStringsAndMovies(uint8_t* base, const Calls& calls, uint32_t frame,
                                  uint32_t files, uint32_t strings_lr, uint32_t jump_lr) {
-  const uint64_t r3 =
-      calls.Call(kStringsRelease, frame, strings_lr, Load(base, kStringTable), files);
+  const uint64_t r3 = calls.Call(kStringsRelease, frame, strings_lr,
+                                schema::StringsAndFontGlobals::strings(base).address, files);
   return calls.Call(kDeleteAllJump, frame, jump_lr, r3, 0);
 }
 
-bool Ready(uint8_t* base, uint32_t mode) {
-  return memory::IsPages(Load(base, mode + kModeBlock));
+template <typename Mode>
+bool Ready(const Mode& mode) {
+  return memory::IsPages(mode.template block<schema::View>().address);
 }
 
 }  // namespace
 
 std::optional<uint64_t> ModeType2Release(uint8_t* base, uint32_t mode, uint32_t sp,
                                          const Calls& calls) {
-  if (!Ready(base, mode)) {
+  const schema::ModeType2 m(base, mode);
+  if (!Ready(m)) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_82196EC0 ModeType2::Release");
   const uint32_t frame = Frame(base, sp, 144);
-  FreeBlock(base, mode);
+  FreeBlock(m);
   StopIfPlaying(base, calls, frame, 80, 0, 0x82196F18, 0x82196F44);
   const uint64_t r3 = StopIfPlaying(base, calls, frame, 96, 2, 0x82196F6C, 0x82196F98);
   StandSceneRelease(base, calls, frame, 0x82196F9C, r3);
@@ -95,12 +107,13 @@ std::optional<uint64_t> ModeType2Release(uint8_t* base, uint32_t mode, uint32_t 
 
 std::optional<uint64_t> ModeType4Release(uint8_t* base, uint32_t mode, uint32_t sp,
                                          const Calls& calls) {
-  if (!Ready(base, mode)) {
+  const schema::ModeType4 m(base, mode);
+  if (!Ready(m)) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_82224AB8 ModeType4::Release");
   const uint32_t frame = Frame(base, sp, 112);
-  FreeBlock(base, mode);
+  FreeBlock(m);
   ReleaseStringsAndMovies(base, calls, frame, 3, 0x82224AF8, 0x82224AFC);
   Store(base, frame + 80, 1);
   Store(base, frame + 84, 1);
@@ -109,47 +122,51 @@ std::optional<uint64_t> ModeType4Release(uint8_t* base, uint32_t mode, uint32_t 
 
 std::optional<uint64_t> ModeType5Release(uint8_t* base, uint32_t mode, uint32_t sp,
                                          const Calls& calls) {
-  if (!Ready(base, mode)) {
+  const schema::ModeType5 m(base, mode);
+  if (!Ready(m)) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_8222FB90 ModeType5::Release");
   const uint32_t frame = Frame(base, sp, 128);
-  FreeBlock(base, mode);
+  FreeBlock(m);
   StopIfPlaying(base, calls, frame, 80, 3, 0x8222FBEC, 0x8222FC18);
   return ReleaseStringsAndMovies(base, calls, frame, 59, 0x8222FC28, 0x8222FC2C);
 }
 
 std::optional<uint64_t> ModeType9Release(uint8_t* base, uint32_t mode, uint32_t sp,
                                          const Calls& calls) {
-  if (!Ready(base, mode)) {
+  const schema::ModeType9 m(base, mode);
+  if (!Ready(m)) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_8225D590 ModeType9::Release");
   const uint32_t frame = Frame(base, sp, 128);
-  FreeBlock(base, mode);
+  FreeBlock(m);
   StopIfPlaying(base, calls, frame, 80, 2, 0x8225D5EC, 0x8225D618);
   return ReleaseStringsAndMovies(base, calls, frame, 171, 0x8225D628, 0x8225D62C);
 }
 
 std::optional<uint64_t> ModeType10Release(uint8_t* base, uint32_t mode, uint32_t sp,
                                           const Calls& calls) {
-  if (!Ready(base, mode)) {
+  const schema::ModeType10 m(base, mode);
+  if (!Ready(m)) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_82288898 ModeType10::Release");
   const uint32_t frame = Frame(base, sp, 96);
-  FreeBlock(base, mode);
+  FreeBlock(m);
   return ReleaseStringsAndMovies(base, calls, frame, 11, 0x822888D8, 0x822888DC);
 }
 
 std::optional<uint64_t> ModeType12Release(uint8_t* base, uint32_t mode, uint32_t sp,
                                           const Calls& calls) {
-  if (!Ready(base, mode)) {
+  const schema::ModeType12 m(base, mode);
+  if (!Ready(m)) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_82277DB0 ModeType12::Release");
   const uint32_t frame = Frame(base, sp, 96);
-  const uint64_t r3 = FreeBlock(base, mode);
+  const uint64_t r3 = FreeBlock(m);
   StandSceneRelease(base, calls, frame, 0x82277DE4, r3);
   return ReleaseStringsAndMovies(base, calls, frame, 59, 0x82277DF4, 0x82277DF8);
 }

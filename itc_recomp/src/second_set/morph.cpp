@@ -8,6 +8,8 @@
 #include "camera_modes/steps.h"
 #include "guest.h"
 #include "native/buffers.h"
+#include "schema/models.h"
+#include "schema/second_set.h"
 
 #include <bit>
 #include <cstdlib>
@@ -37,8 +39,10 @@ simde__m128 Lvx(uint8_t* base, uint32_t address) {
   return VectorOf(Load(base, at), Load(base, at + 4), Load(base, at + 8), Load(base, at + 12));
 }
 
-uint32_t ShapeWord(uint8_t* base, uint32_t model, uint32_t shape, uint32_t offset) {
-  return Load(base, shape * 544 + Load(base, model + 40) + offset);
+// Shape `shape` of `model` (the model's +40, 544 bytes a shape).
+schema::ModelShape Shape(uint8_t* base, uint32_t model, uint32_t shape) {
+  return schema::ModelShape(
+      base, shape * schema::ModelShape::kSize + schema::Model(base, model).shapes().address);
 }
 
 // The blends' copies: whether Buffers_Memcpy will copy (checked before
@@ -77,27 +81,28 @@ uint32_t Lines(uint32_t bytes) {
 BlendResult Blend6(uint8_t* base, uint32_t morph, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8258B578 Morph::Blend6");
   const uint32_t sp = stack - 128;
-  const uint32_t bytes = Load(base, morph + 116) << 4;
-  const uint32_t out = Load(base, morph + 8);
-  Copy(base, out, Load(base, morph + 0), bytes, 0x8258B5A8);
+  const schema::Morph m(base, morph);
+  const uint32_t bytes = m.vertices() << 4;
+  const uint32_t out = m.out1().address;
+  Copy(base, out, m.base_stream(), bytes, 0x8258B5A8);
   BlendResult result{out, Flush::kUnchanged};
-  const uint32_t targets = Load(base, morph + 112);
+  const uint32_t targets = m.count();
   if (targets == 0) {
     return result;
   }
-  const uint32_t vertices = Load(base, morph + 116);
+  const uint32_t vertices = m.vertices();
   Stfs(base, sp + 92, Lfs(base, 0x82000A34));
   result.flush = Flush::kOff;
   for (uint32_t i = 0; i < targets; i++) {
-    WeightVector(base, sp, morph + 80 + 4 * i);
+    WeightVector(base, sp, m.weights_address() + 4 * i);
     result.flush = Flush::kOff;
     if (vertices == 0) {
       continue;
     }
     result.r3 = sp + 80;
     const simde__m128 weight = Lvx(base, sp + 80);
-    const uint32_t from = Load(base, morph + 0) - out;
-    const uint32_t target = Load(base, morph + 16 + 4 * i) - out;
+    const uint32_t from = m.base_stream() - out;
+    const uint32_t target = Load(base, m.targets_address() + 4 * i) - out;
     uint32_t at = out;
     for (uint32_t k = 0; k < vertices; k++) {
       const simde__m128 t = Lvx(base, target + at);
@@ -116,18 +121,19 @@ BlendResult Blend6(uint8_t* base, uint32_t morph, uint32_t stack) {
 BlendResult Blend7(uint8_t* base, uint32_t morph, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8258B678 Morph::Blend7");
   const uint32_t sp = stack - 160;
-  const uint32_t bytes = Load(base, morph + 116) << 4;
+  const schema::Morph m(base, morph);
+  const uint32_t bytes = m.vertices() << 4;
   Store(base, sp + 84, bytes);
-  Copy(base, Load(base, morph + 8), Load(base, morph + 0), bytes, 0x8258B6A4);
-  const uint32_t out2 = Load(base, morph + 12);
-  Copy(base, out2, Load(base, morph + 4), bytes, 0x8258B6B4);
+  Copy(base, m.out1().address, m.base_stream(), bytes, 0x8258B6A4);
+  const uint32_t out2 = m.out2().address;
+  Copy(base, out2, m.base_stream2(), bytes, 0x8258B6B4);
   BlendResult result{out2, Flush::kUnchanged};
-  const uint32_t targets = Load(base, morph + 112);
+  const uint32_t targets = m.count();
   if (targets != 0) {
-    const uint32_t vertices = Load(base, morph + 116);
+    const uint32_t vertices = m.vertices();
     Stfs(base, sp + 108, Lfs(base, 0x82000A34));
     for (uint32_t i = 0; i < targets; i++) {
-      const double w = Lfs(base, morph + 80 + 4 * i);
+      const double w = Lfs(base, m.weights_address() + 4 * i);
       Stfs(base, sp + 96, w);
       Stfs(base, sp + 100, w);
       Stfs(base, sp + 104, w);
@@ -135,11 +141,11 @@ BlendResult Blend7(uint8_t* base, uint32_t morph, uint32_t stack) {
       if (vertices == 0) {
         continue;
       }
-      const uint32_t base1 = Load(base, morph + 0);
-      const uint32_t target1 = Load(base, morph + 16 + 4 * i);
-      const uint32_t second = Load(base, morph + 48 + 4 * i);
-      const uint32_t base2 = Load(base, morph + 4);
-      const uint32_t out1 = Load(base, morph + 8);
+      const uint32_t base1 = m.base_stream();
+      const uint32_t target1 = Load(base, m.targets_address() + 4 * i);
+      const uint32_t second = Load(base, m.target_seconds_address() + 4 * i);
+      const uint32_t base2 = m.base_stream2();
+      const uint32_t out1 = m.out1().address;
       result.r3 = uint64_t(second) - uint64_t(target1);
       const simde__m128 weight = Lvx(base, sp + 96);
       for (uint32_t k = 0; k < vertices; k++) {
@@ -170,53 +176,55 @@ BlendResult Blend7(uint8_t* base, uint32_t morph, uint32_t stack) {
 
 uint32_t ModelStreamData(uint8_t* base, uint32_t model, uint32_t shape) {
   ITC_NATIVE_RUNNING("sub_82594A60 Model::StreamData");
-  return ShapeWord(base, model, shape, 388);
+  return Shape(base, model, shape).stream1_offset();
 }
 
 uint32_t ModelStreamSize(uint8_t* base, uint32_t model, uint32_t shape) {
   ITC_NATIVE_RUNNING("sub_82594A78 Model::StreamSize");
-  return ShapeWord(base, model, shape, 268);
+  // Stream 1's descriptor's +12 (models' ModelShape has no field there).
+  return Load(base, Shape(base, model, shape).stream1_address() + 12);
 }
 
 uint32_t ModelStreamData2(uint8_t* base, uint32_t model, uint32_t shape) {
   ITC_NATIVE_RUNNING("sub_82594A90 Model::StreamData2");
-  return ShapeWord(base, model, shape, 392);
+  return Shape(base, model, shape).stream2_offset();
 }
 
 uint32_t ModelStreamSize2(uint8_t* base, uint32_t model, uint32_t shape) {
   ITC_NATIVE_RUNNING("sub_82594AA8 Model::StreamSize2");
-  return ShapeWord(base, model, shape, 284);
+  // Stream 2's descriptor's +12 (models' ModelShape has no field there).
+  return Load(base, Shape(base, model, shape).stream2_address() + 12);
 }
 
 Flush MorphSetUp(uint8_t* base, uint32_t model, uint32_t morph, uint32_t shape,
                  uint32_t indices, uint32_t weights, uint32_t count) {
   ITC_NATIVE_RUNNING("sub_82594C18 Morph::SetUp");
-  const uint32_t at = shape * 544 + Load(base, model + 40);
-  const uint32_t first = Load(base, at + 400);
-  const uint32_t second = Load(base, at + 404);
+  const schema::ModelShape at = Shape(base, model, shape);
+  const uint32_t first = at.skin_array_a();
+  const uint32_t second = at.skin_array_b();
   if (count >= 8) {
     count = 7;
   }
-  Store(base, morph + 0, first + 16);
-  Store(base, morph + 4, second + 16);
-  Store(base, morph + 116, Load(base, first + 0));
-  Store(base, morph + 112, count);
-  Store(base, morph + 120, Load(base, second + 4));
+  const schema::Morph m(base, morph);
+  m.set_base_stream(first + 16);
+  m.set_base_stream2(second + 16);
+  m.set_vertices(Load(base, first + 0));
+  m.set_count(count);
+  m.set_kind(Load(base, second + 4));
   Flush flush = Flush::kUnchanged;
   for (uint32_t i = 0; i < count; i++) {
-    const uint32_t target = Load(base, Load(base, indices + 4 * i) * 544 +
-                                           Load(base, model + 40) + 400);
-    if (Load(base, morph + 116) != Load(base, target + 0)) {
+    const uint32_t target = Shape(base, model, Load(base, indices + 4 * i)).skin_array_a();
+    if (m.vertices() != Load(base, target + 0)) {
       ITC_LOG_WARN("Second set: Morph::SetUp's debug message 0x8206CD20 ({} against {})",
-                   Load(base, morph + 116), Load(base, target + 0));
+                   m.vertices(), Load(base, target + 0));
     }
-    if (Load(base, morph + 120) != Load(base, second + 4)) {
+    if (m.kind() != Load(base, second + 4)) {
       ITC_LOG_WARN("Second set: Morph::SetUp's debug message 0x8206CD4C ({} against {})",
-                   Load(base, morph + 120), Load(base, target + 4));
+                   m.kind(), Load(base, target + 4));
     }
-    Store(base, morph + 48 + 4 * i, second + 16);
-    Store(base, morph + 16 + 4 * i, target + 16);
-    Stfs(base, morph + 80 + 4 * i, Lfs(base, weights + 4 * i));
+    Store(base, m.target_seconds_address() + 4 * i, second + 16);
+    Store(base, m.targets_address() + 4 * i, target + 16);
+    Stfs(base, m.weights_address() + 4 * i, Lfs(base, weights + 4 * i));
     flush = Flush::kOff;
   }
   return flush;
@@ -224,16 +232,17 @@ Flush MorphSetUp(uint8_t* base, uint32_t model, uint32_t morph, uint32_t shape,
 
 std::optional<BlendResult> MorphBlend(uint8_t* base, uint32_t morph, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8258BD28 Morph::Blend");
-  const uint32_t kind = Load(base, morph + 120);
+  const schema::Morph m(base, morph);
+  const uint32_t kind = m.kind();
   if (kind == 8) {
     return std::nullopt;
   }
   if (kind != 6 && kind != 7) {
     return BlendResult{morph, Flush::kUnchanged};
   }
-  const uint32_t bytes = Load(base, morph + 116) << 4;
-  if (!WillCopy(Load(base, morph + 8), Load(base, morph + 0), bytes) ||
-      (kind == 7 && !WillCopy(Load(base, morph + 12), Load(base, morph + 4), bytes))) {
+  const uint32_t bytes = m.vertices() << 4;
+  if (!WillCopy(m.out1().address, m.base_stream(), bytes) ||
+      (kind == 7 && !WillCopy(m.out2().address, m.base_stream2(), bytes))) {
     return std::nullopt;
   }
   return kind == 6 ? Blend6(base, morph, stack) : Blend7(base, morph, stack);
@@ -242,19 +251,20 @@ std::optional<BlendResult> MorphBlend(uint8_t* base, uint32_t morph, uint32_t st
 std::optional<BlendResult> MorphRun(uint8_t* base, uint32_t morph, uint32_t out1, uint32_t out2,
                                     uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_82594D10 Morph::Run");
-  const uint32_t kind = Load(base, morph + 120);
+  const schema::Morph m(base, morph);
+  const uint32_t kind = m.kind();
   if (kind == 8) {
     return std::nullopt;
   }
   if (kind == 6 || kind == 7) {
-    const uint32_t bytes = Load(base, morph + 116) << 4;
-    if (!WillCopy(out1, Load(base, morph + 0), bytes) ||
-        (kind == 7 && !WillCopy(out2, Load(base, morph + 4), bytes))) {
+    const uint32_t bytes = m.vertices() << 4;
+    if (!WillCopy(out1, m.base_stream(), bytes) ||
+        (kind == 7 && !WillCopy(out2, m.base_stream2(), bytes))) {
       return std::nullopt;
     }
   }
-  Store(base, morph + 8, out1);
-  Store(base, morph + 12, out2);
+  m.set_out1(out1);
+  m.set_out2(out2);
   return MorphBlend(base, morph, stack);
 }
 

@@ -1,0 +1,57 @@
+# The schema of docs/functions/alt-hud.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The alternate HUD: a second dashboard on UI movie 22, probably the
+# replay's, made by RaceScreens::Make1004 at the race HUD holder's +1004
+# (src/alt_hud/).
+
+# The object (264 bytes, cleared by RaceScreens::Make1004).
+[AltHud]
+measure = "RaceScreens@+1004.+0"
+measures = ["AltHud::ToggleView.r3.+0"]
+size = 264
+origin = "allocated"
+fields = [
+  { name = "shown", offset = 0, type = "u32", note = "node 3's flag, the toggle AltHud::Tick flips on X" },
+  { name = "tach_curve", offset = 4, type = "bytes", count = 112, note = "the tachometer's HudCurve (one of three at 0x8200FD28)" },
+  { name = "tach_output", offset = 104, type = "f32", note = "the tachometer curve's output (its +100): the needle's rotation" },
+  { name = "boost_curve", offset = 116, type = "bytes", count = 112, note = "the boost's HudCurve (copied from 0x8200FE78)" },
+  { name = "boost_output", offset = 216, type = "f32", note = "the boost curve's output (its +100): the needle's rotation" },
+  { name = "bar", offset = 228, type = "f32", note = "the bar's value (the car's +2420)" },
+  { name = "bar_high", offset = 232, type = "f32", note = "the bar's range top; nothing found writes it (0.0)" },
+  { name = "bar_low", offset = 236, type = "f32", note = "the bar's range bottom; nothing found writes it (0.0)" },
+  { name = "car", offset = 240, type = "ptr", note = "a Vehicle: Vehicle::Get(player)" },
+  { name = "slot0", offset = 244, type = "s32", note = "the first extra gauge: 0 float, 1 int to 119, 2 int to 149, -1 none" },
+  { name = "slot1", offset = 248, type = "s32", note = "the second extra gauge, as slot0" },
+  { name = "slot2", offset = 252, type = "s32", note = "the third extra gauge, as slot0" },
+  { name = "big_view", offset = 256, type = "u32", note = "AltHud::ToggleView's flag: the big speed readout shown" },
+  { name = "player", offset = 260, type = "u32", note = "the player (0 or 1)" },
+]
+
+# The holder's +1004: two words, both made by RaceScreens::Make1004 and
+# freed by AltHud::Destroy.
+[AltHudHolder]
+measure = "RaceScreens@+1004"
+measures = ["RaceScreens::~RaceScreens.r3@+1004", "AltHud::ToggleView.r3"]
+size = 8
+origin = "embedded"
+fields = [
+  { name = "object", offset = 0, type = "ptr", to = "AltHud", note = "264 bytes, cleared" },
+  { name = "menu_list", offset = 4, type = "ptr", note = "a MenuList (72 bytes, one item); its X press flips the toggle" },
+]
+
+[globals]
+input_records = { address = 0x826C5B30, type = "bytes", count = 8, note = "the car input records by player (racer-controllers.md): +4 the throttle, +6 the brake, +8 the steering, signed halfwords" }
+power_low = { address = 0x820029F0, type = "f32", note = "AltHud::PowerClass: below the stock power times this, class 0" }
+power_high = { address = 0x82002C40, type = "f32", note = "AltHud::PowerClass: below the stock power times this, class 1, else 2" }
+input_scale = { address = 0x82002BD4, type = "f32", note = "the input halfwords' scale, probably 1 / 32,767" }
+kmh_factor = { address = 0x8200A510, type = "f64", note = "the km/h's factor for the dials" }
+ten = { address = 0x8200F728, type = "f64", note = "10.0, the digits' base for PowInt" }
+tach_offset = { address = 0x8200F720, type = "f32", note = "added to the tachometer curve's output" }
+tach_curves = { address = 0x8200FD28, type = "bytes", count = 336, note = "three 112-byte tachometer curves" }
+boost_curve = { address = 0x8200FE78, type = "bytes", count = 112, note = "the boost's curve" }
+curve_table = { address = 0x8200FEE8, type = "bytes", count = 16, note = "16 bytes an index (the racer record's +60): word 0 the curve, words 1 to 3 the dial's faces by power class" }
+steering_scale = { address = 0x82010368, type = "f32", note = "AltHud::SetSteering's scale" }

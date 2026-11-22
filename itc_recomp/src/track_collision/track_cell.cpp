@@ -4,6 +4,8 @@
 #include "track_collision/track_collision.h"
 
 #include "car_physics/float_ops.h"
+#include "schema/collision_world.h"
+#include "schema/track_route.h"
 #include "track_route/track_route.h"
 
 #include "base/log.h"
@@ -14,39 +16,46 @@ using namespace car_physics::ops;
 
 namespace {
 
-constexpr uint32_t kHeightTolerance = 0x82001BDC;  // the point's y within this of a slice's
-constexpr uint32_t kCenterReach = 0x82002A28;      // each axis from the outline's center
-constexpr uint32_t kCenterReachSquared = 0x8200681C;
-constexpr uint32_t kInsideEpsilon = 0x820029D8;
-constexpr uint32_t kBoundsMargin = 0x82001FD8;
-constexpr uint32_t kFarthest = 0x82006824;  // SearchAll's first best distance
-constexpr uint32_t kLinkedTried = 0x826C5B04;
-constexpr uint32_t kGroundRaise = 0x82001BE4;  // 0.5
+using G = schema::CollisionWorldGlobals;
+using Point = schema::TrackQueryPoint;
+using Section = schema::TrackMeshSection;
+using Slice = schema::TrackMeshSlice;
+using Link = schema::TrackMeshLink;
+using OutlinePoint = schema::TrackOutlinePoint;
+using Position = schema::TrackPosition;
 
 uint32_t S16(uint8_t* base, uint32_t address) {
   return uint32_t(int32_t(int16_t(guest::LoadU16(base, address))));
+}
+uint32_t S16(uint16_t value) {
+  return uint32_t(int32_t(int16_t(value)));
 }
 uint32_t S16(uint32_t value) {
   return uint32_t(int32_t(int16_t(value)));
 }
 // The mesh file's section table ([[mesh + 4] + 4]).
 uint32_t SectionTable(uint8_t* base, uint32_t mesh) {
-  return guest::LoadU32(base, guest::LoadU32(base, mesh + 4) + 4);
+  return schema::TrackMesh(base, mesh).file().sections();
 }
 uint32_t Slices(uint8_t* base, uint32_t section) {
-  return guest::LoadU32(base, section + 72) + section;
+  return Section(base, section).slices() + section;
 }
 uint32_t Outline(uint8_t* base, uint32_t section) {
-  return guest::LoadU16(base, section + 2) + section;
+  return Section(base, section).outline() + section;
+}
+// Corner `i` of the slice's outline (a point's index in the section's
+// outline).
+uint32_t Corner(uint8_t* base, uint32_t slice, uint32_t i) {
+  return guest::LoadU16(base, Slice(base, slice).corners_address() + 2 * i);
 }
 // An outline's corner count: 3 when its +18 is 0xFFFF, else 4.
 int32_t Corners(uint8_t* base, uint32_t slice) {
-  return guest::LoadU16(base, slice + 18) == 0xFFFF ? 3 : 4;
+  return Slice(base, slice).corner_3() == 0xFFFF ? 3 : 4;
 }
 // The point's y within the tolerance of the slice's height (a NaN passes,
 // as in the original's two tests).
 bool WithinHeight(uint8_t* base, uint32_t slice, double y, double tolerance) {
-  const double height = Lfs(base, slice + 20);
+  const double height = double(Slice(base, slice).height());
   if (y > Fadds(height, tolerance)) {
     return false;
   }
@@ -57,37 +66,38 @@ bool WithinHeight(uint8_t* base, uint32_t slice, double y, double tolerance) {
 
 uint32_t TrackMeshSliceContains(uint8_t* base, uint32_t slice, uint32_t outline, uint32_t point) {
   ITC_NATIVE_RUNNING("sub_820F6A38 TrackMesh::SliceContains");
-  if (!WithinHeight(base, slice, Lfs(base, point + 4), Lfs(base, kHeightTolerance))) {
+  if (!WithinHeight(base, slice, double(Point(base, point).y()),
+                    double(G::height_tolerance(base)))) {
     return 0;
   }
   const int32_t count = Corners(base, slice);
   double sum_x = Lfs(base, kZero), sum_z = sum_x;
   for (int32_t i = 0; i < count; i++) {
-    const uint32_t p = guest::LoadU16(base, slice + 12 + 2 * uint32_t(i)) * 8 + outline;
-    sum_x = Fadds(Lfs(base, p + 0), sum_x);
-    sum_z = Fadds(Lfs(base, p + 4), sum_z);
+    const uint32_t p = Corner(base, slice, uint32_t(i)) * 8 + outline;
+    sum_x = Fadds(double(OutlinePoint(base, p).x()), sum_x);
+    sum_z = Fadds(double(OutlinePoint(base, p).z()), sum_z);
   }
-  const double px = Lfs(base, point + 0), pz = Lfs(base, point + 8);
+  const double px = double(Point(base, point).x()), pz = double(Point(base, point).z());
   const double inverse = Fdivs(Lfs(base, kOne), double(float(double(int64_t(count)))));
   const double dx = Fabs(Fmsubs(inverse, sum_x, px));
   const double dz = Fabs(Fmsubs(inverse, sum_z, pz));
-  const double reach = Lfs(base, kCenterReach);
+  const double reach = double(G::center_reach(base));
   if (dx > reach || dz > reach) {
     return 0;
   }
-  if (Fmadds(dz, dz, Fmuls(dx, dx)) > Lfs(base, kCenterReachSquared)) {
+  if (Fmadds(dz, dz, Fmuls(dx, dx)) > double(G::center_reach_squared(base))) {
     return 0;
   }
-  const double epsilon = Lfs(base, kInsideEpsilon);
+  const double epsilon = double(G::inside_epsilon(base));
   for (int32_t i = 0; i < count; i++) {
-    const double z = Lfs(base, point + 8);
-    const uint32_t p = guest::LoadU16(base, slice + 12 + 2 * uint32_t(i)) * 8 + outline;
-    const double ax = Fsubs(Lfs(base, p + 0), px);
-    const double az = Fsubs(Lfs(base, p + 4), z);
+    const double z = double(Point(base, point).z());
+    const uint32_t p = Corner(base, slice, uint32_t(i)) * 8 + outline;
+    const double ax = Fsubs(double(OutlinePoint(base, p).x()), px);
+    const double az = Fsubs(double(OutlinePoint(base, p).z()), z);
     const uint32_t next = uint32_t((i + 1) % count);
-    const uint32_t q = guest::LoadU16(base, slice + 12 + 2 * next) * 8 + outline;
-    const double bz = Fsubs(Lfs(base, q + 4), z);
-    const double bx = Fsubs(Lfs(base, q + 0), px);
+    const uint32_t q = Corner(base, slice, next) * 8 + outline;
+    const double bz = Fsubs(double(OutlinePoint(base, q).z()), z);
+    const double bx = Fsubs(double(OutlinePoint(base, q).x()), px);
     if (Fmsubs(bx, az, Fmuls(bz, ax)) > epsilon) {
       return 0;
     }
@@ -101,14 +111,14 @@ uint32_t TrackMeshFindSlice(uint8_t* base, uint32_t section, uint32_t slice, uin
   const uint32_t outline = Outline(base, section);
   int32_t first, end;
   if (int32_t(slice) == -1) {
-    end = int32_t(S16(base, section + 0));
+    end = int32_t(S16(Section(base, section).slice_count()));
     first = 0;
   } else {
     first = int32_t(slice) - 4;
     if (first < 0) {
       first = 0;
     }
-    end = int32_t(S16(base, section + 0));
+    end = int32_t(S16(Section(base, section).slice_count()));
     if (!(int32_t(slice) + 4 > end)) {
       end = int32_t(slice) + 4;
     }
@@ -125,10 +135,10 @@ uint32_t TrackPositionCrossSection(uint8_t* base, uint32_t position, uint32_t me
                                    uint32_t point) {
   ITC_NATIVE_RUNNING("sub_820F71B0 TrackPosition::CrossSection");
   uint32_t found = 0;
-  uint32_t section_index = guest::LoadU16(base, position + 0);
+  uint32_t section_index = Position(base, position).section();
   const uint32_t table = SectionTable(base, mesh);
   uint32_t section = guest::LoadU32(base, S16(section_index) * 4 + table);
-  uint32_t start = guest::LoadU16(base, position + 2);
+  uint32_t start = Position(base, position).slice();
   uint32_t slice = start;
   if (int32_t(S16(start)) < 0) {
     start = 0;
@@ -138,15 +148,16 @@ uint32_t TrackPositionCrossSection(uint8_t* base, uint32_t position, uint32_t me
     slice = last;
     found = 1;
   }
-  if (int32_t(S16(slice)) < 0 || int32_t(S16(slice)) >= int32_t(S16(base, section + 0))) {
+  if (int32_t(S16(slice)) < 0 ||
+      int32_t(S16(slice)) >= int32_t(S16(Section(base, section).slice_count()))) {
     // The sections its links lead to.
     for (uint32_t i = 0; i < 6; i++) {
-      const uint32_t link = section + 6 + 6 * i;
-      if (guest::LoadU16(base, link - 2) == 0xFFFF) {
+      const Link link(base, Section(base, section).links_address() + 6 * i);
+      if (link.from_slice() == 0xFFFF) {
         continue;
       }
-      const uint32_t target_index = guest::LoadU16(base, link + 0);
-      const uint32_t target_slice = S16(base, link + 2);
+      const uint32_t target_index = link.section();
+      const uint32_t target_slice = S16(link.slice());
       const uint32_t target = guest::LoadU32(base, S16(target_index) * 4 + table);
       last = S16(TrackMeshFindSlice(base, target, target_slice, point));
       if (int32_t(last) != -1) {
@@ -158,7 +169,7 @@ uint32_t TrackPositionCrossSection(uint8_t* base, uint32_t position, uint32_t me
       }
     }
   }
-  const uint32_t count = guest::LoadU16(base, section + 0);
+  const uint32_t count = Section(base, section).slice_count();
   if (int32_t(S16(slice)) < 0) {
     last = S16(TrackMeshFindSlice(base, section, S16(count - 1), point));
   } else if (!(int32_t(S16(slice)) < int32_t(S16(count)))) {
@@ -171,34 +182,34 @@ uint32_t TrackPositionCrossSection(uint8_t* base, uint32_t position, uint32_t me
   if (int32_t(S16(slice)) < 0 || !(int32_t(S16(slice)) < int32_t(S16(count)))) {
     slice = 0;
   }
-  guest::StoreU16(base, position + 0, uint16_t(section_index));
-  guest::StoreU16(base, position + 2, uint16_t(slice));
+  Position(base, position).set_section(uint16_t(section_index));
+  Position(base, position).set_slice(uint16_t(slice));
   return found;
 }
 
 uint32_t TrackMeshSectionOutcode(uint8_t* base, uint32_t mesh, uint32_t point, uint32_t section) {
   ITC_NATIVE_RUNNING("sub_820F7D70 TrackMesh::SectionOutcode");
   const uint32_t s = guest::LoadU32(base, S16(section) * 4 + SectionTable(base, mesh));
-  const double margin = Lfs(base, kBoundsMargin);
+  const double margin = double(G::bounds_margin(base));
   uint32_t code = 0;
-  const double x = Lfs(base, point + 0);
-  if (x < Fsubs(Lfs(base, s + 48), margin)) {
+  const double x = double(Point(base, point).x());
+  if (x < Fsubs(double(Section(base, s).min_x()), margin)) {
     code = 1;
-  } else if (x > Fadds(Lfs(base, s + 56), margin)) {
+  } else if (x > Fadds(double(Section(base, s).max_x()), margin)) {
     code = 2;
   }
-  const double a = Lfs(base, s + 44), b = Lfs(base, s + 40);
-  const double y = Lfs(base, point + 4);
+  const double a = double(Section(base, s).center_y()), b = double(Section(base, s).half_height());
+  const double y = double(Point(base, point).y());
   if (y < Fsubs(Fsubs(a, b), margin)) {
     code |= 4;
   } else if (y > Fadds(Fadds(b, a), margin)) {
     code |= 8;
   }
-  const double z = Lfs(base, point + 8);
-  if (z < Fsubs(Lfs(base, s + 52), margin)) {
+  const double z = double(Point(base, point).z());
+  if (z < Fsubs(double(Section(base, s).min_z()), margin)) {
     return code | 16;
   }
-  if (z > Fadds(Lfs(base, s + 60), margin)) {
+  if (z > Fadds(double(Section(base, s).max_z()), margin)) {
     code |= 32;
   }
   return code;
@@ -207,28 +218,29 @@ uint32_t TrackMeshSectionOutcode(uint8_t* base, uint32_t mesh, uint32_t point, u
 uint32_t TrackMeshNearestSlice(uint8_t* base, uint32_t section, uint32_t point, uint32_t best) {
   ITC_NATIVE_RUNNING("sub_820F6C88 TrackMesh::NearestSlice");
   uint32_t nearest = uint32_t(-1);
-  double best_distance = Lfs(base, best);
+  const schema::TrackNearestDistance best_view(base, best);
+  double best_distance = double(best_view.distance());
   uint32_t slice = Slices(base, section);
   const uint32_t outline = Outline(base, section);
-  if (!(int32_t(S16(base, section + 0)) > 0)) {
+  if (!(int32_t(S16(Section(base, section).slice_count())) > 0)) {
     return nearest;
   }
-  const double reach = Lfs(base, kCenterReachSquared);
+  const double reach = double(G::center_reach_squared(base));
   const double one = Lfs(base, kOne);
   const double zero = Lfs(base, kZero);
-  const double tolerance = Lfs(base, kHeightTolerance);
-  for (int32_t i = 0; i < int32_t(S16(base, section + 0)); i++, slice += 28) {
-    if (!WithinHeight(base, slice, Lfs(base, point + 4), tolerance)) {
+  const double tolerance = double(G::height_tolerance(base));
+  for (int32_t i = 0; i < int32_t(S16(Section(base, section).slice_count())); i++, slice += 28) {
+    if (!WithinHeight(base, slice, double(Point(base, point).y()), tolerance)) {
       continue;
     }
     const int32_t count = Corners(base, slice);
     double sum_x = zero, sum_z = zero;
     for (int32_t k = 0; k < count; k++) {
-      const uint32_t p = guest::LoadU16(base, slice + 12 + 2 * uint32_t(k)) * 8 + outline;
-      sum_x = Fadds(Lfs(base, p + 0), sum_x);
-      sum_z = Fadds(Lfs(base, p + 4), sum_z);
+      const uint32_t p = Corner(base, slice, uint32_t(k)) * 8 + outline;
+      sum_x = Fadds(double(OutlinePoint(base, p).x()), sum_x);
+      sum_z = Fadds(double(OutlinePoint(base, p).z()), sum_z);
     }
-    const double px = Lfs(base, point + 0), pz = Lfs(base, point + 8);
+    const double px = double(Point(base, point).x()), pz = double(Point(base, point).z());
     const double inverse = Fdivs(one, double(float(double(int64_t(count)))));
     const double cx = Fmuls(inverse, sum_x), cz = Fmuls(inverse, sum_z);
     const double dx = Fsubs(cx, px);
@@ -238,12 +250,12 @@ uint32_t TrackMeshNearestSlice(uint8_t* base, uint32_t section, uint32_t point, 
       continue;
     }
     if (best_distance > distance) {
-      Stfs(base, best, distance);
+      best_view.set_distance(float(distance));
       best_distance = distance;
       nearest = uint32_t(i);
     }
     if (TrackMeshSliceContains(base, slice, outline, point) != 0) {
-      Stfs(base, best, zero);
+      best_view.set_distance(float(zero));
       return uint32_t(i);
     }
   }
@@ -253,44 +265,44 @@ uint32_t TrackMeshNearestSlice(uint8_t* base, uint32_t section, uint32_t point, 
 uint32_t TrackPositionSearchLinked(uint8_t* base, uint32_t position, uint32_t point, uint32_t mesh) {
   ITC_NATIVE_RUNNING("sub_820F7EE8 TrackPosition::SearchLinked");
   for (uint32_t i = 0; i < 6; i++) {
-    guest::StoreU16(base, kLinkedTried + 2 * i, 0xFFFF);
+    guest::StoreU16(base, G::linked_tried_address() + 2 * i, 0xFFFF);
   }
   uint32_t tried = 0;
-  const int32_t own = int32_t(S16(base, position + 0));
+  const int32_t own = int32_t(S16(Position(base, position).section()));
   if (own != -1) {
     const uint32_t section =
         guest::LoadU32(base, uint32_t(own) * 4 + SectionTable(base, mesh));
     bool found = false;
     for (uint32_t i = 0; i < 6; i++) {
-      const uint32_t link = section + 6 + 6 * i;
-      if (guest::LoadU16(base, link - 2) == 0xFFFF) {
+      const Link link(base, Section(base, section).links_address() + 6 * i);
+      if (link.from_slice() == 0xFFFF) {
         continue;
       }
-      const uint32_t target = S16(base, link + 0);
+      const uint32_t target = S16(link.section());
       if (TrackMeshSectionOutcode(base, mesh, point, target) != 0) {
         continue;
       }
       const uint32_t slice = TrackMeshFindSlice(
           base, guest::LoadU32(base, target * 4 + SectionTable(base, mesh)), uint32_t(-1), point);
       if (int32_t(slice) != -1) {
-        guest::StoreU16(base, position + 2, uint16_t(slice));
-        guest::StoreU16(base, position + 0, uint16_t(target));
+        Position(base, position).set_slice(uint16_t(slice));
+        Position(base, position).set_section(uint16_t(target));
         found = true;
         break;
       }
-      guest::StoreU16(base, kLinkedTried + 2 * tried, uint16_t(target));
+      guest::StoreU16(base, G::linked_tried_address() + 2 * tried, uint16_t(target));
       tried++;
     }
-    guest::StoreU16(base, kLinkedTried + 2 * tried, 0xFFFF);
+    guest::StoreU16(base, G::linked_tried_address() + 2 * tried, 0xFFFF);
     if (found) {
       return 1;
     }
   }
-  const uint32_t file = guest::LoadU32(base, mesh + 4);
-  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, file + 0)); i++) {
+  const schema::TrackMeshFile file = schema::TrackMesh(base, mesh).file();
+  for (int32_t i = 0; i < int32_t(file.section_count()); i++) {
     bool skip = false;
     for (uint32_t k = 0; k < tried; k++) {
-      if (int32_t(S16(base, kLinkedTried + 2 * k)) == i) {
+      if (int32_t(S16(base, G::linked_tried_address() + 2 * k)) == i) {
         skip = true;
         break;
       }
@@ -299,11 +311,11 @@ uint32_t TrackPositionSearchLinked(uint8_t* base, uint32_t position, uint32_t po
       continue;
     }
     const uint32_t slice = TrackMeshFindSlice(
-        base, guest::LoadU32(base, guest::LoadU32(base, file + 4) + 4 * uint32_t(i)), uint32_t(-1),
+        base, guest::LoadU32(base, file.sections() + 4 * uint32_t(i)), uint32_t(-1),
         point);
     if (int32_t(slice) != -1) {
-      guest::StoreU16(base, position + 2, uint16_t(slice));
-      guest::StoreU16(base, position + 0, uint16_t(i));
+      Position(base, position).set_slice(uint16_t(slice));
+      Position(base, position).set_section(uint16_t(i));
       return 1;
     }
   }
@@ -314,26 +326,26 @@ uint32_t TrackPositionSearchAll(uint8_t* base, uint32_t position, uint32_t point
                                 uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820F7E30 TrackPosition::SearchAll");
   uint32_t found = 0;
-  CopyWord(base, kFarthest, frame + 80);
-  uint32_t file = guest::LoadU32(base, mesh + 4);
-  if (!(int32_t(guest::LoadU32(base, file + 0)) > 0)) {
+  CopyWord(base, G::farthest_address(), frame + 80);
+  const schema::TrackMesh m(base, mesh);
+  schema::TrackMeshFile file = m.file();
+  if (!(int32_t(file.section_count()) > 0)) {
     return found;
   }
   const double zero = Lfs(base, kZero);
-  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, file + 0));
-       i++, file = guest::LoadU32(base, mesh + 4)) {
+  for (int32_t i = 0; i < int32_t(file.section_count()); i++, file = m.file()) {
     const uint32_t index = S16(uint32_t(i));
     if (TrackMeshSectionOutcode(base, mesh, point, index) != 0) {
       continue;
     }
-    const uint32_t section = guest::LoadU32(base, guest::LoadU32(base, file + 4) + 4 * uint32_t(i));
+    const uint32_t section = guest::LoadU32(base, file.sections() + 4 * uint32_t(i));
     const uint32_t slice = TrackMeshNearestSlice(base, section, point, frame + 80);
     if (int32_t(slice) == -1) {
       continue;
     }
     found = 1;
-    guest::StoreU16(base, position + 2, uint16_t(slice));
-    guest::StoreU16(base, position + 0, uint16_t(index));
+    Position(base, position).set_slice(uint16_t(slice));
+    Position(base, position).set_section(uint16_t(index));
     if (Lfs(base, frame + 80) == zero) {
       return found;
     }
@@ -345,14 +357,15 @@ uint32_t TrackPositionFindCell(uint8_t* base, uint32_t mesh, uint32_t position, 
                                uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820F8090 TrackPosition::FindCell");
   const uint32_t f = frame;
-  const uint32_t original_slice = guest::LoadU16(base, position + 2);
+  const uint32_t original_slice = Position(base, position).slice();
   guest::StoreU32(base, f + 80, 0);
-  if (int32_t(S16(base, position + 0)) == -1) {
+  if (int32_t(S16(Position(base, position).section())) == -1) {
     TrackPositionSearchLinked(base, position, point, mesh);
     return 0;
   }
   const uint32_t table = SectionTable(base, mesh);
-  const uint32_t section = guest::LoadU32(base, S16(base, position + 0) * 4 + table);
+  const uint32_t section =
+      guest::LoadU32(base, S16(Position(base, position).section()) * 4 + table);
   const uint32_t slices = Slices(base, section);
   const uint32_t outline = Outline(base, section);
   const int32_t here = int32_t(S16(original_slice));
@@ -360,7 +373,7 @@ uint32_t TrackPositionFindCell(uint8_t* base, uint32_t mesh, uint32_t position, 
     return 0;
   }
   // The slices 1, 2 and 3 after and before it (as halfwords).
-  const int32_t count = int32_t(S16(base, section + 0));
+  const int32_t count = int32_t(S16(Section(base, section).slice_count()));
   const int32_t before1 = int32_t(S16(uint32_t(here - 1))), after1 = int32_t(S16(uint32_t(here + 1)));
   const int32_t before2 = int32_t(S16(uint32_t(before1 - 1))),
                 after2 = int32_t(S16(uint32_t(after1 + 1)));
@@ -368,7 +381,7 @@ uint32_t TrackPositionFindCell(uint8_t* base, uint32_t mesh, uint32_t position, 
                 after3 = int32_t(S16(uint32_t(after2 + 1)));
   auto test = [&](int32_t s) {
     if (TrackMeshSliceContains(base, uint32_t(s) * 28 + slices, outline, point) == 1) {
-      guest::StoreU16(base, position + 2, uint16_t(s));
+      Position(base, position).set_slice(uint16_t(s));
       return true;
     }
     return false;
@@ -394,27 +407,27 @@ uint32_t TrackPositionFindCell(uint8_t* base, uint32_t mesh, uint32_t position, 
   bool searched_cross = false;
   uint32_t crossed = 0;
   if (!(after1 < count)) {
-    guest::StoreU16(base, position + 2, uint16_t(after1));
+    Position(base, position).set_slice(uint16_t(after1));
     crossed = TrackPositionCrossSection(base, position, mesh, point);
     searched_cross = true;
   } else if (!(before1 > 0)) {
-    guest::StoreU16(base, position + 2, uint16_t(before1));
+    Position(base, position).set_slice(uint16_t(before1));
     crossed = TrackPositionCrossSection(base, position, mesh, point);
     searched_cross = true;
   } else {
     // The section's linked cells (any link with a slice it leaves from).
     for (uint32_t i = 0; i < 6; i++) {
-      const uint32_t link = section + 6 + 6 * i;
-      if (guest::LoadU16(base, link - 2) == 0xFFFF) {
+      const Link link(base, Section(base, section).links_address() + 6 * i);
+      if (link.from_slice() == 0xFFFF) {
         continue;
       }
-      const uint32_t target_index = guest::LoadU16(base, link + 0);
-      const uint32_t target_slice = guest::LoadU16(base, link + 2);
+      const uint32_t target_index = link.section();
+      const uint32_t target_slice = link.slice();
       const uint32_t target = guest::LoadU32(base, S16(target_index) * 4 + table);
       if (TrackMeshSliceContains(base, S16(target_slice) * 28 + Slices(base, target),
                                  Outline(base, target), point) == 1) {
-        guest::StoreU16(base, position + 0, uint16_t(target_index));
-        guest::StoreU16(base, position + 2, uint16_t(target_slice));
+        Position(base, position).set_section(uint16_t(target_index));
+        Position(base, position).set_slice(uint16_t(target_slice));
         return 0;
       }
     }
@@ -424,16 +437,16 @@ uint32_t TrackPositionFindCell(uint8_t* base, uint32_t mesh, uint32_t position, 
   }
   // The sections linked from the position's (now) section: a slice near the
   // link's, or any, containing the point.
-  if (int32_t(S16(base, position + 0)) != -1) {
+  if (int32_t(S16(Position(base, position).section())) != -1) {
     const uint32_t table2 = SectionTable(base, mesh);
-    const uint32_t own = guest::LoadU32(base, S16(base, position + 0) * 4 + table2);
+    const uint32_t own = guest::LoadU32(base, S16(Position(base, position).section()) * 4 + table2);
     for (uint32_t i = 0; i < 6; i++) {
-      const uint32_t link = own + 6 + 6 * i;
-      if (guest::LoadU16(base, link - 2) == 0xFFFF) {
+      const Link link(base, Section(base, own).links_address() + 6 * i);
+      if (link.from_slice() == 0xFFFF) {
         continue;
       }
-      const uint32_t target_index = guest::LoadU16(base, link + 0);
-      const uint32_t target_slice = S16(base, link + 2);
+      const uint32_t target_index = link.section();
+      const uint32_t target_slice = S16(link.slice());
       const uint32_t target = guest::LoadU32(base, S16(target_index) * 4 + table2);
       const uint32_t target_slices = Slices(base, target);
       const uint32_t target_outline = Outline(base, target);
@@ -445,18 +458,18 @@ uint32_t TrackPositionFindCell(uint8_t* base, uint32_t mesh, uint32_t position, 
         continue;
       }
       if (TrackMeshSliceContains(base, s * 28 + target_slices, target_outline, point) == 1) {
-        guest::StoreU16(base, position + 0, uint16_t(target_index));
-        guest::StoreU16(base, position + 2, uint16_t(s));
+        Position(base, position).set_section(uint16_t(target_index));
+        Position(base, position).set_slice(uint16_t(s));
         break;
       }
     }
   }
-  if (guest::LoadU16(base, position + 2) == 0xFFFF) {
+  if (Position(base, position).slice() == 0xFFFF) {
     guest::StoreU32(base, f + 80, uint32_t(-1));
     if (int32_t(TrackPositionSearchLinked(base, position, point, mesh)) != 1) {
       guest::StoreU32(base, f + 80, uint32_t(-2));
       if (int32_t(TrackPositionSearchAll(base, position, point, mesh, f - 160)) != 1) {
-        guest::StoreU16(base, position + 2, uint16_t(original_slice));
+        Position(base, position).set_slice(uint16_t(original_slice));
         guest::StoreU32(base, f + 80, uint32_t(-3));
       }
     }
@@ -466,22 +479,24 @@ uint32_t TrackPositionFindCell(uint8_t* base, uint32_t mesh, uint32_t position, 
 
 void TrackPositionUpdate(uint8_t* base, uint32_t position, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820F8470 TrackPosition::Update");
-  const uint32_t route_position = position + 4;
-  const uint32_t point = position + 16;
+  const Position pos(base, position);
+  const uint32_t route_position = pos.route_position_address();
+  const uint32_t point = pos.point_x_address();
   // The route position before, for Follow (its frame's +80).
-  guest::StoreU32(base, frame + 80, guest::LoadU32(base, route_position));
+  guest::StoreU32(base, frame + 80, pos.route_position());
   TrackPositionFindCell(base, kMesh, position, point, frame - 240);
   // The ground under the point raised by 0.5; its y put back when none.
-  const double y = Lfs(base, point + 4);
-  Stfs(base, point + 4, Fadds(y, Lfs(base, kGroundRaise)));
-  const int32_t kind = int32_t(
-      TrackMeshGroundHeight(base, kMesh, point, position, position + 32, position + 48, frame - 240));
+  const double y = double(Point(base, point).y());
+  Point(base, point).set_y(float(Fadds(y, double(G::half(base)))));
+  const int32_t kind = int32_t(TrackMeshGroundHeight(base, kMesh, point, position,
+                                                     pos.color_x_address(), pos.normal_x_address(),
+                                                     frame - 240));
   if (!(kind > -1)) {
-    Stfs(base, point + 4, y);
+    Point(base, point).set_y(float(y));
   }
-  guest::StoreU16(base, position + 82, 0);
+  pos.set_flags(0);
   if (kind == 4 || kind == 20) {
-    guest::StoreU16(base, position + 82, 1);
+    pos.set_flags(1);
   }
   uint32_t bit = 0;
   switch (int32_t(TrackMeshSliceKind(base, kMesh, position) & 0xFFFF)) {
@@ -498,26 +513,28 @@ void TrackPositionUpdate(uint8_t* base, uint32_t position, uint32_t frame) {
       break;
   }
   if (bit != 0) {
-    guest::StoreU16(base, position + 82, uint16_t(guest::LoadU16(base, position + 82) | bit));
+    pos.set_flags(uint16_t(pos.flags() | bit));
   }
   track_route::Follow(base, track_route::kRoute, route_position, point, frame + 80, frame - 176);
 }
 
 void TrackPositionInit(uint8_t* base, uint32_t position, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820F8578 TrackPosition::Init");
-  const uint32_t route_position = position + 4;
-  track_route::Point(base, track_route::kRoute, position + 16, route_position, frame - 112);
+  const Position pos(base, position);
+  const uint32_t route_position = pos.route_position_address();
+  track_route::Point(base, track_route::kRoute, pos.point_x_address(), route_position, frame - 112);
   // The cell from the route slice's record's word +32.
-  const uint32_t file = guest::LoadU32(base, track_route::kRoute);
-  const uint32_t number = guest::LoadU16(base, route_position);
-  const uint32_t table = guest::LoadU32(base, file + 12);
-  const uint32_t section = guest::LoadU32(base, table + number * 4);
-  const int32_t slice = int16_t(guest::LoadU16(base, position + 6));
-  const uint32_t cell = guest::LoadU32(base, section + uint32_t(slice) * 84 + 156);
-  guest::StoreU16(base, position + 80, 0);
-  guest::StoreU16(base, position + 82, 0);
-  guest::StoreU16(base, position + 0, uint16_t(cell >> 16));
-  guest::StoreU16(base, position + 2, uint16_t(cell));
+  const schema::TrackRouteFile file = schema::TrackRoute(base, track_route::kRoute).file();
+  const uint32_t number = pos.route_section();
+  const uint32_t table = file.sections();
+  const schema::TrackRouteSection section(base, guest::LoadU32(base, table + number * 4));
+  const int32_t slice = int16_t(pos.route_slice());
+  const uint32_t cell =
+      schema::TrackRouteSlice(base, section.slices_address() + uint32_t(slice) * 84).mesh_cell();
+  pos.set_surface_kind(0);
+  pos.set_flags(0);
+  Position(base, position).set_section(uint16_t(cell >> 16));
+  Position(base, position).set_slice(uint16_t(cell));
   TrackPositionUpdate(base, position, frame - 144);
 }
 

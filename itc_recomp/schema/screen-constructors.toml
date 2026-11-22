@@ -1,0 +1,47 @@
+# The schema of docs/functions/screen-constructors.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The type 6 and 7 modes' screen constructors (src/screen_constructors/;
+# docs/known-data.md, "type 6 screens", "type 7 screens", "type 6 and 7
+# list, panel and node screens"). Most of what they build is described
+# elsewhere: the screens and their node tables by type67-screens, the panel
+# set, its base, the panel groups and the four panels by car-list.toml.
+# The measure gives this area the panels' constructors' types (PanelCBase,
+# PanelDBase, Panel6D, Panel7D, PanelE, PanelEBase, PanelFBase, Panel6F,
+# Panel7F, PanelGroup6B, PanelGroup7B): they are car-list.toml's CarPanel,
+# ColorPanel, RowPanel, TabPanel and PanelGroupBase, so they go there (the
+# lead's to add: this area's report), not here.
+
+# The empty base many classes share (vtable 0x82010B5C: the panel groups'
+# base, PanelDBase's, PanelFBase's, Type7Screen0's; as ListNode's in
+# archive.md). Built by NodeBase::NodeBase (sub_82258FB0).
+[NodeBase]
+measure = "NodeBase"
+size = 8
+origin = "embedded"
+vtable = 0x82010B5C
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32", note = "0 in the constructor; the classes above it keep their group or movie there" },
+]
+
+# ListNodeTable: merged into type67-screens.toml's PairedNodeTable at the integration (the same object).
+
+# ListColorNodeTable: merged into type67-screens.toml's ColorNodeTable at the integration (the same object).
+
+# The type 7 list's items' records (15 of 28 bytes at 0x826370A0, .data):
+# Type7ListScreen::Type7ListScreen makes each item's mask from one.
+[Type7ListRecord]
+size = 28
+origin = "image"
+fields = [
+  { name = "count", offset = 0, type = "s32", note = "0, 1, or 2 and more" },
+  { name = "bit_a", offset = 12, type = "u32", note = "a bit number (in the mask from a count of 1 up)" },
+  { name = "bit_b", offset = 16, type = "u32", note = "a bit number (in the mask from a count of 2 up)" },
+]
+
+[globals]
+type7_list_records = { address = 0x826370A0, type = "bytes", count = 420, note = "15 Type7ListRecords" }

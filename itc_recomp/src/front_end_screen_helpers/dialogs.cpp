@@ -6,12 +6,24 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/menu_helpers.h"
+#include "schema/mode_tick.h"
+#include "schema/options_load_save.h"
+#include "schema/options_screen.h"
+#include "schema/race_screens.h"
+#include "schema/save_screen.h"
+#include "schema/tuning_screen.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
 namespace front_end_screen_helpers {
 
 namespace {
+
+using Node = schema::UiMovieNode;
+using Save = schema::SaveScreenGlobals;
+using Options = schema::OptionsScreenGlobals;
+using OptionsPages = schema::OptionsLoadSaveGlobals;
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -70,12 +82,12 @@ uint64_t SetText(uint8_t* base, const TextSetter& s, uint64_t id, const uint64_t
   if (s.answers == Answers::kOne) {
     calls.Call(kSetNodeText, frame, s.lr_third, movie, third, 4);
     r3 = calls.Call(kClearNodeText, frame, s.lr_fourth, movie, fourth);
-    Store(base, eighth + 80, 0);
+    Node(base, eighth).set_visible(0);
   } else {
     calls.Call(kSetNodeText, frame, s.lr_third, movie, third, 2);
     r3 = calls.Call(kSetNodeText, frame, s.lr_fourth, movie, fourth, 3);
     if (s.answers == Answers::kYesNoShown) {
-      Store(base, eighth + 80, 1);
+      Node(base, eighth).set_visible(1);
     }
   }
   return r3;
@@ -142,20 +154,22 @@ namespace {
 uint64_t InitSaveList(uint8_t* base, uint32_t frame, uint32_t lr, const Calls& calls) {
   Store(base, frame + 92, 158);
   Store(base, frame + 84, 159);
-  const uint64_t args[8] = {Load(base, kSaveList), 1, 1, 0, 154, 153, 155, 156};
+  const uint64_t args[8] = {Save::list(base).address, 1, 1, 0, 154, 153, 155, 156};
   return calls.CallArgs(kMenuListInit, frame, lr, args);
 }
 
-// A page block's change to `page`: +8 = +0 unless +0 is `page`, then the
-// stores in the order given by the caller.
-void PageFrom(uint8_t* base, uint32_t block, uint32_t page) {
-  const uint32_t now = Load(base, block);
+// A page block's change to `page` (a PageObject or an
+// OptionsSubPageBlock, the same layout): previous_page = page unless it is
+// `page`, then the stores in the order given by the caller.
+template <typename Pages>
+void PageFrom(const Pages& block, uint32_t page) {
+  const uint32_t now = block.page();
   if (int32_t(now) != int32_t(page)) {
-    Store(base, block + 8, now);
+    block.set_previous_page(now);
   }
 }
 
-uint32_t SaveData(uint8_t* base) { return Load(base, kSaveData); }
+schema::SaveScreenData SaveData(uint8_t* base) { return Save::data(base); }
 
 constexpr uint64_t kNoVarargs[7] = {0, 0, 0, 0, 0, 0, 0};
 
@@ -166,63 +180,62 @@ uint64_t SaveScreenStartCheck(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 128);
   Store(base, frame + 92, 158);
   Store(base, frame + 84, 159);
-  Store(base, SaveData(base) + 4, 0);
-  Store(base, SaveData(base) + 0, 1);
-  Store(base, SaveData(base) + 28, 0);
-  const uint64_t args[8] = {Load(base, kSaveList), 1, 1, 0, 154, 153, 155, 156};
+  SaveData(base).set_answer(0);
+  SaveData(base).set_set_up(1);
+  SaveData(base).set_cancel(0);
+  const uint64_t args[8] = {Save::list(base).address, 1, 1, 0, 154, 153, 155, 156};
   calls.CallArgs(kMenuListInit, frame, 0x821A54B8, args);
   const uint64_t state = calls.Call(kSaveSlotsState, frame, 0x821A54C0, 0);
   uint64_t r3 = 0;
   if (int32_t(uint32_t(state)) != 0) {
     r3 = SaveScreenSetNote(base, 70, kNoVarargs, frame, calls);
-    Store(base, SaveData(base) + 12, 3);
-    Store(base, SaveData(base) + 24, 0);
+    SaveData(base).set_message(3);
+    SaveData(base).set_wait(0);
   } else {
     r3 = SaveScreenSetNote(base, 69, kNoVarargs, frame, calls);
-    Store(base, SaveData(base) + 12, 2);
+    SaveData(base).set_message(2);
   }
-  Store(base, SaveData(base) + 16, 1);
-  const uint32_t pages = Load(base, kSavePages);
-  PageFrom(base, pages, 1);
-  Store(base, pages + 12, 0);
-  Store(base, pages + 4, 1);
-  Store(base, pages + 16, 0xFFFFFFFFu);
-  Store(base, pages + 0, 0xFFFFFFFFu);
-  Store(base, SaveData(base) + 56, 1);
+  SaveData(base).set_dialog_state(1);
+  const schema::PageObject pages = Save::pages(base);
+  PageFrom(pages, 1);
+  pages.set_step(0);
+  pages.set_next_page(1);
+  pages.set_queued_step(0xFFFFFFFFu);
+  pages.set_page(0xFFFFFFFFu);
+  SaveData(base).set_prompts(1);
   return r3;
 }
 
 uint64_t SaveScreenStart(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821A5540 SaveScreen::Start");
   const uint32_t frame = Frame(base, sp, 144);
-  Store(base, SaveData(base) + 0, 1);
+  SaveData(base).set_set_up(1);
   const uint64_t state = calls.Call(kSaveSlotsState, frame, 0x821A5564, 0);
   InitSaveList(base, frame, 0x821A55A0, calls);
-  Store(base, SaveData(base) + 28, 0);
-  Store(base, SaveData(base) + 56, 1);
+  SaveData(base).set_cancel(0);
+  SaveData(base).set_prompts(1);
   uint64_t r3 = 0;
-  const uint32_t pages_global = kSavePages;
   if (int32_t(uint32_t(state)) != 0) {
     r3 = SaveScreenSetNote(base, 70, kNoVarargs, frame, calls);
-    Store(base, SaveData(base) + 12, 0);
-    Store(base, SaveData(base) + 16, 1);
-    const uint32_t pages = Load(base, pages_global);
-    PageFrom(base, pages, 6);
-    Store(base, pages + 16, 0xFFFFFFFFu);
-    Store(base, pages + 12, 3);
-    Store(base, pages + 4, 6);
-    Store(base, pages + 0, 0xFFFFFFFFu);
-    Store(base, SaveData(base) + 24, 0);
+    SaveData(base).set_message(0);
+    SaveData(base).set_dialog_state(1);
+    const schema::PageObject pages = Save::pages(base);
+    PageFrom(pages, 6);
+    pages.set_queued_step(0xFFFFFFFFu);
+    pages.set_step(3);
+    pages.set_next_page(6);
+    pages.set_page(0xFFFFFFFFu);
+    SaveData(base).set_wait(0);
   } else {
     r3 = SaveScreenSetText(base, 102, kNoVarargs, frame, calls);
-    Store(base, SaveData(base) + 12, 3);
-    Store(base, SaveData(base) + 16, 0);
-    const uint32_t pages = Load(base, pages_global);
-    PageFrom(base, pages, 5);
-    Store(base, pages + 12, 3);
-    Store(base, pages + 16, 0xFFFFFFFFu);
-    Store(base, pages + 4, 5);
-    Store(base, pages + 0, 0xFFFFFFFFu);
+    SaveData(base).set_message(3);
+    SaveData(base).set_dialog_state(0);
+    const schema::PageObject pages = Save::pages(base);
+    PageFrom(pages, 5);
+    pages.set_step(3);
+    pages.set_queued_step(0xFFFFFFFFu);
+    pages.set_next_page(5);
+    pages.set_page(0xFFFFFFFFu);
   }
   return r3;
 }
@@ -235,21 +248,32 @@ uint64_t OptionsSetUpDialogPage(uint8_t* base, uint32_t sub_scene, uint32_t sp,
   } else {
     ITC_NATIVE_RUNNING("sub_821C6E50 Options::SetUpCategory6Page");
   }
-  // Page 9's words (+620 the state, +628 the kind, +632) and block
-  // [0x826D847C], or page 10's (+640, +648, +652) and [0x826D8488].
-  const uint32_t state_at = save ? 620 : 640, kind_at = save ? 628 : 648;
-  const uint32_t pages_global = save ? kOptionsSavePages : kOptionsCategory6Pages;
+  // Page 9's words (load_dialog_state, _kind, _passes) and block
+  // [0x826D847C], or page 10's (save_dialog_*) and [0x826D8488]: the
+  // settings reloaded at every access, as the original does.
+  auto state_at = [&]() {
+    const schema::OptionsSettings o = Options::settings(base);
+    return save ? o.load_dialog_state_address() : o.save_dialog_state_address();
+  };
+  auto kind_at = [&]() {
+    const schema::OptionsSettings o = Options::settings(base);
+    return save ? o.load_dialog_kind_address() : o.save_dialog_kind_address();
+  };
+  auto passes_at = [&]() {
+    const schema::OptionsSettings o = Options::settings(base);
+    return save ? o.load_dialog_passes_address() : o.save_dialog_passes_address();
+  };
   const uint32_t lr_state = save ? 0x821C6D7C : 0x821C6E84;
   const uint32_t frame = Frame(base, sp, 144);
   const uint32_t movie = FindMovie(base, 7, frame + 96);
   const uint64_t state = calls.Call(kSaveSlotsState, frame, lr_state, 0);
   if (int32_t(uint32_t(state)) != 0) {
     OptionsSetDialogNote(base, sub_scene, 70, kNoVarargs, frame, calls);
-    Store(base, Load(base, kOptions) + kind_at, 3);
-    Store(base, Load(base, kOptions) + kind_at + 4, 0);
+    Store(base, kind_at(), 3);
+    Store(base, passes_at(), 0);
   } else {
     OptionsSetDialogNote(base, sub_scene, 69, kNoVarargs, frame, calls);
-    Store(base, Load(base, kOptions) + kind_at, 2);
+    Store(base, kind_at(), 2);
   }
   auto prompts = [&](uint32_t lr) {
     const uint64_t none = 0xFFFFFFFFFFFFFFFFull;
@@ -260,26 +284,27 @@ uint64_t OptionsSetUpDialogPage(uint8_t* base, uint32_t sub_scene, uint32_t sp,
   };
   if (save) {
     prompts(0x821C6DE8);
-    Store(base, Load(base, kOptions) + state_at, 1);
+    Store(base, state_at(), 1);
   } else {
-    Store(base, Load(base, kOptions) + state_at, 1);
+    Store(base, state_at(), 1);
   }
-  const uint32_t pages = Load(base, pages_global);
-  PageFrom(base, pages, 2);
-  Store(base, pages + 0, 2);
-  Store(base, pages + 12, 0xFFFFFFFFu);
-  Store(base, pages + 16, 0xFFFFFFFFu);
+  const schema::OptionsSubPageBlock pages =
+      save ? OptionsPages::load_pages(base) : OptionsPages::save_pages(base);
+  PageFrom(pages, 2);
+  pages.set_page(2);
+  pages.set_step(0xFFFFFFFFu);
+  pages.set_queued_step(0xFFFFFFFFu);
   if (!save) {
     prompts(0x821C6F24);
   }
   const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, 0);
-  Store(base, node + 80, 0);
+  Node(base, node).set_visible(0);
   // SaveBuffers::Create with r3 the node (FindNode's, which it leaves when
   // the buffers are there).
   const uint64_t r3 =
       calls.Call(kSaveBuffersCreate, frame, save ? 0x821C6E34 : 0x821C6F3C, node);
-  Store(base, Load(base, kOptions) + 712, 0);
-  Store(base, Load(base, kOptions) + 708, 0);
+  Options::settings(base).set_save_page_closed(0);
+  Options::settings(base).set_dialog_cancel(0);
   return r3;
 }
 
@@ -289,18 +314,18 @@ uint64_t SaveScreenShowNotice(uint8_t* base, uint32_t step, uint32_t sp, const C
   const uint32_t movie = FindMovie(base, 44, frame + 96);
   if (Load(base, step) == 0) {
     Store(base, step, 1);
-    if (Load(base, Load(base, kSaveData) + 12) == 0) {
+    if (SaveData(base).message() == 0) {
       const uint64_t varargs[7] = {0, 0, 0, 0, 0, 0, 0};
       SaveScreenSetMessage(base, 107, varargs, frame, calls);
     }
-    if (Load(base, Load(base, kSaveData) + 16) == 0) {
+    if (SaveData(base).dialog_state() == 0) {
       calls.Call(kPlayNamed, frame, 0x821A6438, movie, 12, 0, 0);
     }
     calls.Call(kMenuSoundPlay, frame, 0x821A6440, 5);
   }
   const uint64_t ran = calls.Call(kRun, frame, 0x821A644C, movie, 0);
   const bool done = uint32_t(ran) == 0;
-  if (done && Load(base, Load(base, kSaveData) + 16) == 0) {
+  if (done && SaveData(base).dialog_state() == 0) {
     calls.Call(kPlayNamed, frame, 0x821A6484, movie, 2, 0, 0);
     calls.Call(kLoopNamed, frame, 0x821A6490, movie, 2);
   }
@@ -360,8 +385,6 @@ constexpr ShowSpec kShows[3] = {
      {0x821A5F40, 0x821A5F74, 0x821A5F84, 0x821A5EE8, 0x821A5E80, 0x821A5F94, 0x821A5FA4,
       0x821A5FF4, 0x821A6018, 0x821A5FE4, 0x821A6024}}};
 
-constexpr uint32_t kSignInWatch = 0x826BAB40;
-
 uint64_t PlayNamed(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t movie,
                    uint64_t named) {
   return calls.Call(kPlayNamed, frame, lr, movie, named, 0, 0);
@@ -396,49 +419,49 @@ uint64_t SaveScreenShowMessage(uint8_t* base, uint32_t which, uint32_t step, uin
   const uint32_t frame = Frame(base, sp, 160);
   const uint32_t movie = FindMovie(base, 44, frame + 96);
   if (Load(base, step) == 0) {
-    const uint32_t kind = Load(base, SaveData(base) + 12);
+    const uint32_t kind = SaveData(base).message();
     const Kind* k = AskKind(
         spec.kinds, spec.kind_count, kind,
         [&](uint32_t id, const uint64_t* v) { SaveScreenSetText(base, id, v, frame, calls); },
         [&](uint32_t id, const uint64_t* v) { SaveScreenSetNote(base, id, v, frame, calls); });
     if (k != nullptr && k->watch) {
-      Store(base, kSignInWatch + 0, 0);
-      Store(base, kSignInWatch + 4, 0);
+      schema::ModeTickGlobals::set_check_other_user(base, 0);
+      schema::ModeTickGlobals::set_check_signed_out(base, 0);
     }
     if (k != nullptr && k->answer >= 0) {
-      Store(base, SaveData(base) + 48, uint32_t(k->answer));
+      SaveData(base).set_default_answer(uint32_t(k->answer));
     }
-    const uint32_t state = Load(base, SaveData(base) + 16);
+    const uint32_t state = SaveData(base).dialog_state();
     if (state == 0) {
       PlayNamed(calls, frame, lr.play12, movie, 12);
       Store(base, frame + 84, 159);
       Store(base, frame + 92, 158);
-      const uint64_t args[8] = {Load(base, kSaveList), 2, 2, 1, 154, 153, 155, 156};
+      const uint64_t args[8] = {Save::list(base).address, 2, 2, 1, 154, 153, 155, 156};
       calls.CallArgs(kMenuListInit, frame, lr.list_init, args);
-      calls.Call(kListSetSelection, frame, lr.set_selection, Load(base, kSaveList),
-                 Load(base, SaveData(base) + 48));
-      Store(base, SaveData(base) + 56, 1);
+      calls.Call(kListSetSelection, frame, lr.set_selection, Save::list(base).address,
+                 SaveData(base).default_answer());
+      SaveData(base).set_prompts(1);
     } else if (state == 1) {
       PlayNamed(calls, frame, lr.play13_open, movie, 13);
-      Store(base, ui_movies::FindNode(base, movie, 0, 0) + 80, 0);
-      Store(base, ui_movies::Child(base, ui_movies::FindNode(base, movie, 0, 2), 0) + 80, 1);
-      Store(base, SaveData(base) + 56, 1);
+      Node(base, ui_movies::FindNode(base, movie, 0, 0)).set_visible(0);
+      Node(base, ui_movies::Child(base, ui_movies::FindNode(base, movie, 0, 2), 0)).set_visible(1);
+      SaveData(base).set_prompts(1);
     } else if (state == 2) {
       PlayNamed(calls, frame, lr.play13_close, movie, 13);
-      Store(base, ui_movies::FindNode(base, movie, 0, 0) + 80, 1);
-      Store(base, ui_movies::Child(base, ui_movies::FindNode(base, movie, 0, 2), 0) + 80, 0);
-      Store(base, SaveData(base) + 24, 0);
-      Store(base, SaveData(base) + 56, 0);
+      Node(base, ui_movies::FindNode(base, movie, 0, 0)).set_visible(1);
+      Node(base, ui_movies::Child(base, ui_movies::FindNode(base, movie, 0, 2), 0)).set_visible(0);
+      SaveData(base).set_wait(0);
+      SaveData(base).set_prompts(0);
     }
     calls.Call(kMenuSoundPlay, frame, lr.sound, 5);
     Store(base, step, 1);
   }
   const bool done = uint32_t(calls.Call(kRun, frame, lr.run, movie, 0)) == 0;
   if (done) {
-    const int32_t state = int32_t(Load(base, SaveData(base) + 16));
+    const int32_t state = int32_t(SaveData(base).dialog_state());
     if (state == 0) {
       const uint64_t named =
-          calls.Call(kListSelection, frame, lr.selection, Load(base, kSaveList)) + 2;
+          calls.Call(kListSelection, frame, lr.selection, Save::list(base).address) + 2;
       PlayNamed(calls, frame, lr.play_selection, movie, named);
       calls.Call(kLoopNamed, frame, lr.loop, movie, named);
     } else if (state == 2) {
@@ -461,7 +484,22 @@ constexpr Kind kCategory6DialogKinds[12] = {
     {71, 0, 1, false},  {72, 0, 1, false},  {65, 0, 1, false},    {66, 240, -1, false},
     {63, 0, -1, false}, {64, 0, -1, false}, {67, 0, -1, false},   {65, 0, 1, false}};
 
-constexpr uint32_t kOptionsMenu = 0x826D8484;  // the dialogs' two-item menu
+// The dialogs' two-item menu ([0x826D8484]), its words all 0 in the
+// original's order from `first` on (the field addresses, for the stores'
+// order).
+void ClearMenu(uint8_t* base, const schema::FrontEndMenu& m, bool from_first_item) {
+  if (from_first_item) {
+    Store(base, m.first_item_address(), 0);
+    Store(base, m.last_item_address(), 0);
+    Store(base, m.wraps_address(), 0);
+  }
+  for (const uint32_t at :
+       {m.cursor_address(), m.previous_address(), m.moved_address(), m.wrapped_address(),
+        m.visible_row_address(), m.previous_row_address(), m.side_address(), m.player_address(),
+        m.up_down_locked_address(), m.left_right_steps_address(), m.shoulders_step_address()}) {
+    Store(base, at, 0);
+  }
+}
 
 }  // namespace
 
@@ -473,9 +511,22 @@ uint64_t OptionsShowDialog(uint8_t* base, uint32_t sub_scene, uint32_t step, uin
   } else {
     ITC_NATIVE_RUNNING("sub_821C69D0 Options::ShowCategory6Dialog");
   }
-  // Page 9's words (+620 the state, +628 the kind, +632, +636 the default
-  // answer) and animations, or page 10's (+640 to +656).
-  const uint32_t words = save ? 620 : 640;
+  // Page 9's words (the settings' load_dialog_state, _kind, _passes and
+  // _default) and animations, or page 10's (save_dialog_*); the settings
+  // reloaded at every access, as the original does.
+  auto o = [&]() { return Options::settings(base); };
+  auto state_at = [&]() {
+    return save ? o().load_dialog_state_address() : o().save_dialog_state_address();
+  };
+  auto kind_at = [&]() {
+    return save ? o().load_dialog_kind_address() : o().save_dialog_kind_address();
+  };
+  auto passes_at = [&]() {
+    return save ? o().load_dialog_passes_address() : o().save_dialog_passes_address();
+  };
+  auto default_at = [&]() {
+    return save ? o().load_dialog_default_address() : o().save_dialog_default_address();
+  };
   const uint32_t open_named = save ? 853 : 869, shown_named = save ? 854 : 870;
   const uint32_t cursor_named = save ? 843 : 859, close_named = save ? 841 : 857;
   // The calls' return addresses: MenuSound::Play, PlayNamed in states 0, 1
@@ -489,12 +540,11 @@ uint64_t OptionsShowDialog(uint8_t* base, uint32_t sub_scene, uint32_t step, uin
   const uint32_t lr_cursor = save ? 0x821C69B8 : 0x821C6D2C;
   const uint32_t lr_close = save ? 0x821C6988 : 0x821C6CFC;
   const uint32_t lr_loop = save ? 0x821C69C4 : 0x821C6D38;
-  auto o = [&]() { return Load(base, kOptions); };
   const uint32_t frame = Frame(base, sp, 160);
   const uint32_t movie = FindMovie(base, 7, frame + 96);
   if (Load(base, step) == 0) {
     calls.Call(kMenuSoundPlay, frame, lr_sound, 5);
-    const uint32_t kind = Load(base, o() + words + 8);
+    const uint32_t kind = Load(base, kind_at());
     const Kind* k = AskKind(
         save ? kSaveDialogKinds : kCategory6DialogKinds, save ? 13 : 12, kind,
         [&](uint32_t id, const uint64_t* v) {
@@ -504,47 +554,41 @@ uint64_t OptionsShowDialog(uint8_t* base, uint32_t sub_scene, uint32_t step, uin
           OptionsSetDialogNote(base, sub_scene, id, v, frame, calls);
         });
     if (k != nullptr && k->answer >= 0) {
-      Store(base, o() + words + 16, uint32_t(k->answer));
+      Store(base, default_at(), uint32_t(k->answer));
     }
     // The menu's words all 0 (in the original's order), +16 and +20 1 for
     // state 0.
     auto reset_menu = [&](uint32_t first) {
-      const uint32_t m = Load(base, kOptionsMenu);
-      Store(base, m + 16, first);
-      Store(base, m + 12, 0);
-      Store(base, m + 20, first);
-      for (const uint32_t at : {0u, 4u, 8u, 40u, 48u, 52u, 36u, 64u, 24u, 28u, 32u}) {
-        Store(base, m + at, 0);
-      }
+      const schema::FrontEndMenu m = Options::dialog_menu(base);
+      m.set_last_item(first);
+      m.set_first_item(0);
+      m.set_wraps(first);
+      ClearMenu(base, m, false);
     };
     const uint64_t none = 0xFFFFFFFFFFFFFFFFull;
-    const uint32_t state = Load(base, o() + words);
+    const uint32_t state = Load(base, state_at());
     if (state <= 2) {
       uint64_t first_two = 0;
       if (state == 0) {
         PlayNamed(calls, frame, lr_play0, movie, open_named);
         reset_menu(1);
-        const uint32_t m = Load(base, kOptionsMenu);
-        const uint32_t was = Load(base, m + 0);
-        const uint32_t answer = Load(base, o() + words + 16);
-        Store(base, m + 4, was);
-        Store(base, m + 0, answer);
+        const schema::FrontEndMenu m = Options::dialog_menu(base);
+        const uint32_t was = m.cursor();
+        const uint32_t answer = Load(base, default_at());
+        m.set_previous(was);
+        m.set_cursor(answer);
       } else if (state == 1) {
-        Store(base, ui_movies::FindNode(base, movie, sub_scene, 0) + 80, 0);
-        Store(base,
-              ui_movies::Child(base, ui_movies::FindNode(base, movie, sub_scene, 2), 0) + 80, 1);
+        Node(base, ui_movies::FindNode(base, movie, sub_scene, 0)).set_visible(0);
+        Node(base, ui_movies::Child(base, ui_movies::FindNode(base, movie, sub_scene, 2), 0))
+            .set_visible(1);
         PlayNamed(calls, frame, lr_play1, movie, shown_named);
-        const uint32_t m = Load(base, kOptionsMenu);
-        for (const uint32_t at :
-             {12u, 16u, 20u, 0u, 4u, 8u, 40u, 48u, 52u, 36u, 64u, 24u, 28u, 32u}) {
-          Store(base, m + at, 0);
-        }
+        ClearMenu(base, Options::dialog_menu(base), true);
       } else {
-        Store(base, ui_movies::FindNode(base, movie, sub_scene, 0) + 80, 1);
-        Store(base,
-              ui_movies::Child(base, ui_movies::FindNode(base, movie, sub_scene, 2), 0) + 80, 0);
+        Node(base, ui_movies::FindNode(base, movie, sub_scene, 0)).set_visible(1);
+        Node(base, ui_movies::Child(base, ui_movies::FindNode(base, movie, sub_scene, 2), 0))
+            .set_visible(0);
         PlayNamed(calls, frame, lr_play2, movie, shown_named);
-        Store(base, o() + words + 12, 0);
+        Store(base, passes_at(), 0);
         first_two = none;
       }
       const uint64_t args[8] = {first_two, first_two, none, none, none, none, 0, 0};
@@ -554,9 +598,9 @@ uint64_t OptionsShowDialog(uint8_t* base, uint32_t sub_scene, uint32_t step, uin
   }
   const bool done = uint32_t(calls.Call(kRun, frame, lr_run, movie, 0)) == 0;
   if (done) {
-    const int32_t state = int32_t(Load(base, o() + words));
+    const int32_t state = int32_t(Load(base, state_at()));
     if (state == 0) {
-      const uint64_t named = uint64_t(Load(base, Load(base, kOptionsMenu) + 0)) + cursor_named;
+      const uint64_t named = uint64_t(Options::dialog_menu(base).cursor()) + cursor_named;
       PlayNamed(calls, frame, lr_cursor, movie, named);
       calls.Call(kLoopNamed, frame, lr_loop, movie, named);
     } else if (state == 2) {

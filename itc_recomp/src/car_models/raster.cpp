@@ -7,6 +7,7 @@
 #include "base/log.h"
 #include "c_runtime/math.h"
 #include "guest.h"
+#include "schema/car_models.h"
 #include "texture_compression/steps.h"
 
 #include <simde/x86/sse2.h>
@@ -19,6 +20,8 @@ namespace car_models {
 namespace {
 
 using namespace texture_compression::steps;
+using schema::DecalVertex;
+using G = schema::CarModelsGlobals;
 
 uint32_t Load(uint8_t* base, uint32_t address) {
   return guest::LoadU32(base, address);
@@ -88,21 +91,22 @@ uint32_t SampleTexel(uint8_t* base, uint32_t image, double u, double v, uint32_t
   StoreExtended(base, scratch + 8, iy);
   const double fu = Fsubs(u, IntToSingle(ix));
   const double fv = Fsubs(v, IntToSingle(iy));
+  const schema::DecalImage img(base, image);
   int32_t x0 = ix, x1 = int32_t(uint32_t(ix) + 1);
   if (ix < 0) {
     x0 = x1 = 0;
-  } else if (const int32_t width = Signed(Load(base, image + 4)); !(width > x1)) {
+  } else if (const int32_t width = Signed(img.width()); !(width > x1)) {
     x0 = x1 = int32_t(uint32_t(width) - 1);
   }
   int32_t y0 = iy, y1 = int32_t(uint32_t(iy) + 1);
   if (iy < 0) {
     y0 = y1 = 0;
-  } else if (const int32_t height = Signed(Load(base, image + 8)); !(height > y1)) {
+  } else if (const int32_t height = Signed(img.height()); !(height > y1)) {
     y0 = y1 = int32_t(uint32_t(height) - 1);
   }
-  const uint32_t pitch = Load(base, image + 12);
-  const uint32_t pixels = Load(base, image + 0);
-  const double scale = Lfs(base, kTexelScale);
+  const uint32_t pitch = img.pitch();
+  const uint32_t pixels = img.pixels();
+  const double scale = double(G::texel_scale(base));
   const uint32_t tx = FctidzLow(Fmuls(fu, scale));
   const uint32_t ty = FctidzLow(Fmuls(fv, scale));
   const uint32_t row0 = pitch * uint32_t(y0) + pixels;
@@ -121,10 +125,12 @@ void BlendPixel(uint8_t* base, uint32_t image, uint32_t canvas, uint32_t region,
   ITC_NATIVE_RUNNING("sub_820ED498 SoftRaster::BlendPixel");
   const uint32_t frame = stack - kBlendPixelFrameBytes;
   const uint32_t address =
-      (uint32_t(x) << 2) + (Load(base, region + 8) * uint32_t(y) + Load(base, canvas));
+      (uint32_t(x) << 2) + (schema::DecalRegion(base, region).pitch() * uint32_t(y) +
+                            schema::DecalCanvas(base, canvas).first_pixel());
   const uint32_t destination = Load(base, address);
-  const double v = Lfs(base, uv + 4);
-  const double u = Lfs(base, uv + 0);
+  const DecalVertex texel(base, uv);
+  const double v = double(texel.y());
+  const double u = double(texel.x());
   const uint32_t source = SampleTexel(base, image, u, v, frame - 80);
   const uint32_t alpha = source >> 24;
   if (alpha == 0) {
@@ -137,15 +143,17 @@ void DrawSpan(uint8_t* base, uint32_t canvas, uint32_t region, int32_t xa, int32
               int32_t y, uint32_t a, uint32_t b, uint32_t image, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820EDE00 SoftRaster::DrawSpan");
   const uint32_t f = stack - kDrawSpanFrameBytes;
-  if (y < 0 || !(Signed(Load(base, region + 4)) > y) || xa == xb) {
+  const schema::DecalRegion r(base, region);
+  const DecalVertex va(base, a), vb(base, b);
+  if (y < 0 || !(Signed(r.height()) > y) || xa == xb) {
     return;
   }
   int32_t left, right;
   if (xa < xb) {
     right = xb;
     left = xa;
-    const uint64_t a0 = Load64(base, a), b0 = Load64(base, b);
-    const uint64_t a8 = Load64(base, a + 8), b8 = Load64(base, b + 8);
+    const uint64_t a0 = va.xy(), b0 = vb.xy();
+    const uint64_t a8 = va.zw(), b8 = vb.zw();
     Store64(base, f + 112, a0);
     Store64(base, f + 128, b0);
     Store64(base, f + 120, a8);
@@ -153,8 +161,8 @@ void DrawSpan(uint8_t* base, uint32_t canvas, uint32_t region, int32_t xa, int32
   } else {
     left = xb;
     right = xa;
-    const uint64_t b0 = Load64(base, b), a0 = Load64(base, a);
-    const uint64_t b8 = Load64(base, b + 8), a8 = Load64(base, a + 8);
+    const uint64_t b0 = vb.xy(), a0 = va.xy();
+    const uint64_t b8 = vb.zw(), a8 = va.zw();
     Store64(base, f + 112, b0);
     Store64(base, f + 128, a0);
     Store64(base, f + 120, b8);
@@ -165,7 +173,7 @@ void DrawSpan(uint8_t* base, uint32_t canvas, uint32_t region, int32_t xa, int32
   if (flags & 0x80000000u) {
     const double l_u = Lfs(base, f + 112);
     const double r_v = Lfs(base, f + 132);
-    const double half = Lfs(base, kRasterHalf);
+    const double half = double(G::float_half(base));
     lu = Fsubs(l_u, half);
     lv = Fsubs(Lfs(base, f + 116), half);
     const double r_u = Fsubs(Lfs(base, f + 128), half);
@@ -200,7 +208,7 @@ void DrawSpan(uint8_t* base, uint32_t canvas, uint32_t region, int32_t xa, int32
     lu = Lfs(base, f + 112);
     left = 0;
   }
-  if (const int32_t width = Signed(Load(base, region + 0)); !(width > right)) {
+  if (const int32_t width = Signed(r.width()); !(width > right)) {
     const int32_t length = int32_t(uint32_t(right) - uint32_t(left));
     const double du = Fsubs(lu, ru);
     const int32_t over = int32_t(uint32_t(right) - uint32_t(width));
@@ -265,7 +273,7 @@ struct Edge {
 void DrawHalf(uint8_t* base, uint32_t canvas, uint32_t region, uint32_t image, uint32_t f,
               uint32_t flags, int32_t first, int32_t end, double rows, const Edge& ea,
               const Edge& eb, const HalfSlots& s, bool lower) {
-  const double half = Lfs(base, kRasterHalf);
+  const double half = double(G::float_half(base));
   int32_t i = 0;
   for (int32_t y = first; y < end; y++, i++) {
     Store(base, f + 84, flags);
@@ -331,13 +339,13 @@ void DrawTriangle(uint8_t* base, uint32_t canvas, uint32_t region, uint32_t posi
                   uint32_t texels, uint32_t image, uint32_t flags, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820EE0C8 SoftRaster::DrawTriangle");
   const uint32_t f = stack - kDrawTriangleFrameBytes;
-  auto y_of = [&](uint32_t i) { return Lfs(base, positions + 16 * i + 4); };
+  auto y_of = [&](uint32_t i) { return double(DecalVertex(base, positions + 16 * i).y()); };
   uint32_t top = 0, mid = 1, bottom = 2;
   if (y_of(0) > y_of(1)) {
     top = 1;
     mid = 0;
   }
-  if (y_of(top) > Lfs(base, positions + 36)) {
+  if (y_of(top) > double(schema::DecalTriangle(base, positions).y2())) {
     bottom = top;
     top = 2;
   }
@@ -350,7 +358,7 @@ void DrawTriangle(uint8_t* base, uint32_t canvas, uint32_t region, uint32_t posi
   Copy16(base, f + 144, positions + 16 * bottom);
   Copy16(base, f + 160, positions + 16 * mid);
   Copy16(base, f + 176, mid_texel);
-  const double half = Lfs(base, kRasterHalf);
+  const double half = double(G::float_half(base));
   const int32_t y_top = Fctiwz(Fadds(Lfs(base, f + 132), half));
   Store(base, f + 116, uint32_t(y_top));
   const int32_t y_mid = Fctiwz(Fadds(Lfs(base, f + 164), half));
@@ -368,8 +376,9 @@ void DrawTriangle(uint8_t* base, uint32_t canvas, uint32_t region, uint32_t posi
   const double x_mid = Lfs(base, f + 160);  // f23
   const double v_mid = Lfs(base, f + 180);  // f16
   const uint32_t span_flags = (flags & 0x1FFFFFFF) | 0x80000000u;
-  const uint64_t top0 = Load64(base, top_texel), bottom0 = Load64(base, bottom_texel);
-  const uint64_t bottom8 = Load64(base, bottom_texel + 8), top8 = Load64(base, top_texel + 8);
+  const DecalVertex top_v(base, top_texel), bottom_v(base, bottom_texel);
+  const uint64_t top0 = top_v.xy(), bottom0 = bottom_v.xy();
+  const uint64_t bottom8 = bottom_v.zw(), top8 = top_v.zw();
   StoreExtended(base, f + 112, int32_t(uint32_t(y_bottom) - uint32_t(y_top)));
   StoreExtended(base, f + 120, int32_t(uint32_t(y_mid) - uint32_t(y_top)));
   const double u_mid = Lfs(base, f + 176);  // f15
@@ -419,22 +428,23 @@ void DrawTriangle(uint8_t* base, uint32_t canvas, uint32_t region, uint32_t posi
 void DecalCorner(uint8_t* base, uint32_t out, uint32_t p, uint32_t c, uint32_t scale,
                  uint32_t t, double angle) {
   ITC_NATIVE_RUNNING("sub_820ED1E8 Vinyl::DecalCorner");
-  const double px = Lfs(base, p + 0);
-  const double py = Lfs(base, p + 4);
-  const double sy = Lfs(base, scale + 4);
-  const double sx_ = Fmuls(Fsubs(px, Lfs(base, c + 0)), Lfs(base, scale + 0));  // f30
-  const double sy_ = Fmuls(Fsubs(py, Lfs(base, c + 4)), sy);                    // f29
+  const DecalVertex vp(base, p), vc(base, c), vs(base, scale), vt(base, t), vo(base, out);
+  const double px = double(vp.x());
+  const double py = double(vp.y());
+  const double sy = double(vs.y());
+  const double sx_ = Fmuls(Fsubs(px, double(vc.x())), double(vs.x()));  // f30
+  const double sy_ = Fmuls(Fsubs(py, double(vc.y())), sy);               // f29
   const double sine = double(float(c_runtime::Sin(angle)));
   const double cosine = double(float(c_runtime::Cos(angle)));
-  const double cx = Lfs(base, c + 0);
+  const double cx = double(vc.x());
   const double a = Fmuls(sine, sy_);
-  const double tx = Lfs(base, t + 0);
+  const double tx = double(vt.x());
   const double b = Fmuls(sine, sx_);
   const double rx = Fmadds(cosine, sx_, -a);
   const double ry = Fmadds(cosine, sy_, b);
-  StoreSingle(base, out + 0, Fadds(Fadds(rx, cx), tx));
-  const double y = Fadds(ry, Lfs(base, t + 4));
-  StoreSingle(base, out + 4, Fadds(y, Lfs(base, c + 4)));
+  vo.set_x(float(Fadds(Fadds(rx, cx), tx)));
+  const double y = Fadds(ry, double(vt.y()));
+  vo.set_y(float(Fadds(y, double(vc.y()))));
 }
 
 bool DecalRegionPorted(uint32_t region) {
@@ -454,20 +464,20 @@ std::optional<uint32_t> DrawDecal(uint8_t* base, const DecalArguments& arguments
   Store64(base, stack + 48, arguments.header[2]);
   Store64(base, stack + 64, arguments.record[0]);
   Store64(base, stack + 72, arguments.record[1]);
-  Copy16(base, f + 80, kVinylRegions + 16 * arguments.region);
+  Copy16(base, f + 80, G::vinyl_regions_address() + 16 * arguments.region);
   const uint32_t width = guest::LoadU16(base, stack + 46);   // r28
   const uint32_t height = guest::LoadU16(base, stack + 48);  // r27
   StoreSingle(base, f + 112, Lfs(base, stack + 96));
   const uint32_t left = Load(base, f + 80);  // r24
   const uint32_t top = Load(base, f + 84);   // r23
   StoreSingle(base, f + 116, Lfs(base, stack + 100));
-  const double half = Lfs(base, kRasterHalf);
+  const double half = double(G::float_half(base));
   const uint32_t region_width = Load(base, f + 88) - left;  // r26
   const double offset_x = Lfs(base, stack + 64);
   StoreExtended(base, f + 96, Signed(width));
   const uint32_t region_height = Load(base, f + 92) - top;  // r25
   const double offset_y = Lfs(base, stack + 68);
-  const double zero = Lfs(base, kRasterZero);  // f31
+  const double zero = double(G::float_zero(base));  // f31
   StoreSingle(base, f + 208, zero);
   StoreSingle(base, f + 212, zero);
   StoreSingle(base, f + 228, zero);
@@ -510,7 +520,7 @@ std::optional<uint32_t> DrawDecal(uint8_t* base, const DecalArguments& arguments
     Copy16(base, f + 176, f + 192);
     Copy16(base, f + 192, f + 112);
   }
-  const uint32_t pitch = Load(base, kVinylSheetWidth) << 2;
+  const uint32_t pitch = G::vinyl_sheet_width(base) << 2;
   Store(base, f + 80, region_width);
   Store(base, f + 84, region_height);
   Store(base, f + 116, width);

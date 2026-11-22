@@ -36,14 +36,22 @@ the data. Read by the B7 loop's mapping agent, 2026-10-24, from its
 lead (found by the collision world's mapping agent). The names are ours;
 what the zones are for is guessed from the HUD's use (rows say so).
 Fields: `../known-data.md` (`0x828161EC`, "track zone", "route range",
-`0x82603274`, `0x82011AF0`, `0x8200D838`).
+`0x82603274`, `0x82011AF0`, `0x8200D838`). The schema (E5's step 2):
+`itc_recomp/schema/track-zones.toml` (`TrackZones`, `TrackZone`,
+`TrackZoneRangeList`, `RouteRange`, `List64`, `List128`).
 
 Shared with other files, without rows here: `Vehicle::Get`
 (`sub_820C0468`), `Vehicle::Identity` (`sub_820C0168`, the car's track
 position) and `Stages::Copy` (`sub_820FFD88`) (`vehicle-accessors.md`);
 `memcpy` (`sub_825A7410`, `c-runtime.md`); operator new and delete
 (`sub_825A6880`, `sub_825A70E8`, `heap.md`). The route's sections table
-(`[0x826C5B10]` + 12, `track-route.md`) is read directly. `List64::Insert`
+(`[0x826C5B10]` + 12, `track-route.md`) is read directly, through
+track-route's views (`TrackRouteFile`, `TrackRouteSection`,
+`TrackRouteLink`); the car's track position through collision-world's
+`TrackPosition`, the racers' entries through race-world's `RaceManager`
+and minimap's `MinimapRacerEntry`, and the race data through
+race-states' `RaceData` and vehicle-accessors' `Stages` and `RaceStage`
+(E5 step 2's second pass). `List64::Insert`
 (`sub_820FE330`) is also called by `sub_82148428` (a list of models, a
 lead), and `List16::Link` (`sub_821531C0`) by `sub_82154378`,
 `sub_821543E8` and `sub_82154458` (the camera modes' area; `List16::Insert32`, `Insert608` and `Insert20` in `camera-modes.md` since 2026-10-30).
@@ -110,6 +118,11 @@ Status:
   calls direct or through the dispatch table. While the SDK or code not
   native yet still reaches it, its entry for them is an override in
   `src/lifted/` (deleted when nothing reaches it that way).
+- **Host**: E5 (`docs/e5-native.md`, steps 3 to 5): our C++ whose objects
+  are host structs (host byte order, host pointers, made with `new` or
+  kept in containers), read and written as C++ members instead of by
+  offset in guest memory. A Native or Lifted function becomes Host when
+  its area's objects move to the host.
 
 A function usually moves from recompiled or Wrapped to Overridden to
 Native as the `ctx` edge moves up through its callers, or straight to

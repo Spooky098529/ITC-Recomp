@@ -16,6 +16,8 @@
 #include "material_passes/material_passes.h"
 #include "matrix_math/matrix_math.h"
 #include "native/buffers.h"
+#include "schema/cameras.h"
+#include "schema/car_draw.h"
 
 #include <cmath>
 #include <initializer_list>
@@ -47,8 +49,7 @@ void CopyDoublewords(uint8_t* base, uint32_t to, uint32_t from, uint32_t bytes) 
 
 namespace {
 
-constexpr uint32_t kScene = 0x826C2E44;
-constexpr uint32_t kCullFlip = 0x826C5104;
+using G = schema::CarDrawGlobals;
 constexpr uint32_t kOne = 0x82000A30;    // 1.0
 constexpr uint32_t kZero = 0x82000A34;   // 0.0
 constexpr uint32_t kHalf = 0x82001BE4;   // 0.5
@@ -77,13 +78,13 @@ uint32_t Frame(uint8_t* base, uint32_t stack, uint32_t bytes) {
 
 // The block's flag bits (the low word of its +0 doubleword, ld'd each time).
 uint32_t Bits(uint8_t* base, uint32_t block) {
-  return Load(base, block + 4);
+  return schema::CarDrawBlock(base, block).flags();
 }
 
 // [0x826C5104] = !x (cntlzw and the shift): Model::RecordMaterials' cull
 // swap flipped around the lamps' glows.
 void Flip(uint8_t* base) {
-  Store(base, kCullFlip, Load(base, kCullFlip) == 0 ? 1 : 0);
+  G::set_lights_flip(base, G::lights_flip(base) == 0 ? 1 : 0);
 }
 
 // 1.0 (lfs'd once) into each of the frame's words at `offsets`.
@@ -138,9 +139,10 @@ void Memcpy(uint8_t* base, const Calls& calls, uint32_t to, uint32_t from, uint3
 // PartModel::SetPair1002Alpha(the record's model, its shape, the block's
 // +636) from `frame`.
 Left CoverAlpha(uint8_t* base, uint32_t record, uint32_t block, uint32_t frame) {
-  const double f1 = Lfs(base, block + 636);
-  const uint32_t shape = Load(base, record + 228);
-  const uint32_t model = Load(base, record + 4);
+  const double f1 = double(schema::CarDrawBlock(base, block).lights_alpha());
+  const schema::CarPart part(base, record);
+  const uint32_t shape = part.shape();
+  const uint32_t model = part.model();
   return Left{false, material_passes::SetPair1002Alpha(base, model, shape, f1, frame)};
 }
 
@@ -148,7 +150,7 @@ Left CoverAlpha(uint8_t* base, uint32_t record, uint32_t block, uint32_t frame) 
 // (r3 its out, left as the call set it), else its original.
 Left ViewTransposed(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t pass,
                     uint32_t lr) {
-  const uint32_t out = frame + 656, view = pass + 16;
+  const uint32_t out = frame + 656, view = schema::CameraPass(base, pass).view_address();
   if (material_passes::TransposeRotation(base, out, view, frame)) {
     return Left{false, out};
   }
@@ -206,11 +208,11 @@ void TowardEye(uint8_t* base, uint32_t frame, uint32_t pass,
                std::initializer_list<uint32_t> ones) {
   const double one = Lfs(base, kOne);
   double f12 = Lfs(base, frame + 392);
-  double f0 = Fsubs(Lfs(base, pass + 408), f12);
+  double f0 = Fsubs(double(schema::CameraPass(base, pass).eye_z()), f12);
   f12 = Lfs(base, frame + 388);
-  double f13 = Fsubs(Lfs(base, pass + 404), f12);
+  double f13 = Fsubs(double(schema::CameraPass(base, pass).eye_y()), f12);
   const double f11 = Lfs(base, frame + 384);
-  f12 = Fsubs(Lfs(base, pass + 400), f11);
+  f12 = Fsubs(double(schema::CameraPass(base, pass).eye_x()), f11);
   Stfs(base, frame + 172, one);
   Identity(base, frame + 272);
   double length = Fmuls(f0, f0);
@@ -284,7 +286,7 @@ constexpr TailSites kTrafficTailSites = {
 // 0x40 (`any_with_0x40`).
 Left TailGlows(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t group, uint32_t block,
                uint32_t pass, bool any_with_0x40, const TailSites& sites) {
-  const uint32_t vp = pass + 144, world = block + 16;
+  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address(), world = block + 16;
   Left left;
   // The 1.0 w's of the view's transposed rotation and of the matrix at +336.
   const double one = Lfs(base, kOne);
@@ -326,19 +328,20 @@ Left TailGlows(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t group
   }
 
   // The glows: the scene's glow model in red at the four tl**_0k_ef nodes.
-  const uint32_t model = Load(base, kScene) + 480;
+  const schema::CarScene scene = G::scene(base);
+  const uint32_t model = scene.glow_model_address();
   left = GlowColor(base, calls, frame, model, 176, sites.color_memcpy, sites.color);
-  const int32_t shapes = int32_t(Load(base, model + 412));
+  const int32_t shapes = int32_t(scene.glow_model_shapes());
   const double two = Lfs(base, kTwo);
   const double half = Lfs(base, kHalf);
   for (uint32_t node = 0; node < 4; node++) {
-    const uint32_t record = group + 240 * node;
-    if (Load(base, record + 4) == 0) {
+    const schema::CarPart record(base, group + 240 * node);
+    if (record.model() == 0) {
       continue;
     }
     // The node's position through the block's world, at +384 and +448.
     FreshIdentity(base, frame + 336, frame + 208);
-    const uint64_t p0 = Load64(base, record + 144), p1 = Load64(base, record + 152);
+    const uint64_t p0 = record.position_lo(), p1 = record.position_hi();
     Stfs(base, frame + 732, one);
     Stfs(base, frame + 748, one);
     Stfs(base, frame + 764, one);
@@ -405,7 +408,7 @@ Left PartsDrawTailLights(uint8_t* base, const Calls& calls, uint32_t stack, uint
                          uint32_t caller_r28) {
   ITC_NATIVE_RUNNING("sub_820DF8B0 PartsPoints::DrawTailLights");
   const uint32_t frame = Frame(base, stack, kPartsTailLightsFrame);
-  const uint32_t vp = pass + 144, world = block + 16;
+  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address(), world = block + 16;
   auto lamp = [&](uint32_t record, uint32_t lr) {
     return PartsDrawRecord(base, calls, frame, group + record, vp, world, 0, caller_r24,
                            caller_r28, lr);
@@ -436,7 +439,7 @@ Left TrafficDrawTailLights(uint8_t* base, const Calls& calls, uint32_t stack, ui
                            uint32_t caller_r28) {
   ITC_NATIVE_RUNNING("sub_820E5B08 TrafficPoints::DrawTailLights");
   const uint32_t frame = Frame(base, stack, kTrafficTailLightsFrame);
-  const uint32_t vp = pass + 144, world = block + 16;
+  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address(), world = block + 16;
   auto lamp = [&](uint32_t record, uint32_t lr) {
     return PartsDrawRecord(base, calls, frame, group + record, vp, world, 0, caller_r24,
                            caller_r28, lr);
@@ -461,12 +464,13 @@ Left PartsDrawHeadlights(uint8_t* base, const Calls& calls, uint32_t stack, uint
   const uint32_t frame = Frame(base, stack, kPartsHeadlightsFrame);
   Left left;
   left.r3 = group;
-  if (Load(base, group + 4) == 0) {
+  const schema::PartsPoints points(base, group);
+  if (points.record0_model() == 0) {
     return left;
   }
   // The lamps with the pop-up's matrix (+3120): low, high, the winkers; the
   // cover. r28 is the pass here.
-  const uint32_t vp = pass + 144, popup = group + 3120;
+  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address(), popup = points.headlights_popup_matrix_address();
   auto lamp = [&](uint32_t record, uint32_t lr) {
     return PartsDrawRecord(base, calls, frame, group + record, vp, popup, 0, caller_r24, pass,
                            lr);
@@ -522,21 +526,22 @@ Left PartsDrawHeadlights(uint8_t* base, const Calls& calls, uint32_t stack, uint
   // The glows: the low beams' nodes (records 1 to 4), with the high beams
   // also 5 and 6, each facing the camera; the glows follow the block's
   // world, not the pop-up.
-  const uint32_t model = Load(base, kScene) + 480;
+  const schema::CarScene scene = G::scene(base);
+  const uint32_t model = scene.glow_model_address();
   left = GlowColor(base, calls, frame, model, 160, 0x820E18F0, 0x820E1914);
-  const int32_t shapes = int32_t(Load(base, model + 412));
+  const int32_t shapes = int32_t(scene.glow_model_shapes());
   const double zero = Lfs(base, kZero);
   const uint32_t world = block + 16;
   for (uint32_t node = 1; node < 7; node++) {
-    const uint32_t record = group + 240 * node;
-    if (Load(base, record + 4) == 0) {
+    const schema::CarPart record(base, group + 240 * node);
+    if (record.model() == 0) {
       continue;
     }
     if (node >= 5 && (Bits(base, block) & 0x40) == 0) {
       continue;
     }
     FreshIdentity(base, frame + 336, frame + 192);
-    const uint64_t p0 = Load64(base, record + 144), p1 = Load64(base, record + 152);
+    const uint64_t p0 = record.position_lo(), p1 = record.position_hi();
     Stfs(base, frame + 732, one);
     Stfs(base, frame + 748, one);
     Stfs(base, frame + 764, one);
@@ -592,7 +597,7 @@ Left TrafficDrawHeadlights(uint8_t* base, const Calls& calls, uint32_t stack, ui
                            uint32_t caller_r28) {
   ITC_NATIVE_RUNNING("sub_820E61D8 TrafficPoints::DrawHeadlights");
   const uint32_t frame = Frame(base, stack, kTrafficHeadlightsFrame);
-  const uint32_t vp = pass + 144, world = block + 16;
+  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address(), world = block + 16;
   // hl00add_low with bit 0x1 (r28 the caller's), then the cover with its
   // alpha (r28 the block's world from here on).
   if (Bits(base, block) & 0x1) {
@@ -639,17 +644,18 @@ Left TrafficDrawHeadlights(uint8_t* base, const Calls& calls, uint32_t stack, ui
 
   // The glows: the scene's glow model in white at nodes 0 to 3, each facing
   // the camera, with the block's world.
-  const uint32_t model = Load(base, kScene) + 480;
+  const schema::CarScene scene = G::scene(base);
+  const uint32_t model = scene.glow_model_address();
   left = GlowColor(base, calls, frame, model, 176, 0x820E63A8, 0x820E63CC);
-  const int32_t shapes = int32_t(Load(base, model + 412));
+  const int32_t shapes = int32_t(scene.glow_model_shapes());
   const double zero = Lfs(base, kZero);
   for (uint32_t node = 0; node < 4; node++) {
-    const uint32_t record = group + 240 * node;
-    if (Load(base, record + 4) == 0) {
+    const schema::CarPart record(base, group + 240 * node);
+    if (record.model() == 0) {
       continue;
     }
     FreshIdentity(base, frame + 336, frame + 208);
-    const uint64_t p0 = Load64(base, record + 144), p1 = Load64(base, record + 152);
+    const uint64_t p0 = record.position_lo(), p1 = record.position_hi();
     Stfs(base, frame + 732, one);
     Stfs(base, frame + 748, one);
     Stfs(base, frame + 764, one);

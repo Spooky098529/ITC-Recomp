@@ -23,17 +23,16 @@
 #include "car_specs/car_specs.h"
 #include "guest.h"
 #include "native/buffers.h"
+#include "schema/car_makers.h"
+#include "schema/car_specs.h"
+#include "schema/career.h"
+#include "schema/race_event.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
 namespace tuning_screen::refresh {
 
 namespace {
-
-constexpr uint32_t kRows = 9678;          // a byte: the type list's rows
-constexpr uint32_t kFirstRow = 25108;     // the list's first type shown
-constexpr uint32_t kSpoilerShift = 25172; // set: the rear spoiler's types shifted by one
-constexpr uint32_t kBodyKit = 36588;      // AeroParts::Get82's level
 
 constexpr uint32_t kMemcpy = 0x825A7410;
 constexpr uint32_t kGet77 = 0x820CB9E0;  // AeroParts::Get77(out, parts, level)
@@ -43,11 +42,11 @@ constexpr uint32_t kGet82 = 0x820CBC90;  // AeroParts::Get82(out, parts, level)
 
 // Block 5: state 6, the item's types.
 void Context::State6() {
-  if (Word(9716) != 0) {
-    Texture(3, 1, uint64_t(Word(kCategory)) + 1);
+  if (TS(base, screen).command_first_run() != 0) {
+    Texture(3, 1, uint64_t(TS(base, screen).category()) + 1);
     // By the category (unsigned): none for 7 and above.
     static constexpr int32_t kFirst[7] = {8, 12, -1, 17, 20, 30, 38};
-    const uint32_t again = Word(kCategory);
+    const uint32_t again = TS(base, screen).category();
     if (again < 7) {
       Texture(3, 2, again == 2 ? 3 : uint64_t(Item()) + uint64_t(kFirst[again]));
     }
@@ -73,13 +72,13 @@ void Context::State6() {
     } else {
       continue;
     }
-    guest::StoreU32(base, node + 80, 0);
+    UiNode(base, node).set_visible(0);
     ui_movies::SetColor(base, node, 0);
   }
 
   // A row's node shown.
   const auto shown = [&](uint32_t node) {
-    guest::StoreU32(base, node + 80, 1);
+    UiNode(base, node).set_visible(1);
     return node;
   };
   const auto row28 = [&](uint32_t child) { return shown(ChildOf(Node(28, 1), child)); };
@@ -88,25 +87,27 @@ void Context::State6() {
     const uint32_t item = Item();
     if (c == 0 && item == 2) {
       NodeText(shown(Node(29, 5)), 376, 0x821E52B8);
-      for (uint32_t row = 1; int32_t(row) < int32_t(Byte(kRows)); row++) {
+      for (uint32_t row = 1; int32_t(row) < int32_t(uint32_t(TS(base, screen).type_count()));
+           row++) {
         NodeText(shown(Node(29, row + 5)), 379, 0x821E52F0, row);
       }
     } else if (c == 4 && item == 3) {
-      if (int32_t(Word(kSpoilerShift)) != 0) {
+      if (int32_t(TS(base, screen).aero3_type_remap()) != 0) {
         // Row 0 376, row 1 375 (none), then 379 with the type from 1.
         const uint32_t parent = Node(28, 1);
         NodeText(shown(ChildOf(parent, 5)), 376, 0x821E5354);
         NodeText(shown(ChildOf(parent, 6)), 375, 0x821E5374);
-        if (Byte(kRows) > 2) {
+        if (uint32_t(TS(base, screen).type_count()) > 2) {
           uint32_t row = 1;
           do {
             NodeText(row28(row + 6), 379, 0x821E53B4, row);
             row++;
-          } while (int32_t(row + 1) < int32_t(Byte(kRows)));
+          } while (int32_t(row + 1) < int32_t(uint32_t(TS(base, screen).type_count())));
         }
       } else {
         NodeText(row28(5), 376, 0x821E53EC);
-        for (uint32_t row = 1; int32_t(row) < int32_t(Byte(kRows)); row++) {
+        for (uint32_t row = 1; int32_t(row) < int32_t(uint32_t(TS(base, screen).type_count()));
+             row++) {
           NodeText(row28(row + 5), 379, 0x821E542C, row);
         }
       }
@@ -116,7 +117,8 @@ void Context::State6() {
       // IsItemAvailable answers 0.
       const uint32_t first = row28(5);
       NodeText(first, Category() == 4 && Item() == 9 ? 375 : 376, 0x821E55A0);
-      for (uint32_t row = 1; int32_t(row) < int32_t(Byte(kRows)); row++) {
+      for (uint32_t row = 1; int32_t(row) < int32_t(uint32_t(TS(base, screen).type_count()));
+           row++) {
         const uint32_t node = row28(row + 5);
         if (int32_t(IsItemAvailable(base, screen, row)) == 0) {
           ui_movies::SetColor(base, node, 2);
@@ -134,28 +136,29 @@ void Context::State6() {
       continue;
     }
     const uint32_t node = Node(28, 0);
-    guest::StoreU32(base, ChildOf(node, n - 11) + 80, 0);
-    guest::StoreU32(base, ChildOf(node, n) + 80, 0);
+    UiNode(base, ChildOf(node, n - 11)).set_visible(0);
+    UiNode(base, ChildOf(node, n)).set_visible(0);
   }
   if (in28()) {
-    for (uint32_t row = 0; int32_t(row) < int32_t(Byte(kRows)); row++) {
+    for (uint32_t row = 0; int32_t(row) < int32_t(uint32_t(TS(base, screen).type_count())); row++) {
       const uint32_t node = Node(28, 0);
       const uint32_t mark = ChildOf(node, row + 15);
       const uint32_t flag = ChildOf(node, 38 + 2 * row);
-      guest::StoreU32(base, mark + 80, 1);
+      UiNode(base, mark).set_visible(1);
       guest::StoreU32(base, flag + 108, GetChoiceFlag(base, screen, row) != 0 ? 0 : 1);
-      guest::StoreU32(base, ChildOf(node, row + 26) + 80, 1);
+      UiNode(base, ChildOf(node, row + 26)).set_visible(1);
     }
   }
 
   // The scroll arrows by the rows and the type's place from +25108.
   {
-    const uint32_t count = Byte(kRows);
+    const uint32_t count = uint32_t(TS(base, screen).type_count());
     if (count <= 8) {
       Shown(kAll, 25, 0);
       Shown(kAll, 26, 0);
     } else {
-      const uint64_t d = uint64_t(Byte(kType)) - uint64_t(Word(kFirstRow));
+      const uint64_t d =
+          uint64_t(uint32_t(TS(base, screen).type())) - uint64_t(TS(base, screen).types_row());
       if (int32_t(d) == 0) {
         Shown(kAll, 25, 1);
         Shown(kAll, 26, 0);
@@ -181,9 +184,9 @@ void Context::State6() {
   // types without one), the interior's frame for category 6 item 0.
   const int32_t category = Category();
   if (category == 4) {
-    const uint32_t type = Byte(kType);
+    const uint32_t type = uint32_t(TS(base, screen).type());
     int64_t step = 0;  // the type's offset (0: node 17 hidden)
-    if (Item() == 3 && int32_t(Word(kSpoilerShift)) != 0) {
+    if (Item() == 3 && int32_t(TS(base, screen).aero3_type_remap()) != 0) {
       step = type == 0 || type == 1 ? 0 : 2;
     } else {
       step = type == 0 ? 0 : 1;
@@ -193,29 +196,29 @@ void Context::State6() {
     } else {
       Shown(kAll, 17, 1);
       const uint32_t child = ChildOf(Node(kAll, 17), 0);
-      const uint64_t r4 = uint64_t(Byte(kType)) - uint64_t(step);
+      const uint64_t r4 = uint64_t(uint32_t(TS(base, screen).type())) - uint64_t(step);
       const uint64_t r5 = Item();
       // AeroPartValue leaves r4 and r5 as they came: its second call has the
       // same arguments.
       if (int32_t(uint32_t(AeroPartValue(base, screen, r4, r5, frame))) == -1) {
         Shown(kAll, 17, 0);
-        guest::StoreU32(base, child + 108, 0);
+        UiNode(base, child).set_texture_entry(0);
       } else {
-        guest::StoreU32(base, child + 108, uint32_t(AeroPartValue(base, screen, r4, r5, frame)));
+        UiNode(base, child).set_texture_entry(uint32_t(AeroPartValue(base, screen, r4, r5, frame)));
       }
     }
   } else if (category == 6 && Item() == 0) {
-    const uint32_t type = Byte(kType);
+    const uint32_t type = uint32_t(TS(base, screen).type());
     if (type == 0) {
       Shown(kAll, 17, 0);
     } else {
       Shown(kAll, 17, 1);
       const uint32_t child = ChildOf(Node(kAll, 17), 0);
-      guest::StoreU32(base, child + 108, Byte(kType) <= 2 ? 4 : 24);
+      UiNode(base, child).set_texture_entry(uint32_t(TS(base, screen).type()) <= 2 ? 4 : 24);
     }
   }
   if (Category() == 6 && Item() == 0) {
-    ShowInteriorPicture(base, screen, Byte(kType), 0, frame);
+    ShowInteriorPicture(base, screen, uint32_t(TS(base, screen).type()), 0, frame);
   }
 
   // The help line by the category and the item.
@@ -264,16 +267,18 @@ void Context::State6() {
 // and the type -1; else 629 or 630 by bit 0 of 77's +24, or with +36588 set
 // and bit 1 of 82's +24 clear, by its bit 2.
 uint64_t Context::SpoilerHelp() const {
-  const uint32_t save = Word(kSaveData);
-  const uint32_t list = save + 6120;
-  uint32_t count = guest::LoadU32(base, save + 0x19920);
-  uint32_t at = uint32_t(int32_t(int16_t(guest::LoadU16(base, list + 204)))) * 4 + list;
+  const schema::SaveData save(base, TS(base, screen).save_data().address);
+  const uint32_t list = save.garage_address();
+  uint32_t count = save.selected_car();
+  uint32_t at =
+      uint32_t(int32_t(int16_t(schema::CareerGarageList(base, list).head()))) * 4 + list;
   while (count != 0) {
     at = uint32_t(int32_t(int16_t(guest::LoadU16(base, at)))) * 4 + list;
     count--;
   }
   const int32_t slot = int16_t(guest::LoadU16(base, at + 2));
-  const uint32_t car = guest::LoadU32(base, uint32_t(int64_t(slot) * 1968) + list + 224);
+  const uint32_t car =
+      schema::CarMakersCar(base, uint32_t(int64_t(slot) * 1968) + list + 212).car_id();
   const uint32_t parts_out = frame + 176, parts = frame + 96;
   uint32_t words[9];
   car_specs::GetCarParts(base, car, words);
@@ -284,8 +289,8 @@ uint64_t Context::SpoilerHelp() const {
     Call(kMemcpy, {parts, parts_out, 36}, 0x821E5B14);
   }
   int64_t type;
-  if (int32_t(Word(kSpoilerShift)) != 0) {
-    const uint32_t t = Byte(kType);
+  if (int32_t(TS(base, screen).aero3_type_remap()) != 0) {
+    const uint32_t t = uint32_t(TS(base, screen).type());
     if (t == 0) {
       type = 0;
     } else if (t >= 2 && t <= 5) {
@@ -296,7 +301,7 @@ uint64_t Context::SpoilerHelp() const {
       type = 0;
     }
   } else {
-    type = Byte(kType);
+    type = uint32_t(TS(base, screen).type());
   }
   const auto get = [&](uint32_t function, uint32_t out, uint64_t level, uint32_t lr,
                        bool (*plain)(uint8_t*, uint32_t, const uint32_t[9], int32_t)) {
@@ -310,11 +315,11 @@ uint64_t Context::SpoilerHelp() const {
     return uint32_t(Call(function, {out, parts, level}, lr));
   };
   const uint32_t kit77 = get(kGet77, frame + 144, uint64_t(type), 0x821E5B70, car_specs::AeroPart77);
-  const uint32_t a = guest::LoadU32(base, kit77 + 24);
+  const uint32_t a = schema::AeroPartRecord(base, kit77).flags();
   const uint32_t kit82 =
-      get(kGet82, frame + 224, Word(kBodyKit), 0x821E5B90, car_specs::AeroPart82);
-  const uint32_t b = guest::LoadU32(base, kit82 + 24);
-  if (Word(kBodyKit) == 0) {
+      get(kGet82, frame + 224, TS(base, screen).aero9_type(), 0x821E5B90, car_specs::AeroPart82);
+  const uint32_t b = schema::AeroPartRecord(base, kit82).flags();
+  if (TS(base, screen).aero9_type() == 0) {
     if (int32_t(type) == -1) {
       return 865;
     }

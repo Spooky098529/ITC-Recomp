@@ -23,6 +23,10 @@
 #include "race_overlays/race_overlays.h"
 #include "track_route/track_route.h"
 #include "track_zones/track_zones.h"
+#include "schema/camera_modes.h"
+#include "schema/game_modes.h"
+#include "schema/track_route.h"
+#include "schema/track_zones.h"
 
 namespace camera_modes {
 
@@ -30,14 +34,16 @@ using namespace steps;
 
 namespace {
 
-constexpr uint32_t kOne = 0x82000A30;   // 1.0
-constexpr uint32_t kZero = 0x82000A34;  // 0.0
-constexpr uint32_t kRoute = 0x826C5B10;  // the course's route (its file)
-constexpr uint32_t kFlip = 0x82001BE0;   // the z flip (-1.0, probably)
+using G = schema::CameraModesGlobals;
+
+constexpr uint32_t kOne = G::one_address();      // 1.0
+constexpr uint32_t kZero = G::zero_address();    // 0.0
+constexpr uint32_t kRoute = G::route_address();  // the course's route (its file)
+constexpr uint32_t kFlip = G::flip_address();    // the z flip (-1.0, probably)
 
 // TrackRoute::SplinePoint's Catmull-Rom matrix and its guard (bit 1).
-constexpr uint32_t kSplineMatrix = 0x826C2D30;
-constexpr uint32_t kSplineGuard = 0x826C2D70;
+constexpr uint32_t kSplineMatrix = G::spline_matrix_address();
+constexpr uint32_t kSplineGuard = G::spline_guard_address();
 constexpr uint32_t kSplineAtexit = 0x825DAE08;
 
 uint32_t Load(uint8_t* base, uint32_t a) { return guest::LoadU32(base, a); }
@@ -76,50 +82,74 @@ uint32_t SectionOf(uint8_t* base, uint32_t table, uint32_t number) {
   return Load(base, table + ((number << 2) & 0x3FFFC));
 }
 
+// A section's link `i` (0 to 2 forward, 3 to 5 back).
+schema::TrackRouteLink LinkOf(uint8_t* base, uint32_t section, uint32_t i) {
+  return schema::TrackRouteLink(
+      base, schema::TrackRouteSection(base, section).links_address() + schema::TrackRouteLink::kSize * i);
+}
+// A section's slice count (signed).
+int32_t SliceCount(uint8_t* base, uint32_t section) {
+  return int16_t(schema::TrackRouteSection(base, section).slice_count());
+}
+// A slice's record in a section.
+schema::TrackRouteSlice SliceOf(uint8_t* base, uint32_t section, uint32_t slice) {
+  return schema::TrackRouteSlice(
+      base, schema::TrackRouteSection(base, section).slices_address() + slice * schema::TrackRouteSlice::kSize);
+}
+// A slice's point in the section's first (`table` 84) or second (96) edge
+// table after the slice records: 12 bytes a slice (x, y, z).
+schema::TrackRoutePoint EdgeOf(uint8_t* base, uint32_t section, uint32_t count, uint32_t table,
+                               uint32_t slice) {
+  return schema::TrackRoutePoint(
+      base, schema::TrackRouteSection(base, section).slices_address() + count * table + slice * 12);
+}
+
 }  // namespace
 
 // --- The route ranges ---
 
 int64_t RangeCameraAt(uint8_t* base, uint32_t range, uint32_t position) {
   ITC_NATIVE_RUNNING("sub_820FE830 RouteRange::CameraAt");
-  const uint32_t old = Load(base, range);
-  Store(base, range, 1);
+  const schema::RouteRange r(base, range);
+  const uint32_t old = r.state();
+  r.set_state(1);
   const track_zones::Position p{uint16_t(LoadU16(base, position)),
                                 uint16_t(LoadU16(base, position + 2))};
   int64_t result = -1;
   if (track_zones::RangeTest(base, range, p) == 2) {
     result = int64_t(uint64_t(Load(base, track_zones::kSliceCount)));
   }
-  Store(base, range, old);
+  r.set_state(old);
   return result;
 }
 
 void RangeAdvance(uint8_t* base, uint32_t out, uint32_t range, int32_t distance) {
   ITC_NATIVE_RUNNING("sub_820FE598 RouteRange::Advance");
-  int32_t section = LoadS16(base, range + 4);
-  const int32_t end = LoadS16(base, range + 8);
+  const schema::RouteRange r(base, range);
+  int32_t section = int16_t(r.start_section());
+  const int32_t end = int16_t(r.end_section());
   uint32_t left = uint32_t(distance);
   StoreU16(base, out + 0, 0);
   StoreU16(base, out + 2, 0);
   if (end != section) {
-    const uint32_t table = Load(base, Load(base, kRoute) + 12);
+    const uint32_t table = schema::TrackRouteFile(base, Load(base, kRoute)).sections();
     do {
       const uint32_t s = SectionOf(base, table, uint32_t(section));
-      const int32_t length = LoadS16(base, s + 0);
+      const int32_t length = SliceCount(base, s);
       if (int32_t(left) < length) {
         break;
       }
       left -= uint32_t(length);
       int32_t links = 0;
       for (uint32_t i = 0; i < 3; i++) {
-        if (LoadU16(base, s + 28 + 4 * i) != 0xFFFF) {
+        if (LinkOf(base, s, i).section() != 0xFFFF) {
           links++;
         }
       }
       if (links == 1) {
         for (uint32_t i = 0; i < 3; i++) {
-          if (LoadU16(base, s + 28 + 4 * i) != 0xFFFF) {
-            section = LoadS16(base, s + (i + 7) * 4);
+          if (LinkOf(base, s, i).section() != 0xFFFF) {
+            section = int16_t(LinkOf(base, s, i).section());
             break;
           }
         }
@@ -131,13 +161,13 @@ void RangeAdvance(uint8_t* base, uint32_t out, uint32_t range, int32_t distance)
           if (section == last) {
             break;
           }
-          const uint32_t count = uint32_t(LoadS16(base, range + 276));
-          last = LoadS16(base, s + 28 + 4 * i);
+          const uint32_t count = uint32_t(int16_t(r.take_count()));
+          last = int16_t(LinkOf(base, s, i).section());
           if (count == 0) {
             continue;
           }
-          const uint32_t list = range + 12;
-          const uint32_t head = uint32_t(LoadS16(base, list + 260)) * 4 + list;
+          const uint32_t list = r.take_nodes_address();
+          const uint32_t head = uint32_t(int16_t(r.take_head())) * 4 + list;
           for (uint32_t j = 0; j < count; j++) {
             uint32_t node = head;
             for (uint32_t k = j; k != 0; k--) {
@@ -172,22 +202,22 @@ double SliceFraction(uint8_t* base, uint32_t position, uint32_t point, uint32_t 
   const int32_t slice = LoadS16(base, f + 82);
   CopyWord(base, f + 124, kOne);
   CopyWord(base, f + 108, kOne);
-  const uint32_t s = Load(base, Load(base, file + 12) + (section << 2));
+  const uint32_t s = Load(base, schema::TrackRouteFile(base, file).sections() + (section << 2));
   const int32_t next = slice + 1;
-  const bool within = LoadS16(base, s + 0) > next;
-  const int32_t n = LoadS16(base, s + 0);
-  const uint32_t a = s + uint32_t(n) * 84 + uint32_t(slice) * 12;
-  const uint32_t b = s + uint32_t(n) * 96 + uint32_t(slice) * 12;
+  const bool within = SliceCount(base, s) > next;
+  const int32_t n = SliceCount(base, s);
+  const schema::TrackRoutePoint a = EdgeOf(base, s, uint32_t(n), 84, uint32_t(slice));
+  const schema::TrackRoutePoint b = EdgeOf(base, s, uint32_t(n), 96, uint32_t(slice));
   // The point's foot on the line through the slice's two edge points.
-  const double ax = Lfs(base, a + 124);
+  const double ax = double(a.x());
   Stfs(base, f + 96, Fsubs(px, ax));
-  const double ay = Lfs(base, a + 128);
+  const double ay = double(a.y());
   Stfs(base, f + 100, Fsubs(py, ay));
-  const double az = Lfs(base, a + 132);
+  const double az = double(a.z());
   Stfs(base, f + 104, Fsubs(pz, az));
-  double dx = Fsubs(Lfs(base, b + 124), ax);
-  double dy = Fsubs(Lfs(base, b + 128), ay);
-  double dz = Fsubs(Lfs(base, b + 132), az);
+  double dx = Fsubs(double(b.x()), ax);
+  double dy = Fsubs(double(b.y()), ay);
+  double dz = Fsubs(double(b.z()), az);
   Stfs(base, f + 112, dx);
   Stfs(base, f + 116, dy);
   Stfs(base, f + 120, dz);
@@ -216,20 +246,20 @@ double SliceFraction(uint8_t* base, uint32_t position, uint32_t point, uint32_t 
     next_section = uint32_t(track_route::Link(base, kRoute, section, 0));
     next_slice = 0;
   }
-  const uint32_t s2 = SectionOf(base, Load(base, file + 12), next_section);
-  const int32_t n2 = LoadS16(base, s2 + 0);
-  const uint32_t a2 = s2 + uint32_t(n2) * 84 + uint32_t(next_slice) * 12;
-  const uint32_t b2 = s2 + uint32_t(n2) * 96 + uint32_t(next_slice) * 12;
-  const double ax2 = Lfs(base, a2 + 124);
+  const uint32_t s2 = SectionOf(base, schema::TrackRouteFile(base, file).sections(), next_section);
+  const int32_t n2 = SliceCount(base, s2);
+  const schema::TrackRoutePoint a2 = EdgeOf(base, s2, uint32_t(n2), 84, uint32_t(next_slice));
+  const schema::TrackRoutePoint b2 = EdgeOf(base, s2, uint32_t(n2), 96, uint32_t(next_slice));
+  const double ax2 = double(a2.x());
   Stfs(base, f + 96, Fsubs(px, ax2));
-  const double ay2 = Lfs(base, a2 + 128);
+  const double ay2 = double(a2.y());
   const double ex = Fsubs(px, qx);
   Stfs(base, f + 100, Fsubs(py, ay2));
-  const double az2 = Lfs(base, a2 + 132);
+  const double az2 = double(a2.z());
   Stfs(base, f + 104, Fsubs(pz, az2));
-  const double dx2 = Fsubs(Lfs(base, b2 + 124), ax2);
-  const double dy2 = Fsubs(Lfs(base, b2 + 128), ay2);
-  const double dz2 = Fsubs(Lfs(base, b2 + 132), az2);
+  const double dx2 = Fsubs(double(b2.x()), ax2);
+  const double dy2 = Fsubs(double(b2.y()), ay2);
+  const double dz2 = Fsubs(double(b2.z()), az2);
   simde__m128 v13 = LoadVector(base, f + 96);
   Stfs(base, f + 112, dx2);
   Stfs(base, f + 116, dy2);
@@ -270,6 +300,7 @@ double SliceFraction(uint8_t* base, uint32_t position, uint32_t point, uint32_t 
 void TvTrack(uint8_t* base, uint32_t camera, uint32_t position, uint32_t frame,
              const std::function<void(uint32_t buffer, uint32_t index)>& request) {
   ITC_NATIVE_RUNNING("sub_82156980 TvCamera::Track");
+  const schema::TvCamera c(base, camera);
   // A 40-slot list on the stack (frame + 96; List40::'s layout), the
   // ranges the position is on.
   const uint32_t list = frame + 96;
@@ -281,7 +312,7 @@ void TvTrack(uint8_t* base, uint32_t camera, uint32_t position, uint32_t frame,
   StoreU16(base, frame + 260, 0xFFFF);
   StoreU16(base, frame + 262, 0xFFFF);
   StoreU16(base, frame + 258, 0xFFFF);
-  uint32_t ranges = Load(base, camera + 452);
+  uint32_t ranges = c.range_count();
   StoreU16(base, frame + 256, 0);
   StoreU16(base, frame + 264, 0);
   uint32_t count = 0;
@@ -289,7 +320,7 @@ void TvTrack(uint8_t* base, uint32_t camera, uint32_t position, uint32_t frame,
   Store(base, frame + 80, i);
   if (ranges > 0) {
     do {
-      const uint32_t range = camera + 456 + i * 1064;
+      const uint32_t range = c.ranges_address() + i * 1064;
       const track_zones::Position p{uint16_t(LoadU16(base, position)),
                                     uint16_t(LoadU16(base, position + 2))};
       if (track_zones::RangeUpdate(base, range, p) != 0) {
@@ -297,7 +328,7 @@ void TvTrack(uint8_t* base, uint32_t camera, uint32_t position, uint32_t frame,
         count = LoadU16(base, frame + 264);
       }
       i++;
-      ranges = Load(base, camera + 452);
+      ranges = c.range_count();
       Store(base, frame + 80, i);
     } while (i < ranges);
   }
@@ -321,7 +352,7 @@ void TvTrack(uint8_t* base, uint32_t camera, uint32_t position, uint32_t frame,
     for (uint32_t k = 0; k < 4; k++) {
       const uint32_t node = node_at(j);
       const uint32_t index = Load(base, frame + 268 + uint32_t(LoadS16(base, node + 2)) * 4);
-      if (Load(base, camera + 43028 + 28 * k) == index) {
+      if (Load(base, c.buffers_address() + 12 + 28 * k) == index) {
         found = true;
         break;
       }
@@ -332,9 +363,9 @@ void TvTrack(uint8_t* base, uint32_t camera, uint32_t position, uint32_t frame,
     const uint32_t node = node_at(j);
     const uint32_t index = Load(base, frame + 268 + uint32_t(LoadS16(base, node + 2)) * 4);
     for (uint32_t k = 0; k < 4; k++) {
-      const int32_t state = int32_t(Load(base, camera + 43040 + 28 * k));
+      const int32_t state = int32_t(Load(base, c.buffers_address() + 24 + 28 * k));
       if (state == 0 || state == 3) {
-        request(camera + 43016 + 28 * k, index);
+        request(c.buffers_address() + 28 * k, index);
         break;
       }
     }
@@ -345,11 +376,14 @@ void TvTrack(uint8_t* base, uint32_t camera, uint32_t position, uint32_t frame,
 
 void HermiteBasis(uint8_t* base, uint32_t out, uint32_t a, uint32_t b, double t) {
   ITC_NATIVE_RUNNING("sub_82293A48 Hermite::Basis");
+  const schema::HermiteOut to(base, out);
+  const schema::HermiteKey ka(base, a);
+  const schema::HermiteKey kb(base, b);
   double f0 = Fmuls(t, t);
-  double f9 = Lfs(base, a + 8);
-  double f8 = Lfs(base, b + 8);
-  const double f7 = Lfs(base, a + 0);
-  const double f6 = Lfs(base, b + 0);
+  double f9 = double(ka.tangent0());
+  double f8 = double(kb.tangent0());
+  const double f7 = double(ka.value0());
+  const double f6 = double(kb.value0());
   double f13 = Lfs(base, 0x820021E8);  // 2.0
   double f11 = Lfs(base, 0x820021E4);  // 3.0
   double f12 = Fnmsubs(t, f13, f11);
@@ -367,15 +401,15 @@ void HermiteBasis(uint8_t* base, uint32_t out, uint32_t a, uint32_t b, double t)
   f11 = Fmadds(f8, f0, f9);
   f11 = Fmadds(f7, f12, f11);
   f11 = Fmadds(f6, f10, f11);
-  Stfs(base, out + 0, f11);
-  f0 = Fmuls(Lfs(base, b + 12), f0);
-  const double b4 = Lfs(base, b + 4);
-  f9 = Lfs(base, a + 12);
-  f8 = Lfs(base, a + 4);
+  to.set_a(float(f11));
+  f0 = Fmuls(double(kb.tangent1()), f0);
+  const double b4 = double(kb.value1());
+  f9 = double(ka.tangent1());
+  f8 = double(ka.value1());
   f0 = Fmadds(b4, f10, f0);
   f0 = Fmadds(f9, f13, f0);
   f0 = Fmadds(f8, f12, f0);
-  Stfs(base, out + 4, f0);
+  to.set_b(float(f0));
 }
 
 double CurveEvaluate(uint8_t* base, uint32_t curve, double t, uint32_t sp) {
@@ -384,30 +418,30 @@ double CurveEvaluate(uint8_t* base, uint32_t curve, double t, uint32_t sp) {
   uint32_t prev = curve;
   uint32_t next = curve + 24;
   uint32_t end = next;
-  while (Load(base, end + 20) != 3) {
+  while (schema::CameraCurveKey(base, end).kind() != 3) {
     end += 24;
   }
-  const double at = Fmuls(Lfs(base, end + 0), t);
+  const double at = Fmuls(double(schema::CameraCurveKey(base, end).time()), t);
   double time;
   for (;;) {
-    time = Lfs(base, next + 0);
+    time = double(schema::CameraCurveKey(base, next).time());
     if (!(time < at)) {
       break;
     }
     next += 24;
     prev += 24;
   }
-  const uint32_t kind = Load(base, prev + 20);
+  const uint32_t kind = schema::CameraCurveKey(base, prev).kind();
   if (kind < 1) {
-    return Lfs(base, prev + 8);
+    return double(schema::CameraCurveKey(base, prev).leave());
   }
   if (kind == 1) {
-    double f0 = Lfs(base, prev + 0);
-    const double f13 = Lfs(base, next + 0);
+    double f0 = double(schema::CameraCurveKey(base, prev).time());
+    const double f13 = double(schema::CameraCurveKey(base, next).time());
     const double f11 = Fsubs(at, f0);
     f0 = Fsubs(f13, f0);
-    const double f12 = Lfs(base, next + 4);
-    const double f10 = Lfs(base, prev + 8);
+    const double f12 = double(schema::CameraCurveKey(base, next).value());
+    const double f10 = double(schema::CameraCurveKey(base, prev).leave());
     f0 = Fdivs(f11, f0);
     const double weight = Fsubs(Lfs(base, kOne), f0);
     f0 = Fmuls(f12, f0);
@@ -417,14 +451,14 @@ double CurveEvaluate(uint8_t* base, uint32_t curve, double t, uint32_t sp) {
     // The two keys as (value, tangent) pairs on the stack (+96, +112), the
     // tangents scaled by the segment's length, Hermite::Basis into +80.
     const double f12 = time;
-    CopyWord(base, f + 100, prev + 8);
-    const double f13 = Lfs(base, prev + 0);
-    CopyWord(base, f + 116, next + 4);
+    CopyWord(base, f + 100, schema::CameraCurveKey(base, prev).leave_address());
+    const double f13 = double(schema::CameraCurveKey(base, prev).time());
+    CopyWord(base, f + 116, schema::CameraCurveKey(base, next).value_address());
     const double f11 = Fsubs(at, f13);
-    const double f10 = Lfs(base, prev + 16);
-    CopyWord(base, f + 96, prev + 0);
-    const double f9 = Lfs(base, next + 12);
-    CopyWord(base, f + 112, next + 0);
+    const double f10 = double(schema::CameraCurveKey(base, prev).tangent());
+    CopyWord(base, f + 96, schema::CameraCurveKey(base, prev).time_address());
+    const double f9 = double(schema::CameraCurveKey(base, next).tangent_in());
+    CopyWord(base, f + 112, schema::CameraCurveKey(base, next).time_address());
     const double length = Fsubs(f12, f13);
     Stfs(base, f + 104, length);
     Stfs(base, f + 120, length);
@@ -455,30 +489,32 @@ double KeyValue(uint8_t* base, uint32_t pair, double t, uint32_t sp) {
 
 void KeyVec3(uint8_t* base, uint32_t pairs, uint32_t out, double t, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_820AC1D0 Key::Vec3");
+  const schema::CameraVec4 to(base, out);
   const uint32_t f = sp - 112;
-  Stfs(base, out + 0, KeyValue(base, pairs + 0, t, f));
-  Stfs(base, out + 4, KeyValue(base, pairs + 8, t, f));
-  Stfs(base, out + 8, KeyValue(base, pairs + 16, t, f));
-  CopyWord(base, out + 12, kOne);
+  to.set_x(float(KeyValue(base, pairs + 0, t, f)));
+  to.set_y(float(KeyValue(base, pairs + 8, t, f)));
+  to.set_z(float(KeyValue(base, pairs + 16, t, f)));
+  CopyWord(base, to.w_address(), kOne);
 }
 
 // --- The course's route as a spline ---
 
 void MatrixFromRows3(uint8_t* base, uint32_t out, uint32_t x, uint32_t y, uint32_t z) {
   ITC_NATIVE_RUNNING("sub_820AB5F0 Matrix::FromRows3");
+  const schema::CameraMatrix to(base, out);
   constexpr uint32_t one = 0x3F800000;
-  Stvx(base, out + 0, VectorOf(one, 0, 0, 0));
-  Stvx(base, out + 16, VectorOf(0, one, 0, 0));
-  Stvx(base, out + 32, VectorOf(0, 0, one, 0));
-  Stvx(base, out + 48, VectorOf(0, 0, 0, one));
+  Stvx(base, to.row0_address(), VectorOf(one, 0, 0, 0));
+  Stvx(base, to.m10_address(), VectorOf(0, one, 0, 0));
+  Stvx(base, to.m20_address(), VectorOf(0, 0, one, 0));
+  Stvx(base, to.m30_address(), VectorOf(0, 0, 0, one));
   for (uint32_t i = 0; i < 4; i++) {
-    CopyWord(base, out + 0 + 4 * i, x + 4 * i);
+    CopyWord(base, to.row0_address() + 4 * i, x + 4 * i);
   }
   for (uint32_t i = 0; i < 4; i++) {
-    CopyWord(base, out + 16 + 4 * i, y + 4 * i);
+    CopyWord(base, to.m10_address() + 4 * i, y + 4 * i);
   }
   for (uint32_t i = 0; i < 4; i++) {
-    CopyWord(base, out + 32 + 4 * i, z + 4 * i);
+    CopyWord(base, to.m20_address() + 4 * i, z + 4 * i);
   }
 }
 
@@ -519,16 +555,16 @@ void SplinePoint(uint8_t* base, uint32_t out, uint32_t matrix, uint32_t position
   // section's first), the position and the two after it, forks taken at the
   // first link that isn't the point's section yet.
   if (before < 0) {
-    const uint32_t s = SectionOf(base, Load(base, file + 12), section);
+    const uint32_t s = SectionOf(base, schema::TrackRouteFile(base, file).sections(), section);
     for (uint32_t k = 3; k < 6; k++) {
-      if (LoadU16(base, s + 28 + 4 * k) != 0xFFFF) {
-        StoreU16(base, f + 160, LoadU16(base, s + (k + 7) * 4));
-        StoreU16(base, f + 162, LoadU16(base, s + k * 4 + 30));
+      if (LinkOf(base, s, k).section() != 0xFFFF) {
+        StoreU16(base, f + 160, LinkOf(base, s, k).section());
+        StoreU16(base, f + 162, LinkOf(base, s, k).slice());
         break;
       }
     }
   }
-  const uint32_t table = Load(base, file + 12);
+  const uint32_t table = schema::TrackRouteFile(base, file).sections();
   int32_t stored;
   do {
     int32_t current = LoadS16(base, f + 160);
@@ -537,7 +573,7 @@ void SplinePoint(uint8_t* base, uint32_t out, uint32_t matrix, uint32_t position
       const uint32_t prev_section = LoadU16(base, e - 4);
       const int32_t next = LoadS16(base, e - 2) + 1;
       const uint32_t prev_s = Load(base, table + (prev_section << 2));
-      if (LoadS16(base, prev_s + 0) > next) {
+      if (SliceCount(base, prev_s) > next) {
         stored++;
         StoreU16(base, e + 2, uint32_t(next));
         StoreU16(base, e + 0, prev_section);
@@ -546,21 +582,21 @@ void SplinePoint(uint8_t* base, uint32_t out, uint32_t matrix, uint32_t position
       const uint32_t s = SectionOf(base, table, uint32_t(current));
       int32_t links = 0;
       for (uint32_t i = 0; i < 3; i++) {
-        if (LoadU16(base, s + 28 + 4 * i) != 0xFFFF) {
+        if (LinkOf(base, s, i).section() != 0xFFFF) {
           links++;
         }
       }
       int32_t pick = -1;
       if (links == 1) {
         for (uint32_t i = 0; i < 3; i++) {
-          if (LoadU16(base, s + 28 + 4 * i) != 0xFFFF) {
+          if (LinkOf(base, s, i).section() != 0xFFFF) {
             pick = int32_t(i);
             break;
           }
         }
       } else if (links > 1) {
         for (uint32_t i = 0; i < 3; i++) {
-          const int32_t link = LoadS16(base, s + 28 + 4 * i);
+          const int32_t link = int16_t(LinkOf(base, s, i).section());
           if (link != -1 && LoadS16(base, e) != link) {
             pick = int32_t(i);
             break;
@@ -570,8 +606,8 @@ void SplinePoint(uint8_t* base, uint32_t out, uint32_t matrix, uint32_t position
       if (pick < 0) {
         continue;
       }
-      const uint32_t link_section = LoadU16(base, s + (uint32_t(pick) + 7) * 4);
-      const uint32_t link_slice = LoadU16(base, s + uint32_t(pick) * 4 + 30);
+      const uint32_t link_section = LinkOf(base, s, uint32_t(pick)).section();
+      const uint32_t link_slice = LinkOf(base, s, uint32_t(pick)).slice();
       current = int16_t(link_section);
       stored++;
       StoreU16(base, e + 2, link_slice);
@@ -581,34 +617,35 @@ void SplinePoint(uint8_t* base, uint32_t out, uint32_t matrix, uint32_t position
   // The points' centers (each slice's record +124) and the two edge points
   // (after the records: +124 + n x 84 and + n x 96, 12 bytes a slice) at the
   // second and third.
-  const uint32_t table2 = Load(base, file + 12);
+  const uint32_t table2 = schema::TrackRouteFile(base, file).sections();
   auto section_at = [&](uint32_t e) { return Load(base, table2 + (LoadU16(base, e) << 2)); };
   const uint32_t s0 = section_at(f + 160), s1 = section_at(f + 164);
   const uint32_t s2 = section_at(f + 168), s3 = section_at(f + 172);
   const uint32_t sl0 = uint32_t(LoadS16(base, f + 162)), sl1 = uint32_t(LoadS16(base, f + 166));
   const uint32_t sl2 = uint32_t(LoadS16(base, f + 170)), sl3 = uint32_t(LoadS16(base, f + 174));
-  const uint32_t p0 = s0 + sl0 * 84, p1 = s1 + sl1 * 84, p2 = s2 + sl2 * 84, p3 = s3 + sl3 * 84;
-  const uint32_t n1 = uint32_t(LoadS16(base, s1 + 0));
-  const uint32_t n2 = uint32_t(LoadS16(base, s2 + 0));
-  const uint32_t e1a = s1 + n1 * 84 + sl1 * 12, e1b = s1 + n1 * 96 + sl1 * 12;
-  const uint32_t e2a = s2 + n2 * 84 + sl2 * 12, e2b = s2 + n2 * 96 + sl2 * 12;
-  const double f29 = Lfs(base, p0 + 124), f28 = Lfs(base, p0 + 128), f27 = Lfs(base, p0 + 132);
-  const double f26 = Lfs(base, p3 + 124), f25 = Lfs(base, p3 + 128), f24 = Lfs(base, p3 + 132);
-  const double f20 = Lfs(base, p2 + 124), f19 = Lfs(base, p2 + 128), f18 = Lfs(base, p2 + 132);
-  const double f23 = Lfs(base, p1 + 124), f22 = Lfs(base, p1 + 128), f21 = Lfs(base, p1 + 132);
-  const double f16 = Lfs(base, e1a + 124), f15 = Lfs(base, e1a + 128),
-               f14 = Lfs(base, e1a + 132);
+  const schema::TrackRouteSlice p0 = SliceOf(base, s0, sl0), p1 = SliceOf(base, s1, sl1),
+                                p2 = SliceOf(base, s2, sl2), p3 = SliceOf(base, s3, sl3);
+  const uint32_t n1 = uint32_t(SliceCount(base, s1));
+  const uint32_t n2 = uint32_t(SliceCount(base, s2));
+  const schema::TrackRoutePoint e1a = EdgeOf(base, s1, n1, 84, sl1), e1b = EdgeOf(base, s1, n1, 96, sl1);
+  const schema::TrackRoutePoint e2a = EdgeOf(base, s2, n2, 84, sl2), e2b = EdgeOf(base, s2, n2, 96, sl2);
+  const double f29 = double(p0.center_x()), f28 = double(p0.center_y()), f27 = double(p0.center_z());
+  const double f26 = double(p3.center_x()), f25 = double(p3.center_y()), f24 = double(p3.center_z());
+  const double f20 = double(p2.center_x()), f19 = double(p2.center_y()), f18 = double(p2.center_z());
+  const double f23 = double(p1.center_x()), f22 = double(p1.center_y()), f21 = double(p1.center_z());
+  const double f16 = double(e1a.x()), f15 = double(e1a.y()),
+               f14 = double(e1a.z());
   const uint32_t guard = Load(base, kSplineGuard);
   for (uint32_t i = 0; i < 3; i++) {
-    CopyWord(base, f + 304 + 4 * i, e1b + 124 + 4 * i);
+    CopyWord(base, f + 304 + 4 * i, e1b.x_address() + 4 * i);
   }
   for (uint32_t i = 0; i < 3; i++) {
-    CopyWord(base, f + 448 + 4 * i, e2a + 124 + 4 * i);
+    CopyWord(base, f + 448 + 4 * i, e2a.x_address() + 4 * i);
   }
   for (uint32_t i = 0; i < 2; i++) {
-    CopyWord(base, f + 320 + 4 * i, e2b + 124 + 4 * i);
+    CopyWord(base, f + 320 + 4 * i, e2b.x_address() + 4 * i);
   }
-  CopyWord(base, f + 328, e2b + 132);
+  CopyWord(base, f + 328, e2b.z_address());
   CopyWord(base, f + 240, kFlip);
   if ((guard & 1) == 0) {
     // The Catmull-Rom matrix, made once from floats on the stack.
@@ -650,19 +687,19 @@ void SplinePoint(uint8_t* base, uint32_t out, uint32_t matrix, uint32_t position
   Stfs(base, f + 168, f31);
   CopyWord(base, f + 172, kOne);
   for (uint32_t i = 0; i < 3; i++) {
-    CopyWord(base, f + 368 + 4 * i, p0 + 124 + 4 * i);
+    CopyWord(base, f + 368 + 4 * i, p0.center_x_address() + 4 * i);
   }
   CopyWord(base, f + 380, kOne);
   for (uint32_t i = 0; i < 3; i++) {
-    CopyWord(base, f + 384 + 4 * i, p1 + 124 + 4 * i);
+    CopyWord(base, f + 384 + 4 * i, p1.center_x_address() + 4 * i);
   }
   CopyWord(base, f + 396, kOne);
   for (uint32_t i = 0; i < 3; i++) {
-    CopyWord(base, f + 400 + 4 * i, p2 + 124 + 4 * i);
+    CopyWord(base, f + 400 + 4 * i, p2.center_x_address() + 4 * i);
   }
   CopyWord(base, f + 412, kOne);
   for (uint32_t i = 0; i < 3; i++) {
-    CopyWord(base, f + 416 + 4 * i, p3 + 124 + 4 * i);
+    CopyWord(base, f + 416 + 4 * i, p3.center_x_address() + 4 * i);
   }
   CopyWord(base, f + 428, kOne);
   Stfs(base, f + 160, Fmuls(f0, f31));
@@ -781,6 +818,7 @@ void SplinePoint(uint8_t* base, uint32_t out, uint32_t matrix, uint32_t position
 void RoutePoint(uint8_t* base, uint32_t out, uint32_t position, uint32_t offset, double t,
                 uint32_t sp, const c_runtime::AtexitCall& atexit) {
   ITC_NATIVE_RUNNING("sub_820ABDA8 CameraPath::RoutePoint");
+  const schema::CameraVec3 to(base, out);
   const uint32_t f = sp - 208;
   CopyWord(base, f + 124, kOne);
   CopyWord(base, f + 140, kOne);
@@ -790,12 +828,12 @@ void RoutePoint(uint8_t* base, uint32_t out, uint32_t position, uint32_t offset,
   track_route::ClampPosition(base, f + 80, position);
   SplinePoint(base, out, f + 112, Load(base, f + 80), t, f, atexit);
   matrix_math::Vec4Transform(base, f + 96, f + 112, offset);
-  Stfs(base, out + 0, Fadds(Lfs(base, out + 0), Lfs(base, f + 96)));
-  const double y = Fadds(Lfs(base, f + 100), Lfs(base, out + 4));
-  const double out_z = Lfs(base, out + 8);
+  to.set_x(float(Fadds(double(to.x()), Lfs(base, f + 96))));
+  const double y = Fadds(Lfs(base, f + 100), double(to.y()));
+  const double out_z = double(to.z());
   const double z = Fadds(Lfs(base, f + 104), out_z);
-  Stfs(base, out + 4, y);
-  Stfs(base, out + 8, z);
+  to.set_y(float(y));
+  to.set_z(float(z));
 }
 
 // --- CameraPath::Evaluate ---
@@ -831,6 +869,8 @@ void BlendPlaced(uint8_t* base, uint32_t to, uint32_t placed, uint32_t transform
 void PathEvaluate(uint8_t* base, uint32_t key, uint32_t out, uint32_t range, uint32_t transform,
                   double t, uint32_t sp, const c_runtime::AtexitCall& atexit) {
   ITC_NATIVE_RUNNING("sub_820AC248 CameraPath::Evaluate");
+  const schema::CameraPathKey k(base, key);
+  const schema::CameraShotOut o(base, out);
   const uint32_t f = sp - 272;
   double time = t;
   const double one = Lfs(base, kOne);
@@ -854,31 +894,31 @@ void PathEvaluate(uint8_t* base, uint32_t key, uint32_t out, uint32_t range, uin
     }
     return otherwise;
   };
-  Stfs(base, out + 64, Fmuls(pair(key + 8, zero), Lfs(base, 0x8200283C)));
-  Stfs(base, out + 68, Fdivs(Lfs(base, 0x82002838), pair(key + 16, zero)));
-  KeyVec3(base, key + 24, out + 16, time, f);
-  KeyVec3(base, key + 120, out + 32, time, f);
+  o.set_roll(float(Fmuls(pair(k.fov_kind_address(), zero), Lfs(base, 0x8200283C))));
+  o.set_zoom(float(Fdivs(Lfs(base, 0x82002838), pair(k.zoom_kind_address(), zero))));
+  KeyVec3(base, k.eye_position_x_kind_address(), o.eye_address(), time, f);
+  KeyVec3(base, k.target_position_x_kind_address(), o.target_address(), time, f);
   bool eye_moved = false;
   bool target_moved = false;
   // The eye and target moved by the transform (+0 its position, +16 its
   // matrix) by their weights (+72, +168).
-  double weight = pair(key + 72, zero);
+  double weight = pair(k.eye_weight_kind_address(), zero);
   if (weight != zero) {
     CopyWord(base, f + 124, kOne);
-    KeyVec3(base, key + 48, f + 112, time, f);
+    KeyVec3(base, k.eye_offset_x_kind_address(), f + 112, time, f);
     matrix_math::Vec3SwapXZ(base, f + 112);
     matrix_math::Vec4Transform(base, f + 112, transform + 16, f + 112);
     eye_moved = true;
-    BlendPlaced(base, out + 16, f + 112, transform, one, weight);
+    BlendPlaced(base, o.eye_address(), f + 112, transform, one, weight);
   }
-  weight = pair(key + 168, zero);
+  weight = pair(k.target_weight_kind_address(), zero);
   if (weight != zero) {
     CopyWord(base, f + 140, kOne);
-    KeyVec3(base, key + 144, f + 128, time, f);
+    KeyVec3(base, k.target_offset_x_kind_address(), f + 128, time, f);
     matrix_math::Vec3SwapXZ(base, f + 128);
     matrix_math::Vec4Transform(base, f + 128, transform + 16, f + 128);
     target_moved = true;
-    BlendPlaced(base, out + 32, f + 128, transform, one, weight);
+    BlendPlaced(base, o.target_address(), f + 128, transform, one, weight);
   }
   // Then placed on the course's route (+104 and +200 the weights, +80 and
   // +176 the offsets, +112 and +208 the distances along the range in
@@ -912,23 +952,25 @@ void PathEvaluate(uint8_t* base, uint32_t key, uint32_t out, uint32_t range, uin
     Stfs(base, to + 4, Fadds(Lfs(base, to + 4), y));
     Stfs(base, to + 8, Fadds(Lfs(base, to + 8), z));
   };
-  weight = pair(key + 104, zero);
+  weight = pair(k.eye_route_weight_kind_address(), zero);
   if (weight != zero) {
-    on_route(out + 16, key + 80, key + 112, false);
+    on_route(o.eye_address(), k.eye_route_offset_x_kind_address(),
+             k.eye_route_slices_kind_address(), false);
     eye_moved = true;
   }
-  weight = pair(key + 200, zero);
+  weight = pair(k.target_route_weight_kind_address(), zero);
   if (weight != zero) {
-    on_route(out + 32, key + 176, key + 208, true);
+    on_route(o.target_address(), k.target_route_offset_x_kind_address(),
+             k.target_route_slices_kind_address(), true);
     target_moved = true;
   }
   // Left in the path's own space: z flipped.
   const double flip = Lfs(base, kFlip);
   if (!eye_moved) {
-    Stfs(base, out + 24, Fmuls(Lfs(base, out + 24), flip));
+    o.set_eye_z(float(Fmuls(double(o.eye_z()), flip)));
   }
   if (!target_moved) {
-    Stfs(base, out + 40, Fmuls(Lfs(base, out + 40), flip));
+    o.set_target_z(float(Fmuls(double(o.target_z()), flip)));
   }
 }
 
@@ -954,25 +996,27 @@ void CopyWords(uint8_t* base, uint32_t to, uint32_t from, uint32_t words) {
 // either order) covers the slice `x`, as TvCamera::Step's two walks test it
 // (unsigned compares).
 bool Covers(uint8_t* base, uint32_t record, uint32_t x) {
-  const uint32_t a = Load(base, record + 0);
+  const schema::CameraPathRecord r(base, record);
+  const uint32_t a = r.near();
   if (!(x < a)) {
-    if (Load(base, record + 4) > x) {
+    if (r.far() > x) {
       return true;
     }
     if (x > a) {
       return false;
     }
   }
-  return Load(base, record + 4) < x;
+  return r.far() < x;
 }
 
 // The first record from the buffer's +4 to its +8 (20 bytes apart; the
 // first one tested whatever +8 holds) covering `x`, or 0.
 uint32_t CoveringRecord(uint8_t* base, uint32_t buffer, uint32_t x) {
-  uint32_t record = Load(base, buffer + 4);
+  const schema::CameraPathBuffer b(base, buffer);
+  uint32_t record = b.first_path();
   while (!Covers(base, record, x)) {
     record += 20;
-    if (record > Load(base, buffer + 8)) {
+    if (record > b.last_path()) {
       return 0;
     }
   }
@@ -984,11 +1028,12 @@ uint32_t CoveringRecord(uint8_t* base, uint32_t buffer, uint32_t x) {
 // for `index`.
 void RequestFree(uint8_t* base, uint32_t camera, int32_t spot, uint32_t index, uint32_t back,
                  const TvStepCalls& calls) {
+  const schema::TvCamera c(base, camera);
   for (uint32_t k = 0; k < 4; k++) {
-    const uint32_t buffer = camera + 43016 + 28 * k;
-    const int32_t state = int32_t(Load(base, buffer + 24));
+    const uint32_t buffer = c.buffers_address() + schema::CameraPathBuffer::kSize * k;
+    const int32_t state = int32_t(schema::CameraPathBuffer(base, buffer).state());
     if (state == 0 || state == 3) {
-      if (spot != int32_t(Load(base, buffer + 12))) {
+      if (spot != int32_t(schema::CameraPathBuffer(base, buffer).index())) {
         calls.request(buffer, index, back);
       }
     }
@@ -1000,18 +1045,20 @@ void RequestFree(uint8_t* base, uint32_t camera, int32_t spot, uint32_t index, u
 void TvStep(uint8_t* base, uint32_t camera, uint32_t frame, const TvStepCalls& calls,
             const c_runtime::AtexitCall& atexit) {
   ITC_NATIVE_RUNNING("sub_821562F8 TvCamera::Step");
+  const schema::TvCamera c(base, camera);
+  const schema::CameraTarget target(base, c.tracker_address());
   const uint32_t f = frame;
-  const uint32_t tracker = camera + 32;
-  TargetTrack(base, tracker, Load(base, camera + 16), f - 256);
+  const uint32_t tracker = c.tracker_address();
+  TargetTrack(base, tracker, c.vehicle(), f - 256);
   // The track position at f + 80, the transform (the tracked point and the
   // turn) at f + 176.
-  const uint32_t position = Load(base, camera + 260);
-  const uint64_t point_high = Load64(base, tracker + 8);
+  const uint32_t position = Load(base, target.track_position_address() + 4);
+  const uint64_t point_high = Load64(base, target.position_z_address());
   Store(base, f + 80, position);
-  Store64(base, f + 176, Load64(base, tracker + 0));
+  Store64(base, f + 176, Load64(base, target.position_address()));
   Store64(base, f + 184, point_high);
-  if (!c_runtime::Memcpy(base, f + 192, camera + 96, 64)) {
-    calls.copy(f + 192, camera + 96, 64);
+  if (!c_runtime::Memcpy(base, f + 192, target.turn_address(), 64)) {
+    calls.copy(f + 192, target.turn_address(), 64);
   }
   // The ranges the position is on, listed (a 40-slot list at f + 256;
   // List40::'s layout, its data words at f + 428).
@@ -1020,7 +1067,7 @@ void TvStep(uint8_t* base, uint32_t camera, uint32_t frame, const TvStepCalls& c
     StoreU16(base, list + 4 * i + 2, i);
     StoreU16(base, list + 4 * i + 0, i + 1);
   }
-  uint32_t ranges = Load(base, camera + 452);
+  uint32_t ranges = c.range_count();
   StoreU16(base, f + 416, 0);
   StoreU16(base, f + 412, 0xFFFF);
   StoreU16(base, f + 422, 0xFFFF);
@@ -1035,12 +1082,12 @@ void TvStep(uint8_t* base, uint32_t camera, uint32_t frame, const TvStepCalls& c
     do {
       const track_zones::Position p{uint16_t(LoadU16(base, f + 80)),
                                     uint16_t(LoadU16(base, f + 82))};
-      if (track_zones::RangeUpdate(base, camera + 456 + i * 1064, p) != 0) {
+      if (track_zones::RangeUpdate(base, c.ranges_address() + i * 1064, p) != 0) {
         List40Insert(base, list, Load(base, f + 88), uint32_t(int32_t(int16_t(count))));
         count = LoadU16(base, f + 424);
       }
       i++;
-      ranges = Load(base, camera + 452);
+      ranges = c.range_count();
       Store(base, f + 88, i);
     } while (i < ranges);
     head = LoadU16(base, f + 420);
@@ -1064,7 +1111,7 @@ void TvStep(uint8_t* base, uint32_t camera, uint32_t frame, const TvStepCalls& c
   bool kept = false;
   int32_t spot = 0;
   if (listed > 1) {
-    const uint32_t current = Load(base, camera + 360);
+    const uint32_t current = c.spot();
     for (uint32_t j = 0; j < listed; j++) {
       if (current == data_of(node_at(j))) {
         spot = int32_t(current);
@@ -1076,32 +1123,34 @@ void TvStep(uint8_t* base, uint32_t camera, uint32_t frame, const TvStepCalls& c
   if (!kept) {
     spot = int32_t(data_of(node_at(0)));
   }
-  Store(base, camera + 360, uint32_t(spot));
-  const uint32_t range = camera + 456 + uint32_t(spot) * 1064;
+  c.set_spot(uint32_t(spot));
+  const uint32_t range = c.ranges_address() + uint32_t(spot) * 1064;
   const uint32_t slice = uint32_t(RangeCameraAt(base, range, f + 80));
   // The path buffer holding the spot's path.
   uint32_t buffer = 0;
   bool held = false;
   for (uint32_t k = 0; k < 4; k++) {
-    if (int32_t(Load(base, camera + 43028 + 28 * k)) == spot) {
-      buffer = camera + 28 * k + 43016;
+    const schema::CameraPathBuffer held_buffer(
+        base, c.buffers_address() + schema::CameraPathBuffer::kSize * k);
+    if (int32_t(held_buffer.index()) == spot) {
+      buffer = held_buffer.address;
       held = true;
       break;
     }
   }
   if (!held || buffer == 0) {
     for (uint32_t k = 0; k < 4; k++) {
-      const uint32_t b = camera + 43016 + 28 * k;
-      const int32_t state = int32_t(Load(base, b + 24));
+      const uint32_t b = c.buffers_address() + schema::CameraPathBuffer::kSize * k;
+      const int32_t state = int32_t(schema::CameraPathBuffer(base, b).state());
       if (state == 0 || state == 3) {
-        if (Load(base, camera + 360) != Load(base, b + 12)) {
+        if (c.spot() != schema::CameraPathBuffer(base, b).index()) {
           calls.request(b, uint32_t(spot), 0x82156544);
         }
       }
     }
     return;
   }
-  if (int32_t(Load(base, buffer + 24)) != 3) {
+  if (int32_t(schema::CameraPathBuffer(base, buffer).state()) != 3) {
     return;
   }
   const uint32_t record = CoveringRecord(base, buffer, slice);
@@ -1110,8 +1159,8 @@ void TvStep(uint8_t* base, uint32_t camera, uint32_t frame, const TvStepCalls& c
   }
   // t: the slice's fraction plus its place between the record's ends, over
   // their span, clamped to 0-1.
-  const uint32_t a = Load(base, record + 0);
-  const uint32_t b = Load(base, record + 4);
+  const uint32_t a = schema::CameraPathRecord(base, record).near();
+  const uint32_t b = schema::CameraPathRecord(base, record).far();
   uint32_t low, high;
   if (b > a) {
     low = a;
@@ -1139,7 +1188,7 @@ void TvStep(uint8_t* base, uint32_t camera, uint32_t frame, const TvStepCalls& c
   }
   // The path's state (+43520): 0 to 1; 1 to 2 near the far end; 2 to 0 back
   // at the near end.
-  const uint32_t state_at = camera + 43520;
+  const uint32_t state_at = c.filter_state_address();
   const uint32_t state = Load(base, state_at);
   if (state < 1) {
     Store(base, state_at, 1);
@@ -1152,52 +1201,55 @@ void TvStep(uint8_t* base, uint32_t camera, uint32_t frame, const TvStepCalls& c
       Store(base, state_at, 0);
     }
   }
-  PathEvaluate(base, Load(base, record + 16), camera + 368, range, f + 176, t, f, atexit);
-  cameras::ViewportSetZoom(base, Load(base, camera + 20), Lfs(base, camera + 436));
+  PathEvaluate(base, schema::CameraPathRecord(base, record).keys(), c.path_out_address(), range,
+               f + 176, t, f, atexit);
+  cameras::ViewportSetZoom(base, c.viewport().address, double(c.zoom()));
   {
-    const uint32_t viewport = Load(base, camera + 20);
-    const double zoom = Lfs(base, camera + 436);
-    const double ratio = Fdivs(Lfs(base, viewport + 1868), Lfs(base, viewport + 1864));
+    const uint32_t viewport = c.viewport().address;
+    const double zoom = double(c.zoom());
+    const double ratio = Fdivs(double(schema::Viewport(base, viewport).near()),
+                               double(schema::Viewport(base, viewport).zoom()));
     cameras::SetNear(base, Fmuls(ratio, zoom));
   }
-  cameras::ViewportSetRoll(base, Load(base, camera + 20), Lfs(base, camera + 432));
-  CopyWords(base, Load(base, camera + 20) + 1600, camera + 384, 4);
-  CopyWords(base, Load(base, camera + 20) + 1616, camera + 400, 4);
+  cameras::ViewportSetRoll(base, c.viewport().address, double(c.roll()));
+  CopyWords(base, c.viewport().eye_address(), c.eye_address(), 4);
+  CopyWords(base, c.viewport().target_address(), c.target_address(), 4);
   {
-    const uint32_t viewport = Load(base, camera + 20);
-    CopyWords(base, viewport + 1632, viewport + 1712, 4);
+    const uint32_t viewport = c.viewport().address;
+    CopyWords(base, schema::Viewport(base, viewport).up_address(),
+              schema::Viewport(base, viewport).base_up_address(), 4);
   }
-  CopyWords(base, Load(base, camera + 20) + 1648, tracker, 4);
+  CopyWords(base, c.viewport().look_address(), tracker, 4);
   // The slice changed since +352: the next record's (+356 past this
   // record's end, the way the slice moved).
-  const int32_t last = int32_t(Load(base, camera + 352));
+  const int32_t last = int32_t(c.slice());
   if (int32_t(slice) == last) {
     return;
   }
   if (int32_t(slice) > last) {
-    uint32_t end = Load(base, record + 0);
-    const uint32_t other = Load(base, record + 4);
+    uint32_t end = schema::CameraPathRecord(base, record).near();
+    const uint32_t other = schema::CameraPathRecord(base, record).far();
     if (!(end > other)) {
       end = other;
     }
-    Store(base, camera + 356, end + 1);
+    c.set_next(end + 1);
   } else if (int32_t(slice) < last) {
-    uint32_t end = Load(base, record + 0);
-    const uint32_t other = Load(base, record + 4);
+    uint32_t end = schema::CameraPathRecord(base, record).near();
+    const uint32_t other = schema::CameraPathRecord(base, record).far();
     if (!(end < other)) {
       end = other;
     }
-    Store(base, camera + 356, end - 1);
+    c.set_next(end - 1);
   }
-  const uint32_t next = CoveringRecord(base, buffer, Load(base, camera + 356));
+  const uint32_t next = CoveringRecord(base, buffer, c.next());
   if (next != 0) {
     Stfs(base, f + 124, one);
     Stfs(base, f + 140, one);
     Stfs(base, f + 156, one);
     const double at = next < record ? one : zero;
-    PathEvaluate(base, Load(base, next + 16), f + 96, range, f + 176, at, f, atexit);
-    CopyWords(base, Load(base, camera + 20) + 1840, f + 112, 4);
-    Store(base, camera + 352, slice);
+    PathEvaluate(base, schema::CameraPathRecord(base, next).keys(), f + 96, range, f + 176, at, f, atexit);
+    CopyWords(base, c.viewport().next_eye_address(), f + 112, 4);
+    c.set_slice(slice);
     return;
   }
   // None: the position's section's twelve links, each on a range a path
@@ -1215,8 +1267,8 @@ void TvStep(uint8_t* base, uint32_t camera, uint32_t frame, const TvStepCalls& c
       continue;
     }
     uint32_t r = 0;
-    if (Load(base, camera + 452) > 0) {
-      uint32_t at = camera + 456;
+    if (c.range_count() > 0) {
+      uint32_t at = c.ranges_address();
       do {
         const track_zones::Position p{uint16_t(LoadU16(base, f + 88)),
                                       uint16_t(LoadU16(base, f + 90))};
@@ -1226,11 +1278,11 @@ void TvStep(uint8_t* base, uint32_t camera, uint32_t frame, const TvStepCalls& c
         }
         r++;
         at += 1064;
-      } while (r < Load(base, camera + 452));
+      } while (r < c.range_count());
     }
     bool has = false;
     for (uint32_t k = 0; k < 4; k++) {
-      if (pick == int32_t(Load(base, camera + 43028 + 28 * k))) {
+      if (pick == int32_t(Load(base, c.buffers_address() + 12 + 28 * k))) {
         has = true;
         break;
       }
@@ -1240,23 +1292,24 @@ void TvStep(uint8_t* base, uint32_t camera, uint32_t frame, const TvStepCalls& c
     }
     RequestFree(base, camera, spot, uint32_t(pick), 0x821568D8, calls);
   }
-  CopyWords(base, Load(base, camera + 20) + 1840, camera + 384, 4);
-  Store(base, camera + 352, slice);
+  CopyWords(base, c.viewport().next_eye_address(), c.eye_address(), 4);
+  c.set_slice(slice);
 }
 
 void TvUpdate(uint8_t* base, uint32_t camera, uint32_t frame, const TvUpdateCalls& calls,
               const c_runtime::AtexitCall& atexit) {
   ITC_NATIVE_RUNNING("sub_821593D8 TvCamera::Update");
-  constexpr uint32_t kStyle = 0x826D82C8;
-  constexpr uint32_t kGuard = 0x826D82CC;
-  const uint32_t chase = camera + 43136;
+  const schema::TvCamera c(base, camera);
+  constexpr uint32_t kStyle = G::filter_style_address();
+  constexpr uint32_t kGuard = G::filter_guard_address();
+  const uint32_t chase = c.fallback_address();
   const uint32_t update = Load(base, Load(base, chase));
   if (update == 0x82154808) {
     ChaseUpdate(base, chase, frame - 144, calls.video_output);
   } else {
     calls.slot0(update, chase);
   }
-  if (Load(base, camera + 448) == 0) {
+  if (c.paused() == 0) {
     TvStep(base, camera, frame - 720, calls.step, atexit);
   }
   // The attract race's color filter: none once, then while +43520 is 0 one
@@ -1266,7 +1319,7 @@ void TvUpdate(uint8_t* base, uint32_t camera, uint32_t frame, const TvUpdateCall
     Store(base, kGuard, guard | 1);
     Store(base, kStyle, 0);
   }
-  if (Load(base, camera + 43520) == 0) {
+  if (c.filter_state() == 0) {
     Store(base, frame + 80, 0);
     Store(base, frame + 84, 1);
     Store(base, frame + 88, 2);

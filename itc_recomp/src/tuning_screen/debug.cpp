@@ -68,14 +68,14 @@ uint32_t DebugOptionSelect(uint8_t* base, uint32_t screen, uint32_t sp) {
   Frame(base, sp, 96);
   // The lines after the cursor's: the aero item 4's, the tires', the
   // exterior item 1's; none for the others (the cursor's line, 500, last).
-  const int32_t m = int32_t(guest::LoadU32(base, screen + kCategory));
-  if (m == 4 && guest::LoadU8(base, screen + kItem) == 4) {
+  const int32_t m = int32_t(TS(base, screen).category());
+  if (m == 4 && uint32_t(TS(base, screen).item()) == 4) {
     return 520;
   }
   if (m == 3) {
     return 520;
   }
-  if (m == 5 && guest::LoadU8(base, screen + kItem) == 1) {
+  if (m == 5 && uint32_t(TS(base, screen).item()) == 1) {
     return 520;
   }
   return 500;
@@ -151,8 +151,8 @@ namespace {
 // Category 5's item 6 (the stickers, probably): the debug pages' shorter
 // lists.
 bool Stickers(uint8_t* base, uint32_t screen) {
-  return int32_t(guest::LoadU32(base, screen + kCategory)) == 5 &&
-         guest::LoadU8(base, screen + kItem) == 6;
+  return int32_t(TS(base, screen).category()) == 5 &&
+         uint32_t(TS(base, screen).item()) == 6;
 }
 }  // namespace
 
@@ -220,8 +220,8 @@ uint32_t DebugColorSelect(uint8_t* base, uint32_t screen, uint32_t sp) {
   Frame(base, sp, 96);
   // The colors' lines for the aero item 4, the power train's item 3 and the
   // interior's item 0; the cursor's line (500) alone for the others.
-  const int32_t m = int32_t(guest::LoadU32(base, screen + kCategory));
-  const uint8_t p = guest::LoadU8(base, screen + kItem);
+  const int32_t m = int32_t(TS(base, screen).category());
+  const uint8_t p = uint32_t(TS(base, screen).item());
   if ((m == 4 && p == 4) || (m == 1 && p == 3) || (m == 6 && p == 0)) {
     return 520;
   }

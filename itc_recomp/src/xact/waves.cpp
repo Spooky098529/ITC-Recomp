@@ -14,6 +14,8 @@
 #include "graphics/video_output.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/xact_tracks.h"
+#include "schema/xact_waves.h"
 
 #include <initializer_list>
 
@@ -22,12 +24,14 @@ namespace xact {
 namespace {
 
 namespace xa = xaudio;
+using Wave = schema::XACTWave;
+using Track = schema::XACTTrack;
+using Event = schema::XACTEvent;  // the wave's owner (the play-wave event)
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
-double LoadF(uint8_t* base, uint32_t address) { return double(guest::LoadFloat(base, address)); }
 // A single-precision step's result, as the register holds it.
 double Single(double value) { return double(float(value)); }
 
@@ -49,30 +53,34 @@ uint32_t WaveConstruct(uint8_t* base, uint32_t wave, uint32_t engine, uint32_t b
                        uint32_t index, uint32_t owner, bool native_heap, uint32_t frame,
                        const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D23F0 XACTWave::XACTWave");
-  Store(base, wave + 4, wave);
-  Store(base, wave + 8, wave);
-  Store(base, wave + 12, kListenerBaseVtable);
-  const uint8_t flags = guest::LoadU8(base, wave + 25);
-  Store(base, wave + 20, engine);
-  Store(base, wave + 0, kWaveVtable);
-  Store(base, wave + 36, bank);
-  Store(base, wave + 48, owner);
-  Store(base, wave + 12, kWaveListenerVtable);
-  Store(base, wave + 16, 0);
-  guest::StoreU8(base, wave + 24, 0);
-  for (const uint32_t at : {28u, 32u, 40u, 44u, 56u, 60u}) {
-    Store(base, wave + at, 0);
-  }
-  guest::StoreU8(base, wave + 25, flags & 0x20);
-  guest::StoreU16(base, wave + 52, uint16_t(index));
+  const Wave w(base, wave);
+  w.set_node_next(wave);
+  w.set_node_previous(wave);
+  w.set_listener_vtable(kListenerBaseVtable);
+  const uint8_t flags = w.flags();
+  w.set_engine(engine);
+  w.set_vtable(kWaveVtable);
+  w.set_wave_bank(bank);
+  w.set_owner(owner);
+  w.set_listener_vtable(kWaveListenerVtable);
+  w.set_stopped_at_once(0);
+  w.set_loop_count(0);
+  w.set_request_owner(0);
+  w.set_request_stop(0);
+  w.set_state(0);
+  w.set_voice(0);
+  w.set_next_wave(0);
+  w.set_prepared(0);
+  w.set_flags(flags & 0x20);
+  w.set_wave_index(uint16_t(index));
   // AddListener on the bank's +4 interface.
   const uint32_t iface = bank + 4;
   const uint32_t add = xa::Method(base, iface, 0);
   if (add == kWaveBankAddListener && native_heap) {
-    SetRegs(call, Args({iface, wave + 12}));
-    WaveBankAddListener(base, iface, wave + 12);
+    SetRegs(call, Args({iface, w.listener_vtable_address()}));
+    WaveBankAddListener(base, iface, w.listener_vtable_address());
   } else {
-    xa::Regs regs = Args({iface, wave + 12});
+    xa::Regs regs = Args({iface, w.listener_vtable_address()});
     regs.sp = frame;
     call(add, 0x825D2490, regs);
   }
@@ -83,24 +91,31 @@ uint32_t InMemoryWaveConstruct(uint8_t* base, uint32_t wave, uint32_t engine, ui
                                uint32_t index, uint32_t owner, bool native_heap, uint32_t frame,
                                const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D37A8 XACTInMemoryWave::XACTInMemoryWave");
+  const Wave w(base, wave);
   SetRegs(call, Args({wave, engine, bank, index, owner}));
   WaveConstruct(base, wave, engine, bank, index, owner, native_heap,
                 xa::FrameBelow(base, frame, kWaveFrame), call);
-  Store(base, wave + 0, kInMemoryWaveVtable);
-  Store(base, wave + 12, kWaveListenerVtable);
-  for (uint32_t at = 64; at <= 92; at += 4) {
-    Store(base, wave + at, 0);
-  }
-  Store(base, wave + 64, wave);
-  Store(base, wave + 80, wave);
+  w.set_vtable(kInMemoryWaveVtable);
+  w.set_listener_vtable(kWaveListenerVtable);
+  w.set_packet_context(0);
+  w.set_unknown_68(0);
+  w.set_packet_context_looped(0);
+  w.set_unknown_76(0);
+  w.set_loop_context(0);
+  w.set_unknown_84(0);
+  w.set_loop_context_looped(0);
+  w.set_unknown_92(0);
+  w.set_packet_context(wave);
+  w.set_loop_context(wave);
   return wave;
 }
 
 std::optional<CategoryVolume> TrackGetVolume(uint8_t* base, uint32_t track) {
   ITC_NATIVE_RUNNING("sub_825D0268 XACTTrack::GetVolume");
-  const double f31 = LoadF(base, track + 40);
-  const double f30 = LoadF(base, track + 56);
-  const auto volume = SoundGetVolume(base, Load(base, track + 20));
+  const Track t(base, track);
+  const double f31 = double(t.volume());
+  const double f30 = double(t.rpc_volume());
+  const auto volume = SoundGetVolume(base, t.sound());
   if (!volume) {
     return std::nullopt;
   }
@@ -110,9 +125,10 @@ std::optional<CategoryVolume> TrackGetVolume(uint8_t* base, uint32_t track) {
 
 CategoryVolume TrackGetPitch(uint8_t* base, uint32_t track) {
   ITC_NATIVE_RUNNING("sub_825D02B0 XACTTrack::GetPitch");
-  const double f31 = LoadF(base, track + 44);
-  const uint32_t sound = Load(base, track + 20);
-  const double f30 = LoadF(base, track + 60);
+  const Track t(base, track);
+  const double f31 = double(t.pitch());
+  const uint32_t sound = t.sound();
+  const double f30 = double(t.rpc_pitch());
   const double pitch = SoundGetPitch(base, sound);
   const double f0 = Single(f30 + f31);
   return CategoryVolume{Single(f0 + pitch), sound};
@@ -121,12 +137,13 @@ CategoryVolume TrackGetPitch(uint8_t* base, uint32_t track) {
 std::optional<uint32_t> WaveGetStartPosition(uint8_t* base, uint32_t wave, uint32_t entry,
                                              uint32_t ms, uint32_t start, uint32_t count) {
   ITC_NATIVE_RUNNING("sub_825D2170 XACTWave::GetStartPosition");
+  const Wave w(base, wave);
   uint32_t position = WaveEntryMsToSamples(base, entry, ms);
   const uint32_t duration = WaveEntryGetDuration(base, entry);
   // The count byte only when byte +25's bit 0x20 is clear (with it set the
   // original's beq skips the load: no loops).
   const uint32_t loops =
-      (guest::LoadU8(base, wave + 25) & 0x20) == 0 ? guest::LoadU8(base, count) : 0;
+      (w.flags() & 0x20) == 0 ? guest::LoadU8(base, count) : 0;
   uint32_t loop_start = 0, loop = 0, loop_end = 0;
   if (loops != 0) {
     loop_start = WaveEntryGetLoopStart(base, entry);
@@ -172,7 +189,8 @@ std::optional<uint32_t> WaveGetStartPosition(uint8_t* base, uint32_t wave, uint3
 
 void WaveRequestNext(uint8_t* base, uint32_t wave, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_825D1C30 XACTWave::RequestNext");
-  auto* word = reinterpret_cast<uint32_t*>(REX_RAW_ADDR(wave + 32));
+  const Wave w(base, wave);
+  auto* word = reinterpret_cast<uint32_t*>(guest::Pointer(base, w.request_stop_address()));
   uint32_t seen = __atomic_load_n(word, __ATOMIC_SEQ_CST);
   while (!__atomic_compare_exchange_n(word, &seen, __builtin_bswap32(value), false,
                                       __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
@@ -190,9 +208,15 @@ namespace {
 
 constexpr uint32_t kRequestCommitFrame = 112;
 
-// The wave's owner's cue: [[[[owner + 44] + 16] + 20] + 48].
+// The wave's owner's track: [[owner + 44] + 16] (the instance's track).
+Track TrackOf(uint8_t* base, uint32_t owner) {
+  return Event(base, owner).instance().track();
+}
+
+// The wave's owner's cue: the track's sound's +48 (the sound isn't in the
+// schema yet).
 uint32_t CueOf(uint8_t* base, uint32_t owner) {
-  return Load(base, Load(base, Load(base, Load(base, owner + 44) + 16) + 20) + 48);
+  return Load(base, TrackOf(base, owner).sound() + 48);
 }
 
 // A guest call from `frame` (the caller's own frame).
@@ -204,7 +228,8 @@ uint32_t CallAt(const GuestCall& call, uint32_t function, uint32_t return_addres
 
 // XACTEngine::RequestCommit on the wave's engine, in a frame below `frame`.
 void Commit(uint8_t* base, uint32_t wave, uint32_t frame, const GuestCall& call) {
-  const uint32_t engine = Load(base, wave + 20);
+  const Wave w(base, wave);
+  const uint32_t engine = w.engine();
   SetRegs(call, Args({engine}));
   xa::FrameBelow(base, frame, kRequestCommitFrame);
   EngineRequestCommit(base, engine, call);
@@ -245,12 +270,13 @@ uint32_t VoiceSlotFlush(uint8_t* base, uint32_t voice, uint32_t frame, uint32_t 
 uint32_t WaveSetVoice(uint8_t* base, uint32_t wave, uint32_t voice, uint32_t frame,
                       const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D1DF8 XACTWave::SetVoice");
-  Store(base, wave + 44, voice);
+  const Wave w(base, wave);
+  w.set_voice(voice);
   uint32_t r3 = voice;
   if (voice == 0) {
     return r3;
   }
-  const uint32_t owner = Load(base, wave + 48);
+  const uint32_t owner = w.owner();
   if (owner == 0) {
     return r3;
   }
@@ -267,10 +293,10 @@ uint32_t WaveSetVoice(uint8_t* base, uint32_t wave, uint32_t voice, uint32_t fra
   if (int32_t(Load(base, cue + 72)) == 0) {
     return r3;
   }
-  const uint32_t renderer = Load(base, Load(base, wave + 20) + 12);
+  const uint32_t renderer = Load(base, w.engine() + 12);
   const uint32_t matrix = Load(base, cue + 64);
   r3 = CallAt(call, xa::Method(base, renderer, 24), 0x825D1EA0, Args({renderer}), frame);
-  const uint32_t now_voice = Load(base, wave + 44);
+  const uint32_t now_voice = w.voice().address;
   const uint32_t channels = guest::LoadU16(base, cue + 68);
   if (now_voice == 0) {
     return r3;
@@ -282,16 +308,17 @@ uint32_t WaveSetVoice(uint8_t* base, uint32_t wave, uint32_t voice, uint32_t fra
 uint32_t InMemoryWavePlay(uint8_t* base, uint32_t wave, uint32_t deferred, const Thread& thread,
                           uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D3938 XACTInMemoryWave::Play");
-  const uint32_t owner = Load(base, wave + 48);
+  const Wave w(base, wave);
+  const uint32_t owner = w.owner();
   if (owner != 0) {
-    if ((guest::LoadU8(base, wave + 25) & 0x20) != 0 && guest::LoadU8(base, wave + 24) != 0) {
+    if ((w.flags() & 0x20) != 0 && w.loop_count() != 0) {
       CallAt(call, xa::Method(base, owner, 100), 0x825D398C, Args({owner}), frame);
     }
-    const uint32_t now_owner = Load(base, wave + 48);
+    const uint32_t now_owner = w.owner();
     CallAt(call, xa::Method(base, now_owner, 96), 0x825D39A0, Args({now_owner}), frame);
   }
-  if ((guest::LoadU8(base, wave + 25) & 0x80) == 0) {
-    const uint32_t voice = Load(base, wave + 44);
+  if ((w.flags() & 0x80) == 0) {
+    const uint32_t voice = w.voice().address;
     const uint32_t r3 = VoiceSlotStart(base, voice, deferred, thread, frame, 0x825D39C8, call);
     if (int32_t(r3) < 0) {
       return r3;
@@ -299,23 +326,24 @@ uint32_t InMemoryWavePlay(uint8_t* base, uint32_t wave, uint32_t deferred, const
     if (int32_t(deferred) != 0) {
       Commit(base, wave, frame, call);
     }
-    guest::StoreU8(base, wave + 25, guest::LoadU8(base, wave + 25) | 0x2);
+    w.set_flags(w.flags() | 0x2);
   }
-  guest::StoreU8(base, wave + 25, guest::LoadU8(base, wave + 25) | 0x40);
-  return VoiceSlotFlush(base, Load(base, wave + 44), frame, 0x825D3A0C, call);
+  w.set_flags(w.flags() | 0x40);
+  return VoiceSlotFlush(base, w.voice().address, frame, 0x825D3A0C, call);
 }
 
 uint32_t WavePause(uint8_t* base, uint32_t wave, uint32_t pause, const Thread& thread,
                    uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D1ED8 XACTWave::Pause");
-  const uint8_t flags = guest::LoadU8(base, wave + 25);
+  const Wave w(base, wave);
+  const uint8_t flags = w.flags();
   const int32_t paused = (flags & 0x80) == 0x80 ? 1 : 0;
   if (int32_t(pause) == paused) {
     return 0;
   }
   const uint8_t now = uint8_t((flags & 0x7F) | (pause != 0 ? 0x80 : 0));
-  const uint32_t voice = Load(base, wave + 44);
-  guest::StoreU8(base, wave + 25, now);
+  const uint32_t voice = w.voice().address;
+  w.set_flags(now);
   if (voice == 0) {
     return 0;
   }
@@ -330,31 +358,32 @@ uint32_t WavePause(uint8_t* base, uint32_t wave, uint32_t pause, const Thread& t
     return r30;
   }
   Commit(base, wave, frame, call);
-  if ((guest::LoadU8(base, wave + 25) & 0x40) == 0) {
+  if ((w.flags() & 0x40) == 0) {
     return r30;
   }
-  return VoiceSlotFlush(base, Load(base, wave + 44), frame, 0x825D1FB8, call);
+  return VoiceSlotFlush(base, w.voice().address, frame, 0x825D1FB8, call);
 }
 
 uint32_t WavePrepareNext(uint8_t* base, uint32_t wave, bool native_heap, uint32_t frame,
                          const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D2778 XACTWave::PrepareNext");
-  const uint8_t flags = guest::LoadU8(base, wave + 25);
+  const Wave w(base, wave);
+  const uint8_t flags = w.flags();
   if ((flags & 0x8) == 0) {
     return wave;
   }
-  guest::StoreU8(base, wave + 25, flags & 0xF7);
-  if (guest::LoadU8(base, wave + 24) == 0) {
+  w.set_flags(flags & 0xF7);
+  if (w.loop_count() == 0) {
     return wave;
   }
-  const uint32_t owner = Load(base, wave + 48);
+  const uint32_t owner = w.owner();
   uint32_t r3 = CallAt(call, xa::Method(base, owner, 108), 0x825D27D0,
                        Args({owner, frame + 82, frame + 80}), frame);
   if (int32_t(r3) < 0) {
     return r3;
   }
   const uint32_t index = guest::LoadU8(base, frame + 80);
-  const uint32_t sound_bank = Load(base, CueOf(base, Load(base, wave + 48)) + 296);
+  const uint32_t sound_bank = Load(base, CueOf(base, w.owner()) + 296);
   std::optional<uint32_t> found;
   if (native_heap) {
     SetRegs(call, Args({sound_bank, index}));
@@ -366,13 +395,13 @@ uint32_t WavePrepareNext(uint8_t* base, uint32_t wave, bool native_heap, uint32_
     return 0;
   }
   r3 = CallAt(call, xa::Method(base, wave_bank, 40), 0x825D2820,
-              Args({wave_bank, guest::LoadU16(base, frame + 82), Load(base, wave + 48),
+              Args({wave_bank, guest::LoadU16(base, frame + 82), w.owner(),
                     frame + 84}),
               frame);
   if (int32_t(r3) < 0) {
     return r3;
   }
-  uint32_t count = guest::LoadU8(base, wave + 24);
+  uint32_t count = w.loop_count();
   if (count != 255) {
     count = (count + 255) & 0xFF;
   }
@@ -382,9 +411,10 @@ uint32_t WavePrepareNext(uint8_t* base, uint32_t wave, bool native_heap, uint32_
   if (int32_t(r3) >= 0) {
     next = Load(base, frame + 84);
     const uint32_t list = wave_bank + 240;
-    Store(base, wave + 56, next);
-    Store(base, next + 4, list);
-    Store(base, next + 8, Load(base, list + 8));
+    w.set_next_wave(next);
+    const Wave next_wave(base, next);
+    next_wave.set_node_next(list);
+    next_wave.set_node_previous(Load(base, list + 8));
     Store(base, Load(base, list + 8) + 4, next);
     Store(base, list + 8, next);
     return r3;
@@ -399,16 +429,17 @@ uint32_t WavePrepareNext(uint8_t* base, uint32_t wave, bool native_heap, uint32_
 uint32_t InMemoryWaveUpdate(uint8_t* base, uint32_t wave, bool native_heap, uint32_t frame,
                             const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D3890 XACTInMemoryWave::Update");
+  const Wave w(base, wave);
   SetRegs(call, Args({wave}));
   uint32_t r3 = WavePrepareNext(base, wave, native_heap, xa::FrameBelow(base, frame, 112), call);
-  if ((guest::LoadU8(base, wave + 25) & 0x10) != 0) {
+  if ((w.flags() & 0x10) != 0) {
     return CallAt(call, xa::Method(base, wave, 0), 0x825D38D0, Args({wave, 1}), frame);
   }
-  const uint32_t voice = Load(base, wave + 44);
-  if (voice == 0 || int32_t(Load(base, wave + 40)) != 5) {
+  const uint32_t voice = w.voice().address;
+  if (voice == 0 || int32_t(w.state()) != 5) {
     return r3;
   }
-  const uint32_t renderer = Load(base, Load(base, wave + 20) + 12);
+  const uint32_t renderer = Load(base, w.engine() + 12);
   CallAt(call, xa::Method(base, renderer, 12), 0x825D3914, Args({renderer, voice}), frame);
   SetRegs(call, Args({wave, 0}));
   return WaveSetVoice(base, wave, 0, xa::FrameBelow(base, frame, 112), call);
@@ -445,7 +476,7 @@ void StoreSplit(uint8_t* base, uint32_t address, uint32_t value) {
 }
 // The engine's +20 exchanged atomically (the original's lwarx/stwcx. loop).
 void ExchangeWord(uint8_t* base, uint32_t address, uint32_t value) {
-  auto* word = reinterpret_cast<uint32_t*>(REX_RAW_ADDR(address));
+  auto* word = reinterpret_cast<uint32_t*>(guest::Pointer(base, address));
   uint32_t seen = __atomic_load_n(word, __ATOMIC_SEQ_CST);
   while (!__atomic_compare_exchange_n(word, &seen, __builtin_bswap32(value), false,
                                       __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
@@ -531,7 +562,8 @@ uint64_t EngineSendNotification(uint8_t* base, uint64_t engine_r3, const uint64_
 uint64_t WaveNotify(uint8_t* base, uint32_t wave, uint32_t type, uint32_t frame,
                     const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D2030 XACTWave::Notify");
-  const uint32_t bank = Load(base, wave + 36);
+  const Wave w(base, wave);
+  const uint32_t bank = w.wave_bank();
   StoreU8(base, frame + 80, 0);
   // memset (sub_825A71D0) of 28 bytes from +81, its r3 the destination.
   for (uint32_t i = 0; i < 28; i++) {
@@ -541,7 +573,7 @@ uint64_t WaveNotify(uint8_t* base, uint32_t wave, uint32_t type, uint32_t frame,
   if (bank == 0) {
     return cleared;
   }
-  const uint32_t owner = Load(base, wave + 48);
+  const uint32_t owner = w.owner();
   if (owner != 0) {
     const uint32_t cue = CueOf(base, owner);
     const uint32_t sound_bank = Load(base, cue + 296);
@@ -559,12 +591,12 @@ uint64_t WaveNotify(uint8_t* base, uint32_t wave, uint32_t type, uint32_t frame,
     StoreU8(base, frame + 95, 0xFF);
     StoreU8(base, frame + 96, 0xFF);
   }
-  const uint32_t index = guest::LoadU16(base, wave + 52);
+  const uint32_t index = w.wave_index();
   StoreU8(base, frame + 80, type);
   StoreU8(base, frame + 92, bank);
   StoreU8(base, frame + 93, index >> 8);
   StoreU8(base, frame + 94, index);
-  const uint32_t engine = Load(base, wave + 20);
+  const uint32_t engine = w.engine();
   uint64_t words[4];
   words[0] = LoadU64(base, frame + 80);
   words[2] = LoadU64(base, frame + 96);
@@ -584,8 +616,9 @@ uint64_t WaveSetState(uint8_t* base, uint64_t wave_r3, uint32_t state, uint32_t 
                       const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D24D8 XACTWave::SetState");
   const uint32_t wave = uint32_t(wave_r3);
+  const Wave w(base, wave);
   uint64_t r3 = wave_r3;  // as the caller left it
-  const int32_t now = int32_t(Load(base, wave + 40));
+  const int32_t now = int32_t(w.state());
   uint32_t step = 0, type = 0;
   if (int32_t(state) == 3) {
     if (now < 3) {
@@ -597,11 +630,11 @@ uint64_t WaveSetState(uint8_t* base, uint64_t wave_r3, uint32_t state, uint32_t 
     type = 13;
   }
   if (step != 0) {
-    Store(base, wave + 40, step);
+    w.set_state(step);
     SetRegs(call, Args({wave, type}));
     r3 = WaveNotify(base, wave, type, xa::FrameBelow(base, frame, kNotifyFrame), call);
   }
-  Store(base, wave + 40, state);
+  w.set_state(state);
   return r3;
 }
 
@@ -617,63 +650,66 @@ constexpr uint32_t kSetStateFrame = 112;
 
 uint32_t WaveRelease(uint8_t* base, uint32_t wave, uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D28D0 XACTWave::Release");
-  guest::StoreU8(base, wave + 25, uint8_t(guest::LoadU8(base, wave + 25) | 0x4));
-  const uint32_t next_node = Load(base, wave + 4);
+  const Wave w(base, wave);
+  w.set_flags(uint8_t(w.flags() | 0x4));
+  const uint32_t next_node = w.node_next();
   if (next_node != wave) {
-    const uint32_t previous = Load(base, wave + 8);
+    const uint32_t previous = w.node_previous();
     if (previous != wave) {
       Store(base, next_node + 8, previous);
-      Store(base, Load(base, wave + 8) + 4, Load(base, wave + 4));
-      Store(base, wave + 4, wave);
-      Store(base, wave + 8, wave);
+      Store(base, w.node_previous() + 4, w.node_next());
+      w.set_node_next(wave);
+      w.set_node_previous(wave);
     }
   }
-  const uint32_t next = Load(base, wave + 56);
+  const uint32_t next = w.next_wave().address;
   if (next != 0) {
     CallAt(call, xa::Method(base, next, 0), 0x825D2944, Args({next, 1}), frame);
   }
-  const uint32_t owner = Load(base, wave + 48);
+  const uint32_t owner = w.owner();
   if (owner != 0) {
     // r4 as the original leaves it (the caller's, or 1 after the next wave).
     xa::Regs regs;
     regs.r[regs.count++] = owner;
     CallAt(call, xa::Method(base, owner, 28), 0x825D2960, regs, frame);
   }
-  const uint32_t voice = Load(base, wave + 44);
+  const uint32_t voice = w.voice().address;
   if (voice != 0) {
-    const uint32_t renderer = Load(base, Load(base, wave + 20) + 12);
+    const uint32_t renderer = Load(base, w.engine() + 12);
     CallAt(call, xa::Method(base, renderer, 12), 0x825D2984, Args({renderer, voice}), frame);
   }
-  const int32_t state = int32_t(Load(base, wave + 40));
+  const int32_t state = int32_t(w.state());
   if (state >= 3 && state < 5) {
-    Store(base, wave + 40, 5);
+    w.set_state(5);
     SetRegs(call, Args({wave, 13}));
     WaveNotify(base, wave, 13, xa::FrameBelow(base, frame, kNotifyFrame), call);
   }
-  Store(base, wave + 40, 5);
-  const uint32_t listener = Load(base, wave + 36) + 4;
-  return CallAt(call, xa::Method(base, listener, 4), 0x825D29CC, Args({listener, wave + 12}),
-                frame);
+  w.set_state(5);
+  const uint32_t listener = w.wave_bank() + 4;
+  return CallAt(call, xa::Method(base, listener, 4), 0x825D29CC,
+                Args({listener, w.listener_vtable_address()}), frame);
 }
 
 uint32_t WaveDestruct(uint8_t* base, uint32_t wave, uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D29E8 XACTWave::~XACTWave");
-  Store(base, wave + 0, kWaveVtable);
-  Store(base, wave + 12, kWaveListenerVtable);
+  const Wave w(base, wave);
+  w.set_vtable(kWaveVtable);
+  w.set_listener_vtable(kWaveListenerVtable);
   uint32_t r3 = wave;
-  if ((guest::LoadU8(base, wave + 25) & 0x4) == 0) {
+  if ((w.flags() & 0x4) == 0) {
     SetRegs(call, Args({wave}));
     r3 = WaveRelease(base, wave, xa::FrameBelow(base, frame, kReleaseFrame), call);
   }
-  Store(base, wave + 0, kListBaseVtable);
+  w.set_vtable(kListBaseVtable);
   return r3;
 }
 
 uint32_t InMemoryWaveDeletingDestruct(uint8_t* base, uint32_t wave, uint32_t flags,
                                       uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D3820 XACTInMemoryWave::~XACTInMemoryWave (deleting)");
-  Store(base, wave + 0, kInMemoryWaveVtable);
-  Store(base, wave + 12, kWaveListenerVtable);
+  const Wave w(base, wave);
+  w.set_vtable(kInMemoryWaveVtable);
+  w.set_listener_vtable(kWaveListenerVtable);
   SetRegs(call, Args({wave}));
   WaveDestruct(base, wave, xa::FrameBelow(base, frame, kDestructFrame), call);
   if ((flags & 1) != 0) {
@@ -686,15 +722,16 @@ uint32_t InMemoryWaveDeletingDestruct(uint8_t* base, uint32_t wave, uint32_t fla
 uint32_t InMemoryWaveStop(uint8_t* base, uint32_t wave, uint32_t mode, uint32_t exit_loop,
                           uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D3A28 XACTInMemoryWave::Stop");
+  const Wave w(base, wave);
   const auto set_state = [&](uint32_t state) {
     SetRegs(call, Args({wave, state}));
     WaveSetState(base, wave, state, xa::FrameBelow(base, frame, kSetStateFrame), call);
   };
-  const int32_t state = int32_t(Load(base, wave + 40));
+  const int32_t state = int32_t(w.state());
   if (state == 5) {
     return 0;
   }
-  if (state == 4 && (int32_t(Load(base, wave + 16)) != 0 || int32_t(mode) != 0)) {
+  if (state == 4 && (int32_t(w.stopped_at_once()) != 0 || int32_t(mode) != 0)) {
     return 0;
   }
   if (state != 3 && state != 4) {
@@ -702,9 +739,9 @@ uint32_t InMemoryWaveStop(uint8_t* base, uint32_t wave, uint32_t mode, uint32_t 
     return 0;
   }
   if (mode == 0) {
-    Store(base, wave + 16, 1);
+    w.set_stopped_at_once(1);
     set_state(4);
-    const uint32_t voice = Load(base, wave + 44);
+    const uint32_t voice = w.voice().address;
     return VoiceSlotStop(base, voice, 1, frame, 0x825D3B04, call);
   }
   if (mode != 1) {
@@ -714,8 +751,8 @@ uint32_t InMemoryWaveStop(uint8_t* base, uint32_t wave, uint32_t mode, uint32_t 
   if (int32_t(exit_loop) == 0) {
     return 0;
   }
-  const uint32_t voice = Load(base, wave + 44);
-  guest::StoreU8(base, wave + 24, 0);
+  const uint32_t voice = w.voice().address;
+  w.set_loop_count(0);
   return CallAt(call, xa::Method(base, voice, 52), 0x825D3AD0, Args({voice}), frame);
 }
 
@@ -737,7 +774,6 @@ constexpr uint32_t kGetStartPosition = 0x825D2170;
 constexpr uint32_t kSamplesToBytes = 0x825CF080;
 constexpr uint32_t kGetWaveFormat = 0x825CC320;
 constexpr uint32_t kTrackGetVolume = 0x825D0268;
-constexpr uint32_t kOne = 0x82000A30;  // 1.0f, the reverb's level without one
 
 // A guest call from `frame`, r3 in full as the callee leaves it.
 uint64_t CallFull(const GuestCall& call, uint32_t function, uint32_t return_address,
@@ -762,19 +798,19 @@ void SetStateBelow(uint8_t* base, uint32_t wave, uint32_t state, uint32_t frame,
 uint64_t InMemoryWavePrepare(uint8_t* base, uint32_t wave, uint32_t count, uint32_t loops,
                              uint32_t ms, uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D3B10 XACTInMemoryWave::Prepare");
+  const Wave w(base, wave);
   const uint32_t count_byte = frame + 351;  // the caller's parameter area
   guest::StoreU8(base, count_byte, uint8_t(count));
-  Store(base, wave + 60, 0);
+  w.set_prepared(0);
   SetStateBelow(base, wave, 1, frame, call);
-  guest::StoreU8(base, wave + 24, guest::LoadU8(base, count_byte));
-  const uint32_t owner = Load(base, wave + 48);
-  guest::StoreU8(base, wave + 25,
-                 uint8_t((guest::LoadU8(base, wave + 25) & ~0x20) | (loops != 0 ? 0x20 : 0)));
+  w.set_loop_count(guest::LoadU8(base, count_byte));
+  const uint32_t owner = w.owner();
+  w.set_flags(uint8_t((w.flags() & ~0x20) | (loops != 0 ? 0x20 : 0)));
   uint32_t category_flag = 0;  // r21
   if (owner != 0) {
     const uint32_t record =
-        Load(base, Load(base, Load(base, Load(base, owner + 44) + 16) + 20) + 28);
-    const uint32_t engine = Load(base, wave + 20);
+        Load(base, TrackOf(base, owner).sound() + 28);
+    const uint32_t engine = w.engine();
     const uint32_t index = guest::LoadU16(base, record + 1);
     SetRegs(call, Args({engine, index}));
     const auto flag = EngineGetCategoryFlag(base, engine, index);
@@ -786,7 +822,7 @@ uint64_t InMemoryWavePrepare(uint8_t* base, uint32_t wave, uint32_t count, uint3
   SetRegs(call, Args({entry}));
   WaveEntryConstruct(base, entry);
   {
-    const uint32_t bank = Load(base, wave + 36), index = guest::LoadU16(base, wave + 52);
+    const uint32_t bank = w.wave_bank(), index = w.wave_index();
     SetRegs(call, Args({entry, index, bank}));
     if (!WaveEntrySet(base, entry, index, bank)) {
       CallAt(call, kWaveEntrySet, 0x825D3BA4, Args({entry, index, bank}), frame);
@@ -817,8 +853,8 @@ uint64_t InMemoryWavePrepare(uint8_t* base, uint32_t wave, uint32_t count, uint3
     Store(base, packet + at, 0);
   }
   {
-    const uint32_t bank = Load(base, wave + 36);
-    const uint32_t index = guest::LoadU16(base, wave + 52);
+    const uint32_t bank = w.wave_bank();
+    const uint32_t index = w.wave_index();
     CallAt(call, xa::Method(base, bank, 60), 0x825D3C18, Args({bank, index, packet}), frame);
   }
   const uint32_t loop_start = Load(base, packet + 12);   // r23
@@ -831,19 +867,19 @@ uint64_t InMemoryWavePrepare(uint8_t* base, uint32_t wave, uint32_t count, uint3
   Store(base, frame + 92, 0);
   uint32_t reverb = 0;  // r28
   Store(base, frame + 88, 0);
-  MoveFloat(base, frame + 84, kOne);
-  if (const uint32_t now_owner = Load(base, wave + 48); now_owner != 0) {
-    const uint32_t sound = Load(base, Load(base, Load(base, now_owner + 44) + 16) + 20);
+  MoveFloat(base, frame + 84, schema::XactWavesGlobals::one_address());
+  if (const uint32_t now_owner = w.owner(); now_owner != 0) {
+    const uint32_t sound = TrackOf(base, now_owner).sound();
     const uint32_t record = Load(base, sound + 28);
     if ((guest::LoadU8(base, record) & 0x10) != 0) {
       reverb = 1;
-      Store(base, frame + 88, Load(base, Load(base, Load(base, wave + 20) + 124) + 8));
+      Store(base, frame + 88, Load(base, Load(base, w.engine() + 124) + 8));
       MoveFloat(base, frame + 84, sound + 116);
     }
   }
-  const uint32_t renderer = Load(base, Load(base, wave + 20) + 12);  // r30
+  const uint32_t renderer = Load(base, w.engine() + 12);  // r30
   {
-    const uint32_t bank = Load(base, wave + 36), index = guest::LoadU16(base, wave + 52);
+    const uint32_t bank = w.wave_bank(), index = w.wave_index();
     SetRegs(call, Args({bank, index, frame + 96}));
     if (!WaveBankGetWaveFormat(base, bank, index, frame + 96)) {
       CallAt(call, kGetWaveFormat, 0x825D3CD4, Args({bank, index, frame + 96}), frame);
@@ -882,12 +918,12 @@ uint64_t InMemoryWavePrepare(uint8_t* base, uint32_t wave, uint32_t count, uint3
     const uint32_t first = Load(base, packet + 0) + offset;
     Store(base, packet + 8, 0);
     Store(base, packet + 12, 0);
-    Store(base, wave + 72, 0);
+    w.set_packet_context_looped(0);
     Store(base, packet + 16, 0);
-    Store(base, packet + 36, wave + 64);
+    Store(base, packet + 36, w.packet_context_address());
     Store(base, packet + 0, first);
     Store(base, packet + 4, rest);
-    const uint32_t voice = Load(base, wave + 44);
+    const uint32_t voice = w.voice().address;
     r3 = CallFull(call, xa::Method(base, voice, 12), 0x825D3DBC, Args({voice, packet, 0}), frame);
     if (int32_t(r3) < 0) {
       return r3;
@@ -901,11 +937,12 @@ uint64_t InMemoryWavePrepare(uint8_t* base, uint32_t wave, uint32_t count, uint3
     Store(base, packet + 8, left);
     Store(base, packet + 12, 0);
     Store(base, packet + 16, loop_length);
-    for (uint32_t at = 0; at < 16; at += 4) {
-      Store(base, wave + 80 + at, Load(base, wave + 64 + at));
-    }
-    Store(base, wave + 88, 1);
-    context = wave + 80;
+    w.set_loop_context(w.packet_context());
+    w.set_unknown_84(w.unknown_68());
+    w.set_loop_context_looped(w.packet_context_looped());
+    w.set_unknown_92(w.unknown_76());
+    w.set_loop_context_looped(1);
+    context = w.loop_context_address();
     common = false;
   } else {
     // PCM from the start, with the loop region and count.
@@ -928,29 +965,29 @@ uint64_t InMemoryWavePrepare(uint8_t* base, uint32_t wave, uint32_t count, uint3
     }
   }
   if (common) {
-    context = wave + 64;
-    Store(base, wave + 72, 1);
+    context = w.packet_context_address();
+    w.set_packet_context_looped(1);
   }
-  const uint32_t voice = Load(base, wave + 44);
+  const uint32_t voice = w.voice().address;
   Store(base, packet + 36, context);
   const uint64_t submitted =  // r30
       CallFull(call, xa::Method(base, voice, 12), 0x825D3E98, Args({voice, packet, flag}), frame);
   if (int32_t(submitted) < 0) {
     return submitted;
   }
-  Store(base, wave + 60, 1);
+  w.set_prepared(1);
   SetStateBelow(base, wave, 2, frame, call);
-  if (Load(base, wave + 48) == 0 || Load(base, wave + 44) == 0) {
+  if (w.owner() == 0 || w.voice().address == 0) {
     return submitted;
   }
   {
-    const uint32_t track = Load(base, Load(base, Load(base, wave + 48) + 44) + 16);
+    const uint32_t track = TrackOf(base, w.owner()).address;
     SetRegs(call, Args({track}));
     const auto volume = TrackGetVolume(base, track);
     if (!volume) {
       CallAt(call, kTrackGetVolume, 0x825D3ED8, Args({track}), frame);
     }
-    const uint32_t now_voice = Load(base, wave + 44);
+    const uint32_t now_voice = w.voice().address;
     xa::Regs regs = Args({now_voice});
     if (volume) {
       regs.f1_set = true;
@@ -959,10 +996,10 @@ uint64_t InMemoryWavePrepare(uint8_t* base, uint32_t wave, uint32_t count, uint3
     CallAt(call, xa::Method(base, now_voice, 4), 0x825D3EEC, regs, frame);
   }
   {
-    const uint32_t track = Load(base, Load(base, Load(base, wave + 48) + 44) + 16);
+    const uint32_t track = TrackOf(base, w.owner()).address;
     SetRegs(call, Args({track}));
     const CategoryVolume pitch = TrackGetPitch(base, track);
-    const uint32_t now_voice = Load(base, wave + 44);
+    const uint32_t now_voice = w.voice().address;
     xa::Regs regs = Args({now_voice});
     regs.f1_set = true;
     regs.f1 = pitch.f1;
@@ -973,13 +1010,14 @@ uint64_t InMemoryWavePrepare(uint8_t* base, uint32_t wave, uint32_t count, uint3
 
 uint64_t WaveFinish(uint8_t* base, uint32_t wave, uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D1FD8 XACTWave::Finish");
-  const uint32_t owner = Load(base, wave + 48);
-  guest::StoreU8(base, wave + 25, uint8_t(guest::LoadU8(base, wave + 25) | 0x10));
+  const Wave w(base, wave);
+  const uint32_t owner = w.owner();
+  w.set_flags(uint8_t(w.flags() | 0x10));
   if (owner == 0) {
     return 0;
   }
   const uint64_t r3 = CallFull(call, xa::Method(base, owner, 28), 0x825D2014, Args({owner}), frame);
-  Store(base, wave + 48, 0);
+  w.set_owner(0);
   return r3;
 }
 
@@ -988,7 +1026,7 @@ namespace {
 // A request word taken atomically (the original's lwarx/stwcx. loop): 1
 // becomes 0, anything else is written back as it was. Returns the word seen.
 uint32_t TakeRequest(uint8_t* base, uint32_t address) {
-  auto* word = reinterpret_cast<uint32_t*>(REX_RAW_ADDR(address));
+  auto* word = reinterpret_cast<uint32_t*>(guest::Pointer(base, address));
   uint32_t seen = __atomic_load_n(word, __ATOMIC_SEQ_CST);
   while (true) {
     const uint32_t value = __builtin_bswap32(seen);
@@ -1005,8 +1043,9 @@ uint32_t TakeRequest(uint8_t* base, uint32_t address) {
 uint64_t WaveAudioUpdate(uint8_t* base, uint32_t wave, uint64_t r3_in, uint32_t frame,
                          const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D2560 XACTWave::AudioUpdate");
-  const uint8_t flags = guest::LoadU8(base, wave + 25);
-  if ((flags & 0x4) != 0 || (flags & 0x10) != 0 || int32_t(Load(base, wave + 40)) >= 5) {
+  const Wave w(base, wave);
+  const uint8_t flags = w.flags();
+  if ((flags & 0x4) != 0 || (flags & 0x10) != 0 || int32_t(w.state()) >= 5) {
     return r3_in;
   }
   const auto notify = [&](uint32_t type) -> uint64_t {
@@ -1025,33 +1064,33 @@ uint64_t WaveAudioUpdate(uint8_t* base, uint32_t wave, uint64_t r3_in, uint32_t 
     SetRegs(call, Args({owner}));
     return EventDone(base, owner, xa::FrameBelow(base, frame, kDoneFrame), call);
   };
-  if (TakeRequest(base, wave + 32) != 0) {
+  if (TakeRequest(base, w.request_stop_address()) != 0) {
     // Stop now and hand the next wave to the owner.
-    const int32_t state = int32_t(Load(base, wave + 40));
+    const int32_t state = int32_t(w.state());
     if (state >= 3 && state < 5) {
-      Store(base, wave + 40, 5);
+      w.set_state(5);
       notify(13);
     }
-    Store(base, wave + 40, 5);
-    const uint32_t next = Load(base, wave + 56);
-    const uint32_t owner = Load(base, wave + 48);
+    w.set_state(5);
+    const uint32_t next = w.next_wave().address;
+    const uint32_t owner = w.owner();
     if (next == 0) {
       return done(owner);
     }
-    Store(base, wave + 56, 0);
+    w.set_next_wave(0);
     CallAt(call, xa::Method(base, owner, 128), 0x825D2630, Args({owner, next}), frame);
-    Store(base, wave + 48, 0);
+    w.set_owner(0);
     CallAt(call, xa::Method(base, next, 8), 0x825D2654, Args({next, 1, 0, 0}), frame);
     return finish();
   }
   uint64_t r3 = 0;
-  if (TakeRequest(base, wave + 28) != 0) {
-    const uint32_t owner = Load(base, wave + 48);
+  if (TakeRequest(base, w.request_owner_address()) != 0) {
+    const uint32_t owner = w.owner();
     if (owner != 0) {
       CallAt(call, xa::Method(base, owner, 32), 0x825D26BC, Args({owner}), frame);
     }
   }
-  const uint32_t voice = Load(base, wave + 44);
+  const uint32_t voice = w.voice().address;
   if (voice == 0) {
     return 0;
   }
@@ -1059,26 +1098,26 @@ uint64_t WaveAudioUpdate(uint8_t* base, uint32_t wave, uint64_t r3_in, uint32_t 
   if (int32_t(r3) < 0) {
     return r3;
   }
-  const int32_t state = int32_t(Load(base, wave + 40));
+  const int32_t state = int32_t(w.state());
   const uint32_t stopped = Load(base, frame + 80);
   if (state < 3) {
     if (int32_t(stopped) != 0) {
       return r3;
     }
-    Store(base, wave + 40, 3);
+    w.set_state(3);
     r3 = notify(12);
-    Store(base, wave + 40, 3);
+    w.set_state(3);
     return r3;
   }
-  if (int32_t(stopped) == 0 || (guest::LoadU8(base, wave + 25) & 0x80) != 0) {
+  if (int32_t(stopped) == 0 || (w.flags() & 0x80) != 0) {
     return r3;
   }
   if (state < 5) {
-    Store(base, wave + 40, 5);
+    w.set_state(5);
     notify(13);
   }
-  const uint32_t owner = Load(base, wave + 48);
-  Store(base, wave + 40, 5);
+  const uint32_t owner = w.owner();
+  w.set_state(5);
   return done(owner);
 }
 

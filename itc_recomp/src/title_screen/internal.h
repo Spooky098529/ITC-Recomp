@@ -5,6 +5,11 @@
 #include <cstdint>
 
 #include "guest.h"
+#include "schema/boot_mode.h"
+#include "schema/game_modes.h"
+#include "schema/menu_helpers.h"
+#include "schema/race_screens.h"
+#include "schema/title_screen.h"
 #include "title_screen/title_screen.h"
 #include "ui_movies/game.h"
 
@@ -14,6 +19,12 @@ inline uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(ba
 inline void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
+
+using G = schema::TitleScreenGlobals;
+using Machine = schema::Type4Machine;
+// A transition's started word (the page object's +24, the title load
+// block's +16), as the transitions get it (r3).
+using Started = schema::TitleTransitionStarted;
 
 constexpr uint32_t kNone = 0xFFFFFFFFu;
 constexpr uint32_t kMemRelease = 0x8000;
@@ -32,19 +43,44 @@ inline uint32_t FindMovie(uint8_t* base, uint32_t id, uint32_t key) {
   return Load(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, key));
 }
 
-inline uint32_t Words(uint8_t* base) { return Load(base, kWords); }
+// The title's words ([0x82814E34], loaded at each call).
+inline schema::TitleScreenData Words(uint8_t* base) { return G::data(base); }
 
-// Posts the message (id, 0, 0) on `mode`'s ring (+204: its count +600,
-// start +604, 50 slots of 12 bytes), as the handlers do inline.
+// The menu list ([0x82814E30], race-screens' MenuList; loaded at each call).
+inline schema::MenuList MenuListOf(uint8_t* base) { return G::list(base); }
+inline uint32_t ListAddress(uint8_t* base) { return G::list(base).address; }
+
+// Menu4's menu reset (TitleScreen::Create, SetUpMenu4): first item 0, last
+// 1, wrapping, the rest cleared, in the originals' order.
+inline void ResetMenu(const schema::FrontEndMenu& menu) {
+  menu.set_first_item(0);
+  menu.set_last_item(1);
+  menu.set_wraps(1);
+  menu.set_cursor(0);
+  menu.set_previous(0);
+  menu.set_moved(0);
+  menu.set_wrapped(0);
+  menu.set_visible_row(0);
+  menu.set_previous_row(0);
+  menu.set_side(0);
+  menu.set_player(0);
+  menu.set_up_down_locked(0);
+  menu.set_left_right_steps(0);
+  menu.set_shoulders_step(0);
+}
+
+// Posts the message (id, 0, 0) on the dispatcher's ring (`mode`, the
+// handlers' r4: boot-mode's ModeDispatcher, the mode's +36; its count,
+// start, 50 slots of 12 bytes), as the handlers do inline.
 inline void Post(uint8_t* base, uint32_t mode, uint32_t id) {
-  const uint32_t ring = mode + 204;
-  const uint32_t count = Load(base, ring + 600) + 1;
-  const uint32_t start = Load(base, ring + 604);
-  Store(base, ring + 600, count);
-  const uint32_t slot = ring + 12 * ((start + count - 1) % 50);
-  Store(base, slot + 0, id);
-  Store(base, slot + 4, 0);
-  Store(base, slot + 8, 0);
+  const schema::ModeDispatcher d(base, mode);
+  const uint32_t count = d.ring_count() + 1;
+  const uint32_t start = d.ring_start();
+  d.set_ring_count(count);
+  const schema::ModeMessage slot(base, d.ring_address() + 12 * ((start + count - 1) % 50));
+  slot.set_id(id);
+  slot.set_arg0(0);
+  slot.set_arg1(0);
 }
 
 }  // namespace title_screen

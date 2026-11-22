@@ -28,6 +28,7 @@
 #include "base/flags.h"
 #include "graphics/resources.h"
 #include "hooks/heap.h"
+#include "schema/graphics_resources.h"
 
 ITC_FLAG_BOOL(native_graphics_resources, true, "ITC",
               "Run the graphics library's resources (docs/functions/graphics-resources.md: "
@@ -109,8 +110,8 @@ ITC_GRAPHICS_RESOURCES(822A6180, ctx.r3.u64 = ResourceType(base, ctx.r3.u32))
 // r3 = the format, r4, r5 = the block's width and height out (in that order).
 ITC_GRAPHICS_RESOURCES(822A4410, {
   const Block block = GpuBlockSize(ctx.r3.u32);
-  guest::StoreU32(base, ctx.r4.u32, block.width);
-  guest::StoreU32(base, ctx.r5.u32, block.height);
+  schema::GpuOutWord(base, ctx.r4.u32).set_value(block.width);
+  schema::GpuOutWord(base, ctx.r5.u32).set_value(block.height);
 })
 
 // r3 width, r4 height, r5 format, r6 the multisample type.
@@ -201,8 +202,8 @@ ITC_GRAPHICS_RESOURCES(822A39E0, ctx.r3.u64 = GetDepthStencilSurface(base, ctx.r
 // r4 = the stream, r5, r6 = the offset and stride out (in that order).
 ITC_GRAPHICS_RESOURCES(822A3880, {
   const StreamSource source = GetStreamSource(base, ctx.r3.u32, ctx.r4.u32);
-  guest::StoreU32(base, ctx.r5.u32, source.offset);
-  guest::StoreU32(base, ctx.r6.u32, source.stride);
+  schema::GpuOutWord(base, ctx.r5.u32).set_value(source.offset);
+  schema::GpuOutWord(base, ctx.r6.u32).set_value(source.stride);
   ctx.r3.u64 = source.buffer;
 })
 
@@ -250,7 +251,7 @@ ITC_GRAPHICS_RESOURCES(822A6A78, ctx.r3.u64 = UnlockIndexBuffer(base, ctx.r3.u32
 ITC_NATIVE_ENTRY_ALWAYS(822A6210) {
   
   if (!ITC_FLAG(native_graphics_resources) || !hooks::NativeHeapActive() ||
-      (guest::LoadU32(base, ctx.r3.u32) & 0xF) == 9) {
+      (schema::ResourceHeader(base, ctx.r3.u32).common() & 0xF) == 9) {
     lifted::original::c822A6210(ctx, base);
     return;
   }

@@ -1,0 +1,79 @@
+# The schema of docs/functions/data-tables.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The data tables at [0x826C5CA0]: twelve assets from the archive, loaded once
+# at boot into one block and read by index all through the game
+# (src/data_tables/). The entries the accessors return (DataTables::Item.ret,
+# Entry56.ret, Entry20.ret, Entry40.ret) are described by the areas reading
+# them; here are only the tables' own walks.
+
+# The tables object (64 bytes, DataTables::Init). OnItemsLoaded's r6 is it too.
+[DataTables]
+measures = ["new<64>@DataTables::Init", "DataTables::OnItemsLoaded.r6"]
+size = 64
+origin = "allocated"
+fields = [
+  { name = "last_serial", offset = 0, type = "u32", note = "the last load's serial (Archive::Load's; not read)" },
+  { name = "pending", offset = 4, type = "u32", note = "the loads pending: 12 at boot, each callback counts down (DataTables::IsLoading)" },
+  { name = "item_count", offset = 8, type = "u32", note = "400, set by asset 94's callback" },
+  { name = "block", offset = 12, type = "ptr", note = "the block all the tables are in (operator new[])" },
+  { name = "items", offset = 16, type = "ptr", note = "asset 94: 400 entries of 3,008 bytes (DataTables::Item)" },
+  { name = "tables56", offset = 20, type = "bytes", count = 32, note = "eight pointers: the 56-byte tables (asset ids at 0x82616C64; DataTables::Entry56)" },
+  { name = "table20", offset = 52, type = "ptr", to = "DataTablesEntry20", note = "asset 95: 20-byte entries, -1 at +0 ends it" },
+  { name = "table40", offset = 56, type = "ptr", to = "DataTablesEntry40", note = "asset 96: 40-byte entries, -1 at +4 ends it" },
+  { name = "asset84", offset = 60, type = "ptr", note = "asset 84 (no reader found besides the load)" },
+]
+
+# Asset 95's entries as the walks read them (DataTables::Find20 from the
+# table's start, On20Loaded's end check one entry on).
+[DataTablesEntry20]
+measures = ["new<64>@DataTables::Init.+52", "DataTables::On20Loaded.r6"]
+size = 20
+origin = "file"
+fields = [
+  { name = "key0", offset = 0, type = "u32", note = "-1 ends the table; Find20's second key" },
+  { name = "key8", offset = 8, type = "u32", note = "Find20's first key" },
+  { name = "next_key0", offset = 20, type = "u32", note = "the next entry's key0 (the walks read it from the entry before)" },
+]
+
+# Asset 96's entries as On40Loaded's walk reads them.
+[DataTablesEntry40]
+measure = "DataTables::On40Loaded.r6"
+size = 40
+origin = "file"
+fields = [
+  { name = "end_mark", offset = 4, type = "u32", note = "-1 ends the table (after the swap)" },
+  { name = "next_end_mark", offset = 44, type = "u32", note = "the next entry's end_mark (the walk reads it from the entry before)" },
+]
+
+# The 56-byte tables' entries as On56Loaded's walk reads them.
+[DataTablesEntry56]
+measure = "DataTables::On56Loaded.r6"
+size = 56
+origin = "file"
+fields = [
+  { name = "end_mark", offset = 0, type = "u32", note = "-1 ends the table (after the swap)" },
+  { name = "next_end_mark", offset = 56, type = "u32", note = "the next entry's end_mark (the walk reads it from the entry before)" },
+]
+
+# A word SwapWord (sub_820C97D8) reverses in place: read as a single (lfs),
+# its four bytes stored reversed (stb).
+[DataTablesSwappedWord]
+measure = "SwapWord.r3"
+size = 4
+origin = "file"
+fields = [
+  { name = "value", offset = 0, type = "f32", note = "read as a single (the translated code's lfs)" },
+  { name = "word", offset = 0, type = "u32", note = "the word as the hand port loads and stores it whole" },
+  { name = "byte0", offset = 0, type = "u8" },
+  { name = "byte1", offset = 1, type = "u8" },
+  { name = "byte2", offset = 2, type = "u8" },
+  { name = "byte3", offset = 3, type = "u8" },
+]
+
+[globals]
+tables = { address = 0x826C5CA0, type = "ptr", to = "DataTables", note = "the data tables (DataTables::Init)" }
+table_ids = { address = 0x82616C64, type = "bytes", count = 32, note = "the eight 56-byte tables' asset ids: 86, 87, 91, 88, 92, 89, 90, 93" }

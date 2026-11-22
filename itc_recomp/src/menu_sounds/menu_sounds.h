@@ -13,23 +13,9 @@
 
 namespace menu_sounds {
 
-constexpr uint32_t kSoundManager = 0x826C5C80;  // [it] the AudioManager
-// The manager's slots: PlayCue2D (10), GetCategory (29), SetCategoryVolume
-// (30).
-constexpr uint32_t kPlayCue2DSlot = 40;
-constexpr uint32_t kGetCategorySlot = 116;
-constexpr uint32_t kSetCategoryVolumeSlot = 120;
-// The floats 1.0 and 0.0 the originals load, and 1/15.
-constexpr uint32_t kOne = 0x82000A30;
-constexpr uint32_t kZero = 0x82000A34;
-constexpr uint32_t kFifteenth = 0x82008060;
-// The categories' names.
-constexpr uint32_t kDefaultName = 0x8200A6A4;  // "Default"
-constexpr uint32_t kMusicName = 0x82008348;    // "Music"
-// The volume globals: the effects' (two words) and the music's.
-constexpr uint32_t kEffectsVolume = 0x82616C38;
-constexpr uint32_t kEffectsVolume2 = 0x82616C3C;
-constexpr uint32_t kMusicVolume = 0x82616BEC;
+// [it] the AudioManager (other areas' ports read it through this; ours
+// through schema::MenuSoundsGlobals::sound_manager).
+constexpr uint32_t kSoundManager = 0x826C5C80;
 
 // A guest function called through the function table from the frame at
 // `r1`, with the first `set` of r3 to r6 given (the others left as they

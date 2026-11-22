@@ -13,7 +13,9 @@
 
 namespace post_effects {
 
-constexpr uint32_t kEffects = 0x826C5D80;  // 15 effect pointers
+// The 15 effect pointers (schema::PostEffectsGlobals::effects; kept for
+// src/race_scene/, whose accesses aren't switched yet).
+constexpr uint32_t kEffects = 0x826C5D80;
 constexpr uint32_t kCount = 15;
 
 // PostEffects::Get (sub_82133AE8): [kEffects + 4 * index] (the address
@@ -146,7 +148,6 @@ std::optional<uint32_t> TargetFilterConstruct(uint8_t* base, uint32_t frame, uin
 // initializer): [0x826C5DC0] = Surface::EdramTiles(1024, 576, 0x1A2201BF,
 // 1), the EDRAM base the effects' surfaces are given. Returns r3 (the
 // tiles).
-constexpr uint32_t kEdramBase = 0x826C5DC0;
 uint32_t InitEdramBase(uint8_t* base);
 
 // --- Making the effects (create.cpp) ---
@@ -206,7 +207,6 @@ struct InitBootCalls {
 // `device` is 0 (kept at `stack` + 20), the effects' vertex declaration
 // [0x826C5DBC] = CreateVertexDeclaration(0x826176C4), then
 // PostEffects::Create(device, 14). Returns r3 as the original leaves it.
-constexpr uint32_t kVertexDeclaration = 0x826C5DBC;
 uint32_t InitBoot(uint8_t* base, uint32_t stack, uint32_t device, const InitBootCalls& calls);
 
 // --- The records (record.cpp) ---

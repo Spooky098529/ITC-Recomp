@@ -34,43 +34,11 @@ namespace type5_mode {
 
 using Calls = race_hud_object::Calls;
 
-// The dialog's blocks: the page object (28 bytes: +0 the page Draw runs, -1
-// while a step runs; +4 the page after the step; +8 the page before; +12
-// the step Update runs, -1 none; +16 the step queued after it; +20; +24 the
-// step's started word), the menu (68: a front-end menu, items 0 to 1) and
-// the data (68: +0 the movies loaded, +4 the state queued, 21 none, +8 the
-// movie shown, +12 interrupted).
-constexpr uint32_t kPages = 0x82814E3C;
-constexpr uint32_t kMenu = 0x82814E40;
-constexpr uint32_t kData = 0x82814E44;
-// The parking area's machine (Resume's +900).
-constexpr uint32_t kLocationScreen = 0x82814E50;
-// How the title is entered (ForceExit's 0 and 1 set it).
-constexpr uint32_t kEntered = 0x826364EC;
-
-// The machines' words.
-constexpr uint32_t kMachineState = 9604;
-constexpr uint32_t kMachineLoaded = 9608;
-constexpr uint32_t kMachineReenter = 9612;
-constexpr uint32_t kMachineDelete = 9616;
-
-// The mode's fields: the delegate's holder (+4) and the delegate (+8), the
-// dispatcher (+36: the handlers, the count +200; its ring +204 is the
-// mode's +240), the message ring (+240: 50 entries of 12 bytes, the count
-// +840, the start +844) and the block (+848).
-constexpr uint32_t kDispatcher = 36;
-constexpr uint32_t kRing = 240;
-constexpr uint32_t kBlock = 848;
-// The block (28,940 bytes): the car settings at +0, the parking area at
-// +9640, the dialog at +19280, the shown machine's id (+28920: 3, 21 or
-// 16), +28924, and the next mode's 8-byte answer (+28928).
-constexpr uint32_t kBlockBytes = 28940;
-constexpr uint32_t kCarSettingsAt = 0;
-constexpr uint32_t kLocationAt = 9640;
-constexpr uint32_t kDialogAt = 19280;
-constexpr uint32_t kShown = 28920;
-constexpr uint32_t kFirstShown = 28924;
-constexpr uint32_t kNextAnswer = 28928;
+// The dialog's blocks (the page object [0x82814E3C], the menu [0x82814E40],
+// the data [0x82814E44]), the mode, its block and the machines' words are
+// the schema's views (schema/type5_mode.h: ModeType5, Type5ModeBlock,
+// Type5Dialog, Type5DialogData, Type5ModeGlobals; PageObject and
+// FrontEndMenu from schema/menu_helpers.h).
 
 // The callees by address.
 constexpr uint32_t kVirtualAlloc = 0x82295398;
@@ -95,9 +63,6 @@ constexpr uint32_t kLoadingShow = 0x822478D0;
 constexpr uint32_t kLoadingRun = 0x82247898;
 constexpr uint32_t kLoadingFinish = 0x82247A60;
 constexpr uint32_t kDispatch = 0x821062E8;
-// The string table Init loads from, and the fades' passes FadeIn gets.
-constexpr uint32_t kStringTable = 0x826C5C34;
-constexpr uint32_t kFadesIn = 0x82001BEC;
 
 // --- The dialog's steps (dialog_steps.cpp; r3 the started word's address,
 // the page object's +24; each returns 1 when done, else 0) ---

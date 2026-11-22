@@ -2,6 +2,8 @@
 // (docs/functions/data-load.md).
 
 #include "base/flags.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 #include "data_load/data_load.h"
@@ -13,6 +15,7 @@
 #include "hooks/direct_slots.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
+#include "schema/data_load.h"
 #include "ui_movies/game.h"
 #include "lifted/sdk.h"
 
@@ -153,14 +156,14 @@ dl::MovieCalls MovieCalls(lifted::Regs& ctx, uint8_t* base, uint32_t construct_a
     }
     guest_call::InFrame(ctx, base, 112, construct_at, [&](uint32_t) {
       ctx.r3.u64 = movie;
-      lifted::CallFromContext(ctx, base, 0x8211E1C0);  // UiMovie::UiMovie
+      lifted::Enter(ctx, base, game::UiMovie::Ctor);  // UiMovie::UiMovie
     });
     return ctx.r3.u32;
   };
   calls.load = hooks::NativeArchiveLoad(base);
   calls.render_object = [&ctx, base](int which) {
     guest_call::InFrame(ctx, base, 112, 0, [&](uint32_t) {
-      ctx.r3.u64 = guest::LoadU32(base, dl::kRenderApp);
+      ctx.r3.u64 = schema::DataLoadGlobals::render_manager(base).address;
       SlotCall(ctx, base, 8, which == 0 ? 0x822913AC : 0x822913D8);
       SlotCall(ctx, base, which == 0 ? 1 : 2, which == 0 ? 0x822913BC : 0x822913E8);
     });

@@ -14,20 +14,11 @@
 
 namespace location_screen {
 
-// The screen's globals (pointers).
-constexpr uint32_t kPages = 0x82814E48;    // the page object (28 bytes)
-constexpr uint32_t kMenu = 0x82814E4C;     // the location's menu (68 bytes)
-constexpr uint32_t kScreen = 0x82814E50;   // the screen (912 bytes)
-constexpr uint32_t kListMenu = 0x82814E54;      // the location's list
-constexpr uint32_t kOpponentMenu = 0x82814E58;  // the opponents
-constexpr uint32_t kConfirmMenu = 0x82814E5C;   // race, the card, back
-// The race data (a pointer) and its racer records' offset.
-constexpr uint32_t kRaceData = 0x826C5B2C;
-constexpr uint32_t kRacerRecords = 0x59AE8;
-// The save data's unlock list's count.
-constexpr uint32_t kUnlockCount = 0x1CA78;
-// The save data's item records (12 bytes each; +2 a halfword).
-constexpr uint32_t kItemRecords = 0x199F8;
+// The screen's globals (its page object, menus and the screen itself) are
+// schema::LocationScreenGlobals' (schema/location_screen.h).
+// The race data and its results records are schema::RaceData's
+// (schema/race_states.h), the save data's words schema::SaveData's
+// (schema/race_event.h).
 // The frames of the functions that copy an item (3,008 bytes) onto their
 // stack.
 constexpr uint32_t kItemFrame = 3120;

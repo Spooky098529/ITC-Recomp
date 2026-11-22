@@ -50,11 +50,6 @@ struct CompressArguments {
   double alpha_reference;  // f1
 };
 
-// The alpha reference (0x8263B7E8, a float) XGCompressSurface sets for the
-// DXT block encoders, with the premultiplied switch (kPremultiplied,
-// dxt45.h).
-constexpr uint32_t kAlphaReference = 0x8263B7E8;
-
 // sub_8236D3C8 XGGetBlockDimensions: GpuFormat::BlockSize (sub_822A4410's
 // plain C++) for the GPU format `format`, its width stored at `width` and
 // height at `height` where they aren't null. The original's r3: `format`

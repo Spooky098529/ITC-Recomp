@@ -7,6 +7,8 @@
 // originals run.
 
 #include "guest.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -17,6 +19,8 @@
 #include "hooks/post_effects.h"
 #include "hooks/scene_target.h"
 #include "lifted/sdk.h"
+#include "schema/device_shaders.h"
+#include "schema/frame_passes.h"
 
 ITC_FLAG_DECLARE(bool, log_overlay_uploads);
 ITC_FLAG_DECLARE(bool, log_slot_callers);
@@ -103,12 +107,12 @@ void hooks::FramePassesRecordPrimitiveReset(lifted::Regs& ctx, uint8_t* base) {
     }
     done = true;
     // The render queue's slot 4: r4 = the chunk, r5 = 0, f1 = 0.0.
-    ctx.r3.u64 = guest::LoadU32(base, fp::kRenderQueue);
+    ctx.r3.u64 = schema::FramePassesGlobals::render_queue(base);
     ctx.r4.u64 = *chunk;
     ctx.r5.u64 = 0;
     ctx.fpscr.disableFlushMode();
-    ctx.f1.f64 = double(guest::LoadFloat(base, 0x82000A34));
-    const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 16);
+    ctx.f1.f64 = double(schema::FramePassesGlobals::zero(base));
+    const uint32_t function = schema::RenderQueue(base, ctx.r3.u32).vtable().add();
     ctx.ctr.u64 = function;
     ctx.lr = 0x82589A6C;
     lifted::CallFromContext(ctx, base, function);
@@ -132,7 +136,8 @@ void hooks::FramePassesJobWait(lifted::Regs& ctx, uint8_t* base) {
       // The object's slot 1 with r4 = the job.
       ctx.r3.u64 = object;
       ctx.r4.u64 = job;
-      const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, object) + 4);
+      const uint32_t function =
+          schema::FramePassesJobWaiter(base, object).vtable().slot_1_wait();
       ctx.ctr.u64 = function;  // (r11, also the target there: none reads it)
       ctx.lr = 0x82094B48;
       lifted::CallFromContext(ctx, base, function);
@@ -218,7 +223,7 @@ void hooks::FramePassesConstruct(lifted::Regs& ctx, uint8_t* base) {
         [&](uint32_t job) {
           ctx.r3.u64 = job;
           ctx.lr = 0x82098710;
-          lifted::CallFromContext(ctx, base, 0x82094B10);  // --find_menu_selection's wrap
+          lifted::Enter(ctx, base, game::Job::Wait);  // --find_menu_selection's wrap
         },
         [&](uint32_t loop, uint32_t offset, uint32_t key, uint32_t delegate, uint32_t lr) {
           ctx.r5.u64 = delegate;
@@ -263,7 +268,7 @@ void hooks::FramePassesRecord(lifted::Regs& ctx, uint8_t* base) {
         vcall,
         [&](uint32_t queue, uint32_t chunk, uint32_t bucket, uint32_t return_address) {
           ctx.fpscr.disableFlushMode();
-          ctx.f1.f64 = double(guest::LoadFloat(base, 0x82000A34));
+          ctx.f1.f64 = double(schema::FramePassesGlobals::zero(base));
           ctx.r5.u64 = bucket;
           ctx.r4.u64 = chunk;
           vcall(queue, 16, return_address);
@@ -273,7 +278,7 @@ void hooks::FramePassesRecord(lifted::Regs& ctx, uint8_t* base) {
           ctx.r6.u64 = 602;
           ctx.r5.u64 = 150;
           ctx.r4.u64 = list;
-          ctx.r3.u64 = guest::LoadU32(base, 0x8266D08C);
+          ctx.r3.u64 = schema::FramePassesGlobals::scene_target(base);
           ctx.lr = 0x82098620;
           hooks::SceneTargetRecordPassesOrOriginal(ctx, base);
         },

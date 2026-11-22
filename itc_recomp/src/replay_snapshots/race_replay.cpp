@@ -12,6 +12,9 @@
 #include "hooks/vehicle.h"
 #include "native/buffers.h"
 #include "race_world/race_world.h"
+#include "schema/car_physics.h"
+#include "schema/race_world.h"
+#include "schema/replay_snapshots.h"
 #include "vehicle/vehicle.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -19,16 +22,18 @@ namespace replay_snapshots {
 
 namespace {
 
+using Record = schema::ReplayRecord;
+using Snapshot = schema::ReplaySnapshot;
+using G = schema::ReplaySnapshotsGlobals;
+
 constexpr uint32_t kCountA = 0x107AC0;   // player 0's recording's count
 constexpr uint32_t kCountB = 0x20F584;   // the second recording's count
 constexpr uint32_t kBlockA = 0x20F590;   // the race's start
 constexpr uint32_t kBlockB = 0x218DA0;   // the race's end
-constexpr uint32_t kRecords = 2304;      // a block's first record
 constexpr uint32_t kRestored = 0x2225B0; // set to 1 by the restores
-constexpr uint32_t kZero = 0x82000A34;   // the game's float 0.0
 
-uint32_t Recordings(uint8_t* base) { return guest::LoadU32(base, kRecordings); }
-uint32_t Manager(uint8_t* base) { return guest::LoadU32(base, kManager); }
+uint32_t Recordings(uint8_t* base) { return G::input_recordings(base); }
+uint32_t Manager(uint8_t* base) { return G::racers_manager(base); }
 
 // Both recordings' counts = 0 (the recordings' pointer read for each).
 void ClearCounts(uint8_t* base) {
@@ -39,7 +44,7 @@ void ClearCounts(uint8_t* base) {
 // A block's seven records' words +0 = 0.
 void ClearRecords(uint8_t* base, uint32_t block) {
   for (uint32_t i = 0; i < 7; i++) {
-    guest::StoreU32(base, block + kRecords + kRecordBytes * i, 0);
+    Record(base, Snapshot(base, block).records_address() + Record::kSize * i).set_car_flags(0);
   }
 }
 
@@ -60,20 +65,25 @@ void Memcpy(uint8_t* base, uint32_t to, uint32_t from, uint32_t bytes, uint32_t 
 // return addresses.
 void RestoreHead(uint8_t* base, uint32_t manager, uint32_t head, uint32_t caller_entries,
                  uint32_t caller_traffic) {
+  const Snapshot h(base, head);
+  const schema::RaceManager m(base, manager);
   for (uint32_t i = 0; i < 77; i++) {
-    Memcpy(base, manager + 4 + 28 * i, head + 28 * i, 28, caller_entries);
+    Memcpy(base, m.entries_address() + 28 * i, h.entries_address() + 28 * i, 28, caller_entries);
   }
   for (uint32_t i = 0; i < 3; i++) {
-    Memcpy(base, manager + 2160 + 28 * i, head + 2156 + 28 * i, 28, caller_traffic);
+    Memcpy(base, m.traffic_entries_address() + 28 * i, h.traffic_entries_address() + 28 * i, 28,
+           caller_traffic);
   }
   for (uint32_t i = 0; i < 7; i++) {
-    guest::StoreU32(base, manager + 2336 + 4 * i, guest::LoadU32(base, head + 2240 + 4 * i));
+    guest::StoreU32(base, m.vehicle_slots_address() + 4 * i,
+                    guest::LoadU32(base, h.slot_0_address() + 4 * i));
   }
-  constexpr uint32_t kCounts[][2] = {{2364, 2268}, {2368, 2272}, {2372, 2276},
-                                     {2376, 2280}, {2380, 2284}, {2388, 2288}};
-  for (const auto& c : kCounts) {
-    guest::StoreU32(base, manager + c[0], guest::LoadU32(base, head + c[1]));
-  }
+  m.set_racer_count(h.racer_count());
+  m.set_entry_count(h.entry_count());
+  m.set_opponents_with_vehicle(h.opponent_count());
+  m.set_traffic_with_vehicle(h.traffic_listed());
+  m.set_traffic_allowed(h.traffic_count());
+  m.set_traffic_ticks(h.unknown_2288());
 }
 
 void ResetWorld(uint8_t* base, uint32_t frame, const ReplayCalls& calls) {
@@ -99,30 +109,33 @@ void Relink(uint8_t* base, uint32_t vehicle, uint32_t frame, const ReplayCalls& 
   if (!vehicle::VehicleLinkTrackPositions(base, vehicle, &r3)) {
     calls.callee(0x820C1D08, frame, vehicle);
   }
-  const uint32_t object = guest::LoadU32(base, vehicle + 340);
+  const uint32_t object = schema::Vehicle(base, vehicle).collision_object();
   if (!car_physics::CollisionObjectResetTransform(base, object, frame - 112)) {
     calls.callee(0x820B7998, frame, object);
   }
 }
 
-// The vehicles put back from a block's records (at `records` from the
-// recordings), each in use (word +0 not 0): Record5232::Restore, then with
+// The vehicles put back from a block's records (the block at `block` from
+// the recordings), each in use (car_flags not 0): Record5232::Restore, then with
 // `place` (RestoreEnd) the vehicle placed on the route unless it's flagged
 // 0x81 with no contact bits, then Relink.
-void PutBack(uint8_t* base, uint32_t records, bool place, uint32_t frame,
+void PutBack(uint8_t* base, uint32_t block, bool place, uint32_t frame,
              const ReplayCalls& calls) {
-  const double zero = double(guest::LoadFloat(base, kZero));
+  const double zero = double(G::zero(base));
   for (uint32_t i = 0; i < 7; i++) {
-    const uint32_t offset = kRecordBytes * i;
-    if (guest::LoadU32(base, Recordings(base) + offset + records) == 0) {
+    const uint32_t offset = Record::kSize * i;
+    if (Record(base, Snapshot(base, Recordings(base) + block).records_address() + offset)
+            .car_flags() == 0) {
       continue;
     }
-    const uint32_t vehicle = vehicle_accessors::VehicleGet(base, i);
-    Record5232Restore(base, Recordings(base) + offset + records, vehicle);
-    if (place && ((guest::LoadU32(base, vehicle + 6148) & 0x81) == 0 ||
-                  guest::LoadU32(base, vehicle + 6152) != 0)) {
+    const schema::Vehicle v(base, vehicle_accessors::VehicleGet(base, i));
+    const uint32_t vehicle = v.address;
+    Record5232Restore(base, Snapshot(base, Recordings(base) + block).records_address() + offset,
+                      vehicle);
+    if (place && ((v.car_flags() & 0x81) == 0 || v.collision_flags() != 0)) {
+      // +6224: the status block's +64 (no field; car-physics.toml's).
       const uint32_t moving =
-          double(guest::LoadFloat(base, vehicle + 6224)) > zero ? 1 : 0;
+          double(guest::LoadFloat(base, v.status_address() + 64)) > zero ? 1 : 0;
       const double speed = double(Vehicle_GetSpeedKmh(base, vehicle));
       const uint32_t position = vehicle_accessors::VehicleIdentity(vehicle) + 4;
       if (!vehicle::VehiclePlaceOnRoute(base, vehicle, position, speed, zero, int32_t(moving),
@@ -144,7 +157,7 @@ uint64_t RaceReplaySaveStart(uint8_t* base, uint32_t frame, const ReplayCalls& c
   RaceSnapshotSave(base, Recordings(base) + kBlockA);
   ResetWorld(base, frame, calls);
   ResetVehicles(base, 0, frame, calls);
-  PutBack(base, kBlockA + kRecords, false, frame, calls);
+  PutBack(base, kBlockA, false, frame, calls);
   return ListRacers(base, frame, calls);
 }
 
@@ -160,7 +173,7 @@ uint64_t RaceReplayRestoreStart(uint8_t* base, uint32_t frame, const ReplayCalls
   ResetWorld(base, frame, calls);
   RestoreHead(base, Manager(base), Recordings(base) + kBlockA, 0x82104774, 0x821047A0);
   ResetVehicles(base, 1, frame, calls);
-  PutBack(base, kBlockA + kRecords, false, frame, calls);
+  PutBack(base, kBlockA, false, frame, calls);
   const uint64_t r3 = ListRacers(base, frame, calls);
   guest::StoreU32(base, Recordings(base) + kRestored, 1);
   return r3;
@@ -172,7 +185,7 @@ uint64_t RaceReplayRestoreEnd(uint8_t* base, uint32_t frame, const ReplayCalls& 
   ResetWorld(base, frame, calls);
   RestoreHead(base, Manager(base), Recordings(base) + kBlockB, 0x8210491C, 0x82104948);
   ResetVehicles(base, 1, frame, calls);
-  PutBack(base, kBlockB + kRecords, true, frame, calls);
+  PutBack(base, kBlockB, true, frame, calls);
   const uint64_t r3 = ListRacers(base, frame, calls);
   guest::StoreU32(base, Recordings(base) + kRestored, 1);
   return r3;

@@ -7,6 +7,7 @@
 
 #include "base/log.h"
 #include "c_runtime/math.h"
+#include "schema/car_physics.h"
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -30,18 +31,18 @@ uint32_t Wheel(uint32_t vehicle, uint32_t w) {
 }
 
 uint32_t CarData(uint8_t* base, uint32_t vehicle) {
-  return guest::LoadU32(base, vehicle + 272);
+  return schema::Vehicle(base, vehicle).car_data().address;
 }
 
 // The surface record of wheel w (its kind the word +176): [vehicle + 4
 // (kind + 667)] for the front wheels, + 699 for the rear (32-bit
 // arithmetic, as the original); 0 when byte +2664 is clear (none looked up).
 uint32_t SurfaceRecord(uint8_t* base, uint32_t vehicle, uint32_t w, bool* looked_up) {
-  *looked_up = guest::LoadU8(base, vehicle + 2664) != 0;
+  *looked_up = schema::Vehicle(base, vehicle).surfaces_on() != 0;
   if (!*looked_up) {
     return 0;
   }
-  const uint32_t kind = guest::LoadU32(base, Wheel(vehicle, w) + 176);
+  const uint32_t kind = schema::VehicleWheel(base, Wheel(vehicle, w)).surface();
   const uint32_t index = kind + (w == 0 || w == 1 ? 667 : 699);
   return guest::LoadU32(base, vehicle + (index << 2));
 }
@@ -68,43 +69,43 @@ double SurfaceValue(uint8_t* base, uint32_t vehicle, uint32_t w, uint32_t fallba
 uint32_t VehicleBeginStep(uint8_t* base, uint32_t vehicle, double dt) {
   ITC_NATIVE_RUNNING("sub_820AFAE8 Vehicle::BeginStep");
   const double rate = Fdivs(Lfs(base, kOne), dt);
-  Stfs(base, vehicle + 2352, dt);
-  Stfs(base, vehicle + 2356, rate);
+  schema::Vehicle(base, vehicle).set_dt(float(dt));
+  schema::Vehicle(base, vehicle).set_inverse_dt(float(rate));
   for (uint32_t i = 0; i < 5; i++) {
-    vl::Vec4Copy(base, vehicle + 2544 + 16 * i, kZeroVector);
+    vl::Vec4Copy(base, schema::Vehicle(base, vehicle).wheel_accumulators_address() + 16 * i, kZeroVector);
   }
-  CopyWord(base, kZero, vehicle + 2448);
-  CopyWord(base, kZero, vehicle + 2452);
+  CopyWord(base, kZero, schema::Vehicle(base, vehicle).unknown_2448_address());
+  CopyWord(base, kZero, schema::Vehicle(base, vehicle).unknown_2452_address());
   for (uint32_t w = 0; w < 4; w++) {
-    guest::StoreU32(base, guest::LoadU32(base, vehicle + 2144 + 4 * w) + 116, 0);
+    schema::VehicleAxle(base, guest::LoadU32(base, schema::Vehicle(base, vehicle).wheel_axles_address() + 4 * w)).set_locked(uint32_t(0));
   }
-  guest::StoreU32(base, vehicle + 3156, guest::LoadU32(base, vehicle + 3156) + 1);
-  return vehicle + 2544 + 64;
+  schema::Vehicle(base, vehicle).set_step_count(uint32_t(schema::Vehicle(base, vehicle).step_count() + 1));
+  return schema::Vehicle(base, vehicle).wheel_accumulators_address() + 64;
 }
 
 void VehicleWheelLoads(uint8_t* base, uint32_t vehicle) {
   ITC_NATIVE_RUNNING("sub_820AFD30 Vehicle::WheelLoads");
-  if (guest::LoadU32(base, vehicle + 348) == 0) {
+  if (schema::Vehicle(base, vehicle).wheels_on_ground() == 0) {
     for (uint32_t w = 0; w < 4; w++) {
-      CopyWord(base, kZero, Wheel(vehicle, w) + 280);
+      CopyWord(base, kZero, schema::VehicleWheel(base, Wheel(vehicle, w)).load_address());
     }
     return;
   }
   const double zero = Lfs(base, kZero);
   for (uint32_t w = 0; w < 4; w++) {
     const uint32_t wheel = Wheel(vehicle, w);
-    if (guest::LoadU8(base, wheel + 17) == 0) {
-      Stfs(base, wheel + 280, zero);
+    if (schema::VehicleWheel(base, wheel).on_ground() == 0) {
+      schema::VehicleWheel(base, wheel).set_load(float(zero));
       continue;
     }
     // max(+8, 0.0), a NaN kept too (bge: not less than; the original's
     // second check never stores). Through the double, as the translated
     // code (a signaling NaN comes out quiet).
-    const double load = Lfs(base, wheel + 8);
+    const double load = double(schema::VehicleWheel(base, wheel).suspension_force());
     if (!(load < zero)) {
-      Stfs(base, wheel + 280, load);
+      schema::VehicleWheel(base, wheel).set_load(float(load));
     } else {
-      Stfs(base, wheel + 280, zero);
+      schema::VehicleWheel(base, wheel).set_load(float(zero));
     }
   }
 }
@@ -134,35 +135,35 @@ uint32_t VehicleAccumulateTireForces(uint8_t* base, uint32_t vehicle, uint32_t f
   const uint32_t f = frame;
   for (uint32_t w = 0; w < 4; w++) {
     const uint32_t wheel = Wheel(vehicle, w);
-    const uint32_t accumulator = vehicle + 2544 + 16 * w;
+    const uint32_t accumulator = schema::Vehicle(base, vehicle).wheel_accumulators_address() + 16 * w;
     {
-      const double dt = Lfs(base, vehicle + 2352);
-      const double time = Lfs(base, vehicle + 2364);
+      const double dt = double(schema::Vehicle(base, vehicle).dt());
+      const double time = double(schema::Vehicle(base, vehicle).substep_dt());
       const double k = Fdivs(time, dt);
-      const double v284 = Lfs(base, wheel + 284);
-      const double v308 = Lfs(base, wheel + 308);
-      const double v288 = Lfs(base, wheel + 288);
-      const double v304 = Lfs(base, wheel + 304);
-      Stfs(base, wheel + 284, Fmadds(k, v308, v284));
-      const double time2 = Lfs(base, vehicle + 2364);
-      const double dt2 = Lfs(base, vehicle + 2352);
+      const double v284 = double(schema::VehicleWheel(base, wheel).force_integral());
+      const double v308 = double(schema::VehicleWheel(base, wheel).longitudinal_force());
+      const double v288 = double(schema::VehicleWheel(base, wheel).force_integral_2());
+      const double v304 = double(schema::VehicleWheel(base, wheel).lateral_force());
+      schema::VehicleWheel(base, wheel).set_force_integral(float(Fmadds(k, v308, v284)));
+      const double time2 = double(schema::Vehicle(base, vehicle).substep_dt());
+      const double dt2 = double(schema::Vehicle(base, vehicle).dt());
       const double k2 = Fdivs(time2, dt2);
-      Stfs(base, wheel + 288, Fmadds(k2, v304, v288));
+      schema::VehicleWheel(base, wheel).set_force_integral_2(float(Fmadds(k2, v304, v288)));
       // (+128 x +304 + +144 x +308) x k into the accumulator.
-      vl::Vec4Scaled(base, f + 96, wheel + 128, v304);
+      vl::Vec4Scaled(base, f + 96, schema::VehicleWheel(base, wheel).side_axis_address(), v304);
     }
-    vl::Vec4Scaled(base, f + 112, wheel + 144, Lfs(base, wheel + 308));
+    vl::Vec4Scaled(base, f + 112, schema::VehicleWheel(base, wheel).forward_axis_address(), double(schema::VehicleWheel(base, wheel).longitudinal_force()));
     vl::Vec3Sum(base, f + 128, f + 112, f + 96);
-    const double k = Fdivs(Lfs(base, vehicle + 2364), Lfs(base, vehicle + 2352));
+    const double k = Fdivs(double(schema::Vehicle(base, vehicle).substep_dt()), double(schema::Vehicle(base, vehicle).dt()));
     vl::Vec4Scaled(base, f + 80, f + 128, k);
     vl::Vec3AddTo(base, accumulator, f + 80);
   }
-  return vehicle + 2544 + 48;
+  return schema::Vehicle(base, vehicle).wheel_accumulators_address() + 48;
 }
 
 void VehicleRollingResistance(uint8_t* base, uint32_t vehicle) {
   ITC_NATIVE_RUNNING("sub_820B2748 Vehicle::RollingResistance");
-  if (guest::LoadU32(base, vehicle + 348) == 0) {
+  if (schema::Vehicle(base, vehicle).wheels_on_ground() == 0) {
     return;
   }
   const double zero = Lfs(base, kZero);
@@ -170,18 +171,18 @@ void VehicleRollingResistance(uint8_t* base, uint32_t vehicle) {
   const double scale = Lfs(base, 0x82002A18);
   for (uint32_t w = 0; w < 4; w++) {
     const uint32_t wheel = Wheel(vehicle, w);
-    if (guest::LoadU8(base, wheel + 17) == 0) {
+    if (schema::VehicleWheel(base, wheel).on_ground() == 0) {
       continue;
     }
-    const uint32_t spin_at = wheel + 248;
-    const double load = Lfs(base, wheel + 280);
-    const uint32_t data = guest::LoadU32(base, vehicle + 2160 + 4 * w);
+    const uint32_t spin_at = schema::VehicleWheel(base, wheel).spin_address();
+    const double load = double(schema::VehicleWheel(base, wheel).load());
+    const uint32_t data = guest::LoadU32(base, schema::Vehicle(base, vehicle).wheel_axle_data_address() + 4 * w);
     double drag = Fmuls(load, scale);
-    const uint32_t record = guest::LoadU32(base, vehicle + 2144 + 4 * w);
-    double time = Lfs(base, vehicle + 2364);
+    const uint32_t record = guest::LoadU32(base, schema::Vehicle(base, vehicle).wheel_axles_address() + 4 * w);
+    double time = double(schema::Vehicle(base, vehicle).substep_dt());
     const double spin = Lfs(base, spin_at);
-    const double radius = Lfs(base, data + 52);
-    double inertia = Lfs(base, record + 108);
+    const double radius = double(schema::CarDataAxle(base, data).radius());
+    double inertia = double(schema::VehicleAxle(base, record).inertia());
     inertia = Fmuls(inertia, half);
     drag = Fmuls(radius, drag);
     time = Fdivs(time, inertia);
@@ -220,8 +221,8 @@ void VehicleTurnWheels(uint8_t* base, uint32_t vehicle, uint32_t frame) {
   const double high_slope = Lfs(base, 0x820029B8);
   const double high_limit = Lfs(base, 0x820029B4);
   for (uint32_t w = 0; w < 4; w++) {
-    const uint32_t angle_at = Wheel(vehicle, w) + 28;
-    double d = Fmuls(Lfs(base, angle_at + 220), Lfs(base, vehicle + 2352));
+    const uint32_t angle_at = schema::VehicleWheel(base, Wheel(vehicle, w)).angle_address();
+    double d = Fmuls(Lfs(base, angle_at + 220), double(schema::Vehicle(base, vehicle).dt()));
     d = Fneg(d);
     // The step reshaped past the limits.
     if (d > high_limit) {
@@ -260,78 +261,78 @@ void VehicleBrakeTorques(uint8_t* base, uint32_t vehicle) {
   ITC_NATIVE_RUNNING("sub_820B0838 Vehicle::BrakeTorques");
   for (uint32_t w = 0; w < 4; w++) {
     const uint32_t wheel = Wheel(vehicle, w);
-    CopyWord(base, kZero, wheel + 212);
-    CopyWord(base, kZero, wheel + 216);
-    CopyWord(base, kZero, wheel + 300);
+    CopyWord(base, kZero, schema::VehicleWheel(base, wheel).brake_force_address());
+    CopyWord(base, kZero, schema::VehicleWheel(base, wheel).brake_share_address());
+    CopyWord(base, kZero, schema::VehicleWheel(base, wheel).brake_torque_address());
   }
-  const double handbrake = Lfs(base, vehicle + 296);
-  const double brake = Lfs(base, vehicle + 292);
+  const double handbrake = double(schema::Vehicle(base, vehicle).handbrake());
+  const double brake = double(schema::Vehicle(base, vehicle).brake());
   if (Fadds(brake, handbrake) == Lfs(base, kZero)) {
     return;
   }
   const uint32_t data = CarData(base, vehicle);
-  double front = Fmuls(Lfs(base, data + 464), Lfs(base, data + 264));
-  const double rear_scale = Lfs(base, data + 736);
-  double rear_handbrake = Fmuls(Lfs(base, data + 272), rear_scale);
-  const double rear = Fmuls(Lfs(base, data + 268), rear_scale);
+  double front = Fmuls(double(schema::CarDataAxle(base, schema::CarData(base, data).front_axle_address()).unknown_128()), double(schema::CarData(base, data).front_brake()));
+  const double rear_scale = double(schema::CarDataAxle(base, schema::CarData(base, data).rear_axle_address()).unknown_128());
+  double rear_handbrake = Fmuls(double(schema::CarData(base, data).unknown_272()), rear_scale);
+  const double rear = Fmuls(double(schema::CarData(base, data).rear_brake()), rear_scale);
   rear_handbrake = Fmuls(rear_handbrake, handbrake);
   for (uint32_t w = 0; w < 4; w++) {
     const uint32_t wheel = Wheel(vehicle, w);
-    const double x = Lfs(base, vehicle + 2432);
+    const double x = double(schema::Vehicle(base, vehicle).brake_efficiency());
     double torque;
     if (w >= 2) {
-      torque = Fmuls(Lfs(base, wheel + 200), x);
+      torque = Fmuls(double(schema::VehicleWheel(base, wheel).brake()), x);
       const double braking = Fmuls(torque, rear);
       torque = Fadds(braking, rear_handbrake);
-      Stfs(base, wheel + 216, Fdivs(braking, torque));
+      schema::VehicleWheel(base, wheel).set_brake_share(float(Fdivs(braking, torque)));
     } else {
-      torque = Fmuls(Lfs(base, wheel + 200), x);
-      CopyWord(base, kOne, wheel + 216);
+      torque = Fmuls(double(schema::VehicleWheel(base, wheel).brake()), x);
+      CopyWord(base, kOne, schema::VehicleWheel(base, wheel).brake_share_address());
       torque = Fmuls(torque, front);
     }
-    Stfs(base, wheel + 300, torque);
+    schema::VehicleWheel(base, wheel).set_brake_torque(float(torque));
   }
 }
 
 void VehicleAntiLock(uint8_t* base, uint32_t vehicle) {
   ITC_NATIVE_RUNNING("sub_820B0718 Vehicle::AntiLock");
-  guest::StoreU8(base, vehicle + 2401, 0);
+  schema::Vehicle(base, vehicle).set_abs_active(uint8_t(0));
   for (uint32_t w = 0; w < 4; w++) {
-    CopyWord(base, vehicle + 292, Wheel(vehicle, w) + 200);
+    CopyWord(base, schema::Vehicle(base, vehicle).brake_address(), schema::VehicleWheel(base, Wheel(vehicle, w)).brake_address());
   }
-  if (guest::LoadU8(base, vehicle + 2386) == 0) {
+  if (schema::Vehicle(base, vehicle).abs() == 0) {
     return;
   }
-  const double kmh = Fmuls(Lfs(base, vehicle + 48), Lfs(base, 0x820029E0));
+  const double kmh = Fmuls(double(schema::Vehicle(base, vehicle).speed()), Lfs(base, 0x820029E0));
   if (kmh < Lfs(base, 0x82001FD8)) {
     return;
   }
   const double zero = Lfs(base, kZero);
-  if (!(Lfs(base, vehicle + 292) > zero)) {
+  if (!(double(schema::Vehicle(base, vehicle).brake()) > zero)) {
     return;
   }
   const double one = Lfs(base, kOne);
   for (uint32_t w = 0; w < 4; w++) {
     const uint32_t wheel = Wheel(vehicle, w);
-    if (guest::LoadU8(base, wheel + 17) == 0) {
+    if (schema::VehicleWheel(base, wheel).on_ground() == 0) {
       continue;
     }
     const double grip = Lfs(base, vehicle + (w == 0 || w == 1 ? 2000 : 2128));
     const double limit = Fsubs(one, grip);
-    const double slip = Lfs(base, wheel + 268);
+    const double slip = double(schema::VehicleWheel(base, wheel).slip_long());
     bool release = false;
     if (slip < zero) {
       const double slip2 = Fmuls(slip, slip);
-      const double other = Lfs(base, wheel + 264);
+      const double other = double(schema::VehicleWheel(base, wheel).slip_side());
       const double length = double(vl::Sqrtf(Fmadds(other, other, slip2)));
       release = length > limit;
     }
     if (release) {
       // The brake released on this wheel, counted.
-      Stfs(base, wheel + 200, zero);
-      guest::StoreU32(base, wheel + 204, guest::LoadU32(base, wheel + 204) + 1);
+      schema::VehicleWheel(base, wheel).set_brake(float(zero));
+      schema::VehicleWheel(base, wheel).set_abs_count(uint32_t(schema::VehicleWheel(base, wheel).abs_count() + 1));
     } else {
-      CopyWord(base, vehicle + 292, wheel + 200);
+      CopyWord(base, schema::Vehicle(base, vehicle).brake_address(), schema::VehicleWheel(base, wheel).brake_address());
     }
   }
 }
@@ -343,48 +344,49 @@ uint32_t VehicleSuspensionTorques(uint8_t* base, uint32_t vehicle, uint32_t fram
   uint32_t r3 = vehicle;
   for (uint32_t w = 0; w < 4; w++) {
     const uint32_t wheel = Wheel(vehicle, w);
-    if (guest::LoadU8(base, wheel + 17) == 0) {
+    if (schema::VehicleWheel(base, wheel).on_ground() == 0) {
       continue;
     }
-    double v = Lfs(base, wheel + 284);
+    double v = double(schema::VehicleWheel(base, wheel).force_integral());
     if (w >= 2) {
       const uint32_t data = CarData(base, vehicle);
       const double k = Lfs(base, data + (!(v < zero) ? 1828 : 1824));
       v = Fmuls(k, v);
     } else {
-      const double along = double(vl::Vec3DotOf(base, vehicle + 112, wheel + 144));
+      const double along = double(vl::Vec3DotOf(base, schema::Vehicle(base, vehicle).ground_forward_address(), schema::VehicleWheel(base, wheel).forward_axis_address()));
       const double t = Fmuls(along, v);
       const uint32_t data = CarData(base, vehicle);
-      v = Fneg(Fmuls(t, Lfs(base, data + 1820)));
+      v = Fneg(Fmuls(t, Lfs(base, schema::CarData(base, data).load_transfer_address())));
     }
-    vl::Vec4Scaled(base, f + 96, vehicle + 96, v);
-    vl::Vec3AddTo(base, vehicle + 2544 + 16 * w, f + 96);
-    const double moved = Fadds(Lfs(base, wheel + 8), v);
+    vl::Vec4Scaled(base, f + 96, schema::Vehicle(base, vehicle).ground_up_address(), v);
+    vl::Vec3AddTo(base, schema::Vehicle(base, vehicle).wheel_accumulators_address() + 16 * w, f + 96);
+    const double moved = Fadds(double(schema::VehicleWheel(base, wheel).suspension_force()), v);
     guest::StoreU32(base, f + 80, guest::LoadU32(base, kZero));
     CopyWord(base, kOne, f + 84);
     CopyWord(base, kZero, f + 88);
     CopyWord(base, kZero, f + 92);
-    Stfs(base, wheel + 8, moved);
+    schema::VehicleWheel(base, wheel).set_suspension_force(float(moved));
     vl::Vec4Scaled(base, f + 128, f + 80, moved);
-    const double up = double(vl::Vec3DotOf(base, wheel + 112, f + 128));
-    vl::Vec4Scaled(base, f + 144, wheel + 112, up);
-    vl::Vec4Scaled(base, f + 160, f + 80, Lfs(base, wheel + 8));
+    const double up = double(vl::Vec3DotOf(base, schema::VehicleWheel(base, wheel).ground_normal_address(), f + 128));
+    vl::Vec4Scaled(base, f + 144, schema::VehicleWheel(base, wheel).ground_normal_address(), up);
+    vl::Vec4Scaled(base, f + 160, f + 80, double(schema::VehicleWheel(base, wheel).suspension_force()));
     vl::Vec3Difference(base, f + 112, f + 160, f + 144);
-    const uint32_t body = guest::LoadU32(base, vehicle + 336);
-    va::RigidBodyAddTorqueAt(base, body, f + 112, wheel + 160);
-    r3 = body + 128;
+    const uint32_t body = schema::Vehicle(base, vehicle).body().address;
+    va::RigidBodyAddTorqueAt(base, body, f + 112, schema::VehicleWheel(base, wheel).contact_point_address());
+    r3 = schema::RigidBody(base, body).torque_address();
   }
   return r3;
 }
 
 double VehicleEngineTorque(uint8_t* base, uint32_t vehicle, double x, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820B00C8 Vehicle::EngineTorque");
-  const uint32_t engine = CarData(base, vehicle) + 1268;
+  const schema::CarData engine_data(base, CarData(base, vehicle));
+  const uint32_t engine = engine_data.gear_count_address();
   const double one = Lfs(base, kOne);
   if (!(x < one)) {
     return Lfs(base, kZero);
   }
-  const double floor = Lfs(base, engine + 360);
+  const double floor = Lfs(base, engine_data.idle_rpm_address());
   if (!(x > floor)) {
     x = floor;
   }
@@ -403,7 +405,7 @@ double VehicleEngineTorque(uint8_t* base, uint32_t vehicle, double x, uint32_t f
   const uint64_t i = uint64_t(guest::LoadU32(base, frame - 16)) - 1;
   double torque;
   if (uint32_t(i) == 32) {
-    torque = Lfs(base, engine + 152);
+    torque = Lfs(base, engine_data.torque_address());
   } else {
     t = Fsubs(t, one);
     const double zero = Lfs(base, kZero);
@@ -422,7 +424,7 @@ double VehicleEngineTorque(uint8_t* base, uint32_t vehicle, double x, uint32_t f
     const double rest = Fsubs(one, fraction);
     torque = Fmadds(lower, rest, Fmuls(upper, fraction));
   }
-  const double scale = Fmuls(Lfs(base, vehicle + 2956), Lfs(base, engine + 156));
+  const double scale = Fmuls(double(schema::Vehicle(base, vehicle).turbo_torque_factor()), Lfs(base, engine_data.torque_copy_address()));
   return Fmuls(scale, torque);
 }
 
@@ -445,23 +447,23 @@ double TireMagicFormula(uint8_t* base, uint32_t coefficients, double x) {
 
 void VehicleSetGearValues(uint8_t* base, uint32_t vehicle) {
   ITC_NATIVE_RUNNING("sub_820B3C90 Vehicle::SetGearValues");
-  uint32_t gear = guest::LoadU32(base, vehicle + 2252);
+  uint32_t gear = uint32_t(schema::Vehicle(base, vehicle).gear());
   if (gear == 0xFFFFFFFFu) {
     gear = 0;
   } else if (gear == 0) {
     gear = 1;
   }
-  const uint32_t gearbox = CarData(base, vehicle) + 1268;
-  const double clutch = Lfs(base, vehicle + 2328);
-  const double sum = Fadds(Lfs(base, vehicle + 2336), clutch);
+  const uint32_t gearbox = schema::CarData(base, CarData(base, vehicle)).gear_count_address();
+  const double clutch = double(schema::Vehicle(base, vehicle).unknown_2328());
+  const double sum = Fadds(double(schema::Vehicle(base, vehicle).axle_radius()), clutch);
   const double final_drive = Lfs(base, gearbox + 332);
   const double ratio = Fmuls(Lfs(base, (uint32_t(gear + 74) << 2) + gearbox), final_drive);
-  CopyWord(base, vehicle + 2328, vehicle + 2324);
-  CopyWord(base, kZero, vehicle + 2320);
-  Stfs(base, vehicle + 2312, sum);
-  Stfs(base, vehicle + 2304, Fabs(ratio));
+  CopyWord(base, schema::Vehicle(base, vehicle).unknown_2328_address(), schema::Vehicle(base, vehicle).unknown_2324_address());
+  CopyWord(base, kZero, schema::Vehicle(base, vehicle).unknown_2320_address());
+  schema::Vehicle(base, vehicle).set_unknown_2312(float(sum));
+  schema::Vehicle(base, vehicle).set_total_ratio(float(Fabs(ratio)));
   const double value = Lfs(base, (uint32_t(gear + 58) << 2) + gearbox);
-  Stfs(base, vehicle + 2308, Fmuls(value, Lfs(base, gearbox + 276)));
+  schema::Vehicle(base, vehicle).set_gear_value(float(Fmuls(value, Lfs(base, gearbox + 276))));
 }
 
 double VehicleAxleReactionTorque(uint8_t* base, uint32_t vehicle, uint32_t first) {
@@ -487,7 +489,7 @@ double VehicleAxleReactionTorque(uint8_t* base, uint32_t vehicle, uint32_t first
       sign = plus_one;
     }
     double torque = Fmsubs(sign, brake, Lfs(base, spin_at + 60));
-    torque = Fmuls(torque, Lfs(base, data + 52));
+    torque = Fmuls(torque, double(schema::CarDataAxle(base, data).radius()));
     Stfs(base, spin_at + 104, torque);
     sum = Fadds(torque, sum);
   }
@@ -498,8 +500,8 @@ void VehicleUpdateFreeAxle(uint8_t* base, uint32_t vehicle, uint32_t first) {
   ITC_NATIVE_RUNNING("sub_820B3010 Vehicle::UpdateFreeAxle");
   const uint32_t record = guest::LoadU32(base, vehicle + (uint32_t(first + 536) << 2));
   const uint32_t data = guest::LoadU32(base, vehicle + (uint32_t(first + 540) << 2));
-  const double radius = Lfs(base, data + 52);
-  const double inertia = Fmuls(Lfs(base, record + 108), Lfs(base, 0x82001BE4));
+  const double radius = double(schema::CarDataAxle(base, data).radius());
+  const double inertia = Fmuls(double(schema::VehicleAxle(base, record).inertia()), Lfs(base, 0x82001BE4));
   if (first >= first + 2) {
     return;
   }
@@ -510,7 +512,7 @@ void VehicleUpdateFreeAxle(uint8_t* base, uint32_t vehicle, uint32_t first) {
     // The tire's torque (+308 x radius) turns the wheel.
     double drive = Fmuls(Lfs(base, spin_at + 60), radius);
     const double brake = Fabs(Lfs(base, spin_at + 52));
-    const double time = Lfs(base, vehicle + 2364);
+    const double time = double(schema::Vehicle(base, vehicle).substep_dt());
     const double spin0 = Lfs(base, spin_at);
     drive = Fneg(drive);
     drive = Fmuls(drive, inverse);
@@ -519,7 +521,7 @@ void VehicleUpdateFreeAxle(uint8_t* base, uint32_t vehicle, uint32_t first) {
     // The brake slows it toward 0.0, not past it (the branches as the
     // original's: ble and bge are "not greater" and "not less").
     double braking = Fmuls(brake, radius);
-    braking = Fmuls(braking, Lfs(base, vehicle + 2364));
+    braking = Fmuls(braking, double(schema::Vehicle(base, vehicle).substep_dt()));
     braking = Fmuls(braking, inverse);
     bool stop = false;
     double moved = spun;
@@ -546,7 +548,7 @@ void VehicleUpdateFreeAxle(uint8_t* base, uint32_t vehicle, uint32_t first) {
     if (brake > zero) {
       // +212 = |the brake's change of spin x inertia / radius x +216|.
       double t = Fsubs(spin, spun);
-      const double time2 = Lfs(base, vehicle + 2364);
+      const double time2 = double(schema::Vehicle(base, vehicle).substep_dt());
       const double share = Lfs(base, spin_at - 32);
       t = Fdivs(t, time2);
       t = Fmuls(t, inertia);
@@ -633,15 +635,15 @@ void VehicleSetValue2388(uint8_t* base, uint32_t vehicle, double value, uint32_t
   } else {
     clamped = zero;
   }
-  Stfs(base, vehicle + 2388, clamped);
-  guest::StoreU8(base, vehicle + 2385, uint8_t(flag));
+  schema::Vehicle(base, vehicle).set_value2388(float(clamped));
+  schema::Vehicle(base, vehicle).set_value2388_set(uint8_t(uint8_t(flag)));
   double rest = Fnmsubs(value, Lfs(base, 0x82002A2C), one);
   if (rest < zero) {
     rest = zero;
   } else if (rest > one) {
     rest = one;
   }
-  Stfs(base, vehicle + 2396, rest);
+  schema::Vehicle(base, vehicle).set_traction_limit(float(rest));
 }
 
 }  // namespace car_physics

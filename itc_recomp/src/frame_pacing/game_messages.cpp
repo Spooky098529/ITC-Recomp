@@ -1,4 +1,6 @@
 #include <format>
+#include "lifted/names.h"
+#include "lifted/entries.h"
 #include "game_messages.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
@@ -6,6 +8,8 @@
 #include "debug/frame_state_diff.h"
 #include "debug/idle_timer_scan.h"
 #include "debug/menu_selection_scan.h"
+#include "debug/state_digest.h"
+#include "input/pad_ticks.h"
 #include "guest.h"
 #ifndef ITC_NO_HARNESSES
 #include "harnesses/harness.h"
@@ -360,7 +364,7 @@ void Deliver(lifted::Regs& ctx, uint8_t* base, uint32_t dispatcher, uint32_t mes
     ctx.r3.u64 = guest::LoadU32(base, dispatcher + kHandlersOffset + 4 * i);
     ctx.r4.u64 = message;
     ctx.lr = 0x82106370;
-    lifted::CallFromContext(ctx, base, 0x82106280);
+    lifted::Enter(ctx, base, game::StateMachine::Handle);
     uint32_t object = guest::LoadU32(base, ctx.r3.u32);
     uint32_t method = guest::LoadU32(base, guest::LoadU32(base, object));
     ctx.r3.u64 = object;
@@ -478,8 +482,15 @@ void GameMessages_OnPassFinished() {
         native::TextureCache_RaceLeft();
       }
     }
+    if (g_race_draw_step_seen && !g_in_race) {
+      debug::StateDigest_OnRaceEntered();
+      input::PadTicks_OnRaceEntered();
+    }
     g_in_race = g_race_draw_step_seen;
     g_race_draw_step_seen = false;
+    if (g_in_race) {
+      debug::StateDigest_OnRaceTick();
+    }
   }
 }
 

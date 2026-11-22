@@ -1,0 +1,664 @@
+# The schema of docs/functions/device-state.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The graphics device (the 360's Direct3D linked into the game, 20,444 bytes
+# by the measure): its dirty masks, state tables, constants and register
+# shadow (blocks 0x2000- at +10240, 0x2100- +10316, 0x2180- +10400, 0x2200-
+# +10420, 0x2280- +10468, 0x2300- +10552, 0x2380- +10704; gpu-functions.md,
+# "The register shadow as a whole"), the software copies the setters build
+# registers from, the bound objects, the command buffer's and predicated
+# tiling's state, the display's. Names from docs/known-data.md ("device +..."),
+# the area files (device-state.md, command-buffer.md, predicated-tiling.md,
+# video-output.md, functions.md) and the hand ports' constants. Arrays indexed
+# by state, sampler, stream or tile are `bytes`; their first element also has
+# a scalar where code reads it alone. Aliases of other widths at one offset
+# are the same word read in halves (or, where the note says, a measure fault).
+
+[Device]
+measure = "Device"
+measures = ["BeginVertices.r3", "BeginIndexedVertices.r3", "EndVertices.r3", "sub_8229FC40.r3", "sub_822ADC08.r3", "sub_822ADE30.r3", "sub_822ADEF0.r3", "sub_822AE070.r3", "sub_822AE1D0.r3"]
+size = 20444
+origin = "gpu"
+fields = [
+  { name = "allocation", offset = -4, type = "u32", note = "the block the device was allocated in (it starts 4 bytes in); freed by Device::Release" },
+  { name = "vertex_float_dirty_top", offset = 0, type = "u8", note = "its top byte (only Device::PatchVertexShader's shader, a measure fault)" },
+  { name = "vertex_float_dirty_high", offset = 0, type = "u32", note = "its high word (also where measure faults land: SetScissorRect's rectangle, SetDisplayMode's and the workers' r3)" },
+  { name = "vertex_float_dirty", offset = 0, type = "u64", note = "the vertex float constants' dirty mask (a bit a constant block)" },
+  { name = "vertex_float_dirty_low", offset = 4, type = "u32", note = "its low word (measure faults only)" },
+  { name = "pixel_float_dirty_high", offset = 8, type = "u32", note = "its high word (Device::LoadShaders; SetScissorRect's rectangle, a measure fault)" },
+  { name = "pixel_float_dirty", offset = 8, type = "u64", note = "the pixel float constants' dirty mask" },
+  { name = "pixel_float_dirty_low", offset = 12, type = "u32", note = "its low word (SetScissorRect's rectangle, a measure fault)" },
+  { name = "shader_dirty", offset = 16, type = "u64", note = "the shader state's dirty mask: bits 0-11 0x2200-0x220B (bit 11 0x2200), 12-43 the fetch constants (bit 43 constant 0), 44-48 0x2180-0x2184, 49-52 the shaders (gpu-functions.md)" },
+  { name = "render_dirty_high", offset = 24, type = "u32", note = "its high word (Device::LoadShaders; VertexDeclaration::FromFvf's element count, a measure fault)" },
+  { name = "render_dirty", offset = 24, type = "u64", note = "the render state's dirty mask: bit 1 the bool and loop constants, 2-22 0x2100-0x2114, 23-38 0x2000-0x200F, 39-59 0x2280-0x2294" },
+  { name = "render_dirty_low", offset = 28, type = "u32", note = "its low word (VertexDeclaration::FromFvf's +28, a measure fault)" },
+  { name = "other_dirty_high", offset = 32, type = "u32", note = "its high word (Device::Swap)" },
+  { name = "other_dirty", offset = 32, type = "u64", note = "the other state's dirty mask: bits 0-37 0x2300-0x2325, 38-45 0x2380-0x2387, 49-54 sub_822ADEF0's registers" },
+  { name = "other_dirty_low", offset = 36, type = "u32", note = "its low word (Device::Swap)" },
+  { name = "write_position", offset = 40, type = "u32", note = "the command buffer's write position: the last word written (stored with a pre-increment; command-buffer.md)" },
+  { name = "write_position_and_end", offset = 40, type = "u64", note = "+40 and +44 as one doubleword (Device::LoadShaders)" },
+  { name = "segment_end", offset = 44, type = "u32", note = "the open segment's end" },
+  { name = "soft_end", offset = 48, type = "u32", note = "the segment's soft end (+44 - 160): writers end the segment past it" },
+  { name = "reference_count_high", offset = 52, type = "u16", note = "a measure fault: VertexDeclaration::FromFvf's element stores (its declaration isn't the device)" },
+  { name = "reference_count", offset = 52, type = "u32", note = "1 at construction (sub_822AD228); sub_8229D978 drops it and releases the device at 1" },
+  { name = "reference_count_low", offset = 54, type = "u16", note = "a measure fault, as +52's halfword" },
+  { name = "render_state_setters", offset = 56, type = "bytes", count = 384, note = "the render state setters by state (byte offsets 0-380, D3DRS_* order), filled by SetDefaultState from 0x826388F8 (VertexDeclaration::FromFvf's and PatchVertexShader's accesses here are measure faults)" },
+  { name = "sampler_state_setters", offset = 440, type = "bytes", count = 80, note = "the sampler state setters by state (0-76)" },
+  { name = "render_state_getters", offset = 520, type = "bytes", count = 384, note = "the render state getters by state (Device::LoadShaders' accesses here are a measure fault: a shader's file header)" },
+  { name = "sampler_state_getters", offset = 904, type = "bytes", count = 80, note = "the sampler state getters by state" },
+  { name = "fetch_constants", offset = 1024, type = "bytes", count = 768, note = "the fetch constants (0x4800-): 32 of 24 bytes; the textures' (sampler n at +24n) and the vertex fetch constants (95 - stream at +1784 - 8 x stream)" },
+  { name = "vertex_float_constants", offset = 1792, type = "bytes", count = 4096, note = "the vertex float constants (256 of 16 bytes)" },
+  { name = "pixel_float_constants", offset = 5888, type = "bytes", count = 4096, note = "the pixel float constants (256 of 16 bytes)" },
+  { name = "bool_loop_constants", offset = 9984, type = "bytes", count = 160, note = "the bool and loop constants (0x4900-, 40 words); the pixel bools at +10000" },
+  { name = "rb_surface_info_high", offset = 10240, type = "u16", note = "its high halfword" },
+  { name = "rb_surface_info", offset = 10240, type = "u32", note = "0x2000 RB_SURFACE_INFO (Device::SetSurfaceInfo; top 14 bits from the tiling's +12912)" },
+  { name = "rb_color_info", offset = 10244, type = "u32", note = "0x2001 RB_COLOR_INFO (render target 0's)" },
+  { name = "rb_depth_info_high", offset = 10248, type = "u16", note = "its high halfword" },
+  { name = "rb_depth_info", offset = 10248, type = "u32", note = "0x2002 RB_DEPTH_INFO" },
+  { name = "rb_color1_info", offset = 10252, type = "u32", note = "0x2003 RB_COLOR1_INFO" },
+  { name = "rb_color2_info", offset = 10256, type = "u32", note = "0x2004 RB_COLOR2_INFO" },
+  { name = "rb_color3_info", offset = 10260, type = "u32", note = "0x2005 RB_COLOR3_INFO" },
+  { name = "reg_2007", offset = 10268, type = "u32", note = "0x2007 (Device::Resolve); not read" },
+  { name = "reg_200d", offset = 10292, type = "u32", note = "0x200D: 0x1000 with clip planes on, else 0 (SetRenderState_ClipPlaneEnable)" },
+  { name = "reg_200f", offset = 10300, type = "u32", note = "0x200F (sub_822AC2A0 at boot); not read" },
+  { name = "pa_sc_window_scissor_tl", offset = 10308, type = "u32", note = "PA_SC_WINDOW_SCISSOR_TL's shadow (x bits 0-14, y bits 16-30)" },
+  { name = "pa_sc_window_scissor_br", offset = 10312, type = "u32", note = "PA_SC_WINDOW_SCISSOR_BR's shadow" },
+  { name = "reg_2100", offset = 10316, type = "u32", note = "0x2100 (sub_822AC2A0 at boot); not read" },
+  { name = "vgt_multi_prim_ib_reset_indx", offset = 10328, type = "u32", note = "0x2103: the primitive reset index" },
+  { name = "rb_color_mask", offset = 10332, type = "u32", note = "0x2104 RB_COLOR_MASK: 4 bits a render target" },
+  { name = "rb_blend_red", offset = 10336, type = "f32", note = "0x2105 RB_BLEND_RED: the blend factor's" },
+  { name = "rb_blend_green", offset = 10340, type = "f32", note = "0x2106 RB_BLEND_GREEN" },
+  { name = "rb_blend_blue", offset = 10344, type = "f32", note = "0x2107 RB_BLEND_BLUE" },
+  { name = "rb_blend_alpha", offset = 10348, type = "f32", note = "0x2108 RB_BLEND_ALPHA" },
+  { name = "rb_stencilrefmask_bf", offset = 10364, type = "u32", note = "0x210C RB_STENCILREFMASK_BF: the counterclockwise faces' ref, mask, write mask" },
+  { name = "ccw_stencil_write_mask", offset = 10365, type = "u8", note = "RB_STENCILREFMASK_BF bits 16-23" },
+  { name = "ccw_stencil_mask", offset = 10366, type = "u8", note = "RB_STENCILREFMASK_BF bits 8-15" },
+  { name = "ccw_stencil_ref", offset = 10367, type = "u8", note = "RB_STENCILREFMASK_BF bits 0-7" },
+  { name = "rb_stencilrefmask", offset = 10368, type = "u32", note = "0x210D RB_STENCILREFMASK" },
+  { name = "stencil_write_mask", offset = 10369, type = "u8", note = "RB_STENCILREFMASK bits 16-23" },
+  { name = "stencil_mask", offset = 10370, type = "u8", note = "RB_STENCILREFMASK bits 8-15" },
+  { name = "stencil_ref", offset = 10371, type = "u8", note = "RB_STENCILREFMASK bits 0-7" },
+  { name = "rb_alpha_ref", offset = 10372, type = "f32", note = "0x210E RB_ALPHA_REF" },
+  { name = "pa_cl_vport_xscale", offset = 10376, type = "f32", note = "0x210F" },
+  { name = "pa_cl_vport_xoffset", offset = 10380, type = "f32", note = "0x2110" },
+  { name = "pa_cl_vport_yscale", offset = 10384, type = "f32", note = "0x2111" },
+  { name = "pa_cl_vport_yoffset", offset = 10388, type = "f32", note = "0x2112" },
+  { name = "pa_cl_vport_zscale", offset = 10392, type = "f32", note = "0x2113" },
+  { name = "pa_cl_vport_zoffset", offset = 10396, type = "u32", note = "0x2114: a float's bits (SetViewport copies the min Z's)" },
+  { name = "sq_program_cntl", offset = 10400, type = "u32", note = "0x2180 SQ_PROGRAM_CNTL (Device::LoadShaders)" },
+  { name = "sq_context_misc", offset = 10404, type = "u32", note = "0x2181 SQ_CONTEXT_MISC" },
+  { name = "sq_interpolator_cntl", offset = 10408, type = "u32", note = "0x2182 SQ_INTERPOLATOR_CNTL" },
+  { name = "sq_wrapping_0", offset = 10412, type = "u32", note = "0x2183 SQ_WRAPPING_0: wraps 0-7, 4 bits each" },
+  { name = "sq_wrapping_1", offset = 10416, type = "u32", note = "0x2184 SQ_WRAPPING_1: wraps 8-15" },
+  { name = "rb_depthcontrol", offset = 10420, type = "u32", note = "0x2200 RB_DEPTHCONTROL" },
+  { name = "rb_blendcontrol0", offset = 10424, type = "u32", note = "0x2201 RB_BLENDCONTROL0" },
+  { name = "rb_colorcontrol", offset = 10428, type = "u32", note = "0x2202 RB_COLORCONTROL" },
+  { name = "rb_hizcontrol", offset = 10432, type = "u32", note = "0x2203 RB_HIZCONTROL (the hi-z control; from the depth surface's +32)" },
+  { name = "hi_stencil_ref", offset = 10434, type = "u8", note = "RB_HIZCONTROL's byte 2 (SetRenderState_HiStencilRef)" },
+  { name = "pa_cl_clip_cntl", offset = 10436, type = "u32", note = "0x2204 PA_CL_CLIP_CNTL" },
+  { name = "pa_su_sc_mode_cntl", offset = 10440, type = "u32", note = "0x2205 PA_SU_SC_MODE_CNTL" },
+  { name = "pa_cl_vte_cntl", offset = 10444, type = "u32", note = "0x2206 PA_CL_VTE_CNTL" },
+  { name = "rb_modecontrol", offset = 10452, type = "u32", note = "0x2208 RB_MODECONTROL (Device::LoadShaders, sub_822AC2A0)" },
+  { name = "rb_blendcontrol1", offset = 10456, type = "u32", note = "0x2209 RB_BLENDCONTROL1" },
+  { name = "rb_blendcontrol2", offset = 10460, type = "u32", note = "0x220A RB_BLENDCONTROL2" },
+  { name = "rb_blendcontrol3", offset = 10464, type = "u32", note = "0x220B RB_BLENDCONTROL3" },
+  { name = "pa_su_point_height", offset = 10468, type = "u16", note = "0x2280 PA_SU_POINT_SIZE's high half" },
+  { name = "pa_su_point_width", offset = 10470, type = "u16", note = "PA_SU_POINT_SIZE's low half" },
+  { name = "pa_su_point_max", offset = 10472, type = "u16", note = "0x2281 PA_SU_POINT_MINMAX's high half" },
+  { name = "pa_su_point_min", offset = 10474, type = "u16", note = "PA_SU_POINT_MINMAX's low half" },
+  { name = "pa_su_line_cntl", offset = 10476, type = "u32", note = "0x2282 (sub_822AC2A0 at boot)" },
+  { name = "vgt_hos_cntl", offset = 10488, type = "u32", note = "0x2285: the tessellation mode, bits 0-1" },
+  { name = "vgt_hos_max_tess_level", offset = 10492, type = "u32", note = "0x2286: a float's bits" },
+  { name = "vgt_hos_min_tess_level", offset = 10496, type = "u32", note = "0x2287: a float's bits" },
+  { name = "reg_2288", offset = 10500, type = "u32", note = "0x2288 (sub_822AC2A0 at boot)" },
+  { name = "reg_2300", offset = 10552, type = "u32", note = "0x2300, the 0x2300 block's first" },
+  { name = "pa_sc_aa_config", offset = 10556, type = "u32", note = "0x2301: the AA config (0, 0x8001 or 0xC003 by the surface's MSAA)" },
+  { name = "pa_su_vtx_cntl", offset = 10560, type = "u32", note = "0x2302 PA_SU_VTX_CNTL: bit 0 the half pixel offset" },
+  { name = "pa_cl_gb_vert_clip_adj", offset = 10564, type = "u32", note = "0x2303: the guard band's Y, a float's bits" },
+  { name = "pa_cl_gb_vert_disc_adj", offset = 10568, type = "u32", note = "0x2304: the discard band's Y, a float's bits" },
+  { name = "pa_cl_gb_horz_clip_adj", offset = 10572, type = "u32", note = "0x2305: the guard band's X, a float's bits" },
+  { name = "pa_cl_gb_horz_disc_adj", offset = 10576, type = "u32", note = "0x2306: the discard band's X, a float's bits" },
+  { name = "reg_2307", offset = 10580, type = "u32", note = "0x2307 (sub_822AC2A0 at boot)" },
+  { name = "reg_2308", offset = 10584, type = "u32", note = "0x2308 (sub_822AC2A0 at boot)" },
+  { name = "pa_sc_aa_mask", offset = 10624, type = "u32", note = "0x2312 PA_SC_AA_MASK: the multisample mask's low 16 bits" },
+  { name = "reg_2316", offset = 10640, type = "u32", note = "0x2316 (sub_822AC2A0 at boot)" },
+  { name = "reg_2317", offset = 10644, type = "u32", note = "0x2317 (sub_822AC2A0 at boot)" },
+  { name = "rb_copy_control", offset = 10648, type = "u32", note = "0x2318 RB_COPY_CONTROL (Device::Resolve)" },
+  { name = "rb_copy_dest_base", offset = 10652, type = "u32", note = "0x2319 RB_COPY_DEST_BASE" },
+  { name = "rb_copy_dest_pitch", offset = 10656, type = "u32", note = "0x231A RB_COPY_DEST_PITCH: the pitch and rows" },
+  { name = "rb_copy_dest_info", offset = 10660, type = "u32", note = "0x231B RB_COPY_DEST_INFO" },
+  { name = "reg_231c", offset = 10664, type = "u32", note = "0x231C (sub_822AF438); probably a clear value" },
+  { name = "reg_231d", offset = 10668, type = "u32", note = "0x231D (sub_822AF438); probably a clear value" },
+  { name = "reg_231e", offset = 10672, type = "u32", note = "0x231E (sub_822AF8A0)" },
+  { name = "reg_231f", offset = 10676, type = "u32", note = "0x231F (sub_822AF8A0)" },
+  { name = "rb_copy_func", offset = 10692, type = "u32", note = "0x2323: for tiled destinations (Device::Resolve's kCopyFunc)" },
+  { name = "reg_2324", offset = 10696, type = "u32", note = "0x2324 (sub_822AC2A0 at boot)" },
+  { name = "pa_su_poly_offset_front_scale", offset = 10704, type = "f32", note = "0x2380 (the slope scale x 16)" },
+  { name = "pa_su_poly_offset_front_offset", offset = 10708, type = "f32", note = "0x2381 (the depth bias)" },
+  { name = "pa_su_poly_offset_front_offset_bits", offset = 10708, type = "u32", note = "its bits (SetRenderState_DepthBias stores the value as given)" },
+  { name = "pa_su_poly_offset_back_scale", offset = 10712, type = "f32", note = "0x2382" },
+  { name = "pa_su_poly_offset_back_offset", offset = 10716, type = "f32", note = "0x2383" },
+  { name = "pa_su_poly_offset_back_offset_bits", offset = 10716, type = "u32", note = "its bits" },
+  { name = "unknown_10752", offset = 10752, type = "u64", note = "from the image's 0x8260 8ED0 at construction (sub_822AD228); not read" },
+  { name = "owning_thread", offset = 10760, type = "u32", note = "the thread id while a thread holds the device lock or the movie player draws (video-output.md), else 0" },
+  { name = "unknown_10764", offset = 10764, type = "u32", note = "0 at construction (sub_822AD228)" },
+  { name = "progress_block", offset = 10768, type = "ptr", to = "CommandProgressBlock", note = "the 96-byte progress block: the fences our kick writes (command-buffer.md)" },
+  { name = "callback_block", offset = 10772, type = "u32", note = "the 32-byte callback block: the scratch set-up our kick uses (Device::SetUpRing)" },
+  { name = "fence", offset = 10780, type = "u32", note = "the command position (the open segment's fence; +2 a segment): a replaced resource's +8 is set to it" },
+  { name = "fence_mask", offset = 10784, type = "u32", note = "the resource flags (+0) that put a replaced resource on the fence list when +10780 is 0" },
+  { name = "reg_f01", offset = 10788, type = "u32", note = "register 0xF01's value: bits 12-13 from sub_8229B7D8 (its packets Dropped)" },
+  { name = "sq_gpr_management", offset = 10792, type = "u32", note = "the GPU register split (SQ_GPR_MANAGEMENT; read by nothing)" },
+  { name = "predication_select", offset = 10800, type = "u32", note = "the last SET_BIN_MASK's select (two bits a tile)" },
+  { name = "predication_select_high", offset = 10804, type = "u32", note = "cleared with +10800" },
+  { name = "tiling_flags", offset = 10808, type = "u8", note = "bit 1 predicated tiling on, 3, 4 and 5 (0x20 tiling under way), 7 (0x80) a recording command buffer" },
+  { name = "flags", offset = 10809, type = "u8", note = "bit 1 (0x2) the GPU hung, 4 the display mode to set at the next Swap, 5, 6 (0x40) out of command buffer space" },
+  { name = "flags2", offset = 10810, type = "u8", note = "bit 2, 3 (0x8) the buffer wrapped, 5 (first Swap), 6 (0x40) the hi-z bit from the depth surface, 7 cleared by SetVertexShader" },
+  { name = "flags3", offset = 10811, type = "u8", note = "bit 6 (0x40) tiling with EDRAM offsets, 7 cleared by Swap" },
+  { name = "worker_lock", offset = 10812, type = "u32", note = "the workers' shared state (+10812..+11208): +0 a spin lock" },
+  { name = "worker_ring", offset = 10816, type = "u32", note = "the shared state's +4: the primary ring (+13496); 0 tells the workers to exit" },
+  { name = "primary_ring_write", offset = 10820, type = "u32", note = "the primary ring's write position (the shared state's +8)" },
+  { name = "worker_ring_mask", offset = 10824, type = "u32", note = "the shared state's +12: the ring's +13500" },
+  { name = "pending_kicks", offset = 10868, type = "u32", note = "the shared state's +56: kicks deferred until the GPU's interrupts (always 0 in play)" },
+  { name = "worker_lock2", offset = 10872, type = "u32", note = "the shared state's +60: a spin lock" },
+  { name = "worker_event", offset = 10876, type = "bytes", count = 16, note = "the shared state's +64: an event (KEVENT)" },
+  { name = "worker_event_type", offset = 10876, type = "u8", note = "the event's type" },
+  { name = "worker_event_signal_state", offset = 10880, type = "u32", note = "the event's signal state" },
+  { name = "worker_event_wait_list_flink", offset = 10884, type = "ptr", note = "the event's wait list head (points to itself when empty)" },
+  { name = "worker_event_wait_list_blink", offset = 10888, type = "ptr", note = "the wait list head's back link" },
+  { name = "worker_callback_argument", offset = 10892, type = "u32", note = "the shared state's +80: the callback's argument (the tiling header)" },
+  { name = "worker_c0000000", offset = 10904, type = "u32", note = "the shared state's +92: 0xC0000000" },
+  { name = "worker_l2_area", offset = 10920, type = "u32", note = "the shared state's +108: the L2-locked area (0x7F100000)" },
+  { name = "last_worker_cpu", offset = 11208, type = "u32", note = "the CPU of the last worker made (the shared state's +396)" },
+  { name = "workers", offset = 11212, type = "bytes", count = 336, note = "a 56-byte block a CPU (0-5): +0 the shared state, +4 its CPU, +8 and +16 a 32 KB slice of the L2 area, +20 its end, +32 its event, +48 the thread's handle, +52 its id" },
+  { name = "worker0_state", offset = 11212, type = "ptr", note = "CPU 0's block: the shared state (+10812)" },
+  { name = "worker0_cpu", offset = 11216, type = "u32", note = "its CPU" },
+  { name = "worker0_l2_slice", offset = 11220, type = "ptr", note = "its L2 slice" },
+  { name = "worker0_l2_slice_word", offset = 11224, type = "u32", note = "its +12" },
+  { name = "worker0_l2_cursor", offset = 11228, type = "ptr", note = "its +16 (the slice)" },
+  { name = "worker0_l2_end", offset = 11232, type = "u32", note = "its +20: the slice's end" },
+  { name = "worker0_c0000000", offset = 11236, type = "u32", note = "its +24" },
+  { name = "worker0_word28", offset = 11240, type = "u32", note = "its +28" },
+  { name = "worker0_event_type", offset = 11244, type = "u8", note = "its event (+32)'s type" },
+  { name = "worker0_event_signal_state", offset = 11248, type = "u32", note = "its event's signal state" },
+  { name = "worker0_event_wait_list_flink", offset = 11252, type = "ptr", note = "its event's wait list head" },
+  { name = "worker0_event_wait_list_blink", offset = 11256, type = "ptr", note = "its back link" },
+  { name = "worker0_thread", offset = 11260, type = "u32", note = "its thread's handle" },
+  { name = "worker0_thread_id", offset = 11264, type = "u32", note = "its thread's id" },
+  { name = "vertex_declaration", offset = 11552, type = "u32", note = "the bound vertex declaration (Device::SetVertexDeclaration; SetFVF sets it to +11936)" },
+  { name = "pending_flush_range", offset = 11560, type = "u64", note = "the pending CPU-written range to flush: +11560 the end, +11564 the start (empty: 0, FFFFFFFF)" },
+  { name = "shader_strides", offset = 11568, type = "bytes", count = 16, note = "the bound vertex shader's stride in words, a byte a stream" },
+  { name = "shader_strides_0_7", offset = 11568, type = "u64", note = "streams 0-7 (Device::LoadShaders)" },
+  { name = "shader_strides_8_15", offset = 11576, type = "u64", note = "streams 8-15" },
+  { name = "hiz_state", offset = 11584, type = "u64", note = "the HiZ word (set when render state bit 1 is dirty; the draws)" },
+  { name = "blend_control", offset = 11592, type = "u32", note = "the blend control's software copy (color bits 0-12, alpha 16-28)" },
+  { name = "blend_flags", offset = 11596, type = "u32", note = "bit 31 blending on, 30 separate alpha, 23-29 the present immediate threshold" },
+  { name = "scissor_test_enable", offset = 11600, type = "u32", note = "render state 200 (the renderer reads it)" },
+  { name = "color_write_enable0", offset = 11604, type = "u32", note = "the color write masks as set (render targets 0-3)" },
+  { name = "color_write_enable1", offset = 11608, type = "u32" },
+  { name = "color_write_enable2", offset = 11612, type = "u32" },
+  { name = "color_write_enable3", offset = 11616, type = "u32" },
+  { name = "z_enable", offset = 11620, type = "u32", note = "as set: applied again when a depth surface is bound" },
+  { name = "stencil_enable", offset = 11624, type = "u32", note = "as set" },
+  { name = "point_sprite_enable", offset = 11628, type = "u32", note = "as set" },
+  { name = "point_size", offset = 11636, type = "u32", note = "as set: a float's bits" },
+  { name = "point_size_min", offset = 11640, type = "u32", note = "as set: a float's bits" },
+  { name = "point_size_max", offset = 11644, type = "u32", note = "as set: a float's bits" },
+  { name = "max_anisotropy", offset = 11668, type = "bytes", count = 26, note = "a byte a sampler" },
+  { name = "max_mip_level", offset = 11694, type = "bytes", count = 26, note = "a byte a sampler" },
+  { name = "min_mip_level", offset = 11720, type = "bytes", count = 26, note = "a byte a sampler" },
+  { name = "z_filters", offset = 11746, type = "bytes", count = 26, note = "a byte a sampler: bit 0 mag, 1 min, 2 separate" },
+  { name = "high_precision_blend0", offset = 11772, type = "u32", note = "the high-precision blend as set, render targets 0-3" },
+  { name = "high_precision_blend1", offset = 11776, type = "u32" },
+  { name = "high_precision_blend2", offset = 11780, type = "u32" },
+  { name = "high_precision_blend3", offset = 11784, type = "u32" },
+  { name = "unknown_11865", offset = 11865, type = "u8", note = "predicated tiling only with it and +11931 0 (or +10811 bit 6)" },
+  { name = "unknown_11931", offset = 11931, type = "u8", note = "as +11865" },
+  { name = "fvf_declaration", offset = 11936, type = "bytes", count = 240, note = "the device's own vertex declaration (SetFVF builds it: elements from +52)" },
+  { name = "fvf_declaration_type", offset = 11936, type = "u32", note = "5 (SetDefaultState)" },
+  { name = "fvf_declaration_count", offset = 11940, type = "u32", note = "1 (SetDefaultState)" },
+  { name = "fvf", offset = 12176, type = "u32", note = "the flexible vertex format (Device::SetFVF)" },
+  { name = "index_buffer", offset = 12180, type = "u32", note = "the bound index buffer (Device::SetIndices; the renderer reads it)" },
+  { name = "render_target0", offset = 12184, type = "ptr", to = "DeviceSurface", note = "the bound render targets 0-3 (4 bytes an index)" },
+  { name = "render_target1", offset = 12188, type = "ptr", to = "DeviceSurface" },
+  { name = "render_target2", offset = 12192, type = "ptr", to = "DeviceSurface" },
+  { name = "render_target3", offset = 12196, type = "ptr", to = "DeviceSurface" },
+  { name = "depth_surface", offset = 12200, type = "ptr", to = "DeviceSurface", note = "the bound depth surface" },
+  { name = "streams", offset = 12204, type = "bytes", count = 64, note = "the stream sources' buffers, 4 bytes a stream" },
+  { name = "stream_strides", offset = 12272, type = "bytes", count = 16, note = "the streams' strides in words, a byte a stream" },
+  { name = "stream_strides_0_7", offset = 12272, type = "u64", note = "streams 0-7 (Device::LoadShaders)" },
+  { name = "stream_strides_8_15", offset = 12280, type = "u64", note = "streams 8-15" },
+  { name = "textures", offset = 12288, type = "bytes", count = 104, note = "the bound textures, 4 bytes a stage (26)" },
+  { name = "viewport_x", offset = 12392, type = "u32", note = "the viewport (Device::SetViewport, GetViewport's copy)" },
+  { name = "viewport_y", offset = 12396, type = "u32" },
+  { name = "viewport_width", offset = 12400, type = "u32" },
+  { name = "viewport_height", offset = 12404, type = "u32" },
+  { name = "viewport_min_z", offset = 12408, type = "u32", note = "a float's bits" },
+  { name = "viewport_max_z", offset = 12412, type = "u32", note = "a float's bits" },
+  { name = "scissor_left", offset = 12416, type = "u32", note = "the scissor rectangle (the renderer reads it)" },
+  { name = "scissor_top", offset = 12420, type = "u32" },
+  { name = "scissor_right", offset = 12424, type = "u32" },
+  { name = "scissor_bottom", offset = 12428, type = "u32" },
+  { name = "pixel_shader", offset = 12432, type = "u32", note = "the bound pixel shader (Device::SetPixelShader)" },
+  { name = "vertex_shader", offset = 12436, type = "u32", note = "the bound vertex shader (Device::SetVertexShader)" },
+  { name = "shader_word", offset = 12440, type = "u32", note = "written by Device::LoadShaders" },
+  { name = "bin_mask", offset = 12448, type = "u32", note = "the predication select (-1 none)" },
+  { name = "bin_mask_high", offset = 12452, type = "u32" },
+  { name = "predicated", offset = 12456, type = "u32", note = "1 while a tile's predication is set" },
+  { name = "tiling_state", offset = 12460, type = "u32", note = "2 while tiling" },
+  { name = "tiled_surface", offset = 12464, type = "ptr", to = "DeviceSurface", note = "render target 0, else the depth surface (BeginTiling)" },
+  { name = "saved_render_target0", offset = 12468, type = "ptr", to = "DeviceSurface", note = "the bound set saved at the tiling's start: render targets 0-3, the depth surface" },
+  { name = "saved_render_target1", offset = 12472, type = "ptr", to = "DeviceSurface" },
+  { name = "saved_render_target2", offset = 12476, type = "ptr", to = "DeviceSurface" },
+  { name = "saved_render_target3", offset = 12480, type = "ptr", to = "DeviceSurface" },
+  { name = "saved_depth_surface", offset = 12484, type = "ptr", to = "DeviceSurface" },
+  { name = "tile_count", offset = 12488, type = "u32" },
+  { name = "tiles", offset = 12492, type = "bytes", count = 240, note = "16 bytes a tile: left, top, right, bottom" },
+  { name = "tile0_left", offset = 12492, type = "u32" },
+  { name = "tile0_top", offset = 12496, type = "u32" },
+  { name = "tile0_right", offset = 12500, type = "u32" },
+  { name = "tile0_bottom", offset = 12504, type = "u32" },
+  { name = "tile_corners", offset = 12732, type = "bytes", count = 120, note = "the tiles' top-left rounded down to 32, 8 bytes each" },
+  { name = "tile0_corner_x", offset = 12732, type = "u32" },
+  { name = "tile0_corner_y", offset = 12736, type = "u32" },
+  { name = "tile_offsets", offset = 12852, type = "bytes", count = 60, note = "the tiles' offsets in EDRAM tiles (with flags bit 1)" },
+  { name = "tile0_offset", offset = 12852, type = "u32" },
+  { name = "tiling_pitch", offset = 12912, type = "u32", note = "the pitch rounded to the tile size (flags bit 1)" },
+  { name = "tiling_width", offset = 12916, type = "u32", note = "the widest right" },
+  { name = "tiling_height", offset = 12920, type = "u32", note = "the tallest bottom" },
+  { name = "tiling_options", offset = 12924, type = "u32", note = "BeginTiling's flags (bits 24-29 the CPUs for the worker's wake)" },
+  { name = "tiling_clear_color", offset = 12928, type = "bytes", count = 16, note = "the clear color for the tiles after the first" },
+  { name = "tiling_clear_color_01", offset = 12928, type = "u64" },
+  { name = "tiling_clear_color_23", offset = 12936, type = "u64" },
+  { name = "tiling_clear_z", offset = 12944, type = "f32" },
+  { name = "tiling_clear_stencil", offset = 12948, type = "u32" },
+  { name = "tiling_end", offset = 12960, type = "u32", note = "how far the tiled frame's segments reach (0 when not tiling)" },
+  { name = "tiling_generation", offset = 12964, type = "u32" },
+  { name = "tail_position", offset = 12968, type = "u32", note = "the last segment tail's position and generation" },
+  { name = "tail_generation", offset = 12972, type = "u32" },
+  { name = "draw_chain_first", offset = 12976, type = "u32", note = "the tiled draws' chain (20 bytes: first block, current block, cursor, end, device)" },
+  { name = "draw_chain_cursor", offset = 12984, type = "u32" },
+  { name = "draw_chain_end", offset = 12988, type = "u32" },
+  { name = "third_chain_first", offset = 12996, type = "u32", note = "a third chain" },
+  { name = "segment_chain_first", offset = 13016, type = "u32", note = "the segments' chain" },
+  { name = "segment_chain_cursor", offset = 13024, type = "u32" },
+  { name = "segment_chain_end", offset = 13028, type = "u32" },
+  { name = "saved_chain_first", offset = 13036, type = "u32", note = "the segment chain saved at the tiling's start (the list the tiling's end defers its kicks on)" },
+  { name = "saved_write_position", offset = 13056, type = "u32", note = "SaveSegment's six words: +40, +44, +13528, +13524, +13516, +13520" },
+  { name = "saved_segment_end", offset = 13060, type = "u32" },
+  { name = "saved_segment_start", offset = 13064, type = "u32" },
+  { name = "saved_wrap_cursor", offset = 13068, type = "u32" },
+  { name = "saved_data_cursor", offset = 13072, type = "u32" },
+  { name = "saved_generation", offset = 13076, type = "u32" },
+  { name = "wait_callback", offset = 13084, type = "fn", note = "called with the time waited" },
+  { name = "inline_position", offset = 13092, type = "u32", note = "where the inline draw's End puts the write position" },
+  { name = "inline_vertices", offset = 13096, type = "u32" },
+  { name = "inline_indices", offset = 13100, type = "u32" },
+  { name = "inline_vertex_words", offset = 13104, type = "u32" },
+  { name = "inline_index_words", offset = 13108, type = "u32" },
+  { name = "entry_vertex_shader", offset = 13156, type = "u32", note = "the vertex shader sub_822A8958 was given (read by nothing)" },
+  { name = "recorder", offset = 13160, type = "ptr", to = "CommandRecorder", note = "a recording command buffer (never in play)" },
+  { name = "fence_block", offset = 13164, type = "ptr", to = "DeviceDummySegment", note = "the fence list's block in the command buffer (sub_822AD790)" },
+  { name = "fence_list", offset = 13168, type = "u32", note = "the fence list's cursor: 8-byte entries" },
+  { name = "fence_list_end", offset = 13172, type = "u32" },
+  { name = "kick_list", offset = 13180, type = "u32", note = "the recorder's segment list cursor (Device::KickSegment)" },
+  { name = "kick_list_end", offset = 13184, type = "u32" },
+  { name = "presentation_parameters", offset = 13188, type = "u32", note = "a copy of SetUpDisplay's 124 bytes (+64 the front buffer format, +68 the display format, +96 the scaler's)" },
+  { name = "present_interval", offset = 13240, type = "u32", note = "render state 376 (read by sub_822A0718 before each Swap)" },
+  { name = "front_buffer_format", offset = 13252, type = "u32", note = "the parameters' +64" },
+  { name = "display_format", offset = 13256, type = "u32", note = "the parameters' +68" },
+  { name = "scaler_parameters", offset = 13284, type = "u8", note = "the parameters' +96 (Swap's r5 compare)" },
+  { name = "scaler", offset = 13312, type = "u8", note = "56 bytes (the first Swap)" },
+  { name = "display_depth_surface", offset = 13424, type = "u32", note = "SetUpDisplay's depth surface" },
+  { name = "front_buffer", offset = 13428, type = "u32", note = "SetUpDisplay's front buffer" },
+  { name = "display_render_target", offset = 13432, type = "u32", note = "SetUpDisplay's render target" },
+  { name = "ring_allocated", offset = 13436, type = "u32", note = "the ring was allocated by Device::SetUpRing" },
+  { name = "command_buffer_allocated", offset = 13440, type = "u32", note = "the command buffer was allocated by Device::SetUpRing" },
+  { name = "front_buffer_header", offset = 13444, type = "u32", note = "the front buffer's 52-byte header, copied by Swap" },
+  { name = "front_buffer_header_32", offset = 13476, type = "u32", note = "the header's +32: an address (sub_822A0718)" },
+  { name = "ring", offset = 13496, type = "u32", note = "the primary ring" },
+  { name = "ring_mask", offset = 13500, type = "u32" },
+  { name = "command_buffer_start", offset = 13504, type = "u32" },
+  { name = "command_buffer_end", offset = 13508, type = "u32" },
+  { name = "segment_size", offset = 13512, type = "u32", note = "a segment's size in bytes" },
+  { name = "data_cursor", offset = 13516, type = "u32" },
+  { name = "wrap_generation", offset = 13520, type = "u32" },
+  { name = "wrap_cursor", offset = 13524, type = "u32" },
+  { name = "segment_start", offset = 13528, type = "u32", note = "the open segment's start" },
+  { name = "segment_data", offset = 13532, type = "u32", note = "the data reserved for the open segment" },
+  { name = "segment_data_budget", offset = 13536, type = "u32" },
+  { name = "throttle_fence", offset = 13540, type = "u32", note = "the last Swap's fence (+13544 with +20440 bit 0)" },
+  { name = "throttle_fence2", offset = 13544, type = "u32", note = "the one before" },
+  { name = "device_lock", offset = 13548, type = "bytes", count = 28, note = "a critical section (the device lock; a host mutex in the native code)" },
+  { name = "critical_section2", offset = 13576, type = "bytes", count = 28, note = "a critical section (Device::Init)" },
+  { name = "gamma_ramp", offset = 13608, type = "bytes", count = 1536, note = "the gamma ramp: three channels of 256 halfwords" },
+  { name = "gamma_ramp_first", offset = 13608, type = "u8", note = "its first byte (Device::SetGammaRamp, sub_822A3AA8)" },
+  { name = "vblank_callback", offset = 15144, type = "fn", note = "called by the interrupt handler on vblanks" },
+  { name = "vblank_count", offset = 15148, type = "u32" },
+  { name = "video_flags", offset = 15164, type = "u32", note = "the console's video flags (0x00040000)" },
+  { name = "dummy_segment", offset = 15176, type = "ptr", to = "DeviceDummySegment", note = "the 4,800-byte segment writers get when out of space" },
+  { name = "tap", offset = 19980, type = "ptr", to = "CommandTap", note = "a capture object (set: the hung GPU's progress not written)" },
+  { name = "display_width", offset = 19988, type = "u32" },
+  { name = "display_height", offset = 19992, type = "u32" },
+  { name = "display_pitch", offset = 19996, type = "u32" },
+  { name = "display_format_mode", offset = 20000, type = "u32", note = "the display mode's format (0)" },
+  { name = "front_buffer_register", offset = 20004, type = "u32", note = "register 0x1844 (Swap)" },
+  { name = "unknown_20008", offset = 20008, type = "u32", note = "-1 at Device::Init and sub_822AD4A0" },
+  { name = "unknown_20012", offset = 20012, type = "u32", note = "-1 at Device::Init and sub_822AD4A0" },
+  { name = "unknown_20020", offset = 20020, type = "u32", note = "read by Device::Release" },
+  { name = "timer_rate", offset = 20040, type = "f32", note = "the counter's rate" },
+  { name = "timer_period", offset = 20044, type = "f32", note = "the counter's period (the waits' time scale)" },
+  { name = "unknown_20072", offset = 20072, type = "u32", note = "read by Swap" },
+  { name = "unknown_20076", offset = 20076, type = "u32", note = "read and written by Swap" },
+  { name = "timestamps", offset = 20080, type = "u32", note = "the GPU timestamps on (the debugger's)" },
+  { name = "unknown_20084", offset = 20084, type = "u32", note = "read by Device::Release" },
+  { name = "performance_counters", offset = 20100, type = "u32", note = "the GPU performance counters (sub_822B0F70)" },
+  { name = "performance_counters_state", offset = 20104, type = "u32", note = "0 off, 1 starting, 2 on" },
+  { name = "performance_counters_8", offset = 20108, type = "u32" },
+  { name = "performance_counters_12", offset = 20112, type = "u32" },
+  { name = "swap_words", offset = 20120, type = "u32", note = "Swap's 64 words (with +20432)" },
+  { name = "debugger_callback", offset = 20124, type = "fn", note = "the debugger's callback" },
+  { name = "unknown_20136", offset = 20136, type = "u32", note = "written by sub_822B43C0" },
+  { name = "swap_words_end", offset = 20432, type = "u32", note = "with +20120" },
+  { name = "options", offset = 20440, type = "u32", note = "bit 0 picks +13544, bit 8 no workers, bits 24-29 the workers' CPUs" },
+]
+
+# The command replay's command items (functions.md's Command::* handlers):
+# one 280-byte record whose words mean what each command makes of them.
+[ReplayCommand]
+measure = "Command"
+size = 280
+origin = "gpu"
+fields = [
+  { name = "arg0", offset = 0, type = "u32", note = "the item's first word (a stream, a state, a type, a flag word: by command)" },
+  { name = "arg0_high", offset = 0, type = "u16", note = "SetViewports' x, SetScissorRects' left" },
+  { name = "arg0_low", offset = 2, type = "u16", note = "SetViewports' y, SetScissorRects' top" },
+  { name = "arg1", offset = 4, type = "u32", note = "the second word (Clears' rectangles, Resolves' r4, SetStreamSources' buffer)" },
+  { name = "arg1_high", offset = 4, type = "u16", note = "SetViewports' width, SetScissorRects' right, DrawVerticesUP's r5" },
+  { name = "arg1_low", offset = 6, type = "u16", note = "SetViewports' height, SetScissorRects' bottom, DrawVerticesUP's vertex count (r6)" },
+  { name = "arg2", offset = 8, type = "u32", note = "the third word, also a float (SetViewports' min Z); Clears' r6, Resolves' source rectangle" },
+  { name = "arg3", offset = 12, type = "u32", note = "the fourth word, also a float (SetViewports' max Z); SetStreamSources' stride, Clears' r5" },
+  { name = "arg4", offset = 16, type = "u32", note = "DrawIndexedVerticesUP's +16 (1: 16-bit indices)" },
+  { name = "arg5", offset = 20, type = "u32", note = "DrawIndexedVerticesUP's +20" },
+  { name = "arg6", offset = 24, type = "u32", note = "Resolves' destination texture, DrawIndexedVerticesUP's +24" },
+  { name = "arg7", offset = 28, type = "u32", note = "Resolves' r7 (item + 28), DrawIndexedVerticesUP's +28" },
+  { name = "arg9", offset = 36, type = "u32", note = "Resolves' +36" },
+  { name = "arg10", offset = 40, type = "u32", note = "Resolves' +40" },
+  { name = "clear_color_0", offset = 44, type = "u8", note = "Resolves' clear color: the bytes +44 to +47 as floats" },
+  { name = "clear_color_1", offset = 45, type = "u8" },
+  { name = "clear_color_2", offset = 46, type = "u8" },
+  { name = "clear_color_3", offset = 47, type = "u8" },
+  { name = "clear_z", offset = 48, type = "f32", note = "Resolves' +48" },
+  { name = "clear_stencil", offset = 52, type = "u32", note = "Resolves' +52" },
+  { name = "clears_r7", offset = 268, type = "u32", note = "Clears' r7 (probably the color)" },
+  { name = "clears_z", offset = 272, type = "f32", note = "Clears' f1 (probably Z)" },
+  { name = "clears_stencil", offset = 276, type = "u32", note = "Clears' r9 (probably the stencil)" },
+]
+
+# A fence list entry (8 bytes, written where +13168 points): the resource's
+# address / 4 in bits 0-29 (bit 30 clear), then -1.
+[DeviceFenceEntry]
+measure = "sub_822AD790.ret"
+size = 8
+origin = "gpu"
+fields = [
+  { name = "entry", offset = 0, type = "u64", note = "both words, as the originals store them" },
+  { name = "resource", offset = 0, type = "u32", note = "the resource's address / 4 in bits 0-29" },
+  { name = "marker", offset = 4, type = "u32", note = "-1" },
+]
+
+# The 4,800-byte dummy segment (device +15176, made by sub_822AD228): where
+# writers go when the command buffer is out of space; also met as the fence
+# list's block (sub_822AD790 takes it in place of a reservation then).
+[DeviceDummySegment]
+measure = "new<4800>@sub_822AD228"
+size = 4800
+origin = "allocated"
+fields = [
+  { name = "header", offset = 0, type = "u32", note = "the fence block's first word (0 when taken)" },
+  { name = "count", offset = 4, type = "u32", note = "the fence block's second word: bit 31 kept, the rest the entries' count when the next block is taken" },
+]
+
+# A surface (Device::CreateSurface's 48-byte header, graphics-resources.md; the
+# cameras' CameraSurface is the same object): the bound render targets and
+# depth surface, the set saved at the tiling's start.
+[DeviceSurface]
+measures = ["Device.+12468", "Device.+12472", "Device.+12476", "Device.+12480", "Device.+12484", "Device::SetDepthStencilSurface.r4", "Device::SetRenderTarget.r5",
+            "sub_8229FC40.r3.+12200"]
+size = 48
+origin = "gpu"
+fields = [
+  { name = "surface_info", offset = 24, type = "u32", note = "RB_SURFACE_INFO (bits 16-17 the MSAA)" },
+  { name = "format_info", offset = 28, type = "u32", note = "RB_COLOR_INFO (the color format in bits 16-19) or RB_DEPTH_INFO" },
+  { name = "hiz", offset = 32, type = "u32", note = "RB_HIZCONTROL for a depth surface" },
+  { name = "size", offset = 36, type = "u32", note = "width - 1 in bits 0-13, height - 1 in bits 15-29" },
+]
+
+# A texture's header as Device::SetTexture reads it: its fetch constant's six
+# words (+28 to +48).
+[DeviceTexture]
+measure = "Device::SetTexture.r5"
+size = 52
+origin = "gpu"
+fields = [
+  { name = "fetch0", offset = 28, type = "u32", note = "word 0 (the clamps, bits 10-21, are the stage's)" },
+  { name = "base_address", offset = 32, type = "u32", note = "word 1: the base address" },
+  { name = "fetch2", offset = 36, type = "u32", note = "word 2: the size" },
+  { name = "fetch3", offset = 40, type = "u32", note = "word 3 (the filters, bits 19-30, are the stage's)" },
+  { name = "mip_levels", offset = 44, type = "u32", note = "word 4: the max mip level in bits 2-5, the min in 6-9" },
+  { name = "mip_address", offset = 48, type = "u32", note = "word 5: the mip address" },
+]
+
+# A vertex buffer's header (32 bytes, Device::CreateVertexBuffer; known-data.md's
+# "buffer header"; the index buffer at device +12180 is one too).
+[DeviceVertexBuffer]
+measure = "Device::SetStreamSource.r5"
+size = 32
+origin = "gpu"
+fields = [
+  { name = "type", offset = 0, type = "u32", note = "1 vertex, 2 index; the resource flags the fence mask meets" },
+  { name = "reference_count", offset = 4, type = "u32" },
+  { name = "fence", offset = 8, type = "u32", note = "the command position when last replaced" },
+  { name = "data", offset = 24, type = "u32", note = "the data's address (a vertex buffer's with its low 2 bits 3)" },
+  { name = "data_size", offset = 28, type = "u32" },
+]
+
+# A viewport (24 bytes: Device::SetViewport's r4; the device keeps one at +12392).
+[DeviceViewport]
+measure = "Device::SetViewport.r4"
+size = 24
+origin = "gpu"
+fields = [
+  { name = "x", offset = 0, type = "u32" },
+  { name = "y", offset = 4, type = "u32" },
+  { name = "width", offset = 8, type = "u32" },
+  { name = "height", offset = 12, type = "u32" },
+  { name = "min_z", offset = 16, type = "f32" },
+  { name = "min_z_bits", offset = 16, type = "u32" },
+  { name = "max_z", offset = 20, type = "f32" },
+  { name = "max_z_bits", offset = 20, type = "u32" },
+]
+
+# A gamma ramp: three channels of 256 halfwords (ComputeGammaRamp's r3 out,
+# r4 in; the device's at +13608).
+[DeviceGammaRamp]
+measures = ["ComputeGammaRamp.r3", "ComputeGammaRamp.r4"]
+size = 1536
+origin = "gpu"
+fields = [
+  { name = "red", offset = 0, type = "bytes", count = 512 },
+  { name = "green", offset = 512, type = "bytes", count = 512 },
+  { name = "blue", offset = 1024, type = "bytes", count = 512 },
+]
+
+# Device::SetPixelShaderConstantB's data: a word a bool constant (bit 0); the
+# measure names it after SetPixelShaderConstantF's return.
+[DeviceBoolConstant]
+measure = "Device::SetPixelShaderConstantF.ret"
+size = 4
+origin = "gpu"
+fields = [
+  { name = "value", offset = 0, type = "u32", note = "bit 0 the bool" },
+]
+
+[globals]
+render_state_table = { address = 0x826388F8, type = "bytes", count = 1152, note = "96 entries of 12 bytes: the getter, the setter, the default value (by state / 4)" }
+sampler_state_table = { address = 0x82638D78, type = "bytes", count = 240, note = "20 entries of 12 bytes, as the render states'" }
+full_viewport = { address = 0x82013600, type = "bytes", count = 24, note = "0, 0, 0x7FFFFFFF, 0x7FFFFFFF, Z 0.0 to 1.0 (SetSurfaceInfo)" }
+full_scissor = { address = 0x82013618, type = "bytes", count = 16, note = "0, 0, 0x7FFFFFFF, 0x7FFFFFFF (SetSurfaceInfo)" }
+anisotropy_table = { address = 0x82013628, type = "bytes", count = 68, note = "max anisotropy -> the filter's bits: 0, 0, 2, 2, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5" }
+tex_coord_table = { address = 0x82013690, type = "bytes", count = 20, note = "FVF texture coordinate formats: a byte a format, then the element types (VertexDeclaration::FromFvf)" }
+one_over_255 = { address = 0x82002200, type = "f32", note = "the colors' bytes to floats" }
+times_8 = { address = 0x82000C34, type = "f32", note = "the point size to 12.4 (x 8)" }
+times_16 = { address = 0x820021EC, type = "f32", note = "point sizes and the depth slope (x 16)" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0" }
+one_half = { address = 0x82001BE4, type = "f32", note = "0.5 (the viewport's scales)" }
+mip_map_lod_bias_scale = { address = 0x820029CC, type = "f32", note = "the LOD bias to fixed point" }
+anisotropy_bias_scale = { address = 0x82000F18, type = "f32", note = "the anisotropy bias to fixed point" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from Device.
+[DeviceAt11936]
+measure = "Device@+11936"
+size = 232
+origin = "embedded"
+fields = [
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_48", offset = 48, type = "u32" },
+  { name = "unknown_52", offset = 52, type = "u16" },
+  { name = "unknown_54", offset = 54, type = "u16" },
+  { name = "unknown_56", offset = 56, type = "u32" },
+  { name = "unknown_60", offset = 60, type = "u8" },
+  { name = "unknown_61", offset = 61, type = "u8" },
+  { name = "unknown_62", offset = 62, type = "u8" },
+  { name = "unknown_64", offset = 64, type = "u16" },
+  { name = "unknown_66", offset = 66, type = "u16" },
+  { name = "unknown_68", offset = 68, type = "u32" },
+  { name = "unknown_72", offset = 72, type = "u8" },
+  { name = "unknown_73", offset = 73, type = "u8" },
+  { name = "unknown_74", offset = 74, type = "u8" },
+  { name = "unknown_76", offset = 76, type = "u16" },
+  { name = "unknown_78", offset = 78, type = "u16" },
+  { name = "unknown_80", offset = 80, type = "u32" },
+  { name = "unknown_84", offset = 84, type = "u8" },
+  { name = "unknown_85", offset = 85, type = "u8" },
+  { name = "unknown_86", offset = 86, type = "u8" },
+  { name = "unknown_88", offset = 88, type = "u16" },
+  { name = "unknown_90", offset = 90, type = "u16" },
+  { name = "unknown_92", offset = 92, type = "u32" },
+  { name = "unknown_96", offset = 96, type = "u8" },
+  { name = "unknown_97", offset = 97, type = "u8" },
+  { name = "unknown_98", offset = 98, type = "u8" },
+  { name = "unknown_100", offset = 100, type = "u16" },
+  { name = "unknown_102", offset = 102, type = "u16" },
+  { name = "unknown_104", offset = 104, type = "u32" },
+  { name = "unknown_108", offset = 108, type = "u8" },
+  { name = "unknown_109", offset = 109, type = "u8" },
+  { name = "unknown_110", offset = 110, type = "u8" },
+  { name = "unknown_112", offset = 112, type = "u16" },
+  { name = "unknown_114", offset = 114, type = "u16" },
+  { name = "unknown_116", offset = 116, type = "u32" },
+  { name = "unknown_120", offset = 120, type = "u8" },
+  { name = "unknown_121", offset = 121, type = "u8" },
+  { name = "unknown_122", offset = 122, type = "u8" },
+  { name = "unknown_124", offset = 124, type = "u16" },
+  { name = "unknown_126", offset = 126, type = "u16" },
+  { name = "unknown_128", offset = 128, type = "u32" },
+  { name = "unknown_132", offset = 132, type = "u8" },
+  { name = "unknown_133", offset = 133, type = "u8" },
+  { name = "unknown_134", offset = 134, type = "u8" },
+  { name = "unknown_136", offset = 136, type = "u16" },
+  { name = "unknown_138", offset = 138, type = "u16" },
+  { name = "unknown_140", offset = 140, type = "u32" },
+  { name = "unknown_144", offset = 144, type = "u8" },
+  { name = "unknown_145", offset = 145, type = "u8" },
+  { name = "unknown_146", offset = 146, type = "u8" },
+  { name = "unknown_148", offset = 148, type = "u16" },
+  { name = "unknown_150", offset = 150, type = "u16" },
+  { name = "unknown_152", offset = 152, type = "u32" },
+  { name = "unknown_156", offset = 156, type = "u8" },
+  { name = "unknown_157", offset = 157, type = "u8" },
+  { name = "unknown_158", offset = 158, type = "u8" },
+  { name = "unknown_160", offset = 160, type = "u16" },
+  { name = "unknown_162", offset = 162, type = "u16" },
+  { name = "unknown_164", offset = 164, type = "u32" },
+  { name = "unknown_168", offset = 168, type = "u8" },
+  { name = "unknown_169", offset = 169, type = "u8" },
+  { name = "unknown_170", offset = 170, type = "u8" },
+  { name = "unknown_172", offset = 172, type = "u16" },
+  { name = "unknown_174", offset = 174, type = "u16" },
+  { name = "unknown_176", offset = 176, type = "u32" },
+  { name = "unknown_180", offset = 180, type = "u8" },
+  { name = "unknown_181", offset = 181, type = "u8" },
+  { name = "unknown_182", offset = 182, type = "u8" },
+  { name = "unknown_184", offset = 184, type = "u16" },
+  { name = "unknown_186", offset = 186, type = "u16" },
+  { name = "unknown_188", offset = 188, type = "u32" },
+  { name = "unknown_192", offset = 192, type = "u8" },
+  { name = "unknown_193", offset = 193, type = "u8" },
+  { name = "unknown_194", offset = 194, type = "u8" },
+  { name = "unknown_196", offset = 196, type = "u16" },
+  { name = "unknown_198", offset = 198, type = "u16" },
+  { name = "unknown_200", offset = 200, type = "u32" },
+  { name = "unknown_204", offset = 204, type = "u8" },
+  { name = "unknown_205", offset = 205, type = "u8" },
+  { name = "unknown_206", offset = 206, type = "u8" },
+  { name = "unknown_208", offset = 208, type = "u16" },
+  { name = "unknown_210", offset = 210, type = "u16" },
+  { name = "unknown_212", offset = 212, type = "u32" },
+  { name = "unknown_216", offset = 216, type = "u8" },
+  { name = "unknown_217", offset = 217, type = "u8" },
+  { name = "unknown_218", offset = 218, type = "u8" },
+  { name = "unknown_220", offset = 220, type = "u32" },
+  { name = "unknown_224", offset = 224, type = "u32" },
+  { name = "unknown_228", offset = 228, type = "u32" },
+]
+
+# Split from Device.
+[DeviceAt12272]
+measure = "Device@+12272"
+size = 1
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u8" },
+]
+
+# Split from Device.
+[DeviceAt12416]
+measure = "Device@+12416"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+]
+
+# Split from Device.
+[DeviceAt13188]
+measure = "Device@+13188"
+size = 72
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_64", offset = 64, type = "u32" },
+  { name = "unknown_68", offset = 68, type = "u32" },
+]
+
+# Split from Device.
+[DeviceAt13444]
+measure = "Device@+13444"
+size = 44
+origin = "embedded"
+fields = [
+  { name = "unknown_32", offset = 32, type = "u32" },
+  { name = "unknown_36", offset = 36, type = "u32" },
+  { name = "unknown_40", offset = 40, type = "u32" },
+]

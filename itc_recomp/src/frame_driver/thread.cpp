@@ -7,6 +7,7 @@
 #include "guest.h"
 
 #include "base/log.h"
+#include "schema/frame_driver.h"
 
 namespace frame_driver {
 
@@ -19,15 +20,20 @@ void Store(uint8_t* base, uint32_t address, uint32_t value) {
 
 constexpr uint32_t kInvalidParameter = 0xC000000D;
 
+using G = schema::FrameDriverGlobals;
+// A Thread (the measure's "Thread": the frame driver's base, +0 to +16).
+using Thread = schema::FrameDriver;
+
 }  // namespace
 
 void ThreadConstruct(uint8_t* base, uint32_t thread) {
   ITC_NATIVE_RUNNING("sub_8258DE88 Thread::Thread");
-  Store(base, thread + kThreadObject, 0);
-  Store(base, thread + 0, kThreadVtable);
-  Store(base, thread + kThreadHandle, 0xFFFFFFFFu);
-  Store(base, thread + kThreadProcessor, 0);
-  Store(base, thread + kThreadPriority, 2);
+  const Thread t(base, thread);
+  t.set_thread_object(0u);
+  t.set_vtable(kThreadVtable);
+  t.set_thread_handle(0xFFFFFFFFu);
+  t.set_thread_processor(0);
+  t.set_thread_priority(2);
 }
 
 uint32_t CreateThread(uint8_t* base, uint32_t stack, uint32_t entry, uint32_t parameter,
@@ -62,7 +68,7 @@ uint32_t SetThreadPriority(uint8_t* base, uint32_t handle, int32_t priority,
   calls.in_frame(112, 0x822977D4, [&](uint32_t frame) {
     const uint32_t status =
         calls.import(Import::kObReferenceObjectByHandle,
-                     {handle, Load(base, kThreadObjectType), frame + 80}, 0x822977D4);
+                     {handle, G::thread_object_type(base), frame + 80}, 0x822977D4);
     if (int32_t(status) < 0) {
       calls.set_last_error_from_status(status);  // sub_82296E68, a branch to it
       result = 0;
@@ -85,7 +91,7 @@ uint32_t XSetThreadProcessor(uint8_t* base, uint32_t handle, uint32_t processor,
     uint32_t status = kInvalidParameter;
     if (processor < 6) {
       status = calls.import(Import::kObReferenceObjectByHandle,
-                            {handle, Load(base, kThreadObjectType), frame + 80}, 0x822978B8);
+                            {handle, G::thread_object_type(base), frame + 80}, 0x822978B8);
       if (int32_t(status) >= 0) {
         const uint32_t mask = (processor & 0x20) ? 0 : (1u << (processor & 0x1F));
         status = calls.import(Import::kKeSetAffinityThread,
@@ -125,14 +131,15 @@ uint32_t ThreadBegin(uint8_t* base, uint32_t thread, uint32_t object, uint32_t p
   ITC_NATIVE_RUNNING("sub_8258DF18 Thread::Begin");
   uint32_t r3 = 0;
   calls.in_frame(128, 0x8258DF7C, [&](uint32_t frame) {
-    Store(base, thread + kThreadObject, object != 0 ? object : thread);
-    Store(base, thread + kThreadProcessor, Load(base, processor));
-    Store(base, thread + kThreadPriority, Load(base, priority));
+    const Thread t(base, thread);
+    t.set_thread_object(object != 0 ? object : thread);
+    t.set_thread_processor(schema::GameThreadArgWord(base, processor).value());
+    t.set_thread_priority(schema::GameThreadArgWord(base, priority).value());
     // sub_825BA158: CreateThread without a processor (a branch: its frame
     // directly below this one).
     ITC_NATIVE_RUNNING("sub_825BA158 CreateThread (no processor)");
     const uint32_t handle = CreateThread(base, 0, kThreadStart, thread, 4, 0xFFFFFFFFu, 0, calls);
-    Store(base, thread + kThreadHandle, handle);
+    t.set_thread_handle(handle);
     r3 = handle;
     if (handle == 0xFFFFFFFFu) {
       return;
@@ -141,12 +148,11 @@ uint32_t ThreadBegin(uint8_t* base, uint32_t thread, uint32_t object, uint32_t p
     for (uint32_t i = 0; i < 5; i++) {
       Store(base, frame + 80 + 4 * i, uint32_t(table[i]));
     }
-    const uint32_t index = Load(base, thread + kThreadPriority);
+    const uint32_t index = t.thread_priority();
     SetThreadPriority(base, handle, int32_t(Load(base, frame + 80 + ((index << 2) & 0xFFFFFFFCu))),
                       calls);
-    XSetThreadProcessor(base, Load(base, thread + kThreadHandle),
-                        Load(base, thread + kThreadProcessor), calls);
-    r3 = ResumeThread(base, Load(base, thread + kThreadHandle), calls);
+    XSetThreadProcessor(base, t.thread_handle(), t.thread_processor(), calls);
+    r3 = ResumeThread(base, t.thread_handle(), calls);
   });
   return r3;
 }

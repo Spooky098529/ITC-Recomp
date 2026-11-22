@@ -25,8 +25,8 @@ struct SceneDrawCalls;
 namespace course_scenery {
 
 // The manager's pointers ([0x826C5514] by Scenery::Init, [0x826C551C] by
-// Scenery::Create; the same object).
-constexpr uint32_t kManager = 0x826C5514;
+// Scenery::Create; the same object): schema::CourseSceneryGlobals'
+// manager and created (itc_recomp/schema/course-scenery.toml).
 
 // --- The calls into code that still takes the guest context ---
 
@@ -51,8 +51,8 @@ struct Calls {
 // +0 the vtable (0 the key, 1 the load, 2 the reset), +4 the data, +8 its
 // size, +12 the data used, +16 the index, +20 and +24 the previous and next
 // on the pool's list, +32 the flags (0x1 in use, 0x8 loaded, 0x10 seen this
-// update, 0x20 not seen, about to be released), +36 a countdown.
-constexpr uint32_t kObjectFlags = 32;
+// update, 0x20 not seen, about to be released), +36 a countdown
+// (schema::PoolObject).
 
 // PoolObject::AllocData (sub_820FB8B8): `data` the object's +4 (the data,
 // its size, the data used): data + used, used up by the size rounded up to
@@ -195,9 +195,9 @@ void ModelListInit(uint8_t* base, uint32_t list);
 // Scenery::ClearGlobal (sub_820F1480): [0x826C5514] = 0.
 void ClearGlobal(uint8_t* base);
 
-// The physical bytes the scenery holds, kept by AllocPhysical and
+// The physical bytes the scenery holds ([0x826C5518], schema::
+// CourseSceneryGlobals' physical_held), kept by AllocPhysical and
 // FreePhysical.
-constexpr uint32_t kPhysicalHeld = 0x826C5518;
 // Scenery::AllocPhysical (sub_820F1490): XPhysicalAlloc(size, -1, 0, 4)
 // (the layer's AllocPhysical), its allocated size (XPhysicalSize, the
 // layer's PhysicalSize: the user's call, 2026-11-06) added to
@@ -227,7 +227,8 @@ bool Unload(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
 // 0 (FreePhysical's r3). Only while hooks::NativeHeapActive().
 uint32_t Destroy(uint8_t* base);
 
-// The manager's pointer Scenery::Create sets (the same object as kManager's).
+// The manager's pointer Scenery::Create sets (the same object as
+// [0x826C5514]'s; schema::CourseSceneryGlobals' created).
 constexpr uint32_t kCreated = 0x826C551C;
 // Scenery::Create (sub_820F2F88): the 248-byte manager from physical memory
 // (AllocPhysical) into [0x826C551C]; +200, +196 = 0x38435, +204, +208, +212

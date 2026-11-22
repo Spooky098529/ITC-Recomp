@@ -1,0 +1,210 @@
+# The schema of docs/functions/morph-jobs.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The morph jobs: the 224-byte job the pool makers' slot 1 make
+# (PoolMaker2::MakeMorphJob sub_820AC7F0 for Model::MorphShape's wheel morphs,
+# PoolMaker::MakeSkinJob sub_820AC8A0 for Model::SkinShape), run on a worker
+# thread of the second worker pool through the 36-byte work item at its +184
+# (known-data.md, "morph job" and "work item"; src/morph_jobs/).
+#
+# The pool makers (framework.toml's MorphJobMaker) and the worker pool's
+# interface (WorkerPoolInterface) are framework.toml's; the delegate's vtable
+# 0x82002850 is app-states.toml's AppDelegateVtable.
+
+# The job (MorphJob::MorphJob sub_820ACC08 and SkinJob::SkinJob sub_820ACAA8:
+# one class, vtable 0x8200286C, base 0x8200285C). +8 to +55 the skinning
+# job's 48-byte record (SkinRecord, flattened here), +56 to +183 the morph
+# job's 128-byte morph record (second-set.md), +184 to +219 the work item
+# (WorkItem, flattened here with an item_ prefix).
+[MorphJob]
+measures = ["MorphJob", "SkinJob"]
+size = 224
+origin = "allocated"
+vtable = 0x8200286C
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "MorphJobVtable", note = "0x8200286C (0x8200285C the base's, stored by the destructors)" },
+  { name = "released", offset = 4, type = "u8", note = "set by command 22 (slot 3) after the wait; slot 2 reads it" },
+  { name = "released_word", offset = 4, type = "u32", note = "the same word read 4 bytes wide (the skinning record's neighbor; not read)" },
+  { name = "skin_influence_counts", offset = 8, type = "ptr", to = "SkinIndexList", note = "the skinning record's +0: a word a vertex, its bone count" },
+  { name = "skin_weights", offset = 12, type = "u32", note = "the skinning record's +4: a 16-byte weight vector an influence" },
+  { name = "skin_bone_indices", offset = 16, type = "u32", note = "the skinning record's +8: a bone index word an influence" },
+  { name = "skin_source", offset = 20, type = "ptr", to = "SkinVertexStream", note = "the skinning record's +12: the source positions (16 bytes a vertex)" },
+  { name = "skin_destination", offset = 24, type = "ptr", to = "SkinVertexStream", note = "the skinning record's +16: the skinned positions" },
+  { name = "skin_source_2", offset = 28, type = "u32", note = "the skinning record's +20: a second source stream (kinds 7 and 8, probably the normals)" },
+  { name = "skin_destination_2", offset = 32, type = "u32", note = "the skinning record's +24: a second destination stream" },
+  { name = "skin_matrices", offset = 36, type = "u32", note = "the skinning record's +28: the skeleton's matrices (64 bytes a bone)" },
+  { name = "skin_unknown_32", offset = 40, type = "u32", note = "the skinning record's +32" },
+  { name = "skin_vertex_count", offset = 44, type = "u32", note = "the skinning record's +36" },
+  { name = "skin_stream_kind", offset = 48, type = "u32", note = "the skinning record's +40: the stream's kind (5, 9 or 10 pick the blend)" },
+  { name = "skin_stream_format", offset = 52, type = "u32", note = "the skinning record's +44: with kind 5, 6, 7 or 8 picks the blend" },
+  { name = "morph_record", offset = 56, type = "bytes", count = 128, note = "the morph record copied from Model::MorphShape's frame (Morph::Blend's r3, second-set.md)" },
+  { name = "item_vtable", offset = 184, type = "u32", note = "the work item's +0: 0x820066DC (0x82000EB8 its base's)" },
+  { name = "item_interface", offset = 188, type = "u32", note = "the work item's +4: 0x82002908 (0x82000AB4 written first, 0x82000BA8 by the destructor)" },
+  { name = "item_worker_value", offset = 192, type = "u32", note = "the work item's +8: a worker's value, set when it starts" },
+  { name = "item_state", offset = 196, type = "u32", note = "the work item's +12: 1 queued, 2 running, 3 done" },
+  { name = "item_skip", offset = 200, type = "u8", note = "the work item's +16" },
+  { name = "item_post_flag", offset = 201, type = "u8", note = "the work item's +17: the post's r5 (1 here)" },
+  { name = "item_posted", offset = 202, type = "u8", note = "the work item's +18" },
+  { name = "item_waiter", offset = 204, type = "u32", note = "the work item's +20: the pool's waiter interface; the constructor copies an unset frame word" },
+  { name = "delegate_vtable", offset = 208, type = "u32", note = "the work item's +24: 0x82002850 (0x82000ABC its base's, by the destructor)" },
+  { name = "delegate_object", offset = 212, type = "ptr", to = "MorphJob", note = "the work item's +28: the job" },
+  { name = "delegate_target", offset = 216, type = "fn", note = "the work item's +32: MorphJob::RunThunk sub_820AC9C0" },
+  { name = "kind", offset = 220, type = "u32", note = "1 a morph (Morph::Blend on +56), 0 a skin (sub_8258BCD8 on +8)" },
+]
+
+# The job's vtable 0x8200286C (read through by MorphJob::RunThunk and the
+# replay's release).
+[MorphJobVtable]
+measure = "MorphJob.+0"
+size = 20
+origin = "image"
+fields = [
+  { name = "destroy", offset = 0, type = "fn", note = "slot 0: MorphJob::~MorphJob sub_820ACB90 (deleting)" },
+  { name = "wait", offset = 4, type = "fn", note = "slot 1: MorphJob::Wait sub_820AC9B8" },
+  { name = "is_released", offset = 8, type = "fn", note = "slot 2: sub_820AC9D0" },
+  { name = "mark_released", offset = 12, type = "fn", note = "slot 3: sub_820AC9D8" },
+  { name = "run", offset = 16, type = "fn", note = "slot 4: MorphJob::Run sub_820AC998" },
+]
+
+# The 36-byte work item every worker pool job holds (vtables 0x820066DC at +0
+# and 0x82002908 at +4; at the morph job's +184, DebugText + 8, FramePasses +
+# 8). The measure's "Job" is the same item as Job::Wait (sub_82094B10) meets
+# it (+18, +20), joined with Job::~Job's job (+0 = 0x8200285C: a measure join).
+[WorkItem]
+measure = "WorkItem"
+measures = ["Job", "Job::Wait.r3"]
+size = 36
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "WorkItemVtable", note = "0x820066DC (0x82000EB8 its base's, by the destructor)" },
+  { name = "interface", offset = 4, type = "u32", note = "0x82002908 (0x82000AB4 written first, 0x82000BA8 by the destructor)" },
+  { name = "worker_value", offset = 8, type = "u32", note = "a worker's value (its frame + 80, or 0), set by Started" },
+  { name = "state", offset = 12, type = "u32", note = "1 queued, 2 running, 3 done" },
+  { name = "skip", offset = 16, type = "u8", note = "the run isn't made when set" },
+  { name = "post_flag", offset = 17, type = "u8", note = "the post's r5" },
+  { name = "posted", offset = 18, type = "u8", note = "cleared by Job::Wait" },
+  { name = "waiter", offset = 20, type = "ptr", to = "FramePassesJobWaiter", note = "the pool's waiter interface (pool - 4); Job::Wait calls its slot 1" },
+  { name = "delegate_vtable", offset = 24, type = "u32", note = "a 12-byte delegate: 0x82002850 (0x82000ABC its base's, by the destructor)" },
+  { name = "delegate_object", offset = 28, type = "u32" },
+  { name = "delegate_target", offset = 32, type = "fn" },
+]
+
+# The work item's vtable 0x820066DC.
+[WorkItemVtable]
+measure = "WorkItem.+0"
+size = 32
+origin = "image"
+fields = [
+  { name = "destroy", offset = 0, type = "fn", note = "slot 0: WorkItem::~WorkItem sub_82090E40 (deleting)" },
+  { name = "posted", offset = 4, type = "fn", note = "slot 1: sub_82090DD0" },
+  { name = "started", offset = 8, type = "fn", note = "slot 2: sub_82090DE8" },
+  { name = "finished", offset = 12, type = "fn", note = "slot 3: sub_82090DF8" },
+  { name = "skip", offset = 16, type = "fn", note = "slot 4: sub_82090E08" },
+  { name = "run", offset = 20, type = "fn", note = "slot 5: sub_82090E18" },
+  { name = "is_skipped", offset = 24, type = "fn", note = "slot 6: sub_82090CB8" },
+  { name = "call", offset = 28, type = "fn", note = "slot 7: WorkItem::Call sub_820ACA30" },
+]
+
+# The skinning job's 48-byte record (at the job's +8; Model::SkinShape builds
+# it on its frame), as the skinning blend's helpers read it (sub_8258BCD8 picks
+# one by +40 and +44; none seen in play, not read in detail).
+[SkinRecord]
+measures = ["sub_8258AC58.r3", "sub_8258ADA0.r3", "sub_8258B1C0.r3", "sub_8258B368.r3"]
+size = 48
+origin = "embedded"
+fields = [
+  { name = "influence_counts", offset = 0, type = "ptr", to = "SkinIndexList", note = "a word a vertex, its bone count" },
+  { name = "weights", offset = 4, type = "u32", note = "a 16-byte weight vector an influence" },
+  { name = "bone_indices", offset = 8, type = "ptr", to = "SkinIndexList", note = "a bone index word an influence" },
+  { name = "source", offset = 12, type = "ptr", to = "SkinVertexStream", note = "the source positions (16 bytes a vertex)" },
+  { name = "destination", offset = 16, type = "ptr", to = "SkinVertexStream", note = "the skinned positions" },
+  { name = "source_2", offset = 20, type = "u32", note = "a second source stream (kinds 7 and 8, probably the normals)" },
+  { name = "destination_2", offset = 24, type = "u32", note = "a second destination stream" },
+  { name = "matrices", offset = 28, type = "u32", note = "the skeleton's matrices (64 bytes a bone)" },
+  { name = "unknown_32", offset = 32, type = "u32" },
+  { name = "vertex_count", offset = 36, type = "u32" },
+  { name = "stream_kind", offset = 40, type = "u32", note = "5, 9 or 10 pick the blend" },
+  { name = "stream_format", offset = 44, type = "u32", note = "with kind 5: 6, 7 or 8 pick the blend" },
+]
+
+# A word array of the skinning record: the influence counts (+0) or the bone
+# indices (+8); the measure sees its first two words.
+[SkinIndexList]
+measure = "sub_8258AC58.r3.+0"
+measures = ["sub_8258ADA0.r3.+0", "sub_8258B1C0.r3.+0", "sub_8258B368.r3.+0", "sub_8258AC58.r3.+8", "sub_8258ADA0.r3.+8", "sub_8258B1C0.r3.+8", "sub_8258B368.r3.+8", "MorphJob@+8.+8"]
+size = 8
+origin = "embedded"
+fields = [
+  { name = "entry_0", offset = 0, type = "u32" },
+  { name = "entry_1", offset = 4, type = "u32" },
+]
+
+# A vertex stream of the skinning record (the source or destination
+# positions); the measure sees one float of it.
+[SkinVertexStream]
+measure = "sub_8258B368.r3.+12"
+measures = ["sub_8258B368.r3.+16", "MorphJob@+8.+20", "MorphJob@+8.+24"]
+size = 48
+origin = "embedded"
+fields = [
+  { name = "float_28", offset = 28, type = "f32", note = "not read in detail" },
+  { name = "float_44", offset = 44, type = "f32", note = "not read in detail" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from MorphJob.
+[MorphJobAt8]
+measure = "MorphJob@+8"
+size = 48
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_36", offset = 36, type = "u32" },
+  { name = "unknown_40", offset = 40, type = "u32" },
+  { name = "unknown_44", offset = 44, type = "u32" },
+]
+
+# Split from MorphJobVtable.
+[MorphJobVtablePart]
+measure = "MorphJob@+8.+0"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from WorkItem.
+[WorkItemOuter4]
+measure = "sub_82090DC8.r3@-4"
+size = 17
+origin = "embedded"
+fields = [
+  { name = "unknown_16", offset = 16, type = "u8" },
+]
+
+# Split from WorkItem.
+[WorkItemOuter4_2]
+measure = "sub_82090E38.r3@-4"
+size = 28
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+]

@@ -15,6 +15,8 @@
 #include "car_scene_draw/car_scene_draw.h"
 #include "car_scene_draw/ops.h"
 #include "guest.h"
+#include "schema/cameras.h"
+#include "schema/sprites.h"
 
 #include "app_start_up/start_up.h"
 #include "base/log.h"
@@ -42,10 +44,9 @@ constexpr uint32_t kGroupsFrame = 192;
 constexpr uint32_t kXprGetTexture = 0x82597118;
 constexpr uint32_t kVerticesFrame = 304;  // Billboards::BuildVertices's
 
-constexpr uint32_t kRenderApp = 0x826BABA0;   // the render manager
-constexpr uint32_t kAlphaRef = 0x8266D090;    // the 1024 alpha mode's reference
-constexpr uint32_t kVertexShader = 0x826A50A0;
-constexpr uint32_t kPixelShader = 0x826A50A4;
+using G = schema::SpritesGlobals;
+using Material = schema::BillboardMaterial;
+using Pass = schema::BillboardPass;
 
 constexpr uint32_t kOpenChunk = 0x8258C9D0;
 constexpr uint32_t kAllocateSlots = 0x8258CAA0;
@@ -108,19 +109,20 @@ uint32_t RecordBillboardState(uint8_t* base, const car_scene_draw::SceneDrawCall
   Writer w(base, calls, f, list);
 
   // The alpha mode's render states.
-  const int32_t alpha = int32_t(Load(base, material + 0));
+  const Material m(base, material);
+  const int32_t alpha = int32_t(m.alpha_mode());
   if (alpha == 16 || alpha == 32 || alpha == 64 || alpha == 256) {
     w.Slot(0x8209C260, {1, 1, 0});
     w.Slot(0x8209C27C, {56, 0});
   } else if (alpha == 1024) {
-    Stfs(base, f + 80, Lfs(base, kAlphaRef));
+    Stfs(base, f + 80, double(G::alpha_ref(base)));
     w.Slot(0x8209C20C, {1, 2, 0});
     w.Slot(0x8209C228, {56, 0});
     w.Slot(0x8209C244, {208, Load(base, f + 80)});
   }
 
   // The blend mode's.
-  switch (int32_t(Load(base, material + 4))) {
+  switch (int32_t(m.blend_mode())) {
     case 1:
       w.Slot(0x8209C45C, {1, 1, 0});
       w.Slot(0x8209C478, {96, 0});
@@ -157,7 +159,7 @@ uint32_t RecordBillboardState(uint8_t* base, const car_scene_draw::SceneDrawCall
 
   // The identity at +96 (its w column's 1.0 stores overwritten by the
   // vector stores, as the original's), the camera pass's view at +224.
-  const double one = Lfs(base, kOne);
+  const double one = double(G::one(base));
   for (uint32_t at : {108u, 124u, 140u, 156u}) {
     Stfs(base, f + at, one);
   }
@@ -166,9 +168,9 @@ uint32_t RecordBillboardState(uint8_t* base, const car_scene_draw::SceneDrawCall
       Store(base, f + 96 + 16 * row + 4 * col, row == col ? 0x3F800000u : 0u);
     }
   }
-  const uint32_t pass = Load(base, set);
-  if (!native::Buffers_Memcpy(base, f + 224, pass + 16, 64, kMemcpyReturn)) {
-    calls.memcpy(f + 224, pass + 16, 64, f, kMemcpyReturn);
+  const uint32_t view = Pass(base, set).camera_pass().view_address();
+  if (!native::Buffers_Memcpy(base, f + 224, view, 64, kMemcpyReturn)) {
+    calls.memcpy(f + 224, view, 64, f, kMemcpyReturn);
   }
   FlushOff();
 
@@ -182,7 +184,8 @@ uint32_t RecordBillboardState(uint8_t* base, const car_scene_draw::SceneDrawCall
   for (uint32_t at : {172u, 188u, 204u, 220u}) {
     Stfs(base, f + at, one);
   }
-  const uint32_t projection = Load(base, set) + 80;  // read again, as the original
+  const uint32_t projection =
+      Pass(base, set).camera_pass().projection_address();  // read again, as the original
   matrix_math::Multiply(base, f + 160, f + 224, projection);
   interpolation::BlendState_OnMultiply(base, f + 160, f + 224, projection, kMultiplyReturn1);
   matrix_math::Multiply(base, matrix, f + 96, f + 160);
@@ -191,12 +194,12 @@ uint32_t RecordBillboardState(uint8_t* base, const car_scene_draw::SceneDrawCall
 
   // The shaders and the texture (or none in stages 0 to 3).
   w.Slot(0x8209C5B8, {8, 1, 0});
-  w.Slot(0x8209C5D8, {Load(base, kVertexShader)});
+  w.Slot(0x8209C5D8, {G::vertex_shader(base)});
   w.Slot(0x8209C5F4, {9, 1, 0});
-  w.Slot(0x8209C614, {Load(base, kPixelShader)});
-  if (Load(base, material + 12) != 0) {
+  w.Slot(0x8209C614, {G::pixel_shader(base)});
+  if (m.texture() != 0) {
     w.Slot(0x8209C638, {4, 1, 0});
-    return w.Slot(0x8209C654, {0, Load(base, material + 12)});
+    return w.Slot(0x8209C654, {0, m.texture()});
   }
   w.Slot(0x8209C668, {4, 4, 0});
   w.Slot(0x8209C684, {0, 0});
@@ -227,7 +230,7 @@ uint64_t RecordBillboards(uint8_t* base, const car_scene_draw::SceneDrawCalls& c
   // The render manager's slot 8 (its plain C++ called directly where it's
   // the game's, app_start_up::RenderManagerScene).
   auto scene_of = [&](uint32_t lr) {
-    const uint32_t manager = Load(base, kRenderApp);
+    const uint32_t manager = G::render_manager(base);
     const auto scene = app_start_up::RenderManagerScene(base, manager);
     return scene ? *scene : uint32_t(vtable_call(manager, 8, lr));
   };
@@ -268,7 +271,7 @@ uint64_t RecordBillboards(uint8_t* base, const car_scene_draw::SceneDrawCalls& c
 
   // Three render states (alpha reference 0.0, alpha test off) and command
   // 36.
-  const double zero = Lfs(base, kZero);
+  const double zero = double(G::zero(base));
   Stfs(base, f + 80, zero);
   w.Slot(0x8209CCDC, {1, 2, 0});
   w.Slot(0x8209CD00, {208, Load(base, f + 80)});
@@ -282,7 +285,7 @@ uint64_t RecordBillboards(uint8_t* base, const car_scene_draw::SceneDrawCalls& c
   // the set's layer, depth 0.0).
   const uint32_t object2 = scene_of(0x8209CD70);
   const uint32_t queue = uint32_t(vtable_call(object2, 2, 0x8209CD80));
-  return vtable_call(queue, 4, 0x8209CD9C, {chunk, Load(base, set + 4)}, {zero});
+  return vtable_call(queue, 4, 0x8209CD9C, {chunk, Pass(base, set).layer()}, {zero});
 }
 
 uint64_t DrawBillboards(uint8_t* base, const car_scene_draw::SceneDrawCalls& calls,
@@ -290,7 +293,7 @@ uint64_t DrawBillboards(uint8_t* base, const car_scene_draw::SceneDrawCalls& cal
   ITC_NATIVE_RUNNING("sub_8209CDB0 Billboards::Draw");
   const uint32_t f = stack - kDrawFrame;
   Store(base, f, stack);  // the back chain, as stwu
-  if (Load(base, material + 32) == 0) {
+  if (Material(base, material).light_count() == 0) {
     return 0;
   }
   // Record inside its wrap's checks (--debug_hide, --watch_lights,
@@ -314,24 +317,29 @@ uint64_t DrawLightGroups(uint8_t* base, const car_scene_draw::SceneDrawCalls& ca
   Store(base, f, stack);  // the back chain, as stwu
   const uint32_t material = f + 80;
   uint64_t r3 = set;
-  uint32_t group = groups + 16;  // the original's r31
-  if (Load(base, groups) == 0) {
+  const schema::LightGroups list(base, groups);
+  const Material m(base, material);
+  uint32_t group = list.first_group_address();  // the original's r31
+  if (list.count() == 0) {
     return r3;
   }
   for (uint32_t i = 0;;) {
-    const uint32_t count_at = group + 44;  // r29
+    const schema::LightGroup g(base, group);
+    const uint32_t count_at = g.light_count_address();  // r29
     const uint32_t lights = count_at + 16;  // r27
     InitBillboardMaterial(base, material);
-    const uint32_t flags = Load(base, group);
-    Store(base, material + 0, (flags & 0x200) ? 1024u : (flags & 0x10) ? 64u : 32u);
-    Store(base, material + 4, (Load(base, group) & 0x40) ? 2u : 4u);
+    const uint32_t flags = g.flags();
+    m.set_alpha_mode((flags & 0x200) ? 1024u : (flags & 0x10) ? 64u : 32u);
+    m.set_blend_mode((g.flags() & 0x40) ? 2u : 4u);
     if (xpr != 0) {
-      uint32_t texture = Load(base, group + 4);
+      uint32_t texture = g.texture_id();
       if (animations != 0) {
         const uint64_t index = course_scenery::FindAnimationByTexture(base, animations, texture);
         if (int32_t(index) >= 0) {
-          texture = Load(base, scenery_lists::AnimationCurrentFrame(base, animations,
-                                                                    uint32_t(index)) + 4);
+          texture = schema::AnimationFrameEntry(
+                        base, scenery_lists::AnimationCurrentFrame(base, animations,
+                                                                   uint32_t(index)))
+                        .texture_id();
         }
       }
       // XPR::GetTexture inside its wrap's checks (r3 left as the XPR when
@@ -342,13 +350,13 @@ uint64_t DrawLightGroups(uint8_t* base, const car_scene_draw::SceneDrawCalls& ca
         got = models::XprGetTexture(base, xpr, texture);
         debug::FrameStateDiff_After(base, "draw step part", kXprGetTexture);
       }
-      Store(base, material + 12, uint32_t(got));
+      m.set_texture(uint32_t(got));
     }
-    SetBillboardLights(base, material, Load(base, count_at), lights);
+    SetBillboardLights(base, material, g.light_count(), lights);
     r3 = DrawBillboards(base, calls, f, set, material);
     i++;
-    group = Load(base, count_at) * 48 + lights;
-    if (i >= Load(base, groups)) {
+    group = g.light_count() * 48 + lights;
+    if (i >= list.count()) {
       break;
     }
   }

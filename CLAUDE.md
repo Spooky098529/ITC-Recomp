@@ -40,9 +40,16 @@ merged into `rexglue-removal-project` 2026-10-22): one allocation layer of our o
 functions by `src/hooks/heap.cpp` behind `--native_heap`, on by default;
 harness `heap`), whose backing is swapped at the port's end. Guest
 allocation is native: native code allocates through it without `ctx`.
-`docs/e5-native.md` is the plan (a draft, 2026-11-16) for E5, the last
-step: the game's objects, calls, stacks and data made real C++ over host
-memory, ending the 360-shaped guest memory (and the renderer's mirrors).
+`docs/e5-native.md` is the plan for E5, the last step: the game's objects,
+calls, stacks and data made real C++ over host memory, ending the
+360-shaped guest memory (and the renderer's mirrors). In progress on
+`e5-native-16-11-26` (not merged): steps 0 and 1 done; step 2 (the
+schema, `itc_recomp/schema/`, and named fields) done 2026-11-21 by a swarm
+(`docs/loops/e5-loop.md`, "Step 2 as a swarm"; the agents' reports in
+`docs/loops/e5-swarm-reports.md`): 134 areas, built, an attract race,
+the pad replay and a frame dump checked; then the measure's offset and
+class-name faults fixed (2026-11-22, 1,938 types). Left: the lead's list
+there (fault fields still reached, the split types' names); step 3 next.
 `docs/old-hardware.md` is the plan (not started) for running below
 Vulkan 1.3, and why not OpenGL.
 `docs/rexglue-removal.md` is the plan for a native port without the
@@ -790,7 +797,9 @@ measures B7; functions not seen in play still get rows, marked "Not seen in play
 (the user's call, 2026-10-23: a session may not have taken their path).
 `docs/pad-replay.md` is recording the user's pad and replaying it into the
 game through a virtual pad (`pad_record.py`, `scripted_run.sh`), for test
-runs past the title screen.
+runs past the title screen, and (since 2026-11-22) by tick with a state
+digest (`tick_replay.sh`: the same game tick for tick, compared with a
+baseline).
 `docs/tick-replay.md` is a lead (not started): translating draws once a
 tick and replaying our own list on in-between frames.
 `docs/pause-menu-fix.md` is the pause menu's too-fast input repeat: fixed

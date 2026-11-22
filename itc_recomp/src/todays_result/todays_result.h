@@ -30,30 +30,18 @@ namespace todays_result {
 
 using Calls = race_hud_object::Calls;
 
-// The machines' words.
-constexpr uint32_t kMachineState = 9604;
-constexpr uint32_t kMachineLoaded = 9608;
-constexpr uint32_t kMachineReenter = 9612;
-constexpr uint32_t kMachineDelete = 9616;
-
-// The mode's fields: the delegate's holder (+4) and the delegate (+8), the
-// dispatcher (+36: the handlers, the count +200; its ring +204 is the
-// mode's +240), the message ring (+240) and the block (+848).
-constexpr uint32_t kDispatcher = 36;
-constexpr uint32_t kRing = 240;
-constexpr uint32_t kBlock = 848;
-// The block (19,300 bytes): today's result at +0, today's event at +9640,
-// the shown machine's index (+19280: 27 today's result, 0 today's event),
-// +19284.
-constexpr uint32_t kBlockBytes = 19300;
-constexpr uint32_t kEventAt = 9640;
-constexpr uint32_t kShown = 19280;
+// The machines, the mode, its block and the screens' blocks are
+// src/schema/todays_result.h's views (itc_recomp/schema/todays-result.toml):
+// ModeType9, ModeType9Block (today's result at +0, today's event at +9640),
+// TodaysResultMachine, TodaysEventMachine, TodaysResultData,
+// TodaysEventData; the page objects and menus menu-helpers' PageObject and
+// FrontEndMenu, through TodaysResultGlobals.
+// The shown machine's index of today's result (+19280: 27, today's event 0).
 constexpr uint32_t kResultIndex = 27;
 
-// The save data's fields Kind reads: the unlocks just made's count and the
-// movie queued (-1 none).
-constexpr uint32_t kUnlockCount = 0x1CA78;
-constexpr uint32_t kQueuedMovie = 0x1D524;
+// The save data's fields (the unlocks just made, their count, the movie
+// queued) are race-event's SaveData's (schema/race_event.h), its stats
+// record and pick career's CareerSave, CareerStats and CareerCounter.
 
 // The callees by address.
 constexpr uint32_t kVirtualAlloc = 0x82295398;
@@ -90,41 +78,16 @@ constexpr uint32_t kCheckUnlocks = 0x821162B0;
 constexpr uint32_t kRaceEventDestroy = 0x82144DF0;
 constexpr uint32_t kMenuPressed = 0x821864C8;
 constexpr uint32_t kMenuSoundPlay = 0x821103F0;
-// The fades' passes FadeIn and FadeOut get, and the fades' counts the
-// FadeOut transitions wait on.
-constexpr uint32_t kFadesIn = 0x82001BEC;
-constexpr uint32_t kFadesOut = 0x82001BF0;
-constexpr uint32_t kFadeCount0 = 0x826A50E4;
-constexpr uint32_t kFadeCount1 = 0x826A50DC;
-// The boot movies' list (boot-mode.md): five ids, +20 the mode after, +24
-// skippable, +28 the index.
-constexpr uint32_t kBootMovies = 0x826C5BAC;
+// The fades' passes and counts and the boot movies' list (boot-mode.md):
+// TodaysResultGlobals.
 
-// Today's result's blocks: the page object (28 bytes: +0 the page Draw
-// runs, -1 while a transition runs; +4 the page after; +8 the page before;
-// +12 the transition Update runs, -1 none; +16 the one queued after it; +20;
-// +24 the transition's started word), the menu (68 bytes) and the screen's
-// data (68 bytes asked, used to +87: +0 set up, +4 a movie queued, +8 to +52
-// the counts, +56 to +64 the day, +68 to +87 the next pick's record).
-constexpr uint32_t kResultPages = 0x828160C8;
-constexpr uint32_t kResultMenu = 0x828160CC;
-constexpr uint32_t kResultData = 0x828160D0;
+// Today's result's blocks are TodaysResultGlobals' result_pages, result_menu
+// and result_data, today's event's event_pages, event_menu and event_data.
+// The screens' movies and their assets:
 constexpr uint32_t kResultMovie = 27;
 constexpr uint32_t kResultAsset = 22578;
-// Today's event's blocks: the page object (28 bytes, as today's result's),
-// the menu (68 bytes) and the data (68 bytes asked, used to +411: +0 set
-// up, +4 the first image list (46 records at most) and +188 its count,
-// +192 the second and +376 its count, +380 and +384 the images' bits, +388
-// to +396 the unlock shown (+392 its table, +396 its entry, -1 none), +400
-// and +404 the movie's +28 object's +36 and +32 kept, +408 movies queued).
-constexpr uint32_t kEventPages = 0x828160D4;
-constexpr uint32_t kEventMenu = 0x828160D8;
-constexpr uint32_t kEventData = 0x828160DC;
 constexpr uint32_t kEventMovie = 0;
 constexpr uint32_t kEventAsset = 22545;
-// The save's unlocks just made: 12-byte entries (+0 shown, +4 the table,
-// +8 the entry) from +0x1C778, their count at kUnlockCount.
-constexpr uint32_t kUnlocks = 0x1C778;
 // The images' assets: 22696 + i and 22741 + i.
 constexpr uint32_t kImageAssetA = 22696;
 constexpr uint32_t kImageAssetB = 22741;
@@ -135,7 +98,6 @@ constexpr uint32_t kArchiveLoad = 0x8209DE48;
 constexpr uint32_t kImageLoaded = 0x8218D8E8;
 constexpr uint32_t kFreeImage = 0x8218D650;
 constexpr uint32_t kSoundPlay = 0x82175850;
-constexpr uint32_t kSoundManager = 0x826C5C80;
 
 // The accept action Menu::Pressed is asked for.
 constexpr uint32_t kAccept = 159;

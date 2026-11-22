@@ -33,13 +33,12 @@ namespace front_end_screen_helpers {
 
 using Calls = race_hud_object::Calls;
 
-// The sound manager and its vtable's slots (bytes into it).
-constexpr uint32_t kSoundManager = 0x826C5C80;
+// The sound manager's vtable slots the releases call (bytes into it:
+// menu-sounds.toml's AudioManagerVtable stop_cue and is_cue_playing).
 constexpr uint32_t kStopCueSlot = 52;       // 13
 constexpr uint32_t kIsCuePlayingSlot = 56;  // 14
 
 // The callees by address.
-constexpr uint32_t kStringTable = 0x826C5C34;
 constexpr uint32_t kStringsRelease = 0x8210A538;
 constexpr uint32_t kDeleteAllJump = 0x8211E370;
 constexpr uint32_t kStandSceneRelease = 0x82180738;
@@ -58,22 +57,12 @@ constexpr uint32_t kShowPrompts = 0x821C1068;  // Options::ShowPrompts
 constexpr uint32_t kListSelection = 0x8220BC20;     // MenuList::Selection
 constexpr uint32_t kListSetSelection = 0x8220BC30;  // MenuList::SetSelection
 
-// The save screen's data ([0x826D8454]) and the front end's car data
-// ([0x826D83F4]: +12, +36 words, +48 and +52 the list's index, +1136 the
-// car entries).
-constexpr uint32_t kSaveData = 0x826D8454;
-constexpr uint32_t kCarData = 0x826D83F4;
-// The save screen's menu list and page block; the options' settings `o`
-// and pages 9's and 10's blocks; the car list (+4 its scroll).
-constexpr uint32_t kSaveList = 0x826D8450;
-constexpr uint32_t kSavePages = 0x826D844C;
-constexpr uint32_t kOptions = 0x826D8478;
-constexpr uint32_t kOptionsSavePages = 0x826D847C;
-constexpr uint32_t kOptionsCategory6Pages = 0x826D8488;
-constexpr uint32_t kCarList = 0x826D83EC;
-
-// The mode's block (VirtualFree'd by every release).
-constexpr uint32_t kModeBlock = 848;
+// The objects and globals are other areas' views (src/schema/): the car
+// dealer's data, list menu and entries (CarDealerGlobals, CarDealerEntry,
+// CarDealerMode), the save screen's (SaveScreenGlobals), the options'
+// (OptionsScreenGlobals, OptionsLoadSaveGlobals), the modes' blocks
+// (ModeType2 to ModeType12), the UI movie nodes (UiMovieNode), the sound
+// manager (MenuSoundsGlobals) and the string table (StringsAndFontGlobals).
 
 // --- The modes' releases (releases.cpp) ---
 //

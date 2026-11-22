@@ -35,4 +35,8 @@ struct PhysicalPad {
 // read the capabilities (on a connect), which the adapter then stores.
 bool PhysicalPad_Read(PhysicalPad& pad, uint32_t user);
 
+// For the state digest (--state_digest): a hash of the values `user`'s last
+// read gave (0 when it wasn't connected).
+uint64_t PhysicalPad_LastReadHash(uint32_t user);
+
 }  // namespace input

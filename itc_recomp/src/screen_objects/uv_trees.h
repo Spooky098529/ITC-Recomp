@@ -32,24 +32,10 @@
 
 namespace screen_objects {
 
-constexpr uint32_t kLeft = 0;
-constexpr uint32_t kParent = 4;
-constexpr uint32_t kRight = 8;
-constexpr uint32_t kKey = 16;
-constexpr uint32_t kHead = 4;
-constexpr uint32_t kSize = 8;
-
-constexpr uint32_t kColumnNodeBytes = 40;
-constexpr uint32_t kColumnColor = 32;
-constexpr uint32_t kColumnIsNil = 33;
-constexpr uint32_t kColumnValueU = 24;
-constexpr uint32_t kColumnValueV = 28;
-constexpr uint32_t kColumnMaxSize = 0x0FFFFFFE;  // Insert's length_error from here
-
-constexpr uint32_t kMapNodeBytes = 48;
-constexpr uint32_t kMapColumn = 24;
-constexpr uint32_t kMapColor = 40;
-constexpr uint32_t kMapIsNil = 41;
+// Insert's size limits (its length_error from here); the layouts are the
+// schema's (itc_recomp/schema/screen-objects.toml: ScreenObjectUvColumn,
+// ScreenObjectUvColumnNode, ScreenObjectUvMap, ScreenObjectUvMapNode).
+constexpr uint32_t kColumnMaxSize = 0x0FFFFFFE;
 constexpr uint32_t kMapMaxSize = 0x0AAAAAA9;
 
 // A checked iterator: the tree it belongs to, then its node.

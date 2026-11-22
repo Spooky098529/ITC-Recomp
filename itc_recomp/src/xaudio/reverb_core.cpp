@@ -14,6 +14,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/xaudio_objects.h"
 #include "xaudio/ppc_float.h"
 #include "xaudio/reverb_stages.h"
 
@@ -63,25 +64,27 @@ uint64_t ReverbCoreProcess(uint8_t* base, uint64_t core64, uint32_t inputs, uint
   // The input channels by +100 (the stereo flag); the caller's word at
   // sp + 20 the core; the inputs and the output channels' pointers kept in
   // the frame.
+  const schema::ReverbInputs in(base, inputs);
+  const schema::ReverbOutputs out(base, outputs);
   r30 = core;
-  r11 = L32(base, r30 + 100);
+  r11 = schema::ReverbCore(base, r30).stereo();
   S32(base, r1 + 17908, r30);
   if (int32_t(r11) == 1) {
-    r11 = L32(base, inputs);
+    r11 = in.left();
     r29 = r11;
   } else if (int32_t(r11) == 2) {
-    r11 = L32(base, inputs + 4);
+    r11 = in.right();
     r29 = r11;
   } else {
-    r11 = L32(base, inputs);
-    r29 = L32(base, inputs + 4);
+    r11 = in.left();
+    r29 = in.right();
   }
   S32(base, r1 + 148, r11);
   S32(base, r1 + 144, r29);
-  S32(base, r1 + 316, L32(base, outputs));
-  S32(base, r1 + 308, L32(base, outputs + 4));
-  S32(base, r1 + 300, L32(base, outputs + 12));
-  S32(base, r1 + 292, L32(base, outputs + 16));
+  S32(base, r1 + 316, out.front_left());
+  S32(base, r1 + 308, out.front_right());
+  S32(base, r1 + 300, out.back_left());
+  S32(base, r1 + 292, out.back_right());
 
   // The first channel's early chain (the core's +104, +0x200A8, +0x200F0,
   // +0x2091C, +0x20B34, +0x22B60, +0x22F78, +0x23790; the buffers in the
@@ -121,7 +124,7 @@ uint64_t ReverbCoreProcess(uint8_t* base, uint64_t core64, uint32_t inputs, uint
   // the buffers at 6640, 3520 and the others (the original's address
   // arithmetic and spills as it does them).
   r11 = 0x00020000u;
-  w0 = L32(base, r30 + 96); f0 = ToDouble(w0);
+  w0 = L32(base, schema::ReverbCore(base, r30).chain_mix_level_address()); f0 = ToDouble(w0);
   r10 = 0x00020000u;
   r11 = r11 | 18352u;
   r10 = r10 | 236u;
@@ -1385,7 +1388,7 @@ uint64_t ReverbCoreProcess(uint8_t* base, uint64_t core64, uint32_t inputs, uint
   // r29 (the word at 208), in 64 bits.
   const uint64_t r30_64 = uint64_t(uint32_t(r30 + 8)) - 8;
   const uint64_t r29_64 = uint64_t(r29);
-  Vec v0 = Lvlx(base, r31 + 92);
+  Vec v0 = Lvlx(base, schema::ReverbCore(base, r31).gain_address());
   r11 = 0x8264D540u;
   r8 = L32(base, r1 + 144);
   r4 = r27 - r29;

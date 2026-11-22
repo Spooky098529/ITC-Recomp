@@ -9,6 +9,9 @@
 #include "camera_modes/steps.h"
 #include "career/career.h"
 #include "guest.h"
+#include "schema/career.h"
+#include "schema/race_event.h"
+#include "schema/race_screens.h"
 #include "helpers/debug_output.h"
 #include "memory/heap.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -24,6 +27,8 @@ using namespace camera_modes::steps;
 void Frame(uint8_t* base, uint32_t sp, uint32_t bytes) { guest::StoreU32(base, sp - bytes, sp); }
 
 uint32_t Get(uint8_t* base, uint32_t global) { return guest::LoadU32(base, global); }
+
+using G = schema::RaceScreensGlobals;
 
 // VirtualAlloc(0, size, MEM_COMMIT, read-write) over the allocation layer.
 uint32_t Pages(uint32_t size) { return memory::AllocPages(size, 4096); }
@@ -59,8 +64,9 @@ constexpr uint32_t kTextBase = 0x82010000;
 // (screen, data, pages, list).
 void ListInit(uint8_t* base, uint32_t list) {
   if (list != 0) {
-    guest::StoreU32(base, list + 68, 0);
-    guest::StoreU32(base, list + 60, 0);
+    const schema::MenuList l(base, list);
+    l.set_enabled(0);
+    l.set_player(0);
   }
 }
 
@@ -103,7 +109,7 @@ std::optional<uint64_t> DestroyOne(uint8_t* base, uint32_t sp, uint32_t global, 
   return r3;
 }
 
-uint32_t PauseData(uint8_t* base) { return Get(base, kPauseData); }
+schema::PauseMenuData PauseData(uint8_t* base) { return G::pause_data(base); }
 
 // memcpy natively, or through `calls` where its plain C++ refuses.
 void Copy(uint8_t* base, const Calls& calls, uint32_t r1, uint32_t lr, uint32_t destination,
@@ -137,13 +143,13 @@ uint32_t ClampTruncate(uint8_t* base, uint32_t address, uint32_t upper) {
 uint64_t PauseMenuCreate(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8220D7E8 PauseMenu::Create");
   Frame(base, sp, 96);
-  guest::StoreU32(base, kPauseScreen, Pages(4));
-  guest::StoreU32(base, kPauseData, Pages(160));
+  G::set_pause_screen(base, Pages(4));
+  G::set_pause_data(base, Pages(160));
   const uint32_t list = Pages(72);
-  guest::StoreU32(base, kPauseList, list);
+  G::set_pause_list(base, list);
   ListInit(base, list);
   const uint32_t pages = Pages(28);
-  guest::StoreU32(base, kPausePages, pages);
+  G::set_pause_pages(base, pages);
   PagesInit(base, pages, 0);
   return pages;
 }
@@ -165,13 +171,13 @@ uint64_t PauseMenu4Create(uint8_t* base, uint32_t sp) {
 uint64_t AfterRaceMenuCreate(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8221B1F0 AfterRaceMenu::Create");
   Frame(base, sp, 96);
-  guest::StoreU32(base, kAfterScreen, Pages(4));
-  guest::StoreU32(base, kAfterData, Pages(24));
+  G::set_after_screen(base, Pages(4));
+  G::set_after_data(base, Pages(24));
   const uint32_t pages = Pages(28);
-  guest::StoreU32(base, kAfterPages, pages);
+  G::set_after_pages(base, pages);
   PagesInit(base, pages, 1);
   const uint32_t list = Pages(72);
-  guest::StoreU32(base, kAfterList, list);
+  G::set_after_list(base, list);
   ListInit(base, list);
   return list;
 }
@@ -180,27 +186,27 @@ uint64_t RaceDialogCreate(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82217D70 RaceDialog::Create");
   Frame(base, sp, 96);
   const uint32_t list = Pages(72);
-  guest::StoreU32(base, kDialogList, list);
+  G::set_dialog_list(base, list);
   ListInit(base, list);
   const uint32_t pages = Pages(28);
-  guest::StoreU32(base, kDialogPages, pages);
+  G::set_dialog_pages(base, pages);
   PagesInit(base, pages, 0);
-  const uint32_t data = Pages(40);
-  guest::StoreU32(base, kDialogData, data);
-  guest::StoreU32(base, data + 24, 0);
-  guest::StoreU32(base, data + 12, uint32_t(-1));
-  guest::StoreU32(base, data + 16, uint32_t(-1));
-  guest::StoreU32(base, data + 20, uint32_t(-1));
-  guest::StoreU32(base, data + 32, 0);
-  guest::StoreU32(base, data + 36, 0);
-  return data;
+  const schema::RaceDialogData data(base, Pages(40));
+  G::set_dialog_data(base, data);
+  data.set_unknown_24(0);
+  data.set_message(uint32_t(-1));
+  data.set_open_style(uint32_t(-1));
+  data.set_next_open_style(uint32_t(-1));
+  data.set_showing(0);
+  data.set_close_asked(0);
+  return data.address;
 }
 
 uint64_t CareerResultsCreate(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82219138 CareerResults::Create");
   Frame(base, sp, 96);
   const uint32_t block = Pages(212);
-  guest::StoreU32(base, kCareerResults, block);
+  G::set_career_results(base, block);
   return block;
 }
 
@@ -237,8 +243,8 @@ uint64_t Kind6MenuCreate(uint8_t* base, uint32_t sp) {
 
 std::optional<uint64_t> PauseMenuDestroy(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8220C4C8 PauseMenu::Destroy");
-  return DestroyFour(base, sp, kPauseScreen, kPauseData, kPausePages, kPauseList,
-                     kTextBase - 13100);
+  return DestroyFour(base, sp, G::pause_screen_address(), G::pause_data_address(),
+                     G::pause_pages_address(), G::pause_list_address(), kTextBase - 13100);
 }
 
 std::optional<uint64_t> PauseMenu4Destroy(uint8_t* base, uint32_t sp) {
@@ -249,34 +255,36 @@ std::optional<uint64_t> PauseMenu4Destroy(uint8_t* base, uint32_t sp) {
 
 std::optional<uint64_t> AfterRaceMenuDestroy(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8221A3E8 AfterRaceMenu::Destroy");
-  return DestroyFour(base, sp, kAfterScreen, kAfterData, kAfterPages, kAfterList,
-                     kTextBase + 1188);
+  return DestroyFour(base, sp, G::after_screen_address(), G::after_data_address(),
+                     G::after_pages_address(), G::after_list_address(), kTextBase + 1188);
 }
 
 std::optional<uint64_t> RaceDialogDestroy(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82217CD0 RaceDialog::Destroy");
   // No check for an unset global: the three blocks freed, then their
   // globals 0.
-  if (!AllPages(base, {kDialogPages, kDialogList, kDialogData}) ||
-      !alt_hud::MenuListReleasable(base, Get(base, kDialogList))) {
+  if (!AllPages(base,
+                {G::dialog_pages_address(), G::dialog_list_address(), G::dialog_data_address()}) ||
+      !alt_hud::MenuListReleasable(base, G::dialog_list(base).address)) {
     return std::nullopt;
   }
   const uint32_t frame = sp - 112;
   Frame(base, sp, 112);
-  alt_hud::MenuListRelease(base, Get(base, kDialogList), frame);
+  alt_hud::MenuListRelease(base, G::dialog_list(base).address, frame);
   uint64_t r3 = 0;
-  for (const uint32_t global : {kDialogPages, kDialogList, kDialogData}) {
+  for (const uint32_t global :
+       {G::dialog_pages_address(), G::dialog_list_address(), G::dialog_data_address()}) {
     r3 = Free(base, global);
   }
-  guest::StoreU32(base, kDialogPages, 0);
-  guest::StoreU32(base, kDialogList, 0);
-  guest::StoreU32(base, kDialogData, 0);
+  G::set_dialog_pages(base, 0);
+  G::set_dialog_list(base, 0);
+  G::set_dialog_data(base, 0);
   return r3;
 }
 
 std::optional<uint64_t> CareerResultsDestroy(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82219170 CareerResults::Destroy");
-  return DestroyOne(base, sp, kCareerResults, kTextBase + 924);
+  return DestroyOne(base, sp, G::career_results_address(), kTextBase + 924);
 }
 
 std::optional<uint64_t> RaceResultsDestroy(uint8_t* base, uint32_t sp) {
@@ -295,7 +303,7 @@ std::optional<uint64_t> Kind6MenuDestroy(uint8_t* base, uint32_t sp) {
 }
 
 std::optional<uint64_t> AfterRaceMenuClose(uint8_t* base, uint32_t sp) {
-  const uint32_t list = Get(base, kAfterList);
+  const uint32_t list = G::after_list(base).address;
   if (!alt_hud::MenuListReleasable(base, list)) {
     return std::nullopt;
   }
@@ -309,62 +317,84 @@ uint64_t PauseMenuLoadData(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8220F840 PauseMenu::LoadData");
   const uint32_t frame = sp - 6176;
   Frame(base, sp, 6176);
-  const uint32_t options = vehicle_accessors::SaveDataOf(base, 0) + 0x1F85C;
+  // Player 0's save data (race-event.toml's SaveData): its options from
+  // +0x1F85C.
+  const schema::SaveData options(base, vehicle_accessors::SaveDataOf(base, 0));
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   uint64_t r3 = save;
-  guest::StoreU32(base, PauseData(base) + 0, guest::LoadU32(base, options + 0));
-  guest::StoreU32(base, PauseData(base) + 4, guest::LoadU32(base, options + 4));
-  guest::StoreU32(base, PauseData(base) + 8, guest::LoadU32(base, options + 8));
+  // Each store reads [0x826D84D4] after its load, as the original does.
   {
-    const uint32_t data = PauseData(base);
-    guest::StoreU32(base, data + 12, guest::LoadU32(base, options + 12));
-  }
-  for (const uint32_t field : {72u, 76u, 80u, 84u}) {
-    guest::StoreU32(base, PauseData(base) + field, 1);
-  }
-  auto signed_byte = [&](uint32_t offset) {
-    return uint32_t(int32_t(int8_t(guest::LoadU8(base, options + offset))));
-  };
-  {
-    const uint32_t value = signed_byte(28);
-    guest::StoreU32(base, PauseData(base) + 16, value);
+    const uint32_t value = options.hud_option_0();
+    PauseData(base).set_hud_option_0(value);
   }
   {
-    const uint32_t value = signed_byte(29);
-    guest::StoreU32(base, PauseData(base) + 20, value);
+    const uint32_t value = options.hud_option_1();
+    PauseData(base).set_hud_option_1(value);
   }
-  guest::StoreU32(base, PauseData(base) + 88, 15);
-  guest::StoreU32(base, PauseData(base) + 92, 15);
-  for (const auto& [offset, field] : {std::pair{36u, 24u}, {37u, 28u}, {38u, 32u}}) {
-    const uint32_t value = signed_byte(offset);
-    guest::StoreU32(base, PauseData(base) + field, value);
+  {
+    const uint32_t value = options.hud_option_2();
+    PauseData(base).set_hud_option_2(value);
   }
-  for (const uint32_t field : {96u, 100u, 104u}) {
-    guest::StoreU32(base, PauseData(base) + field, 0);
+  {
+    const schema::PauseMenuData data = PauseData(base);
+    data.set_hud_option_3(options.hud_option_3());
   }
-  const int32_t kind = int32_t(guest::LoadU32(base, PauseData(base) + 132));
+  PauseData(base).set_hud_default_0(1);
+  PauseData(base).set_hud_default_1(1);
+  PauseData(base).set_hud_default_2(1);
+  PauseData(base).set_hud_default_3(1);
+  auto signed_byte = [](uint8_t byte) { return uint32_t(int32_t(int8_t(byte))); };
+  {
+    const uint32_t value = signed_byte(options.effects_volume());  // +28
+    PauseData(base).set_music_volume_saved(value);
+  }
+  {
+    const uint32_t value = signed_byte(options.music_volume());  // +29
+    PauseData(base).set_effects_volume_saved(value);
+  }
+  PauseData(base).set_music_volume_default(15);
+  PauseData(base).set_effects_volume_default(15);
+  {
+    const uint32_t value = signed_byte(options.setting_0());
+    PauseData(base).set_adjust_saved_0(value);
+  }
+  {
+    const uint32_t value = signed_byte(options.setting_1());
+    PauseData(base).set_adjust_saved_1(value);
+  }
+  {
+    const uint32_t value = signed_byte(options.setting_2());
+    PauseData(base).set_adjust_saved_2(value);
+  }
+  PauseData(base).set_adjust_default_0(0);
+  PauseData(base).set_adjust_default_1(0);
+  PauseData(base).set_adjust_default_2(0);
+  const int32_t kind = int32_t(PauseData(base).kind());
   if (kind != 0 && kind != 1 && kind != 2) {
     return r3;
   }
   // The career's numbers, from a copy of the save data's stats on the
   // stack (frame + 80) and the player's vehicle.
-  Copy(base, calls, frame, 0x8220F978, frame + 80, save + 48, 6044);
+  // (The stats, +48, are career.toml's CareerSave's: race-event.toml's
+  // SaveData has no field there.)
+  Copy(base, calls, frame, 0x8220F978, frame + 80, schema::CareerSave(base, save).stats_address(),
+       6044);
   const uint32_t vehicle = vehicle_accessors::VehicleGet(base, 0);
   {
-    const uint32_t value = guest::LoadU32(base, save + 6116);
-    guest::StoreU32(base, PauseData(base) + 108, value);
+    const uint32_t value = schema::SaveData(base, save).money();
+    PauseData(base).set_money(value);
   }
   {
-    const int32_t day = int32_t(guest::LoadU32(base, save + 6100));
+    const int32_t day = int32_t(schema::SaveData(base, save).day());
     const int32_t week = day / 7;
-    guest::StoreU32(base, PauseData(base) + 112, uint32_t(day) - uint32_t(week) * 7);
+    PauseData(base).set_weekday(uint32_t(day) - uint32_t(week) * 7);
   }
   {
-    int32_t day = int32_t(guest::LoadU32(base, save + 6100));
+    int32_t day = int32_t(schema::SaveData(base, save).day());
     if (day > 999) {
       day = 999;
     }
-    guest::StoreU32(base, PauseData(base) + 116, uint32_t(day));
+    PauseData(base).set_day(uint32_t(day));
   }
   int32_t streak = 0;
   r3 = career::StatsWinStreak(base, frame + 80);
@@ -378,14 +408,14 @@ uint64_t PauseMenuLoadData(uint8_t* base, uint32_t sp, const Calls& calls) {
       streak = int16_t(uint16_t(r3));
     }
   }
-  guest::StoreU32(base, PauseData(base) + 120, uint32_t(streak));
+  PauseData(base).set_win_streak(uint32_t(streak));
   {
     const uint32_t value = ClampTruncate(base, vehicle + 6248, kTextBase - 13064);
-    guest::StoreU32(base, PauseData(base) + 124, value);
+    PauseData(base).set_car_value_a(value);
   }
   {
     const uint32_t value = ClampTruncate(base, vehicle + 6244, kTextBase - 13068);
-    guest::StoreU32(base, PauseData(base) + 128, value);
+    PauseData(base).set_car_value_b(value);
   }
   return r3;
 }
@@ -394,14 +424,18 @@ uint64_t PauseMenuSaveOptions(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8220D6A0 PauseMenu::SaveOptions");
   Frame(base, sp, 96);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const uint32_t options = save + 0x1F85C;
-  for (const uint32_t field : {0u, 4u, 8u, 12u}) {
-    guest::StoreU32(base, options + field, guest::LoadU32(base, PauseData(base) + field));
-  }
-  for (const auto& [field, offset] :
-       {std::pair{16u, 28u}, {20u, 29u}, {24u, 36u}, {28u, 37u}, {32u, 38u}}) {
-    guest::StoreU8(base, options + offset, uint8_t(guest::LoadU32(base, PauseData(base) + field)));
-  }
+  // The options (race-event.toml's SaveData from +0x1F85C; it names the
+  // bytes +28 and +29 the other way round from the pause data).
+  const schema::SaveData options(base, save);
+  options.set_hud_option_0(PauseData(base).hud_option_0());
+  options.set_hud_option_1(PauseData(base).hud_option_1());
+  options.set_hud_option_2(PauseData(base).hud_option_2());
+  options.set_hud_option_3(PauseData(base).hud_option_3());
+  options.set_effects_volume(uint8_t(PauseData(base).music_volume_saved()));
+  options.set_music_volume(uint8_t(PauseData(base).effects_volume_saved()));
+  options.set_setting_0(uint8_t(PauseData(base).adjust_saved_0()));
+  options.set_setting_1(uint8_t(PauseData(base).adjust_saved_1()));
+  options.set_setting_2(uint8_t(PauseData(base).adjust_saved_2()));
   return save;
 }
 
@@ -414,27 +448,28 @@ uint64_t PauseMenuSaveHudOptions(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8220D740 PauseMenu::SaveHudOptions");
   Frame(base, sp, 96);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const uint32_t options = save + 0x1F85C;
-  for (const uint32_t k : {0u, 4u, 8u, 12u}) {
-    guest::StoreU32(base, options + k, guest::LoadU32(base, PauseData(base) + 36 + k));
-  }
+  const schema::SaveData options(base, save);
+  options.set_hud_option_0(PauseData(base).hud_edit_0());
+  options.set_hud_option_1(PauseData(base).hud_edit_1());
+  options.set_hud_option_2(PauseData(base).hud_edit_2());
+  options.set_hud_option_3(PauseData(base).hud_edit_3());
   return save;
 }
 
 uint32_t PauseMenuAnswerPage(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_8220C5D0 PauseMenu::AnswerPage");
-  return guest::LoadU32(base, PauseData(base) + 140);
+  return PauseData(base).answer();
 }
 
 uint32_t AfterRaceMenuAnswerPage(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_8221A720 AfterRaceMenu::AnswerPage");
-  return guest::LoadU32(base, Get(base, kAfterData) + 12);
+  return G::after_data(base).answer();
 }
 
 uint32_t RaceDialogAnswer(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82217D40 RaceDialog::Answer");
-  guest::StoreU32(base, Get(base, kDialogData) + 32, 0);
-  return guest::LoadU32(base, Get(base, kDialogData) + 0) == 1 ? 1 : 2;
+  G::dialog_data(base).set_showing(0);
+  return G::dialog_data(base).yes() == 1 ? 1 : 2;
 }
 
 }  // namespace race_screens

@@ -18,27 +18,11 @@
 namespace c_runtime::core {
 
 // The globals worked out (docs/known-data.md).
-constexpr uint32_t kFlsIndex = 0x8266B7B4;       // __flsindex: the data's TLS index
-constexpr uint32_t kGetValueIndex = 0x8266B7B8;  // __getvalueindex: the getter's TLS index
-constexpr uint32_t kFlsAlloc = 0x8297115C;       // the FLS stand-ins _mtinit sets
-constexpr uint32_t kFlsGetValue = 0x82971160;
-constexpr uint32_t kFlsSetValue = 0x82971164;
-constexpr uint32_t kFlsFree = 0x82971168;
-constexpr uint32_t kXcptActTab = 0x8266BE60;     // _XcptActTab
 constexpr uint32_t kThreadDataBytes = 196;
 constexpr uint32_t kLockTable = 0x8266BD40;      // 36 entries of 8 bytes
 constexpr uint32_t kLockCount = 36;
-constexpr uint32_t kErrnoFallback = 0x8266B658;     // errno with no thread data
-constexpr uint32_t kDosErrnoFallback = 0x8266B65C;  // _doserrno with none
-constexpr uint32_t kOsErrorTable = 0x8266B4F0;      // 45 pairs (error, errno)
 constexpr uint32_t kCritSecInit = 0x8297132C;       // the critical section initializer
 constexpr uint32_t kCritSecNoSpinCount = 0x825B3570;
-constexpr uint32_t kNotifyLock = 0x82638780;        // XAPI's notify list's lock
-constexpr uint32_t kNotifyList = 0x8263879C;        // its head (+0 first, +4 last)
-constexpr uint32_t kLockSections = 0x829711A0;      // the boot locks' critical sections
-constexpr uint32_t kThreadStartHook = 0x820723A0;   // called at a thread's start
-constexpr uint32_t kThreadEndHook = 0x820723A4;     // and at its end
-constexpr uint32_t kCrtNotifyBlock = 0x82971150;    // the C runtime's notify block
 constexpr uint32_t kCrtNotifyRoutine = 0x825B3650;
 
 enum class Import {
@@ -95,15 +79,15 @@ struct Calls {
 // ignored, as the original branches with it left in r3).
 uint32_t CrtTlsAlloc(uint32_t callback, const Calls& calls);
 
-// sub_825AA400 __set_flsgetvalue: the TLS slot [kGetValueIndex] given the
-// getter [kFlsGetValue] on this thread when it reads 0; returns the value
+// sub_825AA400 __set_flsgetvalue: the TLS slot [getvalue_index] given the
+// getter [fls_get_value] on this thread when it reads 0; returns the value
 // read, or KeTlsSetValue's result when it stored (r3 as the original leaves
 // it; _getptd_noexit doesn't read it).
 uint32_t SetFlsGetValue(uint8_t* base, const Calls& calls);
 
 // sub_825AA4C0 _getptd_noexit: the calling thread's C runtime data (196
 // bytes), made and set up when missing (calloc, stored through
-// [kFlsSetValue]: +20 = 1, +92 = _XcptActTab, +0 the thread's id, +4 = -1;
+// [fls_set_value]: +20 = 1, +92 = _XcptActTab, +0 the thread's id, +4 = -1;
 // freed when the store fails), or 0. The last error kept around it.
 uint32_t GetptdNoexit(uint8_t* base, const Calls& calls);
 
@@ -115,16 +99,16 @@ void FreeFls(uint8_t* base, uint32_t data, const Calls& calls);
 // section that is set and wasn't made at boot (+4 not 1), clearing +0.
 void MtDeleteLocks(uint8_t* base, const Calls& calls);
 
-// sub_825AA448 _mtterm: __flsindex freed through [kFlsFree] and -1,
+// sub_825AA448 _mtterm: __flsindex freed through [fls_free] and -1,
 // __getvalueindex through KeTlsFree and -1 (each unless already -1), then
 // _mtdeletelocks.
 void MtTerm(uint8_t* base, const Calls& calls);
 
 // sub_825A81E0 _errno: the calling thread's errno (its data +8), or
-// kErrnoFallback without data.
+// errno_fallback without data.
 uint32_t Errno(uint8_t* base, const Calls& calls);
 
-// sub_825A8218 __doserrno: its _doserrno (+12), or kDosErrnoFallback.
+// sub_825A8218 __doserrno: its _doserrno (+12), or doserrno_fallback.
 uint32_t DosErrno(uint8_t* base, const Calls& calls);
 
 // sub_825A8178 _get_errno_from_oserr: `error`'s errno from the table, else
@@ -137,7 +121,7 @@ void DosMapErr(uint8_t* base, uint32_t error, const Calls& calls);
 
 // sub_825AA670 _freeptd: `data`, or the calling thread's (through the
 // getter, when the getter slot is set) for 0: when __flsindex isn't -1, its
-// FLS value set to 0 through [kFlsSetValue] and _freefls; then the getter
+// FLS value set to 0 through [fls_set_value] and _freefls; then the getter
 // slot set to 0 (KeTlsSetValue) unless __getvalueindex is -1.
 void FreePtd(uint8_t* base, uint32_t data, const Calls& calls);
 
@@ -151,30 +135,30 @@ uint32_t CritSecNoSpinCount(uint32_t section, const Calls& calls);
 uint32_t InitCritSecAndSpinCount(uint8_t* base, uint32_t section, uint32_t spin,
                                  const Calls& calls);
 
-// sub_82297B98 XRegisterThreadNotifyRoutine: under kNotifyLock, `block`
+// sub_82297B98 XRegisterThreadNotifyRoutine: under notify_lock, `block`
 // linked at the list's tail (`add` not 0) or unlinked.
 void RegisterThreadNotifyRoutine(uint8_t* base, uint32_t block, uint32_t add,
                                  const Calls& calls);
 
-// sub_82297B38 XapiCallThreadNotifyRoutines (probably): under kNotifyLock,
+// sub_82297B38 XapiCallThreadNotifyRoutines (probably): under notify_lock,
 // each block's routine (+8) called with `starting`, the next block read
 // before the call.
 void CallThreadNotifyRoutines(uint8_t* base, uint32_t starting, const Calls& calls);
 
 // sub_825B31D8 _mtinitlocks: each lock table entry made at boot (+4 = 1)
-// given the next 28 bytes of kLockSections and initialized
+// given the next 28 bytes of lock_sections and initialized
 // (__crtInitCritSecAndSpinCount with 4000); 1, or 0 with that entry's +0
 // cleared when one fails.
 uint32_t MtInitLocks(uint8_t* base, const Calls& calls);
 
 // sub_825B3650 the C runtime's thread notify routine (probably): `starting`
-// not 0: [kThreadStartHook] called (with `starting`) when set; 0:
-// [kThreadEndHook] (with 0) when set, then _freeptd(0).
+// not 0: [thread_start_hook] called (with `starting`) when set; 0:
+// [thread_end_hook] (with 0) when set, then _freeptd(0).
 void ThreadNotify(uint8_t* base, uint32_t starting, const Calls& calls);
 
 // sub_825AA708 _mtinit: the FLS stand-ins set, __getvalueindex = KeTlsAlloc
 // holding the getter (KeTlsSetValue), _init_pointers, _mtinitlocks,
-// __flsindex from [kFlsAlloc], the main thread's data made and stored as
+// __flsindex from [fls_alloc], the main thread's data made and stored as
 // _getptd_noexit does, the notify routine registered. 1, or 0 (after
 // _mtterm once the getter's slot is set).
 uint32_t MtInit(uint8_t* base, const Calls& calls);
@@ -238,10 +222,6 @@ uint32_t CloseHandle(uint32_t handle, const Calls& calls);
 uint32_t ResetEvent(uint32_t event, const Calls& calls);
 
 constexpr uint32_t kIob = 0x8266B7D0;         // _iob: 20 streams of 32 bytes
-constexpr uint32_t kNstream = 0x82978328;     // _nstream
-constexpr uint32_t kPiob = 0x82978324;        // __piob
-constexpr uint32_t kNhandle = 0x82978210;     // _nhandle
-constexpr uint32_t kPioinfo = 0x82978220;     // __pioinfo (blocks of 32 handles)
 constexpr uint32_t kLock = 0x825B3430;        // _lock (c-runtime.md)
 constexpr uint32_t kUnlock = 0x825B32D0;      // _unlock
 
@@ -326,14 +306,11 @@ uint32_t Getptd(uint8_t* base, const Calls& calls);
 // sub_825B64F8 _fptrap: _amsg_exit(2) (its tail call); its r3.
 uint64_t Fptrap(uint8_t* base, const Calls& calls);
 
-constexpr uint32_t kDebugMonitorData = 0x820007F0;  // [it]: KeDebugMonitorData's address
-constexpr uint32_t kUnhandledFilter = 0x829714A0;   // SetUnhandledExceptionFilter's word
-constexpr uint32_t kCxxPreviousFilter = 0x82971348;  // the filter before the C++ one
 
 // sub_82297940 UnhandledExceptionFilter: from a 96-byte frame, the debug
 // monitor's routine (its data's +24) with (10, 0) when one is attached
-// ([[kDebugMonitorData]] not 0); when that gives 0 (or there's none), the
-// filter at kUnhandledFilter with the exception pointers when set: -1 when
+// ([[debug_monitor_data]] not 0); when that gives 0 (or there's none), the
+// filter at unhandled_exception_filter with the exception pointers when set: -1 when
 // it returns -1, else 0.
 uint32_t UnhandledExceptionFilter(uint8_t* base, uint32_t pointers, const Calls& calls);
 
@@ -344,7 +321,7 @@ uint32_t UnhandledExceptionFilter(uint8_t* base, uint32_t pointers, const Calls&
 void DebugMonitorNotify(uint8_t* base, uint32_t code, double value, const Calls& calls);
 
 // sub_825B4D90 __CxxRestoreUnhandledExceptionFilter:
-// SetUnhandledExceptionFilter([kCxxPreviousFilter]) (its tail call); the old
+// SetUnhandledExceptionFilter([cxx_previous_filter]) (its tail call); the old
 // filter.
 uint32_t CxxRestoreUnhandledExceptionFilter(uint8_t* base);
 
@@ -553,7 +530,7 @@ uint64_t Flush(uint8_t* base, uint32_t stream, const Calls& calls);
 // sub_825B4CD0 __CxxUnhandledExceptionFilter: from a 112-byte frame, a C++
 // exception (code 0xE06D7363, 3 parameters, magic 0x19930520 to 0x19930522)
 // goes to terminate (which ends the process); then the filter before it
-// (kCxxPreviousFilter), when set and _ValidateExecute passes it, called with
+// (cxx_previous_filter), when set and _ValidateExecute passes it, called with
 // the pointers: its r3; else 0.
 uint64_t CxxUnhandledExceptionFilter(uint8_t* base, uint32_t pointers, const Calls& calls);
 
@@ -635,7 +612,7 @@ uint32_t Cftoe2(uint8_t* base, uint32_t buffer, uint32_t size, int32_t precision
 // _cinit's _initterm runs at boot): from a 96-byte frame, atexit(
 // __CxxRestoreUnhandledExceptionFilter, 0x825B4D90), then
 // SetUnhandledExceptionFilter(__CxxUnhandledExceptionFilter, 0x825B4CD0),
-// the old filter kept at kCxxPreviousFilter. The old filter (its r3).
+// the old filter kept at cxx_previous_filter. The old filter (its r3).
 uint32_t CxxSetUnhandledExceptionFilter(uint8_t* base, const Calls& calls);
 
 // sub_825ACD10 _fflush_nolock: from a 96-byte frame, a null stream: flsall(0)
@@ -668,10 +645,6 @@ uint32_t Flushall(uint8_t* base, const Calls& calls);
 // __piob freed.
 void Endstdio(uint8_t* base, const Calls& calls);
 
-constexpr uint32_t kCExitDone = 0x8297114C;         // _C_Exit_Done
-constexpr uint32_t kCTerminationDone = 0x82971148;  // _C_Termination_Done
-constexpr uint32_t kExitFlag = 0x82971144;          // _exitflag (a byte)
-
 // sub_825AA218 doexit (probably): in its 128-byte frame (`ret` at +164, the
 // caller's frame + 20; +80 the exit table's walk), _lock(8) (a guest call:
 // the exit lock's host mutex is routed there). Unless _C_Exit_Done is 1:
@@ -685,17 +658,12 @@ constexpr uint32_t kExitFlag = 0x82971144;          // _exitflag (a byte)
 // leaves it when it returns (_unlock's).
 uint64_t Doexit(uint8_t* base, uint32_t code, uint32_t quick, uint32_t ret, const Calls& calls);
 
-constexpr uint32_t kAbortBehavior = 0x8266B7C4;    // __abort_behavior
-constexpr uint32_t kSignalActions = 0x82971338;    // SIGINT, SIGBREAK, SIGABRT, SIGTERM
-constexpr uint32_t kXcptActTabCount = 0x8266BEE4;  // _XcptActTabCount
-constexpr uint32_t kFirstFpe = 0x8266BED8;         // _First_FPE_Indx
-constexpr uint32_t kFpeCount = 0x8266BEDC;         // _Num_FPE
 constexpr uint32_t kPurecallHandler = 0x82971178;  // __pPurecall
 
 // sub_825B49C8 raise: in its 160-byte frame (`signal` at +180, the caller's
 // frame + 20; +80 the action, +84 whether lock 0 is taken, +88 the thread's
 // data, +92 the FPE walk, +96 and +100 the saved pointers): SIGINT (2),
-// SIGBREAK (21), SIGABRT (6, 22) and SIGTERM (15) from kSignalActions under
+// SIGBREAK (21), SIGABRT (6, 22) and SIGTERM (15) from sigint_action to sigterm_action under
 // _lock(0); SIGFPE (8), SIGILL (4) and SIGSEGV (11) from the thread's action
 // table (its data's +92, _XcptActTabCount entries of 12 bytes; not found:
 // the word at 8, as the original), -1 without thread data; another signal:

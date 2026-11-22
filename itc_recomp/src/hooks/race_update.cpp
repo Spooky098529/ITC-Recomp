@@ -3,6 +3,8 @@
 // shares (hooks/race_update.h).
 
 #include "hooks/race_update.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -108,7 +110,7 @@ ITC_REGS_STEP(RaceUpdateUpdate) {
     ctx.r3.u64 = manager;
     ctx.r1.u64 = frame;
     ctx.lr = 0x8215D2D8;
-    lifted::CallFromContext(ctx, base, 0x820F4558);
+    lifted::Enter(ctx, base, game::Scenery::Update);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;

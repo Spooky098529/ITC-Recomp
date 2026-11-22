@@ -10,6 +10,8 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/car_physics.h"
+#include "schema/collision.h"
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -22,14 +24,17 @@ namespace cp = car_physics;
 
 namespace {
 
-constexpr uint32_t kMinusOne = 0x82001BE0;  // the game's float -1.0
-constexpr uint32_t kEpsilon = 0x8200222C;   // a small epsilon, probably
-// The impulse's scale for the contact's force (read from guest memory).
-constexpr uint32_t kImpulseScale = 0x82600E84;
+using G = schema::CollisionGlobals;
+using Object = schema::CollisionPairObject;
+using Contact = schema::QueryContact;
+using Pair = schema::CollisionPair;
 
-// Whether the masks of one object's word and the other's share a bit.
-bool Meet(uint8_t* base, uint32_t a, uint32_t a_at, uint32_t b, uint32_t b_at) {
-  return (guest::LoadU32(base, a + a_at) & guest::LoadU32(base, b + b_at)) != 0;
+// Whether the surface bits of one object that get a response (`response`)
+// or push it out (else) meet the other's groups.
+bool Meet(uint8_t* base, uint32_t a, bool response, uint32_t b) {
+  const Object object_a(base, a), object_b(base, b);
+  return ((response ? object_a.response_bits() : object_a.push_out_bits()) &
+          object_b.groups()) != 0;
 }
 
 // A contact recorded on `object` (CollisionObject::AddContact) for its
@@ -37,26 +42,28 @@ bool Meet(uint8_t* base, uint32_t a, uint32_t a_at, uint32_t b, uint32_t b_at) {
 // impulse, +0 = the other object, +4 = its groups (+244).
 void RecordContact(uint8_t* base, uint32_t contact, uint32_t normal, uint32_t point,
                    uint32_t other, double impulse) {
-  vl::Vec4Copy(base, contact + 32, normal);
-  vl::Vec4Copy(base, contact + 16, point);
-  const uint32_t groups = guest::LoadU32(base, other + 244);
-  Stfs(base, contact + 64, impulse);
-  guest::StoreU32(base, contact + 0, other);
-  guest::StoreU32(base, contact + 4, groups);
+  const schema::CollisionContact c(base, contact);
+  vl::Vec4Copy(base, c.normal_address(), normal);
+  vl::Vec4Copy(base, c.position_address(), point);
+  const uint32_t groups = Object(base, other).groups();
+  Stfs(base, c.strength_address(), impulse);
+  c.set_other(other);
+  c.set_flags(groups);
 }
 
 }  // namespace
 
 bool CollisionPairRespondNative(uint8_t* base, uint32_t a, uint32_t b) {
   for (uint32_t object : {a, b}) {
-    if (!IsBox(base, guest::LoadU32(base, object + 32 + 8))) {
+    const schema::CollisionShape record(base, Object(base, object).shape_record_address());
+    if (!IsBox(base, record.current().address)) {
       return false;
     }
   }
   // RigidBody::ContactImpulseWith runs the original for a fixed body.
-  if (Meet(base, a, 256, b, 244) || Meet(base, b, 256, a, 244)) {
+  if (Meet(base, a, true, b) || Meet(base, b, true, a)) {
     for (uint32_t object : {a, b}) {
-      if (guest::LoadU8(base, guest::LoadU32(base, object + 16)) == 1) {
+      if (schema::RigidBody(base, Object(base, object).body()).fixed() == 1) {
         return false;
       }
     }
@@ -68,32 +75,34 @@ void CollisionPairRespond(uint8_t* base, uint32_t a, uint32_t b, uint32_t contac
                           uint32_t frame, uint32_t* r3) {
   ITC_NATIVE_RUNNING("sub_820BB868 CollisionPair::Respond");
   const uint32_t f = frame;
-  const uint32_t normal = contact + 16;
-  const uint32_t direction = contact + 32;
+  const Object object_a(base, a), object_b(base, b);
+  const Contact c(base, contact);
+  const uint32_t normal = c.normal_x_address();
+  const uint32_t direction = c.push_x_address();
   // The push-out: A when its +260 meets B's +244, B when its +260 meets
   // A's, by the depth plus the epsilon.
-  bool push_a = Meet(base, a, 260, b, 244);
-  bool push_b = Meet(base, b, 260, a, 244);
-  const double depth = Fadds(Lfs(base, contact + 48), Lfs(base, kEpsilon));
+  bool push_a = Meet(base, a, false, b);
+  bool push_b = Meet(base, b, false, a);
+  const double depth = Fadds(double(c.depth()), double(G::epsilon(base)));
   double impulse = Lfs(base, kZero);
-  const double minus_one = Lfs(base, kMinusOne);
+  const double minus_one = double(G::minus_one(base));
   if ((push_a || push_b) && depth > impulse) {
     // The mass shares: A moved by B's, B by A's (negated); a fixed body
     // isn't moved and its partner takes all.
-    const double mass_a = double(va::RigidBodyMass(base, guest::LoadU32(base, a + 16)));
-    const double mass_b = double(va::RigidBodyMass(base, guest::LoadU32(base, b + 16)));
+    const double mass_a = double(va::RigidBodyMass(base, object_a.body()));
+    const double mass_b = double(va::RigidBodyMass(base, object_b.body()));
     double share_a = Lfs(base, kOne);
     double share_b = Fdivs(share_a, Fadds(mass_b, mass_a));
-    if ((va::RigidBodyIsFixed(base, guest::LoadU32(base, b + 16)) & 0xFF) != 0) {
+    if ((va::RigidBodyIsFixed(base, object_b.body()) & 0xFF) != 0) {
       push_b = false;
     } else {
-      share_a = Fmuls(double(va::RigidBodyMass(base, guest::LoadU32(base, b + 16))), share_b);
+      share_a = Fmuls(double(va::RigidBodyMass(base, object_b.body())), share_b);
     }
-    if ((va::RigidBodyIsFixed(base, guest::LoadU32(base, a + 16)) & 0xFF) != 0) {
+    if ((va::RigidBodyIsFixed(base, object_a.body()) & 0xFF) != 0) {
       share_b = minus_one;
     } else {
       share_b = Fneg(
-          Fmuls(double(va::RigidBodyMass(base, guest::LoadU32(base, a + 16))), share_b));
+          Fmuls(double(va::RigidBodyMass(base, object_a.body())), share_b));
       if (push_a) {
         vl::Vec4Scaled(base, f + 96, direction, depth);
         vl::Vec4Scaled(base, f + 112, f + 96, share_a);
@@ -108,16 +117,16 @@ void CollisionPairRespond(uint8_t* base, uint32_t a, uint32_t b, uint32_t contac
   }
   // The impulse: when A's +256 meets B's +244 or B's +256 A's, the force
   // along the normal on each such object (B's negated).
-  const bool hit_a = Meet(base, a, 256, b, 244);
-  const bool hit_b = Meet(base, b, 256, a, 244);
+  const bool hit_a = Meet(base, a, true, b);
+  const bool hit_b = Meet(base, b, true, a);
   if (hit_a || hit_b) {
     CopyWord(base, kZero, f + 92);
     double f1 = 0.0;
     uint32_t ignored = 0;
-    cp::RigidBodyContactImpulseWith(base, guest::LoadU32(base, a + 16), contact, normal,
-                                    guest::LoadU32(base, b + 16), f - 272, &f1, &ignored);
+    cp::RigidBodyContactImpulseWith(base, object_a.body(), contact, normal,
+                                    object_b.body(), f - 272, &f1, &ignored);
     impulse = f1;
-    vl::Vec4Scaled(base, f + 112, normal, Fmuls(Lfs(base, kImpulseScale), impulse));
+    vl::Vec4Scaled(base, f + 112, normal, Fmuls(double(G::contact_impulse_scale(base)), impulse));
     vl::Vec4Copy(base, f + 80, f + 112);
     if (hit_a) {
       cp::CollisionObjectAccumulateForce(base, a, contact, f + 80, f - 160);
@@ -137,20 +146,22 @@ void CollisionPairRespond(uint8_t* base, uint32_t a, uint32_t b, uint32_t contac
   if (on_b != 0) {
     vl::Vec4Scaled(base, f + 112, normal, minus_one);
     RecordContact(base, on_b, f + 112, contact, a, impulse);
-    *r3 = on_b + 16;
+    *r3 = schema::CollisionContact(base, on_b).position_address();
   }
 }
 
 bool CollisionPairSolve(uint8_t* base, uint32_t pair, uint32_t frame, uint32_t* result) {
   ITC_NATIVE_RUNNING("sub_820BBE30 CollisionPair::Solve");
-  const uint32_t a = guest::LoadU32(base, pair + 16);
-  const uint32_t b = guest::LoadU32(base, pair + 20);
+  const uint32_t a = Pair(base, pair).a().address;
+  const uint32_t b = Pair(base, pair).b().address;
   // The query's tests are made natively for boxes only (the records'
   // templates and both copies), and the response for objects
   // CollisionPairRespondNative takes: else the original from the start.
   for (uint32_t object : {a, b}) {
-    for (uint32_t at : {0u, 4u, 8u}) {
-      if (!IsBox(base, guest::LoadU32(base, object + 32 + at))) {
+    const schema::CollisionShape record(base, Object(base, object).shape_record_address());
+    for (uint32_t at :
+         {record.template_shape_address(), record.previous_address(), record.current_address()}) {
+      if (!IsBox(base, guest::LoadU32(base, at))) {
         return false;
       }
     }
@@ -161,11 +172,11 @@ bool CollisionPairSolve(uint8_t* base, uint32_t pair, uint32_t frame, uint32_t* 
   const uint32_t f = frame;
   const uint32_t query = f + 128;
   QueryConstruct(base, query);
-  QuerySetShapes(base, query, guest::LoadU32(base, pair + 16) + 32,
-                 guest::LoadU32(base, pair + 20) + 32);
+  QuerySetShapes(base, query, Pair(base, pair).a<Object>().shape_record_address(),
+                 Pair(base, pair).b<Object>().shape_record_address());
   uint32_t touched = 0;
   uint32_t answer = 0;
-  QuerySeparated(base, query, pair + 24, f - 112, &answer);
+  QuerySeparated(base, query, Pair(base, pair).separated_face_address(), f - 112, &answer);
   if (answer != 0) {
     *result = 0;
     return true;
@@ -173,14 +184,13 @@ bool CollisionPairSolve(uint8_t* base, uint32_t pair, uint32_t frame, uint32_t* 
   // After each response: done when the objects no longer push each other
   // out, or the moved copies are apart.
   auto respond = [&](uint32_t* r3) {
-    const uint32_t contact = va::RigidBodyVelocity(query);  // query + 32
-    CollisionPairRespond(base, guest::LoadU32(base, pair + 16), guest::LoadU32(base, pair + 20),
+    const uint32_t contact = va::RigidBodyVelocity(query);  // the query's contact (+32)
+    CollisionPairRespond(base, Pair(base, pair).a().address, Pair(base, pair).b().address,
                          contact, f - 240, r3);
     touched = 1;
-    const uint32_t oa = guest::LoadU32(base, pair + 16);
-    const uint32_t ob = guest::LoadU32(base, pair + 20);
-    if ((guest::LoadU32(base, oa + 260) & guest::LoadU32(base, ob + 244)) == 0 ||
-        (guest::LoadU32(base, oa + 244) & guest::LoadU32(base, ob + 260)) == 0) {
+    const Object oa = Pair(base, pair).a<Object>();
+    const Object ob = Pair(base, pair).b<Object>();
+    if ((oa.push_out_bits() & ob.groups()) == 0 || (oa.groups() & ob.push_out_bits()) == 0) {
       return true;
     }
     uint32_t apart = 0;
@@ -202,19 +212,20 @@ bool CollisionPairSolve(uint8_t* base, uint32_t pair, uint32_t frame, uint32_t* 
   // The push-outs, along the direction from B's previous center to A's
   // weighted by the objects' +208 ((1, 0, 0) when too short), normalized.
   CopyWord(base, kZero, f + 92);
-  const uint32_t center_b =
-      CollisionShapePreviousCenter(base, guest::LoadU32(base, pair + 20) + 32);
-  const uint32_t center_a =
-      CollisionShapePreviousCenter(base, guest::LoadU32(base, pair + 16) + 32);
+  const uint32_t center_b = CollisionShapePreviousCenter(
+      base, Pair(base, pair).b<Object>().shape_record_address());
+  const uint32_t center_a = CollisionShapePreviousCenter(
+      base, Pair(base, pair).a<Object>().shape_record_address());
   vl::Vec3Difference(base, f + 112, center_a, center_b);
   vl::Vec4Copy(base, f + 80, f + 112);
-  const uint32_t ob = guest::LoadU32(base, pair + 20);
-  const uint32_t oa = guest::LoadU32(base, pair + 16);
+  const Object ob = Pair(base, pair).b<Object>();
+  const Object oa = Pair(base, pair).a<Object>();
   for (uint32_t i = 0; i < 12; i += 4) {
-    const double weight = Fmuls(Lfs(base, oa + 208 + i), Lfs(base, ob + 208 + i));
+    const double weight = Fmuls(Lfs(base, oa.push_out_scale_x_address() + i),
+                                Lfs(base, ob.push_out_scale_x_address() + i));
     Stfs(base, f + 80 + i, Fmuls(weight, Lfs(base, f + 80 + i)));
   }
-  if (double(vl::Vec3Dot(base, f + 80, f + 80)) < Lfs(base, kEpsilon)) {
+  if (double(vl::Vec3Dot(base, f + 80, f + 80)) < double(G::epsilon(base))) {
     CopyWord(base, kZero, f + 100);
     CopyWord(base, kZero, f + 104);
     CopyWord(base, kZero, f + 108);

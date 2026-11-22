@@ -1,0 +1,19 @@
+# The schema of docs/functions/front-end-screen-helpers.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# No types of its own. The two the measure filed here are other areas'
+# objects, extended there rather than copied:
+# - "CarCard::Fill.r4" (CarCard::Fill's entry: +744 the price, +769 the
+#   maker byte, +8432 the car id) is a car in the car dealer's lists
+#   ([0x826D83F4] +1136's entries): CarDealerEntry in car-dealer.toml.
+# - "CarDetail::Open.r4" (the mode's ring: +804 the count, +808 the start,
+#   12-byte slots from +204) is the type 2 mode as the dealer's handlers see
+#   it: CarDealerMode in car-dealer.toml (the same layout as boot-mode.toml's
+#   ModeDispatcher).
+# The helpers' globals ([0x826D83F4], [0x826D83EC], [0x826D844C],
+# [0x826D8450], [0x826D8454], [0x826D8478] and on, the sound manager
+# [0x826C5C80]) are the car dealer's, the save screen's, the options' and
+# the sound cues' image words.

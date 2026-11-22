@@ -24,9 +24,6 @@ namespace type8_mode {
 
 using Calls = type67_modes::Calls;
 
-// The asking player the confirms set (Type8Dialog::OpenConfirm reads it).
-constexpr uint32_t kDialogPlayer = 0x82814E6C;
-
 // --- The dialog (dialog.cpp): r3 the dialog (the member's +9792, its
 // machine at +0: the state +9604); r4 the dispatcher where read ---
 

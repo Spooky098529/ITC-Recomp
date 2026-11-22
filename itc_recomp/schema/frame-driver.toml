@@ -1,0 +1,317 @@
+# The schema of docs/functions/frame-driver.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The frame driver (the game's object carrying each frame to its render
+# thread, not our Vulkan renderer) and the app's scene, both made once at
+# boot by Framework::Init (known-data.md's "frame driver" and "app scene";
+# src/frame_driver/). The game's Thread class (vtable 0x8206CB30) is the
+# frame driver's base: its +0 to +16 are the Thread's.
+
+# The frame driver (400 bytes, FrameDriver::Create; framework + 76 holds
+# frame driver + 20). The measure names it after its Thread base.
+[FrameDriver]
+measure = "Thread"
+size = 400
+origin = "allocated"
+vtable = 0x82000D7C
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "GameThreadVtable", note = "0x82000D7C (0 the deleting destructor, 1 FrameDriver::ThreadLoop); the Thread base's 0x8206CB30 first" },
+  { name = "thread_handle", offset = 4, type = "u32", note = "the Thread's handle, -1 for none" },
+  { name = "thread_object", offset = 8, type = "ptr", to = "FrameDriver", note = "the Thread's object whose slot 1 runs (the thread itself when 0 is passed)" },
+  { name = "thread_processor", offset = 12, type = "u32", note = "the Thread's hardware thread (1 for the render thread)" },
+  { name = "thread_priority", offset = 16, type = "u32", note = "the Thread's priority index into {2, 1, 0, -1, -2} (2 for the render thread)" },
+  { name = "interface", offset = 20, type = "bytes", count = 8, note = "the interface (FrameDriverInterface) framework + 76 holds" },
+  { name = "interface_vtable", offset = 20, type = "u32", note = "0x82000D6C (0x82000D48, the base's, first): 1 AddListener, 2 RemoveListener, 3 GetVideoOutput" },
+  { name = "framework_interface", offset = 24, type = "u32", note = "the framework's +4 interface (FrameDriver::Init's block +4)" },
+  { name = "listeners", offset = 28, type = "bytes", count = 12, note = "the listener map (a HandlerMap, framework.md): keys 1 Scene::Draw, 3 the front buffer resolve, 5 FrameDriver::Present" },
+  { name = "requests", offset = 40, type = "bytes", count = 16, note = "the request vector (12-byte requests {type, key, delegate}; interface + 20)" },
+  { name = "requests_first", offset = 44, type = "u32" },
+  { name = "requests_last", offset = 48, type = "u32" },
+  { name = "requests_end", offset = 52, type = "u32" },
+  { name = "video_output", offset = 64, type = "bytes", count = 320, note = "the video output (VideoOutput, video-output.md)" },
+  { name = "device", offset = 384, type = "u32", note = "the device while FrameDriver::DrawFrame holds the device lock" },
+  { name = "frame_start_event", offset = 388, type = "u32", note = "signaled by tick handler 2 (FrameDriver::StartFrame)" },
+  { name = "frame_done_event", offset = 392, type = "u32", note = "waited on by tick handler 16 (FrameDriver::WaitForFrame)" },
+  { name = "running", offset = 396, type = "u8", note = "1 while it runs (set by FrameDriver::Init)" },
+]
+
+# The Thread object's vtable (the frame driver's 0x82000D7C, the base's
+# 0x8206CB30).
+[GameThreadVtable]
+measure = "Thread.+0"
+size = 8
+origin = "image"
+fields = [
+  { name = "deleting_destructor", offset = 0, type = "fn" },
+  { name = "run", offset = 4, type = "fn", note = "slot 1, what Thread::Start runs (FrameDriver::ThreadLoop)" },
+]
+
+# A word Thread::Begin reads by address (r5 the processor, r6 the priority
+# index).
+[GameThreadArgWord]
+measure = "Thread::Begin.r5"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "u32" },
+]
+
+# The frame driver's interface at frame driver + 20 (vtable 0x82000D6C;
+# 0x82000D48 its base's, whose slot 0 is sub_82091A10).
+[FrameDriverInterface]
+measures = ["sub_82091A10.r3", "Scene::Draw.r4"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "FrameDriverInterfaceVtable", note = "0x82000D6C (0x82000D48 the base's)" },
+]
+
+[FrameDriverInterfaceVtable]
+measure = "Scene::Draw.r4.+0"
+size = 16
+origin = "image"
+fields = [
+  { name = "deleting_destructor", offset = 0, type = "fn", note = "a thunk to the frame driver's deleting destructor" },
+  { name = "add_listener", offset = 4, type = "fn", note = "FrameDriver::AddListener sub_820922B8" },
+  { name = "remove_listener", offset = 8, type = "fn", note = "FrameDriver::RemoveListener" },
+  { name = "get_video_output", offset = 12, type = "fn", note = "FrameDriver::GetVideoOutput sub_824960E0" },
+]
+
+# A listener's key, by address (FrameDriver::AddListener's r4; the listener
+# map's lookups' r4 and r5).
+[FrameDriverListenerKey]
+measures = ["FrameDriver::AddListener.r4", "sub_82091BF8.r4", "sub_82091F58.r5"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "key", offset = 0, type = "u32" },
+]
+
+# The delegate FrameDriver::AddListener copies (12 bytes, as app-states.toml's
+# AppDelegate).
+[FrameDriverDelegate]
+measure = "FrameDriver::AddListener.r5"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "FrameDriverDelegateVtable", note = "0x82002850 (base 0x82000ABC)" },
+]
+
+[FrameDriverDelegateVtable]
+measure = "FrameDriver::AddListener.r5.+0"
+size = 12
+origin = "image"
+fields = [
+  { name = "clone", offset = 8, type = "fn", note = "slot 2, Delegate::Clone" },
+]
+
+# The block FrameDriver::Init gets (from Framework::Init).
+[FrameDriverInitBlock]
+measure = "FrameDriver::Init.r4"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "run_loop", offset = 0, type = "ptr", to = "FrameDriverRunLoopRef" },
+  { name = "framework_interface", offset = 4, type = "u32", note = "the framework's +4 interface" },
+]
+
+# The block Scene::Scene gets (from Framework::Init).
+[AppSceneInitBlock]
+measure = "Scene::Scene.r4"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "run_loop", offset = 0, type = "ptr", to = "FrameDriverRunLoopRef" },
+  { name = "framework_interface", offset = 4, type = "ptr", to = "AppSceneFrameworkInterface", note = "the framework's +8 interface" },
+]
+
+# The run loop as FrameDriver::Init and Scene::Scene reach it. A measure
+# fault: the run loop and its vtable joined (+0 is the run loop's vtable
+# word, +4 and +8 are the vtable's slots).
+[FrameDriverRunLoopRef]
+measures = ["FrameDriver::Init.r4.+0", "Scene::Scene.r4.+0",
+            "SaveDevices::SaveDevices.r4.+0", "sub_820998B8.r4.+0"]
+size = 12
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "the run loop's vtable 0x82000FE8" },
+  { name = "add_listener", offset = 4, type = "fn", note = "measure fault: the vtable's slot 1 (AddListener)" },
+  { name = "add_tick_handler", offset = 8, type = "fn", note = "measure fault: the vtable's slot 2 (AddTickHandler)" },
+]
+
+# The run loop as the shutdown listener Scene::OnEvent5 gets it (r4).
+[FrameDriverRunLoop]
+measure = "Scene::OnEvent5.r4"
+measures = ["SaveDevices::OnEvent.r4"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "FrameDriverRunLoopVtable", note = "0x82000FE8" },
+]
+
+[FrameDriverRunLoopVtable]
+measure = "Scene::OnEvent5.r4.+0"
+measures = ["SaveDevices::OnEvent.r4.+0"]
+size = 20
+origin = "image"
+fields = [
+  { name = "remove_listener", offset = 12, type = "fn", note = "slot 3, removes a listener" },
+  { name = "remove_tick_handler", offset = 16, type = "fn", note = "slot 4, removes a tick handler (sub_8209AB08)" },
+]
+
+# The event's word, by address (the run loop's listeners' r5).
+[FrameDriverEventWord]
+measure = "Scene::OnEvent5.r5"
+measures = ["SaveDevices::OnEvent.r5"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "u32", note = "1 the shutdown" },
+]
+
+# An owned pointer's slot (sub_82090380: deleted when not 0, then 0).
+[FrameDriverOwnedPointer]
+measure = "sub_82090380.r3"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "object", offset = 0, type = "ptr", to = "FrameDriverOwnedObject" },
+]
+
+[FrameDriverOwnedObject]
+measure = "sub_82090380.r3.+0"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "measure fault: also its vtable's slot 0 (the deleting destructor), the object and its vtable joined" },
+]
+
+# A listener map iterator {map, node} (sub_82091F58's result, sub_82099F50's
+# r3, sub_82093000's result stored as one doubleword).
+[FrameDriverMapIterator]
+measures = ["sub_82091F58.r3", "sub_82099F50.r3", "sub_82093000.r3"]
+size = 8
+origin = "embedded"
+fields = [
+  { name = "both", offset = 0, type = "u64", note = "the map and the node as one doubleword" },
+  { name = "map", offset = 0, type = "ptr", to = "FrameDriverListenerMap" },
+  { name = "node", offset = 4, type = "ptr", to = "FrameDriverMapNode" },
+]
+
+# The listener map (frame driver + 28; a HandlerMap, framework.md).
+[FrameDriverListenerMap]
+measures = ["sub_82091F58.r4", "sub_82093000.r4", "sub_82099F50.ret.+0"]
+size = 12
+origin = "embedded"
+fields = [
+  { name = "head", offset = 4, type = "ptr", to = "FrameDriverMapNode", note = "the head node (+0 the leftmost, +4 the root, +8 the rightmost)" },
+  { name = "size", offset = 8, type = "u32" },
+]
+
+# A listener map node (24 bytes, Dinkumware's red-black tree).
+[FrameDriverMapNode]
+measures = ["sub_82093000.r4.+4", "sub_82093000.r4.+4.+0", "sub_82093000.r4.+4.+8", "sub_82099F50.ret.+0.+4", "sub_82099F50.ret.+0.+4.+8", "sub_82099F50.ret.+0.+4.+8.+0"]
+size = 24
+origin = "allocated"
+fields = [
+  { name = "left", offset = 0, type = "ptr", to = "FrameDriverMapNode" },
+  { name = "parent", offset = 4, type = "ptr", to = "FrameDriverMapNode" },
+  { name = "right", offset = 8, type = "ptr", to = "FrameDriverMapNode" },
+  { name = "key", offset = 12, type = "u32" },
+  { name = "delegate", offset = 16, type = "u32" },
+  { name = "color", offset = 20, type = "u8" },
+  { name = "is_nil", offset = 21, type = "u8" },
+]
+
+# The app's scene (80 bytes, Scene::Create, framework + 80; not the car
+# scene [0x826C2E44]).
+[AppScene]
+measure = "Scene"
+size = 80
+origin = "allocated"
+vtable = 0x82000F3C
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82000F3C (0 the deleting destructor, 1 the command list's getter, 2 the render queue's)" },
+  { name = "framework_interface", offset = 4, type = "ptr", to = "AppSceneFrameworkInterface", note = "the framework's +8 interface" },
+  { name = "command_list", offset = 8, type = "bytes", count = 56, note = "the command list (CommandList, command-list.toml)" },
+  { name = "command_list_used", offset = 20, type = "u32", note = "the command list's +12, the slots used this tick" },
+  { name = "command_list_last_used", offset = 24, type = "u32", note = "the command list's +16" },
+  { name = "command_list_allocation", offset = 28, type = "u32", note = "the command list's +20, both buffers' block" },
+  { name = "render_queue", offset = 64, type = "bytes", count = 16, note = "the render queue (RenderQueue, device-shaders.toml)" },
+  { name = "render_queue_vtable", offset = 64, type = "ptr", to = "AppSceneRenderQueueVtable", note = "the render queue's +0, 0x8206CB8C" },
+]
+
+# The render queue's vtable 0x8206CB8C as the scene reaches it (device-shaders.toml's
+# RenderQueueVtable).
+[AppSceneRenderQueueVtable]
+measure = "Scene.+64"
+size = 28
+origin = "image"
+fields = [
+  { name = "init", offset = 0, type = "fn", note = "slot 0, RenderQueue::Init" },
+  { name = "clear_recording", offset = 8, type = "fn", note = "slot 2, RenderQueue::ClearRecording" },
+  { name = "replay", offset = 20, type = "fn", note = "slot 5, RenderQueue::Replay" },
+  { name = "flip", offset = 24, type = "fn", note = "slot 6, RenderQueue::Flip" },
+]
+
+# The framework's +8 interface (the scene's +4).
+[AppSceneFrameworkInterface]
+measures = ["Scene.+4", "Scene::Scene.r4.+4"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "AppSceneFrameworkInterfaceVtable" },
+]
+
+[AppSceneFrameworkInterfaceVtable]
+measures = ["Scene.+4.+0", "Scene::Scene.r4.+4.+0"]
+size = 8
+origin = "image"
+fields = [
+  { name = "frame_driver", offset = 4, type = "fn", note = "slot 1, the frame driver's interface (frame driver + 20)" },
+]
+
+[globals]
+thread_object_type = { address = 0x820007FC, type = "u32", note = "the kernel's thread object type, for ObReferenceObjectByHandle" }
+color_rect_queue = { address = 0x826D83D0, type = "u32", note = "the color rectangles' render queue (the scene's +64)" }
+color_rect_list = { address = 0x826D83D4, type = "u32", note = "the color rectangles' command list (the scene's +8)" }
+identity_matrix = { address = 0x8265ECA0, type = "bytes", count = 64, note = "set to the identity by DrawGlobals::Init" }
+default_float4s = { address = 0x8265ECE0, type = "bytes", count = 48, note = "DrawGlobals::Init's float4 defaults" }
+draw_defaults = { address = 0x8265ED20, type = "bytes", count = 32, note = "two float4 defaults DrawGlobals::Init sets last" }
+declaration_elements = { address = 0x8265EACC, type = "bytes", count = 308, note = "eleven tables of seven vertex element list pointers (+28k)" }
+work_buffer = { address = 0x8296B780, type = "u32", note = "the work memory's current buffer (0 or 1)" }
+work_cleared = { address = 0x8296B784, type = "bytes", count = 8, note = "a word per buffer zeroed by WorkMem::Flip" }
+work_virtual0 = { address = 0x8296B78C, type = "u32", note = "a 1 MB Memory::AllocVirtual block (count x 64 bytes)" }
+work_virtual1 = { address = 0x8296B790, type = "u32", note = "the second" }
+work_count = { address = 0x8296B794, type = "u32", note = "16,384" }
+work_headers_used = { address = 0x8296B798, type = "bytes", count = 8, note = "per buffer" }
+work_bytes_used = { address = 0x8296B7A0, type = "bytes", count = 8, note = "per buffer, rounded to 128" }
+work_start = { address = 0x8296B7A8, type = "bytes", count = 8, note = "per buffer: the 2 MB physical blocks" }
+work_capacity = { address = 0x8296B7B0, type = "u32", note = "each buffer's bytes (2 MB)" }
+declarations = { address = 0x8296B7BC, type = "bytes", count = 308, note = "the 77 vertex declarations, eleven tables of seven at 0x8296B8D4 - 28k" }
+sort_key_b = { address = 0x8296B900, type = "u32", note = "a render queue sort key, 1 at boot" }
+sort_key_a = { address = 0x8296B90C, type = "u32", note = "a render queue sort key, 0 at boot" }
+scene_list = { address = 0x8296B918, type = "u32", note = "the scene's command list (scene + 8), for the recorders" }
+scene_queue = { address = 0x8296B91C, type = "u32", note = "the scene's render queue (scene + 64)" }
+lighting_defaults = { address = 0x8296B950, type = "bytes", count = 912, note = "DrawGlobals::Init's lighting float4s (to 0x8296BCDF)" }
+vblank_count = { address = 0x8296BD30, type = "u32", note = "cleared by VideoOutput::BeginFrame once a frame" }
+primitive_flip = { address = 0x82970BC4, type = "u32", note = "flipped once a tick by sub_82591838 (0 when it was 1, else 1)" }
+primitive_declaration = { address = 0x82970BC8, type = "u32", note = "the primitive vertex declaration (probably)" }
+scene_queue_2 = { address = 0x82970BD4, type = "u32", note = "the scene's render queue again" }
+scene_list_2 = { address = 0x82970BD8, type = "u32", note = "the scene's command list again" }
+primitive_declaration_ready = { address = 0x82970BDC, type = "u32", note = "1 once the primitive declaration is made" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from GameThreadArgWord.
+[GameThreadArgWordAt4]
+measure = "Thread::Begin.r5@+4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]

@@ -23,6 +23,8 @@
 // (amount 0) and the frames after it move towards the current one.
 
 #include <format>
+#include "lifted/names.h"
+#include "lifted/entries.h"
 #include "blend_state.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
@@ -200,7 +202,7 @@ bool OneHostRange(uint32_t address) {
 Matrix4 LoadMatrix(uint8_t* base, uint32_t address) {
   Matrix4 m;
   if (OneHostRange(address)) {
-    const uint8_t* p = REX_RAW_ADDR(address);
+    const uint8_t* p = guest::Pointer(base, address);
     for (int i = 0; i < 4; i++) {
       __m128i v = _mm_loadu_si128(reinterpret_cast<const __m128i*>(p + 16 * i));
       _mm_storeu_si128(reinterpret_cast<__m128i*>(&m[4 * i]), guest::SwapVector(v));
@@ -215,7 +217,7 @@ Matrix4 LoadMatrix(uint8_t* base, uint32_t address) {
 
 void StoreMatrix(uint8_t* base, uint32_t address, const Matrix4& m) {
   if (OneHostRange(address)) {
-    uint8_t* p = REX_RAW_ADDR(address);
+    uint8_t* p = guest::Pointer(base, address);
     for (int i = 0; i < 4; i++) {
       __m128i v = _mm_loadu_si128(reinterpret_cast<const __m128i*>(&m[4 * i]));
       _mm_storeu_si128(reinterpret_cast<__m128i*>(p + 16 * i), guest::SwapVector(v));
@@ -4315,7 +4317,7 @@ uint32_t AllocateBillboardSlots(void* user, uint32_t count, uint32_t return_addr
   guest_call::InFrame(s.ctx, s.base, 304, return_address, [&](uint32_t) {
     s.ctx.r3.u64 = s.list;
     s.ctx.r4.u64 = count;
-    lifted::CallFromContext(s.ctx, s.base, 0x8258CAA0);
+    lifted::Enter(s.ctx, s.base, game::CommandList::AllocateSlots);
     first = s.ctx.r3.u32;
   });
   return first;

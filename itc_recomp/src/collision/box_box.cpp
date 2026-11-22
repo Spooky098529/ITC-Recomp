@@ -7,6 +7,8 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/car_physics.h"
+#include "schema/collision.h"
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -18,10 +20,12 @@ namespace va = vehicle_accessors;
 
 namespace {
 
-constexpr uint32_t kMinusOne = 0x82001BE0;  // the game's float -1.0
-constexpr uint32_t kTwo = 0x820021E8;       // 2.0
-constexpr uint32_t kClock = 0x826C2D80;     // the collision world's clock
-constexpr uint32_t kStep = 0x826C2D84;      // and its step
+using G = schema::CollisionGlobals;
+using Box = schema::BoxShape;
+using Block = schema::CollisionBlock;
+using Query = schema::CollisionQuery;
+using Record = schema::CollisionShape;
+using Object = schema::CollisionPairObject;
 
 // A vector's x, y, z (their bits) into a temporary at `at`, its w 0.0, in
 // the originals' order (x, w, z, y).
@@ -45,15 +49,17 @@ uint32_t CoordinateBits(double value, double one, double minus_one, uint32_t abo
   return 0;
 }
 
-// A corner's outcode into its +16, as the originals set it.
-void CornerOutcode(uint8_t* base, uint32_t corner, double one, double minus_one) {
-  guest::StoreU32(base, corner + 16, 0);
+// A block's corner k's outcode, as the originals set it.
+void CornerOutcode(uint8_t* base, const Block& block, uint32_t k, double one, double minus_one) {
+  const uint32_t corner = block.corner_x_address() + 32 * k;
+  const uint32_t outcode = block.corner_outcode_address() + 32 * k;
+  guest::StoreU32(base, outcode, 0);
   for (uint32_t axis = 0; axis < 3; axis++) {
     const uint32_t bits =
         CoordinateBits(Lfs(base, corner + 4 * axis), one, minus_one, 1u << (2 * axis),
                        2u << (2 * axis));
     if (bits) {
-      guest::StoreU32(base, corner + 16, guest::LoadU32(base, corner + 16) | bits);
+      guest::StoreU32(base, outcode, guest::LoadU32(base, outcode) | bits);
     }
   }
 }
@@ -82,16 +88,17 @@ struct Copies {
   uint32_t previous_a, current_a, previous_b, current_b;
 };
 bool BoxCopies(uint8_t* base, uint32_t query, Copies* copies) {
-  const uint32_t record_a = guest::LoadU32(base, query + 0);
-  const uint32_t record_b = guest::LoadU32(base, query + 4);
-  if (!IsBox(base, guest::LoadU32(base, record_a)) ||
-      !IsBox(base, guest::LoadU32(base, record_b))) {
+  const Query q(base, query);
+  const Record record_a = q.shape_a();
+  const Record record_b = q.shape_b();
+  if (!IsBox(base, record_a.template_shape().address) ||
+      !IsBox(base, record_b.template_shape().address)) {
     return false;
   }
-  copies->previous_a = guest::LoadU32(base, record_a + 4);
-  copies->current_a = guest::LoadU32(base, record_a + 8);
-  copies->previous_b = guest::LoadU32(base, record_b + 4);
-  copies->current_b = guest::LoadU32(base, record_b + 8);
+  copies->previous_a = record_a.previous().address;
+  copies->current_a = record_a.current().address;
+  copies->previous_b = record_b.previous().address;
+  copies->current_b = record_b.current().address;
   return true;
 }
 
@@ -99,57 +106,79 @@ bool BoxCopies(uint8_t* base, uint32_t query, Copies* copies) {
 
 uint32_t BoxRelativePlacement(uint8_t* base, uint32_t a, uint32_t block, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_820BA408 BoxShape::RelativePlacement");
+  const Box box_a(base, a), box_b(base, b);
+  const Block out(base, block);
   const double one = Lfs(base, kOne);
   for (uint32_t i = 0; i < 3; i++) {
-    const double dot = double(vl::Vec3DotOf(base, b + 48, a + 320 + 32 * i));
-    const double distance = Fsubs(dot, Lfs(base, a + 304 + 32 * i));
-    Stfs(base, block + 48 + 4 * i, Fmadds(distance, Lfs(base, a + 144 + 4 * i), one));
+    const double dot = double(
+        vl::Vec3DotOf(base, box_b.center_x_address(), box_a.face_px_normal_x_address() + 32 * i));
+    const double distance = Fsubs(dot, Lfs(base, box_a.face_px_distance_address() + 32 * i));
+    Stfs(base, out.center_x_address() + 4 * i,
+         Fmadds(distance, Lfs(base, box_a.inverse_half_extent_x_address() + 4 * i), one));
   }
   // Entry (j, i): dot(B's normal j, A's normal i) x A's inverse half extent
   // i x B's half extent j, the products in the original's orders.
+  const uint32_t bx = box_b.face_px_normal_x_address(), by = box_b.face_py_normal_x_address(),
+                 bz = box_b.face_pz_normal_x_address();
+  const uint32_t ax = box_a.face_px_normal_x_address(), ay = box_a.face_py_normal_x_address(),
+                 az = box_a.face_pz_normal_x_address();
   double d;
-  d = double(vl::Vec3DotOf(base, b + 320, a + 320));
-  Stfs(base, block + 0, Fmuls(Fmuls(Lfs(base, a + 144), Lfs(base, b + 128)), d));
-  d = double(vl::Vec3DotOf(base, b + 320, a + 352));
-  Stfs(base, block + 4, Fmuls(Fmuls(Lfs(base, b + 128), d), Lfs(base, a + 148)));
-  d = double(vl::Vec3DotOf(base, b + 320, a + 384));
-  Stfs(base, block + 8, Fmuls(Fmuls(Lfs(base, a + 152), Lfs(base, b + 128)), d));
-  d = double(vl::Vec3DotOf(base, b + 352, a + 320));
-  Stfs(base, block + 16, Fmuls(Fmuls(Lfs(base, a + 144), d), Lfs(base, b + 132)));
-  d = double(vl::Vec3DotOf(base, b + 352, a + 352));
-  Stfs(base, block + 20, Fmuls(Fmuls(d, Lfs(base, b + 132)), Lfs(base, a + 148)));
-  d = double(vl::Vec3DotOf(base, b + 352, a + 384));
-  Stfs(base, block + 24, Fmuls(Fmuls(Lfs(base, a + 152), d), Lfs(base, b + 132)));
-  d = double(vl::Vec3DotOf(base, b + 384, a + 320));
-  Stfs(base, block + 32, Fmuls(Fmuls(Lfs(base, a + 144), d), Lfs(base, b + 136)));
-  d = double(vl::Vec3DotOf(base, b + 384, a + 352));
-  Stfs(base, block + 36, Fmuls(Fmuls(d, Lfs(base, b + 136)), Lfs(base, a + 148)));
-  d = double(vl::Vec3DotOf(base, b + 384, a + 384));
-  Stfs(base, block + 40, Fmuls(Fmuls(d, Lfs(base, a + 152)), Lfs(base, b + 136)));
-  return b + 384;
+  d = double(vl::Vec3DotOf(base, bx, ax));
+  out.set_row0_x(float(Fmuls(
+      Fmuls(double(box_a.inverse_half_extent_x()), double(box_b.half_extent_x())), d)));
+  d = double(vl::Vec3DotOf(base, bx, ay));
+  out.set_row0_y(float(Fmuls(Fmuls(double(box_b.half_extent_x()), d),
+                             double(box_a.inverse_half_extent_y()))));
+  d = double(vl::Vec3DotOf(base, bx, az));
+  out.set_row0_z(float(Fmuls(
+      Fmuls(double(box_a.inverse_half_extent_z()), double(box_b.half_extent_x())), d)));
+  d = double(vl::Vec3DotOf(base, by, ax));
+  out.set_row1_x(float(Fmuls(Fmuls(double(box_a.inverse_half_extent_x()), d),
+                             double(box_b.half_extent_y()))));
+  d = double(vl::Vec3DotOf(base, by, ay));
+  out.set_row1_y(float(Fmuls(Fmuls(d, double(box_b.half_extent_y())),
+                             double(box_a.inverse_half_extent_y()))));
+  d = double(vl::Vec3DotOf(base, by, az));
+  out.set_row1_z(float(Fmuls(Fmuls(double(box_a.inverse_half_extent_z()), d),
+                             double(box_b.half_extent_y()))));
+  d = double(vl::Vec3DotOf(base, bz, ax));
+  out.set_row2_x(float(Fmuls(Fmuls(double(box_a.inverse_half_extent_x()), d),
+                             double(box_b.half_extent_z()))));
+  d = double(vl::Vec3DotOf(base, bz, ay));
+  out.set_row2_y(float(Fmuls(Fmuls(d, double(box_b.half_extent_z())),
+                             double(box_a.inverse_half_extent_y()))));
+  d = double(vl::Vec3DotOf(base, bz, az));
+  out.set_row2_z(float(Fmuls(Fmuls(d, double(box_a.inverse_half_extent_z())),
+                             double(box_b.half_extent_z()))));
+  return bz;
 }
 
 uint32_t BoxRelativeCenter(uint8_t* base, uint32_t a, uint32_t block, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_820BA5D8 BoxShape::RelativeCenter");
+  const Box box_a(base, a), box_b(base, b);
+  const Block out(base, block);
   const double one = Lfs(base, kOne);
   for (uint32_t i = 0; i < 3; i++) {
-    const double dot = double(vl::Vec3DotOf(base, b + 48, a + 320 + 32 * i));
-    const double distance = Fsubs(dot, Lfs(base, a + 304 + 32 * i));
-    Stfs(base, block + 48 + 4 * i, Fmadds(distance, Lfs(base, a + 144 + 4 * i), one));
+    const double dot = double(
+        vl::Vec3DotOf(base, box_b.center_x_address(), box_a.face_px_normal_x_address() + 32 * i));
+    const double distance = Fsubs(dot, Lfs(base, box_a.face_px_distance_address() + 32 * i));
+    Stfs(base, out.center_x_address() + 4 * i,
+         Fmadds(distance, Lfs(base, box_a.inverse_half_extent_x_address() + 4 * i), one));
   }
-  return b + 48;
+  return box_b.center_x_address();
 }
 
 uint32_t BoxBoxOutcode(uint8_t* base, uint32_t block) {
   ITC_NATIVE_RUNNING("sub_820BD0C8 BoxBox::Outcode");
+  const Block b(base, block);
   const double one = Lfs(base, kOne);
   const double zero = Lfs(base, kZero);
   uint32_t bits = 0;
   for (uint32_t axis = 0; axis < 3; axis++) {
-    const double column1 = Fabs(Lfs(base, block + 16 + 4 * axis));
-    const double column2 = Fabs(Lfs(base, block + 32 + 4 * axis));
-    const double column0 = Fabs(Lfs(base, block + 0 + 4 * axis));
-    const double center = Lfs(base, block + 48 + 4 * axis);
+    const double column1 = Fabs(Lfs(base, b.row1_x_address() + 4 * axis));
+    const double column2 = Fabs(Lfs(base, b.row2_x_address() + 4 * axis));
+    const double column0 = Fabs(Lfs(base, b.row0_x_address() + 4 * axis));
+    const double center = Lfs(base, b.center_x_address() + 4 * axis);
     const double reach = Fadds(Fadds(Fadds(column2, column1), column0), one);
     if (Fsubs(center, reach) > zero) {
       bits |= 1u << (2 * axis);
@@ -162,17 +191,18 @@ uint32_t BoxBoxOutcode(uint8_t* base, uint32_t block) {
 
 void BoxBoxBlockCorners(uint8_t* base, uint32_t block, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820BC978 BoxBox::BlockCorners");
-  const uint32_t row0 = block + 0, row1 = block + 16, row2 = block + 32;
-  const uint32_t corner = block + 80;  // corner k at + 32k
+  const Block b(base, block);
+  const uint32_t row0 = b.row0_x_address(), row1 = b.row1_x_address(), row2 = b.row2_x_address();
+  const uint32_t corner = b.corner_x_address();  // corner k at + 32k
   // Corner 0: the center plus the three rows.
-  vl::Vec3AddCopy(base, frame + 240, block + 48, row0);
+  vl::Vec3AddCopy(base, frame + 240, b.center_x_address(), row0);
   vl::Vec3AddCopy(base, frame + 96, frame + 240, row1);
   vl::Vec3AddCopy(base, frame + 80, frame + 96, row2);
   CopyToTemporary(base, frame + 176, frame + 80);
   vl::Vec4Copy(base, corner + 0, frame + 176);
   // The others, each from one before it and twice a row: (from, row,
   // subtract, temporary, to).
-  const double two = Lfs(base, kTwo);
+  const double two = double(G::two(base));
   const struct {
     uint32_t from, row;
     bool subtract;
@@ -192,27 +222,29 @@ void BoxBoxBlockCorners(uint8_t* base, uint32_t block, uint32_t frame) {
     }
     vl::Vec4Copy(base, corner + 32 * s.to, frame + 96);
   }
-  const double minus_one = Lfs(base, kMinusOne);
+  const double minus_one = double(G::minus_one(base));
   const double one = Lfs(base, kOne);
   for (uint32_t k = 0; k < 8; k++) {
-    CornerOutcode(base, corner + 32 * k, one, minus_one);
+    CornerOutcode(base, b, k, one, minus_one);
   }
 }
 
-void BoxBoxMoveCorners(uint8_t* base, uint32_t corners, uint32_t offset) {
+void BoxBoxMoveCorners(uint8_t* base, uint32_t block, uint32_t offset) {
   ITC_NATIVE_RUNNING("sub_820BCCE8 BoxBox::MoveCorners");
-  const double minus_one = Lfs(base, kMinusOne);
+  const Block b(base, block);
+  const double minus_one = double(G::minus_one(base));
   const double one = Lfs(base, kOne);
   for (uint32_t k = 0; k < 8; k++) {
-    const uint32_t corner = corners + 32 * k;
-    guest::StoreU32(base, corner + 16, 0);
+    const uint32_t corner = b.corner_x_address() + 32 * k;
+    const uint32_t outcode = b.corner_outcode_address() + 32 * k;
+    guest::StoreU32(base, outcode, 0);
     vl::Vec3AddTo(base, corner, offset);
     for (uint32_t axis = 0; axis < 3; axis++) {
       const uint32_t bits =
           CoordinateBits(Lfs(base, corner + 4 * axis), one, minus_one, 1u << (2 * axis),
                          2u << (2 * axis));
       if (bits) {
-        guest::StoreU32(base, corner + 16, guest::LoadU32(base, corner + 16) | bits);
+        guest::StoreU32(base, outcode, guest::LoadU32(base, outcode) | bits);
       }
     }
   }
@@ -225,15 +257,17 @@ namespace {
 // that far outside the face; `strict` the second test's `bgt`, else the
 // first's "not blt".
 bool Outside(uint8_t* base, uint32_t face, uint32_t box, bool strict) {
-  const uint32_t normal = face + 16;
-  const double d0 = Fabs(double(vl::Vec3DotOf(base, box + 320, normal)));
-  const double d1 = Fabs(double(vl::Vec3DotOf(base, box + 352, normal)));
-  const double d2 = double(vl::Vec3DotOf(base, box + 384, normal));
-  const double part1 = Fmuls(Lfs(base, box + 132), d1);
-  const double part2 = Fmadds(Lfs(base, box + 136), Fabs(d2), part1);
-  const double radius = Fmadds(Lfs(base, box + 128), d0, part2);
+  const schema::BoxShapeFace f(base, face);
+  const Box b(base, box);
+  const uint32_t normal = f.normal_x_address();
+  const double d0 = Fabs(double(vl::Vec3DotOf(base, b.face_px_normal_x_address(), normal)));
+  const double d1 = Fabs(double(vl::Vec3DotOf(base, b.face_py_normal_x_address(), normal)));
+  const double d2 = double(vl::Vec3DotOf(base, b.face_pz_normal_x_address(), normal));
+  const double part1 = Fmuls(double(b.half_extent_y()), d1);
+  const double part2 = Fmadds(double(b.half_extent_z()), Fabs(d2), part1);
+  const double radius = Fmadds(double(b.half_extent_x()), d0, part2);
   const double distance =
-      Fsubs(double(vl::Vec3DotOf(base, box + 48, normal)), Lfs(base, face + 0));
+      Fsubs(double(vl::Vec3DotOf(base, b.center_x_address(), normal)), double(f.distance()));
   return strict ? distance > radius : !(distance < radius);
 }
 
@@ -257,7 +291,8 @@ bool BoxBoxSeparated(uint8_t* base, uint32_t query, uint32_t cache, uint32_t fra
     return false;
   }
   // The cached face (one of A's faces in bits 0x3F, of B's in 0x3F00).
-  const uint32_t cached = guest::LoadU32(base, cache);
+  const schema::CollisionPairCache pair_cache(base, cache);
+  const uint32_t cached = pair_cache.separating_faces();
   if (cached != 0) {
     bool tested = false;
     uint32_t separates = 0;
@@ -281,36 +316,37 @@ bool BoxBoxSeparated(uint8_t* base, uint32_t query, uint32_t cache, uint32_t fra
       return true;
     }
   }
-  const uint32_t block_previous_ba = guest::LoadU32(base, query + 8);
-  const uint32_t block_current_ba = guest::LoadU32(base, query + 12);
-  const uint32_t block_previous_ab = guest::LoadU32(base, query + 16);
-  const uint32_t block_current_ab = guest::LoadU32(base, query + 20);
-  BoxRelativePlacement(base, c.previous_a, block_previous_ba, c.previous_b);
-  guest::StoreU32(base, block_previous_ba + 64, BoxBoxOutcode(base, block_previous_ba));
-  BoxRelativePlacement(base, c.current_a, block_current_ba, c.current_b);
-  uint32_t outcode = BoxBoxOutcode(base, block_current_ba);
-  guest::StoreU32(base, block_current_ba + 64, outcode);
-  uint32_t shared = guest::LoadU32(base, block_previous_ba + 64) & outcode;
+  const Query q(base, query);
+  const Block block_previous_ba = q.b_in_a_previous();
+  const Block block_current_ba = q.b_in_a_current();
+  const Block block_previous_ab = q.a_in_b_previous();
+  const Block block_current_ab = q.a_in_b_current();
+  BoxRelativePlacement(base, c.previous_a, block_previous_ba.address, c.previous_b);
+  block_previous_ba.set_outcode(BoxBoxOutcode(base, block_previous_ba.address));
+  BoxRelativePlacement(base, c.current_a, block_current_ba.address, c.current_b);
+  uint32_t outcode = BoxBoxOutcode(base, block_current_ba.address);
+  block_current_ba.set_outcode(outcode);
+  uint32_t shared = block_previous_ba.outcode() & outcode;
   if (shared != 0) {
-    guest::StoreU32(base, cache, shared);
+    pair_cache.set_separating_faces(shared);
     *result = 1;
     return true;
   }
-  BoxRelativePlacement(base, c.previous_b, block_previous_ab, c.previous_a);
-  guest::StoreU32(base, block_previous_ab + 64, BoxBoxOutcode(base, block_previous_ab));
-  BoxRelativePlacement(base, c.current_b, block_current_ab, c.current_a);
-  outcode = BoxBoxOutcode(base, block_current_ab);
-  guest::StoreU32(base, block_current_ab + 64, outcode);
-  shared = guest::LoadU32(base, block_previous_ab + 64) & outcode;
+  BoxRelativePlacement(base, c.previous_b, block_previous_ab.address, c.previous_a);
+  block_previous_ab.set_outcode(BoxBoxOutcode(base, block_previous_ab.address));
+  BoxRelativePlacement(base, c.current_b, block_current_ab.address, c.current_a);
+  outcode = BoxBoxOutcode(base, block_current_ab.address);
+  block_current_ab.set_outcode(outcode);
+  shared = block_previous_ab.outcode() & outcode;
   if (shared != 0) {
-    guest::StoreU32(base, cache, shared << 8);
+    pair_cache.set_separating_faces(shared << 8);
     *result = 1;
     return true;
   }
-  guest::StoreU32(base, cache, 0);
-  for (uint32_t block : {block_previous_ba, block_current_ba, block_previous_ab,
-                         block_current_ab}) {
-    BoxBoxBlockCorners(base, block, frame - 320);
+  pair_cache.set_separating_faces(0);
+  for (const Block& block : {block_previous_ba, block_current_ba, block_previous_ab,
+                             block_current_ab}) {
+    BoxBoxBlockCorners(base, block.address, frame - 320);
   }
   *result = 0;
   return true;
@@ -322,34 +358,35 @@ bool BoxBoxSeparatedAfterMove(uint8_t* base, uint32_t query, uint32_t frame, uin
   if (!BoxCopies(base, query, &c)) {
     return false;
   }
-  const uint32_t block_current_ba = guest::LoadU32(base, query + 12);
-  const uint32_t block_previous_ba = guest::LoadU32(base, query + 8);
-  const uint32_t block_previous_ab = guest::LoadU32(base, query + 16);
-  const uint32_t block_current_ab = guest::LoadU32(base, query + 20);
+  const Query q(base, query);
+  const Block block_current_ba = q.b_in_a_current();
+  const Block block_previous_ba = q.b_in_a_previous();
+  const Block block_previous_ab = q.a_in_b_previous();
+  const Block block_current_ab = q.a_in_b_current();
   // The current blocks' centers before (+80, +112 of the frame, w 0.0).
-  CopyToTemporary(base, frame + 80, block_current_ba + 48);
-  BoxRelativeCenter(base, c.current_a, block_current_ba, c.current_b);
-  uint32_t outcode = BoxBoxOutcode(base, block_current_ba);
-  guest::StoreU32(base, block_current_ba + 64, outcode);
-  if ((guest::LoadU32(base, block_previous_ba + 64) & outcode) != 0) {
+  CopyToTemporary(base, frame + 80, block_current_ba.center_x_address());
+  BoxRelativeCenter(base, c.current_a, block_current_ba.address, c.current_b);
+  uint32_t outcode = BoxBoxOutcode(base, block_current_ba.address);
+  block_current_ba.set_outcode(outcode);
+  if ((block_previous_ba.outcode() & outcode) != 0) {
     *result = 1;
     return true;
   }
-  CopyToTemporary(base, frame + 112, block_current_ab + 48);
-  BoxRelativeCenter(base, c.current_b, block_current_ab, c.current_a);
-  outcode = BoxBoxOutcode(base, block_current_ab);
-  guest::StoreU32(base, block_current_ab + 64, outcode);
-  if ((guest::LoadU32(base, block_previous_ab + 64) & outcode) != 0) {
+  CopyToTemporary(base, frame + 112, block_current_ab.center_x_address());
+  BoxRelativeCenter(base, c.current_b, block_current_ab.address, c.current_a);
+  outcode = BoxBoxOutcode(base, block_current_ab.address);
+  block_current_ab.set_outcode(outcode);
+  if ((block_previous_ab.outcode() & outcode) != 0) {
     *result = 1;
     return true;
   }
   // The corners moved by the centers' change.
-  vl::Vec3SubCopy(base, frame + 144, block_current_ba + 48, frame + 80);
+  vl::Vec3SubCopy(base, frame + 144, block_current_ba.center_x_address(), frame + 80);
   CopyToTemporary(base, frame + 96, frame + 144);
-  BoxBoxMoveCorners(base, block_current_ba + 80, frame + 96);
-  vl::Vec3SubCopy(base, frame + 144, block_current_ab + 48, frame + 112);
+  BoxBoxMoveCorners(base, block_current_ba.address, frame + 96);
+  vl::Vec3SubCopy(base, frame + 144, block_current_ab.center_x_address(), frame + 112);
   CopyToTemporary(base, frame + 128, frame + 144);
-  BoxBoxMoveCorners(base, block_current_ab + 80, frame + 128);
+  BoxBoxMoveCorners(base, block_current_ab.address, frame + 128);
   *result = 0;
   return true;
 }
@@ -367,32 +404,33 @@ bool QuerySeparatedAfterMove(uint8_t* base, uint32_t query, uint32_t frame, uint
 
 double CollisionPairNextCheckTime(uint8_t* base, uint32_t pair, uint32_t frame, uint32_t* r3) {
   ITC_NATIVE_RUNNING("sub_820BBB20 CollisionPair::NextCheckTime");
-  const double step = Lfs(base, kStep);
-  const double clock = Lfs(base, kClock);
-  const uint32_t a = guest::LoadU32(base, pair + 16);
-  const uint32_t b = guest::LoadU32(base, pair + 20);
-  if (guest::LoadU32(base, a + 272) == 0 && guest::LoadU32(base, b + 272) == 0 &&
-      guest::LoadU32(base, a + 276) == 0 && guest::LoadU32(base, b + 276) == 0) {
-    const double speed_a = double(va::RigidBodyFloat48(base, guest::LoadU32(base, a + 16)));
-    const double speed_b = double(va::RigidBodyFloat48(
-        base, guest::LoadU32(base, guest::LoadU32(base, pair + 20) + 16)));
+  // The pair's objects A (+16) and B (+20).
+  const auto object_a = [&] { return schema::CollisionPair(base, pair).a<Object>(); };
+  const auto object_b = [&] { return schema::CollisionPair(base, pair).b<Object>(); };
+  const double step = double(G::step(base));
+  const double clock = double(G::clock(base));
+  const Object a = object_a();
+  const Object b = object_b();
+  if (a.no_queries() == 0 && b.no_queries() == 0 && a.unknown_276() == 0 &&
+      b.unknown_276() == 0) {
+    const double speed_a = double(va::RigidBodyFloat48(base, a.body()));
+    const double speed_b = double(va::RigidBodyFloat48(base, object_b().body()));
     const double speeds = Fadds(speed_b, speed_a);
     if (speeds != Lfs(base, kZero)) {
       const uint32_t center_b =
-          CollisionShapeCurrentCenter(base, guest::LoadU32(base, pair + 20) + 32);
+          CollisionShapeCurrentCenter(base, object_b().shape_record_address());
       const uint32_t center_a =
-          CollisionShapeCurrentCenter(base, guest::LoadU32(base, pair + 16) + 32);
+          CollisionShapeCurrentCenter(base, object_a().shape_record_address());
       vl::Vec3Difference(base, frame + 80, center_a, center_b);
       const double gap = double(vl::Vec3Length(base, frame + 80));
-      const double radius_a =
-          ShapeRadius(base, guest::LoadU32(base, guest::LoadU32(base, pair + 16) + 20));
-      const uint32_t shape_b = guest::LoadU32(base, guest::LoadU32(base, pair + 20) + 20);
+      const double radius_a = ShapeRadius(base, object_a().shape().address);
+      const uint32_t shape_b = object_b().shape().address;
       const double radius_b = ShapeRadius(base, shape_b);
       *r3 = shape_b;
       return Fadds(Fdivs(Fsubs(gap, Fadds(radius_b, radius_a)), speeds), clock);
     }
     // r3 as RigidBodyFloat48's adapter leaves it: B's body.
-    *r3 = guest::LoadU32(base, guest::LoadU32(base, pair + 20) + 16);
+    *r3 = object_b().body();
     return Fadds(clock, step);
   }
   *r3 = pair;

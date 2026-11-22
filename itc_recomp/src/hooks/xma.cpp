@@ -17,6 +17,7 @@
 
 #include "audio/xma_packets.h"
 #include "audio/xma_stream.h"
+#include "schema/audio.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -161,10 +162,11 @@ ITC_NATIVE_ENTRY_ALWAYS(8245C650) {
   object->contexts_made = !(flags & 1);
   for (uint32_t i = 0; i < count; i++) {
     auto s = std::make_unique<StreamState>();
-    const uint32_t d = descriptions + 12 * i;
-    s->sample_rate = guest::LoadU32(base, d);
-    s->ring_samples = guest::LoadU32(base, d + 4);
-    s->channels = guest::LoadU8(base, d + 8);
+    const schema::XmaStreamDescription d(
+        base, descriptions + schema::XmaStreamDescription::kSize * i);
+    s->sample_rate = d.sample_rate();
+    s->ring_samples = d.ring_samples();
+    s->channels = d.channels();
     object->streams.push_back(std::move(s));
   }
   const uint32_t handle = SystemAlloc(16);
@@ -176,7 +178,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8245C650) {
     std::lock_guard lock(g_objects_mutex);
     g_objects[handle] = std::move(object);
   }
-  guest::StoreU32(base, out, handle);
+  schema::XmaObjectOut(base, out).set_object(handle);
   ctx.r3.u64 = 0;
 }
 
@@ -282,7 +284,8 @@ ITC_NATIVE_ENTRY_ALWAYS(8245CD68) {
   
   const uint32_t out = ctx.r5.u32;
   OnStream(ctx, 0, [&](StreamState& s) -> uint32_t {
-    guest::StoreU32(base, out, s.buffer + s.stream.position() * s.channels * 2);
+    schema::XmaReadOut(base, out).set_read_address(s.buffer +
+                                                   s.stream.position() * s.channels * 2);
     return s.input ? s.stream.Contiguous(s.ring_samples) : 0;
   });
 }
@@ -293,7 +296,8 @@ ITC_NATIVE_ENTRY_ALWAYS(8245CBB0) {
   
   const uint32_t count = ctx.r5.u32, out = ctx.r6.u32;
   OnStream(ctx, 0, [&](StreamState& s) -> uint32_t {
-    guest::StoreU32(base, out, s.buffer + s.stream.position() * s.channels * 2);
+    schema::XmaReadOut(base, out).set_read_address(s.buffer +
+                                                   s.stream.position() * s.channels * 2);
     if (!s.input) {
       return 0;
     }
@@ -338,12 +342,12 @@ ITC_NATIVE_ENTRY_ALWAYS(8245CF60) {
 // subframes skipped at the start +9, count +10).
 ITC_NATIVE_ENTRY_ALWAYS(8245CF98) {
   
-  const uint32_t loop = ctx.r5.u32;
-  const uint32_t start_bit = guest::LoadU32(base, loop) & 0x3FFFFFF;
-  const uint32_t end_bit = guest::LoadU32(base, loop + 4) & 0x3FFFFFF;
-  const uint32_t end_subframe = guest::LoadU8(base, loop + 8) & 3;
-  const uint32_t skip = guest::LoadU8(base, loop + 9) & 7;
-  const uint32_t count = guest::LoadU8(base, loop + 10);
+  const schema::XmaLoopData loop(base, ctx.r5.u32);
+  const uint32_t start_bit = loop.start_bit() & 0x3FFFFFF;
+  const uint32_t end_bit = loop.end_bit() & 0x3FFFFFF;
+  const uint32_t end_subframe = loop.end_subframe() & 3;
+  const uint32_t skip = loop.skip_subframes() & 7;
+  const uint32_t count = loop.count();
   OnStream(ctx, 0, [&](StreamState& s) -> uint32_t {
     s.stream.SetLoop(start_bit, end_bit, skip, end_subframe, count);
     if (ITC_FLAG(log_xma)) {
@@ -419,9 +423,10 @@ ITC_NATIVE_ENTRY_ALWAYS(8245D010) {
 ITC_NATIVE_ENTRY_ALWAYS(8245D070) {
   
   ITC_LOG_ERROR("xma: sub_8245D070 called (from {:08X}), not handled", uint32_t(ctx.lr));
-  for (uint32_t i = 0; i < 3; i++) {
-    guest::StoreU32(base, ctx.r5.u32 + 4 * i, 0);
-  }
+  const schema::XmaInputPosition position(base, ctx.r5.u32);
+  position.set_input_buffer(0);
+  position.set_read_offset(0);
+  position.set_format_bits(0);
   ctx.r3.u64 = 0;
 }
 

@@ -21,6 +21,7 @@
 #include <string>
 #include "hooks/heap.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/app_states.h"
 #include "std_list/ptr_list.h"
 #include "lifted/sdk.h"
 
@@ -89,9 +90,9 @@ ITC_REGS_STEP(AppMessagesErase) {
     lifted::original::c82092E70(ctx, base);
     return;
   }
-  REX_STORE_U64(ctx.r1.u32 + 32, ctx.r5.u64);
-  REX_STORE_U64(ctx.r1.u32 + 40, ctx.r6.u64);
-  REX_STORE_U64(ctx.r3.u32, ctx.r5.u64);
+  guest::StoreU64(base, ctx.r1.u32 + 32, ctx.r5.u64);
+  guest::StoreU64(base, ctx.r1.u32 + 40, ctx.r6.u64);
+  guest::StoreU64(base, ctx.r3.u32, ctx.r5.u64);
 }
 
 ITC_REGS_STEP(AppMessagesClear) {
@@ -146,8 +147,8 @@ ITC_REGS_STEP(AppPtrListErase) {
     return;
   }
   const uint64_t result = (ctx.r5.u64 & 0xFFFFFFFF00000000ull) | *next;
-  REX_STORE_U64(ctx.r1.u32 + 32, result);
-  REX_STORE_U64(ctx.r3.u32, result);
+  guest::StoreU64(base, ctx.r1.u32 + 32, result);
+  guest::StoreU64(base, ctx.r3.u32, result);
 }
 
 ITC_REGS_STEP(AppDelegateClone) {
@@ -286,8 +287,8 @@ ITC_REGS_STEP(AppApplyRequest) {
     lifted::original::c82093BE0(ctx, base);
     return;
   }
-  REX_STORE_U64(ctx.r1.u32 + 32, ctx.r4.u64);
-  REX_STORE_U64(ctx.r1.u32 + 40, ctx.r5.u64);
+  guest::StoreU64(base, ctx.r1.u32 + 32, ctx.r4.u64);
+  guest::StoreU64(base, ctx.r1.u32 + 40, ctx.r5.u64);
   if (*inserted) {
     ctx.r3.u64 = ctx.r1.u32 - 32;
   }
@@ -319,7 +320,7 @@ void AddRequestStep(lifted::Regs& ctx, uint8_t* base, uint32_t type, uint32_t cl
     const uint32_t request = frame + 80;
     const auto inserted =
         as::AppAddRequest(base, interface, type, key, delegate, request, clone_return, calls);
-    const uint32_t vector = interface + as::kInterfaceRequests;
+    const uint32_t vector = schema::AppInterface(base, interface).requests_address();
     if (!inserted) {
       ctx.r3.u64 = vector;
       ctx.r4.u64 = request;
@@ -355,8 +356,8 @@ ITC_REGS_STEP(AppOpConstruct) {
 ITC_REGS_STEP(AppOpBuyNode) {
   std::optional<uint32_t> node;
   if (Heap()) {
-    node = as::OpBuyNode(base, ctx.r4.u32, ctx.r5.u32, guest::LoadU32(base, ctx.r6.u32),
-                         guest::LoadU32(base, ctx.r6.u32 + 4));
+    const schema::AppStateOp op(base, ctx.r6.u32);
+    node = as::OpBuyNode(base, ctx.r4.u32, ctx.r5.u32, op.type(), op.state());
   }
   if (!node) {
     lifted::original::c820ACFF8(ctx, base);
@@ -370,16 +371,16 @@ ITC_REGS_STEP(AppLayerPush) {
     lifted::original::c820ADAD0(ctx, base);
     return;
   }
-  ctx.r3.u64 = ctx.r3.u32 + as::kLayerOps;
+  ctx.r3.u64 = schema::StateLayer(base, ctx.r3.u32).ops_address();
 }
 
 ITC_REGS_STEP(AppMessagesInsertN) {
   if (!Heap() || !as::MessagesInsertN(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                      guest::LoadU32(base, ctx.r6.u32))) {
+                                      schema::AppMessageWord(base, ctx.r6.u32).value())) {
     lifted::original::c820938C0(ctx, base);
     return;
   }
-  REX_STORE_U64(ctx.r1.u32 + 24, ctx.r4.u64);
+  guest::StoreU64(base, ctx.r1.u32 + 24, ctx.r4.u64);
 }
 
 ITC_REGS_STEP(AppMessagesInsert) {
@@ -391,7 +392,7 @@ ITC_REGS_STEP(AppMessagesInsert) {
     lifted::original::c82094110(ctx, base);
     return;
   }
-  REX_STORE_U64(ctx.r1.u32 + 32, ctx.r5.u64);
+  guest::StoreU64(base, ctx.r1.u32 + 32, ctx.r5.u64);
   guest::StoreU32(base, ctx.r3.u32 + 0, ctx.r4.u32);
   guest::StoreU32(base, ctx.r3.u32 + 4, *where);
 }
@@ -419,7 +420,8 @@ ITC_REGS_STEP(AppSendMessage) {
     lifted::original::c82094AB0(ctx, base);
     return;
   }
-  ctx.r3.u64 = *inserted ? ctx.r1.u32 - 16 : ctx.r3.u32 + as::kInterfaceMessages;
+  ctx.r3.u64 = *inserted ? ctx.r1.u32 - 16
+                          : schema::AppInterface(base, ctx.r3.u32).messages_address();
 }
 
 ITC_REGS_STEP(AppStatesIsEmpty) {
@@ -482,7 +484,7 @@ ITC_REGS_STEP(AppLayerAddChild) {
     lifted::original::c820ADA08(ctx, base);
     return;
   }
-  ctx.r3.u64 = layer + as::kLayerChildren;
+  ctx.r3.u64 = schema::StateLayer(base, layer).children_address();
 }
 
 ITC_REGS_STEP(AppStatesAddLayer) {
@@ -494,7 +496,7 @@ ITC_REGS_STEP(AppStatesAddLayer) {
     lifted::original::c820AE130(ctx, base);
     return;
   }
-  ctx.r3.u64 = guest::LoadU32(base, states + as::kStatesRoot) + as::kLayerChildren;
+  ctx.r3.u64 = schema::AppStates(base, states).root().children_address();
 }
 
 ITC_REGS_STEP(AppStatesConstruct) {
@@ -782,9 +784,10 @@ ITC_NATIVE_ENTRY_ALWAYS(82092968) {
     return;
   }
   const uint32_t component = ctx.r4.u32;
-  uint32_t update = component ? guest::LoadU32(base, guest::LoadU32(base, component) + 4) : 0;
+  const schema::AppDelegate delegate(base, component);
+  uint32_t update = component ? delegate.vtable().invoke() : 0;
   if (update == 0x8223A3F0 || update == 0x82233460) {
-    update = guest::LoadU32(base, component + 8);
+    update = delegate.function();
   }
   debug::MenuSelectionScan_Before(base);
   run();

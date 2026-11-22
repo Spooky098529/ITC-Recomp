@@ -1,0 +1,292 @@
+# The schema of docs/functions/location-screen.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The parking area (the career's location screen): one of the type 5 mode's
+# three screens, its machine at the mode's block +9640, UI movies 21 (the
+# menus) and 30 (an opponent's card), pictures from the archive
+# (src/location_screen/). Its page object ([0x82814E48], 28 bytes) is a
+# PageObject and its four menus ([0x82814E4C], [0x82814E54], [0x82814E58],
+# [0x82814E5C], 68 bytes each) are FrontEndMenu (menu-helpers.toml's; the
+# measure files them as "new<28>@LocationScreen::Create" and
+# "new<68>@LocationScreen::Create" to "#4", and the location's menu also as
+# "UiMovies::Find.ret.+0.+20044": Page0's r31 + 20044 is 0x82814E4C).
+
+# The screen (912 bytes, VirtualAlloc by LocationScreen::Create, reset by
+# LocationScreen::Reset; known-data.md: 0x82814E50). The measure also files
+# under "LocationScreen" the machine the state handlers get as r3 (the mode
+# block's +9640: the machine_* fields), the type 5 mode's block
+# ModeType5::Init writes (the block_* fields) and the view LocationScreen::ResetView
+# gets (the screen's +560, at +0 to +111 here); they fit the fields below but
+# aren't the screen's (a measure fault).
+[LocationScreen]
+measures = ["LocationScreen", "LocationScreen::OnPictureLoadedA.r6", "LocationScreen::OnPictureLoadedB.r6"]
+size = 912
+origin = "allocated"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32", note = "0 at reset (also the view's +0 and RaceEvent::GroupItem's event +0 by the measure's joins)" },
+  { name = "away_state", offset = 4, type = "u32", note = "2 once Page7 left for another screen (message 6); OnMessage3 then posts 9" },
+  { name = "pictures_a", offset = 8, type = "bytes", count = 128, note = "list A: 32 pointers to LocationScreenPicture (asset 22696 + id)" },
+  { name = "picture_count_a", offset = 136, type = "u32" },
+  { name = "queued_a", offset = 140, type = "bytes", count = 128, note = "ring A: 32 picture ids queued for loading" },
+  { name = "queued_count_a", offset = 268, type = "u32" },
+  { name = "queued_start_a", offset = 272, type = "u32" },
+  { name = "pictures_b", offset = 276, type = "bytes", count = 128, note = "list B: 32 pointers to LocationScreenPicture (asset 22741 + id)" },
+  { name = "picture_count_b", offset = 404, type = "u32" },
+  { name = "queued_b", offset = 408, type = "bytes", count = 128, note = "ring B: 32 picture ids queued for loading" },
+  { name = "queued_count_b", offset = 536, type = "u32" },
+  { name = "queued_start_b", offset = 540, type = "u32" },
+  { name = "default_texture_a", offset = 544, type = "u32", note = "movie 21's node (6, 1) picture texture, put back by Unload" },
+  { name = "default_texture_b", offset = 548, type = "u32", note = "movie 21's node (6, 0) picture texture, put back by Unload" },
+  { name = "scenery", offset = 552, type = "ptr", to = "Scenery", note = "the course scenery ([0x826C551C] after Scenery::Create)" },
+  { name = "view", offset = 560, type = "bytes", count = 240, note = "the course view (LocationScreenView)" },
+  { name = "picked_opponent", offset = 800, type = "u32", note = "the picked opponent: its index in the race event's group" },
+  { name = "group_kind", offset = 804, type = "u32", note = "the race event's group kind (4 to 9) by the location" },
+  { name = "opponent_count", offset = 808, type = "u32", note = "the group's opponent count" },
+  { name = "list_count", offset = 812, type = "u32", note = "the location record's entry count (save +0x1AD20 + 100 x index, its +96)" },
+  { name = "item2_taken", offset = 816, type = "u32", note = "set when page 0's third item was taken (page 7, another screen): Create puts the menu's cursor back on 2, Start skips the after-race page" },
+  { name = "won_card_item", offset = 820, type = "u32", note = "1 after a race won with an item of category 3 to 5 (the after-race transitions); read by Page12 and Page13" },
+  { name = "opponent_models", offset = 824, type = "bytes", count = 24, note = "the opponents' scene models: 6 indices into pool 7 (ScenePools::GetB)" },
+  { name = "location_index", offset = 852, type = "u32", note = "the location's index (0 to 5): the locations' table row" },
+  { name = "teardown_started", offset = 856, type = "u32", note = "PollSceneTeardown's flag" },
+  { name = "teardown_countdown", offset = 860, type = "u32", note = "PollSceneTeardown's countdown (5)" },
+  { name = "location", offset = 864, type = "u32", note = "the save data's location (+6108; 14 to 19)" },
+  { name = "unlock_position", offset = 868, type = "u32", note = "the unlock list's position (ShowUnlockEntry)" },
+  { name = "entry_offset", offset = 872, type = "u32", note = "an entry walk's offset (the 56- or 20-byte entry's index)" },
+  { name = "entry_table", offset = 876, type = "u32", note = "an entry walk's table (DataTables::Entry56)" },
+  { name = "queued_page", offset = 880, type = "u32", note = "the page other screens' messages queue (-1 none; ApplyQueuedPage)" },
+  { name = "queued_transition", offset = 884, type = "u32", note = "the transition to it (-1: the page set directly)" },
+  { name = "more_opponent_text", offset = 888, type = "u32", note = "set by Page4 while NextOpponentText finds more; Transition9 then hides the pictures instead of resetting the opponents' menu" },
+  { name = "special_car", offset = 892, type = "u32", note = "1 when the garage's selected car's spec byte +771 is 1 (page 0's third item refused, SetCarColor 2)" },
+  { name = "load_faded", offset = 896, type = "u32", note = "1 once PollLoad started the fade out" },
+  { name = "restart", offset = 900, type = "u32", note = "UpdatePage restarts the page object when set (ModeType5::Resume)" },
+  { name = "machine_state", offset = 9604, type = "u32", note = "measure fault: the machine's (LocationScreenMachine), r3 of the state handlers" },
+  { name = "machine_loaded", offset = 9608, type = "u32", note = "measure fault: the machine's" },
+  { name = "machine_reenter", offset = 9612, type = "u32", note = "measure fault: the machine's (also the car settings' machine's at the block's +0, by ModeType5::Init)" },
+  { name = "machine_delete_movie", offset = 9616, type = "u32", note = "measure fault: the machine's (also the car settings')" },
+  { name = "machine_next_state", offset = 9620, type = "u32", note = "measure fault: the machine's" },
+  { name = "block_location_reenter", offset = 19252, type = "u32", note = "measure fault: the type 5 mode's block +19252 (this screen's machine's reenter), by ModeType5::Init" },
+  { name = "block_location_delete_movie", offset = 19256, type = "u32", note = "measure fault: the block's +19256" },
+  { name = "block_dialog_reenter", offset = 28892, type = "u32", note = "measure fault: the block's +28892 (the dialog's machine's reenter)" },
+  { name = "block_dialog_delete_movie", offset = 28896, type = "u32", note = "measure fault: the block's +28896" },
+  { name = "block_shown", offset = 28920, type = "u32", note = "measure fault: the block's shown machine's id (3, 16 or 21)" },
+  { name = "block_shown_initial", offset = 28924, type = "u32", note = "measure fault: the block's +28924, 21 by ModeType5::Init (readers not looked for)" },
+]
+
+# The screen's course view (240 bytes at the screen's +560; ResetView): the
+# camera animation's two vectors and floats, two matrices. No measure of its
+# own (the measure meets it as "LocationScreen", ResetView's r3).
+[LocationScreenView]
+size = 240
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32", note = "0 at reset" },
+  { name = "unknown_4", offset = 4, type = "u32", note = "0 at reset" },
+  { name = "unknown_8", offset = 8, type = "u32", note = "1 at reset" },
+  { name = "unknown_12", offset = 12, type = "u32", note = "0 at reset" },
+  { name = "unknown_16", offset = 16, type = "u32", note = "1 at reset" },
+  { name = "camera_vector_1", offset = 32, type = "bytes", count = 16, note = "the camera animation's second vector (probably the position: UpdatePage copies it to 0x8265ECE0); (0, 0, 0, 1) at reset" },
+  { name = "camera_vector_0", offset = 48, type = "bytes", count = 16, note = "the camera animation's first vector; (0, 0, 0, 1) at reset" },
+  { name = "vector_64", offset = 64, type = "bytes", count = 16, note = "(0, 0, 0, 1) at reset; readers not looked for" },
+  { name = "vector_80", offset = 80, type = "bytes", count = 16, note = "(0, 0, 0, 1) at reset; readers not looked for" },
+  { name = "unknown_96", offset = 96, type = "f32", note = "0.0 at reset" },
+  { name = "unknown_100", offset = 100, type = "f32", note = "0.0 at reset" },
+  { name = "camera_float_0", offset = 104, type = "f32", note = "the camera animation's first float (0.0 at reset)" },
+  { name = "camera_float_1", offset = 108, type = "f32", note = "the camera animation's second float (0.0 at reset)" },
+  { name = "matrix0", offset = 112, type = "bytes", count = 64, note = "an identity at reset" },
+  { name = "matrix1", offset = 176, type = "bytes", count = 64, note = "an identity at reset" },
+]
+
+# The screen's state machine (the type 5 mode's block +9640; a StateMachine,
+# game-modes.toml, with the words every front-end screen's machine has), as
+# the pages that leave get it (r4).
+[LocationScreenMachine]
+measures = ["LocationScreen::Page8.r4", "LocationScreen::Page9.r4", "LocationScreen::Page11.r4"]
+size = 9624
+origin = "embedded"
+fields = [
+  { name = "transitions", offset = 0, type = "bytes", count = 9600, note = "200 transitions, 48 bytes each (StateMachine's)" },
+  { name = "transition_count", offset = 9600, type = "u32" },
+  { name = "state", offset = 9604, type = "u32" },
+  { name = "loaded", offset = 9608, type = "u32", note = "1 once movies 21 and 30, the pictures and the scenery are loaded (PollLoad); Reenter goes to 4 with it, else 1" },
+  { name = "reenter", offset = 9612, type = "u32", note = "1 (ModeType5::Init): Create goes to state 1, else 9" },
+  { name = "delete_movie", offset = 9616, type = "u32", note = "nonzero: OnMessage6 deletes movies 21 and 30 and clears `loaded`" },
+  { name = "next_state", offset = 9620, type = "u32", note = "the state Destroy leaves: 11 a race set up, 13 otherwise" },
+]
+
+# The type 5 mode's message dispatcher (the mode's +36) as the screen's
+# handlers get it (r4): they post to its ring.
+[LocationScreenDispatcher]
+measures = ["LocationScreen::OnMessage3.r4", "LocationScreen::Unload.r4"]
+size = 812
+origin = "embedded"
+fields = [
+  { name = "messages", offset = 204, type = "bytes", count = 600, note = "50 messages of 12 bytes (id, two words)" },
+  { name = "message_count", offset = 804, type = "u32" },
+  { name = "message_start", offset = 808, type = "u32", note = "the ring's first slot" },
+]
+
+# LocationScreenMode: merged into type5-mode.toml's ModeType5 at the integration (the same object).
+
+# A screen picture (16 bytes, VirtualAlloc by OnPictureLoadedA and B; freed
+# by Picture::Free and FreePictures; known-data.md: "screen picture").
+[LocationScreenPicture]
+measures = ["Picture", "LocationScreen.+8", "new<16>@LocationScreen::OnPictureLoadedA", "new<16>@LocationScreen::OnPictureLoadedB"]
+size = 16
+origin = "allocated"
+fields = [
+  { name = "loaded", offset = 0, type = "u32" },
+  { name = "id", offset = 4, type = "u32", note = "the picture id (a 56- or 20-byte data table entry's +16), -1 until the ring's front is taken" },
+  { name = "texture", offset = 8, type = "ptr", to = "LocationScreenPictureTexture" },
+  { name = "xpr", offset = 12, type = "ptr", note = "the XPR (24 bytes, XPR::XPR and XPR::Create over the loaded buffer)" },
+]
+
+# A picture's texture record (12 bytes, operator new by OnPictureLoadedA
+# and B, deleted by Picture::Free).
+[LocationScreenPictureTexture]
+measures = ["Picture.+8", "new<12>@LocationScreen::OnPictureLoadedA", "new<12>@LocationScreen::OnPictureLoadedB", "new<16>@LocationScreen::OnPictureLoadedA.+8", "new<16>@LocationScreen::OnPictureLoadedB.+8"]
+size = 12
+origin = "allocated"
+fields = [
+  { name = "texture", offset = 0, type = "u32", note = "the XPR's texture 0 (XPR::GetTexture)" },
+  { name = "width", offset = 4, type = "u32", note = "Texture::GetLevelDesc's +24" },
+  { name = "height", offset = 8, type = "u32", note = "Texture::GetLevelDesc's +28" },
+]
+
+# A 20-byte data table entry (asset 95) as the screen's text walks read it
+# (DataTables::Entry20; data-tables.toml's DataTablesEntry20 is the same
+# entry as the tables' own walks read it).
+[LocationScreenEntry20]
+measure = "DataTables::Entry20.ret"
+size = 20
+origin = "file"
+fields = [
+  { name = "next", offset = 4, type = "u32", note = "added to the walk's offset (+872); 0 ends it" },
+  { name = "text", offset = 12, type = "u32", note = "a text id less 4650" },
+  { name = "picture", offset = 16, type = "u32", note = "the picture id (PictureA, PictureB)" },
+]
+
+# The locations' table (0x82636518; 16 bytes a location, 0 to 5).
+[LocationScreenLocation]
+size = 16
+origin = "image"
+fields = [
+  { name = "view_anim", offset = 0, type = "u32", note = "the view's camera animation id" },
+  { name = "cars_anim", offset = 4, type = "u32", note = "the cars' places' camera animation id" },
+  { name = "list_anim", offset = 8, type = "u32", note = "the list's camera animation id (UpdateView's)" },
+  { name = "scenery_area", offset = 12, type = "u32", note = "a scenery area (LocationScreen::SceneryConfig)" },
+]
+
+# The card table's rows (0x82636578; 24 bytes for each location and the
+# item's card category, +90).
+[LocationScreenCard]
+size = 24
+origin = "image"
+fields = [
+  { name = "named_0", offset = 0, type = "u32", note = "movie 30's first named animation" },
+  { name = "named_1", offset = 4, type = "u32", note = "the second named animation (with a card)" },
+  { name = "child", offset = 8, type = "u32", note = "the child of the first animation's node shown" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "text", offset = 16, type = "u32", note = "text (-1, 12) with a card" },
+  { name = "card_named", offset = 20, type = "u32", note = "movie 30's named animation Transition17 plays" },
+]
+
+[globals]
+pages = { address = 0x82814E48, type = "ptr", to = "PageObject", note = "the page object: 16 pages, 36 transitions" }
+menu = { address = 0x82814E4C, type = "ptr", to = "FrontEndMenu", note = "the location's menu (5 items)" }
+screen = { address = 0x82814E50, type = "ptr", to = "LocationScreen" }
+list_menu = { address = 0x82814E54, type = "ptr", to = "FrontEndMenu", note = "the location's list (list_count items)" }
+opponent_menu = { address = 0x82814E58, type = "ptr", to = "FrontEndMenu", note = "the opponents (opponent_count items)" }
+confirm_menu = { address = 0x82814E5C, type = "ptr", to = "FrontEndMenu", note = "race, the card, back" }
+result_word = { address = 0x82814E68, type = "u32", note = "1 on one path of NextResultTextB (never ran); readers not looked for" }
+locations = { address = 0x82636518, type = "bytes", count = 96, note = "6 LocationScreenLocation" }
+cards = { address = 0x82636578, type = "bytes", note = "LocationScreenCard rows by location and card category" }
+scenery_configs = { address = 0x82602EA0, type = "bytes", note = "8 bytes an entry, by (area + 2) x 3 + the mode (SceneryConfig)" }
+opponent_times = { address = 0x82010780, type = "bytes", count = 24, note = "the camera animations' time for each opponent (6 words)" }
+view_copy = { address = 0x8265ECE0, type = "bytes", count = 16, note = "the view's camera_vector_1, copied by UpdatePage" }
+light_view = { address = 0x8265ED00, type = "bytes", count = 16, note = "0x826366A0's 16 bytes, by UpdateView" }
+light_array_a = { address = 0x8296B950, type = "bytes", count = 48, note = "UpdateView's first array (probably the course view's lights)" }
+light_array_b = { address = 0x8296B980, type = "bytes", count = 48 }
+light_array_c = { address = 0x8296B9B0, type = "bytes", count = 48, note = "UpdateView's r3" }
+light_zeros_a = { address = 0x8296BAE0, type = "bytes", count = 128, note = "zeroed by UpdateView" }
+light_zeros_b = { address = 0x8296BB60, type = "bytes", count = 128, note = "zeroed by UpdateView" }
+light_source_a = { address = 0x826366A0, type = "bytes", count = 16 }
+light_source_b = { address = 0x826366B0, type = "bytes", count = 16 }
+light_source_c = { address = 0x826366C0, type = "bytes", count = 16 }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from LocationScreen.
+[LocationScreenAt804]
+measure = "LocationScreen@+804"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from LocationScreen.
+[LocationScreenPart]
+measure = "new<28940>@ModeType5::Init"
+size = 28928
+origin = "embedded"
+fields = [
+  { name = "unknown_9612", offset = 9612, type = "u32" },
+  { name = "unknown_9616", offset = 9616, type = "u32" },
+  { name = "unknown_19252", offset = 19252, type = "u32" },
+  { name = "unknown_19256", offset = 19256, type = "u32" },
+  { name = "unknown_28892", offset = 28892, type = "u32" },
+  { name = "unknown_28896", offset = 28896, type = "u32" },
+  { name = "unknown_28920", offset = 28920, type = "u32" },
+  { name = "unknown_28924", offset = 28924, type = "u32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from LocationScreen.
+[LocationScreenAt560]
+measure = "LocationScreen@+560"
+size = 112
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_32", offset = 32, type = "u64" },
+  { name = "unknown_40", offset = 40, type = "u64" },
+  { name = "unknown_48", offset = 48, type = "u64" },
+  { name = "unknown_56", offset = 56, type = "u64" },
+  { name = "unknown_64", offset = 64, type = "u64" },
+  { name = "unknown_72", offset = 72, type = "u64" },
+  { name = "unknown_80", offset = 80, type = "u64" },
+  { name = "unknown_88", offset = 88, type = "u64" },
+  { name = "unknown_96", offset = 96, type = "f32" },
+  { name = "unknown_100", offset = 100, type = "f32" },
+  { name = "unknown_104", offset = 104, type = "f32" },
+  { name = "unknown_108", offset = 108, type = "f32" },
+]
+
+# Split from LocationScreen.
+[LocationScreenAt4288]
+measure = "TrafficCar@+4288"
+size = 736
+origin = "embedded"
+fields = [
+  { name = "unknown_732", offset = 732, type = "u32" },
+]
+
+# Split from LocationScreen.
+[LocationScreenAt9640]
+measure = "new<28940>@ModeType5::Init@+9640"
+size = 9608
+origin = "embedded"
+fields = [
+  { name = "unknown_9604", offset = 9604, type = "u32" },
+]

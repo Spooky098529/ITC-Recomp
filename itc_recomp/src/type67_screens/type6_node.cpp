@@ -15,6 +15,8 @@
 #include "base/log.h"
 #include "car_list/car_list.h"
 #include "guest.h"
+#include "schema/tuning_screen.h"
+#include "schema/type67_screens.h"
 #include "race_screens/race_screens.h"
 #include "save_data/save_data.h"
 #include "type67_screens/list_pages.h"
@@ -27,6 +29,8 @@ namespace {
 using namespace pages;
 using guest::LoadU32;
 using guest::StoreU32;
+using NS = schema::NodeScreen;
+using Paired = schema::PairedNodeTable;
 
 constexpr uint32_t kListInit = 0x8220BAC0, kScrollText = 0x8211C570,
                    kResetTextScroll = 0x8211C5F8;
@@ -44,7 +48,7 @@ uint32_t MovieById(uint8_t* base, uint32_t id, uint32_t frame) {
 // UiMovie::HideNode (sub_8211AC48): the node's +80 cleared; the node.
 uint32_t Hide(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child) {
   const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
-  StoreU32(base, node + 80, 0);
+  schema::UiMovieNode(base, node).set_visible(0);
   return node;
 }
 
@@ -76,7 +80,7 @@ uint64_t Type6NodeScreenSetUpMenus(uint8_t* base, uint64_t r3, uint32_t sp, cons
   NodeScreenLoadItem(base, r3, frame, calls);
   const uint32_t traffic = race_screens::ListSelection(base, screen + 10204);
   const uint32_t selection = race_screens::ListSelection(base, screen + 10132);
-  const uint64_t course = uint64_t(LoadU32(base, screen + 10136)) + uint64_t(selection);
+  const uint64_t course = uint64_t(NS(base, screen).course_list_scroll()) + uint64_t(selection);
   return NodeScreenShowRecords(base, r3, course, traffic, frame, calls);
 }
 
@@ -84,7 +88,7 @@ uint64_t Type6NodeScreenSetText(uint8_t* base, uint64_t r3, uint64_t r4, uint32_
                                 const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822370A0 Type6NodeScreen::SetText");
   const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t movie = MovieById(base, LoadU32(base, uint32_t(r3) + 10100), frame);
+  const uint32_t movie = MovieById(base, NS(base, uint32_t(r3)).movie(), frame);
   const uint32_t texts = (uint32_t(r4) << 2) + kCourseTexts;
   uint64_t result = 0;
   for (uint32_t i = 0; i < 7; i++) {
@@ -129,37 +133,39 @@ uint64_t Type6NodeScreenShowMarks(uint8_t* base, uint64_t r4, uint32_t sp) {
   const uint32_t movie = MovieById(base, kNodeMovie, frame);
   const uint32_t which = uint32_t(r4);
   uint32_t node = ui_movies::FindNode(base, movie, 0xFFFFFFFFu, 13);
-  StoreU32(base, node + 80, which != 0 ? 1 : 0);
+  schema::UiMovieNode(base, node).set_visible(which != 0 ? 1 : 0);
   node = ui_movies::FindNode(base, movie, 0xFFFFFFFFu, 14);
-  StoreU32(base, node + 80, which + 6 - 8 != 0 ? 1 : 0);
+  schema::UiMovieNode(base, node).set_visible(which + 6 - 8 != 0 ? 1 : 0);
   return node;
 }
 
 uint64_t NodeScreenSetUpTexts(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82247FE0 NodeScreen::SetUpTexts");
   const uint32_t table = uint32_t(r3), frame = Frame(base, sp, 128);
-  StoreU32(base, frame + 80, LoadU32(base, table + 4));
+  StoreU32(base, frame + 80, Paired(base, table).movie());
   const uint32_t found = ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80);
   const uint32_t movie = LoadU32(base, found);
   uint64_t result = found;
   for (uint32_t i = 0; i < 27; i++) {
-    const uint32_t child = LoadU32(base, table + 156 + 4 * i);
-    if (int32_t(child) >= 0) result = Hide(base, movie, LoadU32(base, table + 12), child);
-    const uint32_t first = LoadU32(base, table + 420);
-    if (int32_t(first) > -1) result = Hide(base, movie, LoadU32(base, table + 8), first + i);
+    const uint32_t child = LoadU32(base, Paired(base, table).item_nodes_address() + 4 * i);
+    if (int32_t(child) >= 0) result = Hide(base, movie, Paired(base, table).node_set_b(), child);
+    const uint32_t first = Paired(base, table).extra_node_base();
+    if (int32_t(first) > -1)
+      result = Hide(base, movie, Paired(base, table).node_set_a(), first + i);
   }
   for (uint32_t i = 0; i < 8; i++) {
-    const uint32_t child = LoadU32(base, table + 264 + 4 * i);
-    if (int32_t(child) >= 0) result = Hide(base, movie, LoadU32(base, table + 8), child);
+    const uint32_t child = LoadU32(base, Paired(base, table).nodes_address() + 4 * i);
+    if (int32_t(child) >= 0) result = Hide(base, movie, Paired(base, table).node_set_a(), child);
   }
-  const uint32_t texts = LoadU32(base, table + 424);
+  const uint32_t texts = Paired(base, table).text_node_base();
   if (int32_t(texts) > -1) {
-    calls.set_text(frame, 0x822480A0, movie, LoadU32(base, table + 8), texts, 402);
+    calls.set_text(frame, 0x822480A0, movie, Paired(base, table).node_set_a(), texts, 402);
     static constexpr uint32_t kIds[3] = {401, 407, 408};
     static constexpr uint32_t kLr[3] = {0x822480B8, 0x822480D0, 0x822480E8};
     for (uint32_t k = 0; k < 3; k++) {
-      const uint32_t child = LoadU32(base, table + 424) + 1 + k;
-      result = calls.set_text(frame, kLr[k], movie, LoadU32(base, table + 8), child, kIds[k]);
+      const uint32_t child = Paired(base, table).text_node_base() + 1 + k;
+      result =
+          calls.set_text(frame, kLr[k], movie, Paired(base, table).node_set_a(), child, kIds[k]);
     }
   }
   return result;
@@ -167,7 +173,7 @@ uint64_t NodeScreenSetUpTexts(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
 
 uint64_t Type6NodeScreenDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82236EA0 Type6NodeScreen::~Type6NodeScreen");
-  StoreU32(base, uint32_t(r3), kType6NodeScreenVtable);
+  NS(base, uint32_t(r3)).set_vtable(kType6NodeScreenVtable);
   // A tail call of ~NodeScreen.
   return NodeScreenDestruct(base, r3, sp, calls);
 }
@@ -176,7 +182,7 @@ uint64_t Type6NodeScreenDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t fl
                                          const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82237048 Type6NodeScreen::DeletingDestructor");
   const uint32_t frame = Frame(base, sp, 112);
-  StoreU32(base, uint32_t(r3), kType6NodeScreenVtable);
+  NS(base, uint32_t(r3)).set_vtable(kType6NodeScreenVtable);
   NodeScreenDestruct(base, r3, frame, calls);
   if ((flags & 1) != 0) {
     // operator delete, r4 as the destructor left it.

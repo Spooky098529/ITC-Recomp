@@ -68,6 +68,16 @@ not seen in play) aren't mapped. Constant: `[0x82000A34]` 0.0. The word
 at recordings + 0x2225B0 (0 at `InputRecordings::Create`) is set to 1
 by both restores; its readers weren't found by its offset.
 
+The schema (E5 step 2, `itc_recomp/schema/replay-snapshots.toml`, 2026-11-21)
+names the objects: `ReplaySnapshot` (the block), `ReplayRecord` (Record5232),
+`ReplayBodyState` (BodyState), `ReplayVehiclePhysics` (Member1136, each
+field named after the vehicle's field it packs), `ReplayCollisionState`
+(Member4080) and `ReplayShapeState` (Part464); the hand ports reach the
+record side through these views, the vehicle's side by offsets still. The
+measure files the placed box `Part464::Save` and `Restore` take apart from
+collision.md's `BoxShape` (`ReplayPlacedBox` for now) and joins the six
+record copies' r4 into one type (`ReplayCopySource`, a bytes field).
+
 Status:
 
 - **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
@@ -109,6 +119,11 @@ Status:
   calls direct or through the dispatch table. While the SDK or code not
   native yet still reaches it, its entry for them is an override in
   `src/lifted/` (deleted when nothing reaches it that way).
+- **Host**: E5 (`docs/e5-native.md`, steps 3 to 5): our C++ whose objects
+  are host structs (host byte order, host pointers, made with `new` or
+  kept in containers), read and written as C++ members instead of by
+  offset in guest memory. A Native or Lifted function becomes Host when
+  its area's objects move to the host.
 
 A function usually moves from recompiled or Wrapped to Overridden to
 Native as the `ctx` edge moves up through its callers, or straight to

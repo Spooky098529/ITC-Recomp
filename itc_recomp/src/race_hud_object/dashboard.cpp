@@ -6,6 +6,11 @@
 #include "base/log.h"
 #include "camera_modes/steps.h"
 #include "guest.h"
+#include "schema/car_physics.h"
+#include "schema/race_event.h"
+#include "schema/race_hud_object.h"
+#include "schema/race_setup.h"
+#include "schema/camera_modes.h"
 #include "ui_movies/game.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -19,8 +24,11 @@ constexpr uint32_t kNone = 0xFFFFFFFFu;  // a sub-scene index of -1
 
 void Frame(uint8_t* base, uint32_t sp, uint32_t bytes) { guest::StoreU32(base, sp - bytes, sp); }
 
-uint32_t Dashboard(uint8_t* base, uint32_t hud) { return guest::LoadU32(base, hud + kHudDashboard); }
-uint32_t Timer(uint8_t* base, uint32_t hud) { return guest::LoadU32(base, hud + kHudTimer); }
+using Hud = schema::RaceHud;
+using G = schema::RaceHudObjectGlobals;
+
+uint32_t Dashboard(uint8_t* base, uint32_t hud) { return Hud(base, hud).dashboard().address; }
+uint32_t Timer(uint8_t* base, uint32_t hud) { return Hud(base, hud).timer().address; }
 
 double LoadDouble(uint8_t* base, uint32_t address) {
   return std::bit_cast<double>(uint64_t(guest::LoadU32(base, address)) << 32 |
@@ -55,18 +63,20 @@ uint32_t Digit(uint8_t* base, uint32_t node, int32_t& value, int32_t place, uint
 uint32_t SetTach(uint8_t* base, uint32_t hud, double value, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82212D58 RaceHud::SetTach");
   Frame(base, sp, 96);
-  CurveEval(base, hud + 20, value);
+  const Hud h(base, hud);
+  CurveEval(base, h.tach_curve_address(), value);
   const uint32_t node = ui_movies::FindNode(base, Dashboard(base, hud), 0, 7);
-  Stfs(base, node + 36, Fadds(Lfs(base, hud + 120), Lfs(base, 0x8200F720)));
+  Stfs(base, node + 36, Fadds(double(h.tach_output()), Lfs(base, 0x8200F720)));
   return node;
 }
 
 uint32_t SetBoost(uint8_t* base, uint32_t hud, double value, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82212E18 RaceHud::SetBoost");
   Frame(base, sp, 96);
-  CurveEval(base, hud + 132, value);
+  const Hud h(base, hud);
+  CurveEval(base, h.boost_curve_address(), value);
   const uint32_t node = ui_movies::FindNode(base, Dashboard(base, hud), 0, 5);
-  Stfs(base, node + 36, Lfs(base, hud + 232));
+  Stfs(base, node + 36, double(h.boost_output()));
   return node;
 }
 
@@ -179,8 +189,9 @@ uint32_t Reset(uint8_t* base, uint32_t hud, uint32_t sp) {
   }
   const uint32_t node5 = ui_movies::FindNode(base, Dashboard(base, hud), kNone, 5);
   Stfs(base, node5 + 68, zero);
-  guest::StoreU32(base, hud + 492, 0);
-  guest::StoreU32(base, hud + 460, 0xFFFFFFFFu);
+  const Hud h(base, hud);
+  h.set_recording_full(0);
+  h.set_item_shown(0xFFFFFFFFu);
   const uint32_t mirror = ui_movies::FindNode(base, Dashboard(base, hud), kNone, 19);
   guest::StoreU32(base, mirror + 80, 0);
   return mirror;
@@ -200,16 +211,18 @@ uint32_t SetUpExtraGauges(uint8_t* base, uint32_t hud, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82213DB0 RaceHud::SetUpExtraGauges");
   const uint32_t frame = sp - 144;
   Frame(base, sp, 144);
-  const uint32_t car = guest::LoadU32(base, hud + kHudVehicle);
-  uint32_t entry = guest::LoadU32(base, car + 5712) + 1824 + 8;
+  const Hud h(base, hud);
+  const schema::Vehicle car = h.vehicle();
+  // The car's five choices' third words (CarChoice.c), 12 bytes apart.
+  uint32_t entry = schema::Car(base, car.car()).choice0_a_address();
   guest::StoreU32(base, frame + 88, 0);
-  guest::StoreU32(base, hud + 476, 0);
+  h.set_part_fitted(0);
   guest::StoreU32(base, frame + 84, 0);
   guest::StoreU32(base, frame + 80, 0);
-  for (int k = 0; k < 5; k++, entry += 12) {
-    switch (int32_t(guest::LoadU32(base, entry))) {
+  for (int k = 0; k < 5; k++, entry += schema::CarChoice::kSize) {
+    switch (int32_t(schema::CarChoice(base, entry).c())) {
       case 1:
-        guest::StoreU32(base, hud + 476, 1);
+        h.set_part_fitted(1);
         break;
       case 2:
         guest::StoreU32(base, frame + 80, 1);
@@ -224,14 +237,14 @@ uint32_t SetUpExtraGauges(uint8_t* base, uint32_t hud, uint32_t sp) {
         break;
     }
   }
-  if (int32_t(guest::LoadU32(base, guest::LoadU32(base, car + 5712) + 12)) == 10) {
-    guest::StoreU32(base, hud + 476, 1);
+  if (int32_t(schema::Car(base, car.car()).car_id()) == 10) {
+    h.set_part_fitted(1);
   }
   guest::StoreU32(base, frame + 96, frame + 80);
   guest::StoreU32(base, frame + 100, frame + 84);
   guest::StoreU32(base, frame + 104, frame + 88);
   // The slots from the last: the first flag set of the three (cleared), or -1.
-  for (uint32_t slot = hud + 488; slot != hud + 476; slot -= 4) {
+  for (uint32_t slot = h.gauge_slot2_address(); slot != h.part_fitted_address(); slot -= 4) {
     guest::StoreU32(base, slot, 0xFFFFFFFFu);
     for (uint32_t i = 0; i < 3; i++) {
       if (int32_t(guest::LoadU32(base, guest::LoadU32(base, frame + 96 + 4 * i))) == 1) {
@@ -242,49 +255,55 @@ uint32_t SetUpExtraGauges(uint8_t* base, uint32_t hud, uint32_t sp) {
     }
   }
   for (uint32_t i = 0; i < 3; i++) {
-    ShowGauge(base, hud, i, guest::LoadU32(base, hud + 480 + 4 * i) < 3 ? 1 : 0, frame);
+    ShowGauge(base, hud, i, guest::LoadU32(base, h.gauge_slot0_address() + 4 * i) < 3 ? 1 : 0,
+              frame);
   }
   const uint32_t node = ui_movies::FindNode(base, Dashboard(base, hud), 0, 1);
-  guest::StoreU32(base, node + 80,
-                  guest::LoadU32(base, hud + 8) & guest::LoadU32(base, hud + 476));
+  guest::StoreU32(base, node + 80, h.option_gauges() & h.part_fitted());
   return node;
 }
 
 uint32_t ApplyOptions(uint8_t* base, uint32_t hud, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82212768 RaceHud::ApplyOptions");
   Frame(base, sp, 96);
-  const uint32_t options = vehicle_accessors::SaveDataOf(base, 0) + 0x20000 - 1956;
-  const bool mirror = guest::LoadU32(base, hud + 472) != 0;
-  for (uint32_t i = 0; i < 16; i += 4) {
-    guest::StoreU32(base, hud + i, guest::LoadU32(base, options + i));
-  }
+  const schema::SaveData options(base, vehicle_accessors::SaveDataOf(base, 0));
+  const Hud h(base, hud);
+  const bool mirror = h.view_dashboard() != 0;
+  // The four HUD options (the save data's +0x1F85C to +0x1F868), word by word.
+  h.set_option_node3(options.hud_option_0());
+  h.set_option_node1(options.hud_option_1());
+  h.set_option_gauges(options.hud_option_2());
+  h.set_option_mirror(options.hud_option_3());
   if (mirror) {
     const uint32_t node = ui_movies::FindNode(base, Dashboard(base, hud), kNone, 4);
-    guest::StoreU32(base, node + 80, guest::LoadU32(base, hud + 12));
+    guest::StoreU32(base, node + 80, h.option_mirror());
   }
   uint32_t node = ui_movies::FindNode(base, Dashboard(base, hud), kNone, 3);
-  guest::StoreU32(base, node + 80, guest::LoadU32(base, hud + 0));
+  guest::StoreU32(base, node + 80, h.option_node3());
   node = ui_movies::FindNode(base, Dashboard(base, hud), 0, 3);
-  guest::StoreU32(base, node + 80, guest::LoadU32(base, hud + 8));
+  guest::StoreU32(base, node + 80, h.option_gauges());
   node = ui_movies::FindNode(base, Dashboard(base, hud), 0, 4);
-  guest::StoreU32(base, node + 80, guest::LoadU32(base, hud + 8));
+  guest::StoreU32(base, node + 80, h.option_gauges());
   node = ui_movies::FindNode(base, Dashboard(base, hud), 0, 1);
-  guest::StoreU32(base, node + 80,
-                  guest::LoadU32(base, hud + 476) & guest::LoadU32(base, hud + 8));
+  {
+    const uint32_t part = h.part_fitted();
+    guest::StoreU32(base, node + 80, part & h.option_gauges());
+  }
   node = ui_movies::FindNode(base, Dashboard(base, hud), kNone, 1);
-  guest::StoreU32(base, node + 80, guest::LoadU32(base, hud + 4));
+  guest::StoreU32(base, node + 80, h.option_node1());
   return node;
 }
 
 uint32_t UpdateView(uint8_t* base, uint32_t hud, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82212B68 RaceHud::UpdateView");
   Frame(base, sp, 112);
-  const uint32_t viewport = guest::LoadU32(base, guest::LoadU32(base, kViewports));
-  guest::StoreU32(base, hud + 432, guest::LoadU32(base, viewport + 1860));
+  const Hud h(base, hud);
+  const schema::Viewport viewport = G::viewports(base).first();
+  h.set_view(viewport.view_mode());
   const uint32_t full = ui_movies::FindNode(base, Dashboard(base, hud), kNone, 0);
   const uint32_t cockpit = ui_movies::FindNode(base, Dashboard(base, hud), kNone, 4);
-  const uint32_t view = guest::LoadU32(base, hud + 432);
-  if (guest::LoadU32(base, hud + 12) != 0) {
+  const uint32_t view = h.view();
+  if (h.option_mirror() != 0) {
     if (view >= 3) {
       return cockpit;
     }
@@ -295,12 +314,12 @@ uint32_t UpdateView(uint8_t* base, uint32_t hud, uint32_t sp) {
       guest::StoreU32(base, full + 80, 1);
     }
     guest::StoreU32(base, cockpit + 80, shown);
-    guest::StoreU32(base, hud + 472, shown);
+    h.set_view_dashboard(shown);
     return cockpit;
   }
-  guest::StoreU32(base, hud + 472, 0);
+  h.set_view_dashboard(0);
   guest::StoreU32(base, cockpit + 80, 0);
-  const uint32_t view2 = guest::LoadU32(base, hud + 432);
+  const uint32_t view2 = h.view();
   if (view2 < 3) {
     guest::StoreU32(base, full + 80, view2 == 1 ? 0 : 1);
   }

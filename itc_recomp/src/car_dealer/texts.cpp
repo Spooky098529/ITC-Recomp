@@ -23,7 +23,7 @@ uint64_t SetBar(uint8_t* base, uint32_t sub_scene, uint64_t value, uint32_t sp) 
   Store(base, frame + 84, uint32_t(uint64_t(wide)));
   const float bar = float(double(wide));
   const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, 0);
-  guest::StoreFloat(base, node + 16, bar);
+  Node(base, node).set_y(bar);
   return node;
 }
 
@@ -47,11 +47,11 @@ uint64_t SetScrollArrows(uint8_t* base, uint64_t scroll, uint64_t count, uint32_
   const uint32_t down = ui_movies::FindNode(base, movie, 7, 4);
   const int32_t s = int32_t(uint32_t(scroll));
   if (s == 0) {
-    Store(base, up + 80, 0);
-    Store(base, down + 80, 1);
+    Node(base, up).set_visible(0);
+    Node(base, down).set_visible(1);
   } else {
-    Store(base, up + 80, 1);
-    Store(base, down + 80, int32_t(uint32_t(s + 4)) == int32_t(uint32_t(count)) ? 0 : 1);
+    Node(base, up).set_visible(1);
+    Node(base, down).set_visible(int32_t(uint32_t(s + 4)) == int32_t(uint32_t(count)) ? 0 : 1);
   }
   return down;
 }
@@ -62,8 +62,8 @@ uint64_t SetHeader(uint8_t* base, uint32_t a, uint32_t b, uint32_t sp) {
   const uint32_t movie = FindMovie(base, 4, frame + 80);
   const uint32_t first = ui_movies::FindNode(base, movie, 2, 1);
   const uint32_t second = ui_movies::FindNode(base, movie, 2, 2);
-  Store(base, first + 108, a);
-  Store(base, second + 108, b);
+  Node(base, first).set_texture_entry(a);
+  Node(base, second).set_texture_entry(b);
   return second;
 }
 
@@ -82,21 +82,23 @@ uint64_t SetPrompts(uint8_t* base, const uint32_t args[6], uint32_t sp) {
   uint32_t r3 = 0;
   for (uint32_t i = 0; i < 3; i++) {
     const uint32_t prompt = ui_movies::FindNode(base, movie, 16, i);
-    const uint32_t first = ui_movies::FindNode(base, movie, 16, Load(base, prompt + 100));
-    r3 = ui_movies::FindNode(base, movie, 16, Load(base, prompt + 100) + 1);
+    // The prompt's +100 read as a word (its first child index), twice.
+    const Node group(base, prompt);
+    const uint32_t first = ui_movies::FindNode(base, movie, 16, Load(base, group.width_address()));
+    r3 = ui_movies::FindNode(base, movie, 16, Load(base, group.width_address()) + 1);
     const uint32_t a = Load(base, frame + 88 + 4 * i);
     if (a != 0xFFFFFFFFu) {
       const uint32_t b = Load(base, frame + 104 + 4 * i);
       if (b != 0xFFFFFFFFu) {
-        Store(base, first + 80, 1);
-        Store(base, r3 + 80, 1);
-        Store(base, first + 108, a);
-        Store(base, r3 + 108, b);
+        Node(base, first).set_visible(1);
+        Node(base, r3).set_visible(1);
+        Node(base, first).set_texture_entry(a);
+        Node(base, r3).set_texture_entry(b);
         continue;
       }
     }
-    Store(base, first + 80, 0);
-    Store(base, r3 + 80, 0);
+    Node(base, first).set_visible(0);
+    Node(base, r3).set_visible(0);
   }
   return r3;
 }

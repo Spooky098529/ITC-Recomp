@@ -4,6 +4,8 @@
 
 #include "physical_pad.h"
 
+#include "base/hash.h"
+
 #include <array>
 #include <bit>
 #include <cmath>
@@ -73,7 +75,19 @@ uint16_t MotorSpeed(float speed) {
 
 }  // namespace
 
+namespace {
+// For the state digest: a hash of each user's values at its last read.
+uint64_t g_last_read_hash[4] = {};
+}  // namespace
+
+uint64_t PhysicalPad_LastReadHash(uint32_t user) {
+  return user < 4 ? g_last_read_hash[user] : 0;
+}
+
 bool PhysicalPad_Read(PhysicalPad& pad, uint32_t user) {
+  if (user < 4) {
+    g_last_read_hash[user] = 0;
+  }
   bool was_connected = pad.flags & kPadConnected;
   std::memset(pad.values, 0, sizeof(pad.values));
   XInputState state;
@@ -127,6 +141,9 @@ bool PhysicalPad_Read(PhysicalPad& pad, uint32_t user) {
     pad.values[33 + 4 * i] = ly_negated;
     pad.values[34 + 4 * i] = lx;
     pad.values[35 + 4 * i] = lx_negated;
+  }
+  if (user < 4) {
+    g_last_read_hash[user] = base::Hash64(pad.values, sizeof(pad.values));
   }
   return caps_read;
 }

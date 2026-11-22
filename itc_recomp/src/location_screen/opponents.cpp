@@ -8,6 +8,9 @@
 #include "guest.h"
 #include "location_screen/internal.h"
 #include "race_event/race_event.h"
+#include "schema/career.h"
+#include "schema/race_event.h"
+#include "schema/tuning_screen.h"
 #include "ui_movies/ui_movies.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -17,26 +20,28 @@ using namespace detail;
 
 namespace {
 
-// An item's record in the save data: save + kItemRecords + 12 id.
-uint32_t Record(uint32_t save, int32_t id) { return uint32_t(id) * 12 + save + kItemRecords; }
+// An item's record in the save data (+0x199F8 + 12 id).
+schema::CareerItemRecord Record(uint8_t* base, uint32_t save, int32_t id) {
+  return schema::CareerItemRecord(
+      base, schema::SaveData(base, save).item_records_address() + uint32_t(id) * 12);
+}
 
 // The picked opponent's item (RaceEvent::GroupItem of +804 and +800, +800
 // stored at the frame's +80) copied to `to`.
 void CopyOpponent(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t lr, uint32_t to) {
-  guest::StoreU32(base, frame + 80, guest::LoadU32(base, Screen(base) + 800));
+  guest::StoreU32(base, frame + 80, Screen(base).picked_opponent());
   const uint32_t event = guest::LoadU32(base, race_event::kEvent);
-  const uint32_t item = race_event::GroupItem(base, event, guest::LoadU32(base, Screen(base) + 804),
+  const uint32_t item = race_event::GroupItem(base, event, Screen(base).group_kind(),
                                               guest::LoadU32(base, frame + 80));
   Copy(base, calls, frame, lr, to, item, 3008);
 }
 
 // An item's state by its record: 0 none, 1 seen (+4 or +0 set), 2 won (+2).
 uint32_t ItemState(uint8_t* base, uint32_t save, int32_t id) {
-  if (int16_t(guest::LoadU16(base, Record(save, id) + 2)) != 0) {
+  if (int16_t(Record(base, save, id).wins()) != 0) {
     return 2;
   }
-  if (guest::LoadU16(base, Record(save, id) + 4) != 0 ||
-      guest::LoadU16(base, Record(save, id)) != 0) {
+  if (Record(base, save, id).outcome3() != 0 || Record(base, save, id).losses() != 0) {
     return 1;
   }
   return 0;
@@ -48,14 +53,13 @@ uint32_t SetTexture(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t 
                                    texture);
 }
 
-// The card table (0x82636578): 24 bytes for each location and the item's
-// card category (+90): +0 and +4 named animations, +8 a child, +16 a text,
-// +20 movie 30's named animation.
-constexpr uint32_t kCards = 0x82636578;
-uint32_t CardRow(uint8_t* base, uint32_t frame) {
+// The card table's row (LocationScreenCard, 24 bytes at 0x82636578) for the
+// location and the item's card category (+90).
+schema::LocationScreenCard CardRow(uint8_t* base, uint32_t frame) {
   const int32_t category = int8_t(guest::LoadU8(base, frame + 186));
-  const uint32_t location = guest::LoadU32(base, Screen(base) + 852);
-  return (((location << 1) & 0xFFFFFFFEu) + uint32_t(category)) * 24;
+  const uint32_t location = Screen(base).location_index();
+  return schema::LocationScreenCard(
+      base, (((location << 1) & 0xFFFFFFFEu) + uint32_t(category)) * 24 + G::cards_address());
 }
 
 }  // namespace
@@ -148,7 +152,7 @@ uint32_t ShowOpponentInfo(uint8_t* base, uint32_t sp, const Calls& calls) {
       if (owned == -1) {
         break;
       }
-      if (guest::LoadU16(base, Record(save, owned) + 2) == 0) {
+      if (Record(base, save, owned).wins() == 0) {
         SetTexture(base, movie, 12, 17, 1);
         break;
       }
@@ -162,12 +166,12 @@ uint32_t ShowOpponentInfo(uint8_t* base, uint32_t sp, const Calls& calls) {
     HideNode(base, movie, 12, 14);
     ShowNode(base, movie, 12, 15);
     child = ui_movies::Child(base, level_node, 0);
-    guest::StoreU32(base, child + 108, uint32_t(id - 310));
+    schema::UiMovieNode(base, child).set_texture_entry(uint32_t(id - 310));
   } else {
     ShowNode(base, movie, 12, 14);
     HideNode(base, movie, 12, 15);
     child = ui_movies::Child(base, name_node, 0);
-    guest::StoreU32(base, child + 108, uint32_t(category));
+    schema::UiMovieNode(base, child).set_texture_entry(uint32_t(category));
   }
   return child;
 }
@@ -180,7 +184,7 @@ uint32_t Transition12(uint8_t* base, uint32_t sp, uint32_t step, const Calls& ca
   CopyOpponent(base, calls, frame, 0x8222B90C, frame + 96);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   if (guest::LoadU32(base, step) == 0) {
-    for (uint32_t i = 0; i < guest::LoadU32(base, Screen(base) + 808); i++) {
+    for (uint32_t i = 0; i < Screen(base).opponent_count(); i++) {
       FinishNamed(calls, frame, 0x8222B948, movie, 84 + i);
     }
     calls.Call(0x8211DE38, frame, 0x8222B96C, movie, 0xFFFFFFFFFFFFFFFFull, 13);
@@ -212,7 +216,7 @@ uint32_t Transition12(uint8_t* base, uint32_t sp, uint32_t step, const Calls& ca
                data_tables::Item(base, uint32_t(last)), 3008);
           found = true;
         }
-        if (guest::LoadU16(base, Record(save, last) + 2) == 0) {
+        if (Record(base, save, last).wins() == 0) {
           kind = 7;
           break;
         }
@@ -222,13 +226,13 @@ uint32_t Transition12(uint8_t* base, uint32_t sp, uint32_t step, const Calls& ca
       }
     }
     const int32_t index = data_tables::Find20(base, uint32_t(id), kind);
-    const uint32_t entry =
-        data_tables::Entry20(base, guest::LoadU32(base, Screen(base) + 872) + uint32_t(index));
+    const schema::LocationScreenEntry20 entry(
+        base, data_tables::Entry20(base, Screen(base).entry_offset() + uint32_t(index)));
     SetText(base, calls, frame, movie, 5, 1,
-            guest::LoadU32(base, Screen(base) + 872) + uint32_t(index) + 5918);
+            Screen(base).entry_offset() + uint32_t(index) + 5918);
     HideNode(base, movie, 5, 0);
-    SetPictureTexture(base, movie, 6, 1, PictureA(base, guest::LoadU32(base, entry + 16)));
-    SetPictureTexture(base, movie, 6, 0, PictureB(base, guest::LoadU32(base, entry + 16)));
+    SetPictureTexture(base, movie, 6, 1, PictureA(base, entry.picture()));
+    SetPictureTexture(base, movie, 6, 0, PictureB(base, entry.picture()));
     HidePictures(base, frame);
     guest::StoreU32(base, step, 1);
   }
@@ -239,7 +243,7 @@ uint32_t Transition12(uint8_t* base, uint32_t sp, uint32_t step, const Calls& ca
     } else {
       HideNode(base, movie, 5, 0);
     }
-    guest::StoreU32(base, guest::LoadU32(base, kOpponentMenu) + 24, 1);
+    G::opponent_menu(base).set_up_down_locked(1);
   }
   return done;
 }
@@ -250,19 +254,19 @@ uint64_t ShowCard(uint8_t* base, uint32_t sp, const Calls& calls) {
   guest::StoreU32(base, frame, sp);
   const uint32_t movie = Movie(base, frame, kCardMovie);
   CopyOpponent(base, calls, frame, 0x8222BC2C, frame + 96);
-  const uint32_t row = CardRow(base, frame) + kCards;
-  const uint32_t first = guest::LoadU32(base, row), second = guest::LoadU32(base, row + 4);
+  const schema::LocationScreenCard row = CardRow(base, frame);
+  const uint32_t first = row.named_0(), second = row.named_1();
   const uint32_t has_card = HasCard(base, calls, frame, 0x8222BC70);
   for (uint32_t m = 0; m < 27; m++) {
     const uint32_t node = ui_movies::FindNode(base, movie, 2, m + 1);
-    guest::StoreU32(base, node + 80, 0);
+    schema::UiMovieNode(base, node).set_visible(0);
     for (uint32_t j = 0; j < 4; j++) {
-      guest::StoreU32(base, ui_movies::Child(base, node, j + 6) + 80, 0);
+      schema::UiMovieNode(base, ui_movies::Child(base, node, j + 6)).set_visible(0);
     }
     FinishNamed(calls, frame, 0x8222BCC4, movie, m);
   }
   for (uint32_t m = 0; m < 27; m++) {
-    guest::StoreU32(base, ui_movies::FindNode(base, movie, 3, m + 6) + 80, 0);
+    schema::UiMovieNode(base, ui_movies::FindNode(base, movie, 3, m + 6)).set_visible(0);
   }
   SetText(base, calls, frame, movie, 3, 55, 402);
   SetText(base, calls, frame, movie, 3, 56, 401);
@@ -270,22 +274,22 @@ uint64_t ShowCard(uint8_t* base, uint32_t sp, const Calls& calls) {
   SetText(base, calls, frame, movie, 3, 58, 408);
   if (has_card != 0) {
     ShowNode(base, movie, 0xFFFFFFFFu, 6);
-    SetText(base, calls, frame, movie, 0xFFFFFFFFu, 12, guest::LoadU32(base, row + 16));
+    SetText(base, calls, frame, movie, 0xFFFFFFFFu, 12, row.text());
     ShowNode(base, movie, 2, first + 1);
     ShowNode(base, movie, 2, second + 1);
     ShowNode(base, movie, 3, first + 6);
     ShowNode(base, movie, 3, second + 6);
-    PlayNamed(base, movie, guest::LoadU32(base, row));
+    PlayNamed(base, movie, row.named_0());
     LoopLast(base, frame, movie);
-    PlayNamed(base, movie, guest::LoadU32(base, row + 4));
+    PlayNamed(base, movie, row.named_1());
   } else {
     ShowNode(base, movie, 2, first + 1);
     ShowNode(base, movie, 3, first + 6);
-    PlayNamed(base, movie, guest::LoadU32(base, row));
+    PlayNamed(base, movie, row.named_0());
   }
   LoopLast(base, frame, movie);
   const uint32_t node = ui_movies::FindNode(base, movie, 2, first + 1);
-  guest::StoreU32(base, ui_movies::Child(base, node, guest::LoadU32(base, row + 8)) + 80, 1);
+  schema::UiMovieNode(base, ui_movies::Child(base, node, row.child())).set_visible(1);
   uint64_t r3 = 0;
   for (uint32_t m = 0; m < 12; m++) {
     r3 = calls.Call(kFinishNamed, frame, 0x8222BE4C, movie, 39 + m);
@@ -301,17 +305,17 @@ uint32_t Transition17(uint8_t* base, uint32_t sp, uint32_t step, const Calls& ca
   const uint32_t card = Movie(base, frame, kCardMovie);
   if (guest::LoadU32(base, step) == 0) {
     CopyOpponent(base, calls, frame, 0x8222EB60, frame + 96);
-    const uint32_t row = CardRow(base, frame);
+    const schema::LocationScreenCard row = CardRow(base, frame);
     ShowCard(base, frame, calls);
     PlayNamed(base, card, 52);
-    PlayNamed(base, card, guest::LoadU32(base, row + kCards + 20));
+    PlayNamed(base, card, row.card_named());
     LoopLast(base, frame, card);
     guest::StoreU32(base, step, 1);
   }
   Run(calls, frame, 0x8222EBDC, menus);
   const uint32_t done = uint32_t(Run(calls, frame, 0x8222EBE8, card)) == 0 ? 1 : 0;
   if (done != 0) {
-    guest::StoreU32(base, guest::LoadU32(base, kConfirmMenu) + 24, 1);
+    G::confirm_menu(base).set_up_down_locked(1);
   }
   return done;
 }

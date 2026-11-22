@@ -1,0 +1,109 @@
+# The schema of docs/functions/race-loading.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The race's loading: the race mode's first state machine (race mode + 848,
+# CourseSetup::), the race mode's +32 interface's slots, and the loading
+# screen (three UI movies, LoadingScreen::; src/race_loading/).
+#
+# Not described here, other areas' types the measure filed here (their
+# measure names belong in those types' `measures`, for the lead):
+#   CourseSetup::Start.r4, CourseSetup::WaitCourse.r4, CourseSetup::Restart.r4,
+#     CourseSetup::EndTick.r4: the race mode's dispatcher (+36), boot-mode.toml's
+#     ModeDispatcher (ring +204, count +804, start +808);
+#   RaceMode::NextMode.r4: game-modes.toml's RaceMode (+840, +844, +10452);
+#   RaceMode::ModeAfterRace.ret: boot-mode.toml's ModeAnswer (+0, +4);
+#   sub_822929E8.r3, sub_822929E8.ret, sub_82292FB0.r3, sub_82291C48.r3,
+#     sub_82291760.r3, sub_82293288.ret: the network session ([0x82816E3C],
+#     sub_82293460's callees), network-mode.toml's Session;
+#   sub_82263B68.r3, sub_8226D0A0.r3: Type12Screen9's and Type12Screen7's
+#     machines' (5, 38) handlers, network-mode.toml's NetMachine.
+
+# The course set-up's state machine (race mode + 848; a StateMachine,
+# game-modes.toml, set up by CourseSetup::Init sub_821517D8), with its own
+# words after the state. Its handlers get r3 = it.
+[CourseSetup]
+measure = "CourseSetup"
+size = 9652
+origin = "embedded"
+fields = [
+  { name = "transitions", offset = 0, type = "bytes", count = 9600, note = "200 transitions of 48 bytes (StateTransition); 11 added by Init" },
+  { name = "transition_count", offset = 9600, type = "u32" },
+  { name = "state", offset = 9604, type = "u32", note = "1 at set-up (started), 3 waiting for the course, 4 for the archive and the fade, 7 the race, 32 restarting, 37 the end, 35 unloaded" },
+  { name = "unknown_9608", offset = 9608, type = "u32", note = "cleared by Begin and WaitDraw; not read here" },
+  { name = "unknown_9616", offset = 9616, type = "u32", note = "cleared by Begin; not read here" },
+  { name = "unknown_9620", offset = 9620, type = "u32", note = "cleared by Begin; not read here" },
+  { name = "unknown_9628", offset = 9628, type = "u32", note = "cleared by Begin; not read here" },
+  { name = "unknown_9632", offset = 9632, type = "u32", note = "cleared by Begin; not read here" },
+  { name = "unknown_9636", offset = 9636, type = "u32", note = "cleared by Begin; not read here" },
+  { name = "unknown_9640", offset = 9640, type = "u32", note = "cleared by OnCourseReady; not read here" },
+  { name = "end_ticks", offset = 9644, type = "u32", note = "the end's tick count: 0 at set-up, counted by EndTick (message 50 once above 2)" },
+  { name = "draw_step", offset = 9648, type = "u32", note = "WaitDraw's step: 0 before the fade-out, 1 fading; cleared by WaitCourse" },
+]
+
+# The race mode seen through its +32 interface (vtable 0x82006D28; r3 = the
+# mode + 32): slot 0 (sub_821511B8) holds the race for a system event, slot 1
+# (sub_821512F0) sends every machine to its end, slot 2 (sub_82151388) undoes
+# slot 0's hold. Offsets are the race mode's less 32 (game-modes.toml's
+# RaceMode).
+[RaceModeInterface32]
+measures = ["sub_821511B8.r3", "sub_821512F0.r3", "sub_82151388.r3"]
+size = 167232
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82006D28 (the mode's +32)" },
+  { name = "course_setup_state", offset = 10420, type = "u32", note = "the +848 machine's state (CourseSetup): 7 racing; 37 from slot 1" },
+  { name = "camera_director_state", offset = 20100, type = "u32", note = "the camera director's machine's state (mode +10528's): 37 from slot 1" },
+  { name = "race_scene_state", offset = 97508, type = "u32", note = "mode +87936's machine's state: 37 from slot 1" },
+  { name = "race_flow_state", offset = 107120, type = "u32", note = "mode +97548's machine's state: 37 from slot 1" },
+  { name = "race_states_state", offset = 116740, type = "u32", note = "mode +107168's machine's state: 37 from slot 1" },
+  { name = "race_world_state", offset = 126384, type = "u32", note = "mode +116812's machine's state: 37 from slot 1" },
+  { name = "race_hud_machine_state", offset = 138236, type = "u32", note = "mode +128664's machine's state: 24 from slot 1" },
+  { name = "race_sounds_state", offset = 147856, type = "u32", note = "mode +138284's machine's state: 37 from slot 1" },
+  { name = "overlays_machine_state", offset = 157516, type = "u32", note = "mode +147944's machine's state: 6 from slot 1" },
+  { name = "running", offset = 167228, type = "u32", note = "the mode's +167260: 0 holds the Update messages (slot 0), 1 again (slots 1 and 2)" },
+]
+
+# A chunk of a UI movie's live scene (the chunks from [movie + 16], each +4
+# bytes long, up to the TRM one), as UiMovie::SetFrames walks them.
+[UiMovieSceneChunk]
+measure = "UiMovie.+16"
+measures = ["RaceHud.+604.+16"]
+size = 84
+origin = "embedded"
+fields = [
+  { name = "tag", offset = 0, type = "u32", note = "'TXT', 'PRM', 'PIC', ... 'TRM' (the last) in its top three bytes" },
+  { name = "size", offset = 4, type = "u32", note = "the chunk's size in bytes (the next chunk follows)" },
+  { name = "frame", offset = 72, type = "u32", note = "probably the frame: set by SetFrames for TXT (its text value), PRM and PIC chunks" },
+  { name = "unknown_80", offset = 80, type = "u32" },
+]
+
+[globals]
+loading_shown = { address = 0x82815E60, type = "u32", note = "1 once LoadingScreen::Show ran" }
+loading_current = { address = 0x82815E64, type = "u32", note = "the loading screen's current movie (0 to 2), set by Show" }
+loading_movies = { address = 0x82815E68, type = "bytes", count = 12, note = "the loading screen's three UI movies (a word each)" }
+loading_animations = { address = 0x8263799C, type = "bytes", count = 12, note = "the animation each loading screen movie plays (a word each: 0, 13 and 0 in the image)" }
+system_request = { address = 0x82816E3C, type = "u32", note = "the network session (network-mode.toml's Session) sub_82293460 tests; 0 in play" }
+fade_in_passes = { address = 0x82001BEC, type = "u32", note = "CourseSetup::Start's ScreenFades::FadeIn passes (5)" }
+fade_out_passes = { address = 0x82001BF0, type = "u32", note = "CourseSetup::WaitDraw's ScreenFades::FadeOut passes (15)" }
+layer0_alpha = { address = 0x826A50D4, type = "u32", note = "the screen fades' layer 0 alpha (0 to 255)" }
+layer0_fade_out = { address = 0x826A50E4, type = "u32", note = "layer 0's fade-out count (passes left)" }
+layer0_fade_in = { address = 0x826A50DC, type = "u32", note = "layer 0's fade-in count (passes left)" }
+collision_state = { address = 0x826C5B24, type = "u32", note = "the course's collision mesh's load state (the word +8 into 0x826C5B1C): 2 loaded" }
+route_state = { address = 0x826C5B18, type = "u32", note = "the course's route's load state (the word +8 into 0x826C5B10): 2 loaded" }
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from CourseSetup.
+[CourseSetupAt848]
+measure = "RaceMode@+848"
+size = 9648
+origin = "embedded"
+fields = [
+  { name = "unknown_9604", offset = 9604, type = "u32" },
+  { name = "unknown_9644", offset = 9644, type = "u32" },
+]

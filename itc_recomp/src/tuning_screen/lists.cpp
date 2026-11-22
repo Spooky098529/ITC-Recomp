@@ -42,12 +42,12 @@ constexpr uint32_t kMovie13 = 13;
 // set; the node.
 uint32_t Show(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child) {
   const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
-  Store(base, node + 80, 1);
+  UiNode(base, node).set_visible(1);
   return node;
 }
 uint32_t Hide(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child) {
   const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
-  Store(base, node + 80, 0);
+  UiNode(base, node).set_visible(0);
   return node;
 }
 
@@ -64,13 +64,13 @@ uint32_t UpdateListDots(uint8_t* base, uint32_t screen, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821EE9B0 TuningScreen::UpdateListDots");
   const uint32_t frame = Frame(base, sp, 176);
   const uint32_t movie = Load(base, MovieEntry(base, frame, kMovieId));
-  auto last = [&] { return int32_t(Load(base, screen + 25224)); };
+  auto last = [&] { return int32_t(TS(base, screen).list_last()); };
   uint32_t r3 = 0;
   for (uint32_t i = 0; i < 38; i++) {
     const uint32_t node = ui_movies::FindNode(base, movie, 1, 6);
     const uint32_t first = ui_movies::Child(base, node, i);
     const uint32_t second = ui_movies::Child(base, node, i);
-    Store(base, first + 80, 0);
+    UiNode(base, first).set_visible(0);
     const int32_t n = last();
     uint32_t size = 0;
     if (n >= 0 && n <= 2) {
@@ -80,20 +80,20 @@ uint32_t UpdateListDots(uint8_t* base, uint32_t screen, uint32_t sp) {
     } else if (n >= 6 && n <= 7) {
       size = 1;
     }
-    Store(base, second + 108, size);
+    UiNode(base, second).set_texture_entry(size);
     r3 = second;
   }
   if (int32_t(uint32_t(last()) + 1) > 0) {
     for (uint32_t j = 0; int32_t(j) < int32_t(uint32_t(last()) + 1); j++) {
       r3 = ui_movies::Child(base, ui_movies::FindNode(base, movie, 1, 6), j);
-      Store(base, r3 + 80, 1);
+      UiNode(base, r3).set_visible(1);
     }
   }
   const int32_t n = last();
   if (n >= 0 && n <= 2) {
     const uint32_t node = ui_movies::FindNode(base, movie, 1, 6);
-    r3 = ui_movies::Child(base, node, Load(base, screen + 25220));
-    Store(base, r3 + 108, 4);
+    r3 = ui_movies::Child(base, node, TS(base, screen).list_cursor());
+    UiNode(base, r3).set_texture_entry(4);
     return r3;
   }
   // h dots each side of the cursor, wrapped over the n + 1 entries; 4 at
@@ -101,8 +101,8 @@ uint32_t UpdateListDots(uint8_t* base, uint32_t screen, uint32_t sp) {
   const int32_t h = (n >= 3 && n <= 4) ? 1 : (n >= 6 && n <= 7) ? 2 : 3;
   for (int32_t j = 0; j <= 2 * h; j++) {
     const uint32_t node = ui_movies::FindNode(base, movie, 1, 6);
-    const uint32_t cursor = Load(base, screen + 25220);
-    const uint32_t count = Load(base, screen + 25224) + 1;
+    const uint32_t cursor = TS(base, screen).list_cursor();
+    const uint32_t count = TS(base, screen).list_last() + 1;
     uint32_t index = cursor + uint32_t(j - h);
     if (int32_t(index) >= int32_t(count)) {
       index -= count;
@@ -110,7 +110,7 @@ uint32_t UpdateListDots(uint8_t* base, uint32_t screen, uint32_t sp) {
       index += count;
     }
     r3 = ui_movies::Child(base, node, index);
-    Store(base, r3 + 108, uint32_t(4 - (j > h ? j - h : h - j)));
+    UiNode(base, r3).set_texture_entry(uint32_t(4 - (j > h ? j - h : h - j)));
   }
   return r3;
 }
@@ -128,13 +128,13 @@ uint32_t ShowOptionMarks(uint8_t* base, uint32_t screen, uint32_t show, uint32_t
     }
     return r3;
   }
-  const int32_t variant = int32_t(Load(base, screen + 30724));
+  const int32_t variant = int32_t(TS(base, screen).editor_page());
   if (variant != 0 && variant != 1) {
     return entry;
   }
   const uint32_t sub_scene = variant == 0 ? 28 : 27;
-  auto option = [&] { return Load(base, screen + 30732); };
-  switch (int32_t(Load(base, screen + 30756))) {
+  auto option = [&] { return TS(base, screen).layer_cursor(); };
+  switch (int32_t(TS(base, screen).order_position())) {
     case 0:
       return Show(base, movie, sub_scene, option() * 2 + 27);
     case 1:
@@ -155,7 +155,7 @@ uint32_t PlaceStateNodes(uint8_t* base, uint32_t screen, uint32_t sp) {
   // The row +30724 of the table at 0x8200C860 (56 bytes a row), read again
   // for each word.
   auto t = [&](uint32_t k) {
-    return Load(base, 0x8200C860u + 56 * Load(base, screen + 30724) + 4 * k);
+    return Load(base, 0x8200C860u + 56 * TS(base, screen).editor_page() + 4 * k);
   };
   struct Place {
     uint32_t child;
@@ -167,12 +167,14 @@ uint32_t PlaceStateNodes(uint8_t* base, uint32_t screen, uint32_t sp) {
     uint32_t node = entry;
     for (const Place& p : places) {
       node = ui_movies::FindNode(base, movie, 29, p.child);
-      Store(base, node + 12, Convert(base, frame + 80, int32_t(t(p.k) + p.dx)));
-      Store(base, node + 16, Convert(base, frame + 80, int32_t(t(p.k + 1) + p.dy)));
+      Store(base, UiNode(base, node).x_address(),
+            Convert(base, frame + 80, int32_t(t(p.k) + p.dx)));
+      Store(base, UiNode(base, node).y_address(),
+            Convert(base, frame + 80, int32_t(t(p.k + 1) + p.dy)));
     }
     return node;
   };
-  switch (int32_t(Load(base, screen + kState))) {
+  switch (int32_t(TS(base, screen).state())) {
     case 29:
       return place({{4, 0, 288, 0}, {5, 2, 0, 224}, {6, 4, 640, 160}, {7, 6, 288, 304}});
     case 30:
@@ -189,21 +191,26 @@ uint32_t LayOutItems(uint8_t* base, uint32_t screen, uint32_t sp) {
   const uint32_t frame = Frame(base, sp, 192);
   const uint32_t entry = MovieEntry(base, frame, kMovie13);
   const uint32_t movie = Load(base, entry);
-  const int32_t state = int32_t(Load(base, screen + kState));
+  const int32_t state = int32_t(TS(base, screen).state());
   if (state == 26 || state == 29 || state == 30 || state == 31 || state == 34) {
     return entry;
   }
-  const int32_t variant = int32_t(Load(base, screen + 30724));
+  const int32_t variant = int32_t(TS(base, screen).editor_page());
   if (variant != 0 && variant != 1) {
     return entry;
   }
   const bool second_set = variant == 1;
   const uint32_t first = second_set ? 22 : 19;
-  const uint32_t records = screen + (second_set ? 31096 : 31024);
-  const uint32_t origin_x = screen + (second_set ? 30816 : 30800);
-  const uint32_t origin_y = screen + (second_set ? 30820 : 30804);
-  const uint32_t scale = screen + (second_set ? 30828 : 30812);
-  const uint32_t size = screen + (second_set ? 30824 : 30808);
+  const uint32_t records = second_set ? TS(base, screen).saved_vinyl_layers_1_address()
+                                      : TS(base, screen).saved_vinyl_layers_0_address();
+  const uint32_t origin_x = second_set ? TS(base, screen).page1_origin_x_address()
+                                       : TS(base, screen).page0_origin_x_address();
+  const uint32_t origin_y = second_set ? TS(base, screen).page1_origin_y_address()
+                                       : TS(base, screen).page0_origin_y_address();
+  const uint32_t scale = second_set ? TS(base, screen).page1_position_scale_address()
+                                    : TS(base, screen).page0_position_scale_address();
+  const uint32_t size = second_set ? TS(base, screen).page1_size_scale_address()
+                                   : TS(base, screen).page0_size_scale_address();
   const double add_y = steps::Lfs(base, second_set ? 0x8200CAE8u : 0x8200CAF0u);
   const double add_x = steps::Lfs(base, second_set ? 0x8200CAECu : 0x8200CAF4u);
   const double half = steps::Lfs(base, 0x82001BE4u);
@@ -226,7 +233,8 @@ uint32_t LayOutItems(uint8_t* base, uint32_t screen, uint32_t sp) {
       const double s = steps::Lfs(base, scale);
       const double ox = single(at_ox, lwa(origin_x));
       const double x = single(at_x, lwa(record + 0));
-      steps::Stfs(base, node + 12, steps::Fadds(steps::Fmadds(x, s, ox), add_x));
+      steps::Stfs(base, UiNode(base, node).x_address(),
+                  steps::Fadds(steps::Fmadds(x, s, ox), add_x));
     }
     {
       const int32_t y_word = lwa(record + 4);
@@ -234,20 +242,21 @@ uint32_t LayOutItems(uint8_t* base, uint32_t screen, uint32_t sp) {
       const int32_t oy_word = lwa(origin_y);
       const double y = single(at_y, y_word);
       const double oy = single(at_oy, oy_word);
-      steps::Stfs(base, node + 16, steps::Fadds(steps::Fmadds(y, s, oy), add_y));
+      steps::Stfs(base, UiNode(base, node).y_address(),
+                  steps::Fadds(steps::Fmadds(y, s, oy), add_y));
     }
-    Store(base, node + 20,
-          uint32_t(steps::Fctiwz(steps::Fmuls(steps::Lfs(base, looked + 100), half))));
-    Store(base, node + 24,
-          uint32_t(steps::Fctiwz(steps::Fmuls(steps::Lfs(base, looked + 104), half))));
-    steps::Stfs(base, node + 36, steps::Lfs(base, record + 8));
+    UiNode(base, node).set_pivot_x(uint32_t(steps::Fctiwz(
+              steps::Fmuls(steps::Lfs(base, UiNode(base, looked).width_address()), half))));
+    UiNode(base, node).set_pivot_y(uint32_t(steps::Fctiwz(
+              steps::Fmuls(steps::Lfs(base, UiNode(base, looked).height_address()), half))));
+    steps::Stfs(base, UiNode(base, node).rotation_address(), steps::Lfs(base, record + 8));
     for (const uint32_t field : {28u, 32u}) {
       const double record_scale = steps::Lfs(base, record + 12);
       const double sz = steps::Lfs(base, size);
       steps::Stfs(base, node + field,
                   second_set ? steps::Fmuls(record_scale, sz) : steps::Fmuls(sz, record_scale));
     }
-    Store(base, looked + 132, int32_t(Load(base, record + 16)) != 0 ? 1 : 0);
+    UiNode(base, looked).set_flip_x(int32_t(Load(base, record + 16)) != 0 ? 1 : 0);
     r3 = node;
   }
   return r3;
@@ -264,13 +273,14 @@ uint32_t ShowItems(uint8_t* base, uint32_t screen, uint32_t show, uint32_t sp) {
     }
     return r3;
   }
-  const int32_t variant = int32_t(Load(base, screen + 30724));
+  const int32_t variant = int32_t(TS(base, screen).editor_page());
   if (variant != 0 && variant != 1) {
     return entry;
   }
   const uint32_t first = variant == 0 ? 19 : 22;
   const uint32_t marks = variant == 0 ? 28 : 27;
-  const uint32_t words = screen + (variant == 0 ? 31192 : 31204);
+  const uint32_t words = variant == 0 ? TS(base, screen).saved_layer_ids_0_address()
+                                       : TS(base, screen).saved_layer_ids_1_address();
   uint32_t r3 = entry;
   for (uint32_t i = 0; i < 3; i++) {
     r3 = Show(base, movie, kAll, first + i);
@@ -279,7 +289,7 @@ uint32_t ShowItems(uint8_t* base, uint32_t screen, uint32_t show, uint32_t sp) {
     const bool none = int32_t(Load(base, words + 4 * i)) == -1;
     const uint32_t child =
         ui_movies::Child(base, ui_movies::FindNode(base, movie, kAll, marks), 10 + 4 * i);
-    Store(base, child + 80, none ? 0 : 1);
+    UiNode(base, child).set_visible(none ? 0 : 1);
     r3 = none ? Hide(base, movie, kAll, first + i) : Show(base, movie, kAll, first + i);
   }
   return r3;

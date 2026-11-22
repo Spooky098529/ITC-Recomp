@@ -9,6 +9,10 @@
 #include "guest.h"
 #include "mode_tick/mode_tick.h"
 #include "race_screens/race_screens.h"
+#include "schema/build_screen.h"
+#include "schema/menu_helpers.h"
+#include "schema/race_screens.h"
+#include "schema/type2_screens.h"
 
 namespace build_screen {
 
@@ -18,13 +22,14 @@ constexpr uint32_t kPlayNamed = 0x8211DAC8;
 constexpr uint32_t kLoopNamed = 0x8211DDE0;
 constexpr uint32_t kFinishNamed = 0x8211DF20;
 constexpr uint32_t kRun = 0x8211E1B8;
-constexpr uint32_t kFadeOutCounts = 0x826A50E4, kFadeInCounts = 0x826A50DC;
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
-uint32_t Screen(uint8_t* base) { return Load(base, kScreen); }
+using G = schema::BuildScreenGlobals;
+
+schema::BuildScreenData Screen(uint8_t* base) { return G::screen(base); }
 
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   Store(base, sp - bytes, sp);
@@ -68,22 +73,24 @@ uint64_t Transition(uint8_t* base, uint32_t step, uint32_t sp, uint32_t bytes, u
   return m.Run(run_lr);
 }
 
-uint32_t Selection(uint8_t* base) { return race_screens::ListSelection(base, Load(base, kList)); }
+uint32_t Selection(uint8_t* base) {
+  return race_screens::ListSelection(base, G::list(base).address);
+}
 
 // A back transition's end, once the movie's animations are done: the state
 // left (+0) kept at +8 unless it is `level`, +4 `level`, +0 and +16 -1, +12
 // `highlight` (that level's highlight transition) with its word +24 0.
 void Back(uint8_t* base, uint32_t level, uint32_t highlight) {
-  const uint32_t machine = Load(base, kMachine);
-  const uint32_t left = Load(base, machine + 0);
+  const schema::PageObject machine = G::machine(base);
+  const uint32_t left = machine.page();
   if (left != level) {
-    Store(base, machine + 8, left);
+    machine.set_previous_page(left);
   }
-  Store(base, machine + 16, 0xFFFFFFFFu);
-  Store(base, machine + 4, level);
-  Store(base, machine + 12, highlight);
-  Store(base, machine + 0, 0xFFFFFFFFu);
-  Store(base, Load(base, kMachine) + 24, 0);
+  machine.set_queued_step(0xFFFFFFFFu);
+  machine.set_next_page(level);
+  machine.set_step(highlight);
+  machine.set_page(0xFFFFFFFFu);
+  G::machine(base).set_step_started(0);
 }
 
 // HighlightGroups and HighlightGroups2: the groups' animations looped (the
@@ -99,7 +106,7 @@ void HighlightGroups(uint8_t* base, const Movie6& m, const uint32_t* lrs, int lo
   for (uint32_t k = 0; k < 4; k++) {
     m.Finish(finish_lr, 76 + k);
   }
-  m.Play(tab_lr, uint64_t(Load(base, Screen(base) + kCategory)) + 76, 1);
+  m.Play(tab_lr, uint64_t(Screen(base).category()) + 76, 1);
 }
 
 }  // namespace
@@ -128,7 +135,7 @@ uint64_t FadeOut(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) 
   Transition(base, step, sp, 112, 0x8219C8C0, calls, [&](const Movie6&) {
     mode_tick::ScreenFadesFadeOut(base, Load(base, 0x82001BF0), 0, 0, 0, 0);
   });
-  return (Load(base, kFadeOutCounts) | Load(base, kFadeInCounts)) == 0 ? 1 : 0;
+  return (G::fade_out_counts(base) | G::fade_in_counts(base)) == 0 ? 1 : 0;
 }
 
 uint64_t HighlightBuilds(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
@@ -177,12 +184,12 @@ uint64_t Open(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
     m.PlayLoop(0x821A0948, 100);
     m.PlayLoop(0x821A0970, 1);
     m.PlayLoop(0x821A0998, 83);
-    if (Load(base, Screen(base) + kOpened) == 0) {
+    if (Screen(base).opened() == 0) {
       m.Play(0x821A09DC, 81, 1);
     }
-    Store(base, Screen(base) + kCategory, 0);
-    Store(base, Screen(base) + kGroupSelection, 0);
-    Store(base, Screen(base) + kGroupScroll, 0);
+    Screen(base).set_category(0);
+    Screen(base).set_group_selection(0);
+    Screen(base).set_group_scroll(0);
     SetUpGroups(base, m.frame, calls);
   });
   return uint32_t(done) == 0 ? 1 : 0;
@@ -208,35 +215,34 @@ uint64_t BackToGroups(uint8_t* base, uint32_t step, uint32_t sp, const Calls& ca
 uint64_t ChangeCategory(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8219FC60 BuildScreen::ChangeCategory");
   Transition(base, step, sp, 160, 0x8219FE00, calls, [&](const Movie6& m) {
-    const uint32_t delta = Load(base, Load(base, kList) + 28);
+    const uint32_t delta = G::list(base).side();
     do {
-      const uint32_t at = Screen(base) + kCategory;
-      Store(base, at, Load(base, at) + delta);
-      const uint32_t category = Load(base, Screen(base) + kCategory);
+      const schema::BuildScreenData at = Screen(base);
+      at.set_category(at.category() + delta);
+      const uint32_t category = Screen(base).category();
       if (int32_t(category) < 0) {
-        Store(base, Screen(base) + kCategory, 4);
+        Screen(base).set_category(4);
       } else if (int32_t(category) > 4) {
-        Store(base, Screen(base) + kCategory, 0);
+        Screen(base).set_category(0);
       } else {
-        Store(base, Screen(base) + kCategory, category);
+        Screen(base).set_category(category);
       }
     } while (FilterGroups(base, m.frame) == 0);
     for (uint32_t k = 0; k < 4; k++) {
       m.Finish(0x8219FD10, 76 + k);
     }
-    m.Play(0x8219FD40, uint64_t(Load(base, Screen(base) + kCategory)) + 76, 1);
+    m.Play(0x8219FD40, uint64_t(Screen(base).category()) + 76, 1);
     m.Finish(0x8219FD58, uint64_t(Selection(base)) + 29);
-    Store(base, Screen(base) + kGroupSelection, 0);
-    Store(base, Screen(base) + kGroupScroll, 0);
+    Screen(base).set_group_selection(0);
+    Screen(base).set_group_scroll(0);
     InitGroupLists(base, m.frame, calls);
     const uint32_t s = Selection(base);
     const uint64_t row = uint64_t(s) + 29;
     m.Play(0x8219FDA8, row);
     m.Loop(0x8219FDB4, row);
     DrawGroupRows(base, m.frame, calls);
-    ShowGroup(base, m.frame, Load(base, Screen(base) + ((s + 0x10000 - 14799) << 2)), calls);
-    GroupArrows(base, m.frame, Load(base, Load(base, kList) + 4),
-                Load(base, Screen(base) + kShownCount));
+    ShowGroup(base, m.frame, Load(base, Screen(base).shown_groups_address() + (s << 2)), calls);
+    GroupArrows(base, m.frame, G::list(base).scroll(), Screen(base).shown_group_count());
   });
   return 1;
 }
@@ -254,8 +260,8 @@ uint64_t OpenBuilds(uint8_t* base, uint32_t step, uint32_t sp, const Calls& call
     m.Finish(0x821A11E4, 28);
     m.Play(0x821A1200, 102);
     KeepGroupList(base, m.frame);
-    Store(base, Screen(base) + kBuildSelection, 0);
-    Store(base, Screen(base) + kBuildScroll, 0);
+    Screen(base).set_build_selection(0);
+    Screen(base).set_build_scroll(0);
     SetUpBuilds(base, m.frame, calls);
   });
   return uint32_t(done) == 0 ? 1 : 0;

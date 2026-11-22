@@ -27,6 +27,14 @@ std::unordered_map<uint32_t, Target>& Table() {
   return table;
 }
 
+// The lifted originals (lifted/originals.cpp), for an address with no entry
+// of its own: a function with plain C++ but no adapter, reached by address
+// from lifted code (docs/e5-native.md, step 0).
+std::unordered_map<uint32_t, Entry>& Fallbacks() {
+  static std::unordered_map<uint32_t, Entry> fallbacks;
+  return fallbacks;
+}
+
 }  // namespace
 
 void ScalarFloatMode() {
@@ -68,7 +76,18 @@ Entry Find(uint32_t address) {
   if (const auto it = table.find(address); it != table.end()) {
     return it->second.entry;
   }
+  const auto& fallbacks = Fallbacks();
+  if (const auto it = fallbacks.find(address); it != fallbacks.end()) {
+    return it->second;
+  }
   return nullptr;
+}
+
+void RegisterFallbacks(const Registration* entries, size_t count) {
+  auto& fallbacks = Fallbacks();
+  for (size_t i = 0; i < count; i++) {
+    fallbacks[entries[i].address] = entries[i].entry;
+  }
 }
 
 void NoOriginal(uint32_t address) {
@@ -91,6 +110,10 @@ Result Call(uint8_t* base, uint32_t address, const Args& args) {
   const auto& table = Table();
   if (const auto it = table.find(address); it != table.end()) {
     return it->second.entry(base, args);
+  }
+  const auto& fallbacks = Fallbacks();
+  if (const auto it = fallbacks.find(address); it != fallbacks.end()) {
+    return it->second(base, args);
   }
   Unknown(address);
 }

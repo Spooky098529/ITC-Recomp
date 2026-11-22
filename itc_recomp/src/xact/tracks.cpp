@@ -9,6 +9,8 @@
 #include "base/log.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/xact_tracks.h"
+#include "schema/xact_waves.h"
 #include "xact/xact.h"
 
 #include <initializer_list>
@@ -19,14 +21,21 @@ namespace {
 
 namespace xa = xaudio;
 
+using TrackV = schema::XACTTrack;
+using TrackRecordV = schema::XACTTrackRecord;
+using InstanceV = schema::XACTTrackInstance;
+using EventV = schema::XACTEvent;
+using PlayWaveV = schema::XACTPlayWaveEvent;
+using WaveVariationV = schema::XACTWaveVariationEvent;
+using EventRecordV = schema::XACTEventRecord;
+using G = schema::XactTracksGlobals;
+using WaveV = schema::XACTWave;
+
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
 uint8_t LoadU8(uint8_t* base, uint32_t address) { return guest::LoadU8(base, address); }
-void StoreU8(uint8_t* base, uint32_t address, uint8_t value) {
-  guest::StoreU8(base, address, value);
-}
 
 xa::Regs Args(std::initializer_list<uint64_t> r) {
   xa::Regs regs;
@@ -64,7 +73,7 @@ uint32_t WaveOf(uint8_t* base, uint32_t event, uint32_t return_address, uint32_t
   const uint32_t method = xa::Method(base, event, 56);
   if (method == kGetWord60) {
     SetRegs(call, Args({event}));
-    return Load(base, event + 60);
+    return PlayWaveV(base, event).wave();
   }
   return CallAt(call, method, return_address, Args({event}), frame);
 }
@@ -72,7 +81,7 @@ uint32_t WaveOf(uint8_t* base, uint32_t event, uint32_t return_address, uint32_t
 uint32_t WaveSetVolumeFrom(uint8_t* base, uint32_t wave, double volume, uint32_t sp,
                            uint32_t return_address, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D1CC8 XACTWave::SetVolume");
-  const uint32_t voice = Load(base, wave + 44);
+  const uint32_t voice = WaveV(base, wave).voice().address;
   if (voice == 0) {
     return 0;
   }
@@ -84,42 +93,45 @@ uint32_t WaveSetVolumeFrom(uint8_t* base, uint32_t wave, double volume, uint32_t
 
 void TrackInstanceConstruct(uint8_t* base, uint32_t instance, uint32_t engine, uint32_t track) {
   ITC_NATIVE_RUNNING("sub_825D57D0 XACTTrackInstance::XACTTrackInstance");
-  Store(base, instance + 4, instance);
-  Store(base, instance + 8, instance);
-  Store(base, instance + 12, engine);
-  Store(base, instance + 16, track);
-  Store(base, instance + 0, kTrackInstanceVtable);
-  Store(base, instance + 20, 0);
-  StoreU8(base, instance + 24, 0);
-  Store(base, instance + 28, 0);
-  Store(base, instance + 36, 0);
-  Store(base, instance + 40, 1);
-  StoreU8(base, instance + 44, 0);
-  StoreU8(base, instance + 45, 0);
-  StoreU8(base, instance + 32, 0);
-  const uint32_t list = instance + 48;
-  Store(base, list + 0, kListBaseVtable);
-  Store(base, list + 4, list);
-  Store(base, list + 8, list);
-  Store(base, instance + 60, 0);
+  InstanceV(base, instance).set_node_next(instance);
+  InstanceV(base, instance).set_node_prev(instance);
+  InstanceV(base, instance).set_engine(engine);
+  InstanceV(base, instance).set_track(track);
+  InstanceV(base, instance).set_vtable(kTrackInstanceVtable);
+  InstanceV(base, instance).set_events(0);
+  InstanceV(base, instance).set_event_count(0);
+  InstanceV(base, instance).set_start_time(0);
+  InstanceV(base, instance).set_play_wave_event(0);
+  InstanceV(base, instance).set_state(1);
+  InstanceV(base, instance).set_unfired_count(0);
+  InstanceV(base, instance).set_unfinished_count(0);
+  InstanceV(base, instance).set_flags(0);
+  const InstanceV inst(base, instance);
+  const uint32_t list = inst.helpers_vtable_address();
+  inst.set_helpers_vtable(kListBaseVtable);
+  inst.set_helpers_next(list);
+  inst.set_helpers_prev(list);
+  InstanceV(base, instance).set_stopped_at_once(0);
 }
 
 void TrackInstanceCheckDone(uint8_t* base, uint32_t instance) {
   ITC_NATIVE_RUNNING("sub_825D55E0 XACTTrackInstance::CheckDone");
-  if (LoadU8(base, instance + 44) != 0 || LoadU8(base, instance + 45) != 0) {
+  if (InstanceV(base, instance).unfired_count() != 0 ||
+      InstanceV(base, instance).unfinished_count() != 0) {
     return;
   }
-  const uint32_t list = instance + 48;
-  if (Load(base, list + 4) != list || Load(base, list + 8) != list) {
+  const InstanceV inst(base, instance);
+  const uint32_t list = inst.helpers_vtable_address();
+  if (inst.helpers_next() != list || inst.helpers_prev() != list) {
     return;
   }
-  Store(base, instance + 40, 6);
+  InstanceV(base, instance).set_state(6);
 }
 
 uint32_t TrackInstanceSetVolume(uint8_t* base, uint32_t instance, double volume, uint32_t sp,
                                 const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D5678 XACTTrackInstance::SetVolume");
-  const uint32_t event = Load(base, instance + 36);
+  const uint32_t event = InstanceV(base, instance).play_wave_event().address;
   if (event == 0) {
     return 0;
   }
@@ -135,7 +147,7 @@ uint32_t TrackInstanceSetVolume(uint8_t* base, uint32_t instance, double volume,
 uint32_t TrackInstanceIsBusy(uint8_t* base, uint32_t instance, uint32_t sp,
                              const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D5780 XACTTrackInstance::IsBusy");
-  const uint32_t event = Load(base, instance + 36);
+  const uint32_t event = InstanceV(base, instance).play_wave_event().address;
   if (event == 0) {
     return 0;
   }
@@ -150,7 +162,7 @@ uint32_t TrackInstanceIsBusy(uint8_t* base, uint32_t instance, uint32_t sp,
 uint32_t TrackInstancePause(uint8_t* base, uint32_t instance, uint32_t pause, uint32_t sp,
                             const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D57A8 XACTTrackInstance::Pause");
-  const uint32_t event = Load(base, instance + 36);
+  const uint32_t event = InstanceV(base, instance).play_wave_event().address;
   if (event == 0) {
     return 0;
   }
@@ -165,7 +177,7 @@ uint32_t TrackInstancePause(uint8_t* base, uint32_t instance, uint32_t pause, ui
 uint32_t TrackPause(uint8_t* base, uint32_t track, uint32_t pause, uint32_t sp,
                     const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D05A8 XACTTrack::Pause");
-  const uint32_t instance = Load(base, track + 24);
+  const uint32_t instance = TrackV(base, track).instance().address;
   if (instance == 0) {
     return 0;
   }
@@ -175,7 +187,7 @@ uint32_t TrackPause(uint8_t* base, uint32_t track, uint32_t pause, uint32_t sp,
 
 uint32_t TrackIsBusy(uint8_t* base, uint32_t track, uint32_t sp, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D0590 XACTTrack::IsBusy");
-  const uint32_t instance = Load(base, track + 24);
+  const uint32_t instance = TrackV(base, track).instance().address;
   if (instance == 0) {
     return 0;
   }
@@ -186,34 +198,35 @@ uint32_t TrackIsBusy(uint8_t* base, uint32_t track, uint32_t sp, const GuestCall
 void EventConstruct(uint8_t* base, uint32_t event, uint32_t engine, uint32_t instance,
                     uint32_t record, uint32_t previous, uint32_t uncounted) {
   ITC_NATIVE_RUNNING("sub_825D1760 XACTEvent::XACTEvent");
-  Store(base, event + 4, event);
-  Store(base, event + 8, event);
-  Store(base, event + 12, engine);
-  Store(base, event + 16, record);
-  Store(base, event + 36, previous);
-  Store(base, event + 44, instance);
-  Store(base, event + 0, kEventVtable);
-  Store(base, event + 20, 0);
-  Store(base, event + 24, 0);
-  Store(base, event + 32, 0);
-  Store(base, event + 28, 0);
-  StoreU8(base, event + 40, uncounted != 0 ? 0x08 : 0);
+  EventV(base, event).set_node_next(event);
+  EventV(base, event).set_node_prev(event);
+  EventV(base, event).set_engine(engine);
+  EventV(base, event).set_record(record);
+  EventV(base, event).set_previous(previous);
+  EventV(base, event).set_instance(instance);
+  EventV(base, event).set_vtable(kEventVtable);
+  EventV(base, event).set_fire_time(0);
+  EventV(base, event).set_done_time(0);
+  EventV(base, event).set_elapsed(0);
+  EventV(base, event).set_end_time(0);
+  EventV(base, event).set_flags(uncounted != 0 ? 0x08 : 0);
 }
 
 void EventDestruct(uint8_t* base, uint32_t event) {
   ITC_NATIVE_RUNNING("sub_825D0EF0 XACTEvent::~XACTEvent");
-  Store(base, event + 0, kListBaseVtable);
+  EventV(base, event).set_vtable(kListBaseVtable);
 }
 
 uint32_t EventFire(uint8_t* base, uint32_t event, uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D1358 XACTEvent::Fire");
-  uint8_t flags = LoadU8(base, event + 40);
+  uint8_t flags = EventV(base, event).flags();
   if ((flags & 0x80) == 0) {
     flags |= 0x80;
-    StoreU8(base, event + 40, flags);
+    EventV(base, event).set_flags(flags);
     if ((flags & 0x08) == 0) {
-      const uint32_t instance = Load(base, event + 44);
-      StoreU8(base, instance + 45, uint8_t(LoadU8(base, instance + 45) + 1));
+      const uint32_t instance = EventV(base, event).instance().address;
+      InstanceV(base, instance)
+          .set_unfinished_count(uint8_t(InstanceV(base, instance).unfinished_count() + 1));
     }
   }
   const uint32_t method = xa::Method(base, event, 16);
@@ -225,9 +238,10 @@ uint32_t EventFire(uint8_t* base, uint32_t event, uint32_t frame, const GuestCal
   } else {
     r3 = CallAt(call, method, 0x825D13BC, Args({event, 0}), frame);
   }
-  if ((LoadU8(base, event + 40) & 0x08) == 0) {
-    const uint32_t instance = Load(base, event + 44);
-    StoreU8(base, instance + 44, uint8_t(LoadU8(base, instance + 44) + 255));
+  if ((EventV(base, event).flags() & 0x08) == 0) {
+    const uint32_t instance = EventV(base, event).instance().address;
+    InstanceV(base, instance)
+        .set_unfired_count(uint8_t(InstanceV(base, instance).unfired_count() + 255));
   }
   return r3;
 }
@@ -236,48 +250,48 @@ uint32_t PlayWaveConstruct(uint8_t* base, uint32_t event, uint32_t engine, uint3
                            uint32_t record, uint32_t previous, uint32_t variation) {
   ITC_NATIVE_RUNNING("sub_825D82E8 XACTPlayWaveEvent::XACTPlayWaveEvent");
   EventConstruct(base, event, engine, instance, record, previous, 0);
-  const uint32_t at = Load(base, event + 16);
-  Store(base, event + 0, kPlayWaveEventVtable);
-  Store(base, event + 48, 0);
-  const uint8_t loops = LoadU8(base, at + 11);
-  Store(base, event + 56, variation);
-  Store(base, event + 60, 0);
-  Store(base, event + 64, 0);
-  Store(base, event + 68, 0);
-  StoreU8(base, event + 52, loops);
+  const uint32_t at = EventV(base, event).record().address;
+  EventV(base, event).set_vtable(kPlayWaveEventVtable);
+  PlayWaveV(base, event).set_slot36_flag(0);
+  const uint8_t loops = EventRecordV(base, at).loop_count();
+  PlayWaveV(base, event).set_variation(variation);
+  PlayWaveV(base, event).set_wave(0);
+  PlayWaveV(base, event).set_play_time(0);
+  PlayWaveV(base, event).set_stop_time(0);
+  PlayWaveV(base, event).set_loop_count(loops);
   return event;
 }
 
 void PlayWaveSetQueued(uint8_t* base, uint32_t event, uint32_t queued) {
   ITC_NATIVE_RUNNING("sub_825D8530 XACTPlayWaveEvent::SetQueued");
-  uint8_t flags = LoadU8(base, event + 40);
-  const uint32_t wave = Load(base, event + 60);
+  uint8_t flags = EventV(base, event).flags();
+  const uint32_t wave = PlayWaveV(base, event).wave();
   flags = uint8_t((flags & ~0x20) | (queued != 0 ? 0x20 : 0));
-  StoreU8(base, event + 40, flags);
-  const uint32_t prepared = Load(base, wave + 60);
+  EventV(base, event).set_flags(flags);
+  const uint32_t prepared = WaveV(base, wave).prepared();
   flags = uint8_t((flags & ~0x40) | (prepared == 0 ? 0x40 : 0));
-  StoreU8(base, event + 40, flags);
+  EventV(base, event).set_flags(flags);
 }
 
 uint32_t PlayWaveGetLoopCount(uint8_t* base, uint32_t event) {
   ITC_NATIVE_RUNNING("sub_825D8358 XACTPlayWaveEvent::GetLoopCount");
-  return LoadU8(base, event + 52);
+  return PlayWaveV(base, event).loop_count();
 }
 
 void PlayWaveSetWave(uint8_t* base, uint32_t event, uint32_t wave) {
   ITC_NATIVE_RUNNING("sub_82483208 XACTPlayWaveEvent::SetWave");
-  Store(base, event + 60, wave);
+  PlayWaveV(base, event).set_wave(wave);
 }
 
 void WaveVariationSetWave(uint8_t* base, uint32_t event, uint32_t wave) {
   ITC_NATIVE_RUNNING("sub_825D7B78 XACTWaveVariationEvent::SetWave");
-  Store(base, event + 72, wave);
+  WaveVariationV(base, event).set_wave(wave);
 }
 
 uint32_t PlayWaveGetVariationRecord(uint8_t* base, uint32_t event) {
   ITC_NATIVE_RUNNING("sub_825D8920 XACTPlayWaveEvent::GetVariationRecord");
-  const uint32_t record = Load(base, event + 16);
-  const int32_t type = int32_t(Load(base, record) & 0x1F);
+  const uint32_t record = EventV(base, event).record().address;
+  const int32_t type = int32_t(EventRecordV(base, record).word() & 0x1F);
   if (type == 4) {
     return record + 12;
   }
@@ -301,7 +315,7 @@ uint32_t PlayWaveGetWaveBank(uint8_t* base, uint32_t event, uint32_t frame,
   if (WaveOf(base, event, 0x825D84E4, frame, call) == 0) {
     return 0;
   }
-  return Load(base, WaveOf(base, event, 0x825D8500, frame, call) + 36);
+  return WaveV(base, WaveOf(base, event, 0x825D8500, frame, call)).wave_bank();
 }
 
 uint32_t PlayWaveIsPrepared(uint8_t* base, uint32_t event, uint32_t frame,
@@ -311,7 +325,7 @@ uint32_t PlayWaveIsPrepared(uint8_t* base, uint32_t event, uint32_t frame,
     return 0;
   }
   const uint32_t wave = WaveOf(base, event, 0x825D76E0, frame, call);
-  return int32_t(Load(base, wave + 40)) >= 2 ? 1 : 0;
+  return int32_t(WaveV(base, wave).state()) >= 2 ? 1 : 0;
 }
 
 uint32_t PlayWaveIsPlaying(uint8_t* base, uint32_t event, uint32_t frame,
@@ -320,10 +334,10 @@ uint32_t PlayWaveIsPlaying(uint8_t* base, uint32_t event, uint32_t frame,
   if (WaveOf(base, event, 0x825D772C, frame, call) == 0) {
     return 0;
   }
-  if (int32_t(Load(base, WaveOf(base, event, 0x825D7748, frame, call) + 40)) < 3) {
+  if (int32_t(WaveV(base, WaveOf(base, event, 0x825D7748, frame, call)).state()) < 3) {
     return 0;
   }
-  return int32_t(Load(base, WaveOf(base, event, 0x825D7768, frame, call) + 40)) > 5 ? 0 : 1;
+  return int32_t(WaveV(base, WaveOf(base, event, 0x825D7768, frame, call)).state()) > 5 ? 0 : 1;
 }
 
 uint32_t PlayWaveIsBusy(uint8_t* base, uint32_t event, uint32_t frame, const GuestCall& call) {
@@ -366,9 +380,6 @@ uint32_t WaveSetVolume(uint8_t* base, uint32_t wave, double volume, uint32_t sp,
 
 namespace {
 
-constexpr uint32_t kZero = 0x82000A34;       // 0.0f
-constexpr uint32_t kOne = 0x82000A30;        // 1.0f
-constexpr uint32_t kGainTable = 0x820761F8;  // 256 floats
 constexpr uint32_t kTrackSetVolume = 0x825D0BF8;
 constexpr uint32_t kTrackSetVolumeFrame = 112;
 constexpr uint32_t kTrackDestructFrame = 96;
@@ -384,16 +395,16 @@ double Single(double value) { return double(float(value)); }
 // UpdateVolume's +40 x f1).
 std::optional<uint32_t> ApplyVolume(uint8_t* base, uint32_t track, bool track_first,
                                     uint32_t frame, const GuestCall& call) {
-  const double f31 = LoadF(base, track + 40);
-  const uint32_t sound = Load(base, track + 20);
-  const double f30 = LoadF(base, track + 56);
+  const double f31 = double(TrackV(base, track).volume());
+  const uint32_t sound = TrackV(base, track).sound();
+  const double f30 = double(TrackV(base, track).rpc_volume());
   const auto volume = SoundGetVolume(base, sound);
   if (!volume) {
     return std::nullopt;
   }
   const double f0 = track_first ? Single(f31 * volume->f1) : Single(volume->f1 * f31);
   const double f1 = Single(f0 * f30);
-  const uint32_t instance = Load(base, track + 24);
+  const uint32_t instance = TrackV(base, track).instance().address;
   SetRegs(call, WithF1(Args({instance}), f1));
   return TrackInstanceSetVolume(base, instance, f1, frame, call);
 }
@@ -402,9 +413,9 @@ std::optional<uint32_t> ApplyVolume(uint8_t* base, uint32_t track, bool track_fi
 
 std::optional<uint32_t> TrackSetVolume(uint8_t* base, uint32_t track, double volume,
                                        uint32_t frame, const GuestCall& call) {
-  const double zero = LoadF(base, kZero);
-  guest::StoreFloat(base, track + 40, float(volume < zero ? zero : volume));
-  if (Load(base, track + 24) == 0) {
+  const double zero = double(G::zero(base));
+  TrackV(base, track).set_volume(float(volume < zero ? zero : volume));
+  if (TrackV(base, track).instance().address == 0) {
     ITC_NATIVE_RUNNING("sub_825D0BF8 XACTTrack::SetVolume");
     return track;
   }
@@ -417,7 +428,7 @@ std::optional<uint32_t> TrackSetVolume(uint8_t* base, uint32_t track, double vol
 
 std::optional<uint32_t> TrackUpdateVolume(uint8_t* base, uint32_t track, uint32_t frame,
                                           const GuestCall& call) {
-  if (Load(base, track + 24) == 0) {
+  if (TrackV(base, track).instance().address == 0) {
     ITC_NATIVE_RUNNING("sub_825D0428 XACTTrack::UpdateVolume");
     return track;
   }
@@ -431,25 +442,26 @@ std::optional<uint32_t> TrackUpdateVolume(uint8_t* base, uint32_t track, uint32_
 uint32_t TrackConstruct(uint8_t* base, uint32_t track, uint32_t engine, uint32_t sound,
                         uint32_t record, uint32_t index, uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D0CE0 XACTTrack::XACTTrack");
-  const float zero = guest::LoadFloat(base, kZero);
-  guest::StoreFloat(base, track + 44, zero);
-  Store(base, track + 4, track);
-  guest::StoreFloat(base, track + 60, zero);
-  Store(base, track + 8, track);
-  Store(base, track + 12, engine);
-  Store(base, track + 16, record);
-  Store(base, track + 20, sound);
-  Store(base, track + 0, kTrackVtable);
-  double f1 = LoadF(base, kOne);
-  guest::StoreFloat(base, track + 56, float(f1));
-  StoreU8(base, track + 48, uint8_t(index));
-  Store(base, track + 24, 0);
-  Store(base, track + 28, 0);
-  Store(base, track + 36, 0);
-  Store(base, track + 52, 0);
-  StoreU8(base, track + 32, 0);
+  const float zero = G::zero(base);
+  TrackV(base, track).set_pitch(zero);
+  TrackV(base, track).set_node_next(track);
+  TrackV(base, track).set_rpc_pitch(zero);
+  TrackV(base, track).set_node_prev(track);
+  TrackV(base, track).set_engine(engine);
+  TrackV(base, track).set_record(record);
+  TrackV(base, track).set_sound(sound);
+  TrackV(base, track).set_vtable(kTrackVtable);
+  double f1 = double(G::one(base));
+  TrackV(base, track).set_rpc_volume(float(f1));
+  TrackV(base, track).set_index(uint8_t(index));
+  TrackV(base, track).set_instance(0);
+  TrackV(base, track).set_next_instance(0);
+  TrackV(base, track).set_pending_transition(0);
+  TrackV(base, track).set_rpc_entries(0);
+  TrackV(base, track).set_flags(0);
   if (record != 0) {
-    f1 = LoadF(base, kGainTable + (uint32_t(LoadU8(base, record)) << 2));
+    f1 =
+        LoadF(base, G::gain_table_address() + (uint32_t(TrackRecordV(base, record).volume()) << 2));
   }
   SetRegs(call, WithF1(Args({track}), f1));
   if (!TrackSetVolume(base, track, f1, xa::FrameBelow(base, frame, kTrackSetVolumeFrame),
@@ -461,19 +473,19 @@ uint32_t TrackConstruct(uint8_t* base, uint32_t track, uint32_t engine, uint32_t
 
 uint32_t TrackUpdate(uint8_t* base, uint32_t track, uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D0E30 XACTTrack::Update");
-  const uint32_t event = Load(base, track + 36);
+  const uint32_t event = TrackV(base, track).pending_transition();
   if (event != 0) {
     CallAt(call, 0x825D0B08, 0x825D0E54, Args({track, event}), frame);
-    Store(base, track + 36, 0);
+    TrackV(base, track).set_pending_transition(0);
   }
   // The empty sub_82106540 with the instance: nothing to do.
-  const uint32_t instance = Load(base, track + 24);
+  const uint32_t instance = TrackV(base, track).instance().address;
   SetRegs(call, Args({instance}));
   return instance;
 }
 
 std::optional<uint32_t> TrackCreateRpcs(uint8_t* base, uint32_t track) {
-  const uint32_t sound = Load(base, track + 20);
+  const uint32_t sound = TrackV(base, track).sound();
   if ((LoadU8(base, Load(base, sound + 28)) & 0x4) != 0) {
     return std::nullopt;
   }
@@ -482,7 +494,7 @@ std::optional<uint32_t> TrackCreateRpcs(uint8_t* base, uint32_t track) {
 }
 
 std::optional<uint32_t> TrackStartRpcs(uint8_t* base, uint32_t track) {
-  const uint32_t sound = Load(base, track + 20);
+  const uint32_t sound = TrackV(base, track).sound();
   if ((LoadU8(base, Load(base, sound + 28)) & 0x4) != 0) {
     return std::nullopt;
   }
@@ -492,16 +504,16 @@ std::optional<uint32_t> TrackStartRpcs(uint8_t* base, uint32_t track) {
 
 uint32_t TrackDestruct(uint8_t* base, uint32_t track, uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D0110 XACTTrack::~XACTTrack");
-  Store(base, track + 0, kTrackVtable);
-  uint32_t r3 = Load(base, track + 28);
+  TrackV(base, track).set_vtable(kTrackVtable);
+  uint32_t r3 = TrackV(base, track).next_instance().address;
   if (r3 != 0) {
     r3 = CallAt(call, xa::Method(base, r3, 0), 0x825D0150, Args({r3, 1}), frame);
   }
-  r3 = Load(base, track + 24);
+  r3 = TrackV(base, track).instance().address;
   if (r3 != 0) {
     r3 = CallAt(call, xa::Method(base, r3, 0), 0x825D0170, Args({r3, 1}), frame);
   }
-  const uint32_t entries = Load(base, track + 52);
+  const uint32_t entries = TrackV(base, track).rpc_entries();
   if (entries != 0) {
     // The RPC entries (never in play): the counted array's vector deleting
     // destructor through the first entry's +4 vtable, or operator delete on
@@ -513,7 +525,7 @@ uint32_t TrackDestruct(uint8_t* base, uint32_t track, uint32_t frame, const Gues
       r3 = CallAt(call, 0x825A70E8, 0x825D01AC, Args({entries - 4}), frame);
     }
   }
-  Store(base, track + 0, kListBaseVtable);
+  TrackV(base, track).set_vtable(kListBaseVtable);
   return r3;
 }
 
@@ -532,12 +544,12 @@ uint32_t TrackDeletingDestruct(uint8_t* base, uint32_t track, uint32_t flags, ui
 uint32_t PlayWaveDeletingDestruct(uint8_t* base, uint32_t event, uint32_t flags,
                                   uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D8660 XACTPlayWaveEvent::~XACTPlayWaveEvent (deleting)");
-  const uint32_t wave = Load(base, event + 60);
-  Store(base, event + 0, kPlayWaveEventVtable);
+  const uint32_t wave = PlayWaveV(base, event).wave();
+  EventV(base, event).set_vtable(kPlayWaveEventVtable);
   if (wave != 0) {
     CallAt(call, xa::Method(base, wave, 0), 0x825D86A8, Args({wave, 1}), frame);
   }
-  Store(base, event + 0, kWaveEventBaseVtable);
+  EventV(base, event).set_vtable(kWaveEventBaseVtable);
   SetRegs(call, Args({event}));
   EventDestruct(base, event);
   if ((flags & 1) != 0) {
@@ -569,9 +581,9 @@ uint32_t PlayWaveGetDuration(uint8_t* base, uint32_t event, bool native_heap, ui
   ITC_NATIVE_RUNNING("sub_825D8870 XACTPlayWaveEvent::GetDuration");
   // The cue: [[[[event + 44] + 16] + 20] + 48] (instance, track, sound).
   const uint32_t cue =
-      Load(base, Load(base, Load(base, Load(base, event + 44) + 16) + 20) + 48);
+      Load(base, EventV(base, event).instance().track().sound() + 48);
   const uint32_t sound_bank = Load(base, cue + 296);
-  const uint32_t index = LoadU8(base, Load(base, event + 16) + 10);
+  const uint32_t index = EventV(base, event).record().wave_bank_index();
   std::optional<uint32_t> found;
   if (native_heap) {
     SetRegs(call, Args({sound_bank, index}));
@@ -583,11 +595,11 @@ uint32_t PlayWaveGetDuration(uint8_t* base, uint32_t event, bool native_heap, ui
   if (bank == 0) {
     return 0;
   }
-  const uint32_t record = Load(base, event + 16);
-  if (LoadU8(base, record + 11) == 255) {
+  const uint32_t record = EventV(base, event).record().address;
+  if (EventRecordV(base, record).loop_count() == 255) {
     return 0x7FFFFFFF;
   }
-  const uint32_t wave = guest::LoadU16(base, record + 8);
+  const uint32_t wave = EventRecordV(base, record).wave_index();
   const xa::Regs regs = Args({bank, wave, frame + 84, frame + 80});
   uint32_t r3;
   if (const auto durations = WaveBankGetWaveDurations(base, bank, wave)) {
@@ -601,7 +613,7 @@ uint32_t PlayWaveGetDuration(uint8_t* base, uint32_t event, bool native_heap, ui
   if (int32_t(r3) < 0) {
     return 0;
   }
-  const uint32_t loops = LoadU8(base, Load(base, event + 16) + 11);
+  const uint32_t loops = EventV(base, event).record().loop_count();
   return loops * Load(base, frame + 80) + Load(base, frame + 84);
 }
 
@@ -646,19 +658,19 @@ uint32_t EventSlotIsPrepared(uint8_t* base, uint32_t event, uint32_t frame,
 uint32_t PlayWavePrepare(uint8_t* base, uint32_t event, uint32_t offset, bool native_heap,
                          uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D86F8 XACTPlayWaveEvent::Prepare");
-  const uint32_t record = Load(base, event + 16);
-  const uint32_t time = (Load(base, record) >> 5) & 0xFFFFFF;
+  const uint32_t record = EventV(base, event).record().address;
+  const uint32_t time = (EventRecordV(base, record).word() >> 5) & 0xFFFFFF;
   uint32_t seek = 0;
   if (int32_t(time) > int32_t(offset)) {
-    Store(base, event + 32, offset);
+    EventV(base, event).set_elapsed(offset);
   } else {
     seek = offset - time;
-    Store(base, event + 32, time);
+    EventV(base, event).set_elapsed(time);
   }
   const uint32_t cue =
-      Load(base, Load(base, Load(base, Load(base, event + 44) + 16) + 20) + 48);
+      Load(base, EventV(base, event).instance().track().sound() + 48);
   const uint32_t sound_bank = Load(base, cue + 296);
-  const uint32_t index = LoadU8(base, record + 10);
+  const uint32_t index = EventRecordV(base, record).wave_bank_index();
   std::optional<uint32_t> found;
   if (native_heap) {
     SetRegs(call, Args({sound_bank, index}));
@@ -678,7 +690,7 @@ uint32_t PlayWavePrepare(uint8_t* base, uint32_t event, uint32_t offset, bool na
     return r30;
   }
   r30 = CallAt(call, xa::Method(base, bank, 40), 0x825D87B0,
-               Args({bank, guest::LoadU16(base, Load(base, event + 16) + 8), event, frame + 80}),
+               Args({bank, EventV(base, event).record().wave_index(), event, frame + 80}),
                frame);
   if (int32_t(r30) >= 0) {
     const uint32_t count_method = xa::Method(base, event, 48);
@@ -703,8 +715,8 @@ uint32_t PlayWavePrepare(uint8_t* base, uint32_t event, uint32_t offset, bool na
       }
       const uint32_t linked = Load(base, frame + 80);
       const uint32_t list = bank + 240;
-      Store(base, linked + 4, list);
-      Store(base, linked + 8, Load(base, list + 8));
+      WaveV(base, linked).set_node_next(list);
+      WaveV(base, linked).set_node_previous(Load(base, list + 8));
       Store(base, Load(base, list + 8) + 4, linked);
       Store(base, list + 8, linked);
       return r30;
@@ -720,38 +732,38 @@ uint32_t PlayWavePrepare(uint8_t* base, uint32_t event, uint32_t offset, bool na
 uint32_t TrackInstancePrepareSimple(uint8_t* base, uint32_t instance, uint32_t record,
                                     uint32_t offset, uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D53D8 XACTTrackInstance::PrepareSimple");
-  Store(base, instance + 40, 2);
-  StoreU8(base, instance + 24, 1);
+  InstanceV(base, instance).set_state(2);
+  InstanceV(base, instance).set_event_count(1);
   SetRegs(call, Args({4, kEventArrayAttributes}));
   const uint32_t array = memory::crt::XMemAlloc(base, 4, kEventArrayAttributes);
-  Store(base, instance + 20, array);
+  InstanceV(base, instance).set_events(array);
   if (array != 0) {
     SetRegs(call, Args({72, kPlayWaveAttributes}));
     uint32_t event = memory::crt::XMemAlloc(base, 72, kPlayWaveAttributes);
     if (event != 0) {
-      const uint32_t engine = Load(base, instance + 12);
+      const uint32_t engine = InstanceV(base, instance).engine();
       SetRegs(call, Args({event, engine, instance, record, 0}));
       PlayWaveConstruct(base, event, engine, instance, record, 0, 0);
     }
-    Store(base, Load(base, instance + 20), event);
-    event = Load(base, Load(base, instance + 20));
+    Store(base, InstanceV(base, instance).events(), event);
+    event = Load(base, InstanceV(base, instance).events());
     if (event != 0) {
-      Store(base, instance + 36, event);
+      InstanceV(base, instance).set_play_wave_event(event);
       const uint32_t r30 = EventSlotPrepare(base, event, offset, frame, 0x825D5490, call);
       if (int32_t(r30) < 0) {
         return r30;
       }
-      const uint32_t prepared =
-          EventSlotIsPrepared(base, Load(base, instance + 36), frame, 0x825D54B0, call);
+      const uint32_t prepared = EventSlotIsPrepared(
+          base, InstanceV(base, instance).play_wave_event().address, frame, 0x825D54B0, call);
       if (int32_t(prepared) != 0) {
-        Store(base, instance + 40, 3);
+        InstanceV(base, instance).set_state(3);
       }
       return r30;
     }
   }
   // Out of memory.
-  const uint32_t held = Load(base, instance + 20);
-  StoreU8(base, instance + 24, 0);
+  const uint32_t held = InstanceV(base, instance).events();
+  InstanceV(base, instance).set_event_count(0);
   if (held == 0) {
     return kOutOfMemory;
   }
@@ -759,10 +771,10 @@ uint32_t TrackInstancePrepareSimple(uint8_t* base, uint32_t instance, uint32_t r
   if (event != 0) {
     CallAt(call, xa::Method(base, event, 0), 0x825D5500, Args({event, 1}), frame);
   }
-  const uint32_t now = Load(base, instance + 20);
+  const uint32_t now = InstanceV(base, instance).events();
   SetRegs(call, Args({now, kEventArrayAttributes}));
   memory::crt::XMemFree(now, kEventArrayAttributes);
-  Store(base, instance + 20, 0);
+  InstanceV(base, instance).set_events(0);
   return kOutOfMemory;
 }
 
@@ -779,11 +791,11 @@ uint32_t TrackPrepareSimple(uint8_t* base, uint32_t track, uint32_t record, uint
   SetRegs(call, Args({64, kTrackInstanceAttributes}));
   uint32_t instance = memory::crt::XMemAlloc(base, 64, kTrackInstanceAttributes);
   if (instance != 0) {
-    const uint32_t engine = Load(base, track + 12);
+    const uint32_t engine = TrackV(base, track).engine();
     SetRegs(call, Args({instance, engine, track, 0xFFFFFFFFFFFFFFFFull}));
     TrackInstanceConstruct(base, instance, engine, track);
   }
-  Store(base, track + 24, instance);
+  TrackV(base, track).set_instance(instance);
   if (instance == 0) {
     r30 = kOutOfMemory;
   } else if (int32_t(r30) >= 0) {
@@ -800,11 +812,11 @@ uint32_t TrackPrepareSimple(uint8_t* base, uint32_t track, uint32_t record, uint
       return r30;
     }
   }
-  instance = Load(base, track + 24);
+  instance = TrackV(base, track).instance().address;
   if (instance != 0) {
     CallAt(call, xa::Method(base, instance, 0), 0x825D0A54, Args({instance, 1}), frame);
   }
-  Store(base, track + 24, 0);
+  TrackV(base, track).set_instance(0);
   return r30;
 }
 
@@ -832,7 +844,7 @@ uint32_t EventSlotIsPlaying(uint8_t* base, uint32_t event, uint32_t frame,
 
 // The sound of the instance's track.
 uint32_t SoundOf(uint8_t* base, uint32_t instance) {
-  return Load(base, Load(base, instance + 16) + 20);
+  return InstanceV(base, instance).track().sound();
 }
 
 }  // namespace
@@ -842,67 +854,69 @@ uint32_t TrackInstanceCancelEvents(uint8_t* base, uint32_t instance, uint32_t fr
   ITC_NATIVE_RUNNING("sub_825D5520 XACTTrackInstance::CancelEvents");
   uint32_t count = 0;
   CallAt(call, xa::kRtlEnterCriticalSection, 0x825D5540,
-         Args({uint64_t(Load(base, instance + 12) + 144)}), frame);
-  for (uint32_t i = 0; i < LoadU8(base, instance + 24); i = (i + 1) & 0xFF) {
-    const uint32_t event = Load(base, Load(base, instance + 20) + 4 * i);
-    if ((LoadU8(base, event + 40) & 0x20) == 0) {
+         Args({uint64_t(InstanceV(base, instance).engine() + 144)}), frame);
+  for (uint32_t i = 0; i < InstanceV(base, instance).event_count(); i = (i + 1) & 0xFF) {
+    const uint32_t event = Load(base, InstanceV(base, instance).events() + 4 * i);
+    if ((EventV(base, event).flags() & 0x20) == 0) {
       continue;
     }
     CallAt(call, kSoundCancel, 0x825D557C, Args({SoundOf(base, instance), event}), frame);
     count++;
   }
-  const uint32_t list = instance + 48;
-  while (Load(base, list + 4) != list && Load(base, list + 8) != list) {
-    const uint32_t helper = Load(base, Load(base, instance + 52) + 12);
+  const InstanceV inst(base, instance);
+  const uint32_t list = inst.helpers_vtable_address();
+  while (inst.helpers_next() != list && inst.helpers_prev() != list) {
+    const uint32_t helper = Load(base, InstanceV(base, instance).helpers_next() + 12);
     CallAt(call, kSoundCancel, 0x825D55C4, Args({SoundOf(base, instance), helper}), frame);
   }
   CallAt(call, xa::kRtlLeaveCriticalSection, 0x825D55D4,
-         Args({uint64_t(Load(base, instance + 12) + 144)}), frame);
+         Args({uint64_t(InstanceV(base, instance).engine() + 144)}), frame);
   return count;
 }
 
 uint32_t TrackInstanceDestruct(uint8_t* base, uint32_t instance, uint32_t frame,
                                const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D5838 XACTTrackInstance::~XACTTrackInstance");
-  Store(base, instance + 0, kTrackInstanceVtable);
+  InstanceV(base, instance).set_vtable(kTrackInstanceVtable);
   uint32_t r3 = instance;
-  const uint32_t next = Load(base, instance + 4);
+  const uint32_t next = InstanceV(base, instance).node_next();
   if (next != instance) {
-    const uint32_t prev = Load(base, instance + 8);
+    const uint32_t prev = InstanceV(base, instance).node_prev();
     if (prev != instance) {
       Store(base, next + 8, prev);
-      Store(base, Load(base, instance + 8) + 4, Load(base, instance + 4));
-      Store(base, instance + 4, instance);
-      Store(base, instance + 8, instance);
+      Store(base, InstanceV(base, instance).node_prev() + 4, InstanceV(base, instance).node_next());
+      InstanceV(base, instance).set_node_next(instance);
+      InstanceV(base, instance).set_node_prev(instance);
     }
   }
-  if (Load(base, instance + 20) != 0) {
+  if (InstanceV(base, instance).events() != 0) {
     SetRegs(call, Args({instance}));
     r3 = TrackInstanceCancelEvents(base, instance, xa::FrameBelow(base, frame, kCancelFrame),
                                    call);
-    for (uint32_t i = 0; i < LoadU8(base, instance + 24); i = (i + 1) & 0xFF) {
-      r3 = Load(base, Load(base, instance + 20) + 4 * i);
+    for (uint32_t i = 0; i < InstanceV(base, instance).event_count(); i = (i + 1) & 0xFF) {
+      r3 = Load(base, InstanceV(base, instance).events() + 4 * i);
       if (r3 != 0) {
         r3 = CallAt(call, xa::Method(base, r3, 0), 0x825D58D8, Args({r3, 1}), frame);
       }
     }
-    const uint32_t events = Load(base, instance + 20);
+    const uint32_t events = InstanceV(base, instance).events();
     SetRegs(call, Args({events, kEventArrayAttributes}));
     r3 = memory::crt::XMemFree(events, kEventArrayAttributes);
   }
-  const uint32_t list = instance + 48;
-  while (Load(base, list + 4) != list && Load(base, list + 8) != list) {
-    r3 = Load(base, instance + 52);
+  const InstanceV inst(base, instance);
+  const uint32_t list = inst.helpers_vtable_address();
+  while (inst.helpers_next() != list && inst.helpers_prev() != list) {
+    r3 = InstanceV(base, instance).helpers_next();
     if (r3 != 0) {
       r3 = CallAt(call, xa::Method(base, r3, 0), 0x825D5938, Args({r3, 1}), frame);
     }
   }
-  const int32_t state = int32_t(Load(base, instance + 40));
+  const int32_t state = int32_t(InstanceV(base, instance).state());
   if (state == 4 || state == 5) {
-    Store(base, instance + 40, 6);
+    InstanceV(base, instance).set_state(6);
   }
-  Store(base, list + 0, kListBaseVtable);
-  Store(base, instance + 0, kListBaseVtable);
+  inst.set_helpers_vtable(kListBaseVtable);
+  InstanceV(base, instance).set_vtable(kListBaseVtable);
   return r3;
 }
 
@@ -922,28 +936,29 @@ uint32_t TrackInstanceDeletingDestruct(uint8_t* base, uint32_t instance, uint32_
 uint32_t TrackInstanceStop(uint8_t* base, uint32_t instance, uint32_t immediate, uint32_t frame,
                            const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D5D18 XACTTrackInstance::Stop");
-  const int32_t state = int32_t(Load(base, instance + 40));
+  const int32_t state = int32_t(InstanceV(base, instance).state());
   if (state == 6) {
     return 0;
   }
-  if (state == 5 && (int32_t(Load(base, instance + 60)) != 0 || int32_t(immediate) == 0)) {
+  if (state == 5 &&
+      (int32_t(InstanceV(base, instance).stopped_at_once()) != 0 || int32_t(immediate) == 0)) {
     return 0;
   }
-  Store(base, instance + 40, 5);
+  InstanceV(base, instance).set_state(5);
   uint32_t cancelled = 0;
   if (int32_t(immediate) != 0) {
-    Store(base, instance + 60, 1);
+    InstanceV(base, instance).set_stopped_at_once(1);
     SetRegs(call, Args({instance}));
     cancelled = TrackInstanceCancelEvents(base, instance,
                                           xa::FrameBelow(base, frame, kCancelFrame), call);
   }
-  const uint32_t event = Load(base, instance + 36);
+  const uint32_t event = InstanceV(base, instance).play_wave_event().address;
   if (event != 0 && int32_t(EventSlotIsPlaying(base, event, frame, 0x825D5D98, call)) != 0) {
-    const uint32_t now = Load(base, instance + 36);
+    const uint32_t now = InstanceV(base, instance).play_wave_event().address;
     CallAt(call, xa::Method(base, now, 60), 0x825D5DB8, Args({now, immediate}), frame);
   }
   if (int32_t(immediate) != 0 && int32_t(cancelled) == 0) {
-    Store(base, instance + 40, 6);
+    InstanceV(base, instance).set_state(6);
   }
   return 0;
 }
@@ -952,24 +967,24 @@ uint32_t TrackStop(uint8_t* base, uint32_t track, uint32_t immediate, uint32_t f
                    const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D01D8 XACTTrack::Stop");
   uint32_t r30 = 0;
-  const uint32_t instance = Load(base, track + 24);
+  const uint32_t instance = TrackV(base, track).instance().address;
   if (instance != 0) {
     uint32_t now = immediate;
     if (int32_t(now) == 0) {
-      const uint32_t event = Load(base, instance + 36);
+      const uint32_t event = InstanceV(base, instance).play_wave_event().address;
       if (event == 0 || int32_t(EventSlotIsPlaying(base, event, frame, 0x825D0220, call)) == 0) {
         now = 1;
       }
     }
-    const uint32_t stopped = Load(base, track + 24);
+    const uint32_t stopped = TrackV(base, track).instance().address;
     SetRegs(call, Args({stopped, now}));
     r30 = TrackInstanceStop(base, stopped, now,
                             xa::FrameBelow(base, frame, kInstanceStopFrame), call);
   }
-  const uint32_t next = Load(base, track + 28);
+  const uint32_t next = TrackV(base, track).next_instance().address;
   if (next != 0) {
-    CallAt(call, 0x825C1548, 0x825D0250, Args({Load(base, track + 12), next}), frame);
-    Store(base, track + 28, 0);
+    CallAt(call, 0x825C1548, 0x825D0250, Args({TrackV(base, track).engine(), next}), frame);
+    TrackV(base, track).set_next_instance(0);
   }
   return r30;
 }
@@ -979,7 +994,7 @@ uint32_t TrackStop(uint8_t* base, uint32_t track, uint32_t immediate, uint32_t f
 std::optional<uint32_t> EventCreate(uint8_t* base, uint32_t engine, uint32_t instance,
                                     uint32_t record, uint32_t previous, uint32_t out,
                                     const GuestCall& call) {
-  const uint32_t type = Load(base, record) & 0x1F;
+  const uint32_t type = EventRecordV(base, record).word() & 0x1F;
   if (type > 20) {
     ITC_NATIVE_RUNNING("sub_825D0F00 XACTEvent::Create");
     return 0x8AC70011u;  // XACTENGINE_E_INVALIDEVENTTYPE
@@ -993,7 +1008,8 @@ std::optional<uint32_t> EventCreate(uint8_t* base, uint32_t engine, uint32_t ins
     SetRegs(call, Args({72, kPlayWaveAttributes}));
     uint32_t event = memory::crt::XMemAlloc(base, 72, kPlayWaveAttributes);
     if (event != 0) {
-      const uint32_t variation = (type == 2 || type == 5) ? Load(base, record + 12) : 0;
+      const uint32_t variation =
+          (type == 2 || type == 5) ? EventRecordV(base, record).variation() : 0;
       SetRegs(call, Args({event, engine, instance, record, previous}));
       event = PlayWaveConstruct(base, event, engine, instance, record, previous, variation);
     }
@@ -1042,19 +1058,19 @@ void DeleteEvent(uint8_t* base, uint32_t event, uint32_t frame, uint32_t return_
 uint32_t TrackInstancePrepare(uint8_t* base, uint32_t instance, uint32_t key, uint32_t offset,
                               uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D5A48 XACTTrackInstance::Prepare");
-  const uint32_t cue = Load(base, Load(base, Load(base, instance + 16) + 20) + 48);
+  const uint32_t cue = Load(base, InstanceV(base, instance).track().sound() + 48);
   const uint32_t sound_bank = Load(base, cue + 296);
   const uint32_t iterator = frame + 88;
   Store(base, iterator + 0, key);
   Store(base, iterator + 4, 0);
   Store(base, iterator + 8, 0);
-  Store(base, instance + 40, 2);
+  InstanceV(base, instance).set_state(2);
   uint32_t record = SoundBankEvent(base, sound_bank, 24, iterator, frame, 0x825D5AA8, call);
   const uint8_t count = LoadU8(base, iterator + 8);
-  StoreU8(base, instance + 24, count);
+  InstanceV(base, instance).set_event_count(count);
   SetRegs(call, Args({uint32_t(count) << 2, kEventArrayAttributes}));
   const uint32_t array = memory::crt::XMemAlloc(base, uint32_t(count) << 2, kEventArrayAttributes);
-  Store(base, instance + 20, array);
+  InstanceV(base, instance).set_events(array);
   uint32_t r29 = array != 0 ? 0 : kOutOfMemory;
   uint8_t kept = 0;
   bool beyond = false;
@@ -1064,21 +1080,22 @@ uint32_t TrackInstancePrepare(uint8_t* base, uint32_t instance, uint32_t key, ui
         r29 = kSeekBeyondEnd;
         break;
       }
-      StoreU8(base, instance + 24, kept);
-      const uint32_t event = Load(base, instance + 36);
+      InstanceV(base, instance).set_event_count(kept);
+      const uint32_t event = InstanceV(base, instance).play_wave_event().address;
       if (event != 0) {
         EventSlotIsPrepared(base, event, frame, 0x825D5D04, call);
       }
-      Store(base, instance + 40, 3);
+      InstanceV(base, instance).set_state(3);
       return r29;
     }
     const uint32_t previous =
-        (Load(base, record) & 0x20000000) != 0
+        (EventRecordV(base, record).word() & 0x20000000) != 0
             ? 0
-            : Load(base, Load(base, instance + 20) + (uint32_t(LoadU8(base, record + 6)) << 2));
+            : Load(base, InstanceV(base, instance).events() +
+                             (uint32_t(EventRecordV(base, record).previous_index()) << 2));
     const uint32_t out = frame + 80;
     Store(base, out, 0);
-    const uint32_t engine = Load(base, instance + 12);
+    const uint32_t engine = InstanceV(base, instance).engine();
     if (const auto made = EventCreate(base, engine, instance, record, previous, out, call)) {
       SetRegs(call, Args({engine, instance, record, previous, out}));
       r29 = *made;
@@ -1092,19 +1109,19 @@ uint32_t TrackInstancePrepare(uint8_t* base, uint32_t instance, uint32_t key, ui
     }
     bool drop = false;
     const uint32_t event = Load(base, out);
-    const uint32_t word = Load(base, Load(base, event + 16));
+    const uint32_t word = EventV(base, event).record().word();
     if ((word & 0x1F) == 9 &&
-        int32_t(((word >> 5) & 0xFFFFFF) + Load(base, event + 20)) < int32_t(offset)) {
+        int32_t(((word >> 5) & 0xFFFFFF) + EventV(base, event).fire_time()) < int32_t(offset)) {
       drop = true;
     } else {
       r29 = EventSlotPrepare(base, event, offset, frame, 0x825D5B94, call);
       if (int32_t(r29) >= 0) {
         const uint32_t prepared = Load(base, out);
-        const int32_t type = int32_t(Load(base, Load(base, prepared + 16)) & 0x1F);
+        const int32_t type = int32_t(EventV(base, prepared).record().word() & 0x1F);
         if (type >= 1 && type <= 6) {
-          Store(base, instance + 36, prepared);
+          InstanceV(base, instance).set_play_wave_event(prepared);
         }
-        Store(base, Load(base, instance + 20) + (uint32_t(kept) << 2), prepared);
+        Store(base, InstanceV(base, instance).events() + (uint32_t(kept) << 2), prepared);
         kept = uint8_t(kept + 1);
       }
       if (r29 == kSeekBeyondEnd) {
@@ -1125,17 +1142,17 @@ uint32_t TrackInstancePrepare(uint8_t* base, uint32_t instance, uint32_t key, ui
   // A failure: every kept event deleted, last first, and the array freed.
   for (uint8_t i = kept; i != 0;) {
     i = uint8_t(i - 1);
-    DeleteEvent(base, Load(base, Load(base, instance + 20) + (uint32_t(i) << 2)), frame,
+    DeleteEvent(base, Load(base, InstanceV(base, instance).events() + (uint32_t(i) << 2)), frame,
                 0x825D5C88, call);
   }
-  const uint32_t held = Load(base, instance + 20);
-  StoreU8(base, instance + 24, 0);
+  const uint32_t held = InstanceV(base, instance).events();
+  InstanceV(base, instance).set_event_count(0);
   if (held != 0) {
     SetRegs(call, Args({held, kEventArrayAttributes}));
     memory::crt::XMemFree(held, kEventArrayAttributes);
-    Store(base, instance + 20, 0);
+    InstanceV(base, instance).set_events(0);
   }
-  Store(base, instance + 36, 0);
+  InstanceV(base, instance).set_play_wave_event(0);
   return r29;
 }
 
@@ -1147,7 +1164,7 @@ uint32_t TrackCreateInstance(uint8_t* base, uint32_t track, uint32_t key, uint32
   if (instance == 0) {
     return kOutOfMemory;
   }
-  const uint32_t engine = Load(base, track + 12);
+  const uint32_t engine = TrackV(base, track).engine();
   SetRegs(call, Args({instance, engine, track, 0xFFFFFFFFFFFFFFFFull}));
   TrackInstanceConstruct(base, instance, engine, track);
   SetRegs(call, Args({instance, key, offset}));
@@ -1183,7 +1200,7 @@ uint32_t TrackPrepare(uint8_t* base, uint32_t track, uint32_t key, uint32_t offs
   if (int32_t(r30) < 0) {
     return r30;
   }
-  Store(base, track + 24, Load(base, out));
+  TrackV(base, track).set_instance(Load(base, out));
   if (TrackStartRpcs(base, track)) {
     SetRegs(call, Args({track}));
   } else {
@@ -1213,7 +1230,7 @@ uint32_t SoundScheduleEvent(uint8_t* base, uint32_t sound, uint32_t event, uint3
   } else {
     r3 = CallAt(call, queued, 0x825CB0FC, Args({event, 1}), frame);
   }
-  const int32_t time = int32_t(Load(base, event + 20));
+  const int32_t time = int32_t(EventV(base, event).fire_time());
   if (time <= int32_t(Load(base, Load(base, sound + 32) + 24))) {
     const uint32_t fire = xa::Method(base, event, 4);
     if (fire == kEventFire) {
@@ -1225,14 +1242,14 @@ uint32_t SoundScheduleEvent(uint8_t* base, uint32_t sound, uint32_t event, uint3
   const uint32_t list = sound + 56;
   uint32_t node = Load(base, sound + 60);
   while (node != list) {
-    if (int32_t(Load(base, node + 20)) > time) {
+    if (int32_t(EventV(base, node).fire_time()) > time) {
       break;
     }
-    node = Load(base, node + 4);
+    node = EventV(base, node).node_next();
   }
   const uint32_t before = Load(base, node + 8);
-  Store(base, event + 8, before);
-  Store(base, event + 4, Load(base, before + 4));
+  EventV(base, event).set_node_prev(before);
+  EventV(base, event).set_node_next(Load(base, before + 4));
   Store(base, Load(base, before + 4) + 8, event);
   Store(base, before + 4, event);
   return r3;
@@ -1259,40 +1276,40 @@ uint32_t RecordTime(uint32_t word) { return (word >> 5) & 0xFFFFFF; }
 uint32_t EventSchedule(uint8_t* base, uint32_t event, bool native_heap, uint32_t frame,
                        const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D1918 XACTEvent::Schedule");
-  const uint32_t record = Load(base, event + 16);
-  const uint32_t word = Load(base, record);
+  const uint32_t record = EventV(base, event).record().address;
+  const uint32_t word = EventRecordV(base, record).word();
   uint32_t fire;
   if ((word & 0x20000000) != 0) {
-    const uint32_t start = (LoadU8(base, event + 40) & 0x08) != 0
+    const uint32_t start = (EventV(base, event).flags() & 0x08) != 0
                                ? ClockMs(base, 0x825D1950, frame, call)
-                               : Load(base, Load(base, event + 44) + 28);
-    const uint32_t time = RecordTime(Load(base, Load(base, event + 16)));
-    fire = time - Load(base, event + 32) + start;
+                               : EventV(base, event).instance().start_time();
+    const uint32_t time = RecordTime(EventV(base, event).record().word());
+    fire = time - EventV(base, event).elapsed() + start;
   } else {
-    const uint32_t previous = Load(base, event + 36);
+    const uint32_t previous = EventV(base, event).previous().address;
     uint32_t from;
     if ((word & 0x40000000) != 0) {
-      from = Load(base, previous + 20);
-    } else if ((LoadU8(base, previous + 40) & 0x40) != 0) {
-      from = Load(base, previous + 24);
+      from = EventV(base, previous).fire_time();
+    } else if ((EventV(base, previous).flags() & 0x40) != 0) {
+      from = EventV(base, previous).done_time();
     } else {
-      from = Load(base, previous + 28);
+      from = EventV(base, previous).end_time();
     }
-    from -= Load(base, event + 32);
-    Store(base, event + 32, 0);
-    Store(base, event + 20, from);
-    const uint32_t time = RecordTime(Load(base, record));
-    fire = Load(base, event + 20) + time;
+    from -= EventV(base, event).elapsed();
+    EventV(base, event).set_elapsed(0);
+    EventV(base, event).set_fire_time(from);
+    const uint32_t time = RecordTime(EventRecordV(base, record).word());
+    fire = EventV(base, event).fire_time() + time;
   }
-  Store(base, event + 32, 0);
-  Store(base, event + 20, fire);
-  const uint32_t spread = guest::LoadU16(base, Load(base, event + 16) + 4);
+  EventV(base, event).set_elapsed(0);
+  EventV(base, event).set_fire_time(fire);
+  const uint32_t spread = EventV(base, event).record().random_spread();
   if (spread != 0) {
     const uint32_t extra =
-        CallAt(call, kRandom, 0x825D1A20, Args({Load(base, event + 12), 0, spread}), frame);
-    const uint32_t offset = Load(base, event + 32);
-    Store(base, event + 32, 0);
-    Store(base, event + 20, fire - offset + extra);
+        CallAt(call, kRandom, 0x825D1A20, Args({EventV(base, event).engine(), 0, spread}), frame);
+    const uint32_t offset = EventV(base, event).elapsed();
+    EventV(base, event).set_elapsed(0);
+    EventV(base, event).set_fire_time(fire - offset + extra);
   }
   const uint32_t method = xa::Method(base, event, 12);
   uint32_t duration;
@@ -1303,8 +1320,10 @@ uint32_t EventSchedule(uint8_t* base, uint32_t event, bool native_heap, uint32_t
   } else {
     duration = CallAt(call, method, 0x825D1A48, Args({event}), frame);
   }
-  Store(base, event + 28, duration == 0x7FFFFFFF ? 0x7FFFFFFF : Load(base, event + 20) + duration);
-  const uint32_t sound = Load(base, Load(base, Load(base, event + 44) + 16) + 20);
+  EventV(base, event)
+      .set_end_time(duration == 0x7FFFFFFF ? 0x7FFFFFFF
+                                           : EventV(base, event).fire_time() + duration);
+  const uint32_t sound = EventV(base, event).instance().track().sound();
   SetRegs(call, Args({sound, event}));
   return SoundScheduleEvent(base, sound, event, xa::FrameBelow(base, frame, kScheduleEventFrame),
                             call);
@@ -1312,16 +1331,18 @@ uint32_t EventSchedule(uint8_t* base, uint32_t event, bool native_heap, uint32_t
 
 uint32_t EventDone(uint8_t* base, uint32_t event, uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D13F0 XACTEvent::Done");
-  const uint8_t flags = LoadU8(base, event + 40);
+  const uint8_t flags = EventV(base, event).flags();
   if ((flags & 0x08) != 0) {
-    return CallAt(call, kRemoveHelper, 0x825D1420, Args({Load(base, event + 44), event}), frame);
+    return CallAt(call, kRemoveHelper, 0x825D1420,
+                  Args({EventV(base, event).instance().address, event}), frame);
   }
-  StoreU8(base, event + 40, uint8_t(flags | 0x40));
-  const uint32_t instance = Load(base, event + 44);
-  StoreU8(base, instance + 45, uint8_t(LoadU8(base, instance + 45) + 255));
+  EventV(base, event).set_flags(uint8_t(flags | 0x40));
+  const uint32_t instance = EventV(base, event).instance().address;
+  InstanceV(base, instance)
+      .set_unfinished_count(uint8_t(InstanceV(base, instance).unfinished_count() + 255));
   const uint32_t now = ClockMs(base, 0x825D1450, frame, call);
-  const uint32_t owner = Load(base, event + 44);
-  Store(base, event + 24, now);
+  const uint32_t owner = EventV(base, event).instance().address;
+  EventV(base, event).set_done_time(now);
   SetRegs(call, Args({owner}));
   TrackInstanceCheckDone(base, owner);
   return owner;
@@ -1338,7 +1359,7 @@ uint64_t PlayWaveFire(uint8_t* base, uint32_t event, uint32_t frame, const Guest
   // r3 in full, as XACTGetTimeMs leaves it (the counter's low word
   // sign-extended).
   const uint64_t now = ClockMsFull(base, 0x825D83E0, frame, call);
-  Store(base, event + 64, uint32_t(now));
+  PlayWaveV(base, event).set_play_time(uint32_t(now));
   return now;
 }
 
@@ -1346,17 +1367,17 @@ uint32_t PlayWaveStop(uint8_t* base, uint32_t event, uint32_t immediate, uint32_
                       const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D83F8 XACTPlayWaveEvent::Stop");
   if (immediate == 0) {
-    Store(base, event + 68, ClockMs(base, 0x825D8418, frame, call));
+    PlayWaveV(base, event).set_stop_time(ClockMs(base, 0x825D8418, frame, call));
   }
   if (WaveOf(base, event, 0x825D8434, frame, call) == 0) {
     return 0;
   }
-  const uint32_t release = LoadU8(base, Load(base, event + 16) + 7) & 1;
+  const uint32_t release = EventV(base, event).record().wave_flags() & 1;
   uint32_t mode = 1;
   if (immediate != 0) {
     mode = 0;
   } else if (release == 0) {
-    const uint32_t track = Load(base, Load(base, event + 44) + 16);
+    const uint32_t track = EventV(base, event).instance().track().address;
     if (CallAt(call, kHasReleaseRpc, 0x825D8468, Args({track}), frame) == 0) {
       mode = 0;
     }
@@ -1383,31 +1404,31 @@ constexpr uint32_t kTrackInstanceAudioUpdateFrame = 96;
 uint32_t TrackInstancePlay(uint8_t* base, uint32_t instance, bool native_heap, uint32_t frame,
                            const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D5980 XACTTrackInstance::Play");
-  if (int32_t(Load(base, instance + 40)) != 3) {
-    StoreU8(base, instance + 32, uint8_t(LoadU8(base, instance + 32) | 0x40));
+  if (int32_t(InstanceV(base, instance).state()) != 3) {
+    InstanceV(base, instance).set_flags(uint8_t(InstanceV(base, instance).flags() | 0x40));
     return 0;
   }
   const uint32_t now = ClockMs(base, 0x825D59A8, frame, call);
-  Store(base, instance + 28, now);
-  Store(base, instance + 40, 4);
-  const uint8_t count = LoadU8(base, instance + 24);
-  StoreU8(base, instance + 44, count);
+  InstanceV(base, instance).set_start_time(now);
+  InstanceV(base, instance).set_state(4);
+  const uint8_t count = InstanceV(base, instance).event_count();
+  InstanceV(base, instance).set_unfired_count(count);
   if (count == 0) {
     return 0;
   }
   uint32_t i = 0;
   do {
-    const uint32_t event = Load(base, Load(base, instance + 20) + 4 * i);
-    if ((Load(base, Load(base, event + 16)) & 0x20000000) != 0) {
+    const uint32_t event = Load(base, InstanceV(base, instance).events() + 4 * i);
+    if ((EventV(base, event).record().word() & 0x20000000) != 0) {
       SetRegs(call, Args({event}));
       EventSchedule(base, event, native_heap, xa::FrameBelow(base, frame, kEventScheduleFrame),
                     call);
     } else {
-      const uint32_t sound = Load(base, Load(base, instance + 16) + 20);
+      const uint32_t sound = InstanceV(base, instance).track().sound();
       CallAt(call, kAddPending, 0x825D5A04, Args({sound, event}), frame);
     }
     i = (i + 1) & 0xFF;
-  } while (i < LoadU8(base, instance + 24));
+  } while (i < InstanceV(base, instance).event_count());
   return 0;
 }
 
@@ -1415,19 +1436,19 @@ uint32_t TrackInstanceAudioUpdate(uint8_t* base, uint32_t instance, bool native_
                                   uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D5EB0 XACTTrackInstance::AudioUpdate");
   uint32_t r3 = instance;
-  if (int32_t(Load(base, instance + 40)) == 2) {
-    const uint32_t event = Load(base, instance + 36);
+  if (int32_t(InstanceV(base, instance).state()) == 2) {
+    const uint32_t event = InstanceV(base, instance).play_wave_event().address;
     r3 = event;
     if (event != 0) {
       r3 = EventSlotIsPrepared(base, event, frame, 0x825D5EEC, call);
       if (r3 != 0) {
-        Store(base, instance + 40, 3);
+        InstanceV(base, instance).set_state(3);
       }
     }
   }
-  const uint8_t flags = LoadU8(base, instance + 32);
-  if ((flags & 0x40) != 0 && int32_t(Load(base, instance + 40)) == 3) {
-    StoreU8(base, instance + 32, uint8_t(flags & 0xBF));
+  const uint8_t flags = InstanceV(base, instance).flags();
+  if ((flags & 0x40) != 0 && int32_t(InstanceV(base, instance).state()) == 3) {
+    InstanceV(base, instance).set_flags(uint8_t(flags & 0xBF));
     SetRegs(call, Args({instance}));
     r3 = TrackInstancePlay(base, instance, native_heap,
                            xa::FrameBelow(base, frame, kTrackInstancePlayFrame), call);
@@ -1438,25 +1459,26 @@ uint32_t TrackInstanceAudioUpdate(uint8_t* base, uint32_t instance, bool native_
 uint32_t TrackAudioUpdate(uint8_t* base, uint32_t track, bool native_heap, uint32_t frame,
                           const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D0D88 XACTTrack::AudioUpdate");
-  const uint32_t sound = Load(base, track + 20);
+  const uint32_t sound = TrackV(base, track).sound();
   if ((LoadU8(base, Load(base, sound + 28)) & 0x4) != 0) {
     const uint32_t count =
-        CallAt(call, kRpcCount, 0x825D0DB8, Args({sound, LoadU8(base, track + 48)}), frame) &
+        CallAt(call, kRpcCount, 0x825D0DB8, Args({sound, TrackV(base, track).index()}), frame) &
         0xFF;
     for (uint32_t i = 0; i < count; i = (i + 1) & 0xFF) {
-      CallAt(call, kRpcAudioUpdate, 0x825D0DD8, Args({Load(base, track + 52) + 44 * i}), frame);
+      CallAt(call, kRpcAudioUpdate, 0x825D0DD8, Args({TrackV(base, track).rpc_entries() + 44 * i}),
+             frame);
     }
   }
-  const uint32_t instance = Load(base, track + 24);
+  const uint32_t instance = TrackV(base, track).instance().address;
   SetRegs(call, Args({instance}));
   uint32_t r3 = TrackInstanceAudioUpdate(
       base, instance, native_heap, xa::FrameBelow(base, frame, kTrackInstanceAudioUpdateFrame),
       call);
-  const uint8_t flags = LoadU8(base, track + 32);
+  const uint8_t flags = TrackV(base, track).flags();
   if ((flags & 0x80) != 0) {
-    const uint32_t next = Load(base, track + 28);
-    if (next != 0 && int32_t(Load(base, next + 40)) == 3) {
-      StoreU8(base, track + 32, uint8_t(flags & 0x7F));
+    const uint32_t next = TrackV(base, track).next_instance().address;
+    if (next != 0 && int32_t(InstanceV(base, next).state()) == 3) {
+      TrackV(base, track).set_flags(uint8_t(flags & 0x7F));
       r3 = CallAt(call, kSwitchInstance, 0x825D0E28, Args({track}), frame);
     }
   }
@@ -1466,7 +1488,7 @@ uint32_t TrackAudioUpdate(uint8_t* base, uint32_t track, bool native_heap, uint3
 uint32_t TrackPlay(uint8_t* base, uint32_t track, bool native_heap, uint32_t sp,
                    const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D01D0 XACTTrack::Play");
-  const uint32_t instance = Load(base, track + 24);
+  const uint32_t instance = TrackV(base, track).instance().address;
   SetRegs(call, Args({instance}));
   return TrackInstancePlay(base, instance, native_heap,
                            xa::FrameBelow(base, sp, kTrackInstancePlayFrame), call);

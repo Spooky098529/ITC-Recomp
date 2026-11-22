@@ -8,11 +8,20 @@
 #include "c_runtime/strings.h"
 #include "data_tables/data_tables.h"
 #include "guest.h"
+#include "schema/career.h"
+#include "schema/race_hud_machine.h"
+#include "schema/race_states.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <cstring>
 
 namespace career {
+
+using schema::CareerCounter;
+using schema::CareerItemRecord;
+using schema::CareerOpponentItem;
+using schema::CareerSave;
+using schema::CareerStats;
 
 namespace {
 
@@ -34,20 +43,43 @@ void CountUp999(uint8_t* base, uint32_t address) {
   guest::StoreU16(base, address, uint16_t(value));
 }
 
-// Per outcome: the counter's halfword, the record's halfword it tests, the
-// bit set's offset, the opponents' halfword (+1628 + 8 x id + this).
-struct OutcomeFields {
-  uint32_t counter, record, bits, opponent;
-};
-constexpr OutcomeFields kFields[3] = {
-    {14, 0, 4, 0},  // a loss
-    {12, 2, 0, 2},  // a win
-    {16, 4, 8, 4},  // outcome 3
-};
+// Per outcome: the counter's halfword, the bit set, the item record's
+// halfword, the opponent record's halfword (its 8 bytes' +0, +2, +4).
+uint32_t CounterField(const CareerCounter& c, Outcome outcome) {
+  switch (outcome) {
+    case Outcome::kLoss:
+      return c.losses_address();
+    case Outcome::kWin:
+      return c.wins_address();
+    default:
+      return c.outcome3_address();
+  }
+}
+uint32_t KindsField(const CareerCounter& c, Outcome outcome) {
+  switch (outcome) {
+    case Outcome::kLoss:
+      return c.lost_kinds_address();
+    case Outcome::kWin:
+      return c.won_kinds_address();
+    default:
+      return c.outcome3_kinds_address();
+  }
+}
+uint32_t RecordField(const CareerItemRecord& r, Outcome outcome) {
+  switch (outcome) {
+    case Outcome::kLoss:
+      return r.losses_address();
+    case Outcome::kWin:
+      return r.wins_address();
+    default:
+      return r.outcome3_address();
+  }
+}
+constexpr uint32_t kOpponentField[3] = {0, 2, 4};  // a loss, a win, outcome 3
 
-// The stats record's halfword +5796 + 14 x mode (+ field).
-uint32_t ByMode(uint32_t stats, uint32_t mode, uint32_t field) {
-  return stats + 14 * mode + 5796 + field;
+// The stats record's by-mode halfword (14 bytes a mode; + field).
+uint32_t ByMode(const CareerStats& s, uint32_t mode, uint32_t field) {
+  return s.by_mode_address() + 14 * mode + field;
 }
 
 }  // namespace
@@ -57,16 +89,16 @@ bool CanCopy(uint32_t destination, uint32_t source, uint32_t size) {
 }
 
 static uint32_t CounterAdd(uint8_t* base, uint32_t counter, const Opponent& o, Outcome outcome) {
-  const OutcomeFields& f = kFields[int(outcome)];
-  CountUp(base, counter + f.counter);
-  if (guest::LoadU16(base, o.record + f.record) == 0) {
-    const int32_t kind = int8_t(guest::LoadU8(base, o.item + 35));
+  const CareerCounter c(base, counter);
+  CountUp(base, CounterField(c, outcome));
+  if (guest::LoadU16(base, RecordField(CareerItemRecord(base, o.record), outcome)) == 0) {
+    const int32_t kind = int8_t(CareerOpponentItem(base, o.item).kind());
     if (kind >= 0) {
-      const uint32_t word = counter + f.bits + (uint32_t(kind >> 5) << 2);
+      const uint32_t word = KindsField(c, outcome) + (uint32_t(kind >> 5) << 2);
       guest::StoreU32(base, word, guest::LoadU32(base, word) | (1u << (kind & 31)));
     }
   }
-  CountUp(base, counter + 22);
+  CountUp(base, c.races_address());
   return counter;
 }
 
@@ -87,12 +119,13 @@ uint32_t CounterAddOutcome3(uint8_t* base, uint32_t counter, const Opponent& o) 
 
 uint32_t WeekCounterAddLoss(uint8_t* base, uint32_t week, const Opponent& o) {
   ITC_NATIVE_RUNNING("sub_82111F60 WeekCounter::AddLoss");
+  const CareerCounter w(base, week);
   CounterAddLoss(base, week, o);
-  const int32_t kind = int8_t(guest::LoadU8(base, o.item + 35));
+  const int32_t kind = int8_t(CareerOpponentItem(base, o.item).kind());
   if (kind == 4) {
-    CountUp(base, week + 56);
+    CountUp(base, w.week_kind4_losses_address());
   } else if (kind == 5) {
-    CountUp(base, week + 58);
+    CountUp(base, w.week_kind5_losses_address());
   }
   return week;
 }
@@ -111,17 +144,19 @@ uint32_t OpponentsAdd(uint8_t* base, uint32_t block, const Opponent& o, Outcome 
       CounterAddOutcome3(base, block, o);
       break;
   }
-  CountUp999(base, block + (o.id << 3) + 1628 + kFields[int(outcome)].opponent);
-  const uint32_t list = block + 24;
-  const uint32_t count = guest::LoadU32(base, list + 1600);
+  const CareerCounter day(base, block);
+  CountUp999(base, day.day_opponent_records_address() + (o.id << 3) +
+                       kOpponentField[int(outcome)]);
+  const uint32_t list = day.day_opponents_address();
+  const uint32_t count = day.day_opponent_count();
   for (uint32_t i = 0; i < count; i++) {
     if (guest::LoadU32(base, list + 4 * i) == o.id) {
       return block;
     }
   }
-  const uint32_t at = list + (guest::LoadU32(base, list + 1600) << 2);
+  const uint32_t at = list + (day.day_opponent_count() << 2);
   guest::StoreU32(base, at, o.id);
-  guest::StoreU32(base, list + 1600, guest::LoadU32(base, list + 1600) + 1);
+  day.set_day_opponent_count(day.day_opponent_count() + 1);
   return block;
 }
 
@@ -144,57 +179,61 @@ uint32_t OpponentsAddOutcome3(uint8_t* base, uint32_t block, const Opponent& o) 
 
 uint32_t StatsAddWin(uint8_t* base, uint32_t stats, const Opponent& o, uint32_t mode) {
   ITC_NATIVE_RUNNING("sub_821139B8 Stats::AddWin");
-  CounterAddWin(base, stats, o);
-  CountUp(base, stats + 5970);
-  const uint16_t streak = guest::LoadU16(base, stats + 5970);
-  if (int16_t(guest::LoadU16(base, stats + 5968)) < int16_t(streak)) {
-    guest::StoreU16(base, stats + 5968, streak);
+  const CareerStats s(base, stats);
+  CounterAddWin(base, s.counter_address(), o);
+  CountUp(base, s.win_streak_address());
+  const uint16_t streak = s.win_streak();
+  if (int16_t(s.best_win_streak()) < int16_t(streak)) {
+    s.set_best_win_streak(streak);
   }
-  const uint32_t day = stats + 24;
-  CountUp(base, day + 4828);
-  const uint16_t day_streak = guest::LoadU16(base, stats + 4852);
-  if (int16_t(guest::LoadU16(base, stats + 4854)) < int16_t(day_streak)) {
-    guest::StoreU16(base, stats + 4854, day_streak);
+  const uint32_t day = s.day_address();
+  const CareerCounter d(base, day);
+  CountUp(base, d.day_win_streak_address());
+  const uint16_t day_streak = d.day_win_streak();
+  if (int16_t(d.day_best_streak()) < int16_t(day_streak)) {
+    d.set_day_best_streak(day_streak);
   }
-  guest::StoreU16(base, stats + 5972, 0);
-  const uint32_t week = stats + 4864;
+  s.set_loss_streak(0);
+  const uint32_t week = s.week_address();
   CounterAddWin(base, week, o);
-  if (guest::LoadU8(base, o.item + 35) == 1) {
-    CountUp(base, week + 52);
+  if (CareerOpponentItem(base, o.item).kind() == 1) {
+    CountUp(base, CareerCounter(base, week).week_kind1_wins_address());
   }
   OpponentsAddWin(base, day, o);
-  CounterAddWin(base, stats + 4924, o);
-  CountUp(base, ByMode(stats, mode, 2));
-  CountUp(base, ByMode(stats, mode, 10));
-  return stats + 4924;
+  CounterAddWin(base, s.other_counter_address(), o);
+  CountUp(base, ByMode(s, mode, 2));
+  CountUp(base, ByMode(s, mode, 10));
+  return s.other_counter_address();
 }
 
 uint32_t StatsAddLoss(uint8_t* base, uint32_t stats, const Opponent& o, uint32_t mode) {
   ITC_NATIVE_RUNNING("sub_82113AB8 Stats::AddLoss");
-  CounterAddLoss(base, stats, o);
-  CountUp(base, stats + 5972);
-  guest::StoreU16(base, stats + 5970, 0);
-  guest::StoreU16(base, stats + 4852, 0);
-  WeekCounterAddLoss(base, stats + 4864, o);
-  OpponentsAddLoss(base, stats + 24, o);
-  CounterAddLoss(base, stats + 4924, o);
-  CountUp(base, ByMode(stats, mode, 4));
-  CountUp(base, ByMode(stats, mode, 10));
-  return stats + 4924;
+  const CareerStats s(base, stats);
+  CounterAddLoss(base, s.counter_address(), o);
+  CountUp(base, s.loss_streak_address());
+  s.set_win_streak(0);
+  CareerCounter(base, s.day_address()).set_day_win_streak(0);
+  WeekCounterAddLoss(base, s.week_address(), o);
+  OpponentsAddLoss(base, s.day_address(), o);
+  CounterAddLoss(base, s.other_counter_address(), o);
+  CountUp(base, ByMode(s, mode, 4));
+  CountUp(base, ByMode(s, mode, 10));
+  return s.other_counter_address();
 }
 
 uint32_t StatsAddOutcome3(uint8_t* base, uint32_t stats, const Opponent& o, uint32_t mode) {
   ITC_NATIVE_RUNNING("sub_82113B50 Stats::AddOutcome3");
-  CounterAddOutcome3(base, stats, o);
-  guest::StoreU16(base, stats + 5970, 0);
-  guest::StoreU16(base, stats + 4852, 0);
-  guest::StoreU16(base, stats + 5972, 0);
-  CounterAddOutcome3(base, stats + 4864, o);
-  OpponentsAddOutcome3(base, stats + 24, o);
-  CounterAddOutcome3(base, stats + 4924, o);
-  CountUp(base, ByMode(stats, mode, 6));
-  CountUp(base, ByMode(stats, mode, 10));
-  return stats + 4924;
+  const CareerStats s(base, stats);
+  CounterAddOutcome3(base, s.counter_address(), o);
+  s.set_win_streak(0);
+  CareerCounter(base, s.day_address()).set_day_win_streak(0);
+  s.set_loss_streak(0);
+  CounterAddOutcome3(base, s.week_address(), o);
+  OpponentsAddOutcome3(base, s.day_address(), o);
+  CounterAddOutcome3(base, s.other_counter_address(), o);
+  CountUp(base, ByMode(s, mode, 6));
+  CountUp(base, ByMode(s, mode, 10));
+  return s.other_counter_address();
 }
 
 namespace {
@@ -207,11 +246,12 @@ uint32_t ItemRecordsAdd(uint8_t* base, uint32_t save, uint32_t id, uint32_t sp,
   o.id = id;
   o.item = data_tables::RecordsItem(base, id);
   guest::StoreU32(base, frame + 88, o.item);
-  o.record = save + kItemRecords + 12 * id;
+  const CareerSave s(base, save);
+  o.record = s.item_records_address() + 12 * id;
   guest::StoreU32(base, frame + 84, o.record);
   data_tables::RecordsItem(base, id);
-  const uint32_t stats = save + kStats;
-  const uint32_t mode = guest::LoadU32(base, save + 6104);
+  const uint32_t stats = s.stats_address();
+  const uint32_t mode = s.mode();
   uint32_t r3 = 0;
   switch (outcome) {
     case Outcome::kLoss:
@@ -224,7 +264,7 @@ uint32_t ItemRecordsAdd(uint8_t* base, uint32_t save, uint32_t id, uint32_t sp,
       r3 = StatsAddOutcome3(base, stats, o, mode);
       break;
   }
-  CountUp999(base, o.record + kFields[int(outcome)].record);
+  CountUp999(base, RecordField(CareerItemRecord(base, o.record), outcome));
   return r3;
 }
 
@@ -249,20 +289,27 @@ uint32_t ItemRecordsAddOutcome3(uint8_t* base, uint32_t save, uint32_t id, uint3
 
 uint32_t ResultRecordFill(uint8_t* base, uint32_t out, uint32_t race) {
   ITC_NATIVE_RUNNING("sub_82110850 ResultRecord::Fill");
-  const uint32_t result = vehicle_accessors::RacerRecordsAt(base, race + 0x59AE8, 0xFFFFFFFFu);
-  guest::StoreU32(base, out + 0, guest::LoadU32(base, result + 812));
-  guest::StoreU32(base, out + 4, guest::LoadU32(base, result + 816));
-  guest::StoreU32(base, out + 8, guest::LoadU32(base, result + 796));
-  guest::StoreU32(base, out + 12, guest::LoadU32(base, result + 800));
-  const uint32_t racer = race + 3936 * guest::LoadU32(base, result + 4);
-  guest::StoreU32(base, out + 40, guest::LoadU32(base, racer + 60));
-  guest::StoreU32(base, out + 16, int32_t(guest::LoadU32(base, result + 3924)) == 1 ? 1 : 0);
+  const schema::CareerResultRecord r(base, out);
+  const schema::RaceData rd(base, race);
+  const uint32_t result =
+      vehicle_accessors::RacerRecordsAt(base, rd.results_address(), 0xFFFFFFFFu);
+  const schema::RacerResultsRecord rr(base, result);
+  r.set_value_812(rr.e0_track_hits());
+  r.set_value_816(rr.e0_car_hits());
+  r.set_mean_796(rr.e0_mean_speed());
+  r.set_mean_796_count(rr.unknown_800());
+  // The racer record's entry 0 place: the race data's +48 + 3,936 x index, +12.
+  const schema::RacerResultsRecord racer(
+      base, rd.racer_records_address() + schema::RacerResultsRecord::kSize * rr.e0_record_index());
+  r.set_racer_60(racer.e0_place());
+  r.set_won(int32_t(rr.finish()) == 1 ? 1 : 0);
   for (uint32_t i = 0; i < 3; i++) {
-    guest::StoreU32(base, out + 20 + 4 * i, guest::LoadU32(base, result + 980 + 972 * i));
+    guest::StoreU32(base, r.opponent_1_address() + 4 * i,
+                    guest::LoadU32(base, rr.e1_item_address() + 972 * i));
   }
-  guest::StoreU32(base, out + 44, uint32_t(int32_t(int16_t(guest::LoadU16(base, result + 968)))));
-  guest::StoreU32(base, out + 32, guest::LoadU32(base, result + 972));
-  guest::StoreU32(base, out + 36, guest::LoadU32(base, race + 32));
+  r.set_value_968(uint32_t(int32_t(int16_t(rr.e0_split_count()))));
+  r.set_value_972(rr.e0_input_seen());
+  r.set_race_mode(schema::CareerFillRaceData(base, race).mode());
   return result;
 }
 
@@ -280,10 +327,11 @@ uint32_t ResultsPush(uint8_t* base, uint32_t list, uint32_t race) {
   for (uint32_t to = list + 676; to != list + 4; to -= 48) {
     c_runtime::Memcpy(base, to, to - 48, 48);
   }
-  const uint32_t r3 = ResultRecordFill(base, list + 4, race);
-  const int32_t count = int32_t(guest::LoadU32(base, list));
+  const schema::CareerResults results(base, list);
+  const uint32_t r3 = ResultRecordFill(base, results.records_address(), race);
+  const int32_t count = int32_t(results.count());
   if (count < 15) {
-    guest::StoreU32(base, list, uint32_t(count + 1));
+    results.set_count(uint32_t(count + 1));
   }
   return r3;
 }
@@ -309,46 +357,52 @@ uint32_t DayLogPush(uint8_t* base, uint32_t log, uint32_t day) {
     guest::StoreU32(base, to + 4, b);
     guest::StoreU32(base, to + 8, c);
   }
-  guest::StoreU32(base, log + 4, uint32_t(int32_t(int16_t(guest::LoadU16(base, day + 22)))));
+  const schema::CareerDayLog l(base, log);
+  const CareerCounter d(base, day);
+  l.set_newest_races(uint32_t(int32_t(int16_t(d.races()))));
   // lfs and stfs: the float through a double.
-  guest::StoreFloat(base, log + 8, float(double(guest::LoadFloat(base, day + 4836))));
-  guest::StoreU32(base, log + 12, uint32_t(int32_t(int16_t(guest::LoadU16(base, day + 18)))));
-  const int32_t count = int32_t(guest::LoadU32(base, log));
+  l.set_newest_4836(float(double(d.unknown_4836())));
+  l.set_newest_18(uint32_t(int32_t(int16_t(d.unknown_18()))));
+  const int32_t count = int32_t(l.count());
   if (count < 10) {
-    guest::StoreU32(base, log, uint32_t(count + 1));
+    l.set_count(uint32_t(count + 1));
   }
   return log;
 }
 
 uint32_t StatsStartDay(uint8_t* base, uint32_t stats, uint32_t weekday) {
   ITC_NATIVE_RUNNING("sub_82112088 Stats::StartDay");
-  const float zero = guest::LoadFloat(base, kZeroFloat);
+  const CareerStats s(base, stats);
+  const float zero = schema::CareerGlobals::zero(base);
   if (weekday == 0) {
-    const uint32_t week = stats + 4864;
+    const uint32_t week = s.week_address();
+    const CareerCounter w(base, week);
     Clear(base, week, 24);
-    guest::StoreFloat(base, week + 24, zero);
-    guest::StoreFloat(base, week + 28, zero);
-    guest::StoreU32(base, week + 32, 0);
-    guest::StoreU32(base, week + 36, 0);
-    guest::StoreU32(base, week + 48, 0);
-    guest::StoreU32(base, week + 44, 0);
-    for (uint32_t k = 52; k <= 58; k += 2) {
-      guest::StoreU16(base, week + k, 0);
-    }
+    w.set_week_best_804(zero);
+    w.set_week_mean_796(zero);
+    w.set_week_mean_796_count(0);
+    w.set_week_808(0);
+    w.set_week_sum_812(0);
+    w.set_week_sum_816(0);
+    w.set_week_kind1_wins(0);
+    w.set_unknown_54(0);
+    w.set_week_kind4_losses(0);
+    w.set_week_kind5_losses(0);
   }
-  const uint32_t day = stats + 24;
-  DayLogPush(base, stats + 5672, day);
+  const uint32_t day = s.day_address();
+  const CareerCounter d(base, day);
+  DayLogPush(base, s.day_log_address(), day);
   Clear(base, day, 4828);
-  guest::StoreFloat(base, day + 4836, zero);
-  guest::StoreU16(base, day + 4830, 0);
-  guest::StoreU16(base, day + 4828, 0);
-  guest::StoreU32(base, day + 4832, 0);
-  guest::StoreU16(base, stats + 5970, 0);
-  guest::StoreU16(base, stats + 5972, 0);
-  guest::StoreU32(base, stats + 5960, 0);
-  guest::StoreU32(base, stats + 5964, 0);
-  guest::StoreU32(base, stats + 5952, 0);
-  guest::StoreU32(base, stats + 5956, 1);
+  d.set_unknown_4836(zero);
+  d.set_day_best_streak(0);
+  d.set_day_win_streak(0);
+  d.set_day_points(0);
+  s.set_win_streak(0);
+  s.set_loss_streak(0);
+  s.set_day_total_8(0);
+  s.set_day_total_12(0);
+  s.set_day_total_4(0);
+  s.set_day_total_0(1);
   return day;
 }
 
@@ -356,10 +410,11 @@ uint32_t StatsStartDay(uint8_t* base, uint32_t stats, uint32_t weekday) {
 
 uint32_t GarageListInsert(uint8_t* base, uint32_t list, uint32_t position) {
   ITC_NATIVE_RUNNING("sub_82113468 GarageList::Insert");
+  const schema::CareerGarageList gl(base, list);
   uint32_t n = uint32_t(int32_t(int16_t(position)));
-  uint32_t link = list + 204;
+  uint32_t link = gl.head_address();
   if (n != 0) {
-    uint32_t node = uint32_t(int32_t(int16_t(guest::LoadU16(base, list + 204))));
+    uint32_t node = uint32_t(int32_t(int16_t(gl.head())));
     for (;;) {
       link = (node << 2) + list;
       if (--n == 0) {
@@ -368,26 +423,27 @@ uint32_t GarageListInsert(uint8_t* base, uint32_t list, uint32_t position) {
       node = uint32_t(int32_t(int16_t(guest::LoadU16(base, link))));
     }
   }
-  const uint16_t free = guest::LoadU16(base, list + 200);
+  const uint16_t free = gl.free();
   const uint32_t slot = uint32_t(int32_t(int16_t(free))) << 2;
-  guest::StoreU16(base, list + 200, guest::LoadU16(base, slot + list));
+  gl.set_free(guest::LoadU16(base, slot + list));
   guest::StoreU16(base, slot + list, free);
   guest::StoreU16(base, slot + list, guest::LoadU16(base, link));
   guest::StoreU16(base, link, free);
-  guest::StoreU16(base, list + 208, uint16_t(guest::LoadU16(base, list + 208) + 1));
+  gl.set_count(uint16_t(gl.count() + 1));
   return list;
 }
 
 bool GarageInsertCar(uint8_t* base, uint32_t garage, uint32_t car, uint32_t position,
                      uint32_t* destination) {
   ITC_NATIVE_RUNNING("sub_821154E0 Garage::InsertCar");
+  const schema::CareerGarageList gl(base, garage);
   GarageListInsert(base, garage, uint32_t(int32_t(int16_t(position))));
-  uint32_t node = (uint32_t(int32_t(int16_t(guest::LoadU16(base, garage + 204)))) << 2) + garage;
+  uint32_t node = (uint32_t(int32_t(int16_t(gl.head()))) << 2) + garage;
   for (uint32_t n = position; n != 0; n--) {
     node = (uint32_t(int32_t(int16_t(guest::LoadU16(base, node)))) << 2) + garage;
   }
   const uint32_t slot = uint32_t(int32_t(int16_t(guest::LoadU16(base, node + 2))));
-  *destination = slot * 1968 + garage + 212;
+  *destination = slot * 1968 + gl.cars_address();
   if (!CanCopy(*destination, car, 1968)) {
     return false;
   }

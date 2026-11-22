@@ -6,18 +6,18 @@
 #include "base/log.h"
 #include "c_runtime/strings.h"
 #include "guest.h"
+#include "schema/c_runtime.h"
 
 namespace c_runtime {
 
 namespace {
 
-// _woutput_l's tables and the C runtime's data it reads.
-constexpr uint32_t kStates = 0x820734D8;      // character classes, then the states
-constexpr uint32_t kNarrowNull = 0x820734CC;  // [] = "(null)"
-constexpr uint32_t kWideNull = 0x820734D0;    // [] = L"(null)"
-constexpr uint32_t kLocale = 0x8266BC28;      // [] = the current locale (+172 MB_CUR_MAX)
-constexpr uint32_t kFloatTable = 0x8266BA5C;  // the float conversions (+24 _cfltcvt_l)
-constexpr uint32_t kCfltcvt = 0x825AEB20;     // _cfltcvt_l
+// _woutput_l's tables and the C runtime's data it reads: CRuntimeGlobals'
+// format_states (character classes, then the states), narrow_null,
+// wide_null, current_locale and float_conversions.
+using schema::CRuntimeGlobals;
+constexpr uint32_t kStates = CRuntimeGlobals::format_states_address();
+constexpr uint32_t kCfltcvt = 0x825AEB20;  // _cfltcvt_l
 
 // The flags (as the C runtime's output.c).
 constexpr uint32_t kSign = 0x1, kSignSpace = 0x2, kLeft = 0x4, kLeadZero = 0x8, kLong = 0x10,
@@ -46,12 +46,17 @@ class WideOutput {
   uint16_t U16(uint32_t a) { return guest::LoadU16(base_, a); }
   uint8_t U8(uint32_t a) { return guest::LoadU8(base_, a); }
   uint32_t U32(uint32_t a) { return guest::LoadU32(base_, a); }
+  // The float conversion table's _cfltcvt_l (+24).
+  uint32_t CfltcvtL() {
+    return schema::FloatConversionTable(base_, CRuntimeGlobals::float_conversions_address())
+        .cfltcvt_l();
+  }
   // The next argument's slot (8 bytes, aligned): its address.
   uint32_t NextSlot() {
     args_ = ((args_ + 7) & ~7u) + 8;
     return args_ - 8;
   }
-  uint32_t MbCurMax() { return U32(U32(kLocale) + 172); }
+  uint32_t MbCurMax() { return uint32_t(CRuntimeGlobals::current_locale(base_).mb_cur_max()); }
   // write_char (sub_825B1368) to the string stream: _putwc_nolock's room
   // taken first (always enough for INT_MAX bytes), the unit stored, the
   // count -1 for 0xFFFF (its failure value) or moved on by one. A dry run
@@ -202,7 +207,7 @@ bool WideOutput::Run(int32_t* result) {
             int32_t most = precision == -1 ? 0x7FFFFFFF : precision;
             text = U32(NextSlot() + 4);
             if (flags & kShort) {
-              if (text == 0) text = U32(kNarrowNull);
+              if (text == 0) text = CRuntimeGlobals::narrow_null(base_).address;
               uint32_t p = text;
               text_length = 0;
               if (most > 0) {
@@ -214,7 +219,7 @@ bool WideOutput::Run(int32_t* result) {
                 }
               }
             } else {
-              if (text == 0) text = U32(kWideNull);
+              if (text == 0) text = CRuntimeGlobals::wide_null(base_).address;
               wide_text = true;
               uint32_t p = text;
               while (most != 0) {
@@ -244,7 +249,7 @@ bool WideOutput::Run(int32_t* result) {
             // _cftof_l), with no buffer from the heap (precision 163 or
             // less) and no forced point ('#' with precision 0).
             if (type != 'f' || precision > 163 || ((flags & kAlternate) && precision == 0) ||
-                U32(kFloatTable + 24) != kCfltcvt) {
+                CfltcvtL() != kCfltcvt) {
               return false;
             }
             const uint32_t slot = NextSlot();

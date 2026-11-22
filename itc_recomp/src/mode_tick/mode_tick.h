@@ -19,19 +19,18 @@ namespace mode_tick {
 // --- The billboards' ring ---
 
 // The ring half (0 or 1) and the vertex count Billboards::BuildVertices
-// writes (docs/functions/sprites.md).
-constexpr uint32_t kRingHalf = 0x826A5098;
-constexpr uint32_t kRingCount = 0x826A509C;
+// writes (docs/functions/sprites.md): schema::ModeTickGlobals' ring_half and
+// ring_count.
 
 // sub_8209BD18 Billboards::FlipRing: the other half, its count 0.
 void BillboardsFlipRing(uint8_t* base);
 
 // --- The screen fades (two layers) ---
 
+// Their words are schema::ModeTickGlobals' fade_* (src/schema/mode_tick.h);
+// these three stay for other areas' code that reads them by address (to be
+// switched there).
 constexpr uint32_t kFadeOutDurations = 0x826A50AC;
-constexpr uint32_t kFadeInDurations = 0x826A50B4;
-constexpr uint32_t kFadeColors = 0x826A50BC;  // three words a layer
-constexpr uint32_t kFadeAlphas = 0x826A50D4;
 constexpr uint32_t kFadeInCounts = 0x826A50DC;
 constexpr uint32_t kFadeOutCounts = 0x826A50E4;
 
@@ -47,11 +46,10 @@ void ScreenFadesFadeIn(uint8_t* base, uint32_t passes, uint32_t red, uint32_t gr
 void ScreenFadesFadeOut(uint8_t* base, uint32_t passes, uint32_t red, uint32_t green,
                         uint32_t blue, uint32_t layer);
 
-// The two layers' sort keys (668 and 676, words in the image) and the camera
-// pass the color rectangles are recorded for (camera pass 0).
-constexpr uint32_t kFadeKeys = 0x82001BF4;
-constexpr uint32_t kFadeCameraPass = 0x826BAC00;
-// The color rectangle ScreenFades::Update builds in its frame (at the
+// The two layers' sort keys (668 and 676, words in the image: fade_keys) and
+// the camera pass the color rectangles are recorded for (camera pass 0:
+// fade_camera_pass).
+// The color rectangle (schema::ColorRect) ScreenFades::Update builds in its frame (at the
 // original's r1 less kScreenFadesUpdateFrame, + 112): an identity matrix at
 // +0, the kind +64 (0: flat), +72 = 2, x, y, width, height at +80 to +92,
 // the color's red, green, blue and alpha words at +96 to +108 (+76 not
@@ -87,7 +85,6 @@ uint32_t RecordScissorEndChunk(uint8_t* base, uint32_t list);
 // slot, which the adapter hands to the render queue at [0x826D83D0] (its
 // slot 4, with the key and 0.0); nullopt, with nothing done, where the
 // original's command list calls would print a message.
-constexpr uint32_t kColorRectLists = 0x826D83D0;
 std::optional<uint32_t> ColorRectRecordFlat(uint8_t* base, uint32_t rect);
 
 // --- The music ---
@@ -99,7 +96,6 @@ std::optional<uint32_t> ColorRectRecordFlat(uint8_t* base, uint32_t rect);
 // addresses the call through [0x826C5C80]'s slot 4 takes in r7 and r8 (the
 // adapter's guest call).
 constexpr uint32_t kMusicPlayFrame = 288;
-constexpr uint32_t kMusicPlayer = 0x826C5C80;
 struct MusicIds {
   uint32_t r7, r8;
 };
@@ -107,17 +103,17 @@ MusicIds MusicPlay(uint8_t* base, uint32_t pcr, uint32_t frame, uint32_t name);
 
 // --- The sign-in watch and the players ---
 
-// Player n's controller's user (four words), the signed-in users' mask
-// (written by Network::Update, docs/functions/system-services.md).
-constexpr uint32_t kPlayerUsers = 0x826BABA4;
+// Player n's controller's user (four words, player_users), the signed-in
+// users' mask (written by Network::Update, docs/functions/system-services.md;
+// signed_in_mask, kept here for other areas' code).
 constexpr uint32_t kSignedInMask = 0x826C7954;
 
 // sub_8209F658 Players::SignedInSlot: the player's user's index among the
 // signed-in users, or -1.
 int32_t PlayersSignedInSlot(uint8_t* base, uint32_t player);
 
-// The action mappers' entries (8 bytes each, four; action-mappers.md).
-constexpr uint32_t kActionMapperEntries = 0x826BAB80;
+// The action mappers' entries (8 bytes each, four; action-mappers.md):
+// action_mapper_entries.
 
 // sub_8209F318 ActionMappers::SetBlocked: each entry's +4 = value.
 void ActionMappersSetBlocked(uint8_t* base, uint32_t value);
@@ -125,12 +121,9 @@ void ActionMappersSetBlocked(uint8_t* base, uint32_t value);
 // --- The per-mode settings, set when a mode is made ---
 
 // The sign-in watch's seven checks a mode turns off (1 = off), its state
-// (0 to 9) and the reason its prompt was started for.
-constexpr uint32_t kChecks = 0x826BAB40;
-constexpr uint32_t kWatchState = 0x826BAB3C;
-constexpr uint32_t kWatchReason = 0x826BAB5C;
-constexpr uint32_t kOtherUserSignedIn = 0x826BAB68;
-constexpr uint32_t kUserSignedOut = 0x826BAB6C;
+// (0 to 9) and the reason its prompt was started for: schema::ModeTickGlobals'
+// checks (check_*), watch_state, watch_reason, other_user_signed_in,
+// user_signed_out.
 
 // sub_82106868 Modes::SetChecks: the checks by the new mode's type. Type 1
 // (the race) copies the current stage (Stages::Copy) into the original's
@@ -163,12 +156,8 @@ bool SignInWatchCheckIdle(uint8_t* base);
 bool SignInWatchCheckIdleTraps(uint8_t* base);
 
 // The user table's names (32-byte UTF-16, from +14, 32 bytes a slot;
-// Network::Update's), the last pass's signed-in count, mask and name.
-constexpr uint32_t kUserNames = 0x826C7670 + 14;
-constexpr uint32_t kSignedInCount = 0x826C7958;
-constexpr uint32_t kLastCount = 0x826BAB60;
-constexpr uint32_t kLastMask = 0x826BAB64;
-constexpr uint32_t kLastName = 0x826BAB1C;
+// Network::Update's: user_table), the last pass's signed-in count, mask and
+// name (last_count, last_mask, last_name).
 
 // sub_8209EEC8 SignInWatch::Update (with its switch's piece sub_8209F040):
 // the player's user compared with the last pass's, the mode's checks

@@ -3,6 +3,8 @@
 
 #include "guest.h"
 #include "hooks/native_entry.h"
+#include "schema/device_shaders.h"
+#include "schema/sprites.h"
 #include "lifted/originals.h"
 
 #include <bit>
@@ -31,11 +33,9 @@ bool SlotDiagnostics() {
          ITC_FLAG(log_recording_by_pass);
 }
 
-// The render queue (its vtable's slot 4 takes a recorded chunk) and the
-// command list the overlays record into.
-constexpr uint32_t kRenderQueue = 0x826C5D5C;
-constexpr uint32_t kOverlayList = 0x826C5D60;
-constexpr uint32_t kZero = 0x82000A34;  // the float 0.0, the chunk's depth
+// The render queue (its vtable's slot 4 takes a recorded chunk), the
+// command list the overlays record into and the 0.0 (the chunk's depth).
+using G = schema::SpritesGlobals;
 }  // namespace
 
 // SpriteList::Reset: r3 = a sprite list (500 sprites).
@@ -81,7 +81,7 @@ ITC_NATIVE_ENTRY(82129940, ITC_FLAG(native_sprites)) {
   float a[4], b[4];
   unpack(ctx.r3.u64, ctx.r4.u64, a);
   unpack(ctx.r5.u64, ctx.r6.u64, b);
-  ctx.r3.s64 = sprites::TurnSide(a, b, guest::LoadFloat(base, 0x82000A34));
+  ctx.r3.s64 = sprites::TurnSide(a, b, G::zero(base));
 }
 
 namespace {
@@ -94,18 +94,18 @@ bool RecordScreenRect(lifted::Regs& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint32_t layer = ctx.r5.u32;
   const std::optional<uint32_t> chunk =
-      sprites::RecordScreenRect(base, guest::LoadU32(base, kOverlayList), ctx.r3.u32);
+      sprites::RecordScreenRect(base, G::command_list(base), ctx.r3.u32);
   if (!chunk) {
     return false;
   }
   const uint64_t lr = ctx.lr;
   guest_call::InFrame(ctx, base, 272, 0x82129278, [&](uint32_t) {
-    const uint32_t queue = guest::LoadU32(base, kRenderQueue);
+    const uint32_t queue = G::render_queue(base);
     ctx.r3.u64 = queue;
     ctx.r4.u64 = *chunk;
     ctx.r5.u64 = layer;
-    ctx.f1.f64 = double(guest::LoadFloat(base, kZero));
-    lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, queue) + 16));
+    ctx.f1.f64 = double(G::zero(base));
+    lifted::CallFromContext(ctx, base, schema::RenderQueue(base, queue).vtable().add());
   });
   ctx.lr = lr;
   return true;

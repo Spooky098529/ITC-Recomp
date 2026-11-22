@@ -9,6 +9,8 @@
 #include "scene/scene.h"
 #include "second_set/point_groups.h"
 #include "second_set/points.h"
+#include "schema/car_draw.h"
+#include "schema/second_set.h"
 
 namespace second_set {
 
@@ -51,7 +53,7 @@ uint32_t PartsInitLeftDoor(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DF5B8 PartsPoints::InitLeftDoor");
   const uint32_t sp = stack - 112;
   Construct(base, group, 25, sp);
-  MatrixWs(base, group + 6016);
+  MatrixWs(base, schema::PartsPoints(base, group).door_matrix_address());
   PartsResetLeftDoor(base, group, sp);
   return group;
 }
@@ -60,7 +62,7 @@ uint32_t PartsInitRightDoor(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DF610 PartsPoints::InitRightDoor");
   const uint32_t sp = stack - 112;
   Construct(base, group, 25, sp);
-  MatrixWs(base, group + 6016);
+  MatrixWs(base, schema::PartsPoints(base, group).door_matrix_address());
   PartsResetRightDoor(base, group, sp);
   return group;
 }
@@ -69,7 +71,7 @@ uint32_t PartsInitHeadlights(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E1388 PartsPoints::InitHeadlights");
   const uint32_t sp = stack - 112;
   Construct(base, group, 13, sp);
-  MatrixWs(base, group + 3120);
+  MatrixWs(base, schema::PartsPoints(base, group).headlights_popup_matrix_address());
   PartsResetHeadlights(base, group, sp);
   return group;
 }
@@ -123,9 +125,10 @@ uint32_t PartsPointsConstruct(uint8_t* base, uint32_t block, uint32_t stack) {
 uint32_t PartsPointsReset(uint8_t* base, uint32_t block, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E00F0 PartsPoints::Reset");
   const uint32_t sp = stack - 112;
-  Store(base, block + 37088, Load(base, scene::kScene));
-  Store(base, block + 37076, 0);
-  Store(base, block + 37092, 0);
+  const schema::PartsPoints b(base, block);
+  b.set_scene(schema::SecondSetGlobals::scene<schema::View>(base));
+  b.set_car_record(0u);
+  b.set_skeleton(0u);
   PartsResetFrontBumper(base, block + 0, sp);
   ClearAndName(base, block + 2656, 0x82602620, sp);
   PartsResetRearBumper(base, block + 2896, sp);
@@ -150,62 +153,71 @@ uint32_t PartsPointsReset(uint8_t* base, uint32_t block, uint32_t stack) {
 uint32_t CockpitPointsConstruct(uint8_t* base, uint32_t block, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DC190 CockpitPoints::CockpitPoints");
   const uint32_t sp = stack - 128;
-  Construct(base, block + 0, 3, sp);
-  CockpitResetFenders(base, block + 0, sp);
-  Construct(base, block + 720, 2, sp);
-  CockpitResetCabin(base, block + 720, sp);
-  CockpitInitBonnet(base, block + 1200, sp);
-  Construct(base, block + 1440, 2, sp);
-  CockpitResetDoors(base, block + 1440, sp);
-  CockpitInitMirror(base, block + 1920, sp);
-  Construct(base, block + 2160, 8, sp);
-  CockpitResetHeadlights(base, block + 2160, sp);
+  const schema::SecondSetCockpitPoints b(base, block);
+  Construct(base, b.fenders_address(), 3, sp);
+  CockpitResetFenders(base, b.fenders_address(), sp);
+  Construct(base, b.cabin_address(), 2, sp);
+  CockpitResetCabin(base, b.cabin_address(), sp);
+  CockpitInitBonnet(base, b.bonnet_address(), sp);
+  Construct(base, b.doors_address(), 2, sp);
+  CockpitResetDoors(base, b.doors_address(), sp);
+  CockpitInitMirror(base, b.mirror_address(), sp);
+  Construct(base, b.headlights_address(), 8, sp);
+  CockpitResetHeadlights(base, b.headlights_address(), sp);
   return block;
 }
 
 uint32_t CockpitPointsReset(uint8_t* base, uint32_t block, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DBC10 CockpitPoints::Reset");
   const uint32_t sp = stack - 112;
-  CockpitResetFenders(base, block + 0, sp);
-  CockpitResetCabin(base, block + 720, sp);
-  ClearAndName(base, block + 1200, 0x8200524C, sp);
-  CockpitResetDoors(base, block + 1440, sp);
-  ClearAndName(base, block + 1920, 0x82005258, sp);
-  const uint32_t r3 = CockpitResetHeadlights(base, block + 2160, sp);
-  Store(base, block + 4080, 0);
+  const schema::SecondSetCockpitPoints b(base, block);
+  CockpitResetFenders(base, b.fenders_address(), sp);
+  CockpitResetCabin(base, b.cabin_address(), sp);
+  ClearAndName(base, b.bonnet_address(), 0x8200524C, sp);
+  CockpitResetDoors(base, b.doors_address(), sp);
+  ClearAndName(base, b.mirror_address(), 0x82005258, sp);
+  const uint32_t r3 = CockpitResetHeadlights(base, b.headlights_address(), sp);
+  b.set_word_4080(0);
   return r3;
 }
 
 uint32_t InteriorPointsConstruct(uint8_t* base, uint32_t block, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E4FD8 InteriorPoints::InteriorPoints");
   const uint32_t sp = stack - 128;
-  InteriorInitBody(base, block + 0, sp);
-  Construct(base, block + 240 + 16, 12, sp);
-  InteriorResetDials(base, block + 240, sp);
-  Construct(base, block + 3152 + 16, 22, sp);
-  InteriorResetMeters(base, block + 3152, sp);
-  Construct(base, block + 8512 + 16, 4, sp);
-  InteriorResetSteering(base, block + 8512, sp);
-  Construct(base, block + 9488 + 16, 4, sp);
-  InteriorResetSeats(base, block + 9488, sp);
-  Construct(base, block + 10464 + 16, 4, sp);
-  InteriorResetRollCage(base, block + 10464, sp);
+  const schema::SecondSetInteriorPoints b(base, block);
+  // A group's records at its +16.
+  auto records = [&](uint32_t group) {
+    return schema::SecondSetInteriorPoints(base, group).group_records_address();
+  };
+  InteriorInitBody(base, b.body_address(), sp);
+  Construct(base, records(b.dials_address()), 12, sp);
+  InteriorResetDials(base, b.dials_address(), sp);
+  Construct(base, records(b.meters_address()), 22, sp);
+  InteriorResetMeters(base, b.meters_address(), sp);
+  Construct(base, records(b.steering_address()), 4, sp);
+  InteriorResetSteering(base, b.steering_address(), sp);
+  Construct(base, records(b.seats_address()), 4, sp);
+  InteriorResetSeats(base, b.seats_address(), sp);
+  Construct(base, records(b.roll_cage_address()), 4, sp);
+  InteriorResetRollCage(base, b.roll_cage_address(), sp);
   return block;
 }
 
 uint32_t InteriorPointsReset(uint8_t* base, uint32_t block, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E35D8 InteriorPoints::Reset");
   const uint32_t sp = stack - 96;
-  for (const uint32_t at : {11440u, 11444u, 11448u, 11452u}) {
-    Store(base, block + at, 0);
-  }
-  Store(base, block + 11456, 1);
-  ClearAndName(base, block + 0, 0x82602864, sp);
-  InteriorResetDials(base, block + 240, sp);
-  InteriorResetMeters(base, block + 3152, sp);
-  InteriorResetSteering(base, block + 8512, sp);
-  InteriorResetSeats(base, block + 9488, sp);
-  return InteriorResetRollCage(base, block + 10464, sp);
+  const schema::SecondSetInteriorPoints b(base, block);
+  b.set_seat_position_source(0);
+  b.set_record(0u);
+  b.set_skeleton(0);
+  b.set_cockpit(0);
+  b.set_accessory_shown(1);
+  ClearAndName(base, b.body_address(), 0x82602864, sp);
+  InteriorResetDials(base, b.dials_address(), sp);
+  InteriorResetMeters(base, b.meters_address(), sp);
+  InteriorResetSteering(base, b.steering_address(), sp);
+  InteriorResetSeats(base, b.seats_address(), sp);
+  return InteriorResetRollCage(base, b.roll_cage_address(), sp);
 }
 
 uint32_t LightPointsConstruct(uint8_t* base, uint32_t block, uint32_t stack) {
@@ -247,7 +259,7 @@ uint32_t TrafficPointsConstruct(uint8_t* base, uint32_t block, uint32_t stack) {
 uint32_t TrafficPointsReset(uint8_t* base, uint32_t block, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E5880 TrafficPoints::Reset");
   const uint32_t sp = stack - 96;
-  Store(base, block + 0, 0);
+  schema::TrafficPoints(base, block).set_word_0(0u);
   TrafficResetBody(base, block + 16, sp);
   TrafficResetHeadlights(base, block + 1472, sp);
   return TrafficResetTailLights(base, block + 3152, sp);
@@ -272,55 +284,70 @@ uint32_t InitWheelsGroup(uint8_t* base, uint32_t group, uint32_t records, uint32
 
 uint32_t WheelsInitTire(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E8A80 WheelPoints::InitTire");
-  return InitWheelsGroup(base, group, group + 368, 6, group + 1808, stack, WheelsResetTire);
+  const schema::SecondSetWheelPoints g(base, group);
+  return InitWheelsGroup(base, group, g.tire_records_address(), 6, g.tire_rows_address(), stack,
+                         WheelsResetTire);
 }
 
 uint32_t WheelsInitRimA(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E99C0 WheelPoints::InitRimA");
-  return InitWheelsGroup(base, group, group + 32, 7, group + 1712, stack, WheelsResetRimA);
+  const schema::SecondSetWheelPoints g(base, group);
+  return InitWheelsGroup(base, group, g.group_records_address(), 7, g.rim_rows_address(), stack,
+                         WheelsResetRimA);
 }
 
 uint32_t WheelsInitRimB(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820EA8E8 WheelPoints::InitRimB");
-  return InitWheelsGroup(base, group, group + 32, 7, group + 1712, stack, WheelsResetRimB);
+  const schema::SecondSetWheelPoints g(base, group);
+  return InitWheelsGroup(base, group, g.group_records_address(), 7, g.rim_rows_address(), stack,
+                         WheelsResetRimB);
 }
 
 uint32_t WheelsInitBrakes(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820EB320 WheelPoints::InitBrakes");
-  return InitWheelsGroup(base, group, group + 32, 12, group + 2912, stack, WheelsResetBrakes);
+  const schema::SecondSetWheelPoints g(base, group);
+  return InitWheelsGroup(base, group, g.group_records_address(), 12, g.brake_rows_address(), stack,
+                         WheelsResetBrakes);
 }
 
 uint32_t WheelPointsConstruct(uint8_t* base, uint32_t block, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820ECC48 WheelPoints::WheelPoints");
   const uint32_t sp = stack - 96;
-  WheelsInitTire(base, block + 32, sp);
-  WheelsInitTire(base, block + 1872, sp);
-  WheelsInitRimA(base, block + 3712, sp);
-  WheelsInitRimA(base, block + 5456, sp);
-  WheelsInitRimB(base, block + 7200, sp);
-  WheelsInitRimB(base, block + 8944, sp);
-  WheelsInitBrakes(base, block + 10688, sp);
-  WheelsInitBrakes(base, block + 13632, sp);
+  const schema::SecondSetWheelPoints b(base, block);
+  WheelsInitTire(base, b.front_tire_address(), sp);
+  WheelsInitTire(base, b.rear_tire_address(), sp);
+  WheelsInitRimA(base, b.rim_a_front_address(), sp);
+  WheelsInitRimA(base, b.rim_a_rear_address(), sp);
+  WheelsInitRimB(base, b.rim_b_front_address(), sp);
+  WheelsInitRimB(base, b.rim_b_rear_address(), sp);
+  WheelsInitBrakes(base, b.brakes_front_address(), sp);
+  WheelsInitBrakes(base, b.brakes_rear_address(), sp);
   return block;
 }
 
 uint32_t WheelPointsReset(uint8_t* base, uint32_t block, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E85C8 WheelPoints::Reset");
   const uint32_t sp = stack - 112;
-  for (uint32_t at = 0; at <= 24; at += 4) {
-    Store(base, block + at, 0);
-  }
-  WheelsResetTire(base, block + 32, sp);
-  WheelsResetTire(base, block + 1872, sp);
-  WheelsResetRimA(base, block + 3712, sp);
-  WheelsResetRimA(base, block + 5456, sp);
-  WheelsResetRimB(base, block + 7200, sp);
-  WheelsResetRimB(base, block + 8944, sp);
-  WheelsResetBrakes(base, block + 10688, sp);
-  const uint32_t r3 = WheelsResetBrakes(base, block + 13632, sp);
-  for (const uint32_t at : {2172u, 5468u, 8956u, 13644u}) {
-    Store(base, block + at, 0);
-  }
+  const schema::SecondSetWheelPoints b(base, block);
+  b.set_car_model(0);
+  b.set_car_record(0u);
+  b.set_wheels_record(0u);
+  b.set_word_12(0);
+  b.set_word_16(0);
+  b.set_word_20(0);
+  b.set_brake_model(0);
+  WheelsResetTire(base, b.front_tire_address(), sp);
+  WheelsResetTire(base, b.rear_tire_address(), sp);
+  WheelsResetRimA(base, b.rim_a_front_address(), sp);
+  WheelsResetRimA(base, b.rim_a_rear_address(), sp);
+  WheelsResetRimB(base, b.rim_b_front_address(), sp);
+  WheelsResetRimB(base, b.rim_b_rear_address(), sp);
+  WheelsResetBrakes(base, b.brakes_front_address(), sp);
+  const uint32_t r3 = WheelsResetBrakes(base, b.brakes_rear_address(), sp);
+  b.set_rear_tire_front(0);
+  b.set_rim_a_rear_front(0);
+  b.set_rim_b_rear_front(0);
+  b.set_brakes_rear_front(0);
   return r3;
 }
 

@@ -13,6 +13,8 @@
 #include "guest.h"
 #include "location_screen/internal.h"
 #include "mode_tick/mode_tick.h"
+#include "schema/career.h"
+#include "schema/race_event.h"
 #include "ui_movies/game.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -34,15 +36,15 @@ uint32_t ResetMovie(uint8_t* base, uint32_t sp, const Calls& calls) {
   calls.Call(kFinishAll, frame, 0x8222CDE8, movie);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   SetText(base, calls, frame, movie, 0xFFFFFFFFu, 35,
-          guest::LoadU32(base, Screen(base) + 852) + 369);
-  SetText(base, calls, frame, movie, 0xFFFFFFFFu, 36, guest::LoadU32(base, save + 6104) + 128);
+          Screen(base).location_index() + 369);
+  SetText(base, calls, frame, movie, 0xFFFFFFFFu, 36, schema::SaveData(base, save).mode() + 128);
   for (uint32_t i = 0; i < 5; i++) {
     SetText(base, calls, frame, movie, 9, guest::LoadU32(base, frame + 128 + 4 * i),
             guest::LoadU32(base, frame + 96 + 4 * i));
   }
-  const uint32_t menu = guest::LoadU32(base, kMenu);
-  if (guest::LoadU32(base, Screen(base) + 892) == 0 || int32_t(guest::LoadU32(base, menu)) != 2) {
-    PlayNamed(base, movie, guest::LoadU32(base, menu) + 13);
+  const schema::FrontEndMenu menu = G::menu(base);
+  if (Screen(base).special_car() == 0 || int32_t(menu.cursor()) != 2) {
+    PlayNamed(base, movie, menu.cursor() + 13);
     LoopLast(base, frame, movie);
   }
   return ShowPictures(base, frame);
@@ -78,22 +80,24 @@ uint32_t ShowUnlockEntry(uint8_t* base, uint32_t sp, const Calls& calls) {
   guest::StoreU32(base, frame, sp);
   const uint32_t movie = Movie(base, frame, kMenusMovie);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const uint32_t list = save + 0x1C778;
-  const uint32_t n = guest::LoadU32(base, Screen(base) + 868);
-  if (n >= guest::LoadU32(base, list + 768)) {
+  const schema::SaveData save_data(base, save);
+  const uint32_t list = save_data.unlocks_shown_address();
+  const uint32_t n = Screen(base).unlock_position();
+  if (n >= save_data.unlocks_shown_count()) {
     return save;
   }
   const uint32_t entry = n * 12 + list;
-  const uint32_t e56 =
-      data_tables::Entry56(base, guest::LoadU32(base, entry + 4), guest::LoadU32(base, entry + 8));
-  guest::StoreU32(base, Screen(base) + 876, guest::LoadU32(base, entry + 4));
-  guest::StoreU32(base, Screen(base) + 872, guest::LoadU32(base, entry + 8));
-  SetText(base, calls, frame, movie, 4, 1, guest::LoadU32(base, e56 + 12) + 4650);
+  const schema::CareerEntry56 e56(
+      base,
+      data_tables::Entry56(base, guest::LoadU32(base, entry + 4), guest::LoadU32(base, entry + 8)));
+  Screen(base).set_entry_table(guest::LoadU32(base, entry + 4));
+  Screen(base).set_entry_offset(guest::LoadU32(base, entry + 8));
+  SetText(base, calls, frame, movie, 4, 1, e56.text() + 4650);
   SetText(base, calls, frame, movie, 4, 2, guest::LoadU32(base, entry + 8) + 6683);
-  SetPictureTexture(base, movie, 6, 1, PictureA(base, guest::LoadU32(base, e56 + 16)));
-  SetPictureTexture(base, movie, 6, 0, PictureB(base, guest::LoadU32(base, e56 + 16)));
-  const uint32_t screen = Screen(base);
-  guest::StoreU32(base, screen + 868, guest::LoadU32(base, screen + 868) + 1);
+  SetPictureTexture(base, movie, 6, 1, PictureA(base, e56.image()));
+  SetPictureTexture(base, movie, 6, 0, PictureB(base, e56.image()));
+  const schema::LocationScreen screen = Screen(base);
+  screen.set_unlock_position(screen.unlock_position() + 1);
   if (Required(ui_movies::HasMoreText(base, movie, 4, 2), "sub_8211D8D8") != 0) {
     return ShowNode(base, movie, 4, 0);
   }
@@ -121,14 +125,14 @@ uint32_t Transition25(uint8_t* base, uint32_t sp, uint32_t step, const Calls& ca
   if (uint32_t(Run(calls, frame, 0x8222D298, movie)) != 0) {
     return 0;
   }
-  const uint32_t pages = guest::LoadU32(base, kPages);
-  const uint32_t page = guest::LoadU32(base, pages);
+  const schema::PageObject pages = G::pages(base);
+  const uint32_t page = pages.page();
   if (int32_t(page) != 13) {
-    guest::StoreU32(base, pages + 8, page);
+    pages.set_previous_page(page);
   }
-  guest::StoreU32(base, pages + 12, 0xFFFFFFFFu);
-  guest::StoreU32(base, pages + 0, 13);
-  guest::StoreU32(base, pages + 16, 0xFFFFFFFFu);
+  pages.set_step(0xFFFFFFFFu);
+  pages.set_page(13);
+  pages.set_queued_step(0xFFFFFFFFu);
   return 1;
 }
 
@@ -138,7 +142,7 @@ uint32_t ShowListEntry(uint8_t* base, uint32_t sp, const Calls& calls) {
   guest::StoreU32(base, frame, sp);
   const uint32_t movie = Movie(base, frame, kMenusMovie);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const uint32_t record = guest::LoadU32(base, Screen(base) + 852) * 100 + save + 0x1AD20;
+  const uint32_t record = Screen(base).location_index() * 100 + save + 0x1AD20;
   Copy(base, calls, frame, 0x8222B0A8, frame + 96, record, 100);
   uint32_t r3 = 0;
   for (uint32_t k = 0; k < 8; k++) {
@@ -150,21 +154,21 @@ uint32_t ShowListEntry(uint8_t* base, uint32_t sp, const Calls& calls) {
   for (uint32_t i = 0; i < count; i++) {
     const uint32_t table = guest::LoadU32(base, frame + 100 + 12 * i);
     const uint32_t index = guest::LoadU32(base, frame + 104 + 12 * i);
-    const uint32_t e56 = data_tables::Entry56(base, table, index);
+    const schema::CareerEntry56 e56(base, data_tables::Entry56(base, table, index));
     const uint32_t flags = ((table * 192 + index + 27614) << 2) + save;
     const bool hidden = guest::LoadU32(base, flags) == 2;
     ShowNode(base, movie, 10, 5 + i);
     ShowNode(base, movie, 0xFFFFFFFFu, 27 + i);
-    if (i == guest::LoadU32(base, guest::LoadU32(base, kListMenu))) {
-      SetPictureTexture(base, movie, 6, 1, PictureA(base, guest::LoadU32(base, e56 + 16)));
-      SetPictureTexture(base, movie, 6, 0, PictureB(base, guest::LoadU32(base, e56 + 16)));
+    if (i == G::list_menu(base).cursor()) {
+      SetPictureTexture(base, movie, 6, 1, PictureA(base, e56.image()));
+      SetPictureTexture(base, movie, 6, 0, PictureB(base, e56.image()));
     }
     if (hidden) {
       HideNode(base, movie, 0xFFFFFFFFu, 19 + i);
     } else {
       ShowNode(base, movie, 0xFFFFFFFFu, 19 + i);
     }
-    r3 = SetText(base, calls, frame, movie, 10, 5 + i, guest::LoadU32(base, e56 + 12) + 4650);
+    r3 = SetText(base, calls, frame, movie, 10, 5 + i, e56.text() + 4650);
   }
   return r3;
 }
@@ -180,27 +184,27 @@ uint32_t Transition2(uint8_t* base, uint32_t sp, uint32_t step, const Calls& cal
   if (guest::LoadU32(base, step) == 0) {
     FinishNamed(calls, frame, 0x8222D67C, movie, 24);
     FinishNamed(calls, frame, 0x8222D688, movie, 23);
-    uint32_t menu = guest::LoadU32(base, kMenu);
-    const int32_t cursor = int32_t(guest::LoadU32(base, menu));
-    const int32_t previous = int32_t(guest::LoadU32(base, menu + 4));
+    schema::FrontEndMenu menu = G::menu(base);
+    const int32_t cursor = int32_t(menu.cursor());
+    const int32_t previous = int32_t(menu.previous());
     if (previous == 0 && cursor == 4) {
       SetCursor(base, frame, 160);
     } else if (cursor == 0 && previous == 4) {
       SetCursor(base, frame, 0);
     } else {
-      const int32_t moved = int32_t(guest::LoadU32(base, menu + 8));
+      const int32_t moved = int32_t(menu.moved());
       if (moved == 1) {
         PlayNamed(base, movie, 24);
       } else if (moved == -1) {
         PlayNamed(base, movie, 23);
       }
     }
-    menu = guest::LoadU32(base, kMenu);
-    const uint32_t named = guest::LoadU32(base, menu) + 13;
-    FinishNamed(calls, frame, 0x8222D724, movie, guest::LoadU32(base, menu + 4) + 13);
-    menu = guest::LoadU32(base, kMenu);
-    if (int32_t(guest::LoadU32(base, Screen(base) + 892)) == 1 &&
-        int32_t(guest::LoadU32(base, menu)) == 2) {
+    menu = G::menu(base);
+    const uint32_t named = menu.cursor() + 13;
+    FinishNamed(calls, frame, 0x8222D724, movie, menu.previous() + 13);
+    menu = G::menu(base);
+    if (int32_t(Screen(base).special_car()) == 1 &&
+        int32_t(menu.cursor()) == 2) {
       PlayNamed(base, movie, 37);
       FinishNamed(calls, frame, 0x8222D770, movie, 37);
       PlayNamed(base, movie, 38, 1, 1);
@@ -208,7 +212,7 @@ uint32_t Transition2(uint8_t* base, uint32_t sp, uint32_t step, const Calls& cal
       SetText(base, calls, frame, movie, 0, 0, 588);
     } else {
       const uint32_t text =
-          guest::LoadU32(base, frame + 96 + ((guest::LoadU32(base, menu) << 2) & 0xFFFFFFFCu));
+          guest::LoadU32(base, frame + 96 + ((menu.cursor() << 2) & 0xFFFFFFFCu));
       SetText(base, calls, frame, movie, 0, 0, text);
       PlayNamed(base, movie, named);
       LoopLast(base, frame, movie);
@@ -231,12 +235,21 @@ uint32_t Transition14(uint8_t* base, uint32_t sp, uint32_t step, const Calls& ca
       guest::StoreU32(base, frame + 104 + 4 * i, 5 + i);
     }
     // The confirm menu reset: 3 items (+16 = 2, +20 = 1, the rest 0).
-    const uint32_t menu = guest::LoadU32(base, kConfirmMenu);
-    for (uint32_t offset : {12u, 0u, 4u, 8u, 40u, 48u, 52u, 36u, 64u, 24u, 28u, 32u}) {
-      guest::StoreU32(base, menu + offset, 0);
-    }
-    guest::StoreU32(base, menu + 16, 2);
-    guest::StoreU32(base, menu + 20, 1);
+    const schema::FrontEndMenu menu = G::confirm_menu(base);
+    menu.set_first_item(0);
+    menu.set_cursor(0);
+    menu.set_previous(0);
+    menu.set_moved(0);
+    menu.set_wrapped(0);
+    menu.set_visible_row(0);
+    menu.set_previous_row(0);
+    menu.set_side(0);
+    menu.set_player(0);
+    menu.set_up_down_locked(0);
+    menu.set_left_right_steps(0);
+    menu.set_shoulders_step(0);
+    menu.set_last_item(2);
+    menu.set_wraps(1);
     for (uint32_t i = 0; i < 3; i++) {
       SetText(base, calls, frame, movie, 9, guest::LoadU32(base, frame + 104 + 4 * i),
               guest::LoadU32(base, frame + 88 + 4 * i));
@@ -276,27 +289,27 @@ uint32_t Transition16(uint8_t* base, uint32_t sp, uint32_t step, const Calls& ca
   if (guest::LoadU32(base, step) == 0) {
     FinishNamed(calls, frame, 0x8222E91C, movie, 23);
     FinishNamed(calls, frame, 0x8222E928, movie, 24);
-    uint32_t menu = guest::LoadU32(base, kConfirmMenu);
-    const int32_t cursor = int32_t(guest::LoadU32(base, menu));
-    const int32_t previous = int32_t(guest::LoadU32(base, menu + 4));
+    schema::FrontEndMenu menu = G::confirm_menu(base);
+    const int32_t cursor = int32_t(menu.cursor());
+    const int32_t previous = int32_t(menu.previous());
     if (previous == 0 && cursor == 2) {
       SetCursor(base, frame, 80);
     } else if (cursor == 0 && previous == 2) {
       SetCursor(base, frame, 0);
     } else {
-      const int32_t moved = int32_t(guest::LoadU32(base, menu + 8));
+      const int32_t moved = int32_t(menu.moved());
       if (moved == 1) {
         PlayNamed(base, movie, 24);
       } else if (moved == -1) {
         PlayNamed(base, movie, 23);
       }
     }
-    menu = guest::LoadU32(base, kConfirmMenu);
-    const uint32_t finished = guest::LoadU32(base, menu + 4) + 13;
-    const uint32_t named = guest::LoadU32(base, menu) + 13;
+    menu = G::confirm_menu(base);
+    const uint32_t finished = menu.previous() + 13;
+    const uint32_t named = menu.cursor() + 13;
     const uint32_t card = HasCard(base, calls, frame, 0x8222E9C0);
-    menu = guest::LoadU32(base, kConfirmMenu);
-    const uint32_t at = (guest::LoadU32(base, menu) << 2) & 0xFFFFFFFCu;
+    menu = G::confirm_menu(base);
+    const uint32_t at = (menu.cursor() << 2) & 0xFFFFFFFCu;
     guest::StoreU32(base, frame + 88, 579);
     uint32_t text;
     if (card != 0) {
@@ -311,7 +324,7 @@ uint32_t Transition16(uint8_t* base, uint32_t sp, uint32_t step, const Calls& ca
       guest::StoreU32(base, frame + 96, 581);
       text = guest::LoadU32(base, frame + 88 + at);
       FinishNamed(calls, frame, 0x8222EA40, movie, finished);
-      if (int32_t(guest::LoadU32(base, guest::LoadU32(base, kConfirmMenu))) != 1) {
+      if (int32_t(G::confirm_menu(base).cursor()) != 1) {
         PlayNamed(base, movie, named);
         LoopLast(base, frame, movie);
       }

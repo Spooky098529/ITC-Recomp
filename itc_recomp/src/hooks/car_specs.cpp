@@ -16,6 +16,8 @@
 // Tire::InchUp sub_820C46B8) have none: only its plain C++ calls them.
 
 #include "guest.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -25,6 +27,7 @@
 #include "hooks/archive.h"
 #include "hooks/heap.h"
 #include "lifted/sdk.h"
+#include "schema/car_specs.h"
 
 ITC_FLAG_BOOL(native_car_specs, true, "ITC",
               "Run the car parameter tables (docs/functions/car-specs.md: the loads' "
@@ -53,7 +56,7 @@ namespace {
 // The archive's TOC for an asset (r3 = the id): the guest function.
 uint32_t Toc(lifted::Regs& ctx, uint8_t* base, uint32_t id) {
   ctx.r3.u64 = id;
-  lifted::CallFromContext(ctx, base, 0x8209D868);
+  lifted::Enter(ctx, base, game::Archive::Toc);
   return ctx.r3.u32;
 }
 
@@ -108,7 +111,8 @@ ITC_NATIVE_ENTRY_ALWAYS(820C9E00) {
   uint32_t parts[9];
   GetCarParts(base, ctx.r4.u32, parts);
   for (uint32_t i = 0; i < 9; i++) {
-    guest::StoreU32(base, ctx.r3.u32 + 4 * i, parts[i]);
+    guest::StoreU32(base, schema::CarPartTables(base, ctx.r3.u32).table74_address() + 4 * i,
+                    parts[i]);
   }
 }
 
@@ -121,7 +125,8 @@ ITC_NATIVE_ENTRY_ALWAYS(820C9E00) {
     ITC_CAR_SPECS_FALLBACK(address)                                    \
     uint32_t parts[9];                                                 \
     for (uint32_t i = 0; i < 9; i++) {                                 \
-      parts[i] = guest::LoadU32(base, ctx.r4.u32 + 4 * i);             \
+      parts[i] = guest::LoadU32(                                       \
+          base, schema::CarPartTables(base, ctx.r4.u32).table74_address() + 4 * i); \
     }                                                                  \
     if (!function(base, ctx.r3.u32, parts, ctx.r5.s32)) {              \
       lifted::original::c##address(ctx, base);                    \

@@ -11,6 +11,13 @@
 #include "graphics/video_output.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "schema/car_draw.h"
+#include "schema/command_list.h"
+#include "schema/course_scenery.h"
+#include "schema/graphics_resources.h"
+#include "schema/post_effects.h"
+#include "schema/race_update.h"
+#include "schema/screen_objects.h"
 
 #include <bit>
 #include <cmath>
@@ -18,6 +25,9 @@
 namespace post_effects {
 
 namespace {
+
+using G = schema::PostEffectsGlobals;
+using schema::PostEffect;
 
 // The single-precision constants the originals load (lfs): read from the
 // image, as they do.
@@ -33,15 +43,15 @@ void StoreSingle(uint8_t* base, uint32_t address, double value) {
 
 uint32_t Get(uint8_t* base, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_82133AE8 PostEffects::Get");
-  return guest::LoadU32(base, kEffects + (index << 2));
+  return guest::LoadU32(base, G::effects_address() + (index << 2));
 }
 
 void MarkUpdated(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82133A08 PostEffects::MarkUpdated");
   for (uint32_t i = 0; i < kCount; i++) {
-    const uint32_t effect = guest::LoadU32(base, kEffects + 4 * i);
+    const uint32_t effect = guest::LoadU32(base, G::effects_address() + 4 * i);
     if (effect != 0) {
-      guest::StoreU32(base, effect + 48, 1);
+      PostEffect(base, effect).set_updated(1);
     }
   }
 }
@@ -49,32 +59,38 @@ void MarkUpdated(uint8_t* base) {
 void ToggleNoHistory(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82133A38 PostEffects::ToggleNoHistory");
   for (uint32_t i = 0; i < kCount; i++) {
-    const uint32_t effect = guest::LoadU32(base, kEffects + 4 * i);
+    const uint32_t effect = guest::LoadU32(base, G::effects_address() + 4 * i);
     if (effect != 0) {
-      guest::StoreU32(base, effect + 44, guest::LoadU32(base, effect + 44) == 0 ? 1 : 0);
+      const PostEffect e(base, effect);
+      e.set_no_history(e.no_history() == 0 ? 1 : 0);
     }
   }
 }
 
 void ToggleScreenObjectHidden(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_8212EDE0 ScreenObject::ToggleHidden");
-  guest::StoreU8(base, object + 25, guest::LoadU8(base, object + 25) == 0 ? 1 : 0);
+  const schema::ScreenObject screen(base, object);
+  screen.set_hidden(screen.hidden() == 0 ? 1 : 0);
 }
 
 uint32_t ToggleRaceEffects(uint8_t* base, uint32_t race) {
   ITC_NATIVE_RUNNING("sub_8215B690 Race::ToggleEffects");
+  const schema::RaceScene scene_object(base, race);
   uint32_t r3 = 0;
+  // The race's screen object, then split screen's two (+31152 to +31160).
   for (uint32_t i = 0; i < 3; i++) {
-    r3 = guest::LoadU32(base, race + 31152 + 4 * i);
+    r3 = i == 0   ? scene_object.screen_object().address
+         : i == 1 ? scene_object.screen_object_first().address
+                  : scene_object.screen_object_second().address;
     if (r3 != 0) {
       ToggleScreenObjectHidden(base, r3);
     }
   }
   ToggleNoHistory(base);
-  const uint32_t scenery = guest::LoadU32(base, 0x826C551C);
-  guest::StoreU32(base, scenery + 196, guest::LoadU32(base, scenery + 196) ^ 0x4000u);
-  const uint32_t scene = guest::LoadU32(base, 0x826C2E44);
-  guest::StoreU32(base, scene + 5048, guest::LoadU32(base, scene + 5048) == 0 ? 1 : 0);
+  const schema::Scenery scenery = G::scenery<schema::Scenery>(base);
+  scenery.set_mask(scenery.mask() ^ 0x4000u);
+  const schema::CarScene scene = G::scene<schema::CarScene>(base);
+  scene.set_blink_timers_held(scene.blink_timers_held() == 0 ? 1 : 0);
   return r3;
 }
 
@@ -82,12 +98,12 @@ uint32_t DestroyRace(uint8_t* base, const std::function<uint32_t(uint32_t, uint3
   ITC_NATIVE_RUNNING("sub_82133A70 PostEffects::DestroyRace");
   uint32_t r3 = 0;
   for (uint32_t i = 0; i < kCount; i++) {
-    const uint32_t at = kEffects + 4 * i;
+    const uint32_t at = G::effects_address() + 4 * i;
     r3 = guest::LoadU32(base, at);
-    if (r3 == 0 || (guest::LoadU32(base, r3 + 32) & 4) != 0) {
+    if (r3 == 0 || (PostEffect(base, r3).flags() & 4) != 0) {
       continue;
     }
-    const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, r3) + 4);
+    const uint32_t function = PostEffect(base, r3).vtable().destroy();
     r3 = destroy(function, r3);
     guest::StoreU32(base, at, 0);
   }
@@ -127,20 +143,22 @@ void GlowSetFromSpeed(uint8_t* base, uint32_t glow, double speed,
   } else if (t > one) {
     t = one;
   }
-  auto slot = [&](uint32_t byte) {
-    return guest::LoadU32(base, guest::LoadU32(base, glow) + byte);
-  };
-  set(slot(8), double(float(-std::fma(t, Constant(base, 0x82002A64), -one))));
-  set(slot(24), double(float(std::fma(t, Constant(base, 0x82002574), Constant(base, 0x82008830)))));
-  set(slot(32), double(float(std::fma(t, Constant(base, 0x82008840), Constant(base, 0x82008834)))));
+  const schema::Glow g(base, glow);
+  set(g.vtable().c33_x_second_setter(),
+      double(float(-std::fma(t, Constant(base, 0x82002A64), -one))));
+  set(g.vtable().strength_setter(),
+      double(float(std::fma(t, Constant(base, 0x82002574), Constant(base, 0x82008830)))));
+  set(g.vtable().history_weight_setter(),
+      double(float(std::fma(t, Constant(base, 0x82008840), Constant(base, 0x82008834)))));
 }
 
 void ColorFilterSetColor0(uint8_t* base, uint32_t filter, double r, double g, double b) {
   ITC_NATIVE_RUNNING("sub_821350F8 ColorFilter::SetColor0");
-  StoreSingle(base, filter + 8080, r);
-  StoreSingle(base, filter + 8084, g);
-  StoreSingle(base, filter + 8088, b);
-  StoreSingle(base, filter + 8092, Constant(base, 0x82000A34));
+  const schema::ColorFilter f(base, filter);
+  f.set_color0_r(float(r));
+  f.set_color0_g(float(g));
+  f.set_color0_b(float(b));
+  f.set_color0_a(float(Constant(base, 0x82000A34)));
 }
 
 void ColorFilterSet(uint8_t* base, uint32_t filter, uint32_t offset, double value) {
@@ -164,8 +182,9 @@ constexpr uint32_t kZero = 0x82000A34;  // 0.0
 // slots used then below the capacity); the last is the largest unless the
 // count wraps, which is left to the original too.
 bool Room(uint8_t* base, uint32_t list, uint32_t slots) {
-  const uint32_t used = guest::LoadU32(base, list + 12);
-  return used + slots < guest::LoadU32(base, list + 8) && used + slots >= used;
+  const schema::CommandList commands(base, list);
+  const uint32_t used = commands.used();
+  return used + slots < commands.capacity() && used + slots >= used;
 }
 
 uint32_t Slot(uint8_t* base, uint32_t list) {
@@ -310,14 +329,15 @@ std::optional<uint32_t> RecordTexelSize(uint8_t* base, uint32_t list, double wid
 uint32_t AddQuad(uint8_t* base, uint32_t effect, uint32_t width, uint32_t height, double value,
                  bool at_view) {
   ITC_NATIVE_RUNNING("sub_82133E30 PostEffect::AddQuad");
-  const uint64_t buffer = guest::LoadU32(base, effect + 8060);
-  const uint64_t used = guest::LoadU32(base, effect + 8056);
-  guest::StoreU32(base, effect + 8056, uint32_t(used + 3));
-  const uint32_t v = uint32_t((buffer * 100 + used) * 40 + effect + 56);
+  const PostEffect e(base, effect);
+  const uint64_t buffer = e.vertex_buffer();
+  const uint64_t used = e.vertex_count();
+  e.set_vertex_count(uint32_t(used + 3));
+  const uint32_t v = uint32_t((buffer * 100 + used) * 40 + e.vertices_address());
   uint32_t x = 0, y = 0;
   if (at_view) {
-    x = guest::LoadU32(base, effect + 24);
-    y = guest::LoadU32(base, effect + 28);
+    x = e.x();
+    y = e.y();
   }
   const double one = Constant(base, kOne);
   const double zero = Constant(base, kZero);
@@ -358,12 +378,11 @@ std::optional<uint32_t> RecordResolve(uint8_t* base, uint32_t effect, uint32_t l
   guest::StoreU32(base, item + 0, 2);
   if (by_view) {
     guest::StoreU32(base, item + 0, 3);
-    guest::StoreU32(base, item + 8, guest::LoadU32(base, effect + 24));
-    guest::StoreU32(base, item + 12, guest::LoadU32(base, effect + 28));
-    guest::StoreU32(base, item + 16,
-                    guest::LoadU32(base, effect + 16) + guest::LoadU32(base, effect + 24));
-    guest::StoreU32(base, item + 20,
-                    guest::LoadU32(base, effect + 20) + guest::LoadU32(base, effect + 28));
+    const PostEffect e(base, effect);
+    guest::StoreU32(base, item + 8, e.x());
+    guest::StoreU32(base, item + 12, e.y());
+    guest::StoreU32(base, item + 16, e.width() + e.x());
+    guest::StoreU32(base, item + 20, e.height() + e.y());
   }
   guest::StoreU32(base, item + 4, flags);
   guest::StoreU32(base, item + 24, texture);
@@ -385,43 +404,58 @@ std::optional<uint32_t> RecordResolve(uint8_t* base, uint32_t effect, uint32_t l
 
 namespace {
 
-// An lfs then stfs of a constant: its bits through a double, as the
-// originals copy them.
-void CopySingle(uint8_t* base, uint32_t to, uint32_t from) {
-  StoreSingle(base, to, Constant(base, from));
+// An lfs of a constant, as the value a view's setter stores (stfs): its
+// bits through a double, as the originals copy them.
+float Single(uint8_t* base, uint32_t from) {
+  return float(Constant(base, from));
+}
+// A single read through a view, copied the same way (through a double).
+float Single(float value) {
+  return float(double(value));
 }
 
 }  // namespace
 
 void GlareDefConstruct(uint8_t* base, uint32_t glare) {
   ITC_NATIVE_RUNNING("sub_8212ED78 GlareDef::GlareDef");
-  const uint32_t star = glare + 48;
+  const schema::GlareDef g(base, glare);
+  const schema::StarDef star(base, g.star_address());
   for (uint32_t i = 0; i < 8; i++) {
-    CopySingle(base, star + 112 + 16 * i + 12, 0x82000A30);  // 1.0
+    schema::GlowStarColor(base, star.colors_address() + 16 * i).set_a(Single(base, 0x82000A30));
   }
-  CopySingle(base, star + 100, kZero);
-  guest::StoreU32(base, star + 0, 0);
-  guest::StoreU32(base, star + 104, 0);
-  for (uint32_t offset : {0u, 4u, 8u, 16u, 20u, 24u, 28u, 32u, 36u}) {
-    CopySingle(base, glare + offset, kZero);
-  }
+  star.set_inclination(Single(base, kZero));
+  star.set_line_count(0);
+  star.set_rotation(0);
+  g.set_glare_luminance(Single(base, kZero));
+  g.set_bloom_luminance(Single(base, kZero));
+  g.set_ghost_luminance(Single(base, kZero));
+  g.set_star_luminance(Single(base, kZero));
+  g.set_star_inclination(Single(base, kZero));
+  g.set_chromatic_aberration_luminance(Single(base, kZero));
+  g.set_afterimage_sensitivity(Single(base, kZero));
+  g.set_afterimage_ratio(Single(base, kZero));
+  g.set_afterimage_luminance(Single(base, kZero));
 }
 
 uint32_t GlareDefInit(uint8_t* base, uint32_t glare, uint32_t type) {
   ITC_NATIVE_RUNNING("sub_8212EC90 GlareDef::Init");
-  const uint32_t entry = 0x82617280u + type * 44u;
-  // +0 to +16 as they are, +24 to +40 to +20 to +36 (the star type at +20
-  // left out).
-  for (uint32_t i = 0; i < 5; i++) {
-    CopySingle(base, glare + 4 * i, entry + 4 * i);
-  }
-  for (uint32_t i = 0; i < 5; i++) {
-    CopySingle(base, glare + 20 + 4 * i, entry + 24 + 4 * i);
-  }
-  const uint32_t star = 0x826171D8u + guest::LoadU32(base, entry + 20) * 28u;
-  StarDefInit(base, glare + 48, guest::LoadU32(base, star + 0), guest::LoadU32(base, star + 4),
-              Constant(base, star + 8), Constant(base, star + 12), Constant(base, star + 20),
-              guest::LoadU32(base, star + 24));
+  const schema::GlareTableEntry entry(base, G::glare_table_address() + type * 44u);
+  const schema::GlareDef g(base, glare);
+  // The entry's floats as they are, the star type left out.
+  g.set_glare_luminance(Single(entry.glare_luminance()));
+  g.set_bloom_luminance(Single(entry.bloom_luminance()));
+  g.set_ghost_luminance(Single(entry.ghost_luminance()));
+  g.set_ghost_distortion(Single(entry.ghost_distortion()));
+  g.set_star_luminance(Single(entry.star_luminance()));
+  g.set_star_inclination(Single(entry.star_inclination()));
+  g.set_chromatic_aberration_luminance(Single(entry.chromatic_aberration_luminance()));
+  g.set_afterimage_sensitivity(Single(entry.afterimage_sensitivity()));
+  g.set_afterimage_ratio(Single(entry.afterimage_ratio()));
+  g.set_afterimage_luminance(Single(entry.afterimage_luminance()));
+  const schema::StarTableEntry star(base, G::star_table_address() + entry.star_type() * 28u);
+  StarDefInit(base, g.star_address(), star.line_count(), star.passes(),
+              double(star.sample_length()), double(star.attenuation()),
+              double(star.inclination()), star.rotation());
   return 0;
 }
 
@@ -429,22 +463,23 @@ uint32_t StarDefInit(uint8_t* base, uint32_t star, uint32_t lines, uint32_t pass
                      double sample_length, double attenuation, double inclination,
                      uint32_t rotation) {
   ITC_NATIVE_RUNNING("sub_8212EA98 StarDef::Init");
-  guest::StoreU32(base, star + 104, rotation);
-  StoreSingle(base, star + 100, inclination);
-  guest::StoreU32(base, star + 0, lines);
+  const schema::StarDef s(base, star);
+  s.set_rotation(rotation);
+  s.set_inclination(float(inclination));
+  s.set_line_count(lines);
   // 360 / lines (as a single), times pi / 180.
   const double count = double(float(double(int64_t(uint64_t(lines)))));
   const double turn = double(float(Constant(base, 0x82002244) / count));
   const double step = double(float(turn * Constant(base, 0x82002948)));
   // Its count read again each time, as the original does (the lines' words
   // never reach +0).
-  for (uint32_t i = 0; i < guest::LoadU32(base, star + 0); i++) {
-    const uint32_t line = star + 4 + 16 * i;
-    StoreSingle(base, line + 4, sample_length);
-    StoreSingle(base, line + 8, attenuation);
-    guest::StoreU32(base, line + 0, passes);
+  for (uint32_t i = 0; i < s.line_count(); i++) {
+    const schema::StarLine line(base, s.lines_address() + 16 * i);
+    line.set_sample_length(float(sample_length));
+    line.set_attenuation(float(attenuation));
+    line.set_passes(passes);
     const double index = double(float(double(int64_t(uint64_t(i)))));
-    StoreSingle(base, line + 12, double(float(index * step)));
+    line.set_angle(float(double(float(index * step))));
   }
   // The eight colors (r, g, b, 0), from the image's constants.
   constexpr uint32_t k05 = 0x82001BE4, k08 = 0x82001070, k03 = 0x8200296C, k10 = 0x82000A30,
@@ -453,10 +488,11 @@ uint32_t StarDefInit(uint8_t* base, uint32_t star, uint32_t lines, uint32_t pass
                                  {k05, k02, k06}, {k02, k02, k10}, {k02, k03, k07},
                                  {k02, k06, k02}, {k03, k05, k03}};
   for (uint32_t i = 0; i < 8; i++) {
-    for (uint32_t j = 0; j < 3; j++) {
-      CopySingle(base, star + 112 + 16 * i + 4 * j, colors[i][j]);
-    }
-    CopySingle(base, star + 112 + 16 * i + 12, kZero);
+    const schema::GlowStarColor color(base, s.colors_address() + 16 * i);
+    color.set_r(Single(base, colors[i][0]));
+    color.set_g(Single(base, colors[i][1]));
+    color.set_b(Single(base, colors[i][2]));
+    color.set_a(Single(base, kZero));
   }
   return 0;
 }
@@ -475,45 +511,47 @@ bool Deletable(uint32_t block) {
 
 std::optional<uint32_t> RenderTextureRelease(uint8_t* base, uint32_t entry) {
   ITC_NATIVE_RUNNING("sub_82133070 RenderTexture::Release");
-  const uint32_t users = guest::LoadU32(base, entry + 20);
+  const schema::RenderTexture t(base, entry);
+  const uint32_t users = t.users();
   if (users == 0) {
     return entry;
   }
   if (users - 1 != 0) {
-    guest::StoreU32(base, entry + 20, users - 1);
+    t.set_users(users - 1);
     return entry;
   }
-  if (!Deletable(guest::LoadU32(base, entry + 24))) {
+  if (!Deletable(t.header().address)) {
     return std::nullopt;
   }
-  guest::StoreU32(base, entry + 20, 0);
-  memory::FreePhysical(guest::LoadU32(base, entry + 28));
-  const uint32_t header = guest::LoadU32(base, entry + 24);
+  t.set_users(0);
+  memory::FreePhysical(t.memory());
+  const uint32_t header = t.header().address;
   memory::crt::OperatorDelete(header);
-  guest::StoreU32(base, entry + 28, 0);
-  guest::StoreU32(base, entry + 24, 0);
+  t.set_memory(0);
+  t.set_header(0u);
   return header;
 }
 
 std::optional<uint32_t> RenderTexturesRelease(uint8_t* base, uint32_t at) {
   ITC_NATIVE_RUNNING("sub_821332F0 RenderTextures::Release");
-  const uint32_t entry = guest::LoadU32(base, at);
+  const schema::RenderTextureRef ref(base, at);
+  const schema::RenderTexture t = ref.entry();
+  const uint32_t entry = t.address;
   // What the frees would leave to the original: checked first, as nothing
   // is done then. (RenderTexture::Release writes only +20, +24 and +28.)
-  if (entry == 0 || (guest::LoadU32(base, entry + 20) == 1 &&
-                     !Deletable(guest::LoadU32(base, entry + 24)))) {
+  if (entry == 0 || (t.users() == 1 && !Deletable(t.header().address))) {
     return std::nullopt;
   }
-  if (int32_t(guest::LoadU32(base, entry + 32)) == 20 && !Deletable(entry)) {
+  if (int32_t(t.id()) == 20 && !Deletable(entry)) {
     return std::nullopt;
   }
   RenderTextureRelease(base, entry);
-  const uint32_t own = guest::LoadU32(base, at);
-  if (int32_t(guest::LoadU32(base, own + 32)) == 20) {
-    memory::crt::OperatorDelete(own);
-    guest::StoreU32(base, at, 0);
+  const schema::RenderTexture own = ref.entry();
+  if (int32_t(own.id()) == 20) {
+    memory::crt::OperatorDelete(own.address);
+    ref.set_entry(0u);
   }
-  return own;
+  return own.address;
 }
 
 uint32_t ReleaseSurface(uint8_t* base, uint32_t frame, uint32_t at, const SurfaceCalls& calls) {
@@ -533,74 +571,73 @@ std::optional<uint32_t> TargetFilterConstruct(uint8_t* base, uint32_t frame, uin
   ITC_NATIVE_RUNNING("sub_82135AA8 TargetFilter::TargetFilter");
   // memcpy's override records destinations in the physical views: those
   // copies are the original's.
-  if (filter + 4 >= 0xA0000000u) {
+  const schema::TargetFilter f(base, filter);
+  if (f.kind_address() >= 0xA0000000u) {
     return std::nullopt;
   }
-  guest::StoreU32(base, filter + 0, 0x82008838);  // the base vtable
-  if (!c_runtime::Memcpy(base, filter + 4, entry, 36)) {
+  f.set_vtable(PostEffect::kVtable);  // the base vtable
+  if (!c_runtime::Memcpy(base, f.kind_address(), entry, 36)) {
     return std::nullopt;
   }
-  guest::StoreU32(base, filter + 40, 1);
-  guest::StoreU32(base, filter + 0, 0x8200889C);
-  guest::StoreU32(base, filter + 44, 0);
+  f.set_reset(1);
+  f.set_vtable(schema::TargetFilter::kVtable);
+  f.set_no_history(0);
   guest::StoreU32(base, frame + 80, 0);
   guest::StoreU32(base, frame + 84, 0);
-  for (uint32_t offset : {48u, 52u, 8056u, 8060u, 8064u}) {
-    guest::StoreU32(base, filter + offset, 0);
-  }
-  const uint32_t height = guest::LoadU32(base, filter + 20);
-  const uint32_t width = guest::LoadU32(base, filter + 16);
+  f.set_updated(0);
+  f.set_skipped(0);
+  f.set_vertex_count(0);
+  f.set_vertex_buffer(0);
+  f.set_surface(0u);
+  const uint32_t height = f.height();
+  const uint32_t width = f.width();
   guest::StoreU32(base, frame + 88, 0);
-  guest::StoreU32(base, filter + 8064,
-                  graphics::CreateSurface(base, width, height, 0x18280186, 0, frame + 80));
+  f.set_surface(graphics::CreateSurface(base, width, height, 0x18280186, 0, frame + 80));
   return filter;
 }
 
 uint32_t InitEdramBase(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_825D99D0 PostEffects::InitEdramBase");
   const uint32_t tiles = graphics::SurfaceEdramTiles(1024, 576, 0x1A2201BF, 1);
-  guest::StoreU32(base, kEdramBase, tiles);
+  G::set_edram_base(base, tiles);
   return tiles;
 }
 
 // --- The destructors ---
 
-namespace {
-
-constexpr uint32_t kBaseVtable = 0x82008838;
-
-}  // namespace
-
 uint32_t GlowDestroy(uint8_t* base, uint32_t glow, const DestroyCalls& calls) {
   ITC_NATIVE_RUNNING("sub_82136E30 Glow::~Glow");
-  guest::StoreU32(base, glow + 0, 0x820088B0);
-  for (uint32_t at = 8432; at >= 8412; at -= 4) {
-    calls.release_surface(glow + at);
+  const schema::Glow g(base, glow);
+  g.set_vtable(schema::Glow::kVtable);
+  for (uint32_t at = g.surface_1_address(); at >= g.quarter_surface_address(); at -= 4) {
+    calls.release_surface(at);
   }
   uint32_t r3 = 0;
-  for (uint32_t at = 8408; at >= 8352; at -= 4) {
-    r3 = calls.release_texture(glow + at);
+  for (uint32_t at = g.history_address(); at >= g.frame_texture_address(); at -= 4) {
+    r3 = calls.release_texture(at);
   }
-  guest::StoreU32(base, glow + 0, kBaseVtable);
+  g.set_vtable(PostEffect::kVtable);
   return r3;
 }
 
 uint32_t ColorFilterDestroy(uint8_t* base, uint32_t filter, const DestroyCalls& calls) {
   ITC_NATIVE_RUNNING("sub_821351A8 ColorFilter::~ColorFilter");
-  guest::StoreU32(base, filter + 0, 0x82008860);
-  const uint32_t r3 = calls.release_texture(filter + 8064);
-  guest::StoreU32(base, filter + 0, kBaseVtable);
+  const schema::ColorFilter f(base, filter);
+  f.set_vtable(schema::ColorFilter::kVtable);
+  const uint32_t r3 = calls.release_texture(f.frame_texture_address());
+  f.set_vtable(PostEffect::kVtable);
   return r3;
 }
 
 uint32_t MotionBlurDestroy(uint8_t* base, uint32_t blur, const DestroyCalls& calls) {
   ITC_NATIVE_RUNNING("sub_82136390 MotionBlur::~MotionBlur");
-  guest::StoreU32(base, blur + 0, 0x820088A4);
-  calls.release_surface(blur + 8076);
-  calls.release_surface(blur + 8072);
-  calls.release_texture(blur + 8068);
-  const uint32_t r3 = calls.release_texture(blur + 8064);
-  guest::StoreU32(base, blur + 0, kBaseVtable);
+  const schema::MotionBlur b(base, blur);
+  b.set_vtable(schema::MotionBlur::kVtable);
+  calls.release_surface(b.depth_surface_address());
+  calls.release_surface(b.velocity_surface_address());
+  calls.release_texture(b.frame_texture_address());
+  const uint32_t r3 = calls.release_texture(b.velocity_texture_address());
+  b.set_vtable(PostEffect::kVtable);
   return r3;
 }
 

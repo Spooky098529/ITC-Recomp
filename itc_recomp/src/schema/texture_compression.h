@@ -1,0 +1,969 @@
+// The views of docs/functions/texture-compression.md's types (docs/e5-native.md, step 2):
+// written by itc_recomp/tools/schema_gen.py from itc_recomp/schema/texture-compression.toml.
+// Don't edit it by hand: edit the schema and run the tool again.
+
+#pragma once
+
+#include "schema/types.h"
+
+namespace schema {
+
+// allocated; measure: ImageCodec, A16B16G16R16Codec, A16B16G16R16FCodec, A1R5G5B5Codec, A2B10G10R10Codec, A2R10G10B10Codec, A2W10V10U10Codec, A32B32G32R32FCodec, A4R4G4B4Codec, A8B8G8R8Codec, A8Codec, A8L8Codec, A8R8G8B8Codec, G16R16Codec, G16R16FCodec, G32R32FCodec, L16Codec, L6V5U5Codec, L8Codec, Q16W16V16U16Codec, Q8W8V8U8Codec, R16FCodec, R32FCodec, R5G6B5Codec, V16U16Codec, V8U8Codec, X1R5G5B5Codec, X4R4G4B4Codec, X8B8G8R8Codec, X8L8V8U8Codec, X8R8G8B8Codec
+struct ImageCodec : View {
+  using View::View;
+  static constexpr uint32_t kSize = 128;
+  static constexpr uint32_t kVtable = 0x8203B778;
+  // the base 0x8203B778 (constructor, destructor), then the format's (0x8203B808-0x8203B9D8)
+  template <typename T = ImageCodecVtable>
+  T vtable() const { return T(base, guest::LoadU32(base, address + 0)); }
+  void set_vtable(const View& v) const { guest::StoreU32(base, address + 0, v.address); }
+  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable_address() const { return address + 0; }
+  // the description's, without bit 8 (tiled)
+  uint32_t format() const { return guest::LoadU32(base, address + 4); }
+  void set_format(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t format_address() const { return address + 4; }
+  // the channels: 1 unsigned, 2 mixed signed, 3 signed, 4 float
+  uint32_t kind() const { return guest::LoadU32(base, address + 8); }
+  void set_kind(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t kind_address() const { return address + 8; }
+  // bits per pixel isn't 0 (not a block format)
+  uint32_t has_bits() const { return guest::LoadU32(base, address + 12); }
+  void set_has_bits(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t has_bits_address() const { return address + 12; }
+  // sRGB (in for a decode, out for an encode)
+  uint32_t srgb() const { return guest::LoadU32(base, address + 16); }
+  void set_srgb(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t srgb_address() const { return address + 16; }
+  // both sides sRGB (ImageCodec::Prepare)
+  uint32_t srgb_both() const { return guest::LoadU32(base, address + 20); }
+  void set_srgb_both(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
+  uint32_t srgb_both_address() const { return address + 20; }
+  // the color key (0: none)
+  uint32_t color_key() const { return guest::LoadU32(base, address + 24); }
+  void set_color_key(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
+  uint32_t color_key_address() const { return address + 24; }
+  // 0 (ImageCodec::Create's LoadPalette test)
+  uint32_t palette_set() const { return guest::LoadU32(base, address + 28); }
+  void set_palette_set(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
+  uint32_t palette_set_address() const { return address + 28; }
+  // the data, at the box's corner for a plain format
+  template <typename T = ImageCodecData>
+  T data() const { return T(base, guest::LoadU32(base, address + 32)); }
+  void set_data(const View& v) const { guest::StoreU32(base, address + 32, v.address); }
+  void set_data(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
+  uint32_t data_address() const { return address + 32; }
+  // the color key's channels times 1/255
+  float color_key_red() const { return guest::LoadFloat(base, address + 36); }
+  void set_color_key_red(float v) const { guest::StoreFloat(base, address + 36, v); }
+  uint32_t color_key_red_address() const { return address + 36; }
+  float color_key_green() const { return guest::LoadFloat(base, address + 40); }
+  void set_color_key_green(float v) const { guest::StoreFloat(base, address + 40, v); }
+  uint32_t color_key_green_address() const { return address + 40; }
+  float color_key_blue() const { return guest::LoadFloat(base, address + 44); }
+  void set_color_key_blue(float v) const { guest::StoreFloat(base, address + 44, v); }
+  uint32_t color_key_blue_address() const { return address + 44; }
+  float color_key_alpha() const { return guest::LoadFloat(base, address + 48); }
+  void set_color_key_alpha(float v) const { guest::StoreFloat(base, address + 48, v); }
+  uint32_t color_key_alpha_address() const { return address + 48; }
+  // the rounding table: 0x8263C768 (0.5s), or the dither's 0x8263C7E8
+  uint32_t rounding() const { return guest::LoadU32(base, address + 52); }
+  void set_rounding(uint32_t v) const { guest::StoreU32(base, address + 52, v); }
+  uint32_t rounding_address() const { return address + 52; }
+  // operator new (ImageCodec::LoadPalette): 1,024 bytes
+  uint32_t palette() const { return guest::LoadU32(base, address + 56); }
+  void set_palette(uint32_t v) const { guest::StoreU32(base, address + 56, v); }
+  uint32_t palette_address() const { return address + 56; }
+  // the box: left, top, right, bottom, front, back (0, 0, 0 at its corner for a plain format)
+  uint32_t box_left() const { return guest::LoadU32(base, address + 60); }
+  void set_box_left(uint32_t v) const { guest::StoreU32(base, address + 60, v); }
+  uint32_t box_left_address() const { return address + 60; }
+  uint32_t box_top() const { return guest::LoadU32(base, address + 64); }
+  void set_box_top(uint32_t v) const { guest::StoreU32(base, address + 64, v); }
+  uint32_t box_top_address() const { return address + 64; }
+  uint32_t box_right() const { return guest::LoadU32(base, address + 68); }
+  void set_box_right(uint32_t v) const { guest::StoreU32(base, address + 68, v); }
+  uint32_t box_right_address() const { return address + 68; }
+  uint32_t box_bottom() const { return guest::LoadU32(base, address + 72); }
+  void set_box_bottom(uint32_t v) const { guest::StoreU32(base, address + 72, v); }
+  uint32_t box_bottom_address() const { return address + 72; }
+  uint32_t box_front() const { return guest::LoadU32(base, address + 76); }
+  void set_box_front(uint32_t v) const { guest::StoreU32(base, address + 76, v); }
+  uint32_t box_front_address() const { return address + 76; }
+  uint32_t box_back() const { return guest::LoadU32(base, address + 80); }
+  void set_box_back(uint32_t v) const { guest::StoreU32(base, address + 80, v); }
+  uint32_t box_back_address() const { return address + 80; }
+  // the other side's channel kind (ConvertRange; 0 none)
+  uint32_t convert_from() const { return guest::LoadU32(base, address + 84); }
+  void set_convert_from(uint32_t v) const { guest::StoreU32(base, address + 84, v); }
+  uint32_t convert_from_address() const { return address + 84; }
+  // a float4 row (operator new, ImageCodec::Prepare)
+  template <typename T = TcFloat4>
+  T row() const { return T(base, guest::LoadU32(base, address + 88)); }
+  void set_row(const View& v) const { guest::StoreU32(base, address + 88, v.address); }
+  void set_row(uint32_t v) const { guest::StoreU32(base, address + 88, v); }
+  uint32_t row_address() const { return address + 88; }
+  // the error diffusion's (width + 2) float4s (operator new), or 0
+  template <typename T = TcFloat4>
+  T error_row() const { return T(base, guest::LoadU32(base, address + 92)); }
+  void set_error_row(const View& v) const { guest::StoreU32(base, address + 92, v.address); }
+  void set_error_row(uint32_t v) const { guest::StoreU32(base, address + 92, v); }
+  uint32_t error_row_address() const { return address + 92; }
+  uint32_t row_pitch() const { return guest::LoadU32(base, address + 96); }
+  void set_row_pitch(uint32_t v) const { guest::StoreU32(base, address + 96, v); }
+  uint32_t row_pitch_address() const { return address + 96; }
+  uint32_t slice_pitch() const { return guest::LoadU32(base, address + 100); }
+  void set_slice_pitch(uint32_t v) const { guest::StoreU32(base, address + 100, v); }
+  uint32_t slice_pitch_address() const { return address + 100; }
+  // the box's size
+  uint32_t width() const { return guest::LoadU32(base, address + 104); }
+  void set_width(uint32_t v) const { guest::StoreU32(base, address + 104, v); }
+  uint32_t width_address() const { return address + 104; }
+  uint32_t height() const { return guest::LoadU32(base, address + 108); }
+  void set_height(uint32_t v) const { guest::StoreU32(base, address + 108, v); }
+  uint32_t height_address() const { return address + 108; }
+  uint32_t depth() const { return guest::LoadU32(base, address + 112); }
+  void set_depth(uint32_t v) const { guest::StoreU32(base, address + 112, v); }
+  uint32_t depth_address() const { return address + 112; }
+  // width x bytes per pixel
+  uint32_t row_bytes() const { return guest::LoadU32(base, address + 116); }
+  void set_row_bytes(uint32_t v) const { guest::StoreU32(base, address + 116, v); }
+  uint32_t row_bytes_address() const { return address + 116; }
+  uint32_t bytes_per_pixel() const { return guest::LoadU32(base, address + 120); }
+  void set_bytes_per_pixel(uint32_t v) const { guest::StoreU32(base, address + 120, v); }
+  uint32_t bytes_per_pixel_address() const { return address + 120; }
+};
+
+// image; measure: ImageCodec.+0
+struct ImageCodecVtable : View {
+  using View::View;
+  static constexpr uint32_t kSize = 16;
+  // the scalar deleting destructor (r4 the flags)
+  uint32_t destroy() const { return guest::LoadU32(base, address + 0); }
+  void set_destroy(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t destroy_address() const { return address + 0; }
+  // a row to float4s: r4 the row, r5 the slice, r6 the float4s
+  uint32_t decode_row() const { return guest::LoadU32(base, address + 4); }
+  void set_decode_row(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t decode_row_address() const { return address + 4; }
+  // a row from float4s, as decode_row
+  uint32_t encode_row() const { return guest::LoadU32(base, address + 8); }
+  void set_encode_row(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t encode_row_address() const { return address + 8; }
+  // the color key quantized to the format
+  uint32_t quantize_color_key() const { return guest::LoadU32(base, address + 12); }
+  void set_quantize_color_key(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t quantize_color_key_address() const { return address + 12; }
+};
+
+// file; measure: ImageCodec.+32, A16B16G16R16Codec.+32, A1R5G5B5Codec.+32, A2B10G10R10Codec.+32, A2R10G10B10Codec.+32, A2W10V10U10Codec.+32, A4R4G4B4Codec.+32, A8B8G8R8Codec.+32, A8Codec.+32, A8L8Codec.+32, A8R8G8B8Codec.+32, G16R16Codec.+32, G32R32FCodec.+32, L16Codec.+32, L6V5U5Codec.+32, L8Codec.+32, Q16W16V16U16Codec.+32, Q8W8V8U8Codec.+32, R32FCodec.+32, R5G6B5Codec.+32, V16U16Codec.+32, V8U8Codec.+32, X1R5G5B5Codec.+32, X4R4G4B4Codec.+32, X8B8G8R8Codec.+32, X8L8V8U8Codec.+32, X8R8G8B8Codec.+32, YuvCodec.+32, new<?>@XGCompressSurface
+struct ImageCodecData : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint8_t byte0() const { return guest::LoadU8(base, address + 0); }
+  void set_byte0(uint8_t v) const { guest::StoreU8(base, address + 0, v); }
+  uint32_t byte0_address() const { return address + 0; }
+  uint16_t half0() const { return guest::LoadU16(base, address + 0); }
+  void set_half0(uint16_t v) const { guest::StoreU16(base, address + 0, v); }
+  uint32_t half0_address() const { return address + 0; }
+  uint8_t byte1() const { return guest::LoadU8(base, address + 1); }
+  void set_byte1(uint8_t v) const { guest::StoreU8(base, address + 1, v); }
+  uint32_t byte1_address() const { return address + 1; }
+  uint16_t half1() const { return guest::LoadU16(base, address + 2); }
+  void set_half1(uint16_t v) const { guest::StoreU16(base, address + 2, v); }
+  uint32_t half1_address() const { return address + 2; }
+};
+
+// file; measure: ImageCodec.+68, ImageCodec.+88, ImageCodec::LinearToSrgb.ret, ImageCodec::ConvertRange.r4, ImageCodec::ApplyColorKey.r4, ImageCodec::LinearToSrgb.r4, ImageCodec::SrgbToLinear.r4, ImageCodec::AddDiffusionError.r4, Dxt, Dxt1::EncodeBlock.r4, Dxt23::EncodeBlockPremultiplied.r4, DxtAlpha::EncodeBlock.r4, DxtColor::EncodeBlock.r4, DxtColor::FitEndpoints.r4, DxtColor::FitEndpoints.r5, DxtAlpha::FitEndpoints.r4, DxtAlpha::FitEndpoints.r5, A16B16G16R16Codec.+92, A1R5G5B5Codec.+92, A2B10G10R10Codec.+92, A2R10G10B10Codec.+92, A2W10V10U10Codec.+92, A4R4G4B4Codec.+92, A8B8G8R8Codec.+92, A8Codec.+92, A8L8Codec.+92, A8R8G8B8Codec.+92, G16R16Codec.+92, L16Codec.+92, L6V5U5Codec.+92, L8Codec.+92, Q16W16V16U16Codec.+92, Q8W8V8U8Codec.+92, R5G6B5Codec.+92, V16U16Codec.+92, V8U8Codec.+92, X1R5G5B5Codec.+92, X4R4G4B4Codec.+92, X8B8G8R8Codec.+92, X8L8V8U8Codec.+92, X8R8G8B8Codec.+92, A8R8G8B8Codec::DecodeRow.r6, X8R8G8B8Codec::DecodeRow.r6, R5G6B5Codec::DecodeRow.r6, X1R5G5B5Codec::DecodeRow.r6, A1R5G5B5Codec::DecodeRow.r6, A4R4G4B4Codec::DecodeRow.r6, A2B10G10R10Codec::DecodeRow.r6, A8B8G8R8Codec::DecodeRow.r6, X8B8G8R8Codec::DecodeRow.r6, G16R16Codec::DecodeRow.r6, A2R10G10B10Codec::DecodeRow.r6, A16B16G16R16Codec::DecodeRow.r6, A8Codec::DecodeRow.r6, X4R4G4B4Codec::DecodeRow.r6, L8Codec::DecodeRow.r6, A8L8Codec::DecodeRow.r6, V8U8Codec::DecodeRow.r6, L6V5U5Codec::DecodeRow.r6, X8L8V8U8Codec::DecodeRow.r6, Q8W8V8U8Codec::DecodeRow.r6, V16U16Codec::DecodeRow.r6, A2W10V10U10Codec::DecodeRow.r6, Q16W16V16U16Codec::DecodeRow.r6, L16Codec::DecodeRow.r6, R32FCodec::DecodeRow.r6, G32R32FCodec::DecodeRow.r6, DxtCodec::DecodeRow.r6, new<4294967295>@Blitter::FilterPoint, new<4294967295>@Blitter::FilterPoint#2, new<4294967295>@Blitter::FilterBox2D, new<4294967295>@Blitter::FilterBox3D, new<4294967295>@Blitter::FilterLinear2D, new<4294967295>@Blitter::FilterLinear2D#2, new<4294967295>@Blitter::FilterLinear3D, new<4294967295>@Blitter::FilterLinear3D#2, new<4294967295>@Blitter::FilterTriangle3D, new<4294967295>@Blitter::FilterTriangle3D#2, new<4294967295>@Blitter::FilterTriangle2D, new<4294967295>@Blitter::FilterTriangle2D#2, new<?>@Blitter::FilterBox2D, new<?>@Blitter::FilterBox3D
+struct TcFloat4 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 16;
+  float red() const { return guest::LoadFloat(base, address + 0); }
+  void set_red(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t red_address() const { return address + 0; }
+  float green() const { return guest::LoadFloat(base, address + 4); }
+  void set_green(float v) const { guest::StoreFloat(base, address + 4, v); }
+  uint32_t green_address() const { return address + 4; }
+  float blue() const { return guest::LoadFloat(base, address + 8); }
+  void set_blue(float v) const { guest::StoreFloat(base, address + 8, v); }
+  uint32_t blue_address() const { return address + 8; }
+  float alpha() const { return guest::LoadFloat(base, address + 12); }
+  void set_alpha(float v) const { guest::StoreFloat(base, address + 12, v); }
+  uint32_t alpha_address() const { return address + 12; }
+};
+
+// allocated; measure: DxtCodec
+struct DxtCodec : View {
+  using View::View;
+  static constexpr uint32_t kSize = 256;
+  static constexpr uint32_t kVtable = 0x8203B9E8;
+  // 0x8203B9E8 (the base 0x8203B778 inside ImageCodec's constructor and destructor)
+  template <typename T = ImageCodecVtable>
+  T vtable() const { return T(base, guest::LoadU32(base, address + 0)); }
+  void set_vtable(const View& v) const { guest::StoreU32(base, address + 0, v.address); }
+  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable_address() const { return address + 0; }
+  // as ImageCodec's
+  uint32_t format() const { return guest::LoadU32(base, address + 4); }
+  void set_format(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t format_address() const { return address + 4; }
+  uint32_t kind() const { return guest::LoadU32(base, address + 8); }
+  void set_kind(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t kind_address() const { return address + 8; }
+  uint32_t has_bits() const { return guest::LoadU32(base, address + 12); }
+  void set_has_bits(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t has_bits_address() const { return address + 12; }
+  uint32_t srgb() const { return guest::LoadU32(base, address + 16); }
+  void set_srgb(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t srgb_address() const { return address + 16; }
+  uint32_t srgb_both() const { return guest::LoadU32(base, address + 20); }
+  void set_srgb_both(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
+  uint32_t srgb_both_address() const { return address + 20; }
+  uint32_t color_key() const { return guest::LoadU32(base, address + 24); }
+  void set_color_key(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
+  uint32_t color_key_address() const { return address + 24; }
+  uint32_t palette_set() const { return guest::LoadU32(base, address + 28); }
+  void set_palette_set(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
+  uint32_t palette_set_address() const { return address + 28; }
+  template <typename T = ImageCodecData>
+  T data() const { return T(base, guest::LoadU32(base, address + 32)); }
+  void set_data(const View& v) const { guest::StoreU32(base, address + 32, v.address); }
+  void set_data(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
+  uint32_t data_address() const { return address + 32; }
+  float color_key_red() const { return guest::LoadFloat(base, address + 36); }
+  void set_color_key_red(float v) const { guest::StoreFloat(base, address + 36, v); }
+  uint32_t color_key_red_address() const { return address + 36; }
+  float color_key_green() const { return guest::LoadFloat(base, address + 40); }
+  void set_color_key_green(float v) const { guest::StoreFloat(base, address + 40, v); }
+  uint32_t color_key_green_address() const { return address + 40; }
+  float color_key_blue() const { return guest::LoadFloat(base, address + 44); }
+  void set_color_key_blue(float v) const { guest::StoreFloat(base, address + 44, v); }
+  uint32_t color_key_blue_address() const { return address + 44; }
+  float color_key_alpha() const { return guest::LoadFloat(base, address + 48); }
+  void set_color_key_alpha(float v) const { guest::StoreFloat(base, address + 48, v); }
+  uint32_t color_key_alpha_address() const { return address + 48; }
+  uint32_t rounding() const { return guest::LoadU32(base, address + 52); }
+  void set_rounding(uint32_t v) const { guest::StoreU32(base, address + 52, v); }
+  uint32_t rounding_address() const { return address + 52; }
+  uint32_t palette() const { return guest::LoadU32(base, address + 56); }
+  void set_palette(uint32_t v) const { guest::StoreU32(base, address + 56, v); }
+  uint32_t palette_address() const { return address + 56; }
+  uint32_t box_left() const { return guest::LoadU32(base, address + 60); }
+  void set_box_left(uint32_t v) const { guest::StoreU32(base, address + 60, v); }
+  uint32_t box_left_address() const { return address + 60; }
+  uint32_t box_top() const { return guest::LoadU32(base, address + 64); }
+  void set_box_top(uint32_t v) const { guest::StoreU32(base, address + 64, v); }
+  uint32_t box_top_address() const { return address + 64; }
+  uint32_t box_right() const { return guest::LoadU32(base, address + 68); }
+  void set_box_right(uint32_t v) const { guest::StoreU32(base, address + 68, v); }
+  uint32_t box_right_address() const { return address + 68; }
+  uint32_t box_bottom() const { return guest::LoadU32(base, address + 72); }
+  void set_box_bottom(uint32_t v) const { guest::StoreU32(base, address + 72, v); }
+  uint32_t box_bottom_address() const { return address + 72; }
+  uint32_t box_front() const { return guest::LoadU32(base, address + 76); }
+  void set_box_front(uint32_t v) const { guest::StoreU32(base, address + 76, v); }
+  uint32_t box_front_address() const { return address + 76; }
+  uint32_t box_back() const { return guest::LoadU32(base, address + 80); }
+  void set_box_back(uint32_t v) const { guest::StoreU32(base, address + 80, v); }
+  uint32_t box_back_address() const { return address + 80; }
+  uint32_t convert_from() const { return guest::LoadU32(base, address + 84); }
+  void set_convert_from(uint32_t v) const { guest::StoreU32(base, address + 84, v); }
+  uint32_t convert_from_address() const { return address + 84; }
+  template <typename T = TcFloat4>
+  T row() const { return T(base, guest::LoadU32(base, address + 88)); }
+  void set_row(const View& v) const { guest::StoreU32(base, address + 88, v.address); }
+  void set_row(uint32_t v) const { guest::StoreU32(base, address + 88, v); }
+  uint32_t row_address() const { return address + 88; }
+  template <typename T = TcFloat4>
+  T error_row() const { return T(base, guest::LoadU32(base, address + 92)); }
+  void set_error_row(const View& v) const { guest::StoreU32(base, address + 92, v.address); }
+  void set_error_row(uint32_t v) const { guest::StoreU32(base, address + 92, v); }
+  uint32_t error_row_address() const { return address + 92; }
+  uint32_t row_pitch() const { return guest::LoadU32(base, address + 96); }
+  void set_row_pitch(uint32_t v) const { guest::StoreU32(base, address + 96, v); }
+  uint32_t row_pitch_address() const { return address + 96; }
+  uint32_t slice_pitch() const { return guest::LoadU32(base, address + 100); }
+  void set_slice_pitch(uint32_t v) const { guest::StoreU32(base, address + 100, v); }
+  uint32_t slice_pitch_address() const { return address + 100; }
+  uint32_t width() const { return guest::LoadU32(base, address + 104); }
+  void set_width(uint32_t v) const { guest::StoreU32(base, address + 104, v); }
+  uint32_t width_address() const { return address + 104; }
+  uint32_t height() const { return guest::LoadU32(base, address + 108); }
+  void set_height(uint32_t v) const { guest::StoreU32(base, address + 108, v); }
+  uint32_t height_address() const { return address + 108; }
+  uint32_t depth() const { return guest::LoadU32(base, address + 112); }
+  void set_depth(uint32_t v) const { guest::StoreU32(base, address + 112, v); }
+  uint32_t depth_address() const { return address + 112; }
+  uint32_t row_bytes() const { return guest::LoadU32(base, address + 116); }
+  void set_row_bytes(uint32_t v) const { guest::StoreU32(base, address + 116, v); }
+  uint32_t row_bytes_address() const { return address + 116; }
+  uint32_t bytes_per_pixel() const { return guest::LoadU32(base, address + 120); }
+  void set_bytes_per_pixel(uint32_t v) const { guest::StoreU32(base, address + 120, v); }
+  uint32_t bytes_per_pixel_address() const { return address + 120; }
+  float unknown_128() const { return guest::LoadFloat(base, address + 128); }
+  void set_unknown_128(float v) const { guest::StoreFloat(base, address + 128, v); }
+  uint32_t unknown_128_address() const { return address + 128; }
+  float unknown_132() const { return guest::LoadFloat(base, address + 132); }
+  void set_unknown_132(float v) const { guest::StoreFloat(base, address + 132, v); }
+  uint32_t unknown_132_address() const { return address + 132; }
+  // 8 (DXT1, 3A, 5A) or 16 (DXT2/3, 4/5)
+  uint32_t block_bytes() const { return guest::LoadU32(base, address + 136); }
+  void set_block_bytes(uint32_t v) const { guest::StoreU32(base, address + 136, v); }
+  uint32_t block_bytes_address() const { return address + 136; }
+  // r3 = 16 float4s, r4 = the block (DXT1 0x82421938, ...)
+  uint32_t decode_block() const { return guest::LoadU32(base, address + 140); }
+  void set_decode_block(uint32_t v) const { guest::StoreU32(base, address + 140, v); }
+  uint32_t decode_block_address() const { return address + 140; }
+  // r3 = the block, r4 = 16 float4s, r5 = dither (DXT4/5 0x82422A68, ...)
+  uint32_t encode_block() const { return guest::LoadU32(base, address + 144); }
+  void set_encode_block(uint32_t v) const { guest::StoreU32(base, address + 144, v); }
+  uint32_t encode_block_address() const { return address + 144; }
+  // the surface: 0, 0, width, height, 0, depth (the description's extent)
+  uint32_t extent_left() const { return guest::LoadU32(base, address + 148); }
+  void set_extent_left(uint32_t v) const { guest::StoreU32(base, address + 148, v); }
+  uint32_t extent_left_address() const { return address + 148; }
+  uint32_t extent_top() const { return guest::LoadU32(base, address + 152); }
+  void set_extent_top(uint32_t v) const { guest::StoreU32(base, address + 152, v); }
+  uint32_t extent_top_address() const { return address + 152; }
+  uint32_t extent_right() const { return guest::LoadU32(base, address + 156); }
+  void set_extent_right(uint32_t v) const { guest::StoreU32(base, address + 156, v); }
+  uint32_t extent_right_address() const { return address + 156; }
+  uint32_t extent_bottom() const { return guest::LoadU32(base, address + 160); }
+  void set_extent_bottom(uint32_t v) const { guest::StoreU32(base, address + 160, v); }
+  uint32_t extent_bottom_address() const { return address + 160; }
+  uint32_t extent_front() const { return guest::LoadU32(base, address + 164); }
+  void set_extent_front(uint32_t v) const { guest::StoreU32(base, address + 164, v); }
+  uint32_t extent_front_address() const { return address + 164; }
+  uint32_t extent_back() const { return guest::LoadU32(base, address + 168); }
+  void set_extent_back(uint32_t v) const { guest::StoreU32(base, address + 168, v); }
+  uint32_t extent_back_address() const { return address + 168; }
+  // the extent rounded out to blocks
+  uint32_t block_extent_left() const { return guest::LoadU32(base, address + 172); }
+  void set_block_extent_left(uint32_t v) const { guest::StoreU32(base, address + 172, v); }
+  uint32_t block_extent_left_address() const { return address + 172; }
+  uint32_t block_extent_top() const { return guest::LoadU32(base, address + 176); }
+  void set_block_extent_top(uint32_t v) const { guest::StoreU32(base, address + 176, v); }
+  uint32_t block_extent_top_address() const { return address + 176; }
+  uint32_t block_extent_right() const { return guest::LoadU32(base, address + 180); }
+  void set_block_extent_right(uint32_t v) const { guest::StoreU32(base, address + 180, v); }
+  uint32_t block_extent_right_address() const { return address + 180; }
+  uint32_t block_extent_bottom() const { return guest::LoadU32(base, address + 184); }
+  void set_block_extent_bottom(uint32_t v) const { guest::StoreU32(base, address + 184, v); }
+  uint32_t block_extent_bottom_address() const { return address + 184; }
+  uint32_t block_extent_front() const { return guest::LoadU32(base, address + 188); }
+  void set_block_extent_front(uint32_t v) const { guest::StoreU32(base, address + 188, v); }
+  uint32_t block_extent_front_address() const { return address + 188; }
+  uint32_t block_extent_back() const { return guest::LoadU32(base, address + 192); }
+  void set_block_extent_back(uint32_t v) const { guest::StoreU32(base, address + 192, v); }
+  uint32_t block_extent_back_address() const { return address + 192; }
+  // the box rounded out to blocks (pixels)
+  uint32_t block_left() const { return guest::LoadU32(base, address + 196); }
+  void set_block_left(uint32_t v) const { guest::StoreU32(base, address + 196, v); }
+  uint32_t block_left_address() const { return address + 196; }
+  uint32_t block_top() const { return guest::LoadU32(base, address + 200); }
+  void set_block_top(uint32_t v) const { guest::StoreU32(base, address + 200, v); }
+  uint32_t block_top_address() const { return address + 200; }
+  uint32_t block_right() const { return guest::LoadU32(base, address + 204); }
+  void set_block_right(uint32_t v) const { guest::StoreU32(base, address + 204, v); }
+  uint32_t block_right_address() const { return address + 204; }
+  uint32_t block_bottom() const { return guest::LoadU32(base, address + 208); }
+  void set_block_bottom(uint32_t v) const { guest::StoreU32(base, address + 208, v); }
+  uint32_t block_bottom_address() const { return address + 208; }
+  uint32_t front() const { return guest::LoadU32(base, address + 212); }
+  void set_front(uint32_t v) const { guest::StoreU32(base, address + 212, v); }
+  uint32_t front_address() const { return address + 212; }
+  uint32_t back() const { return guest::LoadU32(base, address + 216); }
+  void set_back(uint32_t v) const { guest::StoreU32(base, address + 216, v); }
+  uint32_t back_address() const { return address + 216; }
+  uint32_t block_columns() const { return guest::LoadU32(base, address + 220); }
+  void set_block_columns(uint32_t v) const { guest::StoreU32(base, address + 220, v); }
+  uint32_t block_columns_address() const { return address + 220; }
+  uint32_t block_rows() const { return guest::LoadU32(base, address + 224); }
+  void set_block_rows(uint32_t v) const { guest::StoreU32(base, address + 224, v); }
+  uint32_t block_rows_address() const { return address + 224; }
+  uint32_t slices() const { return guest::LoadU32(base, address + 228); }
+  void set_slices(uint32_t v) const { guest::StoreU32(base, address + 228, v); }
+  uint32_t slices_address() const { return address + 228; }
+  // -1 from DxtCodec::DxtCodec
+  uint32_t unknown_232() const { return guest::LoadU32(base, address + 232); }
+  void set_unknown_232(uint32_t v) const { guest::StoreU32(base, address + 232, v); }
+  uint32_t unknown_232_address() const { return address + 232; }
+  // -1 from DxtCodec::DxtCodec
+  uint32_t unknown_236() const { return guest::LoadU32(base, address + 236); }
+  void set_unknown_236(uint32_t v) const { guest::StoreU32(base, address + 236, v); }
+  uint32_t unknown_236_address() const { return address + 236; }
+  // DxtCodec::DecodeRow's block cache (operator new, probably; never seen set), freed by ~DxtCodec
+  template <typename T = DxtBlockCacheEntry>
+  T decode_cache() const { return T(base, guest::LoadU32(base, address + 240)); }
+  void set_decode_cache(const View& v) const { guest::StoreU32(base, address + 240, v.address); }
+  void set_decode_cache(uint32_t v) const { guest::StoreU32(base, address + 240, v); }
+  uint32_t decode_cache_address() const { return address + 240; }
+  // block rows held
+  uint32_t cache_count() const { return guest::LoadU32(base, address + 244); }
+  void set_cache_count(uint32_t v) const { guest::StoreU32(base, address + 244, v); }
+  uint32_t cache_count_address() const { return address + 244; }
+  // EncodeRow's: an entry a block row (by slice and block row)
+  template <typename T = DxtBlockCacheEntry>
+  T cache() const { return T(base, guest::LoadU32(base, address + 248)); }
+  void set_cache(const View& v) const { guest::StoreU32(base, address + 248, v.address); }
+  void set_cache(uint32_t v) const { guest::StoreU32(base, address + 248, v); }
+  uint32_t cache_address() const { return address + 248; }
+  // the description's dither
+  uint32_t dither() const { return guest::LoadU32(base, address + 252); }
+  void set_dither(uint32_t v) const { guest::StoreU32(base, address + 252, v); }
+  uint32_t dither_address() const { return address + 252; }
+};
+
+// allocated; measure: new<4294967295>@DxtCodec::EncodeRow, new<4294967295>@DxtCodec::DecodeRow
+struct DxtBlockCacheEntry : View {
+  using View::View;
+  static constexpr uint32_t kSize = 8;
+  // a bit for each of the block row's four rows in
+  uint32_t rows_in() const { return guest::LoadU32(base, address + 0); }
+  void set_rows_in(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t rows_in_address() const { return address + 0; }
+  // the block row's 16 float4s a block column (operator new)
+  template <typename T = TcFloat4>
+  T pixels() const { return T(base, guest::LoadU32(base, address + 4)); }
+  void set_pixels(const View& v) const { guest::StoreU32(base, address + 4, v.address); }
+  void set_pixels(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t pixels_address() const { return address + 4; }
+};
+
+// allocated; measure: YuvCodec
+struct YuvCodec : View {
+  using View::View;
+  static constexpr uint32_t kSize = 176;
+  static constexpr uint32_t kVtable = 0x8203B9F8;
+  template <typename T = ImageCodecVtable>
+  T vtable() const { return T(base, guest::LoadU32(base, address + 0)); }
+  void set_vtable(const View& v) const { guest::StoreU32(base, address + 0, v.address); }
+  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable_address() const { return address + 0; }
+  // as ImageCodec's
+  uint32_t format() const { return guest::LoadU32(base, address + 4); }
+  void set_format(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t format_address() const { return address + 4; }
+  uint32_t srgb() const { return guest::LoadU32(base, address + 16); }
+  void set_srgb(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t srgb_address() const { return address + 16; }
+  uint32_t color_key() const { return guest::LoadU32(base, address + 24); }
+  void set_color_key(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
+  uint32_t color_key_address() const { return address + 24; }
+  template <typename T = ImageCodecData>
+  T data() const { return T(base, guest::LoadU32(base, address + 32)); }
+  void set_data(const View& v) const { guest::StoreU32(base, address + 32, v.address); }
+  void set_data(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
+  uint32_t data_address() const { return address + 32; }
+  uint32_t box_left() const { return guest::LoadU32(base, address + 60); }
+  void set_box_left(uint32_t v) const { guest::StoreU32(base, address + 60, v); }
+  uint32_t box_left_address() const { return address + 60; }
+  uint32_t box_top() const { return guest::LoadU32(base, address + 64); }
+  void set_box_top(uint32_t v) const { guest::StoreU32(base, address + 64, v); }
+  uint32_t box_top_address() const { return address + 64; }
+  uint32_t box_front() const { return guest::LoadU32(base, address + 76); }
+  void set_box_front(uint32_t v) const { guest::StoreU32(base, address + 76, v); }
+  uint32_t box_front_address() const { return address + 76; }
+  uint32_t convert_from() const { return guest::LoadU32(base, address + 84); }
+  void set_convert_from(uint32_t v) const { guest::StoreU32(base, address + 84, v); }
+  uint32_t convert_from_address() const { return address + 84; }
+  uint32_t row_pitch() const { return guest::LoadU32(base, address + 96); }
+  void set_row_pitch(uint32_t v) const { guest::StoreU32(base, address + 96, v); }
+  uint32_t row_pitch_address() const { return address + 96; }
+  uint32_t slice_pitch() const { return guest::LoadU32(base, address + 100); }
+  void set_slice_pitch(uint32_t v) const { guest::StoreU32(base, address + 100, v); }
+  uint32_t slice_pitch_address() const { return address + 100; }
+  uint32_t width() const { return guest::LoadU32(base, address + 104); }
+  void set_width(uint32_t v) const { guest::StoreU32(base, address + 104, v); }
+  uint32_t width_address() const { return address + 104; }
+  // the pixel pairs' float4s (operator new)
+  template <typename T = YuvCodecPixels>
+  T buffer() const { return T(base, guest::LoadU32(base, address + 128)); }
+  void set_buffer(const View& v) const { guest::StoreU32(base, address + 128, v.address); }
+  void set_buffer(uint32_t v) const { guest::StoreU32(base, address + 128, v); }
+  uint32_t buffer_address() const { return address + 128; }
+  // the box widened to even columns
+  uint32_t even_left() const { return guest::LoadU32(base, address + 132); }
+  void set_even_left(uint32_t v) const { guest::StoreU32(base, address + 132, v); }
+  uint32_t even_left_address() const { return address + 132; }
+  uint32_t unknown_136() const { return guest::LoadU32(base, address + 136); }
+  void set_unknown_136(uint32_t v) const { guest::StoreU32(base, address + 136, v); }
+  uint32_t unknown_136_address() const { return address + 136; }
+  uint32_t even_right() const { return guest::LoadU32(base, address + 140); }
+  void set_even_right(uint32_t v) const { guest::StoreU32(base, address + 140, v); }
+  uint32_t even_right_address() const { return address + 140; }
+  uint32_t unknown_144() const { return guest::LoadU32(base, address + 144); }
+  void set_unknown_144(uint32_t v) const { guest::StoreU32(base, address + 144, v); }
+  uint32_t unknown_144_address() const { return address + 144; }
+  uint32_t unknown_148() const { return guest::LoadU32(base, address + 148); }
+  void set_unknown_148(uint32_t v) const { guest::StoreU32(base, address + 148, v); }
+  uint32_t unknown_148_address() const { return address + 148; }
+  uint32_t unknown_152() const { return guest::LoadU32(base, address + 152); }
+  void set_unknown_152(uint32_t v) const { guest::StoreU32(base, address + 152, v); }
+  uint32_t unknown_152_address() const { return address + 152; }
+  // the buffer's pixels
+  uint32_t buffer_pixels() const { return guest::LoadU32(base, address + 156); }
+  void set_buffer_pixels(uint32_t v) const { guest::StoreU32(base, address + 156, v); }
+  uint32_t buffer_pixels_address() const { return address + 156; }
+  uint32_t unknown_160() const { return guest::LoadU32(base, address + 160); }
+  void set_unknown_160(uint32_t v) const { guest::StoreU32(base, address + 160, v); }
+  uint32_t unknown_160_address() const { return address + 160; }
+  // 0 without a buffer
+  uint32_t unknown_164() const { return guest::LoadU32(base, address + 164); }
+  void set_unknown_164(uint32_t v) const { guest::StoreU32(base, address + 164, v); }
+  uint32_t unknown_164_address() const { return address + 164; }
+  // 0 or 8 by the format (with +172: 0 and 8, or 8 and 0)
+  uint32_t unknown_168() const { return guest::LoadU32(base, address + 168); }
+  void set_unknown_168(uint32_t v) const { guest::StoreU32(base, address + 168, v); }
+  uint32_t unknown_168_address() const { return address + 168; }
+  uint32_t unknown_172() const { return guest::LoadU32(base, address + 172); }
+  void set_unknown_172(uint32_t v) const { guest::StoreU32(base, address + 172, v); }
+  uint32_t unknown_172_address() const { return address + 172; }
+};
+
+// allocated; measure: YuvCodec.+128
+struct YuvCodecPixels : View {
+  using View::View;
+  static constexpr uint32_t kSize = 64;
+  float pixel0_red() const { return guest::LoadFloat(base, address + 0); }
+  void set_pixel0_red(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t pixel0_red_address() const { return address + 0; }
+  float pixel0_green() const { return guest::LoadFloat(base, address + 4); }
+  void set_pixel0_green(float v) const { guest::StoreFloat(base, address + 4, v); }
+  uint32_t pixel0_green_address() const { return address + 4; }
+  float pixel0_blue() const { return guest::LoadFloat(base, address + 8); }
+  void set_pixel0_blue(float v) const { guest::StoreFloat(base, address + 8, v); }
+  uint32_t pixel0_blue_address() const { return address + 8; }
+  float pixel0_alpha() const { return guest::LoadFloat(base, address + 12); }
+  void set_pixel0_alpha(float v) const { guest::StoreFloat(base, address + 12, v); }
+  uint32_t pixel0_alpha_address() const { return address + 12; }
+  float pixel1_red() const { return guest::LoadFloat(base, address + 16); }
+  void set_pixel1_red(float v) const { guest::StoreFloat(base, address + 16, v); }
+  uint32_t pixel1_red_address() const { return address + 16; }
+  float pixel1_green() const { return guest::LoadFloat(base, address + 20); }
+  void set_pixel1_green(float v) const { guest::StoreFloat(base, address + 20, v); }
+  uint32_t pixel1_green_address() const { return address + 20; }
+  float pixel1_blue() const { return guest::LoadFloat(base, address + 24); }
+  void set_pixel1_blue(float v) const { guest::StoreFloat(base, address + 24, v); }
+  uint32_t pixel1_blue_address() const { return address + 24; }
+  float pixel1_alpha() const { return guest::LoadFloat(base, address + 28); }
+  void set_pixel1_alpha(float v) const { guest::StoreFloat(base, address + 28, v); }
+  uint32_t pixel1_alpha_address() const { return address + 28; }
+  float pixel2_red() const { return guest::LoadFloat(base, address + 32); }
+  void set_pixel2_red(float v) const { guest::StoreFloat(base, address + 32, v); }
+  uint32_t pixel2_red_address() const { return address + 32; }
+  float pixel2_green() const { return guest::LoadFloat(base, address + 36); }
+  void set_pixel2_green(float v) const { guest::StoreFloat(base, address + 36, v); }
+  uint32_t pixel2_green_address() const { return address + 36; }
+  float pixel2_blue() const { return guest::LoadFloat(base, address + 40); }
+  void set_pixel2_blue(float v) const { guest::StoreFloat(base, address + 40, v); }
+  uint32_t pixel2_blue_address() const { return address + 40; }
+  float pixel2_alpha() const { return guest::LoadFloat(base, address + 44); }
+  void set_pixel2_alpha(float v) const { guest::StoreFloat(base, address + 44, v); }
+  uint32_t pixel2_alpha_address() const { return address + 44; }
+  float pixel3_red() const { return guest::LoadFloat(base, address + 48); }
+  void set_pixel3_red(float v) const { guest::StoreFloat(base, address + 48, v); }
+  uint32_t pixel3_red_address() const { return address + 48; }
+  float pixel3_green() const { return guest::LoadFloat(base, address + 52); }
+  void set_pixel3_green(float v) const { guest::StoreFloat(base, address + 52, v); }
+  uint32_t pixel3_green_address() const { return address + 52; }
+  float pixel3_blue() const { return guest::LoadFloat(base, address + 56); }
+  void set_pixel3_blue(float v) const { guest::StoreFloat(base, address + 56, v); }
+  uint32_t pixel3_blue_address() const { return address + 56; }
+  float pixel3_alpha() const { return guest::LoadFloat(base, address + 60); }
+  void set_pixel3_alpha(float v) const { guest::StoreFloat(base, address + 60, v); }
+  uint32_t pixel3_alpha_address() const { return address + 60; }
+};
+
+// stack; measure: Blitter, Blitter::Init.ret
+struct Blitter : View {
+  using View::View;
+  static constexpr uint32_t kSize = 12;
+  // not the blit object's: XGCompressSurface's word below it (the destination point's y when none is given), joined by the measure
+  uint32_t frame_point_y() const { return guest::LoadU32(base, address + -4); }
+  void set_frame_point_y(uint32_t v) const { guest::StoreU32(base, address + -4, v); }
+  uint32_t frame_point_y_address() const { return address + -4; }
+  // the source's codec
+  template <typename T = ImageCodec>
+  T source() const { return T(base, guest::LoadU32(base, address + 0)); }
+  void set_source(const View& v) const { guest::StoreU32(base, address + 0, v.address); }
+  void set_source(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t source_address() const { return address + 0; }
+  // the destination's codec
+  template <typename T = ImageCodec>
+  T destination() const { return T(base, guest::LoadU32(base, address + 4)); }
+  void set_destination(const View& v) const { guest::StoreU32(base, address + 4, v.address); }
+  void set_destination(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t destination_address() const { return address + 4; }
+  // the D3DX filter flags: low 16 bits 1 none, 2 point, 3 linear, 4 triangle, 5 box; 0x80000 dither, 0x100000 diffusion, 0x200000 sRGB in, 0x400000 sRGB out; bits 16-18 the mirror flags
+  uint32_t filter() const { return guest::LoadU32(base, address + 8); }
+  void set_filter(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t filter_address() const { return address + 8; }
+  // the filter's low byte (its type)
+  uint8_t filter_type() const { return guest::LoadU8(base, address + 11); }
+  void set_filter_type(uint8_t v) const { guest::StoreU8(base, address + 11, v); }
+  uint32_t filter_type_address() const { return address + 11; }
+};
+
+// stack; measure: Blitter::Init.r4, Blitter::Init.r5
+struct ImageDescription : View {
+  using View::View;
+  static constexpr uint32_t kSize = 84;
+  uint32_t data() const { return guest::LoadU32(base, address + 0); }
+  void set_data(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t data_address() const { return address + 0; }
+  // the codec's format (0x18280086 A8R8G8B8, 0x1A200054 DXT4/5, ...)
+  uint32_t format() const { return guest::LoadU32(base, address + 4); }
+  void set_format(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t format_address() const { return address + 4; }
+  uint32_t row_pitch() const { return guest::LoadU32(base, address + 8); }
+  void set_row_pitch(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t row_pitch_address() const { return address + 8; }
+  uint32_t slice_pitch() const { return guest::LoadU32(base, address + 12); }
+  void set_slice_pitch(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t slice_pitch_address() const { return address + 12; }
+  // the surface: 0, 0, width, height, 0, depth
+  uint32_t extent_left() const { return guest::LoadU32(base, address + 16); }
+  void set_extent_left(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t extent_left_address() const { return address + 16; }
+  uint32_t extent_top() const { return guest::LoadU32(base, address + 20); }
+  void set_extent_top(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
+  uint32_t extent_top_address() const { return address + 20; }
+  uint32_t extent_right() const { return guest::LoadU32(base, address + 24); }
+  void set_extent_right(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
+  uint32_t extent_right_address() const { return address + 24; }
+  uint32_t extent_bottom() const { return guest::LoadU32(base, address + 28); }
+  void set_extent_bottom(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
+  uint32_t extent_bottom_address() const { return address + 28; }
+  uint32_t extent_front() const { return guest::LoadU32(base, address + 32); }
+  void set_extent_front(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
+  uint32_t extent_front_address() const { return address + 32; }
+  uint32_t extent_back() const { return guest::LoadU32(base, address + 36); }
+  void set_extent_back(uint32_t v) const { guest::StoreU32(base, address + 36, v); }
+  uint32_t extent_back_address() const { return address + 36; }
+  // the box: left, top, right, bottom, front, back
+  uint32_t box_left() const { return guest::LoadU32(base, address + 40); }
+  void set_box_left(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
+  uint32_t box_left_address() const { return address + 40; }
+  uint32_t box_top() const { return guest::LoadU32(base, address + 44); }
+  void set_box_top(uint32_t v) const { guest::StoreU32(base, address + 44, v); }
+  uint32_t box_top_address() const { return address + 44; }
+  uint32_t box_right() const { return guest::LoadU32(base, address + 48); }
+  void set_box_right(uint32_t v) const { guest::StoreU32(base, address + 48, v); }
+  uint32_t box_right_address() const { return address + 48; }
+  uint32_t box_bottom() const { return guest::LoadU32(base, address + 52); }
+  void set_box_bottom(uint32_t v) const { guest::StoreU32(base, address + 52, v); }
+  uint32_t box_bottom_address() const { return address + 52; }
+  uint32_t box_front() const { return guest::LoadU32(base, address + 56); }
+  void set_box_front(uint32_t v) const { guest::StoreU32(base, address + 56, v); }
+  uint32_t box_front_address() const { return address + 56; }
+  uint32_t box_back() const { return guest::LoadU32(base, address + 60); }
+  void set_box_back(uint32_t v) const { guest::StoreU32(base, address + 60, v); }
+  uint32_t box_back_address() const { return address + 60; }
+  // Blitter::Init: the filter's 0x80000
+  uint32_t dither() const { return guest::LoadU32(base, address + 64); }
+  void set_dither(uint32_t v) const { guest::StoreU32(base, address + 64, v); }
+  uint32_t dither_address() const { return address + 64; }
+  // Blitter::Init: the filter's 0x100000
+  uint32_t diffusion() const { return guest::LoadU32(base, address + 68); }
+  void set_diffusion(uint32_t v) const { guest::StoreU32(base, address + 68, v); }
+  uint32_t diffusion_address() const { return address + 68; }
+  // Blitter::Init: the filter's 0x200000 (source) or 0x400000 (destination)
+  uint32_t srgb() const { return guest::LoadU32(base, address + 72); }
+  void set_srgb(uint32_t v) const { guest::StoreU32(base, address + 72, v); }
+  uint32_t srgb_address() const { return address + 72; }
+  uint32_t color_key() const { return guest::LoadU32(base, address + 76); }
+  void set_color_key(uint32_t v) const { guest::StoreU32(base, address + 76, v); }
+  uint32_t color_key_address() const { return address + 76; }
+  // never read by ImageCodec::Create's paths
+  uint32_t palette() const { return guest::LoadU32(base, address + 80); }
+  void set_palette(uint32_t v) const { guest::StoreU32(base, address + 80, v); }
+  uint32_t palette_address() const { return address + 80; }
+};
+
+// stack; measure: XGGetBlockDimensions.r4, XGGetBlockDimensions.r5
+struct TcBlockDimension : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t value() const { return guest::LoadU32(base, address + 0); }
+  void set_value(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t value_address() const { return address + 0; }
+};
+
+// allocated; measure: Blitter::LinearWeights.ret, new<4294967295>@Blitter::LinearWeights
+struct BlitLinearWeights : View {
+  using View::View;
+  static constexpr uint32_t kSize = 16;
+  // probably
+  uint32_t first_index() const { return guest::LoadU32(base, address + 0); }
+  void set_first_index(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t first_index_address() const { return address + 0; }
+  // probably
+  float first_weight() const { return guest::LoadFloat(base, address + 4); }
+  void set_first_weight(float v) const { guest::StoreFloat(base, address + 4, v); }
+  uint32_t first_weight_address() const { return address + 4; }
+  // probably
+  uint32_t second_index() const { return guest::LoadU32(base, address + 8); }
+  void set_second_index(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t second_index_address() const { return address + 8; }
+  // probably
+  float second_weight() const { return guest::LoadFloat(base, address + 12); }
+  void set_second_weight(float v) const { guest::StoreFloat(base, address + 12, v); }
+  uint32_t second_weight_address() const { return address + 12; }
+};
+
+// allocated; measure: Blitter::TriangleWeights.ret, new<?>@Blitter::TriangleWeights
+struct BlitTriangleWeights : View {
+  using View::View;
+  static constexpr uint32_t kSize = 24;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  // probably a tap's source index
+  uint32_t first_index() const { return guest::LoadU32(base, address + 8); }
+  void set_first_index(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t first_index_address() const { return address + 8; }
+  // probably its weight
+  float first_weight() const { return guest::LoadFloat(base, address + 12); }
+  void set_first_weight(float v) const { guest::StoreFloat(base, address + 12, v); }
+  uint32_t first_weight_address() const { return address + 12; }
+  // probably
+  uint32_t second_index() const { return guest::LoadU32(base, address + 16); }
+  void set_second_index(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t second_index_address() const { return address + 16; }
+  // probably
+  float second_weight() const { return guest::LoadFloat(base, address + 20); }
+  void set_second_weight(float v) const { guest::StoreFloat(base, address + 20, v); }
+  uint32_t second_weight_address() const { return address + 20; }
+};
+
+// file; measure: DxtColor, DxtColor::DecodeBlock.r4
+struct DxtColorBlock : View {
+  using View::View;
+  static constexpr uint32_t kSize = 16;
+  uint16_t color0() const { return guest::LoadU16(base, address + 0); }
+  void set_color0(uint16_t v) const { guest::StoreU16(base, address + 0, v); }
+  uint32_t color0_address() const { return address + 0; }
+  uint16_t color1() const { return guest::LoadU16(base, address + 2); }
+  void set_color1(uint16_t v) const { guest::StoreU16(base, address + 2, v); }
+  uint32_t color1_address() const { return address + 2; }
+  uint32_t indices() const { return guest::LoadU32(base, address + 4); }
+  void set_indices(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t indices_address() const { return address + 4; }
+  // a float4 pixel's (the measure's join)
+  float red() const { return guest::LoadFloat(base, address + 0); }
+  void set_red(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t red_address() const { return address + 0; }
+  float green() const { return guest::LoadFloat(base, address + 4); }
+  void set_green(float v) const { guest::StoreFloat(base, address + 4, v); }
+  uint32_t green_address() const { return address + 4; }
+  float blue() const { return guest::LoadFloat(base, address + 8); }
+  void set_blue(float v) const { guest::StoreFloat(base, address + 8, v); }
+  uint32_t blue_address() const { return address + 8; }
+  float alpha() const { return guest::LoadFloat(base, address + 12); }
+  void set_alpha(float v) const { guest::StoreFloat(base, address + 12, v); }
+  uint32_t alpha_address() const { return address + 12; }
+};
+
+// file; measure: DxtAlpha, DxtAlpha::DecodeBlock.r4
+struct DxtAlphaBlock : View {
+  using View::View;
+  static constexpr uint32_t kSize = 144;
+  uint8_t alpha0() const { return guest::LoadU8(base, address + 0); }
+  void set_alpha0(uint8_t v) const { guest::StoreU8(base, address + 0, v); }
+  uint32_t alpha0_address() const { return address + 0; }
+  // both ends
+  uint16_t ends() const { return guest::LoadU16(base, address + 0); }
+  void set_ends(uint16_t v) const { guest::StoreU16(base, address + 0, v); }
+  uint32_t ends_address() const { return address + 0; }
+  uint8_t alpha1() const { return guest::LoadU8(base, address + 1); }
+  void set_alpha1(uint8_t v) const { guest::StoreU8(base, address + 1, v); }
+  uint32_t alpha1_address() const { return address + 1; }
+  // the 16 three-bit indices
+  uint32_t index_bytes_address() const { return address + 2; }
+  uint16_t indices_2() const { return guest::LoadU16(base, address + 2); }
+  void set_indices_2(uint16_t v) const { guest::StoreU16(base, address + 2, v); }
+  uint32_t indices_2_address() const { return address + 2; }
+  uint16_t indices_4() const { return guest::LoadU16(base, address + 4); }
+  void set_indices_4(uint16_t v) const { guest::StoreU16(base, address + 4, v); }
+  uint32_t indices_4_address() const { return address + 4; }
+  uint16_t indices_6() const { return guest::LoadU16(base, address + 6); }
+  void set_indices_6(uint16_t v) const { guest::StoreU16(base, address + 6, v); }
+  uint32_t indices_6_address() const { return address + 6; }
+  // the pixels' (the measure's join)
+  float pixel0_red() const { return guest::LoadFloat(base, address + 0); }
+  void set_pixel0_red(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t pixel0_red_address() const { return address + 0; }
+  float pixel0_alpha() const { return guest::LoadFloat(base, address + 12); }
+  void set_pixel0_alpha(float v) const { guest::StoreFloat(base, address + 12, v); }
+  uint32_t pixel0_alpha_address() const { return address + 12; }
+  float pixel8_alpha() const { return guest::LoadFloat(base, address + 140); }
+  void set_pixel8_alpha(float v) const { guest::StoreFloat(base, address + 140, v); }
+  uint32_t pixel8_alpha_address() const { return address + 140; }
+};
+
+// file; measure: Dxt3A, Dxt3A::DecodeBlock.r4
+struct Dxt3ABlock : View {
+  using View::View;
+  static constexpr uint32_t kSize = 144;
+  // pixels 0-7's four bits each (probably)
+  uint32_t alphas_low() const { return guest::LoadU32(base, address + 0); }
+  void set_alphas_low(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t alphas_low_address() const { return address + 0; }
+  // pixels 8-15's (probably)
+  uint32_t alphas_high() const { return guest::LoadU32(base, address + 4); }
+  void set_alphas_high(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t alphas_high_address() const { return address + 4; }
+  // the pixels' (the measure's join)
+  float pixel0_alpha() const { return guest::LoadFloat(base, address + 12); }
+  void set_pixel0_alpha(float v) const { guest::StoreFloat(base, address + 12, v); }
+  uint32_t pixel0_alpha_address() const { return address + 12; }
+  float pixel8_alpha() const { return guest::LoadFloat(base, address + 140); }
+  void set_pixel8_alpha(float v) const { guest::StoreFloat(base, address + 140, v); }
+  uint32_t pixel8_alpha_address() const { return address + 140; }
+};
+
+// The image words docs/functions/texture-compression.md's code uses.
+struct TextureCompressionGlobals {
+  // 1.0
+  static float one(uint8_t* base) { return guest::LoadFloat(base, 0x82000A30u); }
+  static void set_one(uint8_t* base, float v) { guest::StoreFloat(base, 0x82000A30u, v); }
+  static constexpr uint32_t one_address() { return 0x82000A30u; }
+  // 0.0
+  static float zero(uint8_t* base) { return guest::LoadFloat(base, 0x82000A34u); }
+  static void set_zero(uint8_t* base, float v) { guest::StoreFloat(base, 0x82000A34u, v); }
+  static constexpr uint32_t zero_address() { return 0x82000A34u; }
+  // probably 255.0
+  static float scale_255(uint8_t* base) { return guest::LoadFloat(base, 0x82000C44u); }
+  static void set_scale_255(uint8_t* base, float v) { guest::StoreFloat(base, 0x82000C44u, v); }
+  static constexpr uint32_t scale_255_address() { return 0x82000C44u; }
+  // -1.0: DxtColor::FitEndpoints' corrections' factor
+  static float minus_one(uint8_t* base) { return guest::LoadFloat(base, 0x82001BE0u); }
+  static void set_minus_one(uint8_t* base, float v) { guest::StoreFloat(base, 0x82001BE0u, v); }
+  static constexpr uint32_t minus_one_address() { return 0x82001BE0u; }
+  // probably 0.5
+  static float half(uint8_t* base) { return guest::LoadFloat(base, 0x82001BE4u); }
+  static void set_half(uint8_t* base, float v) { guest::StoreFloat(base, 0x82001BE4u, v); }
+  static constexpr uint32_t half_address() { return 0x82001BE4u; }
+  // probably 1/255
+  static float inverse_255(uint8_t* base) { return guest::LoadFloat(base, 0x82002200u); }
+  static void set_inverse_255(uint8_t* base, float v) { guest::StoreFloat(base, 0x82002200u, v); }
+  static constexpr uint32_t inverse_255_address() { return 0x82002200u; }
+  // probably 1/5 (DxtAlpha::EncodeBlock's 6 steps)
+  static float inverse_5(uint8_t* base) { return guest::LoadFloat(base, 0x82002208u); }
+  static void set_inverse_5(uint8_t* base, float v) { guest::StoreFloat(base, 0x82002208u, v); }
+  static constexpr uint32_t inverse_5_address() { return 0x82002208u; }
+  // probably 1/3 (DxtColor::EncodeBlock's palette)
+  static float third(uint8_t* base) { return guest::LoadFloat(base, 0x82002A38u); }
+  static void set_third(uint8_t* base, float v) { guest::StoreFloat(base, 0x82002A38u, v); }
+  static constexpr uint32_t third_address() { return 0x82002A38u; }
+  // 0.125: DxtColor::FitEndpoints' weights' factor
+  static float eighth(uint8_t* base) { return guest::LoadFloat(base, 0x82002A88u); }
+  static void set_eighth(uint8_t* base, float v) { guest::StoreFloat(base, 0x82002A88u, v); }
+  static constexpr uint32_t eighth_address() { return 0x82002A88u; }
+  // DxtAlpha::FitEndpoints' smallest range
+  static float alpha_range_min(uint8_t* base) { return guest::LoadFloat(base, 0x82008058u); }
+  static void set_alpha_range_min(uint8_t* base, float v) { guest::StoreFloat(base, 0x82008058u, v); }
+  static constexpr uint32_t alpha_range_min_address() { return 0x82008058u; }
+  // the error diffusion's (probably 1/16)
+  static float weight_below_right(uint8_t* base) { return guest::LoadFloat(base, 0x820093A0u); }
+  static void set_weight_below_right(uint8_t* base, float v) { guest::StoreFloat(base, 0x820093A0u, v); }
+  static constexpr uint32_t weight_below_right_address() { return 0x820093A0u; }
+  // DxtAlpha::FitEndpoints' squared step to stop
+  static float alpha_gradient_min(uint8_t* base) { return guest::LoadFloat(base, 0x8201607Cu); }
+  static void set_alpha_gradient_min(uint8_t* base, float v) { guest::StoreFloat(base, 0x8201607Cu, v); }
+  static constexpr uint32_t alpha_gradient_min_address() { return 0x8201607Cu; }
+  // FLT_MIN: DxtColor::FitEndpoints' smallest squared extent
+  static float extent_min(uint8_t* base) { return guest::LoadFloat(base, 0x82018FE0u); }
+  static void set_extent_min(uint8_t* base, float v) { guest::StoreFloat(base, 0x82018FE0u, v); }
+  static constexpr uint32_t extent_min_address() { return 0x82018FE0u; }
+  // probably 2/3 (DxtColor::EncodeBlock's palette)
+  static float two_thirds(uint8_t* base) { return guest::LoadFloat(base, 0x82038450u); }
+  static void set_two_thirds(uint8_t* base, float v) { guest::StoreFloat(base, 0x82038450u, v); }
+  static constexpr uint32_t two_thirds_address() { return 0x82038450u; }
+  // the error diffusion's (probably 3/16)
+  static float weight_below_left(uint8_t* base) { return guest::LoadFloat(base, 0x8203B78Cu); }
+  static void set_weight_below_left(uint8_t* base, float v) { guest::StoreFloat(base, 0x8203B78Cu, v); }
+  static constexpr uint32_t weight_below_left_address() { return 0x8203B78Cu; }
+  // the error diffusion's (probably 5/16)
+  static float weight_below(uint8_t* base) { return guest::LoadFloat(base, 0x8203B790u); }
+  static void set_weight_below(uint8_t* base, float v) { guest::StoreFloat(base, 0x8203B790u, v); }
+  static constexpr uint32_t weight_below_address() { return 0x8203B790u; }
+  // probably 31 (PackR5G6B5's red and blue)
+  static float scale_5(uint8_t* base) { return guest::LoadFloat(base, 0x8203B7A0u); }
+  static void set_scale_5(uint8_t* base, float v) { guest::StoreFloat(base, 0x8203B7A0u, v); }
+  static constexpr uint32_t scale_5_address() { return 0x8203B7A0u; }
+  // probably 63 (green)
+  static float scale_6(uint8_t* base) { return guest::LoadFloat(base, 0x8203B7A4u); }
+  static void set_scale_6(uint8_t* base, float v) { guest::StoreFloat(base, 0x8203B7A4u, v); }
+  static constexpr uint32_t scale_6_address() { return 0x8203B7A4u; }
+  // probably 1/31
+  static float step_5(uint8_t* base) { return guest::LoadFloat(base, 0x8203B7A8u); }
+  static void set_step_5(uint8_t* base, float v) { guest::StoreFloat(base, 0x8203B7A8u, v); }
+  static constexpr uint32_t step_5_address() { return 0x8203B7A8u; }
+  // probably 1/63
+  static float step_6(uint8_t* base) { return guest::LoadFloat(base, 0x8203B7ACu); }
+  static void set_step_6(uint8_t* base, float v) { guest::StoreFloat(base, 0x8203B7ACu, v); }
+  static constexpr uint32_t step_6_address() { return 0x8203B7ACu; }
+  // probably 1/7 (DxtAlpha::EncodeBlock's 8 steps)
+  static float inverse_7(uint8_t* base) { return guest::LoadFloat(base, 0x8203B7B0u); }
+  static void set_inverse_7(uint8_t* base, float v) { guest::StoreFloat(base, 0x8203B7B0u, v); }
+  static constexpr uint32_t inverse_7_address() { return 0x8203B7B0u; }
+  // DxtAlpha::FitEndpoints' high end's weights for 8 steps (floats)
+  static constexpr uint32_t alpha_high_weights_8_address() { return 0x8203EA38u; }
+  // the low end's for 8 steps
+  static constexpr uint32_t alpha_low_weights_8_address() { return 0x8203EA58u; }
+  // the high end's for 6 steps
+  static constexpr uint32_t alpha_high_weights_6_address() { return 0x8203EA78u; }
+  // the low end's for 6 steps
+  static constexpr uint32_t alpha_low_weights_6_address() { return 0x8203EA90u; }
+  // 2^-16: DxtColor::FitEndpoints' squared corrections to stop at
+  static float color_stop_min(uint8_t* base) { return guest::LoadFloat(base, 0x8203EAA8u); }
+  static void set_color_stop_min(uint8_t* base, float v) { guest::StoreFloat(base, 0x8203EAA8u, v); }
+  static constexpr uint32_t color_stop_min_address() { return 0x8203EAA8u; }
+  // 2^-12: DxtColor::FitEndpoints' smallest squared length
+  static float color_length_min(uint8_t* base) { return guest::LoadFloat(base, 0x8203EAACu); }
+  static void set_color_length_min(uint8_t* base, float v) { guest::StoreFloat(base, 0x8203EAACu, v); }
+  static constexpr uint32_t color_length_min_address() { return 0x8203EAACu; }
+  // DxtColor::FitEndpoints' high end's weights for 4 colors (floats)
+  static constexpr uint32_t color_high_weights_4_address() { return 0x8203EAB0u; }
+  // the low end's for 4 colors
+  static constexpr uint32_t color_low_weights_4_address() { return 0x8203EAC0u; }
+  // the high end's for 3 colors
+  static constexpr uint32_t color_high_weights_3_address() { return 0x8203EAD0u; }
+  // the low end's for 3 colors
+  static constexpr uint32_t color_low_weights_3_address() { return 0x8203EADCu; }
+  // DxtColor::EncodeBlock's step to palette index (words), 4 colors
+  static constexpr uint32_t color_indices_4_address() { return 0x8203EAE8u; }
+  // 3 colors
+  static constexpr uint32_t color_indices_3_address() { return 0x8203EAF8u; }
+  // the error diffusion's (probably 7/16)
+  static float weight_right(uint8_t* base) { return guest::LoadFloat(base, 0x8203EB04u); }
+  static void set_weight_right(uint8_t* base, float v) { guest::StoreFloat(base, 0x8203EB04u, v); }
+  static constexpr uint32_t weight_right_address() { return 0x8203EB04u; }
+  // DxtAlpha::EncodeBlock's step to index (words), 8 steps
+  static constexpr uint32_t alpha_indices_8_address() { return 0x8203EB08u; }
+  // 6 steps (with 0 and 1)
+  static constexpr uint32_t alpha_indices_6_address() { return 0x8203EB28u; }
+  // XGCompressSurface's f1, stored each call; DXT1's 1-bit alpha below it
+  static float alpha_reference(uint8_t* base) { return guest::LoadFloat(base, 0x8263B7E8u); }
+  static void set_alpha_reference(uint8_t* base, float v) { guest::StoreFloat(base, 0x8263B7E8u, v); }
+  static constexpr uint32_t alpha_reference_address() { return 0x8263B7E8u; }
+  // 32 floats of 0.5 (a codec's +52 without dither)
+  static constexpr uint32_t rounding_table_address() { return 0x8263C768u; }
+  // 32 floats of a 4 x 4 ordered dither's offsets (with dither)
+  static constexpr uint32_t dither_table_address() { return 0x8263C7E8u; }
+  // in .data: the color weights the color encoder scales pixels by (0.2970, 1.0, 0.1008 in play)
+  static constexpr uint32_t color_weights_address() { return 0x82649B10u; }
+  // their inverses
+  static constexpr uint32_t inverse_color_weights_address() { return 0x82649B20u; }
+  // XGCompressSurface's flags & 1, stored each call: the DXT2/3 and 4/5 block functions premultiply alpha
+  static uint32_t premultiplied(uint8_t* base) { return guest::LoadU32(base, 0x82954660u); }
+  static void set_premultiplied(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x82954660u, v); }
+  static constexpr uint32_t premultiplied_address() { return 0x82954660u; }
+};
+
+}  // namespace schema

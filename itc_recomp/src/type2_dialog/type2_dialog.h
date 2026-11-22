@@ -28,25 +28,10 @@ namespace type2_dialog {
 
 using Calls = race_hud_object::Calls;
 
-// The dialog's blocks: the page object (28 bytes: +0 the page Draw runs, -1
-// while a step runs; +4 the page after the step; +8 the page before; +12
-// the step Update runs, -1 none; +16 the step queued after it; +20; +24 the
-// step's started word), the menu (68: a front-end menu, items 0 to 1) and
-// the data (68: +0 the movies loaded, +4 the state queued, 21 none, +8 the
-// movie shown).
-constexpr uint32_t kPages = 0x826D83F8;
-constexpr uint32_t kMenu = 0x826D83FC;
-constexpr uint32_t kData = 0x826D8400;
-// The dialog showing (0 to 3) and its status (-1 loading, 3 idle, 5 an
-// open asked, 0 just shown, 4 asked by TakesInput, 1 taking input, 2
-// cancelled).
-constexpr uint32_t kShowing = 0x82636200;
-constexpr uint32_t kStatus = 0x82636204;
-
-// The machine's words.
-constexpr uint32_t kMachineState = 9604;
-constexpr uint32_t kMachineLoaded = 9608;
-constexpr uint32_t kMachineReenter = 9612;
+// The dialog's blocks and words are in the schema
+// (itc_recomp/schema/type2-dialog.toml: the page object, the menu, the data,
+// the dialog showing and its status; the machine a StateMachine,
+// game-modes.toml), named through their views (src/schema/).
 
 // The callees by address.
 constexpr uint32_t kVirtualAlloc = 0x82295398;
@@ -62,9 +47,10 @@ constexpr uint32_t kMenuStep = 0x82186568;
 constexpr uint32_t kMenuPressed = 0x821864C8;
 constexpr uint32_t kMenuSoundPlay = 0x821103F0;
 
-// Posts the message (id, 0, 0) on `mode`'s ring (+204: its count +600,
-// start +604, 50 slots of 12 bytes), the words in the order `order` names
-// (0: id, +4, +8; 1: +4, +8, id), as the handlers do inline.
+// Posts the message (id, 0, 0) on `mode`'s ring (`mode` the handlers' r4, a
+// schema::ModeDispatcher: its ring of 50 ModeMessages, ring_count and
+// ring_start), the words id, arg0, arg1, or with `id_last` arg0, arg1, id,
+// as the handlers do inline.
 void Post(uint8_t* base, uint32_t mode, uint32_t id, bool id_last = false);
 
 // --- The steps (steps.cpp; r3 the started word's address, the page

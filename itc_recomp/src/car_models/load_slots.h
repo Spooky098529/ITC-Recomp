@@ -33,9 +33,10 @@ std::optional<uint32_t> LoadSlotReleaseBuffer(uint8_t* base, uint32_t slot);
 // same pages would fail the second free.
 bool LoadSlotReleasable(uint8_t* base, uint32_t slot, uint32_t* freed);
 
-// The scene's second set ([0x826C2E44]): its shared load buffer at +5056,
-// the buffer's size at +5060.
-constexpr uint32_t kSceneSet = 0x826C2E44;
+// The car scene's ([0x826C2E44], CarModelsGlobals::scene) load buffer at
+// +5056 and its size at +5060 (car-draw.toml's CarScene load_buffer and
+// load_buffer_size; the code reads them through the view, these offsets are
+// kept for the unbuilt harnesses).
 constexpr uint32_t kSharedBuffer = 5056;
 constexpr uint32_t kSharedBufferSize = 5060;
 

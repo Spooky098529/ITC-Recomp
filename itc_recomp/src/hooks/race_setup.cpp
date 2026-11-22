@@ -3,6 +3,8 @@
 // (hooks/race_setup.h).
 
 #include "hooks/race_setup.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
@@ -10,6 +12,7 @@
 #include "hooks/app_start_up.h"
 #include "base/log.h"
 #include "race_setup/race_setup.h"
+#include "schema/race_setup.h"
 #include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, native_car_physics);
@@ -158,7 +161,7 @@ ITC_REGS_STEP(RaceSetupEntryReset) {
   ctx.fpscr.disableFlushMode();
   rs::EntryReset(base, ctx.r3.u32);
   ctx.r3.u64 = ctx.r1.u64 - 144 + 80;
-  ctx.f1.f64 = double(guest::LoadFloat(base, rs::kZero));
+  ctx.f1.f64 = double(schema::RaceSetupGlobals::zero(base));
 }
 
 ITC_REGS_STEP(RaceSetupCourseRecordReset) {
@@ -187,7 +190,7 @@ ITC_REGS_STEP(RaceSetupCourseRoutesGet) {
     ctx.r4.u64 = source;
     ctx.r5.u64 = rs::kRouteBytes;
     ctx.lr = 0x82101624;
-    lifted::CallFromContext(ctx, base, 0x825A7410);
+    lifted::Enter(ctx, base, game::memcpy_825A7410);
     ctx.r1.u64 = r1;
   }
   ctx.r3.u64 = result;
@@ -269,7 +272,7 @@ ITC_REGS_STEP(RaceSetupRecordReset) {
   // Route::Reset's r3 (its frame + 80), and f1 as the entries' resets leave
   // it (0.0).
   ctx.r3.u64 = ctx.r1.u64 - 128 - rs::kRouteFrameBytes + 80;
-  ctx.f1.f64 = double(guest::LoadFloat(base, rs::kZero));
+  ctx.f1.f64 = double(schema::RaceSetupGlobals::zero(base));
 }
 
 ITC_REGS_STEP(RaceSetupRaceSetRoute) {
@@ -299,7 +302,7 @@ ITC_REGS_STEP(RaceSetupRaceDataReset) {
   }
   // The last sub_82101F68's r3 (its Route::Reset's frame + 80) and f1.
   ctx.r3.u64 = ctx.r1.u64 - 112 - 112 - 128 - rs::kRouteFrameBytes + 80;
-  ctx.f1.f64 = double(guest::LoadFloat(base, rs::kZero));
+  ctx.f1.f64 = double(schema::RaceSetupGlobals::zero(base));
 }
 
 ITC_REGS_STEP(RaceSetupRaceDataResetGlobal) {
@@ -312,7 +315,7 @@ ITC_REGS_STEP(RaceSetupRaceDataResetGlobal) {
     return;
   }
   ctx.r3.u64 = ctx.r1.u64 - 112 - 112 - 128 - rs::kRouteFrameBytes + 80;
-  ctx.f1.f64 = double(guest::LoadFloat(base, rs::kZero));
+  ctx.f1.f64 = double(schema::RaceSetupGlobals::zero(base));
 }
 
 namespace {
@@ -333,7 +336,7 @@ void GuestRefresh(void* user, uint32_t car) {
   ctx.r1.u64 = call.r1;
   ctx.r3.u64 = car;
   ctx.lr = call.lr;
-  lifted::CallFromContext(ctx, call.base, 0x820C4998);
+  lifted::Enter(ctx, call.base, game::Car::Refresh);
   ctx.r1.u64 = r1;
 }
 
@@ -394,22 +397,22 @@ uint64_t SetUpGuestCall(void* user, uint32_t function, const uint64_t args[4], d
   ctx.lr = lr;
   switch (function) {
     case 0x820C4998:
-      lifted::CallFromContext(ctx, call.base, 0x820C4998);
+      lifted::Enter(ctx, call.base, game::Car::Refresh);
       break;
     case 0x82112DB0:
-      lifted::CallFromContext(ctx, call.base, 0x82112DB0);
+      lifted::Enter(ctx, call.base, game::Race::SetUpRival);
       break;
     case 0x82102048:
-      lifted::CallFromContext(ctx, call.base, 0x82102048);
+      lifted::Enter(ctx, call.base, game::Race::PlaceRacers);
       break;
     case 0x821017C0:
-      lifted::CallFromContext(ctx, call.base, 0x821017C0);
+      lifted::Enter(ctx, call.base, game::Race::AddRacer);
       break;
     case 0x821021A8:
-      lifted::CallFromContext(ctx, call.base, 0x821021A8);
+      lifted::Enter(ctx, call.base, game::RaceData::ResetGlobal);
       break;
     case 0x82101D38:
-      lifted::CallFromContext(ctx, call.base, 0x82101D38);
+      lifted::Enter(ctx, call.base, game::Race::SetRoute);
       break;
     default:
       ITC_LOG_ERROR("race_setup: no guest call for {:08X}", function);

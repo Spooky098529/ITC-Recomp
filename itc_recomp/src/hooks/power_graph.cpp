@@ -5,6 +5,8 @@
 // slots by the return address), the original runs.
 
 #include "hooks/power_graph.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -14,6 +16,7 @@
 #include "hooks/front_end_car_draw.h"
 #include "hooks/guest_call.h"
 #include "power_graph/power_graph.h"
+#include "schema/app_start_up.h"
 #include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, log_overlay_uploads);
@@ -38,7 +41,7 @@ namespace {
 
 namespace pg = power_graph;
 
-constexpr uint32_t kRenderManager = 0x826BABA0;
+constexpr uint32_t kRenderManager = schema::AppStartUpGlobals::render_app_address();
 
 // A guest call made from the frame at `frame` (`bytes` long, its back chain
 // written as the original's stwu does), returning to `back`.
@@ -151,7 +154,7 @@ void hooks::TuningScreenDrawPowerGraph(lifted::Regs& ctx, uint8_t* base) {
     // PowerGraph::Draw saves in its frame: not carried by the view.)
     (void)movie;
     ctx.lr = pg::kTuningDrawReturn;
-    lifted::CallFromContext(ctx, base, 0x8217C708);
+    lifted::Enter(ctx, base, game::PowerGraph::Draw);
   });
   ctx.lr = lr;
 }
@@ -188,7 +191,7 @@ void hooks::CarListDrawEntryPowerGraph(lifted::Regs& ctx, uint8_t* base) {
     // PowerGraph::Draw saves in its frame, where a count above 32 reads it
     // back: not carried by the view.)
     ctx.lr = pg::kEntryDrawReturn;
-    lifted::CallFromContext(ctx, base, 0x8217C708);
+    lifted::Enter(ctx, base, game::PowerGraph::Draw);
   });
   ctx.lr = lr;
 }
@@ -220,7 +223,7 @@ void hooks::CarListDrawCarPowerGraph(lifted::Regs& ctx, uint8_t* base) {
     // PowerGraph::Draw saves in its frame, where a count above 32 reads it
     // back: not carried by the view.)
     ctx.lr = pg::kCarDrawReturn;
-    lifted::CallFromContext(ctx, base, 0x8217C708);
+    lifted::Enter(ctx, base, game::PowerGraph::Draw);
   });
   ctx.lr = lr;
 }

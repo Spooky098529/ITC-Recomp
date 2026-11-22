@@ -15,6 +15,8 @@
 #include "models/xpr.h"
 #include "native/buffers.h"
 #include "scene_loaders/pools.h"
+#include "schema/accessories.h"
+#include "schema/car_models.h"
 
 #include <bit>
 #include <cstdlib>
@@ -24,6 +26,8 @@ namespace car_models {
 namespace {
 
 using namespace car_physics::ops;
+using schema::CarModel;
+using G = schema::CarModelsGlobals;
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -44,16 +48,17 @@ void Require(bool done, const char* what) {
   }
 }
 
-constexpr uint32_t kNames = 0x826018C8;       // the cars' names, by block
-constexpr uint32_t kQuarterTurn = 0x82002A50;  // -pi / 2
-constexpr uint32_t kTenth = 0x82001FBC;        // 0.1
 constexpr uint32_t kTwoStrings = 0x82004FE8;   // "%s%s"
 constexpr uint32_t kNumbered = 0x82004FA4;     // "%s%s%d"
 // The nodes' names: tire_fl, tire_fr, tire_rl, tire_rr, seat_L, seat_R,
 // acce_null.
 constexpr uint32_t kNodeNames[7] = {0x82004FAC, 0x82004FB4, 0x82004FBC, 0x82004FC4,
                                     0x82004FCC, 0x82004FD4, 0x82004FDC};
-constexpr uint32_t kNodeMatrices[6] = {6720, 6784, 6848, 6912, 7040, 7104};
+// The six nodes' matrices in the car model: the tires', then the seats'.
+uint32_t NodeMatrix(const CarModel& car, int k) {
+  return k < 4 ? car.tire_matrices_address() + 64 * uint32_t(k)
+               : car.seat_matrices_address() + 64 * uint32_t(k - 4);
+}
 
 // What differs between the two: the suffixes and the return addresses.
 struct Variant {
@@ -102,8 +107,9 @@ bool Print(uint8_t* base, uint32_t f, uint32_t format, uint32_t name, uint32_t s
 
 // The texture set the request is for (0 or 1), or -1.
 int TextureSet(uint8_t* base, uint32_t request, uint32_t car) {
+  const CarModel c(base, car);
   for (int i = 0; i < 2; i++) {
-    if (Load(base, car + 3956 + 24 * uint32_t(i)) == request) {
+    if (schema::LoadSlot(base, c.xpr_slots_address() + 24 * uint32_t(i)).request() == request) {
       return i;
     }
   }
@@ -124,11 +130,13 @@ bool FileLoadedNative(uint8_t* base, FileLoadedSet set, uint32_t request, uint32
   if (i < 0) {
     return true;
   }
-  if (i == 0 && int32_t(Load(base, car + 3724)) == 1) {
+  const CarModel c(base, car);
+  if (i == 0 && int32_t(c.extra_image()) == 1) {
     return false;
   }
   if (set == FileLoadedSet::kA) {
-    const uint32_t buffer = Load(base, car + 3968 + 24 * uint32_t(i));
+    const uint32_t buffer =
+        schema::LoadSlot(base, c.xpr_slots_address() + 24 * uint32_t(i)).buffer();
     return buffer != 0 && memory::IsPages(buffer);
   }
   return true;
@@ -142,57 +150,56 @@ void FileLoaded(uint8_t* base, FileLoadedSet set, uint32_t request, uint32_t buf
     ITC_NATIVE_RUNNING("sub_820D4F80 CarModel::OnFileLoadedB");
   }
   const Variant& variant = kVariants[set == FileLoadedSet::kA ? 0 : 1];
+  const CarModel c(base, car);
   const uint32_t f = stack - kFileLoadedFrameBytes;
-  const auto name = [&] { return Load(base, (Load(base, car + 32) << 2) + kNames); };
+  const auto name = [&] { return Load(base, (c.block() << 2) + G::car_names_address()); };
   Require(Print(base, f, kTwoStrings, name(), variant.suffix, 0, false), "sprintf");
   const int texture_set = TextureSet(base, request, car);
   if (texture_set >= 0) {
     const uint32_t i = uint32_t(texture_set);
-    const uint32_t slot = car + 24 * i;
-    const uint32_t xpr = slot + 4000;
-    const uint32_t file = set == FileLoadedSet::kA ? Load(base, slot + 3968) : buffer;
+    const schema::LoadSlot slot(base, c.xpr_slots_address() + 24 * i);
+    const uint32_t xpr = c.xpr_objects_address() + 24 * i;
+    const uint32_t file = set == FileLoadedSet::kA ? slot.buffer() : buffer;
     if (!models::XprCreate(base, xpr, file)) {
       calls.xpr_create(xpr, file);
     }
-    calls.provider_set(car + 20 * i + 4048, xpr);
+    calls.provider_set(c.texture_providers_address() + 20 * i, xpr);
     if (set == FileLoadedSet::kA) {
-      Store(base, slot + 3972, 3);
-      Require(FreePagesAt(base, slot + 3968).has_value(), "the buffer's release");
-      Store(base, slot + 3968, 0);
+      slot.set_state(3);
+      Require(FreePagesAt(base, slot.buffer_address()).has_value(), "the buffer's release");
+      slot.set_buffer(0);
     } else {
-      Store(base, slot + 3968, 0);
-      Store(base, slot + 3972, 3);
+      slot.set_buffer(0);
+      slot.set_state(3);
     }
     if (i != 0) {
       return;
     }
     // (+3724 isn't 1: FileLoadedNative.)
-    Require(native::Buffers_Memcpy(base, f + 80, car + 3696, 16, variant.plate_memcpy),
+    Require(native::Buffers_Memcpy(base, f + 80, c.plate_w8_w11_address(), 16,
+                                   variant.plate_memcpy),
             "memcpy");
-    const uint32_t plate = car + 3664;
-    const uint64_t regs[4] = {
-        (uint64_t(Load(base, plate + 0)) << 32) | Load(base, plate + 4),
-        (uint64_t(Load(base, plate + 8)) << 32) | Load(base, plate + 12),
-        (uint64_t(Load(base, plate + 16)) << 32) | Load(base, plate + 20),
-        (uint64_t(Load(base, plate + 24)) << 32) | Load(base, plate + 28)};
-    Require(MakePlate(base, car + 6700, car + 6704, car + 6708, car + 6712, regs, f,
+    const uint64_t regs[4] = {c.plate_w0_w1(), c.plate_w2_w3(), c.plate_w4_w5(), c.plate_w6_w7()};
+    Require(MakePlate(base, c.plate_texture_a_address(), c.plate_texture_a_data_address(),
+                      c.plate_texture_b_address(), c.plate_texture_b_data_address(), regs, f,
                       calls.plate_release)
                 .has_value(),
             "MakePlate");
-    Store(base, car + 7232, uint32_t(scene_loaders::XprFindByName(base, car + 4000, f + 384)));
+    Store(base, c.xpr_indices_address(),
+          uint32_t(scene_loaders::XprFindByName(base, c.xpr_objects_address(), f + 384)));
     for (int32_t k = 1; k < 6; k++) {
       Require(Print(base, f, kNumbered, name(), variant.numbered_suffix, k, true), "sprintf");
-      Store(base, car + 7232 + 4 * uint32_t(k),
-            uint32_t(scene_loaders::XprFindByName(base, car + 4000, f + 384)));
+      Store(base, c.xpr_indices_address() + 4 * uint32_t(k),
+            uint32_t(scene_loaders::XprFindByName(base, c.xpr_objects_address(), f + 384)));
     }
     return;
   }
-  if (Load(base, car + 3732) != request) {
+  if (c.node_file_request() != request) {
     return;
   }
   // The node file: the skeleton bound and posed.
-  const uint32_t skeleton = car + 3760;
-  const uint32_t node_file = Load(base, car + 3744);
+  const uint32_t skeleton = c.skeleton_address();
+  const uint32_t node_file = c.node_file_buffer();
   if (!model_animation::SkeletonBind(base, skeleton, node_file, 0)) {
     calls.skeleton_bind(skeleton, node_file);
   }
@@ -202,17 +209,17 @@ void FileLoaded(uint8_t* base, FileLoadedSet set, uint32_t request, uint32_t buf
       model_animation::MatricesResult::kOriginal) {
     calls.update_matrices(skeleton);
   }
-  Store(base, car + 3748, 3);
+  c.set_node_file_state(3);
   int32_t found = 0;
   int32_t nodes = int32_t(model_animation::SkeletonNodeCount(base, skeleton));
   if (nodes > 0) {
     uint32_t record = 0, matrix = 0;
     for (; nodes != 0; nodes--, record += 160, matrix += 64) {
-      const uint32_t node_name = Load(base, car + 3844) + record;
+      const uint32_t node_name = c.skeleton_nodes<schema::View>().address + record;
       for (int k = 0; k < 6; k++) {
         if (SameName(base, kNodeNames[k], node_name)) {
-          const uint32_t to = car + kNodeMatrices[k];
-          const uint32_t from = Load(base, car + 3908) + matrix;
+          const uint32_t to = NodeMatrix(c, k);
+          const uint32_t from = c.skeleton_node_matrices<schema::View>().address + matrix;
           matrix_math::Copy(base, to, from);
           interpolation::BlendState_OnCopy(base, to, from, variant.copies[k]);
           found++;
@@ -220,7 +227,7 @@ void FileLoaded(uint8_t* base, FileLoadedSet set, uint32_t request, uint32_t buf
       }
       if (SameName(base, kNodeNames[6], node_name)) {
         found++;
-        Store(base, car + 7200, Load(base, car + 3908) + matrix);
+        c.set_accessory_matrix(c.skeleton_node_matrices<schema::View>().address + matrix);
       }
     }
   }
@@ -237,57 +244,59 @@ void FileLoaded(uint8_t* base, FileLoadedSet set, uint32_t request, uint32_t buf
     }
   }
   const uint32_t turn = f + 288;
-  CopyWord(base, kQuarterTurn, f + 144);
+  CopyWord(base, G::quarter_turn_address(), f + 144);
   matrix_math::RotateY(base, turn, turn, f + 144, f - 80);
   // The four tires' positions (their matrices' rows 3), w = 1.0, scaled by
   // 0.1 and turned; then w = 0.0.
-  const double tenth = Lfs(base, kTenth);
+  const double tenth = Lfs(base, G::float_tenth_address());
   const auto scale = [&](uint32_t at) { Stfs(base, at, Fmuls(Lfs(base, at), tenth)); };
-  static constexpr uint32_t kTires[4] = {6976, 6992, 7008, 7024};
+  const auto tire = [&](int k) { return c.tire_positions_address() + 16 * uint32_t(k); };
   for (int k = 0; k < 4; k++) {
-    PositionRow(base, car + kNodeMatrices[k] + 48, car + kTires[k]);
+    PositionRow(base, NodeMatrix(c, k) + 48, tire(k));
     if (k < 3) {
-      CopyWord(base, kOne, car + kTires[k] + 12);
+      CopyWord(base, kOne, tire(k) + 12);
     }
   }
   // (Every word read before it's written: the order of the original's
   // multiplies doesn't matter.)
   for (int k = 0; k < 4; k++) {
     for (uint32_t w = 0; w < 3; w++) {
-      scale(car + kTires[k] + 4 * w);
+      scale(tire(k) + 4 * w);
     }
   }
-  CopyWord(base, kOne, car + 7036);
+  CopyWord(base, kOne, tire(3) + 12);
   for (int k = 0; k < 4; k++) {
-    matrix_math::Vec4Transform(base, car + kTires[k], turn, car + kTires[k]);
+    matrix_math::Vec4Transform(base, tire(k), turn, tire(k));
   }
   for (int k = 0; k < 4; k++) {
-    CopyWord(base, kZero, car + kTires[k] + 12);
+    CopyWord(base, kZero, tire(k) + 12);
   }
   if (found == 7) {
-    PositionRow(base, car + 7088, car + 7168);
-    CopyWord(base, kOne, car + 7180);
-    PositionRow(base, car + 7152, car + 7184);
-    for (const uint32_t at : {7168u, 7184u}) {
+    const uint32_t seat_l = c.seat_positions_address(), seat_r = seat_l + 16;
+    PositionRow(base, NodeMatrix(c, 4) + 48, seat_l);
+    CopyWord(base, kOne, seat_l + 12);
+    PositionRow(base, NodeMatrix(c, 5) + 48, seat_r);
+    for (const uint32_t at : {seat_l, seat_r}) {
       for (uint32_t w = 0; w < 3; w++) {
-        scale(car + at + 4 * w);
+        scale(at + 4 * w);
       }
     }
-    CopyWord(base, kOne, car + 7196);
-    matrix_math::Vec4Transform(base, car + 7168, turn, car + 7168);
-    matrix_math::Vec4Transform(base, car + 7184, turn, car + 7184);
-    CopyWord(base, kZero, car + 7180);
-    CopyWord(base, kZero, car + 7196);
+    CopyWord(base, kOne, seat_r + 12);
+    matrix_math::Vec4Transform(base, seat_l, turn, seat_l);
+    matrix_math::Vec4Transform(base, seat_r, turn, seat_r);
+    CopyWord(base, kZero, seat_l + 12);
+    CopyWord(base, kZero, seat_r + 12);
   }
-  const uint32_t accessory = Load(base, car + 7200);
-  if (accessory != 0) {
-    Move8(base, accessory + 48, car + 7216);
-    Move8(base, accessory + 56, car + 7224);
+  const schema::AccessoryMatrix accessory = c.accessory_matrix();
+  if (accessory.address != 0) {
+    const uint32_t position = c.accessory_position_address();
+    Move8(base, accessory.translation_xy_address(), position);
+    Move8(base, accessory.translation_zw_address(), position + 8);
     for (uint32_t w = 0; w < 3; w++) {
-      scale(car + 7216 + 4 * w);
+      scale(position + 4 * w);
     }
-    CopyWord(base, kOne, car + 7228);
-    matrix_math::Vec4Transform(base, car + 7216, turn, car + 7216);
+    CopyWord(base, kOne, position + 12);
+    matrix_math::Vec4Transform(base, position, turn, position);
   }
 }
 

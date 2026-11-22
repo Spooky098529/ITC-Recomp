@@ -22,8 +22,6 @@ namespace {
 
 namespace steps = camera_modes::steps;
 
-constexpr uint32_t kRows = 9677;         // a byte: the level list's rows
-constexpr uint32_t kFirstRow = 25100;    // the list's first level shown
 constexpr uint32_t kMarkerScale = 0x82001FB0;  // a float: the marker's step
 
 }  // namespace
@@ -36,14 +34,17 @@ void Context::NodeText(uint32_t node, uint64_t id, uint32_t lr, uint64_t r6,
 // Block 4: state 5, the item's levels.
 void Context::State5() {
   // The level relative to the list's first row, all 64 bits (lbz - lwz).
-  const auto relative = [&] { return uint64_t(Byte(kLevel)) - uint64_t(Word(kFirstRow)); };
+  const auto relative = [&] {
+    return uint64_t(uint32_t(TS(base, screen).level())) -
+           uint64_t(TS(base, screen).list_scroll_row());
+  };
 
-  if (Word(9716) != 0) {
-    const uint32_t category = Word(kCategory);
+  if (TS(base, screen).command_first_run() != 0) {
+    const uint32_t category = TS(base, screen).category();
     Texture(3, 1, category == 2 ? 0 : uint64_t(category) + 1);
     // By the category (unsigned): none for 7 and above.
     static constexpr int32_t kFirst[7] = {8, 12, -1, 17, 20, 30, 38};
-    const uint32_t again = Word(kCategory);
+    const uint32_t again = TS(base, screen).category();
     if (again < 7) {
       Texture(3, 2, again == 2 ? 3 : uint64_t(Item()) + uint64_t(kFirst[again]));
     }
@@ -55,12 +56,12 @@ void Context::State5() {
     const int32_t category = Category();
     if (category == 0 || category == 1 || category == 2) {
       const uint32_t node = ChildOf(Node(28, 1), n);
-      guest::StoreU32(base, node + 80, 0);
+      UiNode(base, node).set_visible(0);
       ui_movies::SetColor(base, node, 0);
     }
     if (Category() == 3) {
       const uint32_t node = ChildOf(Node(30, 1), n);
-      guest::StoreU32(base, node + 80, 0);
+      UiNode(base, node).set_visible(0);
       ui_movies::SetColor(base, node, 0);
     }
   }
@@ -68,7 +69,7 @@ void Context::State5() {
   // A row shown, colored 2 when IsItemAvailable answers 0 for `item`.
   const auto show_row = [&](uint32_t sub_scene, uint32_t child, auto item) {
     const uint32_t node = ChildOf(Node(sub_scene, 1), child);
-    guest::StoreU32(base, node + 80, 1);
+    UiNode(base, node).set_visible(1);
     if (IsItemAvailable(base, screen, item()) == 0) {
       ui_movies::SetColor(base, node, 2);
     }
@@ -79,12 +80,13 @@ void Context::State5() {
   // return addresses for the first and middle texts.
   const auto list = [&](uint32_t sub_scene, uint32_t last, uint32_t first_lr, uint32_t row_lr) {
     NodeText(show_row(sub_scene, 5, [] { return uint64_t(0); }), 376, first_lr);
-    for (uint32_t row = 1; int32_t(row) < int32_t(Byte(kRows)) - 1; row++) {
+    for (uint32_t row = 1; int32_t(row) < int32_t(uint32_t(TS(base, screen).level_count())) - 1;
+         row++) {
       const uint32_t node = show_row(sub_scene, row + 5, [&] { return uint64_t(row); });
       NodeText(node, 378, row_lr, row);
     }
-    const uint32_t node =
-        show_row(sub_scene, last, [&] { return uint64_t(Byte(kRows)) - 1; });
+    const uint32_t node = show_row(
+        sub_scene, last, [&] { return uint64_t(uint32_t(TS(base, screen).level_count())) - 1; });
     NodeText(node, 377, 0x821E49A0);
   };
 
@@ -98,8 +100,8 @@ void Context::State5() {
     // for 9, else 378, with the level.
     for (uint32_t row = 0; row < 8; row++) {
       const uint32_t node = show_row(28, row + 5, [&] { return relative() + row; });
-      const uint64_t r10 = Word(kFirstRow);
-      const uint64_t level = uint64_t(Byte(kLevel)) - r10 + row;
+      const uint64_t r10 = TS(base, screen).list_scroll_row();
+      const uint64_t level = uint64_t(uint32_t(TS(base, screen).level())) - r10 + row;
       if (int32_t(level) == 0) {
         NodeText(node, 376, 0x821E4404, level, r10);
       } else if (int32_t(level) == 9) {
@@ -119,8 +121,8 @@ void Context::State5() {
     // 0x8200A8F8 by the level (0 to 9; none above).
     for (uint32_t row = 0; row < 8; row++) {
       const uint32_t node = show_row(28, row + 5, [&] { return relative() + row; });
-      const uint64_t r10 = Word(kFirstRow);
-      const uint64_t level = uint64_t(Byte(kLevel)) - r10 + row;
+      const uint64_t r10 = TS(base, screen).list_scroll_row();
+      const uint64_t level = uint64_t(uint32_t(TS(base, screen).level())) - r10 + row;
       constexpr uint32_t kSet = 0x821E4808, kUnset = 0x821E485C;
       switch (uint32_t(level)) {
         case 0: NodeText(node, 376, kUnset, 0, r10); break;
@@ -153,8 +155,8 @@ void Context::State5() {
       continue;
     }
     const uint32_t node = Node(sub_scene, 0);
-    guest::StoreU32(base, ChildOf(node, n - 11) + 80, 0);
-    guest::StoreU32(base, ChildOf(node, n) + 80, 0);
+    UiNode(base, ChildOf(node, n - 11)).set_visible(0);
+    UiNode(base, ChildOf(node, n)).set_visible(0);
   }
 
   // A row's marks: child 15 + row shown, child 38 + 2 row's +108 0 when
@@ -163,9 +165,9 @@ void Context::State5() {
     const uint32_t node = Node(sub_scene, 0);
     const uint32_t shown = ChildOf(node, row + 15);
     const uint32_t flag = ChildOf(node, 38 + 2 * row);
-    guest::StoreU32(base, shown + 80, 1);
+    UiNode(base, shown).set_visible(1);
     guest::StoreU32(base, flag + 108, GetChoiceFlag(base, screen, choice()) != 0 ? 0 : 1);
-    guest::StoreU32(base, ChildOf(node, row + 26) + 80, 1);
+    UiNode(base, ChildOf(node, row + 26)).set_visible(1);
   };
   // The eight levels from +25100: the current choice's marker (child 2 of
   // sub-scene 28's child 0) placed by its row and shown on the first eight.
@@ -173,26 +175,27 @@ void Context::State5() {
     const uint32_t marker = ChildOf(Node(28, 0), 2);
     {
       const uint64_t choice = GetCurrentChoice(base, screen);
-      const uint64_t back = uint64_t(Word(kFirstRow)) - uint64_t(Byte(kLevel));
+      const uint64_t back = uint64_t(TS(base, screen).list_scroll_row()) -
+                            uint64_t(uint32_t(TS(base, screen).level()));
       const int64_t row = int32_t(uint32_t(back + choice));
       guest::StoreU32(base, frame + 80, uint32_t(uint64_t(row) >> 32));
       guest::StoreU32(base, frame + 84, uint32_t(row));
       const double at =
           steps::Fmuls(steps::Single(double(row)), steps::Lfs(base, kMarkerScale));
-      steps::Stfs(base, marker + 16, at);
+      steps::Stfs(base, UiNode(base, marker).y_address(), at);
     }
     {
       const uint64_t choice = GetCurrentChoice(base, screen);
-      const uint64_t row =
-          uint64_t(Word(kFirstRow)) - uint64_t(Byte(kLevel)) + choice;
-      guest::StoreU32(base, marker + 80, int32_t(uint32_t(row)) > 7 ? 0 : 1);
+      const uint64_t row = uint64_t(TS(base, screen).list_scroll_row()) -
+                           uint64_t(uint32_t(TS(base, screen).level())) + choice;
+      UiNode(base, marker).set_visible(int32_t(uint32_t(row)) > 7 ? 0 : 1);
     }
     for (uint32_t row = 0; row < 8; row++) {
       marks(28, row, [&] { return relative() + row; });
     }
   };
   const auto rows = [&](uint32_t sub_scene) {
-    for (uint32_t row = 0; row < Byte(kRows); row++) {
+    for (uint32_t row = 0; row < uint32_t(TS(base, screen).level_count()); row++) {
       marks(sub_scene, row, [&] { return uint64_t(row); });
     }
   };
@@ -213,7 +216,7 @@ void Context::State5() {
 
   // The scroll arrows by the rows and the level's place from +25100.
   {
-    const uint32_t count = Byte(kRows);
+    const uint32_t count = uint32_t(TS(base, screen).level_count());
     if (count <= 8) {
       Shown(kAll, 25, 0);
       Shown(kAll, 26, 0);
@@ -234,7 +237,7 @@ void Context::State5() {
   // The help line by the category, the item and the level (the level byte
   // IsItemAvailable leaves in r4), 857 for a level not available.
   ResetHelp(0x821E4F84);
-  const uint64_t level = Byte(kLevel);
+  const uint64_t level = uint32_t(TS(base, screen).level());
   if (IsItemAvailable(base, screen, level) == 0) {
     Help(857);
     return;
@@ -243,7 +246,7 @@ void Context::State5() {
   if (c == 0) {
     const uint32_t item = Item();
     if (item == 0) {
-      switch (int32_t(Word(kPartSet))) {
+      switch (int32_t(TS(base, screen).price_class())) {
         case 0: Help(level + 649); break;
         case 1: Help(level + 664); break;
         case 2: Help(level + 679); break;
@@ -252,7 +255,7 @@ void Context::State5() {
         default: HelpScroll(); break;
       }
     } else if (item == 1) {
-      switch (int32_t(Word(kPartSet))) {
+      switch (int32_t(TS(base, screen).price_class())) {
         case 0: Help(level + 704); break;
         case 1: Help(level + 711); break;
         default: HelpScroll(); break;

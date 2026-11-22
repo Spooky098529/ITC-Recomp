@@ -8,6 +8,9 @@
 #include "camera_modes/steps.h"
 #include "graphics/resources.h"
 #include "guest.h"
+#include "schema/race_hud_object.h"
+#include "schema/race_setup.h"
+#include "schema/race_states.h"
 #include "scenery_lists/scenery_lists.h"
 #include "track_zones/track_zones.h"
 #include "ui_movies/game.h"
@@ -20,7 +23,10 @@ using namespace camera_modes::steps;
 
 void Frame(uint8_t* base, uint32_t sp, uint32_t bytes) { guest::StoreU32(base, sp - bytes, sp); }
 
-uint32_t Dashboard(uint8_t* base, uint32_t hud) { return guest::LoadU32(base, hud + kHudDashboard); }
+using Hud = schema::RaceHud;
+using G = schema::RaceHudObjectGlobals;
+
+uint32_t Dashboard(uint8_t* base, uint32_t hud) { return Hud(base, hud).dashboard().address; }
 
 // memcpy natively, or through `calls` from the frame `r1` with the return
 // address `lr` where its plain C++ refuses.
@@ -39,10 +45,13 @@ uint32_t SetUpGauges(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& call
   ITC_NATIVE_RUNNING("sub_82213C90 RaceHud::SetUpGauges");
   const uint32_t frame = sp - 480;
   Frame(base, sp, 480);
-  const uint32_t record = guest::LoadU32(base, hud + kHudPlayer) * kRecordBytes +
-                          guest::LoadU32(base, kRaceData);
-  const int32_t level = int32_t(guest::LoadU32(base, record + 1704));
-  const uint32_t index = guest::LoadU32(base, record + 60);
+  const Hud h(base, hud);
+  // The player's racer record: the race data's racer_records + 3,936 x it.
+  const uint32_t player = h.player();
+  const schema::RaceData data(base, G::race_data(base).address);
+  const schema::Car record(base, data.racer_records_address() + player * schema::Car::kSize);
+  const int32_t level = int32_t(record.engine_stage());
+  const uint32_t index = record.car_id();
   const uint32_t kind = level < 3 ? 0 : level < 7 ? 1 : 2;
   constexpr uint32_t kBoostCurve = 0x8200D348;
   Copy(base, calls, frame, 0x82213CF8, frame + 80, kBoostCurve - 336, 112);
@@ -50,31 +59,33 @@ uint32_t SetUpGauges(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& call
   Copy(base, calls, frame, 0x82213D18, frame + 304, kBoostCurve - 112, 112);
   const uint32_t curve = guest::LoadU32(base, (index << 4) + kBoostCurve + 112);
   const uint32_t face = guest::LoadU32(base, ((index << 2) + kind) * 4 + kBoostCurve + 116);
-  Copy(base, calls, frame, 0x82213D58, hud + 20, curve * 112 + frame + 80, 112);
+  Copy(base, calls, frame, 0x82213D58, h.tach_curve_address(), curve * 112 + frame + 80, 112);
   const double zero = Lfs(base, kZero);
-  CurveEval(base, hud + 20, zero);
+  CurveEval(base, h.tach_curve_address(), zero);
   const uint32_t node = ui_movies::FindNode(base, Dashboard(base, hud), 0, 8);
   guest::StoreU32(base, node + 108, face);
-  Copy(base, calls, frame, 0x82213D94, hud + 132, kBoostCurve, 112);
-  CurveEval(base, hud + 132, zero);
-  return hud + 132;
+  Copy(base, calls, frame, 0x82213D94, h.boost_curve_address(), kBoostCurve, 112);
+  CurveEval(base, h.boost_curve_address(), zero);
+  return h.boost_curve_address();
 }
 
 uint32_t SetUpMirror(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822135B0 RaceHud::SetUpMirror");
   const uint32_t frame = sp - 144;
   Frame(base, sp, 144);
-  const uint32_t swapped = guest::LoadU32(base, hud + 588);
+  const Hud h(base, hud);
+  const uint32_t swapped = h.swapped_texture();
   if (swapped != 0) {
     ui_movies::SwapTexture(base, Dashboard(base, hud), kMirrorTexture, swapped);
   }
   const uint32_t target = uint32_t(calls.Call(kRenderTarget, frame, 0x822135E8, 11));
-  guest::StoreU32(base, hud + 592, target);
+  h.set_mirror_texture(target);
   graphics::TextureLevelDesc(base, target, 0, frame + 80);
-  guest::StoreU32(base, hud + 596, guest::LoadU32(base, frame + 104));
-  guest::StoreU32(base, hud + 600, guest::LoadU32(base, frame + 108));
-  const uint32_t old = ui_movies::SwapTexture(base, Dashboard(base, hud), kMirrorTexture, hud + 592);
-  guest::StoreU32(base, hud + 588, old);
+  h.set_mirror_width(guest::LoadU32(base, frame + 104));
+  h.set_mirror_height(guest::LoadU32(base, frame + 108));
+  const uint32_t old = ui_movies::SwapTexture(base, Dashboard(base, hud), kMirrorTexture,
+                                              h.mirror_texture_address());
+  h.set_swapped_texture(old);
   return old;
 }
 
@@ -89,7 +100,7 @@ uint64_t TearDown(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls) 
   } else {
     r3 = calls.Call(kTrackZonesDestroy, frame, 0x822141B8);
   }
-  const uint32_t swapped = guest::LoadU32(base, hud + 588);
+  const uint32_t swapped = Hud(base, hud).swapped_texture();
   if (swapped != 0) {
     r3 = ui_movies::SwapTexture(base, Dashboard(base, hud), kMirrorTexture, swapped);
   }
@@ -113,11 +124,12 @@ uint64_t SetUpSigns(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls
   const uint32_t table = layout != -1
                              ? guest::LoadU32(base, (uint32_t(layout) << 2) + frame + 80)
                              : kLast - 6240;
-  guest::StoreU32(base, hud + 420, table);
+  const Hud h(base, hud);
+  h.set_sign_flags(table);
   const uint64_t r3 = calls.Call(kTrackZonesCreate, frame, 0x822123AC);
-  guest::StoreU32(base, hud + 416, 0xFFFFFFFFu);
-  guest::StoreU32(base, hud + 428, 0xFFFFFFFFu);
-  guest::StoreU32(base, hud + 424, 1);
+  h.set_sign_zone(0xFFFFFFFFu);
+  h.set_place_zone(0xFFFFFFFFu);
+  h.set_signs_on(1);
   return r3;
 }
 
@@ -128,7 +140,7 @@ uint64_t UpdateExtraGauges(uint8_t* base, uint32_t hud, double value, uint64_t i
   Frame(base, sp, 144);
   uint64_t r3 = hud;
   for (uint32_t slot = 0; slot < 3; slot++) {
-    switch (guest::LoadU32(base, hud + 480 + 4 * slot)) {
+    switch (guest::LoadU32(base, Hud(base, hud).gauge_slot0_address() + 4 * slot)) {
       case 0:
         r3 = calls.Call(kGaugeFloat, frame, 0x822151D8, hud, 0, slot, 0, &value);
         break;

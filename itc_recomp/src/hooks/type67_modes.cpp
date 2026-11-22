@@ -5,6 +5,8 @@
 // their adapters stay.
 
 #include "hooks/type67_modes.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -298,7 +300,7 @@ t67::Calls Type67Calls(lifted::Regs& ctx, uint8_t* base) {
     ctx.lr = lr;
     ctx.r3.u64 = id;
     ctx.r4.u64 = asset;
-    lifted::CallFromContext(ctx, base, 0x8211E808);
+    lifted::Enter(ctx, base, game::UiMovies::Open);
     ctx.r1.u64 = stack;
     ctx.lr = link;
     return ctx.r3.u64;
@@ -312,7 +314,7 @@ t67::Calls Type67Calls(lifted::Regs& ctx, uint8_t* base) {
     ctx.r1.u64 = sp;
     ctx.lr = lr;
     ctx.r3.u64 = id;
-    lifted::CallFromContext(ctx, base, 0x8211E258);
+    lifted::Enter(ctx, base, game::UiMovies::Delete);
     ctx.r1.u64 = stack;
     ctx.lr = link;
     return ctx.r3.u64;
@@ -497,8 +499,8 @@ ITC_REGS_STEP(StandSceneCreate) {
     return ctx.r3.u64;
   };
   t67::StandSceneCalls calls;
-  calls.viewports_init = [&](uint32_t frame) { return guest(frame, 0x82180B14, [&] { lifted::CallFromContext(ctx, base, 0x820AB358); }); };
-  calls.scene_create = [&](uint32_t frame) { return guest(frame, 0x82180B18, [&] { lifted::CallFromContext(ctx, base, 0x820C8A50); }); };
+  calls.viewports_init = [&](uint32_t frame) { return guest(frame, 0x82180B14, [&] { lifted::Enter(ctx, base, game::Viewports::Init); }); };
+  calls.scene_create = [&](uint32_t frame) { return guest(frame, 0x82180B18, [&] { lifted::Enter(ctx, base, game::CarScene::Create); }); };
   calls.scene_set_up = [&](uint32_t scene, uint32_t record, uint32_t frame) {
     ctx.r3.u64 = scene;
     ctx.r4.u64 = record;

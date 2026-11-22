@@ -5,6 +5,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/xaudio_objects.h"
 #include "xaudio/ppc_float.h"
 
 #include "base/float_mode.h"
@@ -14,6 +15,10 @@
 #include <cmath>
 
 namespace xaudio {
+
+using schema::ReverbAllPass;
+using schema::ReverbCrossfade;
+using schema::ReverbDelayLine;
 
 namespace {
 
@@ -32,19 +37,20 @@ void CopyFloat(uint8_t* base, uint32_t destination, uint32_t source) {
 void DelayThreeTaps(uint8_t* base, uint32_t line, uint32_t in, uint32_t out_a, uint32_t out_b,
                     uint32_t index_mask, uint32_t wrap) {
   ScalarMode mode;
-  const uint32_t r11_start = guest::LoadU32(base, line + 12);
-  const uint32_t data = line + 44;
-  const uint32_t first = guest::LoadU32(base, line + 0);
-  const uint32_t write = guest::LoadU32(base, line + 36);
-  const uint32_t third = guest::LoadU32(base, line + 24);
+  const ReverbDelayLine d(base, line);
+  const uint32_t r11_start = d.tap_2();
+  const uint32_t data = d.line_address();
+  const uint32_t first = d.tap_1();
+  const uint32_t write = d.write_index();
+  const uint32_t third = d.tap_3();
   const uint32_t r31 = r11_start - first;
-  const double f0 = Load(base, line + 16);
+  const double f0 = double(d.gain_2());
   const uint32_t r30 = r11_start - third;
-  const double f13 = Load(base, line + 4);
+  const double f13 = double(d.gain_1());
   uint32_t r11 = write - r11_start;
-  const double f12 = Load(base, line + 28);
-  CopyFloat(base, out_a, line + 8);
-  CopyFloat(base, out_b, line + 32);
+  const double f12 = double(d.gain_3());
+  CopyFloat(base, out_a, d.last_a_address());
+  CopyFloat(base, out_b, d.last_b_address());
   uint32_t r8 = (write << 2) + data;
   double f10 = 0, f11 = 0;
   for (int k = 0; k < 256; k++) {
@@ -66,9 +72,9 @@ void DelayThreeTaps(uint8_t* base, uint32_t line, uint32_t in, uint32_t out_a, u
     f10 = Fma(f9, f13, f10);
     Store(base, out_a, f10);
   }
-  Store(base, line + 8, f10);
-  Store(base, line + 32, f11);
-  guest::StoreU32(base, line + 36, (write + 256) & wrap);
+  d.set_last_a(float(f10));
+  d.set_last_b(float(f11));
+  d.set_write_index((write + 256) & wrap);
 }
 
 
@@ -156,35 +162,37 @@ double AllPassInPlace(const AllPass& a, uint32_t& p, uint32_t& q, uint32_t& r11,
 // 256 frames, the write index kept by `wrap`.
 void AllPassBlock(uint8_t* base, uint32_t state, uint32_t p, uint32_t mask, uint32_t wrap) {
   ScalarMode mode;
-  const uint32_t write = guest::LoadU32(base, state + 16);
-  const uint32_t tap = guest::LoadU32(base, state + 0);
-  const AllPass a{base, state + 24, mask, Load(base, state + 8), Load(base, state + 4)};
-  const double f11 = Load(base, state + 12);
+  const ReverbAllPass v(base, state);
+  const uint32_t write = v.write_index();
+  const uint32_t tap = v.tap();
+  const AllPass a{base, v.line_address(), mask, double(v.gain_feedback()), double(v.gain_output())};
+  const double f11 = double(v.last_output());
   uint32_t r11 = write - tap + 2;
   uint32_t q = ((write + 2) << 2) + a.data;
   const double last = AllPassInPlace(a, p, q, r11, f11, 32);
-  Store(base, state + 12, last);
+  v.set_last_output(float(last));
   Store(base, p + 0, last);
-  guest::StoreU32(base, state + 16, (write + 256) & wrap);
+  v.set_write_index((write + 256) & wrap);
 }
 }  // namespace
 
 void ReverbLowPass(uint8_t* base, uint32_t state, uint32_t in, uint32_t out, uint32_t count) {
   ITC_NATIVE_RUNNING("sub_82462BC8 the reverb's low-pass");
   ScalarMode mode;
-  double f9 = Load(base, state + 20);
-  double f12 = Load(base, state + 16);
+  const schema::ReverbLowPass v(base, state);
+  double f9 = double(v.last_output());
+  double f12 = double(v.state());
   uint32_t r9 = 1;
-  CopyFloat(base, out, state + 20);
+  CopyFloat(base, out, v.last_output_address());
   uint32_t r11 = out + 4;
   const double f7 = Load(base, 0x82000A30);
   bool ran = false;
   if (int32_t(count) >= 4) {
     ran = true;
-    const double f0 = Load(base, state + 28);
+    const double f0 = double(v.coefficient());
     uint32_t r10 = count >> 2;
     const double f10 = Round(f7 - f0);
-    const double f11 = Load(base, state + 24);
+    const double f11 = double(v.gain());
     r9 = (r10 << 2) + 1;
     const double f13 = Round(f11 * f10);
     do {
@@ -226,10 +234,10 @@ void ReverbLowPass(uint8_t* base, uint32_t state, uint32_t in, uint32_t out, uin
   }
   if (!(r9 > count)) {
     ran = true;
-    const double f0 = Load(base, state + 28);
+    const double f0 = double(v.coefficient());
     uint32_t r10 = count - r9;
     const double f11 = Round(f7 - f0);
-    double f13 = Load(base, state + 24);
+    double f13 = double(v.gain());
     r10 += 1;
     f13 = Round(f11 * f13);
     do {
@@ -246,8 +254,8 @@ void ReverbLowPass(uint8_t* base, uint32_t state, uint32_t in, uint32_t out, uin
     } while (r10 != 0);
   }
   if (ran) {
-    Store(base, state + 16, f12);
-    Store(base, state + 20, f9);
+    v.set_state(float(f12));
+    v.set_last_output(float(f9));
   }
   // With no frames the state is stored back as it was loaded (its bits).
 }
@@ -265,17 +273,18 @@ void ReverbDelay2048(uint8_t* base, uint32_t line, uint32_t in, uint32_t out_a, 
 void ReverbDelay1024(uint8_t* base, uint32_t line, uint32_t in, uint32_t out_a, uint32_t out_b) {
   ITC_NATIVE_RUNNING("sub_82463578 the reverb's 1,024-entry delay line");
   ScalarMode mode;
-  const uint32_t write = guest::LoadU32(base, line + 24);
-  const uint32_t data = line + 32;
-  const uint32_t second = guest::LoadU32(base, line + 12);
-  const uint32_t first = guest::LoadU32(base, line + 0);
+  const schema::ReverbDelay1024 d(base, line);
+  const uint32_t write = d.write_index();
+  const uint32_t data = d.line_address();
+  const uint32_t second = d.tap_b();
+  const uint32_t first = d.tap_a();
   uint32_t r8 = (write << 2) + data;
   uint32_t r9 = write - second;
   uint32_t r10 = write - first;
-  const double f12 = Load(base, line + 4);
-  const double f11 = Load(base, line + 16);
-  CopyFloat(base, out_a, line + 8);
-  CopyFloat(base, out_b, line + 20);
+  const double f12 = double(d.gain_a());
+  const double f11 = double(d.gain_b());
+  CopyFloat(base, out_a, d.last_a_address());
+  CopyFloat(base, out_b, d.last_b_address());
   double f0 = 0, f13 = 0;
   for (int k = 0; k < 256; k++) {
     const uint32_t r30 = (r10 << 2) & 0xFFC;
@@ -294,9 +303,9 @@ void ReverbDelay1024(uint8_t* base, uint32_t line, uint32_t in, uint32_t out_a, 
     r9 += 1;
     r8 += 4;
   }
-  Store(base, line + 8, f0);
-  Store(base, line + 20, f13);
-  guest::StoreU32(base, line + 24, (write + 256) & 0x3FF);
+  d.set_last_a(float(f0));
+  d.set_last_b(float(f13));
+  d.set_write_index((write + 256) & 0x3FF);
 }
 
 }  // namespace xaudio
@@ -306,10 +315,11 @@ namespace xaudio {
 void ReverbAllPass128(uint8_t* base, uint32_t state, uint32_t p) {
   ITC_NATIVE_RUNNING("sub_82462DC8 the reverb's 128-entry all-pass");
   ScalarMode mode;
-  const uint32_t write = guest::LoadU32(base, state + 16);
-  const uint32_t tap = guest::LoadU32(base, state + 0);
-  const AllPass a{base, state + 24, 0x1FC, Load(base, state + 8), Load(base, state + 4)};
-  double f11 = Load(base, state + 12);
+  const ReverbAllPass v(base, state);
+  const uint32_t write = v.write_index();
+  const uint32_t tap = v.tap();
+  const AllPass a{base, v.line_address(), 0x1FC, double(v.gain_feedback()), double(v.gain_output())};
+  double f11 = double(v.last_output());
   uint32_t r10 = write - tap + 2;
   uint32_t r9 = ((write + 2) << 2) + a.data;
   // The first 128 frames written from the write index, as the passes above.
@@ -372,9 +382,9 @@ void ReverbAllPass128(uint8_t* base, uint32_t state, uint32_t p) {
     r10b += 32;
     f12 = Fma(f13, f11, f12);
   }
-  Store(base, state + 12, f12);
+  v.set_last_output(float(f12));
   Store(base, p + 0, f12);
-  guest::StoreU32(base, state + 16, 0);
+  v.set_write_index(0);
 }
 
 void ReverbAllPass256(uint8_t* base, uint32_t state, uint32_t p) {
@@ -390,11 +400,12 @@ void ReverbAllPass512(uint8_t* base, uint32_t state, uint32_t p) {
 void ReverbAllPass512To(uint8_t* base, uint32_t state, uint32_t in, uint32_t out) {
   ITC_NATIVE_RUNNING("sub_82463410 the reverb's 512-entry all-pass to a buffer");
   ScalarMode mode;
-  const uint32_t write = guest::LoadU32(base, state + 16);
-  const uint32_t tap = guest::LoadU32(base, state + 0);
-  const AllPass a{base, state + 24, 0x7FC, Load(base, state + 8), Load(base, state + 4)};
+  const ReverbAllPass v(base, state);
+  const uint32_t write = v.write_index();
+  const uint32_t tap = v.tap();
+  const AllPass a{base, v.line_address(), 0x7FC, double(v.gain_feedback()), double(v.gain_output())};
   const double f0 = a.f0, f13 = a.f13;
-  double f11 = Load(base, state + 12);
+  double f11 = double(v.last_output());
   uint32_t r11 = write - tap + 2;
   uint32_t q = ((write + 2) << 2) + a.data;
   for (int pass = 0; pass < 32; pass++) {
@@ -451,9 +462,9 @@ void ReverbAllPass512To(uint8_t* base, uint32_t state, uint32_t in, uint32_t out
     r11 += 8;
     f11 = Fma(f13, f11, f12);
   }
-  Store(base, state + 12, f11);
+  v.set_last_output(float(f11));
   Store(base, in + 0, f11);
-  guest::StoreU32(base, state + 16, (write + 256) & 0x1FF);
+  v.set_write_index((write + 256) & 0x1FF);
 }
 
 }  // namespace xaudio
@@ -571,7 +582,7 @@ struct Crossfade {
       Store(base, r10 + 4, f10);
       r10 += 16;
     } while (r29 != 0);
-    Store(base, s + 4, f12);
+    ReverbCrossfade(base, s).set_position(float(f12));
   }
 
   // The fade's second four-frame pass (after the taps moved on): the same
@@ -644,18 +655,18 @@ struct Crossfade {
       Store(base, r10 + 8, f11);
       r10 += 16;
     } while (r29 != 0);
-    Store(base, s + 4, f12);
+    ReverbCrossfade(base, s).set_position(float(f12));
   }
 
   // A frame at a time from frame `first` to 256 (the fade's tail after the
   // taps moved on): returns the write index moved on.
   uint32_t OneAtATime(uint32_t first, uint32_t r9) {
     uint32_t r7 = first << 2;
-    const uint32_t r31 = Word(base, s + 8);
+    const uint32_t r31 = ReverbCrossfade(base, s).tap_to();
     uint32_t r10 = r9 << 2;
-    uint32_t r30 = Word(base, s + 12);
+    uint32_t r30 = ReverbCrossfade(base, s).tap_from();
     const uint32_t start = r7 + out;
-    f12 = Load(base, s + 4);
+    f12 = double(ReverbCrossfade(base, s).position());
     uint32_t r8 = 256 - first;
     uint32_t r6 = r10 + r11;
     r10 = r9 - r31;
@@ -685,23 +696,23 @@ struct Crossfade {
       Store(base, r4 + 0, f11b);
       r4 += 4;
     } while (r8 != 0);
-    Store(base, s + 4, f12);
+    ReverbCrossfade(base, s).set_position(float(f12));
     return r9;
   }
 
   // The rest of the fade once the taps moved on (from frame r28), then the
   // last output and the write index stored.
   void Finish(uint32_t r28, uint32_t r9) {
-    const uint32_t r24 = Word(base, s + 16);
-    const uint32_t r10 = Word(base, s + 8);
+    const uint32_t r24 = ReverbCrossfade(base, s).tap_asked();
+    const uint32_t r10 = ReverbCrossfade(base, s).tap_to();
     f12 = r24 == r10 ? Load(base, kZero) : f11;
     const uint32_t r8 = 256 - r28;
-    Store(base, s + 4, f12);
+    ReverbCrossfade(base, s).set_position(float(f12));
     f13 = Round(f11 - f12);
     uint32_t r26 = r28;
     WriteTaps(r10, r24);
     if (int32_t(r8) >= 4) {
-      const uint32_t r27 = Word(base, s + 12);
+      const uint32_t r27 = ReverbCrossfade(base, s).tap_from();
       const uint32_t r29 = ((252 - r28) >> 2) + 1;
       const uint32_t r26c = r29 << 2;
       const uint32_t r30 = r9 - r24;
@@ -717,9 +728,9 @@ struct Crossfade {
       r9 = OneAtATime(r26, r9);
     }
     const uint32_t last = Word(base, out + 1024);
-    SetWord(base, s + 20, last);
-    SetWord(base, s + 24, r9 & kWrap);
-    SetWord(base, s + 24, r9 & kWrap);
+    SetWord(base, ReverbCrossfade(base, s).last_output_address(), last);
+    ReverbCrossfade(base, s).set_write_index(r9 & kWrap);
+    ReverbCrossfade(base, s).set_write_index(r9 & kWrap);
   }
 
   // The taps moved on (+12 the one faded to, +8 the one asked for): in each
@@ -727,18 +738,18 @@ struct Crossfade {
   bool taps_8_first = false;
   void WriteTaps(uint32_t from, uint32_t to) {
     if (taps_8_first) {
-      SetWord(base, s + 8, to);
-      SetWord(base, s + 12, from);
+      ReverbCrossfade(base, s).set_tap_to(to);
+      ReverbCrossfade(base, s).set_tap_from(from);
     } else {
-      SetWord(base, s + 12, from);
-      SetWord(base, s + 8, to);
+      ReverbCrossfade(base, s).set_tap_from(from);
+      ReverbCrossfade(base, s).set_tap_to(to);
     }
   }
 
   // No crossfade (the position past 256 frames): the line written and
   // read at the tap faded to... (the original's two gains, f0 and f13).
   void Steady(uint32_t r9, uint32_t r10, uint32_t r23) {
-    const uint32_t r6 = s + 32;
+    const uint32_t r6 = ReverbCrossfade(base, s).line_address();
     uint32_t r8 = (r9 << 2) + r6;
     uint32_t r7 = out + 4;
     double g0 = Load(base, kOne);
@@ -769,10 +780,10 @@ struct Crossfade {
       Store(base, r7 + 0, f11b);
       r7 += 4;
     }
-    Store(base, s + 4, g0);
+    ReverbCrossfade(base, s).set_position(float(g0));
     const uint32_t last = Word(base, out + 1024);
-    SetWord(base, s + 20, last);
-    SetWord(base, s + 24, end & kWrap);
+    SetWord(base, ReverbCrossfade(base, s).last_output_address(), last);
+    ReverbCrossfade(base, s).set_write_index(end & kWrap);
   }
 };
 
@@ -787,21 +798,21 @@ uint64_t ReverbCrossfadeDelay(uint8_t* base, uint64_t r3_in, uint32_t in, uint32
   c.taps_8_first = false;
   c.sets_r3 = true;
   c.r3 = r3_in;
-  uint32_t r8 = Word(base, s + 12);
-  uint32_t r10 = Word(base, s + 8);
+  uint32_t r8 = ReverbCrossfade(base, s).tap_from();
+  uint32_t r10 = ReverbCrossfade(base, s).tap_to();
   const uint32_t r23 = r10 - r8;
-  CopyFloat(base, out + 0, s + 20);
+  CopyFloat(base, out + 0, ReverbCrossfade(base, s).last_output_address());
   const bool r6 = r23 > 4 || r8 - r10 > 4;
   double f0 = Load(base, kFadeScale);
-  c.f12 = Load(base, s + 4);
+  c.f12 = double(ReverbCrossfade(base, s).position());
   f0 = Round(c.f12 * f0);
-  uint32_t r9 = Word(base, s + 24);
+  uint32_t r9 = ReverbCrossfade(base, s).write_index();
   SetWord(base, sp - 176, uint32_t(uint64_t(ToInt64(f0))));
   const uint32_t r28 = Word(base, sp - 176) >> 1;
   if (r28 < 256) {
     uint32_t r24 = 1;
     c.f11 = Load(base, kOne);
-    c.r11 = s + 32;
+    c.r11 = ReverbCrossfade(base, s).line_address();
     c.f0 = Load(base, kFadeStep);
     c.f13 = Round(c.f11 - c.f12);
     if (int32_t(r28) >= 4) {
@@ -817,11 +828,11 @@ uint64_t ReverbCrossfadeDelay(uint8_t* base, uint64_t r3_in, uint32_t in, uint32
     if (!(r24 > r28)) {
       // One frame at a time to frame r28.
       uint32_t r7 = r24 << 2;
-      const uint32_t r30 = Word(base, s + 8);
+      const uint32_t r30 = ReverbCrossfade(base, s).tap_to();
       uint32_t r10b = r28 - r24;
-      const uint32_t r27 = Word(base, s + 12);
+      const uint32_t r27 = ReverbCrossfade(base, s).tap_from();
       uint32_t r8b = r9 << 2;
-      c.f12 = Load(base, s + 4);
+      c.f12 = double(ReverbCrossfade(base, s).position());
       r10b += 1;
       const uint32_t r29 = r7 + in;
       uint32_t r6b = r8b + c.r11;
@@ -849,7 +860,7 @@ uint64_t ReverbCrossfadeDelay(uint8_t* base, uint64_t r3_in, uint32_t in, uint32
         Store(base, r31 + 0, f10);
         r31 += 4;
       } while (r10b != 0);
-      Store(base, s + 4, c.f12);
+      ReverbCrossfade(base, s).set_position(float(c.f12));
     }
     c.Finish(r28, r9);
     return c.r3;
@@ -888,11 +899,11 @@ uint64_t ReverbCrossfadeDelay(uint8_t* base, uint64_t r3_in, uint32_t in, uint32
         src += 16;
         to += 16;
       }
-      SetWord(base, s + 24, r31);
+      ReverbCrossfade(base, s).set_write_index(r31);
       double f0b = Load(base, kFadeEnd);
       f0b = Round(c.f12 - f0b);
-      Store(base, s + 4, f0b);
-      CopyFloat(base, s + 20, out + 1024);
+      ReverbCrossfade(base, s).set_position(float(f0b));
+      CopyFloat(base, ReverbCrossfade(base, s).last_output_address(), out + 1024);
       return r3;
     }
     // The taps differ by more than 4: crossfade from +8's to +12's.
@@ -922,9 +933,9 @@ uint64_t ReverbCrossfadeDelay(uint8_t* base, uint64_t r3_in, uint32_t in, uint32
       r8b += 4;
     }
     const uint32_t last = Word(base, out + 1024);
-    SetWord(base, s + 24, r31);
-    Store(base, s + 4, c.f12);
-    SetWord(base, s + 20, last);
+    ReverbCrossfade(base, s).set_write_index(r31);
+    ReverbCrossfade(base, s).set_position(float(c.f12));
+    SetWord(base, ReverbCrossfade(base, s).last_output_address(), last);
     return r3_in;
   }
   c.Steady(r9, r10, r23);
@@ -936,9 +947,9 @@ void ReverbCrossfadeDelay256(uint8_t* base, uint32_t s, uint32_t in, uint32_t ou
   ScalarMode mode;
   Crossfade<0x3FC, 0xFF> c{base, s, in, out, 0, 0, 0, 0, 0};
   c.taps_8_first = true;
-  CopyFloat(base, out + 0, s + 20);
-  c.f12 = Load(base, s + 4);
-  uint32_t r10 = Word(base, s + 24);
+  CopyFloat(base, out + 0, ReverbCrossfade(base, s).last_output_address());
+  c.f12 = double(ReverbCrossfade(base, s).position());
+  uint32_t r10 = ReverbCrossfade(base, s).write_index();
   double f0 = Load(base, kFadeScale);
   f0 = Round(c.f12 * f0);
   SetWord(base, sp - 128, uint32_t(uint64_t(ToInt64(f0))));
@@ -946,12 +957,12 @@ void ReverbCrossfadeDelay256(uint8_t* base, uint32_t s, uint32_t in, uint32_t ou
   if (r28 < 256) {
     uint32_t r23 = 1;
     c.f11 = Load(base, kOne);
-    c.r11 = s + 32;
+    c.r11 = ReverbCrossfade(base, s).line_address();
     c.f0 = Load(base, kFadeStep);
     c.f13 = Round(c.f11 - c.f12);
     if (int32_t(r28) >= 4) {
-      const uint32_t r6 = Word(base, s + 8);
-      const uint32_t r31 = Word(base, s + 12);
+      const uint32_t r6 = ReverbCrossfade(base, s).tap_to();
+      const uint32_t r31 = ReverbCrossfade(base, s).tap_from();
       const uint32_t r29 = r28 >> 2;
       const uint32_t w8 = ((r10 + 2) << 2) + c.r11;
       const uint32_t r30 = r10 - r6;
@@ -965,11 +976,11 @@ void ReverbCrossfadeDelay256(uint8_t* base, uint32_t s, uint32_t in, uint32_t ou
       // One frame at a time to frame r28 (the gains' roles as the original
       // has them: the position on the tap faded from, the rest on the other).
       uint32_t r7 = r23 << 2;
-      const uint32_t r30 = Word(base, s + 8);
+      const uint32_t r30 = ReverbCrossfade(base, s).tap_to();
       uint32_t r9 = r28 - r23;
-      uint32_t r27 = Word(base, s + 12);
+      uint32_t r27 = ReverbCrossfade(base, s).tap_from();
       uint32_t r8 = r10 << 2;
-      c.f12 = Load(base, s + 4);
+      c.f12 = double(ReverbCrossfade(base, s).position());
       r9 += 1;
       const uint32_t r29 = r7 + in;
       uint32_t r6 = r8 + c.r11;
@@ -997,13 +1008,13 @@ void ReverbCrossfadeDelay256(uint8_t* base, uint32_t s, uint32_t in, uint32_t ou
         Store(base, r31 + 0, f10);
         r31 += 4;
       } while (r9 != 0);
-      Store(base, s + 4, c.f12);
+      ReverbCrossfade(base, s).set_position(float(c.f12));
     }
     c.Finish(r28, r10);
     return;
   }
-  const uint32_t r31 = Word(base, s + 8);
-  const uint32_t r30 = Word(base, s + 12);
+  const uint32_t r31 = ReverbCrossfade(base, s).tap_to();
+  const uint32_t r30 = ReverbCrossfade(base, s).tap_from();
   c.Steady(r10, r31, r31 - r30);
 }
 

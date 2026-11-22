@@ -1,0 +1,423 @@
+# The schema of docs/functions/app-states.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The app (its update, its handler maps, its message and request vectors),
+# its +20 interface, its state stack (AppStates) and the stack's layers
+# (StateLayer) with their lists, the states' interface, the delegates the
+# handler requests copy (src/app_states/, src/hooks/app_states.cpp;
+# docs/known-data.md "app", "app state stack", "state layer").
+#
+# Measure faults (tools/type_map.py), each kept as a field with a name of its
+# own and a note: std::for_each's and the iterators' results (r3, a 16- or
+# 8-byte temporary in the caller's frame) joined with the container they walk
+# (App, MessageVector, OpList, PtrList); the app's +20 interface and +4
+# interface joined with the app (App::IsRunning, App::Start, App::FrameDriver).
+
+# The app (132 bytes, its constructor sub_82094590, App::Create).
+[App]
+measure = "App"
+measures = ["AppStates.+4", "App::FrameDriver.r3"]
+size = 132
+origin = "allocated"
+vtable = 0x82000EA0
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "AppVtable", note = "0x82000EA0" },
+  { name = "fault_for_each_result_0", offset = 0, type = "u64", note = "measure fault: App::ForEachMessage's and ForEachRequest's r3 is the result functor, not the app" },
+  { name = "vtable_4", offset = 4, type = "u32", note = "the +4 interface's: 0x82000E94 (base 0x82000ABC)" },
+  { name = "vtable_8", offset = 8, type = "u32", note = "the +8 interface's: 0x82000E80 (base 0x82000A74)" },
+  { name = "fault_for_each_result_8", offset = 8, type = "u64", note = "measure fault: as fault_for_each_result_0" },
+  { name = "vtable_12", offset = 12, type = "u32", note = "the +12 interface's: 0x82000E70 (base 0x82000D48)" },
+  { name = "vtable_16", offset = 16, type = "u32", note = "the +16 interface's: 0x82000E38 (base 0x82000DD0); the owner a layer keeps (StateLayer +8)" },
+  { name = "interface_vtable", offset = 20, type = "ptr", to = "AppInterfaceVtable", note = "the +20 interface's: 0x82000E08 (base 0x82000DA0); the interface the framework keeps at +120 (AppInterface)" },
+  { name = "framework_input", offset = 24, type = "ptr", to = "AppFrameworkIface", note = "the framework's +36 interface (its slot 1 the input manager); also App::FrameDriver's +20 read (r3 = app + 4)" },
+  { name = "handlers", offset = 28, type = "u32", note = "a handler map (std::map of delegates by key), run while the toggle is clear or a step was asked: its first word, not read" },
+  { name = "handlers_head", offset = 32, type = "ptr", to = "AppHandlerMapHead" },
+  { name = "handlers_size", offset = 36, type = "u32" },
+  { name = "toggled_handlers", offset = 40, type = "u32", note = "the handler map run while the toggle is set: its first word, not read" },
+  { name = "toggled_handlers_head", offset = 44, type = "ptr", to = "AppHandlerMapHead" },
+  { name = "toggled_handlers_size", offset = 48, type = "u32" },
+  { name = "always_handlers", offset = 52, type = "u32", note = "the handler map run every pass: its first word, not read" },
+  { name = "always_handlers_head", offset = 56, type = "ptr", to = "AppHandlerMapHead" },
+  { name = "always_handlers_size", offset = 60, type = "u32" },
+  { name = "listeners", offset = 64, type = "u32", note = "the listener map (given the messages): its first word, not read" },
+  { name = "listeners_head", offset = 68, type = "ptr", to = "AppHandlerMapHead" },
+  { name = "listeners_size", offset = 72, type = "u32" },
+  { name = "messages", offset = 76, type = "u32", note = "the message vector (MessageVector) starts here: its first word, not read" },
+  { name = "messages_first", offset = 80, type = "ptr", to = "AppMessageWord" },
+  { name = "messages_last", offset = 84, type = "ptr", to = "AppMessageWord" },
+  { name = "messages_end", offset = 88, type = "ptr", to = "AppMessageWord" },
+  { name = "message", offset = 92, type = "u32", note = "the message being delivered (the listeners get its address)" },
+  { name = "requests", offset = 96, type = "u32", note = "the request vector (12-byte requests {type, key, delegate}) starts here: its first word, not read by the app's code; the measure's +96 reads are the +20 interface's +96, the state stack (App::IsRunning, App::Start: a measure fault)" },
+  { name = "requests_first", offset = 100, type = "u32" },
+  { name = "requests_last", offset = 104, type = "u32" },
+  { name = "requests_end", offset = 108, type = "u32" },
+  { name = "toggled", offset = 112, type = "u8", note = "the toggle player 1's Start flips (message 0 when set, 2 when cleared)" },
+  { name = "step", offset = 113, type = "u8", note = "a step asked (Back while toggled, message 1); cleared after the pass" },
+  { name = "unknown_114", offset = 114, type = "u8", note = "0 at construction, not read" },
+  { name = "states", offset = 116, type = "ptr", to = "AppStates", note = "the state stack (AppStates::Create)" },
+  { name = "camera", offset = 120, type = "u32", note = "a second camera class (368 bytes, sub_820A8B88)" },
+  { name = "sound_manager", offset = 124, type = "u32", note = "AudioManager::Create" },
+  { name = "movie", offset = 128, type = "u32", note = "312 bytes, Movie::Movie" },
+]
+
+# The app's own vtable (0x82000EA0), as the state stack calls it.
+[AppVtable]
+measure = "AppStates.+4.+0"
+size = 12
+origin = "image"
+fields = [
+  { name = "destroy", offset = 0, type = "fn" },
+  { name = "interface", offset = 4, type = "fn", note = "slot 1: the +20 interface (AppInterface)" },
+  { name = "owner", offset = 8, type = "fn", note = "slot 2: the interface at app + 16, a layer's owner" },
+]
+
+# The app's +20 interface (vtable 0x82000E08), seen from its own address: what
+# its slots and the state stack's listener get (AppStates::OnMessage's r4).
+[AppInterface]
+measure = "AppStates::OnMessage.r4"
+size = 112
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "AppInterfaceVtable" },
+  { name = "messages", offset = 56, type = "u32", note = "the app's message vector (app + 76)" },
+  { name = "requests", offset = 76, type = "u32", note = "the app's request vector (app + 96)" },
+  { name = "states", offset = 96, type = "ptr", to = "AppStates", note = "the app's +116" },
+]
+
+[AppInterfaceVtable]
+measure = "App.+20"
+measures = ["AppStates::OnMessage.r4.+0", "App::FrameDriver.r3.+20"]
+size = 48
+origin = "image"
+fields = [
+  { name = "fault_framework_vtable", offset = 0, type = "u32", note = "measure fault: App::FrameDriver's read is the framework interface's vtable (r3 = app + 4, its +20 the app's +24)" },
+  { name = "add_listener", offset = 4, type = "fn", note = "App::AddListener" },
+  { name = "add_always_handler", offset = 8, type = "fn", note = "App::AddAlwaysHandler" },
+  { name = "add_toggled_handler", offset = 12, type = "fn", note = "App::AddToggledHandler" },
+  { name = "add_handler", offset = 16, type = "fn", note = "App::AddHandler" },
+  { name = "remove_listener", offset = 20, type = "fn", note = "probably (AppStates::OnMessage's teardown, listener 9); never ran" },
+  { name = "remove_always_handler", offset = 24, type = "fn", note = "probably; never ran" },
+  { name = "remove_toggled_handler", offset = 28, type = "fn", note = "probably (key 2); never ran" },
+  { name = "remove_handler", offset = 32, type = "fn", note = "probably (key 8); never ran" },
+  { name = "start", offset = 36, type = "fn", note = "App::Start" },
+  { name = "send_message", offset = 40, type = "fn", note = "App::SendMessage" },
+  { name = "is_running", offset = 44, type = "fn", note = "App::IsRunning" },
+]
+
+# The framework's +36 interface at app + 24: its slot 1 the input manager.
+[AppFrameworkIface]
+measure = "App.+24"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "AppFrameworkIfaceVtable" },
+]
+
+[AppFrameworkIfaceVtable]
+measure = "App.+24.+0"
+size = 8
+origin = "image"
+fields = [
+  { name = "input_manager", offset = 4, type = "fn", note = "slot 1: the input manager" },
+]
+
+# A handler map's head node (Dinkumware's tree: +0 the leftmost node, begin).
+[AppHandlerMapHead]
+measures = ["App.+32", "App.+44", "App.+56", "App.+68"]
+size = 12
+origin = "allocated"
+fields = [
+  { name = "left", offset = 0, type = "u32", note = "the leftmost node (begin)" },
+]
+
+# A handler request's key, by address (the +20 interface's add slots' r4).
+[AppHandlerKey]
+measures = ["App::AddHandler.r4", "App::AddToggledHandler.r4", "App::AddAlwaysHandler.r4", "App::AddListener.r4"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "key", offset = 0, type = "u32" },
+]
+
+# A message word, by address: one the app sends, or an element of its
+# message vector.
+[AppMessageWord]
+measures = ["MessageVector::PushBack.r4", "MessageVector::InsertN.r6", "AppStates::OnMessage.r5", "MessageVector.+8"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "u32", note = "0 toggle set, 1 a step, 2 toggle cleared, 5 and 6 the teardowns" },
+]
+
+# A delegate (12 bytes): what the handler requests copy (Delegate::Clone).
+[AppDelegate]
+measures = ["App::AddHandler.r5", "App::AddToggledHandler.r5", "App::AddAlwaysHandler.r5", "App::AddListener.r5", "new<12>@Delegate::Clone"]
+size = 12
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "AppDelegateVtable", note = "0x82002850 (base 0x82000ABC)" },
+  { name = "object", offset = 4, type = "u32" },
+  { name = "function", offset = 8, type = "fn" },
+]
+
+[AppDelegateVtable]
+measures = ["App::AddHandler.r5.+0", "App::AddToggledHandler.r5.+0", "App::AddAlwaysHandler.r5.+0", "App::AddListener.r5.+0"]
+size = 16
+origin = "image"
+fields = [
+  { name = "destroy", offset = 0, type = "fn", note = "the base's sub_82094D20, never ran" },
+  { name = "invoke", offset = 4, type = "fn", note = "Delegate::Invoke" },
+  { name = "clone", offset = 8, type = "fn", note = "Delegate::Clone" },
+  { name = "deleting_destructor", offset = 12, type = "fn", note = "sub_820AC9E8, never ran" },
+]
+
+# The app's message vector (std::vector<unsigned>, the app's +76).
+[MessageVector]
+measure = "MessageVector"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "fault_result", offset = 0, type = "u64", note = "measure fault: Erase's and Insert's r3 is the result iterator (vector, element), not the vector" },
+  { name = "first", offset = 4, type = "ptr", to = "AppMessageWord" },
+  { name = "last", offset = 8, type = "ptr", to = "AppMessageWord" },
+  { name = "end", offset = 12, type = "ptr", to = "AppMessageWord" },
+]
+
+# The app's state stack (AppStates::, vtable 0x820028F8; the app's +116).
+[AppStates]
+measures = ["AppStates", "App.+96", "sub_820AD8D0.ret"]
+size = 12
+origin = "allocated"
+vtable = 0x820028F8
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "AppStatesVtable" },
+  { name = "app", offset = 4, type = "ptr", to = "App" },
+  { name = "root", offset = 8, type = "ptr", to = "StateLayer", note = "the root layer (no states; one child in play); sub_820AD8D0.ret's read is AppStates::OnMessage's r3, the stack (a measure fault)" },
+]
+
+[AppStatesVtable]
+measure = "App.+96.+0"
+size = 16
+origin = "image"
+fields = [
+  { name = "destroy", offset = 0, type = "fn", note = "sub_820AE2F8, never ran" },
+  { name = "add_layer", offset = 4, type = "fn", note = "AppStates::AddLayer" },
+  { name = "count_states", offset = 8, type = "fn", note = "sub_820AE198, never ran" },
+  { name = "is_empty", offset = 12, type = "fn", note = "AppStates::IsEmpty" },
+]
+
+# AppStates::AppStates's r4: the set-up block.
+[AppStatesSetup]
+measure = "AppStates::AppStates.r4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "app", offset = 0, type = "ptr", to = "App" },
+]
+
+# A layer of the state stack (48 bytes, vtable 0x820028E0; a state of its
+# parent through its +4).
+[StateLayer]
+measures = ["StateLayer", "AppStates.+8", "sub_820ADBD8.r3", "sub_820AD350.ret", "sub_820AD5B0.r3", "sub_820AD8D0.r3", "sub_820ADA70.r3", "sub_820ADB28.r3", "sub_820ADB80.r3", "sub_820ACD60.r4", "sub_820ACD80.r4", "sub_820ACDE8.r4", "StateLayer::AddChild.r4"]
+size = 48
+origin = "allocated"
+vtable = 0x820028E0
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x820028E0" },
+  { name = "state_vtable", offset = 4, type = "ptr", to = "AppStateVtable", note = "0x820028B0 (the state base's 0x82002880 first): the layer + 4 is a state" },
+  { name = "owner", offset = 8, type = "u32", note = "the app's interface at app + 16 (the app's slot 2)" },
+  { name = "children", offset = 12, type = "u32", note = "the child layers (a PtrList): its first word, not read" },
+  { name = "children_head", offset = 16, type = "ptr", to = "StateListNode" },
+  { name = "children_size", offset = 20, type = "u32" },
+  { name = "states", offset = 24, type = "u32", note = "the states (a PtrList, the top at the front): its first word, not read" },
+  { name = "states_head", offset = 28, type = "ptr", to = "StateListNode" },
+  { name = "states_size", offset = 32, type = "u32" },
+  { name = "ops", offset = 36, type = "u32", note = "the queued operations (an OpList): its first word, not read" },
+  { name = "ops_head", offset = 40, type = "ptr", to = "AppOpListNode" },
+  { name = "ops_size", offset = 44, type = "u32" },
+]
+
+# A state: an object with the state interface (a layer's +4, the modes' holder).
+[AppState]
+measures = ["StateLayer.+28.+0.+8", "sub_820AD5B0.r3.+28.+0.+8"]
+size = 4
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "AppStateVtable" },
+]
+
+# The state interface (base 0x82002880); every slot but 0 gets r4 = the layer.
+[AppStateVtable]
+measures = ["StateLayer.+28.+0.+8.+0", "sub_820AD5B0.r3.+28.+0.+8.+0", "sub_820ACD60.r4.+4", "sub_820ACD80.r4.+4", "sub_820ACDE8.r4.+4", "StateLayer::AddChild.r4.+4", "AppStates.+8.+4"]
+size = 48
+origin = "image"
+fields = [
+  { name = "destroy", offset = 0, type = "fn", note = "sub_820ACCF0 in the base" },
+  { name = "on_enter", offset = 4, type = "fn" },
+  { name = "on_exit", offset = 8, type = "fn" },
+  { name = "on_toggle_on", offset = 12, type = "fn", note = "message 0" },
+  { name = "on_step", offset = 16, type = "fn", note = "message 1" },
+  { name = "on_toggle_off", offset = 20, type = "fn", note = "message 2" },
+  { name = "on_covered", offset = 24, type = "fn" },
+  { name = "on_uncovered", offset = 28, type = "fn" },
+  { name = "update", offset = 32, type = "fn" },
+  { name = "update_toggled", offset = 36, type = "fn" },
+  { name = "tick", offset = 40, type = "fn" },
+  { name = "is_empty", offset = 44, type = "fn", note = "sub_825C8390 (1) in the base" },
+]
+
+# A std::list of pointers (16-byte nodes): a layer's children and states.
+[PtrList]
+measure = "PtrList"
+measures = ["PtrList::Erase.r4", "PtrList::PtrList.r3"]
+size = 12
+origin = "embedded"
+fields = [
+  { name = "fault_result_0", offset = 0, type = "u64", note = "measure fault: PtrList::ForEach's and Erase's r3 is the result (functor or iterator), not the list; HandleList::Remove's and sub_82118850's reads are an iterator's" },
+  { name = "head", offset = 4, type = "ptr", to = "StateListNode", note = "the head node (new<?>@PtrList::AllocateNodes, input's)" },
+  { name = "size", offset = 8, type = "u32" },
+  { name = "fault_result_8", offset = 8, type = "u64", note = "measure fault: as fault_result_0" },
+]
+
+# A node of a list of pointers (a layer's children and states; List::Clear's
+# for any node size: next and previous).
+[StateListNode]
+measure = "StateLayer.+16"
+measures = ["StateLayer.+28", "StateLayer.+28.+0", "sub_820AD5B0.r3.+16", "sub_820AD5B0.r3.+28", "sub_820AD5B0.r3.+28.+0", "sub_820AD8D0.r3.+16", "sub_820AD8D0.r3.+28", "List::Clear_820ACF88.r3.+4", "List::Clear_820ACF88.r3.+4.+0"]
+size = 12
+origin = "allocated"
+fields = [
+  { name = "next", offset = 0, type = "ptr", to = "StateListNode" },
+  { name = "previous", offset = 4, type = "ptr", to = "StateListNode" },
+  { name = "value", offset = 8, type = "u32", note = "a child layer (its +4 a state: AppState) or a state" },
+]
+
+# The layers' operation list (std::list of 8-byte values, 16-byte nodes).
+[OpList]
+measure = "OpList"
+measures = ["OpList::IncSize.r3"]
+size = 12
+origin = "embedded"
+fields = [
+  { name = "fault_result_0", offset = 0, type = "u64", note = "measure fault: OpList::ForEach's r3 is the result functor, not the list" },
+  { name = "head", offset = 4, type = "ptr", to = "AppOpListNode" },
+  { name = "size", offset = 8, type = "u32" },
+  { name = "fault_result_8", offset = 8, type = "u64", note = "measure fault: as fault_result_0" },
+]
+
+# An operation list's node (16 bytes, OpList::AllocateNodes).
+[AppOpListNode]
+measures = ["OpList::BuyNode.ret", "OpList::BuyNode.ret.+4", "StateLayer.+40", "sub_820ADA70.r3.+40", "sub_820ADB28.r3.+40", "sub_820ADB80.r3.+40", "new<?>@OpList::AllocateNodes"]
+size = 16
+origin = "allocated"
+fields = [
+  { name = "next", offset = 0, type = "ptr", to = "AppOpListNode" },
+  { name = "previous", offset = 4, type = "ptr", to = "AppOpListNode" },
+  { name = "op", offset = 8, type = "u64", note = "the operation: its type (high word), then a state" },
+  { name = "op_type", offset = 8, type = "u32", note = "0 add a child layer, 1 pop, 2 push, 3 replace" },
+  { name = "op_state", offset = 12, type = "u32" },
+]
+
+# An operation by address (OpList::BuyNode's r6).
+[AppStateOp]
+measure = "OpList::BuyNode.r6"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "type", offset = 0, type = "u32", note = "0 add a child layer, 1 pop, 2 push, 3 replace" },
+  { name = "state", offset = 4, type = "u32" },
+]
+
+# A member functor's 16 bytes (std::for_each's result: sub_820AD808's r3).
+[AppMemberFunctor]
+measure = "sub_820AD808.r3"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "function_object", offset = 0, type = "u64", note = "the function (high word) and the object" },
+  { name = "adjust", offset = 8, type = "u64", note = "the adjustment (high word)" },
+]
+
+# Input classes met at their destructors (the input area's; the measure files
+# them here, list::clear being ours).
+[InputManagerAtTeardown]
+measure = "sub_82098F30.r3"
+measures = ["sub_82098FF8.ret@+792"]
+size = 3976
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82000F48, then the base's 0x82000A38" },
+  { name = "list_head", offset = 3972, type = "u32", note = "the last of its four lists' head (the lists from +3932, 12 bytes each), freed and cleared" },
+]
+
+[InputProcessorAtTeardown]
+measures = ["sub_8258CEA0.r3", "sub_8258CF40.r3", "sub_82592178.r3"]
+size = 4
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x8206C0C4, then the base's 0x8206CC00" },
+]
+
+[PhysicalPadAtTeardown]
+measure = "sub_82591BB8.r3"
+size = 4
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x8206CBF4, then 0x8206CBE4" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from App.
+[AppOuter8]
+measure = "App::SceneFromInterface16.r3@-8"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "unknown_16", offset = 16, type = "u32" },
+]
+
+# Split from MessageVector.
+[MessageVectorAt56]
+measure = "App::SendMessage.r3@+56"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+]
+
+# Split from AppMessageWord.
+[AppMessageWordAt4]
+measure = "App::SendMessage.r3@+56.+8@+4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from MessageVector.
+[MessageVectorAt76]
+measure = "App@+76"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Split from OpList.
+[OpListAt36]
+measure = "StateLayer@+36"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]

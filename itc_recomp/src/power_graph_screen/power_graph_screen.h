@@ -32,21 +32,9 @@ namespace power_graph_screen {
 
 using Calls = race_hud_object::Calls;
 
-// The screen's blocks: the page object (28 bytes: +0 the page Draw runs, -1
-// while a step runs; +4 the page after the step; +8 the page before; +12
-// the step Update runs, -1 none; +16 the step queued after it; +20; +24 the
-// step's started word), the menu (68: a front-end menu) and the data (92:
-// +0 movie 9 loaded, +4 the state queued, 21 none, +8 to +88 the record,
-// +88 its tab word); the graph shown.
-constexpr uint32_t kPages = 0x82815EB4;
-constexpr uint32_t kMenu = 0x82815EB8;
-constexpr uint32_t kData = 0x82815EBC;
-constexpr uint32_t kShown = 0x82815EC0;
-
-// The member's words (r3 the member).
-constexpr uint32_t kMachineState = 9608;
-constexpr uint32_t kMachineLoaded = 9612;
-constexpr uint32_t kMachineReenter = 9616;
+// The screen's blocks (the page object, the menu, the data), the graph's
+// shown word and the member's words are the schema's
+// (itc_recomp/schema/power-graph-screen.toml, schema/power_graph_screen.h).
 
 // The movie's id.
 constexpr uint32_t kMovie = 9;

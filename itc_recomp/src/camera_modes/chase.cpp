@@ -21,6 +21,18 @@
 #include "matrix_math/matrix_math.h"
 #include "track_zones/track_zones.h"
 #include "vehicle_accessors/vehicle_accessors.h"
+#include "schema/camera_modes.h"
+#include "schema/car_draw.h"
+#include "schema/car_physics.h"
+#include "schema/cameras.h"
+#include "schema/car_scene_draw.h"
+#include "schema/frame_passes.h"
+#include "schema/game_modes.h"
+#include "schema/race_event.h"
+#include "schema/race_states.h"
+#include "schema/scene_models.h"
+#include "schema/type6_type7_modes.h"
+#include "schema/video_output.h"
 
 namespace camera_modes {
 
@@ -28,8 +40,10 @@ using namespace steps;
 
 namespace {
 
-constexpr uint32_t kOne = 0x82000A30;   // 1.0
-constexpr uint32_t kZero = 0x82000A34;  // 0.0
+using G = schema::CameraModesGlobals;
+
+constexpr uint32_t kOne = G::one_address();    // 1.0
+constexpr uint32_t kZero = G::zero_address();  // 0.0
 
 uint32_t Load(uint8_t* base, uint32_t a) { return guest::LoadU32(base, a); }
 uint64_t Load64(uint8_t* base, uint32_t a) {
@@ -128,7 +142,7 @@ double Zoom(uint8_t* base, uint32_t degrees, uint32_t slot, uint32_t frame, uint
             const VideoOutputCall& video_output) {
   const uint32_t video = video_output(frame, back);
   const double fov = Lfs(base, degrees);
-  const int32_t width = int32_t(Load(base, video + 296));
+  const int32_t width = int32_t(schema::VideoOutput(base, video).display_width());
   Store64(base, slot, uint64_t(int64_t(width)));
   return ZoomFromFov(base, fov, Single(double(int64_t(width)))).value();
 }
@@ -136,17 +150,20 @@ double Zoom(uint8_t* base, uint32_t degrees, uint32_t slot, uint32_t frame, uint
 // The zoom, near plane and roll every view's camera sets: SetZoom(zoom),
 // SetNear(+1868 / +1864 x zoom), SetRoll(roll).
 void SetLens(uint8_t* base, uint32_t camera, double zoom, double roll) {
-  cameras::ViewportSetZoom(base, Load(base, camera + 20), zoom);
-  const uint32_t viewport = Load(base, camera + 20);
-  const double ratio = Fdivs(Lfs(base, viewport + 1868), Lfs(base, viewport + 1864));
+  const schema::CameraObject c(base, camera);
+  cameras::ViewportSetZoom(base, c.viewport().address, zoom);
+  const uint32_t viewport = c.viewport().address;
+  const double ratio = Fdivs(double(schema::Viewport(base, viewport).near()),
+                             double(schema::Viewport(base, viewport).zoom()));
   cameras::SetNear(base, Fmuls(ratio, zoom));
-  cameras::ViewportSetRoll(base, Load(base, camera + 20), roll);
+  cameras::ViewportSetRoll(base, c.viewport().address, roll);
 }
 // The same with a given near plane.
 void SetLensNear(uint8_t* base, uint32_t camera, double zoom, double near, double roll) {
-  cameras::ViewportSetZoom(base, Load(base, camera + 20), zoom);
+  const schema::CameraObject c(base, camera);
+  cameras::ViewportSetZoom(base, c.viewport().address, zoom);
   cameras::SetNear(base, near);
-  cameras::ViewportSetRoll(base, Load(base, camera + 20), roll);
+  cameras::ViewportSetRoll(base, c.viewport().address, roll);
 }
 
 // The tracker's w words (1.0), as every view camera's constructor sets them.
@@ -186,12 +203,15 @@ uint32_t MakeStatic(uint8_t* base, uint32_t guard_address, uint32_t guard, uint3
 // direction (target less eye, normalized on the vector unit at `f` + 80),
 // +1660 = 1.0.
 void LookPoint(uint8_t* base, uint32_t camera, uint32_t f, double one) {
-  uint32_t viewport = Load(base, camera + 20);
+  const schema::CameraObject c(base, camera);
+  uint32_t viewport = c.viewport().address;
   Stfs(base, f + 92, one);
-  const double ex = Lfs(base, viewport + 1600);
-  Stfs(base, f + 80, Fsubs(Lfs(base, viewport + 1616), ex));
-  const double ty = Lfs(base, viewport + 1620), tz = Lfs(base, viewport + 1624);
-  const double ey = Lfs(base, viewport + 1604), ez = Lfs(base, viewport + 1608);
+  const double ex = double(schema::Viewport(base, viewport).eye_x());
+  Stfs(base, f + 80, Fsubs(double(schema::Viewport(base, viewport).target_x()), ex));
+  const double ty = double(schema::Viewport(base, viewport).target_y()),
+               tz = double(schema::Viewport(base, viewport).target_z());
+  const double ey = double(schema::Viewport(base, viewport).eye_y()),
+               ez = double(schema::Viewport(base, viewport).eye_z());
   const double dy = Fsubs(ty, ey);
   Stfs(base, f + 88, Fsubs(tz, ez));
   Stfs(base, f + 84, dy);
@@ -202,23 +222,28 @@ void LookPoint(uint8_t* base, uint32_t camera, uint32_t f, double one) {
     n = Normalized(v, Dot3(v, v));
   }
   Stvx(base, f + 80, n);
-  Stfs(base, viewport + 1648, Fadds(ex, Lfs(base, f + 80)));
-  Stfs(base, viewport + 1652, Fadds(Lfs(base, viewport + 1604), Lfs(base, f + 84)));
-  Stfs(base, viewport + 1656, Fadds(Lfs(base, viewport + 1608), Lfs(base, f + 88)));
-  viewport = Load(base, camera + 20);
-  Stfs(base, viewport + 1660, one);
+  schema::Viewport(base, viewport).set_look_x(float(Fadds(ex, Lfs(base, f + 80))));
+  schema::Viewport(base, viewport)
+      .set_look_y(
+          float(Fadds(double(schema::Viewport(base, viewport).eye_y()), Lfs(base, f + 84))));
+  schema::Viewport(base, viewport)
+      .set_look_z(
+          float(Fadds(double(schema::Viewport(base, viewport).eye_z()), Lfs(base, f + 88))));
+  viewport = c.viewport().address;
+  schema::Viewport(base, viewport).set_look_w(float(one));
 }
 
 // The nearest human car's body (Racers::NearestHumanVehicle(the tracker's
 // position at `point`, 1), its frame below `f`): the originals then take
 // its matrix or position and leave it unused.
 void NearestHuman(uint8_t* base, uint32_t camera, uint32_t point, uint32_t f) {
-  CopyWords(base, point, camera + 32, 4);
+  const schema::CameraObject c(base, camera);
+  CopyWords(base, point, c.tracker_address(), 4);
   vehicle::RacersNearestHumanVehicle(base, point, 1, f - 304);
 }
 
-constexpr uint32_t kChaseDegrees = 0x82009300;   // the constructor's (55.0)
-constexpr uint32_t kFollowDegrees = 0x82000D44;  // Follow's (55.0)
+constexpr uint32_t kChaseDegrees = G::chase_degrees_address();    // the constructor's (55.0)
+constexpr uint32_t kFollowDegrees = G::follow_degrees_address();  // Follow's (55.0)
 
 }  // namespace
 
@@ -232,45 +257,52 @@ bool ChaseReady(uint8_t* base) {
 void ChasePlace(uint8_t* base, uint32_t camera, uint32_t eye, uint32_t target, uint32_t up,
                 uint32_t look, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_82153478 ChaseCamera::Place");
+  const schema::ChaseCamera c(base, camera);
+  const schema::CameraTarget t(base, c.tracker_address());
   const double zero = Lfs(base, kZero);
-  uint32_t viewport = Load(base, camera + 20);
-  CopyWords(base, viewport + 1680, eye, 4);
-  viewport = Load(base, camera + 20);
-  CopyWords(base, viewport + 1696, target, 4);
-  viewport = Load(base, camera + 20);
-  CopyWords(base, viewport + 1712, up, 4);
-  viewport = Load(base, camera + 20);
-  CopyWords(base, viewport + 1744, look, 4);
-  viewport = Load(base, camera + 20);
-  CopyWords(base, viewport + 1664, viewport + 1744, 4);
-  const uint32_t vehicle = Load(base, camera + 16);
-  Stfs(base, camera + 368, zero);
+  uint32_t viewport = c.viewport().address;
+  CopyWords(base, schema::Viewport(base, viewport).base_eye_address(), eye, 4);
+  viewport = c.viewport().address;
+  CopyWords(base, schema::Viewport(base, viewport).base_target_address(), target, 4);
+  viewport = c.viewport().address;
+  CopyWords(base, schema::Viewport(base, viewport).base_up_address(), up, 4);
+  viewport = c.viewport().address;
+  CopyWords(base, schema::Viewport(base, viewport).base_look_address(), look, 4);
+  viewport = c.viewport().address;
+  CopyWords(base, schema::Viewport(base, viewport).view1_target_address(),
+            schema::Viewport(base, viewport).base_look_address(), 4);
+  const uint32_t vehicle = c.vehicle();
+  c.set_unknown_368(float(zero));
   if (vehicle == 0) {
     return;
   }
-  TargetTrack(base, camera + 32, vehicle, frame - 256);
+  TargetTrack(base, c.tracker_address(), vehicle, frame - 256);
   // The tracker's rotation (+224) normalized, kept at +240.
-  const uint32_t rotation = camera + 224;
+  const uint32_t rotation = t.rotation_address();
   NormalizeQuat(base, rotation);
   const double one = Lfs(base, kOne);
-  CopyWords(base, camera + 240, rotation, 4);
-  CopyDoublewords(base, camera + 240, rotation, 2);
+  CopyWords(base, t.last_rotation_address(), rotation, 4);
+  CopyDoublewords(base, t.last_rotation_address(), rotation, 2);
   for (uint32_t i = 0; i < 3; i++) {
-    Stfs(base, Load(base, camera + 20) + 1696 + 4 * i, zero);
+    Stfs(base, c.viewport().base_target_address() + 4 * i, zero);
   }
-  Stfs(base, Load(base, camera + 20) + 1708, one);
-  viewport = Load(base, camera + 20);
-  Stfs(base, viewport + 1700, Fadds(Lfs(base, viewport + 1700), Lfs(base, 0x820029F0)));
+  Stfs(base, c.viewport().base_target_w_address(), one);
+  viewport = c.viewport().address;
+  schema::Viewport(base, viewport)
+      .set_base_target_y(float(
+          Fadds(double(schema::Viewport(base, viewport).base_target_y()), Lfs(base, 0x820029F0))));
   // The track position's section and slice (+260, +262) into +376.
-  const uint16_t section = guest::LoadU16(base, camera + 260);
-  const uint16_t slice = guest::LoadU16(base, camera + 262);
-  guest::StoreU16(base, camera + 376, section);
-  guest::StoreU16(base, camera + 378, slice);
+  const uint16_t section = guest::LoadU16(base, t.track_position_address() + 4);
+  const uint16_t slice = guest::LoadU16(base, t.track_position_address() + 6);
+  c.set_section(section);
+  c.set_slice(slice);
 }
 
 void ChaseFollow(uint8_t* base, uint32_t camera, double rate, double least, uint32_t frame,
                  const VideoOutputCall& video_output) {
   ITC_NATIVE_RUNNING("sub_82153640 ChaseCamera::Follow");
+  const schema::ChaseCamera c(base, camera);
+  const schema::CameraTarget t(base, c.tracker_address());
   const uint32_t f = frame;
   const double one = Lfs(base, kOne);
   const double zero = Lfs(base, kZero);
@@ -282,11 +314,11 @@ void ChaseFollow(uint8_t* base, uint32_t camera, double rate, double least, uint
     Stfs(base, f + at + 12, one);
   }
   StoreIdentity(base, f + 160);
-  const uint32_t vehicle = Load(base, camera + 16);
+  const uint32_t vehicle = c.vehicle();
   if (vehicle == 0) {
     return;
   }
-  const uint32_t tracker = camera + 32;
+  const uint32_t tracker = c.tracker_address();
   TargetTrack(base, tracker, vehicle, f - 256);
   SetLens(base, camera, Zoom(base, kFollowDegrees, f + 80, f, 0x82153730, video_output), zero);
   // Forward (1, 0, 0, 1) through the turn now (+160) and before (+96): on
@@ -299,8 +331,8 @@ void ChaseFollow(uint8_t* base, uint32_t camera, double rate, double least, uint
   Stfs(base, f + 104, zero);
   Stfs(base, f + 124, one);
   Stfs(base, f + 108, one);
-  matrix_math::Vec4Transform(base, f + 96, camera + 160, f + 96);
-  const uint32_t turn = camera + 96;
+  matrix_math::Vec4Transform(base, f + 96, t.last_turn_address(), f + 96);
+  const uint32_t turn = t.turn_address();
   matrix_math::Vec4Transform(base, f + 112, turn, f + 112);
   {
     const simde__m128 now = Lvx(base, f + 112);
@@ -329,9 +361,9 @@ void ChaseFollow(uint8_t* base, uint32_t camera, double rate, double least, uint
   }
   const double keep = Fsubs(one, w);
   // The rotation (+224) blended toward the last (+240) by `keep`.
-  const uint32_t rotation = camera + 224;
-  const double l0 = Lfs(base, camera + 240), l1 = Lfs(base, camera + 244);
-  const double l2 = Lfs(base, camera + 248), l3 = Lfs(base, camera + 252);
+  const uint32_t rotation = t.rotation_address();
+  const double l0 = double(t.last_rotation_x()), l1 = double(t.last_rotation_y());
+  const double l2 = double(t.last_rotation_z()), l3 = double(t.last_rotation_w());
   const double r1 = Fmuls(Lfs(base, rotation + 4), w);
   const double r2 = Fmuls(Lfs(base, rotation + 8), w);
   const double r3 = Lfs(base, rotation + 12);
@@ -349,42 +381,46 @@ void ChaseFollow(uint8_t* base, uint32_t camera, double rate, double least, uint
   CopyDoublewords(base, rotation, f + 80, 2);
   NormalizeQuat(base, rotation);
   // The eye's offset from the target (+1680 less +1664) turned by it.
-  uint32_t viewport = Load(base, camera + 20);
+  uint32_t viewport = c.viewport().address;
   for (uint32_t i = 0; i < 3; i++) {
     Stfs(base, f + 128 + 4 * i,
-         Fsubs(Lfs(base, viewport + 1680 + 4 * i), Lfs(base, viewport + 1664 + 4 * i)));
+         Fsubs(Lfs(base, schema::Viewport(base, viewport).base_eye_address() + 4 * i),
+               Lfs(base, schema::Viewport(base, viewport).view1_target_address() + 4 * i)));
   }
   QuatRotate(base, f + 80, rotation, f + 128);
   CopyDoublewords(base, f + 128, f + 80, 2);
   // The eye: the target point (+1664) through the turn about the tracked
   // point (+64), plus the offset; the target through it from +1696.
-  const uint32_t point = camera + 64;
+  const uint32_t point = t.point_address();
   car_physics::MatrixMultiplyTranslation(base, f + 160, turn, point, f - 192);
-  matrix_math::Vec4Transform(base, f + 144, f + 160, Load(base, camera + 20) + 1664);
-  viewport = Load(base, camera + 20);
+  matrix_math::Vec4Transform(base, f + 144, f + 160, c.viewport().view1_target_address());
+  viewport = c.viewport().address;
   for (uint32_t i = 0; i < 3; i++) {
-    Stfs(base, viewport + 1600 + 4 * i,
+    Stfs(base, schema::Viewport(base, viewport).eye_address() + 4 * i,
          Fadds(Lfs(base, f + 128 + 4 * i), Lfs(base, f + 144 + 4 * i)));
   }
-  Stfs(base, Load(base, camera + 20) + 1612, one);
+  Stfs(base, c.viewport().eye_w_address(), one);
   car_physics::MatrixMultiplyTranslation(base, f + 160, turn, point, f - 192);
-  viewport = Load(base, camera + 20);
-  matrix_math::Vec4Transform(base, viewport + 1616, f + 160, viewport + 1696);
-  viewport = Load(base, camera + 20);
-  CopyWords(base, viewport + 1632, viewport + 1712, 4);
-  viewport = Load(base, camera + 20);
-  CopyWords(base, viewport + 1648, tracker, 4);
+  viewport = c.viewport().address;
+  matrix_math::Vec4Transform(base, schema::Viewport(base, viewport).target_address(), f + 160,
+                             schema::Viewport(base, viewport).base_target_address());
+  viewport = c.viewport().address;
+  CopyWords(base, schema::Viewport(base, viewport).up_address(),
+            schema::Viewport(base, viewport).base_up_address(), 4);
+  viewport = c.viewport().address;
+  CopyWords(base, schema::Viewport(base, viewport).look_address(), tracker, 4);
 }
 
 uint32_t ChaseConstruct(uint8_t* base, uint32_t camera, uint32_t viewport, uint32_t vehicle,
                         uint32_t frame, const VideoOutputCall& video_output,
                         const c_runtime::AtexitCall& atexit) {
   ITC_NATIVE_RUNNING("sub_82154548 ChaseCamera::ChaseCamera");
-  constexpr uint32_t kGuard = 0x826D8220;
-  constexpr uint32_t kUp = 0x826D8210;    // (0, 1, 0, 1)
-  constexpr uint32_t kLook = 0x826D8200;  // (0x8200295C's, 0x82008290's, 0, 1)
+  const schema::ChaseCamera c(base, camera);
+  constexpr uint32_t kGuard = G::chase_guard_address();
+  constexpr uint32_t kUp = G::chase_up_address();      // (0, 1, 0, 1)
+  constexpr uint32_t kLook = G::chase_look_address();  // (0x8200295C's, 0x82008290's, 0, 1)
   const uint32_t f = frame;
-  const uint32_t tracker = camera + 32;
+  const uint32_t tracker = c.tracker_address();
   const double one = Lfs(base, kOne);
   for (uint32_t at = 12; at <= 220; at += 16) {
     Stfs(base, tracker + at, one);
@@ -392,19 +428,19 @@ uint32_t ChaseConstruct(uint8_t* base, uint32_t camera, uint32_t viewport, uint3
   for (uint32_t at : {252u, 268u, 284u, 300u}) {
     Stfs(base, tracker + at, one);
   }
-  Store(base, camera + 0, 0x82006B24);
-  Stfs(base, camera + 364, one);
-  Store(base, camera + 16, vehicle);
-  Store(base, camera + 20, viewport);
+  c.set_vtable(0x82006B24);
+  c.set_unknown_364(float(one));
+  c.set_vehicle(vehicle);
+  c.set_viewport(viewport);
   // The offsets from the car's spec block: its +76 and +80 halved, an angle
   // (the table at 0x8200930C by the word at +372, in degrees).
-  const uint32_t spec = vehicle_accessors::ObjectRecord1888(Load(base, vehicle + 5712));
+  const uint32_t spec = vehicle_accessors::ObjectRecord1888(schema::Vehicle(base, vehicle).car());
   const double scale = Lfs(base, 0x820029D8);
-  const uint32_t index = Load(base, camera + 372);
-  const uint32_t r80 = Load(base, spec + 80);
+  const uint32_t index = c.angle();
+  const uint32_t r80 = schema::CarSpecCopies(base, spec).unknown_80();
   const double degrees = Lfs(base, (index << 2) + 0x8200930C);
   Store64(base, f + 96, r80);
-  const uint32_t r76 = Load(base, spec + 76);
+  const uint32_t r76 = schema::CarSpecCopies(base, spec).unknown_76();
   const double angle = Fmuls(degrees, Lfs(base, 0x82002948));
   Store64(base, f + 80, r76);
   const double half = Lfs(base, 0x82001BE4);
@@ -445,9 +481,9 @@ uint32_t ChaseConstruct(uint8_t* base, uint32_t camera, uint32_t viewport, uint3
   }
   SetLens(base, camera, Zoom(base, kChaseDegrees, f + 96, f, 0x82154734, video_output), zero);
   ChasePlace(base, camera, f + 112, f + 80, kUp, kLook, f - 112);
-  TargetTrack(base, tracker, Load(base, camera + 16), f - 256);
+  TargetTrack(base, tracker, c.vehicle(), f - 256);
   ChaseFollow(base, camera, Lfs(base, 0x82002CBC), Lfs(base, 0x82001FBC), f - 320, video_output);
-  CopyWords(base, camera + 352, Load(base, camera + 20) + 1600, 4);
+  CopyWords(base, c.eye_address(), c.viewport().eye_address(), 4);
   return camera;
 }
 
@@ -457,50 +493,53 @@ uint32_t TvConstruct(uint8_t* base, uint32_t camera, uint32_t viewport, uint32_t
                      uint32_t frame, const VideoOutputCall& video_output,
                      const c_runtime::AtexitCall& atexit) {
   ITC_NATIVE_RUNNING("sub_82155288 TvCamera::TvCamera");
+  const schema::TvCamera c(base, camera);
+  const schema::ChaseCamera fallback(base, c.fallback_address());
   const uint32_t f = frame;
   const double one = Lfs(base, kOne);
-  Store(base, camera + 16, 0);
-  Store(base, camera + 20, 0);
-  TrackerOnes(base, camera + 32, one);
-  Store(base, camera + 0, 0x820093BC);
-  Stfs(base, camera + 396, one);
-  Stfs(base, camera + 412, one);
-  Stfs(base, camera + 428, one);
+  c.set_vehicle(0);
+  c.set_viewport(0);
+  TrackerOnes(base, c.tracker_address(), one);
+  c.set_vtable(0x820093BC);
+  c.set_eye_w(float(one));
+  c.set_target_w(float(one));
+  c.set_unknown_416_w(float(one));
   // The four camera path buffers (+43016, Buffer28s): no path (-1), empty.
   for (uint32_t k = 0; k < 4; k++) {
-    const uint32_t buffer = camera + 43016 + 28 * k;
-    Store(base, buffer + 12, 0xFFFFFFFF);
-    Store(base, buffer + 0, 0x82009390);
-    Store(base, buffer + 16, 0xFFFFFFFF);
-    Store(base, buffer + 20, 0);
-    Store(base, buffer + 24, 0);
+    const schema::CameraPathBuffer buffer(base, c.buffers_address() + schema::CameraPathBuffer::kSize * k);
+    buffer.set_index(0xFFFFFFFF);
+    buffer.set_vtable(0x82009390);
+    buffer.set_serial(0xFFFFFFFF);
+    buffer.set_block(0);
+    buffer.set_state(0);
   }
   // The fallback chase camera's fields its constructor doesn't set first.
-  const uint32_t chase = camera + 43136;
-  Store(base, chase + 16, 0);
-  Store(base, chase + 20, 0);
-  Stfs(base, chase + 32 + 12, one);
-  Store(base, chase + 0, 0x82006B24);
+  const uint32_t chase = c.fallback_address();
+  fallback.set_vehicle(0);
+  fallback.set_viewport(0);
+  Stfs(base, fallback.tracker_address() + 12, one);
+  fallback.set_vtable(0x82006B24);
   for (uint32_t at = 28; at <= 220; at += 16) {
-    Stfs(base, chase + 32 + at, one);
+    Stfs(base, fallback.tracker_address() + at, one);
   }
   for (uint32_t at : {252u, 268u, 284u, 300u}) {
-    Stfs(base, chase + 32 + at, one);
+    Stfs(base, fallback.tracker_address() + at, one);
   }
-  Stfs(base, chase + 364, one);
-  Store(base, camera + 16, vehicle);
-  Store(base, camera + 20, viewport);
+  fallback.set_unknown_364(float(one));
+  c.set_vehicle(vehicle);
+  c.set_viewport(viewport);
   // Zoom and near plane (no roll).
   const double zoom = Zoom(base, kChaseDegrees, f + 80, f, 0x821553E0, video_output);
-  cameras::ViewportSetZoom(base, Load(base, camera + 20), zoom);
+  cameras::ViewportSetZoom(base, c.viewport().address, zoom);
   {
-    const uint32_t v = Load(base, camera + 20);
-    const double ratio = Fdivs(Lfs(base, v + 1868), Lfs(base, v + 1864));
+    const uint32_t v = c.viewport().address;
+    const double ratio =
+        Fdivs(double(schema::Viewport(base, v).near()), double(schema::Viewport(base, v).zoom()));
     cameras::SetNear(base, Fmuls(ratio, zoom));
   }
-  TargetTrack(base, camera + 32, vehicle, f - 256);
-  Store(base, camera + 448, 0);
-  Store(base, camera + 43508, 2);  // the chase camera's +372 (its angle)
+  TargetTrack(base, c.tracker_address(), vehicle, f - 256);
+  c.set_paused(0);
+  fallback.set_angle(2);  // the chase camera's +372 (its angle)
   if (chase != 0) {
     ChaseConstruct(base, chase, viewport, vehicle, f - 224, video_output, atexit);
   }
@@ -529,16 +568,16 @@ uint32_t TvConstruct(uint8_t* base, uint32_t camera, uint32_t viewport, uint32_t
       {8, k8, 12},  {9, k9, 12},   {13, k13, 2}, {14, k14, 1}, {16, k16, 6}, {17, k17, 1},
       {19, k19, 2}, {20, k20, 1}, {21, k21, 4}, {22, k22, 3}, {25, k25, 6}, {28, k28, 5},
   };
-  if (Load(base, camera + 452) > 0) {
+  if (c.range_count() > 0) {
     uint32_t i = 0;
     do {
-      const uint32_t record = Load(base, 0x82618D30 + (i << 2));
-      const uint32_t range = camera + 456 + i * 1064;
+      const uint32_t record = Load(base, G::path_assets_address() + (i << 2));
+      const uint32_t range = c.ranges_address() + i * 1064;
       guest::StoreU16(base, f + 82, 0);
       guest::StoreU16(base, f + 80, uint16_t(Load(base, record + 4)));
       guest::StoreU16(base, f + 84, uint16_t(Load(base, record + 8)));
       const uint32_t end = Load(base, record + 8);
-      const uint32_t table = Load(base, Load(base, 0x826C5B10) + 12);
+      const uint32_t table = Load(base, G::route(base) + 12);
       const uint32_t section = Load(base, table + ((end << 2) & 0x3FFFC));
       guest::StoreU16(base, f + 86, uint16_t(guest::LoadU16(base, section) - 1));
       track_zones::RangeInit(base, range,
@@ -552,23 +591,24 @@ uint32_t TvConstruct(uint8_t* base, uint32_t camera, uint32_t viewport, uint32_t
         }
       }
       i++;
-    } while (i < Load(base, camera + 452));
+    } while (i < c.range_count());
   }
-  Store(base, camera + 43520, 0);
+  c.set_filter_state(0);
   return camera;
 }
 
 void ChaseUpdate(uint8_t* base, uint32_t camera, uint32_t frame,
                  const VideoOutputCall& video_output) {
   ITC_NATIVE_RUNNING("sub_82154808 ChaseCamera::Update");
-  constexpr uint32_t kSpeed = 0x826D8228;  // the speed last seen
-  constexpr uint32_t kPull = 0x826D8224;   // the pull back
+  const schema::ChaseCamera c(base, camera);
+  constexpr uint32_t kSpeed = G::last_speed_address();  // the speed last seen
+  constexpr uint32_t kPull = G::pull_back_address();    // the pull back
   const uint32_t f = frame;
   const double least = Lfs(base, 0x82001FBC);
   ChaseFollow(base, camera, Lfs(base, 0x82002CBC), least, f - 320, video_output);
   Shake(base, camera, f - 96);
   // The pull back follows the speed's change, clamped.
-  const double speed = double(Vehicle_GetSpeedKmh(base, Load(base, camera + 16)));
+  const double speed = double(Vehicle_GetSpeedKmh(base, c.vehicle()));
   const double change = Fsubs(speed, Lfs(base, kSpeed));
   Stfs(base, kSpeed, speed);
   const double gain = Lfs(base, 0x820029F8);
@@ -611,16 +651,17 @@ void ChaseUpdate(uint8_t* base, uint32_t camera, uint32_t frame,
   Stfs(base, f + 96, zero);
   Stfs(base, f + 100, zero);
   Stfs(base, f + 108, one);
-  ViewportPullBack(base, Load(base, camera + 20), one, f + 96, f);
+  ViewportPullBack(base, c.viewport().address, one, f + 96, f);
   // A state (+380): the eye moved once off the view's line, then cleared.
-  if (Load(base, camera + 380) != 0) {
-    const uint32_t viewport = Load(base, camera + 20);
+  if (c.state() != 0) {
+    const uint32_t viewport = c.viewport().address;
     Stfs(base, f + 92, one);
     for (uint32_t i = 0; i < 3; i++) {
       Stfs(base, f + 80 + 4 * i,
-           Fsubs(Lfs(base, viewport + 1600 + 4 * i), Lfs(base, viewport + 1616 + 4 * i)));
+           Fsubs(Lfs(base, schema::Viewport(base, viewport).eye_address() + 4 * i),
+                 Lfs(base, schema::Viewport(base, viewport).target_address() + 4 * i)));
     }
-    const double tx = Lfs(base, viewport + 1616);
+    const double tx = double(schema::Viewport(base, viewport).target_x());
     const simde__m128 v = Lvx(base, f + 80);
     simde__m128 n;
     {
@@ -631,15 +672,16 @@ void ChaseUpdate(uint8_t* base, uint32_t camera, uint32_t frame,
     const double dx = Fneg(Lfs(base, f + 80));
     const double dy = Lfs(base, f + 84);
     const double side = Lfs(base, 0x820093B0);
-    Stfs(base, viewport + 1600, Fadds(tx, Fmuls(dx, side)));
+    schema::Viewport(base, viewport).set_eye_x(float(Fadds(tx, Fmuls(dx, side))));
     const double up = Fmuls(dy, Lfs(base, 0x82002CAC));
-    Stfs(base, viewport + 1604, Fadds(Lfs(base, viewport + 1620), up));
+    schema::Viewport(base, viewport)
+        .set_eye_y(float(Fadds(double(schema::Viewport(base, viewport).target_y()), up)));
     const double dz = Fneg(Lfs(base, f + 88));
-    const double tz = Lfs(base, viewport + 1624);
-    Stfs(base, viewport + 1608, Fadds(tz, Fmuls(dz, side)));
-    Store(base, camera + 380, 0);
+    const double tz = double(schema::Viewport(base, viewport).target_z());
+    schema::Viewport(base, viewport).set_eye_z(float(Fadds(tz, Fmuls(dz, side))));
+    c.set_state(0);
   }
-  CopyWords(base, camera + 352, Load(base, camera + 20) + 1600, 4);
+  CopyWords(base, c.eye_address(), c.viewport().eye_address(), 4);
 }
 
 // --- Views 1 and 2 ---
@@ -648,52 +690,56 @@ uint32_t View1Construct(uint8_t* base, uint32_t camera, uint32_t viewport, uint3
                         uint32_t frame, const VideoOutputCall& video_output,
                         const c_runtime::AtexitCall& atexit) {
   ITC_NATIVE_RUNNING("sub_82154A48 ViewCamera1::ViewCamera1");
-  constexpr uint32_t kGuard = 0x826D8270;
+  const schema::ViewCamera1 c(base, camera);
+  const schema::CameraTarget t(base, c.tracker_address());
+  constexpr uint32_t kGuard = G::view1_guard_address();
   const uint32_t f = frame;
-  const uint32_t tracker = camera + 32;
-  Store(base, camera + 16, 0);
+  const uint32_t tracker = c.tracker_address();
+  c.set_vehicle(0);
   const double one = Lfs(base, kOne);
-  Store(base, camera + 20, 0);
+  c.set_viewport(0);
   TrackerOnes(base, tracker, one);
   uint32_t guard = Load(base, kGuard);
-  Store(base, camera + 0, 0x82006B2C);
+  c.set_vtable(0x82006B2C);
   const double depth = Lfs(base, 0x82002A00);
-  Stfs(base, camera + 1100, one);
-  guard = MakeStatic(base, kGuard, guard, 1, 0x826D8260,
+  c.set_rotation_w(float(one));
+  guard = MakeStatic(base, kGuard, guard, 1, G::view1_statics_address() + 48,
                      {Lfs(base, 0x820093B8), one, depth, one}, 0x825DB120, true, atexit);
-  guard = MakeStatic(base, kGuard, guard, 2, 0x826D8250, {one, one, depth, one}, 0x825DB118,
-                     false, atexit);
+  guard = MakeStatic(base, kGuard, guard, 2, G::view1_statics_address() + 32,
+                     {one, one, depth, one}, 0x825DB118, false, atexit);
   const double zero = Lfs(base, kZero);
-  guard = MakeStatic(base, kGuard, guard, 4, 0x826D8240, {zero, one, zero, one}, 0x825DB110,
-                     false, atexit);
-  MakeStatic(base, kGuard, guard, 8, 0x826D8230, {zero, zero, zero, one}, 0x825DB108, false,
-             atexit);
-  Store(base, camera + 16, car);
-  Store(base, camera + 20, viewport);
+  guard = MakeStatic(base, kGuard, guard, 4, G::view1_statics_address() + 16,
+                     {zero, one, zero, one}, 0x825DB110, false, atexit);
+  MakeStatic(base, kGuard, guard, 8, G::view1_statics_address(), {zero, zero, zero, one},
+             0x825DB108, false, atexit);
+  c.set_vehicle(car);
+  c.set_viewport(viewport);
   SetLensNear(base, camera, Zoom(base, kChaseDegrees, f + 80, f, 0x82154BF4, video_output), zero,
               zero);
-  CopyWords(base, Load(base, camera + 20) + 1680, 0x826D8260, 4);
-  CopyWords(base, Load(base, camera + 20) + 1696, 0x826D8250, 4);
-  CopyWords(base, Load(base, camera + 20) + 1712, 0x826D8240, 4);
-  CopyWords(base, Load(base, camera + 20) + 1744, 0x826D8230, 4);
-  TargetTrack(base, tracker, Load(base, camera + 16), f - 256);
-  vehicle::CameraCurveLoad(base, camera + 352, 0, 30);
-  CopyWords(base, camera + 1088, camera + 224, 4);
-  CopyDoublewords(base, camera + 1088, camera + 224, 2);
-  Stfs(base, camera + 1104, zero);
+  CopyWords(base, c.viewport().base_eye_address(), G::view1_statics_address() + 48, 4);
+  CopyWords(base, c.viewport().base_target_address(), G::view1_statics_address() + 32, 4);
+  CopyWords(base, c.viewport().base_up_address(), G::view1_statics_address() + 16, 4);
+  CopyWords(base, c.viewport().base_look_address(), G::view1_statics_address(), 4);
+  TargetTrack(base, tracker, c.vehicle(), f - 256);
+  vehicle::CameraCurveLoad(base, c.curve_address(), 0, 30);
+  CopyWords(base, c.rotation_address(), t.rotation_address(), 4);
+  CopyDoublewords(base, c.rotation_address(), t.rotation_address(), 2);
+  c.set_look_angle(float(zero));
   return camera;
 }
 
 void View1Update(uint8_t* base, uint32_t camera, uint32_t frame,
                  const VideoOutputCall& video_output) {
   ITC_NATIVE_RUNNING("sub_82153A50 ViewCamera1::Update");
+  const schema::ViewCamera1 c(base, camera);
+  const schema::CameraTarget t(base, c.tracker_address());
   const uint32_t f = frame;
-  const uint32_t tracker = camera + 32;
+  const uint32_t tracker = c.tracker_address();
   const double one = Lfs(base, kOne);
   for (uint32_t at : {220u, 236u, 252u, 268u}) {
     Stfs(base, f + at, one);
   }
-  TargetTrack(base, tracker, Load(base, camera + 16), f - 256);
+  TargetTrack(base, tracker, c.vehicle(), f - 256);
   const double zoom = Zoom(base, kChaseDegrees, f + 80, f, 0x82153AB8, video_output);
   const double zero = Lfs(base, kZero);
   SetLensNear(base, camera, zoom, Lfs(base, 0x82001FBC), zero);
@@ -701,33 +747,42 @@ void View1Update(uint8_t* base, uint32_t camera, uint32_t frame,
   // [0x826C7824] 0), else the first; its +48 picks the eye and target
   // offsets (32 bytes each at 0x82618DC0).
   uint32_t n = 0;
-  const uint32_t race = Load(base, kRaceData);
-  if (int32_t(Load(base, race + 0xA3AF0)) == 6 && int32_t(Load(base, race + 0x59614)) == 2) {
-    n = Load(base, 0x826C7824) == 0 ? 1 : 0;
+  const uint32_t race = G::race_data(base);
+  if (int32_t(schema::RaceData(base, race).kind()) == 6 &&
+      int32_t(schema::RaceData(base, race).added_count()) == 2) {
+    n = G::two_player(base) == 0 ? 1 : 0;
   }
   const uint32_t model =
-      vehicle_accessors::ScenePoolsFindModel(base, Load(base, 0x826C2E44), 2, n);
-  const uint32_t entry = (Load(base, model + 48) << 5) & 0xFFFFFFE0u;
-  CopyWords(base, f + 80, 0x82618DC0 + entry, 4);
-  CopyWords(base, f + 112, 0x82618DD0 + entry, 4);
-  const uint32_t turn = camera + 96;
+      vehicle_accessors::ScenePoolsFindModel(base, schema::CarDrawGlobals::scene(base).address, 2, n);
+  const uint32_t entry = (schema::SceneModel(base, model).block() << 5) & 0xFFFFFFE0u;
+  CopyWords(base, f + 80, G::view1_offsets_address() + entry, 4);
+  CopyWords(base, f + 112, G::view1_offsets_address() + 16 + entry, 4);
+  const uint32_t turn = t.turn_address();
   car_physics::MatrixMultiplyTranslation(base, f + 208, turn, tracker, f - 192);
-  matrix_math::Vec4Transform(base, Load(base, camera + 20) + 1600, f + 208, f + 80);
-  matrix_math::Vec4Transform(base, Load(base, camera + 20) + 1616, f + 208, f + 112);
-  uint32_t viewport = Load(base, camera + 20);
-  CopyWords(base, viewport + 1664, viewport + 1616, 4);
-  viewport = Load(base, camera + 20);
-  matrix_math::Vec4Transform(base, viewport + 1632, turn, viewport + 1712);
+  matrix_math::Vec4Transform(base, c.viewport().eye_address(), f + 208, f + 80);
+  matrix_math::Vec4Transform(base, c.viewport().target_address(), f + 208, f + 112);
+  uint32_t viewport = c.viewport().address;
+  CopyWords(base, schema::Viewport(base, viewport).view1_target_address(),
+            schema::Viewport(base, viewport).target_address(), 4);
+  viewport = c.viewport().address;
+  matrix_math::Vec4Transform(base, schema::Viewport(base, viewport).up_address(), turn,
+                             schema::Viewport(base, viewport).base_up_address());
   // The look turned by +1104 (Matrix::RotateY of the identity at +144).
   Stfs(base, f + 96, zero);
   Stfs(base, f + 100, zero);
   Stfs(base, f + 104, zero);
   Stfs(base, f + 108, one);
   StoreIdentity(base, f + 144);
-  viewport = Load(base, camera + 20);
-  Stfs(base, f + 96, Fsubs(Lfs(base, viewport + 1616), Lfs(base, viewport + 1600)));
-  Stfs(base, f + 100, Fsubs(Lfs(base, viewport + 1620), Lfs(base, viewport + 1604)));
-  Stfs(base, f + 104, Fsubs(Lfs(base, viewport + 1624), Lfs(base, viewport + 1608)));
+  viewport = c.viewport().address;
+  Stfs(base, f + 96,
+       Fsubs(double(schema::Viewport(base, viewport).target_x()),
+             double(schema::Viewport(base, viewport).eye_x())));
+  Stfs(base, f + 100,
+       Fsubs(double(schema::Viewport(base, viewport).target_y()),
+             double(schema::Viewport(base, viewport).eye_y())));
+  Stfs(base, f + 104,
+       Fsubs(double(schema::Viewport(base, viewport).target_z()),
+             double(schema::Viewport(base, viewport).eye_z())));
   {
     const simde__m128 v = Lvx(base, f + 96);
     simde__m128 nv;
@@ -737,12 +792,13 @@ void View1Update(uint8_t* base, uint32_t camera, uint32_t frame,
     }
     Stvx(base, f + 96, nv);
   }
-  matrix_math::RotateY(base, f + 144, f + 144, camera + 1104, f - 80);
+  matrix_math::RotateY(base, f + 144, f + 144, c.look_angle_address(), f - 80);
   matrix_math::Vec4Transform(base, f + 96, f + 144, f + 96);
-  viewport = Load(base, camera + 20);
+  viewport = c.viewport().address;
   for (uint32_t i = 0; i < 3; i++) {
-    Stfs(base, viewport + 1616 + 4 * i,
-         Fadds(Lfs(base, viewport + 1600 + 4 * i), Lfs(base, f + 96 + 4 * i)));
+    Stfs(base, schema::Viewport(base, viewport).target_address() + 4 * i,
+         Fadds(Lfs(base, schema::Viewport(base, viewport).eye_address() + 4 * i),
+               Lfs(base, f + 96 + 4 * i)));
   }
   NearestHuman(base, camera, f + 128, f);
   LookPoint(base, camera, f, one);
@@ -752,81 +808,94 @@ uint32_t View2Construct(uint8_t* base, uint32_t camera, uint32_t viewport, uint3
                         uint32_t frame, const VideoOutputCall& video_output,
                         const c_runtime::AtexitCall& atexit) {
   ITC_NATIVE_RUNNING("sub_82154D38 ViewCamera2::ViewCamera2");
-  constexpr uint32_t kGuard = 0x826D82C0;
+  const schema::ViewCamera2 c(base, camera);
+  const schema::CameraTarget t(base, c.tracker_address());
+  constexpr uint32_t kGuard = G::view2_guard_address();
   const uint32_t f = frame;
-  const uint32_t tracker = camera + 32;
+  const uint32_t tracker = c.tracker_address();
   const double one = Lfs(base, kOne);
   TrackerOnes(base, tracker, one);
   uint32_t guard = Load(base, kGuard);
-  Store(base, camera + 16, 0);
-  Store(base, camera + 20, 0);
-  Store(base, camera + 0, 0x82006B34);
+  c.set_vehicle(0);
+  c.set_viewport(0);
+  c.set_vtable(0x82006B34);
   const double height = Lfs(base, 0x82002CB0);
-  Stfs(base, camera + 1100, one);
+  c.set_rotation_w(float(one));
   const double zero = Lfs(base, kZero);
-  guard = MakeStatic(base, kGuard, guard, 1, 0x826D82B0, {one, height, zero, one}, 0x825DB140,
-                     false, atexit);
-  guard = MakeStatic(base, kGuard, guard, 2, 0x826D82A0,
+  guard = MakeStatic(base, kGuard, guard, 1, G::view2_statics_address() + 48,
+                     {one, height, zero, one}, 0x825DB140, false, atexit);
+  guard = MakeStatic(base, kGuard, guard, 2, G::view2_statics_address() + 32,
                      {Lfs(base, 0x82001FD8), height, zero, one}, 0x825DB138, true, atexit);
-  guard = MakeStatic(base, kGuard, guard, 4, 0x826D8290, {zero, one, zero, one}, 0x825DB130,
-                     false, atexit);
-  MakeStatic(base, kGuard, guard, 8, 0x826D8280, {Lfs(base, 0x820029C8), height, zero, one},
-             0x825DB128, true, atexit);
-  Store(base, camera + 16, car);
-  Store(base, camera + 20, viewport);
+  guard = MakeStatic(base, kGuard, guard, 4, G::view2_statics_address() + 16,
+                     {zero, one, zero, one}, 0x825DB130, false, atexit);
+  MakeStatic(base, kGuard, guard, 8, G::view2_statics_address(),
+             {Lfs(base, 0x820029C8), height, zero, one}, 0x825DB128, true, atexit);
+  c.set_vehicle(car);
+  c.set_viewport(viewport);
   SetLens(base, camera, Zoom(base, kChaseDegrees, f + 80, f, 0x82154EF0, video_output), zero);
-  CopyWords(base, Load(base, camera + 20) + 1680, 0x826D82B0, 4);
-  CopyWords(base, Load(base, camera + 20) + 1696, 0x826D82A0, 4);
-  CopyWords(base, Load(base, camera + 20) + 1712, 0x826D8290, 4);
-  CopyWords(base, Load(base, camera + 20) + 1744, 0x826D8280, 4);
-  const uint32_t the_vehicle = Load(base, camera + 16);
+  CopyWords(base, c.viewport().base_eye_address(), G::view2_statics_address() + 48, 4);
+  CopyWords(base, c.viewport().base_target_address(), G::view2_statics_address() + 32, 4);
+  CopyWords(base, c.viewport().base_up_address(), G::view2_statics_address() + 16, 4);
+  CopyWords(base, c.viewport().base_look_address(), G::view2_statics_address(), 4);
+  const uint32_t the_vehicle = c.vehicle();
   if (the_vehicle != 0) {
     // The eye and target from the car's size: its spec's +76 / 10 (x the
     // floats at 0x82001BE0 and 0x820029D8) and +76, +80 halved.
-    const uint32_t spec = vehicle_accessors::ObjectRecord1888(Load(base, the_vehicle + 5712));
+    const uint32_t spec = vehicle_accessors::ObjectRecord1888(schema::Vehicle(base, the_vehicle).car());
     const double scale = Lfs(base, 0x820029D8);
-    const uint32_t tenth = Load(base, spec + 76) / 10;
+    const uint32_t tenth = schema::CarSpecCopies(base, spec).unknown_76() / 10;
     Store64(base, f + 80, tenth);
     double x = Fmuls(Single(double(int64_t(tenth))), Lfs(base, 0x82001BE0));
-    Stfs(base, Load(base, camera + 20) + 1680, Fmuls(x, scale));
-    const uint32_t fields[3][2] = {{80, 1684}, {76, 1696}, {80, 1700}};
+    Stfs(base, c.viewport().base_eye_address(), Fmuls(x, scale));
+    // The spec's word, and the viewport's field it sets: base_eye_y,
+    // base_target_x, base_target_y.
+    const schema::Viewport at0(base, 0);
+    const uint32_t fields[3][2] = {{80, at0.base_eye_y_address()},
+                                   {76, at0.base_target_x_address()},
+                                   {80, at0.base_target_y_address()}};
     for (const auto& field : fields) {
       const uint32_t half = Load(base, spec + field[0]) >> 1;
-      const uint32_t at = Load(base, camera + 20) + field[1];
+      const uint32_t at = c.viewport().address + field[1];
       Store64(base, f + 80, half);
       Stfs(base, at, Fmuls(Single(double(int64_t(half))), scale));
     }
   }
-  vehicle::CameraCurveLoad(base, camera + 352, 0, 30);
-  TargetTrack(base, tracker, Load(base, camera + 16), f - 256);
-  CopyWords(base, camera + 1088, camera + 224, 4);
-  CopyDoublewords(base, camera + 1088, camera + 224, 2);
+  vehicle::CameraCurveLoad(base, c.curve_address(), 0, 30);
+  TargetTrack(base, tracker, c.vehicle(), f - 256);
+  CopyWords(base, c.rotation_address(), t.rotation_address(), 4);
+  CopyDoublewords(base, c.rotation_address(), t.rotation_address(), 2);
   return camera;
 }
 
 void View2Update(uint8_t* base, uint32_t camera, uint32_t frame,
                  const VideoOutputCall& video_output) {
   ITC_NATIVE_RUNNING("sub_82153E58 ViewCamera2::Update");
+  const schema::ViewCamera2 c(base, camera);
+  const schema::CameraTarget t(base, c.tracker_address());
   const uint32_t f = frame;
-  const uint32_t tracker = camera + 32;
+  const uint32_t tracker = c.tracker_address();
   const double one = Lfs(base, kOne);
   for (uint32_t at : {124u, 140u, 156u, 172u}) {
     Stfs(base, f + at, one);
   }
   StoreIdentity(base, f + 112);
-  TargetTrack(base, tracker, Load(base, camera + 16), f - 256);
+  TargetTrack(base, tracker, c.vehicle(), f - 256);
   SetLens(base, camera, Zoom(base, kChaseDegrees, f + 80, f, 0x82153EF0, video_output),
           Lfs(base, kZero));
-  const uint32_t turn = camera + 96;
+  const uint32_t turn = t.turn_address();
   car_physics::MatrixMultiplyTranslation(base, f + 112, turn, tracker, f - 192);
-  uint32_t viewport = Load(base, camera + 20);
-  matrix_math::Vec4Transform(base, viewport + 1600, f + 112, viewport + 1680);
-  viewport = Load(base, camera + 20);
-  matrix_math::Vec4Transform(base, viewport + 1616, f + 112, viewport + 1696);
-  viewport = Load(base, camera + 20);
-  matrix_math::Vec4Transform(base, viewport + 1664, f + 112, viewport + 1744);
-  viewport = Load(base, camera + 20);
-  matrix_math::Vec4Transform(base, viewport + 1632, turn, viewport + 1712);
+  uint32_t viewport = c.viewport().address;
+  matrix_math::Vec4Transform(base, schema::Viewport(base, viewport).eye_address(), f + 112,
+                             schema::Viewport(base, viewport).base_eye_address());
+  viewport = c.viewport().address;
+  matrix_math::Vec4Transform(base, schema::Viewport(base, viewport).target_address(), f + 112,
+                             schema::Viewport(base, viewport).base_target_address());
+  viewport = c.viewport().address;
+  matrix_math::Vec4Transform(base, schema::Viewport(base, viewport).view1_target_address(), f + 112,
+                             schema::Viewport(base, viewport).base_look_address());
+  viewport = c.viewport().address;
+  matrix_math::Vec4Transform(base, schema::Viewport(base, viewport).up_address(), turn,
+                             schema::Viewport(base, viewport).base_up_address());
   NearestHuman(base, camera, f + 96, f);
   LookPoint(base, camera, f, one);
 }
@@ -836,11 +905,11 @@ void View2Update(uint8_t* base, uint32_t camera, uint32_t frame,
 namespace {
 
 constexpr uint32_t kGarageRadians = 0x82002948;  // pi / 180
-constexpr uint32_t kPassZero = 0x826BAC00;       // camera pass 0
+constexpr uint32_t kPassZero = schema::CamerasGlobals::passes_address();  // camera pass 0
 
 // GarageUpdate's tan argument: the field of view (+224) in radians.
 double GarageAngle(uint8_t* base, uint32_t camera) {
-  return Fmuls(Lfs(base, camera + 224), Lfs(base, kGarageRadians));
+  return Fmuls(double(schema::GarageCamera(base, camera).fov()), Lfs(base, kGarageRadians));
 }
 
 }  // namespace
@@ -855,25 +924,27 @@ void GarageUpdate(uint8_t* base, uint32_t camera, uint32_t frame, const GarageCa
   ITC_NATIVE_RUNNING("sub_8217BE98 GarageCamera::Update");
   const uint32_t f = frame;
   const auto [queue, list] = calls.queue_and_list(f);
-  Store(base, 0x8296B918, list);
-  Store(base, 0x8296B91C, queue);
-  CopyWords(base, 0x8296B8F4, kZero, 1);
+  schema::FramePassesGlobals::set_command_list(base, list);
+  schema::FramePassesGlobals::set_render_queue(base, queue);
+  CopyWords(base, schema::FramePassesGlobals::lod_bias_address(), kZero, 1);
   // The target (+32) at f + 96 and the eye's start (+16) at f + 80, read
   // before they're written (the viewport loaded between).
-  const uint64_t target0 = Load64(base, camera + 32), target1 = Load64(base, camera + 40);
+  const schema::GarageCamera cam(base, camera);
+  const uint64_t target0 = Load64(base, cam.target_address()),
+                 target1 = Load64(base, cam.target_address() + 8);
   const uint32_t viewport = Load(base, Load(base, kViewports));
-  const uint64_t eye0 = Load64(base, camera + 16), eye1 = Load64(base, camera + 24);
+  const uint64_t eye0 = Load64(base, cam.eye_address()), eye1 = Load64(base, cam.eye_address() + 8);
   Store64(base, f + 96, target0);
   Store64(base, f + 104, target1);
   Store64(base, f + 80, eye0);
   Store64(base, f + 88, eye1);
   // The orbit: a = +100, b = +176, the distance +180.
-  Stfs(base, f + 84, Fmuls(Single(c_runtime::Sin(Lfs(base, camera + 100))),
-                           Lfs(base, camera + 180)));
-  Stfs(base, f + 88, Fmuls(Single(c_runtime::Cos(Lfs(base, camera + 100))),
-                           Lfs(base, camera + 180)));
-  Stfs(base, f + 80, Fmuls(Single(c_runtime::Sin(Lfs(base, camera + 176))), Lfs(base, f + 88)));
-  const double cos_b = c_runtime::Cos(Lfs(base, camera + 176));
+  Stfs(base, f + 84, Fmuls(Single(c_runtime::Sin(double(cam.tilt()))),
+                           double(cam.distance())));
+  Stfs(base, f + 88, Fmuls(Single(c_runtime::Cos(double(cam.tilt()))),
+                           double(cam.distance())));
+  Stfs(base, f + 80, Fmuls(Single(c_runtime::Sin(double(cam.orbit()))), Lfs(base, f + 88)));
+  const double cos_b = c_runtime::Cos(double(cam.orbit()));
   const double angle = GarageAngle(base, camera);
   Stfs(base, f + 88, Fmuls(Single(cos_b), Lfs(base, f + 88)));
   // tan as its adapter gives it with nearest rounding set (GarageReady
@@ -881,22 +952,22 @@ void GarageUpdate(uint8_t* base, uint32_t camera, uint32_t frame, const GarageCa
   double tangent = 0.0;
   c_runtime::Tan(angle, &tangent);
   const double zoom = Fdivs(Lfs(base, 0x82009EB8), Single(tangent));
-  Stfs(base, camera + 108, zoom);
+  cam.set_zoom(float(zoom));
   cameras::ViewportSetZoom(base, viewport, zoom);
   cameras::SetNear(base, Lfs(base, 0x8200222C));
-  cameras::ViewportSetRoll(base, viewport, Lfs(base, camera + 248));
+  cameras::ViewportSetRoll(base, viewport, double(cam.angle_z()));
   // The identity at f + 112, copied to f + 176 (ld/std), its translation
   // row (f + 224 to + 232) = +256 to +264.
   StoreIdentity(base, f + 112);
   CopyDoublewords(base, f + 176, f + 112, 8);
-  CopyWords(base, f + 224, camera + 256, 3);
+  CopyWords(base, f + 224, cam.translation_address(), 3);
   matrix_math::Vec4Transform(base, f + 80, f + 176, f + 80);
   matrix_math::Vec4Transform(base, f + 96, f + 176, f + 96);
   cameras::ViewportLookAt(base, viewport, f + 80, f + 96);
   cameras::FromViewport(base, kPassZero, 0, 0);
   calls.pass_update(kPassZero, f);
   cameras::Enable(base, kPassZero);
-  CopyDoublewords(base, 0x8265ECE0, f + 80, 2);
+  CopyDoublewords(base, schema::CarSceneDrawGlobals::view_eye_address(), f + 80, 2);
 }
 
 }  // namespace camera_modes

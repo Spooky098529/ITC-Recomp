@@ -11,8 +11,8 @@ namespace ui_movies {
 
 namespace {
 
-constexpr uint32_t kGuard = 0x82970F28;   // bit 0: the table cleared
-constexpr uint32_t kFilled = 0x82970C20;  // byte: the table filled
+using G = schema::UiMoviesGlobals;
+
 constexpr uint32_t kCleanUp = 0x825DB3F0;
 
 // The 48 descriptors the first call fills: the node offset, the type, and
@@ -84,32 +84,34 @@ uint64_t TrackProperty(uint8_t* base, uint64_t id, uint32_t frame,
   // stack's leftovers, under the two bytes it stores at +88 and +89 and
   // loads back as a word), never written by it.
   const uint16_t leftover = guest::LoadU16(base, frame + 90);
-  const uint32_t guard = guest::LoadU32(base, kGuard);
+  const auto entry_at = [&](uint32_t i) {
+    return schema::UiMovieTrackProperty(base, G::track_properties_address() + 12 * i);
+  };
+  const uint32_t guard = G::track_properties_guard(base);
   if ((guard & 1) == 0) {
-    guest::StoreU32(base, kGuard, guard | 1);
+    G::set_track_properties_guard(base, guard | 1);
     for (uint32_t i = 0; i < 64; i++) {
-      const uint32_t entry = kTrackProperties + 12 * i;
-      guest::StoreU32(base, entry, 0);
-      guest::StoreU32(base, entry + 4, 0);
-      guest::StoreU8(base, entry + 8, 0);
-      guest::StoreU8(base, entry + 9, 0);
+      const schema::UiMovieTrackProperty entry = entry_at(i);
+      entry.set_node_offset(0);
+      entry.set_type(0);
+      entry.set_sets(0);
+      entry.set_indirect(0);
     }
     c_runtime::AtexitFrom(base, kCleanUp, call);
   }
-  if (guest::LoadU8(base, kFilled) == 0) {
+  if (G::track_properties_filled(base) == 0) {
     for (uint32_t i = 0; i < std::size(kDescriptors); i++) {
       const Descriptor& d = kDescriptors[i];
-      const uint32_t entry = kTrackProperties + 12 * i;
-      guest::StoreU32(base, entry, d.offset);
-      guest::StoreU32(base, entry + 4, d.type);
-      guest::StoreU32(base, entry + 8,
-                      uint32_t(d.add) << 24 | uint32_t(d.indirect) << 16 | leftover);
+      const schema::UiMovieTrackProperty entry = entry_at(i);
+      entry.set_node_offset(d.offset);
+      entry.set_type(d.type);
+      entry.set_flags(uint32_t(d.add) << 24 | uint32_t(d.indirect) << 16 | leftover);
     }
-    guest::StoreU8(base, kFilled, 1);
+    G::set_track_properties_filled(base, 1);
   }
   // mulli and add on the full registers: the table's address sign-extended
   // (lis).
-  return uint64_t(int64_t(id) * 12) + uint64_t(int64_t(int32_t(kTrackProperties)));
+  return uint64_t(int64_t(id) * 12) + uint64_t(int64_t(int32_t(G::track_properties_address())));
 }
 
 }  // namespace ui_movies

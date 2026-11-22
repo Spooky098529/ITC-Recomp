@@ -9,6 +9,10 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/build_screen.h"
+#include "schema/race_screens.h"
+#include "schema/tuning_screen.h"
+#include "schema/type2_screens.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
@@ -28,7 +32,14 @@ uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, add
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
-uint32_t Screen(uint8_t* base) { return Load(base, kScreen); }
+using G = schema::BuildScreenGlobals;
+
+using schema::BuildGroup;
+using schema::BuildRecord;
+using schema::BuildScreenData;
+using schema::UiMovieNode;
+
+BuildScreenData Screen(uint8_t* base) { return G::screen(base); }
 
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   Store(base, sp - bytes, sp);
@@ -39,7 +50,9 @@ uint32_t Node(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child)
   return ui_movies::FindNode(base, movie, sub_scene, child);
 }
 
-void Show(uint8_t* base, uint32_t node, uint32_t shown) { Store(base, node + 80, shown); }
+void Show(uint8_t* base, uint32_t node, uint32_t shown) {
+  UiMovieNode(base, node).set_visible(shown);
+}
 
 // The arrows of a list of `rows` rows: `up` hidden at the top, `down`
 // hidden when the last row is the count's.
@@ -79,7 +92,8 @@ uint32_t StandArrows(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8219D7B0 BuildScreen::StandArrows");
   const uint32_t movie = Movie(base, Frame(base, sp, 96));
   const uint32_t node = Node(base, movie, 0xFFFFFFFFu, 23);
-  Show(base, node, guest::LoadU16(base, Screen(base) + kBuildCount) == 1 ? 0 : 1);
+  Show(base, node,
+       schema::BuildSlotList(base, Screen(base).build_list_address()).count() == 1 ? 0 : 1);
   return node;
 }
 
@@ -87,12 +101,13 @@ uint32_t ShowBuildMark(uint8_t* base, uint32_t sp, uint32_t build) {
   ITC_NATIVE_RUNNING("sub_8219D440 BuildScreen::ShowBuildMark");
   const uint32_t movie = Movie(base, Frame(base, sp, 112));
   const uint32_t node = Node(base, movie, 17, 0);
-  const uint32_t mark = Load(base, build + 16);
+  const BuildRecord record(base, build);
+  const uint32_t mark = record.special();
   if (mark == 0) {
     Show(base, node, mark);
   } else {
     Show(base, node, 1);
-    Store(base, node + 108, Load(base, build + 0) - 310);
+    UiMovieNode(base, node).set_texture_entry(record.index() - 310);
   }
   return node;
 }
@@ -111,15 +126,18 @@ uint32_t SetPrompts(uint8_t* base, uint32_t sp, const uint32_t pairs[6]) {
   uint32_t last = 0;
   for (uint32_t k = 0; k < 3; k++) {
     const uint32_t slot = Node(base, movie, 2, k);
-    const uint32_t icon_node = Node(base, movie, 2, Load(base, slot + 100));
-    const uint32_t label_node = Node(base, movie, 2, Load(base, slot + 100) + 1);
+    // A group's first child index: the node's +100 read as a word.
+    const uint32_t icon_node =
+        Node(base, movie, 2, Load(base, UiMovieNode(base, slot).width_address()));
+    const uint32_t label_node =
+        Node(base, movie, 2, Load(base, UiMovieNode(base, slot).width_address()) + 1);
     const uint32_t icon = Load(base, frame + 88 + 4 * k);
     const uint32_t label = Load(base, frame + 104 + 4 * k);
     if (int32_t(icon) != -1 && int32_t(label) != -1) {
       Show(base, icon_node, 1);
       Show(base, label_node, 1);
-      Store(base, icon_node + 108, icon);
-      Store(base, label_node + 108, label);
+      UiMovieNode(base, icon_node).set_texture_entry(icon);
+      UiMovieNode(base, label_node).set_texture_entry(label);
     } else {
       Show(base, icon_node, 0);
       Show(base, label_node, 0);
@@ -190,14 +208,17 @@ uint32_t ShowNumber(uint8_t* base, uint32_t sp, uint32_t number) {
   const uint32_t digits = Node(base, movie, 12, 3);
   uint32_t r3 = digits;
   const double ten = double(std::bit_cast<float>(Load(base, 0x82001FD8)));
-  for (int32_t k = int32_t(Load(base, digits + 104) - 1); k >= 0; k--) {
-    const uint32_t first = Load(base, digits + 100);
+  // A group's child count and first child index: the node's +104 and +100
+  // read as words.
+  const UiMovieNode group(base, digits);
+  for (int32_t k = int32_t(Load(base, group.height_address()) - 1); k >= 0; k--) {
+    const uint32_t first = Load(base, group.width_address());
     const int32_t quotient = int32_t(n) / 10;
     const uint32_t digit = n - uint32_t(quotient) * 10;
     const uint32_t child = Node(base, movie, 12, uint32_t(k) + first);
     r3 = child;
     if (int32_t(digit) == 0) {
-      const int32_t places = int32_t(Load(base, digits + 104) - uint32_t(k)) - 1;
+      const int32_t places = int32_t(Load(base, group.height_address()) - uint32_t(k)) - 1;
       if (places > 0) {
         const uint32_t power = ToIntTruncated(PowI(base, ten, uint32_t(places)));
         Store(base, frame + 80, power);
@@ -208,7 +229,7 @@ uint32_t ShowNumber(uint8_t* base, uint32_t sp, uint32_t number) {
       }
     }
     Show(base, child, 1);
-    Store(base, child + 108, k == 0 ? 0 : digit);
+    UiMovieNode(base, child).set_texture_entry(k == 0 ? 0 : digit);
     n = uint32_t(int32_t(n) / 10);
   }
   return r3;
@@ -224,22 +245,22 @@ uint64_t DrawGroupRow(uint8_t* base, uint32_t sp, uint32_t row, uint32_t index,
   const uint32_t new_mark = ui_movies::Child(base, rows, row + 16);
   const uint32_t mark = ui_movies::Child(base, rows, row + 4);
   const uint32_t text = ui_movies::Child(base, name, 0);
-  const uint32_t screen = Screen(base);
-  if (index >= Load(base, screen + kShownCount)) {
+  const BuildScreenData screen = Screen(base);
+  if (index >= screen.shown_group_count()) {
     return text;
   }
-  const uint32_t group = Load(base, screen + ((index + 0x10000 - 14799) << 2));
+  const BuildGroup group(base, Load(base, screen.shown_groups_address() + (index << 2)));
   const uint64_t r3 = calls.Call(kSetNodeText, frame, 0x8219CEC4, movie, text,
-                                 uint64_t(Load(base, group + 0)) + 5299);
-  Show(base, mark, Load(base, group + 32) != 0 ? 1 : 0);
-  Show(base, new_mark, Load(base, group + 28) != 0 ? 1 : 0);
+                                 uint64_t(group.index()) + 5299);
+  Show(base, mark, group.mark() != 0 ? 1 : 0);
+  Show(base, new_mark, group.all_owned() != 0 ? 1 : 0);
   return r3;
 }
 
 uint64_t DrawGroupRows(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8219FA28 BuildScreen::DrawGroupRows");
   const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t scroll = Load(base, Load(base, kList) + 4);
+  const uint32_t scroll = G::list(base).scroll();
   uint64_t r3 = 0;
   for (uint32_t r = 0; r < 11; r++) {
     r3 = DrawGroupRow(base, frame, r, r + scroll, calls);

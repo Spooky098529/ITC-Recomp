@@ -1,0 +1,144 @@
+# The schema of docs/functions/xact-tracks.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The measure gave this area no types (its seed was empty: the hand port's
+# accesses go through local Load/Store helpers the measure doesn't follow),
+# so these are described by hand from docs/known-data.md and
+# src/xact/tracks.cpp. The sound (XACTSound, +28 its record, +32 its clock,
+# +56 its event queue), the wave (XACTWave, xact-waves.md), the cue (+296
+# the sound bank), the wave bank (+240 its wave list, +252 prepared) and the
+# engine are other areas' objects.
+
+[XACTTrack]
+size = 64
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x820765F8; the base's 0x82075344 after the destructor" },
+  { name = "node_next", offset = 4, type = "u32", note = "the node in the sound's track list (sound +36)" },
+  { name = "node_prev", offset = 8, type = "u32" },
+  { name = "engine", offset = 12, type = "u32", note = "the XACT engine" },
+  { name = "record", offset = 16, type = "ptr", to = "XACTTrackRecord", note = "0 for a simple sound" },
+  { name = "sound", offset = 20, type = "u32", note = "the XACTSound" },
+  { name = "instance", offset = 24, type = "ptr", to = "XACTTrackInstance" },
+  { name = "next_instance", offset = 28, type = "ptr", to = "XACTTrackInstance", note = "a transition; never in play" },
+  { name = "flags", offset = 32, type = "u8", note = "0x80 switch to the next instance when it's prepared" },
+  { name = "pending_transition", offset = 36, type = "u32", note = "a pending transition event" },
+  { name = "volume", offset = 40, type = "f32", note = "a gain, at least 0" },
+  { name = "pitch", offset = 44, type = "f32", note = "the pitch offset (octaves)" },
+  { name = "index", offset = 48, type = "u8", note = "the track index" },
+  { name = "rpc_entries", offset = 52, type = "u32", note = "44 bytes each, the count at -4; none in play" },
+  { name = "rpc_volume", offset = 56, type = "f32", note = "an RPC volume factor (1.0)" },
+  { name = "rpc_pitch", offset = 60, type = "f32", note = "an RPC pitch offset (0.0)" },
+]
+
+[XACTTrackRecord]
+size = 1
+origin = "file"
+note = "a complex sound's track record in the sound bank (only its first byte read here)"
+fields = [
+  { name = "volume", offset = 0, type = "u8", note = "an index into the gain table 0x820761F8" },
+]
+
+[XACTTrackInstance]
+size = 64
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82076AD8; the base's 0x82075344 after the destructor" },
+  { name = "node_next", offset = 4, type = "u32", note = "a node, linked to itself" },
+  { name = "node_prev", offset = 8, type = "u32" },
+  { name = "engine", offset = 12, type = "u32", note = "the XACT engine (+144 its critical section)" },
+  { name = "track", offset = 16, type = "ptr", to = "XACTTrack" },
+  { name = "events", offset = 20, type = "u32", note = "an array of XACTEvent pointers" },
+  { name = "event_count", offset = 24, type = "u8" },
+  { name = "start_time", offset = 28, type = "u32", note = "the play start time (ms)" },
+  { name = "flags", offset = 32, type = "u8", note = "0x40 play when prepared" },
+  { name = "play_wave_event", offset = 36, type = "ptr", to = "XACTPlayWaveEvent", note = "the event of types 1 to 6 every volume, pitch, output and pause call goes to" },
+  { name = "state", offset = 40, type = "u32", note = "1 created, 2 preparing, 3 prepared, 4 playing, 5 stopping, 6 done" },
+  { name = "unfired_count", offset = 44, type = "u8", note = "the events not yet fired" },
+  { name = "unfinished_count", offset = 45, type = "u8", note = "the events fired and not done" },
+  { name = "helpers_vtable", offset = 48, type = "u32", note = "the uncounted helper events' list head: the base vtable 0x82075344" },
+  { name = "helpers_next", offset = 52, type = "u32", note = "a node's +12 is its event" },
+  { name = "helpers_prev", offset = 56, type = "u32" },
+  { name = "stopped_at_once", offset = 60, type = "u32" },
+]
+
+[XACTEvent]
+size = 48
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82076A10; the base's 0x82075344 after the destructor" },
+  { name = "node_next", offset = 4, type = "u32", note = "the node in the sound's event queue (sound +56) or pending list (+68)" },
+  { name = "node_prev", offset = 8, type = "u32" },
+  { name = "engine", offset = 12, type = "u32" },
+  { name = "record", offset = 16, type = "ptr", to = "XACTEventRecord" },
+  { name = "fire_time", offset = 20, type = "u32", note = "ms" },
+  { name = "done_time", offset = 24, type = "u32" },
+  { name = "end_time", offset = 28, type = "u32", note = "0x7FFFFFFF without one" },
+  { name = "elapsed", offset = 32, type = "u32", note = "the time already elapsed at the prepare (taken off when scheduled)" },
+  { name = "previous", offset = 36, type = "ptr", to = "XACTEvent", note = "the previous event (timing)" },
+  { name = "flags", offset = 40, type = "u8", note = "0x08 uncounted, 0x10 varied, 0x20 queued, 0x40 done, 0x80 fired" },
+  { name = "instance", offset = 44, type = "ptr", to = "XACTTrackInstance" },
+]
+
+[XACTPlayWaveEvent]
+size = 72
+origin = "allocated"
+note = "an XACTEvent (its first 48 bytes) with the play-wave fields"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82076CE8; the wave event base's 0x82076B58, then the event's, in the destructor" },
+  { name = "node_next", offset = 4, type = "u32" },
+  { name = "node_prev", offset = 8, type = "u32" },
+  { name = "engine", offset = 12, type = "u32" },
+  { name = "record", offset = 16, type = "ptr", to = "XACTEventRecord" },
+  { name = "fire_time", offset = 20, type = "u32" },
+  { name = "done_time", offset = 24, type = "u32" },
+  { name = "end_time", offset = 28, type = "u32" },
+  { name = "elapsed", offset = 32, type = "u32" },
+  { name = "previous", offset = 36, type = "ptr", to = "XACTEvent" },
+  { name = "flags", offset = 40, type = "u8" },
+  { name = "instance", offset = 44, type = "ptr", to = "XACTTrackInstance" },
+  { name = "slot36_flag", offset = 48, type = "u32", note = "a flag (its slot +36)" },
+  { name = "loop_count", offset = 52, type = "u8", note = "255 forever" },
+  { name = "variation", offset = 56, type = "u32", note = "the record + 12 for types 2 and 5" },
+  { name = "wave", offset = 60, type = "u32", note = "the XACTWave, whose +48 is this event" },
+  { name = "play_time", offset = 64, type = "u32" },
+  { name = "stop_time", offset = 68, type = "u32" },
+]
+
+[XACTWaveVariationEvent]
+size = 188
+origin = "allocated"
+note = "never in play; an XACTEvent with a variation table"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82076C60" },
+  { name = "variation_table", offset = 52, type = "u32" },
+  { name = "variation_record", offset = 60, type = "u32" },
+  { name = "loop_count", offset = 68, type = "u8" },
+  { name = "wave", offset = 72, type = "u32", note = "the XACTWave" },
+  { name = "marker_record", offset = 76, type = "bytes", count = 12, note = "an inner marker's 12-byte record" },
+  { name = "marker_event", offset = 100, type = "u32", note = "the inner marker event" },
+  { name = "helper_node", offset = 172, type = "bytes", count = 16, note = "a node for the instance's helper list" },
+]
+
+[XACTEventRecord]
+size = 16
+origin = "file"
+note = "a track's clip event in the sound bank"
+fields = [
+  { name = "word", offset = 0, type = "u32", note = "bits 0-4 the type (1 play wave), 5-28 the time (ms), 0x20000000 timed from the play start, 0x40000000 from the previous event's fire time" },
+  { name = "random_spread", offset = 4, type = "u16", note = "a random 0 to this added to the fire time" },
+  { name = "previous_index", offset = 6, type = "u8", note = "the previous event's index in the instance's events" },
+  { name = "wave_flags", offset = 7, type = "u8", note = "bit 0 a release" },
+  { name = "wave_index", offset = 8, type = "u16", note = "the wave in its bank" },
+  { name = "wave_bank_index", offset = 10, type = "u8" },
+  { name = "loop_count", offset = 11, type = "u8", note = "255 forever" },
+  { name = "variation", offset = 12, type = "u32", note = "types 2 and 5; the variation record at +12 (type 4) or +16 (type 5)" },
+]
+
+[globals]
+one = { address = 0x82000A30, type = "f32", note = "1.0" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0" }
+gain_table = { address = 0x820761F8, type = "bytes", count = 1024, note = "256 floats: a track record's volume byte to a gain" }

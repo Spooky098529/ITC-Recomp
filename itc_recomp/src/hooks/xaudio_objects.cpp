@@ -17,6 +17,7 @@
 #include "xaudio/reverb_core.h"
 #include "xaudio/reverb_stages.h"
 #include "lifted/sdk.h"
+#include "schema/xaudio_objects.h"
 
 ITC_FLAG_BOOL(native_xaudio_objects, true, "ITC",
               "Run the parts of XAudio's factory objects made native "
@@ -249,7 +250,7 @@ void FramedOr(lifted::Regs& ctx, uint8_t* base, uint32_t frame_bytes, bool refus
 }
 
 bool NoBlockSize(uint8_t* base, uint32_t codec_base) {
-  return guest::LoadU16(base, codec_base + 92) == 0;
+  return schema::CodecBase(base, codec_base).block_size() == 0;
 }
 
 }  // namespace
@@ -432,7 +433,7 @@ ITC_REGS_STEP(XAudioXmaCodecSubmitRegion) {
   const uint32_t codec = ctx.r3.u32, region = ctx.r4.u32, flags = ctx.r5.u32;
   const uint32_t thread = Thread(ctx, base);
   const bool refuses =
-      guest::LoadU8(base, codec + 266) != 1 && NoBlockSize(base, codec + 16);
+      schema::XmaCodec(base, codec).submit_mode() != 1 && NoBlockSize(base, codec + 16);
   FramedOr(ctx, base, 128, refuses, lifted::original::c8246A860,
            [&](const xa::GuestCall& call, uint32_t frame) {
              return xa::XmaCodecSubmitRegion(base, codec, region, flags, thread, frame, call);

@@ -1,0 +1,61 @@
+# The schema of docs/functions/race-sounds.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The race's sounds: one of the race mode's state machines (race mode
+# + 138284, RaceSounds::), running the car sounds and stepping the race's
+# music over the sound manager (src/race_sounds/). The car sounds
+# ([0x826C5C3C]) and the wave bank views are car-sounds.toml's; the racer
+# results record AfterRaceTick reads (+3924) is race-hud-machine.toml's
+# (RacerResultsRecord; the measure files it as "Sound::Play.ret").
+
+# The machine: a StateMachine (game-modes.toml) with words of its own after
+# it (known-data.md "race sounds").
+[RaceSounds]
+measure = "RaceSounds"
+size = 9660
+origin = "embedded"
+fields = [
+  { name = "transitions", offset = 0, type = "bytes", count = 9600, note = "200 transitions, 48 bytes each (StateMachine's)" },
+  { name = "transition_count", offset = 9600, type = "u32" },
+  { name = "state", offset = 9604, type = "u32", note = "1 at set-up; 38 before the countdown, 23 racing against a rival, 24 and 25 paused, 30 after the race, 17 the next stage, 10 a rolling start, 32 aborted, 37 the end, 35 unloaded (probably)" },
+  { name = "effects_view", offset = 9608, type = "bytes", count = 24, note = "the effects' wave bank view (a CarSoundWaveBankView; XPR::XPR by RaceMode::RaceMode)" },
+  { name = "effects_bank", offset = 9632, type = "ptr", to = "CarSoundWaveBank", note = "the effects' wave bank buffer (asset 22889, XPhysicalAlloc by Begin)" },
+  { name = "unknown_9636", offset = 9636, type = "u32", note = "0 at Begin; not read here" },
+  { name = "cars_paused", offset = 9640, type = "u32", note = "1 while the car sounds are paused for the system UI" },
+  { name = "flags", offset = 9644, type = "u32", note = "0x2 the music bank released, 0x4 load the next music, 0x10 its cue 0 started, 0x20 faded and stopped, 0x40 to 0x2000 the next music's pick, 0x4000 the cars' sounds stopped, 0x8000 fade the music out, 0x10000 only cleared, 0x20000 the cars' sounds set up" },
+  { name = "cars_step", offset = 9648, type = "u32", note = "the cars' sounds step: 1 to set up, 2 running" },
+  { name = "kind", offset = 9652, type = "u32", note = "the race kind (the race data's +0xA3AF0): 0 the attract race, 1 to 3 and 6 the race HUD's, 4 probably the split screen, 5 the alternate HUD's" },
+  { name = "set_up_wait", offset = 9656, type = "u32", note = "ticks (10 after the cars' set-up) before UpdateCars gives the cars their banks again" },
+]
+
+[globals]
+car_views = { address = 0x826D82FC, type = "bytes", count = 56, note = "car i's two 24-byte wave bank views at +8i and +8i+4 (CarSoundWaveBankView pointers)" }
+slot_contexts = { address = 0x826D8334, type = "bytes", count = 28, note = "the scene models' sound slots' load callback contexts (seven words)" }
+slot_files_arrived = { address = 0x826D8350, type = "bytes", count = 7, note = "the files arrived, a byte a slot (counts to 2)" }
+slot_buffers_0 = { address = 0x826D8358, type = "bytes", count = 28, note = "the slots' first buffers (0x5D2D0 bytes; seven words)" }
+slot_buffers_1 = { address = 0x826D8374, type = "bytes", count = 28, note = "the slots' second buffers (0x6B080 bytes; seven words)" }
+slot_asked = { address = 0x826D8390, type = "bytes", count = 28, note = "1 when asked (seven words)" }
+slot_arrived = { address = 0x826D83AC, type = "bytes", count = 28, note = "1 when both files arrived (seven words)" }
+effects_bank_arrived = { address = 0x826D83C8, type = "u32", note = "1 once the effects' wave bank has arrived (OnEffectsBankLoaded; 0 at Begin)" }
+music_names = { address = 0x826193D4, type = "bytes", count = 52, note = "the race's 13 music names (pointers into 0x82006A18)" }
+music_volume = { address = 0x82616BEC, type = "f32", note = "the music's volume (\"Music\")" }
+kept_music_volume = { address = 0x82616C34, type = "f32", note = "the music's volume kept before a fade" }
+effects_volume = { address = 0x82616C38, type = "f32", note = "the effects' volume option's gain" }
+effects_volume_2 = { address = 0x82616C3C, type = "f32", note = "the effects' volume option's gain (put back into effects_volume)" }
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from RaceSounds.
+[RaceSoundsAt138284]
+measure = "RaceMode@+138284"
+size = 9656
+origin = "embedded"
+fields = [
+  { name = "unknown_9604", offset = 9604, type = "u32" },
+  { name = "unknown_9652", offset = 9652, type = "u32" },
+]

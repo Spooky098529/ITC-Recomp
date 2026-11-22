@@ -38,7 +38,9 @@ at `82110B40`-`82116588`, the code at `82140340`-`82144E58` and the
 front end at `822271F8`-`8222F0B0`). The table's free (`sub_82116FB0`:
 the block +12 and the object, `sub_825A71C0`, `sub_825A70E8`) never ran
 and has no row. The rows were drafted by the B7 loop's mapping agent
-(2026-10-23) from the generated code; since then the B7 loop's migration agent has made them native as far as they're ready (`src/data_tables/`, `--native_data_tables`).
+(2026-10-23) from the generated code; since then the B7 loop's migration agent has made them native as far as they're ready (`src/data_tables/`, `--native_data_tables`). Its objects are described in `itc_recomp/schema/data-tables.toml`
+(E5 step 2: `DataTables`, the tables' entries as the walks read them, the
+swapped word, the globals `tables` and `table_ids`).
 
 Status:
 
@@ -81,6 +83,11 @@ Status:
   calls direct or through the dispatch table. While the SDK or code not
   native yet still reaches it, its entry for them is an override in
   `src/lifted/` (deleted when nothing reaches it that way).
+- **Host**: E5 (`docs/e5-native.md`, steps 3 to 5): our C++ whose objects
+  are host structs (host byte order, host pointers, made with `new` or
+  kept in containers), read and written as C++ members instead of by
+  offset in guest memory. A Native or Lifted function becomes Host when
+  its area's objects move to the host.
 
 A function usually moves from recompiled or Wrapped to Overridden to
 Native as the `ctx` edge moves up through its callers, or straight to

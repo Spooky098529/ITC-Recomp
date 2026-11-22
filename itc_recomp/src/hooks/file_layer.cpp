@@ -2,6 +2,8 @@
 // (docs/functions/file-layer.md).
 
 #include "guest.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -79,7 +81,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820A6AB8) {
     ctx.r3.u64 = file;
     ctx.r4.u64 = text;
     ctx.r5.u64 = flag;
-    lifted::CallFromContext(ctx, base, 0x8258C688);
+    lifted::Enter(ctx, base, game::File::OpenRead);
   });
   const bool opened = (ctx.r3.u32 & 0xFF) != 0;
   file_layer::OpenPathRelease(base, ctx.r1.u32);

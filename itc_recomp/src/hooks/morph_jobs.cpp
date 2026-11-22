@@ -7,6 +7,9 @@
 // (src/car_draw/morph.cpp), which calls the plain C++.
 
 #include "hooks/morph_jobs.h"
+#include "lifted/names.h"
+#include "lifted/functions.h"
+#include "lifted/entries.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
@@ -16,6 +19,7 @@
 #include "hooks/second_set.h"
 #include "memory/c_runtime_heap.h"
 #include "lifted/sdk.h"
+#include "schema/framework.h"
 
 ITC_FLAG_BOOL(native_morph_jobs, true, "ITC",
               "Run the morph jobs (docs/functions/morph-jobs.md: the pool makers' slot 1 "
@@ -82,7 +86,7 @@ mj::ConstructCalls MorphJobsConstructCalls(lifted::Regs& ctx, uint8_t* base) {
     ctx.r3.u64 = interface;
     ctx.r4.u64 = item;
     ctx.r5.u64 = 1;
-    const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, interface) + 4);
+    const uint32_t function = schema::WorkerPoolInterface(base, interface).vtable().post();
     ctx.ctr.u64 = function;
     ctx.lr = lr;
     lifted::CallFromContext(ctx, base, function);
@@ -161,7 +165,7 @@ ITC_REGS_STEP(MorphJobsWorkItemInterfaceDestroy) {
 ITC_REGS_STEP(MorphJobsWait) {
   ITC_NATIVE_RUNNING("sub_820AC9B8 MorphJob::Wait");
   ctx.r3.s64 = ctx.r3.s64 + mj::kItem;
-  lifted::CallFromContext(ctx, base, 0x82094B10);  // Job::Wait (--find_menu_selection's wrap)
+  lifted::Enter(ctx, base, game::Job::Wait);  // Job::Wait (--find_menu_selection's wrap)
 }
 
 ITC_REGS_STEP(MorphJobsIsReleased) {
@@ -178,7 +182,7 @@ ITC_REGS_STEP(MorphJobsRun) {
   // (r11 a leftover for recompiled callers: none now)
   ctx.r3.s64 = ctx.r3.s64 + (run.morph ? 56 : 8);  // run.record, all 64 bits
   if (!run.morph) {
-    lifted::CallFromContext(ctx, base, 0x8258BCD8);  // the skinning blend (not seen in play)
+    lifted::Enter(ctx, base, lifted::e8258BCD8);  // the skinning blend (not seen in play)
   } else if (ITC_FLAG(native_second_set)) {
     SecondSetMorphBlend(ctx, base);
   } else {

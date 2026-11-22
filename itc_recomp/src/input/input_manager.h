@@ -16,11 +16,9 @@
 
 namespace input {
 
-constexpr uint32_t kManagerBytes = 3984;
-constexpr uint32_t kManagerLogicalPads = 8, kLogicalPadBytes = 196;
-constexpr uint32_t kManagerPhysicalPads = 988, kPhysicalPadBytes = 212;
-constexpr uint32_t kManagerProcessors = 1840, kProcessorBytes = 416;
-constexpr uint32_t kManagerListeners = 3920, kListenerListBytes = 12;
+// The manager, its logical pads and processors: schema/input.h's views
+// (itc_recomp/schema/input.toml). The physical pads are model-animation.toml's
+// PhysicalPad, the listener lists app-states.toml's PtrList.
 
 // --- The pads ---
 
@@ -75,8 +73,6 @@ uint32_t ManagerPhysicalPad(uint32_t manager, uint32_t index);
 // dispatcher (the argument block's +0) through the dispatcher's vtable
 // slots +8 and +4: guest calls, made by its adapter between the two parts
 // below.
-
-constexpr uint32_t kManagerVtable = 0x82000F48;
 
 // Input::Create's allocation (sub_820993E8): the manager's 3,984 bytes from
 // operator new. nullopt where the original must run (operator new's error

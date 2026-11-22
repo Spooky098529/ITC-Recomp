@@ -5,6 +5,8 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/menu_helpers.h"
+#include "schema/user_info.h"
 #include "ui_movies/game.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -21,8 +23,8 @@ using guest::StoreU32;
 
 constexpr uint32_t kNone = 0xFFFFFFFFu;
 constexpr uint64_t kAll = ~uint64_t(0);  // li r4,-1
-// The double 0.62138 (kilometers to miles) the texts multiply by.
-constexpr uint32_t kMiles = 0x8200A510;
+
+using G = schema::UserInfoGlobals;
 
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   const uint32_t frame = sp - bytes;
@@ -35,7 +37,7 @@ uint32_t FindMovie(uint8_t* base, uint32_t key) {
   return LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, key));
 }
 
-uint32_t Data(uint8_t* base) { return LoadU32(base, kData); }
+schema::UserInfoData Data(uint8_t* base) { return G::data(base); }
 
 // UiMovie::SetText(movie, -1, node, string, r7, r8, r9) through its
 // override, the varargs the original leaves as leftovers 0 (the user's
@@ -51,13 +53,13 @@ uint64_t SetText(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t movie
 // most 9999), the minutes and seconds (its bytes +48 and +49).
 uint64_t PlayTimeText(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t lr,
                       uint32_t movie) {
-  const uint32_t data = Data(base);
-  uint32_t hours = LoadU32(base, data + 44);
+  const schema::UserInfoData data = Data(base);
+  uint32_t hours = data.play_hours();
   if (hours > 9999) {
     hours = 9999;
   }
-  return SetText(calls, frame, lr, movie, 23, 529, hours, guest::LoadU8(base, data + 48),
-                 guest::LoadU8(base, data + 49));
+  return SetText(calls, frame, lr, movie, 23, 529, hours, data.play_minutes(),
+                 data.play_seconds());
 }
 
 // fctiwz as the recompiled code does it: NaN 0x80000000, from INT_MAX
@@ -76,9 +78,7 @@ int32_t TruncateWord(double value) {
 }
 
 // lfs: a float field as a double.
-double Lfs(uint8_t* base, uint32_t address) {
-  return double(std::bit_cast<float>(LoadU32(base, address)));
-}
+double Lfs(float value) { return double(value); }
 // frsp: rounded to single.
 double Single(double value) { return double(float(value)); }
 
@@ -105,40 +105,41 @@ uint64_t SetPlayTimeText(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t movie = FindMovie(base, frame + 80);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const uint32_t time =
-      uint32_t(calls.Call(kPlayTimeAdd, frame, 0x8220B008, frame + 80, uint64_t(save) + 48));
-  const uint32_t data = Data(base);
-  StoreU32(base, data + 44, LoadU32(base, time + 0));
-  StoreU32(base, data + 48, LoadU32(base, time + 4));
+  const schema::PlayTimeAnswer time(
+      base,
+      uint32_t(calls.Call(kPlayTimeAdd, frame, 0x8220B008, frame + 80, uint64_t(save) + 48)));
+  const schema::UserInfoData data = Data(base);
+  data.set_play_hours(time.hours());
+  data.set_play_time_word(time.time_word());
   return PlayTimeText(base, calls, frame, 0x8220B058, movie);
 }
 
 uint64_t MenuPage(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8220B0D8 UserInfo::MenuPage");
   const uint32_t frame = Frame(base, sp, 112);
-  calls.Call(kMenuStep, frame, 0x8220B0FC, LoadU32(base, kMenu));
+  calls.Call(kMenuStep, frame, 0x8220B0FC, G::menu(base).address);
   SetPlayTimeText(base, frame, calls);
-  uint64_t r3 = calls.Call(kMenuPressed, frame, 0x8220B10C, LoadU32(base, kMenu), 158);
+  uint64_t r3 = calls.Call(kMenuPressed, frame, 0x8220B10C, G::menu(base).address, 158);
   if (uint32_t(r3) == 0) {
-    r3 = calls.Call(kMenuPressed, frame, 0x8220B120, LoadU32(base, kMenu), 164);
+    r3 = calls.Call(kMenuPressed, frame, 0x8220B120, G::menu(base).address, 164);
     if (uint32_t(r3) == 0) {
       return r3;
     }
   }
-  const uint32_t pages = LoadU32(base, kPages);
-  const uint32_t page = LoadU32(base, pages + 0);
+  const schema::PageObject pages = G::pages(base);
+  const uint32_t page = pages.page();
   if (page != 0) {
-    StoreU32(base, pages + 8, page);
+    pages.set_previous_page(page);
   }
-  StoreU32(base, pages + 4, 0);
-  StoreU32(base, pages + 16, kNone);
-  StoreU32(base, pages + 0, kNone);
-  StoreU32(base, pages + 12, 1);
-  const uint32_t ring = mode + 204;
-  const uint32_t count = LoadU32(base, ring + 600) + 1;
-  const uint32_t start = LoadU32(base, ring + 604);
-  StoreU32(base, ring + 600, count);
-  const uint32_t slot = ring + 12 * ((start + count - 1) % 50);
+  pages.set_next_page(0);
+  pages.set_queued_step(kNone);
+  pages.set_page(kNone);
+  pages.set_step(1);
+  const schema::UserInfoMode m(base, mode);
+  const uint32_t count = m.message_count() + 1;
+  const uint32_t start = m.message_start();
+  m.set_message_count(count);
+  const uint32_t slot = m.messages_address() + 12 * ((start + count - 1) % 50);
   StoreU32(base, slot + 0, 6);
   StoreU32(base, slot + 4, 0);
   StoreU32(base, slot + 8, 0);
@@ -161,9 +162,9 @@ uint64_t SetTexts(uint8_t* base, uint32_t sp, const Calls& calls) {
   SetText(calls, frame, 0x8220ADE0, movie, 26, 441);
   SetText(calls, frame, 0x8220ADF4, movie, 27, 446);
   SetText(calls, frame, 0x8220AE08, movie, 28, 435);
-  SetText(calls, frame, 0x8220AE28, movie, 8, 8, LoadU32(base, Data(base) + 8));
-  SetText(calls, frame, 0x8220AE44, movie, 9, 8, LoadU32(base, Data(base) + 12));
-  SetText(calls, frame, 0x8220AE60, movie, 10, 8, LoadU32(base, Data(base) + 16));
+  SetText(calls, frame, 0x8220AE28, movie, 8, 8, Data(base).count_12());
+  SetText(calls, frame, 0x8220AE44, movie, 9, 8, Data(base).count_14());
+  SetText(calls, frame, 0x8220AE60, movie, 10, 8, Data(base).count_16());
   // A double in f1 and in r7 through the frame's +48 (stfd, ld).
   auto with_double = [&](uint32_t lr, uint64_t node, uint64_t string, double value) {
     const uint64_t bits = std::bit_cast<uint64_t>(value);
@@ -171,16 +172,15 @@ uint64_t SetTexts(uint8_t* base, uint32_t sp, const Calls& calls) {
     StoreU32(base, frame + 52, uint32_t(bits));
     SetText(calls, frame, lr, movie, node, string, bits, 0, 0, &value);
   };
-  with_double(0x8220AE84, 11, 453, Lfs(base, Data(base) + 20));
-  SetText(calls, frame, 0x8220AEA0, movie, 12, 8, LoadU32(base, Data(base) + 24));
-  const double miles = std::bit_cast<double>((uint64_t(LoadU32(base, kMiles)) << 32) |
-                                             LoadU32(base, kMiles + 4));
-  with_double(0x8220AED4, 19, 452, Single(Lfs(base, Data(base) + 28) * miles));
-  with_double(0x8220AF00, 20, 452, Single(Lfs(base, Data(base) + 32) * miles));
+  with_double(0x8220AE84, 11, 453, Lfs(Data(base).ratio()));
+  SetText(calls, frame, 0x8220AEA0, movie, 12, 8, Data(base).stats_5968());
+  const double miles = G::miles_per_km(base);
+  with_double(0x8220AED4, 19, 452, Single(Lfs(Data(base).distance_5976()) * miles));
+  with_double(0x8220AF00, 20, 452, Single(Lfs(Data(base).distance_5904()) * miles));
   {
     // lwa, std at +80, fcfid, frsp, times the double, frsp, fctiwz, stfiwx
     // at +80, lwz.
-    const int32_t word = int32_t(LoadU32(base, Data(base) + 36));
+    const int32_t word = Data(base).distance_5992();
     const uint64_t wide = uint64_t(int64_t(word));
     StoreU32(base, frame + 80, uint32_t(wide >> 32));
     StoreU32(base, frame + 84, uint32_t(wide));
@@ -188,10 +188,10 @@ uint64_t SetTexts(uint8_t* base, uint32_t sp, const Calls& calls) {
     StoreU32(base, frame + 80, uint32_t(TruncateWord(value)));
     SetText(calls, frame, 0x8220AF44, movie, 21, 8, LoadU32(base, frame + 80));
   }
-  calls.Call(kSetNumberText, frame, 0x8220AF5C, movie, kAll, 22, LoadU32(base, Data(base) + 40));
+  calls.Call(kSetNumberText, frame, 0x8220AF5C, movie, kAll, 22, Data(base).stats_6024());
   PlayTimeText(base, calls, frame, 0x8220AF90, movie);
-  return SetText(calls, frame, 0x8220AFB0, movie, 24, 444, LoadU32(base, Data(base) + 52),
-                 LoadU32(base, Data(base) + 56));
+  return SetText(calls, frame, 0x8220AFB0, movie, 24, 444, Data(base).garage_count(),
+                 Data(base).save_1991C());
 }
 
 uint64_t Opening(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls) {
@@ -205,7 +205,7 @@ uint64_t Closing(uint8_t* base, uint32_t started, uint32_t sp, const Calls& call
   const uint64_t done =
       Transition(base, started, sp, calls, 1, 0x8220ACC0, 0x8220ACD4, [](uint32_t) {});
   if (done != 0) {
-    StoreU32(base, Data(base) + 4, 9);
+    Data(base).set_queued_state(9);
   }
   return done;
 }

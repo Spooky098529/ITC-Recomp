@@ -10,6 +10,11 @@
 #include "interpolation/blend_state.h"
 #include "models/model.h"
 #include "native/buffers.h"
+#include "schema/car_draw.h"
+#include "schema/frame_driver.h"
+#include "schema/models.h"
+#include "schema/race_states.h"
+#include "schema/race_update.h"
 #include "track_zones/track_zones.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -23,10 +28,8 @@ namespace {
 
 namespace sl = scenery_lists;
 
-constexpr uint32_t kRecordList = 0x8296B918;
-constexpr uint32_t kGroup0Key = 0x8296B90C;
-constexpr uint32_t kGroup1Key = 0x8296B900;
-constexpr uint32_t kDepthKey = 0x8296B908;
+constexpr uint32_t kRecordList = schema::FrameDriverGlobals::scene_list_address();
+using G = schema::CarDrawGlobals;
 
 constexpr uint32_t kOne = 0x82000A30;   // 1.0
 constexpr uint32_t kZero = 0x82000A34;  // 0.0
@@ -85,7 +88,7 @@ std::optional<Draw> ModelDraw(uint8_t* base, const Calls& calls, uint32_t stack,
   }
   const uint32_t frame = Frame(base, stack, kModelDrawFrame);
   Draw draw;
-  if (guest::LoadU32(base, model + 28) == 0) {
+  if (schema::Model(base, model).header().address == 0) {
     draw.r3 = model;
     return draw;
   }
@@ -122,8 +125,8 @@ std::optional<Draw> ModelDraw(uint8_t* base, const Calls& calls, uint32_t stack,
     uint32_t key;
     uint32_t lr;
   };
-  const Group groups[2] = {{0, entry0, kGroup0Key, 0x820D05EC},
-                           {1, entry1, kGroup1Key, 0x820D0654}};
+  const Group groups[2] = {{0, entry0, G::key_group0_address(), 0x820D05EC},
+                           {1, entry1, G::key_group1_address(), 0x820D0654}};
   for (const Group& g : groups) {
     if (models::MaterialCount(base, model, shape, g.group) == 0) {
       // r3 the count's.
@@ -166,7 +169,7 @@ std::optional<Draw> ModelDraw(uint8_t* base, const Calls& calls, uint32_t stack,
     Declined("Model::RecordShapeDepth");
   }
   guest::StoreU32(base, entry + 20, *depth);
-  draw.r3 = calls.draw.submit(calls.draw.user, entry, guest::LoadU32(base, kDepthKey),
+  draw.r3 = calls.draw.submit(calls.draw.user, entry, G::key_depth(base),
                               Lfs(base, *constants + 72), frame, 0x820D06E4);
   draw.queued = true;
   return draw;
@@ -178,13 +181,14 @@ std::optional<Draw> CarPartDraw(uint8_t* base, const Calls& calls, uint32_t stac
                                 uint32_t view_projection, uint32_t world, uint32_t r6,
                                 uint32_t r7, uint32_t caller_r24, uint32_t caller_r28) {
   ITC_NATIVE_RUNNING("sub_820D06F0 CarPart::Draw");
-  const uint32_t model = guest::LoadU32(base, part + 4);
+  const schema::CarPart record(base, part);
+  const uint32_t model = record.model();
   if (model == 0) {
     Draw draw;
     draw.r3 = 0;
     return draw;
   }
-  const uint32_t shape = guest::LoadU32(base, part + 228);
+  const uint32_t shape = record.shape();
   if (int32_t(r7) == 0) {
     return ModelDraw(base, calls, stack, model, view_projection, world, shape, r6, caller_r24);
   }
@@ -216,10 +220,6 @@ std::optional<Draw> CarPartDraw(uint8_t* base, const Calls& calls, uint32_t stac
 uint32_t SceneModelIsNearPlayerHeight(uint8_t* base, const Calls& calls, uint32_t stack,
                                       uint32_t pass, uint32_t position) {
   ITC_NATIVE_RUNNING("sub_820DAB58 SceneModel::IsNearPlayerHeight");
-  constexpr uint32_t kRaceData = 0x826C5B2C;
-  constexpr uint32_t kRaceKind = 0xA3AF0;
-  constexpr uint32_t kRaceWord = 0x59614;
-  constexpr uint32_t kSecondPlayer = 0x826C7824;
   constexpr uint32_t kHeightApart = 0x82002DF4;
   const uint32_t frame = Frame(base, stack, kNearPlayerHeightFrame);
   if (vehicle_accessors::VehicleGet(base, 0) == 0) {
@@ -232,10 +232,9 @@ uint32_t SceneModelIsNearPlayerHeight(uint8_t* base, const Calls& calls, uint32_
   } else if (index >= 4) {
     return 1;
   } else {
-    const uint32_t race = guest::LoadU32(base, kRaceData);
-    if (int32_t(guest::LoadU32(base, race + kRaceKind)) == 6 &&
-        int32_t(guest::LoadU32(base, race + kRaceWord)) == 2) {
-      player = guest::LoadU32(base, kSecondPlayer) == 0 ? 1 : 0;
+    const schema::RaceData race = schema::RaceStatesGlobals::race_data(base);
+    if (int32_t(race.kind()) == 6 && int32_t(race.added_count()) == 2) {
+      player = schema::RaceUpdateGlobals::followed(base) == 0 ? 1 : 0;
     }
   }
   const uint32_t vehicle = track_zones::RacersVehicle(base, player);
@@ -252,7 +251,8 @@ uint32_t SceneModelIsNearPlayerHeight(uint8_t* base, const Calls& calls, uint32_
   }
   debug::Vec4Transform(base, frame + 80, frame + 96, frame + 80);
   const double y = Lfs(base, frame + 84);
-  const double apart = std::fabs(double(float(y - Lfs(base, position + 4))));
+  const double apart =
+      std::fabs(double(float(y - double(schema::NearHeightPosition(base, position).y()))));
   if (apart > Lfs(base, kHeightApart)) {
     return 0;
   }

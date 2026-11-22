@@ -1,0 +1,22 @@
+# The schema of docs/functions/race-end.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The race's end (RaceMode::ModeAfterRace, src/race_end/): no object of its
+# own. It reads the race data ([0x826C5B2C], the measure's Racers, described
+# by the area owning it), the save data (SaveData::Of's answer) and the race
+# mode (game-modes.toml's RaceMode; NextMode's ring and machine words), and
+# writes the next-mode answer (8 bytes: byte +0 1 when a mode is asked for,
+# word +4 its type) and the globals below.
+
+[globals]
+race_data = { address = 0x826C5B2C, type = "ptr", note = "the race data: +0x59AE4 the flags (0x8 an event race, 0x10 a rival race, 0x8000 to the title, 0x10000 to type 12), +0xA3AF0 the kind of race, +0xA3AF4 the race mode" }
+title_flag = { address = 0x826364EC, type = "u32", note = "which front-end menu to show on return, probably: set to 1 when the race goes to the title" }
+session = { address = 0x82816E3C, type = "ptr", note = "the network session, 0 when none (0 in play): kind 5 goes to type 12 with one and race mode 7, else type 10" }
+fade_in_passes = { address = 0x82001BEC, type = "u32", note = "the passes word ScreenFades::FadeIn is given" }
+boot_movie_ids = { address = 0x826C5BAC, type = "bytes", count = 20, note = "the boot movies' five ids (11 ending the list): stages 6 and 8 queue two" }
+boot_movies_next_mode = { address = 0x826C5BC0, type = "u32", note = "the mode type after the boot movies (9, the career's result)" }
+boot_movies_skippable = { address = 0x826C5BC4, type = "u32", note = "1: a button skips the movies" }
+boot_movies_index = { address = 0x826C5BC8, type = "u32", note = "the index of the next movie (0)" }
