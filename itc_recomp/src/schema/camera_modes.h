@@ -650,7 +650,7 @@ struct IntroShot : View {
   uint32_t phase_address() const { return address + 16; }
 };
 
-// embedded; measure: TvCamera
+// embedded; measure: TvCamera, Key::Vec3.r4
 struct TvCamera : View {
   using View::View;
   static constexpr uint32_t kSize = 43524;
@@ -1636,7 +1636,7 @@ struct StageCopy : View {
   uint32_t first_address() const { return address + 0; }
 };
 
-// embedded; measure: List16, List16::Copy32.r4
+// embedded; measure: List16, CutsceneShot::Init.r4@+8
 struct List16 : View {
   using View::View;
   static constexpr uint32_t kSize = 76;
@@ -1689,6 +1689,78 @@ struct List40Word : View {
   uint32_t value() const { return guest::LoadU32(base, address + 0); }
   void set_value(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t value_address() const { return address + 0; }
+};
+
+// embedded; measure: ChaseCamera@+224
+struct ChaseCameraAt224 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 16;
+  float unknown_0() const { return guest::LoadFloat(base, address + 0); }
+  void set_unknown_0(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  float unknown_4() const { return guest::LoadFloat(base, address + 4); }
+  void set_unknown_4(float v) const { guest::StoreFloat(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  float unknown_8() const { return guest::LoadFloat(base, address + 8); }
+  void set_unknown_8(float v) const { guest::StoreFloat(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  float unknown_12() const { return guest::LoadFloat(base, address + 12); }
+  void set_unknown_12(float v) const { guest::StoreFloat(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+};
+
+// embedded; measure: TvCamera@+32
+struct TvCameraAt32 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 12;
+  float unknown_0() const { return guest::LoadFloat(base, address + 0); }
+  void set_unknown_0(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  float unknown_4() const { return guest::LoadFloat(base, address + 4); }
+  void set_unknown_4(float v) const { guest::StoreFloat(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  float unknown_8() const { return guest::LoadFloat(base, address + 8); }
+  void set_unknown_8(float v) const { guest::StoreFloat(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+};
+
+// embedded; measure: TvCamera@+368
+struct TvCameraAt368 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 72;
+  float unknown_16() const { return guest::LoadFloat(base, address + 16); }
+  void set_unknown_16(float v) const { guest::StoreFloat(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+  float unknown_20() const { return guest::LoadFloat(base, address + 20); }
+  void set_unknown_20(float v) const { guest::StoreFloat(base, address + 20, v); }
+  uint32_t unknown_20_address() const { return address + 20; }
+  float unknown_24() const { return guest::LoadFloat(base, address + 24); }
+  void set_unknown_24(float v) const { guest::StoreFloat(base, address + 24, v); }
+  uint32_t unknown_24_address() const { return address + 24; }
+  float unknown_32() const { return guest::LoadFloat(base, address + 32); }
+  void set_unknown_32(float v) const { guest::StoreFloat(base, address + 32, v); }
+  uint32_t unknown_32_address() const { return address + 32; }
+  float unknown_36() const { return guest::LoadFloat(base, address + 36); }
+  void set_unknown_36(float v) const { guest::StoreFloat(base, address + 36, v); }
+  uint32_t unknown_36_address() const { return address + 36; }
+  float unknown_40() const { return guest::LoadFloat(base, address + 40); }
+  void set_unknown_40(float v) const { guest::StoreFloat(base, address + 40, v); }
+  uint32_t unknown_40_address() const { return address + 40; }
+  float unknown_64() const { return guest::LoadFloat(base, address + 64); }
+  void set_unknown_64(float v) const { guest::StoreFloat(base, address + 64, v); }
+  uint32_t unknown_64_address() const { return address + 64; }
+  float unknown_68() const { return guest::LoadFloat(base, address + 68); }
+  void set_unknown_68(float v) const { guest::StoreFloat(base, address + 68, v); }
+  uint32_t unknown_68_address() const { return address + 68; }
+};
+
+// embedded; measure: ViewCamera1@+1104
+struct ViewCamera1At1104 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  float unknown_0() const { return guest::LoadFloat(base, address + 0); }
+  void set_unknown_0(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
 };
 
 // The image words docs/functions/camera-modes.md's code uses.

@@ -29,7 +29,8 @@
 # The manager (measures: its own, LoadAll's and Stream's r3 as SceneryList,
 # Lights::FindNearest's owner as Lights).
 [Scenery]
-measures = ["Scenery", "SceneryList", "Lights"]
+measure = "Scenery"
+measures = ["SceneryList", "Lights", "SceneryList::LoadAll.r4", "SceneryList::Add.r4", "PoolObject.+3792", "SceneryList::Clear.r4", "SceneryList::ReleaseUnused.r4"]
 size = 248
 origin = "allocated"
 fields = [
@@ -104,7 +105,8 @@ fields = [
 
 # A scenery list's item (16 bytes).
 [SceneryListItem]
-measures = ["Scenery.+4", "Scenery.+20"]
+measure = "Scenery.+4"
+measures = ["SceneryList::Add.r4.+20"]
 size = 16
 origin = "allocated"
 fields = [
@@ -118,7 +120,8 @@ fields = [
 
 # A scenery list's table entry (12 bytes): every key the list can hold.
 [SceneryListTableEntry]
-measure = "Scenery.+24"
+measure = "SceneryList::LoadAll.r4.+24"
+measures = ["SceneryConfig.+24"]
 size = 12
 origin = "allocated"
 fields = [
@@ -160,7 +163,8 @@ fields = [
 
 # The course's table of areas (the configuration's +28).
 [SceneryCourseTable]
-measures = ["Scenery.+28", "Scenery.+36", "SceneryConfig.+28"]
+measure = "Scenery.+36"
+measures = ["SceneryConfig.+28"]
 size = 20
 origin = "file"
 fields = [
@@ -506,3 +510,28 @@ view_masks = { address = 0x82602F80, type = "bytes", count = 224, note = "the 14
 range_x = { address = 0x82001FCC, type = "f32", note = "the course set's model's draw range, x (also material-passes' projector_depth_bias)" }
 range_y = { address = 0x82006804, type = "f32", note = "the course set's model's draw range, y (also scenery-lists' point_range_far)" }
 headlight_near_plane = { address = 0x82001FBC, type = "f32", note = "0.1, the headlight projectors' near plane" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from Scenery.
+[SceneryAt100]
+measure = "Scenery@+100"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+]
+
+# Split from Scenery.
+[SceneryAt144]
+measure = "Scenery@+144"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+]

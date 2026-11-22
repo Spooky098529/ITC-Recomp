@@ -68,6 +68,7 @@ fields = [
 # CarDealer::Create, freed by CarDealer::Destroy; docs/known-data.md).
 [CarDealerData]
 measure = "new<1196>@CarDealer::Create"
+measures = ["new<1196>@CarDealer::Create.+1136"]
 size = 1196
 origin = "allocated"
 fields = [

@@ -4614,7 +4614,7 @@ lifted::Result f8229DB38(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mr r28,r7
   r28 = r7;
   // stw r11,0(r27)
-  guest::StoreU32(base, schema::VideoOutput(base, uint32_t(r27)).vtable_address(), uint32_t(r11));
+  guest::StoreU32(base, schema::VideoOutputAt140(base, uint32_t(r27)).unknown_0_address(), uint32_t(r11));
   // bl 0x8229d850
   // (left out: dead in C++)
   { const lifted::Result o = f8229D850(base, r1, r13, r3, r4, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
@@ -4692,7 +4692,7 @@ loc_8229DBDC:
   // li r3,0
   r3 = uint64_t(int64_t(0));
   // stw r31,0(r27)
-  guest::StoreU32(base, schema::VideoOutput(base, uint32_t(r27)).vtable_address(), uint32_t(r31));
+  guest::StoreU32(base, schema::VideoOutputAt140(base, uint32_t(r27)).unknown_0_address(), uint32_t(r31));
 loc_8229DBE4:
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));

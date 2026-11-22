@@ -383,3 +383,17 @@ scale_828 = { address = 0x820029D8, type = "f32", note = "Stats::AddRaceResult's
 day_log_scale = { address = 0x82001FBC, type = "f32", note = "DayLog::SumRaces' scale" }
 play_time_frames = { address = 0x826C5B90, type = "u32", note = "the play time's frame counter (PlayTime::Add)" }
 race_data = { address = 0x826C5B2C, type = "ptr", to = "RaceData", note = "the race data (race-states.toml)" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from CareerStats.
+[CareerStatsAt24]
+measure = "Stats@+24"
+size = 4840
+origin = "embedded"
+fields = [
+  { name = "unknown_18", offset = 18, type = "u16" },
+  { name = "unknown_22", offset = 22, type = "u16" },
+  { name = "unknown_4836", offset = 4836, type = "f32" },
+]

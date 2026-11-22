@@ -29,7 +29,8 @@
 # (PartModel, vtable 0x8200338C, 464 bytes) adds +432 to +460, which the
 # measure files here too.
 [Model]
-measures = ["Model", "Mesh"]
+measure = "Model"
+measures = ["Mesh", "Model.+48"]
 size = 432
 origin = "allocated"
 vtable = 0x8206CD18
@@ -73,6 +74,7 @@ fields = [
 # model, so the provider's vtable slots 5 and 6 are filed here too.
 [ModelVtable]
 measure = "Model.+0"
+measures = ["Model.+48.+0"]
 size = 28
 origin = "image"
 fields = [
@@ -154,7 +156,8 @@ fields = [
 # at +0, and the index reads of car-draw.md's, second-set.md's and others'
 # code) since Model::Load reads a shape's +408 and +428 through them.
 [ModelShape]
-measures = ["Mesh.+40", "WorkMem"]
+measure = "Mesh.+40"
+measures = ["WorkMem", "Model.+40"]
 size = 544
 origin = "file"
 fields = [
@@ -197,7 +200,8 @@ fields = [
 
 # A shape's skin block (the shape's +408).
 [SkinBlock]
-measures = ["Mesh.+40.+408", "WorkMem.+408"]
+measure = "Mesh.+40.+408"
+measures = ["Model.+40.+408"]
 size = 24
 origin = "file"
 fields = [
@@ -210,7 +214,7 @@ fields = [
 
 # A vertex's influence count (the skin block's +8, a word a vertex).
 [SkinInfluenceCount]
-measure = "WorkMem.+408.+8"
+measure = "Model.+40.+408.+8"
 size = 4
 origin = "file"
 fields = [
@@ -220,7 +224,7 @@ fields = [
 # An influence's weight (16 bytes; the skin block's +12): x, y, z quantized
 # at load, the last of a vertex's 1 minus the others' sums.
 [SkinWeight]
-measure = "WorkMem.+408.+12"
+measure = "Model.+40.+408.+12"
 size = 16
 origin = "file"
 fields = [
@@ -319,6 +323,7 @@ fields = [
 # it with the header block itself (XPR +0), whose +0 is the record count.
 [XprRecord]
 measure = "new<?>@XPR::Create"
+measures = ["XPR.+16"]
 size = 16
 origin = "allocated"
 fields = [
@@ -437,7 +442,8 @@ fields = [
 # A node file (the skeleton's +80: its view's +0; NodeFile::View
 # sub_825A21A8 reads it).
 [NodeFile]
-measures = ["Skeleton.+80", "sub_8259A9E0.r3.+80", "sub_82599A20.r3.+80", "sub_825A21A8.ret.+0"]
+measure = "Skeleton.+80"
+measures = ["sub_8259A9E0.r3.+80", "sub_82599A20.r3.+80", "sub_8259A9E0.r3@+80.+0"]
 size = 52
 origin = "file"
 fields = [
@@ -458,7 +464,7 @@ fields = [
 # A node file's view (48 bytes, the skeleton's +80 to +124; NodeFile::View
 # sub_825A21A8's r3): the file's offsets made pointers.
 [NodeFileView]
-measure = "sub_825A21A8.r3"
+measure = "sub_8259A9E0.r3@+80"
 size = 48
 origin = "embedded"
 fields = [
@@ -490,7 +496,8 @@ fields = [
 # A node's state (144 bytes, the skeleton's [+136] + 144i; [+140] the first
 # bone's).
 [SkeletonNodeState]
-measures = ["Skeleton.+136", "Skeleton.+140"]
+measure = "Skeleton.+136"
+measures = ["Skeleton.+140", "CursorCurve::Sample.r5"]
 size = 144
 origin = "allocated"
 fields = [

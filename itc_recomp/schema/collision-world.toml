@@ -169,8 +169,6 @@ fields = [
   { name = "route_section", offset = 4, type = "u16", note = "the route position: a section of the course's route (TrackRoute::Follow)" },
   { name = "route_position", offset = 4, type = "u32", note = "the route position (section and slice) as one word; also the mesh's file (TrackPosition::CrossSection's, FindCell's and the searches' r3 or r4 is the mesh) and a point's y (GroundHeight, TrackRoute::): measure faults" },
   { name = "route_slice", offset = 6, type = "u16", note = "the route position's slice" },
-  { name = "fault_point_z", offset = 8, type = "f32", note = "measure fault: a point's z (as fault_point_x)" },
-  { name = "fault_point_w", offset = 12, type = "f32", note = "measure fault: a point's w (as fault_point_x)" },
   { name = "point_xy", offset = 16, type = "u64", note = "the point's x and y copied as one (TrackPosition::Copy)" },
   { name = "point_x", offset = 16, type = "f32" },
   { name = "point_y", offset = 20, type = "f32", note = "the last ground height under it" },
@@ -407,3 +405,31 @@ corner_order = { address = 0x82006900, type = "bytes", count = 8, note = "the or
 race_data = { address = 0x826C5B2C, type = "ptr", to = "RaceData", note = "the race data (race-states.toml): +4 the course route's index, +20 the branch flags, +24 the route bits, +48 the racer records, +0x59AE4 the stage flags, +0xA3AF4 the race mode" }
 race_progress = { address = 0x826D82E8, type = "ptr", to = "RaceProgress", note = "the race's progress (race-states.toml): +6100 read by WallQuery::ModeSkips for mode 5" }
 racers_manager = { address = 0x826D82F4, type = "ptr", to = "RaceManager", note = "the racers' manager (race-world.toml): +2308 the racers, +2364 their count" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from TrackPosition.
+[TrackPositionAt16]
+measure = "TrackPosition@+16"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]
+
+
+# Split from TrackPosition.
+[TrackPositionAt48]
+measure = "TrackPosition@+48"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]

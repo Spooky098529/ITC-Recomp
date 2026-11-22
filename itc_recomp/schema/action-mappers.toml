@@ -22,6 +22,7 @@
 # listener's held buttons into 30 actions.
 [ActionMapper]
 measure = "ActionMapper"
+measures = ["ActionMapper.+24", "ActionMapper.+180"]
 size = 2896
 origin = "allocated"
 vtable = 0x82007F78
@@ -189,7 +190,8 @@ fields = [
 # The repeat and curve objects' vtables (0x82007F68, 0x82007F70), met
 # through their pointers.
 [ActionObjectVtable]
-measures = ["ActionMapper.+0", "ActionMapper.+144", "ActionMapper.+300"]
+measure = "ActionMapper.+144"
+measures = ["ActionMapper.+300", "ActionMapper.+24.+0", "ActionMapper.+180.+0"]
 size = 8
 origin = "image"
 fields = [
@@ -331,3 +333,16 @@ mappers = { address = 0x826BAB80, type = "ptr", to = "ActionMapper", note = "4 e
 settings_index = { address = 0x82600B84, type = "u32", note = "1 at boot" }
 settings = { address = 0x82600B88, type = "bytes", count = 32, note = "ActionSettings entries of 32 bytes, picked by the index" }
 the_client_list = { address = 0x82970C14, type = "ptr", to = "InputClientList", note = "ClientList's one list (the lookups read it here)" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from ActionMapperConfig.
+[ActionMapperConfigAt8]
+measure = "ActionMapper::Words.r4@+8"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+]

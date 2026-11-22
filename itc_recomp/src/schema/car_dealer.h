@@ -71,7 +71,7 @@ struct CarDealerColors : View {
   uint32_t count_address() const { return address + 52; }
 };
 
-// allocated; measure: new<1196>@CarDealer::Create
+// allocated; measure: new<1196>@CarDealer::Create, new<1196>@CarDealer::Create.+1136
 struct CarDealerData : View {
   using View::View;
   static constexpr uint32_t kSize = 1196;

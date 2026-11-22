@@ -210,7 +210,7 @@ struct RaceHud : View {
   uint32_t movie19_address() const { return address + 636; }
 };
 
-// embedded; measure: RaceHud.+444, sub_822155C0.r3.+444
+// embedded; measure: RaceHud.+444, sub_822155C0.r3.+444, sub_82214BA8.r4
 struct RaceHudRacers : View {
   using View::View;
   static constexpr uint32_t kSize = 3936;
@@ -364,6 +364,24 @@ struct RaceHudSignNode : View {
   uint32_t picture() const { return guest::LoadU32(base, address + 108); }
   void set_picture(uint32_t v) const { guest::StoreU32(base, address + 108, v); }
   uint32_t picture_address() const { return address + 108; }
+};
+
+// embedded; measure: RaceScreens@+656
+struct RaceHudAt656 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 348;
+  uint32_t unknown_328() const { return guest::LoadU32(base, address + 328); }
+  void set_unknown_328(uint32_t v) const { guest::StoreU32(base, address + 328, v); }
+  uint32_t unknown_328_address() const { return address + 328; }
+  uint32_t unknown_336() const { return guest::LoadU32(base, address + 336); }
+  void set_unknown_336(uint32_t v) const { guest::StoreU32(base, address + 336, v); }
+  uint32_t unknown_336_address() const { return address + 336; }
+  uint32_t unknown_340() const { return guest::LoadU32(base, address + 340); }
+  void set_unknown_340(uint32_t v) const { guest::StoreU32(base, address + 340, v); }
+  uint32_t unknown_340_address() const { return address + 340; }
+  uint32_t unknown_344() const { return guest::LoadU32(base, address + 344); }
+  void set_unknown_344(uint32_t v) const { guest::StoreU32(base, address + 344, v); }
+  uint32_t unknown_344_address() const { return address + 344; }
 };
 
 // The image words docs/functions/race-hud-object.md's code uses.

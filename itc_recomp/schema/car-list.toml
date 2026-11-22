@@ -23,6 +23,7 @@
 # (screen-constructors.md).
 [PanelSetBase]
 measure = "PanelSetBase"
+measures = ["PanelSetBase.+1820"]
 size = 1972
 origin = "embedded"
 vtable = 0x820110C4
@@ -568,3 +569,7 @@ color_scale = { address = 0x82000C44, type = "f32", note = "the RGB scale (255)"
 color_unit = { address = 0x82002200, type = "f32", note = "the saturation's and value's unit" }
 color_value_add_raised = { address = 0x82002FF4, type = "u32", note = "added to a color record's value byte when its +0 is set" }
 color_value_add = { address = 0x82002FF8, type = "u32", note = "added to a color record's value byte when its +0 is 0" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+

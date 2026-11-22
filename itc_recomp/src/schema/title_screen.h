@@ -330,6 +330,42 @@ struct TitleTransitionStarted : View {
   uint32_t started_address() const { return address + 0; }
 };
 
+// embedded; measure: new<48220>@ModeType4::Init
+struct Type4BlockPart : View {
+  using View::View;
+  static constexpr uint32_t kSize = 48180;
+  uint32_t unknown_9612() const { return guest::LoadU32(base, address + 9612); }
+  void set_unknown_9612(uint32_t v) const { guest::StoreU32(base, address + 9612, v); }
+  uint32_t unknown_9612_address() const { return address + 9612; }
+  uint32_t unknown_9616() const { return guest::LoadU32(base, address + 9616); }
+  void set_unknown_9616(uint32_t v) const { guest::StoreU32(base, address + 9616, v); }
+  uint32_t unknown_9616_address() const { return address + 9616; }
+  uint32_t unknown_19252() const { return guest::LoadU32(base, address + 19252); }
+  void set_unknown_19252(uint32_t v) const { guest::StoreU32(base, address + 19252, v); }
+  uint32_t unknown_19252_address() const { return address + 19252; }
+  uint32_t unknown_19256() const { return guest::LoadU32(base, address + 19256); }
+  void set_unknown_19256(uint32_t v) const { guest::StoreU32(base, address + 19256, v); }
+  uint32_t unknown_19256_address() const { return address + 19256; }
+  uint32_t unknown_28892() const { return guest::LoadU32(base, address + 28892); }
+  void set_unknown_28892(uint32_t v) const { guest::StoreU32(base, address + 28892, v); }
+  uint32_t unknown_28892_address() const { return address + 28892; }
+  uint32_t unknown_28896() const { return guest::LoadU32(base, address + 28896); }
+  void set_unknown_28896(uint32_t v) const { guest::StoreU32(base, address + 28896, v); }
+  uint32_t unknown_28896_address() const { return address + 28896; }
+  uint32_t unknown_38532() const { return guest::LoadU32(base, address + 38532); }
+  void set_unknown_38532(uint32_t v) const { guest::StoreU32(base, address + 38532, v); }
+  uint32_t unknown_38532_address() const { return address + 38532; }
+  uint32_t unknown_38536() const { return guest::LoadU32(base, address + 38536); }
+  void set_unknown_38536(uint32_t v) const { guest::StoreU32(base, address + 38536, v); }
+  uint32_t unknown_38536_address() const { return address + 38536; }
+  uint32_t unknown_48172() const { return guest::LoadU32(base, address + 48172); }
+  void set_unknown_48172(uint32_t v) const { guest::StoreU32(base, address + 48172, v); }
+  uint32_t unknown_48172_address() const { return address + 48172; }
+  uint32_t unknown_48176() const { return guest::LoadU32(base, address + 48176); }
+  void set_unknown_48176(uint32_t v) const { guest::StoreU32(base, address + 48176, v); }
+  uint32_t unknown_48176_address() const { return address + 48176; }
+};
+
 // The image words docs/functions/title-screen.md's code uses.
 struct TitleScreenGlobals {
   template <typename T = TitleLoadBlock>

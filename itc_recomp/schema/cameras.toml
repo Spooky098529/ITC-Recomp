@@ -378,3 +378,62 @@ up_vector = { address = 0x826C2CF0, type = "bytes", count = 16, note = "(0, 1, 0
 side_vector = { address = 0x826C2D00, type = "bytes", count = 16, note = "(10, 0, 0, 1), made once by Viewport::Init" }
 origin_vector = { address = 0x826C2D10, type = "bytes", count = 16, note = "(0, 0, 0, 1), made once by Viewport::Init" }
 vector_guard = { address = 0x826C2D20, type = "u32", note = "bits 1, 2, 4: origin_vector, side_vector, up_vector made" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from CameraPass.
+[CameraPassAt368]
+measure = "Camera@+368"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+]
+
+# Split from CameraPass.
+[CameraPassAt384]
+measure = "Camera@+384"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+]
+
+# Split from CameraPass.
+[CameraPassAt388]
+measure = "Camera@+388"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+]
+
+# Split from CameraPass.
+[CameraPassAt392]
+measure = "Camera@+392"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+]
+
+# Split from CourseView.
+[CourseViewAt592]
+measure = "CourseView@+592"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u64" },
+  { name = "unknown_8", offset = 8, type = "u64" },
+]
+
+# Split from CourseView.
+[CourseViewAt608]
+measure = "CourseView@+608"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u64" },
+  { name = "unknown_8", offset = 8, type = "u64" },
+]

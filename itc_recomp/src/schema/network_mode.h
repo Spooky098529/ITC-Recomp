@@ -497,6 +497,33 @@ struct Session : View {
   uint32_t rows_address() const { return address + 1297716; }
 };
 
+// embedded; measure: ModeType12.+816@+115888
+struct NetModeBlockAt115888 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 9648;
+  uint32_t unknown_9644() const { return guest::LoadU32(base, address + 9644); }
+  void set_unknown_9644(uint32_t v) const { guest::StoreU32(base, address + 9644, v); }
+  uint32_t unknown_9644_address() const { return address + 9644; }
+};
+
+// embedded; measure: ModeType12.+816@+125536
+struct NetModeBlockAt125536 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 9644;
+  uint32_t unknown_9640() const { return guest::LoadU32(base, address + 9640); }
+  void set_unknown_9640(uint32_t v) const { guest::StoreU32(base, address + 9640, v); }
+  uint32_t unknown_9640_address() const { return address + 9640; }
+};
+
+// embedded; measure: ModeType12.+816@+86880
+struct NetModeBlockAt86880 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 9644;
+  uint32_t unknown_9640() const { return guest::LoadU32(base, address + 9640); }
+  void set_unknown_9640(uint32_t v) const { guest::StoreU32(base, address + 9640, v); }
+  uint32_t unknown_9640_address() const { return address + 9640; }
+};
+
 // The image words docs/functions/network-mode.md's code uses.
 struct NetworkModeGlobals {
   // the game mode before (1 the race)

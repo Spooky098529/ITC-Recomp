@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: Model, Mesh
+// allocated; measure: Model, Mesh, Model.+48
 struct Model : View {
   using View::View;
   static constexpr uint32_t kSize = 432;
@@ -139,7 +139,7 @@ struct Model : View {
   uint32_t replacement_texture_address() const { return address + 460; }
 };
 
-// image; measure: Model.+0
+// image; measure: Model.+0, Model.+48.+0
 struct ModelVtable : View {
   using View::View;
   static constexpr uint32_t kSize = 28;
@@ -296,7 +296,7 @@ struct ShaderPairEntry : View {
   uint32_t pixel_size_address() const { return address + 8; }
 };
 
-// file; measure: Mesh.+40, WorkMem
+// file; measure: Mesh.+40, WorkMem, Model.+40
 struct ModelShape : View {
   using View::View;
   static constexpr uint32_t kSize = 544;
@@ -394,7 +394,7 @@ struct MaterialBlock : View {
   uint32_t records_address() const { return address + 16; }
 };
 
-// file; measure: Mesh.+40.+408, WorkMem.+408
+// file; measure: Mesh.+40.+408, Model.+40.+408
 struct SkinBlock : View {
   using View::View;
   static constexpr uint32_t kSize = 24;
@@ -423,7 +423,7 @@ struct SkinBlock : View {
   uint32_t object_address() const { return address + 20; }
 };
 
-// file; measure: WorkMem.+408.+8
+// file; measure: Model.+40.+408.+8
 struct SkinInfluenceCount : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
@@ -432,7 +432,7 @@ struct SkinInfluenceCount : View {
   uint32_t count_address() const { return address + 0; }
 };
 
-// file; measure: WorkMem.+408.+12
+// file; measure: Model.+40.+408.+12
 struct SkinWeight : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
@@ -602,7 +602,7 @@ struct XPR : View {
   uint32_t fault_3736_address() const { return address + 3736; }
 };
 
-// allocated; measure: new<?>@XPR::Create
+// allocated; measure: new<?>@XPR::Create, XPR.+16
 struct XprRecord : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
@@ -784,7 +784,7 @@ struct ShaderFileRecord : View {
   uint32_t microcode_bytes_address() const { return address + 12; }
 };
 
-// file; measure: Skeleton.+80, sub_8259A9E0.r3.+80, sub_82599A20.r3.+80, sub_825A21A8.ret.+0
+// file; measure: Skeleton.+80, sub_8259A9E0.r3.+80, sub_82599A20.r3.+80, sub_8259A9E0.r3@+80.+0
 struct NodeFile : View {
   using View::View;
   static constexpr uint32_t kSize = 52;
@@ -836,7 +836,7 @@ struct NodeFile : View {
   uint32_t unknown_48_address() const { return address + 48; }
 };
 
-// embedded; measure: sub_825A21A8.r3
+// embedded; measure: sub_8259A9E0.r3@+80
 struct NodeFileView : View {
   using View::View;
   static constexpr uint32_t kSize = 48;
@@ -906,7 +906,7 @@ struct SkeletonNodeRecord : View {
   uint32_t type_address() const { return address + 132; }
 };
 
-// allocated; measure: Skeleton.+136, Skeleton.+140
+// allocated; measure: Skeleton.+136, Skeleton.+140, CursorCurve::Sample.r5
 struct SkeletonNodeState : View {
   using View::View;
   static constexpr uint32_t kSize = 144;

@@ -116,7 +116,8 @@ fields = [
 # A channel's keys as the curve samplers walk them (an array, not an object:
 # Curve::Sample reads keys +20 and +40, the second and third keys' times).
 [AnimationKeyRun]
-measures = ["Curve::Sample.r4", "CursorCurve::Sample.r4"]
+measure = "CursorCurve::Sample.r4"
+measures = ["TrackSet::Channels.ret@+8"]
 size = 60
 origin = "file"
 fields = [
@@ -200,6 +201,7 @@ fields = [
 # start time, a float; its entry count at +16).
 [SkeletonNodeEntry]
 measure = "SkeletonCursor.+8"
+measures = ["SkeletonCursor.+4", "SkeletonCursor.+0"]
 size = 20
 origin = "file"
 fields = [
@@ -264,3 +266,17 @@ fields = [
 float_two = { address = 0x820021E8, type = "f32", note = "the game's float 2.0 (Key::Interpolate)" }
 two_pi = { address = 0x82001FA8, type = "f32", note = "2 pi (Skeleton::LocalMatrices' angle wrap)" }
 inverse_two_pi = { address = 0x82001FA4, type = "f32", note = "1 / (2 pi) (Skeleton::LocalMatrices' angle wrap)" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from PhysicalPad.
+[PhysicalPadAt168]
+measure = "PhysicalPad@+168"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]

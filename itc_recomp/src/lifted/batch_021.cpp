@@ -2957,7 +2957,7 @@ lifted::Result f8259D370(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r30,0
   r30 = uint64_t(int64_t(0));
   // lwz r3,0(r31)
-  r3 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r31)).vtable_address());
+  r3 = guest::LoadU32(base, schema::AudioEngine(base, uint32_t(r31)).settings_address());
   // cmplwi cr6,r3,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq cr6,0x8259d3a0
@@ -2966,25 +2966,25 @@ lifted::Result f8259D370(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = lifted::entry::e825A71C0(base, LIFTED_ARGS(0x8259D39C, r31)); r3 = o.r3; f1 = o.f1; }
   // stw r30,0(r31)
-  guest::StoreU32(base, schema::AudioManager(base, uint32_t(r31)).vtable_address(), uint32_t(r30));
+  guest::StoreU32(base, schema::AudioEngine(base, uint32_t(r31)).settings_address(), uint32_t(r30));
 loc_8259D3A0:
   // lwz r3,8(r31)
-  r3 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r31)).sound_owner_vtable_address());
+  r3 = guest::LoadU32(base, schema::AudioEngine(base, uint32_t(r31)).xact_engine_address());
   // cmplwi cr6,r3,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq cr6,0x8259d3c0
   if (cr6.eq) goto loc_8259D3C0;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::AudioManagerSoundOwnerVtable(base, uint32_t(r3)).slot_0_address());
+  r11 = guest::LoadU32(base, schema::XactEngine(base, uint32_t(r3)).vtable_address());
   // lwz r11,4(r11)
-  r11 = guest::LoadU32(base, schema::AudioManagerSoundOwnerSlot0(base, uint32_t(r11)).unknown_4_address());
+  r11 = guest::LoadU32(base, schema::XactEngineInterface(base, uint32_t(r11)).slot_1_address());
   // mtctr r11
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x8259D3BC, r31)); r3 = o.r3; f1 = o.f1; }
   // stw r30,8(r31)
-  guest::StoreU32(base, schema::AudioManager(base, uint32_t(r31)).sound_owner_vtable_address(), uint32_t(r30));
+  guest::StoreU32(base, schema::AudioEngine(base, uint32_t(r31)).xact_engine_address(), uint32_t(r30));
 loc_8259D3C0:
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));

@@ -298,6 +298,7 @@ fields = [
 # View 4's camera (+13360).
 [TvCamera]
 measure = "TvCamera"
+measures = ["Key::Vec3.r4"]
 size = 43524
 origin = "embedded"
 vtable = 0x820093BC
@@ -793,7 +794,7 @@ fields = [
 # A 16-slot list (List16::Link; track_zones.h): the slots from +76.
 [List16]
 measure = "List16"
-measures = ["List16::Copy32.r4"]
+measures = ["CutsceneShot::Init.r4@+8"]
 size = 76
 origin = "embedded"
 fields = [
@@ -872,3 +873,54 @@ flip = { address = 0x82001BE0, type = "f32", note = "the z flip (-1.0, probably)
 chase_degrees = { address = 0x82009300, type = "f32", note = "the cameras' zoom angle (55.0)" }
 follow_degrees = { address = 0x82000D44, type = "f32", note = "ChaseCamera::Follow's (55.0)" }
 logo_textures = { address = 0x8200CEA0, type = "bytes", count = 184, note = "the rival logo's textures by index; its 12-byte records 304 bytes before" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from ChaseCamera.
+[ChaseCameraAt224]
+measure = "ChaseCamera@+224"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]
+
+# Split from TvCamera.
+[TvCameraAt32]
+measure = "TvCamera@+32"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+]
+
+# Split from TvCamera.
+[TvCameraAt368]
+measure = "TvCamera@+368"
+size = 72
+origin = "embedded"
+fields = [
+  { name = "unknown_16", offset = 16, type = "f32" },
+  { name = "unknown_20", offset = 20, type = "f32" },
+  { name = "unknown_24", offset = 24, type = "f32" },
+  { name = "unknown_32", offset = 32, type = "f32" },
+  { name = "unknown_36", offset = 36, type = "f32" },
+  { name = "unknown_40", offset = 40, type = "f32" },
+  { name = "unknown_64", offset = 64, type = "f32" },
+  { name = "unknown_68", offset = 68, type = "f32" },
+]
+
+# Split from ViewCamera1.
+[ViewCamera1At1104]
+measure = "ViewCamera1@+1104"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+]

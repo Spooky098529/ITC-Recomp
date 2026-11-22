@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: XAudioObject, sub_82465418.r3
+// allocated; measure: XAudioObject, sub_82466410.r3@-4
 struct XAudioObject : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
@@ -835,7 +835,7 @@ struct PcmCodec : View {
   uint32_t converter_flags_address() const { return address + 268; }
 };
 
-// allocated; measure: XmaCodec, XmaCodec::XmaCodec.ret, sub_8246AB00.r3
+// allocated; measure: XmaCodec, XmaCodec::XmaCodec.ret, sub_8246B3F8.r3@-16
 struct XmaCodec : View {
   using View::View;
   static constexpr uint32_t kSize = 284;
@@ -1004,7 +1004,7 @@ struct XmaCodec : View {
   uint32_t unknown_280_address() const { return address + 280; }
 };
 
-// embedded; measure: XAudioCodec, sub_82467450.ret, XAudioSourceVoice.+76
+// embedded; measure: XAudioCodec, XAudioSourceVoice.+76, sub_82466C40.r3@-12
 struct XAudioCodec : View {
   using View::View;
   static constexpr uint32_t kSize = 180;
@@ -1742,10 +1742,10 @@ struct ReverbCrossfade : View {
   uint32_t line_address() const { return address + 32; }
 };
 
-// embedded; measure: -
+// embedded; measure: sub_82462BC8.r3
 struct ReverbLowPass : View {
   using View::View;
-  static constexpr uint32_t kSize = 0;
+  static constexpr uint32_t kSize = 32;
   // probably the sample rate (FilterCoefficient: +4 x 2 pi / +0, a cos's angle)
   float rate() const { return guest::LoadFloat(base, address + 0); }
   void set_rate(float v) const { guest::StoreFloat(base, address + 0, v); }
@@ -1778,7 +1778,7 @@ struct ReverbLowPass : View {
   uint32_t coefficient_address() const { return address + 28; }
 };
 
-// embedded; measure: -
+// embedded; measure: sub_82462CF8.r3, sub_82463060.r3
 struct ReverbDelayLine : View {
   using View::View;
   static constexpr uint32_t kSize = 8236;
@@ -1823,7 +1823,7 @@ struct ReverbDelayLine : View {
   uint32_t line_address() const { return address + 44; }
 };
 
-// embedded; measure: sub_824632A0.r3
+// embedded; measure: sub_824632A0.r3, sub_82462DC8.r3, sub_82463130.r3, sub_82463410.r3
 struct ReverbAllPass : View {
   using View::View;
   static constexpr uint32_t kSize = 2072;
@@ -3085,6 +3085,181 @@ struct Effect6 : View {
   uint32_t unknown_2060() const { return guest::LoadU32(base, address + 2060); }
   void set_unknown_2060(uint32_t v) const { guest::StoreU32(base, address + 2060, v); }
   uint32_t unknown_2060_address() const { return address + 2060; }
+};
+
+// embedded; measure: I3dl2@+4
+struct I3dl2ReverbAt4 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 48;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  float unknown_12() const { return guest::LoadFloat(base, address + 12); }
+  void set_unknown_12(float v) const { guest::StoreFloat(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+  float unknown_16() const { return guest::LoadFloat(base, address + 16); }
+  void set_unknown_16(float v) const { guest::StoreFloat(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+  uint32_t unknown_20() const { return guest::LoadU32(base, address + 20); }
+  void set_unknown_20(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
+  uint32_t unknown_20_address() const { return address + 20; }
+  float unknown_24() const { return guest::LoadFloat(base, address + 24); }
+  void set_unknown_24(float v) const { guest::StoreFloat(base, address + 24, v); }
+  uint32_t unknown_24_address() const { return address + 24; }
+  uint32_t unknown_28() const { return guest::LoadU32(base, address + 28); }
+  void set_unknown_28(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
+  uint32_t unknown_28_address() const { return address + 28; }
+  float unknown_32() const { return guest::LoadFloat(base, address + 32); }
+  void set_unknown_32(float v) const { guest::StoreFloat(base, address + 32, v); }
+  uint32_t unknown_32_address() const { return address + 32; }
+  float unknown_36() const { return guest::LoadFloat(base, address + 36); }
+  void set_unknown_36(float v) const { guest::StoreFloat(base, address + 36, v); }
+  uint32_t unknown_36_address() const { return address + 36; }
+  float unknown_40() const { return guest::LoadFloat(base, address + 40); }
+  void set_unknown_40(float v) const { guest::StoreFloat(base, address + 40, v); }
+  uint32_t unknown_40_address() const { return address + 40; }
+  float unknown_44() const { return guest::LoadFloat(base, address + 44); }
+  void set_unknown_44(float v) const { guest::StoreFloat(base, address + 44, v); }
+  uint32_t unknown_44_address() const { return address + 44; }
+};
+
+// embedded; measure: Reverb@+52
+struct ReverbAt52 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 84;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  uint32_t unknown_12() const { return guest::LoadU32(base, address + 12); }
+  void set_unknown_12(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+  uint32_t unknown_16() const { return guest::LoadU32(base, address + 16); }
+  void set_unknown_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+  uint32_t unknown_20() const { return guest::LoadU32(base, address + 20); }
+  void set_unknown_20(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
+  uint32_t unknown_20_address() const { return address + 20; }
+  uint32_t unknown_24() const { return guest::LoadU32(base, address + 24); }
+  void set_unknown_24(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
+  uint32_t unknown_24_address() const { return address + 24; }
+  uint32_t unknown_28() const { return guest::LoadU32(base, address + 28); }
+  void set_unknown_28(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
+  uint32_t unknown_28_address() const { return address + 28; }
+  uint32_t unknown_32() const { return guest::LoadU32(base, address + 32); }
+  void set_unknown_32(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
+  uint32_t unknown_32_address() const { return address + 32; }
+  uint32_t unknown_36() const { return guest::LoadU32(base, address + 36); }
+  void set_unknown_36(uint32_t v) const { guest::StoreU32(base, address + 36, v); }
+  uint32_t unknown_36_address() const { return address + 36; }
+  uint32_t unknown_40() const { return guest::LoadU32(base, address + 40); }
+  void set_unknown_40(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
+  uint32_t unknown_40_address() const { return address + 40; }
+  uint32_t unknown_44() const { return guest::LoadU32(base, address + 44); }
+  void set_unknown_44(uint32_t v) const { guest::StoreU32(base, address + 44, v); }
+  uint32_t unknown_44_address() const { return address + 44; }
+  uint32_t unknown_48() const { return guest::LoadU32(base, address + 48); }
+  void set_unknown_48(uint32_t v) const { guest::StoreU32(base, address + 48, v); }
+  uint32_t unknown_48_address() const { return address + 48; }
+  float unknown_52() const { return guest::LoadFloat(base, address + 52); }
+  void set_unknown_52(float v) const { guest::StoreFloat(base, address + 52, v); }
+  uint32_t unknown_52_address() const { return address + 52; }
+  float unknown_56() const { return guest::LoadFloat(base, address + 56); }
+  void set_unknown_56(float v) const { guest::StoreFloat(base, address + 56, v); }
+  uint32_t unknown_56_address() const { return address + 56; }
+  float unknown_60() const { return guest::LoadFloat(base, address + 60); }
+  void set_unknown_60(float v) const { guest::StoreFloat(base, address + 60, v); }
+  uint32_t unknown_60_address() const { return address + 60; }
+  float unknown_64() const { return guest::LoadFloat(base, address + 64); }
+  void set_unknown_64(float v) const { guest::StoreFloat(base, address + 64, v); }
+  uint32_t unknown_64_address() const { return address + 64; }
+  float unknown_68() const { return guest::LoadFloat(base, address + 68); }
+  void set_unknown_68(float v) const { guest::StoreFloat(base, address + 68, v); }
+  uint32_t unknown_68_address() const { return address + 68; }
+  float unknown_72() const { return guest::LoadFloat(base, address + 72); }
+  void set_unknown_72(float v) const { guest::StoreFloat(base, address + 72, v); }
+  uint32_t unknown_72_address() const { return address + 72; }
+  float unknown_76() const { return guest::LoadFloat(base, address + 76); }
+  void set_unknown_76(float v) const { guest::StoreFloat(base, address + 76, v); }
+  uint32_t unknown_76_address() const { return address + 76; }
+  float unknown_80() const { return guest::LoadFloat(base, address + 80); }
+  void set_unknown_80(float v) const { guest::StoreFloat(base, address + 80, v); }
+  uint32_t unknown_80_address() const { return address + 80; }
+};
+
+// embedded; measure: sub_82467720.r3, sub_82467788.r3, sub_824677F0.r3, sub_82467858.r3, sub_824678C0.r3, sub_82467928.r3, sub_82467990.r3
+struct ReverbLineFill : View {
+  using View::View;
+  static constexpr uint32_t kSize = 8;
+  // set to 0
+  uint32_t write_index() const { return guest::LoadU32(base, address + 0); }
+  void set_write_index(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t write_index_address() const { return address + 0; }
+  // the value the line is filled with
+  float fill() const { return guest::LoadFloat(base, address + 4); }
+  void set_fill(float v) const { guest::StoreFloat(base, address + 4, v); }
+  uint32_t fill_address() const { return address + 4; }
+  // the line's floats (stored eight at a time)
+  uint32_t line_address() const { return address + 8; }
+};
+
+// embedded; measure: sub_824624F8.r3
+struct ReverbEarlyStage : View {
+  using View::View;
+  static constexpr uint32_t kSize = 28;
+  float unknown_4() const { return guest::LoadFloat(base, address + 4); }
+  void set_unknown_4(float v) const { guest::StoreFloat(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  uint32_t unknown_12() const { return guest::LoadU32(base, address + 12); }
+  void set_unknown_12(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+  uint32_t unknown_16() const { return guest::LoadU32(base, address + 16); }
+  void set_unknown_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+  float unknown_20() const { return guest::LoadFloat(base, address + 20); }
+  void set_unknown_20(float v) const { guest::StoreFloat(base, address + 20, v); }
+  uint32_t unknown_20_address() const { return address + 20; }
+  uint32_t unknown_24() const { return guest::LoadU32(base, address + 24); }
+  void set_unknown_24(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
+  uint32_t unknown_24_address() const { return address + 24; }
+};
+
+// embedded; measure: sub_82463578.r3
+struct ReverbTwoTapLine : View {
+  using View::View;
+  static constexpr uint32_t kSize = 28;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  float unknown_4() const { return guest::LoadFloat(base, address + 4); }
+  void set_unknown_4(float v) const { guest::StoreFloat(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  float unknown_8() const { return guest::LoadFloat(base, address + 8); }
+  void set_unknown_8(float v) const { guest::StoreFloat(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  uint32_t unknown_12() const { return guest::LoadU32(base, address + 12); }
+  void set_unknown_12(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+  float unknown_16() const { return guest::LoadFloat(base, address + 16); }
+  void set_unknown_16(float v) const { guest::StoreFloat(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+  float unknown_20() const { return guest::LoadFloat(base, address + 20); }
+  void set_unknown_20(float v) const { guest::StoreFloat(base, address + 20, v); }
+  uint32_t unknown_20_address() const { return address + 20; }
+  uint32_t write_index() const { return guest::LoadU32(base, address + 24); }
+  void set_write_index(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
+  uint32_t write_index_address() const { return address + 24; }
 };
 
 // The image words docs/functions/xaudio-objects.md's code uses.

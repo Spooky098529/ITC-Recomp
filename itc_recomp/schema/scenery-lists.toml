@@ -106,7 +106,7 @@ fields = [
 # +256 on (models.toml's ModelShape); the measure files it as "Scenery.+0"
 # (a measure fault).
 [SceneryShapeStreams]
-measure = "Scenery.+0"
+measure = "PoolObject.+3792.+0"
 size = 28
 origin = "embedded"
 fields = [

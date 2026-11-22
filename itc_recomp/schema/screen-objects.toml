@@ -135,12 +135,8 @@ fields = [
 
 # A map node (48 bytes, UvMap::AllocateNodes).
 [ScreenObjectUvMapNode]
-measures = ["UvMap.+4", "UvMap.+4.+0", "UvMap.+4.+8", "UvMap.+4.+8.+0", "UvMap.+8",
-            "VideoOutput.+276", "VideoOutput.+276.+4",
-            "new<?>@UvMap::AllocateNodes.+4", "new<?>@UvMap::AllocateNodes.+4.+0",
-            "new<?>@UvMap::AllocateNodes.+4.+0.+8", "new<?>@UvMap::AllocateNodes.+4.+8",
-            "new<?>@UvMap::AllocateNodes.+4.+8.+0",
-            "UvMap::EraseSubtree.r4", "UvMap::EraseSubtree.r4.+0"]
+measure = "UvMap.+4"
+measures = ["UvMap.+4.+0", "UvMap.+4.+8", "UvMap.+4.+8.+0", "VideoOutput.+276", "new<?>@UvMap::AllocateNodes.+4", "new<?>@UvMap::AllocateNodes.+4.+0", "new<?>@UvMap::AllocateNodes.+4.+0.+8", "new<?>@UvMap::AllocateNodes.+4.+8", "new<?>@UvMap::AllocateNodes.+4.+8.+0", "UvMap::EraseSubtree.r4", "UvMap::EraseSubtree.r4.+0", "UvMap.+4.+0.+8"]
 size = 48
 origin = "allocated"
 fields = [
@@ -160,7 +156,8 @@ fields = [
 # The map's value ({double x, a UvColumn}, 20 bytes): UvMap::InsertUnique's
 # r5, UvMap::ConstructNode's r7.
 [ScreenObjectUvMapValue]
-measures = ["UvMap::InsertUnique.r5", "UvMap::ConstructNode.r7", "UvMap::ConstructNode.r7.+4"]
+measure = "UvMap::InsertUnique.r5"
+measures = ["UvMap::ConstructNode.r7", "UvMap::ConstructNode.r7@+8.+4"]
 size = 20
 origin = "embedded"
 fields = [
@@ -170,7 +167,6 @@ fields = [
   { name = "column", offset = 8, type = "bytes", count = 12, note = "a ScreenObjectUvColumn" },
   { name = "column_head", offset = 12, type = "ptr", to = "ScreenObjectUvColumnNode" },
   { name = "column_size", offset = 16, type = "u32" },
-  { name = "fault_column_head", offset = 8, type = "u32", note = "measure fault: a column's +8 met here" },
 ]
 
 # A column (std::map<double, {float u, v}>, 12 bytes): a map node's +24.
@@ -307,3 +303,16 @@ degree = { address = 0x82002948, type = "f32", note = "pi / 180 (BuildRings)" }
 ring_step = { address = 0x82008810, type = "f32", note = "0.035 (BuildRings: the radius step)" }
 one = { address = 0x82000A30, type = "f32", note = "1.0 (SetSpeed's clamp)" }
 zero = { address = 0x82000A34, type = "f32", note = "0.0 (SetSpeed's clamp)" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from ScreenObjectUvMapValue.
+[ScreenObjectUvMapValueAt8]
+measure = "UvMap::ConstructNode.r7@+8"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]

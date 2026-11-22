@@ -73,14 +73,6 @@ struct RaceScreens : View {
   uint32_t flags() const { return guest::LoadU32(base, address + 8); }
   void set_flags(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t flags_address() const { return address + 8; }
-  // measure fault: sub_822159F0's r3 is the holder's +656 (SplitHud +336)
-  uint32_t fault_split_countdown_running() const { return guest::LoadU32(base, address + 336); }
-  void set_fault_split_countdown_running(uint32_t v) const { guest::StoreU32(base, address + 336, v); }
-  uint32_t fault_split_countdown_running_address() const { return address + 336; }
-  // measure fault: sub_82216810's and sub_82216830's r3 is the holder's +656 (SplitHud +340)
-  uint32_t fault_split_mode() const { return guest::LoadU32(base, address + 340); }
-  void set_fault_split_mode(uint32_t v) const { guest::StoreU32(base, address + 340, v); }
-  uint32_t fault_split_mode_address() const { return address + 340; }
   // the race HUD's +424 (signs on): 1 by CloseResults, 0 by OnRaceEnd
   uint32_t hud_signs_on() const { return guest::LoadU32(base, address + 440); }
   void set_hud_signs_on(uint32_t v) const { guest::StoreU32(base, address + 440, v); }
@@ -95,14 +87,6 @@ struct RaceScreens : View {
   void set_hud_results(const View& v) const { guest::StoreU32(base, address + 460, v.address); }
   void set_hud_results(uint32_t v) const { guest::StoreU32(base, address + 460, v); }
   uint32_t hud_results_address() const { return address + 460; }
-  // measure fault: sub_82212A38's r3 is the holder's +16 (the HUD's movie +612)
-  uint32_t fault_hud_countdown_movie() const { return guest::LoadU32(base, address + 612); }
-  void set_fault_hud_countdown_movie(uint32_t v) const { guest::StoreU32(base, address + 612, v); }
-  uint32_t fault_hud_countdown_movie_address() const { return address + 612; }
-  // measure fault: sub_822126C8's, sub_82212868's and sub_82212AE8's r3 is the holder's +16 (the HUD's movie +620)
-  uint32_t fault_hud_movie2() const { return guest::LoadU32(base, address + 620); }
-  void set_fault_hud_movie2(uint32_t v) const { guest::StoreU32(base, address + 620, v); }
-  uint32_t fault_hud_movie2_address() const { return address + 620; }
   // measure fault: RaceUpdate's post, the race mode's dispatcher's ring count (+804)
   uint32_t fault_ring_count() const { return guest::LoadU32(base, address + 820); }
   void set_fault_ring_count(uint32_t v) const { guest::StoreU32(base, address + 820, v); }
@@ -168,7 +152,7 @@ struct RaceHudMachineDispatcher : View {
   uint32_t ring_start_address() const { return address + 808; }
 };
 
-// embedded; measure: RacerRecords::At.ret, Vehicle::Get.ret.+5712, RaceHud.+344, sub_82215A50.r3.+344, sub_82216908.r3.+344, sub_82216950.r3.+344
+// embedded; measure: RacerRecords::At.ret, Vehicle::Get.ret.+5712, sub_82215A50.r3.+344, sub_82216908.r3.+344, sub_82216950.r3.+344, RaceScreens@+656.+344
 struct RacerResultsRecord : View {
   using View::View;
   static constexpr uint32_t kSize = 3936;

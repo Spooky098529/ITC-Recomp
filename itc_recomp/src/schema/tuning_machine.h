@@ -589,6 +589,24 @@ struct TuningMachineMode : View {
   uint32_t message_start_address() const { return address + 808; }
 };
 
+// embedded; measure: TuningMachine@+30800
+struct TuningMachineScreenAt30800 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 16;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  float unknown_8() const { return guest::LoadFloat(base, address + 8); }
+  void set_unknown_8(float v) const { guest::StoreFloat(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  float unknown_12() const { return guest::LoadFloat(base, address + 12); }
+  void set_unknown_12(float v) const { guest::StoreFloat(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+};
+
 // The image words docs/functions/tuning-machine.md's code uses.
 struct TuningMachineGlobals {
   // 0.0 (as bits)

@@ -9,6 +9,7 @@
 #include "schema/camera_modes.h"
 #include "schema/car_dealer.h"
 #include "schema/car_physics.h"
+#include "schema/career.h"
 #include "schema/front_end_car_draw.h"
 #include "schema/garage_screen.h"
 #include "schema/menu_helpers.h"
@@ -21,7 +22,6 @@
 #include "schema/race_world.h"
 #include "schema/save_screen.h"
 #include "schema/stand_models.h"
-#include "schema/tuning_screen.h"
 #include "schema/type2_screens.h"
 #include "schema/ui_movies.h"
 #include "schema/ui_movies_game.h"
@@ -7208,7 +7208,7 @@ lifted::Result f8216D270(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r10,-32024(r10)
   r10 = guest::LoadU32(base, uint32_t(r10) + -32024);
   // lwz r10,2196(r10)
-  r10 = guest::LoadU32(base, schema::RaceProgress(base, uint32_t(r10)).e0_place_address());
+  r10 = guest::LoadU32(base, schema::RaceProgressPart(base, uint32_t(r10)).unknown_2196_address());
   // stw r10,96(r1)
   guest::StoreU32(base, uint32_t(r1) + 96, uint32_t(r10));
   // lwz r3,1028(r11)
@@ -11219,7 +11219,7 @@ lifted::Result f82192958(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r30,0(r10)
   r30 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r10)).value_address());
   // lha r29,6328(r11)
-  r29 = uint64_t(int64_t(int16_t(guest::LoadU16(base, schema::DayBlock(base, uint32_t(r11)).unknown_6328_address()))));
+  r29 = uint64_t(int64_t(int16_t(guest::LoadU16(base, schema::CareerSave(base, uint32_t(r11)).garage_count_address()))));
   // bl 0x82116d88
   // (left out: dead in C++)
   r3 = game::Garage::Sell(base, r1, r13, r3, r4);
@@ -11234,7 +11234,7 @@ lifted::Result f82192958(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // ori r9,r10,38527
   r9 = r10 | 38527;
   // lwz r10,6116(r11)
-  r10 = guest::LoadU32(base, schema::DayBlock(base, uint32_t(r11)).money_address());
+  r10 = guest::LoadU32(base, schema::CareerSave(base, uint32_t(r11)).money_address());
   // add r10,r10,r4
   r10 = r10 + r4;
   // cmpw cr6,r10,r9
@@ -11247,7 +11247,7 @@ loc_821929F4:
   // addi r3,r11,48
   r3 = uint64_t(int64_t(int64_t(r11) + 48));
   // stw r10,6116(r11)
-  guest::StoreU32(base, schema::DayBlock(base, uint32_t(r11)).money_address(), uint32_t(r10));
+  guest::StoreU32(base, schema::CareerSave(base, uint32_t(r11)).money_address(), uint32_t(r10));
   // bl 0x82110b18
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x82110B18, LIFTED_ARGS(0x82192A00, r31)); r3 = o.r3; f1 = o.f1; }
@@ -11262,7 +11262,7 @@ loc_821929F4:
   // lwz r10,36(r11)
   r10 = guest::LoadU32(base, schema::GarageScreenData(base, uint32_t(r11)).save_address());
   // lwz r10,6116(r10)
-  r10 = guest::LoadU32(base, schema::DayBlock(base, uint32_t(r10)).money_address());
+  r10 = guest::LoadU32(base, schema::CareerSave(base, uint32_t(r10)).money_address());
   // stw r10,24(r11)
   guest::StoreU32(base, schema::GarageScreenData(base, uint32_t(r11)).money_address(), uint32_t(r10));
   // lwz r11,-31700(r31)
@@ -11427,7 +11427,7 @@ loc_82192AE4:
   r11 = r9 + r11;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // lha r9,204(r10)
-  r9 = uint64_t(int64_t(int16_t(guest::LoadU16(base, schema::DayBlock(base, uint32_t(r10) - 6120).unknown_6324_address()))));
+  r9 = uint64_t(int64_t(int16_t(guest::LoadU16(base, schema::CareerSave(base, uint32_t(r10) - 6120).garage_head_address()))));
   // b 0x82192b58
   goto loc_82192B58;
 loc_82192B50:
@@ -11464,7 +11464,7 @@ loc_82192B58:
   ctr = r9;
 loc_82192B88:
   // lwz r10,0(r8)
-  r10 = guest::LoadU32(base, schema::PlateEditor(base, uint32_t(r8) - 4).transitions_address() + 4);
+  r10 = guest::LoadU32(base, schema::PlateEditorPart(base, uint32_t(r8) - 4).unknown_4_address());
   // addi r8,r8,4
   r8 = uint64_t(int64_t(int64_t(r8) + 4));
   // stw r10,0(r11)
@@ -11899,7 +11899,7 @@ lifted::Result f82198830(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31688(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31688);
   // stw r3,20(r11)
-  guest::StoreU32(base, schema::PlateEditor(base, uint32_t(r11)).transitions_address() + 20, uint32_t(r3));
+  guest::StoreU32(base, schema::PlateEditorPart(base, uint32_t(r11)).unknown_20_address(), uint32_t(r3));
   // lwz r11,-31696(r28)
   r11 = guest::LoadU32(base, uint32_t(r28) + -31696);
   // lwz r10,0(r11)
@@ -12103,7 +12103,7 @@ lifted::Result f82198B58(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r10,-31688(r10)
   r10 = guest::LoadU32(base, uint32_t(r10) + -31688);
   // lwz r10,52(r10)
-  r10 = guest::LoadU32(base, schema::PlateEditor(base, uint32_t(r10)).transitions_address() + 52);
+  r10 = guest::LoadU32(base, schema::PlateEditorPart(base, uint32_t(r10)).unknown_52_address());
   // li r7,0
   r7 = uint64_t(int64_t(0));
   // li r6,0
@@ -12748,7 +12748,7 @@ lifted::Result f82199E48(uint8_t* base, uint64_t r1, uint64_t r13) {
   // lwz r11,-31688(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31688);
   // lwz r4,20(r11)
-  r4 = guest::LoadU32(base, schema::PlateEditor(base, uint32_t(r11)).transitions_address() + 20);
+  r4 = guest::LoadU32(base, schema::PlateEditorPart(base, uint32_t(r11)).unknown_20_address());
   // bl 0x8220bc30
   // (left out: dead in C++)
   { const lifted::Result o = game::MenuList::SetSelection(base, LIFTED_ARGS(0x82199EA4, r31)); r3 = o.r3; f1 = o.f1; }
@@ -12848,7 +12848,7 @@ lifted::Result f8219A450(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mulli r9,r10,3
   r9 = uint64_t(int64_t(static_cast<int64_t>(r10 * static_cast<uint64_t>(3))));
   // lwz r11,52(r6)
-  r11 = guest::LoadU32(base, schema::PlateEditor(base, uint32_t(r6)).transitions_address() + 52);
+  r11 = guest::LoadU32(base, schema::PlateEditorPart(base, uint32_t(r6)).unknown_52_address());
   // add r28,r7,r11
   r28 = r7 + r11;
   // subf r26,r10,r31
@@ -12887,14 +12887,14 @@ loc_8219A4EC:
   // bge cr6,0x8219a510
   if (!cr6.lt) goto loc_8219A510;
   // stw r11,52(r6)
-  guest::StoreU32(base, schema::PlateEditor(base, uint32_t(r6)).transitions_address() + 52, uint32_t(r11));
+  guest::StoreU32(base, schema::PlateEditorPart(base, uint32_t(r6)).unknown_52_address(), uint32_t(r11));
   // b 0x8219a51c
   goto loc_8219A51C;
 loc_8219A510:
   // li r30,13
   r30 = uint64_t(int64_t(13));
   // stw r25,52(r6)
-  guest::StoreU32(base, schema::PlateEditor(base, uint32_t(r6)).transitions_address() + 52, uint32_t(r25));
+  guest::StoreU32(base, schema::PlateEditorPart(base, uint32_t(r6)).unknown_52_address(), uint32_t(r25));
   // addi r29,r10,1
   r29 = uint64_t(int64_t(int64_t(r10) + 1));
 loc_8219A51C:
@@ -13087,7 +13087,7 @@ lifted::Result f8219A6B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,28(r9)
   r11 = guest::LoadU32(base, schema::MenuList(base, uint32_t(r9)).side_address());
   // lwz r31,52(r8)
-  r31 = guest::LoadU32(base, schema::PlateEditor(base, uint32_t(r8)).transitions_address() + 52);
+  r31 = guest::LoadU32(base, schema::PlateEditorPart(base, uint32_t(r8)).unknown_52_address());
   // add. r11,r11,r31
   r11 = r11 + r31;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -13116,7 +13116,7 @@ loc_8219A744:
   // bge cr6,0x8219a75c
   if (!cr6.lt) goto loc_8219A75C;
   // stw r11,52(r8)
-  guest::StoreU32(base, schema::PlateEditor(base, uint32_t(r8)).transitions_address() + 52, uint32_t(r11));
+  guest::StoreU32(base, schema::PlateEditorPart(base, uint32_t(r8)).unknown_52_address(), uint32_t(r11));
   // b 0x8219a770
   goto loc_8219A770;
 loc_8219A75C:
@@ -13130,7 +13130,7 @@ loc_8219A75C:
   // mr r29,r28
   r29 = r28;
   // stw r31,52(r11)
-  guest::StoreU32(base, schema::PlateEditor(base, uint32_t(r11)).transitions_address() + 52, uint32_t(r31));
+  guest::StoreU32(base, schema::PlateEditorPart(base, uint32_t(r11)).unknown_52_address(), uint32_t(r31));
 loc_8219A770:
   // lwz r9,-31688(r30)
   r9 = guest::LoadU32(base, uint32_t(r30) + -31688);
@@ -13139,7 +13139,7 @@ loc_8219A770:
   // addi r10,r1,88
   r10 = uint64_t(int64_t(int64_t(r1) + 88));
   // lwz r8,56(r9)
-  r8 = guest::LoadU32(base, schema::PlateEditor(base, uint32_t(r9)).transitions_address() + 56);
+  r8 = guest::LoadU32(base, schema::PlateEditorPart(base, uint32_t(r9)).unknown_56_address());
 loc_8219A780:
   // cmpw cr6,r8,r11
   cr6 = lifted::Compare<int32_t>(int32_t(r8), int32_t(r11), so);
@@ -13153,7 +13153,7 @@ loc_8219A790:
   // add r7,r9,r11
   r7 = r9 + r11;
   // lbz r7,6(r7)
-  r7 = guest::LoadU8(base, schema::PlateEditor(base, uint32_t(r7)).transitions_address() + 6);
+  r7 = guest::LoadU8(base, schema::PlateEditorPart(base, uint32_t(r7)).unknown_6_address());
   // extsb r7,r7
   r7 = uint64_t(int64_t(int8_t(r7)));
   // stw r7,0(r10)
@@ -13294,7 +13294,7 @@ lifted::Result f8219A8E0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r10,-31688(r31)
   r10 = guest::LoadU32(base, uint32_t(r31) + -31688);
   // lwz r10,52(r10)
-  r10 = guest::LoadU32(base, schema::PlateEditor(base, uint32_t(r10)).transitions_address() + 52);
+  r10 = guest::LoadU32(base, schema::PlateEditorPart(base, uint32_t(r10)).unknown_52_address());
   // add r11,r10,r11
   r11 = r10 + r11;
   // addi r4,r11,15
@@ -13476,7 +13476,7 @@ lifted::Result f8219AAB0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // subf r26,r10,r31
   r26 = r31 - r10;
   // lwz r11,52(r6)
-  r11 = guest::LoadU32(base, schema::PlateEditor(base, uint32_t(r6)).transitions_address() + 52);
+  r11 = guest::LoadU32(base, schema::PlateEditorPart(base, uint32_t(r6)).unknown_52_address());
   // mulli r9,r9,10
   r9 = uint64_t(int64_t(static_cast<int64_t>(r9 * static_cast<uint64_t>(10))));
   // add. r10,r7,r11
@@ -13522,7 +13522,7 @@ loc_8219AB50:
   r29 = uint64_t(int64_t(int64_t(r11) + 7));
 loc_8219AB78:
   // stw r10,52(r6)
-  guest::StoreU32(base, schema::PlateEditor(base, uint32_t(r6)).transitions_address() + 52, uint32_t(r10));
+  guest::StoreU32(base, schema::PlateEditorPart(base, uint32_t(r6)).unknown_52_address(), uint32_t(r10));
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // lwz r9,-31688(r5)
@@ -13530,7 +13530,7 @@ loc_8219AB78:
   // addi r10,r1,96
   r10 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r8,56(r9)
-  r8 = guest::LoadU32(base, schema::PlateEditor(base, uint32_t(r9)).transitions_address() + 56);
+  r8 = guest::LoadU32(base, schema::PlateEditorPart(base, uint32_t(r9)).unknown_56_address());
 loc_8219AB8C:
   // cmpw cr6,r8,r11
   cr6 = lifted::Compare<int32_t>(int32_t(r8), int32_t(r11), so);
@@ -13544,7 +13544,7 @@ loc_8219AB9C:
   // add r7,r9,r11
   r7 = r9 + r11;
   // lbz r7,9(r7)
-  r7 = guest::LoadU8(base, schema::PlateEditor(base, uint32_t(r7)).transitions_address() + 9);
+  r7 = guest::LoadU8(base, schema::PlateEditorPart(base, uint32_t(r7)).unknown_9_address());
   // extsb r7,r7
   r7 = uint64_t(int64_t(int8_t(r7)));
   // stw r7,0(r10)
@@ -13737,7 +13737,7 @@ lifted::Result f8219AD68(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r7,r11,9
   r7 = uint64_t(int64_t(int64_t(r11) + 9));
   // lwz r9,52(r11)
-  r9 = guest::LoadU32(base, schema::PlateEditor(base, uint32_t(r11)).transitions_address() + 52);
+  r9 = guest::LoadU32(base, schema::PlateEditorPart(base, uint32_t(r11)).unknown_52_address());
   // mulli r11,r3,10
   r11 = uint64_t(int64_t(static_cast<int64_t>(r3 * static_cast<uint64_t>(10))));
   // add r30,r9,r11
@@ -13789,7 +13789,7 @@ loc_8219ADD0:
   // li r10,2
   r10 = uint64_t(int64_t(2));
   // stw r10,56(r11)
-  guest::StoreU32(base, schema::PlateEditor(base, uint32_t(r11)).transitions_address() + 56, uint32_t(r10));
+  guest::StoreU32(base, schema::PlateEditorPart(base, uint32_t(r11)).unknown_56_address(), uint32_t(r10));
   // bl 0x82199cc8
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x82199CC8, LIFTED_ARGS(0x8219AE2C, r31)); r3 = o.r3; f1 = o.f1; }
@@ -13909,7 +13909,7 @@ lifted::Result f8219AE90(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r10,-31688(r10)
   r10 = guest::LoadU32(base, uint32_t(r10) + -31688);
   // lwz r10,52(r10)
-  r10 = guest::LoadU32(base, schema::PlateEditor(base, uint32_t(r10)).transitions_address() + 52);
+  r10 = guest::LoadU32(base, schema::PlateEditorPart(base, uint32_t(r10)).unknown_52_address());
   // add r11,r10,r11
   r11 = r10 + r11;
   // addi r4,r11,27
@@ -14041,7 +14041,7 @@ lifted::Result f8219AF50(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r10,3
   r10 = uint64_t(int64_t(3));
   // stw r10,56(r11)
-  guest::StoreU32(base, schema::PlateEditor(base, uint32_t(r11)).transitions_address() + 56, uint32_t(r10));
+  guest::StoreU32(base, schema::PlateEditorPart(base, uint32_t(r11)).unknown_56_address(), uint32_t(r10));
   // bl 0x82199d88
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x82199D88, LIFTED_ARGS(0x8219AFD4, r31)); r3 = o.r3; f1 = o.f1; }
@@ -14102,7 +14102,7 @@ loc_8219B010:
   // lwz r11,-31688(r29)
   r11 = guest::LoadU32(base, uint32_t(r29) + -31688);
   // lwz r3,60(r11)
-  r3 = guest::LoadU32(base, schema::PlateEditor(base, uint32_t(r11)).transitions_address() + 60);
+  r3 = guest::LoadU32(base, schema::PlateEditorPart(base, uint32_t(r11)).unknown_60_address());
   // bl 0x82199688
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x82199688, LIFTED_ARGS(0x8219B044, r31)); r3 = o.r3; f1 = o.f1; }

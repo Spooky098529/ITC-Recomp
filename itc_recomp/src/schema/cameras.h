@@ -782,6 +782,66 @@ struct CameraVector4 : View {
   uint32_t zw_address() const { return address + 8; }
 };
 
+// embedded; measure: Camera@+368
+struct CameraPassAt368 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  float unknown_0() const { return guest::LoadFloat(base, address + 0); }
+  void set_unknown_0(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: Camera@+384
+struct CameraPassAt384 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  float unknown_0() const { return guest::LoadFloat(base, address + 0); }
+  void set_unknown_0(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: Camera@+388
+struct CameraPassAt388 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  float unknown_0() const { return guest::LoadFloat(base, address + 0); }
+  void set_unknown_0(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: Camera@+392
+struct CameraPassAt392 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  float unknown_0() const { return guest::LoadFloat(base, address + 0); }
+  void set_unknown_0(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: CourseView@+592
+struct CourseViewAt592 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 16;
+  uint64_t unknown_0() const { return guest::LoadU64(base, address + 0); }
+  void set_unknown_0(uint64_t v) const { guest::StoreU64(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint64_t unknown_8() const { return guest::LoadU64(base, address + 8); }
+  void set_unknown_8(uint64_t v) const { guest::StoreU64(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+};
+
+// embedded; measure: CourseView@+608
+struct CourseViewAt608 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 16;
+  uint64_t unknown_0() const { return guest::LoadU64(base, address + 0); }
+  void set_unknown_0(uint64_t v) const { guest::StoreU64(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint64_t unknown_8() const { return guest::LoadU64(base, address + 8); }
+  void set_unknown_8(uint64_t v) const { guest::StoreU64(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+};
+
 // The image words docs/functions/cameras.md's code uses.
 struct CamerasGlobals {
   // CameraPasses::SetMode's: 0 a 2D render target 1, 1 a cube map

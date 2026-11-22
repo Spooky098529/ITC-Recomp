@@ -205,10 +205,6 @@ struct MinimapRacerEntry : View {
   uint32_t flags() const { return guest::LoadU32(base, address + 0); }
   void set_flags(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t flags_address() const { return address + 0; }
-  // measure fault: Minimap::Scaling's r3 is its out matrix (the x scale)
-  float fault_scaling_m00() const { return guest::LoadFloat(base, address + 0); }
-  void set_fault_scaling_m00(float v) const { guest::StoreFloat(base, address + 0, v); }
-  uint32_t fault_scaling_m00_address() const { return address + 0; }
   // the entry's number (race-world.md)
   uint32_t number() const { return guest::LoadU32(base, address + 4); }
   void set_number(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
@@ -237,10 +233,6 @@ struct MinimapRacerEntry : View {
   uint32_t vehicle_index() const { return guest::LoadU32(base, address + 20); }
   void set_vehicle_index(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
   uint32_t vehicle_index_address() const { return address + 20; }
-  // measure fault: Minimap::Scaling's out matrix (the y scale)
-  float fault_scaling_m11() const { return guest::LoadFloat(base, address + 20); }
-  void set_fault_scaling_m11(float v) const { guest::StoreFloat(base, address + 20, v); }
-  uint32_t fault_scaling_m11_address() const { return address + 20; }
   // its racer record's index in the race data's +48 (3,936 bytes each)
   uint32_t record() const { return guest::LoadU32(base, address + 24); }
   void set_record(uint32_t v) const { guest::StoreU32(base, address + 24, v); }

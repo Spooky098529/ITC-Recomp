@@ -1215,7 +1215,7 @@ struct StandHolder : View {
   uint32_t model_made_address() const { return address + 20; }
 };
 
-// embedded; measure: DayBlock
+// embedded; measure: DayBlock, EventCondition::FloatAtLeast.r4, GarageScreen::SetCarRow.r4, CarPanel::ShowCarStats.r4
 struct DayBlock : View {
   using View::View;
   static constexpr uint32_t kSize = 104824;
@@ -1302,6 +1302,48 @@ struct TuningScreenCategoryWord : View {
   uint32_t pressed_slot() const { return guest::LoadU32(base, address + 40); }
   void set_pressed_slot(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
   uint32_t pressed_slot_address() const { return address + 40; }
+};
+
+// embedded; measure: Progress@+129104
+struct DayBlockAt129104 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 12;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+};
+
+// embedded; measure: Progress@+6120
+struct DayBlockAt6120 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 206;
+  uint16_t unknown_204() const { return guest::LoadU16(base, address + 204); }
+  void set_unknown_204(uint16_t v) const { guest::StoreU16(base, address + 204, v); }
+  uint32_t unknown_204_address() const { return address + 204; }
+};
+
+// embedded; measure: TuningScreen@+30832
+struct TuningScreenAt30832 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 20;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  float unknown_8() const { return guest::LoadFloat(base, address + 8); }
+  void set_unknown_8(float v) const { guest::StoreFloat(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  float unknown_12() const { return guest::LoadFloat(base, address + 12); }
+  void set_unknown_12(float v) const { guest::StoreFloat(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+  uint32_t unknown_16() const { return guest::LoadU32(base, address + 16); }
+  void set_unknown_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
 };
 
 // The image words docs/functions/tuning-screen.md's code uses.

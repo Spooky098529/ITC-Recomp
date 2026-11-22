@@ -75,7 +75,7 @@ fields = [
 # The 33 floats PowerCurve::Build is given (the car data's +1292): 32 torque
 # points and the torque's scale.
 [PowerCurvePoints]
-measure = "PowerCurve::Build.r4"
+measure = "PowerCurve::FromEngine.r4@+24"
 size = 132
 origin = "embedded"
 fields = [

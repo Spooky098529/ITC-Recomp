@@ -47,7 +47,7 @@ struct FileVtable : View {
   uint32_t get_size_address() const { return address + 20; }
 };
 
-// embedded; measure: File::Read.r5, File::Write.r5
+// embedded; measure: File::Write.r5, sub_8209DFA8.r3@+68
 struct FileSizeArg : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
@@ -263,7 +263,7 @@ struct XContentData : View {
   uint32_t file_name_address() const { return address + 264; }
 };
 
-// allocated; measure: SaveSlot::WriteFile.r4, SaveSlot::ReadFile.r4, SaveSlot::WaitEnumerate.r4, SaveSlot::Create.r4, SaveSlot::Delete.r4, SaveSlot::LoadStep.r4, SaveSlot::OpenItem.r4, SaveSlot::SaveStep.r4, SaveSlot::ShowDeviceSelector.r4, SaveSlot::WaitDeviceSelector.r4, sub_820A4508.r3, sub_820A5660.r3, SaveSlot::CheckStep.r4, SaveSlot::DeleteStep.r4, SaveSlot::EnumerateStep.r4, SaveSlot::Failed.r4, SaveSlot::Ready.r4, SaveSlot::WaitClose.r4, SaveSlot::WaitForDevice.r4, SaveSlot::WaitForUser.r4, SlotArray.+0
+// allocated; measure: SaveSlot::WaitEnumerate.r4, SaveSlot::Create.r4, SaveSlot::Delete.r4, SaveSlot::LoadStep.r4, SaveSlot::OpenItem.r4, SaveSlot::SaveStep.r4, SaveSlot::ShowDeviceSelector.r4, SaveSlot::WaitDeviceSelector.r4, sub_820A4508.r3, sub_820A5660.r3, SaveSlot::CheckStep.r4, SaveSlot::DeleteStep.r4, SaveSlot::EnumerateStep.r4, SaveSlot::Failed.r4, SaveSlot::Ready.r4, SaveSlot::WaitClose.r4, SaveSlot::WaitForDevice.r4, SaveSlot::WaitForUser.r4, SlotArray.+0, SaveSlot::WaitWrite.r4, SaveSlot::WriteFile.r4@+500, SaveSlot::WaitRead.r4, SaveSlot::ReadFile.r4@+500, SaveSlot::ReadFile.r4@+472
 struct SaveSlot : View {
   using View::View;
   static constexpr uint32_t kSize = 1000;
@@ -418,6 +418,15 @@ struct ArchiveStreamerVtable : View {
   uint32_t on_init() const { return guest::LoadU32(base, address + 4); }
   void set_on_init(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t on_init_address() const { return address + 4; }
+};
+
+// embedded; measure: SaveSlot::Enumerate.r4@+92
+struct SaveSlotAt92 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
 };
 
 }  // namespace schema

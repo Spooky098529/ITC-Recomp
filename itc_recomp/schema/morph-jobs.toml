@@ -132,7 +132,8 @@ fields = [
 # A word array of the skinning record: the influence counts (+0) or the bone
 # indices (+8); the measure sees its first two words.
 [SkinIndexList]
-measures = ["MorphJob.+8", "sub_8258AC58.r3.+0", "sub_8258ADA0.r3.+0", "sub_8258B1C0.r3.+0", "sub_8258B368.r3.+0", "sub_8258AC58.r3.+8", "sub_8258ADA0.r3.+8", "sub_8258B1C0.r3.+8", "sub_8258B368.r3.+8"]
+measure = "sub_8258AC58.r3.+0"
+measures = ["sub_8258ADA0.r3.+0", "sub_8258B1C0.r3.+0", "sub_8258B368.r3.+0", "sub_8258AC58.r3.+8", "sub_8258ADA0.r3.+8", "sub_8258B1C0.r3.+8", "sub_8258B368.r3.+8", "MorphJob@+8.+8"]
 size = 8
 origin = "embedded"
 fields = [
@@ -143,10 +144,42 @@ fields = [
 # A vertex stream of the skinning record (the source or destination
 # positions); the measure sees one float of it.
 [SkinVertexStream]
-measures = ["MorphJob.+20", "MorphJob.+24", "sub_8258B368.r3.+12", "sub_8258B368.r3.+16"]
+measure = "sub_8258B368.r3.+12"
+measures = ["sub_8258B368.r3.+16", "MorphJob@+8.+20", "MorphJob@+8.+24"]
 size = 48
 origin = "embedded"
 fields = [
   { name = "float_28", offset = 28, type = "f32", note = "not read in detail" },
   { name = "float_44", offset = 44, type = "f32", note = "not read in detail" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from MorphJob.
+[MorphJobAt8]
+measure = "MorphJob@+8"
+size = 48
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_36", offset = 36, type = "u32" },
+  { name = "unknown_40", offset = 40, type = "u32" },
+  { name = "unknown_44", offset = 44, type = "u32" },
+]
+
+# Split from MorphJobVtable.
+[MorphJobVtablePart]
+measure = "MorphJob@+8.+0"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
 ]

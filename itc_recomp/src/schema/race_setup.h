@@ -969,7 +969,7 @@ struct LapRecord : View {
   uint32_t unknown_72_address() const { return address + 72; }
 };
 
-// embedded; measure: sub_82101EB0.r3, sub_82101D20.r3
+// embedded; measure: sub_82101D20.r3, sub_82101F68.r3@+4
 struct RaceDataEntry : View {
   using View::View;
   static constexpr uint32_t kSize = 972;
@@ -1085,6 +1085,54 @@ struct RaceDataRecord : View {
   uint32_t unknown_3932() const { return guest::LoadU32(base, address + 3932); }
   void set_unknown_3932(uint32_t v) const { guest::StoreU32(base, address + 3932, v); }
   uint32_t unknown_3932_address() const { return address + 3932; }
+};
+
+// embedded; measure: Car@+1568
+struct CarAt1568 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 20;
+  uint8_t unknown_0() const { return guest::LoadU8(base, address + 0); }
+  void set_unknown_0(uint8_t v) const { guest::StoreU8(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint8_t unknown_1() const { return guest::LoadU8(base, address + 1); }
+  void set_unknown_1(uint8_t v) const { guest::StoreU8(base, address + 1, v); }
+  uint32_t unknown_1_address() const { return address + 1; }
+  uint8_t unknown_2() const { return guest::LoadU8(base, address + 2); }
+  void set_unknown_2(uint8_t v) const { guest::StoreU8(base, address + 2, v); }
+  uint32_t unknown_2_address() const { return address + 2; }
+  uint8_t unknown_3() const { return guest::LoadU8(base, address + 3); }
+  void set_unknown_3(uint8_t v) const { guest::StoreU8(base, address + 3, v); }
+  uint32_t unknown_3_address() const { return address + 3; }
+  uint8_t unknown_4() const { return guest::LoadU8(base, address + 4); }
+  void set_unknown_4(uint8_t v) const { guest::StoreU8(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint8_t unknown_5() const { return guest::LoadU8(base, address + 5); }
+  void set_unknown_5(uint8_t v) const { guest::StoreU8(base, address + 5, v); }
+  uint32_t unknown_5_address() const { return address + 5; }
+  uint8_t unknown_6() const { return guest::LoadU8(base, address + 6); }
+  void set_unknown_6(uint8_t v) const { guest::StoreU8(base, address + 6, v); }
+  uint32_t unknown_6_address() const { return address + 6; }
+  uint8_t unknown_7() const { return guest::LoadU8(base, address + 7); }
+  void set_unknown_7(uint8_t v) const { guest::StoreU8(base, address + 7, v); }
+  uint32_t unknown_7_address() const { return address + 7; }
+  uint8_t unknown_8() const { return guest::LoadU8(base, address + 8); }
+  void set_unknown_8(uint8_t v) const { guest::StoreU8(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  uint8_t unknown_9() const { return guest::LoadU8(base, address + 9); }
+  void set_unknown_9(uint8_t v) const { guest::StoreU8(base, address + 9, v); }
+  uint32_t unknown_9_address() const { return address + 9; }
+  uint8_t unknown_10() const { return guest::LoadU8(base, address + 10); }
+  void set_unknown_10(uint8_t v) const { guest::StoreU8(base, address + 10, v); }
+  uint32_t unknown_10_address() const { return address + 10; }
+  uint8_t unknown_11() const { return guest::LoadU8(base, address + 11); }
+  void set_unknown_11(uint8_t v) const { guest::StoreU8(base, address + 11, v); }
+  uint32_t unknown_11_address() const { return address + 11; }
+  uint8_t unknown_12() const { return guest::LoadU8(base, address + 12); }
+  void set_unknown_12(uint8_t v) const { guest::StoreU8(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+  uint32_t unknown_16() const { return guest::LoadU32(base, address + 16); }
+  void set_unknown_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
 };
 
 // The image words docs/functions/race-setup.md's code uses.

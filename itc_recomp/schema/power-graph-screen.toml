@@ -100,3 +100,15 @@ pages = { address = 0x82815EB4, type = "ptr", to = "PageObject", note = "the pag
 menu = { address = 0x82815EB8, type = "ptr", to = "FrontEndMenu", note = "a front-end menu, +16 = 7" }
 data = { address = 0x82815EBC, type = "ptr", to = "PowerGraphScreenData" }
 shown = { address = 0x82815EC0, type = "u32", note = "the graph drawn while set (Step0's end); 0 from OnEnter, Open, Shown and Step1" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from PowerGraphScreenData.
+[PowerGraphScreenDataAt68]
+measure = "new<92>@PowerGraphScreen67::OnEnter@+68"
+size = 2
+origin = "embedded"
+fields = [
+  { name = "unknown_1", offset = 1, type = "u8" },
+]

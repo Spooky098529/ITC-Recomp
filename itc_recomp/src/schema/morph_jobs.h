@@ -311,7 +311,7 @@ struct SkinRecord : View {
   uint32_t stream_format_address() const { return address + 44; }
 };
 
-// embedded; measure: MorphJob.+8, sub_8258AC58.r3.+0, sub_8258ADA0.r3.+0, sub_8258B1C0.r3.+0, sub_8258B368.r3.+0, sub_8258AC58.r3.+8, sub_8258ADA0.r3.+8, sub_8258B1C0.r3.+8, sub_8258B368.r3.+8
+// embedded; measure: sub_8258AC58.r3.+0, sub_8258ADA0.r3.+0, sub_8258B1C0.r3.+0, sub_8258B368.r3.+0, sub_8258AC58.r3.+8, sub_8258ADA0.r3.+8, sub_8258B1C0.r3.+8, sub_8258B368.r3.+8, MorphJob@+8.+8
 struct SkinIndexList : View {
   using View::View;
   static constexpr uint32_t kSize = 8;
@@ -323,7 +323,7 @@ struct SkinIndexList : View {
   uint32_t entry_1_address() const { return address + 4; }
 };
 
-// embedded; measure: MorphJob.+20, MorphJob.+24, sub_8258B368.r3.+12, sub_8258B368.r3.+16
+// embedded; measure: sub_8258B368.r3.+12, sub_8258B368.r3.+16, MorphJob@+8.+20, MorphJob@+8.+24
 struct SkinVertexStream : View {
   using View::View;
   static constexpr uint32_t kSize = 48;
@@ -335,6 +335,54 @@ struct SkinVertexStream : View {
   float float_44() const { return guest::LoadFloat(base, address + 44); }
   void set_float_44(float v) const { guest::StoreFloat(base, address + 44, v); }
   uint32_t float_44_address() const { return address + 44; }
+};
+
+// embedded; measure: MorphJob@+8
+struct MorphJobAt8 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 48;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  uint32_t unknown_12() const { return guest::LoadU32(base, address + 12); }
+  void set_unknown_12(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+  uint32_t unknown_16() const { return guest::LoadU32(base, address + 16); }
+  void set_unknown_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+  uint32_t unknown_20() const { return guest::LoadU32(base, address + 20); }
+  void set_unknown_20(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
+  uint32_t unknown_20_address() const { return address + 20; }
+  uint32_t unknown_24() const { return guest::LoadU32(base, address + 24); }
+  void set_unknown_24(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
+  uint32_t unknown_24_address() const { return address + 24; }
+  uint32_t unknown_28() const { return guest::LoadU32(base, address + 28); }
+  void set_unknown_28(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
+  uint32_t unknown_28_address() const { return address + 28; }
+  uint32_t unknown_36() const { return guest::LoadU32(base, address + 36); }
+  void set_unknown_36(uint32_t v) const { guest::StoreU32(base, address + 36, v); }
+  uint32_t unknown_36_address() const { return address + 36; }
+  uint32_t unknown_40() const { return guest::LoadU32(base, address + 40); }
+  void set_unknown_40(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
+  uint32_t unknown_40_address() const { return address + 40; }
+  uint32_t unknown_44() const { return guest::LoadU32(base, address + 44); }
+  void set_unknown_44(uint32_t v) const { guest::StoreU32(base, address + 44, v); }
+  uint32_t unknown_44_address() const { return address + 44; }
+};
+
+// embedded; measure: MorphJob@+8.+0
+struct MorphJobVtablePart : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
 };
 
 }  // namespace schema

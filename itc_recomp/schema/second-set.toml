@@ -551,3 +551,91 @@ index_table = { address = 0x820044B0, type = "bytes", count = 2024, note = "44 b
 parts_names = { address = 0x826025F4, type = "bytes", count = 1064, note = "the parts', interior's, wheels' and traffic body's name tables (string pointers, to 0x82602A1B)" }
 cockpit_names = { address = 0x82005238, type = "bytes", count = 68, note = "the cockpit's name tables (to 0x8200527B)" }
 light_names = { address = 0x820055F0, type = "bytes", count = 216, note = "the light kit's three 18-name tables (to 0x820056C7)" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from SceneCockpit.
+[SceneCockpitAt4288]
+measure = "SceneCockpit@+4288"
+size = 24
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+]
+
+# Split from SceneInterior.
+[SceneInteriorAt11632]
+measure = "SceneInterior@+11632"
+size = 24
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+]
+
+# Split from SceneTraffic.
+[SceneTrafficAt9768]
+measure = "SceneTraffic@+9768"
+size = 24
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+]
+
+# Split from SecondSetWheelPoints.
+[SecondSetWheelPointsAt12]
+measure = "WheelPoints@+12"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+  { name = "unknown_16", offset = 16, type = "f32" },
+]
+
+# Split from SecondSetWheelPoints.
+[SecondSetWheelPointsAt328]
+measure = "WheelPoints@+328"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]
+
+# Split from SecondSetWheelPoints.
+[SecondSetWheelPointsAt352]
+measure = "WheelPoints@+352"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+]
+
+# Split from SecondSetWheelPoints.
+[SecondSetWheelPointsAt356]
+measure = "WheelPoints@+356"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+]

@@ -210,3 +210,18 @@ float_one = { address = 0x82000A30, type = "u32", note = "1.0 (as bits)" }
 axle_factor = { address = 0x820021E8, type = "f32", note = "the axles' factor in the weight (2.0 probably)" }
 torque_scale = { address = 0x8200ADA0, type = "f32", note = "the torque shown's scale" }
 fade_in_passes = { address = 0x82001BEC, type = "u32", note = "ScreenFades::FadeIn's pass count" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from TuningMachineScreen.
+[TuningMachineScreenAt30800]
+measure = "TuningMachine@+30800"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]

@@ -83,14 +83,6 @@ struct Movie : View {
   uint32_t state() const { return guest::LoadU32(base, address + 308); }
   void set_state(uint32_t v) const { guest::StoreU32(base, address + 308, v); }
   uint32_t state_address() const { return address + 308; }
-  // measure fault: strncpy's r3 is the movie + 48 (path), joined with the movie at +0
-  uint8_t fault_strncpy_0() const { return guest::LoadU8(base, address + 0); }
-  void set_fault_strncpy_0(uint8_t v) const { guest::StoreU8(base, address + 0, v); }
-  uint32_t fault_strncpy_0_address() const { return address + 0; }
-  // measure fault: strncpy's second byte store (path's +1)
-  uint8_t fault_strncpy_1() const { return guest::LoadU8(base, address + 1); }
-  void set_fault_strncpy_1(uint8_t v) const { guest::StoreU8(base, address + 1, v); }
-  uint32_t fault_strncpy_1_address() const { return address + 1; }
 };
 
 // image; measure: [826C1CDC].+0, sub_820AE808.r3.+0, sub_820AE818.r3.+0
@@ -617,7 +609,7 @@ struct MovieLibNew82483DC0 : View {
   uint32_t unknown_372_address() const { return address + 372; }
 };
 
-// embedded; measure: new<?>@sub_82486810
+// embedded; measure: new<?>@sub_82486810, sub_8248F218.r3
 struct MovieLibNew82486810 : View {
   using View::View;
   static constexpr uint32_t kSize = 344;
@@ -1337,6 +1329,99 @@ struct MovieLib8248CB58R3 : View {
   uint32_t unknown_120() const { return guest::LoadU32(base, address + 120); }
   void set_unknown_120(uint32_t v) const { guest::StoreU32(base, address + 120, v); }
   uint32_t unknown_120_address() const { return address + 120; }
+};
+
+// embedded; measure: Movie@+48
+struct MovieAt48 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 2;
+  uint8_t unknown_0() const { return guest::LoadU8(base, address + 0); }
+  void set_unknown_0(uint8_t v) const { guest::StoreU8(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint8_t unknown_1() const { return guest::LoadU8(base, address + 1); }
+  void set_unknown_1(uint8_t v) const { guest::StoreU8(base, address + 1, v); }
+  uint32_t unknown_1_address() const { return address + 1; }
+};
+
+// embedded; measure: new<?>@sub_824847D0@+136
+struct MovieLibNew824847D0At136_2 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 76;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_56() const { return guest::LoadU32(base, address + 56); }
+  void set_unknown_56(uint32_t v) const { guest::StoreU32(base, address + 56, v); }
+  uint32_t unknown_56_address() const { return address + 56; }
+  uint32_t unknown_60() const { return guest::LoadU32(base, address + 60); }
+  void set_unknown_60(uint32_t v) const { guest::StoreU32(base, address + 60, v); }
+  uint32_t unknown_60_address() const { return address + 60; }
+  uint32_t unknown_64() const { return guest::LoadU32(base, address + 64); }
+  void set_unknown_64(uint32_t v) const { guest::StoreU32(base, address + 64, v); }
+  uint32_t unknown_64_address() const { return address + 64; }
+  uint32_t unknown_68() const { return guest::LoadU32(base, address + 68); }
+  void set_unknown_68(uint32_t v) const { guest::StoreU32(base, address + 68, v); }
+  uint32_t unknown_68_address() const { return address + 68; }
+  float unknown_72() const { return guest::LoadFloat(base, address + 72); }
+  void set_unknown_72(float v) const { guest::StoreFloat(base, address + 72, v); }
+  uint32_t unknown_72_address() const { return address + 72; }
+};
+
+// embedded; measure: new<?>@sub_824847D0@+212
+struct MovieLibNew824847D0At212 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 288;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_284() const { return guest::LoadU32(base, address + 284); }
+  void set_unknown_284(uint32_t v) const { guest::StoreU32(base, address + 284, v); }
+  uint32_t unknown_284_address() const { return address + 284; }
+};
+
+// embedded; measure: new<?>@sub_82485460@+124
+struct MovieLibNew82485460At124_2 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 84;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_56() const { return guest::LoadU32(base, address + 56); }
+  void set_unknown_56(uint32_t v) const { guest::StoreU32(base, address + 56, v); }
+  uint32_t unknown_56_address() const { return address + 56; }
+  uint32_t unknown_60() const { return guest::LoadU32(base, address + 60); }
+  void set_unknown_60(uint32_t v) const { guest::StoreU32(base, address + 60, v); }
+  uint32_t unknown_60_address() const { return address + 60; }
+  uint32_t unknown_64() const { return guest::LoadU32(base, address + 64); }
+  void set_unknown_64(uint32_t v) const { guest::StoreU32(base, address + 64, v); }
+  uint32_t unknown_64_address() const { return address + 64; }
+  uint32_t unknown_68() const { return guest::LoadU32(base, address + 68); }
+  void set_unknown_68(uint32_t v) const { guest::StoreU32(base, address + 68, v); }
+  uint32_t unknown_68_address() const { return address + 68; }
+  uint32_t unknown_72() const { return guest::LoadU32(base, address + 72); }
+  void set_unknown_72(uint32_t v) const { guest::StoreU32(base, address + 72, v); }
+  uint32_t unknown_72_address() const { return address + 72; }
+  uint32_t unknown_76() const { return guest::LoadU32(base, address + 76); }
+  void set_unknown_76(uint32_t v) const { guest::StoreU32(base, address + 76, v); }
+  uint32_t unknown_76_address() const { return address + 76; }
+  float unknown_80() const { return guest::LoadFloat(base, address + 80); }
+  void set_unknown_80(float v) const { guest::StoreFloat(base, address + 80, v); }
+  uint32_t unknown_80_address() const { return address + 80; }
+};
+
+// embedded; measure: new<?>@sub_82485460@+208
+struct MovieLibNew82485460At208 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 452;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_444() const { return guest::LoadU32(base, address + 444); }
+  void set_unknown_444(uint32_t v) const { guest::StoreU32(base, address + 444, v); }
+  uint32_t unknown_444_address() const { return address + 444; }
+  uint32_t unknown_448() const { return guest::LoadU32(base, address + 448); }
+  void set_unknown_448(uint32_t v) const { guest::StoreU32(base, address + 448, v); }
+  uint32_t unknown_448_address() const { return address + 448; }
 };
 
 // The image words docs/functions/movies.md's code uses.

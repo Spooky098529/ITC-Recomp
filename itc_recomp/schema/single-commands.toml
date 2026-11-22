@@ -138,7 +138,8 @@ fields = [
 # shader patch's copy) and its helpers sub_822AE918 and sub_822AE9E8 read it
 # (r4; r7 the other shader's). Not read in detail: names from the code's use.
 [SingleShaderHeader]
-measures = ["sub_822AEAA0.r4", "sub_822AEAA0.r7"]
+measure = "sub_822AEAA0.r4"
+measures = ["sub_822AEAA0.r7", "sub_822AE918.r5", "sub_822AE9E8.r5"]
 size = 32
 origin = "gpu"
 fields = [
@@ -223,4 +224,25 @@ size = 4
 origin = "gpu"
 fields = [
   { name = "space", offset = 0, type = "ptr", to = "CommandDataSpace", note = "the index space in the command buffer's data space" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from CommandPacketWords.
+[CommandPacketWordsAt4]
+measure = "Device.+40@+4"
+size = 40
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_32", offset = 32, type = "u32" },
+  { name = "unknown_36", offset = 36, type = "u32" },
 ]

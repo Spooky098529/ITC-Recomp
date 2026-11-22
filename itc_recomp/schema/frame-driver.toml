@@ -303,3 +303,15 @@ primitive_declaration = { address = 0x82970BC8, type = "u32", note = "the primit
 scene_queue_2 = { address = 0x82970BD4, type = "u32", note = "the scene's render queue again" }
 scene_list_2 = { address = 0x82970BD8, type = "u32", note = "the scene's command list again" }
 primitive_declaration_ready = { address = 0x82970BDC, type = "u32", note = "1 once the primitive declaration is made" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from GameThreadArgWord.
+[GameThreadArgWordAt4]
+measure = "Thread::Begin.r5@+4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]

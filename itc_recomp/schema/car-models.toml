@@ -17,17 +17,8 @@
 # the wheels' and the scene wheels' +24 (their car model), and the second
 # set's objects (CarModel.+24: their +24 is the first set's car model).
 [CarModel]
-measures = [
-  "CarModel",
-  "CarModel.+24",
-  "Vinyl",
-  "CarModel::OnDecalLoaded.r6",
-  "CarModel::OnFileLoaded.r6",
-  "CarModel::OnFileLoadedB.r6",
-  "CarInterior.+24",
-  "Wheels.+24",
-  "SceneWheels.+192.+24",
-  "List::At.ret.+24", "Cockpit.+24", "CarParts.+5328", "TrafficCar.+24"]
+measure = "CarModel"
+measures = ["CarModel.+24", "Vinyl", "CarModel::OnDecalLoaded.r6", "CarModel::OnFileLoaded.r6", "CarModel::OnFileLoadedB.r6", "CarInterior.+24", "Wheels.+24", "SceneWheels.+192.+24", "List::At.ret.+24", "Cockpit.+24", "TrafficCar.+24", "sub_820C3CA0.r4", "TGA::CreateImage.r5", "CarParts.+24"]
 size = 7264
 origin = "allocated"
 vtable = 0x82004F94
@@ -480,3 +471,24 @@ float_half = { address = 0x82001BE4, type = "f32", note = "0.5" }
 texel_scale = { address = 0x82001FAC, type = "f32", note = "the texel weights' scale" }
 float_tenth = { address = 0x82001FBC, type = "f32", note = "0.1" }
 quarter_turn = { address = 0x82002A50, type = "f32", note = "-pi / 2" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from CarModel.
+[CarModelAt6684]
+measure = "Vinyl@+6684"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from CarModel.
+[CarModelAt6688]
+measure = "Vinyl@+6688"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]

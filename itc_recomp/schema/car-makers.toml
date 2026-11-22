@@ -143,7 +143,8 @@ fields = [
 # "car object": the measure splits it by the functions taking it). The
 # fields SceneModelRecord::FromCar, SetPaint and SetWheels read.
 [CarMakersCar]
-measures = ["SceneModelRecord::FromCar.r4", "SceneModelRecord::SetPaint.r4"]
+measure = "SceneModelRecord::FromCar.r4"
+measures = ["SceneModelRecord::SetWheels.r4", "SceneModelRecord::SetPaint.r4@+1568"]
 size = 3896
 origin = "embedded"
 fields = [

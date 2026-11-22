@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: AiDriver, AiDriver::Of.ret, [826C6074], sub_8213A200.r3, sub_82138FA8.r3, sub_82139A08.r3, sub_8213F868.ret, sub_8213F7E0.r3, sub_8213F868.r3
+// allocated; measure: AiDriver, AiDriver::Of.ret, [826C6074], sub_8213A200.r3, sub_82138FA8.r3, sub_82139A08.r3, sub_8213F868.ret, sub_8213F7E0.r3, sub_8213F868.r3, AiOther::Mirror.r4, AiPath::JoinCorners.r5.+0, AiPath::ChooseSideForOther.r5, AiPath::JoinCornerPair.r5.+0
 struct AiDriver : View {
   using View::View;
   static constexpr uint32_t kSize = 6160;
@@ -20,10 +20,6 @@ struct AiDriver : View {
   uint16_t fault_corner_count() const { return guest::LoadU16(base, address + 0); }
   void set_fault_corner_count(uint16_t v) const { guest::StoreU16(base, address + 0, v); }
   uint32_t fault_corner_count_address() const { return address + 0; }
-  // measure fault: a route position's slice (TrackRoute::LocateAt)
-  uint16_t fault_slice() const { return guest::LoadU16(base, address + 2); }
-  void set_fault_slice(uint16_t v) const { guest::StoreU16(base, address + 2, v); }
-  uint32_t fault_slice_address() const { return address + 2; }
   // the route position (section, slice) as one word (-1 none)
   uint32_t route_position() const { return guest::LoadU32(base, address + 4); }
   void set_route_position(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
@@ -42,10 +38,6 @@ struct AiDriver : View {
   float fault_point_z() const { return guest::LoadFloat(base, address + 8); }
   void set_fault_point_z(float v) const { guest::StoreFloat(base, address + 8, v); }
   uint32_t fault_point_z_address() const { return address + 8; }
-  // measure fault: a corner record's +10 (AiDriver::LimitForCorner)
-  uint16_t fault_corner_offset() const { return guest::LoadU16(base, address + 10); }
-  void set_fault_corner_offset(uint16_t v) const { guest::StoreU16(base, address + 10, v); }
-  uint32_t fault_corner_offset_address() const { return address + 10; }
   // a speed: 73.0, or the skill's +4 (500.0 when cleared)
   float cruise_speed() const { return guest::LoadFloat(base, address + 12); }
   void set_cruise_speed(float v) const { guest::StoreFloat(base, address + 12, v); }
@@ -95,10 +87,6 @@ struct AiDriver : View {
   uint16_t racer_mask() const { return guest::LoadU16(base, address + 40); }
   void set_racer_mask(uint16_t v) const { guest::StoreU16(base, address + 40, v); }
   uint32_t racer_mask_address() const { return address + 40; }
-  // measure fault: a corner record's +40 (AiDriver::LimitForCorner)
-  uint32_t fault_corner_kind() const { return guest::LoadU32(base, address + 40); }
-  void set_fault_corner_kind(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
-  uint32_t fault_corner_kind_address() const { return address + 40; }
   // -1 when cleared (written as a word at a halfword's alignment)
   uint32_t plan_word() const { return guest::LoadU32(base, address + 42); }
   void set_plan_word(uint32_t v) const { guest::StoreU32(base, address + 42, v); }
@@ -406,7 +394,7 @@ struct AiDriver : View {
   uint32_t update_address() const { return address + 6148; }
 };
 
-// embedded; measure: AiPath, AiPath::SpreadOffset.ret
+// embedded; measure: AiPath, AiPath::SpreadOffset.ret, AiPath::LeftEntry.r5, AiPath::JoinCorners.r5, AiPath::JoinCornerPair.r5, AiPathEntry::NarrowToOtherEx.r4, AiDriver.+500, AiPathEntry::NarrowToOther.r6, AiPath::NarrowBehind.r4, AiPath::AddCornersAt.r4
 struct AiPath : View {
   using View::View;
   static constexpr uint32_t kSize = 5536;
@@ -419,10 +407,6 @@ struct AiPath : View {
   uint8_t fault_byte_0() const { return guest::LoadU8(base, address + 0); }
   void set_fault_byte_0(uint8_t v) const { guest::StoreU8(base, address + 0, v); }
   uint32_t fault_byte_0_address() const { return address + 0; }
-  // measure fault: a route corner's +0 (AiCorner::Init)
-  uint16_t fault_corner_count() const { return guest::LoadU16(base, address + 0); }
-  void set_fault_corner_count(uint16_t v) const { guest::StoreU16(base, address + 0, v); }
-  uint32_t fault_corner_count_address() const { return address + 0; }
   // measure fault: a corner record's +4 (AiPath::ApproachCorner, JoinCornerPair, JoinCorners)
   template <typename T = RouteCornerEntry>
   T fault_corner_table() const { return T(base, guest::LoadU32(base, address + 4)); }
@@ -634,18 +618,10 @@ struct AiOther : View {
   float factor() const { return guest::LoadFloat(base, address + 12); }
   void set_factor(float v) const { guest::StoreFloat(base, address + 12, v); }
   uint32_t factor_address() const { return address + 12; }
-  // measure fault: the skill's percentage AiOther::PlanReaction reads
-  uint16_t fault_skill_reaction_a() const { return guest::LoadU16(base, address + 14); }
-  void set_fault_skill_reaction_a(uint16_t v) const { guest::StoreU16(base, address + 14, v); }
-  uint32_t fault_skill_reaction_a_address() const { return address + 14; }
   // the other's speed
   float speed() const { return guest::LoadFloat(base, address + 16); }
   void set_speed(float v) const { guest::StoreFloat(base, address + 16, v); }
   uint32_t speed_address() const { return address + 16; }
-  // measure fault: the skill's percentage AiOther::PlanReaction reads
-  uint16_t fault_skill_reaction_b() const { return guest::LoadU16(base, address + 16); }
-  void set_fault_skill_reaction_b(uint16_t v) const { guest::StoreU16(base, address + 16, v); }
-  uint32_t fault_skill_reaction_b_address() const { return address + 16; }
   // -1.0 none
   float ticks_to_meet() const { return guest::LoadFloat(base, address + 20); }
   void set_ticks_to_meet(float v) const { guest::StoreFloat(base, address + 20, v); }
@@ -743,10 +719,6 @@ struct AiSkillSource : View {
   uint16_t speed() const { return guest::LoadU16(base, address + 0); }
   void set_speed(uint16_t v) const { guest::StoreU16(base, address + 0, v); }
   uint32_t speed_address() const { return address + 0; }
-  // measure fault: a trigger's kind (AiSkill::TriggerStarts, TriggerEnds take a trigger, +16 + 8i)
-  uint32_t fault_trigger_kind() const { return guest::LoadU32(base, address + 0); }
-  void set_fault_trigger_kind(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t fault_trigger_kind_address() const { return address + 0; }
   uint16_t throttle_cap() const { return guest::LoadU16(base, address + 2); }
   void set_throttle_cap(uint16_t v) const { guest::StoreU16(base, address + 2, v); }
   uint32_t throttle_cap_address() const { return address + 2; }
@@ -863,7 +835,7 @@ struct CarInput : View {
   uint32_t settings_address() const { return address + 14; }
 };
 
-// file; measure: AiCorner.+0, AiDriver.+0, AiPath.+5164, AiCorner::Init.r4, sub_8213AB40.r4.+0, sub_8213BDF0.r4.+0, sub_8213BDF0.r5.+0, sub_8213BE80.r4.+0, sub_8213BE80.r5.+0, AiPath::JoinCornersShort.r4.+0, AiPath::JoinCornersShort.r5.+0, AiPath::SharesSections.r4
+// file; measure: AiCorner.+0, AiPath.+5164, AiCorner::Init.r4, sub_8213AB40.r4.+0, sub_8213BDF0.r4.+0, sub_8213BDF0.r5.+0, sub_8213BE80.r4.+0, sub_8213BE80.r5.+0, AiPath::JoinCornersShort.r4.+0, AiPath::JoinCornersShort.r5.+0, AiPath::SharesSections.r4, AiPath.+0@+8, AiDriver::LimitSpeedBlend.r5
 struct RouteCorner : View {
   using View::View;
   static constexpr uint32_t kSize = 64;
@@ -939,7 +911,7 @@ struct RouteCornerEntry : View {
   uint32_t offset_address() const { return address + 4; }
 };
 
-// file; measure: AiPath.+52, AiPathEntry.+52, AiDriver::ReadVehicle.r4
+// file; measure: AiPathEntry.+52, AiDriver::ReadVehicle.r4, AiPath::LeftEntry.r5.+52, AiPath::AddCornersAt.r4.+52, AiPath::AddCornersAt.r4.+52@+64
 struct RouteSlice : View {
   using View::View;
   static constexpr uint32_t kSize = 84;
@@ -1064,6 +1036,138 @@ struct AiOtherSpan : View {
   float side_offset() const { return guest::LoadFloat(base, address + 16); }
   void set_side_offset(float v) const { guest::StoreFloat(base, address + 16, v); }
   uint32_t side_offset_address() const { return address + 16; }
+};
+
+// embedded; measure: AiDriver@+4
+struct AiDriverAt4 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint16_t unknown_0() const { return guest::LoadU16(base, address + 0); }
+  void set_unknown_0(uint16_t v) const { guest::StoreU16(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint16_t unknown_2() const { return guest::LoadU16(base, address + 2); }
+  void set_unknown_2(uint16_t v) const { guest::StoreU16(base, address + 2, v); }
+  uint32_t unknown_2_address() const { return address + 2; }
+};
+
+// embedded; measure: AiDriver@+6096
+struct AiDriverAt6096 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 12;
+  float unknown_0() const { return guest::LoadFloat(base, address + 0); }
+  void set_unknown_0(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  float unknown_4() const { return guest::LoadFloat(base, address + 4); }
+  void set_unknown_4(float v) const { guest::StoreFloat(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  float unknown_8() const { return guest::LoadFloat(base, address + 8); }
+  void set_unknown_8(float v) const { guest::StoreFloat(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+};
+
+// embedded; measure: AiDriver@+80
+struct AiDriverAt80 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 12;
+  float unknown_0() const { return guest::LoadFloat(base, address + 0); }
+  void set_unknown_0(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  float unknown_8() const { return guest::LoadFloat(base, address + 8); }
+  void set_unknown_8(float v) const { guest::StoreFloat(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+};
+
+// embedded; measure: AiPath.+0.+500@+90
+struct AiPathAt90 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 1;
+  uint8_t unknown_0() const { return guest::LoadU8(base, address + 0); }
+  void set_unknown_0(uint8_t v) const { guest::StoreU8(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: AiPath.+0@+4
+struct AiDriverAt4_2 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 2;
+  uint16_t unknown_0() const { return guest::LoadU16(base, address + 0); }
+  void set_unknown_0(uint16_t v) const { guest::StoreU16(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: AiPath.+0@+80
+struct AiDriverAt80_2 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 12;
+  float unknown_0() const { return guest::LoadFloat(base, address + 0); }
+  void set_unknown_0(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  float unknown_8() const { return guest::LoadFloat(base, address + 8); }
+  void set_unknown_8(float v) const { guest::StoreFloat(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+};
+
+// embedded; measure: AiPath@+5136
+struct AiPathAt5136 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 2;
+  uint16_t unknown_0() const { return guest::LoadU16(base, address + 0); }
+  void set_unknown_0(uint16_t v) const { guest::StoreU16(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: AiPath@+5164
+struct AiPathAt5164 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 20;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint16_t unknown_10() const { return guest::LoadU16(base, address + 10); }
+  void set_unknown_10(uint16_t v) const { guest::StoreU16(base, address + 10, v); }
+  uint32_t unknown_10_address() const { return address + 10; }
+  float unknown_16() const { return guest::LoadFloat(base, address + 16); }
+  void set_unknown_16(float v) const { guest::StoreFloat(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+};
+
+// embedded; measure: AiPath@+5164.+0
+struct AiDriverPart : View {
+  using View::View;
+  static constexpr uint32_t kSize = 56;
+  uint16_t unknown_50() const { return guest::LoadU16(base, address + 50); }
+  void set_unknown_50(uint16_t v) const { guest::StoreU16(base, address + 50, v); }
+  uint32_t unknown_50_address() const { return address + 50; }
+  uint16_t unknown_52() const { return guest::LoadU16(base, address + 52); }
+  void set_unknown_52(uint16_t v) const { guest::StoreU16(base, address + 52, v); }
+  uint32_t unknown_52_address() const { return address + 52; }
+  uint16_t unknown_54() const { return guest::LoadU16(base, address + 54); }
+  void set_unknown_54(uint16_t v) const { guest::StoreU16(base, address + 54, v); }
+  uint32_t unknown_54_address() const { return address + 54; }
+};
+
+// embedded; measure: AiPath@+5164.+4
+struct RouteCornerEntryPart : View {
+  using View::View;
+  static constexpr uint32_t kSize = 8;
+  float unknown_4() const { return guest::LoadFloat(base, address + 4); }
+  void set_unknown_4(float v) const { guest::StoreFloat(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+};
+
+// embedded; measure: AiSkill.+0@+16
+struct AiSkillSourceAt16 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 6;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint16_t unknown_4() const { return guest::LoadU16(base, address + 4); }
+  void set_unknown_4(uint16_t v) const { guest::StoreU16(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
 };
 
 // The image words docs/functions/ai-drivers.md's code uses.

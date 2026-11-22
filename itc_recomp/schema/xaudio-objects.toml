@@ -34,7 +34,8 @@
 # count, owner). XAudioObject::Release and Free read it; shared with
 # xaudio.md's voices (they hold and release these).
 [XAudioObject]
-measures = ["XAudioObject", "sub_82465418.r3"]
+measure = "XAudioObject"
+measures = ["sub_82466410.r3@-4"]
 size = 16
 origin = "allocated"
 fields = [
@@ -300,8 +301,8 @@ fields = [
 
 # XAudio's sample rate converter state (88 bytes: the PCM codec's +184,
 # each XMA stream's; Resampler::Process and its kernels; docs/known-data.md
-# says 96, but the PCM codec ends at +272 and the XMA streams are 88
-# apart).
+# said 96 until 2026-11-22, but the PCM codec ends at +272 and the XMA
+# streams are 88 apart).
 [ConverterState]
 measures = ["Resampler", "sub_82478E60.r3", "sub_8247E188.r3", "sub_8247E260.r3", "sub_8247F558.r3", "sub_82473E48.r3", "sub_82474188.r3", "sub_8246E208.r7", "sub_8246E4C8.r7", "XmaCodec.+188"]
 size = 88
@@ -400,7 +401,8 @@ fields = [
 # XmaCodec::XmaCodec): as the PCM codec to +184, then its XMA object and
 # streams (each a ConverterState).
 [XmaCodec]
-measures = ["XmaCodec", "XmaCodec::XmaCodec.ret", "sub_8246AB00.r3"]
+measure = "XmaCodec"
+measures = ["XmaCodec::XmaCodec.ret", "sub_8246B3F8.r3@-16"]
 size = 284
 origin = "allocated"
 vtable = 0x8204BA40
@@ -452,9 +454,9 @@ fields = [
 # A codec's inner object (the codec's +4; XAudioCodec::Construct, Init,
 # Destruct): vtable, reference count, owner, then the codec base at +12.
 [XAudioCodec]
+measure = "XAudioCodec"
+measures = ["XAudioSourceVoice.+76", "sub_82466C40.r3@-12"]
 # measures from XAudioSourceCodec (xaudio), merged at the integration
-measures = ["XAudioCodec", "sub_82467450.ret",
-  "XAudioSourceVoice.+76"]
 size = 180
 origin = "embedded"
 fields = [
@@ -814,9 +816,10 @@ fields = [
 ]
 
 # A one-pole low-pass (sub_82462BC8), its coefficients from FilterCoefficient.
-# The measure files its accesses under ReverbCore (a fault): no measure name.
+# Filed under ReverbCore by the measure until its offset fix (2026-11-22).
 [ReverbLowPass]
-size = 0
+measure = "sub_82462BC8.r3"
+size = 32
 origin = "embedded"
 fields = [
   { name = "rate", offset = 0, type = "f32", note = "probably the sample rate (FilterCoefficient: +4 x 2 pi / +0, a cos's angle)" },
@@ -830,8 +833,9 @@ fields = [
 ]
 
 # A three-tap delay line (sub_82462CF8, 512 entries; sub_82463060, 2,048:
-# the count below). No measure name (filed under ReverbCore).
+# the count below). Filed under ReverbCore until the measure's offset fix.
 [ReverbDelayLine]
+measures = ["sub_82462CF8.r3", "sub_82463060.r3"]
 size = 8236
 origin = "embedded"
 fields = [
@@ -853,6 +857,7 @@ fields = [
 # sub_82463410 512: the count below).
 [ReverbAllPass]
 measure = "sub_824632A0.r3"
+measures = ["sub_82462DC8.r3", "sub_82463130.r3", "sub_82463410.r3"]
 size = 2072
 origin = "embedded"
 fields = [
@@ -1342,3 +1347,102 @@ sample_bytes = { address = 0x8204BBC0, type = "bytes", count = 16, note = "bytes
 primes = { address = 0x8204BBD0, type = "bytes", count = 4916, note = "LargestPrimeBelow's 1,229 primes (words)" }
 resampler_kernels = { address = 0x8204CF08, type = "bytes", count = 400, note = "Resampler::Process's 100 kernels (words)" }
 meter_threshold = { address = 0x82072298, type = "f32", note = "VolumeMeter::Process: samples past it counted" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from I3dl2Reverb.
+[I3dl2ReverbAt4]
+measure = "I3dl2@+4"
+size = 48
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+  { name = "unknown_16", offset = 16, type = "f32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "f32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_32", offset = 32, type = "f32" },
+  { name = "unknown_36", offset = 36, type = "f32" },
+  { name = "unknown_40", offset = 40, type = "f32" },
+  { name = "unknown_44", offset = 44, type = "f32" },
+]
+
+# Split from Reverb.
+[ReverbAt52]
+measure = "Reverb@+52"
+size = 84
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_32", offset = 32, type = "u32" },
+  { name = "unknown_36", offset = 36, type = "u32" },
+  { name = "unknown_40", offset = 40, type = "u32" },
+  { name = "unknown_44", offset = 44, type = "u32" },
+  { name = "unknown_48", offset = 48, type = "u32" },
+  { name = "unknown_52", offset = 52, type = "f32" },
+  { name = "unknown_56", offset = 56, type = "f32" },
+  { name = "unknown_60", offset = 60, type = "f32" },
+  { name = "unknown_64", offset = 64, type = "f32" },
+  { name = "unknown_68", offset = 68, type = "f32" },
+  { name = "unknown_72", offset = 72, type = "f32" },
+  { name = "unknown_76", offset = 76, type = "f32" },
+  { name = "unknown_80", offset = 80, type = "f32" },
+]
+
+# What the eight fills (sub_82467720 to sub_82467990, from ReverbCore::Init)
+# are handed: a delay line's or crossfade's write index and what follows it
+# (ReverbDelayLine +36, ReverbCrossfade +24). Filed under ReverbCore until
+# the measure's offset fix (2026-11-22).
+[ReverbLineFill]
+measure = "sub_82467720.r3"
+measures = ["sub_82467788.r3", "sub_824677F0.r3", "sub_82467858.r3", "sub_824678C0.r3", "sub_82467928.r3", "sub_82467990.r3"]
+size = 8
+origin = "embedded"
+fields = [
+  { name = "write_index", offset = 0, type = "u32", note = "set to 0" },
+  { name = "fill", offset = 4, type = "f32", note = "the value the line is filled with" },
+  { name = "line", offset = 8, type = "bytes", count = 32, note = "the line's floats (stored eight at a time)" },
+]
+
+# A stage of ReverbCore::Process (sub_824624F8; probably the early
+# reflections' taps). Not read in detail. Filed under ReverbCore until the
+# measure's offset fix (2026-11-22).
+[ReverbEarlyStage]
+measure = "sub_824624F8.r3"
+size = 28
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "f32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+]
+
+# A stage of ReverbCore::Process (sub_82463578): a 256-frame delay line with
+# two taps and gains, its write index +24. Not read in detail. Filed under
+# ReverbCore until the measure's offset fix (2026-11-22).
+[ReverbTwoTapLine]
+measure = "sub_82463578.r3"
+size = 28
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "f32" },
+  { name = "unknown_20", offset = 20, type = "f32" },
+  { name = "write_index", offset = 24, type = "u32" },
+]

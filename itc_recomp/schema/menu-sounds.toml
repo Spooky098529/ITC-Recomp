@@ -120,24 +120,9 @@ fields = [
   { name = "handler_delegate_method", offset = 1616, type = "u64", note = "the delegate's member pointer (two words)" },
 ]
 
-# The manager's +8 interface's vtable (0x82008364), met at its slot 0.
-[AudioManagerSoundOwnerVtable]
-measure = "AudioManager.+8"
-size = 4
-origin = "image"
-fields = [
-  { name = "slot_0", offset = 0, type = "fn", note = "slot 0 (not read)" },
-]
-
-# What the +8 interface's slot 0 is read as at +4 (not read: probably a
-# measure fault, a function's code read as an object).
-[AudioManagerSoundOwnerSlot0]
-measure = "AudioManager.+8.+0"
-size = 8
-origin = "image"
-fields = [
-  { name = "unknown_4", offset = 4, type = "u32" },
-]
+# AudioManagerSoundOwnerVtable and AudioManagerSoundOwnerSlot0: the XACT engine's
+# interface (sound-cues.toml's XactEngineInterface; the measure had joined the
+# audio manager with the audio engine until its offset fix, 2026-11-22).
 
 # SoundBankIndex: merged into sound-cues.toml's SoundCuesBankIndex at the integration (the same object).
 
@@ -180,3 +165,15 @@ music_category_name = { address = 0x82008348, type = "bytes", count = 6, note = 
 effects_volume = { address = 0x82616C38, type = "u32", note = "the effects' volume option's gain (a float; the car sounds' output scales by it)" }
 effects_volume_2 = { address = 0x82616C3C, type = "u32", note = "the effects' gain again (a float; the race's sound handlers read it)" }
 music_volume = { address = 0x82616BEC, type = "u32", note = "the music's volume (a float; the race's sound handlers fade it)" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from AudioManager.
+[AudioManagerAt1552]
+measure = "AudioManager@+1552"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]

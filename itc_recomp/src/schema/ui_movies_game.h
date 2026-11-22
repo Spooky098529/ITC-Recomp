@@ -59,7 +59,7 @@ struct UiMovieText : View {
   uint32_t first_line_address() const { return address + 24; }
 };
 
-// embedded; measure: TextItem, sub_8211AED0.r3, sub_8211AED0.r4, UiMovie.+100.+0, sub_8259E620.r4
+// embedded; measure: TextItem, sub_8211AED0.r3, sub_8211AED0.r4, sub_8259E620.r4, UiMovie.+40, sub_8259E620.r3
 struct UiMovieTextItem : View {
   using View::View;
   static constexpr uint32_t kSize = 128;
@@ -127,7 +127,7 @@ struct UiMovieTextItemArray : View {
   uint32_t count_address() const { return address + 0; }
 };
 
-// allocated; measure: UiMovie, sub_8211A9E8.r3, sub_8211AC90.r3, sub_8211E378.r3, sub_8211C4F0.r3, sub_8211C5F8.r3, UiMovie::OnLoaded.r6, UiMovies::Find.ret.+0
+// allocated; measure: UiMovie, sub_8211A9E8.r3, sub_8211AC90.r3, sub_8211E378.r3, sub_8211C4F0.r3, sub_8211C5F8.r3, UiMovie::OnLoaded.r6, UiMovies::Find.ret.+0, AnimationList::Get.r4
 struct UiMovie : View {
   using View::View;
   static constexpr uint32_t kSize = 40976;
@@ -399,7 +399,7 @@ struct UiMovieWord : View {
   uint32_t value_address() const { return address + 0; }
 };
 
-// embedded; measure: sub_8211AE68.r3
+// embedded; measure: UiMovie::OnLoaded.r6@+28, sub_8211A6C0.ret@+28, sub_8211A6C0.r3
 struct UiMovieWordVector : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
@@ -701,6 +701,48 @@ struct UiMovieCharText : View {
   uint8_t char_2() const { return guest::LoadU8(base, address + 2); }
   void set_char_2(uint8_t v) const { guest::StoreU8(base, address + 2, v); }
   uint32_t char_2_address() const { return address + 2; }
+};
+
+// embedded; measure: UiMovie@+176
+struct UiMovieAt176 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 36;
+  uint32_t unknown_28() const { return guest::LoadU32(base, address + 28); }
+  void set_unknown_28(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
+  uint32_t unknown_28_address() const { return address + 28; }
+  uint32_t unknown_32() const { return guest::LoadU32(base, address + 32); }
+  void set_unknown_32(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
+  uint32_t unknown_32_address() const { return address + 32; }
+};
+
+// embedded; measure: UiMovie@+28
+struct UiMovieAt28 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 12;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+};
+
+// embedded; measure: UiMovie@+40
+struct UiMovieAt40 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 12;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
 };
 
 // The image words docs/functions/ui-movies-game.md's code uses.

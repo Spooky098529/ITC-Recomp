@@ -311,7 +311,7 @@ struct Type67Screen0Words : View {
   uint32_t pick_address() const { return address + 72; }
 };
 
-// embedded; measure: Type6Dialog, Type7Dialog, Dialog
+// embedded; measure: Type6Dialog, Type7Dialog, Dialog, Type6Mode.+816, Type7Mode.+816
 struct Type67Dialog : View {
   using View::View;
   static constexpr uint32_t kSize = 9764;

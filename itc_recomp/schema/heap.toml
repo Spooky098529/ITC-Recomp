@@ -60,7 +60,8 @@ fields = [
 # size, +4 the segment, +5 the flags, +6 the unused bytes), a large block's
 # virtual entry 48 bytes before it.
 [HeapBlock]
-measures = ["HeapFree.r5", "HeapSize.r5", "new<?>@HeapReAlloc", "[8297149C].+384.+0.+4"]
+measure = "HeapFree.r5"
+measures = ["HeapSize.r5", "new<?>@HeapReAlloc", "[8297149C].+384.+0.+4", "HeapReAlloc.r5"]
 size = 0
 origin = "allocated"
 fields = [
@@ -156,7 +157,7 @@ fields = [
 # 0x82000AB4 at +4), deleted by sub_82090D68; the same pair is embedded in
 # the debug text (+8) and the movie (+12).
 [DualVtableObject]
-measure = "sub_82090D68.ret"
+measure = "sub_82090D60.r3@-4"
 size = 8
 origin = "allocated"
 fields = [

@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: CarModel, CarModel.+24, Vinyl, CarModel::OnDecalLoaded.r6, CarModel::OnFileLoaded.r6, CarModel::OnFileLoadedB.r6, CarInterior.+24, Wheels.+24, SceneWheels.+192.+24, List::At.ret.+24, Cockpit.+24, CarParts.+5328, TrafficCar.+24
+// allocated; measure: CarModel, CarModel.+24, Vinyl, CarModel::OnDecalLoaded.r6, CarModel::OnFileLoaded.r6, CarModel::OnFileLoadedB.r6, CarInterior.+24, Wheels.+24, SceneWheels.+192.+24, List::At.ret.+24, Cockpit.+24, TrafficCar.+24, sub_820C3CA0.r4, TGA::CreateImage.r5, CarParts.+24
 struct CarModel : View {
   using View::View;
   static constexpr uint32_t kSize = 7264;
@@ -915,6 +915,24 @@ struct CarModelsDeferredRelease : View {
   uint32_t state() const { return guest::LoadU32(base, address + 16); }
   void set_state(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
   uint32_t state_address() const { return address + 16; }
+};
+
+// embedded; measure: Vinyl@+6684
+struct CarModelAt6684 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: Vinyl@+6688
+struct CarModelAt6688 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
 };
 
 // The image words docs/functions/car-models.md's code uses.

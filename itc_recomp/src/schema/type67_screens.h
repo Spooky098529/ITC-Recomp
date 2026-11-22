@@ -877,7 +877,7 @@ struct NodeListScreen : View {
   uint32_t table_fourth_before_address() const { return address + 10816; }
 };
 
-// embedded; measure: TitledListScreen, Type6ListScreen
+// embedded; measure: TitledListScreen, Type6ListScreen, Type6ListScreen.+9676
 struct Type6ListScreen : View {
   using View::View;
   static constexpr uint32_t kSize = 10964;
@@ -1964,7 +1964,7 @@ struct ColorListScreen : View {
   uint32_t text_part_address() const { return address + 11036; }
 };
 
-// embedded; measure: Type7ListScreen
+// embedded; measure: Type7ListScreen, Type7ListScreen.+9676
 struct Type7ListScreen : View {
   using View::View;
   static constexpr uint32_t kSize = 11180;
@@ -2542,7 +2542,7 @@ struct Type7ListScreen : View {
   uint32_t part_address() const { return address + 11040; }
 };
 
-// image; measure: ListScreen.+0, NodeListScreen.+0, TitledListScreen.+0, Type6ListScreen.+0, ColorListScreen.+0, Type7ListScreen.+0
+// image; measure: ListScreen.+0, NodeListScreen.+0, TitledListScreen.+0, Type6ListScreen.+0, ColorListScreen.+0, Type6ListScreen.+9676.+0, Type7ListScreen.+9676.+0
 struct ListScreenVtable : View {
   using View::View;
   static constexpr uint32_t kSize = 112;
@@ -3055,7 +3055,7 @@ struct PanelScreen : View {
   uint32_t set_unknown_1928_address() const { return address + 11680; }
 };
 
-// embedded; measure: Type6PanelScreen, Type7PanelScreen
+// embedded; measure: Type6PanelScreen, Type7PanelScreen, Type6PanelScreen.+9644, Type7PanelScreen.+9644
 struct Type67PanelScreen : View {
   using View::View;
   static constexpr uint32_t kSize = 11744;
@@ -3146,7 +3146,7 @@ struct Type67PanelScreen : View {
   uint32_t pair_address() const { return address + 11728; }
 };
 
-// image; measure: PanelScreen.+0, Type6PanelScreen.+0, Type7PanelScreen.+0
+// image; measure: PanelScreen.+0, Type6PanelScreen.+9644.+0, Type7PanelScreen.+9644.+0
 struct PanelScreenVtable : View {
   using View::View;
   static constexpr uint32_t kSize = 76;

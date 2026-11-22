@@ -38,7 +38,7 @@ struct CommandChain : View {
   uint32_t device_address() const { return address + 16; }
 };
 
-// gpu; measure: CommandChain.+0
+// gpu; measure: CommandChain.+0, CommandChain.+8
 struct CommandChainBlock : View {
   using View::View;
   static constexpr uint32_t kSize = 4;

@@ -70,7 +70,8 @@ fields = [
 
 # The framework's own vtable (0x82000B90 in the image).
 [FrameworkVtable]
-measures = ["App::Run.r4.+0", "Framework.+0"]
+measure = "App::Run.r4.+0"
+measures = ["Framework@+48.+0", "Framework@+44.+0"]
 size = 24
 origin = "image"
 fields = [
@@ -109,7 +110,8 @@ fields = [
 
 # One of the framework's interfaces (a vtable whose slots are getters).
 [FrameworkInterface]
-measures = ["FrameStart.+4", "sub_82094350.r3.+20"]
+measure = "FrameStart.+4"
+measures = ["sub_820944C8.r3@-12.+20"]
 size = 4
 origin = "embedded"
 fields = [
@@ -117,7 +119,8 @@ fields = [
 ]
 
 [FrameworkInterfaceVtable]
-measures = ["FrameStart.+4.+0", "sub_82094350.r3.+20.+0"]
+measure = "FrameStart.+4.+0"
+measures = ["sub_820944C8.r3@-12.+20.+0"]
 size = 44
 origin = "image"
 fields = [
@@ -148,7 +151,7 @@ fields = [
 
 # The app seen from app + 4 (sub_82094350's r3).
 [AppPart4]
-measure = "sub_82094350.r3"
+measure = "sub_820944C8.r3@-12"
 size = 24
 origin = "embedded"
 fields = [
@@ -270,7 +273,8 @@ fields = [
 # byte) and HandlerMap::ForEach's (a 16-byte functor): their fields carry
 # "result" in the name.
 [HandlerMap]
-measures = ["HandlerMap", "HandlerMap::Insert.r4", "sub_82093638.r4", "sub_82093850.r3"]
+measure = "HandlerMap"
+measures = ["HandlerMap::Insert.r4", "sub_82093638.r4", "sub_82093850.r3", "HandlerMap::InsertNode.r4"]
 size = 16
 origin = "embedded"
 fields = [
@@ -284,16 +288,8 @@ fields = [
 
 # A map node (24 bytes, HandlerMap::AllocateNodes).
 [HandlerMapNode]
-measures = ["new<?>@HandlerMap::AllocateNodes", "HandlerMap.+4.+8", "HandlerMap::Insert.r4.+4",
-            "HandlerMap::Insert.r4.+4.+0", "HandlerMap::Insert.r4.+4.+0.+8",
-            "HandlerMap::NewNode.ret", "HandlerMap::NewNode.ret.+4", "HandlerMap::NewNode.ret.+4.+8",
-            "HandlerMap::RotateLeft.r4", "HandlerMap::RotateLeft.r4.+4", "HandlerMap::RotateLeft.r4.+8",
-            "HandlerMap::RotateLeft.r4.+8.+0", "HandlerMap::RotateRight.r4.+0.+4",
-            "HandlerMap::RotateRight.r4.+0.+4.+0", "HandlerMap::RotateRight.r4.+0.+4.+0.+8",
-            "sub_82091AE8.r3.+4", "sub_82091AE8.r3.+4.+0", "sub_82091AE8.r3.+4.+8",
-            "sub_82099B18.r3.+4", "sub_82099B18.r3.+4.+0", "sub_82099B18.r3.+4.+8",
-            "sub_82099BA8.r4", "sub_82099BA8.r4.+0", "sub_82093638.r4.+4", "sub_82093850.r3.+4",
-            "sub_8209A008.r3.+20", "App.+8", "App::ApplyRequest.ret.+4.+8"]
+measure = "new<?>@HandlerMap::AllocateNodes"
+measures = ["HandlerMap.+4.+8", "HandlerMap::Insert.r4.+4", "HandlerMap::Insert.r4.+4.+0", "HandlerMap::Insert.r4.+4.+0.+8", "HandlerMap::NewNode.ret", "HandlerMap::NewNode.ret.+4", "HandlerMap::NewNode.ret.+4.+8", "HandlerMap::RotateLeft.r4", "HandlerMap::RotateLeft.r4.+4", "HandlerMap::RotateLeft.r4.+8", "HandlerMap::RotateLeft.r4.+8.+0", "sub_82091AE8.r3.+4", "sub_82091AE8.r3.+4.+0", "sub_82091AE8.r3.+4.+8", "sub_82099B18.r3.+4", "sub_82099B18.r3.+4.+0", "sub_82099B18.r3.+4.+8", "sub_82099BA8.r4", "sub_82099BA8.r4.+0", "sub_82093638.r4.+4", "sub_82093850.r3.+4", "sub_8209A008.r3.+20", "App.+8", "HandlerMap::InsertNode.r4.+4", "HandlerMap::InsertNode.r6.+8", "HandlerMap::InsertNode.r6.+8.+4", "HandlerMap::InsertNode.r6.+8.+0", "HandlerMap::InsertNode.r6.+8.+0.+8"]
 size = 24
 origin = "allocated"
 fields = [
@@ -540,3 +536,33 @@ debug_font_scale_x = { address = 0x8296BD00, type = "f32", note = "+32, probably
 debug_font_scale_y = { address = 0x8296BD04, type = "f32", note = "+36" }
 debug_font_word_40 = { address = 0x8296BD08, type = "u32", note = "+40: 681 (sub_8258BE48)" }
 debug_font_default_scale = { address = 0x82001FAC, type = "f32", note = "read-only data" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from Framework.
+[FrameworkAt44]
+measure = "Framework@+44"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from Framework.
+[FrameworkAt48]
+measure = "Framework@+48"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from WorkerPool.
+[WorkerPoolAt28]
+measure = "new<296>@WorkerPool::Create@+28"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]

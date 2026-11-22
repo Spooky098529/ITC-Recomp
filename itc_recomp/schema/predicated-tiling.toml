@@ -62,6 +62,7 @@ fields = [
 # argument at +4 and +8). Never read in play (the job never runs).
 [TilingChainWords]
 measure = "Device.+0.+36"
+measures = ["Device.+0.+84"]
 size = 264
 origin = "gpu"
 fields = [

@@ -1627,7 +1627,7 @@ double f8213F868(uint8_t* base, uint64_t r1, uint64_t r3) {
   // beq 0x8213f8b4
   if (cr0.eq) goto loc_8213F8B4;
   // lwz r8,0(r11)
-  r8 = guest::LoadU32(base, schema::RaceProgress(base, uint32_t(r11) - 2184).results_count_address());
+  r8 = guest::LoadU32(base, schema::RaceProgressPart(base, uint32_t(r11) - 2184).unknown_2184_address());
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // cmpwi r8,0
@@ -1640,7 +1640,7 @@ double f8213F868(uint8_t* base, uint64_t r1, uint64_t r3) {
   r9 = uint64_t(int64_t(int64_t(r11) + 8));
 loc_8213F898:
   // lwz r6,0(r9)
-  r6 = guest::LoadU32(base, schema::RaceProgress(base, uint32_t(r9) - 2192).e0_item_address());
+  r6 = guest::LoadU32(base, schema::RaceProgressPart(base, uint32_t(r9) - 2192).unknown_2192_address());
   // cmpw cr6,r6,r7
   cr6 = lifted::Compare<int32_t>(int32_t(r6), int32_t(r7), so);
   // beq cr6,0x8213f8e4

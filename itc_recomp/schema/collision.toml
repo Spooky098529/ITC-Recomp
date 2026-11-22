@@ -23,11 +23,10 @@
 # and sub_820911F8 return from a shape record (the current and previous
 # copies), and sub_820BC560's r5 (not read; it calls LowerCorner and Radius).
 [BoxShape]
+measure = "BoxShape"
+measures = ["Shape", "CollisionObject.+32", "sub_820BAB48.r4", "sub_820BAB48.ret", "sub_820BB688.r3", "sub_820BB688.r4", "BoxShape::Place.r5", "sub_822BE2C8.ret", "sub_820911F8.ret", "sub_820BA1D0.r3", "sub_820B9C30.r3", "sub_820BC560.r5", "Part464::Restore.r4", "Part464::Save.r4", "Vehicle.+344", "WallQuery.+12.+0", "AiDriver.+160.+344"]
 # measures from VehicleBox (vehicle-accessors), merged at the integration
 # measures from ReplayPlacedBox (replay-snapshots), merged at the integration
-measure = "BoxShape"
-measures = ["Shape", "CollisionObject.+32", "sub_820BAB48.r4", "sub_820BAB48.ret", "sub_820BB688.r3", "sub_820BB688.r4", "BoxShape::Place.r5", "sub_822BE2C8.ret", "sub_820911F8.ret", "sub_820BA1D0.r3", "sub_820B9C30.r3", "sub_820BC560.r5", "Part464::Restore.r4", "Part464::Save.r4",
-  "Vehicle.+344", "WallQuery.+12.+0"]
 size = 496
 origin = "allocated"
 vtable = 0x82002B30
@@ -301,47 +300,28 @@ fields = [
 # ports use CollisionQuery, CollisionBlock and BoxShapeFace.
 [CollisionBoxBoxArgs]
 measure = "BoxBox"
+measures = ["BoxBox.+12"]
 size = 100
 origin = "embedded"
 fields = [
   { name = "fault_query_shape_a", offset = 0, type = "u32", note = "measure fault: the measure files every BoxBox:: function's r3 under one type, and the query's block pointers back into it: the fields of a CollisionQuery (fault_query_), a CollisionBlock (fault_block_), a block's corner, the edge flags and a face" },
-  { name = "fault_block_row0_x", offset = 0, type = "f32" },
   { name = "fault_query_shape_b", offset = 4, type = "u32" },
-  { name = "fault_block_row0_y", offset = 4, type = "f32" },
   { name = "fault_query_b_in_a_previous", offset = 8, type = "u32" },
-  { name = "fault_block_row0_z", offset = 8, type = "f32" },
   { name = "fault_query_b_in_a_current", offset = 12, type = "u32" },
   { name = "fault_query_a_in_b_previous", offset = 16, type = "u32" },
-  { name = "fault_block_row1_x", offset = 16, type = "f32" },
   { name = "fault_query_a_in_b_current", offset = 20, type = "u32" },
-  { name = "fault_block_row1_y", offset = 20, type = "f32" },
   { name = "fault_block_row1_z", offset = 24, type = "f32" },
   { name = "fault_query_contact_point_x", offset = 32, type = "f32" },
-  { name = "fault_block_row2_x", offset = 32, type = "f32" },
   { name = "fault_query_contact_point_y", offset = 36, type = "f32" },
-  { name = "fault_block_row2_y", offset = 36, type = "f32" },
   { name = "fault_query_contact_point_z", offset = 40, type = "f32" },
-  { name = "fault_block_row2_z", offset = 40, type = "f32" },
   { name = "fault_query_contact_normal_x", offset = 48, type = "f32" },
-  { name = "fault_block_center_x", offset = 48, type = "f32" },
   { name = "fault_query_contact_normal_y", offset = 52, type = "f32" },
-  { name = "fault_block_center_y", offset = 52, type = "f32" },
   { name = "fault_query_contact_normal_z", offset = 56, type = "f32" },
-  { name = "fault_block_center_z", offset = 56, type = "f32" },
   { name = "fault_query_contact_push_x", offset = 64, type = "f32" },
-  { name = "fault_block_outcode", offset = 64, type = "u32" },
   { name = "fault_query_contact_depth", offset = 80, type = "f32" },
-  { name = "fault_block_corner_x", offset = 80, type = "f32" },
   { name = "fault_query_contact_time", offset = 84, type = "f32" },
-  { name = "fault_block_corner_y", offset = 84, type = "f32" },
   { name = "fault_query_unknown_88", offset = 88, type = "f32" },
-  { name = "fault_block_corner_z", offset = 88, type = "f32" },
   { name = "fault_query_direction_x", offset = 96, type = "f32" },
-  { name = "fault_block_corner_outcode", offset = 96, type = "u32" },
-  { name = "fault_corner_x", offset = 0, type = "f32", note = "BoxBox::MoveCorners' r3 is a block's corners (+80): corner k's x, y, z and its outcode +16" },
-  { name = "fault_corner_outcode", offset = 16, type = "u32" },
-  { name = "fault_crossing_flag", offset = 0, type = "u32", note = "BoxBox::EdgesCrossing's r3: its 12 words out (a frame's)" },
-  { name = "fault_face_distance", offset = 0, type = "f32", note = "BoxBox::FaceSeparates' r3: a face's distance (a BoxShapeFace)" },
 ]
 
 # A box's face (32 bytes at its +304 + 32i, BoxShape::Face):

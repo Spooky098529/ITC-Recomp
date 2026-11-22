@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: Sound
+// allocated; measure: Sound, Sound.+0
 struct PlayingSound : View {
   using View::View;
   static constexpr uint32_t kSize = 24;
@@ -53,7 +53,7 @@ struct PlayingSound : View {
   uint32_t cue_index_address() const { return address + 20; }
 };
 
-// allocated; measure: Emitter
+// allocated; measure: Emitter, Emitter.+8
 struct SoundEmitter : View {
   using View::View;
   static constexpr uint32_t kSize = 300;
@@ -70,10 +70,6 @@ struct SoundEmitter : View {
   uint32_t cone() const { return guest::LoadU32(base, address + 8); }
   void set_cone(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t cone_address() const { return address + 8; }
-  // read as a float (probably a measure fault: another object joined)
-  float fault_8_f32() const { return guest::LoadFloat(base, address + 8); }
-  void set_fault_8_f32(float v) const { guest::StoreFloat(base, address + 8, v); }
-  uint32_t fault_8_f32_address() const { return address + 8; }
   // front (0, 0, 1)
   float front_x() const { return guest::LoadFloat(base, address + 12); }
   void set_front_x(float v) const { guest::StoreFloat(base, address + 12, v); }
@@ -563,7 +559,7 @@ struct SoundVector3 : View {
   uint32_t z_address() const { return address + 8; }
 };
 
-// embedded; measure: AudioEngine, sub_8259D1F0.r3.+28
+// embedded; measure: AudioEngine, sub_82118638.r3@+16, sub_82118638.r3@+16@+8
 struct AudioEngine : View {
   using View::View;
   static constexpr uint32_t kSize = 100;
@@ -581,18 +577,10 @@ struct AudioEngine : View {
   void set_xact_engine(const View& v) const { guest::StoreU32(base, address + 8, v.address); }
   void set_xact_engine(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t xact_engine_address() const { return address + 8; }
-  // measure fault: the X3DAudio handle's speed of sound
-  float fault_speed_of_sound() const { return guest::LoadFloat(base, address + 8); }
-  void set_fault_speed_of_sound(float v) const { guest::StoreFloat(base, address + 8, v); }
-  uint32_t fault_speed_of_sound_address() const { return address + 8; }
   // the X3DAudio handle (16 bytes, car-sounds' X3DAudioHandle): 6 (5.1)
   uint32_t x3d_speaker_count() const { return guest::LoadU32(base, address + 12); }
   void set_x3d_speaker_count(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
   uint32_t x3d_speaker_count_address() const { return address + 12; }
-  // measure fault: the X3DAudio handle's Doppler limit
-  float fault_doppler_limit() const { return guest::LoadFloat(base, address + 12); }
-  void set_fault_doppler_limit(float v) const { guest::StoreFloat(base, address + 12, v); }
-  uint32_t fault_doppler_limit_address() const { return address + 12; }
   uint32_t x3d_lfe_speaker() const { return guest::LoadU32(base, address + 16); }
   void set_x3d_lfe_speaker(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
   uint32_t x3d_lfe_speaker_address() const { return address + 16; }
@@ -635,7 +623,7 @@ struct AudioEngine : View {
   uint32_t matrix_5_address() const { return address + 96; }
 };
 
-// allocated; measure: new<196>@XACT3CreateEngine, AudioEngine.+8, sub_8259D1F0.r3.+28.+8
+// allocated; measure: new<196>@XACT3CreateEngine, AudioEngine.+8, sub_82118638.r3@+16.+8
 struct XactEngine : View {
   using View::View;
   static constexpr uint32_t kSize = 196;
@@ -791,10 +779,14 @@ struct XactEngine : View {
   uint32_t file_callback_1_address() const { return address + 192; }
 };
 
-// image; measure: AudioEngine.+8.+0, sub_8259D1F0.r3.+28.+8.+0
+// image; measure: AudioEngine.+8.+0, sub_82118638.r3@+16.+8.+0
 struct XactEngineInterface : View {
   using View::View;
   static constexpr uint32_t kSize = 56;
+  // called by sub_8259D370; not read
+  uint32_t slot_1() const { return guest::LoadU32(base, address + 4); }
+  void set_slot_1(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t slot_1_address() const { return address + 4; }
   // probably Initialize (sub_8259D1F0)
   uint32_t initialize() const { return guest::LoadU32(base, address + 8); }
   void set_initialize(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
@@ -915,7 +907,7 @@ struct AudioManagerDelegate : View {
   uint32_t method_adjust_address() const { return address + 12; }
 };
 
-// embedded; measure: sub_82118850.r3
+// embedded; measure: AudioManager::RemoveStoppedSounds.r3@+1528
 struct SoundList : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
@@ -934,7 +926,7 @@ struct SoundList : View {
   uint32_t size_address() const { return address + 8; }
 };
 
-// allocated; measure: AudioManager.+1532, AudioManager.+1532.+0, sub_82118850.r3.+4, sub_82118850.r3.+4.+0, sub_82119018.r3.+1532
+// allocated; measure: AudioManager.+1532, AudioManager.+1532.+0, sub_82119018.r3.+1532, AudioManager::RemoveStoppedSounds.r3@+1528.+4, AudioManager::RemoveStoppedSounds.r3@+1528.+4.+0
 struct SoundListNode : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
@@ -1068,6 +1060,60 @@ struct AudioVolumeArg : View {
   float volume() const { return guest::LoadFloat(base, address + 0); }
   void set_volume(float v) const { guest::StoreFloat(base, address + 0, v); }
   uint32_t volume_address() const { return address + 0; }
+};
+
+// embedded; measure: AudioEngine@+12
+struct AudioEngineAt12 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 16;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  float unknown_8() const { return guest::LoadFloat(base, address + 8); }
+  void set_unknown_8(float v) const { guest::StoreFloat(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  float unknown_12() const { return guest::LoadFloat(base, address + 12); }
+  void set_unknown_12(float v) const { guest::StoreFloat(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+};
+
+// embedded; measure: AudioManager.+1544.+0@+8
+struct PlayingSoundAt8 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: BankPair@+72
+struct SoundBankPairAt72 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: BankPair@+76
+struct SoundBankPairAt76 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: Sound@+4
+struct PlayingSoundAt4 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
 };
 
 // The image words docs/functions/sound-cues.md's code uses.

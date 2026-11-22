@@ -802,7 +802,7 @@ struct AccessoryFloat4 : View {
   uint32_t zw_address() const { return address + 8; }
 };
 
-// embedded; measure: AccessorySkeleton::SwingNode.r5, sub_8259B188.r5
+// embedded; measure: AccessorySkeleton::SwingNode.r5, sub_8259B660.r3.+144@+16
 struct AccessoryFloat3 : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
@@ -836,6 +836,51 @@ struct AccessoryWorkerPoolVtable : View {
   uint32_t submit() const { return guest::LoadU32(base, address + 4); }
   void set_submit(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t submit_address() const { return address + 4; }
+};
+
+// embedded; measure: Accessory@+1008
+struct AccessoryAt1008 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 12;
+  float unknown_0() const { return guest::LoadFloat(base, address + 0); }
+  void set_unknown_0(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  float unknown_4() const { return guest::LoadFloat(base, address + 4); }
+  void set_unknown_4(float v) const { guest::StoreFloat(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  float unknown_8() const { return guest::LoadFloat(base, address + 8); }
+  void set_unknown_8(float v) const { guest::StoreFloat(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+};
+
+// embedded; measure: Accessory@+1024
+struct AccessoryAt1024 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 12;
+  float unknown_0() const { return guest::LoadFloat(base, address + 0); }
+  void set_unknown_0(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  float unknown_4() const { return guest::LoadFloat(base, address + 4); }
+  void set_unknown_4(float v) const { guest::StoreFloat(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  float unknown_8() const { return guest::LoadFloat(base, address + 8); }
+  void set_unknown_8(float v) const { guest::StoreFloat(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+};
+
+// embedded; measure: Accessory@+992
+struct AccessoryAt992 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 12;
+  float unknown_0() const { return guest::LoadFloat(base, address + 0); }
+  void set_unknown_0(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  float unknown_4() const { return guest::LoadFloat(base, address + 4); }
+  void set_unknown_4(float v) const { guest::StoreFloat(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  float unknown_8() const { return guest::LoadFloat(base, address + 8); }
+  void set_unknown_8(float v) const { guest::StoreFloat(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
 };
 
 // The image words docs/functions/accessories.md's code uses.

@@ -722,7 +722,7 @@ lifted::Result f82094EE0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r3,r31,4
   r3 = uint64_t(int64_t(int64_t(r31) + 4));
   // stw r11,0(r31)
-  guest::StoreU32(base, schema::WorkerPool(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
+  guest::StoreU32(base, schema::WorkerPoolAt28(base, uint32_t(r31)).unknown_0_address(), uint32_t(r11));
   // bl 0x8258dcc8
   // (left out: dead in C++)
   { const lifted::Result o = game::Event::Create(base, r1, r13, r3, r7, r8, r9, r10); r3 = o.r3; f1 = o.f1; }

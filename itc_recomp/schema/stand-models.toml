@@ -27,7 +27,8 @@
 # +0 (the stage pointer) is filed at +0; the camera at + 112 is filed here at
 # the stage's offsets (GarageStage::ApplyPreset, Draw), which is right.
 [GarageStage]
-measures = ["GarageStage", "GarageLights"]
+measure = "GarageStage"
+measures = ["GarageLights", "GarageStage.+0"]
 size = 6208
 origin = "allocated"
 fields = [
@@ -110,7 +111,7 @@ fields = [
 # stand model's word.
 [TrafficCar]
 measure = "TrafficCar"
-measures = ["SceneModel.+5100.+16780"]
+measures = ["SceneCockpit.+28", "SceneTraffic.+9768", "SceneModel.+5092.+9760"]
 size = 16780
 origin = "allocated"
 vtable = 0x820050B4
@@ -293,3 +294,26 @@ fields = [
 [globals]
 scene = { address = 0x826C2E44, type = "ptr", to = "CarScene", note = "the car scene (the second set of scene pools)" }
 stand_holder = { address = 0x826D83E0, type = "ptr", note = "the stand scene's holder (StandScene::Create): +0 to +8 three 4-byte blocks, each holding a garage stage at +0; +20 a stand model was made" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from GarageStage.
+[GarageStageAt32]
+measure = "GarageStage.+0@+32"
+size = 60
+origin = "embedded"
+fields = [
+  { name = "unknown_48", offset = 48, type = "f32" },
+  { name = "unknown_52", offset = 52, type = "f32" },
+  { name = "unknown_56", offset = 56, type = "f32" },
+]
+
+# Split from TrafficCar.
+[TrafficCarAt160]
+measure = "TrafficCar@+160"
+size = 11456
+origin = "embedded"
+fields = [
+  { name = "unknown_11452", offset = 11452, type = "u32" },
+]

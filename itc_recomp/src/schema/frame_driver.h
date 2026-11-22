@@ -424,6 +424,15 @@ struct AppSceneFrameworkInterfaceVtable : View {
   uint32_t frame_driver_address() const { return address + 4; }
 };
 
+// embedded; measure: Thread::Begin.r5@+4
+struct GameThreadArgWordAt4 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
 // The image words docs/functions/frame-driver.md's code uses.
 struct FrameDriverGlobals {
   // the kernel's thread object type, for ObReferenceObjectByHandle

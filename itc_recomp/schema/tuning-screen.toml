@@ -392,6 +392,7 @@ fields = [
 # (+6116 the money, +6324 and +6328 the garage's, +104820): a measure fault.
 [DayBlock]
 measure = "DayBlock"
+measures = ["EventCondition::FloatAtLeast.r4", "GarageScreen::SetCarRow.r4", "CarPanel::ShowCarStats.r4"]
 size = 104824
 origin = "embedded"
 # 60 functions; areas: car-list.md, car-makers.md, career.md, garage-screen.md, mode-tick.md, race-event.md, replay-snapshots.md, stand-models.md, sticker-editor.md, tuning-machine.md, tuning-pages.md, tuning-screen.md
@@ -447,3 +448,38 @@ stand_holder = { address = 0x826D83E0, type = "ptr", to = "StandHolder", note = 
 doors_open = { address = 0x826D8498, type = "u32", note = "the stand's doors animation open (1) or closed (0); UpdateStandAnimations toggles it with GarageStage::Command 4 and 5" }
 roof_open = { address = 0x826D849C, type = "u32", note = "the stand's roof animation open state; toggled with GarageStage::Command 2 and 3" }
 bonnet_open = { address = 0x826D84A0, type = "u32", note = "the stand's bonnet animation open state; toggled with GarageStage::Command 2 and 3" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from DayBlock.
+[DayBlockAt129104]
+measure = "Progress@+129104"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Split from DayBlock.
+[DayBlockAt6120]
+measure = "Progress@+6120"
+size = 206
+origin = "embedded"
+fields = [
+  { name = "unknown_204", offset = 204, type = "u16" },
+]
+
+# Split from TuningScreen.
+[TuningScreenAt30832]
+measure = "TuningScreen@+30832"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+]

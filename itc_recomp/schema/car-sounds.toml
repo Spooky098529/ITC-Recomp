@@ -522,7 +522,8 @@ fields = [
 
 # A vector of three floats (X3DVec::).
 [X3DAudioVector]
-measures = ["X3DVec", "X3DVec::Cross.r4", "X3DVec::Cross.r5", "X3DVec::Dot.r4", "X3DVec::Sub.r4", "X3DVec::Sub.r5"]
+measure = "X3DVec"
+measures = ["X3DVec::Cross.r4", "X3DVec::Cross.r5", "X3DVec::Dot.r4", "X3DVec::Sub.r4", "X3DVec::Sub.r5", "X3DAudio::Matrix.r4"]
 size = 12
 origin = "embedded"
 fields = [
@@ -553,3 +554,40 @@ effects_volume = { address = 0x82616C38, type = "f32", note = "the effects' volu
 effects_volume_2 = { address = 0x82616C3C, type = "f32", note = "the effects' volume option's gain" }
 reverb_off = { address = 0x82616638, type = "bytes", count = 48, note = "the submix's reverb parameters outside a tunnel (probably)" }
 reverb_tunnel = { address = 0x826166F8, type = "bytes", count = 48, note = "the submix's reverb parameters in a tunnel (probably)" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from CarSound.
+[CarSoundAt736]
+measure = "CarSound@+736"
+size = 56
+origin = "embedded"
+fields = [
+  { name = "unknown_40", offset = 40, type = "u32" },
+  { name = "unknown_48", offset = 48, type = "u32" },
+  { name = "unknown_52", offset = 52, type = "u32" },
+]
+
+# Split from CarSound.
+[CarSoundAt840]
+measure = "CarSound@+840"
+size = 46
+origin = "embedded"
+fields = [
+  { name = "unknown_40", offset = 40, type = "u32" },
+  { name = "unknown_45", offset = 45, type = "u8" },
+]
+
+# Split from CarSound.
+[CarSoundAt888]
+measure = "CarSound@+888"
+size = 64
+origin = "embedded"
+fields = [
+  { name = "unknown_40", offset = 40, type = "u32" },
+  { name = "unknown_48", offset = 48, type = "u32" },
+  { name = "unknown_52", offset = 52, type = "u32" },
+  { name = "unknown_56", offset = 56, type = "f32" },
+  { name = "unknown_60", offset = 60, type = "f32" },
+]

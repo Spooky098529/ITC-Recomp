@@ -2991,7 +2991,7 @@ uint64_t f82216830(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   lifted::Cr cr6;
   uint8_t so = 0;
   // lwz r11,340(r3)
-  r11 = guest::LoadU32(base, schema::RaceScreens(base, uint32_t(r3)).fault_split_mode_address());
+  r11 = guest::LoadU32(base, schema::RaceHudAt656(base, uint32_t(r3)).unknown_340_address());
   // cmplwi cr6,r11,1
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
   // blt cr6,0x82216844
@@ -3245,7 +3245,7 @@ loc_82216980:
   lifted::ScalarFloatMode();
   f30 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r10) + -23280)));
   // lfs f29,7156(r11)
-  temp.u32 = guest::LoadU32(base, schema::RaceProgress(base, uint32_t(r11)).race_length_address());
+  temp.u32 = guest::LoadU32(base, schema::RaceProgressPart(base, uint32_t(r11)).unknown_7156_address());
   f29 = double(temp.f32);
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));

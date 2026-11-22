@@ -1028,7 +1028,7 @@ struct X3DAudioDelays : View {
   uint32_t delay_1_address() const { return address + 4; }
 };
 
-// embedded; measure: X3DVec, X3DVec::Cross.r4, X3DVec::Cross.r5, X3DVec::Dot.r4, X3DVec::Sub.r4, X3DVec::Sub.r5
+// embedded; measure: X3DVec, X3DVec::Cross.r4, X3DVec::Cross.r5, X3DVec::Dot.r4, X3DVec::Sub.r4, X3DVec::Sub.r5, X3DAudio::Matrix.r4
 struct X3DAudioVector : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
@@ -1041,6 +1041,54 @@ struct X3DAudioVector : View {
   float z() const { return guest::LoadFloat(base, address + 8); }
   void set_z(float v) const { guest::StoreFloat(base, address + 8, v); }
   uint32_t z_address() const { return address + 8; }
+};
+
+// embedded; measure: CarSound@+736
+struct CarSoundAt736 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 56;
+  uint32_t unknown_40() const { return guest::LoadU32(base, address + 40); }
+  void set_unknown_40(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
+  uint32_t unknown_40_address() const { return address + 40; }
+  uint32_t unknown_48() const { return guest::LoadU32(base, address + 48); }
+  void set_unknown_48(uint32_t v) const { guest::StoreU32(base, address + 48, v); }
+  uint32_t unknown_48_address() const { return address + 48; }
+  uint32_t unknown_52() const { return guest::LoadU32(base, address + 52); }
+  void set_unknown_52(uint32_t v) const { guest::StoreU32(base, address + 52, v); }
+  uint32_t unknown_52_address() const { return address + 52; }
+};
+
+// embedded; measure: CarSound@+840
+struct CarSoundAt840 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 46;
+  uint32_t unknown_40() const { return guest::LoadU32(base, address + 40); }
+  void set_unknown_40(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
+  uint32_t unknown_40_address() const { return address + 40; }
+  uint8_t unknown_45() const { return guest::LoadU8(base, address + 45); }
+  void set_unknown_45(uint8_t v) const { guest::StoreU8(base, address + 45, v); }
+  uint32_t unknown_45_address() const { return address + 45; }
+};
+
+// embedded; measure: CarSound@+888
+struct CarSoundAt888 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 64;
+  uint32_t unknown_40() const { return guest::LoadU32(base, address + 40); }
+  void set_unknown_40(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
+  uint32_t unknown_40_address() const { return address + 40; }
+  uint32_t unknown_48() const { return guest::LoadU32(base, address + 48); }
+  void set_unknown_48(uint32_t v) const { guest::StoreU32(base, address + 48, v); }
+  uint32_t unknown_48_address() const { return address + 48; }
+  uint32_t unknown_52() const { return guest::LoadU32(base, address + 52); }
+  void set_unknown_52(uint32_t v) const { guest::StoreU32(base, address + 52, v); }
+  uint32_t unknown_52_address() const { return address + 52; }
+  float unknown_56() const { return guest::LoadFloat(base, address + 56); }
+  void set_unknown_56(float v) const { guest::StoreFloat(base, address + 56, v); }
+  uint32_t unknown_56_address() const { return address + 56; }
+  float unknown_60() const { return guest::LoadFloat(base, address + 60); }
+  void set_unknown_60(float v) const { guest::StoreFloat(base, address + 60, v); }
+  uint32_t unknown_60_address() const { return address + 60; }
 };
 
 // The image words docs/functions/car-sounds.md's code uses.

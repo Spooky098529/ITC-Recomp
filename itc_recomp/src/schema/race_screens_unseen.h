@@ -513,6 +513,15 @@ struct Kind6StatsSpec : View {
   uint32_t column_2_address() const { return address + 12; }
 };
 
+// embedded; measure: new<360>@Kind6Menu::Create
+struct Kind6MenuPart : View {
+  using View::View;
+  static constexpr uint32_t kSize = 344;
+  uint32_t unknown_340() const { return guest::LoadU32(base, address + 340); }
+  void set_unknown_340(uint32_t v) const { guest::StoreU32(base, address + 340, v); }
+  uint32_t unknown_340_address() const { return address + 340; }
+};
+
 // The image words docs/functions/race-screens-unseen.md's code uses.
 struct RaceScreensUnseenGlobals {
   // kind 4's pause menu (the holder's +1016)

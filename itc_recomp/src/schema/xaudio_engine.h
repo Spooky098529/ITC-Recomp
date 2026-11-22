@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: XAudioAllocator, sub_824604E8.ret, XAudioEngine.+8, XAudioMasteringVoice.+8, sub_8245B170.r3.+8, XAudioEngine::XAudioEngine.r4, AudioRenderDriver::Create.r4, PcmCodec::Create.r4, Reverb::Create.r4, VolumeMeter::Create.r4, XAudioMatrix::Create.r4, XmaCodec::Create.r4, PacketLists::Alloc.r5, VolumeMeter::Init.r5, XAudioMatrix::Init.r5, XmaCodec::XmaCodec.r5, sub_825A50E0.r4, sub_825A5DB8.r4, XAudioVoice.+8, XAudio::GetAllocator.r5.+0, XAudioObject.+8, XAudioBuffer::XAudioBuffer.r5, XAudioBuffer::Create.r4
+// allocated; measure: XAudioAllocator, XAudioEngine.+8, XAudioMasteringVoice.+8, sub_8245B170.r3.+8, XAudioEngine::XAudioEngine.r4, AudioRenderDriver::Create.r4, PcmCodec::Create.r4, Reverb::Create.r4, VolumeMeter::Create.r4, XAudioMatrix::Create.r4, XmaCodec::Create.r4, PacketLists::Alloc.r5, VolumeMeter::Init.r5, XAudioMatrix::Init.r5, XmaCodec::XmaCodec.r5, sub_825A50E0.r4, sub_825A5DB8.r4, XAudioVoice.+8, XAudio::GetAllocator.r5.+0, XAudioObject.+8, XAudioBuffer::XAudioBuffer.r5, XAudioBuffer::Create.r4, sub_824603A0.r3@-4
 struct XAudioBumpAllocator : View {
   using View::View;
   static constexpr uint32_t kSize = 28;
@@ -74,7 +74,7 @@ struct XAudioBumpAllocatorVtable : View {
   uint32_t allocate_address() const { return address + 20; }
 };
 
-// embedded; measure: sub_824603A8.r3, sub_82460370.r3
+// embedded; measure: sub_824603A8.r3, sub_8246D330.r3@-4
 struct XAudioAllocatorInterface : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
@@ -99,7 +99,7 @@ struct XAudioAllocatorInterfaceVtable : View {
   uint32_t destructor_address() const { return address + 0; }
 };
 
-// allocated; measure: new<?>@XAudio::Alloc
+// allocated; measure: new<?>@XAudio::Alloc, new<?>@XAudio::Alloc.+8
 struct XAudioAllocBlock : View {
   using View::View;
   static constexpr uint32_t kSize = 76;
@@ -208,7 +208,7 @@ struct XAudioProcessors : View {
   uint32_t thread_kinds_address() const { return address + 2; }
 };
 
-// allocated; measure: XAudioFactory, sub_8245D650.r3, sub_8245D6D8.r3, sub_8245D760.r3, sub_8245D970.r3
+// allocated; measure: XAudioFactory, sub_8245D650.r3, sub_8245D6D8.r3, sub_8245D760.r3, sub_8245D970.r3, XAudioEngine.+0
 struct XAudioFactory : View {
   using View::View;
   static constexpr uint32_t kSize = 24;
@@ -357,7 +357,7 @@ struct XAudioStage : View {
   uint32_t mixed_address() const { return address + 40; }
 };
 
-// embedded; measure: XAudioEngine::RunStage.r4.+36, XAudioEngine::RunStage.r4.+40, XAudioEngine::StageOf.ret.+40, sub_8245FE88.r3.+24, sub_8245FE88.r3.+28, PacketList::Next.ret
+// embedded; measure: XAudioEngine::RunStage.r4.+36, XAudioEngine::RunStage.r4.+40, XAudioEngine::StageOf.ret.+40, PacketList::Next.ret, sub_8245FE88.r3@+24
 struct XAudioList : View {
   using View::View;
   static constexpr uint32_t kSize = 12;

@@ -39,7 +39,7 @@ struct RenderQueue : View {
   uint32_t list_0_address() const { return address + 12; }
 };
 
-// gpu; measure: RenderQueue.+0, Font.+8.+0, Scene.+0
+// gpu; measure: RenderQueue.+0, Font.+8.+0
 struct RenderQueueVtable : View {
   using View::View;
   static constexpr uint32_t kSize = 40;

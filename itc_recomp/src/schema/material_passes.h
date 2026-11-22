@@ -283,7 +283,7 @@ struct PaintRgb : View {
   uint32_t alpha_address() const { return address + 12; }
 };
 
-// file; measure: Color::HsvToRgb_8224AB50.r4
+// file; measure: Color::HsvToRgb_8224AB50.r4, new<32>@CarDealer::OpenColors@+16, new<32>@PanelSetBase::SetUpColors@+16
 struct HsvColor : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
@@ -319,20 +319,12 @@ struct CarDealerSwatch : View {
   uint32_t red() const { return guest::LoadU32(base, address + 0); }
   void set_red(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t red_address() const { return address + 0; }
-  // measure fault: Color::HsvToRgb's r4 is the swatch's +16 (an HsvColor), not the swatch
-  uint64_t fault_hsv_0() const { return guest::LoadU64(base, address + 0); }
-  void set_fault_hsv_0(uint64_t v) const { guest::StoreU64(base, address + 0, v); }
-  uint32_t fault_hsv_0_address() const { return address + 0; }
   uint32_t green() const { return guest::LoadU32(base, address + 4); }
   void set_green(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t green_address() const { return address + 4; }
   uint32_t blue() const { return guest::LoadU32(base, address + 8); }
   void set_blue(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t blue_address() const { return address + 8; }
-  // measure fault: as fault_hsv_0
-  uint64_t fault_hsv_8() const { return guest::LoadU64(base, address + 8); }
-  void set_fault_hsv_8(uint64_t v) const { guest::StoreU64(base, address + 8, v); }
-  uint32_t fault_hsv_8_address() const { return address + 8; }
   // the color record's halfword +4
   float hue() const { return guest::LoadFloat(base, address + 16); }
   void set_hue(float v) const { guest::StoreFloat(base, address + 16, v); }

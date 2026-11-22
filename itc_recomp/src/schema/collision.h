@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: BoxShape, Shape, CollisionObject.+32, sub_820BAB48.r4, sub_820BAB48.ret, sub_820BB688.r3, sub_820BB688.r4, BoxShape::Place.r5, sub_822BE2C8.ret, sub_820911F8.ret, sub_820BA1D0.r3, sub_820B9C30.r3, sub_820BC560.r5, Part464::Restore.r4, Part464::Save.r4, Vehicle.+344, WallQuery.+12.+0
+// allocated; measure: BoxShape, Shape, CollisionObject.+32, sub_820BAB48.r4, sub_820BAB48.ret, sub_820BB688.r3, sub_820BB688.r4, BoxShape::Place.r5, sub_822BE2C8.ret, sub_820911F8.ret, sub_820BA1D0.r3, sub_820B9C30.r3, sub_820BC560.r5, Part464::Restore.r4, Part464::Save.r4, Vehicle.+344, WallQuery.+12.+0, AiDriver.+160.+344
 struct BoxShape : View {
   using View::View;
   static constexpr uint32_t kSize = 496;
@@ -717,7 +717,7 @@ struct CollisionBlock : View {
   uint32_t corner_outcode_address() const { return address + 96; }
 };
 
-// embedded; measure: BoxBox
+// embedded; measure: BoxBox, BoxBox.+12
 struct CollisionBoxBoxArgs : View {
   using View::View;
   static constexpr uint32_t kSize = 100;
@@ -725,120 +725,57 @@ struct CollisionBoxBoxArgs : View {
   uint32_t fault_query_shape_a() const { return guest::LoadU32(base, address + 0); }
   void set_fault_query_shape_a(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t fault_query_shape_a_address() const { return address + 0; }
-  float fault_block_row0_x() const { return guest::LoadFloat(base, address + 0); }
-  void set_fault_block_row0_x(float v) const { guest::StoreFloat(base, address + 0, v); }
-  uint32_t fault_block_row0_x_address() const { return address + 0; }
   uint32_t fault_query_shape_b() const { return guest::LoadU32(base, address + 4); }
   void set_fault_query_shape_b(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t fault_query_shape_b_address() const { return address + 4; }
-  float fault_block_row0_y() const { return guest::LoadFloat(base, address + 4); }
-  void set_fault_block_row0_y(float v) const { guest::StoreFloat(base, address + 4, v); }
-  uint32_t fault_block_row0_y_address() const { return address + 4; }
   uint32_t fault_query_b_in_a_previous() const { return guest::LoadU32(base, address + 8); }
   void set_fault_query_b_in_a_previous(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t fault_query_b_in_a_previous_address() const { return address + 8; }
-  float fault_block_row0_z() const { return guest::LoadFloat(base, address + 8); }
-  void set_fault_block_row0_z(float v) const { guest::StoreFloat(base, address + 8, v); }
-  uint32_t fault_block_row0_z_address() const { return address + 8; }
   uint32_t fault_query_b_in_a_current() const { return guest::LoadU32(base, address + 12); }
   void set_fault_query_b_in_a_current(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
   uint32_t fault_query_b_in_a_current_address() const { return address + 12; }
   uint32_t fault_query_a_in_b_previous() const { return guest::LoadU32(base, address + 16); }
   void set_fault_query_a_in_b_previous(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
   uint32_t fault_query_a_in_b_previous_address() const { return address + 16; }
-  float fault_block_row1_x() const { return guest::LoadFloat(base, address + 16); }
-  void set_fault_block_row1_x(float v) const { guest::StoreFloat(base, address + 16, v); }
-  uint32_t fault_block_row1_x_address() const { return address + 16; }
   uint32_t fault_query_a_in_b_current() const { return guest::LoadU32(base, address + 20); }
   void set_fault_query_a_in_b_current(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
   uint32_t fault_query_a_in_b_current_address() const { return address + 20; }
-  float fault_block_row1_y() const { return guest::LoadFloat(base, address + 20); }
-  void set_fault_block_row1_y(float v) const { guest::StoreFloat(base, address + 20, v); }
-  uint32_t fault_block_row1_y_address() const { return address + 20; }
   float fault_block_row1_z() const { return guest::LoadFloat(base, address + 24); }
   void set_fault_block_row1_z(float v) const { guest::StoreFloat(base, address + 24, v); }
   uint32_t fault_block_row1_z_address() const { return address + 24; }
   float fault_query_contact_point_x() const { return guest::LoadFloat(base, address + 32); }
   void set_fault_query_contact_point_x(float v) const { guest::StoreFloat(base, address + 32, v); }
   uint32_t fault_query_contact_point_x_address() const { return address + 32; }
-  float fault_block_row2_x() const { return guest::LoadFloat(base, address + 32); }
-  void set_fault_block_row2_x(float v) const { guest::StoreFloat(base, address + 32, v); }
-  uint32_t fault_block_row2_x_address() const { return address + 32; }
   float fault_query_contact_point_y() const { return guest::LoadFloat(base, address + 36); }
   void set_fault_query_contact_point_y(float v) const { guest::StoreFloat(base, address + 36, v); }
   uint32_t fault_query_contact_point_y_address() const { return address + 36; }
-  float fault_block_row2_y() const { return guest::LoadFloat(base, address + 36); }
-  void set_fault_block_row2_y(float v) const { guest::StoreFloat(base, address + 36, v); }
-  uint32_t fault_block_row2_y_address() const { return address + 36; }
   float fault_query_contact_point_z() const { return guest::LoadFloat(base, address + 40); }
   void set_fault_query_contact_point_z(float v) const { guest::StoreFloat(base, address + 40, v); }
   uint32_t fault_query_contact_point_z_address() const { return address + 40; }
-  float fault_block_row2_z() const { return guest::LoadFloat(base, address + 40); }
-  void set_fault_block_row2_z(float v) const { guest::StoreFloat(base, address + 40, v); }
-  uint32_t fault_block_row2_z_address() const { return address + 40; }
   float fault_query_contact_normal_x() const { return guest::LoadFloat(base, address + 48); }
   void set_fault_query_contact_normal_x(float v) const { guest::StoreFloat(base, address + 48, v); }
   uint32_t fault_query_contact_normal_x_address() const { return address + 48; }
-  float fault_block_center_x() const { return guest::LoadFloat(base, address + 48); }
-  void set_fault_block_center_x(float v) const { guest::StoreFloat(base, address + 48, v); }
-  uint32_t fault_block_center_x_address() const { return address + 48; }
   float fault_query_contact_normal_y() const { return guest::LoadFloat(base, address + 52); }
   void set_fault_query_contact_normal_y(float v) const { guest::StoreFloat(base, address + 52, v); }
   uint32_t fault_query_contact_normal_y_address() const { return address + 52; }
-  float fault_block_center_y() const { return guest::LoadFloat(base, address + 52); }
-  void set_fault_block_center_y(float v) const { guest::StoreFloat(base, address + 52, v); }
-  uint32_t fault_block_center_y_address() const { return address + 52; }
   float fault_query_contact_normal_z() const { return guest::LoadFloat(base, address + 56); }
   void set_fault_query_contact_normal_z(float v) const { guest::StoreFloat(base, address + 56, v); }
   uint32_t fault_query_contact_normal_z_address() const { return address + 56; }
-  float fault_block_center_z() const { return guest::LoadFloat(base, address + 56); }
-  void set_fault_block_center_z(float v) const { guest::StoreFloat(base, address + 56, v); }
-  uint32_t fault_block_center_z_address() const { return address + 56; }
   float fault_query_contact_push_x() const { return guest::LoadFloat(base, address + 64); }
   void set_fault_query_contact_push_x(float v) const { guest::StoreFloat(base, address + 64, v); }
   uint32_t fault_query_contact_push_x_address() const { return address + 64; }
-  uint32_t fault_block_outcode() const { return guest::LoadU32(base, address + 64); }
-  void set_fault_block_outcode(uint32_t v) const { guest::StoreU32(base, address + 64, v); }
-  uint32_t fault_block_outcode_address() const { return address + 64; }
   float fault_query_contact_depth() const { return guest::LoadFloat(base, address + 80); }
   void set_fault_query_contact_depth(float v) const { guest::StoreFloat(base, address + 80, v); }
   uint32_t fault_query_contact_depth_address() const { return address + 80; }
-  float fault_block_corner_x() const { return guest::LoadFloat(base, address + 80); }
-  void set_fault_block_corner_x(float v) const { guest::StoreFloat(base, address + 80, v); }
-  uint32_t fault_block_corner_x_address() const { return address + 80; }
   float fault_query_contact_time() const { return guest::LoadFloat(base, address + 84); }
   void set_fault_query_contact_time(float v) const { guest::StoreFloat(base, address + 84, v); }
   uint32_t fault_query_contact_time_address() const { return address + 84; }
-  float fault_block_corner_y() const { return guest::LoadFloat(base, address + 84); }
-  void set_fault_block_corner_y(float v) const { guest::StoreFloat(base, address + 84, v); }
-  uint32_t fault_block_corner_y_address() const { return address + 84; }
   float fault_query_unknown_88() const { return guest::LoadFloat(base, address + 88); }
   void set_fault_query_unknown_88(float v) const { guest::StoreFloat(base, address + 88, v); }
   uint32_t fault_query_unknown_88_address() const { return address + 88; }
-  float fault_block_corner_z() const { return guest::LoadFloat(base, address + 88); }
-  void set_fault_block_corner_z(float v) const { guest::StoreFloat(base, address + 88, v); }
-  uint32_t fault_block_corner_z_address() const { return address + 88; }
   float fault_query_direction_x() const { return guest::LoadFloat(base, address + 96); }
   void set_fault_query_direction_x(float v) const { guest::StoreFloat(base, address + 96, v); }
   uint32_t fault_query_direction_x_address() const { return address + 96; }
-  uint32_t fault_block_corner_outcode() const { return guest::LoadU32(base, address + 96); }
-  void set_fault_block_corner_outcode(uint32_t v) const { guest::StoreU32(base, address + 96, v); }
-  uint32_t fault_block_corner_outcode_address() const { return address + 96; }
-  // BoxBox::MoveCorners' r3 is a block's corners (+80): corner k's x, y, z and its outcode +16
-  float fault_corner_x() const { return guest::LoadFloat(base, address + 0); }
-  void set_fault_corner_x(float v) const { guest::StoreFloat(base, address + 0, v); }
-  uint32_t fault_corner_x_address() const { return address + 0; }
-  uint32_t fault_corner_outcode() const { return guest::LoadU32(base, address + 16); }
-  void set_fault_corner_outcode(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
-  uint32_t fault_corner_outcode_address() const { return address + 16; }
-  // BoxBox::EdgesCrossing's r3: its 12 words out (a frame's)
-  uint32_t fault_crossing_flag() const { return guest::LoadU32(base, address + 0); }
-  void set_fault_crossing_flag(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t fault_crossing_flag_address() const { return address + 0; }
-  // BoxBox::FaceSeparates' r3: a face's distance (a BoxShapeFace)
-  float fault_face_distance() const { return guest::LoadFloat(base, address + 0); }
-  void set_fault_face_distance(float v) const { guest::StoreFloat(base, address + 0, v); }
-  uint32_t fault_face_distance_address() const { return address + 0; }
 };
 
 // embedded; measure: BoxBox::FaceSeparates.r4

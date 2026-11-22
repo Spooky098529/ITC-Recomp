@@ -339,7 +339,8 @@ fields = [
 # Input classes met at their destructors (the input area's; the measure files
 # them here, list::clear being ours).
 [InputManagerAtTeardown]
-measure = "sub_82098FF8.ret"
+measure = "sub_82098F30.r3"
+measures = ["sub_82098FF8.ret@+792"]
 size = 3976
 origin = "allocated"
 fields = [

@@ -128,7 +128,7 @@ struct TilingWorkerState : View {
   uint32_t last_worker_cpu_address() const { return address + 396; }
 };
 
-// gpu; measure: Device.+0.+36
+// gpu; measure: Device.+0.+36, Device.+0.+84
 struct TilingChainWords : View {
   using View::View;
   static constexpr uint32_t kSize = 264;

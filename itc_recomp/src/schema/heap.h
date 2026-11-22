@@ -90,7 +90,7 @@ struct HeapListEntry : View {
   uint32_t previous_address() const { return address + 4; }
 };
 
-// allocated; measure: HeapFree.r5, HeapSize.r5, new<?>@HeapReAlloc, [8297149C].+384.+0.+4
+// allocated; measure: HeapFree.r5, HeapSize.r5, new<?>@HeapReAlloc, [8297149C].+384.+0.+4, HeapReAlloc.r5
 struct HeapBlock : View {
   using View::View;
   static constexpr uint32_t kSize = 0;
@@ -212,7 +212,7 @@ struct VtableObject : View {
   uint32_t vtable_address() const { return address + 0; }
 };
 
-// allocated; measure: sub_82090D68.ret
+// allocated; measure: sub_82090D60.r3@-4
 struct DualVtableObject : View {
   using View::View;
   static constexpr uint32_t kSize = 8;

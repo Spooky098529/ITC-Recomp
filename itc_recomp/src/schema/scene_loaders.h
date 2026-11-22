@@ -401,7 +401,7 @@ struct Interior : View {
   uint32_t first_set_address() const { return address + 3092; }
 };
 
-// allocated; measure: Pool4Object, sub_820D69B8.r6
+// allocated; measure: Pool4Object, sub_820D69B8.r6, SceneLights.+13152
 struct Pool4Object : View {
   using View::View;
   static constexpr uint32_t kSize = 592;
@@ -521,6 +521,24 @@ struct WheelsLoads : View {
   uint32_t provider_vtable_address() const { return address + 2048; }
   uint32_t caliper_slots_address() const { return address + 2088; }
   uint32_t calipers_address() const { return address + 2144; }
+};
+
+// embedded; measure: CarParts@+5280
+struct CarPartsAt5280 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 416;
+  uint32_t unknown_412() const { return guest::LoadU32(base, address + 412); }
+  void set_unknown_412(uint32_t v) const { guest::StoreU32(base, address + 412, v); }
+  uint32_t unknown_412_address() const { return address + 412; }
+};
+
+// embedded; measure: ScenePools@+52
+struct ScenePoolsAt52 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
 };
 
 // The image words docs/functions/scene-loaders.md's code uses.

@@ -30,7 +30,8 @@
 # +360000) and other areas' objects (Race's +3888 to +104928, inside
 # `neighbors`).
 [RaceManager]
-measures = ["Race", "RaceManager"]
+measure = "Race"
+measures = ["RaceManager", "RaceManager::MoveUnseen.r4"]
 size = 363592
 origin = "allocated"
 fields = [
@@ -75,6 +76,7 @@ fields = [
 # +144, +176 and such), so the measure's accesses are the first node's.
 [RaceSortedList]
 measure = "SortedList"
+measures = ["SortedList.+1604.+8", "SortedList.+1604.+8.+12", "SortedList.+1604", "SortedList.+1604.+8.+12.+8"]
 size = 1612
 origin = "embedded"
 fields = [
@@ -264,3 +266,34 @@ start_back_step = { address = 0x82008E3C, type = "f32", note = "the start's step
 start_group_step = { address = 0x82008E34, type = "f32", note = "the step between start entries (image)" }
 start_rows = { address = 0x82008E14, type = "bytes", count = 12, note = "a halfword a row (0 to 5): an index into start_split_sections, 0x8000 or more for none (image)" }
 start_split_sections = { address = 0x82008DE8, type = "u16", note = "the split groups' sections, halfwords (image)" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from RaceManager.
+[RaceManagerAt48]
+measure = "Race@+48"
+size = 6014
+origin = "embedded"
+fields = [
+  { name = "unknown_6008", offset = 6008, type = "u32" },
+  { name = "unknown_6012", offset = 6012, type = "u16" },
+]
+
+# Split from RaceManager.
+[RaceManagerAt32]
+measure = "RaceManager@+32"
+size = 24
+origin = "embedded"
+fields = [
+  { name = "unknown_20", offset = 20, type = "u32" },
+]
+
+# Split from RaceManager.
+[RaceManagerAt4]
+measure = "RaceManager@+4"
+size = 24
+origin = "embedded"
+fields = [
+  { name = "unknown_20", offset = 20, type = "u32" },
+]

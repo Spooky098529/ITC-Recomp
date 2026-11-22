@@ -92,7 +92,6 @@ size = 28
 origin = "embedded"
 fields = [
   { name = "flags", offset = 0, type = "u32", note = "0x4 and 0x8 the two human cars (probably), 0x1 a racer the minimap shows unless 0x20, 0x10 shown without a rival type; also 0x2 traffic, 0x40 has a vehicle (race-world.md)" },
-  { name = "fault_scaling_m00", offset = 0, type = "f32", note = "measure fault: Minimap::Scaling's r3 is its out matrix (the x scale)" },
   { name = "number", offset = 4, type = "u32", note = "the entry's number (race-world.md)" },
   { name = "position", offset = 8, type = "u32", note = "section and slice read as one word (Minimap::Draw's copy of the player's)" },
   { name = "section", offset = 8, type = "u16", note = "the route section it's on (-1 none, signed)" },
@@ -100,7 +99,6 @@ fields = [
   { name = "slice_ticks", offset = 12, type = "f32", note = "ticks gathered toward the next slice while it has no vehicle (race-world.md)" },
   { name = "traffic_number", offset = 16, type = "u32", note = "the traffic's, mod 42 (race-world.md)" },
   { name = "vehicle_index", offset = 20, type = "u32", note = "-1 none (race-world.md)" },
-  { name = "fault_scaling_m11", offset = 20, type = "f32", note = "measure fault: Minimap::Scaling's out matrix (the y scale)" },
   { name = "record", offset = 24, type = "u32", note = "its racer record's index in the race data's +48 (3,936 bytes each)" },
   { name = "fault_scaling_m22", offset = 40, type = "f32", note = "measure fault: Minimap::Scaling's out matrix (the z scale)" },
 ]

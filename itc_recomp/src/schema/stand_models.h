@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: GarageStage, GarageLights
+// allocated; measure: GarageStage, GarageLights, GarageStage.+0
 struct GarageStage : View {
   using View::View;
   static constexpr uint32_t kSize = 6208;
@@ -251,7 +251,7 @@ struct GarageStage : View {
   uint32_t rear_axle_zw_address() const { return address + 6200; }
 };
 
-// allocated; measure: TrafficCar, SceneModel.+5100.+16780
+// allocated; measure: TrafficCar, SceneCockpit.+28, SceneTraffic.+9768, SceneModel.+5092.+9760
 struct TrafficCar : View {
   using View::View;
   static constexpr uint32_t kSize = 16780;
@@ -814,6 +814,30 @@ struct StandModelsSpecCopy : View {
   uint32_t car_id() const { return guest::LoadU32(base, address + 8432); }
   void set_car_id(uint32_t v) const { guest::StoreU32(base, address + 8432, v); }
   uint32_t car_id_address() const { return address + 8432; }
+};
+
+// embedded; measure: GarageStage.+0@+32
+struct GarageStageAt32 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 60;
+  float unknown_48() const { return guest::LoadFloat(base, address + 48); }
+  void set_unknown_48(float v) const { guest::StoreFloat(base, address + 48, v); }
+  uint32_t unknown_48_address() const { return address + 48; }
+  float unknown_52() const { return guest::LoadFloat(base, address + 52); }
+  void set_unknown_52(float v) const { guest::StoreFloat(base, address + 52, v); }
+  uint32_t unknown_52_address() const { return address + 52; }
+  float unknown_56() const { return guest::LoadFloat(base, address + 56); }
+  void set_unknown_56(float v) const { guest::StoreFloat(base, address + 56, v); }
+  uint32_t unknown_56_address() const { return address + 56; }
+};
+
+// embedded; measure: TrafficCar@+160
+struct TrafficCarAt160 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 11456;
+  uint32_t unknown_11452() const { return guest::LoadU32(base, address + 11452); }
+  void set_unknown_11452(uint32_t v) const { guest::StoreU32(base, address + 11452, v); }
+  uint32_t unknown_11452_address() const { return address + 11452; }
 };
 
 // The image words docs/functions/stand-models.md's code uses.

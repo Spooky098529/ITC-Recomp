@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// embedded; measure: PanelSetBase
+// embedded; measure: PanelSetBase, PanelSetBase.+1820
 struct PanelSetBase : View {
   using View::View;
   static constexpr uint32_t kSize = 1972;

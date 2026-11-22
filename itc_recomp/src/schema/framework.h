@@ -173,7 +173,7 @@ struct Framework : View {
   uint32_t app_finished_address() const { return address + 134; }
 };
 
-// image; measure: App::Run.r4.+0, Framework.+0
+// image; measure: App::Run.r4.+0, Framework@+48.+0, Framework@+44.+0
 struct FrameworkVtable : View {
   using View::View;
   static constexpr uint32_t kSize = 24;
@@ -240,7 +240,7 @@ struct FrameworkGetterSelf : View {
   uint32_t word_88_address() const { return address + 88; }
 };
 
-// embedded; measure: FrameStart.+4, sub_82094350.r3.+20
+// embedded; measure: FrameStart.+4, sub_820944C8.r3@-12.+20
 struct FrameworkInterface : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
@@ -251,7 +251,7 @@ struct FrameworkInterface : View {
   uint32_t vtable_address() const { return address + 0; }
 };
 
-// image; measure: FrameStart.+4.+0, sub_82094350.r3.+20.+0
+// image; measure: FrameStart.+4.+0, sub_820944C8.r3@-12.+20.+0
 struct FrameworkInterfaceVtable : View {
   using View::View;
   static constexpr uint32_t kSize = 44;
@@ -300,7 +300,7 @@ struct FrameworkAppInterfaceVtable : View {
   uint32_t is_running_address() const { return address + 44; }
 };
 
-// embedded; measure: sub_82094350.r3
+// embedded; measure: sub_820944C8.r3@-12
 struct AppPart4 : View {
   using View::View;
   static constexpr uint32_t kSize = 24;
@@ -484,7 +484,7 @@ struct DelegateTargetVtable : View {
   uint32_t slot_1_address() const { return address + 4; }
 };
 
-// embedded; measure: HandlerMap, HandlerMap::Insert.r4, sub_82093638.r4, sub_82093850.r3
+// embedded; measure: HandlerMap, HandlerMap::Insert.r4, sub_82093638.r4, sub_82093850.r3, HandlerMap::InsertNode.r4
 struct HandlerMap : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
@@ -515,7 +515,7 @@ struct HandlerMap : View {
   uint32_t result_functor_8_address() const { return address + 8; }
 };
 
-// allocated; measure: new<?>@HandlerMap::AllocateNodes, HandlerMap.+4.+8, HandlerMap::Insert.r4.+4, HandlerMap::Insert.r4.+4.+0, HandlerMap::Insert.r4.+4.+0.+8, HandlerMap::NewNode.ret, HandlerMap::NewNode.ret.+4, HandlerMap::NewNode.ret.+4.+8, HandlerMap::RotateLeft.r4, HandlerMap::RotateLeft.r4.+4, HandlerMap::RotateLeft.r4.+8, HandlerMap::RotateLeft.r4.+8.+0, HandlerMap::RotateRight.r4.+0.+4, HandlerMap::RotateRight.r4.+0.+4.+0, HandlerMap::RotateRight.r4.+0.+4.+0.+8, sub_82091AE8.r3.+4, sub_82091AE8.r3.+4.+0, sub_82091AE8.r3.+4.+8, sub_82099B18.r3.+4, sub_82099B18.r3.+4.+0, sub_82099B18.r3.+4.+8, sub_82099BA8.r4, sub_82099BA8.r4.+0, sub_82093638.r4.+4, sub_82093850.r3.+4, sub_8209A008.r3.+20, App.+8, App::ApplyRequest.ret.+4.+8
+// allocated; measure: new<?>@HandlerMap::AllocateNodes, HandlerMap.+4.+8, HandlerMap::Insert.r4.+4, HandlerMap::Insert.r4.+4.+0, HandlerMap::Insert.r4.+4.+0.+8, HandlerMap::NewNode.ret, HandlerMap::NewNode.ret.+4, HandlerMap::NewNode.ret.+4.+8, HandlerMap::RotateLeft.r4, HandlerMap::RotateLeft.r4.+4, HandlerMap::RotateLeft.r4.+8, HandlerMap::RotateLeft.r4.+8.+0, sub_82091AE8.r3.+4, sub_82091AE8.r3.+4.+0, sub_82091AE8.r3.+4.+8, sub_82099B18.r3.+4, sub_82099B18.r3.+4.+0, sub_82099B18.r3.+4.+8, sub_82099BA8.r4, sub_82099BA8.r4.+0, sub_82093638.r4.+4, sub_82093850.r3.+4, sub_8209A008.r3.+20, App.+8, HandlerMap::InsertNode.r4.+4, HandlerMap::InsertNode.r6.+8, HandlerMap::InsertNode.r6.+8.+4, HandlerMap::InsertNode.r6.+8.+0, HandlerMap::InsertNode.r6.+8.+0.+8
 struct HandlerMapNode : View {
   using View::View;
   static constexpr uint32_t kSize = 24;
@@ -943,6 +943,33 @@ struct MorphJobMaker : View {
   void set_worker_pool(const View& v) const { guest::StoreU32(base, address + 4, v.address); }
   void set_worker_pool(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t worker_pool_address() const { return address + 4; }
+};
+
+// embedded; measure: Framework@+44
+struct FrameworkAt44 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: Framework@+48
+struct FrameworkAt48 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: new<296>@WorkerPool::Create@+28
+struct WorkerPoolAt28 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
 };
 
 // The image words docs/functions/framework.md's code uses.

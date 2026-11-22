@@ -282,7 +282,7 @@ struct ScreenObjectUvMap : View {
   uint32_t fault_node_is_nil_address() const { return address + 41; }
 };
 
-// allocated; measure: UvMap.+4, UvMap.+4.+0, UvMap.+4.+8, UvMap.+4.+8.+0, UvMap.+8, VideoOutput.+276, VideoOutput.+276.+4, new<?>@UvMap::AllocateNodes.+4, new<?>@UvMap::AllocateNodes.+4.+0, new<?>@UvMap::AllocateNodes.+4.+0.+8, new<?>@UvMap::AllocateNodes.+4.+8, new<?>@UvMap::AllocateNodes.+4.+8.+0, UvMap::EraseSubtree.r4, UvMap::EraseSubtree.r4.+0
+// allocated; measure: UvMap.+4, UvMap.+4.+0, UvMap.+4.+8, UvMap.+4.+8.+0, VideoOutput.+276, new<?>@UvMap::AllocateNodes.+4, new<?>@UvMap::AllocateNodes.+4.+0, new<?>@UvMap::AllocateNodes.+4.+0.+8, new<?>@UvMap::AllocateNodes.+4.+8, new<?>@UvMap::AllocateNodes.+4.+8.+0, UvMap::EraseSubtree.r4, UvMap::EraseSubtree.r4.+0, UvMap.+4.+0.+8
 struct ScreenObjectUvMapNode : View {
   using View::View;
   static constexpr uint32_t kSize = 48;
@@ -333,7 +333,7 @@ struct ScreenObjectUvMapNode : View {
   uint32_t is_nil_address() const { return address + 41; }
 };
 
-// embedded; measure: UvMap::InsertUnique.r5, UvMap::ConstructNode.r7, UvMap::ConstructNode.r7.+4
+// embedded; measure: UvMap::InsertUnique.r5, UvMap::ConstructNode.r7, UvMap::ConstructNode.r7@+8.+4
 struct ScreenObjectUvMapValue : View {
   using View::View;
   static constexpr uint32_t kSize = 20;
@@ -356,10 +356,6 @@ struct ScreenObjectUvMapValue : View {
   uint32_t column_size() const { return guest::LoadU32(base, address + 16); }
   void set_column_size(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
   uint32_t column_size_address() const { return address + 16; }
-  // measure fault: a column's +8 met here
-  uint32_t fault_column_head() const { return guest::LoadU32(base, address + 8); }
-  void set_fault_column_head(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t fault_column_head_address() const { return address + 8; }
 };
 
 // embedded; measure: UvColumn, UvColumn::Find.r4, UvColumn::InsertUnique.r4
@@ -531,6 +527,18 @@ struct StdWordVectorOwner : View {
   void set_vector(const View& v) const { guest::StoreU32(base, address + 4, v.address); }
   void set_vector(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t vector_address() const { return address + 4; }
+};
+
+// embedded; measure: UvMap::ConstructNode.r7@+8
+struct ScreenObjectUvMapValueAt8 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 12;
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
 };
 
 // The image words docs/functions/screen-objects.md's code uses.

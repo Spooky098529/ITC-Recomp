@@ -172,7 +172,8 @@ fields = [
 # the status word (type 6 +9756, type 7 +9760). UI movies 16 (the yes/no)
 # to 19 (the notice).
 [Type67Dialog]
-measures = ["Type6Dialog", "Type7Dialog", "Dialog"]
+measure = "Type6Dialog"
+measures = ["Type7Dialog", "Dialog", "Type6Mode.+816", "Type7Mode.+816"]
 size = 9764
 origin = "embedded"
 fields = [

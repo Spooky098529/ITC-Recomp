@@ -157,7 +157,7 @@ struct PowerCurveEngine : View {
   uint32_t torque_points_address() const { return address + 24; }
 };
 
-// embedded; measure: PowerCurve::Build.r4
+// embedded; measure: PowerCurve::FromEngine.r4@+24
 struct PowerCurvePoints : View {
   using View::View;
   static constexpr uint32_t kSize = 132;

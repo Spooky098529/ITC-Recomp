@@ -21,6 +21,7 @@
 # A playing cue (24 bytes, Sound::Sound sub_82117348; the game's Sound class).
 [PlayingSound]
 measure = "Sound"
+measures = ["Sound.+0"]
 size = 24
 origin = "allocated"
 fields = [
@@ -42,13 +43,13 @@ fields = [
 # block handed to the cue with each prepare.
 [SoundEmitter]
 measure = "Emitter"
+measures = ["Emitter.+8"]
 size = 300
 origin = "allocated"
 fields = [
   { name = "cue", offset = 0, type = "ptr", to = "EmitterCue", note = "the XACT cue (0 none)" },
   { name = "unknown_4", offset = 4, type = "f32" },
   { name = "cone", offset = 8, type = "u32", note = "the X3DAudio emitter's cone pointer: this emitter's +100" },
-  { name = "fault_8_f32", offset = 8, type = "f32", note = "read as a float (probably a measure fault: another object joined)" },
   { name = "front_x", offset = 12, type = "f32", note = "front (0, 0, 1)" },
   { name = "front_y", offset = 16, type = "f32" },
   { name = "front_z", offset = 20, type = "f32" },
@@ -280,16 +281,15 @@ fields = [
 # joined with the engine at +0, so the handle's words show at +0 to +12 too
 # (fault_* below).
 [AudioEngine]
-measures = ["AudioEngine", "sub_8259D1F0.r3.+28"]
+measure = "AudioEngine"
+measures = ["sub_82118638.r3@+16", "sub_82118638.r3@+16@+8"]
 size = 100
 origin = "embedded"
 fields = [
   { name = "settings", offset = 0, type = "u32", note = "the global settings (TXR_XACT.xgs) read whole (also the fault's handle: speaker count)" },
   { name = "settings_size", offset = 4, type = "u32", note = "its size (also the fault's handle: LFE speaker)" },
   { name = "xact_engine", offset = 8, type = "ptr", to = "XactEngine", note = "XACT3CreateEngine's" },
-  { name = "fault_speed_of_sound", offset = 8, type = "f32", note = "measure fault: the X3DAudio handle's speed of sound" },
   { name = "x3d_speaker_count", offset = 12, type = "u32", note = "the X3DAudio handle (16 bytes, car-sounds' X3DAudioHandle): 6 (5.1)" },
-  { name = "fault_doppler_limit", offset = 12, type = "f32", note = "measure fault: the X3DAudio handle's Doppler limit" },
   { name = "x3d_lfe_speaker", offset = 16, type = "u32" },
   { name = "x3d_speed_of_sound", offset = 20, type = "f32" },
   { name = "x3d_doppler_limit", offset = 24, type = "f32" },
@@ -309,9 +309,9 @@ fields = [
 # engine"). The list heads are a word and a node's two links pointing at
 # themselves when empty.
 [XactEngine]
+measure = "new<196>@XACT3CreateEngine"
+measures = ["AudioEngine.+8", "sub_82118638.r3@+16.+8"]
 # measures from XactEngineRef (files-and-saves), merged at the integration
-measures = ["new<196>@XACT3CreateEngine", "AudioEngine.+8",
-  "sub_8259D1F0.r3.+28.+8"]
 size = 196
 origin = "allocated"
 fields = [
@@ -363,12 +363,13 @@ fields = [
 # XACT's engine's vtable (0x82075360) as the wrapper calls it (files-and-saves'
 # XactEngineVtable is the same table, met from sub_8259D1F0).
 [XactEngineInterface]
-# measures from XactEngineVtable (files-and-saves), merged at the integration
-measures = ["sub_8259D1F0.r3.+28.+8.+0"]
 measure = "AudioEngine.+8.+0"
+measures = ["sub_82118638.r3@+16.+8.+0"]
+# measures from XactEngineVtable (files-and-saves), merged at the integration
 size = 56
 origin = "image"
 fields = [
+  { name = "slot_1", offset = 4, type = "fn", note = "called by sub_8259D370; not read" },
   { name = "initialize", offset = 8, type = "fn", note = "probably Initialize (sub_8259D1F0)" },
   { name = "do_work", offset = 16, type = "fn", note = "probably DoWork (AudioEngine::DoWork)" },
   { name = "create_sound_bank", offset = 20, type = "fn", note = "probably CreateSoundBank" },
@@ -444,7 +445,7 @@ fields = [
 # The list of playing Sounds (the manager's +1528, a std::list of pointers;
 # sub_82118850's r3).
 [SoundList]
-measure = "sub_82118850.r3"
+measure = "AudioManager::RemoveStoppedSounds.r3@+1528"
 size = 12
 origin = "embedded"
 fields = [
@@ -455,7 +456,8 @@ fields = [
 
 # A node of the Sounds' list (12 bytes): next, previous, a Sound.
 [SoundListNode]
-measures = ["AudioManager.+1532", "AudioManager.+1532.+0", "sub_82118850.r3.+4", "sub_82118850.r3.+4.+0", "sub_82119018.r3.+1532"]
+measure = "AudioManager.+1532"
+measures = ["AudioManager.+1532.+0", "sub_82119018.r3.+1532", "AudioManager::RemoveStoppedSounds.r3@+1528.+4", "AudioManager::RemoveStoppedSounds.r3@+1528.+4.+0"]
 size = 12
 origin = "allocated"
 fields = [
@@ -586,3 +588,54 @@ speed_of_sound = { address = 0x8207145C, type = "f32", note = "AudioEngine::Star
 bank2_wave_buffer = { address = 0x826C5C88, type = "u32", note = "bank pair 2's wave bank buffer (3 MiB, SoundGlobals::Init's)" }
 bank2_sound_buffer = { address = 0x826C5C8C, type = "u32", note = "bank pair 2's sound bank buffer (512 bytes)" }
 xact_engine = { address = 0x82971478, type = "ptr", to = "XactEngine", note = "XACT's engine, made once by XACT3CreateEngine" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from AudioEngine.
+[AudioEngineAt12]
+measure = "AudioEngine@+12"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]
+
+# Split from PlayingSound.
+[PlayingSoundAt8]
+measure = "AudioManager.+1544.+0@+8"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from SoundBankPair.
+[SoundBankPairAt72]
+measure = "BankPair@+72"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from SoundBankPair.
+[SoundBankPairAt76]
+measure = "BankPair@+76"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from PlayingSound.
+[PlayingSoundAt4]
+measure = "Sound@+4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]

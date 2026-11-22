@@ -672,7 +672,7 @@ struct AppMemberFunctor : View {
   uint32_t adjust_address() const { return address + 8; }
 };
 
-// allocated; measure: sub_82098FF8.ret
+// allocated; measure: sub_82098F30.r3, sub_82098FF8.ret@+792
 struct InputManagerAtTeardown : View {
   using View::View;
   static constexpr uint32_t kSize = 3976;

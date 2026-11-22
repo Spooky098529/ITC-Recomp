@@ -362,7 +362,8 @@ fields = [
 # sub_8259B188's r5 (not read), Matrix::FromScaleRotationTranslation's
 # angles, position and scale.
 [AccessoryFloat3]
-measures = ["AccessorySkeleton::SwingNode.r5", "sub_8259B188.r5"]
+measure = "AccessorySkeleton::SwingNode.r5"
+measures = ["sub_8259B660.r3.+144@+16"]
 size = 12
 origin = "embedded"
 fields = [
@@ -395,3 +396,39 @@ zero = { address = 0x82000A34, type = "f32", note = "0.0" }
 material_group_0 = { address = 0x820066D0, type = "u32", note = "the material groups Accessory::SetTexture walks: 0" }
 material_group_1 = { address = 0x820066D4, type = "u32", note = "1" }
 swing_node_name = { address = 0x82006710, type = "bytes", count = 4, note = "the string a swinging node's name holds (not read)" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from Accessory.
+[AccessoryAt1008]
+measure = "Accessory@+1008"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+]
+
+# Split from Accessory.
+[AccessoryAt1024]
+measure = "Accessory@+1024"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+]
+
+# Split from Accessory.
+[AccessoryAt992]
+measure = "Accessory@+992"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+]

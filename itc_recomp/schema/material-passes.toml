@@ -125,7 +125,7 @@ fields = [
 # (r4). The measure joins it with the car dealer's swatch (CarDealer::
 # OpenColors passes the swatch's +16), so it sees no access of its own.
 [HsvColor]
-measures = ["Color::HsvToRgb_8224AB50.r4"]
+measures = ["Color::HsvToRgb_8224AB50.r4", "new<32>@CarDealer::OpenColors@+16", "new<32>@PanelSetBase::SetUpColors@+16"]
 size = 16
 origin = "file"
 fields = [
@@ -148,10 +148,8 @@ origin = "allocated"
 # 2 functions; areas: car-dealer.md, material-passes.md
 fields = [
   { name = "red", offset = 0, type = "u32", note = "HsvToRgb's red x [0x82000C44], truncated (fctiwz)" },
-  { name = "fault_hsv_0", offset = 0, type = "u64", note = "measure fault: Color::HsvToRgb's r4 is the swatch's +16 (an HsvColor), not the swatch" },
   { name = "green", offset = 4, type = "u32" },
   { name = "blue", offset = 8, type = "u32" },
-  { name = "fault_hsv_8", offset = 8, type = "u64", note = "measure fault: as fault_hsv_0" },
   { name = "hue", offset = 16, type = "f32", note = "the color record's halfword +4" },
   { name = "saturation", offset = 20, type = "f32", note = "the color record's byte +6 x [0x82002200]" },
   { name = "value", offset = 24, type = "f32", note = "the color record's byte +7 plus a kind's offset, clamped to 0-255, x [0x82002200]" },
@@ -270,3 +268,7 @@ value_54 = { address = 0x82003590, type = "f32", note = "54.0 (the palette)" }
 value_100 = { address = 0x82002A0C, type = "f32", note = "100.0 (the palette)" }
 value_105 = { address = 0x82003594, type = "f32", note = "105.00004 (the palette)" }
 value_115 = { address = 0x820035A0, type = "f32", note = "115.0 (the palette)" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+

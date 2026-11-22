@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// embedded; measure: CollisionObject, CollisionObject.+228, CollisionObject.+232, new<72>@CollisionWorld::Create.+0, sub_820B7CB8.r3, sub_820B7CC0.r3
+// embedded; measure: CollisionObject, sub_820B7CB8.r3, sub_820B7CC0.r3
 struct CollisionObject : View {
   using View::View;
   static constexpr uint32_t kSize = 320;
@@ -235,7 +235,7 @@ struct CollisionHitRecords : View {
   uint32_t hit1_key_address() const { return address + 140; }
 };
 
-// embedded; measure: Stages, Stages::Copy.r4
+// embedded; measure: Stages
 struct Stages : View {
   using View::View;
   static constexpr uint32_t kSize = 1224;

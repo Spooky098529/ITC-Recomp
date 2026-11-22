@@ -285,7 +285,7 @@ struct SysXOverlapped : View {
   uint32_t extended_error_address() const { return address + 24; }
 };
 
-// image; measure: XNet, sub_82577630.r3.+0
+// image; measure: XNet, sub_82577788.r3@+28.+20
 struct XNetConfig : View {
   using View::View;
   static constexpr uint32_t kSize = 76;
@@ -579,7 +579,7 @@ struct SysLinkPacket : View {
   uint32_t unknown_1275_address() const { return address + 1275; }
 };
 
-// embedded; measure: sub_8214FC40.r4
+// embedded; measure: sub_8214A3B0.r3@+11
 struct SysLinkMessage3 : View {
   using View::View;
   static constexpr uint32_t kSize = 3;
@@ -759,7 +759,7 @@ struct NetScreen7Data : View {
   uint32_t unknown_4_address() const { return address + 4; }
 };
 
-// embedded; measure: sub_82577630.r3, sub_825782C0.r3
+// embedded; measure: sub_82577788.r3@+28, sub_82577850.r3@+8, sub_82577850.r3, sub_82577850.r3@+28
 struct XNetContext : View {
   using View::View;
   static constexpr uint32_t kSize = 24;
@@ -784,7 +784,7 @@ struct XNetContext : View {
   uint32_t unknown_20_address() const { return address + 20; }
 };
 
-// embedded; measure: sub_825782C0.r3.+4, sub_825767A0.r3
+// embedded; measure: sub_825767A0.r3, sub_82577850.r3.+4
 struct XNetBuffer : View {
   using View::View;
   static constexpr uint32_t kSize = 516;

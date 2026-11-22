@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// embedded; measure: Type8PanelScreen
+// embedded; measure: Type8PanelScreen, PanelSetPair.+1908, PanelSetPair.+1912, PanelSetPair.+3880
 struct Type8PanelScreen : View {
   using View::View;
   static constexpr uint32_t kSize = 15252;

@@ -513,7 +513,7 @@ double f820B0340(uint8_t* base, uint64_t r1, uint64_t r3, double f1) {
   // addi r11,r11,184
   r11 = uint64_t(int64_t(int64_t(r11) + 184));
   // lfs f13,0(r11)
-  temp.u32 = guest::LoadU32(base, schema::Vehicle(base, uint32_t(r11) - 184).ground_matrix_address() + 40);
+  temp.u32 = guest::LoadU32(base, schema::CarData(base, uint32_t(r11) - 184).axle_table_record_address());
   f13 = double(temp.f32);
   // fdivs f0,f13,f0
   f0 = double(float(f13 / f0));
@@ -550,7 +550,7 @@ loc_820B036C:
   // bne cr6,0x820b0398
   if (!cr6.eq) goto loc_820B0398;
   // lfs f0,68(r11)
-  temp.u32 = guest::LoadU32(base, schema::Vehicle(base, uint32_t(r11) - 184).body_matrix_address() + 44);
+  temp.u32 = guest::LoadU32(base, schema::CarData(base, uint32_t(r11) - 184).axle_table_record_address() + 68);
   f0 = double(temp.f32);
   // b 0x820b03d4
   goto loc_820B03D4;
@@ -591,7 +591,7 @@ loc_820B0398:
 loc_820B03D4:
   // lfs f13,4(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, schema::Vehicle(base, uint32_t(r11) - 184).ground_matrix_address() + 44);
+  temp.u32 = guest::LoadU32(base, schema::CarData(base, uint32_t(r11) - 184).axle_table_record_address() + 4);
   f13 = double(temp.f32);
   // fmuls f1,f13,f0
   f1 = double(float(f13 * f0));
@@ -665,7 +665,7 @@ loc_820CE620:
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f13,24(r4)
-  temp.u32 = guest::LoadU32(base, schema::CarSpecCopies(base, uint32_t(r4)).torque_rpm_address());
+  temp.u32 = guest::LoadU32(base, schema::CarSpecCopiesAt992_2(base, uint32_t(r4)).unknown_24_address());
   f13 = double(temp.f32);
   // li r10,0
   r10 = uint64_t(int64_t(0));
@@ -707,7 +707,7 @@ loc_820CE620:
 loc_820CE690:
   // lfs f0,0(r8)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, schema::CarSpecCopies(base, uint32_t(r8) - 28).zeroed_28_address());
+  temp.u32 = guest::LoadU32(base, schema::CarSpecCopiesAt992_2(base, uint32_t(r8) - 28).unknown_28_address());
   f0 = double(temp.f32);
   // addi r9,r10,1
   r9 = uint64_t(int64_t(int64_t(r10) + 1));
@@ -782,7 +782,7 @@ loc_820CE6E8:
   temp.f32 = float(f0);
   guest::StoreU32(base, schema::StagePowerCurve(base, uint32_t(r11) + 28).rpm_address(), temp.u32);
   // lfs f12,0(r8)
-  temp.u32 = guest::LoadU32(base, schema::CarSpecCopies(base, uint32_t(r8) - 28).zeroed_28_address());
+  temp.u32 = guest::LoadU32(base, schema::CarSpecCopiesAt992_2(base, uint32_t(r8) - 28).unknown_28_address());
   f12 = double(temp.f32);
   // lfs f13,1048(r3)
   temp.u32 = guest::LoadU32(base, schema::StagePowerCurve(base, uint32_t(r3)).torque_scale_address());
@@ -13810,7 +13810,7 @@ uint64_t f8213F7E0(uint8_t* base, uint64_t r1, uint64_t r3) {
   // beq 0x8213f82c
   if (cr0.eq) goto loc_8213F82C;
   // lwz r8,0(r11)
-  r8 = guest::LoadU32(base, schema::RaceProgress(base, uint32_t(r11) - 2184).results_count_address());
+  r8 = guest::LoadU32(base, schema::RaceProgressPart(base, uint32_t(r11) - 2184).unknown_2184_address());
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // cmpwi r8,0
@@ -13823,7 +13823,7 @@ uint64_t f8213F7E0(uint8_t* base, uint64_t r1, uint64_t r3) {
   r9 = uint64_t(int64_t(int64_t(r11) + 8));
 loc_8213F810:
   // lwz r6,0(r9)
-  r6 = guest::LoadU32(base, schema::RaceProgress(base, uint32_t(r9) - 2192).e0_item_address());
+  r6 = guest::LoadU32(base, schema::RaceProgressPart(base, uint32_t(r9) - 2192).unknown_2192_address());
   // cmpw cr6,r6,r7
   cr6 = lifted::Compare<int32_t>(int32_t(r6), int32_t(r7), so);
   // beq cr6,0x8213f850

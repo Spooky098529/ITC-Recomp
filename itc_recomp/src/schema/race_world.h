@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: Race, RaceManager
+// allocated; measure: Race, RaceManager, RaceManager::MoveUnseen.r4
 struct RaceManager : View {
   using View::View;
   static constexpr uint32_t kSize = 363592;
@@ -101,7 +101,7 @@ struct RaceWorld : View {
   uint32_t unknown_11848_address() const { return address + 11848; }
 };
 
-// embedded; measure: SortedList
+// embedded; measure: SortedList, SortedList.+1604.+8, SortedList.+1604.+8.+12, SortedList.+1604, SortedList.+1604.+8.+12.+8
 struct RaceSortedList : View {
   using View::View;
   static constexpr uint32_t kSize = 1612;
@@ -287,6 +287,36 @@ struct RaceNeighboursEntry : View {
   uint32_t entry() const { return guest::LoadU32(base, address + 0); }
   void set_entry(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t entry_address() const { return address + 0; }
+};
+
+// embedded; measure: Race@+48
+struct RaceManagerAt48 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 6014;
+  uint32_t unknown_6008() const { return guest::LoadU32(base, address + 6008); }
+  void set_unknown_6008(uint32_t v) const { guest::StoreU32(base, address + 6008, v); }
+  uint32_t unknown_6008_address() const { return address + 6008; }
+  uint16_t unknown_6012() const { return guest::LoadU16(base, address + 6012); }
+  void set_unknown_6012(uint16_t v) const { guest::StoreU16(base, address + 6012, v); }
+  uint32_t unknown_6012_address() const { return address + 6012; }
+};
+
+// embedded; measure: RaceManager@+32
+struct RaceManagerAt32 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 24;
+  uint32_t unknown_20() const { return guest::LoadU32(base, address + 20); }
+  void set_unknown_20(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
+  uint32_t unknown_20_address() const { return address + 20; }
+};
+
+// embedded; measure: RaceManager@+4
+struct RaceManagerAt4 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 24;
+  uint32_t unknown_20() const { return guest::LoadU32(base, address + 20); }
+  void set_unknown_20(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
+  uint32_t unknown_20_address() const { return address + 20; }
 };
 
 // The image words docs/functions/race-world.md's code uses.

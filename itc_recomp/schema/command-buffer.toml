@@ -32,6 +32,7 @@ fields = [
 # into its words.
 [CommandChainBlock]
 measure = "CommandChain.+0"
+measures = ["CommandChain.+8"]
 size = 4
 origin = "gpu"
 fields = [

@@ -176,6 +176,15 @@ struct PowerGraphPartValues : View {
   uint32_t value_address() const { return address + 0; }
 };
 
+// embedded; measure: new<92>@PowerGraphScreen67::OnEnter@+68
+struct PowerGraphScreenDataAt68 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 2;
+  uint8_t unknown_1() const { return guest::LoadU8(base, address + 1); }
+  void set_unknown_1(uint8_t v) const { guest::StoreU8(base, address + 1, v); }
+  uint32_t unknown_1_address() const { return address + 1; }
+};
+
 // The image words docs/functions/power-graph-screen.md's code uses.
 struct PowerGraphScreenGlobals {
   // the page object, VirtualAlloc'ed by OnEnter

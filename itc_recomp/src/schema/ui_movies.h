@@ -147,7 +147,7 @@ struct UiMovieChunk : View {
   uint32_t next_address() const { return address + 4; }
 };
 
-// file; measure: sub_825A6558.r3, sub_825A6570.r3
+// file; measure: sub_825A6570.r3, UiMovie::ApplyAnimation.r4
 struct UiMovieAnimation : View {
   using View::View;
   static constexpr uint32_t kSize = 68;

@@ -89,7 +89,7 @@ lifted::Result f820B6170(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lis r10,-32256
   r10 = uint64_t(int64_t(-2113929216));
   // lfs f10,316(r11)
-  temp.u32 = guest::LoadU32(base, schema::Vehicle(base, uint32_t(r11)).steering_limit_left_address());
+  temp.u32 = guest::LoadU32(base, schema::CarData(base, uint32_t(r11)).steering_316_address());
   f10 = double(temp.f32);
   // fmuls f10,f10,f2
   f10 = double(float(f10 * f2));
@@ -101,7 +101,7 @@ lifted::Result f820B6170(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // fsubs f12,f0,f13
   f12 = double(float(f0 - f13));
   // lfs f0,320(r11)
-  temp.u32 = guest::LoadU32(base, schema::Vehicle(base, uint32_t(r11)).steering_limit_right_address());
+  temp.u32 = guest::LoadU32(base, schema::CarData(base, uint32_t(r11)).steering_320_address());
   f0 = double(temp.f32);
   // lfs f31,2612(r10)
   temp.u32 = guest::LoadU32(base, uint32_t(r10) + 2612);
@@ -139,10 +139,10 @@ loc_820B61DC:
   // fadds f7,f7,f13
   f7 = double(float(f7 + f13));
   // lfs f0,328(r11)
-  temp.u32 = guest::LoadU32(base, schema::Vehicle(base, uint32_t(r11)).steering_previous_address());
+  temp.u32 = guest::LoadU32(base, schema::CarData(base, uint32_t(r11)).steering_328_address());
   f0 = double(temp.f32);
   // lfs f3,484(r11)
-  temp.u32 = guest::LoadU32(base, schema::Vehicle(base, uint32_t(r11)).wheels_address() + 68);
+  temp.u32 = guest::LoadU32(base, schema::CarData(base, uint32_t(r11)).front_axle_address() + 148);
   f3 = double(temp.f32);
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));

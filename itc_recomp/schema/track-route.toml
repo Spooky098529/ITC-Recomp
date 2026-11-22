@@ -111,38 +111,8 @@ fields = [
 # A route position: two halfwords, a section and a slice in it (a track
 # position's +4, an AI driver's +4, a stack copy), passed by address.
 [TrackRoutePosition]
-measures = [
-  "TrackRoute::AlongSlice.r5",
-  "TrackRoute::Distance.r4",
-  "TrackRoute::Distance.r5",
-  "TrackRoute::Follow.r6",
-  "TrackRoute::IsMainRoad.r4",
-  "TrackRoute::LaneAt.r5",
-  "TrackRoute::LanePoint.r5",
-  "TrackRoute::LinkDistance.r4",
-  "TrackRoute::LinkDistance.r5",
-  "TrackRoute::LinkLane.r4",
-  "TrackRoute::Normalize.r4",
-  "TrackRoute::NormalizeBack.r4",
-  "TrackRoute::NormalizeForward.r4",
-  "TrackRoute::NormalizeForwardPath.r4",
-  "TrackRoute::NormalizeLane.r4",
-  "TrackRoute::NormalizeLaneMasked.r4",
-  "TrackRoute::NormalizePath.r4",
-  "TrackRoute::NoteShoulder.r5",
-  "TrackRoute::NoteShoulder.r6",
-  "TrackRoute::OnSlice.r5",
-  "TrackRoute::SpecialSection.r4",
-  "TrackRoute::StepAlongPath.r4",
-  "TrackRoute::StepBack.r4",
-  "TrackRoute::StepForward.r4",
-  "TrackRoute::StepForwardLane.r4",
-  "TrackRoute::StepForwardLaneMasked.r4",
-  "TrackRoute::StepForwardMasked.r4",
-  "TrackRoute::TakeBranch.r4",
-  "TrackRoute::ToMainRoad.r4",
-  "sub_820FB2B0.r4",
-]
+measure = "TrackRoute::AlongSlice.r5"
+measures = ["TrackRoute::Distance.r5", "TrackRoute::Follow.r6", "TrackRoute::IsMainRoad.r4", "TrackRoute::LaneAt.r5", "TrackRoute::LanePoint.r5", "TrackRoute::LinkDistance.r4", "TrackRoute::LinkDistance.r5", "TrackRoute::LinkLane.r4", "TrackRoute::Normalize.r4", "TrackRoute::NormalizeBack.r4", "TrackRoute::NormalizeForward.r4", "TrackRoute::NormalizeForwardPath.r4", "TrackRoute::NormalizeLane.r4", "TrackRoute::NormalizeLaneMasked.r4", "TrackRoute::NormalizePath.r4", "TrackRoute::NoteShoulder.r5", "TrackRoute::NoteShoulder.r6", "TrackRoute::OnSlice.r5", "TrackRoute::SpecialSection.r4", "TrackRoute::StepAlongPath.r4", "TrackRoute::StepBack.r4", "TrackRoute::StepForward.r4", "TrackRoute::StepForwardLane.r4", "TrackRoute::StepForwardLaneMasked.r4", "TrackRoute::StepForwardMasked.r4", "TrackRoute::TakeBranch.r4", "TrackRoute::ToMainRoad.r4", "sub_820FB2B0.r4"]
 size = 4
 origin = "embedded"
 fields = [

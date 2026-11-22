@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// embedded; measure: Vehicle, Vehicle::UpdateDrivenAxle.ret, Vehicle::Get.ret
+// embedded; measure: Vehicle, Vehicle::UpdateDrivenAxle.ret, Vehicle::Get.ret, AiDriver.+160, Vehicle.+2160, Vehicle.+2144
 struct Vehicle : View {
   using View::View;
   static constexpr uint32_t kSize = 6268;
@@ -909,7 +909,7 @@ struct SteerRecord : View {
   uint32_t ratio_c_address() const { return address + 32; }
 };
 
-// allocated; measure: RigidBody, CollisionObject.+16, CollisionPair.+20.+16, sub_820B68A0.r3
+// allocated; measure: RigidBody, CollisionObject.+16, CollisionPair.+20.+16, sub_820B68A0.r3, Matrix::Rotate.r5
 struct RigidBody : View {
   using View::View;
   static constexpr uint32_t kSize = 528;
@@ -991,7 +991,7 @@ struct RigidBody : View {
   uint32_t flags_address() const { return address + 516; }
 };
 
-// embedded; measure: RigidBody::Velocity.ret, RigidBody::AngularVelocity.ret, RigidBody::Force.ret, Contact::Position.ret, Matrix::MultiplyTranslation.r5, RigidBody::SetInertia.r4, sub_820B6898.ret
+// embedded; measure: RigidBody::Velocity.ret, RigidBody::AngularVelocity.ret, RigidBody::Force.ret, Contact::Position.ret, Matrix::MultiplyTranslation.r5, sub_820B6898.ret, CarData@+64
 struct PhysicsVector : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
@@ -1055,7 +1055,7 @@ struct TireCoefficients : View {
   uint32_t e_address() const { return address + 12; }
 };
 
-// embedded; measure: CarData, PowerGraph::Draw.r6
+// embedded; measure: CarData, PowerGraph::Draw.r6, RigidBody::EffectiveMassAt.r4
 struct CarData : View {
   using View::View;
   static constexpr uint32_t kSize = 1844;
@@ -1560,7 +1560,7 @@ struct PhysicsCar : View {
   uint32_t flags_address() const { return address + 3888; }
 };
 
-// allocated; measure: new<72>@CollisionWorld::Create
+// allocated; measure: new<72>@CollisionWorld::Create, CollisionObject::Link.r4, CollisionObject::Unlink.r4
 struct CollisionWorld : View {
   using View::View;
   static constexpr uint32_t kSize = 72;
@@ -1656,7 +1656,7 @@ struct CollisionObjectBlock : View {
   uint32_t count_address() const { return address + 0; }
 };
 
-// allocated; measure: new<72>@CollisionWorld::Create.+20, new<72>@CollisionWorld::Create.+68
+// allocated; measure: new<72>@CollisionWorld::Create.+20, new<72>@CollisionWorld::Create.+24
 struct CollisionWorldObject : View {
   using View::View;
   static constexpr uint32_t kSize = 320;
@@ -1761,7 +1761,7 @@ struct CollisionWorldObject : View {
   uint32_t push_out_address() const { return address + 304; }
 };
 
-// image; measure: new<72>@CollisionWorld::Create.+68.+0
+// image; measure: new<72>@CollisionWorld::Create.+24.+0
 struct CollisionWorldObjectVtable : View {
   using View::View;
   static constexpr uint32_t kSize = 4;

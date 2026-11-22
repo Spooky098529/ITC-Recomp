@@ -604,13 +604,13 @@ uint64_t f8258BCD8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   lifted::Cr cr6;
   uint8_t so = 0;
   // lwz r11,40(r3)
-  r11 = guest::LoadU32(base, schema::MorphJob(base, uint32_t(r3)).skin_unknown_32_address());
+  r11 = guest::LoadU32(base, schema::MorphJobAt8(base, uint32_t(r3)).unknown_40_address());
   // cmplwi cr6,r11,5
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 5, so);
   // bne cr6,0x8258bd0c
   if (!cr6.eq) goto loc_8258BD0C;
   // lwz r11,44(r3)
-  r11 = guest::LoadU32(base, schema::MorphJob(base, uint32_t(r3)).skin_vertex_count_address());
+  r11 = guest::LoadU32(base, schema::MorphJobAt8(base, uint32_t(r3)).unknown_44_address());
   // cmplwi cr6,r11,6
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 6, so);
   // beq cr6,0x8258bd08
@@ -1994,23 +1994,23 @@ lifted::Result f8258CCC8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r11,r11,-16256
   r11 = uint64_t(int64_t(int64_t(r11) + -16256));
   // lwz r3,20(r31)
-  r3 = guest::LoadU32(base, schema::AppScene(base, uint32_t(r31)).command_list_used_address());
+  r3 = guest::LoadU32(base, schema::CommandList(base, uint32_t(r31)).allocation_address());
   // cmplwi cr6,r3,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // stw r11,0(r31)
-  guest::StoreU32(base, schema::AppScene(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
+  guest::StoreU32(base, schema::CommandList(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
   // beq cr6,0x8258cd04
   if (cr6.eq) goto loc_8258CD04;
   // bl 0x825a71c0
   // (left out: dead in C++)
   { const lifted::Result o = lifted::entry::e825A71C0(base, LIFTED_ARGS(0x8258CD00, r31)); r3 = o.r3; f1 = o.f1; }
   // stw r30,20(r31)
-  guest::StoreU32(base, schema::AppScene(base, uint32_t(r31)).command_list_used_address(), uint32_t(r30));
+  guest::StoreU32(base, schema::CommandList(base, uint32_t(r31)).allocation_address(), uint32_t(r30));
 loc_8258CD04:
   // stw r30,24(r31)
-  guest::StoreU32(base, schema::AppScene(base, uint32_t(r31)).command_list_last_used_address(), uint32_t(r30));
+  guest::StoreU32(base, schema::CommandList(base, uint32_t(r31)).buffer0_address(), uint32_t(r30));
   // stw r30,28(r31)
-  guest::StoreU32(base, schema::AppScene(base, uint32_t(r31)).command_list_allocation_address(), uint32_t(r30));
+  guest::StoreU32(base, schema::CommandList(base, uint32_t(r31)).buffer1_address(), uint32_t(r30));
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)

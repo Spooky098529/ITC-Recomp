@@ -82,7 +82,8 @@ fields = [
 
 # An animation of a movie file (64-byte header, then 8-byte entries).
 [UiMovieAnimation]
-measures = ["sub_825A6558.r3", "sub_825A6570.r3"]
+measure = "sub_825A6570.r3"
+measures = ["UiMovie::ApplyAnimation.r4"]
 size = 68
 origin = "file"
 fields = [

@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: XAudioVoice, sub_8245FB00.r3
+// allocated; measure: XAudioVoice, sub_8245FB00.r3, XAudioVoice.+0, XAudioVoice.+24.+0
 struct XAudioVoice : View {
   using View::View;
   static constexpr uint32_t kSize = 88;
@@ -546,7 +546,7 @@ struct XAudioMatrixLevels : View {
   uint32_t table_address() const { return address + 4; }
 };
 
-// embedded; measure: XAudioVoice::CreateObject.r4, XAudioVoice::ProcessEffect.r4
+// embedded; measure: XAudioVoice::CreateObject.r4, XAudioSourceVoice@+76
 struct XAudioEffectEntry : View {
   using View::View;
   static constexpr uint32_t kSize = 8;
@@ -569,7 +569,7 @@ struct XAudioEffectEntry : View {
   uint32_t flags_address() const { return address + 6; }
 };
 
-// allocated; measure: XAudioVoice::CreateObject.r4.+0, XAudioVoice::ProcessEffect.r4.+0
+// allocated; measure: XAudioVoice::CreateObject.r4.+0, XAudioSourceVoice@+76.+0
 struct XAudioEffectObject : View {
   using View::View;
   static constexpr uint32_t kSize = 28;
@@ -656,7 +656,7 @@ struct XAudioAllocatorOut : View {
   uint32_t allocator_address() const { return address + 0; }
 };
 
-// allocated; measure: XAudioEngine
+// allocated; measure: XAudioEngine, XAudioEngine.+120
 struct XAudioEngine : View {
   using View::View;
   static constexpr uint32_t kSize = 372;
@@ -892,7 +892,7 @@ struct XAudioBufferDescription : View {
   uint32_t extra_address() const { return address + 16; }
 };
 
-// embedded; measure: XAudioCreateSourceVoice.r4, XAudioCreateSubmixVoice.r4, XAudioVoice::CreateSource.r5, XAudioVoice::CreateSubmix.r5
+// embedded; measure: XAudioCreateSubmixVoice.r4, XAudioVoice::CreateSource.r5, XAudioVoice::CreateSubmix.r5, sub_82483770.r3@+56
 struct XAudioVoiceOut : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
@@ -957,6 +957,33 @@ struct XAudioMeterLevels : View {
   uint32_t peaks_address() const { return address + 40; }
   // 8 floats (probably)
   uint32_t rms_address() const { return address + 72; }
+};
+
+// embedded; measure: XAudioEngine@+356
+struct XAudioEngineAt356 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 8;
+  uint64_t unknown_0() const { return guest::LoadU64(base, address + 0); }
+  void set_unknown_0(uint64_t v) const { guest::StoreU64(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: XAudioEngine@+60
+struct XAudioEngineAt60 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: XAudioEngine@+64
+struct XAudioEngineAt64 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
 };
 
 // The image words docs/functions/xaudio.md's code uses.

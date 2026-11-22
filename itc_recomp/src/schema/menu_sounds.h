@@ -294,25 +294,6 @@ struct AudioManager : View {
   uint32_t handler_delegate_method_address() const { return address + 1616; }
 };
 
-// image; measure: AudioManager.+8
-struct AudioManagerSoundOwnerVtable : View {
-  using View::View;
-  static constexpr uint32_t kSize = 4;
-  // slot 0 (not read)
-  uint32_t slot_0() const { return guest::LoadU32(base, address + 0); }
-  void set_slot_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t slot_0_address() const { return address + 0; }
-};
-
-// image; measure: AudioManager.+8.+0
-struct AudioManagerSoundOwnerSlot0 : View {
-  using View::View;
-  static constexpr uint32_t kSize = 8;
-  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
-  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
-  uint32_t unknown_4_address() const { return address + 4; }
-};
-
 // embedded; measure: Sound::HasHandle.r4
 struct SoundHandleWord : View {
   using View::View;
@@ -338,6 +319,15 @@ struct ListenerFloat52Arg : View {
   float value() const { return guest::LoadFloat(base, address + 0); }
   void set_value(float v) const { guest::StoreFloat(base, address + 0, v); }
   uint32_t value_address() const { return address + 0; }
+};
+
+// embedded; measure: AudioManager@+1552
+struct AudioManagerAt1552 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
 };
 
 // The image words docs/functions/menu-sounds.md's code uses.

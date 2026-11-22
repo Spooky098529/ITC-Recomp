@@ -316,6 +316,24 @@ struct TuningPagesIndexFault : View {
   uint32_t fault_40_address() const { return address + 40; }
 };
 
+// embedded; measure: DecalImages@+28
+struct DecalImagesAt28 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: DecalImages@+32
+struct DecalImagesAt32 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
 // The image words docs/functions/tuning-pages.md's code uses.
 struct TuningPagesGlobals {
   // layer 0's fade-in count (0 once done)

@@ -13,7 +13,6 @@
 #include "schema/car_specs.h"
 #include "schema/collision.h"
 #include "schema/device_shaders.h"
-#include "schema/frame_driver.h"
 #include "schema/models.h"
 #include "schema/movies.h"
 #include "schema/race_event.h"
@@ -1786,7 +1785,7 @@ void f820B03E0(uint8_t* base, uint64_t r3, uint64_t r4, double f1) {
   temp.u32 = guest::LoadU32(base, schema::Vehicle(base, uint32_t(r3)).brake_address());
   f13 = double(temp.f32);
   // lfs f0,128(r11)
-  temp.u32 = guest::LoadU32(base, schema::Vehicle(base, uint32_t(r11)).ground_side_address());
+  temp.u32 = guest::LoadU32(base, schema::CarData(base, uint32_t(r11)).handbrake_ramp_address());
   f0 = double(temp.f32);
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
@@ -1847,7 +1846,7 @@ void f820B0428(uint8_t* base, uint64_t r3, uint64_t r4, double f1) {
   temp.u32 = guest::LoadU32(base, schema::Vehicle(base, uint32_t(r3)).throttle_address());
   f13 = double(temp.f32);
   // lfs f0,1264(r11)
-  temp.u32 = guest::LoadU32(base, schema::Vehicle(base, uint32_t(r11)).wheels_address() + 848);
+  temp.u32 = guest::LoadU32(base, schema::CarData(base, uint32_t(r11)).reverse_ramp_address());
   f0 = double(temp.f32);
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
@@ -8154,7 +8153,7 @@ void f820CE7F0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r
   lifted::Temp temp{};
   // lfs f0,20(r4)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, schema::CarSpecCopies(base, uint32_t(r4)).torque_address());
+  temp.u32 = guest::LoadU32(base, schema::CarSpecCopiesAt992(base, uint32_t(r4)).unknown_20_address());
   f0 = double(temp.f32);
   // stfs f0,1044(r3)
   temp.f32 = float(f0);
@@ -9930,7 +9929,7 @@ loc_820EF804:
   // mr r5,r27
   r5 = r27;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::AppScene(base, uint32_t(r3)).vtable_address());
+  r11 = guest::LoadU32(base, schema::RenderQueue(base, uint32_t(r3)).vtable_address());
   // lwz r11,16(r11)
   r11 = guest::LoadU32(base, schema::RenderQueueVtable(base, uint32_t(r11)).add_address());
   // mtctr r11
@@ -9978,7 +9977,7 @@ loc_820EF804:
   // mr r5,r22
   r5 = r22;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::AppScene(base, uint32_t(r3)).vtable_address());
+  r11 = guest::LoadU32(base, schema::RenderQueue(base, uint32_t(r3)).vtable_address());
   // lwz r11,16(r11)
   r11 = guest::LoadU32(base, schema::RenderQueueVtable(base, uint32_t(r11)).add_address());
   // mtctr r11
@@ -10038,7 +10037,7 @@ loc_820EF8DC:
   // mr r5,r27
   r5 = r27;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::AppScene(base, uint32_t(r3)).vtable_address());
+  r11 = guest::LoadU32(base, schema::RenderQueue(base, uint32_t(r3)).vtable_address());
   // lwz r11,16(r11)
   r11 = guest::LoadU32(base, schema::RenderQueueVtable(base, uint32_t(r11)).add_address());
   // mtctr r11
@@ -10086,7 +10085,7 @@ loc_820EF8DC:
   // lwz r5,292(r1)
   r5 = guest::LoadU32(base, uint32_t(r1) + 292);
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::AppScene(base, uint32_t(r3)).vtable_address());
+  r11 = guest::LoadU32(base, schema::RenderQueue(base, uint32_t(r3)).vtable_address());
   // lwz r11,16(r11)
   r11 = guest::LoadU32(base, schema::RenderQueueVtable(base, uint32_t(r11)).add_address());
   // mtctr r11

@@ -251,3 +251,42 @@ headlight_colors_a = { address = 0x8296BAE0, type = "bytes", count = 128, note =
 headlight_colors_b = { address = 0x8296BB60, type = "bytes", count = 128, note = "slots 0 to 7: the second colors (the scene's +5264 to +5272)" }
 headlight_directions = { address = 0x8296BBE0, type = "bytes", count = 128, note = "slots 0 to 7: the beams' directions" }
 headlight_vectors = { address = 0x8296BC60, type = "bytes", count = 128, note = "slots 0 to 7: the scene's +5440" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from CarSceneFrustum.
+[CarSceneFrustumAt16]
+measure = "Frustum@+16"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]
+
+# Split from CarSceneFrustum.
+[CarSceneFrustumAt32]
+measure = "Frustum@+32"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]
+
+# Split from CarSceneFrustum.
+[CarSceneFrustumAt80]
+measure = "Frustum@+80"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]

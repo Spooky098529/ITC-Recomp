@@ -28,6 +28,7 @@
 # 4): the two players' car pick, over MachineScreen.
 [Type8PanelScreen]
 measure = "Type8PanelScreen"
+measures = ["PanelSetPair.+1908", "PanelSetPair.+1912", "PanelSetPair.+3880"]
 size = 15252
 origin = "embedded"
 vtable = 0x82010AF0

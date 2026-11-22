@@ -34114,35 +34114,35 @@ uint64_t f8258AF80(uint8_t* base, uint64_t r1, uint64_t r3) {
   // (left out: dead in C++)
   // (left out: dead in C++)
   // lwz r9,36(r3)
-  r9 = guest::LoadU32(base, schema::MorphJob(base, uint32_t(r3)).skin_matrices_address());
+  r9 = guest::LoadU32(base, schema::MorphJobAt8(base, uint32_t(r3)).unknown_36_address());
   // lwz r8,20(r3)
-  r8 = guest::LoadU32(base, schema::MorphJob(base, uint32_t(r3)).skin_source_address());
+  r8 = guest::LoadU32(base, schema::MorphJobAt8(base, uint32_t(r3)).unknown_20_address());
   // rlwinm r24,r9,5,0,26
   r24 = __builtin_rotateleft64(uint32_t(r9) | (r9 << 32), 5) & 0xFFFFFFE0;
   // lwz r27,24(r3)
-  r27 = guest::LoadU32(base, schema::MorphJob(base, uint32_t(r3)).skin_destination_address());
+  r27 = guest::LoadU32(base, schema::MorphJobAt8(base, uint32_t(r3)).unknown_24_address());
   // rotlwi r7,r9,0
   r7 = __builtin_rotateleft32(uint32_t(r9), 0);
   // lwz r6,12(r3)
-  r6 = guest::LoadU32(base, schema::MorphJob(base, uint32_t(r3)).skin_weights_address());
+  r6 = guest::LoadU32(base, schema::MorphJobAt8(base, uint32_t(r3)).unknown_12_address());
   // lwz r31,28(r3)
-  r31 = guest::LoadU32(base, schema::MorphJob(base, uint32_t(r3)).skin_source_2_address());
+  r31 = guest::LoadU32(base, schema::MorphJobAt8(base, uint32_t(r3)).unknown_28_address());
   // rlwinm r25,r9,4,0,27
   r25 = __builtin_rotateleft64(uint32_t(r9) | (r9 << 32), 4) & 0xFFFFFFF0;
   // lwz r30,0(r3)
-  r30 = guest::LoadU32(base, schema::MorphJob(base, uint32_t(r3)).vtable_address());
+  r30 = guest::LoadU32(base, schema::MorphJobAt8(base, uint32_t(r3)).unknown_0_address());
   // addi r4,r8,16
   r4 = uint64_t(int64_t(int64_t(r8) + 16));
   // lwz r11,4(r3)
-  r11 = guest::LoadU32(base, schema::MorphJob(base, uint32_t(r3)).released_word_address());
+  r11 = guest::LoadU32(base, schema::MorphJobAt8(base, uint32_t(r3)).unknown_4_address());
   // addi r5,r27,16
   r5 = uint64_t(int64_t(int64_t(r27) + 16));
   // lwz r10,8(r3)
-  r10 = guest::LoadU32(base, schema::MorphJob(base, uint32_t(r3)).skin_influence_counts_address());
+  r10 = guest::LoadU32(base, schema::MorphJobAt8(base, uint32_t(r3)).unknown_8_address());
   // cmplwi cr6,r7,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r7), 0, so);
   // lwz r26,16(r3)
-  r26 = guest::LoadU32(base, schema::MorphJob(base, uint32_t(r3)).skin_bone_indices_address());
+  r26 = guest::LoadU32(base, schema::MorphJobAt8(base, uint32_t(r3)).unknown_16_address());
   // stw r24,-92(r1)
   guest::StoreU32(base, uint32_t(r1) + -92, uint32_t(r24));
   // beq cr6,0x8258b174
@@ -34210,7 +34210,7 @@ loc_8258AFE4:
   // vmsum3fp128 v1,v13,v9
   simde_mm_store_ps(v1.f32, simde_mm_dp_ps(simde_mm_load_ps(v13.f32), simde_mm_load_ps(v9.f32), 0xEF));
   // lwz r9,0(r30)
-  r9 = guest::LoadU32(base, schema::MorphJobVtable(base, uint32_t(r30)).destroy_address());
+  r9 = guest::LoadU32(base, schema::MorphJobVtablePart(base, uint32_t(r30)).unknown_0_address());
   // vmsum4fp128 v3,v0,v8
   simde_mm_store_ps(v3.f32, simde_mm_dp_ps(simde_mm_load_ps(v0.f32), simde_mm_load_ps(v8.f32), 0xFF));
   // vmsum3fp128 v31,v13,v8

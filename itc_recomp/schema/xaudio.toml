@@ -41,7 +41,8 @@
 # on). The source voice (148 bytes) and the submix voice (80) add their own
 # words after +76.
 [XAudioVoice]
-measures = ["XAudioVoice", "sub_8245FB00.r3"]
+measure = "XAudioVoice"
+measures = ["sub_8245FB00.r3", "XAudioVoice.+0", "XAudioVoice.+24.+0"]
 size = 88
 origin = "allocated"
 fields = [
@@ -300,7 +301,8 @@ fields = [
 
 # An effect entry (8 bytes, a voice's +36; the source voice's codec at +76).
 [XAudioEffectEntry]
-measures = ["XAudioVoice::CreateObject.r4", "XAudioVoice::ProcessEffect.r4"]
+measure = "XAudioVoice::CreateObject.r4"
+measures = ["XAudioSourceVoice@+76"]
 size = 8
 origin = "embedded"
 fields = [
@@ -313,7 +315,8 @@ fields = [
 # The effect's object as CreateObject and ProcessEffect meet it (a factory
 # object, xaudio-objects.toml's XAudioObject).
 [XAudioEffectObject]
-measures = ["XAudioVoice::CreateObject.r4.+0", "XAudioVoice::ProcessEffect.r4.+0"]
+measure = "XAudioVoice::CreateObject.r4.+0"
+measures = ["XAudioSourceVoice@+76.+0"]
 size = 28
 origin = "allocated"
 fields = [
@@ -379,6 +382,7 @@ fields = [
 # XAudioEngine::XAudioEngine sub_8245C098, xaudio-engine.md).
 [XAudioEngine]
 measure = "XAudioEngine"
+measures = ["XAudioEngine.+120"]
 size = 372
 origin = "allocated"
 vtable = 0x8204A6CC
@@ -474,7 +478,8 @@ fields = [
 
 # A voice out word (the voices' create functions').
 [XAudioVoiceOut]
-measures = ["XAudioCreateSourceVoice.r4", "XAudioCreateSubmixVoice.r4", "XAudioVoice::CreateSource.r5", "XAudioVoice::CreateSubmix.r5"]
+measure = "XAudioCreateSubmixVoice.r4"
+measures = ["XAudioVoice::CreateSource.r5", "XAudioVoice::CreateSubmix.r5", "sub_82483770.r3@+56"]
 size = 4
 origin = "embedded"
 fields = [
@@ -546,3 +551,33 @@ api_lock_recursion = { address = 0x8264D52C, type = "u32", note = "the critical 
 default_matrices = { address = 0x8204A7B8, type = "bytes", count = 192, note = "the default output matrices' levels" }
 default_output = { address = 0x8204A9F4, type = "bytes", count = 8, note = "{0, 0}: the mastering voice with its default matrix" }
 one = { address = 0x82000A30, type = "f32", note = "1.0" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from XAudioEngine.
+[XAudioEngineAt356]
+measure = "XAudioEngine@+356"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u64" },
+]
+
+# Split from XAudioEngine.
+[XAudioEngineAt60]
+measure = "XAudioEngine@+60"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from XAudioEngine.
+[XAudioEngineAt64]
+measure = "XAudioEngine@+64"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]

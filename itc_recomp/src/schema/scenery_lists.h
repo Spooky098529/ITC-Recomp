@@ -183,7 +183,7 @@ struct TextureProviderSlots : View {
   uint32_t texture_address() const { return address + 0; }
 };
 
-// embedded; measure: Scenery.+0
+// embedded; measure: PoolObject.+3792.+0
 struct SceneryShapeStreams : View {
   using View::View;
   static constexpr uint32_t kSize = 28;

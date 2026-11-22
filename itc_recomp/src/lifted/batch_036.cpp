@@ -21,6 +21,7 @@
 #include "schema/tuning_pages.h"
 #include "schema/tuning_screen.h"
 #include "schema/ui_movies_game.h"
+#include "schema/vehicle_accessors.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -2672,7 +2673,7 @@ uint64_t f821059D0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // li r25,0
   r25 = uint64_t(int64_t(0));
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, schema::RaceData(base, uint32_t(r30) - 303072).fault_records_word_303072_address());
+  r11 = guest::LoadU32(base, schema::RacerRecordArray(base, uint32_t(r30) - 303072).count_address());
   // li r29,0
   r29 = uint64_t(int64_t(0));
   // li r28,0
@@ -2718,7 +2719,7 @@ loc_82105A48:
   r25 = uint64_t(int64_t(int64_t(r25) + 1));
 loc_82105A54:
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, schema::RaceData(base, uint32_t(r30) - 303072).fault_records_word_303072_address());
+  r11 = guest::LoadU32(base, schema::RacerRecordArray(base, uint32_t(r30) - 303072).count_address());
   // addi r31,r31,1
   r31 = uint64_t(int64_t(int64_t(r31) + 1));
   // lwz r9,788(r3)
@@ -2818,7 +2819,7 @@ loc_82105B04:
   r20 = uint64_t(int64_t(0));
 loc_82105B08:
   // lwz r9,0(r22)
-  r9 = guest::LoadU32(base, schema::DayBlock(base, uint32_t(r22)).unknown_0_address());
+  r9 = guest::LoadU32(base, schema::DayBlockAt129104(base, uint32_t(r22)).unknown_0_address());
   // subf. r11,r21,r9
   r11 = r9 - r21;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -2910,15 +2911,15 @@ loc_82105B94:
   // divw r3,r11,r10
   r3 = uint32_t((int32_t(r10) && !(int32_t(r11) == INT32_MIN && int32_t(r10) == -1)) ? int32_t(r11) / int32_t(r10) : 0);
   // lwz r11,8(r22)
-  r11 = guest::LoadU32(base, schema::DayBlock(base, uint32_t(r22)).unknown_8_address());
+  r11 = guest::LoadU32(base, schema::DayBlockAt129104(base, uint32_t(r22)).unknown_8_address());
   // add r11,r26,r11
   r11 = r26 + r11;
   // stw r11,8(r22)
-  guest::StoreU32(base, schema::DayBlock(base, uint32_t(r22)).unknown_8_address(), uint32_t(r11));
+  guest::StoreU32(base, schema::DayBlockAt129104(base, uint32_t(r22)).unknown_8_address(), uint32_t(r11));
   // add r11,r9,r3
   r11 = r9 + r3;
   // stw r11,0(r22)
-  guest::StoreU32(base, schema::DayBlock(base, uint32_t(r22)).unknown_0_address(), uint32_t(r11));
+  guest::StoreU32(base, schema::DayBlockAt129104(base, uint32_t(r22)).unknown_0_address(), uint32_t(r11));
   // addi r1,r1,192
   r1 = uint64_t(int64_t(int64_t(r1) + 192));
   // b 0x825a6eb8

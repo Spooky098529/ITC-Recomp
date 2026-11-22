@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: ActionMapper
+// allocated; measure: ActionMapper, ActionMapper.+24, ActionMapper.+180
 struct ActionMapper : View {
   using View::View;
   static constexpr uint32_t kSize = 2896;
@@ -481,7 +481,7 @@ struct ActionCurve : View {
   uint32_t maximum_address() const { return address + 12; }
 };
 
-// image; measure: ActionMapper.+0, ActionMapper.+144, ActionMapper.+300
+// image; measure: ActionMapper.+144, ActionMapper.+300, ActionMapper.+24.+0, ActionMapper.+180.+0
 struct ActionObjectVtable : View {
   using View::View;
   static constexpr uint32_t kSize = 8;
@@ -684,6 +684,18 @@ struct ActionSettings : View {
   float curve_maximum() const { return guest::LoadFloat(base, address + 28); }
   void set_curve_maximum(float v) const { guest::StoreFloat(base, address + 28, v); }
   uint32_t curve_maximum_address() const { return address + 28; }
+};
+
+// embedded; measure: ActionMapper::Words.r4@+8
+struct ActionMapperConfigAt8 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 8;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
 };
 
 // The image words docs/functions/action-mappers.md's code uses.

@@ -294,14 +294,6 @@ struct TrackPosition : View {
   uint16_t route_slice() const { return guest::LoadU16(base, address + 6); }
   void set_route_slice(uint16_t v) const { guest::StoreU16(base, address + 6, v); }
   uint32_t route_slice_address() const { return address + 6; }
-  // measure fault: a point's z (as fault_point_x)
-  float fault_point_z() const { return guest::LoadFloat(base, address + 8); }
-  void set_fault_point_z(float v) const { guest::StoreFloat(base, address + 8, v); }
-  uint32_t fault_point_z_address() const { return address + 8; }
-  // measure fault: a point's w (as fault_point_x)
-  float fault_point_w() const { return guest::LoadFloat(base, address + 12); }
-  void set_fault_point_w(float v) const { guest::StoreFloat(base, address + 12, v); }
-  uint32_t fault_point_w_address() const { return address + 12; }
   // the point's x and y copied as one (TrackPosition::Copy)
   uint64_t point_xy() const { return guest::LoadU64(base, address + 16); }
   void set_point_xy(uint64_t v) const { guest::StoreU64(base, address + 16, v); }
@@ -745,6 +737,42 @@ struct TrackCollisionObject : View {
   uint32_t value() const { return guest::LoadU32(base, address + 0); }
   void set_value(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t value_address() const { return address + 0; }
+};
+
+// embedded; measure: TrackPosition@+16
+struct TrackPositionAt16 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 16;
+  float unknown_0() const { return guest::LoadFloat(base, address + 0); }
+  void set_unknown_0(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  float unknown_4() const { return guest::LoadFloat(base, address + 4); }
+  void set_unknown_4(float v) const { guest::StoreFloat(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  float unknown_8() const { return guest::LoadFloat(base, address + 8); }
+  void set_unknown_8(float v) const { guest::StoreFloat(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  float unknown_12() const { return guest::LoadFloat(base, address + 12); }
+  void set_unknown_12(float v) const { guest::StoreFloat(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+};
+
+// embedded; measure: TrackPosition@+48
+struct TrackPositionAt48 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 16;
+  float unknown_0() const { return guest::LoadFloat(base, address + 0); }
+  void set_unknown_0(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  float unknown_4() const { return guest::LoadFloat(base, address + 4); }
+  void set_unknown_4(float v) const { guest::StoreFloat(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  float unknown_8() const { return guest::LoadFloat(base, address + 8); }
+  void set_unknown_8(float v) const { guest::StoreFloat(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  float unknown_12() const { return guest::LoadFloat(base, address + 12); }
+  void set_unknown_12(float v) const { guest::StoreFloat(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
 };
 
 // The image words docs/functions/collision-world.md's code uses.

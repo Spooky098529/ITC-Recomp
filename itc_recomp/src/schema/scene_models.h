@@ -573,6 +573,45 @@ struct SceneModelsSoundContext : View {
   uint32_t slot_address() const { return address + 0; }
 };
 
+// embedded; measure: CarRecord@+176
+struct CarRecordAt176 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 64;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  uint64_t unknown_16() const { return guest::LoadU64(base, address + 16); }
+  void set_unknown_16(uint64_t v) const { guest::StoreU64(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+  uint64_t unknown_24() const { return guest::LoadU64(base, address + 24); }
+  void set_unknown_24(uint64_t v) const { guest::StoreU64(base, address + 24, v); }
+  uint32_t unknown_24_address() const { return address + 24; }
+  float unknown_32() const { return guest::LoadFloat(base, address + 32); }
+  void set_unknown_32(float v) const { guest::StoreFloat(base, address + 32, v); }
+  uint32_t unknown_32_address() const { return address + 32; }
+  uint64_t unknown_48() const { return guest::LoadU64(base, address + 48); }
+  void set_unknown_48(uint64_t v) const { guest::StoreU64(base, address + 48, v); }
+  uint32_t unknown_48_address() const { return address + 48; }
+  uint64_t unknown_56() const { return guest::LoadU64(base, address + 56); }
+  void set_unknown_56(uint64_t v) const { guest::StoreU64(base, address + 56, v); }
+  uint32_t unknown_56_address() const { return address + 56; }
+};
+
+// embedded; measure: WheelPoints.+8@+60
+struct SceneModelsWheelsRecordAt60 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  float unknown_0() const { return guest::LoadFloat(base, address + 0); }
+  void set_unknown_0(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
 // The image words docs/functions/scene-models.md's code uses.
 struct SceneModelsGlobals {
   // the car scene (its second set holds the scene models)

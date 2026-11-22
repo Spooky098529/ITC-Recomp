@@ -27,10 +27,9 @@ fields = [
 
 # The vtable 0x8206CB8C (ten slots, read from the image).
 [RenderQueueVtable]
-# measures from SceneryRenderQueueVtable (scenery-lists), merged at the integration
 measure = "RenderQueue.+0"
-measures = ["Font.+8.+0",
-  "Scene.+0"]
+measures = ["Font.+8.+0"]
+# measures from SceneryRenderQueueVtable (scenery-lists), merged at the integration
 size = 40
 origin = "gpu"
 # 3 functions; areas: device-shaders.md

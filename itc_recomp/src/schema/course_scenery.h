@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: Scenery, SceneryList, Lights
+// allocated; measure: Scenery, SceneryList, Lights, SceneryList::LoadAll.r4, SceneryList::Add.r4, PoolObject.+3792, SceneryList::Clear.r4, SceneryList::ReleaseUnused.r4
 struct Scenery : View {
   using View::View;
   static constexpr uint32_t kSize = 248;
@@ -268,7 +268,7 @@ struct SceneryItemList : View {
   uint32_t table_address() const { return address + 24; }
 };
 
-// allocated; measure: Scenery.+4, Scenery.+20
+// allocated; measure: Scenery.+4, SceneryList::Add.r4.+20
 struct SceneryListItem : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
@@ -297,7 +297,7 @@ struct SceneryListItem : View {
   uint32_t object_address() const { return address + 12; }
 };
 
-// allocated; measure: Scenery.+24
+// allocated; measure: SceneryList::LoadAll.r4.+24, SceneryConfig.+24
 struct SceneryListTableEntry : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
@@ -383,7 +383,7 @@ struct SceneryConfig : View {
   uint32_t pool1_on_address() const { return address + 40; }
 };
 
-// file; measure: Scenery.+28, Scenery.+36, SceneryConfig.+28
+// file; measure: Scenery.+36, SceneryConfig.+28
 struct SceneryCourseTable : View {
   using View::View;
   static constexpr uint32_t kSize = 20;
@@ -1044,6 +1044,36 @@ struct Animation : View {
   uint32_t first_start() const { return guest::LoadU32(base, address + 16); }
   void set_first_start(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
   uint32_t first_start_address() const { return address + 16; }
+};
+
+// embedded; measure: Scenery@+100
+struct SceneryAt100 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 8;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+};
+
+// embedded; measure: Scenery@+144
+struct SceneryAt144 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 20;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  uint32_t unknown_16() const { return guest::LoadU32(base, address + 16); }
+  void set_unknown_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
 };
 
 // The image words docs/functions/course-scenery.md's code uses.

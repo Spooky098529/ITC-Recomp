@@ -183,7 +183,7 @@ struct VideoOutput : View {
   uint32_t vblank_interval_address() const { return address + 304; }
 };
 
-// embedded; measure: Device::SetUpRing.r4
+// embedded; measure: Device::SetUpDisplay.r4, Device::SetUpDisplay.r4@+72
 struct VideoPresentParameters : View {
   using View::View;
   static constexpr uint32_t kSize = 124;
@@ -629,6 +629,39 @@ struct DebugTextQuad : View {
   float vertex5_v() const { return guest::LoadFloat(base, address + 140); }
   void set_vertex5_v(float v) const { guest::StoreFloat(base, address + 140, v); }
   uint32_t vertex5_v_address() const { return address + 140; }
+};
+
+// embedded; measure: VideoOutput@+140
+struct VideoOutputAt140 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: sub_822B4680.r3@+20128
+struct DeviceDisplayCaptureAt20128 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 297;
+  uint32_t unknown_64() const { return guest::LoadU32(base, address + 64); }
+  void set_unknown_64(uint32_t v) const { guest::StoreU32(base, address + 64, v); }
+  uint32_t unknown_64_address() const { return address + 64; }
+  uint32_t unknown_68() const { return guest::LoadU32(base, address + 68); }
+  void set_unknown_68(uint32_t v) const { guest::StoreU32(base, address + 68, v); }
+  uint32_t unknown_68_address() const { return address + 68; }
+  uint32_t unknown_72() const { return guest::LoadU32(base, address + 72); }
+  void set_unknown_72(uint32_t v) const { guest::StoreU32(base, address + 72, v); }
+  uint32_t unknown_72_address() const { return address + 72; }
+  uint32_t unknown_76() const { return guest::LoadU32(base, address + 76); }
+  void set_unknown_76(uint32_t v) const { guest::StoreU32(base, address + 76, v); }
+  uint32_t unknown_76_address() const { return address + 76; }
+  uint32_t unknown_292() const { return guest::LoadU32(base, address + 292); }
+  void set_unknown_292(uint32_t v) const { guest::StoreU32(base, address + 292, v); }
+  uint32_t unknown_292_address() const { return address + 292; }
+  uint8_t unknown_296() const { return guest::LoadU8(base, address + 296); }
+  void set_unknown_296(uint8_t v) const { guest::StoreU8(base, address + 296, v); }
+  uint32_t unknown_296_address() const { return address + 296; }
 };
 
 // The image words docs/functions/video-output.md's code uses.

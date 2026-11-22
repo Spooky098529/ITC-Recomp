@@ -233,3 +233,15 @@ net_answer = { address = 0x826C6B0C, type = "u8", note = "the other console's an
 net_answer_word = { address = 0x826C6B04, type = "u32" }
 race_data = { address = 0x826C5B2C, type = "ptr", to = "RaceData", note = "the race data (race-states.toml): +60, +0x59620 the stages, +0x59AE8 the results records, +0xA3AF0 the kind" }
 net_players = { address = 0x826D82E8, type = "ptr", to = "RaceProgress", note = "the race's progress (race-states.toml): its +7244 is the id sent" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from Kind6Menu.
+[Kind6MenuPart]
+measure = "new<360>@Kind6Menu::Create"
+size = 344
+origin = "embedded"
+fields = [
+  { name = "unknown_340", offset = 340, type = "u32" },
+]

@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: Racers
+// allocated; measure: Racers, [826C5B2C], Vehicle.+5712, Vehicle::ResetForCar.r4, Vehicle::SetUpSurfaceGrip.r4, AiDriver.+160.+5712, AiDriver::Setup.r4
 struct RaceData : View {
   using View::View;
   static constexpr uint32_t kSize = 670464;
@@ -64,18 +64,6 @@ struct RaceData : View {
   uint8_t fault_record_byte_77() const { return guest::LoadU8(base, address + 77); }
   void set_fault_record_byte_77(uint8_t v) const { guest::StoreU8(base, address + 77, v); }
   uint32_t fault_record_byte_77_address() const { return address + 77; }
-  // measure fault: the stage list's +800 (the stage count; Stages:: accessors' r3 is the list)
-  uint32_t fault_stage_count() const { return guest::LoadU32(base, address + 800); }
-  void set_fault_stage_count(uint32_t v) const { guest::StoreU32(base, address + 800, v); }
-  uint32_t fault_stage_count_address() const { return address + 800; }
-  // measure fault: the stage list's +804 (the current stage)
-  uint32_t fault_current_stage() const { return guest::LoadU32(base, address + 804); }
-  void set_fault_current_stage(uint32_t v) const { guest::StoreU32(base, address + 804, v); }
-  uint32_t fault_current_stage_address() const { return address + 804; }
-  // measure fault: the stage list's +808 (sub_820FFAB0 sets it, sub_820FFC68 reads it: 48 rather than 7 after a battle called off)
-  uint32_t fault_stages_word_808() const { return guest::LoadU32(base, address + 808); }
-  void set_fault_stages_word_808(uint32_t v) const { guest::StoreU32(base, address + 808, v); }
-  uint32_t fault_stages_word_808_address() const { return address + 808; }
   // measure fault: a racer record's +1656 (its car's; sub_8210EBF0's horn scale below 2 or 5)
   uint32_t fault_record_word_1656() const { return guest::LoadU32(base, address + 1656); }
   void set_fault_record_word_1656(uint32_t v) const { guest::StoreU32(base, address + 1656, v); }
@@ -292,10 +280,6 @@ struct RaceData : View {
   uint16_t fault_record1_start_slice() const { return guest::LoadU16(base, address + 7842); }
   void set_fault_record1_start_slice(uint16_t v) const { guest::StoreU16(base, address + 7842, v); }
   uint32_t fault_record1_start_slice_address() const { return address + 7842; }
-  // measure fault: probably a record list's word met at +0 (sub_821059D0, not read)
-  uint32_t fault_records_word_303072() const { return guest::LoadU32(base, address + 303072); }
-  void set_fault_records_word_303072(uint32_t v) const { guest::StoreU32(base, address + 303072, v); }
-  uint32_t fault_records_word_303072_address() const { return address + 303072; }
   // measure fault: the racers object's (+48) car count, +0x59610 here (Racers::Add, SetStart)
   uint32_t fault_car_count() const { return guest::LoadU32(base, address + 366048); }
   void set_fault_car_count(uint32_t v) const { guest::StoreU32(base, address + 366048, v); }
@@ -484,7 +468,7 @@ struct RaceStatesDispatcher : View {
   uint32_t fault_word_1012_address() const { return address + 1012; }
 };
 
-// allocated; measure: RaceProgress, Achievements, sub_82167D88.r3.+9624
+// allocated; measure: RaceProgress, Achievements, sub_82167D88.r3.+9624, RaceScreens.+460
 struct RaceProgress : View {
   using View::View;
   static constexpr uint32_t kSize = 7248;
@@ -494,10 +478,6 @@ struct RaceProgress : View {
   uint32_t racer_record_0() const { return guest::LoadU32(base, address + 0); }
   void set_racer_record_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t racer_record_0_address() const { return address + 0; }
-  // measure fault: TrackRoute::PathDistance's position's slice
-  uint16_t fault_position_slice() const { return guest::LoadU16(base, address + 2); }
-  void set_fault_position_slice(uint16_t v) const { guest::StoreU16(base, address + 2, v); }
-  uint32_t fault_position_slice_address() const { return address + 2; }
   // the second (also the checks' out pair's reason, a measure fault)
   uint32_t racer_record_1() const { return guest::LoadU32(base, address + 4); }
   void set_racer_record_1(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
@@ -817,7 +797,7 @@ struct PackedTime : View {
   uint32_t packed_address() const { return address + 0; }
 };
 
-// embedded; measure: RoutePosition::MapToSection.r4, RoutePosition::NotAfter.r4, sub_820FFE98.ret, sub_820FFF10.ret, RoutePosition, AiPath::NoteFixedSections.ret
+// embedded; measure: RoutePosition::MapToSection.r4, RoutePosition::NotAfter.r4, sub_820FFE98.ret, sub_820FFF10.ret, RoutePosition, AiDriver::UpdateStarting.ret@+4, TrackPosition@+4
 struct RoutePosition : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
@@ -941,6 +921,63 @@ struct CourseTimeList : View {
   uint32_t entries_address() const { return address + 52; }
   // the best's details
   uint32_t best_address() const { return address + 332; }
+};
+
+// embedded; measure: RaceProgress@+6636
+struct RaceProgressAt6636 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint16_t unknown_2() const { return guest::LoadU16(base, address + 2); }
+  void set_unknown_2(uint16_t v) const { guest::StoreU16(base, address + 2, v); }
+  uint32_t unknown_2_address() const { return address + 2; }
+};
+
+// embedded; measure: new<7248>@RaceProgress::Create
+struct RaceProgressPart : View {
+  using View::View;
+  static constexpr uint32_t kSize = 7248;
+  uint32_t unknown_2184() const { return guest::LoadU32(base, address + 2184); }
+  void set_unknown_2184(uint32_t v) const { guest::StoreU32(base, address + 2184, v); }
+  uint32_t unknown_2184_address() const { return address + 2184; }
+  uint32_t unknown_2192() const { return guest::LoadU32(base, address + 2192); }
+  void set_unknown_2192(uint32_t v) const { guest::StoreU32(base, address + 2192, v); }
+  uint32_t unknown_2192_address() const { return address + 2192; }
+  uint32_t unknown_2196() const { return guest::LoadU32(base, address + 2196); }
+  void set_unknown_2196(uint32_t v) const { guest::StoreU32(base, address + 2196, v); }
+  uint32_t unknown_2196_address() const { return address + 2196; }
+  float unknown_2980() const { return guest::LoadFloat(base, address + 2980); }
+  void set_unknown_2980(float v) const { guest::StoreFloat(base, address + 2980, v); }
+  uint32_t unknown_2980_address() const { return address + 2980; }
+  uint32_t unknown_2984() const { return guest::LoadU32(base, address + 2984); }
+  void set_unknown_2984(uint32_t v) const { guest::StoreU32(base, address + 2984, v); }
+  uint32_t unknown_2984_address() const { return address + 2984; }
+  float unknown_3012() const { return guest::LoadFloat(base, address + 3012); }
+  void set_unknown_3012(float v) const { guest::StoreFloat(base, address + 3012, v); }
+  uint32_t unknown_3012_address() const { return address + 3012; }
+  uint32_t unknown_3020() const { return guest::LoadU32(base, address + 3020); }
+  void set_unknown_3020(uint32_t v) const { guest::StoreU32(base, address + 3020, v); }
+  uint32_t unknown_3020_address() const { return address + 3020; }
+  float unknown_3984() const { return guest::LoadFloat(base, address + 3984); }
+  void set_unknown_3984(float v) const { guest::StoreFloat(base, address + 3984, v); }
+  uint32_t unknown_3984_address() const { return address + 3984; }
+  uint32_t unknown_6076() const { return guest::LoadU32(base, address + 6076); }
+  void set_unknown_6076(uint32_t v) const { guest::StoreU32(base, address + 6076, v); }
+  uint32_t unknown_6076_address() const { return address + 6076; }
+  uint32_t unknown_6100() const { return guest::LoadU32(base, address + 6100); }
+  void set_unknown_6100(uint32_t v) const { guest::StoreU32(base, address + 6100, v); }
+  uint32_t unknown_6100_address() const { return address + 6100; }
+  uint32_t unknown_6116() const { return guest::LoadU32(base, address + 6116); }
+  void set_unknown_6116(uint32_t v) const { guest::StoreU32(base, address + 6116, v); }
+  uint32_t unknown_6116_address() const { return address + 6116; }
+  float unknown_7156() const { return guest::LoadFloat(base, address + 7156); }
+  void set_unknown_7156(float v) const { guest::StoreFloat(base, address + 7156, v); }
+  uint32_t unknown_7156_address() const { return address + 7156; }
+  uint32_t unknown_7240() const { return guest::LoadU32(base, address + 7240); }
+  void set_unknown_7240(uint32_t v) const { guest::StoreU32(base, address + 7240, v); }
+  uint32_t unknown_7240_address() const { return address + 7240; }
+  uint32_t unknown_7244() const { return guest::LoadU32(base, address + 7244); }
+  void set_unknown_7244(uint32_t v) const { guest::StoreU32(base, address + 7244, v); }
+  uint32_t unknown_7244_address() const { return address + 7244; }
 };
 
 // The image words docs/functions/race-states.md's code uses.

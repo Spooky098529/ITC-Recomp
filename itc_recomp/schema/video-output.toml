@@ -79,7 +79,8 @@ fields = [
 # ring size, +8 ring, +12 command buffer size, +16 command buffer, +20
 # segments), which land on the same offsets.
 [VideoPresentParameters]
-measure = "Device::SetUpRing.r4"
+measure = "Device::SetUpDisplay.r4"
+measures = ["Device::SetUpDisplay.r4@+72"]
 size = 124
 origin = "embedded"
 fields = [
@@ -339,3 +340,29 @@ vblank_count = { address = 0x8296BD30, type = "u32", note = "0 at the video outp
 vblank_count_total = { address = 0x8296BD2C, type = "u32", note = "the other vblank count, up by 1 a vblank in VideoOutput::OnVblank (never called now)" }
 vblank_event = { address = 0x8296BD34, type = "u32", note = "the vblank Event's handle, waited on only by the original WaitForVblank" }
 resolve_z = { address = 0x82000A34, type = "f32", note = "0.0: the viewport's min Z; Device::Resolve's f1 in ResolveFrontBuffer" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from VideoOutput.
+[VideoOutputAt140]
+measure = "VideoOutput@+140"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from DeviceDisplayCapture.
+[DeviceDisplayCaptureAt20128]
+measure = "sub_822B4680.r3@+20128"
+size = 297
+origin = "embedded"
+fields = [
+  { name = "unknown_64", offset = 64, type = "u32" },
+  { name = "unknown_68", offset = 68, type = "u32" },
+  { name = "unknown_72", offset = 72, type = "u32" },
+  { name = "unknown_76", offset = 76, type = "u32" },
+  { name = "unknown_292", offset = 292, type = "u32" },
+  { name = "unknown_296", offset = 296, type = "u8" },
+]

@@ -74,7 +74,8 @@ fields = [
 # records from +0 (each +8 an item id, +788 the bar's top), with the count
 # over record 0's +0.
 [RaceHudRacers]
-measures = ["RaceHud.+444", "sub_822155C0.r3.+444"]
+measure = "RaceHud.+444"
+measures = ["sub_822155C0.r3.+444", "sub_82214BA8.r4"]
 size = 3936
 origin = "embedded"
 fields = [
@@ -169,3 +170,18 @@ viewports = { address = 0x826C2CE8, type = "ptr", to = "Viewports", note = "the 
 track_zones = { address = 0x828161EC, type = "ptr", to = "TrackZones", note = "the track zones' owner (track-zones.md)" }
 screens_holder = { address = 0x826D84F0, type = "ptr", to = "RaceScreens", note = "the in-race screens' holder (race-hud-machine.toml's RaceScreens)" }
 strings = { address = 0x826C5C34, type = "ptr", to = "Strings", note = "the string table (Strings::Load and Release, 47)" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from RaceHud.
+[RaceHudAt656]
+measure = "RaceScreens@+656"
+size = 348
+origin = "embedded"
+fields = [
+  { name = "unknown_328", offset = 328, type = "u32" },
+  { name = "unknown_336", offset = 336, type = "u32" },
+  { name = "unknown_340", offset = 340, type = "u32" },
+  { name = "unknown_344", offset = 344, type = "u32" },
+]

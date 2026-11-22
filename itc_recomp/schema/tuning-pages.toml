@@ -212,3 +212,24 @@ bar_length = { address = 0x820021FC, type = "f32", note = "the light bars' lengt
 mirror_angle = { address = 0x82002244, type = "f32", note = "StoreStickers' mirrored angle's offset" }
 store_scale = { address = 0x82002948, type = "f32", note = "pi/180: the decals' angle scale on store" }
 load_scale = { address = 0x8200294C, type = "f32", note = "the decals' angle scale on load (probably 180/pi)" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from DecalImages.
+[DecalImagesAt28]
+measure = "DecalImages@+28"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from DecalImages.
+[DecalImagesAt32]
+measure = "DecalImages@+32"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]

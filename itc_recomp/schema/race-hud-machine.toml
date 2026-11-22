@@ -57,13 +57,9 @@ fields = [
   { name = "fault_alt_hud_object", offset = 0, type = "u32", note = "measure fault: RaceScreens::Make1004's r3 is the holder's +1004 (AltHudHolder's object)" },
   { name = "fault_alt_hud_menu_list", offset = 4, type = "u32", note = "measure fault: RaceScreens::Make1004's AltHudHolder +4 (the menu list)" },
   { name = "flags", offset = 8, type = "u32", note = "0 at set-up; bit 0 the replay bit (set when the menu after the race picks the replay: the alternate HUD drawn in place of the race HUD)" },
-  { name = "fault_split_countdown_running", offset = 336, type = "u32", note = "measure fault: sub_822159F0's r3 is the holder's +656 (SplitHud +336)" },
-  { name = "fault_split_mode", offset = 340, type = "u32", note = "measure fault: sub_82216810's and sub_82216830's r3 is the holder's +656 (SplitHud +340)" },
   { name = "hud_signs_on", offset = 440, type = "u32", note = "the race HUD's +424 (signs on): 1 by CloseResults, 0 by OnRaceEnd" },
   { name = "hud_countdown_running", offset = 452, type = "u32", note = "the race HUD's +436: CountdownUpdate goes to the race once it's 0" },
   { name = "hud_results", offset = 460, type = "ptr", to = "RacerResultsRecord", note = "the race HUD's +444: the race progress's ([0x826D82E8]) +2184, its results record (StartCountdown)" },
-  { name = "fault_hud_countdown_movie", offset = 612, type = "u32", note = "measure fault: sub_82212A38's r3 is the holder's +16 (the HUD's movie +612)" },
-  { name = "fault_hud_movie2", offset = 620, type = "u32", note = "measure fault: sub_822126C8's, sub_82212868's and sub_82212AE8's r3 is the holder's +16 (the HUD's movie +620)" },
   { name = "fault_ring_count", offset = 820, type = "u32", note = "measure fault: RaceUpdate's post, the race mode's dispatcher's ring count (+804)" },
   { name = "fault_ring_start", offset = 824, type = "u32", note = "measure fault: RaceUpdate's post, the dispatcher's ring start (+808)" },
   { name = "split_results", offset = 1000, type = "ptr", to = "RacerResultsRecord", note = "the +656 object's +344: the race progress's +2184 (StartCountdown, kind 4)" },
@@ -97,7 +93,8 @@ fields = [
 # (RacerRecords::At), the race progress's +2184, a vehicle's +5712. Entries
 # E of 972 bytes from +4, one a racer; e0_ is entry 0's word, e1_ entry 1's.
 [RacerResultsRecord]
-measures = ["RacerRecords::At.ret", "Vehicle::Get.ret.+5712", "RaceHud.+344", "sub_82215A50.r3.+344", "sub_82216908.r3.+344", "sub_82216950.r3.+344"]
+measure = "RacerRecords::At.ret"
+measures = ["Vehicle::Get.ret.+5712", "sub_82215A50.r3.+344", "sub_82216908.r3.+344", "sub_82216950.r3.+344", "RaceScreens@+656.+344"]
 size = 3936
 origin = "embedded"
 fields = [

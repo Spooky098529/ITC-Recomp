@@ -777,6 +777,21 @@ struct CareerCarParts778 : View {
   uint32_t unknown_1144_address() const { return address + 1144; }
 };
 
+// embedded; measure: Stats@+24
+struct CareerStatsAt24 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4840;
+  uint16_t unknown_18() const { return guest::LoadU16(base, address + 18); }
+  void set_unknown_18(uint16_t v) const { guest::StoreU16(base, address + 18, v); }
+  uint32_t unknown_18_address() const { return address + 18; }
+  uint16_t unknown_22() const { return guest::LoadU16(base, address + 22); }
+  void set_unknown_22(uint16_t v) const { guest::StoreU16(base, address + 22, v); }
+  uint32_t unknown_22_address() const { return address + 22; }
+  float unknown_4836() const { return guest::LoadFloat(base, address + 4836); }
+  void set_unknown_4836(float v) const { guest::StoreFloat(base, address + 4836, v); }
+  uint32_t unknown_4836_address() const { return address + 4836; }
+};
+
 // The image words docs/functions/career.md's code uses.
 struct CareerGlobals {
   // 0.0

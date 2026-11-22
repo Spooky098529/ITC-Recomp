@@ -259,3 +259,31 @@ half = { address = 0x82001BE4, type = "f32", note = "0.5" }
 wheel_default = { address = 0x82002568, type = "f32", note = "the wheels record's +20 and +36 by default" }
 car_record_z0 = { address = 0x82002A10, type = "f32", note = "CarRecord::Reset's first block's last row's z" }
 car_record_z1 = { address = 0x82002A88, type = "f32", note = "its other blocks' last row's z" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from CarRecord.
+[CarRecordAt176]
+measure = "CarRecord@+176"
+size = 64
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u64" },
+  { name = "unknown_24", offset = 24, type = "u64" },
+  { name = "unknown_32", offset = 32, type = "f32" },
+  { name = "unknown_48", offset = 48, type = "u64" },
+  { name = "unknown_56", offset = 56, type = "u64" },
+]
+
+# Split from SceneModelsWheelsRecord.
+[SceneModelsWheelsRecordAt60]
+measure = "WheelPoints.+8@+60"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+]

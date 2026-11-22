@@ -27,6 +27,7 @@
 # what those see is named `fault_...` with the offset in their own object.
 [RaceData]
 measure = "Racers"
+measures = ["[826C5B2C]", "Vehicle.+5712", "Vehicle::ResetForCar.r4", "Vehicle::SetUpSurfaceGrip.r4", "AiDriver.+160.+5712", "AiDriver::Setup.r4"]
 size = 670464
 origin = "allocated"
 fields = [
@@ -44,9 +45,6 @@ fields = [
   { name = "record0_place", offset = 60, type = "u32", note = "racer record 0's +12 (its first entry's place), read by Kind6Menu::SaveReplay and RaceHudMachine::ShowResults" },
   { name = "fault_record_byte_76", offset = 76, type = "u8", note = "measure fault: a racer record's byte +76 (Vehicle::SetUp's record at +0)" },
   { name = "fault_record_byte_77", offset = 77, type = "u8", note = "measure fault: a racer record's byte +77 (Vehicle::SetUp's record at +0)" },
-  { name = "fault_stage_count", offset = 800, type = "u32", note = "measure fault: the stage list's +800 (the stage count; Stages:: accessors' r3 is the list)" },
-  { name = "fault_current_stage", offset = 804, type = "u32", note = "measure fault: the stage list's +804 (the current stage)" },
-  { name = "fault_stages_word_808", offset = 808, type = "u32", note = "measure fault: the stage list's +808 (sub_820FFAB0 sets it, sub_820FFC68 reads it: 48 rather than 7 after a battle called off)" },
   { name = "fault_record_word_1656", offset = 1656, type = "u32", note = "measure fault: a racer record's +1656 (its car's; sub_8210EBF0's horn scale below 2 or 5)" },
   { name = "fault_record_word_1672", offset = 1672, type = "u32", note = "measure fault: a racer record's +1672 (Vehicle::SetUp)" },
   { name = "fault_record_word_1676", offset = 1676, type = "u32", note = "measure fault: a racer record's +1676 (Vehicle::SetUp)" },
@@ -101,7 +99,6 @@ fields = [
   { name = "fault_record1_start", offset = 7840, type = "u32", note = "measure fault: racer record 1's start position as a word, the records met at +0 (RaceManager::AddRacers)" },
   { name = "fault_record1_start_section", offset = 7840, type = "u16", note = "measure fault: racer record 1's start section, the records met at +0" },
   { name = "fault_record1_start_slice", offset = 7842, type = "u16", note = "measure fault: racer record 1's start slice" },
-  { name = "fault_records_word_303072", offset = 303072, type = "u32", note = "measure fault: probably a record list's word met at +0 (sub_821059D0, not read)" },
   { name = "fault_car_count", offset = 366048, type = "u32", note = "measure fault: the racers object's (+48) car count, +0x59610 here (Racers::Add, SetStart)" },
   { name = "car_count", offset = 366096, type = "u32", note = "+0x59610 the car count" },
   { name = "added_count", offset = 366100, type = "u32", note = "+0x59614 the racers Race::AddRacer added (also tested for 2 with the race kind 6)" },
@@ -187,13 +184,13 @@ fields = [
 # check reads it) and meets it as the machine's +9624. The check functions'
 # out pair (r3) and StartRoute's machine are joined in (faults).
 [RaceProgress]
-measures = ["RaceProgress", "Achievements", "sub_82167D88.r3.+9624"]
+measure = "RaceProgress"
+measures = ["Achievements", "sub_82167D88.r3.+9624", "RaceScreens.+460"]
 size = 7248
 origin = "allocated"
 fields = [
   { name = "racer_records", offset = 0, type = "bytes", count = 40, note = "ten racer record indexes (-1 none; racers whose item's byte +35 is set, RaceStates::SetUpStage)" },
   { name = "racer_record_0", offset = 0, type = "u32", note = "the first (also the checks' out pair's end, a measure fault: RaceCheckResult)" },
-  { name = "fault_position_slice", offset = 2, type = "u16", note = "measure fault: TrackRoute::PathDistance's position's slice" },
   { name = "racer_record_1", offset = 4, type = "u32", note = "the second (also the checks' out pair's reason, a measure fault)" },
   { name = "slots", offset = 40, type = "bytes", count = 2144, note = "four racer slots of 536 bytes (RaceProgressSlot)" },
   { name = "slot0_hold_0", offset = 40, type = "u32", note = "slot 0's +0 (0 at the reset; probably a 15-tick hold after hits)" },
@@ -313,9 +310,9 @@ fields = [
 # met whole as a word. RoutePosition::NotAfter's and MapToSection's
 # argument, the copies sub_820FFE98 and sub_820FFF10 answer.
 [RoutePosition]
+measure = "RoutePosition::MapToSection.r4"
+measures = ["RoutePosition::NotAfter.r4", "sub_820FFE98.ret", "sub_820FFF10.ret", "RoutePosition", "AiDriver::UpdateStarting.ret@+4", "TrackPosition@+4"]
 # measures from VehicleRoutePosition (vehicle), merged at the integration
-measures = ["RoutePosition::MapToSection.r4", "RoutePosition::NotAfter.r4", "sub_820FFE98.ret", "sub_820FFF10.ret",
-  "RoutePosition", "AiPath::NoteFixedSections.ret"]
 size = 4
 origin = "embedded"
 fields = [
@@ -415,3 +412,37 @@ no_time = { address = 0x82006924, type = "u32", note = "a course entry's empty t
 drain_slope = { address = 0x82008540, type = "f32", note = "the SP drain's slope" }
 gap_most = { address = 0x82009808, type = "f32", note = "200.0" }
 hit_strength = { address = 0x82009814, type = "f32", note = "230.0 (a hard hit)" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from RaceProgress.
+[RaceProgressAt6636]
+measure = "RaceProgress@+6636"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_2", offset = 2, type = "u16" },
+]
+
+# Split from RaceProgress.
+[RaceProgressPart]
+measure = "new<7248>@RaceProgress::Create"
+size = 7248
+origin = "embedded"
+fields = [
+  { name = "unknown_2184", offset = 2184, type = "u32" },
+  { name = "unknown_2192", offset = 2192, type = "u32" },
+  { name = "unknown_2196", offset = 2196, type = "u32" },
+  { name = "unknown_2980", offset = 2980, type = "f32" },
+  { name = "unknown_2984", offset = 2984, type = "u32" },
+  { name = "unknown_3012", offset = 3012, type = "f32" },
+  { name = "unknown_3020", offset = 3020, type = "u32" },
+  { name = "unknown_3984", offset = 3984, type = "f32" },
+  { name = "unknown_6076", offset = 6076, type = "u32" },
+  { name = "unknown_6100", offset = 6100, type = "u32" },
+  { name = "unknown_6116", offset = 6116, type = "u32" },
+  { name = "unknown_7156", offset = 7156, type = "f32" },
+  { name = "unknown_7240", offset = 7240, type = "u32" },
+  { name = "unknown_7244", offset = 7244, type = "u32" },
+]

@@ -405,7 +405,7 @@ struct CarMakersRecordChoice : View {
   uint32_t variant_address() const { return address + 8; }
 };
 
-// embedded; measure: SceneModelRecord::FromCar.r4, SceneModelRecord::SetPaint.r4
+// embedded; measure: SceneModelRecord::FromCar.r4, SceneModelRecord::SetWheels.r4, SceneModelRecord::SetPaint.r4@+1568
 struct CarMakersCar : View {
   using View::View;
   static constexpr uint32_t kSize = 3896;

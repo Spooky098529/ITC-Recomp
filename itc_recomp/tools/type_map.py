@@ -23,7 +23,9 @@ libraries left out), and follows pointers through registers:
              (a function pointer) or, at +0 in a constructor, an image address
              (the vtable)
   calls      the types passed in r3 to r10 are voted into the callee's
-             parameters, and its return into the callers' r3; the whole pass
+             parameters (a pointer at a nonzero offset into a type votes
+             for the object embedded there, `T@+96`; one into an array
+             inside it, for nothing), and its return into the callers' r3; the whole pass
              runs again with those votes (three passes)
   globals    loads and stores at a constant image address (0x82...) are the
              image's data: counted by address
@@ -107,6 +109,7 @@ STORES = {"stw": (4, "int"), "stwu": (4, "int"), "sth": (2, "int"), "stb": (1, "
 INDEXED = {"lwzx", "lhzx", "lbzx", "lhax", "ldx", "lfsx", "lfdx", "stwx", "sthx", "stbx",
            "stdx", "stfsx", "stfdx", "lvx", "lvx128", "stvx", "stvx128", "lvlx", "lvrx",
            "stvlx", "stvrx", "lvlx128", "lvrx128", "stvlx128", "stvrx128", "lwbrx", "stwbrx"}
+EMBEDDED = re.compile(r"@[+-]\d+$")
 NO_WRITE = ("st", "cmp", "b", "mt", "tw", "td", "dcb", "sync", "eieio", "lwsync", "isync", "db")
 
 
@@ -237,6 +240,8 @@ class Map:
     # an allocation beats a path.
     @staticmethod
     def rank(t):
+        if EMBEDDED.search(t):
+            return 2
         if ".r" in t[:14] and t.startswith("sub_") or t.endswith(".ret"):
             return 3
         if t.startswith("[") or ".+" in t:
@@ -263,6 +268,12 @@ class Map:
             self.refused += 1
             return
         self.parent[b] = a
+
+    def embedded(self, p):
+        """The type a pointer stands for: its type at offset 0, else the
+        object embedded at its offset (`T@+96`)."""
+        t = self.find(p.type)
+        return t if p.off == 0 else f"{t}@{p.off:+d}"
 
     def class_of(self, fn):
         n = self.names.get(fn)
@@ -358,9 +369,9 @@ class Map:
             self.touch[t].add(fn)
             f = self.fields[t][off]
             f[(width, kind)] += 1
-            if store and isinstance(value, Ptr) and width == 4:
-                f[("ptr", self.find(value.type))] += 1
-                self._new_fields[path(t, off)][self.find(value.type)] += 1
+            if store and isinstance(value, Ptr) and width == 4 and value.off is not None:
+                f[("ptr", self.embedded(value))] += 1
+                self._new_fields[path(t, off)][self.embedded(value)] += 1
             elif store and isinstance(value, Const) and CODE_LO <= value.value < CODE_HI:
                 f[("fn", "%08X" % value.value)] += 1
             elif store and isinstance(value, Const) and IMAGE_LO <= value.value < IMAGE_HI:
@@ -375,8 +386,8 @@ class Map:
             if IMAGE_LO <= address < IMAGE_HI:
                 self.stats["image"] += 1
                 self.globals[address].add(fn)
-                if store and isinstance(value, Ptr) and width == 4:
-                    self._new_fields["[%08X]" % address][self.find(value.type)] += 1
+                if store and isinstance(value, Ptr) and width == 4 and value.off is not None:
+                    self._new_fields["[%08X]" % address][self.embedded(value)] += 1
                 if not store and kind == "int" and width == 4:
                     return Ptr("[%08X]" % address, 0)
                 return None
@@ -433,7 +444,12 @@ class Map:
             for i in range(3, 11):
                 v = regs.get(i)
                 if isinstance(v, Ptr):
-                    new_params[target][i][self.find(v.type)] += 1
+                    # A pointer into the object (`this + 96`) is an embedded
+                    # object's, not the whole type's; an element of an array
+                    # inside it (an index added) votes for nothing.
+                    if v.off is None:
+                        continue
+                    new_params[target][i][self.embedded(v)] += 1
                     if i == 3 and self.is_ctor(target):
                         cls = self.class_of(target)
                         # A constructor calling its base class's on its own

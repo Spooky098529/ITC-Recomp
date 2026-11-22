@@ -782,11 +782,11 @@ void f822B4E78(uint8_t* base, uint64_t r3) {
   lifted::Cr cr0, cr6;
   uint8_t so = 0;
   // lwz r10,64(r3)
-  r10 = guest::LoadU32(base, schema::DeviceDisplayCapture(base, uint32_t(r3)).unknown_64_address());
+  r10 = guest::LoadU32(base, schema::DeviceDisplayCaptureAt20128(base, uint32_t(r3)).unknown_64_address());
   // lwz r9,68(r3)
-  r9 = guest::LoadU32(base, schema::DeviceDisplayCapture(base, uint32_t(r3)).unknown_68_address());
+  r9 = guest::LoadU32(base, schema::DeviceDisplayCaptureAt20128(base, uint32_t(r3)).unknown_68_address());
   // lwz r11,292(r3)
-  r11 = guest::LoadU32(base, schema::DeviceDisplayCapture(base, uint32_t(r3)).unknown_292_address());
+  r11 = guest::LoadU32(base, schema::DeviceDisplayCaptureAt20128(base, uint32_t(r3)).unknown_292_address());
   // add r9,r10,r9
   r9 = r10 + r9;
   // rlwinm r8,r11,12,26,31
@@ -796,7 +796,7 @@ void f822B4E78(uint8_t* base, uint64_t r3) {
   // rlwinm r7,r11,6,26,31
   r7 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 6) & 0x3F;
   // stw r9,68(r3)
-  guest::StoreU32(base, schema::DeviceDisplayCapture(base, uint32_t(r3)).unknown_68_address(), uint32_t(r9));
+  guest::StoreU32(base, schema::DeviceDisplayCaptureAt20128(base, uint32_t(r3)).unknown_68_address(), uint32_t(r9));
   // addi r9,r8,-1
   r9 = uint64_t(int64_t(int64_t(r8) + -1));
   // cmplw cr6,r7,r9
@@ -804,15 +804,15 @@ void f822B4E78(uint8_t* base, uint64_t r3) {
   // bne cr6,0x822b4eac
   if (!cr6.eq) goto loc_822B4EAC;
   // lwz r9,76(r3)
-  r9 = guest::LoadU32(base, schema::DeviceDisplayCapture(base, uint32_t(r3)).unknown_76_address());
+  r9 = guest::LoadU32(base, schema::DeviceDisplayCaptureAt20128(base, uint32_t(r3)).unknown_76_address());
   // b 0x822b4eb0
   goto loc_822B4EB0;
 loc_822B4EAC:
   // lwz r9,72(r3)
-  r9 = guest::LoadU32(base, schema::DeviceDisplayCapture(base, uint32_t(r3)).unknown_72_address());
+  r9 = guest::LoadU32(base, schema::DeviceDisplayCaptureAt20128(base, uint32_t(r3)).unknown_72_address());
 loc_822B4EB0:
   // lwz r6,68(r3)
-  r6 = guest::LoadU32(base, schema::DeviceDisplayCapture(base, uint32_t(r3)).unknown_68_address());
+  r6 = guest::LoadU32(base, schema::DeviceDisplayCaptureAt20128(base, uint32_t(r3)).unknown_68_address());
   // cmplw cr6,r10,r6
   cr6 = lifted::Compare<uint32_t>(uint32_t(r10), uint32_t(r6), so);
   // blt cr6,0x822b4ec4
@@ -835,7 +835,7 @@ loc_822B4EC4:
   // rlwimi r11,r10,26,0,5
   r11 = (__builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 26) & 0xFC000000) | (r11 & 0xFFFFFFFF03FFFFFF);
   // stw r11,292(r3)
-  guest::StoreU32(base, schema::DeviceDisplayCapture(base, uint32_t(r3)).unknown_292_address(), uint32_t(r11));
+  guest::StoreU32(base, schema::DeviceDisplayCaptureAt20128(base, uint32_t(r3)).unknown_292_address(), uint32_t(r11));
   // rlwinm. r10,r11,0,0,5
   r10 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 0) & 0xFC000000;
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
@@ -844,20 +844,20 @@ loc_822B4EC4:
   // li r11,2048
   r11 = uint64_t(int64_t(2048));
   // stw r11,68(r3)
-  guest::StoreU32(base, schema::DeviceDisplayCapture(base, uint32_t(r3)).unknown_68_address(), uint32_t(r11));
+  guest::StoreU32(base, schema::DeviceDisplayCaptureAt20128(base, uint32_t(r3)).unknown_68_address(), uint32_t(r11));
   // lbz r11,296(r3)
-  r11 = guest::LoadU8(base, schema::DeviceDisplayCapture(base, uint32_t(r3)).unknown_296_address());
+  r11 = guest::LoadU8(base, schema::DeviceDisplayCaptureAt20128(base, uint32_t(r3)).unknown_296_address());
   // ori r11,r11,16
   r11 = r11 | 16;
   // stb r11,296(r3)
-  guest::StoreU8(base, schema::DeviceDisplayCapture(base, uint32_t(r3)).unknown_296_address(), uint8_t(r11));
+  guest::StoreU8(base, schema::DeviceDisplayCaptureAt20128(base, uint32_t(r3)).unknown_296_address(), uint8_t(r11));
   // blr
   return;
 loc_822B4F00:
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // stw r11,68(r3)
-  guest::StoreU32(base, schema::DeviceDisplayCapture(base, uint32_t(r3)).unknown_68_address(), uint32_t(r11));
+  guest::StoreU32(base, schema::DeviceDisplayCaptureAt20128(base, uint32_t(r3)).unknown_68_address(), uint32_t(r11));
   // blr
   return;
 }

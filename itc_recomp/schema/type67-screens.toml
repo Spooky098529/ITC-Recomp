@@ -271,7 +271,8 @@ fields = [
 # 0x820109A8, TitledListScreen's 0x820115C8 before it): the titled list over
 # NodeListScreen, a ListPart at +10824.
 [Type6ListScreen]
-measures = ["TitledListScreen", "Type6ListScreen"]
+measure = "TitledListScreen"
+measures = ["Type6ListScreen", "Type6ListScreen.+9676"]
 size = 10964
 origin = "embedded"
 vtable = 0x820109A8
@@ -582,6 +583,7 @@ fields = [
 # 0x82010F18): the color list, a ListPart at +11040.
 [Type7ListScreen]
 measure = "Type7ListScreen"
+measures = ["Type7ListScreen.+9676"]
 size = 11180
 origin = "embedded"
 vtable = 0x82010F18
@@ -744,7 +746,8 @@ fields = [
 # The list screens' vtables (28 slots; 0x82011218, 0x82011558, 0x820115C8,
 # 0x820109A8, 0x820114E0, 0x82010F18).
 [ListScreenVtable]
-measures = ["ListScreen.+0", "NodeListScreen.+0", "TitledListScreen.+0", "Type6ListScreen.+0", "ColorListScreen.+0", "Type7ListScreen.+0"]
+measure = "ListScreen.+0"
+measures = ["NodeListScreen.+0", "TitledListScreen.+0", "Type6ListScreen.+0", "ColorListScreen.+0", "Type6ListScreen.+9676.+0", "Type7ListScreen.+9676.+0"]
 size = 112
 origin = "image"
 fields = [
@@ -927,7 +930,8 @@ fields = [
 # 0x82010E90): MachineScreen, groups A (+9664) and B (+9708), the car list
 # (PanelSet) at +9752, the group pair at +11728.
 [Type67PanelScreen]
-measures = ["Type6PanelScreen", "Type7PanelScreen"]
+measure = "Type6PanelScreen"
+measures = ["Type7PanelScreen", "Type6PanelScreen.+9644", "Type7PanelScreen.+9644"]
 size = 11744
 origin = "embedded"
 vtable = 0x82010E90
@@ -959,7 +963,8 @@ fields = [
 
 # The panel screens' vtables (19 slots; 0x82010920, 0x82010E90).
 [PanelScreenVtable]
-measures = ["PanelScreen.+0", "Type6PanelScreen.+0", "Type7PanelScreen.+0"]
+measure = "PanelScreen.+0"
+measures = ["Type6PanelScreen.+9644.+0", "Type7PanelScreen.+9644.+0"]
 size = 76
 origin = "image"
 fields = [

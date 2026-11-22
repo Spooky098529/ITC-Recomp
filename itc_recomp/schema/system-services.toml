@@ -181,7 +181,8 @@ fields = [
 # source ([0x8265D408]), then the areas after it laid out from the header's
 # sizes. Also met as the +0 of sub_82577630's context (never called).
 [XNetConfig]
-measures = ["XNet", "sub_82577630.r3.+0"]
+measure = "XNet"
+measures = ["sub_82577788.r3@+28.+20"]
 size = 76
 origin = "image"
 fields = [
@@ -352,7 +353,7 @@ fields = [
 
 # A 3-byte system link message (sub_8214FC40's r4).
 [SysLinkMessage3]
-measure = "sub_8214FC40.r4"
+measure = "sub_8214A3B0.r3@+11"
 size = 3
 origin = "embedded"
 fields = [
@@ -475,7 +476,8 @@ fields = [
 # A 24-byte XNet context (sub_82577630, sub_825782C0; never called): XNet's
 # block at +0, a 516-byte buffer at +4.
 [XNetContext]
-measures = ["sub_82577630.r3", "sub_825782C0.r3"]
+measure = "sub_82577788.r3@+28"
+measures = ["sub_82577850.r3@+8", "sub_82577850.r3", "sub_82577850.r3@+28"]
 size = 24
 origin = "embedded"
 fields = [
@@ -488,7 +490,8 @@ fields = [
 
 # A 516-byte XNet buffer (never called): its count at +512, probably.
 [XNetBuffer]
-measures = ["sub_825782C0.r3.+4", "sub_825767A0.r3"]
+measure = "sub_825767A0.r3"
+measures = ["sub_82577850.r3.+4"]
 size = 516
 origin = "embedded"
 fields = [

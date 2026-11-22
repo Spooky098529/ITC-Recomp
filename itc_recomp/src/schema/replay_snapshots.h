@@ -817,7 +817,7 @@ struct ReplayShapeState : View {
   uint32_t unknown_448_address() const { return address + 448; }
 };
 
-// embedded; measure: Member4080::Copy.r4
+// embedded; measure: Record5232::CopyTrack.r4@+1136, Record5232::CopyTrack.r4@+608, Part464::Copy.r4, Record5232::CopyTrack.r4@+4080, Record5232::CopyTrack.r4, Record5232::Copy.r4@+4080@+16
 struct ReplayCopySource : View {
   using View::View;
   static constexpr uint32_t kSize = 2938;

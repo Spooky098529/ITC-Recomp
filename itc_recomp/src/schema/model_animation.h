@@ -181,7 +181,7 @@ struct AnimationKey : View {
   uint32_t out_tangent_address() const { return address + 16; }
 };
 
-// file; measure: Curve::Sample.r4, CursorCurve::Sample.r4
+// file; measure: CursorCurve::Sample.r4, TrackSet::Channels.ret@+8
 struct AnimationKeyRun : View {
   using View::View;
   static constexpr uint32_t kSize = 60;
@@ -340,7 +340,7 @@ struct SkeletonCursor : View {
   uint32_t unknown_16_address() const { return address + 16; }
 };
 
-// file; measure: SkeletonCursor.+8
+// file; measure: SkeletonCursor.+8, SkeletonCursor.+4, SkeletonCursor.+0
 struct SkeletonNodeEntry : View {
   using View::View;
   static constexpr uint32_t kSize = 20;
@@ -423,6 +423,21 @@ struct PhysicalPadRecord : View {
   void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t unknown_4_address() const { return address + 4; }
   // 0 when made
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+};
+
+// embedded; measure: PhysicalPad@+168
+struct PhysicalPadAt168 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 12;
+  float unknown_0() const { return guest::LoadFloat(base, address + 0); }
+  void set_unknown_0(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
   uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
   void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t unknown_8_address() const { return address + 8; }

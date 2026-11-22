@@ -43,7 +43,8 @@ fields = [
 
 # File::Read's and File::Write's r5: the size, passed by pointer.
 [FileSizeArg]
-measures = ["File::Read.r5", "File::Write.r5"]
+measure = "File::Write.r5"
+measures = ["sub_8209DFA8.r3@+68"]
 size = 4
 origin = "embedded"
 fields = [
@@ -213,11 +214,8 @@ fields = [
 # overlappeds are bytes fields (an XOVERLAPPED, 28 bytes, each; the file's a
 # Win32 OVERLAPPED, 20 bytes).
 [SaveSlot]
-measures = ["SaveSlot::WriteFile.r4", "SaveSlot::ReadFile.r4", "SaveSlot::WaitEnumerate.r4",
-            "SaveSlot::Create.r4", "SaveSlot::Delete.r4", "SaveSlot::LoadStep.r4",
-            "SaveSlot::OpenItem.r4", "SaveSlot::SaveStep.r4", "SaveSlot::ShowDeviceSelector.r4",
-            "SaveSlot::WaitDeviceSelector.r4", "sub_820A4508.r3", "sub_820A5660.r3",
-            "SaveSlot::CheckStep.r4", "SaveSlot::DeleteStep.r4", "SaveSlot::EnumerateStep.r4", "SaveSlot::Failed.r4", "SaveSlot::Ready.r4", "SaveSlot::WaitClose.r4", "SaveSlot::WaitForDevice.r4", "SaveSlot::WaitForUser.r4", "SlotArray.+0"]
+measure = "SaveSlot::WaitEnumerate.r4"
+measures = ["SaveSlot::Create.r4", "SaveSlot::Delete.r4", "SaveSlot::LoadStep.r4", "SaveSlot::OpenItem.r4", "SaveSlot::SaveStep.r4", "SaveSlot::ShowDeviceSelector.r4", "SaveSlot::WaitDeviceSelector.r4", "sub_820A4508.r3", "sub_820A5660.r3", "SaveSlot::CheckStep.r4", "SaveSlot::DeleteStep.r4", "SaveSlot::EnumerateStep.r4", "SaveSlot::Failed.r4", "SaveSlot::Ready.r4", "SaveSlot::WaitClose.r4", "SaveSlot::WaitForDevice.r4", "SaveSlot::WaitForUser.r4", "SlotArray.+0", "SaveSlot::WaitWrite.r4", "SaveSlot::WriteFile.r4@+500", "SaveSlot::WaitRead.r4", "SaveSlot::ReadFile.r4@+500", "SaveSlot::ReadFile.r4@+472"]
 size = 1000
 origin = "allocated"
 vtable = 0x82002190
@@ -286,3 +284,15 @@ fields = [
 # XactEngineRef: merged into sound-cues.toml's XactEngine at the integration (the same object).
 
 # XactEngineVtable: merged into sound-cues.toml's XactEngineInterface at the integration (the same object).
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from SaveSlot.
+[SaveSlotAt92]
+measure = "SaveSlot::Enumerate.r4@+92"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]

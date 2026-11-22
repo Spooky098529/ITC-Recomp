@@ -18669,7 +18669,7 @@ uint64_t f822778C0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x822778EC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,9640(r31)
-  r11 = guest::LoadU32(base, schema::NetModeBlock(base, uint32_t(r31)).screen1_address());
+  r11 = guest::LoadU32(base, schema::NetModeBlockAt86880(base, uint32_t(r31)).unknown_9640_address());
   // lwz r3,0(r3)
   r3 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,0

@@ -312,3 +312,33 @@ live_mask = { address = 0x826C795C, type = "u32", note = "the Live users' mask (
 player_controller = { address = 0x826BABA4, type = "u32", note = "player 1's controller (0 to 3)" }
 system_ui0 = { address = 0x826C7960, type = "u32", note = "the system UI's words" }
 system_ui1 = { address = 0x826C7964, type = "u32" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from NetModeBlock.
+[NetModeBlockAt115888]
+measure = "ModeType12.+816@+115888"
+size = 9648
+origin = "embedded"
+fields = [
+  { name = "unknown_9644", offset = 9644, type = "u32" },
+]
+
+# Split from NetModeBlock.
+[NetModeBlockAt125536]
+measure = "ModeType12.+816@+125536"
+size = 9644
+origin = "embedded"
+fields = [
+  { name = "unknown_9640", offset = 9640, type = "u32" },
+]
+
+# Split from NetModeBlock.
+[NetModeBlockAt86880]
+measure = "ModeType12.+816@+86880"
+size = 9644
+origin = "embedded"
+fields = [
+  { name = "unknown_9640", offset = 9640, type = "u32" },
+]
