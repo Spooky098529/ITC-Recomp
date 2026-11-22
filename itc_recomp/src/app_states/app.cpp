@@ -175,11 +175,11 @@ uint32_t RunHandler(uint8_t* base, uint32_t app, uint64_t entry, bool listener, 
   const uint32_t caller = frame + 96;
   Store64(base, caller + 24, entry);
   const schema::App a(base, app);
-  const uint32_t interface = app != 0 ? a.interface_vtable_address() : 0;
+  const uint32_t interface = app != 0 ? app + 20 : 0;  // the +20 interface
   const uint32_t delegate = Load(base, caller + 28);
   const uint32_t target = VirtualTarget(base, delegate, 4);
   if (listener) {
-    return calls.call(target, delegate, interface, uint64_t(a.message_address()), 0x820929EC);
+    return calls.call(target, delegate, interface, uint64_t(app + 92), 0x820929EC);
   }
   return calls.call(target, delegate, interface, std::nullopt, 0x8209299C);
 }
@@ -188,7 +188,7 @@ void DeliverMessage(uint8_t* base, uint32_t app, uint32_t message, uint32_t fram
                     const AppCalls& calls) {
   ITC_NATIVE_RUNNING("sub_82092D50 App::DeliverMessage");
   const schema::App a(base, app);
-  const uint32_t map = a.listeners_address();
+  const uint32_t map = a.listeners_map().address;
   Store(base, frame + 84, 0);
   Store(base, frame + 80, kRunListener);
   const uint64_t function = Load64(base, frame + 80);
@@ -221,8 +221,8 @@ std::optional<bool> AppApplyRequest(uint8_t* base, uint32_t app, uint32_t type, 
     return std::nullopt;  // a handler's removal: never seen in play
   }
   const schema::App a(base, app);
-  const uint32_t maps[4] = {a.handlers_address(), a.toggled_handlers_address(),
-                            a.always_handlers_address(), a.listeners_address()};
+  const uint32_t maps[4] = {a.handlers_map().address, a.toggled_handlers_map().address,
+                            a.always_handlers_map().address, a.listeners_map().address};
   if (!framework::MapInsertUniqueOf(base, maps[type / 2], key, delegate)) {
     return std::nullopt;
   }
@@ -251,7 +251,7 @@ std::optional<bool> AppAddRequest(uint8_t* base, uint32_t interface, uint32_t ty
   r.set_type(type);
   r.set_key(schema::AppHandlerKey(base, key).key());
   r.set_delegate(calls.clone(delegate, clone_return));
-  return framework::RequestsPushBack(base, schema::AppInterface(base, interface).requests_address(),
+  return framework::RequestsPushBack(base, schema::AppInterface(base, interface).requests_vector().address,
                                      request);
 }
 
@@ -323,7 +323,7 @@ bool AppUpdate(uint8_t* base, uint32_t app, uint32_t frame, const AppCalls& call
                                         uint64_t(frame + 80), std::nullopt, 0x82093E00);
   calls.set_register(30, processor);
   // The toggle (Start) and the step (Back held or repeating while it's set).
-  const uint32_t interface = a.interface_vtable_address();
+  const uint32_t interface = app + 20;  // the +20 interface
   const auto send = [&](uint32_t message, uint32_t return_address) {
     Store(base, frame + 96, message);
     calls.call(VirtualTarget(base, interface, 40), interface, uint64_t(frame + 96), std::nullopt,
@@ -351,14 +351,14 @@ bool AppUpdate(uint8_t* base, uint32_t app, uint32_t frame, const AppCalls& call
   }
   // The handler maps.
   if (a.toggled() != 0 && a.step() == 0) {
-    WalkHandlers(base, app, a.toggled_handlers_address(), frame, 0x82093F38, calls);
+    WalkHandlers(base, app, a.toggled_handlers_map().address, frame, 0x82093F38, calls);
   } else {
-    WalkHandlers(base, app, a.handlers_address(), frame, 0x82093F9C, calls);
+    WalkHandlers(base, app, a.handlers_map().address, frame, 0x82093F9C, calls);
     a.set_step(0);
   }
-  WalkHandlers(base, app, a.always_handlers_address(), frame, 0x82094000, calls);
+  WalkHandlers(base, app, a.always_handlers_map().address, frame, 0x82094000, calls);
   // The messages.
-  const uint32_t messages = a.messages_address();
+  const uint32_t messages = a.messages_vector().address;
   calls.set_register(30, messages);
   WalkVector(base, app, schema::MessageVector(base, messages), kDeliverMessage, frame,
              [&](uint64_t first, uint64_t last, uint64_t functor, uint64_t adjust) {
@@ -370,7 +370,7 @@ bool AppUpdate(uint8_t* base, uint32_t app, uint32_t frame, const AppCalls& call
     calls.call(0x82092F98, messages, std::nullopt, std::nullopt, 0x82094084);
   }
   // The requests.
-  const uint32_t requests = a.requests_address();
+  const uint32_t requests = a.requests_vector().address;
   calls.set_register(30, requests);
   WalkVector(base, app, schema::RequestVector(base, requests), kApplyRequest, frame,
              [&](uint64_t first, uint64_t last, uint64_t functor, uint64_t adjust) {
@@ -387,7 +387,7 @@ bool AppUpdate(uint8_t* base, uint32_t app, uint32_t frame, const AppCalls& call
 
 std::optional<bool> AppSendMessage(uint8_t* base, uint32_t interface, uint32_t message) {
   const auto inserted =
-      MessagesPushBack(base, schema::AppInterface(base, interface).messages_address(), message);
+      MessagesPushBack(base, schema::AppInterface(base, interface).messages_vector().address, message);
   if (inserted) {
     ITC_NATIVE_RUNNING("sub_82094AB0 App::SendMessage");
   }

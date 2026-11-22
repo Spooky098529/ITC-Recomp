@@ -31,6 +31,8 @@ struct Type2DialogData : View {
     return Type2DialogData(base, memory::MakeHandle(new Type2DialogDataData(), sizeof(Type2DialogDataData), "Type2DialogData", &kType2DialogDataLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kType2DialogDataLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kType2DialogDataLayout, offset, width, v); }
   uint32_t movies_loaded() const { return data()->movies_loaded; }
   void set_movies_loaded(uint32_t v) const { data()->movies_loaded = v; }
   uint32_t movies_loaded_bits() const { return data()->movies_loaded; }

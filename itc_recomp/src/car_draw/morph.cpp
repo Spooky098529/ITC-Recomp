@@ -217,7 +217,7 @@ std::optional<Left> ModelMorphShape(uint8_t* base, const Calls& calls, uint32_t 
   if (maker != 0) {
     // The maker's slot 1 (sub_820AC7F0 in play: a job blending on a worker
     // thread), its plain C++ where it runs natively.
-    const uint32_t slot = Load(base, Load(base, maker) + 4);
+    const uint32_t slot = Load(base, guest::VtableWord(base, maker) + 4);  // the maker may be in host memory
     std::optional<uint32_t> made;
     if (slot == kMakeMorphJob && calls.make_morph_job) {
       made = calls.make_morph_job(maker, morph, frame);

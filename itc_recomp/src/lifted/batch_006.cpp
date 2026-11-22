@@ -8756,7 +8756,7 @@ lifted::Result f82126818(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r10 = uint32_t(r4) & 0x1;
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r11,0(r31)
-  guest::StoreU32(base, schema::VtableObject(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
+  schema::VtableObject(base, uint32_t(r31)).set_vtable_bits(uint32_t(r11));
   // beq 0x82126844
   if (cr0.eq) goto loc_82126844;
   // bl 0x825a70e8
@@ -12270,7 +12270,7 @@ lifted::Result f82133C18(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r10 = uint32_t(r4) & 0x1;
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r11,0(r31)
-  guest::StoreU32(base, schema::VtableObject(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
+  schema::VtableObject(base, uint32_t(r31)).set_vtable_bits(uint32_t(r11));
   // beq 0x82133c44
   if (cr0.eq) goto loc_82133C44;
   // bl 0x825a70e8

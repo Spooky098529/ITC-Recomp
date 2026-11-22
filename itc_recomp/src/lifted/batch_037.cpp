@@ -3750,9 +3750,9 @@ loc_8225E4AC:
   // li r4,9
   r4 = uint64_t(int64_t(9));
   // lwz r10,600(r11)
-  r10 = guest::LoadU32(base, schema::NetModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r10 = schema::NetModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // lwz r6,604(r11)
-  r6 = guest::LoadU32(base, schema::NetModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r6 = schema::NetModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // add r6,r6,r10
@@ -3760,7 +3760,7 @@ loc_8225E4AC:
   // addi r6,r6,-1
   r6 = uint64_t(int64_t(int64_t(r6) + -1));
   // stw r10,600(r11)
-  guest::StoreU32(base, schema::NetModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r10));
+  schema::NetModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r10));
   // divwu r5,r6,r5
   r5 = uint32_t(uint32_t(r5) ? uint32_t(r6) / uint32_t(r5) : 0);
   // mulli r5,r5,50

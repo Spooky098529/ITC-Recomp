@@ -16,6 +16,11 @@
 # ModeAnswer) at +0 and +4, the mode seen from its +32 interface (r3 = the
 # mode + 32 in Interrupt and ForceExit: iface_* below, 32 bytes before the
 # fields they are) and the block AllLoaded reads (fault_* at +9608 and up).
+# Dual (E5 step 4): made in host memory by Mode::Create; the measure joins
+# guest addresses with it (the delegates' answer on the stack, the block
+# in AllLoaded and FindShown), which the view reads as guest memory. Its
+# fields over the block and at -28 (ForceExit's +4 from the +32 interface:
+# a negative offset no host struct holds) were left out.
 [ModeType2]
 measures = [
   "ModeType2",
@@ -29,9 +34,10 @@ measures = [
 ]
 size = 852
 origin = "allocated"
+storage = "dual"
+host_alloc = [0x82107828]
 vtable = 0x82006B9C
 fields = [
-  { name = "iface_delegate_ptr", offset = -28, type = "u32", note = "measure fault: ForceExit's mode +4 (delegate_ptr) through the +32 interface (r3 - 28), not a field before the mode" },
   { name = "vtable", offset = 0, type = "u32", note = "0x82006B9C (ModeType2Vtable)" },
   { name = "answer_changed", offset = 0, type = "u8", note = "measure fault: the next-mode answer's byte +0 (ModeAnswer), not the mode's" },
   { name = "answer_word0", offset = 0, type = "u32", note = "measure fault: the next-mode answer's first word (ModeAnswer; TearDown copies the block's into it), not the mode's" },
@@ -50,9 +56,6 @@ fields = [
   { name = "iface_ring_start", offset = 812, type = "u32", note = "measure fault: ring_start (+844) through the +32 interface (Interrupt)" },
   { name = "iface_block", offset = 816, type = "u32", note = "measure fault: block (+848) through the +32 interface (Interrupt, ForceExit)" },
   { name = "block", offset = 848, type = "ptr", to = "Type2ModeBlock", note = "VirtualAlloc(0, 162688, 0x1000, 4) by Init, freed by ModeType2::Release" },
-  { name = "fault_hub_loaded", offset = 9608, type = "u32", note = "measure fault: the block's hub machine's loaded word (AllLoaded), not the mode's" },
-  { name = "fault_race_menu_loaded", offset = 19248, type = "u32", note = "measure fault: the block's race menu's loaded word (AllLoaded)" },
-  { name = "fault_tuning_loaded", offset = 29400, type = "u32", note = "measure fault: the block's tuning screen's loaded word (AllLoaded)" },
 ]
 
 # The block (VirtualAlloc'ed by ModeType2::Init; known-data.md: "type 2
@@ -128,6 +131,7 @@ measures = [
 ]
 size = 4
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "ModeType2Vtable", note = "0x82006B9C for the type 2 mode" },
 ]

@@ -20,6 +20,7 @@
 #include "interpolation/blend_state.h"
 #include "native/textures.h"
 #include "race_update/draw_step.h"
+#include "schema/boot_mode.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -127,12 +128,10 @@ bool SkipOnRenderOnlyPass(uint32_t target) {
   return std::find(targets.begin(), targets.end(), target) != targets.end();
 }
 
-// Message dispatcher object (r3 of sub_821062E8).
-constexpr uint32_t kHandlersOffset = 0;  // array of handler pointers
-constexpr uint32_t kHandlerCountOffset = 200;
-constexpr uint32_t kQueueOffset = 204;  // ring of messages
-constexpr uint32_t kQueueCountOffset = 804;
-constexpr uint32_t kQueueReadIndexOffset = 808;
+// Message dispatcher object (r3 of sub_821062E8; a mode's +36): read through
+// schema::ModeDispatcher, a dual view (E5 step 4: the 852-byte modes are in
+// host memory, the boot and race modes in guest memory). Its handlers (+0)
+// and ring (+204) are bytes in guest order, its counts +200, +804 and +808.
 constexpr uint32_t kQueueCapacity = 50;
 constexpr uint32_t kMessageBytes = 12;  // id and two arguments
 
@@ -357,11 +356,12 @@ void LogRecording(uint32_t message, uint32_t handler, int slots) {
 // Delivers one message to every handler, as the game does.
 void Deliver(lifted::Regs& ctx, uint8_t* base, uint32_t dispatcher, uint32_t message,
              const std::string* only_targets = nullptr) {
-  uint32_t handler_count = guest::LoadU32(base, dispatcher + kHandlerCountOffset);
+  const schema::ModeDispatcher d(base, dispatcher);
+  uint32_t handler_count = d.handler_count();
   for (uint32_t i = 0; i < handler_count; i++) {
     // sub_82106280 picks the object that handles this message for handler i;
     // its first virtual method takes it.
-    ctx.r3.u64 = guest::LoadU32(base, dispatcher + kHandlersOffset + 4 * i);
+    ctx.r3.u64 = schema::host::LoadU32(d.handlers() + 4 * i);
     ctx.r4.u64 = message;
     ctx.lr = 0x82106370;
     lifted::Enter(ctx, base, game::StateMachine::Handle);
@@ -421,15 +421,16 @@ void DispatchMessages(lifted::Regs& ctx, uint8_t* base, uint32_t dispatcher) {
   guest::StackFrame frame(ctx, 144);
   uint32_t message = frame.Local(80);
   Counts& counts = GetCounts();
-  while (guest::LoadU32(base, dispatcher + kQueueCountOffset) != 0) {
+  const schema::ModeDispatcher d(base, dispatcher);
+  while (d.ring_count() != 0) {
     // Pop the oldest message into a local copy.
-    uint32_t count = guest::LoadU32(base, dispatcher + kQueueCountOffset);
-    uint32_t read = guest::LoadU32(base, dispatcher + kQueueReadIndexOffset);
-    guest::StoreU32(base, dispatcher + kQueueCountOffset, count - 1);
-    guest::StoreU32(base, dispatcher + kQueueReadIndexOffset, read + 1);
-    uint32_t slot = dispatcher + kQueueOffset + (read % kQueueCapacity) * kMessageBytes;
+    uint32_t count = d.ring_count();
+    uint32_t read = d.ring_start();
+    d.set_ring_count(count - 1);
+    d.set_ring_start(read + 1);
+    const uint32_t slot = (read % kQueueCapacity) * kMessageBytes;
     for (uint32_t k = 0; k < kMessageBytes; k += 4) {
-      guest::StoreU32(base, message + k, guest::LoadU32(base, slot + k));
+      guest::StoreU32(base, message + k, schema::host::LoadU32(d.ring() + slot + k));
     }
 
     uint32_t id = guest::LoadU32(base, message);

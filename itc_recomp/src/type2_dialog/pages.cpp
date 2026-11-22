@@ -6,6 +6,7 @@
 #include "type2_dialog/type2_dialog.h"
 
 #include "base/log.h"
+#include "game_modes/game_modes.h"
 #include "guest.h"
 #include "schema/boot_mode.h"
 #include "schema/game_modes.h"
@@ -56,8 +57,7 @@ void Post(uint8_t* base, uint32_t mode, uint32_t id, bool id_last) {
   const uint32_t count = dispatcher.ring_count() + 1;
   const uint32_t end = dispatcher.ring_start() + count - 1;
   dispatcher.set_ring_count(count);
-  const schema::ModeMessage slot(
-      base, dispatcher.ring_address() + (end - (end / 50) * 50) * schema::ModeMessage::kSize);
+  const game_modes::RingSlot slot{dispatcher.ring() + (end - (end / 50) * 50) * schema::ModeMessage::kSize};
   if (!id_last) {
     slot.set_id(id);
   }

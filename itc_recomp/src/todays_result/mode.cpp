@@ -42,13 +42,15 @@ void Store64(uint8_t* base, uint32_t at, uint64_t value) {
 // originals test it).
 void Delegate(uint8_t* base, uint32_t mode, uint32_t slot) {
   const Mode m(base, mode);
-  const uint32_t delegate = m.delegate_vtable_address();
+  const uint32_t delegate = mode + 8;  // the delegate (in host memory, E5 step 4)
   uint32_t holder = 0;
   if (delegate != 0) {
     holder = delegate;
     m.set_delegate_object(mode);
     // The function and the adjustment, as one doubleword.
-    Store64(base, m.delegate_function_address(), Load64(base, slot));
+    const uint64_t words = Load64(base, slot);
+    m.set_delegate_function(uint32_t(words >> 32));
+    m.set_delegate_adjustment(uint32_t(words));
     m.set_delegate_vtable(kDelegateVtable);
   }
   m.set_delegate_ptr(holder);
@@ -83,7 +85,7 @@ uint32_t ShownMachine(const Block& block) {
 
 void Dispatch(uint8_t* base, const Calls& calls, uint32_t mode, uint32_t frame, uint32_t lr) {
   // Its r4 a leftover the dispatcher doesn't read.
-  calls.Call(kDispatch, frame, lr, Mode(base, mode).handlers_address(), mode);
+  calls.Call(kDispatch, frame, lr, mode + 36, mode);  // the dispatcher (+36)
 }
 
 }  // namespace
@@ -142,7 +144,7 @@ uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls)
     const Block b = block();
     const uint32_t machine = event ? b.event_address() : b.result_address();
     m.set_handler_count(count + 1);
-    Store(base, m.handlers_address() + (count << 2), machine);
+    schema::host::StoreU32(m.handlers() + (count << 2), machine);  // guest order (E5 step 4)
   }
   const uint32_t shown = Kind(base, frame) == 0 ? kResultIndex : 0;
   block().set_shown_at_init(shown);

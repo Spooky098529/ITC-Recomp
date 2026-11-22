@@ -35,10 +35,12 @@ using G = schema::RaceScreensGlobals;
 // VirtualAlloc(0, size, MEM_COMMIT, read-write) over the allocation layer.
 uint32_t Pages(uint32_t size) { return memory::AllocPages(size, 4096); }
 
-// Whether each global's block is the layer's pages (VirtualFree frees it).
+// Whether each global's block is the layer's pages or a host object's handle
+// (E5 step 4: VirtualFree frees either, memory::FreePages).
 bool AllPages(uint8_t* base, std::initializer_list<uint32_t> globals) {
   for (const uint32_t global : globals) {
-    if (!memory::IsPages(Get(base, global))) {
+    const uint32_t block = Get(base, global);
+    if (!memory::IsPages(block) && !memory::IsHandle(block)) {
       return false;
     }
   }
@@ -210,8 +212,11 @@ uint64_t PauseMenu4Create(uint8_t* base, uint32_t sp) {
 uint64_t AfterRaceMenuCreate(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8221B1F0 AfterRaceMenu::Create");
   Frame(base, sp, 96);
-  G::set_after_screen(base, Pages(4));
-  G::set_after_data(base, Pages(24));
+  // The screen and the data live in host memory (E5 step 4): the original's
+  // VirtualAlloc(4) at 0x8221B210 and VirtualAlloc(24) at 0x8221B22C; the
+  // globals hold their handles.
+  G::set_after_screen(base, schema::AfterRaceMenuScreen::New(base));
+  G::set_after_data(base, schema::AfterRaceMenuData::New(base));
   const uint32_t pages = Pages(28);
   G::set_after_pages(base, pages);
   PagesInit(base, pages, 1);
@@ -230,7 +235,9 @@ uint64_t RaceDialogCreate(uint8_t* base, uint32_t sp) {
   const uint32_t pages = Pages(28);
   G::set_dialog_pages(base, pages);
   PagesInit(base, pages, 0);
-  const schema::RaceDialogData data(base, Pages(40));
+  // The data lives in host memory (E5 step 4): the original's
+  // VirtualAlloc(40) at 0x82217DE8; the global holds its handle.
+  const schema::RaceDialogData data = schema::RaceDialogData::New(base);
   G::set_dialog_data(base, data);
   data.set_unknown_24(0);
   data.set_message(uint32_t(-1));

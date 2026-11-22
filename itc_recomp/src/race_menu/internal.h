@@ -4,6 +4,7 @@
 
 #include <cstdint>
 
+#include "game_modes/game_modes.h"
 #include "guest.h"
 #include "race_menu/race_menu.h"
 #include "schema/boot_mode.h"
@@ -38,7 +39,7 @@ using EventKind = schema::RaceMenuEventKind;
 using Save = schema::SaveData;
 using CareerSave = schema::CareerSave;
 using Node = schema::UiMovieNode;
-using Message = schema::ModeMessage;
+using Message = game_modes::RingSlot;  // a slot in a mode's ring (its bytes, E5 step 4)
 // A player's mapper entry (racer-controllers.toml).
 using Entry = schema::PlayerMapperEntry;
 
@@ -88,7 +89,7 @@ inline void Post(uint8_t* base, uint32_t mode, uint32_t id) {
   const uint32_t count = m.message_count() + 1;
   const uint32_t start = m.message_start();
   m.set_message_count(count);
-  const Message slot(base, m.messages_address() + 12 * ((start + count - 1) % 50));
+  const Message slot{m.messages() + 12 * ((start + count - 1) % 50)};
   slot.set_id(id);
   slot.set_arg0(0);
   slot.set_arg1(0);

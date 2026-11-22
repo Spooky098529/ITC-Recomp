@@ -400,7 +400,7 @@ lifted::Result f82589480(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r10 = uint32_t(r4) & 0x1;
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r11,0(r31)
-  guest::StoreU32(base, schema::VtableObject(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
+  schema::VtableObject(base, uint32_t(r31)).set_vtable_bits(uint32_t(r11));
   // beq 0x825894ac
   if (cr0.eq) goto loc_825894AC;
   // bl 0x825a70e8
@@ -3609,7 +3609,7 @@ lifted::Result f8258DEB8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r30,r4
   r30 = r4;
   // stw r11,0(r31)
-  guest::StoreU32(base, schema::VtableObject(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
+  schema::VtableObject(base, uint32_t(r31)).set_vtable_bits(uint32_t(r11));
   // bl 0x8258e530
   // (left out: dead in C++)
   f8258E530(base, r3);
@@ -3650,7 +3650,7 @@ void f8258E530(uint8_t* base, uint64_t r3) {
   // addi r11,r11,3796
   r11 = uint64_t(int64_t(int64_t(r11) + 3796));
   // stw r11,0(r3)
-  guest::StoreU32(base, schema::VtableObject(base, uint32_t(r3)).vtable_address(), uint32_t(r11));
+  schema::VtableObject(base, uint32_t(r3)).set_vtable_bits(uint32_t(r11));
   // blr
   return;
 }
@@ -5700,7 +5700,7 @@ lifted::Result f82591898(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // cmplwi cr6,r10,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
   // stw r11,0(r31)
-  guest::StoreU32(base, schema::VtableObject(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
+  schema::VtableObject(base, uint32_t(r31)).set_vtable_bits(uint32_t(r11));
   // beq cr6,0x825918cc
   if (cr6.eq) goto loc_825918CC;
   // bl 0x825a70e8
@@ -6056,7 +6056,7 @@ lifted::Result f825925A8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // cmplwi cr6,r10,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
   // stw r11,0(r31)
-  guest::StoreU32(base, schema::VtableObject(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
+  schema::VtableObject(base, uint32_t(r31)).set_vtable_bits(uint32_t(r11));
   // beq cr6,0x825925dc
   if (cr6.eq) goto loc_825925DC;
   // bl 0x825a70e8

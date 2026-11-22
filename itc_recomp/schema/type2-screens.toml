@@ -116,6 +116,7 @@ fields = [
 measures = ["Type2Hub::OpenSelected.r4", "Type2Hub::Close.r4", "Type2Hub::OnDialogDone.r4", "PlateEditor::Close.r4", "BuildScreen::Close.r4", "PowerGraphScreen::Close.r4", "Screen::LeaveToHub.r4"]
 size = 812
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "messages", offset = 204, type = "bytes", count = 600, note = "50 messages of 12 bytes (id, two words)" },
   { name = "message_count", offset = 804, type = "u32" },

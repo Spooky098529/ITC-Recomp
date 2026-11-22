@@ -2,6 +2,7 @@
 // over its block (docs/functions/title-screen.md): see title_screen.h.
 
 #include "base/log.h"
+#include "game_modes/game_modes.h"
 #include "schema/game_modes.h"
 #include "schema/options_screen.h"
 #include "title_screen/internal.h"
@@ -45,7 +46,7 @@ void PostRing(uint8_t* base, const V& v, uint32_t id) {
   const uint32_t count = v.ring_count() + 1;
   const uint32_t start = v.ring_start();
   v.set_ring_count(count);
-  const schema::ModeMessage slot(base, v.ring_address() + 12 * ((start + count - 1) % 50));
+  const game_modes::RingSlot slot{v.ring() + 12 * ((start + count - 1) % 50)};
   slot.set_id(id);
   slot.set_arg0(0);
   slot.set_arg1(0);
@@ -61,7 +62,7 @@ uint64_t Load64(uint8_t* base, uint32_t at) {
 // wraps to 0 (never: kept as the originals test it).
 void InstallDelegate(uint8_t* base, uint32_t mode, uint32_t slot) {
   const Mode m(base, mode);
-  const uint32_t delegate = m.delegate_vtable_address();
+  const uint32_t delegate = mode + 8;  // the delegate (in host memory, E5 step 4)
   uint32_t holder = 0;
   if (delegate != 0) {
     holder = delegate;
@@ -160,7 +161,7 @@ uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls)
        {kOptionsAt, kControllerOptionsAt, kTitleLoadAt, kTitleScreenAt, kSaveScreenAt}) {
     const uint32_t count = m.handler_count();
     m.set_handler_count(count + 1);
-    Store(base, m.handlers_address() + (count << 2), block().address + offset);
+    schema::host::StoreU32(m.handlers() + (count << 2), block().address + offset);  // guest order (E5 step 4)
   }
   // The machines' reenter (open at once) and delete_movie (delete the movie
   // when unloaded): the controller options' the other way round.
@@ -198,7 +199,7 @@ void Restart(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const C
     }
   }
   PostRing(base, m, 1);
-  calls.Call(kDispatch, frame, 0x822251B8, m.handlers_address());
+  calls.Call(kDispatch, frame, 0x822251B8, m.address + 36);
 }
 
 void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls) {
@@ -217,7 +218,7 @@ void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const 
     PostRing(base, m, 1);
   }
   PostRing(base, m, 0);
-  calls.Call(kDispatch, frame, 0x82225538, m.handlers_address());
+  calls.Call(kDispatch, frame, 0x82225538, m.address + 36);
   const Block block = m.block();
   uint32_t type = 0;
   switch (ShownState(base, m)) {
@@ -249,7 +250,7 @@ void LeaveScreen(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, con
   ClearAnswer(base, answer);
   FindShown(base, m.block().address, frame);
   PostRing(base, m, 3);
-  calls.Call(kDispatch, frame, 0x82225344, m.handlers_address());
+  calls.Call(kDispatch, frame, 0x82225344, m.address + 36);
   SetDelegate(base, mode, frame + 80, kSlot10Thunk);
 }
 
@@ -266,7 +267,7 @@ void WaitForLeave(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp,
     SetDelegate(base, mode, frame + 80, kNextModeThunk);
   }
   PostRing(base, m, 1);
-  calls.Call(kDispatch, frame, 0x822252AC, m.handlers_address());
+  calls.Call(kDispatch, frame, 0x822252AC, m.address + 36);
 }
 
 void NextModeAnswer(uint8_t* base, uint32_t answer, uint32_t mode) {
@@ -285,7 +286,7 @@ void Leaving(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const C
   const Mode m(base, mode);
   ClearAnswer(base, answer);
   PostRing(base, m, 4);
-  calls.Call(kDispatch, frame, 0x8222570C, m.handlers_address());
+  calls.Call(kDispatch, frame, 0x8222570C, m.address + 36);
   const uint32_t block = m.block().address;
   for (uint32_t index = 0; index < 47; index++) {
     const uint32_t machine = uint32_t(MachineOf(block, index));

@@ -12,7 +12,9 @@
 #include "hooks/vehicle.h"
 #include "memory/c_runtime_heap.h"
 #include "hooks/heap.h"
+#include "memory/handles.h"
 #include "memory/heap.h"
+#include "memory/host_copy.h"
 #include "schema/action_mappers.h"
 #include "schema/ai_drivers.h"
 #include "schema/car_physics.h"
@@ -28,6 +30,7 @@
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <bit>
+#include <optional>
 
 namespace racer_controllers {
 
@@ -60,10 +63,11 @@ bool CreateInputs(uint8_t* base, uint32_t* last) {
     return false;
   }
   // operator new's error paths are the original's: every block made first,
-  // then the records stored and cleared in the original's order.
+  // then the records stored and cleared in the original's order. The
+  // records are in host memory (E5 step 4).
   uint32_t blocks[7];
   for (int i = 0; i < 7; i++) {
-    const auto block = memory::crt::OperatorNew(base, 20);
+    const auto block = std::optional<uint32_t>(schema::CarInput::New(base).address);
     if (!block) {
       for (int k = 0; k < i; k++) {
         memory::crt::OperatorDelete(blocks[k]);
@@ -87,7 +91,7 @@ bool DestroyInputs(uint8_t* base, uint32_t* last) {
   }
   for (int i = 0; i < 7; i++) {
     const uint32_t block = Load(base, Globals::input_records_address() + 4 * i);
-    if (block != 0 && !memory::IsHeapBlock(block)) {
+    if (block != 0 && !memory::IsHandle(block) && !memory::IsHeapBlock(block)) {
       return false;
     }
   }
@@ -162,7 +166,12 @@ uint32_t InputOf(uint8_t* base, uint32_t index) {
   return Load(base, Globals::input_records_address() + 4 * (index & 0xFF));
 }
 
+// A record copied (either may be a host record, E5 step 4: copied with
+// each field swapped).
 void Copy20(uint8_t* base, uint32_t to, uint32_t from) {
+  if (memory::CopyWithHandles(base, to, from, 20)) {
+    return;
+  }
   for (uint32_t i = 0; i < 20; i += 4) {
     Store(base, to + i, Load(base, from + i));
   }
@@ -798,8 +807,17 @@ void DriveByAiWithPad(uint8_t* base, uint32_t index, uint32_t hold, uint32_t pla
   }
   set_half(12, uint32_t(scaled));
   const uint32_t to = InputOf(base, index);
-  for (uint32_t i = 0; i < 20; i++) {
-    guest::StoreU8(base, to + i, copy[i]);
+  if (memory::IsHandle(to)) {
+    // A host record (E5 step 4): the copy put where the original keeps it
+    // (its frame's +96), then copied in with each field swapped.
+    for (uint32_t i = 0; i < 20; i++) {
+      guest::StoreU8(base, frame + 96 + i, copy[i]);
+    }
+    memory::CopyWithHandles(base, to, frame + 96, 20);
+  } else {
+    for (uint32_t i = 0; i < 20; i++) {
+      guest::StoreU8(base, to + i, copy[i]);
+    }
   }
   regs->r3 = answer;
 }

@@ -9,6 +9,7 @@
 #include "type8_mode/type8_mode.h"
 
 #include "base/log.h"
+#include "game_modes/game_modes.h"
 #include "guest.h"
 #include "menu_helpers/menu_helpers.h"
 #include "menu_sounds/menu_sounds.h"
@@ -64,18 +65,17 @@ menu_helpers::Calls Menus(const Calls& calls) {
 }
 
 // The dispatcher's ring's next record, its count raised.
-schema::ModeMessage NextRecord(uint8_t* base, uint32_t dispatcher) {
-  const schema::ModeDispatcher d(base, dispatcher);
+game_modes::RingSlot NextRecord(uint8_t* base, uint32_t dispatcher) {
+  const schema::ModeDispatcher d(base, dispatcher);  // a dual view (E5 step 4)
   const uint32_t count = d.ring_count() + 1;
   const uint32_t end = d.ring_start() + count - 1;
   d.set_ring_count(count);
-  return schema::ModeMessage(
-      base, d.ring_address() + (end - (end / 50) * 50) * schema::ModeMessage::kSize);
+  return game_modes::RingSlot{d.ring() + (end - (end / 50) * 50) * schema::ModeMessage::kSize};
 }
 
 // A message (`message`, 0, 0) posted, the id first.
 void Post(uint8_t* base, uint32_t dispatcher, uint32_t message) {
-  const schema::ModeMessage slot = NextRecord(base, dispatcher);
+  const game_modes::RingSlot slot = NextRecord(base, dispatcher);
   slot.set_id(message);
   slot.set_arg0(0);
   slot.set_arg1(0);
@@ -324,7 +324,7 @@ uint64_t DialogConfirmPage(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint
     answer = menu_sounds::PlayMenuSound(base, 0, frame, Sounds(calls));
     ToStep(base, dialog, 1, 0, 0);
     const bool yes = int32_t(Menu(base, menu).cursor()) == 0;
-    const schema::ModeMessage slot = NextRecord(base, dispatcher);
+    const game_modes::RingSlot slot = NextRecord(base, dispatcher);
     slot.set_arg0(0);
     slot.set_arg1(0);
     slot.set_id(yes ? 9 : 10);

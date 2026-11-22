@@ -1561,90 +1561,143 @@ struct PhysicsCar : View {
 };
 
 // allocated; measure: new<72>@CollisionWorld::Create, CollisionObject::Link.r4, CollisionObject::Unlink.r4
+#pragma pack(push, 1)
+struct CollisionWorldData {
+  uint32_t buffer = 0;  // +0
+  float default_step = 0;  // +4
+  uint32_t ground_callback = 0;  // +8
+  uint32_t object_count = 0;  // +12
+  uint32_t objects = 0;  // +16
+  uint32_t active = 0;  // +20
+  uint32_t free = 0;  // +24
+  uint32_t active_count = 0;  // +28
+  uint32_t pair_capacity = 0;  // +32
+  uint32_t pairs = 0;  // +36
+  uint32_t pair_count = 0;  // +40
+  uint32_t contact_capacity = 0;  // +44
+  uint32_t contacts = 0;  // +48
+  uint32_t contacts_used = 0;  // +52
+  uint32_t updating = 0;  // +56
+  uint32_t query_count = 0;  // +60
+  uint32_t hits = 0;  // +64
+  uint32_t merged_hits = 0;  // +68
+};
+#pragma pack(pop)
+static_assert(sizeof(CollisionWorldData) == 72);
+inline constexpr memory::LayoutField kCollisionWorldFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 4}, {24, 4}, {28, 4}, {32, 4}, {36, 4}, {40, 4}, {44, 4}, {48, 4}, {52, 4}, {56, 4}, {60, 4}, {64, 4}, {68, 4}};
+inline constexpr memory::Layout kCollisionWorldLayout = {kCollisionWorldFields, 18};
+
 struct CollisionWorld : View {
   using View::View;
   static constexpr uint32_t kSize = 72;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  CollisionWorldData* data() const { return static_cast<CollisionWorldData*>(memory::HandleObject(address)); }
+  static CollisionWorld New(uint8_t* base) {
+    return CollisionWorld(base, memory::MakeHandle(new CollisionWorldData(), sizeof(CollisionWorldData), "CollisionWorld", &kCollisionWorldLayout));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCollisionWorldLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCollisionWorldLayout, offset, width, v); }
   // a caller's buffer (0)
-  uint32_t buffer() const { return guest::LoadU32(base, address + 0); }
-  void set_buffer(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t buffer_address() const { return address + 0; }
+  uint32_t buffer() const { return data()->buffer; }
+  void set_buffer(uint32_t v) const { data()->buffer = v; }
+  uint32_t buffer_bits() const { return data()->buffer; }
+  void set_buffer_bits(uint32_t v) const { data()->buffer = v; }
   // 1/30
-  float default_step() const { return guest::LoadFloat(base, address + 4); }
-  void set_default_step(float v) const { guest::StoreFloat(base, address + 4, v); }
-  uint32_t default_step_address() const { return address + 4; }
+  float default_step() const { return data()->default_step; }
+  void set_default_step(float v) const { data()->default_step = v; }
+  uint32_t default_step_bits() const { return std::bit_cast<uint32_t>(data()->default_step); }
+  void set_default_step_bits(uint32_t v) const { data()->default_step = std::bit_cast<float>(v); }
   // 0x820FEAB0 in play
-  uint32_t ground_callback() const { return guest::LoadU32(base, address + 8); }
-  void set_ground_callback(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t ground_callback_address() const { return address + 8; }
+  uint32_t ground_callback() const { return data()->ground_callback; }
+  void set_ground_callback(uint32_t v) const { data()->ground_callback = v; }
+  uint32_t ground_callback_bits() const { return data()->ground_callback; }
+  void set_ground_callback_bits(uint32_t v) const { data()->ground_callback = v; }
   // 50
-  uint32_t object_count() const { return guest::LoadU32(base, address + 12); }
-  void set_object_count(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
-  uint32_t object_count_address() const { return address + 12; }
+  uint32_t object_count() const { return data()->object_count; }
+  void set_object_count(uint32_t v) const { data()->object_count = v; }
+  uint32_t object_count_bits() const { return data()->object_count; }
+  void set_object_count_bits(uint32_t v) const { data()->object_count = v; }
   // the 320-byte collision objects (a count header at -16)
   template <typename T = CollisionWorldObject>
-  T objects() const { return T(base, guest::LoadU32(base, address + 16)); }
-  void set_objects(const View& v) const { guest::StoreU32(base, address + 16, v.address); }
-  void set_objects(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
-  uint32_t objects_address() const { return address + 16; }
+  T objects() const { return T(base, data()->objects); }
+  void set_objects(const View& w) const { const uint32_t v = w.address; data()->objects = v; }
+  void set_objects(uint32_t v) const { data()->objects = v; }
+  uint32_t objects_bits() const { return data()->objects; }
+  void set_objects_bits(uint32_t v) const { data()->objects = v; }
   // the active list
   template <typename T = CollisionWorldObject>
-  T active() const { return T(base, guest::LoadU32(base, address + 20)); }
-  void set_active(const View& v) const { guest::StoreU32(base, address + 20, v.address); }
-  void set_active(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
-  uint32_t active_address() const { return address + 20; }
+  T active() const { return T(base, data()->active); }
+  void set_active(const View& w) const { const uint32_t v = w.address; data()->active = v; }
+  void set_active(uint32_t v) const { data()->active = v; }
+  uint32_t active_bits() const { return data()->active; }
+  void set_active_bits(uint32_t v) const { data()->active = v; }
   // the free list
   template <typename T = CollisionWorldObject>
-  T free() const { return T(base, guest::LoadU32(base, address + 24)); }
-  void set_free(const View& v) const { guest::StoreU32(base, address + 24, v.address); }
-  void set_free(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
-  uint32_t free_address() const { return address + 24; }
-  uint32_t active_count() const { return guest::LoadU32(base, address + 28); }
-  void set_active_count(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
-  uint32_t active_count_address() const { return address + 28; }
+  T free() const { return T(base, data()->free); }
+  void set_free(const View& w) const { const uint32_t v = w.address; data()->free = v; }
+  void set_free(uint32_t v) const { data()->free = v; }
+  uint32_t free_bits() const { return data()->free; }
+  void set_free_bits(uint32_t v) const { data()->free = v; }
+  uint32_t active_count() const { return data()->active_count; }
+  void set_active_count(uint32_t v) const { data()->active_count = v; }
+  uint32_t active_count_bits() const { return data()->active_count; }
+  void set_active_count_bits(uint32_t v) const { data()->active_count = v; }
   // 1,000; never checked
-  uint32_t pair_capacity() const { return guest::LoadU32(base, address + 32); }
-  void set_pair_capacity(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
-  uint32_t pair_capacity_address() const { return address + 32; }
+  uint32_t pair_capacity() const { return data()->pair_capacity; }
+  void set_pair_capacity(uint32_t v) const { data()->pair_capacity = v; }
+  uint32_t pair_capacity_bits() const { return data()->pair_capacity; }
+  void set_pair_capacity_bits(uint32_t v) const { data()->pair_capacity = v; }
   template <typename T = CollisionPair>
-  T pairs() const { return T(base, guest::LoadU32(base, address + 36)); }
-  void set_pairs(const View& v) const { guest::StoreU32(base, address + 36, v.address); }
-  void set_pairs(uint32_t v) const { guest::StoreU32(base, address + 36, v); }
-  uint32_t pairs_address() const { return address + 36; }
-  uint32_t pair_count() const { return guest::LoadU32(base, address + 40); }
-  void set_pair_count(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
-  uint32_t pair_count_address() const { return address + 40; }
+  T pairs() const { return T(base, data()->pairs); }
+  void set_pairs(const View& w) const { const uint32_t v = w.address; data()->pairs = v; }
+  void set_pairs(uint32_t v) const { data()->pairs = v; }
+  uint32_t pairs_bits() const { return data()->pairs; }
+  void set_pairs_bits(uint32_t v) const { data()->pairs = v; }
+  uint32_t pair_count() const { return data()->pair_count; }
+  void set_pair_count(uint32_t v) const { data()->pair_count = v; }
+  uint32_t pair_count_bits() const { return data()->pair_count; }
+  void set_pair_count_bits(uint32_t v) const { data()->pair_count = v; }
   // 100
-  uint32_t contact_capacity() const { return guest::LoadU32(base, address + 44); }
-  void set_contact_capacity(uint32_t v) const { guest::StoreU32(base, address + 44, v); }
-  uint32_t contact_capacity_address() const { return address + 44; }
+  uint32_t contact_capacity() const { return data()->contact_capacity; }
+  void set_contact_capacity(uint32_t v) const { data()->contact_capacity = v; }
+  uint32_t contact_capacity_bits() const { return data()->contact_capacity; }
+  void set_contact_capacity_bits(uint32_t v) const { data()->contact_capacity = v; }
   template <typename T = CollisionContact>
-  T contacts() const { return T(base, guest::LoadU32(base, address + 48)); }
-  void set_contacts(const View& v) const { guest::StoreU32(base, address + 48, v.address); }
-  void set_contacts(uint32_t v) const { guest::StoreU32(base, address + 48, v); }
-  uint32_t contacts_address() const { return address + 48; }
-  uint32_t contacts_used() const { return guest::LoadU32(base, address + 52); }
-  void set_contacts_used(uint32_t v) const { guest::StoreU32(base, address + 52, v); }
-  uint32_t contacts_used_address() const { return address + 52; }
+  T contacts() const { return T(base, data()->contacts); }
+  void set_contacts(const View& w) const { const uint32_t v = w.address; data()->contacts = v; }
+  void set_contacts(uint32_t v) const { data()->contacts = v; }
+  uint32_t contacts_bits() const { return data()->contacts; }
+  void set_contacts_bits(uint32_t v) const { data()->contacts = v; }
+  uint32_t contacts_used() const { return data()->contacts_used; }
+  void set_contacts_used(uint32_t v) const { data()->contacts_used = v; }
+  uint32_t contacts_used_bits() const { return data()->contacts_used; }
+  void set_contacts_used_bits(uint32_t v) const { data()->contacts_used = v; }
   // 1 during CollisionWorld::Update
-  uint32_t updating() const { return guest::LoadU32(base, address + 56); }
-  void set_updating(uint32_t v) const { guest::StoreU32(base, address + 56, v); }
-  uint32_t updating_address() const { return address + 56; }
+  uint32_t updating() const { return data()->updating; }
+  void set_updating(uint32_t v) const { data()->updating = v; }
+  uint32_t updating_bits() const { return data()->updating; }
+  void set_updating_bits(uint32_t v) const { data()->updating = v; }
   // n (32)
-  uint32_t query_count() const { return guest::LoadU32(base, address + 60); }
-  void set_query_count(uint32_t v) const { guest::StoreU32(base, address + 60, v); }
-  uint32_t query_count_address() const { return address + 60; }
+  uint32_t query_count() const { return data()->query_count; }
+  void set_query_count(uint32_t v) const { data()->query_count = v; }
+  uint32_t query_count_bits() const { return data()->query_count; }
+  void set_query_count_bits(uint32_t v) const { data()->query_count = v; }
   // 2n hit records (the raw hits)
   template <typename T = CollisionHit>
-  T hits() const { return T(base, guest::LoadU32(base, address + 64)); }
-  void set_hits(const View& v) const { guest::StoreU32(base, address + 64, v.address); }
-  void set_hits(uint32_t v) const { guest::StoreU32(base, address + 64, v); }
-  uint32_t hits_address() const { return address + 64; }
+  T hits() const { return T(base, data()->hits); }
+  void set_hits(const View& w) const { const uint32_t v = w.address; data()->hits = v; }
+  void set_hits(uint32_t v) const { data()->hits = v; }
+  uint32_t hits_bits() const { return data()->hits; }
+  void set_hits_bits(uint32_t v) const { data()->hits = v; }
   // their second half (the merged hits)
   template <typename T = CollisionHit>
-  T merged_hits() const { return T(base, guest::LoadU32(base, address + 68)); }
-  void set_merged_hits(const View& v) const { guest::StoreU32(base, address + 68, v.address); }
-  void set_merged_hits(uint32_t v) const { guest::StoreU32(base, address + 68, v); }
-  uint32_t merged_hits_address() const { return address + 68; }
+  T merged_hits() const { return T(base, data()->merged_hits); }
+  void set_merged_hits(const View& w) const { const uint32_t v = w.address; data()->merged_hits = v; }
+  void set_merged_hits(uint32_t v) const { data()->merged_hits = v; }
+  uint32_t merged_hits_bits() const { return data()->merged_hits; }
+  void set_merged_hits_bits(uint32_t v) const { data()->merged_hits = v; }
 };
 
 // allocated; measure: new<4294967295>@CollisionWorld::Create

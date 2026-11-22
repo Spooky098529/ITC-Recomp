@@ -35,18 +35,42 @@ struct GarageScreen : View {
 };
 
 // embedded; measure: GarageScreen::Close.r4, GarageScreen::OnNo.r4, GarageScreen::OnPlateCancelled.r4, GarageScreen::OnPlateDone.r4
+#pragma pack(push, 1)
+struct GarageScreenModeData {
+  uint8_t pad_0[204] = {};
+  uint8_t messages[600] = {};  // +204, guest order
+  uint32_t message_count = 0;  // +804
+  uint32_t message_start = 0;  // +808
+};
+#pragma pack(pop)
+static_assert(sizeof(GarageScreenModeData) == 812);
+inline constexpr memory::LayoutField kGarageScreenModeFields[] = {{804, 4}, {808, 4}};
+inline constexpr memory::Layout kGarageScreenModeLayout = {kGarageScreenModeFields, 2};
+
 struct GarageScreenMode : View {
   using View::View;
   static constexpr uint32_t kSize = 812;
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  GarageScreenModeData* data() const { return static_cast<GarageScreenModeData*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static GarageScreenMode New(uint8_t* base) {
+    return GarageScreenMode(base, memory::MakeHandle(new GarageScreenModeData(), sizeof(GarageScreenModeData), "GarageScreenMode", &kGarageScreenModeLayout));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kGarageScreenModeLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kGarageScreenModeLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 50 messages of 12 bytes (id, two words)
-  uint32_t messages_address() const { return address + 204; }
-  uint32_t message_count() const { return guest::LoadU32(base, address + 804); }
-  void set_message_count(uint32_t v) const { guest::StoreU32(base, address + 804, v); }
-  uint32_t message_count_address() const { return address + 804; }
+  uint8_t* messages() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 204 : guest::Pointer(base, address + 204); }
+  uint32_t message_count() const { return on_host() ? uint32_t(data()->message_count) : uint32_t(guest::LoadU32(base, address + 804)); }
+  void set_message_count(uint32_t v) const { if (on_host()) data()->message_count = v; else guest::StoreU32(base, address + 804, v); }
+  uint32_t message_count_bits() const { return on_host() ? data()->message_count : guest::LoadU32(base, address + 804); }
+  void set_message_count_bits(uint32_t v) const { if (on_host()) data()->message_count = v; else guest::StoreU32(base, address + 804, v); }
   // the ring's first slot
-  uint32_t message_start() const { return guest::LoadU32(base, address + 808); }
-  void set_message_start(uint32_t v) const { guest::StoreU32(base, address + 808, v); }
-  uint32_t message_start_address() const { return address + 808; }
+  uint32_t message_start() const { return on_host() ? uint32_t(data()->message_start) : uint32_t(guest::LoadU32(base, address + 808)); }
+  void set_message_start(uint32_t v) const { if (on_host()) data()->message_start = v; else guest::StoreU32(base, address + 808, v); }
+  uint32_t message_start_bits() const { return on_host() ? data()->message_start : guest::LoadU32(base, address + 808); }
+  void set_message_start_bits(uint32_t v) const { if (on_host()) data()->message_start = v; else guest::StoreU32(base, address + 808, v); }
 };
 
 // allocated; measure: new<104>@GarageScreen::Create
@@ -90,13 +114,15 @@ struct GarageScreenData : View {
     return GarageScreenData(base, memory::MakeHandle(new GarageScreenDataData(), sizeof(GarageScreenDataData), "GarageScreenData", &kGarageScreenDataLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kGarageScreenDataLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kGarageScreenDataLayout, offset, width, v); }
   // 1 once the header is set (SetHeader)
   uint32_t set_up() const { return data()->set_up; }
   void set_set_up(uint32_t v) const { data()->set_up = v; }
   uint32_t set_up_bits() const { return data()->set_up; }
   void set_set_up_bits(uint32_t v) const { data()->set_up = v; }
   // the career's pick (player 0's save data +8 to +27, shown as a name)
-  uint8_t* pick() const { return data()->pick; }
+  uint8_t* pick() const { return reinterpret_cast<uint8_t*>(data()) + 4; }
   // save data +6116; the sale adds its price
   uint32_t money() const { return data()->money; }
   void set_money(uint32_t v) const { data()->money = v; }

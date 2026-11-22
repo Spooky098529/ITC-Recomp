@@ -14,7 +14,13 @@
 #include "schema/boot_mode.h"
 #include "schema/camera_modes.h"
 #include "schema/game_modes.h"
+#include "schema/network_mode.h"
 #include "schema/race_overlays.h"
+#include "schema/title_screen.h"
+#include "schema/todays_result.h"
+#include "schema/type10_mode.h"
+#include "schema/type2_mode.h"
+#include "schema/type5_mode.h"
 
 #include <cstdlib>
 
@@ -192,7 +198,7 @@ void ModeConstruct(uint8_t* base, uint32_t mode) {
   const schema::GameMode m(base, mode);
   m.set_vtable(kModeVtableIntermediate);
   m.set_delegate_ptr(0);
-  const uint32_t delegate = m.delegate_vtable_address();
+  const uint32_t delegate = m.address + 8;  // the delegate (a handle's interior in host memory)
   uint32_t pointer = 0;
   if (delegate != 0) {
     pointer = delegate;
@@ -493,11 +499,11 @@ void ModeBaseConstruct(uint8_t* base, uint32_t mode, uint32_t vtable, uint32_t v
                        bool word848 = false) {
   ModeConstruct(base, mode);
   // The dispatcher at +36 (boot-mode.toml's GameMode, ModeDispatcher).
-  const schema::ModeDispatcher dispatcher(base,
-                                          schema::GameMode(base, mode).handlers_address());
+  // Dual views (E5 step 4): the 852-byte modes are in host memory.
+  const schema::ModeDispatcher dispatcher(base, mode + 36);
   dispatcher.set_handler_count(0);
   for (uint32_t i = 0; i < 50 * 3; i++) {
-    guest::StoreU32(base, dispatcher.ring_address() + 4 * i, 0);
+    schema::host::StoreU32(dispatcher.ring() + 4 * i, 0);
   }
   dispatcher.set_ring_count(0);
   dispatcher.set_ring_start(0);
@@ -624,6 +630,25 @@ void ModeTypeConstruct(uint8_t* base, uint32_t type, uint32_t mode) {
   }
 }
 
+namespace {
+
+// An 852-byte mode in host memory (E5 step 4): its schema type's New.
+uint32_t NewMode(uint8_t* base, uint32_t type) {
+  switch (type) {
+    case 2: return schema::ModeType2::New(base).address;
+    case 4: return schema::ModeType4::New(base).address;
+    case 5: return schema::ModeType5::New(base).address;
+    case 6: return schema::GameModeType6::New(base).address;
+    case 7: return schema::GameModeType7::New(base).address;
+    case 9: return schema::ModeType9::New(base).address;
+    case 10: return schema::ModeType10::New(base).address;
+    case 12: return schema::ModeType12::New(base).address;
+    default: return 0;
+  }
+}
+
+}  // namespace
+
 uint32_t ModeBytes(uint32_t type) {
   switch (type) {
     case 1: return kRaceModeBytes;
@@ -650,7 +675,9 @@ std::optional<uint32_t> ModeCreate(uint8_t* base, uint32_t type) {
     ITC_LOG_ERROR("Mode::Create: type 12 (Xbox Live) asked for with --multiplayer_menu_items off");
     return std::nullopt;
   }
-  const auto mode = memory::crt::OperatorNew(base, bytes);
+  // The race and boot modes in guest memory, the 852-byte ones in host memory.
+  const auto mode = bytes == kModeBytes ? std::optional<uint32_t>(NewMode(base, type))
+                                        : memory::crt::OperatorNew(base, bytes);
   if (!mode) {
     return std::nullopt;
   }

@@ -17,6 +17,7 @@
 #include "car_physics/float_ops.h"
 #include "data_tables/data_tables.h"
 #include "guest.h"
+#include "memory/host_copy.h"
 #include "race_setup/race_setup.h"
 #include "racer_controllers/racer_controllers.h"
 #include "track_route/track_route.h"
@@ -95,8 +96,11 @@ int32_t Divw(int32_t a, int32_t b) {
 void GiveInput(uint8_t* base, uint32_t input, uint32_t index) {
   ai_drivers::ClearCarInput(base, input);
   const uint32_t to = Load(base, kInputs + ((index << 2) & 0x3FC));
-  for (uint32_t w = 0; w < 5; w++) {
-    Store(base, to + 4 * w, Load(base, input + 4 * w));
+  // A host record (E5 step 4) is copied with each field swapped.
+  if (!memory::CopyWithHandles(base, to, input, 20)) {
+    for (uint32_t w = 0; w < 5; w++) {
+      Store(base, to + 4 * w, Load(base, input + 4 * w));
+    }
   }
 }
 // An entry's distance to the player's slice point: both slices' centers

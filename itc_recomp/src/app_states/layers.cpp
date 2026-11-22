@@ -11,6 +11,7 @@
 #include "memory/c_runtime_heap.h"
 #include "schema/app_states.h"
 #include "schema/boot_mode.h"
+#include "schema/game_modes.h"
 #include "schema/options_screen.h"
 #include "std_list/ptr_list.h"
 
@@ -194,7 +195,7 @@ std::optional<uint32_t> StatesCreate(uint8_t* base, uint32_t setup, uint32_t fra
 std::optional<uint32_t> AppStart(uint8_t* base, uint32_t interface, uint32_t frame,
                                  const AppCalls& calls) {
   (void)frame;
-  const auto holder = memory::crt::OperatorNew(base, 8);
+  const auto holder = std::optional<uint32_t>(schema::ModeHolder::New(base).address);  // host memory (E5 step 4)
   if (!holder) {
     return std::nullopt;
   }
@@ -264,7 +265,9 @@ void ListForEach(uint8_t* base, uint32_t result, uint64_t first, uint64_t last, 
     const uint32_t object = Load(base, caller + 52) + Load(base, caller + 56);
     const uint32_t function = Load(base, caller + 48);
     if (ops) {
-      const uint64_t op = Load64(base, node + 8);
+      // The node in host memory (E5 step 4): its two words, type then state.
+      const schema::AppOpListNode n(base, node);
+      const uint64_t op = (uint64_t(n.op_type()) << 32) | n.op_state();
       std::optional<uint32_t> ours;
       if (function == kApplyOp) {
         calls.in_frame(128, return_address,
@@ -287,7 +290,8 @@ void ListForEach(uint8_t* base, uint32_t result, uint64_t first, uint64_t last, 
         calls.call(function, object, uint64_t(value), std::nullopt, return_address);
       }
     }
-    node = schema::StateListNode(base, node).next().address;  // an operation's node too
+    node = ops ? schema::AppOpListNode(base, node).next().address
+               : schema::StateListNode(base, node).next().address;
     calls.set_register(31, node);
   }
   const uint64_t a = Load64(base, caller + 48), b = Load64(base, caller + 56);

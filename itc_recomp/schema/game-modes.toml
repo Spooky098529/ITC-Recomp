@@ -94,6 +94,8 @@ fields = [
 measure = "Modes"
 size = 8
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820928D4]
 vtable = 0x82006AF0
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82006AF0 (slot 0 sub_820ACCF0; 1 to 3 the empty sub_82106540)" },
@@ -215,9 +217,16 @@ fields = [
 measure = "ModeType6"
 size = 852
 origin = "allocated"
+storage = "host"
+host_alloc = [0x82107870]
 vtable = 0x82010A48
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82010A48" },
+  { name = "delegate_ptr", offset = 4, type = "u32", note = "the delegate at +8 (GameMode's)" },
+  { name = "delegate_vtable", offset = 8, type = "u32" },
+  { name = "delegate_object", offset = 12, type = "u32" },
+  { name = "delegate_function", offset = 16, type = "fn" },
+  { name = "delegate_adjustment", offset = 20, type = "u32" },
   { name = "vtable32", offset = 32, type = "u32", note = "0x82010A3C" },
   { name = "handlers", offset = 36, type = "bytes", count = 200, note = "the dispatcher: 50 handler pointers" },
   { name = "handler_count", offset = 236, type = "u32" },
@@ -232,15 +241,23 @@ fields = [
 measure = "ModeType7"
 size = 852
 origin = "allocated"
+storage = "host"
+host_alloc = [0x82107888]
 vtable = 0x82010FB0
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82010FB0" },
+  { name = "delegate_ptr", offset = 4, type = "u32", note = "the delegate at +8 (GameMode's)" },
+  { name = "delegate_vtable", offset = 8, type = "u32" },
+  { name = "delegate_object", offset = 12, type = "u32" },
+  { name = "delegate_function", offset = 16, type = "fn" },
+  { name = "delegate_adjustment", offset = 20, type = "u32" },
   { name = "vtable32", offset = 32, type = "u32", note = "0x82010FA4" },
   { name = "handlers", offset = 36, type = "bytes", count = 200, note = "the dispatcher: 50 handler pointers" },
   { name = "handler_count", offset = 236, type = "u32" },
   { name = "ring", offset = 240, type = "bytes", count = 600, note = "50 messages of 12 bytes (ModeMessage)" },
   { name = "ring_count", offset = 840, type = "u32" },
   { name = "ring_start", offset = 844, type = "u32" },
+  { name = "block", offset = 848, type = "u32", note = "the screen block (type6-type7-modes.toml's Type7Mode.block)" },
 ]
 
 [globals]

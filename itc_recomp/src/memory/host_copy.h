@@ -33,4 +33,13 @@ bool CopyWithHandles(uint8_t* base, uint32_t destination, uint32_t source, uint3
 // When the destination is a handle's: the fill done and true; else false.
 bool FillWithHandles(uint8_t* base, uint32_t destination, uint8_t value, uint32_t size);
 
+// A field over other fields of a host object (a union, a word read as two
+// halves, a byte of a word): its value as the guest's bytes would give it.
+// `object` is the host struct's start, `layout` its scalar members; the
+// covered members are put in guest order in a scratch copy, the field read
+// (or written, then the members put back) big-endian there.
+uint64_t LoadOverlay(const uint8_t* object, const Layout& layout, uint32_t offset, uint32_t width);
+void StoreOverlay(uint8_t* object, const Layout& layout, uint32_t offset, uint32_t width,
+                  uint64_t value);
+
 }  // namespace memory

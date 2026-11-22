@@ -113,8 +113,10 @@ uint64_t Step1(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls)
 uint64_t SetTexts(uint8_t* base, uint64_t member, uint32_t sp, const Calls& calls);
 // sub_82250CD0 SetParts (r4 the record's +60): its bytes sign-extended into
 // two arrays on its frame, then SetPartIcon, SetPartRow2 and SetPartRow1.
-// SetPartRow1's r3. 144-byte frame.
-uint64_t SetParts(uint8_t* base, uint32_t parts, uint32_t sp);
+// SetPartRow1's r3. 144-byte frame. `parts` holds the record's +60 to +79
+// in guest byte order (the data is a host object since E5 step 4: its
+// five words read through the view by SetTexts).
+uint64_t SetParts(uint8_t* base, const uint8_t* parts, uint32_t sp);
 // sub_82250B48 SetPartIcon: node (3, 0)'s +108 = `value`. The node.
 // 112-byte frame.
 uint64_t SetPartIcon(uint8_t* base, uint32_t value, uint32_t sp);

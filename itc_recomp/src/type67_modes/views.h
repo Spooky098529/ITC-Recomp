@@ -68,20 +68,18 @@ struct ModeView {
   uint32_t ring_count() const { return type7 ? t7.ring_count() : t6.ring_count(); }
   void set_ring_count(uint32_t v) const { type7 ? t7.set_ring_count(v) : t6.set_ring_count(v); }
   uint32_t ring_start() const { return type7 ? t7.ring_start() : t6.ring_start(); }
-  uint32_t ring_address() const { return type7 ? t7.ring_address() : t6.ring_address(); }
+  // The ring's and the handlers' bytes (guest order in either shape: the
+  // views are dual, the modes in host memory since E5's step 4).
+  uint8_t* ring() const { return type7 ? t7.ring() : t6.ring(); }
   uint32_t handler_count() const { return type7 ? t7.handler_count() : t6.handler_count(); }
   void set_handler_count(uint32_t v) const {
     type7 ? t7.set_handler_count(v) : t6.set_handler_count(v);
   }
-  uint32_t handlers_address() const {
-    return type7 ? t7.handlers_address() : t6.handlers_address();
-  }
-  uint32_t delegate_ptr_address() const {
-    return type7 ? t7.delegate_ptr_address() : t6.delegate_ptr_address();
-  }
-  uint32_t delegate_vtable_address() const {
-    return type7 ? t7.delegate_vtable_address() : t6.delegate_vtable_address();
-  }
+  uint8_t* handlers() const { return type7 ? t7.handlers() : t6.handlers(); }
+  // The dispatcher (+36) and the delegate (+8): addresses inside the mode (a
+  // handle's interior in host memory).
+  uint32_t dispatcher() const { return t6.address + 36; }
+  uint32_t delegate() const { return t6.address + 8; }
   void set_delegate_ptr(uint32_t v) const {
     type7 ? t7.set_delegate_ptr(v) : t6.set_delegate_ptr(v);
   }

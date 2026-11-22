@@ -18,6 +18,7 @@
 #include "c_runtime/strings.h"
 #include "car_list/car_list.h"
 #include "car_makers/car_makers.h"
+#include "game_modes/game_modes.h"
 #include "options_screen/options_screen.h"
 #include "save_screen/save_screen.h"
 #include "stand_models/stand_models.h"
@@ -84,8 +85,7 @@ void Queue(uint8_t* base, const schema::ModeDispatcher& d, uint32_t message) {
   const uint32_t count = d.ring_count() + 1;
   const uint32_t end = d.ring_start() + count - 1;
   d.set_ring_count(count);
-  const schema::ModeMessage slot(
-      base, d.ring_address() + (end - (end / 50) * 50) * schema::ModeMessage::kSize);
+  const game_modes::RingSlot slot{d.ring() + (end - (end / 50) * 50) * schema::ModeMessage::kSize};
   slot.set_id(message);
   slot.set_arg0(0);
   slot.set_arg1(0);
@@ -442,7 +442,7 @@ uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const ScreenCalls& 
   const auto add = [&](uint32_t machine) {
     const uint32_t count = dispatcher.handler_count();
     dispatcher.set_handler_count(count + 1);
-    StoreU32(base, dispatcher.handlers_address() + (count << 2), machine);
+    schema::host::StoreU32(dispatcher.handlers() + (count << 2), machine);  // a dual view (E5 step 4)
   };
   add(member != 0 ? schema::Type8Screen0(base, m.screen0_address()).machine_address() : 0);
   add(dialog);

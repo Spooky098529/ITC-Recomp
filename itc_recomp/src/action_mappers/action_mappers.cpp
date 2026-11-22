@@ -19,6 +19,8 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstdint>
+#include <cstring>
+#include <optional>
 
 namespace action_mappers {
 
@@ -152,6 +154,37 @@ void ClientNodeConstruct(uint8_t* base, uint32_t node, uint32_t type) {
   n.set_vtable(0x82071380);
 }
 
+namespace {
+
+// The client list's count words: +12 + 4 x type the nodes added, +24 + 4 x
+// type those bound. The list is in host memory (E5 step 4), its members at
+// the guest offsets, so a word is the host struct's at that offset (host
+// byte order). The original reads past the six words for a type above 2;
+// nothing passes one.
+constexpr uint32_t kAddedCounts = 12;
+constexpr uint32_t kBoundCounts = 24;
+
+uint8_t* CountWord(const ClientList& list, uint32_t offset, uint32_t type) {
+  const uint64_t at = uint64_t(offset) + 4 * uint64_t(type);
+  if (at + 4 > ClientList::kSize) {
+    ITC_LOG_ERROR("ClientList: count word +{} outside the list (type {})", at, type);
+    std::abort();
+  }
+  return reinterpret_cast<uint8_t*>(list.data()) + at;
+}
+
+uint32_t LoadCount(const ClientList& list, uint32_t offset, uint32_t type) {
+  uint32_t v;
+  std::memcpy(&v, CountWord(list, offset, type), sizeof v);
+  return v;
+}
+
+void StoreCount(const ClientList& list, uint32_t offset, uint32_t type, uint32_t v) {
+  std::memcpy(CountWord(list, offset, type), &v, sizeof v);
+}
+
+}  // namespace
+
 void ClientListConstruct(uint8_t* base, uint32_t list) {
   ITC_NATIVE_RUNNING("sub_8259C7B8 ClientList::ClientList");
   const ClientList l(base, list);
@@ -159,8 +192,8 @@ void ClientListConstruct(uint8_t* base, uint32_t list) {
   l.set_vtable(0x820713C0);
   l.set_last(0u);
   for (uint32_t i = 0; i < 3; i++) {
-    guest::StoreU32(base, l.added_counts_address() + 4 * i, 0);
-    guest::StoreU32(base, l.bound_counts_address() + 4 * i, 0);
+    StoreCount(l, kAddedCounts, i, 0);
+    StoreCount(l, kBoundCounts, i, 0);
   }
   G::set_the_client_list(base, list);
 }
@@ -177,29 +210,29 @@ void ClientListAdd(uint8_t* base, uint32_t node) {
     list.last().set_next(node);
   }
   list.set_last(node);
-  const uint32_t count = list.added_counts_address() + 4 * ClientNode(base, node).type();
-  guest::StoreU32(base, count, guest::LoadU32(base, count) + 1);
+  const uint32_t type = ClientNode(base, node).type();
+  StoreCount(list, kAddedCounts, type, LoadCount(list, kAddedCounts, type) + 1);
 }
 
 namespace {
 
-uint32_t Counter(uint8_t* base, uint32_t address, uint32_t bump) {
+uint32_t Counter(const ClientList& list, uint32_t offset, uint32_t type, uint32_t bump) {
   if ((bump & 0xFF) != 0) {
-    guest::StoreU32(base, address, guest::LoadU32(base, address) + 1);
+    StoreCount(list, offset, type, LoadCount(list, offset, type) + 1);
   }
-  return guest::LoadU32(base, address);
+  return LoadCount(list, offset, type);
 }
 
 }  // namespace
 
 uint32_t ClientListCount(uint8_t* base, uint32_t list, uint32_t type, uint32_t bump) {
   ITC_NATIVE_RUNNING("sub_8259C868 ClientList::Count");
-  return Counter(base, ClientList(base, list).added_counts_address() + 4 * type, bump);
+  return Counter(ClientList(base, list), kAddedCounts, type, bump);
 }
 
 uint32_t ClientListBoundCount(uint8_t* base, uint32_t list, uint32_t type, uint32_t bump) {
   ITC_NATIVE_RUNNING("sub_8259C898 ClientList::BoundCount");
-  return Counter(base, ClientList(base, list).bound_counts_address() + 4 * type, bump);
+  return Counter(ClientList(base, list), kBoundCounts, type, bump);
 }
 
 uint32_t ClientListFind(uint8_t* base, uint32_t type, uint32_t n) {
@@ -885,12 +918,14 @@ bool InitCreate(uint8_t* base, uint32_t manager, uint32_t* list) {
   ITC_NATIVE_RUNNING("sub_8209F430 ActionMappers::Init");
   // operator new's error paths are the original's: every block made first
   // (in the original's order: the list, then mappers 0-3; the constructors
-  // allocate nothing), then built and stored.
+  // allocate nothing), then built and stored. The list is in host memory
+  // (E5 step 4).
   constexpr uint32_t kSizes[5] = {ClientList::kSize, Mapper::kSize, Mapper::kSize,
                                   Mapper::kSize, Mapper::kSize};
   uint32_t blocks[5];
   for (int i = 0; i < 5; i++) {
-    const auto block = memory::crt::OperatorNew(base, kSizes[i]);
+    const auto block = i == 0 ? std::optional<uint32_t>(ClientList::New(base).address)
+                              : memory::crt::OperatorNew(base, kSizes[i]);
     if (!block) {
       for (int k = 0; k < i; k++) {
         memory::crt::OperatorDelete(blocks[k]);

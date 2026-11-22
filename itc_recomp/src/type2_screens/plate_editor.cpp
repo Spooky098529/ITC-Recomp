@@ -4,6 +4,7 @@
 #include "type2_screens/type2_screens.h"
 
 #include "base/log.h"
+#include "game_modes/game_modes.h"
 #include "race_overlays/race_overlays.h"
 #include "race_screens/race_screens.h"
 #include "type2_screens/internal.h"
@@ -20,7 +21,7 @@ void Post(uint8_t* base, uint32_t mode, uint32_t id) {
   const uint32_t count = ring.message_count() + 1;
   const uint32_t start = ring.message_start();
   ring.set_message_count(count);
-  const schema::ModeMessage slot(base, ring.messages_address() + 12 * ((start + count - 1) % 50));
+  const game_modes::RingSlot slot{ring.messages() + 12 * ((start + count - 1) % 50)};
   slot.set_id(id);
   slot.set_arg0(0);
   slot.set_arg1(0);

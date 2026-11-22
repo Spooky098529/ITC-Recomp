@@ -4,6 +4,7 @@
 
 #include <cstdint>
 
+#include "game_modes/game_modes.h"
 #include "guest.h"
 #include "schema/boot_mode.h"
 #include "schema/game_modes.h"
@@ -77,7 +78,7 @@ inline void Post(uint8_t* base, uint32_t mode, uint32_t id) {
   const uint32_t count = d.ring_count() + 1;
   const uint32_t start = d.ring_start();
   d.set_ring_count(count);
-  const schema::ModeMessage slot(base, d.ring_address() + 12 * ((start + count - 1) % 50));
+  const game_modes::RingSlot slot{d.ring() + 12 * ((start + count - 1) % 50)};
   slot.set_id(id);
   slot.set_arg0(0);
   slot.set_arg1(0);

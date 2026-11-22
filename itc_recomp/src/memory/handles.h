@@ -44,6 +44,13 @@ void ReleaseHandle(uint32_t handle);
 // and for a value no live handle covers (logged once with the value).
 void* HandleObject(uint32_t handle);
 
+// The game's frees (HeapFree, VirtualFree, XPhysicalFree, free and operator
+// delete, all through memory/heap.h) given a handle: the host object deleted
+// and its handle released, true; false for a value that isn't a live
+// handle's start (logged). A shared deleting destructor frees host and
+// guest objects alike, so the frees, not their call sites, tell them apart.
+bool FreeHandle(uint32_t handle);
+
 // What a value in the handles' range names: false when no live object's
 // span covers it.
 struct HandleInfo {

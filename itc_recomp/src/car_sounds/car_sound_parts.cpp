@@ -13,6 +13,7 @@
 #include "base/log.h"
 #include "c_runtime/math.h"
 #include "guest.h"
+#include "memory/host_copy.h"
 #include "hooks/vehicle.h"
 #include "schema/camera_modes.h"
 #include "schema/car_physics.h"
@@ -1040,8 +1041,11 @@ uint64_t Fctiwz64(double value) {
 void HornUpdate(uint8_t* base, uint32_t part, uint32_t record, uint32_t horn, uint32_t flag_at,
                 uint32_t slot_at, double volume, double pitch, double f3, const Voices& voices,
                 uint32_t frame, const GuestCall& call) {
-  for (uint32_t i = 0; i < schema::CarInput::kSize; i += 4) {
-    Store(base, frame + 80 + i, Load(base, schema::CarInput(base, record).address + i));
+  // A host record (E5 step 4) is copied with each field swapped.
+  if (!memory::CopyWithHandles(base, frame + 80, record, schema::CarInput::kSize)) {
+    for (uint32_t i = 0; i < schema::CarInput::kSize; i += 4) {
+      Store(base, frame + 80 + i, Load(base, record + i));
+    }
   }
   const uint32_t flag = Load(base, flag_at);
   if ((Load(base, frame + 80) & kHornButton) != 0) {

@@ -6,6 +6,9 @@
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
+#include "guest.h"
+#include "memory/handles.h"
+#include "schema/power_graph_screen.h"
 #include "power_graph_screen/power_graph_screen.h"
 #include "lifted/sdk.h"
 
@@ -125,7 +128,24 @@ ITC_REGS_STEP(PowerGraphScreenSetTexts) {
   ctx.r3.u64 = pgs::SetTexts(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PowerGraphScreenSetParts) {
-  ctx.r3.u64 = pgs::SetParts(base, ctx.r4.u32, ctx.r1.u32);
+  // r4 the record's +60: the data's +68, a handle inside the host object
+  // since E5 step 4 (its words through the view, bytes in guest order), or
+  // a guest address (its bytes as they are). SetParts reads bytes 1 to 11.
+  uint8_t parts[20] = {};
+  const uint32_t at = ctx.r4.u32;
+  if (memory::IsHandle(at)) {
+    const schema::PowerGraphScreenData data(base, at - 68);
+    const uint32_t words[5] = {data.parts_word_0(), data.parts_word_1(), data.parts_word_2(),
+                               data.parts_word_3(), data.parts_word_4()};
+    for (uint32_t i = 0; i < 20; i++) {
+      parts[i] = uint8_t(words[i / 4] >> (24 - 8 * (i % 4)));
+    }
+  } else {
+    for (uint32_t i = 0; i < 12; i++) {
+      parts[i] = guest::LoadU8(base, at + i);
+    }
+  }
+  ctx.r3.u64 = pgs::SetParts(base, parts, ctx.r1.u32);
 }
 ITC_REGS_STEP(PowerGraphScreenSetPartIcon) {
   ctx.r3.u64 = pgs::SetPartIcon(base, ctx.r4.u32, ctx.r1.u32);

@@ -19,6 +19,7 @@
 #include "car_physics/float_ops.h"
 #include "data_tables/data_tables.h"
 #include "guest.h"
+#include "memory/host_copy.h"
 #include "track_collision/track_collision.h"
 #include "track_route/track_route.h"
 #include "vehicle/vehicle.h"
@@ -132,8 +133,11 @@ void Settle(uint8_t* base, uint32_t frame, uint32_t ticks, Settled which, uint32
         Store(base, frame + copy + 4 * w, Load(base, from + 4 * w));
       }
       const uint32_t to = Load(base, kInputs + ((entry.vehicle_index() << 2) & 0x3FC));
-      for (uint32_t w = 0; w < 5; w++) {
-        Store(base, to + 4 * w, Load(base, frame + copy + 4 * w));
+      // A host record (E5 step 4) is copied with each field swapped.
+      if (!memory::CopyWithHandles(base, to, frame + copy, 20)) {
+        for (uint32_t w = 0; w < 5; w++) {
+          Store(base, to + 4 * w, Load(base, frame + copy + 4 * w));
+        }
       }
       vehicle::VehicleTick(base, vehicle, entry.vehicle_index(), 0, 1, frame - 144, calls.tick);
       if (note) {

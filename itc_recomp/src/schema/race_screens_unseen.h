@@ -372,6 +372,8 @@ struct PauseMenu4Data : View {
     return PauseMenu4Data(base, memory::MakeHandle(new PauseMenu4DataData(), sizeof(PauseMenu4DataData), "PauseMenu4Data", &kPauseMenu4DataLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kPauseMenu4DataLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kPauseMenu4DataLayout, offset, width, v); }
   // player 0's save data's byte +0x1F878, sign-extended
   uint32_t music_volume() const { return data()->music_volume; }
   void set_music_volume(uint32_t v) const { data()->music_volume = v; }

@@ -1263,17 +1263,41 @@ struct DayBlock : View {
 };
 
 // embedded; measure: TuningScreen::Command52.r4
+#pragma pack(push, 1)
+struct TuningDispatcherData {
+  uint8_t pad_0[204] = {};
+  uint8_t messages[600] = {};  // +204, guest order
+  uint32_t message_count = 0;  // +804
+  uint32_t message_first = 0;  // +808
+};
+#pragma pack(pop)
+static_assert(sizeof(TuningDispatcherData) == 812);
+inline constexpr memory::LayoutField kTuningDispatcherFields[] = {{804, 4}, {808, 4}};
+inline constexpr memory::Layout kTuningDispatcherLayout = {kTuningDispatcherFields, 2};
+
 struct TuningDispatcher : View {
   using View::View;
   static constexpr uint32_t kSize = 812;
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  TuningDispatcherData* data() const { return static_cast<TuningDispatcherData*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static TuningDispatcher New(uint8_t* base) {
+    return TuningDispatcher(base, memory::MakeHandle(new TuningDispatcherData(), sizeof(TuningDispatcherData), "TuningDispatcher", &kTuningDispatcherLayout));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kTuningDispatcherLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kTuningDispatcherLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 50 messages of 12 bytes (+0 the event, +4, +8)
-  uint32_t messages_address() const { return address + 204; }
-  uint32_t message_count() const { return guest::LoadU32(base, address + 804); }
-  void set_message_count(uint32_t v) const { guest::StoreU32(base, address + 804, v); }
-  uint32_t message_count_address() const { return address + 804; }
-  uint32_t message_first() const { return guest::LoadU32(base, address + 808); }
-  void set_message_first(uint32_t v) const { guest::StoreU32(base, address + 808, v); }
-  uint32_t message_first_address() const { return address + 808; }
+  uint8_t* messages() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 204 : guest::Pointer(base, address + 204); }
+  uint32_t message_count() const { return on_host() ? uint32_t(data()->message_count) : uint32_t(guest::LoadU32(base, address + 804)); }
+  void set_message_count(uint32_t v) const { if (on_host()) data()->message_count = v; else guest::StoreU32(base, address + 804, v); }
+  uint32_t message_count_bits() const { return on_host() ? data()->message_count : guest::LoadU32(base, address + 804); }
+  void set_message_count_bits(uint32_t v) const { if (on_host()) data()->message_count = v; else guest::StoreU32(base, address + 804, v); }
+  uint32_t message_first() const { return on_host() ? uint32_t(data()->message_first) : uint32_t(guest::LoadU32(base, address + 808)); }
+  void set_message_first(uint32_t v) const { if (on_host()) data()->message_first = v; else guest::StoreU32(base, address + 808, v); }
+  uint32_t message_first_bits() const { return on_host() ? data()->message_first : guest::LoadU32(base, address + 808); }
+  void set_message_first_bits(uint32_t v) const { if (on_host()) data()->message_first = v; else guest::StoreU32(base, address + 808, v); }
 };
 
 // embedded; measure: UiMovie.+0

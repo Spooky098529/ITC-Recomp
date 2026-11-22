@@ -1266,15 +1266,18 @@ def host_access(fn, ty, f, obj, inside, m, line):
     width = int(m.group(2))
     store = m.group(1) == "STORE"
     if f["type"] == "bytes":
-        at = f"{view}.{f['name']}() + {inside}"
-        load = f"schema::host::LoadU{width}({at})"
-        store_fn = f"schema::host::StoreU{width}({at}, "
+        # Inside a bytes field (which may hold members): as the guest's bytes give it.
+        at = f["offset"] + inside
+        load = f"uint{width}_t({view}.load_at({at}, {width // 8}))"
+        store_fn = f"{view}.store_at({at}, {width // 8}, "
     elif inside == 0:
         load = f"{view}.{f['name']}_bits()"
         store_fn = f"{view}.set_{f['name']}_bits("
     else:
-        HOST_LEFT_RAW.append(f"{fn}: {ty.name}.{f['name']} +{inside}, {width} bits")
-        return line
+        # Inside a field (a byte of a word): the bytes as the guest's give them.
+        at = f["offset"] + inside
+        load = f"uint{width}_t({view}.load_at({at}, {width // 8}))"
+        store_fn = f"{view}.store_at({at}, {width // 8}, "
     # The call's extent: from `REX_..._Un(` to its closing parenthesis.
     depth, end = 0, None
     for i in range(m.start() + len(f"REX_{m.group(1)}_U{m.group(2)}"), len(line)):

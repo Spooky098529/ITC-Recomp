@@ -162,6 +162,8 @@ fields = [
 measure = "new<40>@RaceDialog::Create"
 size = 40
 origin = "allocated"
+storage = "host"
+host_alloc = [0x82217DE8]
 fields = [
   { name = "yes", offset = 0, type = "u32", note = "1 when the question was answered yes" },
   { name = "slot", offset = 4, type = "u32", note = "AskSlot's slot (0 a new one)" },
@@ -211,11 +213,15 @@ fields = [
 # object's step word) and AfterRaceMenu::ShowReplay's and
 # Replays::ReadEntry's r3, a 36-byte replay record (the replay list's
 # records, [0x828161F0] + 12, save-interface.md): measure faults, its words
-# below as fault_replay_*.
+# below as fault_replay_*. Dual since E5 step 4: the screen itself is a host
+# object (AfterRaceMenu::Create), while the lifted transitions' step words
+# and the replay records it's also measured over stay in guest memory.
 [AfterRaceMenuScreen]
 measures = ["new<4>@AfterRaceMenu::Create", "AfterRaceMenu"]
 size = 4
 origin = "allocated"
+storage = "dual"
+host_alloc = [0x8221B210]
 fields = [
   { name = "movie", offset = 0, type = "ptr", note = "UI movie 9 (UiMovies::Find)" },
   { name = "fault_replay_year", offset = 0, type = "u16", note = "measure fault: a replay record's halfwords +0 to +10, the date and time (probably a SYSTEMTIME's)" },
@@ -235,6 +241,8 @@ fields = [
 measure = "new<24>@AfterRaceMenu::Create"
 size = 24
 origin = "allocated"
+storage = "host"
+host_alloc = [0x8221B22C]
 fields = [
   { name = "kind", offset = 0, type = "u32", note = "0 to 6: which items (the table at 0x82010428)" },
   { name = "item_count", offset = 4, type = "u32", note = "the kind's items, at most 4" },

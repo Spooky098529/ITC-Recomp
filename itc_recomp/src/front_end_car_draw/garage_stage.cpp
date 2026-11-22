@@ -320,25 +320,25 @@ uint64_t GarageStageApplyPreset(uint8_t* base, const Calls& calls, uint64_t r3, 
   camera.set_zoom(float(Fdivs(double(G::focal(base)), Frsp(t))));
   // The preset's vectors as doublewords (ld, std): +32 to the camera's
   // translation, +16 to its angles, +48 to the car's angles.
-  const uint32_t v32 = p.vector_32_address(), v16 = p.vector_16_address();
+  // The preset is a host object (E5 step 4): its words through the view.
   const uint32_t translation = camera.translation_address(), angles = camera.angles_address();
-  const uint32_t w0 = Load(base, v32), w1 = Load(base, v32 + 4);
+  const uint32_t w0 = p.vector_32_x_bits(), w1 = p.vector_32_y_bits();
   Store(base, translation, w0);
   Store(base, translation + 4, w1);
-  const uint32_t w2 = Load(base, v32 + 8), w3 = Load(base, v32 + 12);
+  const uint32_t w2 = p.vector_32_z_bits(), w3 = p.vector_32_w_bits();
   Store(base, translation + 8, w2);
   Store(base, translation + 12, w3);
-  const uint32_t w4 = Load(base, v16), w5 = Load(base, v16 + 4);
+  const uint32_t w4 = p.vector_16_x_bits(), w5 = p.vector_16_y_bits();
   Store(base, angles, w4);
   Store(base, angles + 4, w5);
-  const uint32_t w6 = Load(base, v16 + 8), w7 = Load(base, v16 + 12);
+  const uint32_t w6 = p.vector_16_z_bits(), w7 = p.vector_16_w_bits();
   Store(base, angles + 8, w6);
   Store(base, angles + 12, w7);
-  const uint32_t from = p.angles_address(), car = st.angle_x_address();
-  const uint32_t w8 = Load(base, from), w9 = Load(base, from + 4);
+  const uint32_t car = st.angle_x_address();
+  const uint32_t w8 = p.angles_x_bits(), w9 = p.angles_y_bits();
   Store(base, car, w8);
   Store(base, car + 4, w9);
-  const uint32_t w10 = Load(base, from + 8), w11 = Load(base, from + 12);
+  const uint32_t w10 = p.angles_z_bits(), w11 = p.angles_w_bits();
   Store(base, car + 8, w10);
   Store(base, car + 12, w11);
   st.set_waiting_preset(0xFFFFFFFFu);

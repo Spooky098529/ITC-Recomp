@@ -37,6 +37,7 @@ fields = [
 measures = ["Options::Close.r4", "Options::Leave.r4", "Options::OnClosed.r4", "Options::Show.r4"]
 size = 812
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "messages", offset = 204, type = "bytes", count = 600, note = "50 messages of 12 bytes (id, two words)" },
   { name = "message_count", offset = 804, type = "u32" },

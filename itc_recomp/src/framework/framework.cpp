@@ -246,8 +246,18 @@ void FrameworkConstruct(uint8_t* base, uint32_t framework) {
       0x82000AE4, 0x82000AD4, 0x82000ACC, 0x82000AC8};
   // The sixteen interfaces' vtable words, +0 to +60 in order.
   const schema::Framework fw(base, framework);
+  using Set = void (schema::Framework::*)(uint32_t) const;
+  static constexpr Set kSetters[16] = {
+      &schema::Framework::set_vtable,    &schema::Framework::set_vtable_4,
+      &schema::Framework::set_vtable_8,  &schema::Framework::set_vtable_12,
+      &schema::Framework::set_vtable_16, &schema::Framework::set_vtable_20,
+      &schema::Framework::set_vtable_24, &schema::Framework::set_vtable_28,
+      &schema::Framework::set_vtable_32, &schema::Framework::set_vtable_36,
+      &schema::Framework::set_vtable_40, &schema::Framework::set_vtable_44,
+      &schema::Framework::set_vtable_48, &schema::Framework::set_vtable_52,
+      &schema::Framework::set_vtable_56, &schema::Framework::set_vtable_60};
   for (uint32_t i = 0; i < 16; i++) {
-    guest::StoreU32(base, fw.vtable_address() + 4 * i, kVtables[i]);
+    (fw.*kSetters[i])(kVtables[i]);
   }
   fw.set_run_loop(0u);
   fw.set_frame_driver(0);
@@ -270,7 +280,8 @@ std::optional<uint32_t> FrameworkCreate(uint8_t* base, uint32_t holder) {
   if (!CanAllocate(base)) {
     return std::nullopt;
   }
-  const auto block = memory::crt::OperatorNew(base, 136);
+  // Host memory (E5 step 4).
+  const auto block = std::optional<uint32_t>(schema::Framework::New(base).address);
   if (!block) {
     return std::nullopt;
   }

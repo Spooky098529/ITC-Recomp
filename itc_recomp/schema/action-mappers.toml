@@ -229,6 +229,8 @@ fields = [
 measures = ["ClientList", "InputClientList"]
 size = 52
 origin = "allocated"
+storage = "host"
+host_alloc = [0x8209F454]
 vtable = 0x82007F18
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x820713C0, then 0x82007F18" },

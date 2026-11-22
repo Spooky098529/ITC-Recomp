@@ -40,10 +40,10 @@ void Post(uint8_t* base, uint32_t mode, uint32_t id) {
   const uint32_t count = m.message_count() + 1;
   const uint32_t start = m.message_start();
   m.set_message_count(count);
-  const uint32_t slot = m.messages_address() + 12 * ((start + count - 1) % 50);
-  StoreU32(base, slot + 0, id);
-  StoreU32(base, slot + 4, 0);
-  StoreU32(base, slot + 8, 0);
+  uint8_t* slot = m.messages() + 12 * ((start + count - 1) % 50);  // guest order (E5 step 4)
+  schema::host::StoreU32(slot + 0, id);
+  schema::host::StoreU32(slot + 4, 0);
+  schema::host::StoreU32(slot + 8, 0);
 }
 
 // The pages' table in UpdatePage's frame: MenuPage, the empty sub_82106540.
@@ -85,8 +85,10 @@ uint64_t Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls
   menu.set_up_down_locked(0);
   menu.set_left_right_steps(0);
   menu.set_shoulders_step(0);
-  const uint64_t r3 = calls.Call(kVirtualAlloc, frame, 0x8220AB1C, 0, 60, 0x1000, 4);
-  const schema::UserInfoData data(base, uint32_t(r3));
+  // The data lives in host memory (E5 step 4): the original's
+  // VirtualAlloc(60) returning to 0x8220AB1C; the global holds its handle.
+  const schema::UserInfoData data = schema::UserInfoData::New(base);
+  const uint64_t r3 = data.address;
   G::set_data(base, data);
   data.set_loaded(0);
   data.set_queued_state(21);

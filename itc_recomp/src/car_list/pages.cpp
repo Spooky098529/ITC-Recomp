@@ -54,7 +54,8 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
 // VirtualFree(block, 0, MEM_RELEASE): the allocation layer's pages freed
 // (1), else a guest call to its override.
 uint64_t FreePages(uint32_t block, uint32_t frame, uint32_t lr, const Calls& calls) {
-  if (memory::IsPages(block)) {
+  // The list entries and colors are host objects (E5 step 4).
+  if (memory::IsPages(block) || memory::IsHandle(block)) {
     return memory::FreePages(block) ? 1 : 0;
   }
   return calls.Call(kVirtualFree, frame, lr, block, 0, 0x8000);
@@ -538,7 +539,8 @@ uint64_t Build(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& calls) {
     if ((word & (1u << (car & 31))) == 0) {
       continue;
     }
-    const uint32_t entry = memory::AllocPages(8448, 4096);
+    // A host object (E5 step 4) in place of the VirtualAlloc(8448).
+    const uint32_t entry = Entry::New(base).address;
     const uint32_t spec = car_specs::GetCarSpec(base, car);
     r3 = CopySpec(base, entry, spec, frame, 0x8224C838, calls);
     const int8_t kind = int8_t(Entry(base, entry).list_kind());
@@ -562,7 +564,7 @@ uint64_t Build(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& calls) {
   const uint32_t garage = Save(base, save).garage_address();
   const uint32_t list = Base(base, b).list2_address();
   for (uint32_t i = 0; i < uint32_t(int32_t(int16_t(Save(base, save).garage_count()))); i++) {
-    const uint32_t entry = memory::AllocPages(8448, 4096);
+    const uint32_t entry = Entry::New(base).address;  // a host object (E5 step 4)
     const uint32_t id = AddedCar(base, GarageCar(base, garage, GarageNode(base, garage, i))).car_id();
     r3 = CopySpec(base, entry, car_specs::GetCarSpec(base, id), frame, 0x8224C914, calls);
     Entry(base, entry)
@@ -1000,11 +1002,14 @@ uint64_t SetUpColors(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& cal
   if (int32_t(count) > 0) {
     const double scale = double(G::color_scale(base));
     const double unit = double(G::color_unit(base));
-    uint32_t source = Entry(base, entry).color_records_address();
+    // The entry's color records (a `bytes` field, in guest order) and the
+    // colors made: host objects (E5 step 4) in place of the VirtualAlloc(32).
+    const uint8_t* source = Entry(base, entry).color_records();
     for (uint32_t left = count; left != 0; left--, source += 20) {
-      const uint32_t record = memory::AllocPages(32, 4096);
-      const uint32_t word = LoadU32(base, source + 4);
-      const uint32_t raised = guest::LoadU16(base, source + 0);
+      const uint32_t record = Color::New(base).address;
+      const uint32_t word = (uint32_t(source[4]) << 24) | (uint32_t(source[5]) << 16) |
+                            (uint32_t(source[6]) << 8) | source[7];
+      const uint32_t raised = (uint32_t(source[0]) << 8) | source[1];
       StoreU32(base, frame + 96, word);
       const uint32_t add = LoadU32(
           base, raised == 0 ? G::color_value_add_address() : G::color_value_add_raised_address());
@@ -1029,7 +1034,16 @@ uint64_t SetUpColors(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& cal
       Color(base, record).set_hue(float(h));
       Color(base, record).set_saturation(float(double(float(s * unit))));
       Color(base, record).set_value(float(double(float(vv * unit))));
-      tuning_pages::HsvToRgb(base, frame + 128, Color(base, record).hue_address(), frame);
+      // Color::HsvToRgb reads its input (+16 to +31 of the color) from guest
+      // memory: staged below `frame`, where it copies the 16 bytes itself.
+      {
+        const Color c(base, record);
+        const uint32_t words[4] = {c.hue_bits(), c.saturation_bits(), c.value_bits(), 0};
+        for (uint32_t i = 0; i < 4; i++) {
+          StoreU32(base, frame - 16 + 4 * i, words[i]);
+        }
+      }
+      tuning_pages::HsvToRgb(base, frame + 128, frame - 16, frame);
       flush_off();
       const double red = double(float(double(guest::LoadFloat(base, frame + 128)) * scale));
       const double green = double(float(double(guest::LoadFloat(base, frame + 132)) * scale));

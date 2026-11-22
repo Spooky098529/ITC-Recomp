@@ -142,10 +142,11 @@ uint64_t CarDetailOpen(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& c
   const uint32_t count = m.message_count() + 1;
   const uint32_t start = m.message_start();
   m.set_message_count(count);
-  const uint32_t slot = m.messages_address() + 12 * ((start + count - 1) % 50);
-  Store(base, slot + 0, 36);
-  Store(base, slot + 4, 0);
-  Store(base, slot + 8, 0);
+  // The ring's bytes, in guest order in either shape (a dual view, E5 step 4).
+  uint8_t* slot = m.messages() + 12 * ((start + count - 1) % 50);
+  schema::host::StoreU32(slot + 0, 36);
+  schema::host::StoreU32(slot + 4, 0);
+  schema::host::StoreU32(slot + 8, 0);
   return r3;
 }
 

@@ -320,7 +320,7 @@ void AddRequestStep(lifted::Regs& ctx, uint8_t* base, uint32_t type, uint32_t cl
     const uint32_t request = frame + 80;
     const auto inserted =
         as::AppAddRequest(base, interface, type, key, delegate, request, clone_return, calls);
-    const uint32_t vector = schema::AppInterface(base, interface).requests_address();
+    const uint32_t vector = schema::AppInterface(base, interface).requests_vector().address;
     if (!inserted) {
       ctx.r3.u64 = vector;
       ctx.r4.u64 = request;
@@ -421,7 +421,7 @@ ITC_REGS_STEP(AppSendMessage) {
     return;
   }
   ctx.r3.u64 = *inserted ? ctx.r1.u32 - 16
-                          : schema::AppInterface(base, ctx.r3.u32).messages_address();
+                          : schema::AppInterface(base, ctx.r3.u32).messages_vector().address;
 }
 
 ITC_REGS_STEP(AppStatesIsEmpty) {

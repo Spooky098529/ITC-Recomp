@@ -12,6 +12,7 @@
 
 #include "base/log.h"
 #include "boot_mode/boot_mode.h"
+#include "game_modes/game_modes.h"
 #include "guest.h"
 #include "race_screens/race_screens.h"
 #include "save_data/save_data.h"
@@ -66,8 +67,7 @@ void Post(uint8_t* base, uint32_t dispatcher, uint32_t message, bool id_last = f
   const uint32_t count = d.ring_count() + 1;
   const uint32_t end = d.ring_start() + count - 1;
   d.set_ring_count(count);
-  const schema::ModeMessage slot(
-      base, d.ring_address() + (end - (end / 50) * 50) * schema::ModeMessage::kSize);
+  const game_modes::RingSlot slot{d.ring() + (end - (end / 50) * 50) * schema::ModeMessage::kSize};
   if (id_last) {
     slot.set_arg1(0);
     slot.set_arg0(0);

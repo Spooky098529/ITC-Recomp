@@ -127,16 +127,16 @@ uint64_t SetPartRow1(uint8_t* base, uint32_t values, uint32_t sp) {
   return r3;
 }
 
-uint64_t SetParts(uint8_t* base, uint32_t parts, uint32_t sp) {
+uint64_t SetParts(uint8_t* base, const uint8_t* parts, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82250CD0 PowerGraphScreen67::SetParts");
   const uint32_t frame = Frame(base, sp, 144);
   for (uint32_t i = 0; i < 3; i++) {
-    StoreU32(base, frame + 80 + 4 * i, uint32_t(int32_t(int8_t(guest::LoadU8(base, parts + 2 + i)))));
+    StoreU32(base, frame + 80 + 4 * i, uint32_t(int32_t(int8_t(parts[2 + i]))));
   }
   for (uint32_t i = 0; i < 7; i++) {
-    StoreU32(base, frame + 96 + 4 * i, uint32_t(int32_t(int8_t(guest::LoadU8(base, parts + 5 + i)))));
+    StoreU32(base, frame + 96 + 4 * i, uint32_t(int32_t(int8_t(parts[5 + i]))));
   }
-  SetPartIcon(base, uint32_t(int32_t(int8_t(guest::LoadU8(base, parts + 1)))), frame);
+  SetPartIcon(base, uint32_t(int32_t(int8_t(parts[1]))), frame);
   SetPartRow2(base, frame + 80, frame);
   return SetPartRow1(base, frame + 96, frame);
 }
@@ -233,7 +233,16 @@ uint64_t SetTexts(uint8_t* base, uint64_t member, uint32_t sp, const Calls& call
     return node;
   }
   (void)member;
-  return SetParts(base, G::data(base).parts_address(), frame);
+  // The parts' five words through the view (the data is a host object since
+  // E5 step 4), their bytes in guest order (most significant first).
+  const Data data = G::data(base);
+  const uint32_t words[5] = {data.parts_word_0(), data.parts_word_1(), data.parts_word_2(),
+                             data.parts_word_3(), data.parts_word_4()};
+  uint8_t parts[20];
+  for (uint32_t i = 0; i < 20; i++) {
+    parts[i] = uint8_t(words[i / 4] >> (24 - 8 * (i % 4)));
+  }
+  return SetParts(base, parts, frame);
 }
 
 uint64_t Step0(uint8_t* base, uint64_t member, uint32_t started, uint32_t sp, const Calls& calls) {

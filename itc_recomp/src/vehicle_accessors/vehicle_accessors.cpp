@@ -456,16 +456,34 @@ void VehicleSpeedRecord(uint8_t* base, uint32_t out, uint32_t vehicle) {
   guest::StoreU16(base, out + 6, own.route_slice());
 }
 
+// A list head's word (Link's and Unlink's r4): in guest memory, or inside a
+// host object (the collision world's +20 and +24 through its handle, E5
+// step 4; host structs keep the guest offsets, the word in host order).
+static uint32_t LoadHead(uint8_t* base, uint32_t head) {
+  if (memory::IsHandle(head)) {
+    return *static_cast<const uint32_t*>(memory::HandleObject(head));
+  }
+  return guest::LoadU32(base, head);
+}
+
+static void StoreHead(uint8_t* base, uint32_t head, uint32_t value) {
+  if (memory::IsHandle(head)) {
+    *static_cast<uint32_t*>(memory::HandleObject(head)) = value;
+    return;
+  }
+  guest::StoreU32(base, head, value);
+}
+
 void CollisionObjectLink(uint8_t* base, uint32_t object, uint32_t head) {
   ITC_NATIVE_RUNNING("sub_820B7BF0 CollisionObject::Link");
   const CollisionObject o(base, object);
-  const uint32_t first = guest::LoadU32(base, head);
+  const uint32_t first = LoadHead(base, head);
   if (first != 0) {
     CollisionObject(base, first).set_previous(object);
   }
   o.set_previous(0);
-  o.set_next(guest::LoadU32(base, head));
-  guest::StoreU32(base, head, object);
+  o.set_next(LoadHead(base, head));
+  StoreHead(base, head, object);
 }
 
 void CollisionObjectUnlink(uint8_t* base, uint32_t object, uint32_t head) {
@@ -475,7 +493,7 @@ void CollisionObjectUnlink(uint8_t* base, uint32_t object, uint32_t head) {
   if (previous) {
     previous.set_next(o.next());
   } else {
-    guest::StoreU32(base, head, o.next().address);
+    StoreHead(base, head, o.next().address);
   }
   const CollisionObject next = o.next();
   if (next) {

@@ -73,6 +73,11 @@ std::optional<uint32_t> OpAllocateNodes(uint8_t* base, uint32_t count) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_820ACF10 OpList::AllocateNodes");
+  if (count == 1) {
+    // A node in host memory (E5 step 4): the list's only use (OpList::OpList
+    // and BuyNode ask for one).
+    return std::optional<uint32_t>(schema::AppOpListNode::New(base).address);
+  }
   return memory::crt::OperatorNew(base, count * kNodeBytes);
 }
 
@@ -101,7 +106,7 @@ bool OpConstruct(uint8_t* base, uint32_t list) {
   if (*head != 0) {
     node.set_next(*head);
   }
-  if (node.previous_address() != 0) {
+  if (*head + 4 != 0) {
     node.set_previous(*head);
   }
   const schema::OpList ops(base, list);
@@ -124,10 +129,10 @@ std::optional<uint32_t> OpBuyNode(uint8_t* base, uint32_t next, uint32_t previou
   if (*node != 0) {
     n.set_next(next);
   }
-  if (n.previous_address() != 0) {
+  if (*node + 4 != 0) {
     n.set_previous(previous);
   }
-  if (n.op_address() != 0) {
+  if (*node + 8 != 0) {
     n.set_op_type(type);
     n.set_op_state(state);
   }
@@ -308,25 +313,40 @@ std::optional<bool> MessagesPushBack(uint8_t* base, uint32_t vector, uint32_t va
   return true;
 }
 
-uint32_t ListClear(uint8_t* base, uint32_t list) {
-  ITC_NATIVE_RUNNING("sub_820ACF88 List::Clear");
-  // Any list with 16-byte or other nodes: the layout of a list of pointers
-  // (+4 the head, +8 the size; a node +0 next, +4 previous).
-  const schema::PtrList l(base, list);
-  auto head = l.head();
+namespace {
+
+// List::Clear over nodes of type `Node` (a list of pointers' StateListNode in
+// guest memory, or an operation list's AppOpListNode in host memory).
+template <typename Node>
+uint32_t ClearNodes(uint8_t* base, const schema::PtrList& l) {
+  auto head = l.head<Node>();
   uint32_t node = head.next().address;
   head.set_next(head.address);
-  head = l.head();
+  head = l.head<Node>();
   head.set_previous(head.address);
-  head = l.head();
+  head = l.head<Node>();
   l.set_size(0);
   while (node != head.address) {
-    const uint32_t next = schema::StateListNode(base, node).next().address;
+    const uint32_t next = Node(base, node).next().address;
     Delete(node, "List::Clear");
-    head = l.head();
+    head = l.head<Node>();
     node = next;
   }
   return node;
+}
+
+}  // namespace
+
+uint32_t ListClear(uint8_t* base, uint32_t list) {
+  ITC_NATIVE_RUNNING("sub_820ACF88 List::Clear");
+  // Any list with 16-byte or other nodes: the layout of a list of pointers
+  // (+4 the head, +8 the size; a node +0 next, +4 previous). The operation
+  // lists' nodes are in host memory (E5 step 4), told by their handles.
+  const schema::PtrList l(base, list);
+  if (memory::IsHandle(l.head<schema::View>().address)) {
+    return ClearNodes<schema::AppOpListNode>(base, l);
+  }
+  return ClearNodes<schema::StateListNode>(base, l);
 }
 
 std::optional<uint32_t> DelegateClone(uint8_t* base, uint32_t delegate) {

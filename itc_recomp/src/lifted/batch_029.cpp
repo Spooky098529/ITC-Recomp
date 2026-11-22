@@ -18286,7 +18286,7 @@ lifted::Result f8224EA10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // fctiwz f10,f10
   f10 = std::bit_cast<double>(uint64_t(int64_t(std::isnan(f10) ? int64_t(0x80000000U) : (f10 >= double(INT_MAX)) ? INT_MAX : simde_mm_cvttsd_si32(simde_mm_load_sd(&f10)))));
   // lwz r7,0(r31)
-  r7 = guest::LoadU32(base, schema::CarPanel(base, uint32_t(r31)).vtable_address());
+  r7 = schema::CarPanel(base, uint32_t(r31)).vtable_bits();
   // addi r4,r1,80
   r4 = uint64_t(int64_t(int64_t(r1) + 80));
   // mr r3,r31
@@ -18355,7 +18355,7 @@ lifted::Result f8224EA10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x8224EB48, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, schema::CarPanel(base, uint32_t(r31)).shows_price_address());
+  r11 = schema::CarPanel(base, uint32_t(r31)).shows_price_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x8224eb60

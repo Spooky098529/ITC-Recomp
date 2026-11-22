@@ -14,6 +14,7 @@
 #include "ai_drivers/ai_drivers.h"
 #include "base/log.h"
 #include "guest.h"
+#include "memory/host_copy.h"
 #include "memory/c_runtime_heap.h"
 #include "racer_controllers/racer_controllers.h"
 #include "track_collision/track_collision.h"
@@ -94,8 +95,11 @@ void ResetVehicles(uint8_t* base, uint32_t manager, uint32_t flag, uint32_t fram
     ai_drivers::ClearCarInput(base, input);
     const uint32_t to =
         guest::LoadU32(base, kInputs + ((e.vehicle_index() & 0xFF) << 2));
-    for (uint32_t w = 0; w < 5; w++) {
-      guest::StoreU32(base, to + 4 * w, guest::LoadU32(base, input + 4 * w));
+    // A host record (E5 step 4) is copied with each field swapped.
+    if (!memory::CopyWithHandles(base, to, input, 20)) {
+      for (uint32_t w = 0; w < 5; w++) {
+        guest::StoreU32(base, to + 4 * w, guest::LoadU32(base, input + 4 * w));
+      }
     }
     guest::StoreU32(base, frame + 80, 1);
     const uint32_t id =

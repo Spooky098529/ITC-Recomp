@@ -8,11 +8,29 @@
 
 #pragma once
 
+#include "schema/view.h"
+
 #include <cstdint>
 #include <functional>
 #include <optional>
 
 namespace game_modes {
+
+// A message slot (id, two words: schema::ModeMessage's layout) in a mode's
+// ring, given by its bytes: a dispatcher view's `ring()` (or `messages()`)
+// plus the slot's offset. The 852-byte modes are in host memory since E5's
+// step 4 and their dispatcher's views are dual; the ring's bytes keep guest
+// order in either shape, so a slot's words are read and written as guest
+// memory holds them (the same stores, in the caller's order).
+struct RingSlot {
+  uint8_t* p;
+  uint32_t id() const { return schema::host::LoadU32(p); }
+  uint32_t arg0() const { return schema::host::LoadU32(p + 4); }
+  uint32_t arg1() const { return schema::host::LoadU32(p + 8); }
+  void set_id(uint32_t v) const { schema::host::StoreU32(p, v); }
+  void set_arg0(uint32_t v) const { schema::host::StoreU32(p + 4, v); }
+  void set_arg1(uint32_t v) const { schema::host::StoreU32(p + 8, v); }
+};
 
 // --- The state machines (StateMachine::, Transition::, StateKey::) ---
 

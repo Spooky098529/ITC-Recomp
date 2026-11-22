@@ -22,6 +22,7 @@
 #include "car_physics/float_ops.h"
 #include "data_tables/data_tables.h"
 #include "guest.h"
+#include "memory/host_copy.h"
 #include "hooks/vehicle.h"
 #include "racer_controllers/racer_controllers.h"
 #include "track_collision/track_collision.h"
@@ -248,8 +249,11 @@ void StreamOpponents(uint8_t* base, uint32_t manager, uint32_t player, double sp
       List(base, manager, entry);
       ai_drivers::ClearCarInput(base, frame + 144);
       const uint32_t to = Load(base, kInputs + ((E(base, entry).vehicle_index() << 2) & 0x3FC));
-      for (uint32_t w = 0; w < 5; w++) {
-        Store(base, to + 4 * w, Load(base, frame + 144 + 4 * w));
+      // A host record (E5 step 4) is copied with each field swapped.
+      if (!memory::CopyWithHandles(base, to, frame + 144, 20)) {
+        for (uint32_t w = 0; w < 5; w++) {
+          Store(base, to + 4 * w, Load(base, frame + 144 + 4 * w));
+        }
       }
       const uint32_t number = E(base, entry).record();
       const uint32_t id = CarOf(base, number).item_id_address();
@@ -376,8 +380,11 @@ void Refresh(uint8_t* base, uint32_t manager, uint32_t frame, bool heap,
       List(base, manager, entry);
       ai_drivers::ClearCarInput(base, frame + 144);
       const uint32_t to = Load(base, kInputs + ((E(base, entry).vehicle_index() << 2) & 0x3FC));
-      for (uint32_t w = 0; w < 5; w++) {
-        Store(base, to + 4 * w, Load(base, frame + 144 + 4 * w));
+      // A host record (E5 step 4) is copied with each field swapped.
+      if (!memory::CopyWithHandles(base, to, frame + 144, 20)) {
+        for (uint32_t w = 0; w < 5; w++) {
+          Store(base, to + 4 * w, Load(base, frame + 144 + 4 * w));
+        }
       }
       const uint32_t number = E(base, entry).record();
       const uint32_t id = CarOf(base, number).item_id_address();
@@ -665,8 +672,11 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
   ai_drivers::ClearCarInput(base, frame + 224);
   {
     const uint32_t to = Load(base, kInputs + ((E(base, entry).vehicle_index() << 2) & 0x3FC));
-    for (uint32_t w = 0; w < 5; w++) {
-      Store(base, to + 4 * w, Load(base, frame + 224 + 4 * w));
+    // A host record (E5 step 4) is copied with each field swapped.
+    if (!memory::CopyWithHandles(base, to, frame + 224, 20)) {
+      for (uint32_t w = 0; w < 5; w++) {
+        Store(base, to + 4 * w, Load(base, frame + 224 + 4 * w));
+      }
     }
   }
   const uint32_t status = schema::Vehicle(base, given).status_address();

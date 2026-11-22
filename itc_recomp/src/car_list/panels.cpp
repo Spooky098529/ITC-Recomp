@@ -65,9 +65,34 @@ double FloatOf(uint8_t* base, uint32_t frame, int64_t word) {
   return steps::Single(double(word));
 }
 
+// A word of a `bytes` field (kept in guest order in either shape: the
+// view's pointer to it, host or guest memory).
+uint32_t BytesWord(const uint8_t* at) {
+  return (uint32_t(at[0]) << 24) | (uint32_t(at[1]) << 16) | (uint32_t(at[2]) << 8) | at[3];
+}
+
 // The C panel's stats child index `i` (0 to 21: its +160 + 4 x i).
 uint32_t StatsChild(uint8_t* base, uint32_t panel, uint32_t i) {
-  return LoadU32(base, Car(base, panel).stats_children_address() + 4 * i);
+  return BytesWord(Car(base, panel).stats_children() + 4 * i);
+}
+
+// The panels' runs of word fields read by index (the panels are host or
+// guest objects, E5 step 4: their fields through the views).
+uint32_t TabText(const Tab& t, uint32_t i) {
+  return i == 0 ? t.tab0_text() : i == 1 ? t.tab1_text() : t.tab2_text();
+}
+uint32_t TabEnabled(const Tab& t, uint32_t i) {
+  return i == 0 ? t.tab0_enabled() : i == 1 ? t.tab1_enabled() : t.tab2_enabled();
+}
+uint32_t RowNode(const Row& r, uint32_t i) { return BytesWord(r.row_nodes() + 4 * i); }
+// The C panel's action word for `action` (its action_anims + 4 x action,
+// 32-bit).
+uint32_t CarActionAnim(const Car& c, uint64_t action) {
+  return BytesWord(c.action_anims() + (uint32_t(action) << 2));
+}
+// Its two show animations (+40, +44).
+uint32_t CarShowAnim(const Car& c, uint32_t i) {
+  return i == 0 ? c.show_anim_a() : c.show_anim_b();
 }
 
 // UiMovie::PlayNamed(m, named, r5, r6, r7, r8).
@@ -172,7 +197,7 @@ uint64_t TabSetTab(uint8_t* base, uint32_t panel, uint64_t tab, uint32_t sp, con
     const uint32_t node =
         ui_movies::FindNode(base, m, Tab(base, panel).node_set(), Tab(base, panel).texts_node());
     const uint32_t child =
-        ui_movies::Child(base, node, LoadU32(base, Tab(base, panel).tab0_text_address() + 4 * i));
+        ui_movies::Child(base, node, TabText(Tab(base, panel), i));
     calls.Call(kSetNodeText, frame, kLr[i], m, child, 124 + i);
   }
   const uint32_t node =
@@ -202,7 +227,7 @@ uint64_t TabMove(uint8_t* base, uint32_t panel, uint64_t tab, uint64_t before, u
   // and looped, else the moves' two animations played and finished.
   const int32_t t = int32_t(uint32_t(tab));
   const bool known = t == 0 || t == 1 || t == 2;
-  if (known && LoadU32(base, Tab(base, panel).tab0_enabled_address() + 4 * uint32_t(t)) == 1) {
+  if (known && TabEnabled(Tab(base, panel), uint32_t(t)) == 1) {
     enabled = true;
     calls.Call(kFinishNamed, frame, 0x82250098, m, Tab(base, panel).tab_anims() + tab);
     PlayNamed(calls, frame, 0x822500B8, m, Tab(base, panel).tab_anims() + tab, 1, 0, 0, 0);
@@ -247,7 +272,7 @@ uint64_t RowSetRow(uint8_t* base, uint32_t panel, uint64_t row, uint32_t entry, 
   uint32_t node = 0;
   const uint32_t child =
       int32_t(uint32_t(row)) >= 0
-          ? LoadU32(base, Row(base, panel).row_nodes_address() + 4 * uint32_t(row))
+          ? RowNode(Row(base, panel), uint32_t(row))
           : Row(base, panel).spare_row_node();
   if (int32_t(child) >= 0) {
     r3 = ui_movies::Child(base, uint32_t(r3), child);
@@ -301,7 +326,7 @@ uint64_t RowFill(uint8_t* base, uint64_t panel_r3, uint32_t list, uint64_t scrol
   const uint32_t first = List(base, list).entries_address() + (uint32_t(scroll) << 2);
   for (int32_t i = 0; i < int32_t(Row(base, panel).row_count()); i++) {
     const uint32_t row = ui_movies::Child(
-        base, node, LoadU32(base, Row(base, panel).row_nodes_address() + 4 * uint32_t(i)));
+        base, node, RowNode(Row(base, panel), uint32_t(i)));
     if (i < count) {
       Node(base, row).set_visible(1);
       RowSetRow(base, panel, uint32_t(i), LoadU32(base, first + 4 * uint32_t(i)), frame, calls);
@@ -673,7 +698,7 @@ uint64_t CarSelect(uint8_t* base, uint32_t panel, uint64_t arrows, uint32_t sp,
   const uint32_t action = Car(base, panel).action();
   if (int32_t(action) >= 0) {
     const auto named = [&] {
-      return LoadU32(base, Car(base, panel).action_anims_address() + 4 * Car(base, panel).action());
+      return CarActionAnim(Car(base, panel), Car(base, panel).action());
     };
     calls.Call(kFinishNamed, frame, 0x8224DD2C, m, named());
     PlayNamed(calls, frame, 0x8224DD54, m, named(), 1, 0, 0, 0);
@@ -786,15 +811,14 @@ uint64_t CarSetCarName(uint8_t* base, uint32_t panel, uint64_t id, uint64_t kind
   const uint32_t m = Movie(base, Car(base, panel).group().address, frame);
   uint64_t r3 = m;
   // UiMovie::SetText(m, -1, the node at `at`, string): r7 to r10 unset (0).
-  const auto text = [&](uint32_t at, uint32_t lr, uint64_t string) {
-    const uint32_t node = LoadU32(base, at);
+  const auto text = [&](uint32_t node, uint32_t lr, uint64_t string) {
     if (int32_t(node) >= 0) {
       r3 = calls.Call(kSetText, frame, lr, m, 0xFFFFFFFFFFFFFFFFull, node, string);
     }
   };
-  text(Car(base, panel).text_maker_address(), 0x82241824, kind + 1934);
-  text(Car(base, panel).text_name_address(), 0x82241840, id + 1646);
-  text(Car(base, panel).text_third_address(), 0x8224185C, id + 1718);
+  text(Car(base, panel).text_maker(), 0x82241824, kind + 1934);
+  text(Car(base, panel).text_name(), 0x82241840, id + 1646);
+  text(Car(base, panel).text_third(), 0x8224185C, id + 1718);
   return r3;
 }
 
@@ -806,16 +830,15 @@ uint64_t BaseSetCarName(uint8_t* base, uint32_t panel, uint64_t id, uint64_t kin
   const uint32_t node = ui_movies::FindNode(base, m, 0xFFFFFFFFu, Car(base, panel).name_node());
   uint64_t r3 = node;
   // SetNodeText(m, child [at], string): r6 to r10 unset (0).
-  const auto text = [&](uint32_t at, uint32_t lr, uint64_t string) {
-    const uint32_t index = LoadU32(base, at);
+  const auto text = [&](uint32_t index, uint32_t lr, uint64_t string) {
     if (int32_t(index) >= 0) {
       const uint32_t child = ui_movies::Child(base, node, index);
       r3 = calls.Call(kSetNodeText, frame, lr, m, child, string);
     }
   };
-  text(Car(base, panel).text_maker_address(), 0x8224E8CC, kind + 1934);
-  text(Car(base, panel).text_name_address(), 0x8224E8F0, id + 1646);
-  text(Car(base, panel).text_third_address(), 0x8224E914, id + 1718);
+  text(Car(base, panel).text_maker(), 0x8224E8CC, kind + 1934);
+  text(Car(base, panel).text_name(), 0x8224E8F0, id + 1646);
+  text(Car(base, panel).text_third(), 0x8224E914, id + 1718);
   return r3;
 }
 
@@ -941,12 +964,12 @@ uint64_t CarShowStats(uint8_t* base, uint64_t panel_r3, uint32_t entry, uint32_t
   StoreU32(base, frame + 92, Entry(base, entry).displacement());
   StoreU32(base, frame + 84, Entry(base, entry).turbo() != 0 ? 1 : 0);
   StoreU32(base, frame + 96,
-           uint32_t(steps::Fctiwz(steps::Lfs(base, Entry(base, entry).unknown_652_address()))));
+           uint32_t(steps::Fctiwz(double(Entry(base, entry).unknown_652()))));
   StoreU32(base, frame + 100,
-           uint32_t(steps::Fctiwz(steps::Lfs(base, Entry(base, entry).unknown_656_address()))));
-  steps::Stfs(base, frame + 104, steps::Lfs(base, Entry(base, entry).unknown_660_address()));
+           uint32_t(steps::Fctiwz(double(Entry(base, entry).unknown_656()))));
+  steps::Stfs(base, frame + 104, double(Entry(base, entry).unknown_660()));
   StoreU32(base, frame + 108,
-           uint32_t(steps::Fctiwz(steps::Lfs(base, Entry(base, entry).unknown_664_address()))));
+           uint32_t(steps::Fctiwz(double(Entry(base, entry).unknown_664()))));
   const uint32_t stats = CarVtable(base, vtable).set_stats();
   if (stats == kSetStats) {
     CarSetStats(base, panel, frame + 80, frame, calls);
@@ -1007,7 +1030,7 @@ uint64_t CarIsShown(uint8_t* base, uint32_t panel, uint32_t sp) {
   const uint32_t frame = Frame(base, sp, 128);
   const uint32_t m = Movie(base, Car(base, panel).group().address, frame);
   for (uint32_t i = 0; i < 2; i++) {
-    if (Active(base, m, LoadU32(base, Car(base, panel).show_anim_a_address() + 4 * i))) {
+    if (Active(base, m, CarShowAnim(Car(base, panel), i))) {
       return 0;
     }
   }
@@ -1034,12 +1057,14 @@ uint64_t ColorIsIdle(uint8_t* base, uint32_t panel, uint32_t sp) {
 
 namespace {
 // The loop the shows and selections start when it isn't running: for the
-// word at `at` (nothing when negative), IsNamedActive (r3 1 when it's
-// running), else PlayNamed(m, it, 1, 0, 0, 0) and LoopNamed from `lr_play`
-// and `lr_loop`. The word read again for each call, as the originals do.
-void LoopIfIdle(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t m, uint32_t at,
+// panel's word `word` gives (nothing when negative), IsNamedActive (r3 1
+// when it's running), else PlayNamed(m, it, 1, 0, 0, 0) and LoopNamed from
+// `lr_play` and `lr_loop`. The word read again for each call, as the
+// originals do (through the panel's view: host or guest, E5 step 4).
+template <typename Word>
+void LoopIfIdle(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t m, const Word& word,
                 uint32_t lr_play, uint32_t lr_loop, uint64_t& r3) {
-  const uint32_t named = LoadU32(base, at);
+  const uint32_t named = word();
   if (int32_t(named) < 0) {
     return;
   }
@@ -1047,30 +1072,23 @@ void LoopIfIdle(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t m, u
     r3 = 1;
     return;
   }
-  PlayNamed(calls, frame, lr_play, m, LoadU32(base, at), 1, 0, 0, 0);
-  r3 = calls.Call(kLoopNamed, frame, lr_loop, m, LoadU32(base, at));
+  PlayNamed(calls, frame, lr_play, m, word(), 1, 0, 0, 0);
+  r3 = calls.Call(kLoopNamed, frame, lr_loop, m, word());
 }
 
-// FinishNamed on the word at `at` when it isn't negative.
-void FinishIfSet(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t m, uint32_t at,
-                 uint32_t lr, uint64_t& r3) {
-  const uint32_t named = LoadU32(base, at);
+// FinishNamed on the panel's word `word` gives when it isn't negative.
+template <typename Word>
+void FinishIfSet(const Calls& calls, uint32_t frame, uint32_t m, const Word& word, uint32_t lr,
+                 uint64_t& r3) {
+  const uint32_t named = word();
   if (int32_t(named) >= 0) {
     r3 = calls.Call(kFinishNamed, frame, lr, m, named);
   }
 }
 
-// The sum of two of the panel's words (their guest addresses), as the
-// originals' 64-bit add of two zero-extended loads.
-uint64_t Sum(uint8_t* base, uint32_t a, uint32_t b) {
-  return uint64_t(LoadU32(base, a)) + uint64_t(LoadU32(base, b));
-}
-
-// The C panel's action word for `action` (its action_anims + 4 x action,
-// 32-bit).
-uint32_t ActionAt(uint8_t* base, uint32_t panel, uint64_t action) {
-  return Car(base, panel).action_anims_address() + (uint32_t(action) << 2);
-}
+// The sum of two of the panel's words, as the originals' 64-bit add of two
+// zero-extended loads.
+uint64_t Sum(uint32_t a, uint32_t b) { return uint64_t(a) + uint64_t(b); }
 }  // namespace
 
 uint64_t TabShow(uint8_t* base, uint32_t panel, uint32_t sp, const Calls& calls) {
@@ -1084,9 +1102,10 @@ uint64_t TabShow(uint8_t* base, uint32_t panel, uint32_t sp, const Calls& calls)
   if (int32_t(first) >= 0) {
     r3 = PlayNamed(calls, frame, 0x8224FEA4, m, first, 1, 0, 0, 0);
   }
-  LoopIfIdle(base, calls, frame, m, Tab(base, panel).loop_a_address(), 0x8224FEDC, 0x8224FEE8, r3);
-  LoopIfIdle(base, calls, frame, m, Tab(base, panel).loop_c_address(), 0x8224FF20, 0x8224FF2C, r3);
-  LoopIfIdle(base, calls, frame, m, Tab(base, panel).loop_d_address(), 0x8224FF64, 0x8224FF70, r3);
+  const Tab t(base, panel);
+  LoopIfIdle(base, calls, frame, m, [&] { return t.loop_a(); }, 0x8224FEDC, 0x8224FEE8, r3);
+  LoopIfIdle(base, calls, frame, m, [&] { return t.loop_c(); }, 0x8224FF20, 0x8224FF2C, r3);
+  LoopIfIdle(base, calls, frame, m, [&] { return t.loop_d(); }, 0x8224FF64, 0x8224FF70, r3);
   return r3;
 }
 
@@ -1098,25 +1117,21 @@ uint64_t TabSelect(uint8_t* base, uint32_t panel, uint32_t sp, const Calls& call
   // The tab (+8, unsigned) and its word (+12, +16, +20): when set, its
   // animation (+96 + the tab) finished, played and looped.
   const uint32_t tab = Tab(base, panel).tab();
-  if (tab < 3 && LoadU32(base, Tab(base, panel).tab0_enabled_address() + 4 * tab) != 0) {
+  const Tab t(base, panel);
+  if (tab < 3 && TabEnabled(t, tab) != 0) {
     calls.Call(kFinishNamed, frame, 0x8224FB9C, m, uint64_t(Tab(base, panel).tab_anims()) + tab);
-    PlayNamed(calls, frame, 0x8224FBC0, m,
-              Sum(base, Tab(base, panel).tab_address(), Tab(base, panel).tab_anims_address()), 1, 0,
-              0, 0);
-    r3 =
-        calls.Call(kLoopNamed, frame, 0x8224FBD4, m,
-                   Sum(base, Tab(base, panel).tab_address(), Tab(base, panel).tab_anims_address()));
+    PlayNamed(calls, frame, 0x8224FBC0, m, Sum(t.tab(), t.tab_anims()), 1, 0, 0, 0);
+    r3 = calls.Call(kLoopNamed, frame, 0x8224FBD4, m, Sum(t.tab(), t.tab_anims()));
   }
-  LoopIfIdle(base, calls, frame, m, Tab(base, panel).loop_b_address(), 0x8224FC0C, 0x8224FC18, r3);
-  LoopIfIdle(base, calls, frame, m, Tab(base, panel).loop_c_address(), 0x8224FC50, 0x8224FC5C, r3);
+  LoopIfIdle(base, calls, frame, m, [&] { return t.loop_b(); }, 0x8224FC0C, 0x8224FC18, r3);
+  LoopIfIdle(base, calls, frame, m, [&] { return t.loop_c(); }, 0x8224FC50, 0x8224FC5C, r3);
   // The three tabs' nodes dimmed (color 0) or not (2) by their words.
   const uint32_t node =
       ui_movies::FindNode(base, m, Tab(base, panel).node_set(), Tab(base, panel).texts_node());
   for (uint32_t i = 0; i < 3; i++) {
     const uint32_t child =
-        ui_movies::Child(base, node, LoadU32(base, Tab(base, panel).tab0_text_address() + 4 * i));
-    ui_movies::SetColor(
-        base, child, LoadU32(base, Tab(base, panel).tab0_enabled_address() + 4 * i) == 0 ? 2 : 0);
+        ui_movies::Child(base, node, TabText(Tab(base, panel), i));
+    ui_movies::SetColor(base, child, TabEnabled(t, i) == 0 ? 2 : 0);
   }
   return m;
 }
@@ -1128,18 +1143,19 @@ uint64_t RowShow(uint8_t* base, uint32_t panel, uint32_t sp, const Calls& calls)
   const uint32_t first = Row(base, panel).show_alt() != 0 ? Row(base, panel).show_anim_alt()
                                                           : Row(base, panel).show_anim();
   uint64_t r3 = PlayNamed(calls, frame, 0x8224F228, m, first, 1, 0, 1, 0);
-  LoopIfIdle(base, calls, frame, m, Row(base, panel).loop_a_address(), 0x8224F260, 0x8224F26C, r3);
-  LoopIfIdle(base, calls, frame, m, Row(base, panel).loop_b_address(), 0x8224F2A4, 0x8224F2B0, r3);
-  FinishIfSet(base, calls, frame, m, Row(base, panel).arrow_up_address(), 0x8224F2C4, r3);
-  FinishIfSet(base, calls, frame, m, Row(base, panel).arrow_down_address(), 0x8224F2D8, r3);
+  const Row r(base, panel);
+  const auto up = [&] { return r.arrow_up(); };
+  const auto down = [&] { return r.arrow_down(); };
+  LoopIfIdle(base, calls, frame, m, [&] { return r.loop_a(); }, 0x8224F260, 0x8224F26C, r3);
+  LoopIfIdle(base, calls, frame, m, [&] { return r.loop_b(); }, 0x8224F2A4, 0x8224F2B0, r3);
+  FinishIfSet(calls, frame, m, up, 0x8224F2C4, r3);
+  FinishIfSet(calls, frame, m, down, 0x8224F2D8, r3);
   if (int32_t(Row(base, panel).row()) >= 0) {
-    r3 =
-        calls.Call(kFinishNamed, frame, 0x8224F2F4, m,
-                   Sum(base, Row(base, panel).row_anims_address(), Row(base, panel).row_address()));
+    r3 = calls.Call(kFinishNamed, frame, 0x8224F2F4, m, Sum(r.row_anims(), r.row()));
     Row(base, panel).set_row(0xFFFFFFFFu);
   }
-  FinishIfSet(base, calls, frame, m, Row(base, panel).arrow_up_address(), 0x8224F310, r3);
-  FinishIfSet(base, calls, frame, m, Row(base, panel).arrow_down_address(), 0x8224F324, r3);
+  FinishIfSet(calls, frame, m, up, 0x8224F310, r3);
+  FinishIfSet(calls, frame, m, down, 0x8224F324, r3);
   return r3;
 }
 
@@ -1147,30 +1163,25 @@ uint64_t RowSelect(uint8_t* base, uint32_t panel, uint32_t sp, const Calls& call
   ITC_NATIVE_RUNNING("sub_8224F340 RowPanel::Select");
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t m = Movie(base, Row(base, panel).group().address, frame);
-  calls.Call(kFinishNamed, frame, 0x8224F374, m,
-             Sum(base, Row(base, panel).row_address(), Row(base, panel).row_anims_address()));
-  PlayNamed(calls, frame, 0x8224F398, m,
-            Sum(base, Row(base, panel).row_address(), Row(base, panel).row_anims_address()), 1, 0,
-            0, 0);
-  uint64_t r3 =
-      calls.Call(kLoopNamed, frame, 0x8224F3AC, m,
-                 Sum(base, Row(base, panel).row_address(), Row(base, panel).row_anims_address()));
-  LoopIfIdle(base, calls, frame, m, Row(base, panel).loop_a_address(), 0x8224F3E4, 0x8224F3F0, r3);
-  LoopIfIdle(base, calls, frame, m, Row(base, panel).loop_b_address(), 0x8224F428, 0x8224F434, r3);
+  const Row r(base, panel);
+  calls.Call(kFinishNamed, frame, 0x8224F374, m, Sum(r.row(), r.row_anims()));
+  PlayNamed(calls, frame, 0x8224F398, m, Sum(r.row(), r.row_anims()), 1, 0, 0, 0);
+  uint64_t r3 = calls.Call(kLoopNamed, frame, 0x8224F3AC, m, Sum(r.row(), r.row_anims()));
+  LoopIfIdle(base, calls, frame, m, [&] { return r.loop_a(); }, 0x8224F3E4, 0x8224F3F0, r3);
+  LoopIfIdle(base, calls, frame, m, [&] { return r.loop_b(); }, 0x8224F428, 0x8224F434, r3);
   // The arrows (+104, +108) finished, played and looped.
   static constexpr uint32_t kArrows[2][3] = {{0x8224F448, 0x8224F464, 0x8224F470},
                                              {0x8224F484, 0x8224F4A0, 0x8224F4AC}};
-  const uint32_t arrows[2] = {Row(base, panel).arrow_up_address(),
-                              Row(base, panel).arrow_down_address()};
+  const auto arrow = [&](uint32_t k) { return k == 0 ? r.arrow_up() : r.arrow_down(); };
   for (uint32_t k = 0; k < 2; k++) {
     const uint32_t* const a = kArrows[k];
-    const uint32_t named = LoadU32(base, arrows[k]);
+    const uint32_t named = arrow(k);
     if (int32_t(named) < 0) {
       continue;
     }
     calls.Call(kFinishNamed, frame, a[0], m, named);
-    PlayNamed(calls, frame, a[1], m, LoadU32(base, arrows[k]), 1, 0, 0, 0);
-    r3 = calls.Call(kLoopNamed, frame, a[2], m, LoadU32(base, arrows[k]));
+    PlayNamed(calls, frame, a[1], m, arrow(k), 1, 0, 0, 0);
+    r3 = calls.Call(kLoopNamed, frame, a[2], m, arrow(k));
   }
   return r3;
 }
@@ -1182,13 +1193,13 @@ uint64_t CarShow(uint8_t* base, uint32_t panel, uint32_t sp, const Calls& calls)
   uint64_t r3 = m;
   const uint32_t action = Car(base, panel).action();
   if (int32_t(action) >= 0) {
-    calls.Call(kFinishNamed, frame, 0x8224DA58, m, LoadU32(base, ActionAt(base, panel, action)));
+    calls.Call(kFinishNamed, frame, 0x8224DA58, m, CarActionAnim(Car(base, panel), action));
     Car(base, panel).set_action(0xFFFFFFFFu);
   }
   // The ten actions' animations (+68 on): played once when not running,
   // then finished.
   for (uint32_t i = 0; i < 10; i++) {
-    const uint32_t named = LoadU32(base, Car(base, panel).action_anims_address() + 4 * i);
+    const uint32_t named = CarActionAnim(Car(base, panel), i);
     if (!Active(base, m, named)) {
       PlayNamed(calls, frame, 0x8224DA9C, m, named, 1, 0, 0, 0);
     }
@@ -1196,12 +1207,13 @@ uint64_t CarShow(uint8_t* base, uint32_t panel, uint32_t sp, const Calls& calls)
   }
   for (uint32_t i = 0; i < 2; i++) {
     r3 = PlayNamed(calls, frame, 0x8224DAD8, m,
-                   LoadU32(base, Car(base, panel).show_anim_a_address() + 4 * i), 1, 0, 1, 0);
+                   CarShowAnim(Car(base, panel), i), 1, 0, 1, 0);
   }
-  LoopIfIdle(base, calls, frame, m, Car(base, panel).loop_a_address(), 0x8224DB1C, 0x8224DB28, r3);
-  LoopIfIdle(base, calls, frame, m, Car(base, panel).loop_b_address(), 0x8224DB60, 0x8224DB6C, r3);
-  FinishIfSet(base, calls, frame, m, Car(base, panel).arrow_a_address(), 0x8224DB80, r3);
-  FinishIfSet(base, calls, frame, m, Car(base, panel).arrow_b_address(), 0x8224DB94, r3);
+  const Car c(base, panel);
+  LoopIfIdle(base, calls, frame, m, [&] { return c.loop_a(); }, 0x8224DB1C, 0x8224DB28, r3);
+  LoopIfIdle(base, calls, frame, m, [&] { return c.loop_b(); }, 0x8224DB60, 0x8224DB6C, r3);
+  FinishIfSet(calls, frame, m, [&] { return c.arrow_a(); }, 0x8224DB80, r3);
+  FinishIfSet(calls, frame, m, [&] { return c.arrow_b(); }, 0x8224DB94, r3);
   return r3;
 }
 
@@ -1212,14 +1224,13 @@ namespace {
 // `lr` (Move's 0x8224DE30, Pick's 0x8224E084), the same steps apart.
 void CarSwap(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t m, uint32_t panel,
              uint64_t action, uint64_t before, uint32_t lr) {
-  const uint32_t old_at = ActionAt(base, panel, before);
-  calls.Call(kFinishNamed, frame, lr, m, LoadU32(base, old_at));
-  calls.Call(kUnloopNamed, frame, lr + 0x0C, m, LoadU32(base, old_at));
-  const uint32_t new_at = ActionAt(base, panel, action);
-  calls.Call(kFinishNamed, frame, lr + 0x20, m, LoadU32(base, new_at));
-  calls.Call(kUnloopNamed, frame, lr + 0x2C, m, LoadU32(base, new_at));
-  PlayNamed(calls, frame, lr + 0x48, m, LoadU32(base, new_at), 1, 0, 0, 0);
-  calls.Call(kLoopNamed, frame, lr + 0x54, m, LoadU32(base, new_at));
+  const Car c(base, panel);
+  calls.Call(kFinishNamed, frame, lr, m, CarActionAnim(c, before));
+  calls.Call(kUnloopNamed, frame, lr + 0x0C, m, CarActionAnim(c, before));
+  calls.Call(kFinishNamed, frame, lr + 0x20, m, CarActionAnim(c, action));
+  calls.Call(kUnloopNamed, frame, lr + 0x2C, m, CarActionAnim(c, action));
+  PlayNamed(calls, frame, lr + 0x48, m, CarActionAnim(c, action), 1, 0, 0, 0);
+  calls.Call(kLoopNamed, frame, lr + 0x54, m, CarActionAnim(c, action));
   calls.Call(kFinishNamed, frame, lr + 0x60, m, Car(base, panel).scroll_back());
 }
 }  // namespace
@@ -1276,12 +1287,12 @@ uint64_t PowerGraphSetEntry(uint8_t* base, uint64_t entry_r3, uint64_t tab) {
   data.set_spec_flag(Entry(base, entry).turbo() != 0 ? 1 : 0);
   data.set_spec_word_3(Entry(base, entry).displacement());
   data.set_curve_value_0(
-      uint32_t(steps::Fctiwz(steps::Lfs(base, Entry(base, entry).unknown_652_address()))));
+      uint32_t(steps::Fctiwz(double(Entry(base, entry).unknown_652()))));
   data.set_curve_value_1(
-      uint32_t(steps::Fctiwz(steps::Lfs(base, Entry(base, entry).unknown_656_address()))));
-  data.set_peak_torque(float(steps::Lfs(base, Entry(base, entry).unknown_660_address())));
+      uint32_t(steps::Fctiwz(double(Entry(base, entry).unknown_656()))));
+  data.set_peak_torque(float(double(Entry(base, entry).unknown_660())));
   data.set_peak_index(
-      uint32_t(steps::Fctiwz(steps::Lfs(base, Entry(base, entry).unknown_664_address()))));
+      uint32_t(steps::Fctiwz(double(Entry(base, entry).unknown_664()))));
   return entry_r3;
 }
 

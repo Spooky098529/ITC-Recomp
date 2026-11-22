@@ -9,6 +9,7 @@
 #include "course_scenery/course_scenery.h"
 #include "data_tables/data_tables.h"
 #include "debug/state_digest.h"
+#include "game_modes/game_modes.h"
 #include "input/pad_ticks.h"
 #include "mode_tick/mode_tick.h"
 #include "schema/boot_mode.h"
@@ -49,8 +50,7 @@ void Post(uint8_t* base, uint32_t dispatcher, uint32_t message) {
   const uint32_t count = d.ring_count() + 1;
   const uint32_t at = d.ring_start() + count - 1;
   d.set_ring_count(count);
-  const schema::ModeMessage slot(
-      base, d.ring_address() + (at % kRingSlots) * schema::ModeMessage::kSize);
+  const game_modes::RingSlot slot{d.ring() + (at % kRingSlots) * schema::ModeMessage::kSize};
   slot.set_id(message);
   slot.set_arg0(0);
   slot.set_arg1(0);

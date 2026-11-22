@@ -28,6 +28,8 @@ measures = ["Framework", "sub_820908F8.ret", "App::Run.r4", "sub_82090350.r3.+0"
             "sub_82090760.r3", "sub_82090768.r3"]
 size = 136
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820909D4]
 vtable = 0x82000B90
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "FrameworkVtable", note = "0x82000B90" },
@@ -98,14 +100,16 @@ fields = [
 [FrameworkGetterSelf]
 measures = ["sub_82090770.r3", "sub_82090778.r3", "sub_82090788.r3", "sub_824892F8.r3",
             "sub_8248F030.r3"]
-size = 92
+size = 96
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "word_44", offset = 44, type = "u32", note = "sub_824892F8: from framework + 24, the first worker pool" },
   { name = "word_60", offset = 60, type = "u32", note = "sub_82090770: from framework + 20, the scene" },
   { name = "word_64", offset = 64, type = "u32", note = "sub_82090778: on the framework, the run loop; from + 24, the input manager" },
   { name = "word_68", offset = 68, type = "u32", note = "sub_8248F030: from framework + 8 or + 24, the frame driver or the debug text" },
   { name = "word_88", offset = 88, type = "u32", note = "sub_82090788: on the framework, the input manager" },
+  { name = "word_92", offset = 92, type = "u32", note = "sub_82493700: from framework + 36, the users (framework + 128)" },
 ]
 
 # One of the framework's interfaces (a vtable whose slots are getters).
@@ -114,6 +118,7 @@ measure = "FrameStart.+4"
 measures = ["sub_820944C8.r3@-12.+20"]
 size = 4
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "FrameworkInterfaceVtable" },
 ]
@@ -254,6 +259,7 @@ fields = [
 measures = ["sub_82096330.r3", "sub_82096340.r3"]
 size = 4
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "DelegateTargetVtable" },
 ]
@@ -277,13 +283,14 @@ measure = "HandlerMap"
 measures = ["HandlerMap::Insert.r4", "sub_82093638.r4", "sub_82093850.r3", "HandlerMap::InsertNode.r4", "HandlerMap::HandlerMap.r3"]
 size = 16
 origin = "embedded"
+storage = "dual"
 fields = [
-  { name = "result_where", offset = 0, type = "u64", note = "measure fault: an insert result's iterator as one doubleword (the map, the node)" },
-  { name = "result_map", offset = 0, type = "u32", note = "measure fault: an insert result's map" },
+  { name = "fault_result_where", offset = 0, type = "u64", note = "measure fault: an insert result's iterator as one doubleword (the map, the node)" },
+  { name = "fault_result_map", offset = 0, type = "u32", note = "measure fault: an insert result's map" },
   { name = "head", offset = 4, type = "ptr", to = "HandlerMapNode", note = "the head node (left the leftmost, parent the root, right the rightmost); also an insert result's node" },
   { name = "size", offset = 8, type = "u32" },
-  { name = "result_inserted", offset = 8, type = "u8", note = "measure fault: HandlerMap::Insert's inserted byte" },
-  { name = "result_functor_8", offset = 8, type = "u64", note = "measure fault: HandlerMap::ForEach's returned functor's second doubleword" },
+  { name = "fault_result_inserted", offset = 8, type = "u8", note = "measure fault: HandlerMap::Insert's inserted byte" },
+  { name = "fault_result_functor_8", offset = 8, type = "u64", note = "measure fault: HandlerMap::ForEach's returned functor's second doubleword" },
 ]
 
 # A map node (24 bytes, HandlerMap::AllocateNodes).
@@ -292,6 +299,7 @@ measure = "new<?>@HandlerMap::AllocateNodes"
 measures = ["HandlerMap::Insert.r4.+4", "HandlerMap::Insert.r4.+4.+0", "HandlerMap::Insert.r4.+4.+0.+8", "HandlerMap::NewNode.ret", "HandlerMap::NewNode.ret.+4", "HandlerMap::NewNode.ret.+4.+8", "HandlerMap::RotateLeft.r4", "HandlerMap::RotateLeft.r4.+4", "HandlerMap::RotateLeft.r4.+8", "HandlerMap::RotateLeft.r4.+8.+0", "sub_82091AE8.r3.+4", "sub_82091AE8.r3.+4.+0", "sub_82091AE8.r3.+4.+8", "sub_82099B18.r3.+4", "sub_82099B18.r3.+4.+0", "sub_82099B18.r3.+4.+8", "sub_82099BA8.r4", "sub_82099BA8.r4.+0", "sub_82093638.r4.+4", "sub_82093850.r3.+4", "sub_8209A008.r3.+20", "App.+8", "HandlerMap::InsertNode.r4.+4", "HandlerMap::InsertNode.r6.+8", "HandlerMap::InsertNode.r6.+8.+4", "HandlerMap::InsertNode.r6.+8.+0", "HandlerMap::InsertNode.r6.+8.+0.+8", "HandlerMap.+4"]
 size = 24
 origin = "allocated"
+storage = "host"
 fields = [
   { name = "left", offset = 0, type = "ptr", to = "HandlerMapNode" },
   { name = "parent", offset = 4, type = "ptr", to = "HandlerMapNode" },
@@ -347,8 +355,9 @@ measure = "RequestVector"
 measures = ["RequestVector::PushBack.r3", "RequestVector::Erase.r4", "RequestVector::Clear.r3"]
 size = 16
 origin = "embedded"
+storage = "dual"
 fields = [
-  { name = "result_where", offset = 0, type = "u64", note = "measure fault: a result iterator (the vector, the element)" },
+  { name = "fault_result_where", offset = 0, type = "u64", note = "measure fault: a result iterator (the vector, the element)" },
   { name = "first", offset = 4, type = "ptr", to = "Request" },
   { name = "last", offset = 8, type = "ptr", to = "Request" },
   { name = "end", offset = 12, type = "ptr", to = "Request" },
@@ -384,6 +393,8 @@ fields = [
 measure = "FrameStart"
 size = 8
 origin = "allocated"
+storage = "host"
+host_alloc = [0x82090B30]
 vtable = 0x82000D84
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "DelegateTargetVtable", note = "0x82000D84: 0 FrameStart::OnTick, 1 sub_82092650, 2 sub_820926C8" },
@@ -513,6 +524,8 @@ fields = [
 measure = "new<8>@Framework::Init#3"
 size = 8
 origin = "allocated"
+storage = "host"
+host_alloc = [0x82090BE4, 0x82090C0C]  # the first pool maker (PoolMaker, vtable 0x82002848, framework + 112) too: it shares this view
 vtable = 0x82002840
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82002840" },
@@ -547,6 +560,7 @@ debug_font_default_scale = { address = 0x82001FAC, type = "f32", note = "read-on
 measure = "Framework@+44"
 size = 4
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "unknown_0", offset = 0, type = "u32" },
 ]
@@ -556,6 +570,7 @@ fields = [
 measure = "Framework@+48"
 size = 4
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "unknown_0", offset = 0, type = "u32" },
 ]

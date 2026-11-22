@@ -40,6 +40,7 @@ fields = [
 measures = ["GarageScreen::Close.r4", "GarageScreen::OnNo.r4", "GarageScreen::OnPlateCancelled.r4", "GarageScreen::OnPlateDone.r4"]
 size = 812
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "messages", offset = 204, type = "bytes", count = 600, note = "50 messages of 12 bytes (id, two words)" },
   { name = "message_count", offset = 804, type = "u32" },

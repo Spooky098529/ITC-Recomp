@@ -110,7 +110,14 @@ uint64_t SetPlayTimeText(uint8_t* base, uint32_t sp, const Calls& calls) {
       uint32_t(calls.Call(kPlayTimeAdd, frame, 0x8220B008, frame + 80, uint64_t(save) + 48)));
   const schema::UserInfoData data = Data(base);
   data.set_play_hours(time.hours());
-  data.set_play_time_word(time.time_word());
+  // The word's bytes in guest order (the data is a host object since E5
+  // step 4; play_minutes and play_seconds read its bytes +48 and +49).
+  const uint32_t word = time.time_word();
+  uint8_t* const bytes = data.play_time();
+  bytes[0] = uint8_t(word >> 24);
+  bytes[1] = uint8_t(word >> 16);
+  bytes[2] = uint8_t(word >> 8);
+  bytes[3] = uint8_t(word);
   return PlayTimeText(base, calls, frame, 0x8220B058, movie);
 }
 
@@ -139,10 +146,10 @@ uint64_t MenuPage(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls)
   const uint32_t count = m.message_count() + 1;
   const uint32_t start = m.message_start();
   m.set_message_count(count);
-  const uint32_t slot = m.messages_address() + 12 * ((start + count - 1) % 50);
-  StoreU32(base, slot + 0, 6);
-  StoreU32(base, slot + 4, 0);
-  StoreU32(base, slot + 8, 0);
+  uint8_t* slot = m.messages() + 12 * ((start + count - 1) % 50);  // guest order (E5 step 4)
+  schema::host::StoreU32(slot + 0, 6);
+  schema::host::StoreU32(slot + 4, 0);
+  schema::host::StoreU32(slot + 8, 0);
   return calls.Call(kMenuSoundPlay, frame, 0x8220B1AC, 2);
 }
 

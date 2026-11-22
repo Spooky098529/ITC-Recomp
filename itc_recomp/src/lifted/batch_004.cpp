@@ -967,7 +967,7 @@ lifted::Result f820ADA70(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r11,84(r1)
   guest::StoreU32(base, uint32_t(r1) + 84, uint32_t(r11));
   // lwz r5,4(r30)
-  r5 = guest::LoadU32(base, schema::AppOpListNode(base, uint32_t(r30)).previous_address());
+  r5 = schema::AppOpListNode(base, uint32_t(r30)).previous_bits();
   // bl 0x820acff8
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x820ACFF8, LIFTED_ARGS(0x820ADAA8, r31)); r3 = o.r3; f1 = o.f1; }
@@ -981,11 +981,11 @@ lifted::Result f820ADA70(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x820AD768, LIFTED_ARGS(0x820ADAB8, r31)); r3 = o.r3; f1 = o.f1; }
   // stw r29,4(r30)
-  guest::StoreU32(base, schema::AppOpListNode(base, uint32_t(r30)).previous_address(), uint32_t(r29));
+  schema::AppOpListNode(base, uint32_t(r30)).set_previous_bits(uint32_t(r29));
   // lwz r11,4(r29)
-  r11 = guest::LoadU32(base, schema::AppOpListNode(base, uint32_t(r29)).previous_address());
+  r11 = schema::AppOpListNode(base, uint32_t(r29)).previous_bits();
   // stw r29,0(r11)
-  guest::StoreU32(base, schema::AppOpListNode(base, uint32_t(r11)).next_address(), uint32_t(r29));
+  schema::AppOpListNode(base, uint32_t(r11)).set_next_bits(uint32_t(r29));
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
   // b 0x825a6edc
@@ -1025,7 +1025,7 @@ lifted::Result f820ADB28(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r4,r30
   r4 = r30;
   // lwz r5,4(r30)
-  r5 = guest::LoadU32(base, schema::AppOpListNode(base, uint32_t(r30)).previous_address());
+  r5 = schema::AppOpListNode(base, uint32_t(r30)).previous_bits();
   // bl 0x820acff8
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x820ACFF8, LIFTED_ARGS(0x820ADB5C, r31)); r3 = o.r3; f1 = o.f1; }
@@ -1039,11 +1039,11 @@ lifted::Result f820ADB28(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x820AD768, LIFTED_ARGS(0x820ADB6C, r31)); r3 = o.r3; f1 = o.f1; }
   // stw r29,4(r30)
-  guest::StoreU32(base, schema::AppOpListNode(base, uint32_t(r30)).previous_address(), uint32_t(r29));
+  schema::AppOpListNode(base, uint32_t(r30)).set_previous_bits(uint32_t(r29));
   // lwz r11,4(r29)
-  r11 = guest::LoadU32(base, schema::AppOpListNode(base, uint32_t(r29)).previous_address());
+  r11 = schema::AppOpListNode(base, uint32_t(r29)).previous_bits();
   // stw r29,0(r11)
-  guest::StoreU32(base, schema::AppOpListNode(base, uint32_t(r11)).next_address(), uint32_t(r29));
+  schema::AppOpListNode(base, uint32_t(r11)).set_next_bits(uint32_t(r29));
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
   // b 0x825a6edc
@@ -1083,7 +1083,7 @@ lifted::Result f820ADB80(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r4,r30
   r4 = r30;
   // lwz r5,4(r30)
-  r5 = guest::LoadU32(base, schema::AppOpListNode(base, uint32_t(r30)).previous_address());
+  r5 = schema::AppOpListNode(base, uint32_t(r30)).previous_bits();
   // bl 0x820acff8
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x820ACFF8, LIFTED_ARGS(0x820ADBB4, r31)); r3 = o.r3; f1 = o.f1; }
@@ -1097,11 +1097,11 @@ lifted::Result f820ADB80(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x820AD768, LIFTED_ARGS(0x820ADBC4, r31)); r3 = o.r3; f1 = o.f1; }
   // stw r29,4(r30)
-  guest::StoreU32(base, schema::AppOpListNode(base, uint32_t(r30)).previous_address(), uint32_t(r29));
+  schema::AppOpListNode(base, uint32_t(r30)).set_previous_bits(uint32_t(r29));
   // lwz r11,4(r29)
-  r11 = guest::LoadU32(base, schema::AppOpListNode(base, uint32_t(r29)).previous_address());
+  r11 = schema::AppOpListNode(base, uint32_t(r29)).previous_bits();
   // stw r29,0(r11)
-  guest::StoreU32(base, schema::AppOpListNode(base, uint32_t(r11)).next_address(), uint32_t(r29));
+  schema::AppOpListNode(base, uint32_t(r11)).set_next_bits(uint32_t(r29));
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
   // b 0x825a6edc

@@ -9,6 +9,7 @@
 #include "base/log.h"
 #include "game_modes/game_modes.h"
 #include "guest.h"
+#include "memory/host_copy.h"
 #include "cameras/cameras.h"
 #include "post_effects/post_effects.h"
 #include "track_zones/track_zones.h"
@@ -719,8 +720,11 @@ void DirectorUpdate(uint8_t* base, uint32_t director, uint32_t frame,
   // five words copied into the frame at +96.
   const uint32_t player = d.followed_input() & 0xFF;
   const uint32_t input = guest::LoadU32(base, G::input_records_address() + 4 * player);
-  for (uint32_t i = 0; i < 5; i++) {
-    guest::StoreU32(base, frame + 96 + 4 * i, guest::LoadU32(base, input + 4 * i));
+  // A host record (E5 step 4) is copied with each field swapped.
+  if (!memory::CopyWithHandles(base, frame + 96, input, 20)) {
+    for (uint32_t i = 0; i < 5; i++) {
+      guest::StoreU32(base, frame + 96 + 4 * i, guest::LoadU32(base, input + 4 * i));
+    }
   }
   const uint32_t buttons = guest::LoadU32(base, frame + 96);
   auto tv_flag = [&] { return (schema::RaceData(base, G::race_data(base)).flags() >> 7) & 1; };

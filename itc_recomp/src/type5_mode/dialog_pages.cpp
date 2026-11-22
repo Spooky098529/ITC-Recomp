@@ -7,6 +7,7 @@
 #include "type5_mode/type5_mode.h"
 
 #include "base/log.h"
+#include "game_modes/game_modes.h"
 #include "guest.h"
 #include "schema/boot_mode.h"
 #include "schema/game_modes.h"
@@ -35,7 +36,7 @@ void Post(uint8_t* base, uint32_t dispatcher, uint32_t id, bool id_last = false)
   const uint32_t count = d.ring_count() + 1;
   const uint32_t end = d.ring_start() + count - 1;
   d.set_ring_count(count);
-  const schema::ModeMessage slot(base, d.ring_address() + (end - (end / 50) * 50) * 12);
+  const game_modes::RingSlot slot{d.ring() + (end - (end / 50) * 50) * 12};
   if (!id_last) {
     slot.set_id(id);
   }

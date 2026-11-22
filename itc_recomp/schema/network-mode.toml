@@ -22,12 +22,18 @@
 # get (r3: +0 a byte, +4 a word, as GameMode's answer_*) and with its +32
 # interface (Interrupt, ForceExit and Resume get the mode + 32: their +808,
 # +812 and +816 are the mode's ring count, ring start and block).
+# Dual (E5 step 4): made in host memory by Mode::Create; the measure joins
+# guest addresses with it (the delegates' answer on the stack, the block
+# in AllLoaded and FindShown), which the view reads as guest memory. Its
+# fields over the block were left out.
 [ModeType12]
 measures = ["ModeType12", "ModeType12::LeaveScreen.r4", "ModeType12::NextMode.r4",
             "ModeType12::Teardown.r4", "ModeType12::WaitForLoads.r4",
             "ModeType12::WaitForShown.r4"]
 size = 852
 origin = "allocated"
+storage = "dual"
+host_alloc = [0x821078BC]
 vtable = 0x82006C6C
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82006C6C" },
@@ -44,9 +50,6 @@ fields = [
   { name = "ring_count", offset = 840, type = "u32" },
   { name = "ring_start", offset = 844, type = "u32" },
   { name = "block", offset = 848, type = "ptr", to = "NetModeBlock", note = "the block, VirtualAlloc'ed by Init (the +32 interface's +816)" },
-  { name = "select_loaded", offset = 9608, type = "u32", note = "measure fault: AllLoaded's r3 is the block (NetModeBlock): the mode select's loaded word" },
-  { name = "screen1_loaded", offset = 19248, type = "u32", note = "measure fault: the block's screen 1 (+9640) loaded word, read by AllLoaded" },
-  { name = "screen3_loaded", offset = 28888, type = "u32", note = "measure fault: the block's screen 3 (+19280) loaded word, read by AllLoaded" },
 ]
 
 # The mode's block (135,208 bytes at the mode's +848, VirtualAlloc'ed by
@@ -140,6 +143,7 @@ measures = ["NetModeSelect::Leave.r4", "NetModeSelect::Unloaded.r4", "NetRanking
             "sub_82285630.r4"]
 size = 812
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "handlers", offset = 0, type = "bytes", count = 200, note = "50 handler pointers (the machines)" },
   { name = "handler_count", offset = 200, type = "u32" },

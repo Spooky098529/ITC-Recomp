@@ -112,7 +112,7 @@ uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls)
     const uint32_t count = m.handler_count();
     const uint32_t machine = block() + member.offset;
     m.set_handler_count(count + 1);
-    StoreU32(base, m.handlers_address() + (count << 2), machine);
+    schema::host::StoreU32(m.handlers() + (count << 2), machine);  // guest order (E5 step 4)
   }
   const uint32_t first = FirstScreen(base);
   Block(base, block()).set_first_shown(first);
@@ -152,7 +152,7 @@ uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls)
   // The delegate: WaitForLoads through Mode::Slot8Thunk.
   StoreU32(base, frame + 116, 0);
   StoreU32(base, frame + 112, kSlot8Thunk);
-  const uint32_t delegate = m.delegate_vtable_address();
+  const uint32_t delegate = mode + 8;  // the delegate (in host memory, E5 step 4)
   uint32_t holder = 0;
   if (delegate != 0) {
     holder = delegate;
@@ -232,12 +232,14 @@ void Store64(uint8_t* base, uint32_t at, uint64_t value) {
 // originals test it).
 void Delegate(uint8_t* base, uint32_t mode, uint32_t slot) {
   const Mode m(base, mode);
-  const uint32_t delegate = m.delegate_vtable_address();
+  const uint32_t delegate = mode + 8;  // the delegate (in host memory, E5 step 4)
   uint32_t holder = 0;
   if (delegate != 0) {
     holder = delegate;
     m.set_delegate_object(mode);
-    Store64(base, m.delegate_function_address(), Load64(base, slot));
+    const uint64_t words = Load64(base, slot);  // the function and adjustment, one doubleword
+    m.set_delegate_function(uint32_t(words >> 32));
+    m.set_delegate_adjustment(uint32_t(words));
     m.set_delegate_vtable(kDelegateVtable);
   }
   m.set_delegate_ptr(holder);
@@ -260,7 +262,7 @@ void ClearAnswer(uint8_t* base, uint32_t answer) {
 uint32_t BlockOf(uint8_t* base, uint32_t mode) { return Mode(base, mode).block().address; }
 
 // The mode's dispatcher (+36), whose ring PostRing posts to.
-uint32_t DispatcherOf(uint32_t mode) { return Mode(nullptr, mode).handlers_address(); }
+uint32_t DispatcherOf(uint32_t mode) { return mode + 36; }
 
 int32_t ShownState(uint8_t* base, uint32_t mode) {
   const uint32_t block = BlockOf(base, mode);
@@ -591,7 +593,7 @@ uint64_t ForceExit(uint8_t* base, uint32_t object, uint32_t sp, const Calls& cal
   }
   SessionFree(base, frame, calls);
   NetMachine(base, mode.block().power_graph_address()).set_state(9);
-  PostRing(base, mode.handlers_address(), shown + 20);
+  PostRing(base, mode.address + 36, shown + 20);
   const uint32_t machine = Machine(mode.block().address, shown);
   NetMachine(base, machine).set_state(10);
   return machine;
@@ -605,7 +607,7 @@ uint32_t Resume(uint8_t* base, uint32_t object, uint32_t sp) {
   const Block block = mode.block();
   const uint32_t machine = Machine(block.address, block.shown());
   NetMachine(base, machine).set_again(0);
-  PostRing(base, mode.handlers_address(), 44);
+  PostRing(base, mode.address + 36, 44);
   return machine;
 }
 

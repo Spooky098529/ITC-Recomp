@@ -166,7 +166,7 @@ void hooks::FramePassesBoot(lifted::Regs& ctx, uint8_t* base) {
   guest_call::InFrame(ctx, base, fp::kBootFrame, 0x820962DC, [&](uint32_t frame) {
     auto vtable_call = [&](uint32_t object, uint32_t byte, uint32_t return_address) {
       ctx.r3.u64 = object;
-      const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, object) + byte);
+      const uint32_t function = guest::LoadU32(base, guest::VtableWord(base, object) + byte);
       ctx.ctr.u64 = function;  // (r11, also the target there: none reads it)
       ctx.lr = return_address;
       lifted::CallFromContext(ctx, base, function);
@@ -207,7 +207,7 @@ void hooks::FramePassesConstruct(lifted::Regs& ctx, uint8_t* base) {
   guest_call::InFrame(ctx, base, fp::kConstructFrame, 0x820986F0, [&](uint32_t frame) {
     auto vtable_call = [&](uint32_t object, uint32_t byte, uint32_t return_address) {
       ctx.r3.u64 = object;
-      const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, object) + byte);
+      const uint32_t function = guest::LoadU32(base, guest::VtableWord(base, object) + byte);
       ctx.ctr.u64 = function;  // (r11, also the target there: none reads it)
       ctx.lr = return_address;
       lifted::CallFromContext(ctx, base, function);
@@ -258,7 +258,7 @@ void hooks::FramePassesRecord(lifted::Regs& ctx, uint8_t* base) {
   guest_call::InFrame(ctx, base, fp::kRecordFrame, 0x82096440, [&](uint32_t frame) {
     auto vcall = [&](uint32_t object, uint32_t byte, uint32_t return_address) {
       ctx.r3.u64 = object;
-      const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, object) + byte);
+      const uint32_t function = guest::LoadU32(base, guest::VtableWord(base, object) + byte);
       ctx.ctr.u64 = function;  // (r11, also the target there: none reads it)
       ctx.lr = return_address;
       lifted::CallFromContext(ctx, base, function);

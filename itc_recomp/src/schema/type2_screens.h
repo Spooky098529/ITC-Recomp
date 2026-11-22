@@ -162,6 +162,8 @@ struct Type2HubImage : View {
     return Type2HubImage(base, memory::MakeHandle(new Type2HubImageData(), sizeof(Type2HubImageData), "Type2HubImage", &kType2HubImageLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kType2HubImageLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kType2HubImageLayout, offset, width, v); }
   // 1 once ImageLoaded ran
   uint32_t loaded() const { return data()->loaded; }
   void set_loaded(uint32_t v) const { data()->loaded = v; }
@@ -186,18 +188,42 @@ struct Type2HubImage : View {
 };
 
 // embedded; measure: Type2Hub::OpenSelected.r4, Type2Hub::Close.r4, Type2Hub::OnDialogDone.r4, PlateEditor::Close.r4, BuildScreen::Close.r4, PowerGraphScreen::Close.r4, Screen::LeaveToHub.r4
+#pragma pack(push, 1)
+struct Type2ScreensModeData {
+  uint8_t pad_0[204] = {};
+  uint8_t messages[600] = {};  // +204, guest order
+  uint32_t message_count = 0;  // +804
+  uint32_t message_start = 0;  // +808
+};
+#pragma pack(pop)
+static_assert(sizeof(Type2ScreensModeData) == 812);
+inline constexpr memory::LayoutField kType2ScreensModeFields[] = {{804, 4}, {808, 4}};
+inline constexpr memory::Layout kType2ScreensModeLayout = {kType2ScreensModeFields, 2};
+
 struct Type2ScreensMode : View {
   using View::View;
   static constexpr uint32_t kSize = 812;
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  Type2ScreensModeData* data() const { return static_cast<Type2ScreensModeData*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static Type2ScreensMode New(uint8_t* base) {
+    return Type2ScreensMode(base, memory::MakeHandle(new Type2ScreensModeData(), sizeof(Type2ScreensModeData), "Type2ScreensMode", &kType2ScreensModeLayout));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kType2ScreensModeLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kType2ScreensModeLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 50 messages of 12 bytes (id, two words)
-  uint32_t messages_address() const { return address + 204; }
-  uint32_t message_count() const { return guest::LoadU32(base, address + 804); }
-  void set_message_count(uint32_t v) const { guest::StoreU32(base, address + 804, v); }
-  uint32_t message_count_address() const { return address + 804; }
+  uint8_t* messages() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 204 : guest::Pointer(base, address + 204); }
+  uint32_t message_count() const { return on_host() ? uint32_t(data()->message_count) : uint32_t(guest::LoadU32(base, address + 804)); }
+  void set_message_count(uint32_t v) const { if (on_host()) data()->message_count = v; else guest::StoreU32(base, address + 804, v); }
+  uint32_t message_count_bits() const { return on_host() ? data()->message_count : guest::LoadU32(base, address + 804); }
+  void set_message_count_bits(uint32_t v) const { if (on_host()) data()->message_count = v; else guest::StoreU32(base, address + 804, v); }
   // the ring's first slot
-  uint32_t message_start() const { return guest::LoadU32(base, address + 808); }
-  void set_message_start(uint32_t v) const { guest::StoreU32(base, address + 808, v); }
-  uint32_t message_start_address() const { return address + 808; }
+  uint32_t message_start() const { return on_host() ? uint32_t(data()->message_start) : uint32_t(guest::LoadU32(base, address + 808)); }
+  void set_message_start(uint32_t v) const { if (on_host()) data()->message_start = v; else guest::StoreU32(base, address + 808, v); }
+  uint32_t message_start_bits() const { return on_host() ? data()->message_start : guest::LoadU32(base, address + 808); }
+  void set_message_start_bits(uint32_t v) const { if (on_host()) data()->message_start = v; else guest::StoreU32(base, address + 808, v); }
 };
 
 // embedded; measure: PlateEditor

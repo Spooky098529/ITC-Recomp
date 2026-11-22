@@ -8,6 +8,7 @@
 #include "type2_mode/type2_mode.h"
 
 #include "base/log.h"
+#include "game_modes/game_modes.h"
 #include "guest.h"
 #include "schema/boot_mode.h"
 #include "schema/game_modes.h"
@@ -25,7 +26,7 @@ using G = schema::Type2ModeGlobals;
 using Mode = schema::ModeType2;
 using Block = schema::Type2ModeBlock;
 using Machine = schema::Type2ScreenMachine;
-using Message = schema::ModeMessage;
+using Message = game_modes::RingSlot;  // a slot in the mode's ring (its bytes, E5 step 4)
 
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   const uint32_t frame = sp - bytes;
@@ -41,18 +42,18 @@ void ClearAnswer(uint8_t* base, uint32_t answer) {
 
 // The mode's ring's next slot (its count +840, the start +844), the count
 // raised.
-uint32_t NextSlot(uint8_t* base, uint32_t mode) {
+Message NextSlot(uint8_t* base, uint32_t mode) {
   const Mode m(base, mode);
   const uint32_t count = m.ring_count() + 1;
   const uint32_t end = m.ring_start() + count - 1;
   m.set_ring_count(count);
-  return m.ring_address() + (end - (end / 50) * 50) * Message::kSize;
+  return Message{m.ring() + (end - (end / 50) * 50) * schema::ModeMessage::kSize};
 }
 
 // A message (`message`, 0, 0) queued in the mode's ring (+240), the words
 // in the original's order (`id_last`: +8, +4, then the id).
 void Queue(uint8_t* base, uint32_t mode, uint32_t message, bool id_last = false) {
-  const Message slot(base, NextSlot(base, mode));
+  const Message slot = NextSlot(base, mode);
   if (id_last) {
     slot.set_arg1(0);
     slot.set_arg0(0);
@@ -65,7 +66,7 @@ void Queue(uint8_t* base, uint32_t mode, uint32_t message, bool id_last = false)
 }
 
 uint64_t Dispatch(const Calls& calls, uint32_t mode, uint32_t frame, uint32_t lr) {
-  return calls.Call(kDispatch, frame, lr, Mode(nullptr, mode).handlers_address(), mode);
+  return calls.Call(kDispatch, frame, lr, mode + 36, mode);  // the dispatcher (+36)
 }
 
 // The delegate (mode +4 = mode +8 when that isn't 0) given the member
@@ -73,7 +74,7 @@ uint64_t Dispatch(const Calls& calls, uint32_t mode, uint32_t frame, uint32_t lr
 // the frame holds): vtable 0x82010FA0, the mode, the doubleword.
 void SetDelegate(uint8_t* base, uint32_t mode, uint32_t words) {
   const Mode m(base, mode);
-  uint32_t delegate = m.delegate_vtable_address();
+  uint32_t delegate = mode + 8;  // the delegate (in host memory, E5 step 4)
   if (delegate != 0) {
     const uint32_t function = LoadU32(base, words), adjustment = LoadU32(base, words + 4);
     m.set_delegate_object(mode);
@@ -146,7 +147,7 @@ void Restart(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const C
 void Leaving(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82198008 ModeType2::Leaving");
   const uint32_t frame = Frame(base, sp, 128);
-  const Message slot(base, NextSlot(base, mode));
+  const Message slot = NextSlot(base, mode);
   ClearAnswer(base, answer);
   slot.set_id(4);
   slot.set_arg0(0);
@@ -319,7 +320,7 @@ uint32_t Interrupt(uint8_t* base, uint32_t object, uint32_t sp) {
     post = type2_dialog::TakesInput(base) != 0;
   }
   if (post) {
-    const Message slot(base, NextSlot(base, mode.address));
+    const Message slot = NextSlot(base, mode.address);
     slot.set_arg1(0);
     slot.set_arg0(0);
     slot.set_id(48);

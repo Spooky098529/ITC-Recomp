@@ -149,8 +149,8 @@ bool CollisionWorldAddObject(uint8_t* base, uint32_t body, uint32_t shape, uint3
     return false;
   }
   ITC_NATIVE_RUNNING("sub_820B9570 CollisionWorld::AddObject");
-  va::CollisionObjectUnlink(base, free_object, schema::CollisionWorld(base, World(base)).free_address());
-  va::CollisionObjectLink(base, free_object, schema::CollisionWorld(base, World(base)).active_address());
+  va::CollisionObjectUnlink(base, free_object, schema::CollisionWorld(base, World(base)).address + 24);  // the free list's head
+  va::CollisionObjectLink(base, free_object, schema::CollisionWorld(base, World(base)).address + 20);  // the active list's head
   uint32_t world = World(base);
   schema::CollisionWorld(base, world).set_active_count(uint32_t(schema::CollisionWorld(base, world).active_count() + 1));
   world = World(base);

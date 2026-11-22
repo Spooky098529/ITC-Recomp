@@ -621,6 +621,8 @@ measure = "new<72>@CollisionWorld::Create"
 measures = ["CollisionObject::Link.r4", "CollisionObject::Unlink.r4"]
 size = 72
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820B8D68]
 fields = [
   { name = "buffer", offset = 0, type = "u32", note = "a caller's buffer (0)" },
   { name = "default_step", offset = 4, type = "f32", note = "1/30" },

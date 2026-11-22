@@ -12,6 +12,8 @@
 #include "schema/type67_screens.h"
 #include "schema/type6_type7_modes.h"
 
+#include <cstring>
+
 namespace screen_constructors {
 
 namespace {
@@ -28,6 +30,25 @@ void Fill(uint8_t* base, uint32_t from, uint32_t to, uint32_t value) {
 }
 
 constexpr uint32_t kNone = 0xFFFFFFFF;  // -1
+
+// The panels are host or guest objects (E5 step 4, dual views). A word of a
+// `bytes` field, kept in guest order in either shape (the view's pointer).
+void SetBytesWord(uint8_t* at, uint32_t value) {
+  at[0] = uint8_t(value >> 24);
+  at[1] = uint8_t(value >> 16);
+  at[2] = uint8_t(value >> 8);
+  at[3] = uint8_t(value);
+}
+// `value` (0 or -1: the same bytes in either order) in the panel's words
+// from +`from` to +`to` (both included).
+template <typename Panel>
+void FillPanel(uint8_t* base, const Panel& panel, uint32_t from, uint32_t to, uint32_t value) {
+  if (panel.on_host()) {
+    std::memset(reinterpret_cast<uint8_t*>(panel.data()) + from, int(value & 0xFF), to + 4 - from);
+  } else {
+    Fill(base, panel.address + from, panel.address + to, value);
+  }
+}
 // The panels' vtable (PanelGroupBase's too).
 constexpr uint32_t kPanelVtable = 0x82010974;
 
@@ -48,8 +69,8 @@ void PanelC(uint8_t* base, uint32_t panel, uint32_t group, uint32_t vtable, uint
   p.set_hide_anim_b(kNone);
   p.set_show_again_anim(kNone);
   p.set_arrow_a(112);
-  Store(base, p.action_anims_address() + 0, 5);
-  Store(base, p.action_anims_address() + 4, 6);
+  SetBytesWord(p.action_anims() + 0, 5);
+  SetBytesWord(p.action_anims() + 4, 6);
   p.set_scroll_back(15);
   p.set_scroll_on(16);
   p.set_loop_a(0);
@@ -60,14 +81,14 @@ void PanelC(uint8_t* base, uint32_t panel, uint32_t group, uint32_t vtable, uint
   p.set_texts(5);
   p.set_cursor(0);
   for (uint32_t i = 0; i < 4; i++) {
-    Store(base, p.stats_children_address() + 4 * i, 5 + i);  // +160 to +172: 5 to 8
+    SetBytesWord(p.stats_children() + 4 * i, 5 + i);  // +160 to +172: 5 to 8
   }
-  Store(base, p.stats_children_address() + 16, 11);  // +176
-  Store(base, p.stats_children_address() + 20, 12);  // +180
-  Store(base, p.stats_children_address() + 56, 9);   // +216
-  Store(base, p.stats_children_address() + 60, 10);  // +220
-  Store(base, p.stats_children_address() + 64, 13);  // +224
-  Store(base, p.stats_children_address() + 68, 14);  // +228
+  SetBytesWord(p.stats_children() + 16, 11);  // +176
+  SetBytesWord(p.stats_children() + 20, 12);  // +180
+  SetBytesWord(p.stats_children() + 56, 9);   // +216
+  SetBytesWord(p.stats_children() + 60, 10);  // +220
+  SetBytesWord(p.stats_children() + 64, 13);  // +224
+  SetBytesWord(p.stats_children() + 68, 14);  // +228
   p.set_buttons(4);
   p.set_text_a(123);
   p.set_text_b(112);
@@ -84,10 +105,11 @@ void PanelD(uint8_t* base, uint32_t panel, uint32_t group, uint32_t w12, uint32_
   p.set_show_anim(110);
   p.set_hide_anim(111);
   p.set_item_anims(w24);
-  for (uint32_t i = 0; i < 4; i++) {
-    // +28 to +40: scroll_back, scroll_on, swatches_on, swatches_back
-    Store(base, p.scroll_back_address() + 4 * i, w28 + i);
-  }
+  // +28 to +40: scroll_back, scroll_on, swatches_on, swatches_back
+  p.set_scroll_back(w28 + 0);
+  p.set_scroll_on(w28 + 1);
+  p.set_swatches_on(w28 + 2);
+  p.set_swatches_back(w28 + 3);
   p.set_arrows_node(w60);
   p.set_cursor(0);
   p.set_swatches(1);
@@ -169,18 +191,20 @@ void PanelScreen(uint8_t* base, uint32_t screen, uint32_t sp, const New& new_pan
   const uint32_t group_b = s.group_b_address();
   type.group_b(base, group_b);
   // Each panel built unless operator new gave 0 (the original's check).
-  auto make = [&](uint32_t size, void (*construct)(uint8_t*, uint32_t, uint32_t),
+  // The panels live in host memory (E5 step 4): their handles in place of
+  // operator new's blocks (`new_panel` no longer called).
+  (void)new_panel;
+  auto make = [&](uint32_t panel, void (*construct)(uint8_t*, uint32_t, uint32_t),
                   uint32_t group) {
-    const uint32_t panel = new_panel(size, frame);
     if (panel != 0) {
       construct(base, panel, group);
     }
     return panel;
   };
-  const uint32_t c = make(schema::CarPanel::kSize, type.panel_c, group_b);
-  const uint32_t d = make(schema::ColorPanel::kSize, type.panel_d, group_b);
-  const uint32_t e = make(schema::RowPanel::kSize, PanelE, group_a);
-  const uint32_t f = make(schema::TabPanel::kSize, type.panel_f, group_a);
+  const uint32_t c = make(schema::CarPanel::New(base).address, type.panel_c, group_b);
+  const uint32_t d = make(schema::ColorPanel::New(base).address, type.panel_d, group_b);
+  const uint32_t e = make(schema::RowPanel::New(base).address, PanelE, group_a);
+  const uint32_t f = make(schema::TabPanel::New(base).address, type.panel_f, group_a);
   const uint32_t set = s.set_address();
   PanelSet(base, set, f, e, d, c, group_b, frame);
   const uint32_t pair = s.pair_address();
@@ -225,11 +249,11 @@ void PanelCBase(uint8_t* base, uint32_t panel) {
   p.set_action(kNone);
   p.set_group(0);
   p.set_node_set(kNone);
-  Fill(base, p.stats_node_address(), p.texts_address(), kNone);  // +24 to +140
+  FillPanel(base, p, 24, 140, kNone);  // +24 (stats_node) to +140 (texts)
   // +148 to +244 (unknown_148 to the stats children's 22nd word).
-  Fill(base, p.unknown_148_address(), p.stats_children_address() + 84, kNone);
-  Fill(base, p.price_child_address(), p.buttons_address(), kNone);  // +260 to +272
-  Fill(base, p.text_a_address(), p.two_players_address(), 0);       // +276 to +316
+  FillPanel(base, p, 148, 160 + 84, kNone);
+  FillPanel(base, p, 260, 272, kNone);  // +260 (price_child) to +272 (buttons)
+  FillPanel(base, p, 276, 316, 0);      // +276 (text_a) to +316 (two_players)
 }
 
 void PanelDBase(uint8_t* base, uint32_t panel) {
@@ -237,7 +261,7 @@ void PanelDBase(uint8_t* base, uint32_t panel) {
   const schema::ColorPanel p(base, panel);
   p.set_group(0);
   p.set_vtable(kEmptyBaseVtable);
-  Fill(base, p.node_set_address(), p.swatch_color_address(), kNone);  // +8 to +80
+  FillPanel(base, p, 8, 80, kNone);  // +8 (node_set) to +80 (swatch_color)
   p.set_two_players(0);
 }
 
@@ -246,7 +270,7 @@ void PanelEBase(uint8_t* base, uint32_t panel) {
   const schema::RowPanel p(base, panel);
   p.set_group(0);
   p.set_row_count(0);
-  Fill(base, p.row_address(), p.arrows_address(), kNone);  // +8 to +148
+  FillPanel(base, p, 8, 148, kNone);  // +8 (row) to +148 (arrows)
   p.set_show_alt(0);
   p.set_two_players(0);
 }
@@ -259,9 +283,14 @@ void PanelE(uint8_t* base, uint32_t panel, uint32_t group) {
   p.set_row_count(4);
   p.set_node(4);
   for (uint32_t i = 0; i < 4; i++) {
-    Store(base, p.row_nodes_address() + 4 * i, 5 + i);  // +20 to +32: 5 to 8
+    SetBytesWord(p.row_nodes() + 4 * i, 5 + i);  // +20 to +32: 5 to 8
     // +124 to +136 (text_maker, text_name, text_third, unknown_136): 5 to 8
-    Store(base, p.text_maker_address() + 4 * i, 5 + i);
+    switch (i) {
+      case 0: p.set_text_maker(5); break;
+      case 1: p.set_text_name(6); break;
+      case 2: p.set_text_third(7); break;
+      default: p.set_unknown_136(8); break;
+    }
   }
   p.set_spare_row_node(9);
   p.set_unknown_64(5);
@@ -287,7 +316,7 @@ void PanelFBase(uint8_t* base, uint32_t panel) {
   const schema::TabPanel p(base, panel);
   p.set_group(0);
   p.set_vtable(kEmptyBaseVtable);
-  Fill(base, p.node_set_address(), p.loop_d_address(), kNone);  // +24 to +136
+  FillPanel(base, p, 24, 136, kNone);  // +24 (node_set) to +136 (loop_d)
   p.set_two_players(0);
 }
 

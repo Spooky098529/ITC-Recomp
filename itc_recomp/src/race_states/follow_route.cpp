@@ -10,6 +10,7 @@
 #include "base/log.h"
 #include "car_physics/float_ops.h"
 #include "hooks/vehicle.h"
+#include "memory/host_copy.h"
 #include "race_setup/race_setup.h"
 #include "track_route/track_route.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -107,8 +108,11 @@ uint32_t FollowRoute(uint8_t* base, uint32_t out, uint32_t progress, uint32_t in
   {
     const uint32_t car = slot.entry().vehicle_index();
     const uint32_t from = Load(base, G::input_records_address() + ((car << 2) & 0x3FC));
-    for (uint32_t k = 0; k < 20; k += 4) {
-      Store(base, frame + 96 + k, Load(base, from + k));
+    // A host record (E5 step 4) is copied with each field swapped.
+    if (!memory::CopyWithHandles(base, frame + 96, from, 20)) {
+      for (uint32_t k = 0; k < 20; k += 4) {
+        Store(base, frame + 96 + k, Load(base, from + k));
+      }
     }
   }
   const uint32_t e = index * kEntryBytes;  // entry `index`'s offset from entry 0

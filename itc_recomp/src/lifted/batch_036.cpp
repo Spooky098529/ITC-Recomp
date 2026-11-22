@@ -172,9 +172,9 @@ uint64_t f82091BF8(uint8_t* base, uint64_t r3, uint64_t r4) {
   // lwz r10,4(r3)
   r10 = guest::LoadU32(base, schema::FrameDriverListenerMap(base, uint32_t(r3)).head_address());
   // lwz r11,4(r10)
-  r11 = guest::LoadU32(base, schema::FrameDriverMapNode(base, uint32_t(r10)).parent_address());
+  r11 = schema::FrameDriverMapNode(base, uint32_t(r10)).parent_bits();
   // lbz r9,21(r11)
-  r9 = guest::LoadU8(base, schema::FrameDriverMapNode(base, uint32_t(r11)).is_nil_address());
+  r9 = schema::FrameDriverMapNode(base, uint32_t(r11)).is_nil_bits();
   // cmplwi cr6,r9,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r9), 0, so);
   // bne cr6,0x82091c40
@@ -183,7 +183,7 @@ uint64_t f82091BF8(uint8_t* base, uint64_t r3, uint64_t r4) {
   r9 = guest::LoadU32(base, schema::FrameDriverListenerKey(base, uint32_t(r4)).key_address());
 loc_82091C10:
   // lwz r8,12(r11)
-  r8 = guest::LoadU32(base, schema::FrameDriverMapNode(base, uint32_t(r11)).key_address());
+  r8 = schema::FrameDriverMapNode(base, uint32_t(r11)).key_bits();
   // subfc r8,r9,r8
   ca = uint32_t(r8) >= uint32_t(r9);
   r8 = r8 - r9;
@@ -197,17 +197,17 @@ loc_82091C10:
   // beq 0x82091c2c
   if (cr0.eq) goto loc_82091C2C;
   // lwz r11,8(r11)
-  r11 = guest::LoadU32(base, schema::FrameDriverMapNode(base, uint32_t(r11)).right_address());
+  r11 = schema::FrameDriverMapNode(base, uint32_t(r11)).right_bits();
   // b 0x82091c34
   goto loc_82091C34;
 loc_82091C2C:
   // mr r10,r11
   r10 = r11;
   // lwz r11,0(r11)
-  r11 = guest::LoadU32(base, schema::FrameDriverMapNode(base, uint32_t(r11)).left_address());
+  r11 = schema::FrameDriverMapNode(base, uint32_t(r11)).left_bits();
 loc_82091C34:
   // lbz r8,21(r11)
-  r8 = guest::LoadU8(base, schema::FrameDriverMapNode(base, uint32_t(r11)).is_nil_address());
+  r8 = schema::FrameDriverMapNode(base, uint32_t(r11)).is_nil_bits();
   // cmplwi cr6,r8,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r8), 0, so);
   // beq cr6,0x82091c10

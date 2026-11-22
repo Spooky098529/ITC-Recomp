@@ -33,7 +33,7 @@ uint64_t Load64(uint8_t* base, uint32_t at) {
 // The delegate's words from the doubleword at `slot` (function, then
 // adjustment: two word stores).
 void FillDelegate(uint8_t* base, const Mode& m, uint32_t slot) {
-  const uint32_t delegate = m.delegate_vtable_address();
+  const uint32_t delegate = m.address + 8;  // the delegate (in host memory, E5 step 4)
   uint32_t holder = 0;
   if (delegate != 0) {
     holder = delegate;
@@ -76,9 +76,10 @@ schema::StateMachine ShownMachine(const Block& block) {
   return schema::StateMachine(block.base, index == 1 ? block.save_screen_address() : 0);
 }
 
-// The mode's dispatcher (+36) and ring (+240).
-uint32_t Dispatcher(uint8_t* base, uint32_t mode) { return Mode(base, mode).handlers_address(); }
-uint32_t Ring(uint8_t* base, uint32_t mode) { return Mode(base, mode).ring_address(); }
+// The mode's dispatcher (+36) and ring (+240): addresses inside the mode (a
+// handle's interior since E5 step 4), reached through the dual views.
+uint32_t Dispatcher(uint8_t* base, uint32_t mode) { return Mode(base, mode).address + 36; }
+uint32_t Ring(uint8_t* base, uint32_t mode) { return Mode(base, mode).address + 240; }
 
 void Dispatch(uint8_t* base, const Calls& calls, uint32_t mode, uint32_t frame, uint32_t lr) {
   calls.Call(kDispatch, frame, lr, Dispatcher(base, mode), mode);
@@ -123,8 +124,8 @@ uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls)
     }
     m.set_handler_count(count + 1);
     const Block b = block();
-    Store(base, m.handlers_address() + (count << 2),
-          save_screen ? b.save_screen_address() : b.theater_address());
+    schema::host::StoreU32(m.handlers() + (count << 2),  // guest order (E5 step 4)
+                           save_screen ? b.save_screen_address() : b.theater_address());
   }
   block().set_shown_at_init(0);
   block().set_shown(0);
@@ -163,12 +164,12 @@ void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const 
     SetDelegate(base, mode, frame + 80, kSlot11Thunk);
   }
   if (shown_state() == 10) {
-    PostRing(base, m.ring_address(), 4);
+    PostRing(base, m.address + 240, 4);
   }
   if (G::pad_blocked0(base) == 0 && G::pad_blocked1(base) == 0) {
-    PostRing(base, m.ring_address(), 1);
+    PostRing(base, m.address + 240, 1);
   }
-  PostRing(base, m.ring_address(), 0);
+  PostRing(base, m.address + 240, 0);
   Dispatch(base, calls, mode, frame, 0x82289038);
   // The answer (byte 1, the next mode) built over the frame's doubleword
   // at +80 (its other three bytes as they are).
@@ -207,7 +208,7 @@ void WaitForShown(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp,
   if (int32_t(machine.loaded()) == 1) {
     SetDelegate(base, mode, frame + 80, kNextModeThunk);
   }
-  PostRing(base, m.ring_address(), 1);
+  PostRing(base, m.address + 240, 1);
   Dispatch(base, calls, mode, frame, 0x82288D94);
 }
 
@@ -260,7 +261,7 @@ uint32_t Interrupt(uint8_t* base, uint32_t object, uint32_t sp) {
   if (int32_t(block.save_screen_state()) != 5 && OnList(base) != 1) {
     return 1;
   }
-  PostRing(base, iface.ring_address(), 15);
+  PostRing(base, iface.address + 208, 15);  // the ring (+208 from the +32 interface)
   return 0;
 }
 
@@ -285,7 +286,7 @@ void ForceExit(uint8_t* base, uint32_t object, uint32_t number, uint32_t sp) {
 
 void Resume(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82288B20 ModeType10::Resume");
-  PostRing(base, Interface32(base, object).ring_address(), 16);
+  PostRing(base, Interface32(base, object).address + 208, 16);  // the ring (+208 from the +32 interface)
 }
 
 }  // namespace type10_mode

@@ -588,8 +588,8 @@ bool CollisionWorldRemovePairsByGroups(uint8_t* base, uint32_t object, uint32_t 
 
 bool CollisionWorldRemoveObject(uint8_t* base, uint32_t object, uint32_t* r3) {
   ITC_NATIVE_RUNNING("sub_820B9448 CollisionWorld::RemoveObject");
-  va::CollisionObjectUnlink(base, object, schema::CollisionWorld(base, World(base)).active_address());
-  va::CollisionObjectLink(base, object, schema::CollisionWorld(base, World(base)).free_address());
+  va::CollisionObjectUnlink(base, object, schema::CollisionWorld(base, World(base)).address + 20);  // the active list's head
+  va::CollisionObjectLink(base, object, schema::CollisionWorld(base, World(base)).address + 24);  // the free list's head
   const uint32_t world = World(base);
   schema::CollisionWorld(base, world).set_active_count(uint32_t(schema::CollisionWorld(base, world).active_count() - 1));
   return CollisionWorldRemovePairsOf(base, object, r3);
@@ -769,7 +769,7 @@ bool CollisionWorldCreate(uint8_t* base, uint32_t objects, uint32_t pairs, uint3
     return false;
   }
   ITC_NATIVE_RUNNING("sub_820B8D30 CollisionWorld::Create");
-  const uint32_t world_block = memory::crt::OperatorNew(base, 72).value_or(0);
+  const uint32_t world_block = schema::CollisionWorld::New(base).address;  // host memory (E5 step 4)
   schema::CarPhysicsGlobals::set_collision_world(base, uint32_t(world_block));
   schema::CollisionWorld(base, world_block).set_buffer(uint32_t(0));
   schema::CollisionWorld(base, World(base)).set_updating(uint32_t(0));
@@ -833,7 +833,7 @@ bool CollisionWorldCreate(uint8_t* base, uint32_t objects, uint32_t pairs, uint3
     schema::CollisionWorld(base, World(base)).set_contacts(uint32_t(block));
   }
   schema::CollisionWorld(base, World(base)).set_contacts_used(uint32_t(0));
-  CopyWord(base, 0x820029EC, schema::CollisionWorld(base, World(base)).default_step_address());  // 1/30
+  schema::CollisionWorld(base, World(base)).set_default_step_bits(guest::LoadU32(base, 0x820029EC));  // 1/30
   CollisionWorldResetSurfaces(base);
   schema::CarPhysicsGlobals::set_query_walls(base, uint32_t(0x825C8388));
   schema::CarPhysicsGlobals::set_query_ground(base, uint32_t(0x820BC828));

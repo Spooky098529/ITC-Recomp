@@ -867,9 +867,9 @@ uint64_t f82263D80(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // li r9,18
   r9 = uint64_t(int64_t(18));
   // lwz r10,600(r11)
-  r10 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r10 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // lwz r6,604(r11)
-  r6 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r6 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // add r6,r6,r10
@@ -877,7 +877,7 @@ uint64_t f82263D80(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // addi r6,r6,-1
   r6 = uint64_t(int64_t(int64_t(r6) + -1));
   // stw r10,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r10));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r10));
   // divwu r5,r6,r5
   r5 = uint32_t(uint32_t(r5) ? uint32_t(r6) / uint32_t(r5) : 0);
   // mulli r5,r5,50
@@ -3598,9 +3598,9 @@ loc_82265418:
   // mr r3,r26
   r3 = r26;
   // lwz r10,600(r11)
-  r10 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r10 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // lwz r6,604(r11)
-  r6 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r6 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // add r6,r6,r10
@@ -3608,7 +3608,7 @@ loc_82265418:
   // addi r6,r6,-1
   r6 = uint64_t(int64_t(int64_t(r6) + -1));
   // stw r10,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r10));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r10));
   // divwu r5,r6,r5
   r5 = uint32_t(uint32_t(r5) ? uint32_t(r6) / uint32_t(r5) : 0);
   // mulli r5,r5,50
@@ -4035,11 +4035,11 @@ loc_8226571C:
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // lwz r10,600(r11)
-  r10 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r10 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // li r6,40
   r6 = uint64_t(int64_t(40));
   // lwz r3,604(r11)
-  r3 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r3 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // addi r10,r10,1
@@ -4049,7 +4049,7 @@ loc_8226571C:
   // addi r3,r3,-1
   r3 = uint64_t(int64_t(int64_t(r3) + -1));
   // stw r10,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r10));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r10));
   // divwu r30,r3,r31
   r30 = uint32_t(uint32_t(r31) ? uint32_t(r3) / uint32_t(r31) : 0);
   // mulli r30,r30,50
@@ -4067,9 +4067,9 @@ loc_8226571C:
   // stw r7,8(r10)
   guest::StoreU32(base, uint32_t(r10) + 8, uint32_t(r7));
   // lwz r10,600(r11)
-  r10 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r10 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // lwz r9,604(r11)
-  r9 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r9 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // add r9,r9,r10
@@ -4077,7 +4077,7 @@ loc_8226571C:
   // addi r9,r9,-1
   r9 = uint64_t(int64_t(int64_t(r9) + -1));
   // stw r10,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r10));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r10));
   // divwu r8,r9,r31
   r8 = uint32_t(uint32_t(r31) ? uint32_t(r9) / uint32_t(r31) : 0);
   // mulli r8,r8,50
@@ -4245,9 +4245,9 @@ loc_822658AC:
   // li r7,0
   r7 = uint64_t(int64_t(0));
   // lwz r10,600(r11)
-  r10 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r10 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // lwz r6,604(r11)
-  r6 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r6 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // add r6,r6,r10
@@ -4255,7 +4255,7 @@ loc_822658AC:
   // addi r6,r6,-1
   r6 = uint64_t(int64_t(int64_t(r6) + -1));
   // stw r10,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r10));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r10));
   // divwu r5,r6,r5
   r5 = uint32_t(uint32_t(r5) ? uint32_t(r6) / uint32_t(r5) : 0);
   // mulli r5,r5,50
@@ -5057,9 +5057,9 @@ lifted::Result f82266028(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // lwz r9,600(r11)
-  r9 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r9 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // lwz r6,604(r11)
-  r6 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r6 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // mr r7,r10
   r7 = r10;
   // addi r9,r9,1
@@ -5069,7 +5069,7 @@ lifted::Result f82266028(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r6,r6,-1
   r6 = uint64_t(int64_t(int64_t(r6) + -1));
   // stw r9,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r9));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r9));
   // divwu r5,r6,r5
   r5 = uint32_t(uint32_t(r5) ? uint32_t(r6) / uint32_t(r5) : 0);
   // mulli r5,r5,50
@@ -5151,9 +5151,9 @@ loc_8226616C:
   // stw r10,25052(r9)
   guest::StoreU32(base, uint32_t(r9) + 25052, uint32_t(r10));
   // lwz r9,600(r11)
-  r9 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r9 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // lwz r6,604(r11)
-  r6 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r6 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // addi r9,r9,1
   r9 = uint64_t(int64_t(int64_t(r9) + 1));
   // add r6,r6,r9
@@ -5161,7 +5161,7 @@ loc_8226616C:
   // addi r6,r6,-1
   r6 = uint64_t(int64_t(int64_t(r6) + -1));
   // stw r9,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r9));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r9));
   // divwu r5,r6,r5
   r5 = uint32_t(uint32_t(r5) ? uint32_t(r6) / uint32_t(r5) : 0);
   // mulli r5,r5,50
@@ -5387,11 +5387,11 @@ lifted::Result f822662F0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r7,r8
   r7 = r8;
   // lwz r10,600(r11)
-  r10 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r10 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // li r9,16
   r9 = uint64_t(int64_t(16));
   // lwz r6,604(r11)
-  r6 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r6 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // add r6,r6,r10
@@ -5399,7 +5399,7 @@ lifted::Result f822662F0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r6,r6,-1
   r6 = uint64_t(int64_t(int64_t(r6) + -1));
   // stw r10,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r10));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r10));
   // divwu r5,r6,r5
   r5 = uint32_t(uint32_t(r5) ? uint32_t(r6) / uint32_t(r5) : 0);
   // mulli r5,r5,50
@@ -5556,11 +5556,11 @@ loc_82266430:
   // li r7,0
   r7 = uint64_t(int64_t(0));
   // lwz r10,600(r11)
-  r10 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r10 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // li r6,40
   r6 = uint64_t(int64_t(40));
   // lwz r3,604(r11)
-  r3 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r3 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // addi r10,r10,1
@@ -5574,7 +5574,7 @@ loc_82266430:
   // addi r3,r3,-1
   r3 = uint64_t(int64_t(int64_t(r3) + -1));
   // stw r10,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r10));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r10));
   // divwu r28,r3,r31
   r28 = uint32_t(uint32_t(r31) ? uint32_t(r3) / uint32_t(r31) : 0);
   // mulli r28,r28,50
@@ -5592,9 +5592,9 @@ loc_82266430:
   // stw r7,8(r10)
   guest::StoreU32(base, uint32_t(r10) + 8, uint32_t(r7));
   // lwz r10,600(r11)
-  r10 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r10 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // lwz r9,604(r11)
-  r9 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r9 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // add r9,r9,r10
@@ -5602,7 +5602,7 @@ loc_82266430:
   // addi r9,r9,-1
   r9 = uint64_t(int64_t(int64_t(r9) + -1));
   // stw r10,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r10));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r10));
   // divwu r8,r9,r31
   r8 = uint32_t(uint32_t(r31) ? uint32_t(r9) / uint32_t(r31) : 0);
   // mulli r8,r8,50
@@ -5769,11 +5769,11 @@ loc_822665B8:
   // li r6,0
   r6 = uint64_t(int64_t(0));
   // lwz r9,600(r11)
-  r9 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r9 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // lwz r30,604(r11)
-  r30 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r30 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // li r3,0
   r3 = uint64_t(int64_t(0));
   // addi r9,r9,1
@@ -5785,7 +5785,7 @@ loc_822665B8:
   // addi r30,r30,-1
   r30 = uint64_t(int64_t(int64_t(r30) + -1));
   // stw r9,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r9));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r9));
   // divwu r28,r30,r10
   r28 = uint32_t(uint32_t(r10) ? uint32_t(r30) / uint32_t(r10) : 0);
   // mulli r28,r28,50
@@ -5803,9 +5803,9 @@ loc_822665B8:
   // stw r6,8(r9)
   guest::StoreU32(base, uint32_t(r9) + 8, uint32_t(r6));
   // lwz r9,600(r11)
-  r9 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r9 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // lwz r8,604(r11)
-  r8 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r8 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // addi r9,r9,1
   r9 = uint64_t(int64_t(int64_t(r9) + 1));
   // add r8,r8,r9
@@ -5813,7 +5813,7 @@ loc_822665B8:
   // addi r8,r8,-1
   r8 = uint64_t(int64_t(int64_t(r8) + -1));
   // stw r9,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r9));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r9));
   // divwu r10,r8,r10
   r10 = uint32_t(uint32_t(r10) ? uint32_t(r8) / uint32_t(r10) : 0);
   // mulli r10,r10,50
@@ -5910,11 +5910,11 @@ loc_822666B4:
   // li r6,0
   r6 = uint64_t(int64_t(0));
   // lwz r9,600(r11)
-  r9 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r9 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // lwz r30,604(r11)
-  r30 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r30 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // li r3,0
   r3 = uint64_t(int64_t(0));
   // addi r9,r9,1
@@ -5926,7 +5926,7 @@ loc_822666B4:
   // addi r30,r30,-1
   r30 = uint64_t(int64_t(int64_t(r30) + -1));
   // stw r9,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r9));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r9));
   // divwu r28,r30,r10
   r28 = uint32_t(uint32_t(r10) ? uint32_t(r30) / uint32_t(r10) : 0);
   // mulli r28,r28,50
@@ -5944,9 +5944,9 @@ loc_822666B4:
   // stw r6,8(r9)
   guest::StoreU32(base, uint32_t(r9) + 8, uint32_t(r6));
   // lwz r9,600(r11)
-  r9 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r9 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // lwz r8,604(r11)
-  r8 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r8 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // addi r9,r9,1
   r9 = uint64_t(int64_t(int64_t(r9) + 1));
   // add r8,r8,r9
@@ -5954,7 +5954,7 @@ loc_822666B4:
   // addi r8,r8,-1
   r8 = uint64_t(int64_t(int64_t(r8) + -1));
   // stw r9,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r9));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r9));
   // divwu r10,r8,r10
   r10 = uint32_t(uint32_t(r10) ? uint32_t(r8) / uint32_t(r10) : 0);
   // mulli r10,r10,50
@@ -6052,11 +6052,11 @@ lifted::Result f82266750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r6,40
   r6 = uint64_t(int64_t(40));
   // lwz r10,600(r11)
-  r10 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r10 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // lwz r30,604(r11)
-  r30 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r30 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // addi r10,r10,1
@@ -6068,7 +6068,7 @@ lifted::Result f82266750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r30,r30,-1
   r30 = uint64_t(int64_t(int64_t(r30) + -1));
   // stw r10,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r10));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r10));
   // divwu r26,r30,r31
   r26 = uint32_t(uint32_t(r31) ? uint32_t(r30) / uint32_t(r31) : 0);
   // mulli r26,r26,50
@@ -6086,9 +6086,9 @@ lifted::Result f82266750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r7,8(r10)
   guest::StoreU32(base, uint32_t(r10) + 8, uint32_t(r7));
   // lwz r10,600(r11)
-  r10 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r10 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // lwz r9,604(r11)
-  r9 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r9 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // add r9,r9,r10
@@ -6096,7 +6096,7 @@ lifted::Result f82266750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r9,r9,-1
   r9 = uint64_t(int64_t(int64_t(r9) + -1));
   // stw r10,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r10));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r10));
   // divwu r8,r9,r31
   r8 = uint32_t(uint32_t(r31) ? uint32_t(r9) / uint32_t(r31) : 0);
   // mulli r8,r8,50
@@ -6152,11 +6152,11 @@ loc_82266860:
   // li r6,39
   r6 = uint64_t(int64_t(39));
   // lwz r10,600(r11)
-  r10 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r10 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // lwz r3,604(r11)
-  r3 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r3 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // addi r10,r10,1
@@ -6166,7 +6166,7 @@ loc_82266860:
   // addi r3,r3,-1
   r3 = uint64_t(int64_t(int64_t(r3) + -1));
   // stw r10,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r10));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r10));
   // divwu r30,r3,r31
   r30 = uint32_t(uint32_t(r31) ? uint32_t(r3) / uint32_t(r31) : 0);
   // mulli r30,r30,50
@@ -6184,9 +6184,9 @@ loc_82266860:
   // stw r7,8(r10)
   guest::StoreU32(base, uint32_t(r10) + 8, uint32_t(r7));
   // lwz r10,600(r11)
-  r10 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r10 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // lwz r9,604(r11)
-  r9 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r9 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // add r9,r9,r10
@@ -6194,7 +6194,7 @@ loc_82266860:
   // addi r9,r9,-1
   r9 = uint64_t(int64_t(int64_t(r9) + -1));
   // stw r10,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r10));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r10));
   // divwu r8,r9,r31
   r8 = uint32_t(uint32_t(r31) ? uint32_t(r9) / uint32_t(r31) : 0);
   // mulli r8,r8,50
@@ -10249,9 +10249,9 @@ loc_82268240:
   // li r9,19
   r9 = uint64_t(int64_t(19));
   // lwz r10,600(r11)
-  r10 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r10 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // lwz r6,604(r11)
-  r6 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r6 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // add r6,r6,r10
@@ -10259,7 +10259,7 @@ loc_82268240:
   // addi r6,r6,-1
   r6 = uint64_t(int64_t(int64_t(r6) + -1));
   // stw r10,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r10));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r10));
   // divwu r5,r6,r5
   r5 = uint32_t(uint32_t(r5) ? uint32_t(r6) / uint32_t(r5) : 0);
   // mulli r5,r5,50
@@ -13067,9 +13067,9 @@ loc_82269C58:
   // li r9,16
   r9 = uint64_t(int64_t(16));
   // lwz r10,600(r11)
-  r10 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r10 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // lwz r6,604(r11)
-  r6 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r6 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // add r6,r6,r10
@@ -13077,7 +13077,7 @@ loc_82269C58:
   // addi r6,r6,-1
   r6 = uint64_t(int64_t(int64_t(r6) + -1));
   // stw r10,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r10));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r10));
   // divwu r5,r6,r5
   r5 = uint32_t(uint32_t(r5) ? uint32_t(r6) / uint32_t(r5) : 0);
   // mulli r5,r5,50
@@ -13677,11 +13677,11 @@ loc_8226A098:
   // mr r7,r8
   r7 = r8;
   // lwz r10,600(r11)
-  r10 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r10 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // li r9,16
   r9 = uint64_t(int64_t(16));
   // lwz r6,604(r11)
-  r6 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r6 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // add r6,r6,r10
@@ -13689,7 +13689,7 @@ loc_8226A098:
   // addi r6,r6,-1
   r6 = uint64_t(int64_t(int64_t(r6) + -1));
   // stw r10,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r10));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r10));
   // divwu r5,r6,r5
   r5 = uint32_t(uint32_t(r5) ? uint32_t(r6) / uint32_t(r5) : 0);
   // mulli r5,r5,50
@@ -13937,9 +13937,9 @@ loc_8226A248:
   // stw r9,9640(r29)
   guest::StoreU32(base, schema::NetMachine(base, uint32_t(r29)).unknown_9640_address(), uint32_t(r9));
   // lwz r9,600(r10)
-  r9 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r10) - 204).ring_count_address());
+  r9 = schema::ModeDispatcher(base, uint32_t(r10) - 204).ring_count_bits();
   // lwz r6,604(r10)
-  r6 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r10) - 204).ring_start_address());
+  r6 = schema::ModeDispatcher(base, uint32_t(r10) - 204).ring_start_bits();
   // addi r9,r9,1
   r9 = uint64_t(int64_t(int64_t(r9) + 1));
   // add r6,r6,r9
@@ -13947,7 +13947,7 @@ loc_8226A248:
   // addi r6,r6,-1
   r6 = uint64_t(int64_t(int64_t(r6) + -1));
   // stw r9,600(r10)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r10) - 204).ring_count_address(), uint32_t(r9));
+  schema::ModeDispatcher(base, uint32_t(r10) - 204).set_ring_count_bits(uint32_t(r9));
   // divwu r5,r6,r5
   r5 = uint32_t(uint32_t(r5) ? uint32_t(r6) / uint32_t(r5) : 0);
   // mulli r5,r5,50
@@ -14126,9 +14126,9 @@ loc_8226A3DC:
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // lwz r9,600(r10)
-  r9 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r10) - 204).ring_count_address());
+  r9 = schema::ModeDispatcher(base, uint32_t(r10) - 204).ring_count_bits();
   // lwz r6,604(r10)
-  r6 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r10) - 204).ring_start_address());
+  r6 = schema::ModeDispatcher(base, uint32_t(r10) - 204).ring_start_bits();
   // mr r7,r11
   r7 = r11;
   // addi r9,r9,1
@@ -14138,7 +14138,7 @@ loc_8226A3DC:
   // addi r6,r6,-1
   r6 = uint64_t(int64_t(int64_t(r6) + -1));
   // stw r9,600(r10)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r10) - 204).ring_count_address(), uint32_t(r9));
+  schema::ModeDispatcher(base, uint32_t(r10) - 204).set_ring_count_bits(uint32_t(r9));
   // divwu r5,r6,r5
   r5 = uint32_t(uint32_t(r5) ? uint32_t(r6) / uint32_t(r5) : 0);
   // mulli r5,r5,50
@@ -14336,11 +14336,11 @@ loc_8226A550:
   // li r7,0
   r7 = uint64_t(int64_t(0));
   // lwz r10,600(r11)
-  r10 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r10 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // li r6,40
   r6 = uint64_t(int64_t(40));
   // lwz r3,604(r11)
-  r3 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r3 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // addi r10,r10,1
@@ -14354,7 +14354,7 @@ loc_8226A550:
   // addi r3,r3,-1
   r3 = uint64_t(int64_t(int64_t(r3) + -1));
   // stw r10,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r10));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r10));
   // divwu r28,r3,r31
   r28 = uint32_t(uint32_t(r31) ? uint32_t(r3) / uint32_t(r31) : 0);
   // mulli r28,r28,50
@@ -14372,9 +14372,9 @@ loc_8226A550:
   // stw r7,8(r10)
   guest::StoreU32(base, uint32_t(r10) + 8, uint32_t(r7));
   // lwz r10,600(r11)
-  r10 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r10 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // lwz r9,604(r11)
-  r9 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r9 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // add r9,r9,r10
@@ -14382,7 +14382,7 @@ loc_8226A550:
   // addi r9,r9,-1
   r9 = uint64_t(int64_t(int64_t(r9) + -1));
   // stw r10,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r10));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r10));
   // divwu r8,r9,r31
   r8 = uint32_t(uint32_t(r31) ? uint32_t(r9) / uint32_t(r31) : 0);
   // mulli r8,r8,50
@@ -14548,11 +14548,11 @@ loc_8226A6D8:
   // li r6,0
   r6 = uint64_t(int64_t(0));
   // lwz r9,600(r11)
-  r9 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r9 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // lwz r30,604(r11)
-  r30 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r30 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // li r3,0
   r3 = uint64_t(int64_t(0));
   // addi r9,r9,1
@@ -14564,7 +14564,7 @@ loc_8226A6D8:
   // addi r30,r30,-1
   r30 = uint64_t(int64_t(int64_t(r30) + -1));
   // stw r9,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r9));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r9));
   // divwu r28,r30,r10
   r28 = uint32_t(uint32_t(r10) ? uint32_t(r30) / uint32_t(r10) : 0);
   // mulli r28,r28,50
@@ -14582,9 +14582,9 @@ loc_8226A6D8:
   // stw r6,8(r9)
   guest::StoreU32(base, uint32_t(r9) + 8, uint32_t(r6));
   // lwz r9,600(r11)
-  r9 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r9 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // lwz r8,604(r11)
-  r8 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r8 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // addi r9,r9,1
   r9 = uint64_t(int64_t(int64_t(r9) + 1));
   // add r8,r8,r9
@@ -14592,7 +14592,7 @@ loc_8226A6D8:
   // addi r8,r8,-1
   r8 = uint64_t(int64_t(int64_t(r8) + -1));
   // stw r9,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r9));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r9));
   // divwu r10,r8,r10
   r10 = uint32_t(uint32_t(r10) ? uint32_t(r8) / uint32_t(r10) : 0);
   // mulli r10,r10,50
@@ -14690,11 +14690,11 @@ lifted::Result f8226A778(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r6,40
   r6 = uint64_t(int64_t(40));
   // lwz r10,600(r11)
-  r10 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r10 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // lwz r29,604(r11)
-  r29 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r29 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // addi r10,r10,1
@@ -14706,7 +14706,7 @@ lifted::Result f8226A778(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r29,r29,-1
   r29 = uint64_t(int64_t(int64_t(r29) + -1));
   // stw r10,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r10));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r10));
   // divwu r26,r29,r31
   r26 = uint32_t(uint32_t(r31) ? uint32_t(r29) / uint32_t(r31) : 0);
   // mulli r26,r26,50
@@ -14724,9 +14724,9 @@ lifted::Result f8226A778(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r7,8(r10)
   guest::StoreU32(base, uint32_t(r10) + 8, uint32_t(r7));
   // lwz r10,600(r11)
-  r10 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r10 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // lwz r9,604(r11)
-  r9 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r9 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // add r9,r9,r10
@@ -14734,7 +14734,7 @@ lifted::Result f8226A778(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r9,r9,-1
   r9 = uint64_t(int64_t(int64_t(r9) + -1));
   // stw r10,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r10));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r10));
   // divwu r8,r9,r31
   r8 = uint32_t(uint32_t(r31) ? uint32_t(r9) / uint32_t(r31) : 0);
   // mulli r8,r8,50
@@ -14795,11 +14795,11 @@ loc_8226A888:
   // li r6,39
   r6 = uint64_t(int64_t(39));
   // lwz r10,600(r11)
-  r10 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r10 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // lwz r3,604(r11)
-  r3 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r3 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // addi r10,r10,1
@@ -14809,7 +14809,7 @@ loc_8226A888:
   // addi r3,r3,-1
   r3 = uint64_t(int64_t(int64_t(r3) + -1));
   // stw r10,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r10));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r10));
   // divwu r29,r3,r31
   r29 = uint32_t(uint32_t(r31) ? uint32_t(r3) / uint32_t(r31) : 0);
   // mulli r29,r29,50
@@ -14827,9 +14827,9 @@ loc_8226A888:
   // stw r7,8(r10)
   guest::StoreU32(base, uint32_t(r10) + 8, uint32_t(r7));
   // lwz r10,600(r11)
-  r10 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r10 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // lwz r9,604(r11)
-  r9 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r9 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // add r9,r9,r10
@@ -14837,7 +14837,7 @@ loc_8226A888:
   // addi r9,r9,-1
   r9 = uint64_t(int64_t(int64_t(r9) + -1));
   // stw r10,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r10));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r10));
   // divwu r8,r9,r31
   r8 = uint32_t(uint32_t(r31) ? uint32_t(r9) / uint32_t(r31) : 0);
   // mulli r8,r8,50
@@ -14946,11 +14946,11 @@ loc_8226A9A8:
   // li r6,0
   r6 = uint64_t(int64_t(0));
   // lwz r9,600(r11)
-  r9 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r9 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // lwz r30,604(r11)
-  r30 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r30 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // li r3,0
   r3 = uint64_t(int64_t(0));
   // addi r9,r9,1
@@ -14962,7 +14962,7 @@ loc_8226A9A8:
   // addi r30,r30,-1
   r30 = uint64_t(int64_t(int64_t(r30) + -1));
   // stw r9,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r9));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r9));
   // divwu r28,r30,r10
   r28 = uint32_t(uint32_t(r10) ? uint32_t(r30) / uint32_t(r10) : 0);
   // mulli r28,r28,50
@@ -14980,9 +14980,9 @@ loc_8226A9A8:
   // stw r6,8(r9)
   guest::StoreU32(base, uint32_t(r9) + 8, uint32_t(r6));
   // lwz r9,600(r11)
-  r9 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r9 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // lwz r8,604(r11)
-  r8 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r8 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // addi r9,r9,1
   r9 = uint64_t(int64_t(int64_t(r9) + 1));
   // add r8,r8,r9
@@ -14990,7 +14990,7 @@ loc_8226A9A8:
   // addi r8,r8,-1
   r8 = uint64_t(int64_t(int64_t(r8) + -1));
   // stw r9,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r9));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r9));
   // divwu r10,r8,r10
   r10 = uint32_t(uint32_t(r10) ? uint32_t(r8) / uint32_t(r10) : 0);
   // mulli r10,r10,50
@@ -15062,11 +15062,11 @@ lifted::Result f8226AA48(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r7,r8
   r7 = r8;
   // lwz r10,600(r11)
-  r10 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r10 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // li r9,16
   r9 = uint64_t(int64_t(16));
   // lwz r6,604(r11)
-  r6 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r6 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // add r6,r6,r10
@@ -15074,7 +15074,7 @@ lifted::Result f8226AA48(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r6,r6,-1
   r6 = uint64_t(int64_t(int64_t(r6) + -1));
   // stw r10,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r10));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r10));
   // divwu r5,r6,r5
   r5 = uint32_t(uint32_t(r5) ? uint32_t(r6) / uint32_t(r5) : 0);
   // mulli r5,r5,50
@@ -15190,11 +15190,11 @@ lifted::Result f8226AB48(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r7,0
   r7 = uint64_t(int64_t(0));
   // lwz r10,600(r11)
-  r10 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address());
+  r10 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_bits();
   // mr r31,r3
   r31 = r3;
   // lwz r6,604(r11)
-  r6 = guest::LoadU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_address());
+  r6 = schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_start_bits();
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // add r6,r6,r10
@@ -15202,7 +15202,7 @@ lifted::Result f8226AB48(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r6,r6,-1
   r6 = uint64_t(int64_t(int64_t(r6) + -1));
   // stw r10,600(r11)
-  guest::StoreU32(base, schema::ModeDispatcher(base, uint32_t(r11) - 204).ring_count_address(), uint32_t(r10));
+  schema::ModeDispatcher(base, uint32_t(r11) - 204).set_ring_count_bits(uint32_t(r10));
   // divwu r5,r6,r5
   r5 = uint32_t(uint32_t(r5) ? uint32_t(r6) / uint32_t(r5) : 0);
   // mulli r5,r5,50

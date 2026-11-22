@@ -4,6 +4,7 @@
 #include "type5_mode/type5_mode.h"
 
 #include "base/log.h"
+#include "game_modes/game_modes.h"
 #include "guest.h"
 #include "schema/boot_mode.h"
 #include "schema/game_modes.h"
@@ -84,7 +85,7 @@ void PostRing(uint8_t* base, uint32_t mode, uint32_t id) {
   const uint32_t count = m.ring_count() + 1;
   const uint32_t end = m.ring_start() + count - 1;
   m.set_ring_count(count);
-  const schema::ModeMessage slot(base, m.ring_address() + 12 * (end - (end / 50) * 50));
+  const game_modes::RingSlot slot{m.ring() + 12 * (end - (end / 50) * 50)};
   slot.set_id(id);
   slot.set_arg0(0);
   slot.set_arg1(0);
@@ -155,7 +156,7 @@ uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls)
     const uint32_t machine = i == 0   ? b.location_screen_address()
                              : i == 1 ? b.car_settings_address()
                                       : b.dialog_address();
-    StoreU32(base, m.handlers_address() + (count << 2), machine);
+    schema::host::StoreU32(m.handlers() + (count << 2), machine);  // guest order (E5 step 4)
   }
   block().set_first_shown(21);
   block().set_shown(21);
@@ -187,7 +188,7 @@ void WaitForLoads(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp,
     SetDelegate(base, mode, frame + 88, kNextModeThunk);
   }
   PostRing(base, mode, 1);
-  calls.Call(kDispatch, frame, 0x82230158, Mode(base, mode).handlers_address(), mode);
+  calls.Call(kDispatch, frame, 0x82230158, mode + 36, mode);
 }
 
 void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls) {
@@ -207,7 +208,7 @@ void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const 
   }
   PostRing(base, mode, 1);
   PostRing(base, mode, 0);
-  calls.Call(kDispatch, frame, 0x822305F4, Mode(base, mode).handlers_address(), 0);
+  calls.Call(kDispatch, frame, 0x822305F4, mode + 36, 0);
   // The answer (byte 1, the next mode) built over the frame's doubleword
   // at +80 (its other three bytes as they are: the Slot12Thunk word's when
   // the state 8 branch ran this call, else the stack's).
@@ -233,7 +234,7 @@ void LeaveScreen(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, con
   ClearAnswer(base, answer);
   FindShown(base, Mode(base, mode).block().address);
   PostRing(base, mode, 3);
-  calls.Call(kDispatch, frame, 0x822302DC, Mode(base, mode).handlers_address(), mode);
+  calls.Call(kDispatch, frame, 0x822302DC, mode + 36, mode);
   SetDelegate(base, mode, frame + 80, kSlot11Thunk);
 }
 
@@ -247,7 +248,7 @@ void WaitForShown(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp,
     SetDelegate(base, mode, frame + 80, kNextModeThunk);
   }
   PostRing(base, mode, 1);
-  calls.Call(kDispatch, frame, 0x82230248, Mode(base, mode).handlers_address(), mode);
+  calls.Call(kDispatch, frame, 0x82230248, mode + 36, mode);
 }
 
 void Leaving(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls) {
@@ -255,7 +256,7 @@ void Leaving(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const C
   const uint32_t frame = Frame(base, sp, 128);
   ClearAnswer(base, answer);
   PostRing(base, mode, 4);
-  calls.Call(kDispatch, frame, 0x8223039C, Mode(base, mode).handlers_address(), mode);
+  calls.Call(kDispatch, frame, 0x8223039C, mode + 36, mode);
   // The machines' check over the ids 0 to 2, as the original's (none of
   // which is a machine: the check always passes).
   const Block block = Mode(base, mode).block();

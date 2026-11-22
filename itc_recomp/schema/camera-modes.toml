@@ -472,6 +472,8 @@ measure = "CameraAnim"
 measures = ["new<340>@CameraAnim::ParseObject", "CameraAnim::EvalTarget.r4", "CameraAnims::Find.ret.+0"]
 size = 340
 origin = "allocated"
+storage = "host"
+host_alloc = [0x82150128]
 fields = [
   { name = "kind", offset = 0, type = "u32", note = "6 a camera, 7 a target, 1 a matrix, 14 the end" },
   { name = "header_size", offset = 4, type = "u32", note = "the file's +4: its blocks start there" },

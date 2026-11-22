@@ -4,6 +4,7 @@
 #include "options_screen/options_screen.h"
 
 #include "base/log.h"
+#include "game_modes/game_modes.h"
 #include "guest.h"
 #include "memory/heap.h"
 #include "schema/game_modes.h"
@@ -69,7 +70,7 @@ void Post(uint8_t* base, uint32_t dispatcher, uint32_t message) {
   const uint32_t end = d.message_start() + count - 1;
   d.set_message_count(count);
   // A message: three words (the id, 0, 0).
-  const schema::ModeMessage slot(base, d.messages_address() + (end - (end / 50) * 50) * 12);
+  const game_modes::RingSlot slot{d.messages() + (end - (end / 50) * 50) * 12};
   slot.set_arg1(0);
   slot.set_arg0(0);
   slot.set_id(message);

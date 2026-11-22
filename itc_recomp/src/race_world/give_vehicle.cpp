@@ -8,6 +8,7 @@
 #include "race_world/race_world.h"
 
 #include "guest.h"
+#include "memory/host_copy.h"
 #include "schema/car_physics.h"
 #include "schema/minimap.h"
 #include "schema/race_setup.h"
@@ -87,8 +88,11 @@ uint64_t GiveVehicle(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t manager,
   call(kInputRecordClear, {frame + 96});
   const uint32_t to =
       guest::LoadU32(base, kInputRecords + 4 * (e.vehicle_index() & 0xFF));
-  for (uint32_t k = 0; k < 20; k += 4) {
-    guest::StoreU32(base, to + k, guest::LoadU32(base, frame + 96 + k));
+  // A host record (E5 step 4) is copied with each field swapped.
+  if (!memory::CopyWithHandles(base, to, frame + 96, 20)) {
+    for (uint32_t k = 0; k < 20; k += 4) {
+      guest::StoreU32(base, to + k, guest::LoadU32(base, frame + 96 + k));
+    }
   }
   call(kBodySetUp, {v.status_address(), vehicle});
   call(kPhysicsStep, {vehicle}, {double(guest::LoadFloat(base, kStepTime))});

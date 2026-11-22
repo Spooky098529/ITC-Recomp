@@ -289,7 +289,10 @@ bool BoxPlace(uint8_t* base, uint32_t box, uint32_t matrix, uint32_t source, uin
 }
 
 bool Deletable(uint32_t block) {
-  return block == 0 || memory::IsHeapBlock(block);
+  // A host object's handle (E5 step 4): operator delete frees it.
+  memory::HandleInfo info;
+  return block == 0 || memory::IsHeapBlock(block) ||
+         (memory::DescribeHandle(block, &info) && info.offset == 0);
 }
 
 bool ShapeDeletingDestructor(uint8_t* base, uint32_t shape, uint32_t flags) {

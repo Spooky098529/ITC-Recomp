@@ -31,12 +31,19 @@
 # functions' r3: the byte +0 and +4), the +32 interface (Interrupt,
 # ForceExit, Resume: r3 the mode + 32, the fault_interface_* fields) and the
 # block AllLoaded gets (fault_block_*).
+# Dual (E5 step 4): made in host memory by Mode::Create; the measure joins
+# guest addresses with it (the delegates' answer on the stack, the block
+# in AllLoaded and FindShown), which the view reads as guest memory. Its
+# fields over the block and at -28 (ForceExit's +4 from the +32 interface:
+# a negative offset no host struct holds) were left out.
 [ModeType4]
 measures = ["ModeType4", "ModeType4::Restart.r4", "ModeType4::WaitForLeave.r4",
             "ModeType4::LeaveScreen.r4", "ModeType4::NextMode.r4", "ModeType4::Leaving.r4",
             "ModeType4::NextModeAnswer.r4"]
 size = 852
 origin = "allocated"
+storage = "dual"
+host_alloc = [0x82107840]
 vtable = 0x82006BE0
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82006BE0" },
@@ -53,12 +60,9 @@ fields = [
   { name = "ring_count", offset = 840, type = "u32" },
   { name = "ring_start", offset = 844, type = "u32" },
   { name = "block", offset = 848, type = "ptr", to = "Type4Block", note = "VirtualAlloc'ed by Init (48,220 bytes)" },
-  { name = "fault_interface_delegate_ptr", offset = -28, type = "u32", note = "measure fault: the +32 interface's -28 (ForceExit), the mode's +4" },
   { name = "fault_interface_ring_count", offset = 808, type = "u32", note = "measure fault: the +32 interface's +808 (ModeType4Interface32), the mode's +840" },
   { name = "fault_interface_ring_start", offset = 812, type = "u32", note = "measure fault: the +32 interface's +812, the mode's +844" },
   { name = "fault_interface_block", offset = 816, type = "u32", note = "measure fault: the +32 interface's +816, the mode's +848" },
-  { name = "fault_block_options_loaded", offset = 9608, type = "u32", note = "measure fault: AllLoaded's block (Type4Block.options_loaded), not the mode's" },
-  { name = "fault_block_save_screen_loaded", offset = 28888, type = "u32", note = "measure fault: AllLoaded's block (Type4Block.save_screen_loaded), not the mode's" },
 ]
 
 # The type 4 mode seen through its +32 interface (vtable 0x82006BD4; r3 the
@@ -67,6 +71,7 @@ fields = [
 [ModeType4Interface32]
 size = 820
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82006BD4" },
   { name = "ring", offset = 208, type = "bytes", count = 600, note = "the mode's ring (+240)" },

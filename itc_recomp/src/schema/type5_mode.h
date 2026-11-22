@@ -9,78 +9,113 @@
 namespace schema {
 
 // allocated; measure: ModeType5, ModeType5::LeaveScreen.r4, ModeType5::Leaving.r4, ModeType5::NextMode.r4, ModeType5::WaitForLoads.r4, ModeType5::WaitForShown.r4, FrontEndMode::NextMode.r4
+#pragma pack(push, 1)
+struct ModeType5Data {
+  uint32_t vtable = 0;  // +0
+  uint32_t delegate_ptr = 0;  // +4
+  uint32_t delegate_vtable = 0;  // +8
+  uint32_t delegate_object = 0;  // +12
+  uint32_t delegate_function = 0;  // +16
+  uint32_t delegate_adjustment = 0;  // +20
+  uint8_t pad_24[8] = {};
+  uint32_t vtable32 = 0;  // +32
+  uint8_t handlers[200] = {};  // +36, guest order
+  uint32_t handler_count = 0;  // +236
+  uint8_t pad_240[576] = {};
+  uint32_t iface_block = 0;  // +816
+  uint8_t pad_820[20] = {};
+  uint32_t ring_count = 0;  // +840
+  uint32_t ring_start = 0;  // +844
+  uint32_t block = 0;  // +848
+};
+#pragma pack(pop)
+static_assert(sizeof(ModeType5Data) == 852);
+inline constexpr memory::LayoutField kModeType5Fields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 4}, {32, 4}, {236, 4}, {816, 4}, {840, 4}, {844, 4}, {848, 4}};
+inline constexpr memory::Layout kModeType5Layout = {kModeType5Fields, 12};
+
 struct ModeType5 : View {
   using View::View;
   static constexpr uint32_t kSize = 852;
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
   static constexpr uint32_t kVtable = 0x82006C24;
-  // measure fault: ForceExit's mode +4 (delegate_ptr) through the +32 interface (r3 - 28), not a field before the mode
-  uint32_t iface_delegate_ptr() const { return guest::LoadU32(base, address + -28); }
-  void set_iface_delegate_ptr(uint32_t v) const { guest::StoreU32(base, address + -28, v); }
-  uint32_t iface_delegate_ptr_address() const { return address + -28; }
+  ModeType5Data* data() const { return static_cast<ModeType5Data*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static ModeType5 New(uint8_t* base) {
+    return ModeType5(base, memory::MakeHandle(new ModeType5Data(), sizeof(ModeType5Data), "ModeType5", &kModeType5Layout));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kModeType5Layout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kModeType5Layout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0x82006C24 (Type5ModeVtable)
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t vtable_address() const { return address + 0; }
+  uint32_t vtable() const { return on_host() ? uint32_t(data()->vtable) : uint32_t(guest::LoadU32(base, address + 0)); }
+  void set_vtable(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable_bits() const { return on_host() ? data()->vtable : guest::LoadU32(base, address + 0); }
+  void set_vtable_bits(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
   // measure fault: the next-mode answer's byte +0 (ModeAnswer; the delegates clear it), not the mode's
-  uint8_t answer_changed() const { return guest::LoadU8(base, address + 0); }
-  void set_answer_changed(uint8_t v) const { guest::StoreU8(base, address + 0, v); }
-  uint32_t answer_changed_address() const { return address + 0; }
+  uint8_t answer_changed_bits() const { return on_host() ? uint8_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kModeType5Layout, 0, 1)) : guest::LoadU8(base, address + 0); }
+  void set_answer_changed_bits(uint8_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kModeType5Layout, 0, 1, v); else guest::StoreU8(base, address + 0, v); }
+  uint8_t answer_changed() const { return uint8_t(answer_changed_bits()); }
+  void set_answer_changed(uint8_t v) const { set_answer_changed_bits(uint8_t(v)); }
   // the delegate at +8, 0 when it wraps to 0 (also the answer's next type +4 by the measure's join)
   template <typename T = ModeDelegate>
-  T delegate_ptr() const { return T(base, guest::LoadU32(base, address + 4)); }
-  void set_delegate_ptr(const View& v) const { guest::StoreU32(base, address + 4, v.address); }
-  void set_delegate_ptr(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
-  uint32_t delegate_ptr_address() const { return address + 4; }
+  T delegate_ptr() const { return T(base, on_host() ? data()->delegate_ptr : guest::LoadU32(base, address + 4)); }
+  void set_delegate_ptr(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->delegate_ptr = v; else guest::StoreU32(base, address + 4, v); }
+  void set_delegate_ptr(uint32_t v) const { if (on_host()) data()->delegate_ptr = v; else guest::StoreU32(base, address + 4, v); }
+  uint32_t delegate_ptr_bits() const { return on_host() ? data()->delegate_ptr : guest::LoadU32(base, address + 4); }
+  void set_delegate_ptr_bits(uint32_t v) const { if (on_host()) data()->delegate_ptr = v; else guest::StoreU32(base, address + 4, v); }
   // the delegate (ModeDelegate): vtable 0x82010FA0
-  uint32_t delegate_vtable() const { return guest::LoadU32(base, address + 8); }
-  void set_delegate_vtable(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t delegate_vtable_address() const { return address + 8; }
+  uint32_t delegate_vtable() const { return on_host() ? uint32_t(data()->delegate_vtable) : uint32_t(guest::LoadU32(base, address + 8)); }
+  void set_delegate_vtable(uint32_t v) const { if (on_host()) data()->delegate_vtable = v; else guest::StoreU32(base, address + 8, v); }
+  uint32_t delegate_vtable_bits() const { return on_host() ? data()->delegate_vtable : guest::LoadU32(base, address + 8); }
+  void set_delegate_vtable_bits(uint32_t v) const { if (on_host()) data()->delegate_vtable = v; else guest::StoreU32(base, address + 8, v); }
   // the delegate's object: the mode
-  uint32_t delegate_object() const { return guest::LoadU32(base, address + 12); }
-  void set_delegate_object(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
-  uint32_t delegate_object_address() const { return address + 12; }
+  uint32_t delegate_object() const { return on_host() ? uint32_t(data()->delegate_object) : uint32_t(guest::LoadU32(base, address + 12)); }
+  void set_delegate_object(uint32_t v) const { if (on_host()) data()->delegate_object = v; else guest::StoreU32(base, address + 12, v); }
+  uint32_t delegate_object_bits() const { return on_host() ? data()->delegate_object : guest::LoadU32(base, address + 12); }
+  void set_delegate_object_bits(uint32_t v) const { if (on_host()) data()->delegate_object = v; else guest::StoreU32(base, address + 12, v); }
   // a slot thunk: Mode::Slot8Thunk (WaitForLoads) after Init, Mode::NextModeThunk 0x82235C08 once loaded, Slot11Thunk to Slot14Thunk
-  uint32_t delegate_function() const { return guest::LoadU32(base, address + 16); }
-  void set_delegate_function(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
-  uint32_t delegate_function_address() const { return address + 16; }
-  uint32_t delegate_adjustment() const { return guest::LoadU32(base, address + 20); }
-  void set_delegate_adjustment(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
-  uint32_t delegate_adjustment_address() const { return address + 20; }
+  uint32_t delegate_function() const { return on_host() ? uint32_t(data()->delegate_function) : uint32_t(guest::LoadU32(base, address + 16)); }
+  void set_delegate_function(uint32_t v) const { if (on_host()) data()->delegate_function = v; else guest::StoreU32(base, address + 16, v); }
+  uint32_t delegate_function_bits() const { return on_host() ? data()->delegate_function : guest::LoadU32(base, address + 16); }
+  void set_delegate_function_bits(uint32_t v) const { if (on_host()) data()->delegate_function = v; else guest::StoreU32(base, address + 16, v); }
+  uint32_t delegate_adjustment() const { return on_host() ? uint32_t(data()->delegate_adjustment) : uint32_t(guest::LoadU32(base, address + 20)); }
+  void set_delegate_adjustment(uint32_t v) const { if (on_host()) data()->delegate_adjustment = v; else guest::StoreU32(base, address + 20, v); }
+  uint32_t delegate_adjustment_bits() const { return on_host() ? data()->delegate_adjustment : guest::LoadU32(base, address + 20); }
+  void set_delegate_adjustment_bits(uint32_t v) const { if (on_host()) data()->delegate_adjustment = v; else guest::StoreU32(base, address + 20, v); }
   // the +32 interface's vtable 0x82006C18 (Interrupt, ForceExit, Resume)
-  uint32_t vtable32() const { return guest::LoadU32(base, address + 32); }
-  void set_vtable32(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
-  uint32_t vtable32_address() const { return address + 32; }
+  uint32_t vtable32() const { return on_host() ? uint32_t(data()->vtable32) : uint32_t(guest::LoadU32(base, address + 32)); }
+  void set_vtable32(uint32_t v) const { if (on_host()) data()->vtable32 = v; else guest::StoreU32(base, address + 32, v); }
+  uint32_t vtable32_bits() const { return on_host() ? data()->vtable32 : guest::LoadU32(base, address + 32); }
+  void set_vtable32_bits(uint32_t v) const { if (on_host()) data()->vtable32 = v; else guest::StoreU32(base, address + 32, v); }
   // the dispatcher (+36, ModeDispatcher): 50 handler pointers, the block's three machines (+9640, +0, +19280)
-  uint32_t handlers_address() const { return address + 36; }
-  uint32_t handler_count() const { return guest::LoadU32(base, address + 236); }
-  void set_handler_count(uint32_t v) const { guest::StoreU32(base, address + 236, v); }
-  uint32_t handler_count_address() const { return address + 236; }
+  uint8_t* handlers() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 36 : guest::Pointer(base, address + 36); }
+  uint32_t handler_count() const { return on_host() ? uint32_t(data()->handler_count) : uint32_t(guest::LoadU32(base, address + 236)); }
+  void set_handler_count(uint32_t v) const { if (on_host()) data()->handler_count = v; else guest::StoreU32(base, address + 236, v); }
+  uint32_t handler_count_bits() const { return on_host() ? data()->handler_count : guest::LoadU32(base, address + 236); }
+  void set_handler_count_bits(uint32_t v) const { if (on_host()) data()->handler_count = v; else guest::StoreU32(base, address + 236, v); }
   // the dispatcher's ring: 50 messages of 12 bytes (ModeMessage)
-  uint32_t ring_address() const { return address + 240; }
-  uint32_t ring_count() const { return guest::LoadU32(base, address + 840); }
-  void set_ring_count(uint32_t v) const { guest::StoreU32(base, address + 840, v); }
-  uint32_t ring_count_address() const { return address + 840; }
-  uint32_t ring_start() const { return guest::LoadU32(base, address + 844); }
-  void set_ring_start(uint32_t v) const { guest::StoreU32(base, address + 844, v); }
-  uint32_t ring_start_address() const { return address + 844; }
+  uint8_t* ring() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 240 : guest::Pointer(base, address + 240); }
+  uint32_t ring_count() const { return on_host() ? uint32_t(data()->ring_count) : uint32_t(guest::LoadU32(base, address + 840)); }
+  void set_ring_count(uint32_t v) const { if (on_host()) data()->ring_count = v; else guest::StoreU32(base, address + 840, v); }
+  uint32_t ring_count_bits() const { return on_host() ? data()->ring_count : guest::LoadU32(base, address + 840); }
+  void set_ring_count_bits(uint32_t v) const { if (on_host()) data()->ring_count = v; else guest::StoreU32(base, address + 840, v); }
+  uint32_t ring_start() const { return on_host() ? uint32_t(data()->ring_start) : uint32_t(guest::LoadU32(base, address + 844)); }
+  void set_ring_start(uint32_t v) const { if (on_host()) data()->ring_start = v; else guest::StoreU32(base, address + 844, v); }
+  uint32_t ring_start_bits() const { return on_host() ? data()->ring_start : guest::LoadU32(base, address + 844); }
+  void set_ring_start_bits(uint32_t v) const { if (on_host()) data()->ring_start = v; else guest::StoreU32(base, address + 844, v); }
   // measure fault: block (+848) through the +32 interface (Interrupt, ForceExit)
-  uint32_t iface_block() const { return guest::LoadU32(base, address + 816); }
-  void set_iface_block(uint32_t v) const { guest::StoreU32(base, address + 816, v); }
-  uint32_t iface_block_address() const { return address + 816; }
+  uint32_t iface_block() const { return on_host() ? uint32_t(data()->iface_block) : uint32_t(guest::LoadU32(base, address + 816)); }
+  void set_iface_block(uint32_t v) const { if (on_host()) data()->iface_block = v; else guest::StoreU32(base, address + 816, v); }
+  uint32_t iface_block_bits() const { return on_host() ? data()->iface_block : guest::LoadU32(base, address + 816); }
+  void set_iface_block_bits(uint32_t v) const { if (on_host()) data()->iface_block = v; else guest::StoreU32(base, address + 816, v); }
   // VirtualAlloc(0, 28940, 0x1000, 4) by Init, freed by ModeType5::Release
   template <typename T = Type5ModeBlock>
-  T block() const { return T(base, guest::LoadU32(base, address + 848)); }
-  void set_block(const View& v) const { guest::StoreU32(base, address + 848, v.address); }
-  void set_block(uint32_t v) const { guest::StoreU32(base, address + 848, v); }
-  uint32_t block_address() const { return address + 848; }
-  // measure fault: FindShown's block (r3) +9604, the car settings' machine state, not the mode's
-  uint32_t fault_car_settings_state() const { return guest::LoadU32(base, address + 9604); }
-  void set_fault_car_settings_state(uint32_t v) const { guest::StoreU32(base, address + 9604, v); }
-  uint32_t fault_car_settings_state_address() const { return address + 9604; }
-  // measure fault: FindShown's block (r3) +28920, the shown machine's id, not the mode's
-  uint32_t fault_shown() const { return guest::LoadU32(base, address + 28920); }
-  void set_fault_shown(uint32_t v) const { guest::StoreU32(base, address + 28920, v); }
-  uint32_t fault_shown_address() const { return address + 28920; }
+  T block() const { return T(base, on_host() ? data()->block : guest::LoadU32(base, address + 848)); }
+  void set_block(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->block = v; else guest::StoreU32(base, address + 848, v); }
+  void set_block(uint32_t v) const { if (on_host()) data()->block = v; else guest::StoreU32(base, address + 848, v); }
+  uint32_t block_bits() const { return on_host() ? data()->block : guest::LoadU32(base, address + 848); }
+  void set_block_bits(uint32_t v) const { if (on_host()) data()->block = v; else guest::StoreU32(base, address + 848, v); }
 };
 
 // allocated; measure: ModeType5.+816, ModeType5::NextMode.r4.+848, ModeType5::WaitForLoads.r4.+848, ModeType5::Leaving.r4.+848, FrontEndMode::NextMode.r4.+848
@@ -226,6 +261,8 @@ struct Type5DialogData : View {
     return Type5DialogData(base, memory::MakeHandle(new Type5DialogDataData(), sizeof(Type5DialogDataData), "Type5DialogData", &kType5DialogDataLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kType5DialogDataLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kType5DialogDataLayout, offset, width, v); }
   // 1 once movies 16 to 19 are loaded
   uint32_t movies_loaded() const { return data()->movies_loaded; }
   void set_movies_loaded(uint32_t v) const { data()->movies_loaded = v; }
@@ -249,15 +286,35 @@ struct Type5DialogData : View {
 };
 
 // embedded; measure: Mode::Slot14Thunk.r4
+#pragma pack(push, 1)
+struct Type5SlotObjectData {
+  uint32_t vtable = 0;  // +0
+};
+#pragma pack(pop)
+static_assert(sizeof(Type5SlotObjectData) == 4);
+inline constexpr memory::LayoutField kType5SlotObjectFields[] = {{0, 4}};
+inline constexpr memory::Layout kType5SlotObjectLayout = {kType5SlotObjectFields, 1};
+
 struct Type5SlotObject : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  Type5SlotObjectData* data() const { return static_cast<Type5SlotObjectData*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static Type5SlotObject New(uint8_t* base) {
+    return Type5SlotObject(base, memory::MakeHandle(new Type5SlotObjectData(), sizeof(Type5SlotObjectData), "Type5SlotObject", &kType5SlotObjectLayout));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kType5SlotObjectLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kType5SlotObjectLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0x82006C24
   template <typename T = Type5ModeVtable>
-  T vtable() const { return T(base, guest::LoadU32(base, address + 0)); }
-  void set_vtable(const View& v) const { guest::StoreU32(base, address + 0, v.address); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t vtable_address() const { return address + 0; }
+  T vtable() const { return T(base, on_host() ? data()->vtable : guest::LoadU32(base, address + 0)); }
+  void set_vtable(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
+  void set_vtable(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable_bits() const { return on_host() ? data()->vtable : guest::LoadU32(base, address + 0); }
+  void set_vtable_bits(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
 };
 
 // image; measure: Mode::Slot14Thunk.r4.+0

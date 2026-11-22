@@ -3635,9 +3635,9 @@ loc_821AFCC0:
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // lwz r10,600(r11)
-  r10 = guest::LoadU32(base, schema::CarSettingsMode(base, uint32_t(r11) - 204).message_count_address());
+  r10 = schema::CarSettingsMode(base, uint32_t(r11) - 204).message_count_bits();
   // lwz r6,604(r11)
-  r6 = guest::LoadU32(base, schema::CarSettingsMode(base, uint32_t(r11) - 204).message_start_address());
+  r6 = schema::CarSettingsMode(base, uint32_t(r11) - 204).message_start_bits();
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // add r6,r6,r10
@@ -3645,7 +3645,7 @@ loc_821AFCC0:
   // addi r6,r6,-1
   r6 = uint64_t(int64_t(int64_t(r6) + -1));
   // stw r10,600(r11)
-  guest::StoreU32(base, schema::CarSettingsMode(base, uint32_t(r11) - 204).message_count_address(), uint32_t(r10));
+  schema::CarSettingsMode(base, uint32_t(r11) - 204).set_message_count_bits(uint32_t(r10));
   // divwu r5,r6,r5
   r5 = uint32_t(uint32_t(r5) ? uint32_t(r6) / uint32_t(r5) : 0);
   // mulli r5,r5,50

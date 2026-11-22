@@ -4,6 +4,7 @@
 
 #include <cstdint>
 
+#include "game_modes/game_modes.h"
 #include "guest.h"
 #include "save_screen/save_screen.h"
 #include "schema/action_mappers.h"
@@ -97,7 +98,7 @@ inline void Post(uint8_t* base, uint32_t mode, uint32_t id) {
   const uint32_t count = ring.message_count() + 1;
   const uint32_t at = ring.message_start() + count - 1;
   ring.set_message_count(count);
-  const schema::ModeMessage entry(base, ring.messages_address() + 12 * (at % 50));
+  const game_modes::RingSlot entry{ring.messages() + 12 * (at % 50)};
   entry.set_arg1(0);
   entry.set_arg0(0);
   entry.set_id(id);

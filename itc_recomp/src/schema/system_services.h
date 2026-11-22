@@ -768,6 +768,8 @@ struct NetScreen7Data : View {
     return NetScreen7Data(base, memory::MakeHandle(new NetScreen7DataData(), sizeof(NetScreen7DataData), "NetScreen7Data", &kNetScreen7DataLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kNetScreen7DataLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kNetScreen7DataLayout, offset, width, v); }
   uint32_t unknown_0() const { return data()->unknown_0; }
   void set_unknown_0(uint32_t v) const { data()->unknown_0 = v; }
   uint32_t unknown_0_bits() const { return data()->unknown_0; }

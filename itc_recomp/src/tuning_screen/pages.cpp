@@ -8,6 +8,7 @@
 
 #include "base/log.h"
 #include "camera_modes/steps.h"
+#include "game_modes/game_modes.h"
 #include "guest.h"
 #include "schema/game_modes.h"
 #include "schema/ui_movies_game.h"
@@ -48,8 +49,7 @@ void PostDialogMessage(uint8_t* base, uint32_t dispatcher, uint32_t event) {
   const uint32_t count = d.message_count() + 1;
   const uint32_t index = d.message_first() + count - 1;
   d.set_message_count(count);
-  const schema::ModeMessage record(base,
-                                   d.messages_address() + (index - (index / 50) * 50) * 12);
+  const game_modes::RingSlot record{d.messages() + (index - (index / 50) * 50) * 12};  // E5 step 4
   record.set_arg1(0);
   record.set_arg0(0);
   record.set_id(event);

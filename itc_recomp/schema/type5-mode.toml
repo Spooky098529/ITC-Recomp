@@ -22,6 +22,11 @@
 # ModeAnswer) at +0, the mode seen from its +32 interface (r3 = the mode + 32
 # in Interrupt and ForceExit: iface_* below, 32 bytes before the fields they
 # are) and the block FindShown gets (fault_* at +9604 and +28920).
+# Dual (E5 step 4): made in host memory by Mode::Create; the measure joins
+# guest addresses with it (the delegates' answer on the stack, the block
+# in AllLoaded and FindShown), which the view reads as guest memory. Its
+# fields over the block and at -28 (ForceExit's +4 from the +32 interface:
+# a negative offset no host struct holds) were left out.
 [ModeType5]
 # measures from LocationScreenMode (location-screen), merged at the integration
 measures = [
@@ -34,9 +39,10 @@ measures = [
   "FrontEndMode::NextMode.r4"]
 size = 852
 origin = "allocated"
+storage = "dual"
+host_alloc = [0x82107858]
 vtable = 0x82006C24
 fields = [
-  { name = "iface_delegate_ptr", offset = -28, type = "u32", note = "measure fault: ForceExit's mode +4 (delegate_ptr) through the +32 interface (r3 - 28), not a field before the mode" },
   { name = "vtable", offset = 0, type = "u32", note = "0x82006C24 (Type5ModeVtable)" },
   { name = "answer_changed", offset = 0, type = "u8", note = "measure fault: the next-mode answer's byte +0 (ModeAnswer; the delegates clear it), not the mode's" },
   { name = "delegate_ptr", offset = 4, type = "ptr", to = "ModeDelegate", note = "the delegate at +8, 0 when it wraps to 0 (also the answer's next type +4 by the measure's join)" },
@@ -52,8 +58,6 @@ fields = [
   { name = "ring_start", offset = 844, type = "u32" },
   { name = "iface_block", offset = 816, type = "u32", note = "measure fault: block (+848) through the +32 interface (Interrupt, ForceExit)" },
   { name = "block", offset = 848, type = "ptr", to = "Type5ModeBlock", note = "VirtualAlloc(0, 28940, 0x1000, 4) by Init, freed by ModeType5::Release" },
-  { name = "fault_car_settings_state", offset = 9604, type = "u32", note = "measure fault: FindShown's block (r3) +9604, the car settings' machine state, not the mode's" },
-  { name = "fault_shown", offset = 28920, type = "u32", note = "measure fault: FindShown's block (r3) +28920, the shown machine's id, not the mode's" },
 ]
 
 # The block (VirtualAlloc'ed by ModeType5::Init; known-data.md: "type 5 mode
@@ -139,6 +143,7 @@ fields = [
 measure = "Mode::Slot14Thunk.r4"
 size = 4
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "Type5ModeVtable", note = "0x82006C24" },
 ]

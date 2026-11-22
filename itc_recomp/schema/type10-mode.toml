@@ -31,12 +31,18 @@
 # fault_interface_* fields) and the block FindShown gets (fault_block_*).
 # NextModeAnswer is the type 9 mode's function (shared, slot 12): its r4 is
 # this mode here.
+# Dual (E5 step 4): made in host memory by Mode::Create; the measure joins
+# guest addresses with it (the delegates' answer on the stack, the block
+# in AllLoaded and FindShown), which the view reads as guest memory. Its
+# fields over the block were left out.
 [ModeType10]
 measures = ["ModeType10", "ModeType10::WaitForLoads.r4", "ModeType10::WaitForShown.r4",
             "ModeType10::LeaveScreen.r4", "ModeType10::NextMode.r4", "ModeType10::Leaving.r4",
             "ModeType9::NextModeAnswer.r4"]
 size = 852
 origin = "allocated"
+storage = "dual"
+host_alloc = [0x821078EC]
 vtable = 0x82006CF0
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82006CF0 (14 slots)" },
@@ -57,8 +63,6 @@ fields = [
   { name = "fault_interface_ring_count", offset = 808, type = "u32", note = "measure fault: the +32 interface's +808 (ModeType10Interface32), the mode's +840" },
   { name = "fault_interface_ring_start", offset = 812, type = "u32", note = "measure fault: the +32 interface's +812, the mode's +844" },
   { name = "fault_interface_block", offset = 816, type = "u32", note = "measure fault: the +32 interface's +816, the mode's +848" },
-  { name = "fault_block_theater_state", offset = 9604, type = "u32", note = "measure fault: FindShown's block (ModeType10Block.theater_state), not the mode's" },
-  { name = "fault_block_shown", offset = 19280, type = "u32", note = "measure fault: FindShown's block (ModeType10Block.shown), not the mode's" },
 ]
 
 # The type 10 mode seen through its +32 interface (vtable 0x82006CE4; r3
@@ -68,6 +72,7 @@ fields = [
 [ModeType10Interface32]
 size = 820
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82006CE4" },
   { name = "ring", offset = 208, type = "bytes", count = 600, note = "the mode's ring (+240)" },

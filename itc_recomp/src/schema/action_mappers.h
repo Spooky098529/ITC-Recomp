@@ -497,61 +497,104 @@ struct ActionMapperInputManagerVtable : View {
 };
 
 // allocated; measure: ClientList, InputClientList
+#pragma pack(push, 1)
+struct InputClientListData {
+  uint32_t vtable = 0;  // +0
+  uint32_t first = 0;  // +4
+  uint32_t last = 0;  // +8
+  uint32_t added_counts = 0;  // +12
+  uint32_t added_count_1 = 0;  // +16
+  uint32_t added_count_2 = 0;  // +20
+  uint32_t bound_counts = 0;  // +24
+  uint32_t bound_count_1 = 0;  // +28
+  uint32_t bound_count_2 = 0;  // +32
+  uint32_t manager = 0;  // +36
+  uint32_t unknown_40 = 0;  // +40
+  uint32_t unknown_44 = 0;  // +44
+  uint32_t unknown_48 = 0;  // +48
+};
+#pragma pack(pop)
+static_assert(sizeof(InputClientListData) == 52);
+inline constexpr memory::LayoutField kInputClientListFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 4}, {24, 4}, {28, 4}, {32, 4}, {36, 4}, {40, 4}, {44, 4}, {48, 4}};
+inline constexpr memory::Layout kInputClientListLayout = {kInputClientListFields, 13};
+
 struct InputClientList : View {
   using View::View;
   static constexpr uint32_t kSize = 52;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   static constexpr uint32_t kVtable = 0x82007F18;
+  InputClientListData* data() const { return static_cast<InputClientListData*>(memory::HandleObject(address)); }
+  static InputClientList New(uint8_t* base) {
+    return InputClientList(base, memory::MakeHandle(new InputClientListData(), sizeof(InputClientListData), "InputClientList", &kInputClientListLayout));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kInputClientListLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kInputClientListLayout, offset, width, v); }
   // 0x820713C0, then 0x82007F18
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t vtable_address() const { return address + 0; }
+  uint32_t vtable() const { return data()->vtable; }
+  void set_vtable(uint32_t v) const { data()->vtable = v; }
+  uint32_t vtable_bits() const { return data()->vtable; }
+  void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
   template <typename T = InputClientNode>
-  T first() const { return T(base, guest::LoadU32(base, address + 4)); }
-  void set_first(const View& v) const { guest::StoreU32(base, address + 4, v.address); }
-  void set_first(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
-  uint32_t first_address() const { return address + 4; }
+  T first() const { return T(base, data()->first); }
+  void set_first(const View& w) const { const uint32_t v = w.address; data()->first = v; }
+  void set_first(uint32_t v) const { data()->first = v; }
+  uint32_t first_bits() const { return data()->first; }
+  void set_first_bits(uint32_t v) const { data()->first = v; }
   template <typename T = InputClientNode>
-  T last() const { return T(base, guest::LoadU32(base, address + 8)); }
-  void set_last(const View& v) const { guest::StoreU32(base, address + 8, v.address); }
-  void set_last(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t last_address() const { return address + 8; }
+  T last() const { return T(base, data()->last); }
+  void set_last(const View& w) const { const uint32_t v = w.address; data()->last = v; }
+  void set_last(uint32_t v) const { data()->last = v; }
+  uint32_t last_bits() const { return data()->last; }
+  void set_last_bits(uint32_t v) const { data()->last = v; }
   // 3 words: the nodes added of types 0-2
-  uint32_t added_counts() const { return guest::LoadU32(base, address + 12); }
-  void set_added_counts(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
-  uint32_t added_counts_address() const { return address + 12; }
-  uint32_t added_count_1() const { return guest::LoadU32(base, address + 16); }
-  void set_added_count_1(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
-  uint32_t added_count_1_address() const { return address + 16; }
+  uint32_t added_counts() const { return data()->added_counts; }
+  void set_added_counts(uint32_t v) const { data()->added_counts = v; }
+  uint32_t added_counts_bits() const { return data()->added_counts; }
+  void set_added_counts_bits(uint32_t v) const { data()->added_counts = v; }
+  uint32_t added_count_1() const { return data()->added_count_1; }
+  void set_added_count_1(uint32_t v) const { data()->added_count_1 = v; }
+  uint32_t added_count_1_bits() const { return data()->added_count_1; }
+  void set_added_count_1_bits(uint32_t v) const { data()->added_count_1 = v; }
   // the mappers
-  uint32_t added_count_2() const { return guest::LoadU32(base, address + 20); }
-  void set_added_count_2(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
-  uint32_t added_count_2_address() const { return address + 20; }
+  uint32_t added_count_2() const { return data()->added_count_2; }
+  void set_added_count_2(uint32_t v) const { data()->added_count_2 = v; }
+  uint32_t added_count_2_bits() const { return data()->added_count_2; }
+  void set_added_count_2_bits(uint32_t v) const { data()->added_count_2 = v; }
   // 3 words: those bound, types 0-2
-  uint32_t bound_counts() const { return guest::LoadU32(base, address + 24); }
-  void set_bound_counts(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
-  uint32_t bound_counts_address() const { return address + 24; }
-  uint32_t bound_count_1() const { return guest::LoadU32(base, address + 28); }
-  void set_bound_count_1(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
-  uint32_t bound_count_1_address() const { return address + 28; }
+  uint32_t bound_counts() const { return data()->bound_counts; }
+  void set_bound_counts(uint32_t v) const { data()->bound_counts = v; }
+  uint32_t bound_counts_bits() const { return data()->bound_counts; }
+  void set_bound_counts_bits(uint32_t v) const { data()->bound_counts = v; }
+  uint32_t bound_count_1() const { return data()->bound_count_1; }
+  void set_bound_count_1(uint32_t v) const { data()->bound_count_1 = v; }
+  uint32_t bound_count_1_bits() const { return data()->bound_count_1; }
+  void set_bound_count_1_bits(uint32_t v) const { data()->bound_count_1 = v; }
   // the mappers bound
-  uint32_t bound_count_2() const { return guest::LoadU32(base, address + 32); }
-  void set_bound_count_2(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
-  uint32_t bound_count_2_address() const { return address + 32; }
+  uint32_t bound_count_2() const { return data()->bound_count_2; }
+  void set_bound_count_2(uint32_t v) const { data()->bound_count_2 = v; }
+  uint32_t bound_count_2_bits() const { return data()->bound_count_2; }
+  void set_bound_count_2_bits(uint32_t v) const { data()->bound_count_2 = v; }
   // the object ActionMappers::Init was given
   template <typename T = ActionMappersOwner>
-  T manager() const { return T(base, guest::LoadU32(base, address + 36)); }
-  void set_manager(const View& v) const { guest::StoreU32(base, address + 36, v.address); }
-  void set_manager(uint32_t v) const { guest::StoreU32(base, address + 36, v); }
-  uint32_t manager_address() const { return address + 36; }
-  uint32_t unknown_40() const { return guest::LoadU32(base, address + 40); }
-  void set_unknown_40(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
-  uint32_t unknown_40_address() const { return address + 40; }
-  uint32_t unknown_44() const { return guest::LoadU32(base, address + 44); }
-  void set_unknown_44(uint32_t v) const { guest::StoreU32(base, address + 44, v); }
-  uint32_t unknown_44_address() const { return address + 44; }
-  uint32_t unknown_48() const { return guest::LoadU32(base, address + 48); }
-  void set_unknown_48(uint32_t v) const { guest::StoreU32(base, address + 48, v); }
-  uint32_t unknown_48_address() const { return address + 48; }
+  T manager() const { return T(base, data()->manager); }
+  void set_manager(const View& w) const { const uint32_t v = w.address; data()->manager = v; }
+  void set_manager(uint32_t v) const { data()->manager = v; }
+  uint32_t manager_bits() const { return data()->manager; }
+  void set_manager_bits(uint32_t v) const { data()->manager = v; }
+  uint32_t unknown_40() const { return data()->unknown_40; }
+  void set_unknown_40(uint32_t v) const { data()->unknown_40 = v; }
+  uint32_t unknown_40_bits() const { return data()->unknown_40; }
+  void set_unknown_40_bits(uint32_t v) const { data()->unknown_40 = v; }
+  uint32_t unknown_44() const { return data()->unknown_44; }
+  void set_unknown_44(uint32_t v) const { data()->unknown_44 = v; }
+  uint32_t unknown_44_bits() const { return data()->unknown_44; }
+  void set_unknown_44_bits(uint32_t v) const { data()->unknown_44 = v; }
+  uint32_t unknown_48() const { return data()->unknown_48; }
+  void set_unknown_48(uint32_t v) const { data()->unknown_48 = v; }
+  uint32_t unknown_48_bits() const { return data()->unknown_48; }
+  void set_unknown_48_bits(uint32_t v) const { data()->unknown_48 = v; }
 };
 
 // embedded; measure: ClientNode, InputClient

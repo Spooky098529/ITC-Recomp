@@ -42,18 +42,18 @@ uint64_t MovieSlot(uint8_t* base, MovieSlotField slot, uint32_t ours,
   return calls.call(target, sp, lr, movie, 0);
 }
 
-// A message (id, 0, 0) queued in the ring of `owner` (a view with the ring,
-// its count and its start): the count first, then the message at (start +
+// A message (id, 0, 0) queued in the ring of a mode's dispatcher (the mode's
+// +36; a dual view, E5 step 4: the 852-byte modes are in host memory, their
+// ring's bytes in guest order): the count first, then the message at (start +
 // count - 1) mod 50.
-template <typename T>
-void Queue(uint8_t* base, const T& owner, uint32_t id) {
+void Queue(const schema::ModeDispatcher& owner, uint32_t id) {
   const uint32_t count = owner.ring_count() + 1;
   const uint32_t at = owner.ring_start() + count - 1;
   owner.set_ring_count(count);
-  const uint32_t slot = owner.ring_address() + (at % kRingSlots) * kRingMessageBytes;
-  Store(base, slot, id);
-  Store(base, slot + 4, 0);
-  Store(base, slot + 8, 0);
+  uint8_t* slot = owner.ring() + (at % kRingSlots) * kRingMessageBytes;
+  schema::host::StoreU32(slot, id);
+  schema::host::StoreU32(slot + 4, 0);
+  schema::host::StoreU32(slot + 8, 0);
 }
 
 // BootMachine::Init's stores and copies, in its order (read from the
@@ -218,7 +218,7 @@ uint64_t WaitForMovie(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint
   }
   if (end) {
     mode_tick::ScreenFadesFadeOut(base, 1, 0, 0, 0, 0);
-    Queue(base, schema::ModeDispatcher(base, dispatcher), 1);
+    Queue(schema::ModeDispatcher(base, dispatcher), 1);
   }
   uint64_t r3 = MoviesState(base, state_frame, calls);
   if (int32_t(r3) == 1 && boot.movie_started() == 0) {
@@ -320,7 +320,7 @@ void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t frame, con
       MoviesResume(base, frame, 0x821080B4, calls);
     }
   }
-  Queue(base, boot, 0);
+  Queue(schema::ModeDispatcher(base, mode + 36), 0);  // the boot mode's dispatcher
   // GameMessages::Dispatch (its override, src/frame_pacing/game_messages.cpp).
   calls.call(0x821062E8, frame, 0x82108108, boot.handlers_address(), mode);
   if (boot.machine_state() != 2) {

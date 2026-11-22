@@ -178,8 +178,9 @@ uint64_t OpenColors(uint8_t* base, uint32_t sp, const Calls& calls) {
     const double unit = double(guest::LoadFloat(base, 0x82002200));
     SpecColor source(base, entry.color_records_address());
     for (uint32_t left = n; left != 0; left--, source.address += SpecColor::kSize) {
-      const Swatch record(
-          base, uint32_t(calls.Call(kVirtualAlloc, frame, 0x8218493C, 0, 32, 4096, 4)));
+      // A host object (E5 step 4) in place of the VirtualAlloc(32) at
+      // 0x8218493C.
+      const Swatch record = Swatch::New(base);
       const int64_t hue = int64_t(int32_t(source.hue()));
       StoreWide(base, frame + 96, hue);
       record.set_hue(float(double(float(double(hue)))));
@@ -198,7 +199,14 @@ uint64_t OpenColors(uint8_t* base, uint32_t sp, const Calls& calls) {
       StoreWide(base, kind == 1 ? frame + 112 : frame + 120, value);
       const double v = double(float(double(int64_t(value))));
       record.set_value(float(double(float(v * unit))));
-      calls.Call(kHsvToRgb, frame, 0x82184A00, frame + 128, record.hue_address());
+      // Color::HsvToRgb reads its input (the record's +16 to +31) from guest
+      // memory: staged below `frame` (its r1), where it copies the 16 bytes
+      // itself.
+      Store(base, frame - 16, record.hue_bits());
+      Store(base, frame - 12, record.saturation_bits());
+      Store(base, frame - 8, record.value_bits());
+      Store(base, frame - 4, 0);
+      calls.Call(kHsvToRgb, frame, 0x82184A00, frame + 128, frame - 16);
       const double red = double(float(double(guest::LoadFloat(base, frame + 128)) * scale));
       const double green = double(float(double(guest::LoadFloat(base, frame + 132)) * scale));
       const double blue = double(float(double(guest::LoadFloat(base, frame + 136)) * scale));

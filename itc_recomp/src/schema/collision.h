@@ -499,6 +499,8 @@ struct WordAt8Object : View {
     return WordAt8Object(base, memory::MakeHandle(new WordAt8ObjectData(), sizeof(WordAt8ObjectData), "WordAt8Object", &kWordAt8ObjectLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kWordAt8ObjectLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kWordAt8ObjectLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // the word sub_822BE2C8 returns (a shape record's current copy in collision)
   uint32_t word_8() const { return on_host() ? uint32_t(data()->word_8) : uint32_t(guest::LoadU32(base, address + 8)); }
   void set_word_8(uint32_t v) const { if (on_host()) data()->word_8 = v; else guest::StoreU32(base, address + 8, v); }

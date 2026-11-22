@@ -1738,7 +1738,7 @@ void f8259C7F8(uint8_t* base, uint64_t r3) {
   // addi r11,r11,5056
   r11 = uint64_t(int64_t(int64_t(r11) + 5056));
   // stw r11,0(r3)
-  guest::StoreU32(base, schema::VtableObject(base, uint32_t(r3)).vtable_address(), uint32_t(r11));
+  schema::VtableObject(base, uint32_t(r3)).set_vtable_bits(uint32_t(r11));
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // stw r11,3092(r10)
@@ -1775,7 +1775,7 @@ lifted::Result f8259C8C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r10 = uint32_t(r4) & 0x1;
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r11,0(r31)
-  guest::StoreU32(base, schema::VtableObject(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
+  schema::VtableObject(base, uint32_t(r31)).set_vtable_bits(uint32_t(r11));
   // beq 0x8259c8f4
   if (cr0.eq) goto loc_8259C8F4;
   // bl 0x825a70e8
@@ -1826,7 +1826,7 @@ lifted::Result f8259C910(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lis r10,-32105
   r10 = uint64_t(int64_t(-2104033280));
   // stw r11,0(r31)
-  guest::StoreU32(base, schema::VtableObject(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
+  schema::VtableObject(base, uint32_t(r31)).set_vtable_bits(uint32_t(r11));
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // stw r11,3092(r10)

@@ -304,7 +304,7 @@ fd::SceneSetUpCalls SceneSetUpCallsOn(lifted::Regs& ctx, uint8_t* base) {
     ctx.r3.u64 = object;
     ctx.r4.u64 = r4;
     ctx.r5.u64 = r5;
-    const uint32_t target = guest::LoadU32(base, guest::LoadU32(base, object) + byte);
+    const uint32_t target = guest::LoadU32(base, guest::VtableWord(base, object) + byte);
     ctx.ctr.u64 = target;  // (r11, also the target there: none reads it)
     ctx.lr = return_address;
     lifted::CallFromContext(ctx, base, target);

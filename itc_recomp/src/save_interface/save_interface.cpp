@@ -116,7 +116,7 @@ std::optional<uint32_t> AppUsers(uint8_t* base, uint32_t interface) {
 
 uint32_t FrameworkUsers(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82493700 word +92");
-  return Load(base, object + 92);
+  return schema::FrameworkGetterSelf(base, object).word_92();  // the framework may be in host memory
 }
 
 uint32_t UsersCount(uint8_t* base, uint32_t users) {

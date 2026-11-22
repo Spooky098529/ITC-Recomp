@@ -106,7 +106,16 @@ void HubFillPlayerRecord(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t time = uint32_t(calls.Call(kPlayTimeAdd, frame, 0x8218DB2C, frame + 80, stats));
   const schema::PlayTimeAnswer answer(base, time);
   record.set_play_hours(answer.hours());
-  record.set_play_time_word(answer.time_word());
+  {
+    // The word's bytes in guest order (the user info data is a host object
+    // since E5 step 4; its play_minutes and play_seconds read them).
+    const uint32_t word = answer.time_word();
+    uint8_t* const bytes = record.play_time();
+    bytes[0] = uint8_t(word >> 24);
+    bytes[1] = uint8_t(word >> 16);
+    bytes[2] = uint8_t(word >> 8);
+    bytes[3] = uint8_t(word);
+  }
   record.set_garage_count(uint32_t(int32_t(int16_t(SaveData(base, save).garage_count()))));
   record.set_save_1991C(Load(base, save + 0x1991C));  // not in SaveData yet
 }

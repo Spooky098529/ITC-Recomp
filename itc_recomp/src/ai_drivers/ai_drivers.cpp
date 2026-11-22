@@ -3697,9 +3697,9 @@ uint32_t TriggerStarts(uint8_t* base, uint32_t driver, uint32_t trigger, double*
     case 12:
       return LoadS16(base, AiDriver(base, driver).passes_b_address()) > 0 ? 1 : 0;
     case 13:
-      return (Load(base, Load(base, G::inputs_address())) & 0x100) == 0 ? 0 : 1;
+      return (CarInput(base, Load(base, G::inputs_address())).flags() & 0x100) == 0 ? 0 : 1;
     case 14:
-      return (Load(base, Load(base, G::inputs_address())) & 0x20000) == 0 ? 0 : 1;
+      return (CarInput(base, Load(base, G::inputs_address())).flags() & 0x20000) == 0 ? 0 : 1;
     default:
       return 0;
   }

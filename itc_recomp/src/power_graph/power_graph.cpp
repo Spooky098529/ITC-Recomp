@@ -401,9 +401,14 @@ uint32_t SetFromCar(uint8_t* base, uint32_t car, uint32_t tab, uint32_t sp,
   const schema::CarSpecCopies s(base, spec);
   const schema::PowerCurve c(base, curve);
   record.set_tab(tab);
+  // The parts' five words through the view (the data is a host object since
+  // E5 step 4), loaded and stored in the original's order.
+  using Data = schema::PowerGraphScreenData;
+  static constexpr void (Data::*kPartsWords[5])(uint32_t) const = {
+      &Data::set_parts_word_0, &Data::set_parts_word_1, &Data::set_parts_word_2,
+      &Data::set_parts_word_3, &Data::set_parts_word_4};
   for (uint32_t i = 0; i < 5; i++) {
-    guest::StoreU32(base, record.parts_address() + 4 * i,
-                    guest::LoadU32(base, head.setting_bytes_address() + 4 * i));
+    (record.*kPartsWords[i])(guest::LoadU32(base, head.setting_bytes_address() + 4 * i));
   }
   record.set_car_value(Fctiwz32(double(garage_car.racer_float())));
   const double sum = double(float(double(schema::CarDataAxle(base, d.front_axle_address()).wheel_mass()) +

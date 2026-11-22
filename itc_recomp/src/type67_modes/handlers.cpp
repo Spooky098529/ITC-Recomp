@@ -9,12 +9,14 @@
 #include "type67_modes/views.h"
 
 #include "base/log.h"
+#include "game_modes/game_modes.h"
 #include "guest.h"
 #include "memory/heap.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
 #include <bit>
+#include <cstring>
 #include <initializer_list>
 
 namespace type67_modes {
@@ -68,15 +70,22 @@ void CopyWords(uint8_t* base, uint32_t to, uint32_t from, uint32_t count) {
 // A message (three words: `message`, 0, 0) queued in a dispatcher's ring
 // (+204: 50 slots of 12 bytes, the count at +600, the start at +604), with
 // no overflow check, as the handlers do it inline.
-uint32_t RingSlot(uint8_t* base, uint32_t dispatcher) {
+// A dual view (E5 step 4): the slot by its bytes, in guest order.
+game_modes::RingSlot NextRingSlot(uint8_t* base, uint32_t dispatcher) {
   const schema::ModeDispatcher d(base, dispatcher);
   const uint32_t count = d.ring_count() + 1;
   const uint32_t end = d.ring_start() + count - 1;
   d.set_ring_count(count);
-  return d.ring_address() + (end - (end / 50) * 50) * 12;
+  return game_modes::RingSlot{d.ring() + (end - (end / 50) * 50) * 12};
 }
 
 constexpr uint32_t kMinusOne = 0xFFFFFFFF;
+
+// A preset's word at `offset` (a host object, laid out at the guest
+// offsets: its fields are floats and vectors of floats).
+void SetPresetWord(const schema::CameraPreset& preset, uint32_t offset, uint32_t value) {
+  std::memcpy(reinterpret_cast<uint8_t*>(preset.data()) + offset, &value, sizeof value);
+}
 
 }  // namespace
 
@@ -107,20 +116,24 @@ uint64_t CameraPresetConstruct(uint8_t* base, uint64_t r3, uint32_t sp) {
   const uint32_t zero = ThroughFloat(base, kZero);
   const uint32_t one = ThroughFloat(base, kOne);
   ScratchVectors(base, sp, zero, one, zero);
-  StoreU32(base, preset.elevation_address(), zero);
-  StoreU32(base, preset.value_8_address(), zero);
-  StoreU32(base, preset.value_12_address(), zero);
+  preset.set_elevation_bits(zero);
+  preset.set_value_8_bits(zero);
+  preset.set_value_12_bits(zero);
   // The three vectors (+16, +32, +48), twelve words.
-  CopyWords(base, preset.vector_16_address(), sp - 48, 12);
+  for (uint32_t i = 0; i < 12; i++) {
+    SetPresetWord(preset, 16 + 4 * i, LoadU32(base, sp - 48 + 4 * i));
+  }
   return r3;
 }
 
 uint64_t CameraPresetCopy(uint8_t* base, uint32_t source, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8217D7D0 CameraPreset::Copy");
-  const uint32_t copy = Pages(64);
+  // In host memory (E5 step 4): VirtualAlloc's 64 bytes in the original.
+  const uint32_t copy = schema::CameraPreset::New(base).address;
   CameraPresetConstruct(base, copy, sp - 96);
+  const schema::CameraPreset preset(base, copy);
   for (uint32_t offset = 4; offset <= 60; offset += 4) {
-    StoreU32(base, copy + offset, ThroughFloat(base, source + offset));
+    SetPresetWord(preset, offset, ThroughFloat(base, source + offset));
   }
   return copy;
 }
@@ -131,7 +144,8 @@ bool PresetsArePages(uint8_t* base, uint32_t address) {
   const schema::GarageCamera camera(base, address);
   const uint32_t count = camera.preset_count();
   for (uint32_t i = 0; i < count; i++) {
-    if (!memory::IsPages(LoadU32(base, camera.presets_address() + 4 * i))) {
+    const uint32_t preset = LoadU32(base, camera.presets_address() + 4 * i);
+    if (!memory::IsPages(preset) && !memory::IsHandle(preset)) {  // presets are host (E5)
       return false;
     }
   }
@@ -279,8 +293,7 @@ uint64_t ControllerOptionsLeave(uint8_t* base, uint64_t r3, uint32_t dispatcher)
     default:
       return r3;
   }
-  const uint32_t slot = RingSlot(base, dispatcher);
-  const schema::ModeMessage queued(base, slot);
+  const game_modes::RingSlot queued = NextRingSlot(base, dispatcher);
   queued.set_arg1(0);
   queued.set_arg0(0);
   queued.set_id(message);

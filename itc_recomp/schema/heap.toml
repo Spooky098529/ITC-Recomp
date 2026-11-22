@@ -149,6 +149,7 @@ measures = ["sub_820901D8.r3", "sub_82090268.r3", "sub_820926C8.r3", "sub_820927
             "sub_8259C8C8.r3", "sub_8259C910.r3"]
 size = 4
 origin = "allocated"
+storage = "dual"
 fields = [
   { name = "vtable", offset = 0, type = "u32" },
 ]

@@ -185,6 +185,7 @@ def field_width(f, alltypes):
 
 
 ALLTYPES = {}
+TYPE_AREA = {}
 
 
 def embed_accessors(f, view_address):
@@ -235,7 +236,10 @@ def members(t):
     (a union, or a measure's `fault_` field) and are read at their offset.
     Real fields first, by offset; then `fault_` fields where they fit."""
     taken, chosen = [], set()
-    for f in sorted(t.get("fields", []), key=lambda f: (f["name"].startswith("fault_"), f["offset"])):
+    # Scalars before bytes fields: a bytes field over scalars (a record kept
+    # whole) would leave the scalars as unswapped overlays.
+    for f in sorted(t.get("fields", []), key=lambda f: (f["name"].startswith("fault_"),
+                                                         f["type"] == "bytes", f["offset"])):
         lo, hi = f["offset"], f["offset"] + field_width(f, ALLTYPES)
         if f["type"] == "embed" or any(lo < b and a < hi for a, b in taken):
             continue
@@ -330,6 +334,23 @@ def host_type(name, t):
     out.append("  }")
     out.append(f"  void Delete() const {{ delete data(); memory::ReleaseHandle(address); }}")
 
+    # Any offset, any width (1, 2, 4 or 8 bytes), as the guest's bytes give it:
+    # for accesses inside a field (a byte of a word) and code reading by offset.
+    hl = f"memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), k{name}Layout, offset, width)"
+    hs = f"memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), k{name}Layout, offset, width, v)"
+    gl = ("width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? "
+          "guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) "
+          ": guest::LoadU64(base, address + offset)")
+    gs = ("if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) "
+          "guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) "
+          "guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v);")
+    if dual:
+        out.append(f"  uint64_t load_at(uint32_t offset, uint32_t width) const {{ if (on_host()) return {hl}; return {gl}; }}")
+        out.append(f"  void store_at(uint32_t offset, uint32_t width, uint64_t v) const {{ if (on_host()) {{ {hs}; return; }} {gs} }}")
+    else:
+        out.append(f"  uint64_t load_at(uint32_t offset, uint32_t width) const {{ return {hl}; }}")
+        out.append(f"  void store_at(uint32_t offset, uint32_t width, uint64_t v) const {{ {hs}; }}")
+
     def pick(host, guest):
         return f"on_host() ? {host} : {guest}" if dual else host
 
@@ -341,21 +362,23 @@ def host_type(name, t):
             out.extend(embed_accessors(f, "address"))
             continue
         if ty == "bytes":
+            # At its offset (a member, or bytes over scalar members).
             out.append(f"  uint8_t* {n}() const {{ return "
-                       + pick(f"data()->{n}", f"guest::Pointer(base, address + {off})") + "; }")
+                       + pick(f"reinterpret_cast<uint8_t*>(data()) + {off}",
+                              f"guest::Pointer(base, address + {off})") + "; }")
             continue
         member, bits = HOST[ty]
         if n in overlaid:
             # A field over an earlier one (a union, or a measure fault): its
             # bytes at its offset, in host order.
-            p = f"reinterpret_cast<uint8_t*>(data()) + {off}"
-            gl = (SCALARS[ty] if ty in SCALARS else SCALARS["u32"])[1].format(a=f"address + {off}")
+            # Its value as the guest's bytes give it (memory::LoadOverlay).
+            p = "reinterpret_cast<uint8_t*>(data())"
             w = {1: "U8", 2: "U16", 4: "U32", 8: "U64"}[WIDTHS[ty]]
-            hget = f"[&] {{ {bits} v; std::memcpy(&v, {p}, sizeof v); return v; }}()"
+            hget = f"{bits}(memory::LoadOverlay({p}, k{name}Layout, {off}, {WIDTHS[ty]}))"
             gbits = f"guest::Load{w}(base, address + {off})"
             getbits = f"on_host() ? {hget} : {gbits}" if dual else hget
             out.append(f"  {bits} {n}_bits() const {{ return {getbits}; }}")
-            hput = f"std::memcpy({p}, &v, sizeof v)"
+            hput = f"memory::StoreOverlay({p}, k{name}Layout, {off}, {WIDTHS[ty]}, v)"
             gput = f"guest::Store{w}(base, address + {off}, v)"
             putbits = f"if (on_host()) {hput}; else {gput};" if dual else f"{hput};"
             out.append(f"  void set_{n}_bits({bits} v) const {{ {putbits} }}")
@@ -460,6 +483,20 @@ def emit_area(area, data):
         lines.append("};")
         lines.append("")
     lines += ["}  // namespace schema", ""]
+    # The areas whose types this one embeds: their views, for the embed
+    # accessors (templates, instantiated at use: at the end, so a cycle of
+    # areas resolves under #pragma once).
+    owners = set()
+    for name, t in data.items():
+        if name == "globals":
+            continue
+        for f in t.get("fields", []):
+            if f.get("type") == "embed" and f.get("to") in TYPE_AREA and TYPE_AREA[f["to"]] != area:
+                owners.add(TYPE_AREA[f["to"]])
+    for a in sorted(owners):
+        lines.append(f'#include "schema/{a.replace("-", "_")}.h"')
+    if owners:
+        lines.append("")
     return "\n".join(lines)
 
 
@@ -474,6 +511,7 @@ def main(argv):
             print(f"{area}: no schema file (or it doesn't parse)", file=sys.stderr)
             return 1
         types, errors = check(areas)
+        TYPE_AREA.update({n: a for a, d in areas.items() for n in d if n != "globals"})
         ALLTYPES.update({n: t for d in areas.values() for n, t in d.items() if n != "globals"})
         errors = [e for e in errors if e.startswith(f"{area}:")]
         if errors:
@@ -487,6 +525,7 @@ def main(argv):
         return 0
     areas = load()
     types, errors = check(areas)
+    TYPE_AREA.update({n: a for a, d in areas.items() for n in d if n != "globals"})
     ALLTYPES.update({n: t for d in areas.values() for n, t in d.items() if n != "globals"})
     if errors:
         for e in errors:

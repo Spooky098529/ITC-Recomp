@@ -44,90 +44,162 @@ struct UserInfoMachine : View {
 };
 
 // embedded; measure: UserInfo::Close.r4
+#pragma pack(push, 1)
+struct UserInfoModeData {
+  uint8_t pad_0[204] = {};
+  uint8_t messages[600] = {};  // +204, guest order
+  uint32_t message_count = 0;  // +804
+  uint32_t message_start = 0;  // +808
+};
+#pragma pack(pop)
+static_assert(sizeof(UserInfoModeData) == 812);
+inline constexpr memory::LayoutField kUserInfoModeFields[] = {{804, 4}, {808, 4}};
+inline constexpr memory::Layout kUserInfoModeLayout = {kUserInfoModeFields, 2};
+
 struct UserInfoMode : View {
   using View::View;
   static constexpr uint32_t kSize = 812;
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  UserInfoModeData* data() const { return static_cast<UserInfoModeData*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static UserInfoMode New(uint8_t* base) {
+    return UserInfoMode(base, memory::MakeHandle(new UserInfoModeData(), sizeof(UserInfoModeData), "UserInfoMode", &kUserInfoModeLayout));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kUserInfoModeLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kUserInfoModeLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 50 messages of 12 bytes (id, two words)
-  uint32_t messages_address() const { return address + 204; }
-  uint32_t message_count() const { return guest::LoadU32(base, address + 804); }
-  void set_message_count(uint32_t v) const { guest::StoreU32(base, address + 804, v); }
-  uint32_t message_count_address() const { return address + 804; }
+  uint8_t* messages() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 204 : guest::Pointer(base, address + 204); }
+  uint32_t message_count() const { return on_host() ? uint32_t(data()->message_count) : uint32_t(guest::LoadU32(base, address + 804)); }
+  void set_message_count(uint32_t v) const { if (on_host()) data()->message_count = v; else guest::StoreU32(base, address + 804, v); }
+  uint32_t message_count_bits() const { return on_host() ? data()->message_count : guest::LoadU32(base, address + 804); }
+  void set_message_count_bits(uint32_t v) const { if (on_host()) data()->message_count = v; else guest::StoreU32(base, address + 804, v); }
   // the ring's first slot
-  uint32_t message_start() const { return guest::LoadU32(base, address + 808); }
-  void set_message_start(uint32_t v) const { guest::StoreU32(base, address + 808, v); }
-  uint32_t message_start_address() const { return address + 808; }
+  uint32_t message_start() const { return on_host() ? uint32_t(data()->message_start) : uint32_t(guest::LoadU32(base, address + 808)); }
+  void set_message_start(uint32_t v) const { if (on_host()) data()->message_start = v; else guest::StoreU32(base, address + 808, v); }
+  uint32_t message_start_bits() const { return on_host() ? data()->message_start : guest::LoadU32(base, address + 808); }
+  void set_message_start_bits(uint32_t v) const { if (on_host()) data()->message_start = v; else guest::StoreU32(base, address + 808, v); }
 };
 
 // allocated; measure: new<60>@UserInfo::Create
+#pragma pack(push, 1)
+struct UserInfoDataData {
+  uint32_t loaded = 0;  // +0
+  uint32_t queued_state = 0;  // +4
+  uint32_t count_12 = 0;  // +8
+  uint32_t count_14 = 0;  // +12
+  uint32_t count_16 = 0;  // +16
+  float ratio = 0;  // +20
+  uint32_t stats_5968 = 0;  // +24
+  float distance_5976 = 0;  // +28
+  float distance_5904 = 0;  // +32
+  int32_t distance_5992 = 0;  // +36
+  uint32_t stats_6024 = 0;  // +40
+  uint32_t play_hours = 0;  // +44
+  uint8_t play_minutes = 0;  // +48
+  uint8_t play_seconds = 0;  // +49
+  uint8_t pad_50[2] = {};
+  uint32_t garage_count = 0;  // +52
+  uint32_t save_1991C = 0;  // +56
+};
+#pragma pack(pop)
+static_assert(sizeof(UserInfoDataData) == 60);
+inline constexpr memory::LayoutField kUserInfoDataFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 4}, {24, 4}, {28, 4}, {32, 4}, {36, 4}, {40, 4}, {44, 4}, {52, 4}, {56, 4}};
+inline constexpr memory::Layout kUserInfoDataLayout = {kUserInfoDataFields, 14};
+
 struct UserInfoData : View {
   using View::View;
   static constexpr uint32_t kSize = 60;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  UserInfoDataData* data() const { return static_cast<UserInfoDataData*>(memory::HandleObject(address)); }
+  static UserInfoData New(uint8_t* base) {
+    return UserInfoData(base, memory::MakeHandle(new UserInfoDataData(), sizeof(UserInfoDataData), "UserInfoData", &kUserInfoDataLayout));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kUserInfoDataLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kUserInfoDataLayout, offset, width, v); }
   // 1 once loaded (WaitForLoad)
-  uint32_t loaded() const { return guest::LoadU32(base, address + 0); }
-  void set_loaded(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t loaded_address() const { return address + 0; }
+  uint32_t loaded() const { return data()->loaded; }
+  void set_loaded(uint32_t v) const { data()->loaded = v; }
+  uint32_t loaded_bits() const { return data()->loaded; }
+  void set_loaded_bits(uint32_t v) const { data()->loaded = v; }
   // the state Update moves the machine to: 21 none, 9 from Closing
-  uint32_t queued_state() const { return guest::LoadU32(base, address + 4); }
-  void set_queued_state(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
-  uint32_t queued_state_address() const { return address + 4; }
+  uint32_t queued_state() const { return data()->queued_state; }
+  void set_queued_state(uint32_t v) const { data()->queued_state = v; }
+  uint32_t queued_state_bits() const { return data()->queued_state; }
+  void set_queued_state_bits(uint32_t v) const { data()->queued_state = v; }
   // the stats' halfword +12 (node 8)
-  uint32_t count_12() const { return guest::LoadU32(base, address + 8); }
-  void set_count_12(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t count_12_address() const { return address + 8; }
+  uint32_t count_12() const { return data()->count_12; }
+  void set_count_12(uint32_t v) const { data()->count_12 = v; }
+  uint32_t count_12_bits() const { return data()->count_12; }
+  void set_count_12_bits(uint32_t v) const { data()->count_12 = v; }
   // the stats' halfword +14 (node 9)
-  uint32_t count_14() const { return guest::LoadU32(base, address + 12); }
-  void set_count_14(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
-  uint32_t count_14_address() const { return address + 12; }
+  uint32_t count_14() const { return data()->count_14; }
+  void set_count_14(uint32_t v) const { data()->count_14 = v; }
+  uint32_t count_14_bits() const { return data()->count_14; }
+  void set_count_14_bits(uint32_t v) const { data()->count_14 = v; }
   // the stats' halfword +16 (node 10)
-  uint32_t count_16() const { return guest::LoadU32(base, address + 16); }
-  void set_count_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
-  uint32_t count_16_address() const { return address + 16; }
+  uint32_t count_16() const { return data()->count_16; }
+  void set_count_16(uint32_t v) const { data()->count_16 = v; }
+  uint32_t count_16_bits() const { return data()->count_16; }
+  void set_count_16_bits(uint32_t v) const { data()->count_16 = v; }
   // +12 / +22 times 100 (node 11, string 453; probably the win rate)
-  float ratio() const { return guest::LoadFloat(base, address + 20); }
-  void set_ratio(float v) const { guest::StoreFloat(base, address + 20, v); }
-  uint32_t ratio_address() const { return address + 20; }
+  float ratio() const { return data()->ratio; }
+  void set_ratio(float v) const { data()->ratio = v; }
+  uint32_t ratio_bits() const { return std::bit_cast<uint32_t>(data()->ratio); }
+  void set_ratio_bits(uint32_t v) const { data()->ratio = std::bit_cast<float>(v); }
   // the stats' +5968 (node 12)
-  uint32_t stats_5968() const { return guest::LoadU32(base, address + 24); }
-  void set_stats_5968(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
-  uint32_t stats_5968_address() const { return address + 24; }
+  uint32_t stats_5968() const { return data()->stats_5968; }
+  void set_stats_5968(uint32_t v) const { data()->stats_5968 = v; }
+  uint32_t stats_5968_bits() const { return data()->stats_5968; }
+  void set_stats_5968_bits(uint32_t v) const { data()->stats_5968 = v; }
   // the stats' +5976, shown times 0.62138 (node 19, kilometers in miles)
-  float distance_5976() const { return guest::LoadFloat(base, address + 28); }
-  void set_distance_5976(float v) const { guest::StoreFloat(base, address + 28, v); }
-  uint32_t distance_5976_address() const { return address + 28; }
+  float distance_5976() const { return data()->distance_5976; }
+  void set_distance_5976(float v) const { data()->distance_5976 = v; }
+  uint32_t distance_5976_bits() const { return std::bit_cast<uint32_t>(data()->distance_5976); }
+  void set_distance_5976_bits(uint32_t v) const { data()->distance_5976 = std::bit_cast<float>(v); }
   // the stats' +5904, shown times 0.62138 (node 20)
-  float distance_5904() const { return guest::LoadFloat(base, address + 32); }
-  void set_distance_5904(float v) const { guest::StoreFloat(base, address + 32, v); }
-  uint32_t distance_5904_address() const { return address + 32; }
+  float distance_5904() const { return data()->distance_5904; }
+  void set_distance_5904(float v) const { data()->distance_5904 = v; }
+  uint32_t distance_5904_bits() const { return std::bit_cast<uint32_t>(data()->distance_5904); }
+  void set_distance_5904_bits(uint32_t v) const { data()->distance_5904 = std::bit_cast<float>(v); }
   // the stats' +5992 truncated, shown times 0.62138 (node 21)
-  int32_t distance_5992() const { return int32_t(guest::LoadU32(base, address + 36)); }
-  void set_distance_5992(int32_t v) const { guest::StoreU32(base, address + 36, uint32_t(v)); }
-  uint32_t distance_5992_address() const { return address + 36; }
+  int32_t distance_5992() const { return data()->distance_5992; }
+  void set_distance_5992(int32_t v) const { data()->distance_5992 = v; }
+  uint32_t distance_5992_bits() const { return std::bit_cast<uint32_t>(data()->distance_5992); }
+  void set_distance_5992_bits(uint32_t v) const { data()->distance_5992 = std::bit_cast<int32_t>(v); }
   // the stats' +6024 (node 22, SetNumberText)
-  uint32_t stats_6024() const { return guest::LoadU32(base, address + 40); }
-  void set_stats_6024(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
-  uint32_t stats_6024_address() const { return address + 40; }
+  uint32_t stats_6024() const { return data()->stats_6024; }
+  void set_stats_6024(uint32_t v) const { data()->stats_6024 = v; }
+  uint32_t stats_6024_bits() const { return data()->stats_6024; }
+  void set_stats_6024_bits(uint32_t v) const { data()->stats_6024 = v; }
   // the play time's hours (PlayTime::Add; shown at most 9999)
-  uint32_t play_hours() const { return guest::LoadU32(base, address + 44); }
-  void set_play_hours(uint32_t v) const { guest::StoreU32(base, address + 44, v); }
-  uint32_t play_hours_address() const { return address + 44; }
-  // PlayTime::Add's word +4: the minutes and seconds bytes
-  uint32_t play_time_word() const { return guest::LoadU32(base, address + 48); }
-  void set_play_time_word(uint32_t v) const { guest::StoreU32(base, address + 48, v); }
-  uint32_t play_time_word_address() const { return address + 48; }
-  uint8_t play_minutes() const { return guest::LoadU8(base, address + 48); }
-  void set_play_minutes(uint8_t v) const { guest::StoreU8(base, address + 48, v); }
-  uint32_t play_minutes_address() const { return address + 48; }
-  uint8_t play_seconds() const { return guest::LoadU8(base, address + 49); }
-  void set_play_seconds(uint8_t v) const { guest::StoreU8(base, address + 49, v); }
-  uint32_t play_seconds_address() const { return address + 49; }
+  uint32_t play_hours() const { return data()->play_hours; }
+  void set_play_hours(uint32_t v) const { data()->play_hours = v; }
+  uint32_t play_hours_bits() const { return data()->play_hours; }
+  void set_play_hours_bits(uint32_t v) const { data()->play_hours = v; }
+  // PlayTime::Add's word +4, stored as a word (bytes in guest order in the host object since E5 step 4): the minutes and seconds bytes
+  uint8_t* play_time() const { return reinterpret_cast<uint8_t*>(data()) + 48; }
+  uint8_t play_minutes() const { return data()->play_minutes; }
+  void set_play_minutes(uint8_t v) const { data()->play_minutes = v; }
+  uint8_t play_minutes_bits() const { return data()->play_minutes; }
+  void set_play_minutes_bits(uint8_t v) const { data()->play_minutes = v; }
+  uint8_t play_seconds() const { return data()->play_seconds; }
+  void set_play_seconds(uint8_t v) const { data()->play_seconds = v; }
+  uint8_t play_seconds_bits() const { return data()->play_seconds; }
+  void set_play_seconds_bits(uint8_t v) const { data()->play_seconds = v; }
   // the garage's count (node 24, string 444)
-  uint32_t garage_count() const { return guest::LoadU32(base, address + 52); }
-  void set_garage_count(uint32_t v) const { guest::StoreU32(base, address + 52, v); }
-  uint32_t garage_count_address() const { return address + 52; }
+  uint32_t garage_count() const { return data()->garage_count; }
+  void set_garage_count(uint32_t v) const { data()->garage_count = v; }
+  uint32_t garage_count_bits() const { return data()->garage_count; }
+  void set_garage_count_bits(uint32_t v) const { data()->garage_count = v; }
   // the save's +0x1991C (node 24)
-  uint32_t save_1991C() const { return guest::LoadU32(base, address + 56); }
-  void set_save_1991C(uint32_t v) const { guest::StoreU32(base, address + 56, v); }
-  uint32_t save_1991C_address() const { return address + 56; }
+  uint32_t save_1991C() const { return data()->save_1991C; }
+  void set_save_1991C(uint32_t v) const { data()->save_1991C = v; }
+  uint32_t save_1991C_bits() const { return data()->save_1991C; }
+  void set_save_1991C_bits(uint32_t v) const { data()->save_1991C = v; }
 };
 
 // embedded; measure: PlayTime::Add.ret

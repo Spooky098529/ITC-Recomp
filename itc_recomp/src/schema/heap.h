@@ -204,12 +204,32 @@ struct ExceptionMessage : View {
 };
 
 // allocated; measure: sub_820901D8.r3, sub_82090268.r3, sub_820926C8.r3, sub_820927E8.r3, sub_82092830.r3, sub_82094B68.r3, sub_8209FB80.r3, sub_820A44C0.r3, sub_820A70B0.r3, sub_820AC950.r3, sub_820ACCF0.r3, sub_8210B0E8.r3, sub_8210B0E8.ret, sub_82126818.r3, sub_82133C18.r3, sub_82589480.r3, sub_8258DEB8.r3, sub_8258DEB8.ret, sub_82591898.r3, sub_825925A8.r3, sub_8259C8C8.r3, sub_8259C910.r3
+#pragma pack(push, 1)
+struct VtableObjectData {
+  uint32_t vtable = 0;  // +0
+};
+#pragma pack(pop)
+static_assert(sizeof(VtableObjectData) == 4);
+inline constexpr memory::LayoutField kVtableObjectFields[] = {{0, 4}};
+inline constexpr memory::Layout kVtableObjectLayout = {kVtableObjectFields, 1};
+
 struct VtableObject : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t vtable_address() const { return address + 0; }
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  VtableObjectData* data() const { return static_cast<VtableObjectData*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static VtableObject New(uint8_t* base) {
+    return VtableObject(base, memory::MakeHandle(new VtableObjectData(), sizeof(VtableObjectData), "VtableObject", &kVtableObjectLayout));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kVtableObjectLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kVtableObjectLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
+  uint32_t vtable() const { return on_host() ? uint32_t(data()->vtable) : uint32_t(guest::LoadU32(base, address + 0)); }
+  void set_vtable(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable_bits() const { return on_host() ? data()->vtable : guest::LoadU32(base, address + 0); }
+  void set_vtable_bits(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
 };
 
 // allocated; measure: sub_82090D60.r3@-4
@@ -300,6 +320,8 @@ struct FloatPair : View {
     return FloatPair(base, memory::MakeHandle(new FloatPairData(), sizeof(FloatPairData), "FloatPair", &kFloatPairLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kFloatPairLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kFloatPairLayout, offset, width, v); }
   // 1 when made
   uint8_t flag() const { return data()->flag; }
   void set_flag(uint8_t v) const { data()->flag = v; }

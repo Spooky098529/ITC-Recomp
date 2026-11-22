@@ -313,6 +313,8 @@ measures = ["AiDriver::Drive.r4",
   "new<20>@CarInputs::Create"]
 size = 20
 origin = "embedded"
+storage = "dual"
+host_alloc = [0x82102280]
 fields = [
   { name = "flags", offset = 0, type = "u32", note = "0x200 set by a stuck AI driver (probably reverse); the pad's in known-data.md" },
   { name = "throttle", offset = 4, type = "u16", note = "signed, out of 32,767" },

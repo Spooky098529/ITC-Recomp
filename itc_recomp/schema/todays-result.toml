@@ -25,14 +25,20 @@
 # interface (ForceExit and IsLoaded get the mode + 32), the block (FindShown
 # gets the block) and the next-mode answer (the delegates' r3): those
 # accesses are the fields marked "measure fault".
+# Dual (E5 step 4): made in host memory by Mode::Create; the measure joins
+# guest addresses with it (the delegates' answer on the stack, the block
+# in AllLoaded and FindShown), which the view reads as guest memory. Its
+# fields over the block and at -28 (ForceExit's +4 from the +32 interface:
+# a negative offset no host struct holds) were left out.
 [ModeType9]
 measures = ["ModeType9", "ModeType9::WaitForLoads.r4", "ModeType9::WaitForShown.r4",
             "ModeType9::LeaveScreen.r4", "ModeType9::NextMode.r4", "ModeType9::Leaving.r4"]
 size = 852
 origin = "allocated"
+storage = "dual"
+host_alloc = [0x821078D4]
 vtable = 0x82006CAC
 fields = [
-  { name = "iface_delegate_ptr", offset = -28, type = "u32", note = "measure fault: ForceExit's r3 is the mode + 32, so this is the mode's +4 (delegate_ptr)" },
   { name = "vtable", offset = 0, type = "u32", note = "0x82006CAC (14 slots)" },
   { name = "answer_changed", offset = 0, type = "u8", note = "measure fault: the next-mode answer's byte +0 (ModeAnswer), the delegates' r3" },
   { name = "answer", offset = 0, type = "u64", note = "measure fault: the next-mode answer's 8 bytes (ModeAnswer)" },
@@ -49,8 +55,6 @@ fields = [
   { name = "ring_start", offset = 844, type = "u32" },
   { name = "iface_block", offset = 816, type = "ptr", to = "ModeType9Block", note = "measure fault: IsLoaded's and ForceExit's r3 is the mode + 32, so this is the mode's +848 (block)" },
   { name = "block", offset = 848, type = "ptr", to = "ModeType9Block", note = "VirtualAlloc'ed by Init, freed by Release" },
-  { name = "block_event_state", offset = 19244, type = "u32", note = "measure fault: FindShown's r3 is the block (ModeType9Block.event_state)" },
-  { name = "block_shown", offset = 19280, type = "u32", note = "measure fault: FindShown's r3 is the block (ModeType9Block.shown)" },
 ]
 
 # The type 9 mode's block (19,300 bytes at the mode's +848; known-data.md:

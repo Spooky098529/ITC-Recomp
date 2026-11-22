@@ -51,6 +51,7 @@ fields = [
 measures = ["sub_8209E540.r4", "sub_8209E610.r4", "sub_8209E790.r4"]
 size = 4
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "SignInModeInterfaceVtable" },
 ]

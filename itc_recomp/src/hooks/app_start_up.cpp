@@ -137,7 +137,7 @@ uint32_t VideoOutput(lifted::Regs& ctx, uint8_t* base, uint32_t first, uint32_t 
   if (!hooks::DirectSlotCall(ctx, base, slot7)) {
     lifted::CallFromContext(ctx, base, slot7);
   }
-  ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 12);
+  ctx.ctr.u64 = guest::LoadU32(base, guest::VtableWord(base, ctx.r3.u32) + 12);
   ctx.lr = second;
   lifted::CallFromContext(ctx, base, ctx.ctr.u32);
   return ctx.r3.u32;
@@ -193,7 +193,7 @@ namespace {
 uint32_t VirtualCall(lifted::Regs& ctx, uint8_t* base, uint32_t object, uint32_t offset,
                      uint32_t return_address) {
   ctx.r3.u64 = object;
-  ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, object) + offset);
+  ctx.ctr.u64 = guest::LoadU32(base, guest::VtableWord(base, object) + offset);
   ctx.lr = return_address;
   // (The render manager's slots 8 and 7 by their plain C++ where they're the
   // game's, hooks::DirectSlotCall.)

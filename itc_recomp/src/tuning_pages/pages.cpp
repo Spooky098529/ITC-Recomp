@@ -7,6 +7,7 @@
 #include "base/log.h"
 #include "camera_modes/steps.h"
 #include "debug/pause_menu_log.h"
+#include "game_modes/game_modes.h"
 #include "guest.h"
 #include "mode_tick/mode_tick.h"
 #include "schema/game_modes.h"
@@ -2709,8 +2710,7 @@ uint64_t Leave(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp) {
   const uint32_t count = mode.message_count() + 1;
   const uint32_t start = mode.message_start();
   mode.set_message_count(count);
-  const schema::ModeMessage record(
-      base, mode.messages_address() + ((start + count - 1) % 50) * 12);
+  const game_modes::RingSlot record{mode.messages() + ((start + count - 1) % 50) * 12};  // E5 step 4
   record.set_id(11);
   record.set_arg0(0);
   record.set_arg1(0);

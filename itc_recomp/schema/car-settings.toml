@@ -33,6 +33,7 @@ fields = [
 measures = ["CarSettings::Close.r4", "CarSettings::Leave.r4"]
 size = 812
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "messages", offset = 204, type = "bytes", count = 600, note = "50 messages of 12 bytes (id, two words)" },
   { name = "message_count", offset = 804, type = "u32" },

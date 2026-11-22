@@ -163,6 +163,11 @@ std::optional<uint32_t> MapAllocateNodes(uint8_t* base, uint32_t count) {
   if (count != 0 && 0xFFFFFFFFu / count < Node::kSize) {
     return std::nullopt;
   }
+  if (count == 1) {
+    // A node in host memory (E5 step 4): the map's only use (NewHead and
+    // NewNode ask for one).
+    return std::optional<uint32_t>(Node::New(base).address);
+  }
   return memory::crt::OperatorNew(base, count * Node::kSize);
 }
 
@@ -173,10 +178,10 @@ uint32_t MapNewHead(uint8_t* base) {
   if (node != 0) {
     Node(base, node).set_left(0);
   }
-  if (Node(base, node).parent_address() != 0) {
+  if (node + 4 != 0) {
     Node(base, node).set_parent(0);
   }
-  if (Node(base, node).right_address() != 0) {
+  if (node + 8 != 0) {
     Node(base, node).set_right(0);
   }
   SetColor(base, node, 1);

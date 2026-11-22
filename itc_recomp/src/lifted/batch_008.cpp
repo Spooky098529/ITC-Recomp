@@ -11340,7 +11340,7 @@ loc_82192A9C:
   // addi r10,r10,4
   r10 = uint64_t(int64_t(int64_t(r10) + 4));
   // stw r11,0(r9)
-  schema::host::StoreU32(schema::GarageScreenData(base, uint32_t(r9) - 4).pick() + 0, uint32_t(r11));
+  schema::GarageScreenData(base, uint32_t(r9) - 4).store_at(4, 4, uint32_t(r11));
   // addi r9,r9,4
   r9 = uint64_t(int64_t(int64_t(r9) + 4));
   // bdnz 0x82192a9c

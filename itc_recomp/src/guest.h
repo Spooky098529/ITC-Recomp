@@ -24,6 +24,14 @@ namespace lifted {
 struct Regs;
 }  // namespace lifted
 
+namespace memory {
+// A raw load or store reaching a host object through its handle
+// (memory/host_copy.cpp): the bytes as the guest's would give them; logged
+// once per type and offset (code still in guest shape, to convert).
+uint64_t RawHandleLoad(uint32_t address, uint32_t width);
+void RawHandleStore(uint32_t address, uint32_t width, uint64_t value);
+}  // namespace memory
+
 namespace guest {
 
 // Guest memory's one spelling, for lifted code and hand ports alike
@@ -39,34 +47,62 @@ inline uint8_t* Pointer(uint8_t* base, uint32_t address) {
 }
 
 inline uint8_t LoadU8(uint8_t* base, uint32_t address) {
+  if (memory::IsHandle(address)) [[unlikely]] {
+    return uint8_t(memory::RawHandleLoad(address, 1));
+  }
   return *reinterpret_cast<volatile uint8_t*>(base + address);
 }
 
 inline void StoreU8(uint8_t* base, uint32_t address, uint8_t value) {
+  if (memory::IsHandle(address)) [[unlikely]] {
+    memory::RawHandleStore(address, 1, value);
+    return;
+  }
   *reinterpret_cast<volatile uint8_t*>(base + address) = value;
 }
 
 inline uint16_t LoadU16(uint8_t* base, uint32_t address) {
+  if (memory::IsHandle(address)) [[unlikely]] {
+    return uint16_t(memory::RawHandleLoad(address, 2));
+  }
   return __builtin_bswap16(*reinterpret_cast<volatile uint16_t*>(base + address));
 }
 
 inline void StoreU16(uint8_t* base, uint32_t address, uint16_t value) {
+  if (memory::IsHandle(address)) [[unlikely]] {
+    memory::RawHandleStore(address, 2, value);
+    return;
+  }
   *reinterpret_cast<volatile uint16_t*>(base + address) = __builtin_bswap16(value);
 }
 
 inline uint32_t LoadU32(uint8_t* base, uint32_t address) {
+  if (memory::IsHandle(address)) [[unlikely]] {
+    return uint32_t(memory::RawHandleLoad(address, 4));
+  }
   return __builtin_bswap32(*reinterpret_cast<volatile uint32_t*>(base + address));
 }
 
 inline void StoreU32(uint8_t* base, uint32_t address, uint32_t value) {
+  if (memory::IsHandle(address)) [[unlikely]] {
+    memory::RawHandleStore(address, 4, value);
+    return;
+  }
   *reinterpret_cast<volatile uint32_t*>(base + address) = __builtin_bswap32(value);
 }
 
 inline uint64_t LoadU64(uint8_t* base, uint32_t address) {
+  if (memory::IsHandle(address)) [[unlikely]] {
+    return uint64_t(memory::RawHandleLoad(address, 8));
+  }
   return __builtin_bswap64(*reinterpret_cast<volatile uint64_t*>(base + address));
 }
 
 inline void StoreU64(uint8_t* base, uint32_t address, uint64_t value) {
+  if (memory::IsHandle(address)) [[unlikely]] {
+    memory::RawHandleStore(address, 8, value);
+    return;
+  }
   *reinterpret_cast<volatile uint64_t*>(base + address) = __builtin_bswap64(value);
 }
 

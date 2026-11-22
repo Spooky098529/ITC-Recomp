@@ -84,7 +84,7 @@ uint64_t Init(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls) {
   for (const uint32_t offset : kAdded) {
     const uint32_t count = m.handler_count();
     m.set_handler_count(count + 1);
-    StoreU32(base, m.handlers_address() + (count << 2), block() + offset);
+    schema::host::StoreU32(m.handlers() + (count << 2), block() + offset);  // guest order (E5 step 4)
   }
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   const schema::SaveData save_data(base, save);
@@ -145,7 +145,7 @@ uint64_t Init(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls) {
   // The delegate: WaitForLoads through Mode::Slot9Thunk.
   StoreU32(base, frame + 108, 0);
   StoreU32(base, frame + 104, kSlot9Thunk);
-  const uint32_t delegate = m.delegate_vtable_address();
+  const uint32_t delegate = mode + 8;  // the delegate (in host memory, E5 step 4)
   uint32_t holder = 0;
   if (delegate != 0) {
     holder = delegate;

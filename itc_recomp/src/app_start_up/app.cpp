@@ -52,11 +52,11 @@ uint32_t AppConstruct(uint8_t* base, uint32_t app, uint32_t block, uint32_t fram
   self.set_vtable_16(0x82000E38);
   self.set_interface_vtable(0x82000E08);
   // The four handler maps (r30 still the +12 vtable).
-  calls.call(kHandlerMap, self.handlers_address(), 0x82000E80, 0x82094644, 0x82000E70,
+  calls.call(kHandlerMap, self.handlers_map().address, 0x82000E80, 0x82094644, 0x82000E70,
              {});  // r4 as left
-  calls.call(kHandlerMap, self.toggled_handlers_address(), {}, 0x8209464C, 0x82000E70, {});
-  calls.call(kHandlerMap, self.always_handlers_address(), {}, 0x82094654, 0x82000E70, {});
-  calls.call(kHandlerMap, self.listeners_address(), {}, 0x8209465C, 0x82000E70, {});
+  calls.call(kHandlerMap, self.toggled_handlers_map().address, {}, 0x8209464C, 0x82000E70, {});
+  calls.call(kHandlerMap, self.always_handlers_map().address, {}, 0x82094654, 0x82000E70, {});
+  calls.call(kHandlerMap, self.listeners_map().address, {}, 0x8209465C, 0x82000E70, {});
   // The tick handler (key 8, App::Update) on the run loop's slot 2.
   Store(base, frame + 116, app);
   Store(base, frame + 84, 0);
@@ -91,8 +91,9 @@ uint32_t AppConstruct(uint8_t* base, uint32_t app, uint32_t block, uint32_t fram
   Store(base, frame + 88, app);
   Store(base, frame + 128, 0x82000ABC);
   const uint32_t states = calls.call(kStatesCreate, frame + 88, {}, 0x82094748, 0, {});
-  Store(base, frame + 96, self.interface_vtable_address());
-  Store(base, frame + 100, self.vtable_4_address());
+  // The app's interfaces (app + N).
+  Store(base, frame + 96, app + 20);
+  Store(base, frame + 100, app + 4);
   self.set_states(states);
   // The second camera class, from {app + 20, app + 4}.
   uint32_t camera = 0;
@@ -103,8 +104,8 @@ uint32_t AppConstruct(uint8_t* base, uint32_t app, uint32_t block, uint32_t fram
     camera = calls.call(kAppCamera, camera_at, frame + 96, 0x82094770, 0, {});
   }
   // The movie class, from {app + 20, app + 8}.
-  Store(base, frame + 104, self.interface_vtable_address());
-  Store(base, frame + 108, self.vtable_8_address());
+  Store(base, frame + 104, app + 20);
+  Store(base, frame + 108, app + 8);
   self.set_camera(camera);
   uint32_t movie = 0;
   const auto movie_block = memory::crt::OperatorNew(base, kMovieBytes);
@@ -117,10 +118,10 @@ uint32_t AppConstruct(uint8_t* base, uint32_t app, uint32_t block, uint32_t fram
   // The sound manager, "txr_xact" with 3 banks (the count on the frame).
   Store(base, frame + 80, 3);
   const uint32_t sound =
-      calls.call(kAudioManagerCreate, self.vtable_12_address(), kSoundName, 0x820947C4, movie,
+      calls.call(kAudioManagerCreate, app + 12, kSoundName, 0x820947C4, movie,
                  frame + 80);
   self.set_sound_manager(sound);
-  calls.call(kStartUp, self.vtable_16_address(), {}, 0x820947D4, movie, {});
+  calls.call(kStartUp, app + 16, {}, 0x820947D4, movie, {});
   return app;
 }
 

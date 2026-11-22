@@ -4,6 +4,7 @@
 #include "tuning_machine/tuning_machine.h"
 
 #include "base/log.h"
+#include "game_modes/game_modes.h"
 #include "tuning_pages/tuning_pages.h"
 #include "guest.h"
 #include "schema/game_modes.h"
@@ -52,7 +53,7 @@ void Post(uint8_t* base, uint32_t mode, uint32_t id) {
   const uint32_t count = m.message_count() + 1;
   const uint32_t start = m.message_start();
   m.set_message_count(count);
-  const schema::ModeMessage slot(base, m.messages_address() + 12 * ((start + count - 1) % 50));
+  const game_modes::RingSlot slot{m.messages() + 12 * ((start + count - 1) % 50)};
   slot.set_id(id);
   slot.set_arg0(0);
   slot.set_arg1(0);

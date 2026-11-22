@@ -40,14 +40,18 @@
 # interface (Interrupt, ForceExit and Resume get the mode + 32) and the
 # next-mode answer (the delegate functions' r3: ModeAnswer): those accesses
 # are the fields marked "measure fault".
+# Dual (E5 step 4): the mode is in host memory (Mode::Create, as
+# game-modes.toml's GameModeType6 and GameModeType7); the measure joins the
+# delegates' answer on the stack with it. iface_delegate_ptr (-28, ForceExit's
+# +4 from the +32 interface) was left out: no host struct holds a negative offset.
 [Type6Mode]
 measures = ["Type6Mode", "Type6Mode::Leaving.r4", "Type6Mode::NextMode.r4",
             "Type6Mode::TearDown.r4", "Type6Mode::WaitForLoads.r4"]
 size = 852
 origin = "allocated"
+storage = "dual"
 vtable = 0x82010A48
 fields = [
-  { name = "iface_delegate_ptr", offset = -28, type = "u32", note = "measure fault: ForceExit's r3 is the mode + 32, so this is the mode's +4 (delegate_ptr)" },
   { name = "vtable", offset = 0, type = "u32", note = "0x82010A48" },
   { name = "answer_changed", offset = 0, type = "u8", note = "measure fault: the next-mode answer's byte +0 (ModeAnswer), the delegate functions' r3" },
   { name = "answer_word0", offset = 0, type = "u32", note = "measure fault: the answer's first word (ModeAnswer.word0), TearDown's copy of the block's answer" },
@@ -75,9 +79,9 @@ measures = ["Type7Mode", "Type7Mode::Leaving.r4", "Type7Mode::NextMode.r4",
             "Type7Mode::TearDown.r4", "Type7Mode::WaitForLoads.r4"]
 size = 852
 origin = "allocated"
+storage = "dual"
 vtable = 0x82010FB0
 fields = [
-  { name = "iface_delegate_ptr", offset = -28, type = "u32", note = "measure fault: ForceExit's r3 is the mode + 32, so this is the mode's +4 (delegate_ptr)" },
   { name = "vtable", offset = 0, type = "u32", note = "0x82010FB0" },
   { name = "answer_changed", offset = 0, type = "u8", note = "measure fault: the next-mode answer's byte +0 (ModeAnswer), the delegate functions' r3" },
   { name = "answer_word0", offset = 0, type = "u32", note = "measure fault: the answer's first word (ModeAnswer.word0), TearDown's copy of the block's answer" },
@@ -103,6 +107,7 @@ fields = [
 measure = "StandMode"
 size = 852
 origin = "allocated"
+storage = "dual"
 fields = [
   { name = "block", offset = 848, type = "u32", note = "the screen block (Type6Screens or Type7Screens), freed and 0" },
 ]
@@ -341,6 +346,8 @@ fields = [
 measure = "CameraPreset"
 size = 64
 origin = "allocated"
+storage = "host"
+host_alloc = [0x8217D7F8]
 fields = [
   { name = "elevation", offset = 4, type = "f32", note = "the camera's tilt (GarageStage::ApplyPreset)" },
   { name = "value_8", offset = 8, type = "f32" },

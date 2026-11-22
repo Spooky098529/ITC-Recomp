@@ -1,5 +1,6 @@
 #include "memory/heap.h"
 
+#include "memory/handles.h"
 #include "memory/mapping.h"
 
 #include "base/log.h"
@@ -244,6 +245,9 @@ bool Free(uint32_t address) {
   if (address == 0) {
     return true;
   }
+  if (IsHandle(address)) {
+    return FreeHandle(address);  // a host object (E5)
+  }
   std::lock_guard lock(mutex);
   auto it = blocks.find(address);
   if (it == blocks.end() || it->second.pages) {
@@ -315,6 +319,9 @@ uint32_t Realloc(uint32_t address, uint32_t size, uint32_t flags) {
 
 uint32_t Size(uint32_t address) {
   ITC_NATIVE_RUNNING("sub_82298FF8 HeapSize");
+  if (HandleInfo info; IsHandle(address) && DescribeHandle(address, &info)) {
+    return info.size;  // a host object (E5)
+  }
   std::lock_guard lock(mutex);
   auto it = blocks.find(address);
   if (it == blocks.end() || it->second.pages) {
@@ -327,12 +334,18 @@ uint32_t Size(uint32_t address) {
 }
 
 bool IsHeapBlock(uint32_t address) {
+  if (HandleInfo info; IsHandle(address) && DescribeHandle(address, &info)) {
+    return info.offset == 0;  // a host object's handle (E5): freed by any of the frees
+  }
   std::lock_guard lock(mutex);
   auto it = blocks.find(address);
   return it != blocks.end() && !it->second.pages;
 }
 
 bool IsPages(uint32_t address) {
+  if (HandleInfo info; IsHandle(address) && DescribeHandle(address, &info)) {
+    return info.offset == 0;  // a host object's handle (E5): freed by any of the frees
+  }
   std::lock_guard lock(mutex);
   auto it = blocks.find(address);
   return it != blocks.end() && it->second.pages;
@@ -357,6 +370,9 @@ uint32_t AllocPages(uint32_t size, uint32_t alignment) {
 
 bool FreePages(uint32_t address) {
   ITC_NATIVE_RUNNING("sub_82295330 VirtualFree");
+  if (IsHandle(address)) {
+    return FreeHandle(address);  // a host object (E5)
+  }
   std::lock_guard lock(mutex);
   auto it = blocks.find(address);
   if (it == blocks.end() || !it->second.pages) {
@@ -371,6 +387,9 @@ bool FreePages(uint32_t address) {
 }
 
 bool InRange(uint32_t address) {
+  if (IsHandle(address)) {
+    return true;  // a host object (E5): ours, freed through its handle
+  }
   const uint32_t start = range_start.load(std::memory_order_relaxed);
   return start != 0 && address >= start && address - start < kRangeBytes;
 }
@@ -435,6 +454,10 @@ uint32_t AllocPhysical(uint32_t size, uint32_t low, uint32_t high, uint32_t alig
 
 void FreePhysical(uint32_t address) {
   ITC_NATIVE_RUNNING("sub_822965C8 XPhysicalFree");
+  if (IsHandle(address)) {
+    FreeHandle(address);  // a host object (E5)
+    return;
+  }
   std::lock_guard lock(mutex);
   const auto it = physical_sizes.find(address);
   if (it == physical_sizes.end()) {

@@ -139,6 +139,23 @@ void ReleaseHandle(uint32_t handle) {
   g_free.emplace_back(first, count);
 }
 
+bool FreeHandle(uint32_t handle) {
+  void* object = nullptr;
+  {
+    std::lock_guard lock(g_mutex);
+    if (!IsHandle(handle) || !g_entries || !g_entries[Granule(handle)].object ||
+        g_entries[Granule(handle)].start != handle) {
+      ITC_LOG_ERROR("handles: a free of {:08X}, not a live handle's start", handle);
+      return false;
+    }
+    object = g_entries[Granule(handle)].object;
+  }
+  ReleaseHandle(handle);
+  // The schema's host structs are plain data made with `new T()`.
+  ::operator delete(object);
+  return true;
+}
+
 bool DescribeHandle(uint32_t value, HandleInfo* info) {
   if (!IsHandle(value) || !g_entries) {
     return false;

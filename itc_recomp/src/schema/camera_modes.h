@@ -1025,61 +1025,108 @@ struct CameraAnimObjects : View {
 };
 
 // allocated; measure: CameraAnim, new<340>@CameraAnim::ParseObject, CameraAnim::EvalTarget.r4, CameraAnims::Find.ret.+0
+#pragma pack(push, 1)
+struct CameraAnimData {
+  uint32_t kind = 0;  // +0
+  uint32_t header_size = 0;  // +4
+  uint32_t unknown_8 = 0;  // +8
+  uint32_t block_count = 0;  // +12
+  uint32_t unknown_16 = 0;  // +16
+  uint32_t unknown_20 = 0;  // +20
+  uint32_t unknown_24 = 0;  // +24
+  uint32_t unknown_28 = 0;  // +28
+  uint32_t unknown_32 = 0;  // +32
+  uint32_t unknown_36 = 0;  // +36
+  float unknown_40 = 0;  // +40
+  float unknown_44 = 0;  // +44
+  uint8_t unknown_48[32] = {};  // +48, guest order
+  uint32_t first_block = 0;  // +80
+  uint8_t pad_84[252] = {};
+  uint32_t blocks_used = 0;  // +336
+};
+#pragma pack(pop)
+static_assert(sizeof(CameraAnimData) == 340);
+inline constexpr memory::LayoutField kCameraAnimFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 4}, {24, 4}, {28, 4}, {32, 4}, {36, 4}, {40, 4}, {44, 4}, {80, 4}, {336, 4}};
+inline constexpr memory::Layout kCameraAnimLayout = {kCameraAnimFields, 14};
+
 struct CameraAnim : View {
   using View::View;
   static constexpr uint32_t kSize = 340;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  CameraAnimData* data() const { return static_cast<CameraAnimData*>(memory::HandleObject(address)); }
+  static CameraAnim New(uint8_t* base) {
+    return CameraAnim(base, memory::MakeHandle(new CameraAnimData(), sizeof(CameraAnimData), "CameraAnim", &kCameraAnimLayout));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCameraAnimLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCameraAnimLayout, offset, width, v); }
   // 6 a camera, 7 a target, 1 a matrix, 14 the end
-  uint32_t kind() const { return guest::LoadU32(base, address + 0); }
-  void set_kind(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t kind_address() const { return address + 0; }
+  uint32_t kind() const { return data()->kind; }
+  void set_kind(uint32_t v) const { data()->kind = v; }
+  uint32_t kind_bits() const { return data()->kind; }
+  void set_kind_bits(uint32_t v) const { data()->kind = v; }
   // the file's +4: its blocks start there
-  uint32_t header_size() const { return guest::LoadU32(base, address + 4); }
-  void set_header_size(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
-  uint32_t header_size_address() const { return address + 4; }
-  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
-  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t unknown_8_address() const { return address + 8; }
+  uint32_t header_size() const { return data()->header_size; }
+  void set_header_size(uint32_t v) const { data()->header_size = v; }
+  uint32_t header_size_bits() const { return data()->header_size; }
+  void set_header_size_bits(uint32_t v) const { data()->header_size = v; }
+  uint32_t unknown_8() const { return data()->unknown_8; }
+  void set_unknown_8(uint32_t v) const { data()->unknown_8 = v; }
+  uint32_t unknown_8_bits() const { return data()->unknown_8; }
+  void set_unknown_8_bits(uint32_t v) const { data()->unknown_8 = v; }
   // the file object's blocks
-  uint32_t block_count() const { return guest::LoadU32(base, address + 12); }
-  void set_block_count(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
-  uint32_t block_count_address() const { return address + 12; }
-  uint32_t unknown_16() const { return guest::LoadU32(base, address + 16); }
-  void set_unknown_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
-  uint32_t unknown_16_address() const { return address + 16; }
-  uint32_t unknown_20() const { return guest::LoadU32(base, address + 20); }
-  void set_unknown_20(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
-  uint32_t unknown_20_address() const { return address + 20; }
-  uint32_t unknown_24() const { return guest::LoadU32(base, address + 24); }
-  void set_unknown_24(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
-  uint32_t unknown_24_address() const { return address + 24; }
-  uint32_t unknown_28() const { return guest::LoadU32(base, address + 28); }
-  void set_unknown_28(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
-  uint32_t unknown_28_address() const { return address + 28; }
-  uint32_t unknown_32() const { return guest::LoadU32(base, address + 32); }
-  void set_unknown_32(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
-  uint32_t unknown_32_address() const { return address + 32; }
-  uint32_t unknown_36() const { return guest::LoadU32(base, address + 36); }
-  void set_unknown_36(uint32_t v) const { guest::StoreU32(base, address + 36, v); }
-  uint32_t unknown_36_address() const { return address + 36; }
-  float unknown_40() const { return guest::LoadFloat(base, address + 40); }
-  void set_unknown_40(float v) const { guest::StoreFloat(base, address + 40, v); }
-  uint32_t unknown_40_address() const { return address + 40; }
-  float unknown_44() const { return guest::LoadFloat(base, address + 44); }
-  void set_unknown_44(float v) const { guest::StoreFloat(base, address + 44, v); }
-  uint32_t unknown_44_address() const { return address + 44; }
+  uint32_t block_count() const { return data()->block_count; }
+  void set_block_count(uint32_t v) const { data()->block_count = v; }
+  uint32_t block_count_bits() const { return data()->block_count; }
+  void set_block_count_bits(uint32_t v) const { data()->block_count = v; }
+  uint32_t unknown_16() const { return data()->unknown_16; }
+  void set_unknown_16(uint32_t v) const { data()->unknown_16 = v; }
+  uint32_t unknown_16_bits() const { return data()->unknown_16; }
+  void set_unknown_16_bits(uint32_t v) const { data()->unknown_16 = v; }
+  uint32_t unknown_20() const { return data()->unknown_20; }
+  void set_unknown_20(uint32_t v) const { data()->unknown_20 = v; }
+  uint32_t unknown_20_bits() const { return data()->unknown_20; }
+  void set_unknown_20_bits(uint32_t v) const { data()->unknown_20 = v; }
+  uint32_t unknown_24() const { return data()->unknown_24; }
+  void set_unknown_24(uint32_t v) const { data()->unknown_24 = v; }
+  uint32_t unknown_24_bits() const { return data()->unknown_24; }
+  void set_unknown_24_bits(uint32_t v) const { data()->unknown_24 = v; }
+  uint32_t unknown_28() const { return data()->unknown_28; }
+  void set_unknown_28(uint32_t v) const { data()->unknown_28 = v; }
+  uint32_t unknown_28_bits() const { return data()->unknown_28; }
+  void set_unknown_28_bits(uint32_t v) const { data()->unknown_28 = v; }
+  uint32_t unknown_32() const { return data()->unknown_32; }
+  void set_unknown_32(uint32_t v) const { data()->unknown_32 = v; }
+  uint32_t unknown_32_bits() const { return data()->unknown_32; }
+  void set_unknown_32_bits(uint32_t v) const { data()->unknown_32 = v; }
+  uint32_t unknown_36() const { return data()->unknown_36; }
+  void set_unknown_36(uint32_t v) const { data()->unknown_36 = v; }
+  uint32_t unknown_36_bits() const { return data()->unknown_36; }
+  void set_unknown_36_bits(uint32_t v) const { data()->unknown_36 = v; }
+  float unknown_40() const { return data()->unknown_40; }
+  void set_unknown_40(float v) const { data()->unknown_40 = v; }
+  uint32_t unknown_40_bits() const { return std::bit_cast<uint32_t>(data()->unknown_40); }
+  void set_unknown_40_bits(uint32_t v) const { data()->unknown_40 = std::bit_cast<float>(v); }
+  float unknown_44() const { return data()->unknown_44; }
+  void set_unknown_44(float v) const { data()->unknown_44 = v; }
+  uint32_t unknown_44_bits() const { return std::bit_cast<uint32_t>(data()->unknown_44); }
+  void set_unknown_44_bits(uint32_t v) const { data()->unknown_44 = std::bit_cast<float>(v); }
   // 0
-  uint32_t unknown_48_address() const { return address + 48; }
+  uint8_t* unknown_48() const { return reinterpret_cast<uint8_t*>(data()) + 48; }
   // up to 64 CameraAnimBlock pointers
-  uint32_t blocks_address() const { return address + 80; }
+  uint8_t* blocks() const { return reinterpret_cast<uint8_t*>(data()) + 80; }
   template <typename T = CameraAnimBlock>
-  T first_block() const { return T(base, guest::LoadU32(base, address + 80)); }
-  void set_first_block(const View& v) const { guest::StoreU32(base, address + 80, v.address); }
-  void set_first_block(uint32_t v) const { guest::StoreU32(base, address + 80, v); }
-  uint32_t first_block_address() const { return address + 80; }
+  T first_block() const { return T(base, data()->first_block); }
+  void set_first_block(const View& w) const { const uint32_t v = w.address; data()->first_block = v; }
+  void set_first_block(uint32_t v) const { data()->first_block = v; }
+  uint32_t first_block_bits() const { return data()->first_block; }
+  void set_first_block_bits(uint32_t v) const { data()->first_block = v; }
   // their count
-  uint32_t blocks_used() const { return guest::LoadU32(base, address + 336); }
-  void set_blocks_used(uint32_t v) const { guest::StoreU32(base, address + 336, v); }
-  uint32_t blocks_used_address() const { return address + 336; }
+  uint32_t blocks_used() const { return data()->blocks_used; }
+  void set_blocks_used(uint32_t v) const { data()->blocks_used = v; }
+  uint32_t blocks_used_bits() const { return data()->blocks_used; }
+  void set_blocks_used_bits(uint32_t v) const { data()->blocks_used = v; }
 };
 
 // allocated; measure: CameraAnimBlock, new<64>@CameraAnim::ParseObject, CameraAnim::EvalTarget.r4.+80, CameraAnims::Find.ret.+0.+80, CameraAnim::EvalTarget.r4.+80.+60
@@ -1108,6 +1155,8 @@ struct CameraAnimBlock : View {
     return CameraAnimBlock(base, memory::MakeHandle(new CameraAnimBlockData(), sizeof(CameraAnimBlockData), "CameraAnimBlock", &kCameraAnimBlockLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCameraAnimBlockLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCameraAnimBlockLayout, offset, width, v); }
   // 0 x, 1 y, 2 -z, 101 the film's height, 102 the focal length, 109 -roll
   uint32_t channel() const { return data()->channel; }
   void set_channel(uint32_t v) const { data()->channel = v; }
@@ -1133,7 +1182,7 @@ struct CameraAnimBlock : View {
   uint32_t duration_bits() const { return std::bit_cast<uint32_t>(data()->duration); }
   void set_duration_bits(uint32_t v) const { data()->duration = std::bit_cast<float>(v); }
   // 0
-  uint8_t* unknown_20() const { return data()->unknown_20; }
+  uint8_t* unknown_20() const { return reinterpret_cast<uint8_t*>(data()) + 20; }
   // its floats, one a frame (guest pages); "data" before E5 step 3 (a host view's data() is its struct)
   uint32_t values() const { return data()->values; }
   void set_values(uint32_t v) const { data()->values = v; }
@@ -1202,6 +1251,8 @@ struct CameraAnimLoad : View {
     return CameraAnimLoad(base, memory::MakeHandle(new CameraAnimLoadData(), sizeof(CameraAnimLoadData), "CameraAnimLoad", &kCameraAnimLoadLayout));
   }
   void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCameraAnimLoadLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCameraAnimLoadLayout, offset, width, v); }
   // the asset id
   uint32_t id() const { return data()->id; }
   void set_id(uint32_t v) const { data()->id = v; }

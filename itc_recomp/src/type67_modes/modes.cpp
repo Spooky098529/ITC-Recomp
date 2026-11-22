@@ -11,6 +11,7 @@
 
 #include "base/log.h"
 #include "front_end_car_draw/front_end_car_draw.h"
+#include "game_modes/game_modes.h"
 #include "guest.h"
 #include "memory/heap.h"
 #include "menu_sounds/menu_sounds.h"
@@ -60,8 +61,7 @@ void Queue(uint8_t* base, const ModeView& m, uint32_t message) {
   const uint32_t count = m.ring_count() + 1;
   const uint32_t end = m.ring_start() + count - 1;
   m.set_ring_count(count);
-  const uint32_t slot = m.ring_address() + (end - (end / 50) * 50) * 12;
-  const schema::ModeMessage queued(base, slot);
+  const game_modes::RingSlot queued{m.ring() + (end - (end / 50) * 50) * 12};
   queued.set_id(message);
   queued.set_arg0(0);
   queued.set_arg1(0);
@@ -76,7 +76,7 @@ void ClearAnswer(uint8_t* base, uint32_t answer) {
 // The delegate (mode +4 = mode +8 when that isn't 0) given a member functor:
 // vtable 0x82010FA0, the mode, the function and adjustment from the frame.
 void SetDelegate(uint8_t* base, const ModeView& m, uint32_t frame) {
-  uint32_t delegate = m.delegate_vtable_address();
+  uint32_t delegate = m.delegate();
   if (int32_t(delegate) != 0) {
     m.set_delegate_object(m.t6.address);
     m.set_delegate_function(LoadU32(base, frame + 80));
@@ -126,7 +126,7 @@ void ModeNextMode(uint8_t* base, const ModeLayout& layout, uint32_t answer, uint
   const ModeView m(base, mode, &layout == &kType7Layout);
   Queue(base, m, 1);
   Queue(base, m, 0);
-  calls.call(kDispatch, frame, layout.next_lr, m.handlers_address(), 0);
+  calls.call(kDispatch, frame, layout.next_lr, m.dispatcher(), 0);
   const uint32_t block = m.block();
   ClearAnswer(base, answer);
   bool leave = false;
@@ -186,7 +186,7 @@ uint64_t ModeWaitForLoads(uint8_t* base, bool type7, uint64_t r3, uint64_t r4, u
       StoreU32(base, frame + 92, 0);
       BlockView(base, now, type7).set_phase(3);
       StoreU32(base, frame + 88, kNextModeThunk);
-      uint32_t delegate = m.delegate_vtable_address();
+      uint32_t delegate = m.delegate();
       if (int32_t(delegate) != 0) {
         m.set_delegate_object(mode);
         m.set_delegate_function(LoadU32(base, frame + 88));
@@ -202,12 +202,11 @@ uint64_t ModeWaitForLoads(uint8_t* base, bool type7, uint64_t r3, uint64_t r4, u
   const uint32_t count = m.ring_count() + 1;
   const uint32_t end = m.ring_start() + count - 1;
   m.set_ring_count(count);
-  const uint32_t slot = m.ring_address() + (end - (end / 50) * 50) * 12;
-  const schema::ModeMessage queued(base, slot);
+  const game_modes::RingSlot queued{m.ring() + (end - (end / 50) * 50) * 12};
   queued.set_arg1(0);
   queued.set_arg0(0);
   queued.set_id(message);
-  calls.call(kDispatch, frame, layout.dispatch_lr, m.handlers_address(), 0);
+  calls.call(kDispatch, frame, layout.dispatch_lr, m.dispatcher(), 0);
   return r3;
 }
 
@@ -221,7 +220,7 @@ void ModeLeaving(uint8_t* base, const ModeLayout& layout, uint32_t answer, uint3
   const ModeView m(base, mode, &layout == &kType7Layout);
   ClearAnswer(base, answer);
   Queue(base, m, layout.leave_message);
-  calls.call(kDispatch, frame, layout.leaving_lr, m.handlers_address(), mode);
+  calls.call(kDispatch, frame, layout.leaving_lr, m.dispatcher(), mode);
   const uint32_t block = m.block();
   for (uint32_t i = 0; i < layout.leave_count; i++) {
     if (State(base, block, layout.leave_checks[i]) != 6) {
@@ -471,7 +470,7 @@ uint64_t ModeInit(uint8_t* base, bool type7, uint32_t mode, uint32_t sp,
       const uint32_t machine = Machine(m.block(), a.test, a.member, a.machine);
       const uint32_t count = m.handler_count();
       m.set_handler_count(count + 1);
-      StoreU32(base, m.handlers_address() + (count << 2), machine);
+      schema::host::StoreU32(m.handlers() + (count << 2), machine);  // guest order (E5 step 4)
     }
     for (size_t i = 0; i < l.word_count; i++) {
       StoreWords(base, m.block(), l.words[i]);
@@ -498,7 +497,7 @@ uint64_t ModeInit(uint8_t* base, bool type7, uint32_t mode, uint32_t sp,
   // The delegate's member functor, built at the frame's +80.
   StoreU32(base, frame + 84, 0);
   StoreU32(base, frame + 80, l.wait_for_loads);
-  const uint32_t delegate = m.delegate_vtable_address();
+  const uint32_t delegate = m.delegate();
   uint32_t holder = 0;
   if (int32_t(delegate) != 0) {
     holder = delegate;
