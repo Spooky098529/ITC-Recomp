@@ -49,7 +49,15 @@ schema, `itc_recomp/schema/`, and named fields) done 2026-11-21 by a swarm
 `docs/loops/e5-swarm-reports.md`): 134 areas, built, an attract race,
 the pad replay and a frame dump checked; then the measure's offset and
 class-name faults fixed (2026-11-22, 1,938 types). Left: the lead's list
-there (fault fields still reached, the split types' names); step 3 next.
+there (fault fields still reached, the split types' names). Step 3 (private
+objects to host memory) under way: its groundwork (the state digest and the
+pad replayed by tick, `tools/tick_replay.sh`; handles,
+`src/memory/handles.h`; `storage = "host"` in the schema; the pick list,
+`tools/e5_movable.py`) and its pilot (`Type2DialogData`) done; the rest by a
+swarm in batches (`docs/loops/e5-loop.md`, "Step 3 as a swarm": the batches,
+`lift.py`'s `host_alloc` and `host_free` to write before batch 2, the lead's
+check, where it stands; the script
+`itc_recomp/tools/workflows/e5-step3-swarm.js`).
 `docs/old-hardware.md` is the plan (not started) for running below
 Vulkan 1.3, and why not OpenGL.
 `docs/rexglue-removal.md` is the plan for a native port without the
