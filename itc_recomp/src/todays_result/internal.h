@@ -13,6 +13,7 @@
 #include "schema/race_event.h"
 #include "schema/todays_result.h"
 #include "schema/tuning_screen.h"
+#include "schema/type2_screens.h"
 #include "schema/ui_movies_game.h"
 #include "todays_result/todays_result.h"
 #include "ui_movies/game.h"

@@ -191,23 +191,8 @@ fields = [
 size = 188
 origin = "embedded"
 fields = [
-  { name = "records", offset = 0, type = "bytes", count = 184, note = "46 TodaysEventImage pointers" },
+  { name = "records", offset = 0, type = "bytes", count = 184, note = "46 Type2HubImage pointers (type2-screens.toml)" },
   { name = "count", offset = 184, type = "u32" },
-]
-
-# An image record of today's event (16 bytes, VirtualAlloc'ed by
-# LoadImagePair, one per list; Archive::Load's callback Type2Hub::ImageLoaded
-# fills it).
-[TodaysEventImage]
-measures = ["new<16>@TodaysEvent::LoadImagePair", "new<16>@TodaysEvent::LoadImagePair#2",
-            "TodaysEvent.+4", "TodaysEvent.+192", "TodaysEvent.+192.+4"]
-size = 16
-origin = "allocated"
-fields = [
-  { name = "loaded", offset = 0, type = "u32", note = "set once the image is loaded" },
-  { name = "image_index", offset = 4, type = "u32" },
-  { name = "texture", offset = 8, type = "u32", note = "the texture record ShowImages hands movie 0's +28 object" },
-  { name = "xpr", offset = 12, type = "u32", note = "the XPR (probably)" },
 ]
 
 [globals]

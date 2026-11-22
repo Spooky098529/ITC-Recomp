@@ -88,11 +88,21 @@ fields = [
 ]
 
 # A notice image record (16 bytes, VirtualAlloc'ed by LoadNoticeImage, one
-# a list; the archive's callback ImageLoaded fills it).
+# a list; the archive's callback ImageLoaded fills it). Today's event's
+# image records (todays-result's LoadImagePair) are the same type: the same
+# callback fills them and FreeImage frees their blocks (once
+# TodaysEventImage, merged in E5 step 3).
 [Type2HubImage]
-measures = ["new<16>@Type2Hub::LoadNoticeImage", "new<16>@Type2Hub::LoadNoticeImage#2", "Type2Hub::ImageLoaded.r6", "Type2Hub.+32", "Type2Hub.+220", "Type2Hub.+220.+4"]
+measures = ["new<16>@Type2Hub::LoadNoticeImage", "new<16>@Type2Hub::LoadNoticeImage#2", "Type2Hub::ImageLoaded.r6", "Type2Hub.+32", "Type2Hub.+220", "Type2Hub.+220.+4",
+            "new<16>@TodaysEvent::LoadImagePair", "new<16>@TodaysEvent::LoadImagePair#2",
+            "TodaysEvent.+4", "TodaysEvent.+192", "TodaysEvent.+192.+4"]
 size = 16
 origin = "allocated"
+# In host memory since E5 step 3 (2026-11-22): made by Type2Hub::LoadNoticeImage
+# and TodaysEvent::LoadImagePair, deleted by Type2Hub::FreeImages and
+# TodaysEvent::FreeImages (no lifted call allocates or frees them); the image
+# lists and the archive's callback context hold their handles.
+storage = "host"
 fields = [
   { name = "loaded", offset = 0, type = "u32", note = "1 once ImageLoaded ran" },
   { name = "index", offset = 4, type = "u32", note = "the image (0 to 45)" },
