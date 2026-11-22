@@ -17,6 +17,7 @@
 // a null pointer faults. The file's pages are only backed once touched.
 
 #include "memory/mapping.h"
+#include "memory/handles.h"
 
 #include "base/log.h"
 
@@ -102,6 +103,8 @@ bool Map() {
   close(file);
   base = mapped;
   ITC_LOG_INFO("guest memory: mapped at {}", static_cast<void*>(base));
+  // The handles' range, inaccessible (docs/e5-native.md step 3; handles.h).
+  ProtectHandles(base);
   return true;
 }
 
