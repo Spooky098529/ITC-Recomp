@@ -455,6 +455,10 @@ args, in the same session) only when the user's current message says to.
 ### Where step 3 stands (2026-11-22)
 
 - Groundwork done; the pilot (`Type2DialogData`) done, `98123e00`.
-- Batches 1 to 3: not started. `lift.py`'s `host_alloc` and `host_free`: not
-  written.
+- Batch 1 done and checked (2026-11-22): 6 types moved, 12 skipped
+  (`docs/loops/e5-step3-reports.md`); both replay races match. Only
+  `TitleLoadBlock` is on the replay's path; the other five are checked by
+  the build only. Its proposed rows await the user's review.
+- `lift.py`'s `host_alloc` and `host_free`: written, not yet checked.
+- Batches 2 and 3: not started.
 - Merged into `rexglue-removal-project` up to the pilot (`fc5e3b94`).

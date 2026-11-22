@@ -311999,7 +311999,7 @@ loc_8222946C:
   // lwz r8,0(r11)
   r8 = guest::LoadU32(base, schema::LocationScreen(base, uint32_t(r11) - 8).pictures_a_address());
   // lwz r8,0(r8)
-  r8 = guest::LoadU32(base, schema::LocationScreenPicture(base, uint32_t(r8)).loaded_address());
+  r8 = schema::LocationScreenPicture(base, uint32_t(r8)).loaded_bits();
   // cmpwi cr6,r8,0
   cr6 = lifted::Compare<int32_t>(int32_t(r8), 0, so);
   // beq cr6,0x8222956c
@@ -320972,11 +320972,11 @@ loc_82233A80:
   // li r6,5
   r6 = uint64_t(int64_t(5));
   // stw r9,72(r10)
-  guest::StoreU32(base, schema::Type67Screen0Words(base, uint32_t(r10)).pick_address(), uint32_t(r9));
+  schema::Type67Screen0Words(base, uint32_t(r10)).set_pick_bits(uint32_t(r9));
   // stw r11,68(r10)
-  guest::StoreU32(base, schema::Type67Screen0Words(base, uint32_t(r10)).unknown_68_address(), uint32_t(r11));
+  schema::Type67Screen0Words(base, uint32_t(r10)).set_unknown_68_bits(uint32_t(r11));
   // stw r11,0(r10)
-  guest::StoreU32(base, schema::Type67Screen0Words(base, uint32_t(r10)).loading_shown_address(), uint32_t(r11));
+  schema::Type67Screen0Words(base, uint32_t(r10)).set_loading_shown_bits(uint32_t(r11));
   // lwz r10,9648(r31)
   r10 = guest::LoadU32(base, schema::Type6Screen0(base, uint32_t(r31)).menu_address());
   // stw r11,9652(r31)
@@ -321236,7 +321236,7 @@ lifted::Result f82233C80(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,9640(r28)
   r11 = guest::LoadU32(base, schema::Type6Screen0(base, uint32_t(r28)).words_address());
   // stw r27,0(r11)
-  guest::StoreU32(base, schema::Type67Screen0Words(base, uint32_t(r11)).loading_shown_address(), uint32_t(r27));
+  schema::Type67Screen0Words(base, uint32_t(r11)).set_loading_shown_bits(uint32_t(r27));
   // lwz r11,1972(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 1972);
   // cmpwi cr6,r11,-1
@@ -326882,11 +326882,11 @@ loc_82243FE8:
   // li r6,4
   r6 = uint64_t(int64_t(4));
   // stw r9,72(r10)
-  guest::StoreU32(base, schema::Type67Screen0Words(base, uint32_t(r10)).pick_address(), uint32_t(r9));
+  schema::Type67Screen0Words(base, uint32_t(r10)).set_pick_bits(uint32_t(r9));
   // stw r11,68(r10)
-  guest::StoreU32(base, schema::Type67Screen0Words(base, uint32_t(r10)).unknown_68_address(), uint32_t(r11));
+  schema::Type67Screen0Words(base, uint32_t(r10)).set_unknown_68_bits(uint32_t(r11));
   // stw r11,0(r10)
-  guest::StoreU32(base, schema::Type67Screen0Words(base, uint32_t(r10)).loading_shown_address(), uint32_t(r11));
+  schema::Type67Screen0Words(base, uint32_t(r10)).set_loading_shown_bits(uint32_t(r11));
   // lwz r10,9652(r31)
   r10 = guest::LoadU32(base, schema::Type7Screen0(base, uint32_t(r31)).menu_address());
   // stw r11,9656(r31)
@@ -327138,7 +327138,7 @@ lifted::Result f822441D8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,9644(r28)
   r11 = guest::LoadU32(base, schema::Type7Screen0(base, uint32_t(r28)).words_address());
   // stw r27,0(r11)
-  guest::StoreU32(base, schema::Type67Screen0Words(base, uint32_t(r11)).loading_shown_address(), uint32_t(r27));
+  schema::Type67Screen0Words(base, uint32_t(r11)).set_loading_shown_bits(uint32_t(r27));
   // lwz r11,1972(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 1972);
   // cmpwi cr6,r11,-1
