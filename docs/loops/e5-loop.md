@@ -3,8 +3,9 @@
 Instructions for running E5's steps 2 to 5 (`docs/e5-native.md`) area by
 area, as B7's loop did (`docs/loops/b7-loop.md`; its rules carried over by
 the user's call, 2026-11-16: precedent first, the user's limits per run).
-This file covers step 2 (the schema and named fields); steps 3 to 5 get
-their sections when they start.
+This file covers step 2 (the schema and named fields) and, drafted,
+step 3 (private objects to the host); steps 4 and 5 get their sections
+when they start.
 
 The session running the loop (the **lead**) does no area's work itself: it
 hands each area to one subagent at a time, reads its report, checks it
@@ -237,3 +238,88 @@ Left:
 - `docs/functions/replay-snapshots.md`'s schema paragraph is stale
   (`ReplayPlacedBox`, merged into `BoxShape`; the record copies' r4, split
   by the offset fix).
+
+## Step 3: private objects to the host (draft, 2026-11-22)
+
+`docs/e5-native.md` step 3 is the why. A type moves when only one area's
+code touches it: it becomes a plain C++ struct in host memory, and its
+schema view (`schema::T`) reads that struct instead of guest memory, so
+code already switched to the views doesn't change. The user agreed the
+outline (2026-11-22); the details below are a draft for review.
+
+### Groundwork, before the first area (done directly, not by agents)
+
+1. **The state digest** (`--state_digest`, decided 2026-11-16, not built
+   yet): a line a tick with a hash of the state that matters (the racers'
+   positions and speeds, the race's progress, the menus' selections, the
+   app's state stack). Run the pad replay twice on the same build first:
+   what still varies between runs (threads' timing, the attract filter,
+   `rand`'s seed) is fixed under a flag or left out. Then a baseline
+   digest from the build before step 3, kept in the repo
+   (`itc_recomp/pad_recordings/`), that every area's replay is compared to.
+2. **Host storage in the schema**: a type marked `storage = "host"` gets
+   a generated C++ struct (host byte order, its fields as members, host
+   pointers for `ptr` fields to other host types), and its view holds a
+   pointer to it. A host view has **no `_address()` accessors**: every
+   use of a moved type's guest address (lifted code's
+   `guest::LoadU32(base, view.field_address())`, a hand port's offset
+   arithmetic, a memcpy over the object) stops compiling, so the build
+   lists what's left to convert.
+3. **`lift.py` for host types**: lifted accesses to a host type's field
+   become value accessors (`view.field()`, `view.set_field(v)`), with the
+   same width and conversion.
+4. **Handles**: a 32-bit value standing for a host object where code
+   still in guest shape holds it (in a guest object's field, a register
+   passed to unconverted code). Handles come from a guest range made
+   inaccessible (`PROT_NONE`: today all 4 GB is mapped read and write, so
+   a range nothing allocates in is carved out first, probably in the
+   0x40000000 view), with a fault handler that logs the address and the
+   code. A raw load or store the tools couldn't type, reaching a moved
+   object, then stops the game at that access, loudly, instead of reading
+   stale guest bytes. A table maps handle to host pointer; views take
+   either.
+5. **The pick list** (`tools/e5_movable.py`, new): from the measure, the
+   types one area touches, not read from a file in place, not read by the
+   GPU, not saved; with their allocation and free sites. Ordered by the
+   areas with the fewest ties first (`type_map_areas.tsv`). A type whose
+   accesses include ones the measure couldn't type is flagged: those
+   functions are read first.
+
+Each groundwork piece: built, an attract race and the pad replay (no
+object moved yet, so the game is unchanged), committed.
+
+### One area (the agent's work)
+
+1. Take the area's movable types from the pick list; read their rows and
+   schema entries.
+2. For each type: `storage = "host"` in its schema file; its allocation
+   sites make a host object (`new`, or a member of another host object)
+   and hand out a handle where guest-shaped code keeps it; its frees
+   delete it and release the handle.
+3. The full `schema_gen.py`, `lift.py reemit`, `lift_originals.py --all`;
+   the build. Every compile error is a place still using the guest
+   address: converted to the view (or, where a callee in another area
+   needs an address, passed the handle).
+4. Functions whose objects are all host structs: status **Host** in the
+   area's `docs/functions/` file; `check_function_statuses.py`.
+5. Report: types moved, handles handed out (and where), anything left in
+   guest shape and why.
+
+### Check after each area (the lead)
+
+As now, plus the digest: the build; `timeout 120 attract_race.sh 40`; the
+pad replay (no error lines, the race at the frame cap) **with its state
+digest compared to the baseline: the first tick that differs is a
+halt**; a frame dump. A handle fault (a raw access to a moved object) is a
+halt with its address. Then commit and push. The user drives before each
+merge into `rexglue-removal-project`.
+
+### Open points for the first run
+
+- Which range the handles take (checked against our allocation layer and
+  the physical views).
+- Objects kept in arrays inside guest objects, or copied whole by memcpy:
+  moved with their container, or later (step 4).
+- Vtables: a moved object's vtable word stays the guest address of the
+  image's table until step 4 (virtual calls through the dispatch table as
+  now).
