@@ -43,7 +43,7 @@ allocation is native: native code allocates through it without `ctx`.
 `docs/e5-native.md` is the plan for E5, the last step: the game's objects,
 calls, stacks and data made real C++ over host memory, ending the
 360-shaped guest memory (and the renderer's mirrors). In progress on
-`e5-native-16-11-26` (not merged): steps 0 and 1 done; step 2 (the
+`e5-native-16-11-26` (merged into `rexglue-removal-project` 2026-11-22 with step 3's groundwork and pilot): steps 0 and 1 done; step 2 (the
 schema, `itc_recomp/schema/`, and named fields) done 2026-11-21 by a swarm
 (`docs/loops/e5-loop.md`, "Step 2 as a swarm"; the agents' reports in
 `docs/loops/e5-swarm-reports.md`): 134 areas, built, an attract race,
