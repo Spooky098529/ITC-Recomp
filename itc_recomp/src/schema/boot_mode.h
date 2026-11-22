@@ -108,7 +108,7 @@ struct BootMode : View {
   uint32_t movie_started_address() const { return address + 10456; }
 };
 
-// embedded; measure: Boot, BootMachine
+// embedded; measure: Boot, BootMode@+848
 struct BootMachine : View {
   using View::View;
   static constexpr uint32_t kSize = 9612;
@@ -275,7 +275,7 @@ struct ModeType8 : View {
   uint32_t member_address() const { return address + 848; }
 };
 
-// embedded; measure: ModeType8Member
+// embedded; measure: ModeType8@+848
 struct ModeType8Member : View {
   using View::View;
   static constexpr uint32_t kSize = 86920;

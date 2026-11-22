@@ -13,7 +13,8 @@
 
 # The base class, as PostEffects:: meets every kind (the array's words).
 [PostEffect]
-measures = ["PostEffect", "[826C5D80]", "sub_82136DC8.r3"]
+measure = "PostEffect"
+measures = ["[826C5D80]", "sub_82136DC8.r3", "PostEffect::ReleaseSurface.r3"]
 size = 8064
 origin = "allocated"
 vtable = 0x82008838
@@ -313,7 +314,8 @@ fields = [
 # A render texture: an entry of the pool at 0x826C5DC8 (20 of 36 bytes, by id), or
 # one of its own (id 20, operator new).
 [RenderTexture]
-measures = ["RenderTexture", "new<36>@RenderTextures::Acquire", "Glow.+8364", "Glow.+8368", "Glow.+8372", "Glow.+8404"]
+measure = "RenderTexture"
+measures = ["new<36>@RenderTextures::Acquire", "Glow.+8364", "Glow.+8368", "Glow.+8372", "Glow.+8404", "RenderTextures::Release.r3.+0"]
 size = 36
 origin = "allocated"
 fields = [
@@ -330,7 +332,7 @@ fields = [
 
 # An effect's render texture field, by address (RenderTextures::Release's r3).
 [RenderTextureRef]
-measure = "RenderTextures"
+measure = "RenderTextures::Release.r3"
 size = 4
 origin = "embedded"
 fields = [
@@ -339,7 +341,7 @@ fields = [
 
 # The glare definition (the glow's +8064; probably the DirectX SDK HDR sample's GLAREDEF).
 [GlareDef]
-measure = "GlareDef"
+measure = "Glow@+8064"
 size = 288
 origin = "embedded"
 fields = [
@@ -362,7 +364,7 @@ fields = [
 
 # The star definition (the glare's +48; probably the HDR sample's STARDEF).
 [StarDef]
-measure = "StarDef"
+measure = "Glow@+8064@+48"
 size = 240
 origin = "embedded"
 fields = [

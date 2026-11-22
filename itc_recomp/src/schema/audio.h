@@ -242,6 +242,21 @@ struct AudioRenderDriverVtable : View {
   uint32_t register_driver_address() const { return address + 28; }
 };
 
+// embedded; measure: sub_82465848.r3@-4
+struct AudioRenderDriverOuter4 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 20;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_16() const { return guest::LoadU32(base, address + 16); }
+  void set_unknown_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+};
+
 // The image words docs/functions/audio.md's code uses.
 struct AudioGlobals {
   // the XMA registers' ContextArrayAddress (read once at boot by sub_8245C638, used by sub_8245D138 for context ids; neither runs now)

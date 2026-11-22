@@ -133,7 +133,7 @@ fields = [
 
 # A work item's +20 (Job::Wait's): the pool's waiter interface (pool - 4).
 [FramePassesJobWaiter]
-measure = "Job.+20"
+measure = "Job::Wait.r3.+20"
 size = 4
 origin = "embedded"
 fields = [
@@ -141,7 +141,7 @@ fields = [
 ]
 
 [FramePassesJobWaiterVtable]
-measure = "Job.+20.+0"
+measure = "Job::Wait.r3.+20.+0"
 size = 8
 origin = "image"
 fields = [

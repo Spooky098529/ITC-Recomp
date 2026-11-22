@@ -196,7 +196,7 @@ struct SceneParts : View {
   uint32_t scene_address() const { return address + 37284; }
 };
 
-// embedded; measure: InteriorMeters
+// embedded; measure: SceneInterior@+3312
 struct InteriorMeters : View {
   using View::View;
   static constexpr uint32_t kSize = 5360;

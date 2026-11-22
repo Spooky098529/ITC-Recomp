@@ -13,7 +13,7 @@
 # holder's +656 probably holds a second one, the split screen's).
 [RaceHud]
 measure = "RaceHud"
-measures = ["sub_822155C0.r3", "sub_82213860.r3", "sub_82214C88.r3"]
+measures = ["sub_822155C0.r3", "sub_82213860.r3", "sub_82214C88.r3", "RaceHud::ApplyOptions.r3", "RaceHud::StopCountdown.r3"]
 size = 640
 origin = "embedded"
 fields = [
@@ -111,7 +111,7 @@ fields = [
 # A gauge curve (112 bytes: the HUD's +20 and +132, the alternate HUD's;
 # HudCurve::Eval).
 [HudCurve]
-measure = "HudCurve"
+measure = "HudCurve::Eval.r3"
 size = 112
 origin = "embedded"
 fields = [
@@ -184,4 +184,97 @@ fields = [
   { name = "unknown_336", offset = 336, type = "u32" },
   { name = "unknown_340", offset = 340, type = "u32" },
   { name = "unknown_344", offset = 344, type = "u32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from RaceHud.
+[RaceHudAt16]
+measure = "RaceHudMachine.+9608@+16"
+size = 636
+origin = "embedded"
+fields = [
+  { name = "unknown_444", offset = 444, type = "u32" },
+  { name = "unknown_456", offset = 456, type = "u32" },
+  { name = "unknown_604", offset = 604, type = "u32" },
+  { name = "unknown_608", offset = 608, type = "u32" },
+  { name = "unknown_624", offset = 624, type = "u32" },
+  { name = "unknown_632", offset = 632, type = "u32" },
+]
+
+# Split from RaceHud.
+[RaceHudAt16_2]
+measure = "RaceScreens::~RaceScreens.r3@+16"
+size = 612
+origin = "embedded"
+fields = [
+  { name = "unknown_588", offset = 588, type = "u32" },
+  { name = "unknown_608", offset = 608, type = "u32" },
+]
+
+# Split from RaceHud.
+[RaceHudAt16_3]
+measure = "RaceScreens@+16"
+size = 640
+origin = "embedded"
+fields = [
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_120", offset = 120, type = "f32" },
+  { name = "unknown_232", offset = 232, type = "f32" },
+  { name = "unknown_404", offset = 404, type = "f32" },
+  { name = "unknown_408", offset = 408, type = "f32" },
+  { name = "unknown_412", offset = 412, type = "f32" },
+  { name = "unknown_416", offset = 416, type = "u32" },
+  { name = "unknown_420", offset = 420, type = "u32" },
+  { name = "unknown_424", offset = 424, type = "u32" },
+  { name = "unknown_428", offset = 428, type = "u32" },
+  { name = "unknown_432", offset = 432, type = "u32" },
+  { name = "unknown_436", offset = 436, type = "u32" },
+  { name = "unknown_440", offset = 440, type = "u32" },
+  { name = "unknown_444", offset = 444, type = "u32" },
+  { name = "unknown_448", offset = 448, type = "u32" },
+  { name = "unknown_452", offset = 452, type = "u32" },
+  { name = "unknown_456", offset = 456, type = "u32" },
+  { name = "unknown_460", offset = 460, type = "u32" },
+  { name = "unknown_464", offset = 464, type = "u32" },
+  { name = "unknown_468", offset = 468, type = "u32" },
+  { name = "unknown_472", offset = 472, type = "u32" },
+  { name = "unknown_476", offset = 476, type = "u32" },
+  { name = "unknown_480", offset = 480, type = "u32" },
+  { name = "unknown_488", offset = 488, type = "u32" },
+  { name = "unknown_492", offset = 492, type = "u32" },
+  { name = "unknown_496", offset = 496, type = "u32" },
+  { name = "unknown_572", offset = 572, type = "u32" },
+  { name = "unknown_576", offset = 576, type = "u32" },
+  { name = "unknown_580", offset = 580, type = "u32" },
+  { name = "unknown_584", offset = 584, type = "u32" },
+  { name = "unknown_588", offset = 588, type = "u32" },
+  { name = "unknown_592", offset = 592, type = "u32" },
+  { name = "unknown_596", offset = 596, type = "u32" },
+  { name = "unknown_600", offset = 600, type = "u32" },
+  { name = "unknown_604", offset = 604, type = "u32" },
+  { name = "unknown_608", offset = 608, type = "u32" },
+  { name = "unknown_612", offset = 612, type = "u32" },
+  { name = "unknown_616", offset = 616, type = "u32" },
+  { name = "unknown_620", offset = 620, type = "u32" },
+  { name = "unknown_624", offset = 624, type = "u32" },
+  { name = "unknown_628", offset = 628, type = "u32" },
+  { name = "unknown_632", offset = 632, type = "u32" },
+  { name = "unknown_636", offset = 636, type = "u32" },
+]
+
+# Split from RaceHudRacers.
+[RaceHudRacersPart]
+measure = "RaceScreens@+16.+444"
+size = 3936
+origin = "embedded"
+fields = [
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_828", offset = 828, type = "f32" },
+  { name = "unknown_836", offset = 836, type = "u32" },
+  { name = "unknown_3932", offset = 3932, type = "u32" },
 ]

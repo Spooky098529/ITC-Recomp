@@ -10,7 +10,8 @@
 
 # The object (264 bytes, cleared by RaceScreens::Make1004).
 [AltHud]
-measure = "AltHud.+0"
+measure = "RaceScreens@+1004.+0"
+measures = ["AltHud::ToggleView.r3.+0"]
 size = 264
 origin = "allocated"
 fields = [
@@ -33,7 +34,8 @@ fields = [
 # The holder's +1004: two words, both made by RaceScreens::Make1004 and
 # freed by AltHud::Destroy.
 [AltHudHolder]
-measure = "AltHud"
+measure = "RaceScreens@+1004"
+measures = ["RaceScreens::~RaceScreens.r3@+1004", "AltHud::ToggleView.r3"]
 size = 8
 origin = "embedded"
 fields = [

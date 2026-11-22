@@ -209,7 +209,7 @@ struct CarParts : View {
   uint32_t first_set_address() const { return address + 106000; }
 };
 
-// embedded; measure: CarPartsLoads
+// embedded; measure: CarParts@+96
 struct CarPartsLoads : View {
   using View::View;
   static constexpr uint32_t kSize = 105904;
@@ -440,7 +440,7 @@ struct Pool4Object : View {
   uint32_t first_set_address() const { return address + 576; }
 };
 
-// embedded; measure: CarModelLoads
+// embedded; measure: CarModel@+3728
 struct CarModelLoads : View {
   using View::View;
   static constexpr uint32_t kSize = 2988;
@@ -499,7 +499,7 @@ struct CarModelLoads : View {
   uint32_t plate_second_data_address() const { return address + 2984; }
 };
 
-// embedded; measure: WheelsLoads
+// embedded; measure: Wheels@+192
 struct WheelsLoads : View {
   using View::View;
   static constexpr uint32_t kSize = 3072;

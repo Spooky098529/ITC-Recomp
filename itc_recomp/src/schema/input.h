@@ -100,7 +100,7 @@ struct InputDispatcherVtable : View {
   uint32_t register_5_address() const { return address + 8; }
 };
 
-// embedded; measure: LogicalPad, InputProcessor::Update.r4, LogicalPad::Bind.r3
+// embedded; measure: InputProcessor::Update.r4, LogicalPad::Bind.r3, InputManager@+8
 struct LogicalPad : View {
   using View::View;
   static constexpr uint32_t kSize = 196;
@@ -146,7 +146,7 @@ struct InputDeviceVtable : View {
   uint32_t values_address() const { return address + 4; }
 };
 
-// embedded; measure: InputProcessor, InputProcessorBase, InputProcessor::Assign.r4
+// embedded; measure: InputProcessor, InputProcessorBase, InputProcessor::Assign.r4, InputProcessor::InputProcessor.r3
 struct InputProcessor : View {
   using View::View;
   static constexpr uint32_t kSize = 416;

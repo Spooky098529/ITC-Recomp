@@ -50,4 +50,13 @@ struct XACTWaveEntry : View {
   uint32_t loop_length_address() const { return address + 32; }
 };
 
+// embedded; measure: SkeletonBase@+80
+struct XACTWaveEntryAt80 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
 }  // namespace schema

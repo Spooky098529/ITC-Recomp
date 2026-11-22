@@ -22,7 +22,7 @@ struct RaceOverlays : View {
   uint32_t others_address() const { return address + 4; }
 };
 
-// image; measure: CarOverlays.+0, RaceOverlays.+8.+0
+// image; measure: CarOverlays.+0, sub_8215E6C0.r3@+9608.+8.+0
 struct OverlayVtable : View {
   using View::View;
   static constexpr uint32_t kSize = 32;
@@ -68,7 +68,7 @@ struct OverlayViewVtable : View {
   uint32_t deleting_destructor_address() const { return address + 0; }
 };
 
-// allocated; measure: CarOverlays, RaceOverlays.+8
+// allocated; measure: CarOverlays, sub_8215E6C0.r3@+9608.+8
 struct CarOverlays : View {
   using View::View;
   static constexpr uint32_t kSize = 848;
@@ -1201,6 +1201,93 @@ struct OverlaySprite : View {
   uint32_t end1_alpha() const { return guest::LoadU32(base, address + 140); }
   void set_end1_alpha(uint32_t v) const { guest::StoreU32(base, address + 140, v); }
   uint32_t end1_alpha_address() const { return address + 140; }
+};
+
+// embedded; measure: RaceMode@+157552
+struct RaceOverlaysAt157552 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: RaceOverlays::OnUpdate.r3@+9608
+struct RaceOverlaysAt9608 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: sub_8215E158.r3@+9608
+struct RaceOverlaysAt9608_2 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: sub_8215E680.r3@+9608
+struct RaceOverlaysAt9608_3 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 8;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+};
+
+// embedded; measure: sub_8215E6C0.r3@+9608
+struct RaceOverlaysAt9608_4 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 12;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+};
+
+// embedded; measure: sub_8215E6C0.r3@+9608.+0
+struct CarOverlaysPart : View {
+  using View::View;
+  static constexpr uint32_t kSize = 108;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_24() const { return guest::LoadU32(base, address + 24); }
+  void set_unknown_24(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
+  uint32_t unknown_24_address() const { return address + 24; }
+  uint32_t unknown_104() const { return guest::LoadU32(base, address + 104); }
+  void set_unknown_104(uint32_t v) const { guest::StoreU32(base, address + 104, v); }
+  uint32_t unknown_104_address() const { return address + 104; }
+};
+
+// embedded; measure: sub_8215E6C0.r3@+9608.+4
+struct CarOverlaysPart_2 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: sub_8215E6C0.r3@+9608.+4.+0
+struct OverlayVtablePart : View {
+  using View::View;
+  static constexpr uint32_t kSize = 28;
+  uint32_t unknown_24() const { return guest::LoadU32(base, address + 24); }
+  void set_unknown_24(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
+  uint32_t unknown_24_address() const { return address + 24; }
 };
 
 // The image words docs/functions/race-overlays.md's code uses.

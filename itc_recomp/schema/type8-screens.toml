@@ -28,7 +28,7 @@
 # 4): the two players' car pick, over MachineScreen.
 [Type8PanelScreen]
 measure = "Type8PanelScreen"
-measures = ["PanelSetPair.+1908", "PanelSetPair.+1912", "PanelSetPair.+3880"]
+measures = ["ModeType8@+848@+42740@+10296", "ModeType8@+848@+42740@+9972", "ModeType8@+848@+42740@+11072"]
 size = 15252
 origin = "embedded"
 vtable = 0x82010AF0
@@ -103,7 +103,7 @@ fields = [
 # The panel group (36 bytes at the panel screen's +11212): PanelGroupBase
 # (car-list.toml) with its own vtable.
 [Type8PanelGroup]
-measure = "PanelGroup8"
+measure = "ModeType8@+848@+42740@+11212"
 size = 36
 origin = "embedded"
 vtable = 0x82010B48
@@ -116,7 +116,7 @@ fields = [
 
 # F, the tabs (148 bytes): car-list.toml's TabPanel and the player.
 [Type8TabPanel]
-measure = "Panel8F"
+measure = "Panel8F::Panel8F.r3"
 size = 148
 origin = "embedded"
 vtable = 0x82001DD8
@@ -146,7 +146,7 @@ fields = [
 
 # E, the car rows (164 bytes): car-list.toml's RowPanel and the player.
 [Type8RowPanel]
-measure = "Panel8E"
+measure = "Panel8E::Panel8E.r3"
 size = 164
 origin = "embedded"
 fields = [
@@ -180,6 +180,7 @@ fields = [
 # C, the car's info (324 bytes): car-list.toml's CarPanel and the player.
 [Type8CarPanel]
 measure = "Panel8C"
+measures = ["Panel8C::Panel8C.r3"]
 size = 324
 origin = "embedded"
 vtable = 0x82010B4C
@@ -242,7 +243,7 @@ fields = [
 
 # D, the colors (96 bytes): car-list.toml's ColorPanel and the player.
 [Type8ColorPanel]
-measure = "Panel8D"
+measure = "Panel8D::Panel8D.r3"
 size = 96
 origin = "embedded"
 vtable = 0x82001DD8
@@ -271,7 +272,7 @@ fields = [
 
 # The confirm panel (44 bytes): car-list.toml's ConfirmPanel and the player.
 [Type8ConfirmPanel]
-measure = "ConfirmPanel8"
+measure = "ConfirmPanel8::ConfirmPanel8.r3"
 size = 44
 origin = "embedded"
 vtable = 0x82010B5C
@@ -639,7 +640,8 @@ fields = [
 # menu, 2 items, and the setting, 2 items) and the node, string and named
 # animation ids (from the tables at 0x82011430 to 0x82011488, by the player).
 [Type8PlayerBlock]
-measures = ["Type8PlayerBlock", "Type8PlayerBlock.+228"]
+measure = "Type8PlayerBlock"
+measures = ["Type8PlayerBlock.+228", "Type8PlayerBlock::Type8PlayerBlock.r3", "Type8PlayerBlock::SetUp.r3", "Type8PlayerBlock::ShowSelections.r3", "Type8PlayerBlock::PlayOpening.r3", "Type8PlayerBlock::WhileReady.r3"]
 size = 232
 origin = "embedded"
 fields = [
@@ -683,7 +685,8 @@ fields = [
 # item menu, 3 items; the third choice, 2; the second choice, 5) and the
 # ids (from the tables at 0x82011348 to 0x820113D4, by the player).
 [Type8ColorBlock]
-measures = ["Type8ColorBlock", "Type8ColorBlock.+360"]
+measure = "Type8ColorBlock"
+measures = ["Type8ColorBlock.+360", "Type8ColorBlock::Type8ColorBlock.r3", "Type8ColorBlock::SetUp.r3", "Type8ColorBlock::ShowSelections.r3", "Type8ColorBlock::PlayOpening.r3", "Type8ColorBlock::WhileReady.r3"]
 size = 364
 origin = "embedded"
 fields = [
@@ -763,3 +766,234 @@ course_texts = { address = 0x82010D70, type = "bytes", count = 32, note = "the c
 course_infos = { address = 0x82010D90, type = "bytes", count = 128, note = "8 Type8CourseInfos" }
 color_block_ids = { address = 0x82011348, type = "bytes", count = 144, note = "Type8ColorBlock's id tables (by the player)" }
 player_block_ids = { address = 0x82011430, type = "bytes", count = 92, note = "Type8PlayerBlock's id tables (by the player)" }
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from Type8ListScreen.
+[Type8ListScreenAt19544]
+measure = "ModeType8@+848@+19544"
+size = 10844
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_9672", offset = 9672, type = "u32" },
+  { name = "unknown_9676", offset = 9676, type = "u32" },
+  { name = "unknown_9708", offset = 9708, type = "u32" },
+  { name = "unknown_9712", offset = 9712, type = "u32" },
+  { name = "unknown_9716", offset = 9716, type = "u32" },
+  { name = "unknown_9720", offset = 9720, type = "u32" },
+  { name = "unknown_9724", offset = 9724, type = "u32" },
+  { name = "unknown_9728", offset = 9728, type = "u32" },
+  { name = "unknown_9732", offset = 9732, type = "u32" },
+  { name = "unknown_9736", offset = 9736, type = "u32" },
+  { name = "unknown_9740", offset = 9740, type = "u32" },
+  { name = "unknown_9744", offset = 9744, type = "u32" },
+  { name = "unknown_9748", offset = 9748, type = "u32" },
+  { name = "unknown_9752", offset = 9752, type = "u32" },
+  { name = "unknown_9756", offset = 9756, type = "u32" },
+  { name = "unknown_9768", offset = 9768, type = "u32" },
+  { name = "unknown_9776", offset = 9776, type = "u32" },
+  { name = "unknown_9784", offset = 9784, type = "u32" },
+  { name = "unknown_9788", offset = 9788, type = "u32" },
+  { name = "unknown_9800", offset = 9800, type = "u32" },
+  { name = "unknown_9804", offset = 9804, type = "u32" },
+  { name = "unknown_9808", offset = 9808, type = "u32" },
+  { name = "unknown_9812", offset = 9812, type = "u32" },
+  { name = "unknown_9816", offset = 9816, type = "u32" },
+  { name = "unknown_9820", offset = 9820, type = "u32" },
+  { name = "unknown_9824", offset = 9824, type = "u32" },
+  { name = "unknown_9828", offset = 9828, type = "u32" },
+  { name = "unknown_9832", offset = 9832, type = "u32" },
+  { name = "unknown_9848", offset = 9848, type = "u32" },
+  { name = "unknown_9852", offset = 9852, type = "u32" },
+  { name = "unknown_9856", offset = 9856, type = "u32" },
+  { name = "unknown_9860", offset = 9860, type = "u32" },
+  { name = "unknown_9868", offset = 9868, type = "u32" },
+  { name = "unknown_9872", offset = 9872, type = "u32" },
+  { name = "unknown_9876", offset = 9876, type = "u32" },
+  { name = "unknown_9880", offset = 9880, type = "u32" },
+  { name = "unknown_9888", offset = 9888, type = "u32" },
+  { name = "unknown_9892", offset = 9892, type = "u32" },
+  { name = "unknown_9896", offset = 9896, type = "u32" },
+  { name = "unknown_9900", offset = 9900, type = "u32" },
+  { name = "unknown_9904", offset = 9904, type = "u32" },
+  { name = "unknown_9908", offset = 9908, type = "u32" },
+  { name = "unknown_9912", offset = 9912, type = "u32" },
+  { name = "unknown_9916", offset = 9916, type = "u32" },
+  { name = "unknown_9928", offset = 9928, type = "u32" },
+  { name = "unknown_9932", offset = 9932, type = "u32" },
+  { name = "unknown_9936", offset = 9936, type = "u32" },
+  { name = "unknown_9976", offset = 9976, type = "u32" },
+  { name = "unknown_9980", offset = 9980, type = "u32" },
+  { name = "unknown_9984", offset = 9984, type = "u32" },
+  { name = "unknown_10820", offset = 10820, type = "u32" },
+  { name = "unknown_10832", offset = 10832, type = "u32" },
+  { name = "unknown_10836", offset = 10836, type = "u32" },
+  { name = "unknown_10840", offset = 10840, type = "u32" },
+]
+
+# Split from Type8ListPart.
+[Type8ListPartPart]
+measure = "ModeType8@+848@+19544.+9676"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+]
+
+# Split from Type8ColorListScreen.
+[Type8ColorListScreenAt30912]
+measure = "ModeType8@+848@+30912"
+size = 11040
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_9672", offset = 9672, type = "u32" },
+  { name = "unknown_9676", offset = 9676, type = "u32" },
+  { name = "unknown_9684", offset = 9684, type = "u32" },
+  { name = "unknown_9708", offset = 9708, type = "u32" },
+  { name = "unknown_9712", offset = 9712, type = "u32" },
+  { name = "unknown_9716", offset = 9716, type = "u32" },
+  { name = "unknown_9720", offset = 9720, type = "u32" },
+  { name = "unknown_9724", offset = 9724, type = "u32" },
+  { name = "unknown_9728", offset = 9728, type = "u32" },
+  { name = "unknown_9732", offset = 9732, type = "u32" },
+  { name = "unknown_9736", offset = 9736, type = "u32" },
+  { name = "unknown_9740", offset = 9740, type = "u32" },
+  { name = "unknown_9744", offset = 9744, type = "u32" },
+  { name = "unknown_9748", offset = 9748, type = "u32" },
+  { name = "unknown_9752", offset = 9752, type = "u32" },
+  { name = "unknown_9756", offset = 9756, type = "u32" },
+  { name = "unknown_9768", offset = 9768, type = "u32" },
+  { name = "unknown_9776", offset = 9776, type = "u32" },
+  { name = "unknown_9784", offset = 9784, type = "u32" },
+  { name = "unknown_9788", offset = 9788, type = "u32" },
+  { name = "unknown_9800", offset = 9800, type = "u32" },
+  { name = "unknown_9804", offset = 9804, type = "u32" },
+  { name = "unknown_9808", offset = 9808, type = "u32" },
+  { name = "unknown_9812", offset = 9812, type = "u32" },
+  { name = "unknown_9816", offset = 9816, type = "u32" },
+  { name = "unknown_9820", offset = 9820, type = "u32" },
+  { name = "unknown_9824", offset = 9824, type = "u32" },
+  { name = "unknown_9828", offset = 9828, type = "u32" },
+  { name = "unknown_9832", offset = 9832, type = "u32" },
+  { name = "unknown_9840", offset = 9840, type = "u32" },
+  { name = "unknown_9844", offset = 9844, type = "u32" },
+  { name = "unknown_9848", offset = 9848, type = "u32" },
+  { name = "unknown_9852", offset = 9852, type = "u32" },
+  { name = "unknown_9856", offset = 9856, type = "u32" },
+  { name = "unknown_9860", offset = 9860, type = "u32" },
+  { name = "unknown_9864", offset = 9864, type = "u32" },
+  { name = "unknown_9868", offset = 9868, type = "u32" },
+  { name = "unknown_9872", offset = 9872, type = "u32" },
+  { name = "unknown_9876", offset = 9876, type = "u32" },
+  { name = "unknown_9888", offset = 9888, type = "u32" },
+  { name = "unknown_9892", offset = 9892, type = "u32" },
+  { name = "unknown_9896", offset = 9896, type = "u32" },
+  { name = "unknown_9900", offset = 9900, type = "u32" },
+  { name = "unknown_9904", offset = 9904, type = "u32" },
+  { name = "unknown_9908", offset = 9908, type = "u32" },
+  { name = "unknown_9912", offset = 9912, type = "u32" },
+  { name = "unknown_9916", offset = 9916, type = "u32" },
+  { name = "unknown_9920", offset = 9920, type = "u32" },
+  { name = "unknown_9924", offset = 9924, type = "u32" },
+  { name = "unknown_9928", offset = 9928, type = "u32" },
+  { name = "unknown_9932", offset = 9932, type = "u32" },
+  { name = "unknown_9936", offset = 9936, type = "u32" },
+  { name = "unknown_9976", offset = 9976, type = "u32" },
+  { name = "unknown_10016", offset = 10016, type = "u32" },
+  { name = "unknown_10056", offset = 10056, type = "u32" },
+  { name = "unknown_10060", offset = 10060, type = "u32" },
+  { name = "unknown_10064", offset = 10064, type = "u32" },
+  { name = "unknown_10096", offset = 10096, type = "u32" },
+  { name = "unknown_10100", offset = 10100, type = "u32" },
+  { name = "unknown_10104", offset = 10104, type = "u32" },
+  { name = "unknown_10440", offset = 10440, type = "u32" },
+  { name = "unknown_10444", offset = 10444, type = "u32" },
+  { name = "unknown_10448", offset = 10448, type = "u32" },
+  { name = "unknown_10588", offset = 10588, type = "u32" },
+  { name = "unknown_10744", offset = 10744, type = "u32" },
+  { name = "unknown_10852", offset = 10852, type = "u32" },
+  { name = "unknown_10856", offset = 10856, type = "u32" },
+  { name = "unknown_10916", offset = 10916, type = "u32" },
+  { name = "unknown_10920", offset = 10920, type = "u32" },
+  { name = "unknown_10924", offset = 10924, type = "u32" },
+  { name = "unknown_10932", offset = 10932, type = "u32" },
+  { name = "unknown_10936", offset = 10936, type = "u32" },
+  { name = "unknown_10940", offset = 10940, type = "u32" },
+  { name = "unknown_10952", offset = 10952, type = "u32" },
+  { name = "unknown_10956", offset = 10956, type = "u32" },
+  { name = "unknown_10960", offset = 10960, type = "u32" },
+  { name = "unknown_10968", offset = 10968, type = "u32" },
+  { name = "unknown_10972", offset = 10972, type = "u32" },
+  { name = "unknown_10976", offset = 10976, type = "u32" },
+  { name = "unknown_11036", offset = 11036, type = "u32" },
+]
+
+# Split from Type8ColorListPart.
+[Type8ColorListPartPart]
+measure = "ModeType8@+848@+30912.+9676"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+]
+
+# Split from Type8PanelScreen.
+[Type8PanelScreenAt42740]
+measure = "ModeType8@+848@+42740"
+size = 15252
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_9644", offset = 9644, type = "u32" },
+  { name = "unknown_9648", offset = 9648, type = "u32" },
+  { name = "unknown_9652", offset = 9652, type = "u32" },
+  { name = "unknown_9656", offset = 9656, type = "u32" },
+  { name = "unknown_11256", offset = 11256, type = "u32" },
+  { name = "unknown_11260", offset = 11260, type = "u32" },
+  { name = "unknown_11264", offset = 11264, type = "u32" },
+  { name = "unknown_11268", offset = 11268, type = "u32" },
+  { name = "unknown_11396", offset = 11396, type = "u32" },
+  { name = "unknown_13192", offset = 13192, type = "u32" },
+  { name = "unknown_13196", offset = 13196, type = "u32" },
+  { name = "unknown_13236", offset = 13236, type = "u32" },
+  { name = "unknown_13240", offset = 13240, type = "u32" },
+  { name = "unknown_13244", offset = 13244, type = "u32" },
+  { name = "unknown_13368", offset = 13368, type = "u32" },
+  { name = "unknown_15164", offset = 15164, type = "u32" },
+  { name = "unknown_15168", offset = 15168, type = "u32" },
+  { name = "unknown_15208", offset = 15208, type = "u32" },
+  { name = "unknown_15212", offset = 15212, type = "u32" },
+  { name = "unknown_15216", offset = 15216, type = "u32" },
+  { name = "unknown_15228", offset = 15228, type = "u32" },
+  { name = "unknown_15232", offset = 15232, type = "u32" },
+  { name = "unknown_15236", offset = 15236, type = "u32" },
+  { name = "unknown_15240", offset = 15240, type = "u32" },
+  { name = "unknown_15244", offset = 15244, type = "u32" },
+  { name = "unknown_15248", offset = 15248, type = "u32" },
+]
+
+# Split from Type8ListPartInner.
+[Type8ListPartInnerPart]
+measure = "Type8Screen0@+19544.+9676.+16"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from Type8ColorPartInner.
+[Type8ColorPartInnerPart]
+measure = "Type8Screen0@+30912.+9676.+16"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]

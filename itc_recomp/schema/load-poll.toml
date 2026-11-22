@@ -85,7 +85,7 @@ fields = [
 # Dash (measure "Dash") is the same object, by its names here, to merge.
 # Gauge records at +16 + 240k: the needles' models at their +4, shapes at +228.
 [InteriorMeters]
-measure = "InteriorMeters"
+measures = ["SceneInterior@+3312"]
 size = 5360
 origin = "embedded"
 fields = [

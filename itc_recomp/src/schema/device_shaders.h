@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// gpu; measure: RenderQueue, sub_8258E5C8.r3, Font.+8
+// gpu; measure: RenderQueue, sub_8258E5C8.r3, Font.+8, [82970BD4]
 struct RenderQueue : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
@@ -39,7 +39,7 @@ struct RenderQueue : View {
   uint32_t list_0_address() const { return address + 12; }
 };
 
-// gpu; measure: RenderQueue.+0, Font.+8.+0
+// gpu; measure: RenderQueue.+0, Font.+8.+0, [82970BD4].+0
 struct RenderQueueVtable : View {
   using View::View;
   static constexpr uint32_t kSize = 40;

@@ -30,7 +30,7 @@
 # measure files here too.
 [Model]
 measure = "Model"
-measures = ["Mesh", "Model.+48"]
+measures = ["Mesh", "Model.+48", "Model::Load.r3", "Model::SetVinylTextures.r3"]
 size = 432
 origin = "allocated"
 vtable = 0x8206CD18
@@ -157,7 +157,7 @@ fields = [
 # code) since Model::Load reads a shape's +408 and +428 through them.
 [ModelShape]
 measure = "Mesh.+40"
-measures = ["WorkMem", "Model.+40"]
+measures = ["WorkMem", "Model.+40", "Model::Load.r3.+40"]
 size = 544
 origin = "file"
 fields = [
@@ -201,7 +201,7 @@ fields = [
 # A shape's skin block (the shape's +408).
 [SkinBlock]
 measure = "Mesh.+40.+408"
-measures = ["Model.+40.+408"]
+measures = ["Model::Load.r3.+40.+408"]
 size = 24
 origin = "file"
 fields = [
@@ -214,7 +214,7 @@ fields = [
 
 # A vertex's influence count (the skin block's +8, a word a vertex).
 [SkinInfluenceCount]
-measure = "Model.+40.+408.+8"
+measure = "Model::Load.r3.+40.+408.+8"
 size = 4
 origin = "file"
 fields = [
@@ -224,7 +224,7 @@ fields = [
 # An influence's weight (16 bytes; the skin block's +12): x, y, z quantized
 # at load, the last of a vertex's 1 minus the others' sums.
 [SkinWeight]
-measure = "Model.+40.+408.+12"
+measure = "Model::Load.r3.+40.+408.+12"
 size = 16
 origin = "file"
 fields = [
@@ -243,7 +243,8 @@ fields = [
 # the vector's own view). heap.toml's TextureProvider (its deleting
 # destructor's r3, sub_82594440.r3) is this one, to move here.
 [TextureProvider]
-measures = ["TextureProvider", "sub_82594440.r3"]
+measure = "TextureProvider"
+measures = ["sub_82594440.r3", "TextureProvider::Reserve.r3", "TextureProvider::~TextureProvider.r3", "TextureProvider::TextureProvider.r3", "TextureProvider::Clear.r3"]
 size = 20
 origin = "embedded"
 vtable = 0x8206CCB4
@@ -282,8 +283,8 @@ fields = [
 
 # The texture provider's vtable (0x8206CCB4).
 [TextureProviderVtable]
-measures = ["TextureProvider.+0", "Model.+80",
-            "SceneAssets.+144", "SceneAssets.+164", "SceneAssets.+232", "SceneAssets.+300", "SceneAssets.+368", "SceneAssets.+1000", "SceneAssets.+1068", "SceneAssets.+4800", "CarScene::OnFileLoaded.r6.+296", "CarScene::OnFileLoaded.r6.+364", "CarScene::OnFileLoaded.r6.+432", "CarScene::OnFileLoaded.r6.+1064", "CarScene::OnFileLoaded.r6.+1132", "CarModelLoads.+320", "Cockpit.+496", "WheelsLoads.+2048", "TrafficCar.+4064", "TrafficCar::OnFileLoaded.r6.+4064"]
+measure = "TextureProvider.+0"
+measures = ["SceneAssets.+144", "SceneAssets.+164", "SceneAssets.+232", "SceneAssets.+300", "SceneAssets.+368", "SceneAssets.+1000", "SceneAssets.+1068", "SceneAssets.+4800", "CarScene::OnFileLoaded.r6.+296", "CarScene::OnFileLoaded.r6.+364", "CarScene::OnFileLoaded.r6.+432", "CarScene::OnFileLoaded.r6.+1064", "CarScene::OnFileLoaded.r6.+1132", "Cockpit.+496", "TrafficCar.+4064", "TrafficCar::OnFileLoaded.r6.+4064", "Model::Load.r3.+80", "CarModel@+3728.+320", "Wheels@+192.+2048"]
 size = 44
 origin = "image"
 fields = [
@@ -304,6 +305,7 @@ fields = [
 # a measure fault).
 [XPR]
 measure = "XPR"
+measures = ["XPR::Release_82108860.r3"]
 size = 24
 origin = "embedded"
 fields = [
@@ -443,7 +445,7 @@ fields = [
 # sub_825A21A8 reads it).
 [NodeFile]
 measure = "Skeleton.+80"
-measures = ["sub_8259A9E0.r3.+80", "sub_82599A20.r3.+80", "sub_8259A9E0.r3@+80.+0"]
+measures = ["sub_8259A9E0.r3.+80", "sub_82599A20.r3.+80", "sub_8259A9E0.r3@+80.+0", "Skeleton::LocalMatrices.r3.+80"]
 size = 52
 origin = "file"
 fields = [
@@ -485,6 +487,7 @@ fields = [
 # A node record (160 bytes, the skeleton's [+84] + 160i).
 [SkeletonNodeRecord]
 measure = "Skeleton.+84"
+measures = ["Skeleton::LocalMatrices.r3.+84"]
 size = 160
 origin = "file"
 fields = [
@@ -496,8 +499,8 @@ fields = [
 # A node's state (144 bytes, the skeleton's [+136] + 144i; [+140] the first
 # bone's).
 [SkeletonNodeState]
-measure = "Skeleton.+136"
-measures = ["Skeleton.+140", "CursorCurve::Sample.r5"]
+measure = "CursorCurve::Sample.r5"
+measures = ["Skeleton::LocalMatrices.r3.+136", "Skeleton::LocalMatrices.r3.+140"]
 size = 144
 origin = "allocated"
 fields = [
@@ -516,7 +519,7 @@ fields = [
 # writes the identity's words and the translation row as doublewords too.
 [SkeletonMatrix]
 measure = "Skeleton.+148"
-measures = ["Cockpit::OnFileLoaded.r6.+3472"]
+measures = ["Cockpit::OnFileLoaded.r6.+3472", "Skeleton::LocalMatrices.r3.+148"]
 size = 64
 origin = "allocated"
 fields = [
@@ -591,3 +594,37 @@ pending_frees = { address = 0x8296BD54, type = "bytes", count = 12, note = "the 
 weight_multiply = { address = 0x82001BDC, type = "f32", note = "Model::Load's weight quantization: the factor" }
 weight_add = { address = 0x82001BE4, type = "f32", note = "Model::Load's weight quantization: the addend (0.5)" }
 weight_scale = { address = 0x820029D8, type = "f32", note = "Model::Load's weight quantization: the scale back" }
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from Model.
+[ModelAt4160]
+measure = "Floor@+4160"
+size = 44
+origin = "embedded"
+fields = [
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_40", offset = 40, type = "u32" },
+]
+
+# Split from TextureProvider.
+[TextureProviderAt4]
+measure = "TextureProvider::TextureProvider.r3@+4"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Split from TextureProvider.
+[TextureProviderAt4_2]
+measure = "TextureProvider@+4"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]

@@ -1275,7 +1275,7 @@ lifted::Result f822158E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r11,r3
   r11 = r3;
   // lwz r28,12(r31)
-  r28 = guest::LoadU32(base, schema::RaceData(base, uint32_t(r31)).route_first_position_address());
+  r28 = guest::LoadU32(base, schema::RaceDataAt48(base, uint32_t(r31)).unknown_12_address());
   // mr r4,r31
   r4 = r31;
   // mr r3,r30

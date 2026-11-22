@@ -109,7 +109,7 @@ struct RaceModeInterface32 : View {
   uint32_t running_address() const { return address + 167228; }
 };
 
-// embedded; measure: UiMovie.+16
+// embedded; measure: UiMovie.+16, RaceHud.+604.+16
 struct UiMovieSceneChunk : View {
   using View::View;
   static constexpr uint32_t kSize = 84;
@@ -128,6 +128,18 @@ struct UiMovieSceneChunk : View {
   uint32_t unknown_80() const { return guest::LoadU32(base, address + 80); }
   void set_unknown_80(uint32_t v) const { guest::StoreU32(base, address + 80, v); }
   uint32_t unknown_80_address() const { return address + 80; }
+};
+
+// embedded; measure: RaceMode@+848
+struct CourseSetupAt848 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 9648;
+  uint32_t unknown_9604() const { return guest::LoadU32(base, address + 9604); }
+  void set_unknown_9604(uint32_t v) const { guest::StoreU32(base, address + 9604, v); }
+  uint32_t unknown_9604_address() const { return address + 9604; }
+  uint32_t unknown_9644() const { return guest::LoadU32(base, address + 9644); }
+  void set_unknown_9644(uint32_t v) const { guest::StoreU32(base, address + 9644, v); }
+  uint32_t unknown_9644_address() const { return address + 9644; }
 };
 
 // The image words docs/functions/race-loading.md's code uses.

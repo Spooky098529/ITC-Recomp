@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// embedded; measure: sub_82379338.r3, sub_82379350.r3, SaveInterface, sub_820943B0.r3, sub_820943C8.r3
+// embedded; measure: sub_82379338.r3, sub_82379350.r3, sub_820943B0.r3, sub_820943C8.r3, [826BDC90]
 struct AppInterface16 : View {
   using View::View;
   static constexpr uint32_t kSize = 116;
@@ -44,7 +44,7 @@ struct AppInterface8 : View {
   uint32_t framework_interface_address() const { return address + 16; }
 };
 
-// embedded; measure: App.+16, sub_82094368.r3.+16, sub_820943B0.r3.+8, sub_820943C8.r3.+8
+// embedded; measure: sub_82094368.r3.+16, sub_820943B0.r3.+8, sub_820943C8.r3.+8, App::SceneFromInterface16.r3@-8.+16
 struct AppFrameworkInterface : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
@@ -56,7 +56,7 @@ struct AppFrameworkInterface : View {
   uint32_t vtable_address() const { return address + 0; }
 };
 
-// image; measure: App.+16.+0, App.+20.+0, sub_82094368.r3.+16.+0, sub_820943B0.r3.+8.+0, sub_820943C8.r3.+8.+0
+// image; measure: sub_82094368.r3.+16.+0, sub_820943B0.r3.+8.+0, sub_820943C8.r3.+8.+0, App::SceneFromInterface16.r3@-8.+16.+0, App::FrameDriver.r3.+20.+0
 struct AppFrameworkInterfaceVtable : View {
   using View::View;
   static constexpr uint32_t kSize = 44;

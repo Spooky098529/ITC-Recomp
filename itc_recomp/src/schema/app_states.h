@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: App, AppStates.+4
+// allocated; measure: App, AppStates.+4, App::FrameDriver.r3
 struct App : View {
   using View::View;
   static constexpr uint32_t kSize = 132;
@@ -213,7 +213,7 @@ struct AppInterface : View {
   uint32_t states_address() const { return address + 96; }
 };
 
-// image; measure: App.+20, AppStates::OnMessage.r4.+0
+// image; measure: App.+20, AppStates::OnMessage.r4.+0, App::FrameDriver.r3.+20
 struct AppInterfaceVtable : View {
   using View::View;
   static constexpr uint32_t kSize = 48;
@@ -553,7 +553,7 @@ struct AppStateVtable : View {
   uint32_t is_empty_address() const { return address + 44; }
 };
 
-// embedded; measure: PtrList, PtrList::Erase.r4
+// embedded; measure: PtrList, PtrList::Erase.r4, PtrList::PtrList.r3
 struct PtrList : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
@@ -576,7 +576,7 @@ struct PtrList : View {
   uint32_t fault_result_8_address() const { return address + 8; }
 };
 
-// allocated; measure: StateLayer.+16, StateLayer.+28, StateLayer.+28.+0, sub_820AD5B0.r3.+16, sub_820AD5B0.r3.+28, sub_820AD5B0.r3.+28.+0, sub_820AD8D0.r3.+16, sub_820AD8D0.r3.+28, List.+4.+0
+// allocated; measure: StateLayer.+16, StateLayer.+28, StateLayer.+28.+0, sub_820AD5B0.r3.+16, sub_820AD5B0.r3.+28, sub_820AD5B0.r3.+28.+0, sub_820AD8D0.r3.+16, sub_820AD8D0.r3.+28, List::Clear_820ACF88.r3.+4, List::Clear_820ACF88.r3.+4.+0
 struct StateListNode : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
@@ -596,7 +596,7 @@ struct StateListNode : View {
   uint32_t value_address() const { return address + 8; }
 };
 
-// embedded; measure: OpList
+// embedded; measure: OpList, OpList::IncSize.r3
 struct OpList : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
@@ -704,6 +704,63 @@ struct PhysicalPadAtTeardown : View {
   uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
   void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
+};
+
+// embedded; measure: App::SceneFromInterface16.r3@-8
+struct AppOuter8 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 20;
+  uint32_t unknown_16() const { return guest::LoadU32(base, address + 16); }
+  void set_unknown_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+};
+
+// embedded; measure: App::SendMessage.r3@+56
+struct MessageVectorAt56 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 16;
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  uint32_t unknown_12() const { return guest::LoadU32(base, address + 12); }
+  void set_unknown_12(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+};
+
+// embedded; measure: App::SendMessage.r3@+56.+8@+4
+struct AppMessageWordAt4 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: App@+76
+struct MessageVectorAt76 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 12;
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+};
+
+// embedded; measure: StateLayer@+36
+struct OpListAt36 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 12;
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
 };
 
 }  // namespace schema

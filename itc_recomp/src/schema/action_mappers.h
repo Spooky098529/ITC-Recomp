@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: ActionMapper, ActionMapper.+24, ActionMapper.+180
+// allocated; measure: ActionMapper, ActionMapper::ResetWords.r3, ActionMapper::ResetAnalog.r3, ActionMapper::ResetWords.r3.+24, ActionMapper@+448.+24, ActionMapper::ResetAnalog.r3.+180
 struct ActionMapper : View {
   using View::View;
   static constexpr uint32_t kSize = 2896;
@@ -251,62 +251,10 @@ struct ActionMapper : View {
   float fault_analog_values() const { return guest::LoadFloat(base, address + 60); }
   void set_fault_analog_values(float v) const { guest::StoreFloat(base, address + 60, v); }
   uint32_t fault_analog_values_address() const { return address + 60; }
-  // measure fault: ActionMapperState's first repeat's vtable (mapper + 592)
-  uint32_t fault_state_repeats() const { return guest::LoadU32(base, address + 144); }
-  void set_fault_state_repeats(uint32_t v) const { guest::StoreU32(base, address + 144, v); }
-  uint32_t fault_state_repeats_address() const { return address + 144; }
-  // measure fault: the first repeat's delay (mapper + 600)
-  uint32_t fault_state_repeat_delay() const { return guest::LoadU32(base, address + 152); }
-  void set_fault_state_repeat_delay(uint32_t v) const { guest::StoreU32(base, address + 152, v); }
-  uint32_t fault_state_repeat_delay_address() const { return address + 152; }
-  // measure fault: the first repeat's period (mapper + 604)
-  uint32_t fault_state_repeat_period() const { return guest::LoadU32(base, address + 156); }
-  void set_fault_state_repeat_period(uint32_t v) const { guest::StoreU32(base, address + 156, v); }
-  uint32_t fault_state_repeat_period_address() const { return address + 156; }
   // measure fault: the analog stage's curve pointers (mapper + 1252)
   uint32_t fault_analog_curve_pointers() const { return guest::LoadU32(base, address + 180); }
   void set_fault_analog_curve_pointers(uint32_t v) const { guest::StoreU32(base, address + 180, v); }
   uint32_t fault_analog_curve_pointers_address() const { return address + 180; }
-  // measure fault: the analog stage's first curve's vtable (mapper + 1372)
-  uint32_t fault_analog_curves() const { return guest::LoadU32(base, address + 300); }
-  void set_fault_analog_curves(uint32_t v) const { guest::StoreU32(base, address + 300, v); }
-  uint32_t fault_analog_curves_address() const { return address + 300; }
-  // measure fault: the first curve's center (mapper + 1376)
-  float fault_analog_curve_center() const { return guest::LoadFloat(base, address + 304); }
-  void set_fault_analog_curve_center(float v) const { guest::StoreFloat(base, address + 304, v); }
-  uint32_t fault_analog_curve_center_address() const { return address + 304; }
-  // measure fault: the first curve's dead zone (mapper + 1380)
-  float fault_analog_curve_dead_zone() const { return guest::LoadFloat(base, address + 308); }
-  void set_fault_analog_curve_dead_zone(float v) const { guest::StoreFloat(base, address + 308, v); }
-  uint32_t fault_analog_curve_dead_zone_address() const { return address + 308; }
-  // measure fault: the first curve's maximum (mapper + 1384)
-  float fault_analog_curve_maximum() const { return guest::LoadFloat(base, address + 312); }
-  void set_fault_analog_curve_maximum(float v) const { guest::StoreFloat(base, address + 312, v); }
-  uint32_t fault_analog_curve_maximum_address() const { return address + 312; }
-  // measure fault: ActionMapperState +684, the analog stage's values (mapper + 1132)
-  float fault_state_analog_values() const { return guest::LoadFloat(base, address + 684); }
-  void set_fault_state_analog_values(float v) const { guest::StoreFloat(base, address + 684, v); }
-  uint32_t fault_state_analog_values_address() const { return address + 684; }
-  // measure fault: ActionMapperState +1404, the first threshold's on (mapper + 1852)
-  float fault_threshold_on() const { return guest::LoadFloat(base, address + 1404); }
-  void set_fault_threshold_on(float v) const { guest::StoreFloat(base, address + 1404, v); }
-  uint32_t fault_threshold_on_address() const { return address + 1404; }
-  // measure fault: the first threshold's off (mapper + 1856)
-  float fault_threshold_off() const { return guest::LoadFloat(base, address + 1408); }
-  void set_fault_threshold_off(float v) const { guest::StoreFloat(base, address + 1408, v); }
-  uint32_t fault_threshold_off_address() const { return address + 1408; }
-  // measure fault: the first threshold's suppress ticks (mapper + 1860)
-  uint32_t fault_threshold_suppress_ticks() const { return guest::LoadU32(base, address + 1412); }
-  void set_fault_threshold_suppress_ticks(uint32_t v) const { guest::StoreU32(base, address + 1412, v); }
-  uint32_t fault_threshold_suppress_ticks_address() const { return address + 1412; }
-  // measure fault: the first threshold's counter (mapper + 1864)
-  uint32_t fault_threshold_counter() const { return guest::LoadU32(base, address + 1416); }
-  void set_fault_threshold_counter(uint32_t v) const { guest::StoreU32(base, address + 1416, v); }
-  uint32_t fault_threshold_counter_address() const { return address + 1416; }
-  // measure fault: the first threshold's state (mapper + 1868)
-  uint8_t fault_threshold_state() const { return guest::LoadU8(base, address + 1420); }
-  void set_fault_threshold_state(uint8_t v) const { guest::StoreU8(base, address + 1420, v); }
-  uint32_t fault_threshold_state_address() const { return address + 1420; }
   // the logical pad's 40 values (input manager + 44 + 196 × player)
   template <typename T = ActionPadValues>
   T pad_values() const { return T(base, guest::LoadU32(base, address + 2880)); }
@@ -481,7 +429,7 @@ struct ActionCurve : View {
   uint32_t maximum_address() const { return address + 12; }
 };
 
-// image; measure: ActionMapper.+144, ActionMapper.+300, ActionMapper.+24.+0, ActionMapper.+180.+0
+// image; measure: ActionMapper@+448.+144, ActionMapper@+448@+624.+300, ActionMapper::ResetWords.r3.+24.+0, ActionMapper@+448.+24.+0, ActionMapper::ResetAnalog.r3.+180.+0
 struct ActionObjectVtable : View {
   using View::View;
   static constexpr uint32_t kSize = 8;
@@ -696,6 +644,106 @@ struct ActionMapperConfigAt8 : View {
   uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
   void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t unknown_4_address() const { return address + 4; }
+};
+
+// embedded; measure: ActionMapper@+448
+struct ActionMapperAt448 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 1421;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  uint32_t unknown_12() const { return guest::LoadU32(base, address + 12); }
+  void set_unknown_12(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): ActionMapperState's fired (mapper + 464)
+  uint32_t state_fired() const { return guest::LoadU32(base, address + 16); }
+  void set_state_fired(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t state_fired_address() const { return address + 16; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): ActionMapperState's pending (mapper + 468)
+  uint32_t state_pending() const { return guest::LoadU32(base, address + 20); }
+  void set_state_pending(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
+  uint32_t state_pending_address() const { return address + 20; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): ActionMapperState's repeat pointers (mapper + 472)
+  uint32_t state_repeat_pointers() const { return guest::LoadU32(base, address + 24); }
+  void set_state_repeat_pointers(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
+  uint32_t state_repeat_pointers_address() const { return address + 24; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): ActionMapperState's first repeat's vtable (mapper + 592)
+  uint32_t state_repeats() const { return guest::LoadU32(base, address + 144); }
+  void set_state_repeats(uint32_t v) const { guest::StoreU32(base, address + 144, v); }
+  uint32_t state_repeats_address() const { return address + 144; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): the first repeat's delay (mapper + 600)
+  uint32_t state_repeat_delay() const { return guest::LoadU32(base, address + 152); }
+  void set_state_repeat_delay(uint32_t v) const { guest::StoreU32(base, address + 152, v); }
+  uint32_t state_repeat_delay_address() const { return address + 152; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): the first repeat's period (mapper + 604)
+  uint32_t state_repeat_period() const { return guest::LoadU32(base, address + 156); }
+  void set_state_repeat_period(uint32_t v) const { guest::StoreU32(base, address + 156, v); }
+  uint32_t state_repeat_period_address() const { return address + 156; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): ActionMapperState +684, the analog stage's values (mapper + 1132)
+  float state_analog_values() const { return guest::LoadFloat(base, address + 684); }
+  void set_state_analog_values(float v) const { guest::StoreFloat(base, address + 684, v); }
+  uint32_t state_analog_values_address() const { return address + 684; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): ActionMapperState +1404, the first threshold's on (mapper + 1852)
+  float threshold_on() const { return guest::LoadFloat(base, address + 1404); }
+  void set_threshold_on(float v) const { guest::StoreFloat(base, address + 1404, v); }
+  uint32_t threshold_on_address() const { return address + 1404; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): the first threshold's off (mapper + 1856)
+  float threshold_off() const { return guest::LoadFloat(base, address + 1408); }
+  void set_threshold_off(float v) const { guest::StoreFloat(base, address + 1408, v); }
+  uint32_t threshold_off_address() const { return address + 1408; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): the first threshold's suppress ticks (mapper + 1860)
+  uint32_t threshold_suppress_ticks() const { return guest::LoadU32(base, address + 1412); }
+  void set_threshold_suppress_ticks(uint32_t v) const { guest::StoreU32(base, address + 1412, v); }
+  uint32_t threshold_suppress_ticks_address() const { return address + 1412; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): the first threshold's counter (mapper + 1864)
+  uint32_t threshold_counter() const { return guest::LoadU32(base, address + 1416); }
+  void set_threshold_counter(uint32_t v) const { guest::StoreU32(base, address + 1416, v); }
+  uint32_t threshold_counter_address() const { return address + 1416; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): the first threshold's state (mapper + 1868)
+  uint8_t threshold_state() const { return guest::LoadU8(base, address + 1420); }
+  void set_threshold_state(uint8_t v) const { guest::StoreU8(base, address + 1420, v); }
+  uint32_t threshold_state_address() const { return address + 1420; }
+};
+
+// embedded; measure: ActionMapper@+448@+624
+struct ActionMapperAt624 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 316;
+  // the owner's fault_ field before the measure's fixes (2026-11-22): the analog stage's raw[0] (ActionMapperAnalog +0, mapper + 1072)
+  uint16_t analog_raw() const { return guest::LoadU16(base, address + 0); }
+  void set_analog_raw(uint16_t v) const { guest::StoreU16(base, address + 0, v); }
+  uint32_t analog_raw_address() const { return address + 0; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): the analog stage's values (mapper + 1132)
+  float analog_values() const { return guest::LoadFloat(base, address + 60); }
+  void set_analog_values(float v) const { guest::StoreFloat(base, address + 60, v); }
+  uint32_t analog_values_address() const { return address + 60; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): the analog stage's curve pointers (mapper + 1252)
+  uint32_t analog_curve_pointers() const { return guest::LoadU32(base, address + 180); }
+  void set_analog_curve_pointers(uint32_t v) const { guest::StoreU32(base, address + 180, v); }
+  uint32_t analog_curve_pointers_address() const { return address + 180; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): the analog stage's first curve's vtable (mapper + 1372)
+  uint32_t analog_curves() const { return guest::LoadU32(base, address + 300); }
+  void set_analog_curves(uint32_t v) const { guest::StoreU32(base, address + 300, v); }
+  uint32_t analog_curves_address() const { return address + 300; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): the first curve's center (mapper + 1376)
+  float analog_curve_center() const { return guest::LoadFloat(base, address + 304); }
+  void set_analog_curve_center(float v) const { guest::StoreFloat(base, address + 304, v); }
+  uint32_t analog_curve_center_address() const { return address + 304; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): the first curve's dead zone (mapper + 1380)
+  float analog_curve_dead_zone() const { return guest::LoadFloat(base, address + 308); }
+  void set_analog_curve_dead_zone(float v) const { guest::StoreFloat(base, address + 308, v); }
+  uint32_t analog_curve_dead_zone_address() const { return address + 308; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): the first curve's maximum (mapper + 1384)
+  float analog_curve_maximum() const { return guest::LoadFloat(base, address + 312); }
+  void set_analog_curve_maximum(float v) const { guest::StoreFloat(base, address + 312, v); }
+  uint32_t analog_curve_maximum_address() const { return address + 312; }
 };
 
 // The image words docs/functions/action-mappers.md's code uses.

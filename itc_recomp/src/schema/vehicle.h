@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// embedded; measure: VehicleStatus
+// embedded; measure: Vehicle@+6160
 struct VehicleStatus : View {
   using View::View;
   static constexpr uint32_t kSize = 108;
@@ -169,7 +169,7 @@ struct PowerCurvePoints : View {
   uint32_t torque_scale_address() const { return address + 128; }
 };
 
-// embedded; measure: CameraCurve
+// embedded; measure: CameraCurve::Load.r3
 struct VehicleCameraCurve : View {
   using View::View;
   static constexpr uint32_t kSize = 724;

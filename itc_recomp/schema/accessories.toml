@@ -45,7 +45,8 @@ fields = [
 # file's and accessory's words the measure meets through the entry are named
 # here at the entry's offsets.
 [AccessoryEntry]
-measures = ["AccessoryEntry", "Accessories.+4", "new<1104>@AccessoryEntry::New", "AccessoryEntry::OnLoaded.r6"]
+measure = "Accessories.+4"
+measures = ["new<1104>@AccessoryEntry::New", "AccessoryEntry::OnLoaded.r6", "Accessories@+4"]
 size = 1104
 origin = "allocated"
 fields = [
@@ -63,7 +64,8 @@ fields = [
 # 0x82010B5C): in an entry (+4), an accessory (+464, +500) and a skeleton
 # (+180). OnArchiveDone's r6 is one.
 [AccessoryFile]
-measures = ["AccessoryFile", "AccessoryFile::OnArchiveDone.r6"]
+measure = "AccessoryFile"
+measures = ["AccessoryFile::OnArchiveDone.r6", "AccessoryFile::AccessoryFile.r3", "AccessoryFile::SetData.r3"]
 size = 36
 origin = "embedded"
 vtable = 0x82006738
@@ -85,7 +87,8 @@ fields = [
 # and skeleton's words met through the accessory are named here at the
 # accessory's offsets.
 [Accessory]
-measures = ["Accessory", "Accessories::AcquireEntry.ret"]
+measure = "Accessory"
+measures = ["Accessories::AcquireEntry.ret", "Accessory::SetTexture.r3"]
 size = 1056
 origin = "embedded"
 vtable = 0x820066C8
@@ -140,7 +143,7 @@ fields = [
 
 # The accessory's texture provider's vtable (the provider embedded at +80).
 [AccessoryTexturesVtable]
-measure = "Accessory.+80"
+measure = "Accessory::SetTexture.r3.+80"
 size = 16
 origin = "image"
 fields = [
@@ -252,6 +255,7 @@ fields = [
 # A node record (160 bytes, the skeleton's +84).
 [AccessoryNodeRecord]
 measure = "AccessorySkeleton.+84"
+measures = ["strstr.ret"]
 size = 160
 origin = "file"
 fields = [
@@ -264,7 +268,8 @@ fields = [
 
 # A 16-byte row (the skeleton's +88, +92, +96 arrays, one a node).
 [AccessoryNodeRow]
-measures = ["AccessorySkeleton.+88", "AccessorySkeleton.+92", "AccessorySkeleton.+96", "Accessory.+632"]
+measure = "Accessory.+632"
+measures = ["AccessoryEntry::OnLoaded.r6@+48@+544.+88", "AccessoryEntry::OnLoaded.r6@+48@+544.+92", "AccessoryEntry::OnLoaded.r6@+48@+544.+96"]
 size = 16
 origin = "file"
 fields = [
@@ -431,4 +436,183 @@ fields = [
   { name = "unknown_0", offset = 0, type = "f32" },
   { name = "unknown_4", offset = 4, type = "f32" },
   { name = "unknown_8", offset = 8, type = "f32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from AccessorySkeleton.
+[AccessorySkeletonAt544]
+measure = "Accessory::Step.r3@+544"
+size = 256
+origin = "embedded"
+fields = [
+  { name = "unknown_224", offset = 224, type = "u32" },
+  { name = "unknown_228", offset = 228, type = "u32" },
+  { name = "unknown_232", offset = 232, type = "u8" },
+  { name = "unknown_233", offset = 233, type = "u8" },
+  { name = "unknown_234", offset = 234, type = "u8" },
+  { name = "unknown_236", offset = 236, type = "u32" },
+  { name = "unknown_244", offset = 244, type = "u32" },
+  { name = "unknown_248", offset = 248, type = "u64" },
+]
+
+# Split from AccessorySkeleton.
+[AccessorySkeletonAt544_2]
+measure = "Accessory@+544"
+size = 432
+origin = "embedded"
+fields = [
+  { name = "unknown_152", offset = 152, type = "u32" },
+  { name = "unknown_416", offset = 416, type = "f32" },
+  { name = "unknown_420", offset = 420, type = "f32" },
+  { name = "unknown_424", offset = 424, type = "f32" },
+  { name = "unknown_428", offset = 428, type = "f32" },
+]
+
+# Split from Accessory.
+[AccessoryAt48]
+measure = "AccessoryEntry::OnLoaded.r6@+48"
+size = 1052
+origin = "embedded"
+fields = [
+  { name = "unknown_476", offset = 476, type = "u32" },
+  { name = "unknown_480", offset = 480, type = "u32" },
+  { name = "unknown_516", offset = 516, type = "u32" },
+  { name = "unknown_632", offset = 632, type = "u32" },
+  { name = "unknown_800", offset = 800, type = "u32" },
+  { name = "unknown_992", offset = 992, type = "u64" },
+  { name = "unknown_1000", offset = 1000, type = "u64" },
+  { name = "unknown_1048", offset = 1048, type = "u32" },
+]
+
+# Split from AccessorySkeleton.
+[AccessorySkeletonAt544_3]
+measure = "AccessoryEntry::OnLoaded.r6@+48@+544"
+size = 448
+origin = "embedded"
+fields = [
+  { name = "unknown_80", offset = 80, type = "u32" },
+  { name = "unknown_84", offset = 84, type = "u32" },
+  { name = "unknown_88", offset = 88, type = "u32" },
+  { name = "unknown_92", offset = 92, type = "u32" },
+  { name = "unknown_96", offset = 96, type = "u32" },
+  { name = "unknown_136", offset = 136, type = "u32" },
+  { name = "unknown_152", offset = 152, type = "u32" },
+  { name = "unknown_192", offset = 192, type = "u32" },
+  { name = "unknown_196", offset = 196, type = "u32" },
+  { name = "unknown_256", offset = 256, type = "u32" },
+  { name = "unknown_260", offset = 260, type = "u32" },
+  { name = "unknown_268", offset = 268, type = "f32" },
+  { name = "unknown_272", offset = 272, type = "f32" },
+  { name = "unknown_416", offset = 416, type = "f32" },
+  { name = "unknown_420", offset = 420, type = "f32" },
+  { name = "unknown_424", offset = 424, type = "f32" },
+  { name = "unknown_428", offset = 428, type = "f32" },
+  { name = "unknown_432", offset = 432, type = "f32" },
+  { name = "unknown_436", offset = 436, type = "f32" },
+  { name = "unknown_440", offset = 440, type = "f32" },
+  { name = "unknown_444", offset = 444, type = "f32" },
+]
+
+# Split from AccessoryNodeLocal.
+[AccessoryNodeLocalPart]
+measure = "AccessoryEntry::OnLoaded.r6@+48@+544.+136"
+size = 64
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u64" },
+  { name = "unknown_8", offset = 8, type = "u64" },
+  { name = "unknown_16", offset = 16, type = "u64" },
+  { name = "unknown_24", offset = 24, type = "u64" },
+  { name = "unknown_32", offset = 32, type = "u64" },
+  { name = "unknown_40", offset = 40, type = "u64" },
+  { name = "unknown_48", offset = 48, type = "u64" },
+  { name = "unknown_56", offset = 56, type = "u64" },
+]
+
+# Split from AccessoryNodeFile.
+[AccessoryNodeFilePart]
+measure = "AccessoryEntry::OnLoaded.r6@+48@+544.+80"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+]
+
+# Split from AccessoryNodeRecord.
+[AccessoryNodeRecordPart]
+measure = "AccessoryEntry::OnLoaded.r6@+48@+544.+84"
+size = 136
+origin = "embedded"
+fields = [
+  { name = "unknown_64", offset = 64, type = "u64" },
+  { name = "unknown_72", offset = 72, type = "u64" },
+  { name = "unknown_132", offset = 132, type = "u32" },
+]
+
+# Split from Accessory.
+[AccessoryAt48_2]
+measure = "new<1104>@AccessoryEntry::New@+48"
+size = 1052
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_992", offset = 992, type = "f32" },
+  { name = "unknown_996", offset = 996, type = "f32" },
+  { name = "unknown_1000", offset = 1000, type = "f32" },
+  { name = "unknown_1004", offset = 1004, type = "f32" },
+  { name = "unknown_1008", offset = 1008, type = "f32" },
+  { name = "unknown_1012", offset = 1012, type = "f32" },
+  { name = "unknown_1016", offset = 1016, type = "f32" },
+  { name = "unknown_1020", offset = 1020, type = "f32" },
+  { name = "unknown_1024", offset = 1024, type = "f32" },
+  { name = "unknown_1028", offset = 1028, type = "f32" },
+  { name = "unknown_1032", offset = 1032, type = "f32" },
+  { name = "unknown_1036", offset = 1036, type = "f32" },
+  { name = "unknown_1040", offset = 1040, type = "u32" },
+  { name = "unknown_1044", offset = 1044, type = "u32" },
+  { name = "unknown_1048", offset = 1048, type = "u32" },
+]
+
+# Split from AccessorySkeleton.
+[AccessorySkeletonAt544_4]
+measure = "new<1104>@AccessoryEntry::New@+48@+544"
+size = 448
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_176", offset = 176, type = "u32" },
+  { name = "unknown_216", offset = 216, type = "u32" },
+  { name = "unknown_220", offset = 220, type = "u32" },
+  { name = "unknown_224", offset = 224, type = "u32" },
+  { name = "unknown_228", offset = 228, type = "u32" },
+  { name = "unknown_232", offset = 232, type = "u8" },
+  { name = "unknown_233", offset = 233, type = "u8" },
+  { name = "unknown_234", offset = 234, type = "u8" },
+  { name = "unknown_240", offset = 240, type = "u32" },
+  { name = "unknown_244", offset = 244, type = "u32" },
+  { name = "unknown_248", offset = 248, type = "u64" },
+  { name = "unknown_256", offset = 256, type = "u32" },
+  { name = "unknown_260", offset = 260, type = "u32" },
+  { name = "unknown_264", offset = 264, type = "u32" },
+  { name = "unknown_268", offset = 268, type = "f32" },
+  { name = "unknown_272", offset = 272, type = "f32" },
+  { name = "unknown_300", offset = 300, type = "f32" },
+  { name = "unknown_316", offset = 316, type = "f32" },
+  { name = "unknown_332", offset = 332, type = "f32" },
+  { name = "unknown_348", offset = 348, type = "f32" },
+  { name = "unknown_364", offset = 364, type = "f32" },
+  { name = "unknown_380", offset = 380, type = "f32" },
+  { name = "unknown_396", offset = 396, type = "f32" },
+  { name = "unknown_412", offset = 412, type = "f32" },
+  { name = "unknown_416", offset = 416, type = "f32" },
+  { name = "unknown_420", offset = 420, type = "f32" },
+  { name = "unknown_424", offset = 424, type = "f32" },
+  { name = "unknown_428", offset = 428, type = "f32" },
+  { name = "unknown_432", offset = 432, type = "f32" },
+  { name = "unknown_436", offset = 436, type = "f32" },
+  { name = "unknown_440", offset = 440, type = "f32" },
+  { name = "unknown_444", offset = 444, type = "f32" },
 ]

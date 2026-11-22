@@ -3833,7 +3833,7 @@ lifted::Result f8246A7D0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r30,r5
   r30 = r5;
   // lbz r11,266(r31)
-  r11 = guest::LoadU8(base, schema::XmaCodec(base, uint32_t(r31)).submit_mode_address());
+  r11 = guest::LoadU8(base, schema::XmaCodecOuter16_2(base, uint32_t(r31)).unknown_266_address());
   // cmplwi cr6,r11,2
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 2, so);
   // bne cr6,0x8246a804
@@ -3848,7 +3848,7 @@ loc_8246A804:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stb r11,266(r31)
-  guest::StoreU8(base, schema::XmaCodec(base, uint32_t(r31)).submit_mode_address(), uint8_t(r11));
+  guest::StoreU8(base, schema::XmaCodecOuter16_2(base, uint32_t(r31)).unknown_266_address(), uint8_t(r11));
   // lwz r11,8(r4)
   r11 = guest::LoadU32(base, schema::XAudioPacket(base, uint32_t(r4)).loop_count_address());
   // cmplwi cr6,r11,255

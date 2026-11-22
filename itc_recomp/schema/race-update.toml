@@ -56,7 +56,8 @@ fields = [
 
 # The light set (1,076 bytes, the race scene's +30064; RaceLights::SetUp).
 [RaceLights]
-measure = "RaceLights"
+measure = "RaceScene@+30064@+16"
+measures = ["RaceScene@+30064"]
 size = 1076
 origin = "embedded"
 fields = [

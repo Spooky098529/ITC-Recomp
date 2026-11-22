@@ -193,7 +193,8 @@ fields = [
 
 # The last 15 results: the stats record's +4948 (save data +4996).
 [CareerResults]
-measure = "Results"
+measure = "Career@+4996"
+measures = ["Stats@+4996"]
 size = 724
 origin = "embedded"
 fields = [
@@ -204,7 +205,7 @@ fields = [
 # One of the last results (ResultRecord::Fill, from the race data's last
 # result record).
 [CareerResultRecord]
-measure = "ResultRecord"
+measure = "Stats@+4996@+4"
 size = 48
 origin = "embedded"
 fields = [
@@ -233,7 +234,8 @@ fields = [
 
 # The day log: the stats record's +5672.
 [CareerDayLog]
-measure = "DayLog"
+measure = "Career@+48@+5672"
+measures = ["Career@+5720"]
 size = 124
 origin = "embedded"
 fields = [
@@ -280,7 +282,7 @@ fields = [
 
 # The garage's list: the save data's +6120.
 [CareerGarageList]
-measure = "GarageList"
+measure = "Garage@+6120"
 size = 98612
 origin = "embedded"
 fields = [
@@ -389,11 +391,149 @@ race_data = { address = 0x826C5B2C, type = "ptr", to = "RaceData", note = "the r
 
 # Split from CareerStats.
 [CareerStatsAt24]
-measure = "Stats@+24"
+measure = "Career@+48@+24"
 size = 4840
 origin = "embedded"
 fields = [
   { name = "unknown_18", offset = 18, type = "u16" },
   { name = "unknown_22", offset = 22, type = "u16" },
   { name = "unknown_4836", offset = 4836, type = "f32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from CareerStats.
+[CareerStatsAt48]
+measure = "Career@+48"
+size = 6030
+origin = "embedded"
+fields = [
+  { name = "unknown_4852", offset = 4852, type = "u16" },
+  { name = "unknown_4854", offset = 4854, type = "u16" },
+  { name = "unknown_4856", offset = 4856, type = "u32" },
+  { name = "unknown_4860", offset = 4860, type = "f32" },
+  { name = "unknown_4888", offset = 4888, type = "f32" },
+  { name = "unknown_4892", offset = 4892, type = "f32" },
+  { name = "unknown_4896", offset = 4896, type = "u32" },
+  { name = "unknown_4900", offset = 4900, type = "u32" },
+  { name = "unknown_4908", offset = 4908, type = "u32" },
+  { name = "unknown_4912", offset = 4912, type = "u32" },
+  { name = "unknown_4916", offset = 4916, type = "u16" },
+  { name = "unknown_4918", offset = 4918, type = "u16" },
+  { name = "unknown_4920", offset = 4920, type = "u16" },
+  { name = "unknown_4922", offset = 4922, type = "u16" },
+  { name = "unknown_5952", offset = 5952, type = "u32" },
+  { name = "unknown_5956", offset = 5956, type = "u32" },
+  { name = "unknown_5960", offset = 5960, type = "u32" },
+  { name = "unknown_5964", offset = 5964, type = "u32" },
+  { name = "unknown_5970", offset = 5970, type = "u16" },
+  { name = "unknown_5972", offset = 5972, type = "u16" },
+  { name = "unknown_6028", offset = 6028, type = "u16" },
+]
+
+# Split from CareerStats.
+[CareerStatsAt48_2]
+measure = "ItemRecords@+48"
+size = 5974
+origin = "embedded"
+fields = [
+  { name = "unknown_4852", offset = 4852, type = "u16" },
+  { name = "unknown_4854", offset = 4854, type = "u16" },
+  { name = "unknown_5968", offset = 5968, type = "u16" },
+  { name = "unknown_5970", offset = 5970, type = "u16" },
+  { name = "unknown_5972", offset = 5972, type = "u16" },
+]
+
+# Split from CareerStats.
+[CareerStatsAt48_3]
+measure = "Progress@+48"
+size = 6039
+origin = "embedded"
+fields = [
+  { name = "unknown_4852", offset = 4852, type = "u16" },
+  { name = "unknown_4854", offset = 4854, type = "u16" },
+  { name = "unknown_4856", offset = 4856, type = "u32" },
+  { name = "unknown_4860", offset = 4860, type = "f32" },
+  { name = "unknown_4888", offset = 4888, type = "f32" },
+  { name = "unknown_4892", offset = 4892, type = "f32" },
+  { name = "unknown_4896", offset = 4896, type = "u32" },
+  { name = "unknown_4900", offset = 4900, type = "u32" },
+  { name = "unknown_4908", offset = 4908, type = "u32" },
+  { name = "unknown_4912", offset = 4912, type = "u32" },
+  { name = "unknown_4916", offset = 4916, type = "u16" },
+  { name = "unknown_4918", offset = 4918, type = "u16" },
+  { name = "unknown_4920", offset = 4920, type = "u16" },
+  { name = "unknown_4922", offset = 4922, type = "u16" },
+  { name = "unknown_5672", offset = 5672, type = "u32" },
+  { name = "unknown_5676", offset = 5676, type = "u32" },
+  { name = "unknown_5680", offset = 5680, type = "f32" },
+  { name = "unknown_5684", offset = 5684, type = "u32" },
+  { name = "unknown_5796", offset = 5796, type = "u16" },
+  { name = "unknown_5798", offset = 5798, type = "u16" },
+  { name = "unknown_5800", offset = 5800, type = "u16" },
+  { name = "unknown_5802", offset = 5802, type = "u16" },
+  { name = "unknown_5804", offset = 5804, type = "u16" },
+  { name = "unknown_5806", offset = 5806, type = "u16" },
+  { name = "unknown_5808", offset = 5808, type = "u16" },
+  { name = "unknown_5838", offset = 5838, type = "u16" },
+  { name = "unknown_5866", offset = 5866, type = "u16" },
+  { name = "unknown_5956", offset = 5956, type = "u32" },
+  { name = "unknown_6008", offset = 6008, type = "u32" },
+  { name = "unknown_6024", offset = 6024, type = "u32" },
+  { name = "unknown_6032", offset = 6032, type = "u32" },
+  { name = "unknown_6036", offset = 6036, type = "u8" },
+  { name = "unknown_6037", offset = 6037, type = "u8" },
+  { name = "unknown_6038", offset = 6038, type = "u8" },
+]
+
+# Split from CareerStats.
+[CareerStatsAt4948]
+measure = "Progress@+48@+4948"
+size = 52
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_32", offset = 32, type = "u32" },
+  { name = "unknown_36", offset = 36, type = "u32" },
+  { name = "unknown_40", offset = 40, type = "u32" },
+  { name = "unknown_48", offset = 48, type = "u32" },
+]
+
+# Split from CareerStats.
+[CareerStatsAt48_4]
+measure = "new<129400>@SaveData::Create@+48"
+size = 5952
+origin = "embedded"
+fields = [
+  { name = "unknown_4892", offset = 4892, type = "f32" },
+  { name = "unknown_4896", offset = 4896, type = "u32" },
+  { name = "unknown_4960", offset = 4960, type = "f32" },
+  { name = "unknown_4964", offset = 4964, type = "u32" },
+  { name = "unknown_5880", offset = 5880, type = "f32" },
+  { name = "unknown_5884", offset = 5884, type = "u32" },
+  { name = "unknown_5888", offset = 5888, type = "f32" },
+  { name = "unknown_5892", offset = 5892, type = "u32" },
+  { name = "unknown_5896", offset = 5896, type = "f32" },
+  { name = "unknown_5900", offset = 5900, type = "u32" },
+  { name = "unknown_5904", offset = 5904, type = "f32" },
+  { name = "unknown_5908", offset = 5908, type = "u32" },
+  { name = "unknown_5912", offset = 5912, type = "f32" },
+  { name = "unknown_5916", offset = 5916, type = "u32" },
+  { name = "unknown_5920", offset = 5920, type = "f32" },
+  { name = "unknown_5924", offset = 5924, type = "u32" },
+  { name = "unknown_5928", offset = 5928, type = "f32" },
+  { name = "unknown_5932", offset = 5932, type = "u32" },
+  { name = "unknown_5936", offset = 5936, type = "f32" },
+  { name = "unknown_5940", offset = 5940, type = "u32" },
+  { name = "unknown_5944", offset = 5944, type = "f32" },
+  { name = "unknown_5948", offset = 5948, type = "u32" },
 ]

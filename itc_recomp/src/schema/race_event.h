@@ -133,7 +133,7 @@ struct RaceEventEntry : View {
   uint32_t start_slice_address() const { return address + 6; }
 };
 
-// embedded; measure: EventGroup
+// embedded; measure: EventGroup, EventGroup::Alloc.r3, EventGroup::Free.r3
 struct EventGroup : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
@@ -260,7 +260,7 @@ struct RaceEventPoolBlock : View {
   uint32_t pool4_kept_address() const { return address + 3038; }
 };
 
-// embedded; measure: EventCondition
+// embedded; measure: EventCondition, EventCondition::State.r3
 struct EventCondition : View {
   using View::View;
   static constexpr uint32_t kSize = 20;
@@ -366,10 +366,6 @@ struct OpponentItem : View {
   uint8_t unknown_182() const { return guest::LoadU8(base, address + 182); }
   void set_unknown_182(uint8_t v) const { guest::StoreU8(base, address + 182, v); }
   uint32_t unknown_182_address() const { return address + 182; }
-  // measure fault: Unlock::HasSectionCondition's unlock block (+40): its first condition's kind (the item's +50)
-  uint16_t fault_block_condition_kind() const { return guest::LoadU16(base, address + 10); }
-  void set_fault_block_condition_kind(uint16_t v) const { guest::StoreU16(base, address + 10, v); }
-  uint32_t fault_block_condition_kind_address() const { return address + 10; }
   // measure fault: the build +0 (CarDecal::FromBuild: a decal entry's word +0)
   float build_gear_factor_0() const { return guest::LoadFloat(base, address + 0); }
   void set_build_gear_factor_0(float v) const { guest::StoreFloat(base, address + 0, v); }
@@ -2013,6 +2009,82 @@ struct CarSpecCopiesAt992_2 : View {
   float unknown_28() const { return guest::LoadFloat(base, address + 28); }
   void set_unknown_28(float v) const { guest::StoreFloat(base, address + 28, v); }
   uint32_t unknown_28_address() const { return address + 28; }
+};
+
+// embedded; measure: EventPools@+2432
+struct EventPoolsAt2432 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 408;
+  uint16_t unknown_0() const { return guest::LoadU16(base, address + 0); }
+  void set_unknown_0(uint16_t v) const { guest::StoreU16(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint16_t unknown_2() const { return guest::LoadU16(base, address + 2); }
+  void set_unknown_2(uint16_t v) const { guest::StoreU16(base, address + 2, v); }
+  uint32_t unknown_2_address() const { return address + 2; }
+  uint16_t unknown_202() const { return guest::LoadU16(base, address + 202); }
+  void set_unknown_202(uint16_t v) const { guest::StoreU16(base, address + 202, v); }
+  uint32_t unknown_202_address() const { return address + 202; }
+  uint16_t unknown_204() const { return guest::LoadU16(base, address + 204); }
+  void set_unknown_204(uint16_t v) const { guest::StoreU16(base, address + 204, v); }
+  uint32_t unknown_204_address() const { return address + 204; }
+  uint16_t unknown_404() const { return guest::LoadU16(base, address + 404); }
+  void set_unknown_404(uint16_t v) const { guest::StoreU16(base, address + 404, v); }
+  uint32_t unknown_404_address() const { return address + 404; }
+  uint16_t unknown_406() const { return guest::LoadU16(base, address + 406); }
+  void set_unknown_406(uint16_t v) const { guest::StoreU16(base, address + 406, v); }
+  uint32_t unknown_406_address() const { return address + 406; }
+};
+
+// embedded; measure: RaceEvent@+36
+struct EventGroupAt36 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 12;
+  uint16_t unknown_0() const { return guest::LoadU16(base, address + 0); }
+  void set_unknown_0(uint16_t v) const { guest::StoreU16(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint16_t unknown_2() const { return guest::LoadU16(base, address + 2); }
+  void set_unknown_2(uint16_t v) const { guest::StoreU16(base, address + 2, v); }
+  uint32_t unknown_2_address() const { return address + 2; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+};
+
+// embedded; measure: RaceEvent@+36.+8
+struct EventGroupEntryPart : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint16_t unknown_0() const { return guest::LoadU16(base, address + 0); }
+  void set_unknown_0(uint16_t v) const { guest::StoreU16(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_0_4i() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0_4i(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_4i_address() const { return address + 0; }
+  uint16_t unknown_2() const { return guest::LoadU16(base, address + 2); }
+  void set_unknown_2(uint16_t v) const { guest::StoreU16(base, address + 2, v); }
+  uint32_t unknown_2_address() const { return address + 2; }
+};
+
+// embedded; measure: RaceSounds::PickRivalMusic.ret@+40
+struct OpponentItemAt40 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 12;
+  // the owner's fault_ field before the measure's fixes (2026-11-22): Unlock::HasSectionCondition's unlock block (+40): its first condition's kind (the item's +50)
+  uint16_t block_condition_kind() const { return guest::LoadU16(base, address + 10); }
+  void set_block_condition_kind(uint16_t v) const { guest::StoreU16(base, address + 10, v); }
+  uint32_t block_condition_kind_address() const { return address + 10; }
+};
+
+// embedded; measure: [826C5B2C]@+48@+3916
+struct RaceEventAt3916 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
 };
 
 // The image words docs/functions/race-event.md's code uses.

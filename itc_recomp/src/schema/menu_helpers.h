@@ -76,7 +76,7 @@ struct FrontEndMenu : View {
   uint32_t player_address() const { return address + 64; }
 };
 
-// allocated; measure: new<28>@Type2Dialog::OnEnter, new<28>@Type12Screen7::Create, ScreenPages, new<28>@PauseMenu::Create, new<28>@RaceDialog::Create, new<28>@AfterRaceMenu::Create, new<28>@PauseMenu4::Create, new<28>@Type12Screen6::Create, new<28>@Type12Screen9::Create, new<28>@Type12Dialog11::Create, new<28>@NetRanking::Create, new<28>@TitleScreen::Create, new<28>@TodaysResult::Create, new<28>@TodaysEvent::Create, new<28>@TuningMachine::Create, new<28>@Type2Hub::Create, new<28>@BuildScreen::Create, new<28>@PowerGraphScreen::Create, new<28>@ReplayTheater::Create, new<28>@Type5Dialog::OnEnter, new<28>@Type6Screen0::OnEnter, new<28>@Type7Screen0::OnEnter, new<28>@ControllerOptions::OnEnter, new<28>@UserInfo::Create
+// allocated; measure: new<28>@Type2Dialog::OnEnter, new<28>@Type12Screen7::Create, ScreenPages, new<28>@PauseMenu::Create, new<28>@RaceDialog::Create, new<28>@AfterRaceMenu::Create, new<28>@PauseMenu4::Create, new<28>@Type12Screen6::Create, new<28>@Type12Screen9::Create, new<28>@Type12Dialog11::Create, new<28>@NetRanking::Create, new<28>@TitleScreen::Create, new<28>@TodaysResult::Create, new<28>@TodaysEvent::Create, new<28>@TuningMachine::Create, new<28>@Type2Hub::Create, new<28>@BuildScreen::Create, new<28>@PowerGraphScreen::Create, new<28>@ReplayTheater::Create, new<28>@Type5Dialog::OnEnter, new<28>@Type6Screen0::OnEnter, new<28>@Type7Screen0::OnEnter, new<28>@ControllerOptions::OnEnter, new<28>@UserInfo::Create, ScreenPages::Finish.r3
 struct PageObject : View {
   using View::View;
   static constexpr uint32_t kSize = 28;

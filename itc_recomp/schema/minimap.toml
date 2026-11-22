@@ -167,3 +167,19 @@ range_near = { address = 0x82002814, type = "f32", note = "the map's draws' near
 marker_scale = { address = 0x82002A0C, type = "f32", note = "the markers' x and z scale (image)" }
 range_far = { address = 0x82006804, type = "f32", note = "the map's draws' far range (image)" }
 lowest = { address = 0x82006808, type = "f32", note = "-1000.0: points below aren't drawn (image)" }
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from MinimapRacerEntry.
+[MinimapRacerEntryAt4]
+measure = "new<363592>@RaceManager::Create@+4"
+size = 28
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u16" },
+  { name = "unknown_10", offset = 10, type = "u16" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+]

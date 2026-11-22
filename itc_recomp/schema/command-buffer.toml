@@ -16,6 +16,7 @@
 # by CommandChain::NewBlock (sub_8229EB10), closed by sub_8229DFB8.
 [CommandChain]
 measure = "CommandChain"
+measures = ["CommandChain::Init.r3", "CommandChain::Close.r3"]
 size = 20
 origin = "gpu"
 fields = [
@@ -31,8 +32,8 @@ fields = [
 # physical address (its own start + 4 while open). The cursor and end point
 # into its words.
 [CommandChainBlock]
-measure = "CommandChain.+0"
-measures = ["CommandChain.+8"]
+measure = "CommandChain.+8"
+measures = ["CommandChain.+4", "CommandChain::Close.r3.+4", "CommandChain::Close.r3.+8"]
 size = 4
 origin = "gpu"
 fields = [

@@ -18,7 +18,8 @@
 
 # The app (132 bytes, its constructor sub_82094590, App::Create).
 [App]
-measures = ["App", "AppStates.+4"]
+measure = "App"
+measures = ["AppStates.+4", "App::FrameDriver.r3"]
 size = 132
 origin = "allocated"
 vtable = 0x82000EA0
@@ -87,7 +88,8 @@ fields = [
 ]
 
 [AppInterfaceVtable]
-measures = ["App.+20", "AppStates::OnMessage.r4.+0"]
+measure = "App.+20"
+measures = ["AppStates::OnMessage.r4.+0", "App::FrameDriver.r3.+20"]
 size = 48
 origin = "image"
 fields = [
@@ -269,7 +271,8 @@ fields = [
 
 # A std::list of pointers (16-byte nodes): a layer's children and states.
 [PtrList]
-measures = ["PtrList", "PtrList::Erase.r4"]
+measure = "PtrList"
+measures = ["PtrList::Erase.r4", "PtrList::PtrList.r3"]
 size = 12
 origin = "embedded"
 fields = [
@@ -282,7 +285,8 @@ fields = [
 # A node of a list of pointers (a layer's children and states; List::Clear's
 # for any node size: next and previous).
 [StateListNode]
-measures = ["StateLayer.+16", "StateLayer.+28", "StateLayer.+28.+0", "sub_820AD5B0.r3.+16", "sub_820AD5B0.r3.+28", "sub_820AD5B0.r3.+28.+0", "sub_820AD8D0.r3.+16", "sub_820AD8D0.r3.+28", "List.+4.+0"]
+measure = "StateLayer.+16"
+measures = ["StateLayer.+28", "StateLayer.+28.+0", "sub_820AD5B0.r3.+16", "sub_820AD5B0.r3.+28", "sub_820AD5B0.r3.+28.+0", "sub_820AD8D0.r3.+16", "sub_820AD8D0.r3.+28", "List::Clear_820ACF88.r3.+4", "List::Clear_820ACF88.r3.+4.+0"]
 size = 12
 origin = "allocated"
 fields = [
@@ -294,6 +298,7 @@ fields = [
 # The layers' operation list (std::list of 8-byte values, 16-byte nodes).
 [OpList]
 measure = "OpList"
+measures = ["OpList::IncSize.r3"]
 size = 12
 origin = "embedded"
 fields = [
@@ -362,4 +367,57 @@ size = 4
 origin = "allocated"
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x8206CBF4, then 0x8206CBE4" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from App.
+[AppOuter8]
+measure = "App::SceneFromInterface16.r3@-8"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "unknown_16", offset = 16, type = "u32" },
+]
+
+# Split from MessageVector.
+[MessageVectorAt56]
+measure = "App::SendMessage.r3@+56"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+]
+
+# Split from AppMessageWord.
+[AppMessageWordAt4]
+measure = "App::SendMessage.r3@+56.+8@+4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from MessageVector.
+[MessageVectorAt76]
+measure = "App@+76"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Split from OpList.
+[OpListAt36]
+measure = "StateLayer@+36"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
 ]

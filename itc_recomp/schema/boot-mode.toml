@@ -61,7 +61,8 @@ fields = [
 # The boot mode's state machine (+848; a StateMachine, game-modes.toml),
 # its +9608 the boot's own word.
 [BootMachine]
-measures = ["Boot", "BootMachine"]
+measure = "Boot"
+measures = ["BootMode@+848"]
 size = 9612
 origin = "embedded"
 fields = [
@@ -160,7 +161,7 @@ fields = [
 # The type 8 mode's +848 (its screens; known-data.md: "type 8 mode"), its
 # end the mode's 8-byte answer at +87760.
 [ModeType8Member]
-measure = "ModeType8Member"
+measure = "ModeType8@+848"
 size = 86920
 origin = "embedded"
 fields = [

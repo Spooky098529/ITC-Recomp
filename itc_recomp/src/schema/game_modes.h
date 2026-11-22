@@ -326,7 +326,7 @@ struct RaceOverlaysMachine : View {
   uint32_t overlays_address() const { return address + 9608; }
 };
 
-// embedded; measure: Buffer28, CameraPath::OnLoaded.r6
+// embedded; measure: Buffer28, CameraPath::OnLoaded.r6, Buffer28::Reset.r3
 struct CameraPathBuffer : View {
   using View::View;
   static constexpr uint32_t kSize = 28;
@@ -361,7 +361,7 @@ struct CameraPathBuffer : View {
   uint32_t state_address() const { return address + 24; }
 };
 
-// embedded; measure: XprHolder
+// embedded; measure: XprHolder::XprHolder.r3
 struct XprHolder : View {
   using View::View;
   static constexpr uint32_t kSize = 56;
@@ -455,6 +455,24 @@ struct GameModeType7 : View {
   uint32_t ring_start() const { return guest::LoadU32(base, address + 844); }
   void set_ring_start(uint32_t v) const { guest::StoreU32(base, address + 844, v); }
   uint32_t ring_start_address() const { return address + 844; }
+};
+
+// embedded; measure: Buffers28::~Buffers28.r3@+43100
+struct CameraPathBufferAt43100 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: RaceMode@+147944
+struct RaceOverlaysMachineAt147944 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 9608;
+  uint32_t unknown_9604() const { return guest::LoadU32(base, address + 9604); }
+  void set_unknown_9604(uint32_t v) const { guest::StoreU32(base, address + 9604, v); }
+  uint32_t unknown_9604_address() const { return address + 9604; }
 };
 
 // The image words docs/functions/game-modes.md's code uses.

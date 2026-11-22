@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: BoxShape, Shape, CollisionObject.+32, sub_820BAB48.r4, sub_820BAB48.ret, sub_820BB688.r3, sub_820BB688.r4, BoxShape::Place.r5, sub_822BE2C8.ret, sub_820911F8.ret, sub_820BA1D0.r3, sub_820B9C30.r3, sub_820BC560.r5, Part464::Restore.r4, Part464::Save.r4, Vehicle.+344, WallQuery.+12.+0, AiDriver.+160.+344
+// allocated; measure: BoxShape, Shape, sub_820BAB48.r4, sub_820BAB48.ret, sub_820BB688.r3, sub_820BB688.r4, BoxShape::Place.r5, sub_822BE2C8.ret, sub_820911F8.ret, sub_820BA1D0.r3, sub_820B9C30.r3, sub_820BC560.r5, Part464::Restore.r4, Part464::Save.r4, Vehicle.+344, WallQuery.+12.+0, AiDriver.+160.+344, CollisionShape::Place.r3.+8
 struct BoxShape : View {
   using View::View;
   static constexpr uint32_t kSize = 496;
@@ -271,7 +271,7 @@ struct BoxShape : View {
   uint32_t face_nz_normal_address() const { return address + 480; }
 };
 
-// image; measure: BoxShape.+0, CollisionObject.+32.+0, BoxShape::Place.r5.+0, sub_822BE2C8.ret.+0, sub_820911F8.ret.+0, sub_820BC560.r5.+0
+// image; measure: BoxShape.+0, BoxShape::Place.r5.+0, sub_822BE2C8.ret.+0, sub_820911F8.ret.+0, sub_820BC560.r5.+0, CollisionShape::Place.r3.+8.+0, CollisionShape.+0, CollisionObject@+32.+0
 struct BoxShapeVtable : View {
   using View::View;
   static constexpr uint32_t kSize = 96;
@@ -373,7 +373,7 @@ struct BoxShapeVtable : View {
   uint32_t slot_23_address() const { return address + 92; }
 };
 
-// embedded; measure: CollisionShape
+// embedded; measure: CollisionShape, CollisionShape::Place.r3, CollisionShape::CurrentCenter.r3, CollisionShape::PreviousCenter.r3
 struct CollisionShape : View {
   using View::View;
   static constexpr uint32_t kSize = 116;
@@ -985,6 +985,127 @@ struct BoxExitFace : View {
   uint32_t face() const { return guest::LoadU32(base, address + 0); }
   void set_face(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t face_address() const { return address + 0; }
+};
+
+// embedded; measure: BoxBox.+20@+80
+struct CollisionBoxBoxArgsAt80 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 20;
+  // the owner's fault_ field before the measure's fixes (2026-11-22): the measure files every BoxBox:: function's r3 under one type, and the query's block pointers back into it: the fields of a CollisionQuery (fault_query_), a CollisionBlock (fault_block_), a block's corner, the edge flags and a face
+  float query_shape_a() const { return guest::LoadFloat(base, address + 0); }
+  void set_query_shape_a(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t query_shape_a_address() const { return address + 0; }
+  float query_shape_b() const { return guest::LoadFloat(base, address + 4); }
+  void set_query_shape_b(float v) const { guest::StoreFloat(base, address + 4, v); }
+  uint32_t query_shape_b_address() const { return address + 4; }
+  float query_b_in_a_previous() const { return guest::LoadFloat(base, address + 8); }
+  void set_query_b_in_a_previous(float v) const { guest::StoreFloat(base, address + 8, v); }
+  uint32_t query_b_in_a_previous_address() const { return address + 8; }
+  uint32_t query_a_in_b_previous() const { return guest::LoadU32(base, address + 16); }
+  void set_query_a_in_b_previous(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t query_a_in_b_previous_address() const { return address + 16; }
+};
+
+// embedded; measure: CollisionObject::CollisionObject.ret@+32
+struct CollisionShapeAt32 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 48;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  float unknown_28() const { return guest::LoadFloat(base, address + 28); }
+  void set_unknown_28(float v) const { guest::StoreFloat(base, address + 28, v); }
+  uint32_t unknown_28_address() const { return address + 28; }
+  float unknown_44() const { return guest::LoadFloat(base, address + 44); }
+  void set_unknown_44(float v) const { guest::StoreFloat(base, address + 44, v); }
+  uint32_t unknown_44_address() const { return address + 44; }
+};
+
+// embedded; measure: CollisionObject@+32
+struct CollisionShapeAt32_2 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 116;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  float unknown_112() const { return guest::LoadFloat(base, address + 112); }
+  void set_unknown_112(float v) const { guest::StoreFloat(base, address + 112, v); }
+  uint32_t unknown_112_address() const { return address + 112; }
+};
+
+// embedded; measure: CollisionObject@+32.+4
+struct BoxShapePart : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: CollisionObject@+32.+4.+0
+struct BoxShapeVtablePart : View {
+  using View::View;
+  static constexpr uint32_t kSize = 40;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_36() const { return guest::LoadU32(base, address + 36); }
+  void set_unknown_36(uint32_t v) const { guest::StoreU32(base, address + 36, v); }
+  uint32_t unknown_36_address() const { return address + 36; }
+};
+
+// embedded; measure: CollisionObject@+32.+8
+struct BoxShapePart_2 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 60;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  float unknown_48() const { return guest::LoadFloat(base, address + 48); }
+  void set_unknown_48(float v) const { guest::StoreFloat(base, address + 48, v); }
+  uint32_t unknown_48_address() const { return address + 48; }
+  float unknown_52() const { return guest::LoadFloat(base, address + 52); }
+  void set_unknown_52(float v) const { guest::StoreFloat(base, address + 52, v); }
+  uint32_t unknown_52_address() const { return address + 52; }
+  float unknown_56() const { return guest::LoadFloat(base, address + 56); }
+  void set_unknown_56(float v) const { guest::StoreFloat(base, address + 56, v); }
+  uint32_t unknown_56_address() const { return address + 56; }
+};
+
+// embedded; measure: CollisionObject@+32.+8.+0
+struct BoxShapeVtablePart_2 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 44;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_36() const { return guest::LoadU32(base, address + 36); }
+  void set_unknown_36(uint32_t v) const { guest::StoreU32(base, address + 36, v); }
+  uint32_t unknown_36_address() const { return address + 36; }
+  uint32_t unknown_40() const { return guest::LoadU32(base, address + 40); }
+  void set_unknown_40(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
+  uint32_t unknown_40_address() const { return address + 40; }
+};
+
+// embedded; measure: Vehicles::DestroyAll.r3@+37632.+344
+struct BoxShapePart_3 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
 };
 
 // The image words docs/functions/collision.md's code uses.

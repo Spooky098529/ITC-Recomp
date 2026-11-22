@@ -274,7 +274,7 @@ fields = [
 # "result" in the name.
 [HandlerMap]
 measure = "HandlerMap"
-measures = ["HandlerMap::Insert.r4", "sub_82093638.r4", "sub_82093850.r3", "HandlerMap::InsertNode.r4"]
+measures = ["HandlerMap::Insert.r4", "sub_82093638.r4", "sub_82093850.r3", "HandlerMap::InsertNode.r4", "HandlerMap::HandlerMap.r3"]
 size = 16
 origin = "embedded"
 fields = [
@@ -289,7 +289,7 @@ fields = [
 # A map node (24 bytes, HandlerMap::AllocateNodes).
 [HandlerMapNode]
 measure = "new<?>@HandlerMap::AllocateNodes"
-measures = ["HandlerMap.+4.+8", "HandlerMap::Insert.r4.+4", "HandlerMap::Insert.r4.+4.+0", "HandlerMap::Insert.r4.+4.+0.+8", "HandlerMap::NewNode.ret", "HandlerMap::NewNode.ret.+4", "HandlerMap::NewNode.ret.+4.+8", "HandlerMap::RotateLeft.r4", "HandlerMap::RotateLeft.r4.+4", "HandlerMap::RotateLeft.r4.+8", "HandlerMap::RotateLeft.r4.+8.+0", "sub_82091AE8.r3.+4", "sub_82091AE8.r3.+4.+0", "sub_82091AE8.r3.+4.+8", "sub_82099B18.r3.+4", "sub_82099B18.r3.+4.+0", "sub_82099B18.r3.+4.+8", "sub_82099BA8.r4", "sub_82099BA8.r4.+0", "sub_82093638.r4.+4", "sub_82093850.r3.+4", "sub_8209A008.r3.+20", "App.+8", "HandlerMap::InsertNode.r4.+4", "HandlerMap::InsertNode.r6.+8", "HandlerMap::InsertNode.r6.+8.+4", "HandlerMap::InsertNode.r6.+8.+0", "HandlerMap::InsertNode.r6.+8.+0.+8"]
+measures = ["HandlerMap::Insert.r4.+4", "HandlerMap::Insert.r4.+4.+0", "HandlerMap::Insert.r4.+4.+0.+8", "HandlerMap::NewNode.ret", "HandlerMap::NewNode.ret.+4", "HandlerMap::NewNode.ret.+4.+8", "HandlerMap::RotateLeft.r4", "HandlerMap::RotateLeft.r4.+4", "HandlerMap::RotateLeft.r4.+8", "HandlerMap::RotateLeft.r4.+8.+0", "sub_82091AE8.r3.+4", "sub_82091AE8.r3.+4.+0", "sub_82091AE8.r3.+4.+8", "sub_82099B18.r3.+4", "sub_82099B18.r3.+4.+0", "sub_82099B18.r3.+4.+8", "sub_82099BA8.r4", "sub_82099BA8.r4.+0", "sub_82093638.r4.+4", "sub_82093850.r3.+4", "sub_8209A008.r3.+20", "App.+8", "HandlerMap::InsertNode.r4.+4", "HandlerMap::InsertNode.r6.+8", "HandlerMap::InsertNode.r6.+8.+4", "HandlerMap::InsertNode.r6.+8.+0", "HandlerMap::InsertNode.r6.+8.+0.+8", "HandlerMap.+4"]
 size = 24
 origin = "allocated"
 fields = [
@@ -344,6 +344,7 @@ fields = [
 # as one doubleword at +0).
 [RequestVector]
 measure = "RequestVector"
+measures = ["RequestVector::PushBack.r3", "RequestVector::Erase.r4", "RequestVector::Clear.r3"]
 size = 16
 origin = "embedded"
 fields = [
@@ -355,7 +356,8 @@ fields = [
 
 # A request (12 bytes).
 [Request]
-measures = ["RequestVector.+8", "RequestVector::InsertN.r6", "RequestVector::PushBack.r4"]
+measure = "RequestVector.+8"
+measures = ["RequestVector::InsertN.r6", "RequestVector::PushBack.r4", "RequestVector::PushBack.r3.+8"]
 size = 12
 origin = "embedded"
 fields = [

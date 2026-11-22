@@ -175,7 +175,8 @@ fields = [
 # +43016): a camera path file loaded into a VirtualAlloc block
 # (CameraPath::Load and OnLoaded, camera-modes.md).
 [CameraPathBuffer]
-measures = ["Buffer28", "CameraPath::OnLoaded.r6"]
+measure = "Buffer28"
+measures = ["CameraPath::OnLoaded.r6", "Buffer28::Reset.r3"]
 size = 28
 origin = "embedded"
 vtable = 0x82009390
@@ -192,7 +193,7 @@ fields = [
 # An object holding an XPR (XprHolder::XprHolder sub_821067A0; the cutscene's
 # rival logo's at its +20, camera-modes.toml's RivalLogo).
 [XprHolder]
-measure = "XprHolder"
+measure = "XprHolder::XprHolder.r3"
 size = 56
 origin = "embedded"
 fields = [
@@ -254,3 +255,25 @@ mode_checks = { address = 0x826BAB40, type = "bytes", count = 28, note = "the mo
 remake_save_data = { address = 0x826BAB70, type = "u32", note = "1 makes the next mode change remake player 0's save data (mode-tick.md)" }
 one = { address = 0x82000A30, type = "f32", note = "1.0 in .rdata (the camera objects' w words)" }
 tv_camera_range_count = { address = 0x82618BB4, type = "u32", note = "the word Member13360::Member13360 copies to the TV camera's +452 (its route ranges' count)" }
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from CameraPathBuffer.
+[CameraPathBufferAt43100]
+measure = "Buffers28::~Buffers28.r3@+43100"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from RaceOverlaysMachine.
+[RaceOverlaysMachineAt147944]
+measure = "RaceMode@+147944"
+size = 9608
+origin = "embedded"
+fields = [
+  { name = "unknown_9604", offset = 9604, type = "u32" },
+]

@@ -45,3 +45,17 @@ music_volume = { address = 0x82616BEC, type = "f32", note = "the music's volume 
 kept_music_volume = { address = 0x82616C34, type = "f32", note = "the music's volume kept before a fade" }
 effects_volume = { address = 0x82616C38, type = "f32", note = "the effects' volume option's gain" }
 effects_volume_2 = { address = 0x82616C3C, type = "f32", note = "the effects' volume option's gain (put back into effects_volume)" }
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from RaceSounds.
+[RaceSoundsAt138284]
+measure = "RaceMode@+138284"
+size = 9656
+origin = "embedded"
+fields = [
+  { name = "unknown_9604", offset = 9604, type = "u32" },
+  { name = "unknown_9652", offset = 9652, type = "u32" },
+]

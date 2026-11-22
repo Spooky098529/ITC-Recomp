@@ -127,7 +127,7 @@ struct UiMovieTextItemArray : View {
   uint32_t count_address() const { return address + 0; }
 };
 
-// allocated; measure: UiMovie, sub_8211A9E8.r3, sub_8211AC90.r3, sub_8211E378.r3, sub_8211C4F0.r3, sub_8211C5F8.r3, UiMovie::OnLoaded.r6, UiMovies::Find.ret.+0, AnimationList::Get.r4
+// allocated; measure: UiMovie, sub_8211A9E8.r3, sub_8211AC90.r3, sub_8211E378.r3, sub_8211C4F0.r3, sub_8211C5F8.r3, UiMovie::OnLoaded.r6, UiMovies::Find.ret.+0, AnimationList::Get.r4, RaceHud.+604
 struct UiMovie : View {
   using View::View;
   static constexpr uint32_t kSize = 40976;
@@ -257,7 +257,7 @@ struct UiMovie : View {
   uint32_t fault_location_menu_address() const { return address + 20044; }
 };
 
-// embedded; measure: AnimationList
+// embedded; measure: UiMovie@+37044, AnimationList::RemoveAt.r3
 struct UiMovieAnimationList : View {
   using View::View;
   static constexpr uint32_t kSize = 1420;
@@ -358,7 +358,7 @@ struct UiMoviePair : View {
   uint32_t value_address() const { return address + 4; }
 };
 
-// embedded; measure: TextMap
+// embedded; measure: TextMap::Set.r3, TextMap::Find.r3
 struct UiMovieTextMap : View {
   using View::View;
   static constexpr uint32_t kSize = 1028;
@@ -743,6 +743,108 @@ struct UiMovieAt40 : View {
   uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
   void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t unknown_8_address() const { return address + 8; }
+};
+
+// embedded; measure: UiMovie@+64
+struct UiMovieAt64 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 112;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  float unknown_12() const { return guest::LoadFloat(base, address + 12); }
+  void set_unknown_12(float v) const { guest::StoreFloat(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+  uint32_t unknown_12_4i() const { return guest::LoadU32(base, address + 12); }
+  void set_unknown_12_4i(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t unknown_12_4i_address() const { return address + 12; }
+  float unknown_28() const { return guest::LoadFloat(base, address + 28); }
+  void set_unknown_28(float v) const { guest::StoreFloat(base, address + 28, v); }
+  uint32_t unknown_28_address() const { return address + 28; }
+  float unknown_44() const { return guest::LoadFloat(base, address + 44); }
+  void set_unknown_44(float v) const { guest::StoreFloat(base, address + 44, v); }
+  uint32_t unknown_44_address() const { return address + 44; }
+  float unknown_60() const { return guest::LoadFloat(base, address + 60); }
+  void set_unknown_60(float v) const { guest::StoreFloat(base, address + 60, v); }
+  uint32_t unknown_60_address() const { return address + 60; }
+  uint32_t unknown_64() const { return guest::LoadU32(base, address + 64); }
+  void set_unknown_64(uint32_t v) const { guest::StoreU32(base, address + 64, v); }
+  uint32_t unknown_64_address() const { return address + 64; }
+  uint32_t unknown_68() const { return guest::LoadU32(base, address + 68); }
+  void set_unknown_68(uint32_t v) const { guest::StoreU32(base, address + 68, v); }
+  uint32_t unknown_68_address() const { return address + 68; }
+  uint32_t unknown_72() const { return guest::LoadU32(base, address + 72); }
+  void set_unknown_72(uint32_t v) const { guest::StoreU32(base, address + 72, v); }
+  uint32_t unknown_72_address() const { return address + 72; }
+  uint32_t unknown_76() const { return guest::LoadU32(base, address + 76); }
+  void set_unknown_76(uint32_t v) const { guest::StoreU32(base, address + 76, v); }
+  uint32_t unknown_76_address() const { return address + 76; }
+  float unknown_80() const { return guest::LoadFloat(base, address + 80); }
+  void set_unknown_80(float v) const { guest::StoreFloat(base, address + 80, v); }
+  uint32_t unknown_80_address() const { return address + 80; }
+  float unknown_84() const { return guest::LoadFloat(base, address + 84); }
+  void set_unknown_84(float v) const { guest::StoreFloat(base, address + 84, v); }
+  uint32_t unknown_84_address() const { return address + 84; }
+  float unknown_88() const { return guest::LoadFloat(base, address + 88); }
+  void set_unknown_88(float v) const { guest::StoreFloat(base, address + 88, v); }
+  uint32_t unknown_88_address() const { return address + 88; }
+  float unknown_92() const { return guest::LoadFloat(base, address + 92); }
+  void set_unknown_92(float v) const { guest::StoreFloat(base, address + 92, v); }
+  uint32_t unknown_92_address() const { return address + 92; }
+  uint32_t unknown_96() const { return guest::LoadU32(base, address + 96); }
+  void set_unknown_96(uint32_t v) const { guest::StoreU32(base, address + 96, v); }
+  uint32_t unknown_96_address() const { return address + 96; }
+  uint32_t unknown_100() const { return guest::LoadU32(base, address + 100); }
+  void set_unknown_100(uint32_t v) const { guest::StoreU32(base, address + 100, v); }
+  uint32_t unknown_100_address() const { return address + 100; }
+  uint32_t unknown_104() const { return guest::LoadU32(base, address + 104); }
+  void set_unknown_104(uint32_t v) const { guest::StoreU32(base, address + 104, v); }
+  uint32_t unknown_104_address() const { return address + 104; }
+  uint32_t unknown_108() const { return guest::LoadU32(base, address + 108); }
+  void set_unknown_108(uint32_t v) const { guest::StoreU32(base, address + 108, v); }
+  uint32_t unknown_108_address() const { return address + 108; }
+};
+
+// embedded; measure: new<65552>@sub_8211B018@+16
+struct UiMovieTextItemAt16 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 100;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  float unknown_28() const { return guest::LoadFloat(base, address + 28); }
+  void set_unknown_28(float v) const { guest::StoreFloat(base, address + 28, v); }
+  uint32_t unknown_28_address() const { return address + 28; }
+  float unknown_44() const { return guest::LoadFloat(base, address + 44); }
+  void set_unknown_44(float v) const { guest::StoreFloat(base, address + 44, v); }
+  uint32_t unknown_44_address() const { return address + 44; }
+  float unknown_60() const { return guest::LoadFloat(base, address + 60); }
+  void set_unknown_60(float v) const { guest::StoreFloat(base, address + 60, v); }
+  uint32_t unknown_60_address() const { return address + 60; }
+  float unknown_76() const { return guest::LoadFloat(base, address + 76); }
+  void set_unknown_76(float v) const { guest::StoreFloat(base, address + 76, v); }
+  uint32_t unknown_76_address() const { return address + 76; }
+  float unknown_80() const { return guest::LoadFloat(base, address + 80); }
+  void set_unknown_80(float v) const { guest::StoreFloat(base, address + 80, v); }
+  uint32_t unknown_80_address() const { return address + 80; }
+  float unknown_84() const { return guest::LoadFloat(base, address + 84); }
+  void set_unknown_84(float v) const { guest::StoreFloat(base, address + 84, v); }
+  uint32_t unknown_84_address() const { return address + 84; }
+  float unknown_88() const { return guest::LoadFloat(base, address + 88); }
+  void set_unknown_88(float v) const { guest::StoreFloat(base, address + 88, v); }
+  uint32_t unknown_88_address() const { return address + 88; }
+  float unknown_92() const { return guest::LoadFloat(base, address + 92); }
+  void set_unknown_92(float v) const { guest::StoreFloat(base, address + 92, v); }
+  uint32_t unknown_92_address() const { return address + 92; }
+  float unknown_96() const { return guest::LoadFloat(base, address + 96); }
+  void set_unknown_96(float v) const { guest::StoreFloat(base, address + 96, v); }
+  uint32_t unknown_96_address() const { return address + 96; }
 };
 
 // The image words docs/functions/ui-movies-game.md's code uses.

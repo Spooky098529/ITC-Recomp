@@ -14,7 +14,8 @@
 # Also the object the deleting destructor sub_8258CE00 reads (heap.toml held
 # it before; its entry there is to go).
 [CommandList]
-measures = ["CommandList", "sub_8258CE00.r3"]
+measure = "CommandList"
+measures = ["sub_8258CE00.r3", "[82970BD8]"]
 size = 53
 origin = "embedded"
 vtable = 0x8206C080

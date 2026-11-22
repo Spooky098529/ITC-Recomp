@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// embedded; measure: CommandList, sub_8258CE00.r3
+// embedded; measure: CommandList, sub_8258CE00.r3, [82970BD8]
 struct CommandList : View {
   using View::View;
   static constexpr uint32_t kSize = 53;

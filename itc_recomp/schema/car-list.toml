@@ -23,7 +23,7 @@
 # (screen-constructors.md).
 [PanelSetBase]
 measure = "PanelSetBase"
-measures = ["PanelSetBase.+1820"]
+measures = ["PanelSetBase.+1820", "PanelSetBase::PanelSetBase.r3", "PanelSetBase::Build.r3", "PanelSetBase::ToTabs.r3", "PanelSetBase::Update.r3", "PanelSetBase::HandleInput.r3"]
 size = 1972
 origin = "embedded"
 vtable = 0x820110C4
@@ -114,7 +114,7 @@ fields = [
 # set's own slots reach them.
 [PanelSet]
 measure = "PanelSet"
-measures = ["PanelScreen.+9644"]
+measures = ["PanelScreen.+9644", "PanelSet::PanelSet.r3"]
 size = 1976
 origin = "embedded"
 vtable = 0x820110C8
@@ -322,7 +322,8 @@ fields = [
 # The panel groups' and the D, E, F panels' base (vtable 0x82010974; built
 # on NodeBase).
 [PanelGroupBase]
-measures = ["PanelGroupBase", "PanelGroup6B", "PanelGroup7B"]
+measure = "PanelGroupBase"
+measures = ["Type6Screens@+40948@+9708", "Type7Screens@+30608@+9708"]
 size = 36
 origin = "embedded"
 vtable = 0x82010974
@@ -387,7 +388,8 @@ fields = [
 
 # E, the car rows (160 bytes, PanelE).
 [RowPanel]
-measures = ["RowPanel", "MenuList.+1900", "PanelE", "PanelEBase"]
+measure = "RowPanel"
+measures = ["MenuList.+1900", "PanelE", "PanelEBase", "PanelSetBase::ToTabs.r3.+1900"]
 size = 160
 origin = "embedded"
 fields = [
@@ -573,3 +575,58 @@ color_value_add = { address = 0x82002FF8, type = "u32", note = "added to a color
 # Embedded objects the measure split from their owners after its offset
 # fix (2026-11-22): seeded from the measure, unknown_ until read.
 
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from PanelSetPair.
+[PanelSetPairPart]
+measure = "ModeType8@+848@+42740.+9644"
+size = 3936
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_1900", offset = 1900, type = "u32" },
+  { name = "unknown_1904", offset = 1904, type = "u32" },
+  { name = "unknown_1908", offset = 1908, type = "u32" },
+  { name = "unknown_1912", offset = 1912, type = "u32" },
+  { name = "unknown_1916", offset = 1916, type = "u32" },
+  { name = "unknown_1960", offset = 1960, type = "u32" },
+  { name = "unknown_3872", offset = 3872, type = "u32" },
+  { name = "unknown_3876", offset = 3876, type = "u32" },
+  { name = "unknown_3880", offset = 3880, type = "u32" },
+  { name = "unknown_3884", offset = 3884, type = "u32" },
+  { name = "unknown_3888", offset = 3888, type = "u32" },
+  { name = "unknown_3932", offset = 3932, type = "u32" },
+]
+
+# Split from PanelSetBase.
+[PanelSetBaseAt4]
+measure = "PanelSet::Free.r3@+4"
+size = 1880
+origin = "embedded"
+fields = [
+  { name = "unknown_784", offset = 784, type = "u32" },
+  { name = "unknown_1300", offset = 1300, type = "u32" },
+  { name = "unknown_1816", offset = 1816, type = "u32" },
+  { name = "unknown_1820", offset = 1820, type = "u32" },
+  { name = "unknown_1876", offset = 1876, type = "u32" },
+]
+
+# Split from PanelSetBase.
+[PanelSetBaseAt4_2]
+measure = "PanelSet::SetKind.r3@+4"
+size = 1884
+origin = "embedded"
+fields = [
+  { name = "unknown_32", offset = 32, type = "u32" },
+  { name = "unknown_36", offset = 36, type = "u32" },
+  { name = "unknown_40", offset = 40, type = "u32" },
+  { name = "unknown_44", offset = 44, type = "u32" },
+  { name = "unknown_52", offset = 52, type = "u32" },
+  { name = "unknown_56", offset = 56, type = "u32" },
+  { name = "unknown_228", offset = 228, type = "u32" },
+  { name = "unknown_232", offset = 232, type = "u32" },
+  { name = "unknown_1820", offset = 1820, type = "u32" },
+  { name = "unknown_1880", offset = 1880, type = "u32" },
+]

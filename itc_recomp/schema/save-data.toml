@@ -15,7 +15,7 @@
 # The 400-bit unlock set at the save data's +0x1ACE4 (BitSet400::SetAll):
 # 13 words, bit i at word i >> 5, 1 << (i & 31).
 [BitSet400]
-measure = "BitSet400"
+measure = "Progress@+109796"
 size = 52
 origin = "embedded"
 fields = [
@@ -26,7 +26,7 @@ fields = [
 # control number (0 to 30, PlayerInput::Control). Four in the options at
 # +44, +104 (player 0's pad and wheel), +164 and +224 (player 1's).
 [ControlMap]
-measure = "ControlMap"
+measure = "ControlMap::SetDefault.r3"
 size = 60
 origin = "embedded"
 fields = [

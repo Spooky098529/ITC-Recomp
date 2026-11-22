@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// embedded; measure: GarageAnims.+12
+// embedded; measure: GarageStage.+0@+5600.+12
 struct GarageAnimValues : View {
   using View::View;
   static constexpr uint32_t kSize = 68;
@@ -42,7 +42,7 @@ struct GarageAnimValues : View {
   uint32_t doors_word_address() const { return address + 64; }
 };
 
-// embedded; measure: GarageAnims
+// embedded; measure: GarageStage.+0@+5600
 struct GarageAnimList : View {
   using View::View;
   static constexpr uint32_t kSize = 452;
@@ -118,10 +118,14 @@ struct GarageAnimEntry : View {
   uint32_t camera_step_address() const { return address + 24; }
 };
 
-// embedded; measure: Plates
+// embedded; measure: TrafficCar.+5060@+176
 struct FrontEndPlatePoints : View {
   using View::View;
   static constexpr uint32_t kSize = 4580;
+  // measure fault: SceneParts::LightValue's r3 joined with the plates (2026-11-22)
+  uint32_t fault_light_value_27664() const { return guest::LoadU32(base, address + 27664); }
+  void set_fault_light_value_27664(uint32_t v) const { guest::StoreU32(base, address + 27664, v); }
+  uint32_t fault_light_value_27664_address() const { return address + 27664; }
   // the front bumper's own plate texture flag (PartsPoints' +2640)
   uint32_t front_plate_set() const { return guest::LoadU32(base, address + 2640); }
   void set_front_plate_set(uint32_t v) const { guest::StoreU32(base, address + 2640, v); }

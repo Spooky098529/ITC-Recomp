@@ -16670,7 +16670,7 @@ lifted::Result f82214330(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r5,r24,12
   r5 = uint64_t(int64_t(int64_t(r24) + 12));
   // lwz r3,608(r25)
-  r3 = guest::LoadU32(base, schema::RaceHud(base, uint32_t(r25)).dashboard_address());
+  r3 = guest::LoadU32(base, schema::RaceHudAt16(base, uint32_t(r25)).unknown_608_address());
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // stfiwx f13,0,r11
@@ -16717,7 +16717,7 @@ loc_822143D0:
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // lwz r3,608(r25)
-  r3 = guest::LoadU32(base, schema::RaceHud(base, uint32_t(r25)).dashboard_address());
+  r3 = guest::LoadU32(base, schema::RaceHudAt16(base, uint32_t(r25)).unknown_608_address());
   // add r5,r11,r31
   r5 = r11 + r31;
   // bl 0x8211a578
@@ -16824,7 +16824,7 @@ loc_82214488:
   // addi r5,r24,9
   r5 = uint64_t(int64_t(int64_t(r24) + 9));
   // lwz r3,608(r25)
-  r3 = guest::LoadU32(base, schema::RaceHud(base, uint32_t(r25)).dashboard_address());
+  r3 = guest::LoadU32(base, schema::RaceHudAt16(base, uint32_t(r25)).unknown_608_address());
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // bl 0x8211a578
@@ -16878,7 +16878,7 @@ lifted::Result f822144B0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r5,r24,12
   r5 = uint64_t(int64_t(int64_t(r24) + 12));
   // lwz r3,608(r26)
-  r3 = guest::LoadU32(base, schema::RaceHud(base, uint32_t(r26)).dashboard_address());
+  r3 = guest::LoadU32(base, schema::RaceHudAt16(base, uint32_t(r26)).unknown_608_address());
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // bl 0x8211a578
@@ -16909,7 +16909,7 @@ loc_82214500:
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // lwz r3,608(r26)
-  r3 = guest::LoadU32(base, schema::RaceHud(base, uint32_t(r26)).dashboard_address());
+  r3 = guest::LoadU32(base, schema::RaceHudAt16(base, uint32_t(r26)).unknown_608_address());
   // add r5,r30,r11
   r5 = r30 + r11;
   // mulli r11,r10,10
@@ -16976,7 +16976,7 @@ loc_82214578:
   // addi r5,r24,9
   r5 = uint64_t(int64_t(int64_t(r24) + 9));
   // lwz r3,608(r26)
-  r3 = guest::LoadU32(base, schema::RaceHud(base, uint32_t(r26)).dashboard_address());
+  r3 = guest::LoadU32(base, schema::RaceHudAt16(base, uint32_t(r26)).unknown_608_address());
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // bl 0x8211a578
@@ -17030,7 +17030,7 @@ lifted::Result f822145A0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r5,r24,12
   r5 = uint64_t(int64_t(int64_t(r24) + 12));
   // lwz r3,608(r26)
-  r3 = guest::LoadU32(base, schema::RaceHud(base, uint32_t(r26)).dashboard_address());
+  r3 = guest::LoadU32(base, schema::RaceHudAt16(base, uint32_t(r26)).unknown_608_address());
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // bl 0x8211a578
@@ -17061,7 +17061,7 @@ loc_822145F0:
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // lwz r3,608(r26)
-  r3 = guest::LoadU32(base, schema::RaceHud(base, uint32_t(r26)).dashboard_address());
+  r3 = guest::LoadU32(base, schema::RaceHudAt16(base, uint32_t(r26)).unknown_608_address());
   // add r5,r30,r11
   r5 = r30 + r11;
   // mulli r11,r10,10
@@ -17128,7 +17128,7 @@ loc_82214668:
   // addi r5,r24,9
   r5 = uint64_t(int64_t(int64_t(r24) + 9));
   // lwz r3,608(r26)
-  r3 = guest::LoadU32(base, schema::RaceHud(base, uint32_t(r26)).dashboard_address());
+  r3 = guest::LoadU32(base, schema::RaceHudAt16(base, uint32_t(r26)).unknown_608_address());
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // bl 0x8211a578

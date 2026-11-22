@@ -90,11 +90,8 @@ fields = [
 # editors load from the archive, a swap entry, 200 kept textures and the
 # movies' placeholder textures.
 [DecalImages]
-measures = [
-  "DecalImages", "TuningScreen.+10048",
-  "DecalImages::Load.r3", "DecalImages::SwapKept.r3", "DecalImages::Request.r3",
-  "DecalImages::Reload.r3", "DecalImages::Unload.r3", "DecalImages::Scroll.r3",
-]
+measure = "DecalImages"
+measures = ["TuningScreen.+10048", "DecalImages::Load.r3", "DecalImages::SwapKept.r3", "DecalImages::Request.r3", "DecalImages::Reload.r3", "DecalImages::Unload.r3", "DecalImages::Scroll.r3", "DecalImages::UnloadAll.r3", "DecalImages::SetSlot.r3"]
 size = 8856
 origin = "embedded"
 fields = [
@@ -218,7 +215,7 @@ load_scale = { address = 0x8200294C, type = "f32", note = "the decals' angle sca
 
 # Split from DecalImages.
 [DecalImagesAt28]
-measure = "DecalImages@+28"
+measure = "TuningScreen@+10048@+28"
 size = 4
 origin = "embedded"
 fields = [
@@ -227,9 +224,53 @@ fields = [
 
 # Split from DecalImages.
 [DecalImagesAt32]
-measure = "DecalImages@+32"
+measure = "TuningScreen@+10048@+32"
 size = 4
 origin = "embedded"
 fields = [
   { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from DecalImages.
+[DecalImagesAt10048]
+measure = "TuningMachine@+10048"
+size = 8856
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_32", offset = 32, type = "u32" },
+  { name = "unknown_8836", offset = 8836, type = "u32" },
+  { name = "unknown_8840", offset = 8840, type = "u32" },
+  { name = "unknown_8844", offset = 8844, type = "u32" },
+  { name = "unknown_8848", offset = 8848, type = "u32" },
+  { name = "unknown_8852", offset = 8852, type = "u32" },
+]
+
+# Split from DecalImages.
+[DecalImagesAt10048_2]
+measure = "TuningScreen@+10048"
+size = 860
+origin = "embedded"
+fields = [
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_64", offset = 64, type = "u32" },
+  { name = "unknown_100", offset = 100, type = "u32" },
+  { name = "unknown_784", offset = 784, type = "u32" },
+  { name = "unknown_820", offset = 820, type = "u32" },
+  { name = "unknown_856", offset = 856, type = "u32" },
 ]

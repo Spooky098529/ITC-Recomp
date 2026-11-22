@@ -105,7 +105,7 @@ fields = [
 # r3 met as "UiMovie"): the fault_ fields.
 [UiMovie]
 measure = "UiMovie"
-measures = ["sub_8211A9E8.r3", "sub_8211AC90.r3", "sub_8211E378.r3", "sub_8211C4F0.r3", "sub_8211C5F8.r3", "UiMovie::OnLoaded.r6", "UiMovies::Find.ret.+0", "AnimationList::Get.r4"]
+measures = ["sub_8211A9E8.r3", "sub_8211AC90.r3", "sub_8211E378.r3", "sub_8211C4F0.r3", "sub_8211C5F8.r3", "UiMovie::OnLoaded.r6", "UiMovies::Find.ret.+0", "AnimationList::Get.r4", "RaceHud.+604"]
 # measures from UiMovieObject (tuning-pages), merged at the integration
 size = 40976
 origin = "allocated"
@@ -152,7 +152,8 @@ fields = [
 # 1,420 bytes each: 32 links of 4 bytes (16-bit: +0 the next link, +2 its
 # slot; -1 ends a chain) and 32 slots of 40 bytes.
 [UiMovieAnimationList]
-measure = "AnimationList"
+measure = "UiMovie@+37044"
+measures = ["AnimationList::RemoveAt.r3"]
 size = 1420
 origin = "embedded"
 fields = [
@@ -210,7 +211,8 @@ fields = [
 # A movie's texts (+0x9BCC): 128 {id, text} pairs in place, then their
 # count (TextMap::Find sub_8211B310, TextMap::Set sub_8211B370).
 [UiMovieTextMap]
-measure = "TextMap"
+measure = "TextMap::Set.r3"
+measures = ["TextMap::Find.r3"]
 size = 1028
 origin = "embedded"
 fields = [
@@ -452,4 +454,54 @@ fields = [
   { name = "unknown_0", offset = 0, type = "u32" },
   { name = "unknown_4", offset = 4, type = "u32" },
   { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from UiMovie.
+[UiMovieAt64]
+measure = "UiMovie@+64"
+size = 112
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+  { name = "unknown_12_4i", offset = 12, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "f32" },
+  { name = "unknown_44", offset = 44, type = "f32" },
+  { name = "unknown_60", offset = 60, type = "f32" },
+  { name = "unknown_64", offset = 64, type = "u32" },
+  { name = "unknown_68", offset = 68, type = "u32" },
+  { name = "unknown_72", offset = 72, type = "u32" },
+  { name = "unknown_76", offset = 76, type = "u32" },
+  { name = "unknown_80", offset = 80, type = "f32" },
+  { name = "unknown_84", offset = 84, type = "f32" },
+  { name = "unknown_88", offset = 88, type = "f32" },
+  { name = "unknown_92", offset = 92, type = "f32" },
+  { name = "unknown_96", offset = 96, type = "u32" },
+  { name = "unknown_100", offset = 100, type = "u32" },
+  { name = "unknown_104", offset = 104, type = "u32" },
+  { name = "unknown_108", offset = 108, type = "u32" },
+]
+
+# Split from UiMovieTextItem.
+[UiMovieTextItemAt16]
+measure = "new<65552>@sub_8211B018@+16"
+size = 100
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "f32" },
+  { name = "unknown_44", offset = 44, type = "f32" },
+  { name = "unknown_60", offset = 60, type = "f32" },
+  { name = "unknown_76", offset = 76, type = "f32" },
+  { name = "unknown_80", offset = 80, type = "f32" },
+  { name = "unknown_84", offset = 84, type = "f32" },
+  { name = "unknown_88", offset = 88, type = "f32" },
+  { name = "unknown_92", offset = 92, type = "f32" },
+  { name = "unknown_96", offset = 96, type = "f32" },
 ]

@@ -484,7 +484,7 @@ struct DelegateTargetVtable : View {
   uint32_t slot_1_address() const { return address + 4; }
 };
 
-// embedded; measure: HandlerMap, HandlerMap::Insert.r4, sub_82093638.r4, sub_82093850.r3, HandlerMap::InsertNode.r4
+// embedded; measure: HandlerMap, HandlerMap::Insert.r4, sub_82093638.r4, sub_82093850.r3, HandlerMap::InsertNode.r4, HandlerMap::HandlerMap.r3
 struct HandlerMap : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
@@ -515,7 +515,7 @@ struct HandlerMap : View {
   uint32_t result_functor_8_address() const { return address + 8; }
 };
 
-// allocated; measure: new<?>@HandlerMap::AllocateNodes, HandlerMap.+4.+8, HandlerMap::Insert.r4.+4, HandlerMap::Insert.r4.+4.+0, HandlerMap::Insert.r4.+4.+0.+8, HandlerMap::NewNode.ret, HandlerMap::NewNode.ret.+4, HandlerMap::NewNode.ret.+4.+8, HandlerMap::RotateLeft.r4, HandlerMap::RotateLeft.r4.+4, HandlerMap::RotateLeft.r4.+8, HandlerMap::RotateLeft.r4.+8.+0, sub_82091AE8.r3.+4, sub_82091AE8.r3.+4.+0, sub_82091AE8.r3.+4.+8, sub_82099B18.r3.+4, sub_82099B18.r3.+4.+0, sub_82099B18.r3.+4.+8, sub_82099BA8.r4, sub_82099BA8.r4.+0, sub_82093638.r4.+4, sub_82093850.r3.+4, sub_8209A008.r3.+20, App.+8, HandlerMap::InsertNode.r4.+4, HandlerMap::InsertNode.r6.+8, HandlerMap::InsertNode.r6.+8.+4, HandlerMap::InsertNode.r6.+8.+0, HandlerMap::InsertNode.r6.+8.+0.+8
+// allocated; measure: new<?>@HandlerMap::AllocateNodes, HandlerMap::Insert.r4.+4, HandlerMap::Insert.r4.+4.+0, HandlerMap::Insert.r4.+4.+0.+8, HandlerMap::NewNode.ret, HandlerMap::NewNode.ret.+4, HandlerMap::NewNode.ret.+4.+8, HandlerMap::RotateLeft.r4, HandlerMap::RotateLeft.r4.+4, HandlerMap::RotateLeft.r4.+8, HandlerMap::RotateLeft.r4.+8.+0, sub_82091AE8.r3.+4, sub_82091AE8.r3.+4.+0, sub_82091AE8.r3.+4.+8, sub_82099B18.r3.+4, sub_82099B18.r3.+4.+0, sub_82099B18.r3.+4.+8, sub_82099BA8.r4, sub_82099BA8.r4.+0, sub_82093638.r4.+4, sub_82093850.r3.+4, sub_8209A008.r3.+20, App.+8, HandlerMap::InsertNode.r4.+4, HandlerMap::InsertNode.r6.+8, HandlerMap::InsertNode.r6.+8.+4, HandlerMap::InsertNode.r6.+8.+0, HandlerMap::InsertNode.r6.+8.+0.+8, HandlerMap.+4
 struct HandlerMapNode : View {
   using View::View;
   static constexpr uint32_t kSize = 24;
@@ -608,7 +608,7 @@ struct HandlerMapOwner : View {
   uint32_t app_listeners_head_address() const { return address + 68; }
 };
 
-// embedded; measure: RequestVector
+// embedded; measure: RequestVector, RequestVector::PushBack.r3, RequestVector::Erase.r4, RequestVector::Clear.r3
 struct RequestVector : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
@@ -633,7 +633,7 @@ struct RequestVector : View {
   uint32_t end_address() const { return address + 12; }
 };
 
-// embedded; measure: RequestVector.+8, RequestVector::InsertN.r6, RequestVector::PushBack.r4
+// embedded; measure: RequestVector.+8, RequestVector::InsertN.r6, RequestVector::PushBack.r4, RequestVector::PushBack.r3.+8
 struct Request : View {
   using View::View;
   static constexpr uint32_t kSize = 12;

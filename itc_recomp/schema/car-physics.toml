@@ -18,7 +18,7 @@
 # ApplyTuning's r3 the car data): the fields marked so are those.
 [Vehicle]
 measure = "Vehicle"
-measures = ["Vehicle::UpdateDrivenAxle.ret", "Vehicle::Get.ret", "AiDriver.+160", "Vehicle.+2160", "Vehicle.+2144"]
+measures = ["Vehicle::UpdateDrivenAxle.ret", "Vehicle::Get.ret", "AiDriver.+160", "Vehicle.+2160", "Vehicle.+2144", "sub_820C0140.r3"]
 size = 6268
 origin = "embedded"
 fields = [
@@ -296,7 +296,8 @@ fields = [
 
 # An axle of the vehicle (+1888 the front, +2016 the rear; [+2144 + 4 w]).
 [VehicleAxle]
-measures = ["WheelRecord2", "WheelRecord2::Copy.r4", "Vehicle.+2152"]
+measure = "WheelRecord2::Copy.r4"
+measures = ["Vehicle.+2152", "WheelRecord2::Copy.r3"]
 size = 128
 origin = "embedded"
 fields = [
@@ -316,7 +317,7 @@ fields = [
 
 # The vehicle's steering record (+2988; SteerRecord::Fill, Curve).
 [SteerRecord]
-measure = "SteerRecord"
+measure = "Vehicle@+2988"
 size = 36
 origin = "embedded"
 fields = [
@@ -377,7 +378,7 @@ fields = [
 # +96, +64, a contact's +16 and the like).
 [PhysicsVector]
 measure = "RigidBody::Velocity.ret"
-measures = ["RigidBody::AngularVelocity.ret", "RigidBody::Force.ret", "Contact::Position.ret", "Matrix::MultiplyTranslation.r5", "sub_820B6898.ret", "CarData@+64"]
+measures = ["RigidBody::AngularVelocity.ret", "RigidBody::Force.ret", "Contact::Position.ret", "Matrix::MultiplyTranslation.r5", "sub_820B6898.ret", "RigidBody::SetInertia.r4"]
 size = 16
 origin = "embedded"
 fields = [
@@ -721,9 +722,9 @@ fields = [
 
 # A contact on a collision object (from its +240, linked by +68; the world's +48).
 [CollisionContact]
+measure = "new<4294967295>@CollisionWorld::Create#4"
+measures = ["CollisionWorld::NewContact.ret", "Contact", "CollisionObject.+240.+68", "Contact::Set.r3"]
 # measures from CollisionObjectContact (vehicle-accessors), merged at the integration
-measures = ["new<4294967295>@CollisionWorld::Create#4", "CollisionWorld::NewContact.ret",
-  "Contact", "CollisionObject.+240.+68"]
 size = 80
 origin = "allocated"
 fields = [
@@ -781,3 +782,43 @@ last_step = { address = 0x826C2D84, type = "f32" }
 collision_world = { address = 0x826C2D88, type = "ptr", to = "CollisionWorld" }
 surface_settings = { address = 0x826C2DF0, type = "bytes", count = 64, note = "four groups of four floats (CollisionSurface::A to D: the default and three bits')" }
 axle_records = { address = 0x8260181C, type = "bytes", count = 24, note = "six pointers to 88-byte records (by the car data's +176)" }
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from Vehicle.
+[VehiclePart]
+measure = "RaceScreens@+16.+440"
+size = 6264
+origin = "embedded"
+fields = [
+  { name = "unknown_2252", offset = 2252, type = "u32" },
+  { name = "unknown_2420", offset = 2420, type = "f32" },
+  { name = "unknown_2944", offset = 2944, type = "f32" },
+  { name = "unknown_5712", offset = 5712, type = "u32" },
+  { name = "unknown_6168", offset = 6168, type = "u32" },
+  { name = "unknown_6252", offset = 6252, type = "f32" },
+  { name = "unknown_6256", offset = 6256, type = "f32" },
+  { name = "unknown_6260", offset = 6260, type = "f32" },
+]
+
+# Split from Vehicle.
+[VehicleAt37632]
+measure = "Vehicles::DestroyAll.r3@+37632"
+size = 348
+origin = "embedded"
+fields = [
+  { name = "unknown_336", offset = 336, type = "u32" },
+  { name = "unknown_340", offset = 340, type = "u32" },
+  { name = "unknown_344", offset = 344, type = "u32" },
+]
+
+# Split from VehicleBoxVtable.
+[VehicleBoxVtablePart]
+measure = "Vehicles::DestroyAll.r3@+37632.+344.+0"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]

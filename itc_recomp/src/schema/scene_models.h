@@ -254,7 +254,7 @@ struct SceneModel : View {
   uint32_t scene_address() const { return address + 5116; }
 };
 
-// embedded; measure: CarRecord, CarRecord::Copy.r4, sub_820D45B0.r3, WheelPoints.+4
+// embedded; measure: CarRecord::Copy.r4, sub_820D45B0.r3, CarRecord::Copy.r3, CarRecord::Reset.r3, SceneModelRecord@+16, SceneModelRecord::FromCar.r3@+16@+3632, WheelPoints::SetUpTire.r3.+4, WheelPoints::DrawTireMorphed.r3.+4
 struct CarRecord : View {
   using View::View;
   static constexpr uint32_t kSize = 3696;
@@ -342,7 +342,7 @@ struct SceneModelsCockpitRecord : View {
   uint32_t interior_record_address() const { return address + 24; }
 };
 
-// embedded; measure: sub_820D3900.r3, WheelPoints.+8944
+// embedded; measure: sub_820D3900.r3, WheelPoints::DrawBrakesMorphed.r3.+8, WheelPoints::DrawBrakes.r3.+8, WheelPoints::DrawTireMorphed.r3.+8, WheelPoints::SetUpTire.r3.+8, WheelPoints::SetUpBrakes.r3.+8, WheelPoints::DrawTire.r3.+8, WheelPoints::DrawRimB.r3.+8, WheelPoints::SetUpRimA.r3.+8, WheelPoints::SetUpRimB.r3.+8
 struct SceneModelsWheelsRecord : View {
   using View::View;
   static constexpr uint32_t kSize = 156;
@@ -573,7 +573,7 @@ struct SceneModelsSoundContext : View {
   uint32_t slot_address() const { return address + 0; }
 };
 
-// embedded; measure: CarRecord@+176
+// embedded; measure: CarRecord::Reset.r3@+176
 struct CarRecordAt176 : View {
   using View::View;
   static constexpr uint32_t kSize = 64;
@@ -603,7 +603,7 @@ struct CarRecordAt176 : View {
   uint32_t unknown_56_address() const { return address + 56; }
 };
 
-// embedded; measure: WheelPoints.+8@+60
+// embedded; measure: WheelPoints::DrawTireMorphed.r3.+8@+60
 struct SceneModelsWheelsRecordAt60 : View {
   using View::View;
   static constexpr uint32_t kSize = 4;

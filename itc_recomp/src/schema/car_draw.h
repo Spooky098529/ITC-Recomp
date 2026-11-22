@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: CarScene, Car.+5116, CarScene::OnFileLoaded.r6, VirtualFree.ret, PartsPoints.+37088
+// allocated; measure: CarScene, Car.+5116, CarScene::OnFileLoaded.r6, VirtualFree.ret, SceneParts@+176.+37088
 struct CarScene : View {
   using View::View;
   static constexpr uint32_t kSize = 5536;
@@ -420,146 +420,6 @@ struct CarScene : View {
   float lighting_end() const { return guest::LoadFloat(base, address + 5520); }
   void set_lighting_end(float v) const { guest::StoreFloat(base, address + 5520, v); }
   uint32_t lighting_end_address() const { return address + 5520; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +0, the scene's +5248
-  uint64_t fault_lighting_0() const { return guest::LoadU64(base, address + 0); }
-  void set_fault_lighting_0(uint64_t v) const { guest::StoreU64(base, address + 0, v); }
-  uint32_t fault_lighting_0_address() const { return address + 0; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +8, the scene's +5256
-  uint64_t fault_lighting_8() const { return guest::LoadU64(base, address + 8); }
-  void set_fault_lighting_8(uint64_t v) const { guest::StoreU64(base, address + 8, v); }
-  uint32_t fault_lighting_8_address() const { return address + 8; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +16, the scene's +5264
-  uint64_t fault_lighting_16() const { return guest::LoadU64(base, address + 16); }
-  void set_fault_lighting_16(uint64_t v) const { guest::StoreU64(base, address + 16, v); }
-  uint32_t fault_lighting_16_address() const { return address + 16; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +24, the scene's +5272
-  uint64_t fault_lighting_24() const { return guest::LoadU64(base, address + 24); }
-  void set_fault_lighting_24(uint64_t v) const { guest::StoreU64(base, address + 24, v); }
-  uint32_t fault_lighting_24_address() const { return address + 24; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +32, the scene's +5280
-  uint64_t fault_lighting_32() const { return guest::LoadU64(base, address + 32); }
-  void set_fault_lighting_32(uint64_t v) const { guest::StoreU64(base, address + 32, v); }
-  uint32_t fault_lighting_32_address() const { return address + 32; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +40, the scene's +5288
-  uint64_t fault_lighting_40() const { return guest::LoadU64(base, address + 40); }
-  void set_fault_lighting_40(uint64_t v) const { guest::StoreU64(base, address + 40, v); }
-  uint32_t fault_lighting_40_address() const { return address + 40; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +48, the scene's +5296
-  uint64_t fault_lighting_48() const { return guest::LoadU64(base, address + 48); }
-  void set_fault_lighting_48(uint64_t v) const { guest::StoreU64(base, address + 48, v); }
-  uint32_t fault_lighting_48_address() const { return address + 48; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +56, the scene's +5304
-  uint64_t fault_lighting_56() const { return guest::LoadU64(base, address + 56); }
-  void set_fault_lighting_56(uint64_t v) const { guest::StoreU64(base, address + 56, v); }
-  uint32_t fault_lighting_56_address() const { return address + 56; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +64, the scene's +5312
-  uint64_t fault_lighting_64() const { return guest::LoadU64(base, address + 64); }
-  void set_fault_lighting_64(uint64_t v) const { guest::StoreU64(base, address + 64, v); }
-  uint32_t fault_lighting_64_address() const { return address + 64; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +72, the scene's +5320
-  uint64_t fault_lighting_72() const { return guest::LoadU64(base, address + 72); }
-  void set_fault_lighting_72(uint64_t v) const { guest::StoreU64(base, address + 72, v); }
-  uint32_t fault_lighting_72_address() const { return address + 72; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +80, the scene's +5328
-  uint64_t fault_lighting_80() const { return guest::LoadU64(base, address + 80); }
-  void set_fault_lighting_80(uint64_t v) const { guest::StoreU64(base, address + 80, v); }
-  uint32_t fault_lighting_80_address() const { return address + 80; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +88, the scene's +5336
-  uint64_t fault_lighting_88() const { return guest::LoadU64(base, address + 88); }
-  void set_fault_lighting_88(uint64_t v) const { guest::StoreU64(base, address + 88, v); }
-  uint32_t fault_lighting_88_address() const { return address + 88; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +96, the scene's +5344
-  uint64_t fault_lighting_96() const { return guest::LoadU64(base, address + 96); }
-  void set_fault_lighting_96(uint64_t v) const { guest::StoreU64(base, address + 96, v); }
-  uint32_t fault_lighting_96_address() const { return address + 96; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +104, the scene's +5352
-  uint64_t fault_lighting_104() const { return guest::LoadU64(base, address + 104); }
-  void set_fault_lighting_104(uint64_t v) const { guest::StoreU64(base, address + 104, v); }
-  uint32_t fault_lighting_104_address() const { return address + 104; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +112, the scene's +5360
-  uint64_t fault_lighting_112() const { return guest::LoadU64(base, address + 112); }
-  void set_fault_lighting_112(uint64_t v) const { guest::StoreU64(base, address + 112, v); }
-  uint32_t fault_lighting_112_address() const { return address + 112; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +120, the scene's +5368
-  uint64_t fault_lighting_120() const { return guest::LoadU64(base, address + 120); }
-  void set_fault_lighting_120(uint64_t v) const { guest::StoreU64(base, address + 120, v); }
-  uint32_t fault_lighting_120_address() const { return address + 120; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +128, the scene's +5376
-  uint64_t fault_lighting_128() const { return guest::LoadU64(base, address + 128); }
-  void set_fault_lighting_128(uint64_t v) const { guest::StoreU64(base, address + 128, v); }
-  uint32_t fault_lighting_128_address() const { return address + 128; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +136, the scene's +5384
-  uint64_t fault_lighting_136() const { return guest::LoadU64(base, address + 136); }
-  void set_fault_lighting_136(uint64_t v) const { guest::StoreU64(base, address + 136, v); }
-  uint32_t fault_lighting_136_address() const { return address + 136; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +144, the scene's +5392
-  uint64_t fault_lighting_144() const { return guest::LoadU64(base, address + 144); }
-  void set_fault_lighting_144(uint64_t v) const { guest::StoreU64(base, address + 144, v); }
-  uint32_t fault_lighting_144_address() const { return address + 144; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +152, the scene's +5400
-  uint64_t fault_lighting_152() const { return guest::LoadU64(base, address + 152); }
-  void set_fault_lighting_152(uint64_t v) const { guest::StoreU64(base, address + 152, v); }
-  uint32_t fault_lighting_152_address() const { return address + 152; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +160, the scene's +5408
-  uint64_t fault_lighting_160() const { return guest::LoadU64(base, address + 160); }
-  void set_fault_lighting_160(uint64_t v) const { guest::StoreU64(base, address + 160, v); }
-  uint32_t fault_lighting_160_address() const { return address + 160; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +168, the scene's +5416
-  uint64_t fault_lighting_168() const { return guest::LoadU64(base, address + 168); }
-  void set_fault_lighting_168(uint64_t v) const { guest::StoreU64(base, address + 168, v); }
-  uint32_t fault_lighting_168_address() const { return address + 168; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +176, the scene's +5424
-  uint64_t fault_lighting_176() const { return guest::LoadU64(base, address + 176); }
-  void set_fault_lighting_176(uint64_t v) const { guest::StoreU64(base, address + 176, v); }
-  uint32_t fault_lighting_176_address() const { return address + 176; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +184, the scene's +5432
-  uint64_t fault_lighting_184() const { return guest::LoadU64(base, address + 184); }
-  void set_fault_lighting_184(uint64_t v) const { guest::StoreU64(base, address + 184, v); }
-  uint32_t fault_lighting_184_address() const { return address + 184; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +192, the scene's +5440
-  uint64_t fault_lighting_192() const { return guest::LoadU64(base, address + 192); }
-  void set_fault_lighting_192(uint64_t v) const { guest::StoreU64(base, address + 192, v); }
-  uint32_t fault_lighting_192_address() const { return address + 192; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +200, the scene's +5448
-  uint64_t fault_lighting_200() const { return guest::LoadU64(base, address + 200); }
-  void set_fault_lighting_200(uint64_t v) const { guest::StoreU64(base, address + 200, v); }
-  uint32_t fault_lighting_200_address() const { return address + 200; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +208, the scene's +5456
-  uint64_t fault_lighting_208() const { return guest::LoadU64(base, address + 208); }
-  void set_fault_lighting_208(uint64_t v) const { guest::StoreU64(base, address + 208, v); }
-  uint32_t fault_lighting_208_address() const { return address + 208; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +216, the scene's +5464
-  uint64_t fault_lighting_216() const { return guest::LoadU64(base, address + 216); }
-  void set_fault_lighting_216(uint64_t v) const { guest::StoreU64(base, address + 216, v); }
-  uint32_t fault_lighting_216_address() const { return address + 216; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +224, the scene's +5472
-  uint64_t fault_lighting_224() const { return guest::LoadU64(base, address + 224); }
-  void set_fault_lighting_224(uint64_t v) const { guest::StoreU64(base, address + 224, v); }
-  uint32_t fault_lighting_224_address() const { return address + 224; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +232, the scene's +5480
-  uint64_t fault_lighting_232() const { return guest::LoadU64(base, address + 232); }
-  void set_fault_lighting_232(uint64_t v) const { guest::StoreU64(base, address + 232, v); }
-  uint32_t fault_lighting_232_address() const { return address + 232; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +240, the scene's +5488
-  uint64_t fault_lighting_240() const { return guest::LoadU64(base, address + 240); }
-  void set_fault_lighting_240(uint64_t v) const { guest::StoreU64(base, address + 240, v); }
-  uint32_t fault_lighting_240_address() const { return address + 240; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +248, the scene's +5496
-  uint64_t fault_lighting_248() const { return guest::LoadU64(base, address + 248); }
-  void set_fault_lighting_248(uint64_t v) const { guest::StoreU64(base, address + 248, v); }
-  uint32_t fault_lighting_248_address() const { return address + 248; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +256, the scene's +5504
-  uint64_t fault_lighting_256() const { return guest::LoadU64(base, address + 256); }
-  void set_fault_lighting_256(uint64_t v) const { guest::StoreU64(base, address + 256, v); }
-  uint32_t fault_lighting_256_address() const { return address + 256; }
-  // measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +264, the scene's +5512
-  uint64_t fault_lighting_264() const { return guest::LoadU64(base, address + 264); }
-  void set_fault_lighting_264(uint64_t v) const { guest::StoreU64(base, address + 264, v); }
-  uint32_t fault_lighting_264_address() const { return address + 264; }
-  // measure fault: InitLighting's last float, the scene's +5520 (lighting_end)
-  uint32_t fault_lighting_272() const { return guest::LoadU32(base, address + 272); }
-  void set_fault_lighting_272(uint32_t v) const { guest::StoreU32(base, address + 272, v); }
-  uint32_t fault_lighting_272_address() const { return address + 272; }
   // the SceneAssets (scene.toml) at +64: CarScene::OnFileLoaded's r6 reaches its slots' requests and states through the scene (scene's report)
   uint32_t assets_address() const { return address + 64; }
 };
@@ -594,7 +454,7 @@ struct CarPart : View {
   uint32_t shape_address() const { return address + 228; }
 };
 
-// embedded; measure: PartsPoints
+// embedded; measure: PartsPoints, PartsPoints::DrawFrontBumper.r3, PartsPoints::DrawRearBumper.r3, PartsPoints::DrawHeadlights.r3, PartsPoints::DrawDoorWindows02.r3, PartsPoints::DrawDoorWindows01.r3, PartsPoints::DrawTailLights.r3, PartsPoints::DrawHeadlightBody.r3, PartsPoints::DrawFrontBumperLights.r3, PartsPoints::ResetRearBumper.r3, PartsPoints::DrawCabinWindow02.r3, PartsPoints::DrawCabinWindow01.r3, PartsPoints::ResetShadows.r3, PartsPoints::DrawBonnet.r3
 struct PartsPoints : View {
   using View::View;
   static constexpr uint32_t kSize = 37108;
@@ -818,7 +678,7 @@ struct PartsPoints : View {
   uint32_t skeleton_address() const { return address + 37092; }
 };
 
-// embedded; measure: PartsPoints.+37080, PartsPoints.+5520, PartsPoints.+6084, sub_820D3558.r3
+// embedded; measure: sub_820D3558.r3, PartsPoints::DrawRace.ret@+176.+37080, SceneParts::Draw.r3@+176.+37080, SceneParts::Draw.r3@+176@+18224.+5520, PartsPoints::DrawRace.ret@+176@+6032.+6084, PartsPoints::DrawRace.ret@+176@+12128.+6084
 struct PartsRecord : View {
   using View::View;
   static constexpr uint32_t kSize = 60;
@@ -884,7 +744,7 @@ struct PartsRecord : View {
   uint32_t unknown_52_address() const { return address + 52; }
 };
 
-// embedded; measure: LightPoints, BlinkTimers
+// embedded; measure: SceneLights@+144, SceneLights@+4480, SceneLights@+8816, SceneLights@+96, LightPoints::FindGroup.r3, LightPoints::ResetFront.r3, LightPoints::ResetSides.r3, LightPoints::ResetRear.r3
 struct LightPoints : View {
   using View::View;
   static constexpr uint32_t kSize = 13056;
@@ -944,7 +804,7 @@ struct LightPoints : View {
   uint32_t spot_shape_address() const { return address + 3124; }
 };
 
-// embedded; measure: LightPoints.+0, BlinkTimers.+0, sub_820D34E0.r3
+// embedded; measure: sub_820D34E0.r3, SceneLights@+144.+0, SceneLights@+4480.+0, SceneLights@+8816.+0, SceneLights@+96.+0
 struct LightKitRecord : View {
   using View::View;
   static constexpr uint32_t kSize = 52;
@@ -993,7 +853,7 @@ struct LightKitRecord : View {
   uint32_t rear_rate_address() const { return address + 48; }
 };
 
-// embedded; measure: TrafficPoints
+// embedded; measure: TrafficPoints::Draw.r3@+16, TrafficPoints::Draw.r3@+1472, TrafficPoints::Find.r3@+3152, TrafficPoints::Draw.r3@+3152, TrafficPoints::Find.r3@+1472, SceneTraffic@+3728
 struct TrafficPoints : View {
   using View::View;
   static constexpr uint32_t kSize = 6032;
@@ -1054,7 +914,7 @@ struct TrafficPoints : View {
   uint32_t record10_shape_address() const { return address + 2628; }
 };
 
-// embedded; measure: InteriorDials.+0, InteriorPoints.+0, InteriorPoints.+10464, Dash.+0, sub_820D3840.r3
+// embedded; measure: sub_820D3840.r3, SceneInterior@+160@+240.+0, SceneInterior@+160@+9488.+0, SceneInterior@+160@+10464.+0, SceneInterior@+160.+9488, SceneInterior@+160.+11444, SceneInterior@+160@+3152.+0
 struct InteriorRecord : View {
   using View::View;
   static constexpr uint32_t kSize = 120;
@@ -1166,7 +1026,7 @@ struct InteriorRecord : View {
   uint32_t unknown_116_address() const { return address + 116; }
 };
 
-// embedded; measure: InteriorDials
+// embedded; measure: SceneInterior@+160@+240, SceneInterior@+400
 struct InteriorDials : View {
   using View::View;
   static constexpr uint32_t kSize = 2912;
@@ -1195,10 +1055,18 @@ struct InteriorDials : View {
   uint32_t ones_shape() const { return guest::LoadU32(base, address + 2404); }
   void set_ones_shape(uint32_t v) const { guest::StoreU32(base, address + 2404, v); }
   uint32_t ones_shape_address() const { return address + 2404; }
+  // read by InteriorPoints::FindDials (not read)
+  uint32_t unknown_2420() const { return guest::LoadU32(base, address + 2420); }
+  void set_unknown_2420(uint32_t v) const { guest::StoreU32(base, address + 2420, v); }
+  uint32_t unknown_2420_address() const { return address + 2420; }
   // record 10's shape
   uint32_t tens_shape() const { return guest::LoadU32(base, address + 2644); }
   void set_tens_shape(uint32_t v) const { guest::StoreU32(base, address + 2644, v); }
   uint32_t tens_shape_address() const { return address + 2644; }
+  // read by InteriorPoints::FindDials (not read)
+  uint32_t unknown_2660() const { return guest::LoadU32(base, address + 2660); }
+  void set_unknown_2660(uint32_t v) const { guest::StoreU32(base, address + 2660, v); }
+  uint32_t unknown_2660_address() const { return address + 2660; }
   // record 11's shape
   uint32_t hundreds_shape() const { return guest::LoadU32(base, address + 2884); }
   void set_hundreds_shape(uint32_t v) const { guest::StoreU32(base, address + 2884, v); }
@@ -1209,7 +1077,7 @@ struct InteriorDials : View {
   uint32_t gauge_record_address() const { return address + 2896; }
 };
 
-// embedded; measure: Dash
+// embedded; measure: SceneInterior@+160@+3152
 struct Dash : View {
   using View::View;
   static constexpr uint32_t kSize = 5356;
@@ -1298,7 +1166,7 @@ struct Dash : View {
   uint32_t gauge6_angle_address() const { return address + 5352; }
 };
 
-// embedded; measure: CockpitPoints::DrawCabinWindow.r4, InteriorDials::DrawDigitalSpeed.r4, InteriorPoints::DrawRace.r4, PartsPoints::DrawBonnet.r4, PartsPoints::DrawCabinWindow01.r4, PartsPoints::DrawCabinWindow02.r4, PartsPoints::DrawFenderLights.r4, PartsPoints::DrawFrontBumperLights.r4, PartsPoints::DrawFrontEnd.r4, PartsPoints::DrawHeadlightBody.r4, PartsPoints::DrawHeadlights.r4, PartsPoints::DrawLeftDoorPanel.r4, PartsPoints::DrawRace.r4, PartsPoints::DrawRearBumperLights.r4, PartsPoints::DrawTailLights.r4, TrafficPoints::DrawHeadlights.r4, WheelPoints::DrawRimAMorphed.r5, WheelPoints::DrawRimB.r5, SceneModelBlock
+// embedded; measure: CockpitPoints::DrawCabinWindow.r4, InteriorDials::DrawDigitalSpeed.r4, InteriorPoints::DrawRace.r4, PartsPoints::DrawBonnet.r4, PartsPoints::DrawCabinWindow01.r4, PartsPoints::DrawCabinWindow02.r4, PartsPoints::DrawFenderLights.r4, PartsPoints::DrawFrontBumperLights.r4, PartsPoints::DrawFrontEnd.r4, PartsPoints::DrawHeadlightBody.r4, PartsPoints::DrawHeadlights.r4, PartsPoints::DrawLeftDoorPanel.r4, PartsPoints::DrawRace.r4, PartsPoints::DrawRearBumperLights.r4, PartsPoints::DrawTailLights.r4, TrafficPoints::DrawHeadlights.r4, WheelPoints::DrawRimAMorphed.r5, WheelPoints::DrawRimB.r5, SceneModel@+4288
 struct CarDrawBlock : View {
   using View::View;
   static constexpr uint32_t kSize = 736;
@@ -1539,6 +1407,482 @@ struct NearHeightPosition : View {
   float y() const { return guest::LoadFloat(base, address + 4); }
   void set_y(float v) const { guest::StoreFloat(base, address + 4, v); }
   uint32_t y_address() const { return address + 4; }
+};
+
+// embedded; measure: CarScene@+5248
+struct CarSceneAt5248 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 276;
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +0, the scene's +5248
+  uint64_t lighting_0() const { return guest::LoadU64(base, address + 0); }
+  void set_lighting_0(uint64_t v) const { guest::StoreU64(base, address + 0, v); }
+  uint32_t lighting_0_address() const { return address + 0; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +8, the scene's +5256
+  uint64_t lighting_8() const { return guest::LoadU64(base, address + 8); }
+  void set_lighting_8(uint64_t v) const { guest::StoreU64(base, address + 8, v); }
+  uint32_t lighting_8_address() const { return address + 8; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +16, the scene's +5264
+  uint64_t lighting_16() const { return guest::LoadU64(base, address + 16); }
+  void set_lighting_16(uint64_t v) const { guest::StoreU64(base, address + 16, v); }
+  uint32_t lighting_16_address() const { return address + 16; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +24, the scene's +5272
+  uint64_t lighting_24() const { return guest::LoadU64(base, address + 24); }
+  void set_lighting_24(uint64_t v) const { guest::StoreU64(base, address + 24, v); }
+  uint32_t lighting_24_address() const { return address + 24; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +32, the scene's +5280
+  uint64_t lighting_32() const { return guest::LoadU64(base, address + 32); }
+  void set_lighting_32(uint64_t v) const { guest::StoreU64(base, address + 32, v); }
+  uint32_t lighting_32_address() const { return address + 32; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +40, the scene's +5288
+  uint64_t lighting_40() const { return guest::LoadU64(base, address + 40); }
+  void set_lighting_40(uint64_t v) const { guest::StoreU64(base, address + 40, v); }
+  uint32_t lighting_40_address() const { return address + 40; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +48, the scene's +5296
+  uint64_t lighting_48() const { return guest::LoadU64(base, address + 48); }
+  void set_lighting_48(uint64_t v) const { guest::StoreU64(base, address + 48, v); }
+  uint32_t lighting_48_address() const { return address + 48; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +56, the scene's +5304
+  uint64_t lighting_56() const { return guest::LoadU64(base, address + 56); }
+  void set_lighting_56(uint64_t v) const { guest::StoreU64(base, address + 56, v); }
+  uint32_t lighting_56_address() const { return address + 56; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +64, the scene's +5312
+  uint64_t lighting_64() const { return guest::LoadU64(base, address + 64); }
+  void set_lighting_64(uint64_t v) const { guest::StoreU64(base, address + 64, v); }
+  uint32_t lighting_64_address() const { return address + 64; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +72, the scene's +5320
+  uint64_t lighting_72() const { return guest::LoadU64(base, address + 72); }
+  void set_lighting_72(uint64_t v) const { guest::StoreU64(base, address + 72, v); }
+  uint32_t lighting_72_address() const { return address + 72; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +80, the scene's +5328
+  uint64_t lighting_80() const { return guest::LoadU64(base, address + 80); }
+  void set_lighting_80(uint64_t v) const { guest::StoreU64(base, address + 80, v); }
+  uint32_t lighting_80_address() const { return address + 80; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +88, the scene's +5336
+  uint64_t lighting_88() const { return guest::LoadU64(base, address + 88); }
+  void set_lighting_88(uint64_t v) const { guest::StoreU64(base, address + 88, v); }
+  uint32_t lighting_88_address() const { return address + 88; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +96, the scene's +5344
+  uint64_t lighting_96() const { return guest::LoadU64(base, address + 96); }
+  void set_lighting_96(uint64_t v) const { guest::StoreU64(base, address + 96, v); }
+  uint32_t lighting_96_address() const { return address + 96; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +104, the scene's +5352
+  uint64_t lighting_104() const { return guest::LoadU64(base, address + 104); }
+  void set_lighting_104(uint64_t v) const { guest::StoreU64(base, address + 104, v); }
+  uint32_t lighting_104_address() const { return address + 104; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +112, the scene's +5360
+  uint64_t lighting_112() const { return guest::LoadU64(base, address + 112); }
+  void set_lighting_112(uint64_t v) const { guest::StoreU64(base, address + 112, v); }
+  uint32_t lighting_112_address() const { return address + 112; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +120, the scene's +5368
+  uint64_t lighting_120() const { return guest::LoadU64(base, address + 120); }
+  void set_lighting_120(uint64_t v) const { guest::StoreU64(base, address + 120, v); }
+  uint32_t lighting_120_address() const { return address + 120; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +128, the scene's +5376
+  uint64_t lighting_128() const { return guest::LoadU64(base, address + 128); }
+  void set_lighting_128(uint64_t v) const { guest::StoreU64(base, address + 128, v); }
+  uint32_t lighting_128_address() const { return address + 128; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +136, the scene's +5384
+  uint64_t lighting_136() const { return guest::LoadU64(base, address + 136); }
+  void set_lighting_136(uint64_t v) const { guest::StoreU64(base, address + 136, v); }
+  uint32_t lighting_136_address() const { return address + 136; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +144, the scene's +5392
+  uint64_t lighting_144() const { return guest::LoadU64(base, address + 144); }
+  void set_lighting_144(uint64_t v) const { guest::StoreU64(base, address + 144, v); }
+  uint32_t lighting_144_address() const { return address + 144; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +152, the scene's +5400
+  uint64_t lighting_152() const { return guest::LoadU64(base, address + 152); }
+  void set_lighting_152(uint64_t v) const { guest::StoreU64(base, address + 152, v); }
+  uint32_t lighting_152_address() const { return address + 152; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +160, the scene's +5408
+  uint64_t lighting_160() const { return guest::LoadU64(base, address + 160); }
+  void set_lighting_160(uint64_t v) const { guest::StoreU64(base, address + 160, v); }
+  uint32_t lighting_160_address() const { return address + 160; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +168, the scene's +5416
+  uint64_t lighting_168() const { return guest::LoadU64(base, address + 168); }
+  void set_lighting_168(uint64_t v) const { guest::StoreU64(base, address + 168, v); }
+  uint32_t lighting_168_address() const { return address + 168; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +176, the scene's +5424
+  uint64_t lighting_176() const { return guest::LoadU64(base, address + 176); }
+  void set_lighting_176(uint64_t v) const { guest::StoreU64(base, address + 176, v); }
+  uint32_t lighting_176_address() const { return address + 176; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +184, the scene's +5432
+  uint64_t lighting_184() const { return guest::LoadU64(base, address + 184); }
+  void set_lighting_184(uint64_t v) const { guest::StoreU64(base, address + 184, v); }
+  uint32_t lighting_184_address() const { return address + 184; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +192, the scene's +5440
+  uint64_t lighting_192() const { return guest::LoadU64(base, address + 192); }
+  void set_lighting_192(uint64_t v) const { guest::StoreU64(base, address + 192, v); }
+  uint32_t lighting_192_address() const { return address + 192; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +200, the scene's +5448
+  uint64_t lighting_200() const { return guest::LoadU64(base, address + 200); }
+  void set_lighting_200(uint64_t v) const { guest::StoreU64(base, address + 200, v); }
+  uint32_t lighting_200_address() const { return address + 200; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +208, the scene's +5456
+  uint64_t lighting_208() const { return guest::LoadU64(base, address + 208); }
+  void set_lighting_208(uint64_t v) const { guest::StoreU64(base, address + 208, v); }
+  uint32_t lighting_208_address() const { return address + 208; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +216, the scene's +5464
+  uint64_t lighting_216() const { return guest::LoadU64(base, address + 216); }
+  void set_lighting_216(uint64_t v) const { guest::StoreU64(base, address + 216, v); }
+  uint32_t lighting_216_address() const { return address + 216; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +224, the scene's +5472
+  uint64_t lighting_224() const { return guest::LoadU64(base, address + 224); }
+  void set_lighting_224(uint64_t v) const { guest::StoreU64(base, address + 224, v); }
+  uint32_t lighting_224_address() const { return address + 224; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +232, the scene's +5480
+  uint64_t lighting_232() const { return guest::LoadU64(base, address + 232); }
+  void set_lighting_232(uint64_t v) const { guest::StoreU64(base, address + 232, v); }
+  uint32_t lighting_232_address() const { return address + 232; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +240, the scene's +5488
+  uint64_t lighting_240() const { return guest::LoadU64(base, address + 240); }
+  void set_lighting_240(uint64_t v) const { guest::StoreU64(base, address + 240, v); }
+  uint32_t lighting_240_address() const { return address + 240; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +248, the scene's +5496
+  uint64_t lighting_248() const { return guest::LoadU64(base, address + 248); }
+  void set_lighting_248(uint64_t v) const { guest::StoreU64(base, address + 248, v); }
+  uint32_t lighting_248_address() const { return address + 248; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +256, the scene's +5504
+  uint64_t lighting_256() const { return guest::LoadU64(base, address + 256); }
+  void set_lighting_256(uint64_t v) const { guest::StoreU64(base, address + 256, v); }
+  uint32_t lighting_256_address() const { return address + 256; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +264, the scene's +5512
+  uint64_t lighting_264() const { return guest::LoadU64(base, address + 264); }
+  void set_lighting_264(uint64_t v) const { guest::StoreU64(base, address + 264, v); }
+  uint32_t lighting_264_address() const { return address + 264; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): InitLighting's last float, the scene's +5520 (lighting_end)
+  float lighting_272() const { return guest::LoadFloat(base, address + 272); }
+  void set_lighting_272(float v) const { guest::StoreFloat(base, address + 272, v); }
+  uint32_t lighting_272_address() const { return address + 272; }
+};
+
+// embedded; measure: PartsPoints::DrawRace.ret@+176
+struct PartsPointsAt176 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 37084;
+  uint32_t unknown_37076() const { return guest::LoadU32(base, address + 37076); }
+  void set_unknown_37076(uint32_t v) const { guest::StoreU32(base, address + 37076, v); }
+  uint32_t unknown_37076_address() const { return address + 37076; }
+  uint32_t unknown_37080() const { return guest::LoadU32(base, address + 37080); }
+  void set_unknown_37080(uint32_t v) const { guest::StoreU32(base, address + 37080, v); }
+  uint32_t unknown_37080_address() const { return address + 37080; }
+};
+
+// embedded; measure: PartsPoints::DrawRace.ret@+176@+12128
+struct PartsPointsAt12128 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 6088;
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_6080() const { return guest::LoadU32(base, address + 6080); }
+  void set_unknown_6080(uint32_t v) const { guest::StoreU32(base, address + 6080, v); }
+  uint32_t unknown_6080_address() const { return address + 6080; }
+  uint32_t unknown_6084() const { return guest::LoadU32(base, address + 6084); }
+  void set_unknown_6084(uint32_t v) const { guest::StoreU32(base, address + 6084, v); }
+  uint32_t unknown_6084_address() const { return address + 6084; }
+};
+
+// embedded; measure: PartsPoints::DrawRace.ret@+176@+6032
+struct PartsPointsAt6032 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 6088;
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_6080() const { return guest::LoadU32(base, address + 6080); }
+  void set_unknown_6080(uint32_t v) const { guest::StoreU32(base, address + 6080, v); }
+  uint32_t unknown_6080_address() const { return address + 6080; }
+  uint32_t unknown_6084() const { return guest::LoadU32(base, address + 6084); }
+  void set_unknown_6084(uint32_t v) const { guest::StoreU32(base, address + 6084, v); }
+  uint32_t unknown_6084_address() const { return address + 6084; }
+};
+
+// embedded; measure: PartsPoints::PartsPoints.r3@+34640
+struct PartsPointsAt34640 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 64;
+  float unknown_12() const { return guest::LoadFloat(base, address + 12); }
+  void set_unknown_12(float v) const { guest::StoreFloat(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+  float unknown_28() const { return guest::LoadFloat(base, address + 28); }
+  void set_unknown_28(float v) const { guest::StoreFloat(base, address + 28, v); }
+  uint32_t unknown_28_address() const { return address + 28; }
+  float unknown_44() const { return guest::LoadFloat(base, address + 44); }
+  void set_unknown_44(float v) const { guest::StoreFloat(base, address + 44, v); }
+  uint32_t unknown_44_address() const { return address + 44; }
+  float unknown_60() const { return guest::LoadFloat(base, address + 60); }
+  void set_unknown_60(float v) const { guest::StoreFloat(base, address + 60, v); }
+  uint32_t unknown_60_address() const { return address + 60; }
+};
+
+// embedded; measure: SceneParts::Draw.r3@+176
+struct PartsPointsAt176_2 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 37084;
+  uint32_t unknown_37080() const { return guest::LoadU32(base, address + 37080); }
+  void set_unknown_37080(uint32_t v) const { guest::StoreU32(base, address + 37080, v); }
+  uint32_t unknown_37080_address() const { return address + 37080; }
+};
+
+// embedded; measure: SceneParts::Draw.r3@+176@+18224
+struct PartsPointsAt18224 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 5524;
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_228() const { return guest::LoadU32(base, address + 228); }
+  void set_unknown_228(uint32_t v) const { guest::StoreU32(base, address + 228, v); }
+  uint32_t unknown_228_address() const { return address + 228; }
+  uint32_t unknown_244() const { return guest::LoadU32(base, address + 244); }
+  void set_unknown_244(uint32_t v) const { guest::StoreU32(base, address + 244, v); }
+  uint32_t unknown_244_address() const { return address + 244; }
+  uint32_t unknown_468() const { return guest::LoadU32(base, address + 468); }
+  void set_unknown_468(uint32_t v) const { guest::StoreU32(base, address + 468, v); }
+  uint32_t unknown_468_address() const { return address + 468; }
+  uint32_t unknown_5520() const { return guest::LoadU32(base, address + 5520); }
+  void set_unknown_5520(uint32_t v) const { guest::StoreU32(base, address + 5520, v); }
+  uint32_t unknown_5520_address() const { return address + 5520; }
+};
+
+// embedded; measure: SceneParts::Draw.r3@+176@+36096
+struct PartsPointsAt36096 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 952;
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_228() const { return guest::LoadU32(base, address + 228); }
+  void set_unknown_228(uint32_t v) const { guest::StoreU32(base, address + 228, v); }
+  uint32_t unknown_228_address() const { return address + 228; }
+  uint32_t unknown_724() const { return guest::LoadU32(base, address + 724); }
+  void set_unknown_724(uint32_t v) const { guest::StoreU32(base, address + 724, v); }
+  uint32_t unknown_724_address() const { return address + 724; }
+  uint32_t unknown_948() const { return guest::LoadU32(base, address + 948); }
+  void set_unknown_948(uint32_t v) const { guest::StoreU32(base, address + 948, v); }
+  uint32_t unknown_948_address() const { return address + 948; }
+};
+
+// embedded; measure: SceneParts@+176
+struct PartsPointsAt176_3 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 37092;
+  uint32_t unknown_724() const { return guest::LoadU32(base, address + 724); }
+  void set_unknown_724(uint32_t v) const { guest::StoreU32(base, address + 724, v); }
+  uint32_t unknown_724_address() const { return address + 724; }
+  uint32_t unknown_948() const { return guest::LoadU32(base, address + 948); }
+  void set_unknown_948(uint32_t v) const { guest::StoreU32(base, address + 948, v); }
+  uint32_t unknown_948_address() const { return address + 948; }
+  uint32_t unknown_964() const { return guest::LoadU32(base, address + 964); }
+  void set_unknown_964(uint32_t v) const { guest::StoreU32(base, address + 964, v); }
+  uint32_t unknown_964_address() const { return address + 964; }
+  uint32_t unknown_1188() const { return guest::LoadU32(base, address + 1188); }
+  void set_unknown_1188(uint32_t v) const { guest::StoreU32(base, address + 1188, v); }
+  uint32_t unknown_1188_address() const { return address + 1188; }
+  uint32_t unknown_1204() const { return guest::LoadU32(base, address + 1204); }
+  void set_unknown_1204(uint32_t v) const { guest::StoreU32(base, address + 1204, v); }
+  uint32_t unknown_1204_address() const { return address + 1204; }
+  uint32_t unknown_1428() const { return guest::LoadU32(base, address + 1428); }
+  void set_unknown_1428(uint32_t v) const { guest::StoreU32(base, address + 1428, v); }
+  uint32_t unknown_1428_address() const { return address + 1428; }
+  uint32_t unknown_1924() const { return guest::LoadU32(base, address + 1924); }
+  void set_unknown_1924(uint32_t v) const { guest::StoreU32(base, address + 1924, v); }
+  uint32_t unknown_1924_address() const { return address + 1924; }
+  uint32_t unknown_2644() const { return guest::LoadU32(base, address + 2644); }
+  void set_unknown_2644(uint32_t v) const { guest::StoreU32(base, address + 2644, v); }
+  uint32_t unknown_2644_address() const { return address + 2644; }
+  uint32_t unknown_2648() const { return guest::LoadU32(base, address + 2648); }
+  void set_unknown_2648(uint32_t v) const { guest::StoreU32(base, address + 2648, v); }
+  uint32_t unknown_2648_address() const { return address + 2648; }
+  uint32_t unknown_4580() const { return guest::LoadU32(base, address + 4580); }
+  void set_unknown_4580(uint32_t v) const { guest::StoreU32(base, address + 4580, v); }
+  uint32_t unknown_4580_address() const { return address + 4580; }
+  uint32_t unknown_12032() const { return guest::LoadU32(base, address + 12032); }
+  void set_unknown_12032(uint32_t v) const { guest::StoreU32(base, address + 12032, v); }
+  uint32_t unknown_12032_address() const { return address + 12032; }
+  uint32_t unknown_12112() const { return guest::LoadU32(base, address + 12112); }
+  void set_unknown_12112(uint32_t v) const { guest::StoreU32(base, address + 12112, v); }
+  uint32_t unknown_12112_address() const { return address + 12112; }
+  uint32_t unknown_12116() const { return guest::LoadU32(base, address + 12116); }
+  void set_unknown_12116(uint32_t v) const { guest::StoreU32(base, address + 12116, v); }
+  uint32_t unknown_12116_address() const { return address + 12116; }
+  uint32_t unknown_18128() const { return guest::LoadU32(base, address + 18128); }
+  void set_unknown_18128(uint32_t v) const { guest::StoreU32(base, address + 18128, v); }
+  uint32_t unknown_18128_address() const { return address + 18128; }
+  uint32_t unknown_18208() const { return guest::LoadU32(base, address + 18208); }
+  void set_unknown_18208(uint32_t v) const { guest::StoreU32(base, address + 18208, v); }
+  uint32_t unknown_18208_address() const { return address + 18208; }
+  uint32_t unknown_18212() const { return guest::LoadU32(base, address + 18212); }
+  void set_unknown_18212(uint32_t v) const { guest::StoreU32(base, address + 18212, v); }
+  uint32_t unknown_18212_address() const { return address + 18212; }
+  uint32_t unknown_23744() const { return guest::LoadU32(base, address + 23744); }
+  void set_unknown_23744(uint32_t v) const { guest::StoreU32(base, address + 23744, v); }
+  uint32_t unknown_23744_address() const { return address + 23744; }
+  uint32_t unknown_37088() const { return guest::LoadU32(base, address + 37088); }
+  void set_unknown_37088(uint32_t v) const { guest::StoreU32(base, address + 37088, v); }
+  uint32_t unknown_37088_address() const { return address + 37088; }
+};
+
+// embedded; measure: SceneParts@+176@+18224
+struct PartsPointsAt18224_2 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 952;
+  uint32_t unknown_724() const { return guest::LoadU32(base, address + 724); }
+  void set_unknown_724(uint32_t v) const { guest::StoreU32(base, address + 724, v); }
+  uint32_t unknown_724_address() const { return address + 724; }
+  uint32_t unknown_948() const { return guest::LoadU32(base, address + 948); }
+  void set_unknown_948(uint32_t v) const { guest::StoreU32(base, address + 948, v); }
+  uint32_t unknown_948_address() const { return address + 948; }
+};
+
+// embedded; measure: SceneParts@+176@+24480
+struct PartsPointsAt24480 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 3188;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_224() const { return guest::LoadU32(base, address + 224); }
+  void set_unknown_224(uint32_t v) const { guest::StoreU32(base, address + 224, v); }
+  uint32_t unknown_224_address() const { return address + 224; }
+  uint32_t unknown_1684() const { return guest::LoadU32(base, address + 1684); }
+  void set_unknown_1684(uint32_t v) const { guest::StoreU32(base, address + 1684, v); }
+  uint32_t unknown_1684_address() const { return address + 1684; }
+  uint32_t unknown_1908() const { return guest::LoadU32(base, address + 1908); }
+  void set_unknown_1908(uint32_t v) const { guest::StoreU32(base, address + 1908, v); }
+  uint32_t unknown_1908_address() const { return address + 1908; }
+  uint32_t unknown_1924() const { return guest::LoadU32(base, address + 1924); }
+  void set_unknown_1924(uint32_t v) const { guest::StoreU32(base, address + 1924, v); }
+  uint32_t unknown_1924_address() const { return address + 1924; }
+  uint32_t unknown_2148() const { return guest::LoadU32(base, address + 2148); }
+  void set_unknown_2148(uint32_t v) const { guest::StoreU32(base, address + 2148, v); }
+  uint32_t unknown_2148_address() const { return address + 2148; }
+  uint32_t unknown_2164() const { return guest::LoadU32(base, address + 2164); }
+  void set_unknown_2164(uint32_t v) const { guest::StoreU32(base, address + 2164, v); }
+  uint32_t unknown_2164_address() const { return address + 2164; }
+  uint32_t unknown_2388() const { return guest::LoadU32(base, address + 2388); }
+  void set_unknown_2388(uint32_t v) const { guest::StoreU32(base, address + 2388, v); }
+  uint32_t unknown_2388_address() const { return address + 2388; }
+  uint32_t unknown_2404() const { return guest::LoadU32(base, address + 2404); }
+  void set_unknown_2404(uint32_t v) const { guest::StoreU32(base, address + 2404, v); }
+  uint32_t unknown_2404_address() const { return address + 2404; }
+  uint32_t unknown_2628() const { return guest::LoadU32(base, address + 2628); }
+  void set_unknown_2628(uint32_t v) const { guest::StoreU32(base, address + 2628, v); }
+  uint32_t unknown_2628_address() const { return address + 2628; }
+  float unknown_3184() const { return guest::LoadFloat(base, address + 3184); }
+  void set_unknown_3184(float v) const { guest::StoreFloat(base, address + 3184, v); }
+  uint32_t unknown_3184_address() const { return address + 3184; }
+};
+
+// embedded; measure: SceneParts@+176@+27680
+struct PartsPointsAt27680 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 2152;
+  uint32_t unknown_1924() const { return guest::LoadU32(base, address + 1924); }
+  void set_unknown_1924(uint32_t v) const { guest::StoreU32(base, address + 1924, v); }
+  uint32_t unknown_1924_address() const { return address + 1924; }
+  uint32_t unknown_2148() const { return guest::LoadU32(base, address + 2148); }
+  void set_unknown_2148(uint32_t v) const { guest::StoreU32(base, address + 2148, v); }
+  uint32_t unknown_2148_address() const { return address + 2148; }
+};
+
+// embedded; measure: SceneParts@+176@+2896
+struct PartsPointsAt2896 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 1688;
+  uint32_t unknown_244() const { return guest::LoadU32(base, address + 244); }
+  void set_unknown_244(uint32_t v) const { guest::StoreU32(base, address + 244, v); }
+  uint32_t unknown_244_address() const { return address + 244; }
+  uint32_t unknown_468() const { return guest::LoadU32(base, address + 468); }
+  void set_unknown_468(uint32_t v) const { guest::StoreU32(base, address + 468, v); }
+  uint32_t unknown_468_address() const { return address + 468; }
+  uint32_t unknown_484() const { return guest::LoadU32(base, address + 484); }
+  void set_unknown_484(uint32_t v) const { guest::StoreU32(base, address + 484, v); }
+  uint32_t unknown_484_address() const { return address + 484; }
+  uint32_t unknown_708() const { return guest::LoadU32(base, address + 708); }
+  void set_unknown_708(uint32_t v) const { guest::StoreU32(base, address + 708, v); }
+  uint32_t unknown_708_address() const { return address + 708; }
+  uint32_t unknown_724() const { return guest::LoadU32(base, address + 724); }
+  void set_unknown_724(uint32_t v) const { guest::StoreU32(base, address + 724, v); }
+  uint32_t unknown_724_address() const { return address + 724; }
+  uint32_t unknown_948() const { return guest::LoadU32(base, address + 948); }
+  void set_unknown_948(uint32_t v) const { guest::StoreU32(base, address + 948, v); }
+  uint32_t unknown_948_address() const { return address + 948; }
+  uint32_t unknown_964() const { return guest::LoadU32(base, address + 964); }
+  void set_unknown_964(uint32_t v) const { guest::StoreU32(base, address + 964, v); }
+  uint32_t unknown_964_address() const { return address + 964; }
+  uint32_t unknown_1188() const { return guest::LoadU32(base, address + 1188); }
+  void set_unknown_1188(uint32_t v) const { guest::StoreU32(base, address + 1188, v); }
+  uint32_t unknown_1188_address() const { return address + 1188; }
+  uint32_t unknown_1444() const { return guest::LoadU32(base, address + 1444); }
+  void set_unknown_1444(uint32_t v) const { guest::StoreU32(base, address + 1444, v); }
+  uint32_t unknown_1444_address() const { return address + 1444; }
+  uint32_t unknown_1684() const { return guest::LoadU32(base, address + 1684); }
+  void set_unknown_1684(uint32_t v) const { guest::StoreU32(base, address + 1684, v); }
+  uint32_t unknown_1684_address() const { return address + 1684; }
+};
+
+// embedded; measure: SceneParts@+176@+31280
+struct PartsPointsAt31280 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 952;
+  uint32_t unknown_724() const { return guest::LoadU32(base, address + 724); }
+  void set_unknown_724(uint32_t v) const { guest::StoreU32(base, address + 724, v); }
+  uint32_t unknown_724_address() const { return address + 724; }
+  uint32_t unknown_948() const { return guest::LoadU32(base, address + 948); }
+  void set_unknown_948(uint32_t v) const { guest::StoreU32(base, address + 948, v); }
+  uint32_t unknown_948_address() const { return address + 948; }
+};
+
+// embedded; measure: SceneParts@+176@+32960
+struct PartsPointsAt32960 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 472;
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_228() const { return guest::LoadU32(base, address + 228); }
+  void set_unknown_228(uint32_t v) const { guest::StoreU32(base, address + 228, v); }
+  uint32_t unknown_228_address() const { return address + 228; }
+  uint32_t unknown_244() const { return guest::LoadU32(base, address + 244); }
+  void set_unknown_244(uint32_t v) const { guest::StoreU32(base, address + 244, v); }
+  uint32_t unknown_244_address() const { return address + 244; }
+  uint32_t unknown_468() const { return guest::LoadU32(base, address + 468); }
+  void set_unknown_468(uint32_t v) const { guest::StoreU32(base, address + 468, v); }
+  uint32_t unknown_468_address() const { return address + 468; }
+};
+
+// embedded; measure: SceneParts@+176@+4832
+struct PartsPointsAt4832 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 712;
+  uint32_t unknown_244() const { return guest::LoadU32(base, address + 244); }
+  void set_unknown_244(uint32_t v) const { guest::StoreU32(base, address + 244, v); }
+  uint32_t unknown_244_address() const { return address + 244; }
+  uint32_t unknown_468() const { return guest::LoadU32(base, address + 468); }
+  void set_unknown_468(uint32_t v) const { guest::StoreU32(base, address + 468, v); }
+  uint32_t unknown_468_address() const { return address + 468; }
+  uint32_t unknown_484() const { return guest::LoadU32(base, address + 484); }
+  void set_unknown_484(uint32_t v) const { guest::StoreU32(base, address + 484, v); }
+  uint32_t unknown_484_address() const { return address + 484; }
+  uint32_t unknown_708() const { return guest::LoadU32(base, address + 708); }
+  void set_unknown_708(uint32_t v) const { guest::StoreU32(base, address + 708, v); }
+  uint32_t unknown_708_address() const { return address + 708; }
+};
+
+// embedded; measure: SceneParts@+176@+6032
+struct PartsPointsAt6032_2 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 1912;
+  uint32_t unknown_1684() const { return guest::LoadU32(base, address + 1684); }
+  void set_unknown_1684(uint32_t v) const { guest::StoreU32(base, address + 1684, v); }
+  uint32_t unknown_1684_address() const { return address + 1684; }
+  uint32_t unknown_1908() const { return guest::LoadU32(base, address + 1908); }
+  void set_unknown_1908(uint32_t v) const { guest::StoreU32(base, address + 1908, v); }
+  uint32_t unknown_1908_address() const { return address + 1908; }
 };
 
 // The image words docs/functions/car-draw.md's code uses.

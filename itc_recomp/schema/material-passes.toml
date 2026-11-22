@@ -83,7 +83,7 @@ fields = [
 # models the car's loading objects keep for their parts.
 [PartModel]
 measure = "PartModel"
-measures = ["SceneInterior.+11632", "ModelPoint::Find.r4"]
+measures = ["SceneInterior.+11632", "ModelPoint::Find.r4", "PartModel::PartModel.r3", "PartModel::Clear.r3", "PartModel::SetPaint.r3", "PartModel::SetPaintBody.r3", "PartModel::ApplyPalette.r3", "PartModel::SetMaterials.r3"]
 size = 464
 origin = "file"
 vtable = 0x8200338C

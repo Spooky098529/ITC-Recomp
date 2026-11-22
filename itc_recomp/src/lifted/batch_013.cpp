@@ -1263,7 +1263,7 @@ uint64_t f82231F70(uint8_t* base, uint64_t r3) {
   lifted::Cr cr6;
   uint8_t so = 0;
   // lwz r11,9756(r3)
-  r11 = guest::LoadU32(base, schema::Type67Dialog(base, uint32_t(r3)).type6_status_address());
+  r11 = guest::LoadU32(base, schema::Type67DialogAt9672(base, uint32_t(r3)).unknown_9756_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x82231f84
@@ -1271,10 +1271,10 @@ uint64_t f82231F70(uint8_t* base, uint64_t r3) {
   // li r11,4
   r11 = uint64_t(int64_t(4));
   // stw r11,9756(r3)
-  guest::StoreU32(base, schema::Type67Dialog(base, uint32_t(r3)).type6_status_address(), uint32_t(r11));
+  guest::StoreU32(base, schema::Type67DialogAt9672(base, uint32_t(r3)).unknown_9756_address(), uint32_t(r11));
 loc_82231F84:
   // lwz r11,9756(r3)
-  r11 = guest::LoadU32(base, schema::Type67Dialog(base, uint32_t(r3)).type6_status_address());
+  r11 = guest::LoadU32(base, schema::Type67DialogAt9672(base, uint32_t(r3)).unknown_9756_address());
   // addi r11,r11,-1
   r11 = uint64_t(int64_t(int64_t(r11) + -1));
   // cntlzw r11,r11
@@ -2291,7 +2291,7 @@ uint64_t f822419E0(uint8_t* base, uint64_t r3) {
   lifted::Cr cr6;
   uint8_t so = 0;
   // lwz r11,9760(r3)
-  r11 = guest::LoadU32(base, schema::Type67Dialog(base, uint32_t(r3)).type7_status_address());
+  r11 = guest::LoadU32(base, schema::Type67DialogAt9664(base, uint32_t(r3)).unknown_9760_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x822419f4
@@ -2299,10 +2299,10 @@ uint64_t f822419E0(uint8_t* base, uint64_t r3) {
   // li r11,4
   r11 = uint64_t(int64_t(4));
   // stw r11,9760(r3)
-  guest::StoreU32(base, schema::Type67Dialog(base, uint32_t(r3)).type7_status_address(), uint32_t(r11));
+  guest::StoreU32(base, schema::Type67DialogAt9664(base, uint32_t(r3)).unknown_9760_address(), uint32_t(r11));
 loc_822419F4:
   // lwz r11,9760(r3)
-  r11 = guest::LoadU32(base, schema::Type67Dialog(base, uint32_t(r3)).type7_status_address());
+  r11 = guest::LoadU32(base, schema::Type67DialogAt9664(base, uint32_t(r3)).unknown_9760_address());
   // addi r11,r11,-1
   r11 = uint64_t(int64_t(int64_t(r11) + -1));
   // cntlzw r11,r11
@@ -3675,29 +3675,29 @@ void f82249610(uint8_t* base, uint64_t r3, uint64_t r4) {
   // li r11,-1
   r11 = uint64_t(int64_t(-1));
   // stw r4,36(r3)
-  guest::StoreU32(base, schema::PanelSetBase(base, uint32_t(r3)).next_page_address(), uint32_t(r4));
+  guest::StoreU32(base, schema::PanelSetBaseAt4_2(base, uint32_t(r3)).unknown_36_address(), uint32_t(r4));
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // stw r4,32(r3)
-  guest::StoreU32(base, schema::PanelSetBase(base, uint32_t(r3)).page_address(), uint32_t(r4));
+  guest::StoreU32(base, schema::PanelSetBaseAt4_2(base, uint32_t(r3)).unknown_32_address(), uint32_t(r4));
   // cmpwi cr6,r4,0
   cr6 = lifted::Compare<int32_t>(int32_t(r4), 0, so);
   // stw r4,40(r3)
-  guest::StoreU32(base, schema::PanelSetBase(base, uint32_t(r3)).previous_page_address(), uint32_t(r4));
+  guest::StoreU32(base, schema::PanelSetBaseAt4_2(base, uint32_t(r3)).unknown_40_address(), uint32_t(r4));
   // stw r11,52(r3)
-  guest::StoreU32(base, schema::PanelSetBase(base, uint32_t(r3)).step_cleared_address(), uint32_t(r11));
+  guest::StoreU32(base, schema::PanelSetBaseAt4_2(base, uint32_t(r3)).unknown_52_address(), uint32_t(r11));
   // stw r11,44(r3)
-  guest::StoreU32(base, schema::PanelSetBase(base, uint32_t(r3)).step_address(), uint32_t(r11));
+  guest::StoreU32(base, schema::PanelSetBaseAt4_2(base, uint32_t(r3)).unknown_44_address(), uint32_t(r11));
   // stw r10,56(r3)
-  guest::StoreU32(base, schema::PanelSetBase(base, uint32_t(r3)).first_pass_address(), uint32_t(r10));
+  guest::StoreU32(base, schema::PanelSetBaseAt4_2(base, uint32_t(r3)).unknown_56_address(), uint32_t(r10));
   // bne cr6,0x82249648
   if (!cr6.eq) goto loc_82249648;
   // lwz r11,1880(r3)
-  r11 = guest::LoadU32(base, schema::PanelSetBase(base, uint32_t(r3)).previous_tab_address());
+  r11 = guest::LoadU32(base, schema::PanelSetBaseAt4_2(base, uint32_t(r3)).unknown_1880_address());
   // stw r11,232(r3)
-  guest::StoreU32(base, schema::PanelSetBase(base, uint32_t(r3)).tab_address(), uint32_t(r11));
+  guest::StoreU32(base, schema::PanelSetBaseAt4_2(base, uint32_t(r3)).unknown_232_address(), uint32_t(r11));
   // stw r11,228(r3)
-  guest::StoreU32(base, schema::PanelSetBase(base, uint32_t(r3)).tab_shown_address(), uint32_t(r11));
+  guest::StoreU32(base, schema::PanelSetBaseAt4_2(base, uint32_t(r3)).unknown_228_address(), uint32_t(r11));
   // blr
   return;
 loc_82249648:
@@ -3708,11 +3708,11 @@ loc_82249648:
   // addi r11,r3,272
   r11 = uint64_t(int64_t(int64_t(r3) + 272));
   // stw r10,228(r3)
-  guest::StoreU32(base, schema::PanelSetBase(base, uint32_t(r3)).tab_shown_address(), uint32_t(r10));
+  guest::StoreU32(base, schema::PanelSetBaseAt4_2(base, uint32_t(r3)).unknown_228_address(), uint32_t(r10));
   // stw r10,232(r3)
-  guest::StoreU32(base, schema::PanelSetBase(base, uint32_t(r3)).tab_address(), uint32_t(r10));
+  guest::StoreU32(base, schema::PanelSetBaseAt4_2(base, uint32_t(r3)).unknown_232_address(), uint32_t(r10));
   // stw r11,1820(r3)
-  guest::StoreU32(base, schema::PanelSetBase(base, uint32_t(r3)).current_list_address(), uint32_t(r11));
+  guest::StoreU32(base, schema::PanelSetBaseAt4_2(base, uint32_t(r3)).unknown_1820_address(), uint32_t(r11));
   // blr
   return;
 }

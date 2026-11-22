@@ -91,3 +91,19 @@ pad_blocked0 = { address = 0x826C7960, type = "u32", note = "the pad blocked: Re
 pad_blocked1 = { address = 0x826C7964, type = "u32" }
 one = { address = 0x82000A30, type = "f32", note = "1.0: ReadPad's speed threshold" }
 zero = { address = 0x82000A34, type = "f32", note = "0.0" }
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from RaceFlow.
+[RaceFlowAt97548]
+measure = "RaceMode@+97548"
+size = 9620
+origin = "embedded"
+fields = [
+  { name = "unknown_9604", offset = 9604, type = "u32" },
+  { name = "unknown_9608", offset = 9608, type = "u32" },
+  { name = "unknown_9612", offset = 9612, type = "u32" },
+  { name = "unknown_9616", offset = 9616, type = "u32" },
+]

@@ -433,6 +433,81 @@ struct LocationScreenPart : View {
   uint32_t unknown_28924_address() const { return address + 28924; }
 };
 
+// embedded; measure: LocationScreen@+560
+struct LocationScreenAt560 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 112;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  uint32_t unknown_12() const { return guest::LoadU32(base, address + 12); }
+  void set_unknown_12(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+  uint32_t unknown_16() const { return guest::LoadU32(base, address + 16); }
+  void set_unknown_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+  uint64_t unknown_32() const { return guest::LoadU64(base, address + 32); }
+  void set_unknown_32(uint64_t v) const { guest::StoreU64(base, address + 32, v); }
+  uint32_t unknown_32_address() const { return address + 32; }
+  uint64_t unknown_40() const { return guest::LoadU64(base, address + 40); }
+  void set_unknown_40(uint64_t v) const { guest::StoreU64(base, address + 40, v); }
+  uint32_t unknown_40_address() const { return address + 40; }
+  uint64_t unknown_48() const { return guest::LoadU64(base, address + 48); }
+  void set_unknown_48(uint64_t v) const { guest::StoreU64(base, address + 48, v); }
+  uint32_t unknown_48_address() const { return address + 48; }
+  uint64_t unknown_56() const { return guest::LoadU64(base, address + 56); }
+  void set_unknown_56(uint64_t v) const { guest::StoreU64(base, address + 56, v); }
+  uint32_t unknown_56_address() const { return address + 56; }
+  uint64_t unknown_64() const { return guest::LoadU64(base, address + 64); }
+  void set_unknown_64(uint64_t v) const { guest::StoreU64(base, address + 64, v); }
+  uint32_t unknown_64_address() const { return address + 64; }
+  uint64_t unknown_72() const { return guest::LoadU64(base, address + 72); }
+  void set_unknown_72(uint64_t v) const { guest::StoreU64(base, address + 72, v); }
+  uint32_t unknown_72_address() const { return address + 72; }
+  uint64_t unknown_80() const { return guest::LoadU64(base, address + 80); }
+  void set_unknown_80(uint64_t v) const { guest::StoreU64(base, address + 80, v); }
+  uint32_t unknown_80_address() const { return address + 80; }
+  uint64_t unknown_88() const { return guest::LoadU64(base, address + 88); }
+  void set_unknown_88(uint64_t v) const { guest::StoreU64(base, address + 88, v); }
+  uint32_t unknown_88_address() const { return address + 88; }
+  float unknown_96() const { return guest::LoadFloat(base, address + 96); }
+  void set_unknown_96(float v) const { guest::StoreFloat(base, address + 96, v); }
+  uint32_t unknown_96_address() const { return address + 96; }
+  float unknown_100() const { return guest::LoadFloat(base, address + 100); }
+  void set_unknown_100(float v) const { guest::StoreFloat(base, address + 100, v); }
+  uint32_t unknown_100_address() const { return address + 100; }
+  float unknown_104() const { return guest::LoadFloat(base, address + 104); }
+  void set_unknown_104(float v) const { guest::StoreFloat(base, address + 104, v); }
+  uint32_t unknown_104_address() const { return address + 104; }
+  float unknown_108() const { return guest::LoadFloat(base, address + 108); }
+  void set_unknown_108(float v) const { guest::StoreFloat(base, address + 108, v); }
+  uint32_t unknown_108_address() const { return address + 108; }
+};
+
+// embedded; measure: TrafficCar@+4288
+struct LocationScreenAt4288 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 736;
+  uint32_t unknown_732() const { return guest::LoadU32(base, address + 732); }
+  void set_unknown_732(uint32_t v) const { guest::StoreU32(base, address + 732, v); }
+  uint32_t unknown_732_address() const { return address + 732; }
+};
+
+// embedded; measure: new<28940>@ModeType5::Init@+9640
+struct LocationScreenAt9640 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 9608;
+  uint32_t unknown_9604() const { return guest::LoadU32(base, address + 9604); }
+  void set_unknown_9604(uint32_t v) const { guest::StoreU32(base, address + 9604, v); }
+  uint32_t unknown_9604_address() const { return address + 9604; }
+};
+
 // The image words docs/functions/location-screen.md's code uses.
 struct LocationScreenGlobals {
   // the page object: 16 pages, 36 transitions

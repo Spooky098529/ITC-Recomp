@@ -55,6 +55,18 @@ struct RaceSounds : View {
   uint32_t set_up_wait_address() const { return address + 9656; }
 };
 
+// embedded; measure: RaceMode@+138284
+struct RaceSoundsAt138284 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 9656;
+  uint32_t unknown_9604() const { return guest::LoadU32(base, address + 9604); }
+  void set_unknown_9604(uint32_t v) const { guest::StoreU32(base, address + 9604, v); }
+  uint32_t unknown_9604_address() const { return address + 9604; }
+  uint32_t unknown_9652() const { return guest::LoadU32(base, address + 9652); }
+  void set_unknown_9652(uint32_t v) const { guest::StoreU32(base, address + 9652, v); }
+  uint32_t unknown_9652_address() const { return address + 9652; }
+};
+
 // The image words docs/functions/race-sounds.md's code uses.
 struct RaceSoundsGlobals {
   // car i's two 24-byte wave bank views at +8i and +8i+4 (CarSoundWaveBankView pointers)

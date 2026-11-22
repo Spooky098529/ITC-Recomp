@@ -24,7 +24,8 @@ fields = [
 
 # The overlays' vtable (CarOverlays' 0x82008524 and the children's).
 [OverlayVtable]
-measures = ["CarOverlays.+0", "RaceOverlays.+8.+0"]
+measure = "CarOverlays.+0"
+measures = ["sub_8215E6C0.r3@+9608.+8.+0"]
 size = 32
 origin = "image"
 fields = [
@@ -49,7 +50,8 @@ fields = [
 
 # One car's overlays (848 bytes, CarOverlays::CarOverlays sub_82123350).
 [CarOverlays]
-measures = ["CarOverlays", "RaceOverlays.+8"]
+measure = "CarOverlays"
+measures = ["sub_8215E6C0.r3@+9608.+8"]
 size = 848
 origin = "allocated"
 vtable = 0x82008524
@@ -605,3 +607,84 @@ model_sprite_kind6 = { address = 0x82616D30, type = "u32" }
 model_sprite_kind7 = { address = 0x82616D54, type = "u32" }
 model_sprite_kind8 = { address = 0x82616D78, type = "u32" }
 model_sprite_other = { address = 0x826C5CF0, type = "u32" }
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from RaceOverlays.
+[RaceOverlaysAt157552]
+measure = "RaceMode@+157552"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from RaceOverlays.
+[RaceOverlaysAt9608]
+measure = "RaceOverlays::OnUpdate.r3@+9608"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from RaceOverlays.
+[RaceOverlaysAt9608_2]
+measure = "sub_8215E158.r3@+9608"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from RaceOverlays.
+[RaceOverlaysAt9608_3]
+measure = "sub_8215E680.r3@+9608"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+]
+
+# Split from RaceOverlays.
+[RaceOverlaysAt9608_4]
+measure = "sub_8215E6C0.r3@+9608"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Split from CarOverlays.
+[CarOverlaysPart]
+measure = "sub_8215E6C0.r3@+9608.+0"
+size = 108
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "unknown_104", offset = 104, type = "u32" },
+]
+
+# Split from CarOverlays.
+[CarOverlaysPart_2]
+measure = "sub_8215E6C0.r3@+9608.+4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from OverlayVtable.
+[OverlayVtablePart]
+measure = "sub_8215E6C0.r3@+9608.+4.+0"
+size = 28
+origin = "embedded"
+fields = [
+  { name = "unknown_24", offset = 24, type = "u32" },
+]

@@ -159,7 +159,8 @@ fields = [
 # 96i; a section and slice kept from tick to tick with the last point,
 # normal and surface kind.
 [TrackPosition]
-measures = ["TrackPosition", "TrackMesh::FindTriangle.r7"]
+measure = "TrackPosition"
+measures = ["TrackMesh::FindTriangle.r7", "TrackPosition::Copy.r3"]
 size = 96
 origin = "embedded"
 fields = [
@@ -432,4 +433,20 @@ fields = [
   { name = "unknown_4", offset = 4, type = "f32" },
   { name = "unknown_8", offset = 8, type = "f32" },
   { name = "unknown_12", offset = 12, type = "f32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from TrackMesh.
+[TrackMeshAt32]
+measure = "TrackPosition@+32"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "out_w", offset = 12, type = "f32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): TrackMesh::TriangleNormal's r3 is the out vector (its w)" },
 ]

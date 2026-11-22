@@ -16,6 +16,7 @@
 #include "schema/race_loading.h"
 #include "schema/race_overlays.h"
 #include "schema/race_scene.h"
+#include "schema/race_setup.h"
 #include "schema/race_states.h"
 #include "schema/race_update.h"
 #include "schema/racer_controllers.h"
@@ -1285,7 +1286,7 @@ uint64_t f8213C248(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // (left out: dead in C++)
   { const lifted::Result o = game::RaceEvent::Current(base, LIFTED_ARGS(0x8213C264, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, schema::AiPath(base, uint32_t(r30)).driver_address());
+  r11 = guest::LoadU32(base, schema::AiPathAt512(base, uint32_t(r30)).unknown_0_address());
   // mr. r31,r3
   r31 = r3;
   cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
@@ -1434,7 +1435,7 @@ uint64_t f8213D898(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r10,0(r3)
-  r10 = guest::LoadU32(base, schema::AiPath(base, uint32_t(r3)).driver_address());
+  r10 = guest::LoadU32(base, schema::AiPathAt512(base, uint32_t(r3)).unknown_0_address());
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f0,4(r4)
@@ -1465,13 +1466,13 @@ uint64_t f8213D898(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // ble cr6,0x8213d9c4
   if (!cr6.gt) goto loc_8213D9C4;
   // lha r11,5136(r3)
-  r11 = uint64_t(int64_t(int16_t(guest::LoadU16(base, schema::AiPath(base, uint32_t(r3)).entry_count_address()))));
+  r11 = uint64_t(int64_t(int16_t(guest::LoadU16(base, schema::AiPathAt512(base, uint32_t(r3)).unknown_5136_address()))));
   // cmpwi cr6,r11,1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 1, so);
   // ble cr6,0x8213d9c4
   if (!cr6.gt) goto loc_8213D9C4;
   // lha r11,5138(r3)
-  r11 = uint64_t(int64_t(int16_t(guest::LoadU16(base, schema::AiPath(base, uint32_t(r3)).first_address()))));
+  r11 = uint64_t(int64_t(int16_t(guest::LoadU16(base, schema::AiPathAt512(base, uint32_t(r3)).unknown_5138_address()))));
   // li r10,80
   r10 = uint64_t(int64_t(80));
   // addi r11,r11,1
@@ -7850,14 +7851,14 @@ lifted::Result f8215C248(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r11,7
   r11 = uint64_t(int64_t(7));
   // stw r11,0(r30)
-  guest::StoreU32(base, schema::RaceScene(base, uint32_t(r30)).scenery_address(), uint32_t(r11));
+  guest::StoreU32(base, schema::CarAt16_2(base, uint32_t(r30)).unknown_0_address(), uint32_t(r11));
   // bl 0x820d0d50
   // (left out: dead in C++)
   { const lifted::Result o = game::SceneSetUp::Ctor(base, LIFTED_ARGS(0x8215C280, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r10,r1,80
   r10 = uint64_t(int64_t(int64_t(r1) + 80));
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, schema::RaceScene(base, uint32_t(r30)).scenery_address());
+  r11 = guest::LoadU32(base, schema::CarAt16_2(base, uint32_t(r30)).unknown_0_address());
   // li r31,0
   r31 = uint64_t(int64_t(0));
   // li r5,0
@@ -7909,13 +7910,13 @@ loc_8215C2E4:
   // li r9,-1
   r9 = uint64_t(int64_t(-1));
   // stw r31,0(r11)
-  guest::StoreU32(base, schema::RaceScene(base, uint32_t(r11) - 16).car_slot_count_address(), uint32_t(r31));
+  guest::StoreU32(base, schema::CarAt16_2(base, uint32_t(r11) - 16).unknown_16_address(), uint32_t(r31));
   // addic. r10,r10,-1
   ca = uint32_t(r10) > 0;
   r10 = uint64_t(int64_t(int64_t(r10) + -1));
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r9,4272(r11)
-  guest::StoreU32(base, schema::RaceScene(base, uint32_t(r11) - 16).car_slots_address() + 4256, uint32_t(r9));
+  guest::StoreU32(base, schema::CarAt16_2(base, uint32_t(r11) - 16).unknown_4288_address(), uint32_t(r9));
   // addi r11,r11,4288
   r11 = uint64_t(int64_t(int64_t(r11) + 4288));
   // bne 0x8215c2e4
@@ -8382,7 +8383,7 @@ lifted::Result f8215DF20(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r30 = uint64_t(int64_t(25));
 loc_8215DF3C:
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, schema::RaceOverlays(base, uint32_t(r31)).overlay_0_address());
+  r11 = guest::LoadU32(base, schema::RaceOverlaysAt9608_2(base, uint32_t(r31)).unknown_0_address());
   // cmplwi cr6,r11,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq cr6,0x8215df5c
@@ -8688,7 +8689,7 @@ lifted::Result f8215E208(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   ctr = r10;
 loc_8215E234:
   // stw r9,0(r11)
-  guest::StoreU32(base, schema::RaceOverlays(base, uint32_t(r11)).overlay_0_address(), uint32_t(r9));
+  guest::StoreU32(base, schema::RaceOverlaysAt9608_3(base, uint32_t(r11)).unknown_0_address(), uint32_t(r9));
   // addi r11,r11,4
   r11 = uint64_t(int64_t(int64_t(r11) + 4));
   // bdnz 0x8215e234
@@ -8708,7 +8709,7 @@ loc_8215E234:
   // (left out: dead in C++)
   { const lifted::Result o = game::VirtualAlloc(base, LIFTED_ARGS(0x8215E258, r31)); r3 = o.r3; f1 = o.f1; }
   // stw r3,0(r30)
-  guest::StoreU32(base, schema::RaceOverlays(base, uint32_t(r30)).overlay_0_address(), uint32_t(r3));
+  guest::StoreU32(base, schema::RaceOverlaysAt9608_3(base, uint32_t(r30)).unknown_0_address(), uint32_t(r3));
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq 0x8215e268
@@ -8757,7 +8758,7 @@ loc_8215E298:
   // (left out: dead in C++)
   { const lifted::Result o = game::VirtualAlloc(base, LIFTED_ARGS(0x8215E2B0, r31)); r3 = o.r3; f1 = o.f1; }
   // stw r3,0(r31)
-  guest::StoreU32(base, schema::RaceOverlays(base, uint32_t(r31) - 4).others_address(), uint32_t(r3));
+  guest::StoreU32(base, schema::RaceOverlaysAt9608_3(base, uint32_t(r31) - 4).unknown_4_address(), uint32_t(r3));
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq 0x8215e2c0
@@ -8778,7 +8779,7 @@ loc_8215E2CC:
   // li r4,71
   r4 = uint64_t(int64_t(71));
   // lwz r3,0(r30)
-  r3 = guest::LoadU32(base, schema::RaceOverlays(base, uint32_t(r30)).overlay_0_address());
+  r3 = guest::LoadU32(base, schema::RaceOverlaysAt9608_3(base, uint32_t(r30)).unknown_0_address());
   // bl 0x82125888
   // (left out: dead in C++)
   { const lifted::Result o = game::CarOverlays::LoadTextures(base, r1, r13, r3, r4, r8, r9, r10); r3 = o.r3; f1 = o.f1; }
@@ -8856,7 +8857,7 @@ lifted::Result f8215E2E0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r11,r3
   r11 = r3;
   // lwz r3,0(r31)
-  r3 = guest::LoadU32(base, schema::RaceOverlays(base, uint32_t(r31)).overlay_0_address());
+  r3 = guest::LoadU32(base, schema::RaceOverlaysAt9608_4(base, uint32_t(r31)).unknown_0_address());
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // lwz r10,11496(r23)
@@ -8879,7 +8880,7 @@ lifted::Result f8215E2E0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // lwz r3,0(r31)
-  r3 = guest::LoadU32(base, schema::RaceOverlays(base, uint32_t(r31)).overlay_0_address());
+  r3 = guest::LoadU32(base, schema::RaceOverlaysAt9608_4(base, uint32_t(r31)).unknown_0_address());
   // bl 0x82126550
   // (left out: dead in C++)
   { const lifted::Result o = game::CarOverlays::View(base, LIFTED_ARGS(0x8215E374, r31)); r3 = o.r3; f1 = o.f1; }
@@ -8940,7 +8941,7 @@ loc_8215E3D0:
   guest::StoreU32(base, uint32_t(r1) + 88, uint32_t(r11));
 loc_8215E3DC:
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, schema::RaceOverlays(base, uint32_t(r31)).others_address());
+  r11 = guest::LoadU32(base, schema::RaceOverlaysAt9608_4(base, uint32_t(r31)).unknown_4_address());
   // cmplwi cr6,r11,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq cr6,0x8215e46c
@@ -8955,7 +8956,7 @@ loc_8215E3DC:
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // lwz r3,4(r31)
-  r3 = guest::LoadU32(base, schema::RaceOverlays(base, uint32_t(r31)).others_address());
+  r3 = guest::LoadU32(base, schema::RaceOverlaysAt9608_4(base, uint32_t(r31)).unknown_4_address());
   // stw r11,80(r1)
   guest::StoreU32(base, uint32_t(r1) + 80, uint32_t(r11));
   // stw r11,112(r1)
@@ -8974,7 +8975,7 @@ loc_8215E3DC:
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // lwz r3,4(r31)
-  r3 = guest::LoadU32(base, schema::RaceOverlays(base, uint32_t(r31)).others_address());
+  r3 = guest::LoadU32(base, schema::RaceOverlaysAt9608_4(base, uint32_t(r31)).unknown_4_address());
   // bl 0x82126550
   // (left out: dead in C++)
   { const lifted::Result o = game::CarOverlays::View(base, LIFTED_ARGS(0x8215E424, r31)); r3 = o.r3; f1 = o.f1; }
@@ -8986,14 +8987,14 @@ loc_8215E3DC:
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // lwz r3,0(r31)
-  r3 = guest::LoadU32(base, schema::RaceOverlays(base, uint32_t(r31)).overlay_0_address());
+  r3 = guest::LoadU32(base, schema::RaceOverlaysAt9608_4(base, uint32_t(r31)).unknown_0_address());
   // bl 0x82126660
   // (left out: dead in C++)
   { const lifted::Result o = game::CarOverlays::NewView(base, r1, r13, r3, r4, r8, r9, r10); r3 = o.r3; f1 = o.f1; }
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // lwz r3,0(r31)
-  r3 = guest::LoadU32(base, schema::RaceOverlays(base, uint32_t(r31)).overlay_0_address());
+  r3 = guest::LoadU32(base, schema::RaceOverlaysAt9608_4(base, uint32_t(r31)).unknown_0_address());
   // bl 0x82126550
   // (left out: dead in C++)
   { const lifted::Result o = game::CarOverlays::View(base, LIFTED_ARGS(0x8215E444, r31)); r3 = o.r3; f1 = o.f1; }
@@ -9005,14 +9006,14 @@ loc_8215E3DC:
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // lwz r3,4(r31)
-  r3 = guest::LoadU32(base, schema::RaceOverlays(base, uint32_t(r31)).others_address());
+  r3 = guest::LoadU32(base, schema::RaceOverlaysAt9608_4(base, uint32_t(r31)).unknown_4_address());
   // bl 0x82126660
   // (left out: dead in C++)
   { const lifted::Result o = game::CarOverlays::NewView(base, r1, r13, r3, r4, r8, r9, r10); r3 = o.r3; f1 = o.f1; }
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // lwz r3,4(r31)
-  r3 = guest::LoadU32(base, schema::RaceOverlays(base, uint32_t(r31)).others_address());
+  r3 = guest::LoadU32(base, schema::RaceOverlaysAt9608_4(base, uint32_t(r31)).unknown_4_address());
   // bl 0x82126550
   // (left out: dead in C++)
   { const lifted::Result o = game::CarOverlays::View(base, LIFTED_ARGS(0x8215E464, r31)); r3 = o.r3; f1 = o.f1; }
@@ -9028,7 +9029,7 @@ loc_8215E46C:
   r30 = uint64_t(int64_t(int64_t(r31) + 8));
 loc_8215E474:
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, schema::RaceOverlays(base, uint32_t(r30) - 8).others_address() + 4);
+  r11 = guest::LoadU32(base, schema::RaceOverlaysAt9608_4(base, uint32_t(r30) - 8).unknown_8_address());
   // cmplwi cr6,r11,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq cr6,0x8215e4fc
@@ -9050,7 +9051,7 @@ loc_8215E474:
   // mr r27,r3
   r27 = r3;
   // lwz r3,0(r30)
-  r3 = guest::LoadU32(base, schema::RaceOverlays(base, uint32_t(r30) - 8).others_address() + 4);
+  r3 = guest::LoadU32(base, schema::RaceOverlaysAt9608_4(base, uint32_t(r30) - 8).unknown_8_address());
   // mr r4,r27
   r4 = r27;
   // bl 0x82126660
@@ -9059,7 +9060,7 @@ loc_8215E474:
   // mr r4,r27
   r4 = r27;
   // lwz r3,0(r30)
-  r3 = guest::LoadU32(base, schema::RaceOverlays(base, uint32_t(r30) - 8).others_address() + 4);
+  r3 = guest::LoadU32(base, schema::RaceOverlaysAt9608_4(base, uint32_t(r30) - 8).unknown_8_address());
   // bl 0x82126550
   // (left out: dead in C++)
   { const lifted::Result o = game::CarOverlays::View(base, LIFTED_ARGS(0x8215E4B4, r31)); r3 = o.r3; f1 = o.f1; }
@@ -9071,14 +9072,14 @@ loc_8215E474:
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // lwz r3,0(r30)
-  r3 = guest::LoadU32(base, schema::RaceOverlays(base, uint32_t(r30) - 8).others_address() + 4);
+  r3 = guest::LoadU32(base, schema::RaceOverlaysAt9608_4(base, uint32_t(r30) - 8).unknown_8_address());
   // bl 0x82126660
   // (left out: dead in C++)
   { const lifted::Result o = game::CarOverlays::NewView(base, r1, r13, r3, r4, r8, r9, r10); r3 = o.r3; f1 = o.f1; }
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // lwz r3,0(r30)
-  r3 = guest::LoadU32(base, schema::RaceOverlays(base, uint32_t(r30) - 8).others_address() + 4);
+  r3 = guest::LoadU32(base, schema::RaceOverlaysAt9608_4(base, uint32_t(r30) - 8).unknown_8_address());
   // bl 0x82126550
   // (left out: dead in C++)
   { const lifted::Result o = game::CarOverlays::View(base, LIFTED_ARGS(0x8215E4D4, r31)); r3 = o.r3; f1 = o.f1; }
@@ -9090,14 +9091,14 @@ loc_8215E474:
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // lwz r3,0(r30)
-  r3 = guest::LoadU32(base, schema::RaceOverlays(base, uint32_t(r30) - 8).others_address() + 4);
+  r3 = guest::LoadU32(base, schema::RaceOverlaysAt9608_4(base, uint32_t(r30) - 8).unknown_8_address());
   // bl 0x82126660
   // (left out: dead in C++)
   { const lifted::Result o = game::CarOverlays::NewView(base, r1, r13, r3, r4, r8, r9, r10); r3 = o.r3; f1 = o.f1; }
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // lwz r3,0(r30)
-  r3 = guest::LoadU32(base, schema::RaceOverlays(base, uint32_t(r30) - 8).others_address() + 4);
+  r3 = guest::LoadU32(base, schema::RaceOverlaysAt9608_4(base, uint32_t(r30) - 8).unknown_8_address());
   // bl 0x82126550
   // (left out: dead in C++)
   { const lifted::Result o = game::CarOverlays::View(base, LIFTED_ARGS(0x8215E4F4, r31)); r3 = o.r3; f1 = o.f1; }
@@ -9165,7 +9166,7 @@ loc_8215E510:
   // li r28,3
   r28 = uint64_t(int64_t(3));
   // lwz r3,4(r31)
-  r3 = guest::LoadU32(base, schema::RaceOverlays(base, uint32_t(r31)).others_address());
+  r3 = guest::LoadU32(base, schema::RaceOverlaysAt9608_4(base, uint32_t(r31)).unknown_4_address());
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r24,128(r1)
@@ -9179,9 +9180,9 @@ loc_8215E510:
   // stw r28,164(r1)
   guest::StoreU32(base, uint32_t(r1) + 164, uint32_t(r28));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::CarOverlays(base, uint32_t(r3)).vtable_address());
+  r11 = guest::LoadU32(base, schema::CarOverlaysPart_2(base, uint32_t(r3)).unknown_0_address());
   // lwz r11,24(r11)
-  r11 = guest::LoadU32(base, schema::OverlayVtable(base, uint32_t(r11)).init_address());
+  r11 = guest::LoadU32(base, schema::OverlayVtablePart(base, uint32_t(r11)).unknown_24_address());
   // mtctr r11
   ctr = r11;
   // bctrl
@@ -9211,7 +9212,7 @@ loc_8215E510:
   guest::StoreU32(base, uint32_t(r1) + 180, uint32_t(r11));
 loc_8215E5C4:
   // lwz r11,0(r29)
-  r11 = guest::LoadU32(base, schema::RaceOverlays(base, uint32_t(r29) - 8).others_address() + 4);
+  r11 = guest::LoadU32(base, schema::RaceOverlaysAt9608_4(base, uint32_t(r29) - 8).unknown_8_address());
   // cmplwi cr6,r11,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq cr6,0x8215e5f8
@@ -9222,7 +9223,7 @@ loc_8215E5C4:
   // (left out: dead in C++)
   { const lifted::Result o = game::RaceOverlays::SlotOf(base, LIFTED_ARGS(0x8215E5D8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r29)
-  r11 = guest::LoadU32(base, schema::RaceOverlays(base, uint32_t(r29) - 8).others_address() + 4);
+  r11 = guest::LoadU32(base, schema::RaceOverlaysAt9608_4(base, uint32_t(r29) - 8).unknown_8_address());
   // stw r3,172(r1)
   guest::StoreU32(base, uint32_t(r1) + 172, uint32_t(r3));
   // addi r4,r1,160
@@ -9260,7 +9261,7 @@ loc_8215E60C:
   r29 = uint64_t(int64_t(int64_t(r31) + 4));
 loc_8215E61C:
   // lwz r11,0(r29)
-  r11 = guest::LoadU32(base, schema::RaceOverlays(base, uint32_t(r29) - 4).others_address());
+  r11 = guest::LoadU32(base, schema::RaceOverlaysAt9608_4(base, uint32_t(r29) - 4).unknown_4_address());
   // cmplwi cr6,r11,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq cr6,0x8215e650
@@ -9271,7 +9272,7 @@ loc_8215E61C:
   // (left out: dead in C++)
   { const lifted::Result o = game::RaceOverlays::SlotOf(base, LIFTED_ARGS(0x8215E630, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r29)
-  r11 = guest::LoadU32(base, schema::RaceOverlays(base, uint32_t(r29) - 4).others_address());
+  r11 = guest::LoadU32(base, schema::RaceOverlaysAt9608_4(base, uint32_t(r29) - 4).unknown_4_address());
   // stw r3,172(r1)
   guest::StoreU32(base, uint32_t(r1) + 172, uint32_t(r3));
   // addi r4,r1,160
@@ -9279,9 +9280,9 @@ loc_8215E61C:
   // mr r3,r11
   r3 = r11;
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, schema::CarOverlays(base, uint32_t(r11)).vtable_address());
+  r10 = guest::LoadU32(base, schema::CarOverlaysPart_2(base, uint32_t(r11)).unknown_0_address());
   // lwz r11,24(r10)
-  r11 = guest::LoadU32(base, schema::OverlayVtable(base, uint32_t(r10)).init_address());
+  r11 = guest::LoadU32(base, schema::OverlayVtablePart(base, uint32_t(r10)).unknown_24_address());
   // mtctr r11
   ctr = r11;
   // bctrl
@@ -9298,13 +9299,13 @@ loc_8215E650:
   if (cr6.lt) goto loc_8215E61C;
 loc_8215E660:
   // lwz r3,0(r31)
-  r3 = guest::LoadU32(base, schema::RaceOverlays(base, uint32_t(r31)).overlay_0_address());
+  r3 = guest::LoadU32(base, schema::RaceOverlaysAt9608_4(base, uint32_t(r31)).unknown_0_address());
   // addi r4,r1,128
   r4 = uint64_t(int64_t(int64_t(r1) + 128));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::CarOverlays(base, uint32_t(r3)).vtable_address());
+  r11 = guest::LoadU32(base, schema::CarOverlaysPart(base, uint32_t(r3)).unknown_0_address());
   // lwz r11,24(r11)
-  r11 = guest::LoadU32(base, schema::OverlayVtable(base, uint32_t(r11)).init_address());
+  r11 = guest::LoadU32(base, schema::CarOverlaysPart(base, uint32_t(r11)).unknown_24_address());
   // mtctr r11
   ctr = r11;
   // bctrl

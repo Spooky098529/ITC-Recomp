@@ -15,7 +15,7 @@
 # sub_8209B038's).
 [Matrix]
 measure = "Matrix"
-measures = ["Matrix::Copy.r4", "Matrix::Multiply.r4", "Matrix::Multiply.r5", "Matrix::Inverse.r4", "Vec4::Transform.r4", "Matrix::ProjectPoint.r4", "sub_8209B038.r3"]
+measures = ["Matrix::Copy.r4", "Matrix::Multiply.r4", "Matrix::Multiply.r5", "Matrix::Inverse.r4", "Vec4::Transform.r4", "Matrix::ProjectPoint.r4", "sub_8209B038.r3", "Matrix::SetTranslation.r3"]
 size = 64
 origin = "file"
 fields = [
@@ -107,3 +107,79 @@ fourth_row = { address = 0x826382D0, type = "bytes", count = 16, note = "probabl
 zero_matrix = { address = 0x8266D000, type = "bytes", count = 64, note = "a zero matrix, built at boot by ZeroMatrix::StaticInit (sub_825D8F88)" }
 identity_matrix = { address = 0x8266D040, type = "bytes", count = 64, note = "the identity, built at boot by IdentityMatrix::StaticInit (sub_825D9060)" }
 identity = { address = 0x82953740, type = "bytes", count = 64, note = "probably the identity matrix (Matrix::SetIdentity copies it)" }
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from Matrix.
+[MatrixAt64]
+measure = "CameraTarget::Track.r3@+64"
+size = 64
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+  { name = "unknown_16", offset = 16, type = "f32" },
+  { name = "unknown_20", offset = 20, type = "f32" },
+  { name = "unknown_24", offset = 24, type = "f32" },
+  { name = "unknown_28", offset = 28, type = "f32" },
+  { name = "unknown_32", offset = 32, type = "f32" },
+  { name = "unknown_36", offset = 36, type = "f32" },
+  { name = "unknown_40", offset = 40, type = "f32" },
+  { name = "unknown_44", offset = 44, type = "f32" },
+  { name = "unknown_48", offset = 48, type = "f32" },
+  { name = "unknown_52", offset = 52, type = "f32" },
+  { name = "unknown_56", offset = 56, type = "f32" },
+  { name = "unknown_60", offset = 60, type = "f32" },
+]
+
+# Split from Quaternion.
+[QuaternionAt80]
+measure = "RigidBody@+80"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]
+
+# Split from Quaternion.
+[QuaternionAt464]
+measure = "Vehicle@+464"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]
+
+# Split from Matrix.
+[MatrixAt16]
+measure = "Vehicle@+6160@+16"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]
+
+# Split from Quaternion.
+[QuaternionAt16]
+measure = "VehicleStatus::Update.r3@+16"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]

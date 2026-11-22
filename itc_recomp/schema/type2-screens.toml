@@ -432,3 +432,27 @@ origin = "embedded"
 fields = [
   { name = "unknown_1", offset = 1, type = "u8" },
 ]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from BuildScreenData.
+[BuildScreenDataAt76]
+measure = "new<206444>@BuildScreen::Create@+76"
+size = 1610
+origin = "embedded"
+fields = [
+  { name = "unknown_1600", offset = 1600, type = "u16" },
+  { name = "unknown_1604", offset = 1604, type = "u16" },
+  { name = "unknown_1608", offset = 1608, type = "u16" },
+]
+
+# Split from PlateEditor.
+[PlateEditorAt4]
+measure = "new<76>@PlateEditor::Create@+4"
+size = 2
+origin = "embedded"
+fields = [
+  { name = "unknown_1", offset = 1, type = "u8" },
+]

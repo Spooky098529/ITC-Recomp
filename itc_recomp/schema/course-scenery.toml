@@ -121,7 +121,7 @@ fields = [
 # A scenery list's table entry (12 bytes): every key the list can hold.
 [SceneryListTableEntry]
 measure = "SceneryList::LoadAll.r4.+24"
-measures = ["SceneryConfig.+24"]
+measures = ["Scenery@+8.+24"]
 size = 12
 origin = "allocated"
 fields = [
@@ -144,7 +144,7 @@ fields = [
 
 # The 44-byte configuration Scenery::Setup copies to the manager's +8.
 [SceneryConfig]
-measure = "SceneryConfig"
+measure = "Scenery@+8"
 size = 44
 origin = "file"
 fields = [
@@ -164,7 +164,7 @@ fields = [
 # The course's table of areas (the configuration's +28).
 [SceneryCourseTable]
 measure = "Scenery.+36"
-measures = ["SceneryConfig.+28"]
+measures = ["Scenery@+8.+28"]
 size = 20
 origin = "file"
 fields = [
@@ -217,7 +217,8 @@ fields = [
 
 # A pooled object's 40-byte header.
 [PoolObject]
-measures = ["PoolObject", "ObjectPools::Pool.ret.+20", "ObjectPools::Release.ret"]
+measure = "PoolObject"
+measures = ["ObjectPools::Pool.ret.+20", "ObjectPools::Release.ret", "PoolObject::AllocData.r3"]
 size = 40
 origin = "allocated"
 vtable = 0x82006848
@@ -534,4 +535,18 @@ fields = [
   { name = "unknown_4", offset = 4, type = "u32" },
   { name = "unknown_8", offset = 8, type = "u32" },
   { name = "unknown_16", offset = 16, type = "u32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from Scenery.
+[SceneryAt92]
+measure = "Scenery@+92"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
 ]

@@ -83,12 +83,6 @@ fields = [
   { name = "fault_record_byte_2019", offset = 2019, type = "u8", note = "measure fault: a racer record's byte +2019 (sub_8210EBF0's horn scale when 1)" },
   { name = "fault_record_flags", offset = 3888, type = "u32", note = "measure fault: a racer record's +3888 flags (0x1 and 0x80 the players, 0x2 rivals and opponents, 0x4 traffic, 0x100, 0x200, 0x400, 0x800)" },
   { name = "fault_record_word_3892", offset = 3892, type = "u32", note = "measure fault: a racer record's +3892 (RaceHud::Tick, Vehicle::SetUp)" },
-  { name = "fault_record_start", offset = 3904, type = "u32", note = "measure fault: a racer record's +3904 start position (section, slice) as a word (Racers::SetStart)" },
-  { name = "fault_record_start_section", offset = 3904, type = "u16", note = "measure fault: the record's start section (RaceManager::AddRacers)" },
-  { name = "fault_record_start_slice", offset = 3906, type = "u16", note = "measure fault: the record's start slice" },
-  { name = "fault_record_start_value", offset = 3908, type = "f32", note = "measure fault: the record's +3908 float ([0x8200692C], or 0.0 for stage types 2 and 3)" },
-  { name = "fault_record_racer_id", offset = 3912, type = "u32", note = "measure fault: the record's racer id (Racers::IndexOf)" },
-  { name = "fault_record_event_index", offset = 3916, type = "u32", note = "measure fault: the record's index in the event's list" },
   { name = "record0_flags", offset = 3936, type = "u32", note = "racer record 0's flags (+3888; 0x1 the player, RaceStates::RacersNear)" },
   { name = "record0_word_3892", offset = 3940, type = "u32", note = "racer record 0's +3892 (Replay::Keep)" },
   { name = "record0_start_section", offset = 3952, type = "u16", note = "racer record 0's start section (Replay::Keep, SetUpRace)" },
@@ -96,9 +90,6 @@ fields = [
   { name = "record0_start_value", offset = 3956, type = "f32", note = "racer record 0's +3908 float" },
   { name = "record0_racer_id", offset = 3960, type = "u32", note = "racer record 0's racer id (+3912)" },
   { name = "record0_car_value", offset = 3968, type = "f32", note = "racer record 0's +3920 float (Racers::Add's f1: the garage car's +1892)" },
-  { name = "fault_record1_start", offset = 7840, type = "u32", note = "measure fault: racer record 1's start position as a word, the records met at +0 (RaceManager::AddRacers)" },
-  { name = "fault_record1_start_section", offset = 7840, type = "u16", note = "measure fault: racer record 1's start section, the records met at +0" },
-  { name = "fault_record1_start_slice", offset = 7842, type = "u16", note = "measure fault: racer record 1's start slice" },
   { name = "fault_car_count", offset = 366048, type = "u32", note = "measure fault: the racers object's (+48) car count, +0x59610 here (Racers::Add, SetStart)" },
   { name = "car_count", offset = 366096, type = "u32", note = "+0x59610 the car count" },
   { name = "added_count", offset = 366100, type = "u32", note = "+0x59614 the racers Race::AddRacer added (also tested for 2 with the race kind 6)" },
@@ -134,7 +125,6 @@ size = 9644
 origin = "embedded"
 fields = [
   { name = "transitions", offset = 0, type = "bytes", count = 9600, note = "200 transitions, 48 bytes each (StateTransition, game-modes.toml); 87 added by RaceStates::Init" },
-  { name = "fault_still_count", offset = 0, type = "u32", note = "measure fault: RaceStates::RacersStill's count word (its r3 is the machine's +9628, not the machine)" },
   { name = "fault_record_word_4", offset = 4, type = "u16", note = "measure fault: SceneModelRecord::FromCar's halfword +4" },
   { name = "fault_car_word_12", offset = 12, type = "u32", note = "measure fault: EventCondition::CarIs's +12" },
   { name = "fault_wheels_1692", offset = 1692, type = "u32", note = "measure fault: SceneModelRecord::SetWheels's +1692" },
@@ -185,7 +175,7 @@ fields = [
 # out pair (r3) and StartRoute's machine are joined in (faults).
 [RaceProgress]
 measure = "RaceProgress"
-measures = ["Achievements", "sub_82167D88.r3.+9624", "RaceScreens.+460"]
+measures = ["Achievements", "sub_82167D88.r3.+9624", "RaceStates.+9624@+2184"]
 size = 7248
 origin = "allocated"
 fields = [
@@ -311,7 +301,7 @@ fields = [
 # argument, the copies sub_820FFE98 and sub_820FFF10 answer.
 [RoutePosition]
 measure = "RoutePosition::MapToSection.r4"
-measures = ["RoutePosition::NotAfter.r4", "sub_820FFE98.ret", "sub_820FFF10.ret", "RoutePosition", "AiDriver::UpdateStarting.ret@+4", "TrackPosition@+4"]
+measures = ["RoutePosition::NotAfter.r4", "sub_820FFE98.ret", "sub_820FFF10.ret", "RoutePosition", "AiDriver::UpdateStarting.ret@+4", "TrackPosition@+4", "RoutePosition::StepToMainRoad.r3"]
 # measures from VehicleRoutePosition (vehicle), merged at the integration
 size = 4
 origin = "embedded"
@@ -366,6 +356,7 @@ fields = [
 # never seen in play): a list of ten nodes, then ten entries.
 [CourseTimeList]
 measure = "CourseRecord"
+measures = ["CourseRecord::Reset.r3"]
 size = 408
 origin = "embedded"
 fields = [
@@ -445,4 +436,94 @@ fields = [
   { name = "unknown_7156", offset = 7156, type = "f32" },
   { name = "unknown_7240", offset = 7240, type = "u32" },
   { name = "unknown_7244", offset = 7244, type = "u32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from RaceStates.
+[RaceStatesAt107168]
+measure = "RaceMode@+107168"
+size = 9628
+origin = "embedded"
+fields = [
+  { name = "unknown_9604", offset = 9604, type = "u32" },
+  { name = "unknown_9624", offset = 9624, type = "u32" },
+]
+
+# Split from RoutePosition.
+[RoutePositionAt6088]
+measure = "RaceProgress@+6088"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u16" },
+  { name = "unknown_2", offset = 2, type = "u16" },
+]
+
+# Split from RaceData.
+[RaceDataPart]
+measure = "RaceScreens@+16.+440.+5712"
+size = 3896
+origin = "embedded"
+fields = [
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "record_tuning_136", offset = 1832, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the record's car tuning +136 (the extra gauges' part, RaceHud::SetUpExtraGauges)" },
+  { name = "record_word_3892", offset = 3892, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's +3892 (RaceHud::Tick, Vehicle::SetUp)" },
+]
+
+# Split from RaceStates.
+[RaceStatesAt9628]
+measure = "RaceStates@+9628"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "still_count", offset = 0, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): RaceStates::RacersStill's count word (its r3 is the machine's +9628, not the machine)" },
+]
+
+# Split from CourseTimeList.
+[CourseTimeListAt366924]
+measure = "[826C5B2C]@+366924"
+size = 50
+origin = "embedded"
+fields = [
+  { name = "unknown_40", offset = 40, type = "u16" },
+  { name = "unknown_44", offset = 44, type = "u16" },
+  { name = "unknown_48", offset = 48, type = "u16" },
+]
+
+# Split from RaceData.
+[RaceDataAt48]
+measure = "[826C5B2C]@+48"
+size = 366052
+origin = "embedded"
+fields = [
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "record_byte_76", offset = 76, type = "u8", note = "the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's byte +76 (Vehicle::SetUp's record at +0)" },
+  { name = "record_byte_77", offset = 77, type = "u8", note = "the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's byte +77 (Vehicle::SetUp's record at +0)" },
+  { name = "record_word_1656", offset = 1656, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's +1656 (its car's; sub_8210EBF0's horn scale below 2 or 5)" },
+  { name = "record_word_1672", offset = 1672, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's +1672 (Vehicle::SetUp)" },
+  { name = "record_word_1676", offset = 1676, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's +1676 (Vehicle::SetUp)" },
+  { name = "record_flags", offset = 3888, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's +3888 flags (0x1 and 0x80 the players, 0x2 rivals and opponents, 0x4 traffic, 0x100, 0x200, 0x400, 0x800)" },
+  { name = "record_word_3892", offset = 3892, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's +3892 (RaceHud::Tick, Vehicle::SetUp)" },
+  { name = "record_start_section", offset = 3904, type = "u16", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the record's start section (RaceManager::AddRacers)" },
+  { name = "record_start", offset = 3904, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's +3904 start position (section, slice) as a word (Racers::SetStart)" },
+  { name = "record_start_slice", offset = 3906, type = "u16", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the record's start slice" },
+  { name = "record_start_value", offset = 3908, type = "f32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the record's +3908 float ([0x8200692C], or 0.0 for stage types 2 and 3)" },
+  { name = "record_racer_id", offset = 3912, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the record's racer id (Racers::IndexOf)" },
+  { name = "record_event_index", offset = 3916, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the record's index in the event's list" },
+  { name = "record1_start_section", offset = 7840, type = "u16", note = "the owner's fault_ field before the measure's fixes (2026-11-22): racer record 1's start section, the records met at +0" },
+  { name = "record1_start", offset = 7840, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): racer record 1's start position as a word, the records met at +0 (RaceManager::AddRacers)" },
+  { name = "record1_start_slice", offset = 7842, type = "u16", note = "the owner's fault_ field before the measure's fixes (2026-11-22): racer record 1's start slice" },
+  { name = "car_count", offset = 366048, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the racers object's (+48) car count, +0x59610 here (Racers::Add, SetStart)" },
+]
+
+# Split from RaceProgress.
+[RaceProgressAt6076]
+measure = "new<7248>@RaceProgress::Create@+6076"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
 ]

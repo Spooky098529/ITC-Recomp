@@ -15,7 +15,8 @@
 # One racer's sounds (1,264 bytes). CarSounds::Destroy's r3 is the array's
 # first element (the measure's "CarSounds"), whose count is 16 bytes before.
 [CarSound]
-measures = ["CarSound", "CarSounds"]
+measure = "CarSound"
+measures = ["CarSounds", "CarSound::UpdateVoices.r3", "CarSound::Pause.r3", "CarSound::Clear.r3", "CarSound::Resume.r3"]
 size = 1264
 origin = "allocated"
 fields = [
@@ -105,7 +106,8 @@ fields = [
 # The engine (car sound +408): two layers, +0 the main one and +84 the
 # pitched one (EngineLayer::UpdatePitched).
 [CarSoundEngine]
-measure = "EngineSound"
+measure = "new<8864>@CarSounds::Init@+16@+408"
+measures = ["CarSound@+408"]
 size = 176
 origin = "embedded"
 vtable = 0x82008018
@@ -119,6 +121,7 @@ fields = [
 # An engine layer (84 bytes, vtable 0x82008018), its voice holder at +44.
 [CarSoundEngineLayer]
 measure = "EngineLayer"
+measures = ["EngineLayer::Update.r3", "EngineLayer::Start.r3"]
 size = 84
 origin = "embedded"
 vtable = 0x82008018
@@ -135,7 +138,7 @@ fields = [
 # An engine layer's table: the car's sound parameters ([[0x82616318 + 16 i]
 # + 4 j], the main layer's at +820).
 [CarSoundEngineTable]
-measure = "EngineLayer.+4"
+measure = "EngineLayer::Update.r3.+4"
 size = 548
 origin = "image"
 fields = [
@@ -166,7 +169,7 @@ fields = [
 
 # The hits (car sound +584): the impact, the scrape and wave 9.
 [CarSoundHits]
-measure = "HitSounds"
+measure = "CarSound@+584"
 size = 68
 origin = "embedded"
 fields = [
@@ -182,7 +185,7 @@ fields = [
 
 # The tires (car sound +652): two layer records, their voice holder at +24.
 [CarSoundTires]
-measures = ["TireSound", "TireLayer"]
+measure = "CarSound@+652"
 size = 84
 origin = "embedded"
 fields = [
@@ -219,7 +222,7 @@ fields = [
 
 # The roll noise (car sound +792): a looping wave 1 in slot 0.
 [CarSoundRoll]
-measure = "RollSound"
+measure = "CarSound@+792"
 size = 48
 origin = "embedded"
 fields = [
@@ -255,7 +258,7 @@ fields = [
 
 # The turbo (car sound +952, probably).
 [CarSoundTurbo]
-measure = "TurboSound"
+measure = "CarSound@+952"
 size = 64
 origin = "embedded"
 fields = [
@@ -272,7 +275,7 @@ fields = [
 
 # The wind (car sound +1016).
 [CarSoundWind]
-measure = "WindSound"
+measure = "CarSound@+1016"
 size = 56
 origin = "embedded"
 fields = [
@@ -285,7 +288,7 @@ fields = [
 
 # The horn (car sound +1072, probably).
 [CarSoundHorn]
-measure = "HornSound"
+measure = "CarSound@+1072"
 size = 64
 origin = "embedded"
 fields = [
@@ -300,7 +303,7 @@ fields = [
 
 # The pass by (car sound +1136).
 [CarSoundPassBy]
-measure = "PassBySound"
+measure = "CarSound@+1136"
 size = 56
 origin = "embedded"
 fields = [
@@ -523,7 +526,7 @@ fields = [
 # A vector of three floats (X3DVec::).
 [X3DAudioVector]
 measure = "X3DVec"
-measures = ["X3DVec::Cross.r4", "X3DVec::Cross.r5", "X3DVec::Dot.r4", "X3DVec::Sub.r4", "X3DVec::Sub.r5", "X3DAudio::Matrix.r4"]
+measures = ["X3DVec::Cross.r4", "X3DVec::Cross.r5", "X3DVec::Dot.r4", "X3DVec::Sub.r4", "X3DVec::Sub.r5", "X3DAudio::Matrix.r4", "X3DVec::Sub.r3"]
 size = 12
 origin = "embedded"
 fields = [
@@ -590,4 +593,67 @@ fields = [
   { name = "unknown_52", offset = 52, type = "u32" },
   { name = "unknown_56", offset = 56, type = "f32" },
   { name = "unknown_60", offset = 60, type = "f32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from X3DAudioVector.
+[X3DAudioVectorAt12]
+measure = "X3DAudio::Delay.r4@+12"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+]
+
+# Split from CarSound.
+[CarSoundAt16]
+measure = "new<8864>@CarSounds::Init@+16"
+size = 1164
+origin = "embedded"
+fields = [
+  { name = "unknown_584", offset = 584, type = "u32" },
+  { name = "unknown_588", offset = 588, type = "u32" },
+  { name = "unknown_604", offset = 604, type = "u32" },
+  { name = "unknown_608", offset = 608, type = "u32" },
+  { name = "unknown_676", offset = 676, type = "u32" },
+  { name = "unknown_680", offset = 680, type = "u32" },
+  { name = "unknown_696", offset = 696, type = "u32" },
+  { name = "unknown_700", offset = 700, type = "u32" },
+  { name = "unknown_736", offset = 736, type = "u32" },
+  { name = "unknown_740", offset = 740, type = "u32" },
+  { name = "unknown_756", offset = 756, type = "u32" },
+  { name = "unknown_760", offset = 760, type = "u32" },
+  { name = "unknown_792", offset = 792, type = "u32" },
+  { name = "unknown_796", offset = 796, type = "u32" },
+  { name = "unknown_812", offset = 812, type = "u32" },
+  { name = "unknown_816", offset = 816, type = "u32" },
+  { name = "unknown_840", offset = 840, type = "u32" },
+  { name = "unknown_844", offset = 844, type = "u32" },
+  { name = "unknown_860", offset = 860, type = "u32" },
+  { name = "unknown_864", offset = 864, type = "u32" },
+  { name = "unknown_888", offset = 888, type = "u32" },
+  { name = "unknown_892", offset = 892, type = "u32" },
+  { name = "unknown_908", offset = 908, type = "u32" },
+  { name = "unknown_912", offset = 912, type = "u32" },
+  { name = "unknown_952", offset = 952, type = "u32" },
+  { name = "unknown_956", offset = 956, type = "u32" },
+  { name = "unknown_972", offset = 972, type = "u32" },
+  { name = "unknown_976", offset = 976, type = "u32" },
+  { name = "unknown_1016", offset = 1016, type = "u32" },
+  { name = "unknown_1020", offset = 1020, type = "u32" },
+  { name = "unknown_1036", offset = 1036, type = "u32" },
+  { name = "unknown_1040", offset = 1040, type = "u32" },
+  { name = "unknown_1072", offset = 1072, type = "u32" },
+  { name = "unknown_1076", offset = 1076, type = "u32" },
+  { name = "unknown_1092", offset = 1092, type = "u32" },
+  { name = "unknown_1096", offset = 1096, type = "u32" },
+  { name = "unknown_1136", offset = 1136, type = "u32" },
+  { name = "unknown_1140", offset = 1140, type = "u32" },
+  { name = "unknown_1156", offset = 1156, type = "u32" },
+  { name = "unknown_1160", offset = 1160, type = "u32" },
 ]

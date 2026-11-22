@@ -3399,7 +3399,7 @@ lifted::Result f8258DD78(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   lifted::Cr cr6;
   uint8_t so = 0;
   // lwz r3,0(r3)
-  r3 = guest::LoadU32(base, schema::Event(base, uint32_t(r3)).handle_address());
+  r3 = guest::LoadU32(base, schema::Semaphore(base, uint32_t(r3)).event_address());
   // cmpwi cr6,r3,-1
   cr6 = lifted::Compare<int32_t>(int32_t(r3), -1, so);
   // beqlr cr6
@@ -3425,7 +3425,7 @@ lifted::Result f8258DD90(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r3,0(r3)
-  r3 = guest::LoadU32(base, schema::Event(base, uint32_t(r3)).handle_address());
+  r3 = guest::LoadU32(base, schema::Semaphore(base, uint32_t(r3)).event_address());
   // cmpwi cr6,r3,-1
   cr6 = lifted::Compare<int32_t>(int32_t(r3), -1, so);
   // beq cr6,0x8258ddbc

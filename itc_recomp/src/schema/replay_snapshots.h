@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// embedded; measure: RaceSnapshot, RaceSnapshot::Copy.r4
+// embedded; measure: RaceSnapshot::Copy.r4, RaceSnapshot::Save.r3, RaceSnapshot::Copy.r3
 struct ReplaySnapshot : View {
   using View::View;
   static constexpr uint32_t kSize = 38928;
@@ -70,7 +70,7 @@ struct ReplaySnapshot : View {
   uint32_t records_address() const { return address + 2304; }
 };
 
-// file; measure: Record5232
+// file; measure: Record5232, Record5232::Record5232.r3
 struct ReplayRecord : View {
   using View::View;
   static constexpr uint32_t kSize = 5232;
@@ -94,7 +94,7 @@ struct ReplayRecord : View {
   uint32_t collision_address() const { return address + 4080; }
 };
 
-// embedded; measure: BodyState
+// embedded; measure: Record5232@+608
 struct ReplayBodyState : View {
   using View::View;
   static constexpr uint32_t kSize = 516;
@@ -147,7 +147,7 @@ struct ReplayBodyState : View {
   uint32_t effective_mass_address() const { return address + 512; }
 };
 
-// file; measure: Member1136
+// file; measure: Record5232@+1136, Record5232::Record5232.ret@+1136
 struct ReplayVehiclePhysics : View {
   using View::View;
   static constexpr uint32_t kSize = 2944;
@@ -693,7 +693,7 @@ struct ReplayVehiclePhysics : View {
   uint32_t tipped_address() const { return address + 2937; }
 };
 
-// file; measure: Member4080
+// file; measure: Record5232@+4080, Record5232::Record5232.ret@+4080, Record5232::Copy.r3@+4080@+16
 struct ReplayCollisionState : View {
   using View::View;
   static constexpr uint32_t kSize = 1152;
@@ -737,7 +737,7 @@ struct ReplayCollisionState : View {
   uint32_t push_out_address() const { return address + 1136; }
 };
 
-// file; measure: Part464
+// file; measure: Part464::Restore.r3, Part464::Save.r3, Part464::Copy.r3, Part464::Part464.r3
 struct ReplayShapeState : View {
   using View::View;
   static constexpr uint32_t kSize = 452;

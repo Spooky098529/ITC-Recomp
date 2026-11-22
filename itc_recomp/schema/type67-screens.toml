@@ -20,7 +20,8 @@
 # The derived lists below repeat these fields (no inheritance in the schema).
 # "ListScreen.+9892" is the toggle's two animations reached by index.
 [ListScreen]
-measures = ["ListScreen", "ListScreen.+9892"]
+measure = "ListScreen"
+measures = ["ListScreen.+9892", "ListScreen::Init.r3"]
 size = 10144
 origin = "embedded"
 vtable = 0x82011218
@@ -126,6 +127,7 @@ fields = [
 # mode's list).
 [NodeListScreen]
 measure = "NodeListScreen"
+measures = ["NodeListScreen::NodeListScreen.r3"]
 size = 10820
 origin = "embedded"
 vtable = 0x82011558
@@ -421,6 +423,7 @@ fields = [
 # mode's color list).
 [ColorListScreen]
 measure = "ColorListScreen"
+measures = ["ColorListScreen::ColorListScreen.r3"]
 size = 11040
 origin = "embedded"
 vtable = 0x820114E0
@@ -747,7 +750,7 @@ fields = [
 # 0x820109A8, 0x820114E0, 0x82010F18).
 [ListScreenVtable]
 measure = "ListScreen.+0"
-measures = ["NodeListScreen.+0", "TitledListScreen.+0", "Type6ListScreen.+0", "ColorListScreen.+0", "Type6ListScreen.+9676.+0", "Type7ListScreen.+9676.+0"]
+measures = ["NodeListScreen.+0", "TitledListScreen.+0", "Type6ListScreen.+0", "ColorListScreen.+0", "Type6ListScreen.+9676.+0", "Type7ListScreen.+9676.+0", "ListScreen::Init.r3.+0"]
 size = 112
 origin = "image"
 fields = [
@@ -908,6 +911,7 @@ fields = [
 # screen differs there).
 [PanelScreen]
 measure = "PanelScreen"
+measures = ["PanelScreen::Init.r3"]
 size = 11684
 origin = "embedded"
 fields = [
@@ -964,7 +968,7 @@ fields = [
 # The panel screens' vtables (19 slots; 0x82010920, 0x82010E90).
 [PanelScreenVtable]
 measure = "PanelScreen.+0"
-measures = ["Type6PanelScreen.+9644.+0", "Type7PanelScreen.+9644.+0"]
+measures = ["Type6PanelScreen.+9644.+0", "Type7PanelScreen.+9644.+0", "PanelScreen::Init.r3.+0"]
 size = 76
 origin = "image"
 fields = [
@@ -1021,6 +1025,7 @@ fields = [
 # machine at +4.
 [MachineScreen]
 measure = "MachineScreen"
+measures = ["MachineScreen::MachineScreen.r3"]
 size = 9656
 origin = "embedded"
 vtable = 0x82011168
@@ -1033,7 +1038,8 @@ fields = [
 # The group pair (16 bytes, the panel screens' +11728, vtable 0x82011084; its
 # base's 0x82011064).
 [GroupPair]
-measures = ["GroupPair", "PanelScreen.+9648"]
+measure = "GroupPair"
+measures = ["PanelScreen.+9648", "GroupPair::GroupPair.r3", "GroupPair::~GroupPair.r3"]
 size = 16
 origin = "embedded"
 vtable = 0x82011084
@@ -1064,6 +1070,7 @@ fields = [
 # PanelGroupBase): the panel screens' +9664 and +9708.
 [PanelGroup]
 measure = "PanelGroup"
+measures = ["PanelGroup::PanelGroup.r3", "PanelGroup::~PanelGroup.r3"]
 size = 44
 origin = "embedded"
 vtable = 0x82010E8C
@@ -1090,7 +1097,8 @@ fields = [
 # +11040; vtable 0x82011314, ListPartBase's 0x820112A0): a two-item prompt
 # (probably yes and no) run by its inner part at +20.
 [ListPart]
-measures = ["ListPart", "ListPartBase", "ColorListScreen.+9676", "TitledListScreen.+9676"]
+measure = "ListPart"
+measures = ["ListPartBase", "ColorListScreen.+9676", "TitledListScreen.+9676", "ListPart::ListPart.r3"]
 size = 140
 origin = "embedded"
 vtable = 0x82011314
@@ -1169,6 +1177,7 @@ fields = [
 # PairedNodeTable and ColorNodeTable): the items' nodes in a UI movie.
 [NodeTable]
 measure = "NodeTable"
+measures = ["NodeListScreen.+9672"]
 size = 584
 origin = "embedded"
 vtable = 0x82010FF0
@@ -1209,10 +1218,9 @@ fields = [
 # The same object as screen-constructors.toml's ListNodeTable
 # ("Type6ListScreen.+9672", to merge).
 [PairedNodeTable]
+measure = "PairedNodeTable"
+measures = ["sub_82247FE0.r3", "PairedNodeTable::SavePairs.r3", "Type6Screens@+19432.+9672", "ModeType8@+848@+19544.+9672"]
 # measures from ListNodeTable (screen-constructors), merged at the integration
-measures = ["PairedNodeTable", "sub_82247FE0.r3",
-  "Type6ListScreen.+9672",
-            "Type8ListScreen.+9672"]
 size = 460
 origin = "embedded"
 vtable = 0x82010FF8
@@ -1245,10 +1253,9 @@ fields = [
 # The same object as screen-constructors.toml's ListColorNodeTable
 # ("Type7ListScreen.+9672", to merge).
 [ColorNodeTable]
+measure = "ColorNodeTable"
+measures = ["ColorListScreen.+10432", "NodeTable::SetMarks.ret", "Type7Screens@+19428.+9672", "ModeType8@+848@+30912.+9672"]
 # measures from ListColorNodeTable (screen-constructors), merged at the integration
-measures = ["ColorNodeTable", "ColorListScreen.+10432", "NodeTable::SetMarks.ret",
-  "Type7ListScreen.+9672",
-            "Type8ColorListScreen.+9672"]
 size = 584
 origin = "embedded"
 vtable = 0x82011000
@@ -1411,3 +1418,320 @@ type7_car_slot = { address = 0x8263798C, type = "u32", note = "its +1980 (the sl
 type6_car_list = { address = 0x82636F9C, type = "u32", note = "the type 6 car's +1972" }
 type6_car_entry = { address = 0x82636FA0, type = "u32", note = "its +1976" }
 type6_car_slot = { address = 0x82636FA4, type = "u32", note = "its +1980" }
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from ColorNodeTable.
+[ColorNodeTableAt10432]
+measure = "ColorListScreen@+10432"
+size = 480
+origin = "embedded"
+fields = [
+  { name = "unknown_428", offset = 428, type = "u32" },
+  { name = "unknown_432", offset = 432, type = "u32" },
+  { name = "unknown_436", offset = 436, type = "u32" },
+  { name = "unknown_440", offset = 440, type = "u32" },
+  { name = "unknown_444", offset = 444, type = "u32" },
+  { name = "unknown_448", offset = 448, type = "u32" },
+  { name = "unknown_452", offset = 452, type = "u32" },
+  { name = "unknown_456", offset = 456, type = "u32" },
+  { name = "unknown_460", offset = 460, type = "u32" },
+  { name = "unknown_464", offset = 464, type = "u32" },
+  { name = "unknown_468", offset = 468, type = "u32" },
+  { name = "unknown_472", offset = 472, type = "u32" },
+  { name = "unknown_476", offset = 476, type = "u32" },
+]
+
+# Split from ListPartInner.
+[ListPartInnerAt20]
+measure = "ListPart::ListPart.ret@+20"
+size = 120
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_100", offset = 100, type = "u32" },
+  { name = "unknown_108", offset = 108, type = "u32" },
+  { name = "unknown_112", offset = 112, type = "u32" },
+  { name = "unknown_116", offset = 116, type = "u32" },
+]
+
+# Split from SingleGroup.
+[SingleGroupPart]
+measure = "ModeType8@+848@+42740.+9648"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+]
+
+# Split from Type6ListScreen.
+[Type6ListScreenAt19432]
+measure = "Type6Screens@+19432"
+size = 10824
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_9672", offset = 9672, type = "u32" },
+  { name = "unknown_9676", offset = 9676, type = "u32" },
+  { name = "unknown_9712", offset = 9712, type = "u32" },
+  { name = "unknown_9716", offset = 9716, type = "u32" },
+  { name = "unknown_9720", offset = 9720, type = "u32" },
+  { name = "unknown_9724", offset = 9724, type = "u32" },
+  { name = "unknown_9728", offset = 9728, type = "u32" },
+  { name = "unknown_9732", offset = 9732, type = "u32" },
+  { name = "unknown_9740", offset = 9740, type = "u32" },
+  { name = "unknown_9744", offset = 9744, type = "u32" },
+  { name = "unknown_9748", offset = 9748, type = "u32" },
+  { name = "unknown_9752", offset = 9752, type = "u32" },
+  { name = "unknown_9756", offset = 9756, type = "u32" },
+  { name = "unknown_9760", offset = 9760, type = "u32" },
+  { name = "unknown_9768", offset = 9768, type = "u32" },
+  { name = "unknown_9784", offset = 9784, type = "u32" },
+  { name = "unknown_9788", offset = 9788, type = "u32" },
+  { name = "unknown_9800", offset = 9800, type = "u32" },
+  { name = "unknown_9804", offset = 9804, type = "u32" },
+  { name = "unknown_9812", offset = 9812, type = "u32" },
+  { name = "unknown_9816", offset = 9816, type = "u32" },
+  { name = "unknown_9828", offset = 9828, type = "u32" },
+  { name = "unknown_9832", offset = 9832, type = "u32" },
+  { name = "unknown_9856", offset = 9856, type = "u32" },
+  { name = "unknown_9860", offset = 9860, type = "u32" },
+  { name = "unknown_9868", offset = 9868, type = "u32" },
+  { name = "unknown_9872", offset = 9872, type = "u32" },
+  { name = "unknown_9876", offset = 9876, type = "u32" },
+  { name = "unknown_9880", offset = 9880, type = "u32" },
+  { name = "unknown_9892", offset = 9892, type = "u32" },
+  { name = "unknown_9896", offset = 9896, type = "u32" },
+  { name = "unknown_9900", offset = 9900, type = "u32" },
+  { name = "unknown_9904", offset = 9904, type = "u32" },
+  { name = "unknown_9908", offset = 9908, type = "u32" },
+  { name = "unknown_9928", offset = 9928, type = "u32" },
+  { name = "unknown_9932", offset = 9932, type = "u32" },
+  { name = "unknown_9936", offset = 9936, type = "u32" },
+  { name = "unknown_10820", offset = 10820, type = "u32" },
+]
+
+# Split from NodeScreen.
+[NodeScreenAt30396]
+measure = "Type6Screens@+30396"
+size = 10552
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_124", offset = 124, type = "u32" },
+  { name = "unknown_156", offset = 156, type = "u32" },
+  { name = "unknown_296", offset = 296, type = "u32" },
+  { name = "unknown_420", offset = 420, type = "u32" },
+  { name = "unknown_424", offset = 424, type = "u32" },
+  { name = "unknown_10064", offset = 10064, type = "u32" },
+  { name = "unknown_10100", offset = 10100, type = "u32" },
+  { name = "unknown_10104", offset = 10104, type = "u32" },
+  { name = "unknown_10108", offset = 10108, type = "u32" },
+  { name = "unknown_10112", offset = 10112, type = "u32" },
+  { name = "unknown_10116", offset = 10116, type = "u32" },
+  { name = "unknown_10124", offset = 10124, type = "u32" },
+  { name = "unknown_10128", offset = 10128, type = "u32" },
+  { name = "unknown_10276", offset = 10276, type = "u32" },
+  { name = "unknown_10280", offset = 10280, type = "u32" },
+  { name = "unknown_10284", offset = 10284, type = "u32" },
+  { name = "unknown_10296", offset = 10296, type = "u32" },
+  { name = "unknown_10304", offset = 10304, type = "u32" },
+  { name = "unknown_10308", offset = 10308, type = "u32" },
+  { name = "unknown_10312", offset = 10312, type = "u32" },
+  { name = "unknown_10324", offset = 10324, type = "u32" },
+  { name = "unknown_10328", offset = 10328, type = "u32" },
+  { name = "unknown_10336", offset = 10336, type = "u32" },
+  { name = "unknown_10340", offset = 10340, type = "u32" },
+  { name = "unknown_10344", offset = 10344, type = "u32" },
+  { name = "unknown_10348", offset = 10348, type = "u32" },
+  { name = "unknown_10352", offset = 10352, type = "u32" },
+  { name = "unknown_10392", offset = 10392, type = "u32" },
+  { name = "unknown_10396", offset = 10396, type = "u32" },
+  { name = "unknown_10400", offset = 10400, type = "u32" },
+  { name = "unknown_10404", offset = 10404, type = "u32" },
+  { name = "unknown_10408", offset = 10408, type = "u32" },
+  { name = "unknown_10412", offset = 10412, type = "u32" },
+  { name = "unknown_10416", offset = 10416, type = "u32" },
+  { name = "unknown_10420", offset = 10420, type = "u32" },
+  { name = "unknown_10424", offset = 10424, type = "u32" },
+  { name = "unknown_10428", offset = 10428, type = "u32" },
+  { name = "unknown_10432", offset = 10432, type = "u32" },
+  { name = "unknown_10436", offset = 10436, type = "u32" },
+  { name = "unknown_10440", offset = 10440, type = "u32" },
+  { name = "unknown_10444", offset = 10444, type = "u32" },
+  { name = "unknown_10448", offset = 10448, type = "u32" },
+  { name = "unknown_10452", offset = 10452, type = "u32" },
+  { name = "unknown_10456", offset = 10456, type = "u32" },
+  { name = "unknown_10460", offset = 10460, type = "u32" },
+  { name = "unknown_10464", offset = 10464, type = "u32" },
+  { name = "unknown_10468", offset = 10468, type = "u32" },
+  { name = "unknown_10472", offset = 10472, type = "u32" },
+  { name = "unknown_10476", offset = 10476, type = "u32" },
+  { name = "unknown_10480", offset = 10480, type = "u32" },
+  { name = "unknown_10484", offset = 10484, type = "u32" },
+  { name = "unknown_10488", offset = 10488, type = "u32" },
+  { name = "unknown_10492", offset = 10492, type = "u32" },
+  { name = "unknown_10496", offset = 10496, type = "u32" },
+  { name = "unknown_10500", offset = 10500, type = "u32" },
+  { name = "unknown_10504", offset = 10504, type = "u32" },
+  { name = "unknown_10508", offset = 10508, type = "u32" },
+  { name = "unknown_10512", offset = 10512, type = "u32" },
+  { name = "unknown_10516", offset = 10516, type = "u32" },
+  { name = "unknown_10520", offset = 10520, type = "u32" },
+  { name = "unknown_10524", offset = 10524, type = "u32" },
+  { name = "unknown_10528", offset = 10528, type = "u32" },
+  { name = "unknown_10532", offset = 10532, type = "u32" },
+  { name = "unknown_10536", offset = 10536, type = "u32" },
+  { name = "unknown_10540", offset = 10540, type = "u32" },
+  { name = "unknown_10544", offset = 10544, type = "u32" },
+  { name = "unknown_10548", offset = 10548, type = "u32" },
+]
+
+# Split from NodeScreenVtable.
+[NodeScreenVtablePart]
+measure = "Type6Screens@+30396.+0"
+size = 36
+origin = "embedded"
+fields = [
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_32", offset = 32, type = "u32" },
+]
+
+# Split from Type67PanelScreen.
+[Type67PanelScreenAt40948]
+measure = "Type6Screens@+40948"
+size = 11728
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_9644", offset = 9644, type = "u32" },
+  { name = "unknown_9648", offset = 9648, type = "u32" },
+  { name = "unknown_11648", offset = 11648, type = "u32" },
+  { name = "unknown_11672", offset = 11672, type = "u32" },
+  { name = "unknown_11676", offset = 11676, type = "u32" },
+  { name = "unknown_11716", offset = 11716, type = "u32" },
+  { name = "unknown_11720", offset = 11720, type = "u32" },
+  { name = "unknown_11724", offset = 11724, type = "u32" },
+]
+
+# Split from Type7ListScreen.
+[Type7ListScreenAt19428]
+measure = "Type7Screens@+19428"
+size = 10980
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_9672", offset = 9672, type = "u32" },
+  { name = "unknown_9676", offset = 9676, type = "u32" },
+  { name = "unknown_9684", offset = 9684, type = "u32" },
+  { name = "unknown_9712", offset = 9712, type = "u32" },
+  { name = "unknown_9716", offset = 9716, type = "u32" },
+  { name = "unknown_9720", offset = 9720, type = "u32" },
+  { name = "unknown_9724", offset = 9724, type = "u32" },
+  { name = "unknown_9728", offset = 9728, type = "u32" },
+  { name = "unknown_9732", offset = 9732, type = "u32" },
+  { name = "unknown_9736", offset = 9736, type = "u32" },
+  { name = "unknown_9740", offset = 9740, type = "u32" },
+  { name = "unknown_9744", offset = 9744, type = "u32" },
+  { name = "unknown_9748", offset = 9748, type = "u32" },
+  { name = "unknown_9752", offset = 9752, type = "u32" },
+  { name = "unknown_9756", offset = 9756, type = "u32" },
+  { name = "unknown_9768", offset = 9768, type = "u32" },
+  { name = "unknown_9776", offset = 9776, type = "u32" },
+  { name = "unknown_9784", offset = 9784, type = "u32" },
+  { name = "unknown_9788", offset = 9788, type = "u32" },
+  { name = "unknown_9800", offset = 9800, type = "u32" },
+  { name = "unknown_9804", offset = 9804, type = "u32" },
+  { name = "unknown_9808", offset = 9808, type = "u32" },
+  { name = "unknown_9812", offset = 9812, type = "u32" },
+  { name = "unknown_9816", offset = 9816, type = "u32" },
+  { name = "unknown_9828", offset = 9828, type = "u32" },
+  { name = "unknown_9832", offset = 9832, type = "u32" },
+  { name = "unknown_9840", offset = 9840, type = "u32" },
+  { name = "unknown_9844", offset = 9844, type = "u32" },
+  { name = "unknown_9848", offset = 9848, type = "u32" },
+  { name = "unknown_9852", offset = 9852, type = "u32" },
+  { name = "unknown_9856", offset = 9856, type = "u32" },
+  { name = "unknown_9860", offset = 9860, type = "u32" },
+  { name = "unknown_9868", offset = 9868, type = "u32" },
+  { name = "unknown_9872", offset = 9872, type = "u32" },
+  { name = "unknown_9876", offset = 9876, type = "u32" },
+  { name = "unknown_9884", offset = 9884, type = "u32" },
+  { name = "unknown_9892", offset = 9892, type = "u32" },
+  { name = "unknown_9896", offset = 9896, type = "u32" },
+  { name = "unknown_9900", offset = 9900, type = "u32" },
+  { name = "unknown_9904", offset = 9904, type = "u32" },
+  { name = "unknown_9908", offset = 9908, type = "u32" },
+  { name = "unknown_9912", offset = 9912, type = "u32" },
+  { name = "unknown_9916", offset = 9916, type = "u32" },
+  { name = "unknown_9920", offset = 9920, type = "u32" },
+  { name = "unknown_9924", offset = 9924, type = "u32" },
+  { name = "unknown_9928", offset = 9928, type = "u32" },
+  { name = "unknown_9932", offset = 9932, type = "u32" },
+  { name = "unknown_9936", offset = 9936, type = "u32" },
+  { name = "unknown_9976", offset = 9976, type = "u32" },
+  { name = "unknown_10016", offset = 10016, type = "u32" },
+  { name = "unknown_10056", offset = 10056, type = "u32" },
+  { name = "unknown_10060", offset = 10060, type = "u32" },
+  { name = "unknown_10064", offset = 10064, type = "u32" },
+  { name = "unknown_10096", offset = 10096, type = "u32" },
+  { name = "unknown_10100", offset = 10100, type = "u32" },
+  { name = "unknown_10104", offset = 10104, type = "u32" },
+  { name = "unknown_10440", offset = 10440, type = "u32" },
+  { name = "unknown_10444", offset = 10444, type = "u32" },
+  { name = "unknown_10448", offset = 10448, type = "u32" },
+  { name = "unknown_10588", offset = 10588, type = "u32" },
+  { name = "unknown_10744", offset = 10744, type = "u32" },
+  { name = "unknown_10852", offset = 10852, type = "u32" },
+  { name = "unknown_10856", offset = 10856, type = "u32" },
+  { name = "unknown_10916", offset = 10916, type = "u32" },
+  { name = "unknown_10920", offset = 10920, type = "u32" },
+  { name = "unknown_10924", offset = 10924, type = "u32" },
+  { name = "unknown_10932", offset = 10932, type = "u32" },
+  { name = "unknown_10936", offset = 10936, type = "u32" },
+  { name = "unknown_10940", offset = 10940, type = "u32" },
+  { name = "unknown_10952", offset = 10952, type = "u32" },
+  { name = "unknown_10956", offset = 10956, type = "u32" },
+  { name = "unknown_10960", offset = 10960, type = "u32" },
+  { name = "unknown_10968", offset = 10968, type = "u32" },
+  { name = "unknown_10972", offset = 10972, type = "u32" },
+  { name = "unknown_10976", offset = 10976, type = "u32" },
+]
+
+# Split from Type67PanelScreen.
+[Type67PanelScreenAt30608]
+measure = "Type7Screens@+30608"
+size = 11728
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_9644", offset = 9644, type = "u32" },
+  { name = "unknown_9648", offset = 9648, type = "u32" },
+  { name = "unknown_9664", offset = 9664, type = "u32" },
+  { name = "unknown_11648", offset = 11648, type = "u32" },
+  { name = "unknown_11672", offset = 11672, type = "u32" },
+  { name = "unknown_11676", offset = 11676, type = "u32" },
+  { name = "unknown_11680", offset = 11680, type = "u32" },
+  { name = "unknown_11716", offset = 11716, type = "u32" },
+  { name = "unknown_11720", offset = 11720, type = "u32" },
+  { name = "unknown_11724", offset = 11724, type = "u32" },
+]
+
+# Split from PairedNodeTable.
+[PairedNodeTableAt10360]
+measure = "Type8ListBase@+10360"
+size = 448
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_428", offset = 428, type = "u32" },
+  { name = "unknown_436", offset = 436, type = "u32" },
+  { name = "unknown_444", offset = 444, type = "u32" },
+]

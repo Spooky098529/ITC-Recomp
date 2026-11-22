@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// embedded; measure: RouteRange, RouteRange::Advance.r4
+// embedded; measure: RouteRange, RouteRange::Advance.r4, RouteRange::AddBranch.r3
 struct RouteRange : View {
   using View::View;
   static constexpr uint32_t kSize = 1064;
@@ -167,7 +167,7 @@ struct TrackZone : View {
   uint32_t inside_address() const { return address + 17112; }
 };
 
-// embedded; measure: ZoneRanges
+// embedded; measure: ZoneRanges::Insert.r3
 struct TrackZoneRangeList : View {
   using View::View;
   static constexpr uint32_t kSize = 17100;
@@ -223,7 +223,7 @@ struct List128 : View {
   uint32_t words_address() const { return address + 524; }
 };
 
-// embedded; measure: List64
+// embedded; measure: List64, List64::Insert.r3
 struct List64 : View {
   using View::View;
   static constexpr uint32_t kSize = 524;

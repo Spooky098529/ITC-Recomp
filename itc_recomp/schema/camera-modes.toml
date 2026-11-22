@@ -163,7 +163,7 @@ fields = [
 
 # A camera's target tracker (camera + 32, CameraTarget::Track).
 [CameraTarget]
-measure = "CameraTarget"
+measure = "CameraTarget::Track.r3"
 size = 308
 origin = "embedded"
 fields = [
@@ -923,4 +923,278 @@ size = 4
 origin = "embedded"
 fields = [
   { name = "unknown_0", offset = 0, type = "f32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from TvCamera.
+[TvCameraAt13360]
+measure = "CameraDirector@+13360"
+size = 43044
+origin = "embedded"
+fields = [
+  { name = "unknown_452", offset = 452, type = "u32" },
+  { name = "unknown_43028", offset = 43028, type = "u32" },
+  { name = "unknown_43040", offset = 43040, type = "u32" },
+]
+
+# Split from CameraPathKey.
+[CameraPathKeyAt16]
+measure = "CameraPath::OnLoaded.r4@+16"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+]
+
+# Split from RivalLogo.
+[RivalLogoAt10760]
+measure = "Cutscene@+10760"
+size = 88
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_48", offset = 48, type = "u32" },
+  { name = "unknown_76", offset = 76, type = "u32" },
+  { name = "unknown_84", offset = 84, type = "u32" },
+]
+
+# Split from RivalLogo.
+[RivalLogoAt20]
+measure = "Cutscene@+10760@+20"
+size = 64
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_56", offset = 56, type = "u32" },
+  { name = "unknown_60", offset = 60, type = "u32" },
+]
+
+# Split from List16.
+[List16At952]
+measure = "Cutscene@+952"
+size = 70
+origin = "embedded"
+fields = [
+  { name = "unknown_68", offset = 68, type = "u16" },
+]
+
+# Split from List16.
+[List16At12]
+measure = "CutsceneShot@+12"
+size = 70
+origin = "embedded"
+fields = [
+  { name = "unknown_68", offset = 68, type = "u16" },
+]
+
+# Split from List16.
+[List16At352]
+measure = "IntroCamera@+352"
+size = 70
+origin = "embedded"
+fields = [
+  { name = "unknown_68", offset = 68, type = "u16" },
+]
+
+# Split from CameraDirector.
+[CameraDirectorAt10512]
+measure = "RaceMode@+10512"
+size = 77392
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_9616", offset = 9616, type = "u32" },
+  { name = "unknown_9620", offset = 9620, type = "u32" },
+  { name = "unknown_9624", offset = 9624, type = "u32" },
+  { name = "unknown_9628", offset = 9628, type = "u32" },
+  { name = "unknown_9632", offset = 9632, type = "u32" },
+  { name = "unknown_9648", offset = 9648, type = "u32" },
+  { name = "unknown_9664", offset = 9664, type = "u32" },
+  { name = "unknown_9668", offset = 9668, type = "u32" },
+  { name = "unknown_9692", offset = 9692, type = "f32" },
+  { name = "unknown_9708", offset = 9708, type = "f32" },
+  { name = "unknown_9724", offset = 9724, type = "f32" },
+  { name = "unknown_9740", offset = 9740, type = "f32" },
+  { name = "unknown_9756", offset = 9756, type = "f32" },
+  { name = "unknown_9772", offset = 9772, type = "f32" },
+  { name = "unknown_9788", offset = 9788, type = "f32" },
+  { name = "unknown_9804", offset = 9804, type = "f32" },
+  { name = "unknown_9820", offset = 9820, type = "f32" },
+  { name = "unknown_9836", offset = 9836, type = "f32" },
+  { name = "unknown_9852", offset = 9852, type = "f32" },
+  { name = "unknown_9868", offset = 9868, type = "f32" },
+  { name = "unknown_9884", offset = 9884, type = "f32" },
+  { name = "unknown_9900", offset = 9900, type = "f32" },
+  { name = "unknown_9932", offset = 9932, type = "f32" },
+  { name = "unknown_9948", offset = 9948, type = "f32" },
+  { name = "unknown_9964", offset = 9964, type = "f32" },
+  { name = "unknown_9980", offset = 9980, type = "f32" },
+  { name = "unknown_10748", offset = 10748, type = "f32" },
+  { name = "unknown_11856", offset = 11856, type = "u32" },
+  { name = "unknown_11872", offset = 11872, type = "u32" },
+  { name = "unknown_11876", offset = 11876, type = "u32" },
+  { name = "unknown_11900", offset = 11900, type = "f32" },
+  { name = "unknown_11916", offset = 11916, type = "f32" },
+  { name = "unknown_11932", offset = 11932, type = "f32" },
+  { name = "unknown_11948", offset = 11948, type = "f32" },
+  { name = "unknown_11964", offset = 11964, type = "f32" },
+  { name = "unknown_11980", offset = 11980, type = "f32" },
+  { name = "unknown_11996", offset = 11996, type = "f32" },
+  { name = "unknown_12012", offset = 12012, type = "f32" },
+  { name = "unknown_12028", offset = 12028, type = "f32" },
+  { name = "unknown_12044", offset = 12044, type = "f32" },
+  { name = "unknown_12060", offset = 12060, type = "f32" },
+  { name = "unknown_12076", offset = 12076, type = "f32" },
+  { name = "unknown_12092", offset = 12092, type = "f32" },
+  { name = "unknown_12108", offset = 12108, type = "f32" },
+  { name = "unknown_12140", offset = 12140, type = "f32" },
+  { name = "unknown_12156", offset = 12156, type = "f32" },
+  { name = "unknown_12172", offset = 12172, type = "f32" },
+  { name = "unknown_12188", offset = 12188, type = "f32" },
+  { name = "unknown_12956", offset = 12956, type = "f32" },
+  { name = "unknown_12976", offset = 12976, type = "u32" },
+  { name = "unknown_12992", offset = 12992, type = "u32" },
+  { name = "unknown_12996", offset = 12996, type = "u32" },
+  { name = "unknown_13020", offset = 13020, type = "f32" },
+  { name = "unknown_13036", offset = 13036, type = "f32" },
+  { name = "unknown_13052", offset = 13052, type = "f32" },
+  { name = "unknown_13068", offset = 13068, type = "f32" },
+  { name = "unknown_13084", offset = 13084, type = "f32" },
+  { name = "unknown_13100", offset = 13100, type = "f32" },
+  { name = "unknown_13116", offset = 13116, type = "f32" },
+  { name = "unknown_13132", offset = 13132, type = "f32" },
+  { name = "unknown_13148", offset = 13148, type = "f32" },
+  { name = "unknown_13164", offset = 13164, type = "f32" },
+  { name = "unknown_13180", offset = 13180, type = "f32" },
+  { name = "unknown_13196", offset = 13196, type = "f32" },
+  { name = "unknown_13212", offset = 13212, type = "f32" },
+  { name = "unknown_13228", offset = 13228, type = "f32" },
+  { name = "unknown_13260", offset = 13260, type = "f32" },
+  { name = "unknown_13276", offset = 13276, type = "f32" },
+  { name = "unknown_13292", offset = 13292, type = "f32" },
+  { name = "unknown_13308", offset = 13308, type = "f32" },
+  { name = "unknown_13340", offset = 13340, type = "f32" },
+  { name = "unknown_69628", offset = 69628, type = "f32" },
+  { name = "unknown_77376", offset = 77376, type = "u32" },
+  { name = "unknown_77380", offset = 77380, type = "u32" },
+  { name = "unknown_77384", offset = 77384, type = "u32" },
+  { name = "unknown_77388", offset = 77388, type = "u32" },
+]
+
+# Split from RivalLogo.
+[RivalLogoAt20_2]
+measure = "RivalLogo@+20"
+size = 72
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_56", offset = 56, type = "u32" },
+  { name = "unknown_60", offset = 60, type = "u32" },
+  { name = "unknown_64", offset = 64, type = "u32" },
+  { name = "unknown_68", offset = 68, type = "u32" },
+]
+
+# Split from CameraPathKey.
+[CameraPathKeyAt43016]
+measure = "TvCamera@+43016"
+size = 28
+origin = "embedded"
+fields = [
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+]
+
+# Split from ChaseCamera.
+[ChaseCameraAt43136]
+measure = "TvCamera@+43136"
+size = 380
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_44", offset = 44, type = "f32" },
+  { name = "unknown_60", offset = 60, type = "f32" },
+  { name = "unknown_76", offset = 76, type = "f32" },
+  { name = "unknown_92", offset = 92, type = "f32" },
+  { name = "unknown_108", offset = 108, type = "f32" },
+  { name = "unknown_124", offset = 124, type = "f32" },
+  { name = "unknown_140", offset = 140, type = "f32" },
+  { name = "unknown_156", offset = 156, type = "f32" },
+  { name = "unknown_172", offset = 172, type = "f32" },
+  { name = "unknown_188", offset = 188, type = "f32" },
+  { name = "unknown_204", offset = 204, type = "f32" },
+  { name = "unknown_220", offset = 220, type = "f32" },
+  { name = "unknown_224", offset = 224, type = "f32" },
+  { name = "unknown_224_8i", offset = 224, type = "u64" },
+  { name = "unknown_228", offset = 228, type = "f32" },
+  { name = "unknown_232", offset = 232, type = "f32" },
+  { name = "unknown_232_8i", offset = 232, type = "u64" },
+  { name = "unknown_236", offset = 236, type = "f32" },
+  { name = "unknown_240", offset = 240, type = "f32" },
+  { name = "unknown_240_8i", offset = 240, type = "u64" },
+  { name = "unknown_244", offset = 244, type = "f32" },
+  { name = "unknown_248", offset = 248, type = "f32" },
+  { name = "unknown_248_8i", offset = 248, type = "u64" },
+  { name = "unknown_252", offset = 252, type = "f32" },
+  { name = "unknown_260", offset = 260, type = "u16" },
+  { name = "unknown_262", offset = 262, type = "u16" },
+  { name = "unknown_284", offset = 284, type = "f32" },
+  { name = "unknown_300", offset = 300, type = "f32" },
+  { name = "unknown_316", offset = 316, type = "f32" },
+  { name = "unknown_332", offset = 332, type = "f32" },
+  { name = "unknown_352", offset = 352, type = "f32" },
+  { name = "unknown_356", offset = 356, type = "f32" },
+  { name = "unknown_360", offset = 360, type = "f32" },
+  { name = "unknown_364", offset = 364, type = "f32" },
+  { name = "unknown_368", offset = 368, type = "f32" },
+  { name = "unknown_372", offset = 372, type = "u32" },
+  { name = "unknown_376", offset = 376, type = "u16" },
+  { name = "unknown_378", offset = 378, type = "u16" },
+]
+
+# Split from Viewport.
+[ViewportPart]
+measure = "TvCamera@+43136.+20"
+size = 1872
+origin = "embedded"
+fields = [
+  { name = "unknown_1600", offset = 1600, type = "f32" },
+  { name = "unknown_1604", offset = 1604, type = "f32" },
+  { name = "unknown_1608", offset = 1608, type = "f32" },
+  { name = "unknown_1612", offset = 1612, type = "f32" },
+  { name = "unknown_1664", offset = 1664, type = "f32" },
+  { name = "unknown_1668", offset = 1668, type = "f32" },
+  { name = "unknown_1672", offset = 1672, type = "f32" },
+  { name = "unknown_1676", offset = 1676, type = "f32" },
+  { name = "unknown_1680", offset = 1680, type = "f32" },
+  { name = "unknown_1684", offset = 1684, type = "f32" },
+  { name = "unknown_1688", offset = 1688, type = "f32" },
+  { name = "unknown_1692", offset = 1692, type = "f32" },
+  { name = "unknown_1696", offset = 1696, type = "f32" },
+  { name = "unknown_1700", offset = 1700, type = "f32" },
+  { name = "unknown_1704", offset = 1704, type = "f32" },
+  { name = "unknown_1708", offset = 1708, type = "f32" },
+  { name = "unknown_1712", offset = 1712, type = "f32" },
+  { name = "unknown_1716", offset = 1716, type = "f32" },
+  { name = "unknown_1720", offset = 1720, type = "f32" },
+  { name = "unknown_1724", offset = 1724, type = "f32" },
+  { name = "unknown_1744", offset = 1744, type = "f32" },
+  { name = "unknown_1748", offset = 1748, type = "f32" },
+  { name = "unknown_1752", offset = 1752, type = "f32" },
+  { name = "unknown_1756", offset = 1756, type = "f32" },
+  { name = "unknown_1864", offset = 1864, type = "f32" },
+  { name = "unknown_1868", offset = 1868, type = "f32" },
 ]

@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: PostEffect, [826C5D80], sub_82136DC8.r3
+// allocated; measure: PostEffect, [826C5D80], sub_82136DC8.r3, PostEffect::ReleaseSurface.r3
 struct PostEffect : View {
   using View::View;
   static constexpr uint32_t kSize = 8064;
@@ -954,7 +954,7 @@ struct PostEffectTableEntry : View {
   uint32_t camera_pass_address() const { return address + 32; }
 };
 
-// allocated; measure: RenderTexture, new<36>@RenderTextures::Acquire, Glow.+8364, Glow.+8368, Glow.+8372, Glow.+8404
+// allocated; measure: RenderTexture, new<36>@RenderTextures::Acquire, Glow.+8364, Glow.+8368, Glow.+8372, Glow.+8404, RenderTextures::Release.r3.+0
 struct RenderTexture : View {
   using View::View;
   static constexpr uint32_t kSize = 36;
@@ -993,7 +993,7 @@ struct RenderTexture : View {
   uint32_t id_address() const { return address + 32; }
 };
 
-// embedded; measure: RenderTextures
+// embedded; measure: RenderTextures::Release.r3
 struct RenderTextureRef : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
@@ -1004,7 +1004,7 @@ struct RenderTextureRef : View {
   uint32_t entry_address() const { return address + 0; }
 };
 
-// embedded; measure: GlareDef
+// embedded; measure: Glow@+8064
 struct GlareDef : View {
   using View::View;
   static constexpr uint32_t kSize = 288;
@@ -1053,7 +1053,7 @@ struct GlareDef : View {
   uint32_t star_colors_address() const { return address + 160; }
 };
 
-// embedded; measure: StarDef
+// embedded; measure: Glow@+8064@+48
 struct StarDef : View {
   using View::View;
   static constexpr uint32_t kSize = 240;

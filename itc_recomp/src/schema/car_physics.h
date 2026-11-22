@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// embedded; measure: Vehicle, Vehicle::UpdateDrivenAxle.ret, Vehicle::Get.ret, AiDriver.+160, Vehicle.+2160, Vehicle.+2144
+// embedded; measure: Vehicle, Vehicle::UpdateDrivenAxle.ret, Vehicle::Get.ret, AiDriver.+160, Vehicle.+2160, Vehicle.+2144, sub_820C0140.r3
 struct Vehicle : View {
   using View::View;
   static constexpr uint32_t kSize = 6268;
@@ -835,7 +835,7 @@ struct VehicleWheel : View {
   uint32_t slip_speed_address() const { return address + 356; }
 };
 
-// embedded; measure: WheelRecord2, WheelRecord2::Copy.r4, Vehicle.+2152
+// embedded; measure: WheelRecord2::Copy.r4, Vehicle.+2152, WheelRecord2::Copy.r3
 struct VehicleAxle : View {
   using View::View;
   static constexpr uint32_t kSize = 128;
@@ -868,7 +868,7 @@ struct VehicleAxle : View {
   uint32_t locked_address() const { return address + 116; }
 };
 
-// embedded; measure: SteerRecord
+// embedded; measure: Vehicle@+2988
 struct SteerRecord : View {
   using View::View;
   static constexpr uint32_t kSize = 36;
@@ -991,7 +991,7 @@ struct RigidBody : View {
   uint32_t flags_address() const { return address + 516; }
 };
 
-// embedded; measure: RigidBody::Velocity.ret, RigidBody::AngularVelocity.ret, RigidBody::Force.ret, Contact::Position.ret, Matrix::MultiplyTranslation.r5, sub_820B6898.ret, CarData@+64
+// embedded; measure: RigidBody::Velocity.ret, RigidBody::AngularVelocity.ret, RigidBody::Force.ret, Contact::Position.ret, Matrix::MultiplyTranslation.r5, sub_820B6898.ret, RigidBody::SetInertia.r4
 struct PhysicsVector : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
@@ -1832,7 +1832,7 @@ struct CollisionPair : View {
   uint32_t object_owner_id_address() const { return address + 268; }
 };
 
-// allocated; measure: new<4294967295>@CollisionWorld::Create#4, CollisionWorld::NewContact.ret, Contact, CollisionObject.+240.+68
+// allocated; measure: new<4294967295>@CollisionWorld::Create#4, CollisionWorld::NewContact.ret, Contact, CollisionObject.+240.+68, Contact::Set.r3
 struct CollisionContact : View {
   using View::View;
   static constexpr uint32_t kSize = 80;
@@ -1913,6 +1913,60 @@ struct VehicleBoxVtable : View {
   uint32_t deleting_destructor() const { return guest::LoadU32(base, address + 0); }
   void set_deleting_destructor(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t deleting_destructor_address() const { return address + 0; }
+};
+
+// embedded; measure: RaceScreens@+16.+440
+struct VehiclePart : View {
+  using View::View;
+  static constexpr uint32_t kSize = 6264;
+  uint32_t unknown_2252() const { return guest::LoadU32(base, address + 2252); }
+  void set_unknown_2252(uint32_t v) const { guest::StoreU32(base, address + 2252, v); }
+  uint32_t unknown_2252_address() const { return address + 2252; }
+  float unknown_2420() const { return guest::LoadFloat(base, address + 2420); }
+  void set_unknown_2420(float v) const { guest::StoreFloat(base, address + 2420, v); }
+  uint32_t unknown_2420_address() const { return address + 2420; }
+  float unknown_2944() const { return guest::LoadFloat(base, address + 2944); }
+  void set_unknown_2944(float v) const { guest::StoreFloat(base, address + 2944, v); }
+  uint32_t unknown_2944_address() const { return address + 2944; }
+  uint32_t unknown_5712() const { return guest::LoadU32(base, address + 5712); }
+  void set_unknown_5712(uint32_t v) const { guest::StoreU32(base, address + 5712, v); }
+  uint32_t unknown_5712_address() const { return address + 5712; }
+  uint32_t unknown_6168() const { return guest::LoadU32(base, address + 6168); }
+  void set_unknown_6168(uint32_t v) const { guest::StoreU32(base, address + 6168, v); }
+  uint32_t unknown_6168_address() const { return address + 6168; }
+  float unknown_6252() const { return guest::LoadFloat(base, address + 6252); }
+  void set_unknown_6252(float v) const { guest::StoreFloat(base, address + 6252, v); }
+  uint32_t unknown_6252_address() const { return address + 6252; }
+  float unknown_6256() const { return guest::LoadFloat(base, address + 6256); }
+  void set_unknown_6256(float v) const { guest::StoreFloat(base, address + 6256, v); }
+  uint32_t unknown_6256_address() const { return address + 6256; }
+  float unknown_6260() const { return guest::LoadFloat(base, address + 6260); }
+  void set_unknown_6260(float v) const { guest::StoreFloat(base, address + 6260, v); }
+  uint32_t unknown_6260_address() const { return address + 6260; }
+};
+
+// embedded; measure: Vehicles::DestroyAll.r3@+37632
+struct VehicleAt37632 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 348;
+  uint32_t unknown_336() const { return guest::LoadU32(base, address + 336); }
+  void set_unknown_336(uint32_t v) const { guest::StoreU32(base, address + 336, v); }
+  uint32_t unknown_336_address() const { return address + 336; }
+  uint32_t unknown_340() const { return guest::LoadU32(base, address + 340); }
+  void set_unknown_340(uint32_t v) const { guest::StoreU32(base, address + 340, v); }
+  uint32_t unknown_340_address() const { return address + 340; }
+  uint32_t unknown_344() const { return guest::LoadU32(base, address + 344); }
+  void set_unknown_344(uint32_t v) const { guest::StoreU32(base, address + 344, v); }
+  uint32_t unknown_344_address() const { return address + 344; }
+};
+
+// embedded; measure: Vehicles::DestroyAll.r3@+37632.+344.+0
+struct VehicleBoxVtablePart : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
 };
 
 // The image words docs/functions/car-physics.md's code uses.

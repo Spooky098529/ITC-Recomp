@@ -203,7 +203,7 @@ struct CarSceneMatrix : View {
   uint32_t m33_address() const { return address + 60; }
 };
 
-// embedded; measure: ScenePass
+// embedded; measure: CarScene@+5072
 struct ScenePass : View {
   using View::View;
   static constexpr uint32_t kSize = 176;
@@ -436,6 +436,21 @@ struct CarSceneFrustumAt80 : View {
   uint32_t unknown_4_address() const { return address + 4; }
   float unknown_8() const { return guest::LoadFloat(base, address + 8); }
   void set_unknown_8(float v) const { guest::StoreFloat(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  float unknown_12() const { return guest::LoadFloat(base, address + 12); }
+  void set_unknown_12(float v) const { guest::StoreFloat(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+};
+
+// embedded; measure: Frustum@+128
+struct CarScenePlaneAt128 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 16;
+  uint64_t unknown_0() const { return guest::LoadU64(base, address + 0); }
+  void set_unknown_0(uint64_t v) const { guest::StoreU64(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint64_t unknown_8() const { return guest::LoadU64(base, address + 8); }
+  void set_unknown_8(uint64_t v) const { guest::StoreU64(base, address + 8, v); }
   uint32_t unknown_8_address() const { return address + 8; }
   float unknown_12() const { return guest::LoadFloat(base, address + 12); }
   void set_unknown_12(float v) const { guest::StoreFloat(base, address + 12, v); }

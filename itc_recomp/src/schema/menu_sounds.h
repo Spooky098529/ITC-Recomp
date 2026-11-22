@@ -146,7 +146,7 @@ struct AudioManagerVtable : View {
   uint32_t resume_category_address() const { return address + 128; }
 };
 
-// allocated; measure: AudioManager.+1544, AudioManager.+1544.+0, HandleList.+4, HandleList.+4.+0
+// allocated; measure: AudioManager.+1544, AudioManager.+1544.+0, AudioManager::RemoveHandle.r3@+1540.+4, AudioManager::RemoveHandle.r3@+1540.+4.+0
 struct SoundHandleNode : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
@@ -166,7 +166,7 @@ struct SoundHandleNode : View {
   uint32_t sound_address() const { return address + 8; }
 };
 
-// embedded; measure: HandleList
+// embedded; measure: AudioManager::RemoveHandle.r3@+1540
 struct SoundHandleList : View {
   using View::View;
   static constexpr uint32_t kSize = 12;

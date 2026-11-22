@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// embedded; measure: BitSet400
+// embedded; measure: Progress@+109796
 struct BitSet400 : View {
   using View::View;
   static constexpr uint32_t kSize = 52;
@@ -16,7 +16,7 @@ struct BitSet400 : View {
   uint32_t words_address() const { return address + 0; }
 };
 
-// embedded; measure: ControlMap
+// embedded; measure: ControlMap::SetDefault.r3
 struct ControlMap : View {
   using View::View;
   static constexpr uint32_t kSize = 60;

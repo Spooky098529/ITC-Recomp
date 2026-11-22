@@ -8668,13 +8668,13 @@ uint64_t f825A1938(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::TrackSet(base, uint32_t(r3)).section_address());
+  r11 = guest::LoadU32(base, schema::TrackSetAt384(base, uint32_t(r3)).unknown_0_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x825a1a20
   if (cr6.eq) goto loc_825A1A20;
   // lwz r10,16(r3)
-  r10 = guest::LoadU32(base, schema::TrackSet(base, uint32_t(r3)).values_address());
+  r10 = guest::LoadU32(base, schema::TrackSetAt384(base, uint32_t(r3)).unknown_16_address());
   // mulli r11,r4,208
   r11 = uint64_t(int64_t(static_cast<int64_t>(r4 * static_cast<uint64_t>(208))));
   // add r31,r11,r10
@@ -8809,7 +8809,7 @@ double f825A6608(uint8_t* base, uint64_t r3, uint64_t r4) {
   uint8_t so = 0;
   lifted::Temp temp{};
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::TrackSet(base, uint32_t(r3)).section_address());
+  r11 = guest::LoadU32(base, schema::TrackSetAt384(base, uint32_t(r3)).unknown_0_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x825a6620
@@ -8835,7 +8835,7 @@ loc_825A6620:
   return f1;
 loc_825A6630:
   // lwz r10,8(r3)
-  r10 = guest::LoadU32(base, schema::TrackSet(base, uint32_t(r3)).tracks_address());
+  r10 = guest::LoadU32(base, schema::TrackSetAt384(base, uint32_t(r3)).unknown_8_address());
   // mulli r11,r4,352
   r11 = uint64_t(int64_t(static_cast<int64_t>(r4 * static_cast<uint64_t>(352))));
   // add r11,r11,r10
@@ -8855,7 +8855,7 @@ uint64_t f825A6648(uint8_t* base, uint64_t r3, uint64_t r4) {
   lifted::Cr cr6;
   uint8_t so = 0;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, schema::TrackSet(base, uint32_t(r3)).section_address());
+  r11 = guest::LoadU32(base, schema::TrackSetAt384(base, uint32_t(r3)).unknown_0_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x825a665c

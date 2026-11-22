@@ -147,7 +147,7 @@ struct UclStream : View {
   uint32_t first_block_size_address() const { return address + 18; }
 };
 
-// embedded; measure: Ucl
+// embedded; measure: Ucl::Unpack.r4@+26
 struct UclBlockSource : View {
   using View::View;
   static constexpr uint32_t kSize = 30;
@@ -182,7 +182,7 @@ struct DataFile : View {
   uint32_t offsets_address() const { return address + 4; }
 };
 
-// allocated; measure: MovieSource
+// allocated; measure: MovieSource::AtEnd.r3
 struct MovieSource : View {
   using View::View;
   static constexpr uint32_t kSize = 136;
@@ -263,7 +263,7 @@ struct XContentData : View {
   uint32_t file_name_address() const { return address + 264; }
 };
 
-// allocated; measure: SaveSlot::WaitEnumerate.r4, SaveSlot::Create.r4, SaveSlot::Delete.r4, SaveSlot::LoadStep.r4, SaveSlot::OpenItem.r4, SaveSlot::SaveStep.r4, SaveSlot::ShowDeviceSelector.r4, SaveSlot::WaitDeviceSelector.r4, sub_820A4508.r3, sub_820A5660.r3, SaveSlot::CheckStep.r4, SaveSlot::DeleteStep.r4, SaveSlot::EnumerateStep.r4, SaveSlot::Failed.r4, SaveSlot::Ready.r4, SaveSlot::WaitClose.r4, SaveSlot::WaitForDevice.r4, SaveSlot::WaitForUser.r4, SlotArray.+0, SaveSlot::WaitWrite.r4, SaveSlot::WriteFile.r4@+500, SaveSlot::WaitRead.r4, SaveSlot::ReadFile.r4@+500, SaveSlot::ReadFile.r4@+472
+// allocated; measure: SaveSlot::WaitEnumerate.r4, SaveSlot::Create.r4, SaveSlot::Delete.r4, SaveSlot::LoadStep.r4, SaveSlot::OpenItem.r4, SaveSlot::SaveStep.r4, SaveSlot::ShowDeviceSelector.r4, SaveSlot::WaitDeviceSelector.r4, sub_820A4508.r3, sub_820A5660.r3, SaveSlot::CheckStep.r4, SaveSlot::DeleteStep.r4, SaveSlot::EnumerateStep.r4, SaveSlot::Failed.r4, SaveSlot::Ready.r4, SaveSlot::WaitClose.r4, SaveSlot::WaitForDevice.r4, SaveSlot::WaitForUser.r4, SaveSlot::WaitWrite.r4, SaveSlot::WriteFile.r4@+500, SaveSlot::WaitRead.r4, SaveSlot::ReadFile.r4@+500, SaveSlot::ReadFile.r4@+472, SaveDevices@+44.+0
 struct SaveSlot : View {
   using View::View;
   static constexpr uint32_t kSize = 1000;

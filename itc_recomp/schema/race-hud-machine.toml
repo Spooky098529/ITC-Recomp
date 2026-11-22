@@ -34,7 +34,7 @@ fields = [
 # +9608 after RaceHud::RunMovie). race-hud-object.toml's RaceHud +436 (the
 # countdown running, a word, not a pointer) points here by that join.
 [RaceHud_436]
-measure = "RaceHud.+436"
+measure = "RaceScreens@+16.+436"
 size = 9612
 origin = "embedded"
 fields = [
@@ -50,12 +50,11 @@ fields = [
 # at +1004: the words of theirs the holder's users reach through the holder
 # are named here by the object's offset.
 [RaceScreens]
-measures = ["RaceScreens", "PauseMenu4::Open.ret.+9608", "AltHud::ToggleView.ret.+9608", "RaceHud.+436.+9608"]
+measure = "RaceScreens"
+measures = ["PauseMenu4::Open.ret.+9608", "AltHud::ToggleView.ret.+9608", "RaceScreens@+16.+436.+9608"]
 size = 1040
 origin = "allocated"
 fields = [
-  { name = "fault_alt_hud_object", offset = 0, type = "u32", note = "measure fault: RaceScreens::Make1004's r3 is the holder's +1004 (AltHudHolder's object)" },
-  { name = "fault_alt_hud_menu_list", offset = 4, type = "u32", note = "measure fault: RaceScreens::Make1004's AltHudHolder +4 (the menu list)" },
   { name = "flags", offset = 8, type = "u32", note = "0 at set-up; bit 0 the replay bit (set when the menu after the race picks the replay: the alternate HUD drawn in place of the race HUD)" },
   { name = "hud_signs_on", offset = 440, type = "u32", note = "the race HUD's +424 (signs on): 1 by CloseResults, 0 by OnRaceEnd" },
   { name = "hud_countdown_running", offset = 452, type = "u32", note = "the race HUD's +436: CountdownUpdate goes to the race once it's 0" },
@@ -175,3 +174,16 @@ streak_factor_3 = { address = 0x82002CB0, type = "f32", note = "for 3 and more" 
 split_scale = { address = 0x82001BE0, type = "f32", note = "AwardPrize's splits' factor (probably -1.0, not read)" }
 one = { address = 0x82000A30, type = "f32", note = "1.0, probably (AwardPrize's factor below a streak of 3)" }
 zero = { address = 0x82000A34, type = "f32", note = "0.0" }
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from RaceHudMachine.
+[RaceHudMachineAt128664]
+measure = "RaceMode@+128664"
+size = 9608
+origin = "embedded"
+fields = [
+  { name = "unknown_9604", offset = 9604, type = "u32" },
+]

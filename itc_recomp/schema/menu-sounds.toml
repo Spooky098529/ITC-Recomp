@@ -62,7 +62,8 @@ fields = [
 # A node of the handle list (12 bytes, PtrList's): next, previous, a Sound.
 # The same layout as sound-cues.md's list at +1528 (AudioManager.+1532).
 [SoundHandleNode]
-measures = ["AudioManager.+1544", "AudioManager.+1544.+0", "HandleList.+4", "HandleList.+4.+0"]
+measure = "AudioManager.+1544"
+measures = ["AudioManager.+1544.+0", "AudioManager::RemoveHandle.r3@+1540.+4", "AudioManager::RemoveHandle.r3@+1540.+4.+0"]
 size = 12
 origin = "allocated"
 fields = [
@@ -74,7 +75,7 @@ fields = [
 # The list of Sounds kept by handle (the manager's +1540, a std::list of
 # pointers; HandleList::Remove's r3).
 [SoundHandleList]
-measure = "HandleList"
+measure = "AudioManager::RemoveHandle.r3@+1540"
 size = 12
 origin = "embedded"
 fields = [

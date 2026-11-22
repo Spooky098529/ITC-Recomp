@@ -26,3 +26,16 @@ fields = [
   { name = "loop_start", offset = 28, type = "u32", note = "the loop region's start, in samples" },
   { name = "loop_length", offset = 32, type = "u32", note = "the loop region's length, in samples; 0 for no loop" },
 ]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from XACTWaveEntry.
+[XACTWaveEntryAt80]
+measure = "SkeletonBase@+80"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]

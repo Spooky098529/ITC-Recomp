@@ -16,7 +16,8 @@
 # state after it). The measure splits the point list (PointList::Draw's
 # view) from the list.
 [ModelList]
-measures = ["ModelList", "PointList"]
+measure = "CourseSet@+3180"
+measures = ["ModelList::Load.r3", "ModelList::Init.r3", "ModelList::Release.r3", "PoolObject@+3180"]
 size = 624
 origin = "embedded"
 fields = [

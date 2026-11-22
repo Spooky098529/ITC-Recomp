@@ -143,7 +143,7 @@ struct SaveSlotArrayBlock : View {
   uint32_t slots_address() const { return address + 8; }
 };
 
-// embedded; measure: SlotArray
+// embedded; measure: SaveDevices@+44
 struct SaveSlotArrayHolder : View {
   using View::View;
   static constexpr uint32_t kSize = 4;

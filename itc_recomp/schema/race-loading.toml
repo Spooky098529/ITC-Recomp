@@ -70,6 +70,7 @@ fields = [
 # bytes long, up to the TRM one), as UiMovie::SetFrames walks them.
 [UiMovieSceneChunk]
 measure = "UiMovie.+16"
+measures = ["RaceHud.+604.+16"]
 size = 84
 origin = "embedded"
 fields = [
@@ -92,3 +93,17 @@ layer0_fade_out = { address = 0x826A50E4, type = "u32", note = "layer 0's fade-o
 layer0_fade_in = { address = 0x826A50DC, type = "u32", note = "layer 0's fade-in count (passes left)" }
 collision_state = { address = 0x826C5B24, type = "u32", note = "the course's collision mesh's load state (the word +8 into 0x826C5B1C): 2 loaded" }
 route_state = { address = 0x826C5B18, type = "u32", note = "the course's route's load state (the word +8 into 0x826C5B10): 2 loaded" }
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from CourseSetup.
+[CourseSetupAt848]
+measure = "RaceMode@+848"
+size = 9648
+origin = "embedded"
+fields = [
+  { name = "unknown_9604", offset = 9604, type = "u32" },
+  { name = "unknown_9644", offset = 9644, type = "u32" },
+]

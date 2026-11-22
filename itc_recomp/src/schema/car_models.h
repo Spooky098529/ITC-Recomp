@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: CarModel, CarModel.+24, Vinyl, CarModel::OnDecalLoaded.r6, CarModel::OnFileLoaded.r6, CarModel::OnFileLoadedB.r6, CarInterior.+24, Wheels.+24, SceneWheels.+192.+24, List::At.ret.+24, Cockpit.+24, TrafficCar.+24, sub_820C3CA0.r4, TGA::CreateImage.r5, CarParts.+24
+// allocated; measure: CarModel, CarModel.+24, Vinyl, CarModel::OnDecalLoaded.r6, CarModel::OnFileLoaded.r6, CarModel::OnFileLoadedB.r6, CarInterior.+24, Wheels.+24, SceneWheels.+192.+24, List::At.ret.+24, Cockpit.+24, TrafficCar.+24, sub_820C3CA0.r4, TGA::CreateImage.r5, CarParts.+24, CarModel::MakePlate.r3
 struct CarModel : View {
   using View::View;
   static constexpr uint32_t kSize = 7264;
@@ -240,7 +240,7 @@ struct CarModelDecalRecord : View {
   uint32_t scale_address() const { return address + 48; }
 };
 
-// embedded; measure: LoadSlot
+// embedded; measure: LoadSlot, LoadSlot::Load.r3, LoadSlot::LoadShared.r3
 struct LoadSlot : View {
   using View::View;
   static constexpr uint32_t kSize = 24;
@@ -455,7 +455,7 @@ struct TgaFile : View {
   uint32_t descriptor_address() const { return address + 17; }
 };
 
-// embedded; measure: TgaHeader
+// embedded; measure: TgaHeader::Clear.r3
 struct TgaHeader : View {
   using View::View;
   static constexpr uint32_t kSize = 20;
@@ -497,7 +497,7 @@ struct TgaHeader : View {
   uint32_t descriptor_address() const { return address + 19; }
 };
 
-// embedded; measure: TgaImage
+// embedded; measure: TgaReader@+56
 struct TgaImage : View {
   using View::View;
   static constexpr uint32_t kSize = 28;
@@ -526,7 +526,7 @@ struct TgaImage : View {
   uint32_t height_address() const { return address + 24; }
 };
 
-// embedded; measure: TGA
+// embedded; measure: TGA, TGA.+8
 struct TgaHeaderOrImage : View {
   using View::View;
   static constexpr uint32_t kSize = 28;
@@ -701,7 +701,7 @@ struct DecalTriangle : View {
   uint32_t y2_address() const { return address + 36; }
 };
 
-// embedded; measure: CarScene::SetUp.r4, SceneSetUp
+// embedded; measure: CarScene::SetUp.r4, CarScene@+4
 struct CarSceneSetUpRecord : View {
   using View::View;
   static constexpr uint32_t kSize = 48;
@@ -933,6 +933,84 @@ struct CarModelAt6688 : View {
   uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
   void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: TgaReader@+56.+8
+struct TgaHeaderOrImagePart : View {
+  using View::View;
+  static constexpr uint32_t kSize = 20;
+  uint8_t unknown_0() const { return guest::LoadU8(base, address + 0); }
+  void set_unknown_0(uint8_t v) const { guest::StoreU8(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint8_t unknown_1() const { return guest::LoadU8(base, address + 1); }
+  void set_unknown_1(uint8_t v) const { guest::StoreU8(base, address + 1, v); }
+  uint32_t unknown_1_address() const { return address + 1; }
+  uint8_t unknown_2() const { return guest::LoadU8(base, address + 2); }
+  void set_unknown_2(uint8_t v) const { guest::StoreU8(base, address + 2, v); }
+  uint32_t unknown_2_address() const { return address + 2; }
+  uint8_t unknown_4() const { return guest::LoadU8(base, address + 4); }
+  void set_unknown_4(uint8_t v) const { guest::StoreU8(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint16_t unknown_4_2i() const { return guest::LoadU16(base, address + 4); }
+  void set_unknown_4_2i(uint16_t v) const { guest::StoreU16(base, address + 4, v); }
+  uint32_t unknown_4_2i_address() const { return address + 4; }
+  uint8_t unknown_5() const { return guest::LoadU8(base, address + 5); }
+  void set_unknown_5(uint8_t v) const { guest::StoreU8(base, address + 5, v); }
+  uint32_t unknown_5_address() const { return address + 5; }
+  uint8_t unknown_6() const { return guest::LoadU8(base, address + 6); }
+  void set_unknown_6(uint8_t v) const { guest::StoreU8(base, address + 6, v); }
+  uint32_t unknown_6_address() const { return address + 6; }
+  uint16_t unknown_6_2i() const { return guest::LoadU16(base, address + 6); }
+  void set_unknown_6_2i(uint16_t v) const { guest::StoreU16(base, address + 6, v); }
+  uint32_t unknown_6_2i_address() const { return address + 6; }
+  uint8_t unknown_7() const { return guest::LoadU8(base, address + 7); }
+  void set_unknown_7(uint8_t v) const { guest::StoreU8(base, address + 7, v); }
+  uint32_t unknown_7_address() const { return address + 7; }
+  uint8_t unknown_8() const { return guest::LoadU8(base, address + 8); }
+  void set_unknown_8(uint8_t v) const { guest::StoreU8(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  uint8_t unknown_10() const { return guest::LoadU8(base, address + 10); }
+  void set_unknown_10(uint8_t v) const { guest::StoreU8(base, address + 10, v); }
+  uint32_t unknown_10_address() const { return address + 10; }
+  uint16_t unknown_10_2i() const { return guest::LoadU16(base, address + 10); }
+  void set_unknown_10_2i(uint16_t v) const { guest::StoreU16(base, address + 10, v); }
+  uint32_t unknown_10_2i_address() const { return address + 10; }
+  uint8_t unknown_11() const { return guest::LoadU8(base, address + 11); }
+  void set_unknown_11(uint8_t v) const { guest::StoreU8(base, address + 11, v); }
+  uint32_t unknown_11_address() const { return address + 11; }
+  uint8_t unknown_12() const { return guest::LoadU8(base, address + 12); }
+  void set_unknown_12(uint8_t v) const { guest::StoreU8(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+  uint16_t unknown_12_2i() const { return guest::LoadU16(base, address + 12); }
+  void set_unknown_12_2i(uint16_t v) const { guest::StoreU16(base, address + 12, v); }
+  uint32_t unknown_12_2i_address() const { return address + 12; }
+  uint8_t unknown_13() const { return guest::LoadU8(base, address + 13); }
+  void set_unknown_13(uint8_t v) const { guest::StoreU8(base, address + 13, v); }
+  uint32_t unknown_13_address() const { return address + 13; }
+  uint8_t unknown_14() const { return guest::LoadU8(base, address + 14); }
+  void set_unknown_14(uint8_t v) const { guest::StoreU8(base, address + 14, v); }
+  uint32_t unknown_14_address() const { return address + 14; }
+  uint16_t unknown_14_2i() const { return guest::LoadU16(base, address + 14); }
+  void set_unknown_14_2i(uint16_t v) const { guest::StoreU16(base, address + 14, v); }
+  uint32_t unknown_14_2i_address() const { return address + 14; }
+  uint8_t unknown_15() const { return guest::LoadU8(base, address + 15); }
+  void set_unknown_15(uint8_t v) const { guest::StoreU8(base, address + 15, v); }
+  uint32_t unknown_15_address() const { return address + 15; }
+  uint8_t unknown_16() const { return guest::LoadU8(base, address + 16); }
+  void set_unknown_16(uint8_t v) const { guest::StoreU8(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+  uint16_t unknown_16_2i() const { return guest::LoadU16(base, address + 16); }
+  void set_unknown_16_2i(uint16_t v) const { guest::StoreU16(base, address + 16, v); }
+  uint32_t unknown_16_2i_address() const { return address + 16; }
+  uint8_t unknown_17() const { return guest::LoadU8(base, address + 17); }
+  void set_unknown_17(uint8_t v) const { guest::StoreU8(base, address + 17, v); }
+  uint32_t unknown_17_address() const { return address + 17; }
+  uint8_t unknown_18() const { return guest::LoadU8(base, address + 18); }
+  void set_unknown_18(uint8_t v) const { guest::StoreU8(base, address + 18, v); }
+  uint32_t unknown_18_address() const { return address + 18; }
+  uint8_t unknown_19() const { return guest::LoadU8(base, address + 19); }
+  void set_unknown_19(uint8_t v) const { guest::StoreU8(base, address + 19, v); }
+  uint32_t unknown_19_address() const { return address + 19; }
 };
 
 // The image words docs/functions/car-models.md's code uses.

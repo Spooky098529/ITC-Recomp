@@ -85,6 +85,7 @@ fields = [
 # byte-swapped in place (each word loaded, its bytes stored reversed).
 [CarSpecSwapWords]
 measure = "CarSpec"
+measures = ["CarSpec::Swap5.r3"]
 size = 128
 origin = "file"
 fields = [
@@ -93,7 +94,8 @@ fields = [
 
 # A car spec's 92-byte tire (21 front at spec +4244, 21 rear at +6176; CarSpec::GetTire).
 [CarTire]
-measure = "Tire"
+measure = "CarSpec::Swap.r3@+4244"
+measures = ["Tire::InchUp.r3"]
 size = 92
 origin = "file"
 fields = [
@@ -124,7 +126,7 @@ fields = [
 
 # A car spec's 204-byte engine stage (16 at spec +980; car +1656 picks one).
 [CarEngineStage]
-measure = "EngineStage"
+measure = "CarSpec::Swap.r3@+980"
 size = 204
 origin = "file"
 fields = [
@@ -152,7 +154,7 @@ fields = [
 
 # A car spec's paints (272 bytes at spec +8108).
 [CarPaints]
-measure = "Paint"
+measure = "CarSpec::Swap.r3@+8108"
 size = 272
 origin = "file"
 fields = [
@@ -255,3 +257,302 @@ fields = [
 params = { address = 0x826C2E48, type = "ptr", to = "CarParams", note = "0 in the image; Params::Init makes it, Params::Free clears it" }
 float_one = { address = 0x82000A30, type = "u32", note = "1.0f (copied as a word)" }
 float_zero = { address = 0x82000A34, type = "u32", note = "0.0f (copied as a word)" }
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from CarSpecSwapWords.
+[CarSpecSwapWordsAt640]
+measure = "CarSpec::Swap.r3@+640"
+size = 128
+origin = "embedded"
+fields = [
+  { name = "unknown_72", offset = 72, type = "u8" },
+  { name = "unknown_72_4f", offset = 72, type = "f32" },
+  { name = "unknown_73", offset = 73, type = "u8" },
+  { name = "unknown_74", offset = 74, type = "u8" },
+  { name = "unknown_75", offset = 75, type = "u8" },
+  { name = "unknown_76", offset = 76, type = "u8" },
+  { name = "unknown_76_4f", offset = 76, type = "f32" },
+  { name = "unknown_77", offset = 77, type = "u8" },
+  { name = "unknown_78", offset = 78, type = "u8" },
+  { name = "unknown_79", offset = 79, type = "u8" },
+  { name = "unknown_88", offset = 88, type = "u8" },
+  { name = "unknown_88_4f", offset = 88, type = "f32" },
+  { name = "unknown_89", offset = 89, type = "u8" },
+  { name = "unknown_90", offset = 90, type = "u8" },
+  { name = "unknown_91", offset = 91, type = "u8" },
+  { name = "unknown_92", offset = 92, type = "u8" },
+  { name = "unknown_92_4f", offset = 92, type = "f32" },
+  { name = "unknown_93", offset = 93, type = "u8" },
+  { name = "unknown_94", offset = 94, type = "u8" },
+  { name = "unknown_95", offset = 95, type = "u8" },
+  { name = "unknown_96", offset = 96, type = "u8" },
+  { name = "unknown_96_4f", offset = 96, type = "f32" },
+  { name = "unknown_97", offset = 97, type = "u8" },
+  { name = "unknown_98", offset = 98, type = "u8" },
+  { name = "unknown_99", offset = 99, type = "u8" },
+  { name = "unknown_100", offset = 100, type = "u8" },
+  { name = "unknown_100_4f", offset = 100, type = "f32" },
+  { name = "unknown_101", offset = 101, type = "u8" },
+  { name = "unknown_102", offset = 102, type = "u8" },
+  { name = "unknown_103", offset = 103, type = "u8" },
+  { name = "unknown_104", offset = 104, type = "u8" },
+  { name = "unknown_104_4f", offset = 104, type = "f32" },
+  { name = "unknown_105", offset = 105, type = "u8" },
+  { name = "unknown_106", offset = 106, type = "u8" },
+  { name = "unknown_107", offset = 107, type = "u8" },
+  { name = "unknown_108", offset = 108, type = "u8" },
+  { name = "unknown_108_4f", offset = 108, type = "f32" },
+  { name = "unknown_109", offset = 109, type = "u8" },
+  { name = "unknown_110", offset = 110, type = "u8" },
+  { name = "unknown_111", offset = 111, type = "u8" },
+  { name = "unknown_112", offset = 112, type = "u8" },
+  { name = "unknown_112_4f", offset = 112, type = "f32" },
+  { name = "unknown_113", offset = 113, type = "u8" },
+  { name = "unknown_114", offset = 114, type = "u8" },
+  { name = "unknown_115", offset = 115, type = "u8" },
+  { name = "unknown_116", offset = 116, type = "u8" },
+  { name = "unknown_116_4f", offset = 116, type = "f32" },
+  { name = "unknown_117", offset = 117, type = "u8" },
+  { name = "unknown_118", offset = 118, type = "u8" },
+  { name = "unknown_119", offset = 119, type = "u8" },
+  { name = "unknown_120", offset = 120, type = "u8" },
+  { name = "unknown_120_4f", offset = 120, type = "f32" },
+  { name = "unknown_121", offset = 121, type = "u8" },
+  { name = "unknown_122", offset = 122, type = "u8" },
+  { name = "unknown_123", offset = 123, type = "u8" },
+  { name = "unknown_124", offset = 124, type = "u8" },
+  { name = "unknown_124_4f", offset = 124, type = "f32" },
+  { name = "unknown_125", offset = 125, type = "u8" },
+  { name = "unknown_126", offset = 126, type = "u8" },
+  { name = "unknown_127", offset = 127, type = "u8" },
+]
+
+# Split from CarSpecSwapWords.
+[CarSpecSwapWordsAt132]
+measure = "CarSpec::Swap.r3@+640@+132"
+size = 40
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u8" },
+  { name = "unknown_0_4f", offset = 0, type = "f32" },
+  { name = "unknown_1", offset = 1, type = "u8" },
+  { name = "unknown_2", offset = 2, type = "u8" },
+  { name = "unknown_3", offset = 3, type = "u8" },
+  { name = "unknown_4", offset = 4, type = "u8" },
+  { name = "unknown_4_4f", offset = 4, type = "f32" },
+  { name = "unknown_5", offset = 5, type = "u8" },
+  { name = "unknown_6", offset = 6, type = "u8" },
+  { name = "unknown_7", offset = 7, type = "u8" },
+  { name = "unknown_8", offset = 8, type = "u8" },
+  { name = "unknown_8_4f", offset = 8, type = "f32" },
+  { name = "unknown_9", offset = 9, type = "u8" },
+  { name = "unknown_10", offset = 10, type = "u8" },
+  { name = "unknown_11", offset = 11, type = "u8" },
+  { name = "unknown_12", offset = 12, type = "u8" },
+  { name = "unknown_12_4f", offset = 12, type = "f32" },
+  { name = "unknown_13", offset = 13, type = "u8" },
+  { name = "unknown_14", offset = 14, type = "u8" },
+  { name = "unknown_15", offset = 15, type = "u8" },
+  { name = "unknown_16", offset = 16, type = "u8" },
+  { name = "unknown_16_4f", offset = 16, type = "f32" },
+  { name = "unknown_17", offset = 17, type = "u8" },
+  { name = "unknown_18", offset = 18, type = "u8" },
+  { name = "unknown_19", offset = 19, type = "u8" },
+  { name = "unknown_20", offset = 20, type = "u8" },
+  { name = "unknown_20_4f", offset = 20, type = "f32" },
+  { name = "unknown_21", offset = 21, type = "u8" },
+  { name = "unknown_22", offset = 22, type = "u8" },
+  { name = "unknown_23", offset = 23, type = "u8" },
+  { name = "unknown_24", offset = 24, type = "u8" },
+  { name = "unknown_24_4f", offset = 24, type = "f32" },
+  { name = "unknown_25", offset = 25, type = "u8" },
+  { name = "unknown_26", offset = 26, type = "u8" },
+  { name = "unknown_27", offset = 27, type = "u8" },
+  { name = "unknown_28", offset = 28, type = "u8" },
+  { name = "unknown_28_4f", offset = 28, type = "f32" },
+  { name = "unknown_29", offset = 29, type = "u8" },
+  { name = "unknown_30", offset = 30, type = "u8" },
+  { name = "unknown_31", offset = 31, type = "u8" },
+  { name = "unknown_32", offset = 32, type = "u8" },
+  { name = "unknown_32_4f", offset = 32, type = "f32" },
+  { name = "unknown_33", offset = 33, type = "u8" },
+  { name = "unknown_34", offset = 34, type = "u8" },
+  { name = "unknown_35", offset = 35, type = "u8" },
+  { name = "unknown_36", offset = 36, type = "u8" },
+  { name = "unknown_36_4f", offset = 36, type = "f32" },
+  { name = "unknown_37", offset = 37, type = "u8" },
+  { name = "unknown_38", offset = 38, type = "u8" },
+  { name = "unknown_39", offset = 39, type = "u8" },
+]
+
+# Split from CarSpecSwapWords.
+[CarSpecSwapWordsAt300]
+measure = "CarSpec::Swap.r3@+640@+300"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u8" },
+  { name = "unknown_0_4f", offset = 0, type = "f32" },
+  { name = "unknown_1", offset = 1, type = "u8" },
+  { name = "unknown_2", offset = 2, type = "u8" },
+  { name = "unknown_3", offset = 3, type = "u8" },
+  { name = "unknown_4", offset = 4, type = "u8" },
+  { name = "unknown_4_4f", offset = 4, type = "f32" },
+  { name = "unknown_5", offset = 5, type = "u8" },
+  { name = "unknown_6", offset = 6, type = "u8" },
+  { name = "unknown_7", offset = 7, type = "u8" },
+  { name = "unknown_8", offset = 8, type = "u8" },
+  { name = "unknown_8_4f", offset = 8, type = "f32" },
+  { name = "unknown_9", offset = 9, type = "u8" },
+  { name = "unknown_10", offset = 10, type = "u8" },
+  { name = "unknown_11", offset = 11, type = "u8" },
+  { name = "unknown_12", offset = 12, type = "u8" },
+  { name = "unknown_12_4f", offset = 12, type = "f32" },
+  { name = "unknown_13", offset = 13, type = "u8" },
+  { name = "unknown_14", offset = 14, type = "u8" },
+  { name = "unknown_15", offset = 15, type = "u8" },
+]
+
+# Split from CarSpecSwapWords.
+[CarSpecSwapWordsAt8]
+measure = "CarSpec::Swap.r3@+640@+8"
+size = 60
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u8" },
+  { name = "unknown_0_4f", offset = 0, type = "f32" },
+  { name = "unknown_1", offset = 1, type = "u8" },
+  { name = "unknown_2", offset = 2, type = "u8" },
+  { name = "unknown_3", offset = 3, type = "u8" },
+  { name = "unknown_4", offset = 4, type = "u8" },
+  { name = "unknown_4_4f", offset = 4, type = "f32" },
+  { name = "unknown_5", offset = 5, type = "u8" },
+  { name = "unknown_6", offset = 6, type = "u8" },
+  { name = "unknown_7", offset = 7, type = "u8" },
+  { name = "unknown_12", offset = 12, type = "u8" },
+  { name = "unknown_12_4f", offset = 12, type = "f32" },
+  { name = "unknown_13", offset = 13, type = "u8" },
+  { name = "unknown_14", offset = 14, type = "u8" },
+  { name = "unknown_15", offset = 15, type = "u8" },
+  { name = "unknown_20", offset = 20, type = "f32" },
+  { name = "unknown_56", offset = 56, type = "u8" },
+  { name = "unknown_56_4f", offset = 56, type = "f32" },
+  { name = "unknown_57", offset = 57, type = "u8" },
+  { name = "unknown_58", offset = 58, type = "u8" },
+  { name = "unknown_59", offset = 59, type = "u8" },
+]
+
+# Split from CarSpecSwapWords.
+[CarSpecSwapWordsAt16]
+measure = "CarSpec::SwapBlock1.r3@+16"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u8" },
+  { name = "unknown_0_4f", offset = 0, type = "f32" },
+  { name = "unknown_1", offset = 1, type = "u8" },
+  { name = "unknown_2", offset = 2, type = "u8" },
+  { name = "unknown_3", offset = 3, type = "u8" },
+  { name = "unknown_4", offset = 4, type = "u8" },
+  { name = "unknown_4_4f", offset = 4, type = "f32" },
+  { name = "unknown_5", offset = 5, type = "u8" },
+  { name = "unknown_6", offset = 6, type = "u8" },
+  { name = "unknown_7", offset = 7, type = "u8" },
+  { name = "unknown_8", offset = 8, type = "u8" },
+  { name = "unknown_8_4f", offset = 8, type = "f32" },
+  { name = "unknown_9", offset = 9, type = "u8" },
+  { name = "unknown_10", offset = 10, type = "u8" },
+  { name = "unknown_11", offset = 11, type = "u8" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]
+
+# Split from CarSpecSwapWords.
+[CarSpecSwapWordsAt64]
+measure = "CarSpec::SwapMatrix.ret@+64@+64@+64"
+size = 64
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u8" },
+  { name = "unknown_0_4f", offset = 0, type = "f32" },
+  { name = "unknown_1", offset = 1, type = "u8" },
+  { name = "unknown_2", offset = 2, type = "u8" },
+  { name = "unknown_3", offset = 3, type = "u8" },
+  { name = "unknown_4", offset = 4, type = "u8" },
+  { name = "unknown_4_4f", offset = 4, type = "f32" },
+  { name = "unknown_5", offset = 5, type = "u8" },
+  { name = "unknown_6", offset = 6, type = "u8" },
+  { name = "unknown_7", offset = 7, type = "u8" },
+  { name = "unknown_8", offset = 8, type = "u8" },
+  { name = "unknown_8_4f", offset = 8, type = "f32" },
+  { name = "unknown_9", offset = 9, type = "u8" },
+  { name = "unknown_10", offset = 10, type = "u8" },
+  { name = "unknown_11", offset = 11, type = "u8" },
+  { name = "unknown_12", offset = 12, type = "u8" },
+  { name = "unknown_12_4f", offset = 12, type = "f32" },
+  { name = "unknown_13", offset = 13, type = "u8" },
+  { name = "unknown_14", offset = 14, type = "u8" },
+  { name = "unknown_15", offset = 15, type = "u8" },
+  { name = "unknown_16", offset = 16, type = "u8" },
+  { name = "unknown_16_4f", offset = 16, type = "f32" },
+  { name = "unknown_17", offset = 17, type = "u8" },
+  { name = "unknown_18", offset = 18, type = "u8" },
+  { name = "unknown_19", offset = 19, type = "u8" },
+  { name = "unknown_20", offset = 20, type = "u8" },
+  { name = "unknown_20_4f", offset = 20, type = "f32" },
+  { name = "unknown_21", offset = 21, type = "u8" },
+  { name = "unknown_22", offset = 22, type = "u8" },
+  { name = "unknown_23", offset = 23, type = "u8" },
+  { name = "unknown_24", offset = 24, type = "u8" },
+  { name = "unknown_24_4f", offset = 24, type = "f32" },
+  { name = "unknown_25", offset = 25, type = "u8" },
+  { name = "unknown_26", offset = 26, type = "u8" },
+  { name = "unknown_27", offset = 27, type = "u8" },
+  { name = "unknown_28", offset = 28, type = "u8" },
+  { name = "unknown_28_4f", offset = 28, type = "f32" },
+  { name = "unknown_29", offset = 29, type = "u8" },
+  { name = "unknown_30", offset = 30, type = "u8" },
+  { name = "unknown_31", offset = 31, type = "u8" },
+  { name = "unknown_32", offset = 32, type = "u8" },
+  { name = "unknown_32_4f", offset = 32, type = "f32" },
+  { name = "unknown_33", offset = 33, type = "u8" },
+  { name = "unknown_34", offset = 34, type = "u8" },
+  { name = "unknown_35", offset = 35, type = "u8" },
+  { name = "unknown_36", offset = 36, type = "u8" },
+  { name = "unknown_36_4f", offset = 36, type = "f32" },
+  { name = "unknown_37", offset = 37, type = "u8" },
+  { name = "unknown_38", offset = 38, type = "u8" },
+  { name = "unknown_39", offset = 39, type = "u8" },
+  { name = "unknown_40", offset = 40, type = "u8" },
+  { name = "unknown_40_4f", offset = 40, type = "f32" },
+  { name = "unknown_41", offset = 41, type = "u8" },
+  { name = "unknown_42", offset = 42, type = "u8" },
+  { name = "unknown_43", offset = 43, type = "u8" },
+  { name = "unknown_44", offset = 44, type = "u8" },
+  { name = "unknown_44_4f", offset = 44, type = "f32" },
+  { name = "unknown_45", offset = 45, type = "u8" },
+  { name = "unknown_46", offset = 46, type = "u8" },
+  { name = "unknown_47", offset = 47, type = "u8" },
+  { name = "unknown_48", offset = 48, type = "u8" },
+  { name = "unknown_48_4f", offset = 48, type = "f32" },
+  { name = "unknown_49", offset = 49, type = "u8" },
+  { name = "unknown_50", offset = 50, type = "u8" },
+  { name = "unknown_51", offset = 51, type = "u8" },
+  { name = "unknown_52", offset = 52, type = "u8" },
+  { name = "unknown_52_4f", offset = 52, type = "f32" },
+  { name = "unknown_53", offset = 53, type = "u8" },
+  { name = "unknown_54", offset = 54, type = "u8" },
+  { name = "unknown_55", offset = 55, type = "u8" },
+  { name = "unknown_56", offset = 56, type = "u8" },
+  { name = "unknown_56_4f", offset = 56, type = "f32" },
+  { name = "unknown_57", offset = 57, type = "u8" },
+  { name = "unknown_58", offset = 58, type = "u8" },
+  { name = "unknown_59", offset = 59, type = "u8" },
+  { name = "unknown_60", offset = 60, type = "u8" },
+  { name = "unknown_60_4f", offset = 60, type = "f32" },
+  { name = "unknown_61", offset = 61, type = "u8" },
+  { name = "unknown_62", offset = 62, type = "u8" },
+  { name = "unknown_63", offset = 63, type = "u8" },
+]

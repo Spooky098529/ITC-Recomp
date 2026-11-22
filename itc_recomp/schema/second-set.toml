@@ -79,7 +79,8 @@ fields = [
 # the fenders (3 records), +720 the cabin (2), +1200 the bonnet, +1440 the
 # doors (2), +1920 the mirror, +2160 the headlights (8: 4 nodes, 4 shapes).
 [SecondSetCockpitPoints]
-measure = "CockpitPoints"
+measure = "CockpitPoints::Draw.r3@+720"
+measures = ["CockpitPoints::Draw.r3@+1440", "CockpitPoints::Find.r3@+2160", "SceneCockpit@+192"]
 size = 4084
 origin = "embedded"
 fields = [
@@ -147,7 +148,8 @@ fields = [
 # at +16 + 240k: +240 the dials (12), +3152 the meters (22), +8512 the
 # steering wheel (4), +9488 the seats (4), +10464 the roll cage (4).
 [SecondSetInteriorPoints]
-measure = "InteriorPoints"
+measure = "SceneInterior@+160"
+measures = ["SceneInterior@+160@+9488", "InteriorPoints::ResetMeters.r3", "InteriorPoints::ResetDials.r3", "SceneInterior@+160@+10464"]
 size = 11460
 origin = "embedded"
 fields = [
@@ -253,6 +255,7 @@ fields = [
 # (rims) or +2912 (brakes) two rows.
 [SecondSetWheelPoints]
 measure = "WheelPoints"
+measures = ["WheelPoints::SetUpBrakes.r3", "WheelPoints::DrawBrakesMorphed.r3", "WheelPoints::SetUpRimB.r3", "WheelPoints::DrawBrakes.r3", "WheelPoints::SetUpTire.r3", "WheelPoints::SetUpRimA.r3", "WheelPoints::DrawRimAMorphed.r3", "WheelPoints::DrawTireMorphed.r3", "WheelPoints::DrawTire.r3", "WheelPoints::DrawRimA.r3", "WheelPoints::DrawRimB.r3", "WheelPoints::InitTire.r3", "WheelPoints::InitRimA.r3", "WheelPoints::InitRimB.r3", "WheelPoints::InitBrakes.r3"]
 size = 13648
 origin = "embedded"
 fields = [
@@ -371,7 +374,8 @@ fields = [
 # by the set-ups' Rows), joined by the measure with the block's +0 (a
 # second set car model, its +24 the first set's car model).
 [SecondSetWheelMatrix]
-measure = "WheelPoints.+0"
+measure = "SceneWheels@+192.+0"
+measures = ["WheelPoints::SetUpTire.r3.+0", "WheelPoints::SetUpRimA.r3.+0", "WheelPoints::SetUpRimB.r3.+0", "WheelPoints::SetUpBrakes.r3.+0", "WheelPoints::DrawBrakesMorphed.r3.+0"]
 size = 64
 origin = "embedded"
 fields = [
@@ -496,7 +500,8 @@ fields = [
 # The number plate's part model a bumper's group finds (record 6 of the
 # rear bumper, record 8 of the front).
 [SecondSetPlateModel]
-measures = ["PartsPoints.+1444", "PartsPoints.+1924"]
+measure = "PartsPoints::DrawRearBumper.r3.+1444"
+measures = ["SceneParts@+176@+2896.+1444", "PartsPoints::DrawFrontBumper.r3.+1924", "SceneParts@+176.+1924"]
 size = 460
 origin = "embedded"
 fields = [
@@ -599,7 +604,7 @@ fields = [
 
 # Split from SecondSetWheelPoints.
 [SecondSetWheelPointsAt12]
-measure = "WheelPoints@+12"
+measure = "sub_820E6F28.r3"
 size = 20
 origin = "embedded"
 fields = [
@@ -612,7 +617,8 @@ fields = [
 
 # Split from SecondSetWheelPoints.
 [SecondSetWheelPointsAt328]
-measure = "WheelPoints@+328"
+measure = "sub_820E7010.r5"
+measures = ["Morph::SetUp.r7"]
 size = 16
 origin = "embedded"
 fields = [
@@ -624,7 +630,7 @@ fields = [
 
 # Split from SecondSetWheelPoints.
 [SecondSetWheelPointsAt352]
-measure = "WheelPoints@+352"
+measure = "sub_820E7010.r6"
 size = 4
 origin = "embedded"
 fields = [
@@ -633,9 +639,64 @@ fields = [
 
 # Split from SecondSetWheelPoints.
 [SecondSetWheelPointsAt356]
-measure = "WheelPoints@+356"
+measure = "sub_820E7010.r7"
 size = 4
 origin = "embedded"
 fields = [
   { name = "unknown_0", offset = 0, type = "f32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from SecondSetWheelPoints.
+[SecondSetWheelPointsAt192]
+measure = "SceneWheels@+192"
+size = 13648
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "unknown_32", offset = 32, type = "u32" },
+  { name = "unknown_36", offset = 36, type = "u32" },
+  { name = "unknown_40", offset = 40, type = "u32" },
+  { name = "unknown_384", offset = 384, type = "f32" },
+  { name = "unknown_388", offset = 388, type = "f32" },
+  { name = "unknown_1872", offset = 1872, type = "u32" },
+  { name = "unknown_1876", offset = 1876, type = "u32" },
+  { name = "unknown_1880", offset = 1880, type = "u32" },
+  { name = "unknown_2172", offset = 2172, type = "u32" },
+  { name = "unknown_2224", offset = 2224, type = "f32" },
+  { name = "unknown_2228", offset = 2228, type = "f32" },
+  { name = "unknown_3712", offset = 3712, type = "u32" },
+  { name = "unknown_3720", offset = 3720, type = "u32" },
+  { name = "unknown_3728", offset = 3728, type = "f32" },
+  { name = "unknown_3732", offset = 3732, type = "f32" },
+  { name = "unknown_5456", offset = 5456, type = "u32" },
+  { name = "unknown_5464", offset = 5464, type = "u32" },
+  { name = "unknown_5468", offset = 5468, type = "u32" },
+  { name = "unknown_5472", offset = 5472, type = "f32" },
+  { name = "unknown_5476", offset = 5476, type = "f32" },
+  { name = "unknown_7200", offset = 7200, type = "u32" },
+  { name = "unknown_7208", offset = 7208, type = "u32" },
+  { name = "unknown_7216", offset = 7216, type = "f32" },
+  { name = "unknown_7220", offset = 7220, type = "f32" },
+  { name = "unknown_8944", offset = 8944, type = "u32" },
+  { name = "unknown_8952", offset = 8952, type = "u32" },
+  { name = "unknown_8956", offset = 8956, type = "u32" },
+  { name = "unknown_8960", offset = 8960, type = "f32" },
+  { name = "unknown_8964", offset = 8964, type = "f32" },
+  { name = "unknown_10688", offset = 10688, type = "u32" },
+  { name = "unknown_10692", offset = 10692, type = "u32" },
+  { name = "unknown_10696", offset = 10696, type = "u32" },
+  { name = "unknown_13632", offset = 13632, type = "u32" },
+  { name = "unknown_13636", offset = 13636, type = "u32" },
+  { name = "unknown_13640", offset = 13640, type = "u32" },
+  { name = "unknown_13644", offset = 13644, type = "u32" },
 ]

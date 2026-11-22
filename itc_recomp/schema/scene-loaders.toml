@@ -135,7 +135,7 @@ fields = [
 # The car parts' loads (the car parts' +96; CarPartsLoads::CarPartsLoads
 # sub_820D6F88).
 [CarPartsLoads]
-measure = "CarPartsLoads"
+measure = "CarParts@+96"
 size = 105904
 origin = "embedded"
 fields = [
@@ -232,7 +232,7 @@ fields = [
 # The car model's loads (the car model's +3728; CarModelLoads::CarModelLoads
 # sub_820D3DE0, Reset sub_820D3B58). Its end isn't known.
 [CarModelLoads]
-measure = "CarModelLoads"
+measure = "CarModel@+3728"
 size = 2988
 origin = "embedded"
 fields = [
@@ -258,7 +258,7 @@ fields = [
 # The wheels' loads (the wheels' +192; WheelsLoads::WheelsLoads sub_820D8F60):
 # front and rear 24 bytes (slots) or 464 bytes (models) apart.
 [WheelsLoads]
-measure = "WheelsLoads"
+measure = "Wheels@+192"
 size = 3072
 origin = "embedded"
 fields = [

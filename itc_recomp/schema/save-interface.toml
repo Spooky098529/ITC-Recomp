@@ -83,7 +83,7 @@ fields = [
 # The save devices' +44 as SlotArray::Reset (sub_820A55F0) gets it (r3 =
 # the save devices + 44).
 [SaveSlotArrayHolder]
-measure = "SlotArray"
+measure = "SaveDevices@+44"
 size = 4
 origin = "embedded"
 fields = [

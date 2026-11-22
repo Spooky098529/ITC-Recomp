@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// file; measure: TrackSet, sub_825A1148.r3
+// file; measure: TrackSet, sub_825A1148.r3, TrackSet::SetupFloat.r3, TrackSet::ReleaseArray.r3, TrackSet::Release.r3, TrackSet::EndTime.r3, TrackSet::TrackSet.r3, TrackSet::Track.r3, TrackSet::Channels.r3
 struct TrackSet : View {
   using View::View;
   static constexpr uint32_t kSize = 20;
@@ -189,7 +189,7 @@ struct AnimationKeyRun : View {
   uint32_t keys_address() const { return address + 0; }
 };
 
-// allocated; measure: new<4294967295>@TrackSet::SetupFloat
+// allocated; measure: Mesh@+364.+16, Mesh@+384.+16, Mesh@+304.+16
 struct TrackValues : View {
   using View::View;
   static constexpr uint32_t kSize = 208;
@@ -209,7 +209,7 @@ struct TrackValueBlock : View {
   uint32_t values_address() const { return address + 16; }
 };
 
-// file; measure: Skeleton, SkeletonBase, sub_82599BE0.r3, sub_8259B600.r3, PartsPoints.+0
+// file; measure: Skeleton, SkeletonBase, sub_82599BE0.r3, sub_8259B600.r3, Skeleton::LocalMatrices.r3, Skeleton::ResetPose.r3, Skeleton::~Skeleton.r3, Skeleton::Skeleton.r3, Skeleton::FreeNodeValues.r3, Skeleton::UpdateMatrices.r3, SceneParts@+176@+24480.+0
 struct Skeleton : View {
   using View::View;
   static constexpr uint32_t kSize = 180;
@@ -310,7 +310,7 @@ struct Skeleton : View {
   uint32_t node_values_address() const { return address + 176; }
 };
 
-// file; measure: SkeletonCursor
+// file; measure: SkeletonCursor, Skeleton.+128
 struct SkeletonCursor : View {
   using View::View;
   static constexpr uint32_t kSize = 20;
@@ -340,7 +340,7 @@ struct SkeletonCursor : View {
   uint32_t unknown_16_address() const { return address + 16; }
 };
 
-// file; measure: SkeletonCursor.+8, SkeletonCursor.+4, SkeletonCursor.+0
+// file; measure: SkeletonCursor.+0, Skeleton.+128.+8, Mesh@+112.+128.+8, Mesh@+112.+128.+4, Skeleton.+128.+4
 struct SkeletonNodeEntry : View {
   using View::View;
   static constexpr uint32_t kSize = 20;
@@ -380,7 +380,7 @@ struct PrimitiveDrawer : View {
   uint32_t declaration_address() const { return address + 4; }
 };
 
-// allocated; measure: new<4>@PrimitiveDrawer::PrimitiveDrawer, sub_825A1810.r3.+4
+// allocated; measure: sub_825A1810.r3.+4, PrimitiveDrawer.+4
 struct PrimitiveDrawerDeclaration : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
@@ -390,7 +390,7 @@ struct PrimitiveDrawerDeclaration : View {
   uint32_t vertex_declaration_address() const { return address + 0; }
 };
 
-// file; measure: PhysicalPad
+// file; measure: InputManager@+988
 struct PhysicalPad : View {
   using View::View;
   static constexpr uint32_t kSize = 212;
@@ -428,7 +428,7 @@ struct PhysicalPadRecord : View {
   uint32_t unknown_8_address() const { return address + 8; }
 };
 
-// embedded; measure: PhysicalPad@+168
+// embedded; measure: InputManager@+988@+168
 struct PhysicalPadAt168 : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
@@ -441,6 +441,99 @@ struct PhysicalPadAt168 : View {
   uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
   void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t unknown_8_address() const { return address + 8; }
+};
+
+// embedded; measure: Mesh@+112
+struct SkeletonAt112 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 180;
+  uint32_t unknown_128() const { return guest::LoadU32(base, address + 128); }
+  void set_unknown_128(uint32_t v) const { guest::StoreU32(base, address + 128, v); }
+  uint32_t unknown_128_address() const { return address + 128; }
+  uint32_t unknown_176() const { return guest::LoadU32(base, address + 176); }
+  void set_unknown_176(uint32_t v) const { guest::StoreU32(base, address + 176, v); }
+  uint32_t unknown_176_address() const { return address + 176; }
+};
+
+// embedded; measure: Mesh@+112.+128
+struct SkeletonCursorPart : View {
+  using View::View;
+  static constexpr uint32_t kSize = 12;
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+};
+
+// embedded; measure: Mesh@+304
+struct TrackSetAt304 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 20;
+  uint32_t unknown_16() const { return guest::LoadU32(base, address + 16); }
+  void set_unknown_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+};
+
+// embedded; measure: Mesh@+364
+struct TrackSetAt364 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 20;
+  uint32_t unknown_16() const { return guest::LoadU32(base, address + 16); }
+  void set_unknown_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+};
+
+// embedded; measure: Mesh@+384
+struct TrackSetAt384 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 20;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  uint32_t unknown_16() const { return guest::LoadU32(base, address + 16); }
+  void set_unknown_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+};
+
+// embedded; measure: Model::Animate.r3@+304
+struct TrackSetAt304_2 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 20;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_16() const { return guest::LoadU32(base, address + 16); }
+  void set_unknown_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+};
+
+// embedded; measure: Model::Animate.r3@+364
+struct TrackSetAt364_2 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 20;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_16() const { return guest::LoadU32(base, address + 16); }
+  void set_unknown_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+};
+
+// embedded; measure: new<88>@RenderQueue::RenderQueue@+4
+struct PrimitiveDrawerAt4 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 8;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
 };
 
 // The image words docs/functions/model-animation.md's code uses.

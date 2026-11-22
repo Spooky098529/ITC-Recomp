@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// embedded; measure: CollisionObject, sub_820B7CB8.r3, sub_820B7CC0.r3
+// embedded; measure: CollisionObject, sub_820B7CB8.r3, sub_820B7CC0.r3, CollisionObject::CollisionObject.r3
 struct CollisionObject : View {
   using View::View;
   static constexpr uint32_t kSize = 320;
@@ -235,7 +235,7 @@ struct CollisionHitRecords : View {
   uint32_t hit1_key_address() const { return address + 140; }
 };
 
-// embedded; measure: Stages
+// embedded; measure: [826C5B2C]@+366112
 struct Stages : View {
   using View::View;
   static constexpr uint32_t kSize = 1224;
@@ -308,7 +308,7 @@ struct RaceStage : View {
   uint32_t slot_count_address() const { return address + 76; }
 };
 
-// embedded; measure: RacerRecords, RacerRecords::At.r3
+// embedded; measure: RacerRecords::At.r3, [826C5B2C]@+367336
 struct RacerRecordArray : View {
   using View::View;
   static constexpr uint32_t kSize = 303076;
@@ -317,7 +317,7 @@ struct RacerRecordArray : View {
   uint32_t count_address() const { return address + 303072; }
 };
 
-// file; measure: List
+// file; measure: List, List::Clear_820ACF88.r3, List::At.r3
 struct AccessorList : View {
   using View::View;
   static constexpr uint32_t kSize = 20;
@@ -343,7 +343,7 @@ struct AccessorList : View {
   uint32_t unknown_16_address() const { return address + 16; }
 };
 
-// file; measure: List::At.ret, List.+0
+// file; measure: List::At.ret, List.+0, List::At.r3.+0
 struct AccessorListNode : View {
   using View::View;
   static constexpr uint32_t kSize = 5076;
@@ -629,6 +629,36 @@ struct Sub820BD740Object : View {
   float unknown_88() const { return guest::LoadFloat(base, address + 88); }
   void set_unknown_88(float v) const { guest::StoreFloat(base, address + 88, v); }
   uint32_t unknown_88_address() const { return address + 88; }
+};
+
+// embedded; measure: CarScene@+4944
+struct AccessorListAt4944 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 12;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+};
+
+// embedded; measure: WallQuery@+1408
+struct VectorLibVectorAt1408 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 16;
+  float unknown_0() const { return guest::LoadFloat(base, address + 0); }
+  void set_unknown_0(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  float unknown_4() const { return guest::LoadFloat(base, address + 4); }
+  void set_unknown_4(float v) const { guest::StoreFloat(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  float unknown_8() const { return guest::LoadFloat(base, address + 8); }
+  void set_unknown_8(float v) const { guest::StoreFloat(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  float unknown_12() const { return guest::LoadFloat(base, address + 12); }
+  void set_unknown_12(float v) const { guest::StoreFloat(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
 };
 
 // The image words docs/functions/vehicle-accessors.md's code uses.

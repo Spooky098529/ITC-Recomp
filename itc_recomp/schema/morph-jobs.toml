@@ -74,7 +74,8 @@ fields = [
 # 8). The measure's "Job" is the same item as Job::Wait (sub_82094B10) meets
 # it (+18, +20), joined with Job::~Job's job (+0 = 0x8200285C: a measure join).
 [WorkItem]
-measures = ["WorkItem", "Job"]
+measure = "WorkItem"
+measures = ["Job", "Job::Wait.r3"]
 size = 36
 origin = "embedded"
 fields = [
@@ -182,4 +183,28 @@ size = 4
 origin = "embedded"
 fields = [
   { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from WorkItem.
+[WorkItemOuter4]
+measure = "sub_82090DC8.r3@-4"
+size = 17
+origin = "embedded"
+fields = [
+  { name = "unknown_16", offset = 16, type = "u8" },
+]
+
+# Split from WorkItem.
+[WorkItemOuter4_2]
+measure = "sub_82090E38.r3@-4"
+size = 28
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
 ]

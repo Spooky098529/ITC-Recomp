@@ -161,7 +161,7 @@ struct MorphJobVtable : View {
   uint32_t run_address() const { return address + 16; }
 };
 
-// embedded; measure: WorkItem, Job
+// embedded; measure: WorkItem, Job, Job::Wait.r3
 struct WorkItem : View {
   using View::View;
   static constexpr uint32_t kSize = 36;
@@ -383,6 +383,30 @@ struct MorphJobVtablePart : View {
   uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
   void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: sub_82090DC8.r3@-4
+struct WorkItemOuter4 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 17;
+  uint8_t unknown_16() const { return guest::LoadU8(base, address + 16); }
+  void set_unknown_16(uint8_t v) const { guest::StoreU8(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+};
+
+// embedded; measure: sub_82090E38.r3@-4
+struct WorkItemOuter4_2 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 28;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_24() const { return guest::LoadU32(base, address + 24); }
+  void set_unknown_24(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
+  uint32_t unknown_24_address() const { return address + 24; }
 };
 
 }  // namespace schema

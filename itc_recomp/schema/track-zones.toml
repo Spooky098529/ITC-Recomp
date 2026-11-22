@@ -24,7 +24,7 @@
 # set-ups, the camera modes' sub_82155288).
 [RouteRange]
 measure = "RouteRange"
-measures = ["RouteRange::Advance.r4"]
+measures = ["RouteRange::Advance.r4", "RouteRange::AddBranch.r3"]
 size = 1064
 origin = "embedded"
 # 9 functions; areas: camera-modes.md, track-zones.md
@@ -97,7 +97,7 @@ fields = [
 # A zone's range list (the zone's +4; ZoneRanges::Insert's r3): a 16-slot
 # list whose data slots are 1,064-byte RouteRanges.
 [TrackZoneRangeList]
-measure = "ZoneRanges"
+measure = "ZoneRanges::Insert.r3"
 size = 17100
 origin = "embedded"
 # 1 functions; areas: track-zones.md
@@ -131,6 +131,7 @@ fields = [
 # sections (also the scenery's list of models, scenery-lists.md).
 [List64]
 measure = "List64"
+measures = ["List64::Insert.r3"]
 size = 524
 origin = "embedded"
 # 2 functions; areas: track-zones.md

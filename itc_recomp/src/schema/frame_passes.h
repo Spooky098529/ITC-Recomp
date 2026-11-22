@@ -222,7 +222,7 @@ struct FramePassesDelegateObjectVtable : View {
   uint32_t slot_3_address() const { return address + 12; }
 };
 
-// embedded; measure: Job.+20
+// embedded; measure: Job::Wait.r3.+20
 struct FramePassesJobWaiter : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
@@ -233,7 +233,7 @@ struct FramePassesJobWaiter : View {
   uint32_t vtable_address() const { return address + 0; }
 };
 
-// image; measure: Job.+20.+0
+// image; measure: Job::Wait.r3.+20.+0
 struct FramePassesJobWaiterVtable : View {
   using View::View;
   static constexpr uint32_t kSize = 8;

@@ -64,3 +64,16 @@ light_color_p = { address = 0x82001FC0, type = "f32", note = "the entries' +16 p
 light_color_q = { address = 0x82009798, type = "f32", note = "the entries' +16 q" }
 light_cone_inner = { address = 0x82009790, type = "f64", note = "kind 2 entries' +84: cos of it (probably the cone's inner angle)" }
 light_cone_outer = { address = 0x82002FE0, type = "f64", note = "kind 2 entries' +80: cos of it (probably the cone's outer angle)" }
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from RaceSceneMachine.
+[RaceSceneMachineAt87936]
+measure = "RaceMode@+87936"
+size = 9608
+origin = "embedded"
+fields = [
+  { name = "unknown_9604", offset = 9604, type = "u32" },
+]

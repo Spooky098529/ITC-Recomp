@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: AltHud.+0
+// allocated; measure: RaceScreens@+1004.+0, AltHud::ToggleView.r3.+0
 struct AltHud : View {
   using View::View;
   static constexpr uint32_t kSize = 264;
@@ -66,7 +66,7 @@ struct AltHud : View {
   uint32_t player_address() const { return address + 260; }
 };
 
-// embedded; measure: AltHud
+// embedded; measure: RaceScreens@+1004, RaceScreens::~RaceScreens.r3@+1004, AltHud::ToggleView.r3
 struct AltHudHolder : View {
   using View::View;
   static constexpr uint32_t kSize = 8;

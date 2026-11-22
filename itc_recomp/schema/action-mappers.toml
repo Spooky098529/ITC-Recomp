@@ -22,7 +22,7 @@
 # listener's held buttons into 30 actions.
 [ActionMapper]
 measure = "ActionMapper"
-measures = ["ActionMapper.+24", "ActionMapper.+180"]
+measures = ["ActionMapper::ResetWords.r3", "ActionMapper::ResetAnalog.r3", "ActionMapper::ResetWords.r3.+24", "ActionMapper@+448.+24", "ActionMapper::ResetAnalog.r3.+180"]
 size = 2896
 origin = "allocated"
 vtable = 0x82007F78
@@ -87,20 +87,7 @@ fields = [
   { name = "fault_state_pending", offset = 20, type = "u32", note = "measure fault: ActionMapperState's pending (mapper + 468)" },
   { name = "fault_state_repeat_pointers", offset = 24, type = "u32", note = "measure fault: ActionMapperState's repeat pointers (mapper + 472)" },
   { name = "fault_analog_values", offset = 60, type = "f32", note = "measure fault: the analog stage's values (mapper + 1132)" },
-  { name = "fault_state_repeats", offset = 144, type = "u32", note = "measure fault: ActionMapperState's first repeat's vtable (mapper + 592)" },
-  { name = "fault_state_repeat_delay", offset = 152, type = "u32", note = "measure fault: the first repeat's delay (mapper + 600)" },
-  { name = "fault_state_repeat_period", offset = 156, type = "u32", note = "measure fault: the first repeat's period (mapper + 604)" },
   { name = "fault_analog_curve_pointers", offset = 180, type = "u32", note = "measure fault: the analog stage's curve pointers (mapper + 1252)" },
-  { name = "fault_analog_curves", offset = 300, type = "u32", note = "measure fault: the analog stage's first curve's vtable (mapper + 1372)" },
-  { name = "fault_analog_curve_center", offset = 304, type = "f32", note = "measure fault: the first curve's center (mapper + 1376)" },
-  { name = "fault_analog_curve_dead_zone", offset = 308, type = "f32", note = "measure fault: the first curve's dead zone (mapper + 1380)" },
-  { name = "fault_analog_curve_maximum", offset = 312, type = "f32", note = "measure fault: the first curve's maximum (mapper + 1384)" },
-  { name = "fault_state_analog_values", offset = 684, type = "f32", note = "measure fault: ActionMapperState +684, the analog stage's values (mapper + 1132)" },
-  { name = "fault_threshold_on", offset = 1404, type = "f32", note = "measure fault: ActionMapperState +1404, the first threshold's on (mapper + 1852)" },
-  { name = "fault_threshold_off", offset = 1408, type = "f32", note = "measure fault: the first threshold's off (mapper + 1856)" },
-  { name = "fault_threshold_suppress_ticks", offset = 1412, type = "u32", note = "measure fault: the first threshold's suppress ticks (mapper + 1860)" },
-  { name = "fault_threshold_counter", offset = 1416, type = "u32", note = "measure fault: the first threshold's counter (mapper + 1864)" },
-  { name = "fault_threshold_state", offset = 1420, type = "u8", note = "measure fault: the first threshold's state (mapper + 1868)" },
   { name = "pad_values", offset = 2880, type = "ptr", to = "ActionPadValues", note = "the logical pad's 40 values (input manager + 44 + 196 × player)" },
   { name = "bound", offset = 2884, type = "u8" },
   { name = "player", offset = 2888, type = "u32", note = "0-3" },
@@ -190,8 +177,8 @@ fields = [
 # The repeat and curve objects' vtables (0x82007F68, 0x82007F70), met
 # through their pointers.
 [ActionObjectVtable]
-measure = "ActionMapper.+144"
-measures = ["ActionMapper.+300", "ActionMapper.+24.+0", "ActionMapper.+180.+0"]
+measure = "ActionMapper@+448.+144"
+measures = ["ActionMapper@+448@+624.+300", "ActionMapper::ResetWords.r3.+24.+0", "ActionMapper@+448.+24.+0", "ActionMapper::ResetAnalog.r3.+180.+0"]
 size = 8
 origin = "image"
 fields = [
@@ -345,4 +332,47 @@ origin = "embedded"
 fields = [
   { name = "unknown_0", offset = 0, type = "u32" },
   { name = "unknown_4", offset = 4, type = "u32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from ActionMapper.
+[ActionMapperAt448]
+measure = "ActionMapper@+448"
+size = 1421
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "state_fired", offset = 16, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): ActionMapperState's fired (mapper + 464)" },
+  { name = "state_pending", offset = 20, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): ActionMapperState's pending (mapper + 468)" },
+  { name = "state_repeat_pointers", offset = 24, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): ActionMapperState's repeat pointers (mapper + 472)" },
+  { name = "state_repeats", offset = 144, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): ActionMapperState's first repeat's vtable (mapper + 592)" },
+  { name = "state_repeat_delay", offset = 152, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the first repeat's delay (mapper + 600)" },
+  { name = "state_repeat_period", offset = 156, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the first repeat's period (mapper + 604)" },
+  { name = "state_analog_values", offset = 684, type = "f32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): ActionMapperState +684, the analog stage's values (mapper + 1132)" },
+  { name = "threshold_on", offset = 1404, type = "f32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): ActionMapperState +1404, the first threshold's on (mapper + 1852)" },
+  { name = "threshold_off", offset = 1408, type = "f32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the first threshold's off (mapper + 1856)" },
+  { name = "threshold_suppress_ticks", offset = 1412, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the first threshold's suppress ticks (mapper + 1860)" },
+  { name = "threshold_counter", offset = 1416, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the first threshold's counter (mapper + 1864)" },
+  { name = "threshold_state", offset = 1420, type = "u8", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the first threshold's state (mapper + 1868)" },
+]
+
+# Split from ActionMapper.
+[ActionMapperAt624]
+measure = "ActionMapper@+448@+624"
+size = 316
+origin = "embedded"
+fields = [
+  { name = "analog_raw", offset = 0, type = "u16", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the analog stage's raw[0] (ActionMapperAnalog +0, mapper + 1072)" },
+  { name = "analog_values", offset = 60, type = "f32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the analog stage's values (mapper + 1132)" },
+  { name = "analog_curve_pointers", offset = 180, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the analog stage's curve pointers (mapper + 1252)" },
+  { name = "analog_curves", offset = 300, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the analog stage's first curve's vtable (mapper + 1372)" },
+  { name = "analog_curve_center", offset = 304, type = "f32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the first curve's center (mapper + 1376)" },
+  { name = "analog_curve_dead_zone", offset = 308, type = "f32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the first curve's dead zone (mapper + 1380)" },
+  { name = "analog_curve_maximum", offset = 312, type = "f32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the first curve's maximum (mapper + 1384)" },
 ]

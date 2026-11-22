@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: Model, Mesh, Model.+48
+// allocated; measure: Model, Mesh, Model.+48, Model::Load.r3, Model::SetVinylTextures.r3
 struct Model : View {
   using View::View;
   static constexpr uint32_t kSize = 432;
@@ -296,7 +296,7 @@ struct ShaderPairEntry : View {
   uint32_t pixel_size_address() const { return address + 8; }
 };
 
-// file; measure: Mesh.+40, WorkMem, Model.+40
+// file; measure: Mesh.+40, WorkMem, Model.+40, Model::Load.r3.+40
 struct ModelShape : View {
   using View::View;
   static constexpr uint32_t kSize = 544;
@@ -394,7 +394,7 @@ struct MaterialBlock : View {
   uint32_t records_address() const { return address + 16; }
 };
 
-// file; measure: Mesh.+40.+408, Model.+40.+408
+// file; measure: Mesh.+40.+408, Model::Load.r3.+40.+408
 struct SkinBlock : View {
   using View::View;
   static constexpr uint32_t kSize = 24;
@@ -423,7 +423,7 @@ struct SkinBlock : View {
   uint32_t object_address() const { return address + 20; }
 };
 
-// file; measure: Model.+40.+408.+8
+// file; measure: Model::Load.r3.+40.+408.+8
 struct SkinInfluenceCount : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
@@ -432,7 +432,7 @@ struct SkinInfluenceCount : View {
   uint32_t count_address() const { return address + 0; }
 };
 
-// file; measure: Model.+40.+408.+12
+// file; measure: Model::Load.r3.+40.+408.+12
 struct SkinWeight : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
@@ -449,7 +449,7 @@ struct SkinWeight : View {
   uint32_t next_address() const { return address + 16; }
 };
 
-// embedded; measure: TextureProvider, sub_82594440.r3
+// embedded; measure: TextureProvider, sub_82594440.r3, TextureProvider::Reserve.r3, TextureProvider::~TextureProvider.r3, TextureProvider::TextureProvider.r3, TextureProvider::Clear.r3
 struct TextureProvider : View {
   using View::View;
   static constexpr uint32_t kSize = 20;
@@ -517,7 +517,7 @@ struct TextureSlot : View {
   uint32_t texture_address() const { return address + 0; }
 };
 
-// image; measure: TextureProvider.+0, Model.+80, SceneAssets.+144, SceneAssets.+164, SceneAssets.+232, SceneAssets.+300, SceneAssets.+368, SceneAssets.+1000, SceneAssets.+1068, SceneAssets.+4800, CarScene::OnFileLoaded.r6.+296, CarScene::OnFileLoaded.r6.+364, CarScene::OnFileLoaded.r6.+432, CarScene::OnFileLoaded.r6.+1064, CarScene::OnFileLoaded.r6.+1132, CarModelLoads.+320, Cockpit.+496, WheelsLoads.+2048, TrafficCar.+4064, TrafficCar::OnFileLoaded.r6.+4064
+// image; measure: TextureProvider.+0, SceneAssets.+144, SceneAssets.+164, SceneAssets.+232, SceneAssets.+300, SceneAssets.+368, SceneAssets.+1000, SceneAssets.+1068, SceneAssets.+4800, CarScene::OnFileLoaded.r6.+296, CarScene::OnFileLoaded.r6.+364, CarScene::OnFileLoaded.r6.+432, CarScene::OnFileLoaded.r6.+1064, CarScene::OnFileLoaded.r6.+1132, Cockpit.+496, TrafficCar.+4064, TrafficCar::OnFileLoaded.r6.+4064, Model::Load.r3.+80, CarModel@+3728.+320, Wheels@+192.+2048
 struct TextureProviderVtable : View {
   using View::View;
   static constexpr uint32_t kSize = 44;
@@ -556,7 +556,7 @@ struct TextureProviderVtable : View {
   uint32_t find_xpr_texture_10_address() const { return address + 40; }
 };
 
-// embedded; measure: XPR
+// embedded; measure: XPR, XPR::Release_82108860.r3
 struct XPR : View {
   using View::View;
   static constexpr uint32_t kSize = 24;
@@ -784,7 +784,7 @@ struct ShaderFileRecord : View {
   uint32_t microcode_bytes_address() const { return address + 12; }
 };
 
-// file; measure: Skeleton.+80, sub_8259A9E0.r3.+80, sub_82599A20.r3.+80, sub_8259A9E0.r3@+80.+0
+// file; measure: Skeleton.+80, sub_8259A9E0.r3.+80, sub_82599A20.r3.+80, sub_8259A9E0.r3@+80.+0, Skeleton::LocalMatrices.r3.+80
 struct NodeFile : View {
   using View::View;
   static constexpr uint32_t kSize = 52;
@@ -888,7 +888,7 @@ struct NodeFileView : View {
   uint32_t non_bone_count_address() const { return address + 44; }
 };
 
-// file; measure: Skeleton.+84
+// file; measure: Skeleton.+84, Skeleton::LocalMatrices.r3.+84
 struct SkeletonNodeRecord : View {
   using View::View;
   static constexpr uint32_t kSize = 160;
@@ -906,7 +906,7 @@ struct SkeletonNodeRecord : View {
   uint32_t type_address() const { return address + 132; }
 };
 
-// allocated; measure: Skeleton.+136, Skeleton.+140, CursorCurve::Sample.r5
+// allocated; measure: CursorCurve::Sample.r5, Skeleton::LocalMatrices.r3.+136, Skeleton::LocalMatrices.r3.+140
 struct SkeletonNodeState : View {
   using View::View;
   static constexpr uint32_t kSize = 144;
@@ -941,7 +941,7 @@ struct SkeletonNodeState : View {
   uint32_t scale_z_address() const { return address + 40; }
 };
 
-// allocated; measure: Skeleton.+148, Cockpit::OnFileLoaded.r6.+3472
+// allocated; measure: Skeleton.+148, Cockpit::OnFileLoaded.r6.+3472, Skeleton::LocalMatrices.r3.+148
 struct SkeletonMatrix : View {
   using View::View;
   static constexpr uint32_t kSize = 64;
@@ -1050,6 +1050,42 @@ struct PartModelPicker : View {
   uint32_t unknown_2284() const { return guest::LoadU32(base, address + 2284); }
   void set_unknown_2284(uint32_t v) const { guest::StoreU32(base, address + 2284, v); }
   uint32_t unknown_2284_address() const { return address + 2284; }
+};
+
+// embedded; measure: Floor@+4160
+struct ModelAt4160 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 44;
+  uint32_t unknown_28() const { return guest::LoadU32(base, address + 28); }
+  void set_unknown_28(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
+  uint32_t unknown_28_address() const { return address + 28; }
+  uint32_t unknown_40() const { return guest::LoadU32(base, address + 40); }
+  void set_unknown_40(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
+  uint32_t unknown_40_address() const { return address + 40; }
+};
+
+// embedded; measure: TextureProvider::TextureProvider.r3@+4
+struct TextureProviderAt4 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 12;
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+};
+
+// embedded; measure: TextureProvider@+4
+struct TextureProviderAt4_2 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 12;
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
 };
 
 // The image words docs/functions/models.md's code uses.

@@ -24,7 +24,7 @@
 # copies), and sub_820BC560's r5 (not read; it calls LowerCorner and Radius).
 [BoxShape]
 measure = "BoxShape"
-measures = ["Shape", "CollisionObject.+32", "sub_820BAB48.r4", "sub_820BAB48.ret", "sub_820BB688.r3", "sub_820BB688.r4", "BoxShape::Place.r5", "sub_822BE2C8.ret", "sub_820911F8.ret", "sub_820BA1D0.r3", "sub_820B9C30.r3", "sub_820BC560.r5", "Part464::Restore.r4", "Part464::Save.r4", "Vehicle.+344", "WallQuery.+12.+0", "AiDriver.+160.+344"]
+measures = ["Shape", "sub_820BAB48.r4", "sub_820BAB48.ret", "sub_820BB688.r3", "sub_820BB688.r4", "BoxShape::Place.r5", "sub_822BE2C8.ret", "sub_820911F8.ret", "sub_820BA1D0.r3", "sub_820B9C30.r3", "sub_820BC560.r5", "Part464::Restore.r4", "Part464::Save.r4", "Vehicle.+344", "WallQuery.+12.+0", "AiDriver.+160.+344", "CollisionShape::Place.r3.+8"]
 # measures from VehicleBox (vehicle-accessors), merged at the integration
 # measures from ReplayPlacedBox (replay-snapshots), merged at the integration
 size = 496
@@ -123,7 +123,7 @@ fields = [
 # box is met (its +0).
 [BoxShapeVtable]
 measure = "BoxShape.+0"
-measures = ["CollisionObject.+32.+0", "BoxShape::Place.r5.+0", "sub_822BE2C8.ret.+0", "sub_820911F8.ret.+0", "sub_820BC560.r5.+0"]
+measures = ["BoxShape::Place.r5.+0", "sub_822BE2C8.ret.+0", "sub_820911F8.ret.+0", "sub_820BC560.r5.+0", "CollisionShape::Place.r3.+8.+0", "CollisionShape.+0", "CollisionObject@+32.+0"]
 size = 96
 origin = "image"
 fields = [
@@ -157,6 +157,7 @@ fields = [
 # sub_820BAA78, SetUp sub_820BB580).
 [CollisionShape]
 measure = "CollisionShape"
+measures = ["CollisionShape::Place.r3", "CollisionShape::CurrentCenter.r3", "CollisionShape::PreviousCenter.r3"]
 size = 116
 origin = "embedded"
 fields = [
@@ -483,3 +484,95 @@ impact_tests = { address = 0x82600EB4, type = "bytes", count = 36, note = "the i
 clock = { address = 0x826C2D80, type = "f32", note = "the collision world's clock (CollisionPair::NextCheckTime)" }
 step = { address = 0x826C2D84, type = "f32", note = "and its step" }
 face_direction = { address = 0x826C2DE0, type = "bytes", count = 16, note = "BoxShape::FaceDirection's static vector (its answer)" }
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from CollisionBoxBoxArgs.
+[CollisionBoxBoxArgsAt80]
+measure = "BoxBox.+20@+80"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "query_shape_a", offset = 0, type = "f32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the measure files every BoxBox:: function's r3 under one type, and the query's block pointers back into it: the fields of a CollisionQuery (fault_query_), a CollisionBlock (fault_block_), a block's corner, the edge flags and a face" },
+  { name = "query_shape_b", offset = 4, type = "f32" },
+  { name = "query_b_in_a_previous", offset = 8, type = "f32" },
+  { name = "query_a_in_b_previous", offset = 16, type = "u32" },
+]
+
+# Split from CollisionShape.
+[CollisionShapeAt32]
+measure = "CollisionObject::CollisionObject.ret@+32"
+size = 48
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "f32" },
+  { name = "unknown_44", offset = 44, type = "f32" },
+]
+
+# Split from CollisionShape.
+[CollisionShapeAt32_2]
+measure = "CollisionObject@+32"
+size = 116
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_112", offset = 112, type = "f32" },
+]
+
+# Split from BoxShape.
+[BoxShapePart]
+measure = "CollisionObject@+32.+4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from BoxShapeVtable.
+[BoxShapeVtablePart]
+measure = "CollisionObject@+32.+4.+0"
+size = 40
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_36", offset = 36, type = "u32" },
+]
+
+# Split from BoxShape.
+[BoxShapePart_2]
+measure = "CollisionObject@+32.+8"
+size = 60
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_48", offset = 48, type = "f32" },
+  { name = "unknown_52", offset = 52, type = "f32" },
+  { name = "unknown_56", offset = 56, type = "f32" },
+]
+
+# Split from BoxShapeVtable.
+[BoxShapeVtablePart_2]
+measure = "CollisionObject@+32.+8.+0"
+size = 44
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_36", offset = 36, type = "u32" },
+  { name = "unknown_40", offset = 40, type = "u32" },
+]
+
+# Split from BoxShape.
+[BoxShapePart_3]
+measure = "Vehicles::DestroyAll.r3@+37632.+344"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]

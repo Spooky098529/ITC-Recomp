@@ -243,3 +243,50 @@ fields = [
   { name = "unknown_28920", offset = 28920, type = "u32" },
   { name = "unknown_28924", offset = 28924, type = "u32" },
 ]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from LocationScreen.
+[LocationScreenAt560]
+measure = "LocationScreen@+560"
+size = 112
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_32", offset = 32, type = "u64" },
+  { name = "unknown_40", offset = 40, type = "u64" },
+  { name = "unknown_48", offset = 48, type = "u64" },
+  { name = "unknown_56", offset = 56, type = "u64" },
+  { name = "unknown_64", offset = 64, type = "u64" },
+  { name = "unknown_72", offset = 72, type = "u64" },
+  { name = "unknown_80", offset = 80, type = "u64" },
+  { name = "unknown_88", offset = 88, type = "u64" },
+  { name = "unknown_96", offset = 96, type = "f32" },
+  { name = "unknown_100", offset = 100, type = "f32" },
+  { name = "unknown_104", offset = 104, type = "f32" },
+  { name = "unknown_108", offset = 108, type = "f32" },
+]
+
+# Split from LocationScreen.
+[LocationScreenAt4288]
+measure = "TrafficCar@+4288"
+size = 736
+origin = "embedded"
+fields = [
+  { name = "unknown_732", offset = 732, type = "u32" },
+]
+
+# Split from LocationScreen.
+[LocationScreenAt9640]
+measure = "new<28940>@ModeType5::Init@+9640"
+size = 9608
+origin = "embedded"
+fields = [
+  { name = "unknown_9604", offset = 9604, type = "u32" },
+]

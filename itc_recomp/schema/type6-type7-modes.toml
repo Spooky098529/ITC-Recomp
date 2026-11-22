@@ -279,7 +279,8 @@ fields = [
 # The garage stage's camera (stage + 112; known-data.md "garage camera").
 # OnPresetsLoaded's r6 is the same camera.
 [GarageCamera]
-measures = ["GarageCamera", "GarageCamera::OnPresetsLoaded.r6"]
+measure = "GarageCamera::OnPresetsLoaded.r6"
+measures = ["GarageStage.+0@+112", "GarageCamera::Reset.r3", "GarageStage@+112"]
 size = 4396
 origin = "embedded"
 fields = [
@@ -420,3 +421,44 @@ type7_steps = { address = 0x82815E3C, type = "bytes", count = 32, note = "Type7S
 type7_steps_guard = { address = 0x82815E5C, type = "u32", note = "its guard (bit 0)" }
 type6_draw_table = { address = 0x826367B8, type = "bytes", count = 16, note = "Type6Screen0::Draw's page table (4 handlers)" }
 type6_steps = { address = 0x826367C8, type = "bytes", count = 32, note = "Type6Screen0::Update's step table" }
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from Type67Dialog.
+[Type67DialogAt9672]
+measure = "Type6Mode.+816@+9672"
+size = 9760
+origin = "embedded"
+fields = [
+  { name = "unknown_9756", offset = 9756, type = "u32" },
+]
+
+# Split from Type6Screen0.
+[Type6Screen0At4]
+measure = "Type6Screens@+4"
+size = 9608
+origin = "embedded"
+fields = [
+  { name = "unknown_9604", offset = 9604, type = "u32" },
+]
+
+# Split from Type67Dialog.
+[Type67DialogAt9664]
+measure = "Type7Mode.+816@+9664"
+size = 9764
+origin = "embedded"
+fields = [
+  { name = "unknown_9760", offset = 9760, type = "u32" },
+]
+
+# Split from Type7Screen0.
+[Type7Screen0At4]
+measure = "Type7Screens@+4"
+size = 9612
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_9608", offset = 9608, type = "u32" },
+]

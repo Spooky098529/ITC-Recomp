@@ -10385,7 +10385,7 @@ uint64_t f820EFCF8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // (left out: dead in C++)
   { const lifted::Result o = game::Matrix::Copy(base, LIFTED_ARGS(0x820EFD1C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,152(r31)
-  r11 = guest::LoadU32(base, schema::AccessorySkeleton(base, uint32_t(r31)).stepped_address());
+  r11 = guest::LoadU32(base, schema::AccessorySkeletonAt544_2(base, uint32_t(r31)).unknown_152_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x820efd54
@@ -10407,19 +10407,19 @@ uint64_t f820EFCF8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   r11 = uint64_t(int64_t(-2113929216));
   // stfs f0,424(r31)
   temp.f32 = float(f0);
-  guest::StoreU32(base, schema::AccessorySkeleton(base, uint32_t(r31)).movement_z_address(), temp.u32);
+  guest::StoreU32(base, schema::AccessorySkeletonAt544_2(base, uint32_t(r31)).unknown_424_address(), temp.u32);
   // stfs f0,420(r31)
   temp.f32 = float(f0);
-  guest::StoreU32(base, schema::AccessorySkeleton(base, uint32_t(r31)).movement_y_address(), temp.u32);
+  guest::StoreU32(base, schema::AccessorySkeletonAt544_2(base, uint32_t(r31)).unknown_420_address(), temp.u32);
   // stfs f0,416(r31)
   temp.f32 = float(f0);
-  guest::StoreU32(base, schema::AccessorySkeleton(base, uint32_t(r31)).movement_x_address(), temp.u32);
+  guest::StoreU32(base, schema::AccessorySkeletonAt544_2(base, uint32_t(r31)).unknown_416_address(), temp.u32);
   // lfs f13,2608(r11)
   temp.u32 = guest::LoadU32(base, uint32_t(r11) + 2608);
   f13 = double(temp.f32);
   // stfs f13,428(r31)
   temp.f32 = float(f13);
-  guest::StoreU32(base, schema::AccessorySkeleton(base, uint32_t(r31)).movement_w_address(), temp.u32);
+  guest::StoreU32(base, schema::AccessorySkeletonAt544_2(base, uint32_t(r31)).unknown_428_address(), temp.u32);
 loc_820EFD54:
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
@@ -11542,21 +11542,21 @@ lifted::Result f820F0718(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // ld r7,80(r1)
   r7 = guest::LoadU64(base, uint32_t(r1) + 80);
   // stw r11,8(r4)
-  guest::StoreU32(base, schema::AccessorySkeleton(base, uint32_t(r4) - 216).unknown_224_address(), uint32_t(r11));
+  guest::StoreU32(base, schema::AccessorySkeletonAt544(base, uint32_t(r4) - 216).unknown_224_address(), uint32_t(r11));
   // stw r11,12(r4)
-  guest::StoreU32(base, schema::AccessorySkeleton(base, uint32_t(r4) - 216).unknown_228_address(), uint32_t(r11));
+  guest::StoreU32(base, schema::AccessorySkeletonAt544(base, uint32_t(r4) - 216).unknown_228_address(), uint32_t(r11));
   // stb r11,16(r4)
-  guest::StoreU8(base, schema::AccessorySkeleton(base, uint32_t(r4) - 216).unknown_232_address(), uint8_t(r11));
+  guest::StoreU8(base, schema::AccessorySkeletonAt544(base, uint32_t(r4) - 216).unknown_232_address(), uint8_t(r11));
   // stb r9,17(r4)
-  guest::StoreU8(base, schema::AccessorySkeleton(base, uint32_t(r4) - 216).unknown_233_address(), uint8_t(r9));
+  guest::StoreU8(base, schema::AccessorySkeletonAt544(base, uint32_t(r4) - 216).unknown_233_address(), uint8_t(r9));
   // stb r11,18(r4)
-  guest::StoreU8(base, schema::AccessorySkeleton(base, uint32_t(r4) - 216).unknown_234_address(), uint8_t(r11));
+  guest::StoreU8(base, schema::AccessorySkeletonAt544(base, uint32_t(r4) - 216).unknown_234_address(), uint8_t(r11));
   // stw r8,20(r4)
-  guest::StoreU32(base, schema::AccessorySkeleton(base, uint32_t(r4) - 216).unknown_236_address(), uint32_t(r8));
+  guest::StoreU32(base, schema::AccessorySkeletonAt544(base, uint32_t(r4) - 216).unknown_236_address(), uint32_t(r8));
   // stw r3,28(r4)
-  guest::StoreU32(base, schema::AccessorySkeleton(base, uint32_t(r4) - 216).job_target_address(), uint32_t(r3));
+  guest::StoreU32(base, schema::AccessorySkeletonAt544(base, uint32_t(r4) - 216).unknown_244_address(), uint32_t(r3));
   // std r7,32(r4)
-  guest::StoreU64(base, schema::AccessorySkeleton(base, uint32_t(r4) - 216).job_method_pair_address(), r7);
+  guest::StoreU64(base, schema::AccessorySkeletonAt544(base, uint32_t(r4) - 216).unknown_248_address(), r7);
   // beq cr6,0x820f0790
   if (cr6.eq) goto loc_820F0790;
   // lwz r11,0(r10)

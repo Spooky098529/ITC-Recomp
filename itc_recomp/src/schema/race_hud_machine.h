@@ -37,7 +37,7 @@ struct RaceHudMachine : View {
   uint32_t message30_address() const { return address + 9616; }
 };
 
-// embedded; measure: RaceHud.+436
+// embedded; measure: RaceScreens@+16.+436
 struct RaceHud_436 : View {
   using View::View;
   static constexpr uint32_t kSize = 9612;
@@ -57,18 +57,10 @@ struct RaceHud_436 : View {
   uint32_t fault_machine_holder_address() const { return address + 9608; }
 };
 
-// allocated; measure: RaceScreens, PauseMenu4::Open.ret.+9608, AltHud::ToggleView.ret.+9608, RaceHud.+436.+9608
+// allocated; measure: RaceScreens, PauseMenu4::Open.ret.+9608, AltHud::ToggleView.ret.+9608, RaceScreens@+16.+436.+9608
 struct RaceScreens : View {
   using View::View;
   static constexpr uint32_t kSize = 1040;
-  // measure fault: RaceScreens::Make1004's r3 is the holder's +1004 (AltHudHolder's object)
-  uint32_t fault_alt_hud_object() const { return guest::LoadU32(base, address + 0); }
-  void set_fault_alt_hud_object(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t fault_alt_hud_object_address() const { return address + 0; }
-  // measure fault: RaceScreens::Make1004's AltHudHolder +4 (the menu list)
-  uint32_t fault_alt_hud_menu_list() const { return guest::LoadU32(base, address + 4); }
-  void set_fault_alt_hud_menu_list(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
-  uint32_t fault_alt_hud_menu_list_address() const { return address + 4; }
   // 0 at set-up; bit 0 the replay bit (set when the menu after the race picks the replay: the alternate HUD drawn in place of the race HUD)
   uint32_t flags() const { return guest::LoadU32(base, address + 8); }
   void set_flags(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
@@ -327,6 +319,15 @@ struct SplitHudTime : View {
   uint32_t packed() const { return guest::LoadU32(base, address + 0); }
   void set_packed(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t packed_address() const { return address + 0; }
+};
+
+// embedded; measure: RaceMode@+128664
+struct RaceHudMachineAt128664 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 9608;
+  uint32_t unknown_9604() const { return guest::LoadU32(base, address + 9604); }
+  void set_unknown_9604(uint32_t v) const { guest::StoreU32(base, address + 9604, v); }
+  uint32_t unknown_9604_address() const { return address + 9604; }
 };
 
 // The image words docs/functions/race-hud-machine.md's code uses.

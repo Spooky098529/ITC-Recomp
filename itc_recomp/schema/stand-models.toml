@@ -28,7 +28,7 @@
 # the stage's offsets (GarageStage::ApplyPreset, Draw), which is right.
 [GarageStage]
 measure = "GarageStage"
-measures = ["GarageLights", "GarageStage.+0"]
+measures = ["GarageStage.+0", "GarageStage@+4512", "GarageStage.+0@+4512"]
 size = 6208
 origin = "allocated"
 fields = [
@@ -316,4 +316,24 @@ size = 11456
 origin = "embedded"
 fields = [
   { name = "unknown_11452", offset = 11452, type = "u32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from GarageStage.
+[GarageStageAt32_2]
+measure = "GarageStage@+32"
+size = 68
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_16", offset = 16, type = "u64" },
+  { name = "unknown_24", offset = 24, type = "u64" },
+  { name = "unknown_32", offset = 32, type = "u64" },
+  { name = "unknown_40", offset = 40, type = "u64" },
+  { name = "unknown_48", offset = 48, type = "u64" },
+  { name = "unknown_56", offset = 56, type = "u64" },
+  { name = "unknown_64", offset = 64, type = "u32" },
 ]

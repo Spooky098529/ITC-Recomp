@@ -66,7 +66,8 @@ fields = [
 # A logical pad (196 bytes, LogicalPad::LogicalPad sub_82591B38): the sum of
 # its bound devices' values, clamped (LogicalPad::Build).
 [LogicalPad]
-measures = ["LogicalPad", "InputProcessor::Update.r4", "LogicalPad::Bind.r3"]
+measure = "InputProcessor::Update.r4"
+measures = ["LogicalPad::Bind.r3", "InputManager@+8"]
 size = 196
 origin = "embedded"
 vtable = 0x8206CBEC
@@ -103,7 +104,8 @@ fields = [
 # docs/pause-menu-fix.md). The _pair fields are two floats InputProcessor::Assign
 # copies as a doubleword.
 [InputProcessor]
-measures = ["InputProcessor", "InputProcessorBase", "InputProcessor::Assign.r4"]
+measure = "InputProcessor"
+measures = ["InputProcessorBase", "InputProcessor::Assign.r4", "InputProcessor::InputProcessor.r3"]
 size = 416
 origin = "embedded"
 vtable = 0x8206C0C4

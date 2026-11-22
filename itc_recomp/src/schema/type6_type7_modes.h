@@ -545,7 +545,7 @@ struct StandSlot : View {
   uint32_t stage_address() const { return address + 0; }
 };
 
-// embedded; measure: GarageCamera, GarageCamera::OnPresetsLoaded.r6
+// embedded; measure: GarageCamera::OnPresetsLoaded.r6, GarageStage.+0@+112, GarageCamera::Reset.r3, GarageStage@+112
 struct GarageCamera : View {
   using View::View;
   static constexpr uint32_t kSize = 4396;
@@ -806,6 +806,45 @@ struct Type67Car : View {
   uint32_t paint_word() const { return guest::LoadU32(base, address + 1980); }
   void set_paint_word(uint32_t v) const { guest::StoreU32(base, address + 1980, v); }
   uint32_t paint_word_address() const { return address + 1980; }
+};
+
+// embedded; measure: Type6Mode.+816@+9672
+struct Type67DialogAt9672 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 9760;
+  uint32_t unknown_9756() const { return guest::LoadU32(base, address + 9756); }
+  void set_unknown_9756(uint32_t v) const { guest::StoreU32(base, address + 9756, v); }
+  uint32_t unknown_9756_address() const { return address + 9756; }
+};
+
+// embedded; measure: Type6Screens@+4
+struct Type6Screen0At4 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 9608;
+  uint32_t unknown_9604() const { return guest::LoadU32(base, address + 9604); }
+  void set_unknown_9604(uint32_t v) const { guest::StoreU32(base, address + 9604, v); }
+  uint32_t unknown_9604_address() const { return address + 9604; }
+};
+
+// embedded; measure: Type7Mode.+816@+9664
+struct Type67DialogAt9664 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 9764;
+  uint32_t unknown_9760() const { return guest::LoadU32(base, address + 9760); }
+  void set_unknown_9760(uint32_t v) const { guest::StoreU32(base, address + 9760, v); }
+  uint32_t unknown_9760_address() const { return address + 9760; }
+};
+
+// embedded; measure: Type7Screens@+4
+struct Type7Screen0At4 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 9612;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_9608() const { return guest::LoadU32(base, address + 9608); }
+  void set_unknown_9608(uint32_t v) const { guest::StoreU32(base, address + 9608, v); }
+  uint32_t unknown_9608_address() const { return address + 9608; }
 };
 
 // The image words docs/functions/type6-type7-modes.md's code uses.

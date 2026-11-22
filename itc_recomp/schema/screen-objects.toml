@@ -136,7 +136,7 @@ fields = [
 # A map node (48 bytes, UvMap::AllocateNodes).
 [ScreenObjectUvMapNode]
 measure = "UvMap.+4"
-measures = ["UvMap.+4.+0", "UvMap.+4.+8", "UvMap.+4.+8.+0", "VideoOutput.+276", "new<?>@UvMap::AllocateNodes.+4", "new<?>@UvMap::AllocateNodes.+4.+0", "new<?>@UvMap::AllocateNodes.+4.+0.+8", "new<?>@UvMap::AllocateNodes.+4.+8", "new<?>@UvMap::AllocateNodes.+4.+8.+0", "UvMap::EraseSubtree.r4", "UvMap::EraseSubtree.r4.+0", "UvMap.+4.+0.+8"]
+measures = ["UvMap.+4.+0", "UvMap.+4.+8", "UvMap.+4.+8.+0", "new<?>@UvMap::AllocateNodes.+4", "new<?>@UvMap::AllocateNodes.+4.+0", "new<?>@UvMap::AllocateNodes.+4.+0.+8", "new<?>@UvMap::AllocateNodes.+4.+8", "new<?>@UvMap::AllocateNodes.+4.+8.+0", "UvMap::EraseSubtree.r4", "UvMap::EraseSubtree.r4.+0", "UvMap.+4.+0.+8", "RaceScreens@+16.+592"]
 size = 48
 origin = "allocated"
 fields = [
@@ -315,4 +315,84 @@ origin = "embedded"
 fields = [
   { name = "unknown_4", offset = 4, type = "u32" },
   { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from ScreenObjectUvMap.
+[ScreenObjectUvMapAt76124]
+measure = "ScreenObject::~ScreenObject.r3@+76124"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+]
+
+# Split from ScreenObjectUvMapNode.
+[ScreenObjectUvMapNodePart]
+measure = "ScreenObject::~ScreenObject.r3@+76124.+4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from ScreenObjectUvMap.
+[ScreenObjectUvMapAt76124_2]
+measure = "ScreenObject@+76124"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Split from ScreenObjectUvMapNode.
+[ScreenObjectUvMapNodePart_2]
+measure = "ScreenObject@+76124.+4.+8.+4"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Split from ScreenObjectUvColumn.
+[ScreenObjectUvColumnAt24]
+measure = "UvMap::EraseSubtree.r4@+24"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Split from ScreenObjectUvColumnNode.
+[ScreenObjectUvColumnNodePart]
+measure = "UvMap::EraseSubtree.r4@+24.+4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from ScreenObjectUvColumn.
+[ScreenObjectUvColumnAt24_2]
+measure = "UvMap@+24"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Split from ScreenObjectUvColumnNode.
+[ScreenObjectUvColumnNodePart_2]
+measure = "new<?>@UvColumn::AllocateNodes.+4"
+size = 34
+origin = "embedded"
+fields = [
+  { name = "unknown_33", offset = 33, type = "u8" },
 ]

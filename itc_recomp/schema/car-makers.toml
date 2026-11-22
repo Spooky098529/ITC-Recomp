@@ -14,7 +14,7 @@
 # and Copy), filled from a car object by SceneModelRecord::FromCar.
 [SceneModelRecord]
 measure = "SceneModelRecord"
-measures = ["SceneModelRecord::Copy.r4"]
+measures = ["SceneModelRecord::Copy.r4", "SceneModelRecord::FromCar.r3", "SceneModelRecord::SetChoice.r3", "SceneModelRecord::Copy.r3"]
 size = 4244
 origin = "embedded"
 fields = [
@@ -293,8 +293,8 @@ fields = [
 # A garage car (1,968 bytes): the head of a car object and its own words
 # (known-data's "garage car"; a save data's garage holds them at +6332).
 [GarageCar]
-measure = "GarageCar"
-measures = ["sub_8218D708.r3"]
+measure = "sub_8218D708.r3"
+measures = ["Type12Screen1@+832"]
 size = 1968
 origin = "embedded"
 fields = [

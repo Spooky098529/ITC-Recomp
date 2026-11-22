@@ -297,3 +297,28 @@ origin = "embedded"
 fields = [
   { name = "unknown_20", offset = 20, type = "u32" },
 ]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from RaceManager.
+[RaceManagerAt2392]
+measure = "RaceManager@+2392"
+size = 360004
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_360000", offset = 360000, type = "u32" },
+]
+
+# Split from RaceWorld.
+[RaceWorldAt116812]
+measure = "RaceMode@+116812"
+size = 9612
+origin = "embedded"
+fields = [
+  { name = "unknown_9604", offset = 9604, type = "u32" },
+  { name = "unknown_9608", offset = 9608, type = "u32" },
+]

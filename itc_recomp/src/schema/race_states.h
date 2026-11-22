@@ -216,30 +216,6 @@ struct RaceData : View {
   uint32_t fault_record_word_3892() const { return guest::LoadU32(base, address + 3892); }
   void set_fault_record_word_3892(uint32_t v) const { guest::StoreU32(base, address + 3892, v); }
   uint32_t fault_record_word_3892_address() const { return address + 3892; }
-  // measure fault: a racer record's +3904 start position (section, slice) as a word (Racers::SetStart)
-  uint32_t fault_record_start() const { return guest::LoadU32(base, address + 3904); }
-  void set_fault_record_start(uint32_t v) const { guest::StoreU32(base, address + 3904, v); }
-  uint32_t fault_record_start_address() const { return address + 3904; }
-  // measure fault: the record's start section (RaceManager::AddRacers)
-  uint16_t fault_record_start_section() const { return guest::LoadU16(base, address + 3904); }
-  void set_fault_record_start_section(uint16_t v) const { guest::StoreU16(base, address + 3904, v); }
-  uint32_t fault_record_start_section_address() const { return address + 3904; }
-  // measure fault: the record's start slice
-  uint16_t fault_record_start_slice() const { return guest::LoadU16(base, address + 3906); }
-  void set_fault_record_start_slice(uint16_t v) const { guest::StoreU16(base, address + 3906, v); }
-  uint32_t fault_record_start_slice_address() const { return address + 3906; }
-  // measure fault: the record's +3908 float ([0x8200692C], or 0.0 for stage types 2 and 3)
-  float fault_record_start_value() const { return guest::LoadFloat(base, address + 3908); }
-  void set_fault_record_start_value(float v) const { guest::StoreFloat(base, address + 3908, v); }
-  uint32_t fault_record_start_value_address() const { return address + 3908; }
-  // measure fault: the record's racer id (Racers::IndexOf)
-  uint32_t fault_record_racer_id() const { return guest::LoadU32(base, address + 3912); }
-  void set_fault_record_racer_id(uint32_t v) const { guest::StoreU32(base, address + 3912, v); }
-  uint32_t fault_record_racer_id_address() const { return address + 3912; }
-  // measure fault: the record's index in the event's list
-  uint32_t fault_record_event_index() const { return guest::LoadU32(base, address + 3916); }
-  void set_fault_record_event_index(uint32_t v) const { guest::StoreU32(base, address + 3916, v); }
-  uint32_t fault_record_event_index_address() const { return address + 3916; }
   // racer record 0's flags (+3888; 0x1 the player, RaceStates::RacersNear)
   uint32_t record0_flags() const { return guest::LoadU32(base, address + 3936); }
   void set_record0_flags(uint32_t v) const { guest::StoreU32(base, address + 3936, v); }
@@ -268,18 +244,6 @@ struct RaceData : View {
   float record0_car_value() const { return guest::LoadFloat(base, address + 3968); }
   void set_record0_car_value(float v) const { guest::StoreFloat(base, address + 3968, v); }
   uint32_t record0_car_value_address() const { return address + 3968; }
-  // measure fault: racer record 1's start position as a word, the records met at +0 (RaceManager::AddRacers)
-  uint32_t fault_record1_start() const { return guest::LoadU32(base, address + 7840); }
-  void set_fault_record1_start(uint32_t v) const { guest::StoreU32(base, address + 7840, v); }
-  uint32_t fault_record1_start_address() const { return address + 7840; }
-  // measure fault: racer record 1's start section, the records met at +0
-  uint16_t fault_record1_start_section() const { return guest::LoadU16(base, address + 7840); }
-  void set_fault_record1_start_section(uint16_t v) const { guest::StoreU16(base, address + 7840, v); }
-  uint32_t fault_record1_start_section_address() const { return address + 7840; }
-  // measure fault: racer record 1's start slice
-  uint16_t fault_record1_start_slice() const { return guest::LoadU16(base, address + 7842); }
-  void set_fault_record1_start_slice(uint16_t v) const { guest::StoreU16(base, address + 7842, v); }
-  uint32_t fault_record1_start_slice_address() const { return address + 7842; }
   // measure fault: the racers object's (+48) car count, +0x59610 here (Racers::Add, SetStart)
   uint32_t fault_car_count() const { return guest::LoadU32(base, address + 366048); }
   void set_fault_car_count(uint32_t v) const { guest::StoreU32(base, address + 366048, v); }
@@ -374,10 +338,6 @@ struct RaceStates : View {
   static constexpr uint32_t kSize = 9644;
   // 200 transitions, 48 bytes each (StateTransition, game-modes.toml); 87 added by RaceStates::Init
   uint32_t transitions_address() const { return address + 0; }
-  // measure fault: RaceStates::RacersStill's count word (its r3 is the machine's +9628, not the machine)
-  uint32_t fault_still_count() const { return guest::LoadU32(base, address + 0); }
-  void set_fault_still_count(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t fault_still_count_address() const { return address + 0; }
   // measure fault: SceneModelRecord::FromCar's halfword +4
   uint16_t fault_record_word_4() const { return guest::LoadU16(base, address + 4); }
   void set_fault_record_word_4(uint16_t v) const { guest::StoreU16(base, address + 4, v); }
@@ -468,7 +428,7 @@ struct RaceStatesDispatcher : View {
   uint32_t fault_word_1012_address() const { return address + 1012; }
 };
 
-// allocated; measure: RaceProgress, Achievements, sub_82167D88.r3.+9624, RaceScreens.+460
+// allocated; measure: RaceProgress, Achievements, sub_82167D88.r3.+9624, RaceStates.+9624@+2184
 struct RaceProgress : View {
   using View::View;
   static constexpr uint32_t kSize = 7248;
@@ -797,7 +757,7 @@ struct PackedTime : View {
   uint32_t packed_address() const { return address + 0; }
 };
 
-// embedded; measure: RoutePosition::MapToSection.r4, RoutePosition::NotAfter.r4, sub_820FFE98.ret, sub_820FFF10.ret, RoutePosition, AiDriver::UpdateStarting.ret@+4, TrackPosition@+4
+// embedded; measure: RoutePosition::MapToSection.r4, RoutePosition::NotAfter.r4, sub_820FFE98.ret, sub_820FFF10.ret, RoutePosition, AiDriver::UpdateStarting.ret@+4, TrackPosition@+4, RoutePosition::StepToMainRoad.r3
 struct RoutePosition : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
@@ -880,7 +840,7 @@ struct CourseTimeEntry : View {
   uint32_t time_b_address() const { return address + 24; }
 };
 
-// embedded; measure: CourseRecord
+// embedded; measure: CourseRecord, CourseRecord::Reset.r3
 struct CourseTimeList : View {
   using View::View;
   static constexpr uint32_t kSize = 408;
@@ -978,6 +938,158 @@ struct RaceProgressPart : View {
   uint32_t unknown_7244() const { return guest::LoadU32(base, address + 7244); }
   void set_unknown_7244(uint32_t v) const { guest::StoreU32(base, address + 7244, v); }
   uint32_t unknown_7244_address() const { return address + 7244; }
+};
+
+// embedded; measure: RaceMode@+107168
+struct RaceStatesAt107168 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 9628;
+  uint32_t unknown_9604() const { return guest::LoadU32(base, address + 9604); }
+  void set_unknown_9604(uint32_t v) const { guest::StoreU32(base, address + 9604, v); }
+  uint32_t unknown_9604_address() const { return address + 9604; }
+  uint32_t unknown_9624() const { return guest::LoadU32(base, address + 9624); }
+  void set_unknown_9624(uint32_t v) const { guest::StoreU32(base, address + 9624, v); }
+  uint32_t unknown_9624_address() const { return address + 9624; }
+};
+
+// embedded; measure: RaceProgress@+6088
+struct RoutePositionAt6088 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint16_t unknown_0() const { return guest::LoadU16(base, address + 0); }
+  void set_unknown_0(uint16_t v) const { guest::StoreU16(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint16_t unknown_2() const { return guest::LoadU16(base, address + 2); }
+  void set_unknown_2(uint16_t v) const { guest::StoreU16(base, address + 2, v); }
+  uint32_t unknown_2_address() const { return address + 2; }
+};
+
+// embedded; measure: RaceScreens@+16.+440.+5712
+struct RaceDataPart : View {
+  using View::View;
+  static constexpr uint32_t kSize = 3896;
+  uint32_t unknown_12() const { return guest::LoadU32(base, address + 12); }
+  void set_unknown_12(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): the record's car tuning +136 (the extra gauges' part, RaceHud::SetUpExtraGauges)
+  uint32_t record_tuning_136() const { return guest::LoadU32(base, address + 1832); }
+  void set_record_tuning_136(uint32_t v) const { guest::StoreU32(base, address + 1832, v); }
+  uint32_t record_tuning_136_address() const { return address + 1832; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's +3892 (RaceHud::Tick, Vehicle::SetUp)
+  uint32_t record_word_3892() const { return guest::LoadU32(base, address + 3892); }
+  void set_record_word_3892(uint32_t v) const { guest::StoreU32(base, address + 3892, v); }
+  uint32_t record_word_3892_address() const { return address + 3892; }
+};
+
+// embedded; measure: RaceStates@+9628
+struct RaceStatesAt9628 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  // the owner's fault_ field before the measure's fixes (2026-11-22): RaceStates::RacersStill's count word (its r3 is the machine's +9628, not the machine)
+  uint32_t still_count() const { return guest::LoadU32(base, address + 0); }
+  void set_still_count(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t still_count_address() const { return address + 0; }
+};
+
+// embedded; measure: [826C5B2C]@+366924
+struct CourseTimeListAt366924 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 50;
+  uint16_t unknown_40() const { return guest::LoadU16(base, address + 40); }
+  void set_unknown_40(uint16_t v) const { guest::StoreU16(base, address + 40, v); }
+  uint32_t unknown_40_address() const { return address + 40; }
+  uint16_t unknown_44() const { return guest::LoadU16(base, address + 44); }
+  void set_unknown_44(uint16_t v) const { guest::StoreU16(base, address + 44, v); }
+  uint32_t unknown_44_address() const { return address + 44; }
+  uint16_t unknown_48() const { return guest::LoadU16(base, address + 48); }
+  void set_unknown_48(uint16_t v) const { guest::StoreU16(base, address + 48, v); }
+  uint32_t unknown_48_address() const { return address + 48; }
+};
+
+// embedded; measure: [826C5B2C]@+48
+struct RaceDataAt48 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 366052;
+  uint32_t unknown_12() const { return guest::LoadU32(base, address + 12); }
+  void set_unknown_12(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's byte +76 (Vehicle::SetUp's record at +0)
+  uint8_t record_byte_76() const { return guest::LoadU8(base, address + 76); }
+  void set_record_byte_76(uint8_t v) const { guest::StoreU8(base, address + 76, v); }
+  uint32_t record_byte_76_address() const { return address + 76; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's byte +77 (Vehicle::SetUp's record at +0)
+  uint8_t record_byte_77() const { return guest::LoadU8(base, address + 77); }
+  void set_record_byte_77(uint8_t v) const { guest::StoreU8(base, address + 77, v); }
+  uint32_t record_byte_77_address() const { return address + 77; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's +1656 (its car's; sub_8210EBF0's horn scale below 2 or 5)
+  uint32_t record_word_1656() const { return guest::LoadU32(base, address + 1656); }
+  void set_record_word_1656(uint32_t v) const { guest::StoreU32(base, address + 1656, v); }
+  uint32_t record_word_1656_address() const { return address + 1656; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's +1672 (Vehicle::SetUp)
+  uint32_t record_word_1672() const { return guest::LoadU32(base, address + 1672); }
+  void set_record_word_1672(uint32_t v) const { guest::StoreU32(base, address + 1672, v); }
+  uint32_t record_word_1672_address() const { return address + 1672; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's +1676 (Vehicle::SetUp)
+  uint32_t record_word_1676() const { return guest::LoadU32(base, address + 1676); }
+  void set_record_word_1676(uint32_t v) const { guest::StoreU32(base, address + 1676, v); }
+  uint32_t record_word_1676_address() const { return address + 1676; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's +3888 flags (0x1 and 0x80 the players, 0x2 rivals and opponents, 0x4 traffic, 0x100, 0x200, 0x400, 0x800)
+  uint32_t record_flags() const { return guest::LoadU32(base, address + 3888); }
+  void set_record_flags(uint32_t v) const { guest::StoreU32(base, address + 3888, v); }
+  uint32_t record_flags_address() const { return address + 3888; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's +3892 (RaceHud::Tick, Vehicle::SetUp)
+  uint32_t record_word_3892() const { return guest::LoadU32(base, address + 3892); }
+  void set_record_word_3892(uint32_t v) const { guest::StoreU32(base, address + 3892, v); }
+  uint32_t record_word_3892_address() const { return address + 3892; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): the record's start section (RaceManager::AddRacers)
+  uint16_t record_start_section() const { return guest::LoadU16(base, address + 3904); }
+  void set_record_start_section(uint16_t v) const { guest::StoreU16(base, address + 3904, v); }
+  uint32_t record_start_section_address() const { return address + 3904; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's +3904 start position (section, slice) as a word (Racers::SetStart)
+  uint32_t record_start() const { return guest::LoadU32(base, address + 3904); }
+  void set_record_start(uint32_t v) const { guest::StoreU32(base, address + 3904, v); }
+  uint32_t record_start_address() const { return address + 3904; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): the record's start slice
+  uint16_t record_start_slice() const { return guest::LoadU16(base, address + 3906); }
+  void set_record_start_slice(uint16_t v) const { guest::StoreU16(base, address + 3906, v); }
+  uint32_t record_start_slice_address() const { return address + 3906; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): the record's +3908 float ([0x8200692C], or 0.0 for stage types 2 and 3)
+  float record_start_value() const { return guest::LoadFloat(base, address + 3908); }
+  void set_record_start_value(float v) const { guest::StoreFloat(base, address + 3908, v); }
+  uint32_t record_start_value_address() const { return address + 3908; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): the record's racer id (Racers::IndexOf)
+  uint32_t record_racer_id() const { return guest::LoadU32(base, address + 3912); }
+  void set_record_racer_id(uint32_t v) const { guest::StoreU32(base, address + 3912, v); }
+  uint32_t record_racer_id_address() const { return address + 3912; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): the record's index in the event's list
+  uint32_t record_event_index() const { return guest::LoadU32(base, address + 3916); }
+  void set_record_event_index(uint32_t v) const { guest::StoreU32(base, address + 3916, v); }
+  uint32_t record_event_index_address() const { return address + 3916; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): racer record 1's start section, the records met at +0
+  uint16_t record1_start_section() const { return guest::LoadU16(base, address + 7840); }
+  void set_record1_start_section(uint16_t v) const { guest::StoreU16(base, address + 7840, v); }
+  uint32_t record1_start_section_address() const { return address + 7840; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): racer record 1's start position as a word, the records met at +0 (RaceManager::AddRacers)
+  uint32_t record1_start() const { return guest::LoadU32(base, address + 7840); }
+  void set_record1_start(uint32_t v) const { guest::StoreU32(base, address + 7840, v); }
+  uint32_t record1_start_address() const { return address + 7840; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): racer record 1's start slice
+  uint16_t record1_start_slice() const { return guest::LoadU16(base, address + 7842); }
+  void set_record1_start_slice(uint16_t v) const { guest::StoreU16(base, address + 7842, v); }
+  uint32_t record1_start_slice_address() const { return address + 7842; }
+  // the owner's fault_ field before the measure's fixes (2026-11-22): the racers object's (+48) car count, +0x59610 here (Racers::Add, SetStart)
+  uint32_t car_count() const { return guest::LoadU32(base, address + 366048); }
+  void set_car_count(uint32_t v) const { guest::StoreU32(base, address + 366048, v); }
+  uint32_t car_count_address() const { return address + 366048; }
+};
+
+// embedded; measure: new<7248>@RaceProgress::Create@+6076
+struct RaceProgressAt6076 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
 };
 
 // The image words docs/functions/race-states.md's code uses.

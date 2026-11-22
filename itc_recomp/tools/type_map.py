@@ -22,6 +22,8 @@ libraries left out), and follows pointers through registers:
              it's itself a typed pointer (the field's pointee), a code address
              (a function pointer) or, at +0 in a constructor, an image address
              (the vtable)
+  names      a function `X::Y`'s r3 is joined with `X` unless every caller
+             passes it an embedded object (`T@+N`): the callers win
   calls      the types passed in r3 to r10 are voted into the callee's
              parameters (a pointer at a nonzero offset into a type votes
              for the object embedded there, `T@+96`; one into an array
@@ -321,7 +323,11 @@ class Map:
         pairs = list(self.ctor_joins)
         for fn, used in self.used_ptr.items():
             cls = self.class_of(fn)
-            if cls and 3 in used:
+            # A `this` every caller passes as an object embedded in another
+            # (`T@+N`) is that object, whatever class the row names.
+            votes = new_params.get(fn, {}).get(3)
+            embedded = votes and all(EMBEDDED.search(t) for t in votes)
+            if cls and 3 in used and not embedded:
                 pairs.append((cls, f"{fn}.r3"))
         for fn, v in new_params.items():
             for i, c in v.items():

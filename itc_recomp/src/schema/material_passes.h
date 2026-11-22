@@ -195,7 +195,7 @@ struct MaterialRecord : View {
   uint32_t fault_816_address() const { return address + 816; }
 };
 
-// file; measure: PartModel, SceneInterior.+11632, ModelPoint::Find.r4
+// file; measure: PartModel, SceneInterior.+11632, ModelPoint::Find.r4, PartModel::PartModel.r3, PartModel::Clear.r3, PartModel::SetPaint.r3, PartModel::SetPaintBody.r3, PartModel::ApplyPalette.r3, PartModel::SetMaterials.r3
 struct PartModel : View {
   using View::View;
   static constexpr uint32_t kSize = 464;

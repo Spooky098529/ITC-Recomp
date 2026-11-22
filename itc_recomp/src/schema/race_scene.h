@@ -77,6 +77,15 @@ struct RaceGlowParams : View {
   uint32_t c33_w_address() const { return address + 40; }
 };
 
+// embedded; measure: RaceMode@+87936
+struct RaceSceneMachineAt87936 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 9608;
+  uint32_t unknown_9604() const { return guest::LoadU32(base, address + 9604); }
+  void set_unknown_9604(uint32_t v) const { guest::StoreU32(base, address + 9604, v); }
+  uint32_t unknown_9604_address() const { return address + 9604; }
+};
+
 // The image words docs/functions/race-scene.md's code uses.
 struct RaceSceneGlobals {
   // the race scene (31,168 bytes, RaceScene::Create; RaceScene::Destroy leaves the pointer)

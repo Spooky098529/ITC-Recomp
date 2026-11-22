@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// embedded; measure: ModelList, PointList
+// embedded; measure: CourseSet@+3180, ModelList::Load.r3, ModelList::Init.r3, ModelList::Release.r3, PoolObject@+3180
 struct ModelList : View {
   using View::View;
   static constexpr uint32_t kSize = 624;

@@ -21,8 +21,9 @@
 # A track set (20 bytes, model +304, +324, +344, +364, +384): the section it
 # views and the values it animates, one a track.
 [TrackSet]
-measures = ["sub_825A1148.r3"]  # from SceneryMaterialTrackSet (scenery-lists), merged at the integration
 measure = "TrackSet"
+measures = ["sub_825A1148.r3", "TrackSet::SetupFloat.r3", "TrackSet::ReleaseArray.r3", "TrackSet::Release.r3", "TrackSet::EndTime.r3", "TrackSet::TrackSet.r3", "TrackSet::Track.r3", "TrackSet::Channels.r3"]
+# sub_825A1148.r3 from SceneryMaterialTrackSet (scenery-lists), merged at the integration
 size = 20
 origin = "file"
 fields = [
@@ -126,7 +127,8 @@ fields = [
 
 # A track set's values (an array: the measure joins the five sets' kinds).
 [TrackValues]
-measure = "new<4294967295>@TrackSet::SetupFloat"
+measure = "Mesh@+364.+16"
+measures = ["Mesh@+384.+16", "Mesh@+304.+16"]
 size = 208
 origin = "allocated"
 fields = [
@@ -149,9 +151,9 @@ fields = [
 # (vtable 0x8206CE60, 164 bytes) and the skeleton (vtable 0x8206CE50) are
 # one object here.
 [Skeleton]
+measure = "Skeleton"
+measures = ["SkeletonBase", "sub_82599BE0.r3", "sub_8259B600.r3", "Skeleton::LocalMatrices.r3", "Skeleton::ResetPose.r3", "Skeleton::~Skeleton.r3", "Skeleton::Skeleton.r3", "Skeleton::FreeNodeValues.r3", "Skeleton::UpdateMatrices.r3", "SceneParts@+176@+24480.+0"]
 # measures from SecondSetPointSkeleton (second-set), merged at the integration
-measures = ["Skeleton", "SkeletonBase", "sub_82599BE0.r3", "sub_8259B600.r3",
-  "PartsPoints.+0"]
 size = 180
 origin = "file"
 vtable = 0x8206CE50
@@ -186,6 +188,7 @@ fields = [
 # +0x28 section with +16 = 0.
 [SkeletonCursor]
 measure = "SkeletonCursor"
+measures = ["Skeleton.+128"]
 size = 20
 origin = "file"
 fields = [
@@ -200,8 +203,8 @@ fields = [
 # joins it with what the cursor's +0 and +4 point to (the section: +4 its
 # start time, a float; its entry count at +16).
 [SkeletonNodeEntry]
-measure = "SkeletonCursor.+8"
-measures = ["SkeletonCursor.+4", "SkeletonCursor.+0"]
+measure = "SkeletonCursor.+0"
+measures = ["Skeleton.+128.+8", "Mesh@+112.+128.+8", "Mesh@+112.+128.+4", "Skeleton.+128.+4"]
 size = 20
 origin = "file"
 fields = [
@@ -226,8 +229,8 @@ fields = [
 
 # The primitive drawer's 4-byte block: its vertex declaration.
 [PrimitiveDrawerDeclaration]
-measure = "new<4>@PrimitiveDrawer::PrimitiveDrawer"
-measures = ["sub_825A1810.r3.+4"]
+measure = "sub_825A1810.r3.+4"
+measures = ["PrimitiveDrawer.+4"]
 size = 4
 origin = "allocated"
 fields = [
@@ -239,7 +242,7 @@ fields = [
 # (sub_825A18D8) stores to the records at +168 and +180 as the pad's +0, +4
 # and +8 (a measure fault: its r3 is pad + 168).
 [PhysicalPad]
-measure = "PhysicalPad"
+measure = "InputManager@+988"
 size = 212
 origin = "file"
 vtable = 0x8206CBF4
@@ -272,11 +275,94 @@ inverse_two_pi = { address = 0x82001FA4, type = "f32", note = "1 / (2 pi) (Skele
 
 # Split from PhysicalPad.
 [PhysicalPadAt168]
-measure = "PhysicalPad@+168"
+measure = "InputManager@+988@+168"
 size = 12
 origin = "embedded"
 fields = [
   { name = "unknown_0", offset = 0, type = "f32" },
   { name = "unknown_4", offset = 4, type = "u32" },
   { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from Skeleton.
+[SkeletonAt112]
+measure = "Mesh@+112"
+size = 180
+origin = "embedded"
+fields = [
+  { name = "unknown_128", offset = 128, type = "u32" },
+  { name = "unknown_176", offset = 176, type = "u32" },
+]
+
+# Split from SkeletonCursor.
+[SkeletonCursorPart]
+measure = "Mesh@+112.+128"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Split from TrackSet.
+[TrackSetAt304]
+measure = "Mesh@+304"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "unknown_16", offset = 16, type = "u32" },
+]
+
+# Split from TrackSet.
+[TrackSetAt364]
+measure = "Mesh@+364"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "unknown_16", offset = 16, type = "u32" },
+]
+
+# Split from TrackSet.
+[TrackSetAt384]
+measure = "Mesh@+384"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+]
+
+# Split from TrackSet.
+[TrackSetAt304_2]
+measure = "Model::Animate.r3@+304"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+]
+
+# Split from TrackSet.
+[TrackSetAt364_2]
+measure = "Model::Animate.r3@+364"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+]
+
+# Split from PrimitiveDrawer.
+[PrimitiveDrawerAt4]
+measure = "new<88>@RenderQueue::RenderQueue@+4"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
 ]

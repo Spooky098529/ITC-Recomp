@@ -164,7 +164,7 @@ struct UiMovieTexture : View {
   uint32_t texture_address() const { return address + 0; }
 };
 
-// embedded; measure: DecalImages, TuningScreen.+10048, DecalImages::Load.r3, DecalImages::SwapKept.r3, DecalImages::Request.r3, DecalImages::Reload.r3, DecalImages::Unload.r3, DecalImages::Scroll.r3
+// embedded; measure: DecalImages, TuningScreen.+10048, DecalImages::Load.r3, DecalImages::SwapKept.r3, DecalImages::Request.r3, DecalImages::Reload.r3, DecalImages::Unload.r3, DecalImages::Scroll.r3, DecalImages::UnloadAll.r3, DecalImages::SetSlot.r3
 struct DecalImages : View {
   using View::View;
   static constexpr uint32_t kSize = 8856;
@@ -316,7 +316,7 @@ struct TuningPagesIndexFault : View {
   uint32_t fault_40_address() const { return address + 40; }
 };
 
-// embedded; measure: DecalImages@+28
+// embedded; measure: TuningScreen@+10048@+28
 struct DecalImagesAt28 : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
@@ -325,13 +325,97 @@ struct DecalImagesAt28 : View {
   uint32_t unknown_0_address() const { return address + 0; }
 };
 
-// embedded; measure: DecalImages@+32
+// embedded; measure: TuningScreen@+10048@+32
 struct DecalImagesAt32 : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
   uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
   void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: TuningMachine@+10048
+struct DecalImagesAt10048 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 8856;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  uint32_t unknown_12() const { return guest::LoadU32(base, address + 12); }
+  void set_unknown_12(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+  uint32_t unknown_16() const { return guest::LoadU32(base, address + 16); }
+  void set_unknown_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+  uint32_t unknown_20() const { return guest::LoadU32(base, address + 20); }
+  void set_unknown_20(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
+  uint32_t unknown_20_address() const { return address + 20; }
+  uint32_t unknown_24() const { return guest::LoadU32(base, address + 24); }
+  void set_unknown_24(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
+  uint32_t unknown_24_address() const { return address + 24; }
+  uint32_t unknown_28() const { return guest::LoadU32(base, address + 28); }
+  void set_unknown_28(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
+  uint32_t unknown_28_address() const { return address + 28; }
+  uint32_t unknown_32() const { return guest::LoadU32(base, address + 32); }
+  void set_unknown_32(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
+  uint32_t unknown_32_address() const { return address + 32; }
+  uint32_t unknown_8836() const { return guest::LoadU32(base, address + 8836); }
+  void set_unknown_8836(uint32_t v) const { guest::StoreU32(base, address + 8836, v); }
+  uint32_t unknown_8836_address() const { return address + 8836; }
+  uint32_t unknown_8840() const { return guest::LoadU32(base, address + 8840); }
+  void set_unknown_8840(uint32_t v) const { guest::StoreU32(base, address + 8840, v); }
+  uint32_t unknown_8840_address() const { return address + 8840; }
+  uint32_t unknown_8844() const { return guest::LoadU32(base, address + 8844); }
+  void set_unknown_8844(uint32_t v) const { guest::StoreU32(base, address + 8844, v); }
+  uint32_t unknown_8844_address() const { return address + 8844; }
+  uint32_t unknown_8848() const { return guest::LoadU32(base, address + 8848); }
+  void set_unknown_8848(uint32_t v) const { guest::StoreU32(base, address + 8848, v); }
+  uint32_t unknown_8848_address() const { return address + 8848; }
+  uint32_t unknown_8852() const { return guest::LoadU32(base, address + 8852); }
+  void set_unknown_8852(uint32_t v) const { guest::StoreU32(base, address + 8852, v); }
+  uint32_t unknown_8852_address() const { return address + 8852; }
+};
+
+// embedded; measure: TuningScreen@+10048
+struct DecalImagesAt10048_2 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 860;
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  uint32_t unknown_12() const { return guest::LoadU32(base, address + 12); }
+  void set_unknown_12(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+  uint32_t unknown_16() const { return guest::LoadU32(base, address + 16); }
+  void set_unknown_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+  uint32_t unknown_20() const { return guest::LoadU32(base, address + 20); }
+  void set_unknown_20(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
+  uint32_t unknown_20_address() const { return address + 20; }
+  uint32_t unknown_28() const { return guest::LoadU32(base, address + 28); }
+  void set_unknown_28(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
+  uint32_t unknown_28_address() const { return address + 28; }
+  uint32_t unknown_64() const { return guest::LoadU32(base, address + 64); }
+  void set_unknown_64(uint32_t v) const { guest::StoreU32(base, address + 64, v); }
+  uint32_t unknown_64_address() const { return address + 64; }
+  uint32_t unknown_100() const { return guest::LoadU32(base, address + 100); }
+  void set_unknown_100(uint32_t v) const { guest::StoreU32(base, address + 100, v); }
+  uint32_t unknown_100_address() const { return address + 100; }
+  uint32_t unknown_784() const { return guest::LoadU32(base, address + 784); }
+  void set_unknown_784(uint32_t v) const { guest::StoreU32(base, address + 784, v); }
+  uint32_t unknown_784_address() const { return address + 784; }
+  uint32_t unknown_820() const { return guest::LoadU32(base, address + 820); }
+  void set_unknown_820(uint32_t v) const { guest::StoreU32(base, address + 820, v); }
+  uint32_t unknown_820_address() const { return address + 820; }
+  uint32_t unknown_856() const { return guest::LoadU32(base, address + 856); }
+  void set_unknown_856(uint32_t v) const { guest::StoreU32(base, address + 856, v); }
+  uint32_t unknown_856_address() const { return address + 856; }
 };
 
 // The image words docs/functions/tuning-pages.md's code uses.

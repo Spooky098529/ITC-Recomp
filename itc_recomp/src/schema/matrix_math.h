@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// file; measure: Matrix, Matrix::Copy.r4, Matrix::Multiply.r4, Matrix::Multiply.r5, Matrix::Inverse.r4, Vec4::Transform.r4, Matrix::ProjectPoint.r4, sub_8209B038.r3
+// file; measure: Matrix, Matrix::Copy.r4, Matrix::Multiply.r4, Matrix::Multiply.r5, Matrix::Inverse.r4, Vec4::Transform.r4, Matrix::ProjectPoint.r4, sub_8209B038.r3, Matrix::SetTranslation.r3
 struct Matrix : View {
   using View::View;
   static constexpr uint32_t kSize = 64;
@@ -189,6 +189,132 @@ struct MatrixMathFloat : View {
   float value() const { return guest::LoadFloat(base, address + 0); }
   void set_value(float v) const { guest::StoreFloat(base, address + 0, v); }
   uint32_t value_address() const { return address + 0; }
+};
+
+// embedded; measure: CameraTarget::Track.r3@+64
+struct MatrixAt64 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 64;
+  float unknown_0() const { return guest::LoadFloat(base, address + 0); }
+  void set_unknown_0(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  float unknown_4() const { return guest::LoadFloat(base, address + 4); }
+  void set_unknown_4(float v) const { guest::StoreFloat(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  float unknown_8() const { return guest::LoadFloat(base, address + 8); }
+  void set_unknown_8(float v) const { guest::StoreFloat(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  float unknown_12() const { return guest::LoadFloat(base, address + 12); }
+  void set_unknown_12(float v) const { guest::StoreFloat(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+  float unknown_16() const { return guest::LoadFloat(base, address + 16); }
+  void set_unknown_16(float v) const { guest::StoreFloat(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+  float unknown_20() const { return guest::LoadFloat(base, address + 20); }
+  void set_unknown_20(float v) const { guest::StoreFloat(base, address + 20, v); }
+  uint32_t unknown_20_address() const { return address + 20; }
+  float unknown_24() const { return guest::LoadFloat(base, address + 24); }
+  void set_unknown_24(float v) const { guest::StoreFloat(base, address + 24, v); }
+  uint32_t unknown_24_address() const { return address + 24; }
+  float unknown_28() const { return guest::LoadFloat(base, address + 28); }
+  void set_unknown_28(float v) const { guest::StoreFloat(base, address + 28, v); }
+  uint32_t unknown_28_address() const { return address + 28; }
+  float unknown_32() const { return guest::LoadFloat(base, address + 32); }
+  void set_unknown_32(float v) const { guest::StoreFloat(base, address + 32, v); }
+  uint32_t unknown_32_address() const { return address + 32; }
+  float unknown_36() const { return guest::LoadFloat(base, address + 36); }
+  void set_unknown_36(float v) const { guest::StoreFloat(base, address + 36, v); }
+  uint32_t unknown_36_address() const { return address + 36; }
+  float unknown_40() const { return guest::LoadFloat(base, address + 40); }
+  void set_unknown_40(float v) const { guest::StoreFloat(base, address + 40, v); }
+  uint32_t unknown_40_address() const { return address + 40; }
+  float unknown_44() const { return guest::LoadFloat(base, address + 44); }
+  void set_unknown_44(float v) const { guest::StoreFloat(base, address + 44, v); }
+  uint32_t unknown_44_address() const { return address + 44; }
+  float unknown_48() const { return guest::LoadFloat(base, address + 48); }
+  void set_unknown_48(float v) const { guest::StoreFloat(base, address + 48, v); }
+  uint32_t unknown_48_address() const { return address + 48; }
+  float unknown_52() const { return guest::LoadFloat(base, address + 52); }
+  void set_unknown_52(float v) const { guest::StoreFloat(base, address + 52, v); }
+  uint32_t unknown_52_address() const { return address + 52; }
+  float unknown_56() const { return guest::LoadFloat(base, address + 56); }
+  void set_unknown_56(float v) const { guest::StoreFloat(base, address + 56, v); }
+  uint32_t unknown_56_address() const { return address + 56; }
+  float unknown_60() const { return guest::LoadFloat(base, address + 60); }
+  void set_unknown_60(float v) const { guest::StoreFloat(base, address + 60, v); }
+  uint32_t unknown_60_address() const { return address + 60; }
+};
+
+// embedded; measure: RigidBody@+80
+struct QuaternionAt80 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 16;
+  float unknown_0() const { return guest::LoadFloat(base, address + 0); }
+  void set_unknown_0(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  float unknown_4() const { return guest::LoadFloat(base, address + 4); }
+  void set_unknown_4(float v) const { guest::StoreFloat(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  float unknown_8() const { return guest::LoadFloat(base, address + 8); }
+  void set_unknown_8(float v) const { guest::StoreFloat(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  float unknown_12() const { return guest::LoadFloat(base, address + 12); }
+  void set_unknown_12(float v) const { guest::StoreFloat(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+};
+
+// embedded; measure: Vehicle@+464
+struct QuaternionAt464 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 16;
+  float unknown_0() const { return guest::LoadFloat(base, address + 0); }
+  void set_unknown_0(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  float unknown_4() const { return guest::LoadFloat(base, address + 4); }
+  void set_unknown_4(float v) const { guest::StoreFloat(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  float unknown_8() const { return guest::LoadFloat(base, address + 8); }
+  void set_unknown_8(float v) const { guest::StoreFloat(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  float unknown_12() const { return guest::LoadFloat(base, address + 12); }
+  void set_unknown_12(float v) const { guest::StoreFloat(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+};
+
+// embedded; measure: Vehicle@+6160@+16
+struct MatrixAt16 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 16;
+  float unknown_0() const { return guest::LoadFloat(base, address + 0); }
+  void set_unknown_0(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  float unknown_4() const { return guest::LoadFloat(base, address + 4); }
+  void set_unknown_4(float v) const { guest::StoreFloat(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  float unknown_8() const { return guest::LoadFloat(base, address + 8); }
+  void set_unknown_8(float v) const { guest::StoreFloat(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  float unknown_12() const { return guest::LoadFloat(base, address + 12); }
+  void set_unknown_12(float v) const { guest::StoreFloat(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+};
+
+// embedded; measure: VehicleStatus::Update.r3@+16
+struct QuaternionAt16 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 16;
+  float unknown_0() const { return guest::LoadFloat(base, address + 0); }
+  void set_unknown_0(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  float unknown_4() const { return guest::LoadFloat(base, address + 4); }
+  void set_unknown_4(float v) const { guest::StoreFloat(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  float unknown_8() const { return guest::LoadFloat(base, address + 8); }
+  void set_unknown_8(float v) const { guest::StoreFloat(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  float unknown_12() const { return guest::LoadFloat(base, address + 12); }
+  void set_unknown_12(float v) const { guest::StoreFloat(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
 };
 
 // The image words docs/functions/matrix-math.md's code uses.

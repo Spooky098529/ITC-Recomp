@@ -101,9 +101,9 @@ fields = [
 # sub_820D45B0). The measure also files the 64-byte vinyl layer reset
 # (sub_820D0A20, r3 a layer) and CarRecord::ResetBytes' words at +0.
 [CarRecord]
+measure = "CarRecord::Copy.r4"
+measures = ["sub_820D45B0.r3", "CarRecord::Copy.r3", "CarRecord::Reset.r3", "SceneModelRecord@+16", "SceneModelRecord::FromCar.r3@+16@+3632", "WheelPoints::SetUpTire.r3.+4", "WheelPoints::DrawTireMorphed.r3.+4"]
 # measures from SecondSetWheelCarRecord (second-set), merged at the integration
-measures = ["CarRecord", "CarRecord::Copy.r4", "sub_820D45B0.r3",
-  "WheelPoints.+4"]
 size = 3696
 origin = "embedded"
 fields = [
@@ -144,9 +144,9 @@ fields = [
 # The wheels' 156-byte record (the scene model record's +4036, the wheels'
 # +32; sub_820D3900; docs/known-data.md "car draw records").
 [SceneModelsWheelsRecord]
-# measures from SecondSetWheelsRecord (second-set), merged at the integration
-measures = ["WheelPoints.+8944"]
 measure = "sub_820D3900.r3"
+measures = ["WheelPoints::DrawBrakesMorphed.r3.+8", "WheelPoints::DrawBrakes.r3.+8", "WheelPoints::DrawTireMorphed.r3.+8", "WheelPoints::SetUpTire.r3.+8", "WheelPoints::SetUpBrakes.r3.+8", "WheelPoints::DrawTire.r3.+8", "WheelPoints::DrawRimB.r3.+8", "WheelPoints::SetUpRimA.r3.+8", "WheelPoints::SetUpRimB.r3.+8"]
+# measures from SecondSetWheelsRecord (second-set), merged at the integration
 size = 156
 origin = "embedded"
 fields = [
@@ -265,7 +265,7 @@ car_record_z1 = { address = 0x82002A88, type = "f32", note = "its other blocks' 
 
 # Split from CarRecord.
 [CarRecordAt176]
-measure = "CarRecord@+176"
+measure = "CarRecord::Reset.r3@+176"
 size = 64
 origin = "embedded"
 fields = [
@@ -281,7 +281,7 @@ fields = [
 
 # Split from SceneModelsWheelsRecord.
 [SceneModelsWheelsRecordAt60]
-measure = "WheelPoints.+8@+60"
+measure = "WheelPoints::DrawTireMorphed.r3.+8@+60"
 size = 4
 origin = "embedded"
 fields = [

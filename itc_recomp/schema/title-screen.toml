@@ -224,3 +224,16 @@ fields = [
   { name = "unknown_48172", offset = 48172, type = "u32" },
   { name = "unknown_48176", offset = 48176, type = "u32" },
 ]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from Type4Block.
+[Type4BlockAt38560]
+measure = "new<48220>@ModeType4::Init@+38560"
+size = 9608
+origin = "embedded"
+fields = [
+  { name = "unknown_9604", offset = 9604, type = "u32" },
+]

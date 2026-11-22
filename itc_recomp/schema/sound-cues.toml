@@ -229,7 +229,8 @@ fields = [
 # The manager's +1456 (56 bytes, Listener::Listener sub_8259D478): an X3DAudio
 # listener (car-sounds' X3DAudioListener) and two floats.
 [SoundListener]
-measure = "Listener"
+measure = "AudioManager@+1456"
+measures = ["AudioManager::SetListenerOrientation.r3@+1456", "AudioManager::SetListenerPosition.r3@+1456", "AudioManager::SetListenerParams.r3@+1456"]
 size = 56
 origin = "embedded"
 fields = [
@@ -281,8 +282,8 @@ fields = [
 # joined with the engine at +0, so the handle's words show at +0 to +12 too
 # (fault_* below).
 [AudioEngine]
-measure = "AudioEngine"
-measures = ["sub_82118638.r3@+16", "sub_82118638.r3@+16@+8"]
+measure = "sub_82118638.r3@+16"
+measures = ["sub_82118638.r3@+16@+8", "AudioManager@+16", "AudioManager::GetCategory.r3@+16", "AudioManager::SetCategoryVolume.r3@+16", "AudioManager::PauseCategory.r3@+16", "AudioManager::ResumeCategory.r3@+16", "AudioEngine::DoWork.r3"]
 size = 100
 origin = "embedded"
 fields = [
@@ -310,7 +311,7 @@ fields = [
 # themselves when empty.
 [XactEngine]
 measure = "new<196>@XACT3CreateEngine"
-measures = ["AudioEngine.+8", "sub_82118638.r3@+16.+8"]
+measures = ["sub_82118638.r3@+16.+8", "AudioManager::GetCategory.r3@+16.+8", "AudioManager::SetCategoryVolume.r3@+16.+8", "AudioManager::PauseCategory.r3@+16.+8", "AudioManager::ResumeCategory.r3@+16.+8", "AudioEngine::DoWork.r3.+8", "AudioManager@+16.+8"]
 # measures from XactEngineRef (files-and-saves), merged at the integration
 size = 196
 origin = "allocated"
@@ -363,8 +364,8 @@ fields = [
 # XACT's engine's vtable (0x82075360) as the wrapper calls it (files-and-saves'
 # XactEngineVtable is the same table, met from sub_8259D1F0).
 [XactEngineInterface]
-measure = "AudioEngine.+8.+0"
-measures = ["sub_82118638.r3@+16.+8.+0"]
+measure = "sub_82118638.r3@+16.+8.+0"
+measures = ["AudioManager::GetCategory.r3@+16.+8.+0", "AudioManager::SetCategoryVolume.r3@+16.+8.+0", "AudioManager::PauseCategory.r3@+16.+8.+0", "AudioManager::ResumeCategory.r3@+16.+8.+0", "AudioEngine::DoWork.r3.+8.+0", "AudioManager@+16.+8.+0"]
 # measures from XactEngineVtable (files-and-saves), merged at the integration
 size = 56
 origin = "image"
@@ -594,7 +595,7 @@ xact_engine = { address = 0x82971478, type = "ptr", to = "XactEngine", note = "X
 
 # Split from AudioEngine.
 [AudioEngineAt12]
-measure = "AudioEngine@+12"
+measure = "AudioManager@+16@+12"
 size = 16
 origin = "embedded"
 fields = [
@@ -638,4 +639,28 @@ size = 4
 origin = "embedded"
 fields = [
   { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from WordVector.
+[WordVectorAt1512]
+measure = "AudioManager@+1512"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+]
+
+# Split from SoundBankPair.
+[SoundBankPairOuter12]
+measure = "sub_82090858.r3@-12"
+size = 80
+origin = "embedded"
+fields = [
+  { name = "unknown_76", offset = 76, type = "u32" },
 ]

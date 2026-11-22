@@ -307,6 +307,24 @@ struct MinimapPoint : View {
   uint32_t w_address() const { return address + 12; }
 };
 
+// embedded; measure: new<363592>@RaceManager::Create@+4
+struct MinimapRacerEntryAt4 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 28;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint16_t unknown_8() const { return guest::LoadU16(base, address + 8); }
+  void set_unknown_8(uint16_t v) const { guest::StoreU16(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  uint16_t unknown_10() const { return guest::LoadU16(base, address + 10); }
+  void set_unknown_10(uint16_t v) const { guest::StoreU16(base, address + 10, v); }
+  uint32_t unknown_10_address() const { return address + 10; }
+  uint32_t unknown_24() const { return guest::LoadU32(base, address + 24); }
+  void set_unknown_24(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
+  uint32_t unknown_24_address() const { return address + 24; }
+};
+
 // The image words docs/functions/minimap.md's code uses.
 struct MinimapGlobals {
   // the car marker's 7 triangles: 3 vertices of 16 bytes (x, 0.0, z, 1.0) each

@@ -831,6 +831,30 @@ struct PlateEditorAt24 : View {
   uint32_t unknown_1_address() const { return address + 1; }
 };
 
+// embedded; measure: new<206444>@BuildScreen::Create@+76
+struct BuildScreenDataAt76 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 1610;
+  uint16_t unknown_1600() const { return guest::LoadU16(base, address + 1600); }
+  void set_unknown_1600(uint16_t v) const { guest::StoreU16(base, address + 1600, v); }
+  uint32_t unknown_1600_address() const { return address + 1600; }
+  uint16_t unknown_1604() const { return guest::LoadU16(base, address + 1604); }
+  void set_unknown_1604(uint16_t v) const { guest::StoreU16(base, address + 1604, v); }
+  uint32_t unknown_1604_address() const { return address + 1604; }
+  uint16_t unknown_1608() const { return guest::LoadU16(base, address + 1608); }
+  void set_unknown_1608(uint16_t v) const { guest::StoreU16(base, address + 1608, v); }
+  uint32_t unknown_1608_address() const { return address + 1608; }
+};
+
+// embedded; measure: new<76>@PlateEditor::Create@+4
+struct PlateEditorAt4 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 2;
+  uint8_t unknown_1() const { return guest::LoadU8(base, address + 1); }
+  void set_unknown_1(uint8_t v) const { guest::StoreU8(base, address + 1, v); }
+  uint32_t unknown_1_address() const { return address + 1; }
+};
+
 // The image words docs/functions/type2-screens.md's code uses.
 struct Type2ScreensGlobals {
   // pages 0 the menu, 3 the choice made, 4 the notices, 5 the record, 6 a save prompt; 13 transitions

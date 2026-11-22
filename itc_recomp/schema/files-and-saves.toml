@@ -139,7 +139,7 @@ fields = [
 # A compressed block (Ucl::UnpackBlock's r3): NRV2B's bit stream, read a
 # byte at a time.
 [UclBlockSource]
-measure = "Ucl"
+measure = "Ucl::Unpack.r4@+26"
 size = 30
 origin = "embedded"
 fields = [
@@ -170,7 +170,7 @@ fields = [
 # The movie player's file data source (the XDK media library's, vtable
 # 0x8204DD50; src/hooks/movie_files.cpp).
 [MovieSource]
-measure = "MovieSource"
+measure = "MovieSource::AtEnd.r3"
 size = 136
 origin = "allocated"
 vtable = 0x8204DD50
@@ -215,7 +215,7 @@ fields = [
 # Win32 OVERLAPPED, 20 bytes).
 [SaveSlot]
 measure = "SaveSlot::WaitEnumerate.r4"
-measures = ["SaveSlot::Create.r4", "SaveSlot::Delete.r4", "SaveSlot::LoadStep.r4", "SaveSlot::OpenItem.r4", "SaveSlot::SaveStep.r4", "SaveSlot::ShowDeviceSelector.r4", "SaveSlot::WaitDeviceSelector.r4", "sub_820A4508.r3", "sub_820A5660.r3", "SaveSlot::CheckStep.r4", "SaveSlot::DeleteStep.r4", "SaveSlot::EnumerateStep.r4", "SaveSlot::Failed.r4", "SaveSlot::Ready.r4", "SaveSlot::WaitClose.r4", "SaveSlot::WaitForDevice.r4", "SaveSlot::WaitForUser.r4", "SlotArray.+0", "SaveSlot::WaitWrite.r4", "SaveSlot::WriteFile.r4@+500", "SaveSlot::WaitRead.r4", "SaveSlot::ReadFile.r4@+500", "SaveSlot::ReadFile.r4@+472"]
+measures = ["SaveSlot::Create.r4", "SaveSlot::Delete.r4", "SaveSlot::LoadStep.r4", "SaveSlot::OpenItem.r4", "SaveSlot::SaveStep.r4", "SaveSlot::ShowDeviceSelector.r4", "SaveSlot::WaitDeviceSelector.r4", "sub_820A4508.r3", "sub_820A5660.r3", "SaveSlot::CheckStep.r4", "SaveSlot::DeleteStep.r4", "SaveSlot::EnumerateStep.r4", "SaveSlot::Failed.r4", "SaveSlot::Ready.r4", "SaveSlot::WaitClose.r4", "SaveSlot::WaitForDevice.r4", "SaveSlot::WaitForUser.r4", "SaveSlot::WaitWrite.r4", "SaveSlot::WriteFile.r4@+500", "SaveSlot::WaitRead.r4", "SaveSlot::ReadFile.r4@+500", "SaveSlot::ReadFile.r4@+472", "SaveDevices@+44.+0"]
 size = 1000
 origin = "allocated"
 vtable = 0x82002190

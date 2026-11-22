@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: GarageStage, GarageLights, GarageStage.+0
+// allocated; measure: GarageStage, GarageStage.+0, GarageStage@+4512, GarageStage.+0@+4512
 struct GarageStage : View {
   using View::View;
   static constexpr uint32_t kSize = 6208;
@@ -838,6 +838,36 @@ struct TrafficCarAt160 : View {
   uint32_t unknown_11452() const { return guest::LoadU32(base, address + 11452); }
   void set_unknown_11452(uint32_t v) const { guest::StoreU32(base, address + 11452, v); }
   uint32_t unknown_11452_address() const { return address + 11452; }
+};
+
+// embedded; measure: GarageStage@+32
+struct GarageStageAt32_2 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 68;
+  float unknown_0() const { return guest::LoadFloat(base, address + 0); }
+  void set_unknown_0(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint64_t unknown_16() const { return guest::LoadU64(base, address + 16); }
+  void set_unknown_16(uint64_t v) const { guest::StoreU64(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+  uint64_t unknown_24() const { return guest::LoadU64(base, address + 24); }
+  void set_unknown_24(uint64_t v) const { guest::StoreU64(base, address + 24, v); }
+  uint32_t unknown_24_address() const { return address + 24; }
+  uint64_t unknown_32() const { return guest::LoadU64(base, address + 32); }
+  void set_unknown_32(uint64_t v) const { guest::StoreU64(base, address + 32, v); }
+  uint32_t unknown_32_address() const { return address + 32; }
+  uint64_t unknown_40() const { return guest::LoadU64(base, address + 40); }
+  void set_unknown_40(uint64_t v) const { guest::StoreU64(base, address + 40, v); }
+  uint32_t unknown_40_address() const { return address + 40; }
+  uint64_t unknown_48() const { return guest::LoadU64(base, address + 48); }
+  void set_unknown_48(uint64_t v) const { guest::StoreU64(base, address + 48, v); }
+  uint32_t unknown_48_address() const { return address + 48; }
+  uint64_t unknown_56() const { return guest::LoadU64(base, address + 56); }
+  void set_unknown_56(uint64_t v) const { guest::StoreU64(base, address + 56, v); }
+  uint32_t unknown_56_address() const { return address + 56; }
+  uint32_t unknown_64() const { return guest::LoadU32(base, address + 64); }
+  void set_unknown_64(uint32_t v) const { guest::StoreU32(base, address + 64, v); }
+  uint32_t unknown_64_address() const { return address + 64; }
 };
 
 // The image words docs/functions/stand-models.md's code uses.

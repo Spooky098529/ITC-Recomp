@@ -13,7 +13,7 @@
 # The vehicle's status record (108 bytes at the vehicle's +6160; reset by
 # VehicleStatus::Reset, updated by VehicleStatus::Update and Vehicle::Tick).
 [VehicleStatus]
-measure = "VehicleStatus"
+measure = "Vehicle@+6160"
 size = 108
 origin = "embedded"
 fields = [
@@ -85,7 +85,7 @@ fields = [
 
 # A camera curve (CameraCurve::Load, from the camera modes; the name is a guess).
 [VehicleCameraCurve]
-measure = "CameraCurve"
+measure = "CameraCurve::Load.r3"
 size = 724
 origin = "embedded"
 fields = [

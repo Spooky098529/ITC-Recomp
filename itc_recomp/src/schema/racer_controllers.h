@@ -95,6 +95,24 @@ struct AiDriverSetupHold : View {
   uint32_t hold_address() const { return address + 0; }
 };
 
+// embedded; measure: RaceMode@+97548
+struct RaceFlowAt97548 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 9620;
+  uint32_t unknown_9604() const { return guest::LoadU32(base, address + 9604); }
+  void set_unknown_9604(uint32_t v) const { guest::StoreU32(base, address + 9604, v); }
+  uint32_t unknown_9604_address() const { return address + 9604; }
+  uint32_t unknown_9608() const { return guest::LoadU32(base, address + 9608); }
+  void set_unknown_9608(uint32_t v) const { guest::StoreU32(base, address + 9608, v); }
+  uint32_t unknown_9608_address() const { return address + 9608; }
+  uint32_t unknown_9612() const { return guest::LoadU32(base, address + 9612); }
+  void set_unknown_9612(uint32_t v) const { guest::StoreU32(base, address + 9612, v); }
+  uint32_t unknown_9612_address() const { return address + 9612; }
+  uint32_t unknown_9616() const { return guest::LoadU32(base, address + 9616); }
+  void set_unknown_9616(uint32_t v) const { guest::StoreU32(base, address + 9616, v); }
+  uint32_t unknown_9616_address() const { return address + 9616; }
+};
+
 // The image words docs/functions/racer-controllers.md's code uses.
 struct RacerControllersGlobals {
   // the race data (a pointer): +0x59620 the stages, +0x59AE4 the flags, +0xA3AD8 a finish count, +0xA3AF0 the kind (mode)

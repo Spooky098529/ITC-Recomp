@@ -12,8 +12,7 @@
 
 [RenderQueue]
 measure = "RenderQueue"
-measures = ["sub_8258E5C8.r3",
-            "Font.+8"]
+measures = ["sub_8258E5C8.r3", "Font.+8", "[82970BD4]"]
 size = 16
 origin = "gpu"
 vtable = 0x8206CB8C
@@ -28,7 +27,7 @@ fields = [
 # The vtable 0x8206CB8C (ten slots, read from the image).
 [RenderQueueVtable]
 measure = "RenderQueue.+0"
-measures = ["Font.+8.+0"]
+measures = ["Font.+8.+0", "[82970BD4].+0"]
 # measures from SceneryRenderQueueVtable (scenery-lists), merged at the integration
 size = 40
 origin = "gpu"

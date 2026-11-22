@@ -319,6 +319,33 @@ struct RaceManagerAt4 : View {
   uint32_t unknown_20_address() const { return address + 20; }
 };
 
+// embedded; measure: RaceManager@+2392
+struct RaceManagerAt2392 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 360004;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_360000() const { return guest::LoadU32(base, address + 360000); }
+  void set_unknown_360000(uint32_t v) const { guest::StoreU32(base, address + 360000, v); }
+  uint32_t unknown_360000_address() const { return address + 360000; }
+};
+
+// embedded; measure: RaceMode@+116812
+struct RaceWorldAt116812 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 9612;
+  uint32_t unknown_9604() const { return guest::LoadU32(base, address + 9604); }
+  void set_unknown_9604(uint32_t v) const { guest::StoreU32(base, address + 9604, v); }
+  uint32_t unknown_9604_address() const { return address + 9604; }
+  uint32_t unknown_9608() const { return guest::LoadU32(base, address + 9608); }
+  void set_unknown_9608(uint32_t v) const { guest::StoreU32(base, address + 9608, v); }
+  uint32_t unknown_9608_address() const { return address + 9608; }
+};
+
 // The image words docs/functions/race-world.md's code uses.
 struct RaceWorldGlobals {
   // the racers' manager (0 when none)

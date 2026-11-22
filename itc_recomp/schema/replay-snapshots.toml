@@ -21,7 +21,8 @@
 # (+0x20F590, the race's start) and block B (+0x218DA0, its end); the kept
 # replay's +0x2B610 a copy of block A.
 [ReplaySnapshot]
-measures = ["RaceSnapshot", "RaceSnapshot::Copy.r4"]
+measure = "RaceSnapshot::Copy.r4"
+measures = ["RaceSnapshot::Save.r3", "RaceSnapshot::Copy.r3"]
 size = 38928
 origin = "embedded"
 fields = [
@@ -48,6 +49,7 @@ fields = [
 # data-load.md).
 [ReplayRecord]
 measure = "Record5232"
+measures = ["Record5232::Record5232.r3"]
 size = 5232
 origin = "file"
 fields = [
@@ -63,7 +65,7 @@ fields = [
 # The rigid body's first 516 bytes (car-physics.toml's RigidBody, at the
 # same offsets): a record's +608.
 [ReplayBodyState]
-measure = "BodyState"
+measure = "Record5232@+608"
 size = 516
 origin = "embedded"
 fields = [
@@ -101,7 +103,8 @@ fields = [
 # (Member1136::Save and Restore), named as car-physics.toml's Vehicle names
 # it; unknown_ where the vehicle's field is.
 [ReplayVehiclePhysics]
-measure = "Member1136"
+measure = "Record5232@+1136"
+measures = ["Record5232::Record5232.ret@+1136"]
 size = 2944
 origin = "file"
 fields = [
@@ -262,7 +265,8 @@ fields = [
 # The collision object's state (car-physics.toml's CollisionWorldObject,
 # the vehicle's +340): a record's +4080.
 [ReplayCollisionState]
-measure = "Member4080"
+measure = "Record5232@+4080"
+measures = ["Record5232::Record5232.ret@+4080", "Record5232::Copy.r3@+4080@+16"]
 size = 1152
 origin = "file"
 fields = [
@@ -285,7 +289,8 @@ fields = [
 # A placed shape copy's state (collision.toml's BoxShape fields, packed):
 # ReplayCollisionState's +16 and +480.
 [ReplayShapeState]
-measure = "Part464"
+measure = "Part464::Restore.r3"
+measures = ["Part464::Save.r3", "Part464::Copy.r3", "Part464::Part464.r3"]
 size = 452
 origin = "file"
 fields = [

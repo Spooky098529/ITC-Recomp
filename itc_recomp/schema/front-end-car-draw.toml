@@ -17,7 +17,7 @@
 # car's angles), the garage camera (stage + 112) for types 6 and 7. An
 # interior pointer into the stage: to fold into the stage's type.
 [GarageAnimValues]
-measure = "GarageAnims.+12"
+measure = "GarageStage.+0@+5600.+12"
 size = 68
 origin = "embedded"
 fields = [
@@ -35,7 +35,7 @@ fields = [
 # +24 are entry 0's (the measure meets an entry as the list's address
 # plus 28i); the hand port reads entry i as GarageAnimEntry(list + 28i).
 [GarageAnimList]
-measure = "GarageAnims"
+measure = "GarageStage.+0@+5600"
 size = 452
 origin = "embedded"
 fields = [
@@ -68,10 +68,11 @@ fields = [
 # The parts' point block (the scene parts' +176) as Plates::Hide and Show
 # meet it: car-draw.toml's PartsPoints, to merge there.
 [FrontEndPlatePoints]
-measure = "Plates"
+measure = "TrafficCar.+5060@+176"
 size = 4580
 origin = "embedded"
 fields = [
+  { name = "fault_light_value_27664", offset = 27664, type = "u32", note = "measure fault: SceneParts::LightValue's r3 joined with the plates (2026-11-22)" },
   { name = "front_plate_set", offset = 2640, type = "u32", note = "the front bumper's own plate texture flag (PartsPoints' +2640)" },
   { name = "rear_plate_set", offset = 4576, type = "u32", note = "the rear bumper's own plate texture flag (its group's +1680)" },
 ]

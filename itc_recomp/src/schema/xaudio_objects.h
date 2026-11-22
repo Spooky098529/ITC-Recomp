@@ -31,7 +31,7 @@ struct XAudioObject : View {
   uint32_t owner_address() const { return address + 12; }
 };
 
-// image; measure: XAudioObject.+4, Reverb::Reverb.ret.+4, XmaCodec::XmaCodec.ret.+4
+// image; measure: Reverb::Reverb.ret.+4, XmaCodec::XmaCodec.ret.+4, sub_8246D308.r3@-4.+4
 struct XAudioInnerVtable : View {
   using View::View;
   static constexpr uint32_t kSize = 20;
@@ -158,7 +158,7 @@ struct CodecStateOut : View {
   uint32_t state_address() const { return address + 0; }
 };
 
-// allocated; measure: PacketList.+0, PacketLists.+24.+4
+// allocated; measure: PacketList.+0, XAudioCodec::Init.r3@+12@+4.+24
 struct PacketNode : View {
   using View::View;
   static constexpr uint32_t kSize = 8;
@@ -187,7 +187,7 @@ struct PacketList : View {
   uint32_t node_offset_address() const { return address + 8; }
 };
 
-// embedded; measure: PacketLists
+// embedded; measure: XAudioCodec::Init.r3@+12@+4, XAudioCodec::Construct.r3@+12@+4
 struct PacketLists : View {
   using View::View;
   static constexpr uint32_t kSize = 28;
@@ -339,7 +339,7 @@ struct XAudioRegionPacket : View {
   uint32_t context_address() const { return address + 28; }
 };
 
-// embedded; measure: CodecBase, sub_82469A88.r3
+// embedded; measure: CodecBase, sub_82469A88.r3, CodecBase::SubmitPacket.r3, CodecBase::SetFormat.r3, CodecBase::~CodecBase.r3
 struct CodecBase : View {
   using View::View;
   static constexpr uint32_t kSize = 168;
@@ -446,7 +446,7 @@ struct CodecBase : View {
   uint32_t loop_end_callback_address() const { return address + 164; }
 };
 
-// image; measure: CodecBase.+0, PcmCodec.+16, XAudioCodec.+16
+// image; measure: CodecBase.+0, PcmCodec.+16, CodecBase::SetFormat.r3.+0, sub_8246D738.r3@-16.+16
 struct CodecBaseVtable : View {
   using View::View;
   static constexpr uint32_t kSize = 96;
@@ -534,7 +534,7 @@ struct CodecVtable : View {
   uint32_t xma_set_up_address() const { return address + 120; }
 };
 
-// embedded; measure: Resampler, sub_82478E60.r3, sub_8247E188.r3, sub_8247E260.r3, sub_8247F558.r3, sub_82473E48.r3, sub_82474188.r3, sub_8246E208.r7, sub_8246E4C8.r7, XmaCodec.+188
+// embedded; measure: sub_82478E60.r3, sub_8247E188.r3, sub_8247E260.r3, sub_8247F558.r3, sub_82473E48.r3, sub_82474188.r3, sub_8246E208.r7, sub_8246E4C8.r7, XmaCodec.+188, PcmCodec@+184
 struct ConverterState : View {
   using View::View;
   static constexpr uint32_t kSize = 88;
@@ -625,7 +625,7 @@ struct ConverterState : View {
   uint32_t flags_address() const { return address + 84; }
 };
 
-// allocated; measure: PcmCodec
+// allocated; measure: PcmCodec, PcmCodec::~PcmCodec.r3
 struct PcmCodec : View {
   using View::View;
   static constexpr uint32_t kSize = 272;
@@ -1004,7 +1004,7 @@ struct XmaCodec : View {
   uint32_t unknown_280_address() const { return address + 280; }
 };
 
-// embedded; measure: XAudioCodec, XAudioSourceVoice.+76, sub_82466C40.r3@-12
+// embedded; measure: XAudioCodec, XAudioSourceVoice.+76, sub_82466C40.r3@-12, XAudioCodec::Construct.r3, XAudioCodec::Destruct.r3, XAudioCodec::Init.r3
 struct XAudioCodec : View {
   using View::View;
   static constexpr uint32_t kSize = 180;
@@ -1307,7 +1307,7 @@ struct NativeReverbParams : View {
   uint32_t room_size_address() const { return address + 80; }
 };
 
-// embedded; measure: I3dl2, I3dl2Params
+// embedded; measure: Reverb@+16
 struct I3dl2Reverb : View {
   using View::View;
   static constexpr uint32_t kSize = 196;
@@ -1441,7 +1441,7 @@ struct I3dl2Reverb : View {
   uint32_t core_vtable_address() const { return address + 192; }
 };
 
-// image; measure: I3dl2.+0, I3dl2Params.+0, Reverb.+16, Reverb.+0
+// image; measure: Reverb.+16, Reverb@+16.+0
 struct I3dl2ReverbVtable : View {
   using View::View;
   static constexpr uint32_t kSize = 8;
@@ -1887,7 +1887,7 @@ struct ReverbDelay1024 : View {
   uint32_t line_address() const { return address + 32; }
 };
 
-// embedded; measure: ReverbCore
+// embedded; measure: ReverbCore, ReverbCore::Init.r3, ReverbCore::FilterCoefficient.r3
 struct ReverbCore : View {
   using View::View;
   static constexpr uint32_t kSize = 309712;
@@ -3087,7 +3087,7 @@ struct Effect6 : View {
   uint32_t unknown_2060_address() const { return address + 2060; }
 };
 
-// embedded; measure: I3dl2@+4
+// embedded; measure: Reverb@+16@+4
 struct I3dl2ReverbAt4 : View {
   using View::View;
   static constexpr uint32_t kSize = 48;
@@ -3126,7 +3126,7 @@ struct I3dl2ReverbAt4 : View {
   uint32_t unknown_44_address() const { return address + 44; }
 };
 
-// embedded; measure: Reverb@+52
+// embedded; measure: Reverb@+16@+52
 struct ReverbAt52 : View {
   using View::View;
   static constexpr uint32_t kSize = 84;
@@ -3260,6 +3260,378 @@ struct ReverbTwoTapLine : View {
   uint32_t write_index() const { return guest::LoadU32(base, address + 24); }
   void set_write_index(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
   uint32_t write_index_address() const { return address + 24; }
+};
+
+// embedded; measure: Reverb@+68
+struct ReverbCoreAt68 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 84;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  uint32_t unknown_12() const { return guest::LoadU32(base, address + 12); }
+  void set_unknown_12(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+  uint32_t unknown_24() const { return guest::LoadU32(base, address + 24); }
+  void set_unknown_24(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
+  uint32_t unknown_24_address() const { return address + 24; }
+  uint32_t unknown_28() const { return guest::LoadU32(base, address + 28); }
+  void set_unknown_28(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
+  uint32_t unknown_28_address() const { return address + 28; }
+  uint32_t unknown_32() const { return guest::LoadU32(base, address + 32); }
+  void set_unknown_32(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
+  uint32_t unknown_32_address() const { return address + 32; }
+  uint32_t unknown_36() const { return guest::LoadU32(base, address + 36); }
+  void set_unknown_36(uint32_t v) const { guest::StoreU32(base, address + 36, v); }
+  uint32_t unknown_36_address() const { return address + 36; }
+  uint32_t unknown_40() const { return guest::LoadU32(base, address + 40); }
+  void set_unknown_40(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
+  uint32_t unknown_40_address() const { return address + 40; }
+  uint32_t unknown_44() const { return guest::LoadU32(base, address + 44); }
+  void set_unknown_44(uint32_t v) const { guest::StoreU32(base, address + 44, v); }
+  uint32_t unknown_44_address() const { return address + 44; }
+  uint32_t unknown_48() const { return guest::LoadU32(base, address + 48); }
+  void set_unknown_48(uint32_t v) const { guest::StoreU32(base, address + 48, v); }
+  uint32_t unknown_48_address() const { return address + 48; }
+  float unknown_52() const { return guest::LoadFloat(base, address + 52); }
+  void set_unknown_52(float v) const { guest::StoreFloat(base, address + 52, v); }
+  uint32_t unknown_52_address() const { return address + 52; }
+  float unknown_56() const { return guest::LoadFloat(base, address + 56); }
+  void set_unknown_56(float v) const { guest::StoreFloat(base, address + 56, v); }
+  uint32_t unknown_56_address() const { return address + 56; }
+  float unknown_60() const { return guest::LoadFloat(base, address + 60); }
+  void set_unknown_60(float v) const { guest::StoreFloat(base, address + 60, v); }
+  uint32_t unknown_60_address() const { return address + 60; }
+  float unknown_64() const { return guest::LoadFloat(base, address + 64); }
+  void set_unknown_64(float v) const { guest::StoreFloat(base, address + 64, v); }
+  uint32_t unknown_64_address() const { return address + 64; }
+  float unknown_68() const { return guest::LoadFloat(base, address + 68); }
+  void set_unknown_68(float v) const { guest::StoreFloat(base, address + 68, v); }
+  uint32_t unknown_68_address() const { return address + 68; }
+  float unknown_72() const { return guest::LoadFloat(base, address + 72); }
+  void set_unknown_72(float v) const { guest::StoreFloat(base, address + 72, v); }
+  uint32_t unknown_72_address() const { return address + 72; }
+  float unknown_76() const { return guest::LoadFloat(base, address + 76); }
+  void set_unknown_76(float v) const { guest::StoreFloat(base, address + 76, v); }
+  uint32_t unknown_76_address() const { return address + 76; }
+  float unknown_80() const { return guest::LoadFloat(base, address + 80); }
+  void set_unknown_80(float v) const { guest::StoreFloat(base, address + 80, v); }
+  uint32_t unknown_80_address() const { return address + 80; }
+};
+
+// embedded; measure: XAudioCodec::Construct.ret@+12
+struct CodecBaseAt12 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+};
+
+// embedded; measure: XAudioCodec::Init.r3@+12
+struct CodecBaseAt12_2 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 157;
+  uint16_t unknown_92() const { return guest::LoadU16(base, address + 92); }
+  void set_unknown_92(uint16_t v) const { guest::StoreU16(base, address + 92, v); }
+  uint32_t unknown_92_address() const { return address + 92; }
+  uint16_t unknown_94() const { return guest::LoadU16(base, address + 94); }
+  void set_unknown_94(uint16_t v) const { guest::StoreU16(base, address + 94, v); }
+  uint32_t unknown_94_address() const { return address + 94; }
+  float unknown_96() const { return guest::LoadFloat(base, address + 96); }
+  void set_unknown_96(float v) const { guest::StoreFloat(base, address + 96, v); }
+  uint32_t unknown_96_address() const { return address + 96; }
+  float unknown_100() const { return guest::LoadFloat(base, address + 100); }
+  void set_unknown_100(float v) const { guest::StoreFloat(base, address + 100, v); }
+  uint32_t unknown_100_address() const { return address + 100; }
+  uint32_t unknown_152() const { return guest::LoadU32(base, address + 152); }
+  void set_unknown_152(uint32_t v) const { guest::StoreU32(base, address + 152, v); }
+  uint32_t unknown_152_address() const { return address + 152; }
+  uint8_t unknown_156() const { return guest::LoadU8(base, address + 156); }
+  void set_unknown_156(uint8_t v) const { guest::StoreU8(base, address + 156, v); }
+  uint32_t unknown_156_address() const { return address + 156; }
+};
+
+// embedded; measure: sub_82465410.r3@-4
+struct ReverbOuter4 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 212;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_16() const { return guest::LoadU32(base, address + 16); }
+  void set_unknown_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+  uint32_t unknown_208() const { return guest::LoadU32(base, address + 208); }
+  void set_unknown_208(uint32_t v) const { guest::StoreU32(base, address + 208, v); }
+  uint32_t unknown_208_address() const { return address + 208; }
+};
+
+// embedded; measure: sub_82465410.r3@-4.+16
+struct I3dl2ReverbVtablePart : View {
+  using View::View;
+  static constexpr uint32_t kSize = 8;
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+};
+
+// embedded; measure: sub_82465BD8.r3@-4
+struct XAudioMatrixOuter4 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 8;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+};
+
+// embedded; measure: sub_8246A908.r3@-16
+struct XmaCodecOuter16 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 267;
+  uint8_t unknown_266() const { return guest::LoadU8(base, address + 266); }
+  void set_unknown_266(uint8_t v) const { guest::StoreU8(base, address + 266, v); }
+  uint32_t unknown_266_address() const { return address + 266; }
+};
+
+// embedded; measure: sub_8246A910.r3@-16
+struct XmaCodecOuter16_2 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 267;
+  uint8_t unknown_266() const { return guest::LoadU8(base, address + 266); }
+  void set_unknown_266(uint8_t v) const { guest::StoreU8(base, address + 266, v); }
+  uint32_t unknown_266_address() const { return address + 266; }
+};
+
+// embedded; measure: sub_8246B418.r3@-16
+struct XAudioCodecOuter16 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 173;
+  uint8_t unknown_172() const { return guest::LoadU8(base, address + 172); }
+  void set_unknown_172(uint8_t v) const { guest::StoreU8(base, address + 172, v); }
+  uint32_t unknown_172_address() const { return address + 172; }
+};
+
+// embedded; measure: sub_8246B420.r3@-16
+struct XmaCodecOuter16_3 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 192;
+  uint8_t unknown_56() const { return guest::LoadU8(base, address + 56); }
+  void set_unknown_56(uint8_t v) const { guest::StoreU8(base, address + 56, v); }
+  uint32_t unknown_56_address() const { return address + 56; }
+  float unknown_112() const { return guest::LoadFloat(base, address + 112); }
+  void set_unknown_112(float v) const { guest::StoreFloat(base, address + 112, v); }
+  uint32_t unknown_112_address() const { return address + 112; }
+  uint32_t unknown_188() const { return guest::LoadU32(base, address + 188); }
+  void set_unknown_188(uint32_t v) const { guest::StoreU32(base, address + 188, v); }
+  uint32_t unknown_188_address() const { return address + 188; }
+};
+
+// embedded; measure: sub_8246B438.r3@-16
+struct XmaCodecOuter16_4 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 192;
+  uint8_t unknown_56() const { return guest::LoadU8(base, address + 56); }
+  void set_unknown_56(uint8_t v) const { guest::StoreU8(base, address + 56, v); }
+  uint32_t unknown_56_address() const { return address + 56; }
+  float unknown_116() const { return guest::LoadFloat(base, address + 116); }
+  void set_unknown_116(float v) const { guest::StoreFloat(base, address + 116, v); }
+  uint32_t unknown_116_address() const { return address + 116; }
+  uint32_t unknown_188() const { return guest::LoadU32(base, address + 188); }
+  void set_unknown_188(uint32_t v) const { guest::StoreU32(base, address + 188, v); }
+  uint32_t unknown_188_address() const { return address + 188; }
+};
+
+// embedded; measure: sub_8246CEC0.r3@+16
+struct CodecBaseAt16 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 94;
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+  uint32_t unknown_12() const { return guest::LoadU32(base, address + 12); }
+  void set_unknown_12(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t unknown_12_address() const { return address + 12; }
+  uint32_t unknown_16() const { return guest::LoadU32(base, address + 16); }
+  void set_unknown_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+  uint32_t unknown_24() const { return guest::LoadU32(base, address + 24); }
+  void set_unknown_24(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
+  uint32_t unknown_24_address() const { return address + 24; }
+  uint32_t unknown_32() const { return guest::LoadU32(base, address + 32); }
+  void set_unknown_32(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
+  uint32_t unknown_32_address() const { return address + 32; }
+  uint16_t unknown_92() const { return guest::LoadU16(base, address + 92); }
+  void set_unknown_92(uint16_t v) const { guest::StoreU16(base, address + 92, v); }
+  uint32_t unknown_92_address() const { return address + 92; }
+};
+
+// embedded; measure: sub_8246D2F0.r3@-16
+struct PcmCodecOuter16 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 228;
+  float unknown_112() const { return guest::LoadFloat(base, address + 112); }
+  void set_unknown_112(float v) const { guest::StoreFloat(base, address + 112, v); }
+  uint32_t unknown_112_address() const { return address + 112; }
+  float unknown_224() const { return guest::LoadFloat(base, address + 224); }
+  void set_unknown_224(float v) const { guest::StoreFloat(base, address + 224, v); }
+  uint32_t unknown_224_address() const { return address + 224; }
+};
+
+// embedded; measure: sub_8246D308.r3@-4
+struct XAudioObjectOuter4 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 12;
+  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
+};
+
+// embedded; measure: sub_8246D310.r3@-16
+struct PcmCodecOuter16_2 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 268;
+  uint8_t unknown_52() const { return guest::LoadU8(base, address + 52); }
+  void set_unknown_52(uint8_t v) const { guest::StoreU8(base, address + 52, v); }
+  uint32_t unknown_52_address() const { return address + 52; }
+  uint8_t unknown_56() const { return guest::LoadU8(base, address + 56); }
+  void set_unknown_56(uint8_t v) const { guest::StoreU8(base, address + 56, v); }
+  uint32_t unknown_56_address() const { return address + 56; }
+  uint32_t unknown_60() const { return guest::LoadU32(base, address + 60); }
+  void set_unknown_60(uint32_t v) const { guest::StoreU32(base, address + 60, v); }
+  uint32_t unknown_60_address() const { return address + 60; }
+  float unknown_116() const { return guest::LoadFloat(base, address + 116); }
+  void set_unknown_116(float v) const { guest::StoreFloat(base, address + 116, v); }
+  uint32_t unknown_116_address() const { return address + 116; }
+  uint8_t unknown_196() const { return guest::LoadU8(base, address + 196); }
+  void set_unknown_196(uint8_t v) const { guest::StoreU8(base, address + 196, v); }
+  uint32_t unknown_196_address() const { return address + 196; }
+  uint8_t unknown_197() const { return guest::LoadU8(base, address + 197); }
+  void set_unknown_197(uint8_t v) const { guest::StoreU8(base, address + 197, v); }
+  uint32_t unknown_197_address() const { return address + 197; }
+  uint32_t unknown_264() const { return guest::LoadU32(base, address + 264); }
+  void set_unknown_264(uint32_t v) const { guest::StoreU32(base, address + 264, v); }
+  uint32_t unknown_264_address() const { return address + 264; }
+};
+
+// embedded; measure: sub_8246D320.r3@-16
+struct PcmCodecOuter16_3 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 268;
+  uint8_t unknown_52() const { return guest::LoadU8(base, address + 52); }
+  void set_unknown_52(uint8_t v) const { guest::StoreU8(base, address + 52, v); }
+  uint32_t unknown_52_address() const { return address + 52; }
+  uint8_t unknown_56() const { return guest::LoadU8(base, address + 56); }
+  void set_unknown_56(uint8_t v) const { guest::StoreU8(base, address + 56, v); }
+  uint32_t unknown_56_address() const { return address + 56; }
+  uint32_t unknown_60() const { return guest::LoadU32(base, address + 60); }
+  void set_unknown_60(uint32_t v) const { guest::StoreU32(base, address + 60, v); }
+  uint32_t unknown_60_address() const { return address + 60; }
+  float unknown_116() const { return guest::LoadFloat(base, address + 116); }
+  void set_unknown_116(float v) const { guest::StoreFloat(base, address + 116, v); }
+  uint32_t unknown_116_address() const { return address + 116; }
+  uint8_t unknown_196() const { return guest::LoadU8(base, address + 196); }
+  void set_unknown_196(uint8_t v) const { guest::StoreU8(base, address + 196, v); }
+  uint32_t unknown_196_address() const { return address + 196; }
+  uint8_t unknown_197() const { return guest::LoadU8(base, address + 197); }
+  void set_unknown_197(uint8_t v) const { guest::StoreU8(base, address + 197, v); }
+  uint32_t unknown_197_address() const { return address + 197; }
+  uint32_t unknown_264() const { return guest::LoadU32(base, address + 264); }
+  void set_unknown_264(uint32_t v) const { guest::StoreU32(base, address + 264, v); }
+  uint32_t unknown_264_address() const { return address + 264; }
+};
+
+// embedded; measure: sub_8246D338.r3@-16
+struct PcmCodecOuter16_4 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 198;
+  uint16_t unknown_108() const { return guest::LoadU16(base, address + 108); }
+  void set_unknown_108(uint16_t v) const { guest::StoreU16(base, address + 108, v); }
+  uint32_t unknown_108_address() const { return address + 108; }
+  uint16_t unknown_110() const { return guest::LoadU16(base, address + 110); }
+  void set_unknown_110(uint16_t v) const { guest::StoreU16(base, address + 110, v); }
+  uint32_t unknown_110_address() const { return address + 110; }
+  uint8_t unknown_196() const { return guest::LoadU8(base, address + 196); }
+  void set_unknown_196(uint8_t v) const { guest::StoreU8(base, address + 196, v); }
+  uint32_t unknown_196_address() const { return address + 196; }
+  uint8_t unknown_197() const { return guest::LoadU8(base, address + 197); }
+  void set_unknown_197(uint8_t v) const { guest::StoreU8(base, address + 197, v); }
+  uint32_t unknown_197_address() const { return address + 197; }
+};
+
+// embedded; measure: sub_8246D738.r3@-16
+struct XAudioCodecOuter16_2 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 32;
+  uint32_t unknown_16() const { return guest::LoadU32(base, address + 16); }
+  void set_unknown_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+  uint32_t unknown_20() const { return guest::LoadU32(base, address + 20); }
+  void set_unknown_20(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
+  uint32_t unknown_20_address() const { return address + 20; }
+  uint32_t unknown_28() const { return guest::LoadU32(base, address + 28); }
+  void set_unknown_28(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
+  uint32_t unknown_28_address() const { return address + 28; }
+};
+
+// embedded; measure: sub_8246D740.r3@-16
+struct PcmCodecOuter16_5 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 176;
+  uint32_t unknown_16() const { return guest::LoadU32(base, address + 16); }
+  void set_unknown_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+  uint8_t unknown_172() const { return guest::LoadU8(base, address + 172); }
+  void set_unknown_172(uint8_t v) const { guest::StoreU8(base, address + 172, v); }
+  uint32_t unknown_172_address() const { return address + 172; }
+  uint16_t unknown_174() const { return guest::LoadU16(base, address + 174); }
+  void set_unknown_174(uint16_t v) const { guest::StoreU16(base, address + 174, v); }
+  uint32_t unknown_174_address() const { return address + 174; }
+};
+
+// embedded; measure: sub_8246D740.r3@-16.+16
+struct CodecBaseVtablePart : View {
+  using View::View;
+  static constexpr uint32_t kSize = 88;
+  uint32_t unknown_84() const { return guest::LoadU32(base, address + 84); }
+  void set_unknown_84(uint32_t v) const { guest::StoreU32(base, address + 84, v); }
+  uint32_t unknown_84_address() const { return address + 84; }
+};
+
+// embedded; measure: sub_8246D748.r3@-16
+struct PcmCodecOuter16_6 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 173;
+  uint32_t unknown_16() const { return guest::LoadU32(base, address + 16); }
+  void set_unknown_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t unknown_16_address() const { return address + 16; }
+  uint8_t unknown_172() const { return guest::LoadU8(base, address + 172); }
+  void set_unknown_172(uint8_t v) const { guest::StoreU8(base, address + 172, v); }
+  uint32_t unknown_172_address() const { return address + 172; }
+};
+
+// embedded; measure: sub_8246D748.r3@-16.+16
+struct CodecBaseVtablePart_2 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 88;
+  uint32_t unknown_84() const { return guest::LoadU32(base, address + 84); }
+  void set_unknown_84(uint32_t v) const { guest::StoreU32(base, address + 84, v); }
+  uint32_t unknown_84_address() const { return address + 84; }
 };
 
 // The image words docs/functions/xaudio-objects.md's code uses.

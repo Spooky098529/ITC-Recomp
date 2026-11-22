@@ -20,10 +20,9 @@
 # docs/functions/scene.md's layout, docs/known-data.md's "scene pass
 # description" and "car scene (the draw's reads)").
 [CarScene]
+measure = "CarScene"
+measures = ["Car.+5116", "CarScene::OnFileLoaded.r6", "VirtualFree.ret", "SceneParts@+176.+37088"]
 # measures from SecondSetSceneRef (second-set), merged at the integration
-measures = ["CarScene", "Car.+5116",
-            "CarScene::OnFileLoaded.r6", "VirtualFree.ret",
-  "PartsPoints.+37088"]
 size = 5536
 origin = "allocated"
 fields = [
@@ -146,41 +145,6 @@ fields = [
   { name = "cone_b_hi", offset = 5512, type = "u64" },
   { name = "cone_b_w", offset = 5516, type = "f32" },
   { name = "lighting_end", offset = 5520, type = "f32", note = "InitLighting's last float (0x8200256C), read by CarLighting::Gather" },
-  { name = "fault_lighting_0", offset = 0, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +0, the scene's +5248" },
-  { name = "fault_lighting_8", offset = 8, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +8, the scene's +5256" },
-  { name = "fault_lighting_16", offset = 16, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +16, the scene's +5264" },
-  { name = "fault_lighting_24", offset = 24, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +24, the scene's +5272" },
-  { name = "fault_lighting_32", offset = 32, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +32, the scene's +5280" },
-  { name = "fault_lighting_40", offset = 40, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +40, the scene's +5288" },
-  { name = "fault_lighting_48", offset = 48, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +48, the scene's +5296" },
-  { name = "fault_lighting_56", offset = 56, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +56, the scene's +5304" },
-  { name = "fault_lighting_64", offset = 64, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +64, the scene's +5312" },
-  { name = "fault_lighting_72", offset = 72, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +72, the scene's +5320" },
-  { name = "fault_lighting_80", offset = 80, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +80, the scene's +5328" },
-  { name = "fault_lighting_88", offset = 88, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +88, the scene's +5336" },
-  { name = "fault_lighting_96", offset = 96, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +96, the scene's +5344" },
-  { name = "fault_lighting_104", offset = 104, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +104, the scene's +5352" },
-  { name = "fault_lighting_112", offset = 112, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +112, the scene's +5360" },
-  { name = "fault_lighting_120", offset = 120, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +120, the scene's +5368" },
-  { name = "fault_lighting_128", offset = 128, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +128, the scene's +5376" },
-  { name = "fault_lighting_136", offset = 136, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +136, the scene's +5384" },
-  { name = "fault_lighting_144", offset = 144, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +144, the scene's +5392" },
-  { name = "fault_lighting_152", offset = 152, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +152, the scene's +5400" },
-  { name = "fault_lighting_160", offset = 160, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +160, the scene's +5408" },
-  { name = "fault_lighting_168", offset = 168, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +168, the scene's +5416" },
-  { name = "fault_lighting_176", offset = 176, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +176, the scene's +5424" },
-  { name = "fault_lighting_184", offset = 184, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +184, the scene's +5432" },
-  { name = "fault_lighting_192", offset = 192, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +192, the scene's +5440" },
-  { name = "fault_lighting_200", offset = 200, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +200, the scene's +5448" },
-  { name = "fault_lighting_208", offset = 208, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +208, the scene's +5456" },
-  { name = "fault_lighting_216", offset = 216, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +216, the scene's +5464" },
-  { name = "fault_lighting_224", offset = 224, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +224, the scene's +5472" },
-  { name = "fault_lighting_232", offset = 232, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +232, the scene's +5480" },
-  { name = "fault_lighting_240", offset = 240, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +240, the scene's +5488" },
-  { name = "fault_lighting_248", offset = 248, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +248, the scene's +5496" },
-  { name = "fault_lighting_256", offset = 256, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +256, the scene's +5504" },
-  { name = "fault_lighting_264", offset = 264, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +264, the scene's +5512" },
-  { name = "fault_lighting_272", offset = 272, type = "u32", note = "measure fault: InitLighting's last float, the scene's +5520 (lighting_end)" },
   { name = "assets", offset = 64, type = "bytes", count = 4880, note = "the SceneAssets (scene.toml) at +64: CarScene::OnFileLoaded's r6 reaches its slots' requests and states through the scene (scene's report)" },
 ]
 
@@ -209,6 +173,7 @@ fields = [
 # mufflers, +36096 shadows. A group's records are at +240k.
 [PartsPoints]
 measure = "PartsPoints"
+measures = ["PartsPoints::DrawFrontBumper.r3", "PartsPoints::DrawRearBumper.r3", "PartsPoints::DrawHeadlights.r3", "PartsPoints::DrawDoorWindows02.r3", "PartsPoints::DrawDoorWindows01.r3", "PartsPoints::DrawTailLights.r3", "PartsPoints::DrawHeadlightBody.r3", "PartsPoints::DrawFrontBumperLights.r3", "PartsPoints::ResetRearBumper.r3", "PartsPoints::DrawCabinWindow02.r3", "PartsPoints::DrawCabinWindow01.r3", "PartsPoints::ResetShadows.r3", "PartsPoints::DrawBonnet.r3"]
 size = 37108
 origin = "embedded"
 fields = [
@@ -279,8 +244,8 @@ fields = [
 
 # The parts object's 60-byte record (SceneParts +108).
 [PartsRecord]
-measures = ["PartsPoints.+37080", "PartsPoints.+5520", "PartsPoints.+6084",
-            "sub_820D3558.r3"]
+measure = "sub_820D3558.r3"
+measures = ["PartsPoints::DrawRace.ret@+176.+37080", "SceneParts::Draw.r3@+176.+37080", "SceneParts::Draw.r3@+176@+18224.+5520", "PartsPoints::DrawRace.ret@+176@+6032.+6084", "PartsPoints::DrawRace.ret@+176@+12128.+6084"]
 size = 60
 origin = "embedded"
 fields = [
@@ -306,7 +271,8 @@ fields = [
 # bumper's): +0 the record either way; a group's 18 records at +16 + 240k
 # (the neon, 11 LEDs, 6 spots).
 [LightPoints]
-measures = ["LightPoints", "BlinkTimers"]
+measure = "SceneLights@+144"
+measures = ["SceneLights@+4480", "SceneLights@+8816", "SceneLights@+96", "LightPoints::FindGroup.r3", "LightPoints::ResetFront.r3", "LightPoints::ResetSides.r3", "LightPoints::ResetRear.r3"]
 size = 13056
 origin = "embedded"
 fields = [
@@ -329,8 +295,8 @@ fields = [
 
 # The light kit's 52-byte record (pool 4's, the scene model's record +4224).
 [LightKitRecord]
-measures = ["LightPoints.+0", "BlinkTimers.+0",
-            "sub_820D34E0.r3"]
+measure = "sub_820D34E0.r3"
+measures = ["SceneLights@+144.+0", "SceneLights@+4480.+0", "SceneLights@+8816.+0", "SceneLights@+96.+0"]
 size = 52
 origin = "embedded"
 fields = [
@@ -353,7 +319,8 @@ fields = [
 # (+16 the body's records, +1472 the headlights, +3152 the tail lights),
 # records at +240k.
 [TrafficPoints]
-measure = "TrafficPoints"
+measure = "TrafficPoints::Draw.r3@+16"
+measures = ["TrafficPoints::Draw.r3@+1472", "TrafficPoints::Find.r3@+3152", "TrafficPoints::Draw.r3@+3152", "TrafficPoints::Find.r3@+1472", "SceneTraffic@+3728"]
 size = 6032
 origin = "embedded"
 fields = [
@@ -378,8 +345,8 @@ fields = [
 # The interior's 120-byte record (SceneInterior +40; the point block's
 # groups' +0).
 [InteriorRecord]
-measures = ["InteriorDials.+0", "InteriorPoints.+0", "InteriorPoints.+10464", "Dash.+0",
-            "sub_820D3840.r3"]
+measure = "sub_820D3840.r3"
+measures = ["SceneInterior@+160@+240.+0", "SceneInterior@+160@+9488.+0", "SceneInterior@+160@+10464.+0", "SceneInterior@+160.+9488", "SceneInterior@+160.+11444", "SceneInterior@+160@+3152.+0"]
 size = 120
 origin = "embedded"
 fields = [
@@ -418,7 +385,8 @@ fields = [
 # The interior's dials (its point block +240; SceneInterior +400): records at
 # +16 + 240k.
 [InteriorDials]
-measure = "InteriorDials"
+measure = "SceneInterior@+160@+240"
+measures = ["SceneInterior@+400"]
 size = 2912
 origin = "embedded"
 fields = [
@@ -428,7 +396,9 @@ fields = [
   { name = "tachometer_model", offset = 20, type = "u32", note = "record 0's model: Dash::PoseTachometer runs when set" },
   { name = "digits_model", offset = 2180, type = "u32", note = "record 9's model: DrawDigitalSpeed runs when set" },
   { name = "ones_shape", offset = 2404, type = "u32", note = "record 9's shape" },
+  { name = "unknown_2420", offset = 2420, type = "u32", note = "read by InteriorPoints::FindDials (not read)" },
   { name = "tens_shape", offset = 2644, type = "u32", note = "record 10's shape" },
+  { name = "unknown_2660", offset = 2660, type = "u32", note = "read by InteriorPoints::FindDials (not read)" },
   { name = "hundreds_shape", offset = 2884, type = "u32", note = "record 11's shape" },
   { name = "gauge_record", offset = 2896, type = "u32", note = "a 48-byte record of the table at 0x82003680 (sub_820D3728 of the block)" },
 ]
@@ -437,7 +407,7 @@ fields = [
 # load-poll's measure, to merge), with Dash::PoseTachometer's reads of the
 # dials (+0, +2896). Records at +16 + 240k.
 [Dash]
-measure = "Dash"
+measure = "SceneInterior@+160@+3152"
 size = 5356
 origin = "embedded"
 fields = [
@@ -472,27 +442,9 @@ fields = [
 # gets it in r4 (or r5): the same object as second-set.toml's
 # SceneModelBlock (to merge, the measures with it).
 [CarDrawBlock]
+measure = "CockpitPoints::DrawCabinWindow.r4"
+measures = ["InteriorDials::DrawDigitalSpeed.r4", "InteriorPoints::DrawRace.r4", "PartsPoints::DrawBonnet.r4", "PartsPoints::DrawCabinWindow01.r4", "PartsPoints::DrawCabinWindow02.r4", "PartsPoints::DrawFenderLights.r4", "PartsPoints::DrawFrontBumperLights.r4", "PartsPoints::DrawFrontEnd.r4", "PartsPoints::DrawHeadlightBody.r4", "PartsPoints::DrawHeadlights.r4", "PartsPoints::DrawLeftDoorPanel.r4", "PartsPoints::DrawRace.r4", "PartsPoints::DrawRearBumperLights.r4", "PartsPoints::DrawTailLights.r4", "TrafficPoints::DrawHeadlights.r4", "WheelPoints::DrawRimAMorphed.r5", "WheelPoints::DrawRimB.r5", "SceneModel@+4288"]
 # measures from SceneModelBlock (second-set), merged at the integration
-measures = [
-  "CockpitPoints::DrawCabinWindow.r4",
-  "InteriorDials::DrawDigitalSpeed.r4",
-  "InteriorPoints::DrawRace.r4",
-  "PartsPoints::DrawBonnet.r4",
-  "PartsPoints::DrawCabinWindow01.r4",
-  "PartsPoints::DrawCabinWindow02.r4",
-  "PartsPoints::DrawFenderLights.r4",
-  "PartsPoints::DrawFrontBumperLights.r4",
-  "PartsPoints::DrawFrontEnd.r4",
-  "PartsPoints::DrawHeadlightBody.r4",
-  "PartsPoints::DrawHeadlights.r4",
-  "PartsPoints::DrawLeftDoorPanel.r4",
-  "PartsPoints::DrawRace.r4",
-  "PartsPoints::DrawRearBumperLights.r4",
-  "PartsPoints::DrawTailLights.r4",
-  "TrafficPoints::DrawHeadlights.r4",
-  "WheelPoints::DrawRimAMorphed.r5",
-  "WheelPoints::DrawRimB.r5",
-  "SceneModelBlock"]
 size = 736
 origin = "embedded"
 fields = [
@@ -601,3 +553,256 @@ key_group0 = { address = 0x8296B90C, type = "u32", note = "Model::Draw's group 0
 depth_key = { address = 0x8296B8FC, type = "u32", note = "the depth draws' key" }
 other_key = { address = 0x8296B8F8, type = "u32", note = "the depth draws' second key" }
 pool_maker = { address = 0x8296B914, type = "u32", note = "the second pool maker (its slot 1 makes the morph's job)" }
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from CarScene.
+[CarSceneAt5248]
+measure = "CarScene@+5248"
+size = 276
+origin = "embedded"
+fields = [
+  { name = "lighting_0", offset = 0, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +0, the scene's +5248" },
+  { name = "lighting_8", offset = 8, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +8, the scene's +5256" },
+  { name = "lighting_16", offset = 16, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +16, the scene's +5264" },
+  { name = "lighting_24", offset = 24, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +24, the scene's +5272" },
+  { name = "lighting_32", offset = 32, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +32, the scene's +5280" },
+  { name = "lighting_40", offset = 40, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +40, the scene's +5288" },
+  { name = "lighting_48", offset = 48, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +48, the scene's +5296" },
+  { name = "lighting_56", offset = 56, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +56, the scene's +5304" },
+  { name = "lighting_64", offset = 64, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +64, the scene's +5312" },
+  { name = "lighting_72", offset = 72, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +72, the scene's +5320" },
+  { name = "lighting_80", offset = 80, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +80, the scene's +5328" },
+  { name = "lighting_88", offset = 88, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +88, the scene's +5336" },
+  { name = "lighting_96", offset = 96, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +96, the scene's +5344" },
+  { name = "lighting_104", offset = 104, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +104, the scene's +5352" },
+  { name = "lighting_112", offset = 112, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +112, the scene's +5360" },
+  { name = "lighting_120", offset = 120, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +120, the scene's +5368" },
+  { name = "lighting_128", offset = 128, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +128, the scene's +5376" },
+  { name = "lighting_136", offset = 136, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +136, the scene's +5384" },
+  { name = "lighting_144", offset = 144, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +144, the scene's +5392" },
+  { name = "lighting_152", offset = 152, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +152, the scene's +5400" },
+  { name = "lighting_160", offset = 160, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +160, the scene's +5408" },
+  { name = "lighting_168", offset = 168, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +168, the scene's +5416" },
+  { name = "lighting_176", offset = 176, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +176, the scene's +5424" },
+  { name = "lighting_184", offset = 184, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +184, the scene's +5432" },
+  { name = "lighting_192", offset = 192, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +192, the scene's +5440" },
+  { name = "lighting_200", offset = 200, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +200, the scene's +5448" },
+  { name = "lighting_208", offset = 208, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +208, the scene's +5456" },
+  { name = "lighting_216", offset = 216, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +216, the scene's +5464" },
+  { name = "lighting_224", offset = 224, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +224, the scene's +5472" },
+  { name = "lighting_232", offset = 232, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +232, the scene's +5480" },
+  { name = "lighting_240", offset = 240, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +240, the scene's +5488" },
+  { name = "lighting_248", offset = 248, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +248, the scene's +5496" },
+  { name = "lighting_256", offset = 256, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +256, the scene's +5504" },
+  { name = "lighting_264", offset = 264, type = "u64", note = "the owner's fault_ field before the measure's fixes (2026-11-22): CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +264, the scene's +5512" },
+  { name = "lighting_272", offset = 272, type = "f32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): InitLighting's last float, the scene's +5520 (lighting_end)" },
+]
+
+# Split from PartsPoints.
+[PartsPointsAt176]
+measure = "PartsPoints::DrawRace.ret@+176"
+size = 37084
+origin = "embedded"
+fields = [
+  { name = "unknown_37076", offset = 37076, type = "u32" },
+  { name = "unknown_37080", offset = 37080, type = "u32" },
+]
+
+# Split from PartsPoints.
+[PartsPointsAt12128]
+measure = "PartsPoints::DrawRace.ret@+176@+12128"
+size = 6088
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_6080", offset = 6080, type = "u32" },
+  { name = "unknown_6084", offset = 6084, type = "u32" },
+]
+
+# Split from PartsPoints.
+[PartsPointsAt6032]
+measure = "PartsPoints::DrawRace.ret@+176@+6032"
+size = 6088
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_6080", offset = 6080, type = "u32" },
+  { name = "unknown_6084", offset = 6084, type = "u32" },
+]
+
+# Split from PartsPoints.
+[PartsPointsAt34640]
+measure = "PartsPoints::PartsPoints.r3@+34640"
+size = 64
+origin = "embedded"
+fields = [
+  { name = "unknown_12", offset = 12, type = "f32" },
+  { name = "unknown_28", offset = 28, type = "f32" },
+  { name = "unknown_44", offset = 44, type = "f32" },
+  { name = "unknown_60", offset = 60, type = "f32" },
+]
+
+# Split from PartsPoints.
+[PartsPointsAt176_2]
+measure = "SceneParts::Draw.r3@+176"
+size = 37084
+origin = "embedded"
+fields = [
+  { name = "unknown_37080", offset = 37080, type = "u32" },
+]
+
+# Split from PartsPoints.
+[PartsPointsAt18224]
+measure = "SceneParts::Draw.r3@+176@+18224"
+size = 5524
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_228", offset = 228, type = "u32" },
+  { name = "unknown_244", offset = 244, type = "u32" },
+  { name = "unknown_468", offset = 468, type = "u32" },
+  { name = "unknown_5520", offset = 5520, type = "u32" },
+]
+
+# Split from PartsPoints.
+[PartsPointsAt36096]
+measure = "SceneParts::Draw.r3@+176@+36096"
+size = 952
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_228", offset = 228, type = "u32" },
+  { name = "unknown_724", offset = 724, type = "u32" },
+  { name = "unknown_948", offset = 948, type = "u32" },
+]
+
+# Split from PartsPoints.
+[PartsPointsAt176_3]
+measure = "SceneParts@+176"
+size = 37092
+origin = "embedded"
+fields = [
+  { name = "unknown_724", offset = 724, type = "u32" },
+  { name = "unknown_948", offset = 948, type = "u32" },
+  { name = "unknown_964", offset = 964, type = "u32" },
+  { name = "unknown_1188", offset = 1188, type = "u32" },
+  { name = "unknown_1204", offset = 1204, type = "u32" },
+  { name = "unknown_1428", offset = 1428, type = "u32" },
+  { name = "unknown_1924", offset = 1924, type = "u32" },
+  { name = "unknown_2644", offset = 2644, type = "u32" },
+  { name = "unknown_2648", offset = 2648, type = "u32" },
+  { name = "unknown_4580", offset = 4580, type = "u32" },
+  { name = "unknown_12032", offset = 12032, type = "u32" },
+  { name = "unknown_12112", offset = 12112, type = "u32" },
+  { name = "unknown_12116", offset = 12116, type = "u32" },
+  { name = "unknown_18128", offset = 18128, type = "u32" },
+  { name = "unknown_18208", offset = 18208, type = "u32" },
+  { name = "unknown_18212", offset = 18212, type = "u32" },
+  { name = "unknown_23744", offset = 23744, type = "u32" },
+  { name = "unknown_37088", offset = 37088, type = "u32" },
+]
+
+# Split from PartsPoints.
+[PartsPointsAt18224_2]
+measure = "SceneParts@+176@+18224"
+size = 952
+origin = "embedded"
+fields = [
+  { name = "unknown_724", offset = 724, type = "u32" },
+  { name = "unknown_948", offset = 948, type = "u32" },
+]
+
+# Split from PartsPoints.
+[PartsPointsAt24480]
+measure = "SceneParts@+176@+24480"
+size = 3188
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_224", offset = 224, type = "u32" },
+  { name = "unknown_1684", offset = 1684, type = "u32" },
+  { name = "unknown_1908", offset = 1908, type = "u32" },
+  { name = "unknown_1924", offset = 1924, type = "u32" },
+  { name = "unknown_2148", offset = 2148, type = "u32" },
+  { name = "unknown_2164", offset = 2164, type = "u32" },
+  { name = "unknown_2388", offset = 2388, type = "u32" },
+  { name = "unknown_2404", offset = 2404, type = "u32" },
+  { name = "unknown_2628", offset = 2628, type = "u32" },
+  { name = "unknown_3184", offset = 3184, type = "f32" },
+]
+
+# Split from PartsPoints.
+[PartsPointsAt27680]
+measure = "SceneParts@+176@+27680"
+size = 2152
+origin = "embedded"
+fields = [
+  { name = "unknown_1924", offset = 1924, type = "u32" },
+  { name = "unknown_2148", offset = 2148, type = "u32" },
+]
+
+# Split from PartsPoints.
+[PartsPointsAt2896]
+measure = "SceneParts@+176@+2896"
+size = 1688
+origin = "embedded"
+fields = [
+  { name = "unknown_244", offset = 244, type = "u32" },
+  { name = "unknown_468", offset = 468, type = "u32" },
+  { name = "unknown_484", offset = 484, type = "u32" },
+  { name = "unknown_708", offset = 708, type = "u32" },
+  { name = "unknown_724", offset = 724, type = "u32" },
+  { name = "unknown_948", offset = 948, type = "u32" },
+  { name = "unknown_964", offset = 964, type = "u32" },
+  { name = "unknown_1188", offset = 1188, type = "u32" },
+  { name = "unknown_1444", offset = 1444, type = "u32" },
+  { name = "unknown_1684", offset = 1684, type = "u32" },
+]
+
+# Split from PartsPoints.
+[PartsPointsAt31280]
+measure = "SceneParts@+176@+31280"
+size = 952
+origin = "embedded"
+fields = [
+  { name = "unknown_724", offset = 724, type = "u32" },
+  { name = "unknown_948", offset = 948, type = "u32" },
+]
+
+# Split from PartsPoints.
+[PartsPointsAt32960]
+measure = "SceneParts@+176@+32960"
+size = 472
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_228", offset = 228, type = "u32" },
+  { name = "unknown_244", offset = 244, type = "u32" },
+  { name = "unknown_468", offset = 468, type = "u32" },
+]
+
+# Split from PartsPoints.
+[PartsPointsAt4832]
+measure = "SceneParts@+176@+4832"
+size = 712
+origin = "embedded"
+fields = [
+  { name = "unknown_244", offset = 244, type = "u32" },
+  { name = "unknown_468", offset = 468, type = "u32" },
+  { name = "unknown_484", offset = 484, type = "u32" },
+  { name = "unknown_708", offset = 708, type = "u32" },
+]
+
+# Split from PartsPoints.
+[PartsPointsAt6032_2]
+measure = "SceneParts@+176@+6032"
+size = 1912
+origin = "embedded"
+fields = [
+  { name = "unknown_1684", offset = 1684, type = "u32" },
+  { name = "unknown_1908", offset = 1908, type = "u32" },
+]

@@ -152,3 +152,18 @@ fields = [
 
 [globals]
 xma_context_array = { address = 0x82954F0C, type = "u32", note = "the XMA registers' ContextArrayAddress (read once at boot by sub_8245C638, used by sub_8245D138 for context ids; neither runs now)" }
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from AudioRenderDriver.
+[AudioRenderDriverOuter4]
+measure = "sub_82465848.r3@-4"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+]

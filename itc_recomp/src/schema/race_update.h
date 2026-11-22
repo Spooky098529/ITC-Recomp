@@ -80,7 +80,7 @@ struct RaceCarSlot : View {
   uint32_t pool_index_address() const { return address + 4272; }
 };
 
-// embedded; measure: RaceLights
+// embedded; measure: RaceScene@+30064@+16, RaceScene@+30064
 struct RaceLights : View {
   using View::View;
   static constexpr uint32_t kSize = 1076;

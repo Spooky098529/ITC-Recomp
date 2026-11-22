@@ -483,3 +483,64 @@ fields = [
   { name = "unknown_12", offset = 12, type = "f32" },
   { name = "unknown_16", offset = 16, type = "u32" },
 ]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from DayBlock.
+[DayBlockAt72]
+measure = "Progress@+72"
+size = 4836
+origin = "embedded"
+fields = [
+  { name = "unknown_4828", offset = 4828, type = "u16" },
+  { name = "unknown_4830", offset = 4830, type = "u16" },
+  { name = "unknown_4832", offset = 4832, type = "u32" },
+]
+
+# Split from TuningScreen.
+[TuningScreenAt36588]
+measure = "TuningScreen@+36588"
+size = 33580
+origin = "embedded"
+fields = [
+  { name = "unknown_9652", offset = 9652, type = "u32" },
+  { name = "unknown_9716", offset = 9716, type = "u32" },
+  { name = "unknown_10076", offset = 10076, type = "u32" },
+  { name = "unknown_10112", offset = 10112, type = "u32" },
+  { name = "unknown_10148", offset = 10148, type = "u32" },
+  { name = "unknown_10832", offset = 10832, type = "u32" },
+  { name = "unknown_10868", offset = 10868, type = "u32" },
+  { name = "unknown_10904", offset = 10904, type = "u32" },
+  { name = "unknown_25092", offset = 25092, type = "u32" },
+  { name = "unknown_25096", offset = 25096, type = "u32" },
+  { name = "unknown_25116", offset = 25116, type = "u32" },
+  { name = "unknown_25204", offset = 25204, type = "u32" },
+  { name = "unknown_25212", offset = 25212, type = "u32" },
+  { name = "unknown_25228", offset = 25228, type = "u32" },
+  { name = "unknown_30492", offset = 30492, type = "u32" },
+  { name = "unknown_30500", offset = 30500, type = "u32" },
+  { name = "unknown_30508", offset = 30508, type = "u32" },
+  { name = "unknown_30512", offset = 30512, type = "u32" },
+  { name = "unknown_30516", offset = 30516, type = "u32" },
+  { name = "unknown_30520", offset = 30520, type = "u32" },
+  { name = "unknown_30524", offset = 30524, type = "u32" },
+  { name = "unknown_30528", offset = 30528, type = "u32" },
+  { name = "unknown_30544", offset = 30544, type = "u32" },
+  { name = "unknown_30560", offset = 30560, type = "u32" },
+  { name = "unknown_30724", offset = 30724, type = "u32" },
+  { name = "unknown_30740", offset = 30740, type = "u32" },
+  { name = "unknown_30748", offset = 30748, type = "u32" },
+  { name = "unknown_30764", offset = 30764, type = "u32" },
+  { name = "unknown_30768", offset = 30768, type = "u32" },
+  { name = "unknown_30832", offset = 30832, type = "u32" },
+  { name = "unknown_30836", offset = 30836, type = "u32" },
+  { name = "unknown_30840", offset = 30840, type = "f32" },
+  { name = "unknown_30844", offset = 30844, type = "f32" },
+  { name = "unknown_30848", offset = 30848, type = "u32" },
+  { name = "unknown_31192", offset = 31192, type = "u32" },
+  { name = "unknown_33548", offset = 33548, type = "u32" },
+  { name = "unknown_33564", offset = 33564, type = "u32" },
+  { name = "unknown_33576", offset = 33576, type = "u32" },
+]

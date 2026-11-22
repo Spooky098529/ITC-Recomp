@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// embedded; measure: PanelSetBase, PanelSetBase.+1820
+// embedded; measure: PanelSetBase, PanelSetBase.+1820, PanelSetBase::PanelSetBase.r3, PanelSetBase::Build.r3, PanelSetBase::ToTabs.r3, PanelSetBase::Update.r3, PanelSetBase::HandleInput.r3
 struct PanelSetBase : View {
   using View::View;
   static constexpr uint32_t kSize = 1972;
@@ -314,7 +314,7 @@ struct PanelSetBase : View {
   uint32_t busy_anim_done_address() const { return address + 1968; }
 };
 
-// embedded; measure: PanelSet, PanelScreen.+9644
+// embedded; measure: PanelSet, PanelScreen.+9644, PanelSet::PanelSet.r3
 struct PanelSet : View {
   using View::View;
   static constexpr uint32_t kSize = 1976;
@@ -788,7 +788,7 @@ struct CarListStats : View {
   uint32_t unknown_28_address() const { return address + 28; }
 };
 
-// embedded; measure: PanelGroupBase, PanelGroup6B, PanelGroup7B
+// embedded; measure: PanelGroupBase, Type6Screens@+40948@+9708, Type7Screens@+30608@+9708
 struct PanelGroupBase : View {
   using View::View;
   static constexpr uint32_t kSize = 36;
@@ -950,7 +950,7 @@ struct TabPanel : View {
   uint32_t two_players_address() const { return address + 140; }
 };
 
-// embedded; measure: RowPanel, MenuList.+1900, PanelE, PanelEBase
+// embedded; measure: RowPanel, MenuList.+1900, PanelE, PanelEBase, PanelSetBase::ToTabs.r3.+1900
 struct RowPanel : View {
   using View::View;
   static constexpr uint32_t kSize = 160;
@@ -1361,6 +1361,108 @@ struct CarListStepWord : View {
   uint32_t first_pass() const { return guest::LoadU32(base, address + 0); }
   void set_first_pass(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t first_pass_address() const { return address + 0; }
+};
+
+// embedded; measure: ModeType8@+848@+42740.+9644
+struct PanelSetPairPart : View {
+  using View::View;
+  static constexpr uint32_t kSize = 3936;
+  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
+  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_1900() const { return guest::LoadU32(base, address + 1900); }
+  void set_unknown_1900(uint32_t v) const { guest::StoreU32(base, address + 1900, v); }
+  uint32_t unknown_1900_address() const { return address + 1900; }
+  uint32_t unknown_1904() const { return guest::LoadU32(base, address + 1904); }
+  void set_unknown_1904(uint32_t v) const { guest::StoreU32(base, address + 1904, v); }
+  uint32_t unknown_1904_address() const { return address + 1904; }
+  uint32_t unknown_1908() const { return guest::LoadU32(base, address + 1908); }
+  void set_unknown_1908(uint32_t v) const { guest::StoreU32(base, address + 1908, v); }
+  uint32_t unknown_1908_address() const { return address + 1908; }
+  uint32_t unknown_1912() const { return guest::LoadU32(base, address + 1912); }
+  void set_unknown_1912(uint32_t v) const { guest::StoreU32(base, address + 1912, v); }
+  uint32_t unknown_1912_address() const { return address + 1912; }
+  uint32_t unknown_1916() const { return guest::LoadU32(base, address + 1916); }
+  void set_unknown_1916(uint32_t v) const { guest::StoreU32(base, address + 1916, v); }
+  uint32_t unknown_1916_address() const { return address + 1916; }
+  uint32_t unknown_1960() const { return guest::LoadU32(base, address + 1960); }
+  void set_unknown_1960(uint32_t v) const { guest::StoreU32(base, address + 1960, v); }
+  uint32_t unknown_1960_address() const { return address + 1960; }
+  uint32_t unknown_3872() const { return guest::LoadU32(base, address + 3872); }
+  void set_unknown_3872(uint32_t v) const { guest::StoreU32(base, address + 3872, v); }
+  uint32_t unknown_3872_address() const { return address + 3872; }
+  uint32_t unknown_3876() const { return guest::LoadU32(base, address + 3876); }
+  void set_unknown_3876(uint32_t v) const { guest::StoreU32(base, address + 3876, v); }
+  uint32_t unknown_3876_address() const { return address + 3876; }
+  uint32_t unknown_3880() const { return guest::LoadU32(base, address + 3880); }
+  void set_unknown_3880(uint32_t v) const { guest::StoreU32(base, address + 3880, v); }
+  uint32_t unknown_3880_address() const { return address + 3880; }
+  uint32_t unknown_3884() const { return guest::LoadU32(base, address + 3884); }
+  void set_unknown_3884(uint32_t v) const { guest::StoreU32(base, address + 3884, v); }
+  uint32_t unknown_3884_address() const { return address + 3884; }
+  uint32_t unknown_3888() const { return guest::LoadU32(base, address + 3888); }
+  void set_unknown_3888(uint32_t v) const { guest::StoreU32(base, address + 3888, v); }
+  uint32_t unknown_3888_address() const { return address + 3888; }
+  uint32_t unknown_3932() const { return guest::LoadU32(base, address + 3932); }
+  void set_unknown_3932(uint32_t v) const { guest::StoreU32(base, address + 3932, v); }
+  uint32_t unknown_3932_address() const { return address + 3932; }
+};
+
+// embedded; measure: PanelSet::Free.r3@+4
+struct PanelSetBaseAt4 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 1880;
+  uint32_t unknown_784() const { return guest::LoadU32(base, address + 784); }
+  void set_unknown_784(uint32_t v) const { guest::StoreU32(base, address + 784, v); }
+  uint32_t unknown_784_address() const { return address + 784; }
+  uint32_t unknown_1300() const { return guest::LoadU32(base, address + 1300); }
+  void set_unknown_1300(uint32_t v) const { guest::StoreU32(base, address + 1300, v); }
+  uint32_t unknown_1300_address() const { return address + 1300; }
+  uint32_t unknown_1816() const { return guest::LoadU32(base, address + 1816); }
+  void set_unknown_1816(uint32_t v) const { guest::StoreU32(base, address + 1816, v); }
+  uint32_t unknown_1816_address() const { return address + 1816; }
+  uint32_t unknown_1820() const { return guest::LoadU32(base, address + 1820); }
+  void set_unknown_1820(uint32_t v) const { guest::StoreU32(base, address + 1820, v); }
+  uint32_t unknown_1820_address() const { return address + 1820; }
+  uint32_t unknown_1876() const { return guest::LoadU32(base, address + 1876); }
+  void set_unknown_1876(uint32_t v) const { guest::StoreU32(base, address + 1876, v); }
+  uint32_t unknown_1876_address() const { return address + 1876; }
+};
+
+// embedded; measure: PanelSet::SetKind.r3@+4
+struct PanelSetBaseAt4_2 : View {
+  using View::View;
+  static constexpr uint32_t kSize = 1884;
+  uint32_t unknown_32() const { return guest::LoadU32(base, address + 32); }
+  void set_unknown_32(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
+  uint32_t unknown_32_address() const { return address + 32; }
+  uint32_t unknown_36() const { return guest::LoadU32(base, address + 36); }
+  void set_unknown_36(uint32_t v) const { guest::StoreU32(base, address + 36, v); }
+  uint32_t unknown_36_address() const { return address + 36; }
+  uint32_t unknown_40() const { return guest::LoadU32(base, address + 40); }
+  void set_unknown_40(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
+  uint32_t unknown_40_address() const { return address + 40; }
+  uint32_t unknown_44() const { return guest::LoadU32(base, address + 44); }
+  void set_unknown_44(uint32_t v) const { guest::StoreU32(base, address + 44, v); }
+  uint32_t unknown_44_address() const { return address + 44; }
+  uint32_t unknown_52() const { return guest::LoadU32(base, address + 52); }
+  void set_unknown_52(uint32_t v) const { guest::StoreU32(base, address + 52, v); }
+  uint32_t unknown_52_address() const { return address + 52; }
+  uint32_t unknown_56() const { return guest::LoadU32(base, address + 56); }
+  void set_unknown_56(uint32_t v) const { guest::StoreU32(base, address + 56, v); }
+  uint32_t unknown_56_address() const { return address + 56; }
+  uint32_t unknown_228() const { return guest::LoadU32(base, address + 228); }
+  void set_unknown_228(uint32_t v) const { guest::StoreU32(base, address + 228, v); }
+  uint32_t unknown_228_address() const { return address + 228; }
+  uint32_t unknown_232() const { return guest::LoadU32(base, address + 232); }
+  void set_unknown_232(uint32_t v) const { guest::StoreU32(base, address + 232, v); }
+  uint32_t unknown_232_address() const { return address + 232; }
+  uint32_t unknown_1820() const { return guest::LoadU32(base, address + 1820); }
+  void set_unknown_1820(uint32_t v) const { guest::StoreU32(base, address + 1820, v); }
+  uint32_t unknown_1820_address() const { return address + 1820; }
+  uint32_t unknown_1880() const { return guest::LoadU32(base, address + 1880); }
+  void set_unknown_1880(uint32_t v) const { guest::StoreU32(base, address + 1880, v); }
+  uint32_t unknown_1880_address() const { return address + 1880; }
 };
 
 // The image words docs/functions/car-list.md's code uses.
