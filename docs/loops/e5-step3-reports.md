@@ -72,3 +72,69 @@ calls.
 For the user's review (not written): see the lead's message of
 2026-11-22; Status unchanged in every row (each function's other objects
 are still guest objects), the Notes extended.
+
+## Batch 2 (2026-11-22, `lifted_sites: true`)
+
+9 areas, 9 agents (run `wf_0de3cceb-1eb`). 1 type moved by an agent, 1 by
+the lead, 18 skipped (and `FloatPair`, moved earlier by the lead as the
+check of `host_alloc` and `host_free`). Checked by the lead: schema_gen,
+schema_check (0), `lift.py reemit` (no host type's access left raw),
+`lift_originals.py --all`, the build (22 errors at first: the pause data's
+words reached by address in `options.cpp` and `transitions.cpp`, which the
+agent hadn't converted; fixed with `race_screens/pause_data.h`), an attract
+race (no error lines), `tick_replay.sh` twice (both races all match;
+`PauseMenu::Create`, `PauseMenu4::Create` and `PauseMenu::Destroy` ran), a
+frame dump (normal).
+
+The first `reemit` stopped: the pause data's sites are in the lifted
+originals, and `originals.cpp` was stale at that point. Since then each
+tool also accepts a site that is a call in the other tool's functions
+(their generated bodies), so their order doesn't matter.
+
+### Moved
+
+| Type | Area | Allocation | Free |
+|---|---|---|---|
+| `PauseMenuData` (160 B) | race-screens | `PauseMenu::Create` (`Pages(160)` before; the original's `VirtualAlloc` at `0x8220D824`, `host_alloc` for the lifted original), handle in `[0x826D84D4]` | `PauseMenu::Destroy` through `DestroyFour`'s new `free_data` (the original's `VirtualFree` at `0x8220C524`, `host_free`, returns 1) |
+| `PauseMenu4Data` (80 B) | race-screens-unseen (moved by the lead) | `PauseMenu4::Create` (`0x822108A4`, `host_alloc`), handle in `[0x826D84E4]` | `PauseMenu4::Destroy` (`0x8220FCF4`, `host_free`, returns 1) |
+
+Changes beyond the sites: the pause data's 40 fields are consecutive
+words the original reaches by address (a field's address + 4 x an index,
+runs of 2 to 4 words copied, a table of field addresses in
+`ToggleOption`'s frame); `race_screens/pause_data.h` reads and writes the
+host struct's word at a byte offset (`PauseWord`, `SetPauseWord`,
+`CopyPauseWords`), and `ToggleOption`'s frame table holds handle + offset
+(read back as the offset). `StepVolume` and `StepAdjust` (the agent's)
+switch on the index field by field.
+
+### Skipped
+
+| Type | Area | Why |
+|---|---|---|
+| `FloatTriple` | heap | `FloatTripleItem`'s vtable slot 14 (`sub_820A7BC0`, lifted) reads its +12 raw through the item; never measured. |
+| `FloatPairItem`, `FloatTripleItem` | heap | Handed out by the factory `sub_820A81C0`; their vtable functions read them raw; dispatched by callers. |
+| `ByteCountedList` | heap | Stored raw into a caller's frame copy and handed on; may mix guest and host lists. |
+| `D3DXBuffer` | heap | Handed to the shader objects and the hardcoded shaders' adapter; `Release` reads it raw. |
+| `FrameStart` | framework | A delegate target: the delegate thunks read its vtable through the generic `DelegateTarget`. |
+| `HandlerMapNode` | framework | A red-black tree walked raw by lifted code and other areas. |
+| `MorphJobMaker` | framework | `car_draw/morph.cpp` reads its vtable raw; dispatched virtually from morph-jobs. |
+| `WorkerPool` | framework | Hands out an interior interface (pool + 8) to other areas; virtual calls through it. |
+| `AppDelegate`, `AppStates` | app-states | Vtables read raw on every virtual call (`VirtualTarget`). |
+| `StateLayer` | app-states | Embedded interface and lists whose addresses are handed out. |
+| `CarListEntry` | car-list | A memcpy target for the car's 8,432-byte spec; read by address in other areas. |
+| `CarDealerSwatch` | material-passes | Its hue's address passed to `Color::HsvToRgb`; its sites in car-dealer's files. |
+| `StandModelsSpecCopy` | stand-models | A memcpy target; the Xbox Live mode only (unreachable). |
+| `CarOverlays` | race-overlays | Also its base `Overlay`'s object; its address handed to `Archive::Load` and other areas. |
+| `OverlayView` | race-overlays | `FreeView`'s per-slot path reads its vtable raw; the deleting destructor stores through a shared type. |
+| `Kind6MenuPart` | race-screens-unseen | Part of `Kind6Menu`'s one block (the Xbox Live mode). |
+| `CareerResultsScreen` | race-screens | A memcpy target and an embedded page object handed out by address. |
+| `PauseMenuScreen` | race-screens | Its measure also takes the transitions' step word (a measure fault): lifted code would read a guest address as a handle. |
+
+Patterns (for later batches and step 4): most of the rest has vtables
+read raw (virtual dispatch), interfaces or objects embedded at offsets, or
+is a memcpy target.
+
+### Proposed row changes
+
+For the user's review (not written); Status unchanged (each function's
+other objects are still guest objects).

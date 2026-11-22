@@ -473,5 +473,8 @@ args, in the same session) only when the user's current message says to.
   didn't cover the race's own loads; fixed with a start mark
   (`docs/pad-replay.md`, "By tick"), the recording and baseline made again,
   then both races matched twice.
-- Batches 2 and 3: not started.
+- Batch 2 done and checked (2026-11-22): 2 types moved (`PauseMenuData`,
+  `PauseMenu4Data`, both seen in the replay), 18 skipped; both replay
+  races match. Its proposed rows await the user's review.
+- Batch 3: not started.
 - Merged into `rexglue-removal-project` up to the pilot (`fc5e3b94`).
