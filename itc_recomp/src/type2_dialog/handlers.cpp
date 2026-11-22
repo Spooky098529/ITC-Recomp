@@ -149,8 +149,10 @@ uint64_t OnEnter(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& call
   menu.set_up_down_locked(0);
   menu.set_left_right_steps(0);
   menu.set_shoulders_step(0);
-  const uint64_t r3 = calls.Call(kVirtualAlloc, frame, 0x82186A7C, 0, 68, 0x1000, 4);
-  const schema::Type2DialogData data(base, uint32_t(r3));
+  // The data block lives in host memory (E5 step 3, the pilot): the
+  // original's VirtualAlloc(68) at 0x82186A7C; the global holds its handle.
+  const schema::Type2DialogData data = schema::Type2DialogData::New(base);
+  const uint64_t r3 = data.address;
   G::set_data(base, data);
   data.set_movies_loaded(0);
   data.set_movie_shown(0);
@@ -363,7 +365,10 @@ uint64_t OnLeft(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 112);
   calls.Call(kVirtualFree, frame, 0x82186450, G::pages(base).address, 0, 0x8000);
   calls.Call(kVirtualFree, frame, 0x82186464, G::menu(base).address, 0, 0x8000);
-  const uint64_t r3 = calls.Call(kVirtualFree, frame, 0x82186478, G::data(base).address, 0, 0x8000);
+  // The host data block (OnEnter): the original's VirtualFree at
+  // 0x82186478, which returned 1.
+  G::data(base).Delete();
+  const uint64_t r3 = 1;
   G::set_pages(base, 0u);
   G::set_menu(base, 0u);
   G::set_data(base, 0u);

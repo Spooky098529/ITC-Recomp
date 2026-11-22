@@ -16,6 +16,9 @@
 measure = "new<68>@Type2Dialog::OnEnter#2"
 size = 68
 origin = "allocated"
+# In host memory since E5 step 3's pilot (2026-11-22): made by OnEnter, freed
+# by OnLeft; the global at 0x826D8400 holds its handle.
+storage = "host"
 fields = [
   { name = "movies_loaded", offset = 0, type = "u32" },
   { name = "queued_state", offset = 4, type = "u32", note = "21 none" },

@@ -298,6 +298,21 @@ pilot area).
 Each groundwork piece: built, an attract race and the pad replay (no
 object moved yet, so the game is unchanged), committed.
 
+### The pilot (2026-11-22)
+
+`type2-dialog`'s `Type2DialogData` (68 bytes, `[0x826D8400]`): marked
+`storage = "host"`; `Type2Dialog::OnEnter` makes it with
+`Type2DialogData::New` in place of the `VirtualAlloc(68)` at `0x82186A7C`
+(returning the handle as the original returned the address), `OnLeft`
+frees it with `Delete()` in place of the `VirtualFree` at `0x82186478`
+(returning 1, as that did). Nothing else changed: every user already went
+through the view, no lifted code reaches the block (the re-emit left the
+batches as they were), and the build had nothing to report. Checked: an
+attract race; `tick_replay.sh` (both races match the baseline, the replay
+entering and leaving the dialog: `OnEnter` and `OnLeft` ran); no handle
+fault. The functions keep their status: the dialog's pages and menu are
+still guest objects, so none has all its objects in host memory (**Host**).
+
 ### One area (the agent's work)
 
 1. Take the area's movable types from the pick list; read their rows and

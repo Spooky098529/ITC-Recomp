@@ -9,19 +9,34 @@
 namespace schema {
 
 // allocated; measure: new<68>@Type2Dialog::OnEnter#2
+struct Type2DialogDataData {
+  uint32_t movies_loaded = 0;  // +0
+  uint32_t queued_state = 0;  // +4
+  uint32_t movie_shown = 0;  // +8
+};
+
 struct Type2DialogData : View {
   using View::View;
   static constexpr uint32_t kSize = 68;
-  uint32_t movies_loaded() const { return guest::LoadU32(base, address + 0); }
-  void set_movies_loaded(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t movies_loaded_address() const { return address + 0; }
+  static constexpr bool kHost = true;
+  Type2DialogDataData* data() const { return static_cast<Type2DialogDataData*>(memory::HandleObject(address)); }
+  static Type2DialogData New(uint8_t* base) {
+    return Type2DialogData(base, memory::MakeHandle(new Type2DialogDataData(), kSize, "Type2DialogData"));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  uint32_t movies_loaded() const { return data()->movies_loaded; }
+  void set_movies_loaded(uint32_t v) const { data()->movies_loaded = v; }
+  uint32_t movies_loaded_bits() const { return data()->movies_loaded; }
+  void set_movies_loaded_bits(uint32_t v) const { data()->movies_loaded = v; }
   // 21 none
-  uint32_t queued_state() const { return guest::LoadU32(base, address + 4); }
-  void set_queued_state(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
-  uint32_t queued_state_address() const { return address + 4; }
-  uint32_t movie_shown() const { return guest::LoadU32(base, address + 8); }
-  void set_movie_shown(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t movie_shown_address() const { return address + 8; }
+  uint32_t queued_state() const { return data()->queued_state; }
+  void set_queued_state(uint32_t v) const { data()->queued_state = v; }
+  uint32_t queued_state_bits() const { return data()->queued_state; }
+  void set_queued_state_bits(uint32_t v) const { data()->queued_state = v; }
+  uint32_t movie_shown() const { return data()->movie_shown; }
+  void set_movie_shown(uint32_t v) const { data()->movie_shown = v; }
+  uint32_t movie_shown_bits() const { return data()->movie_shown; }
+  void set_movie_shown_bits(uint32_t v) const { data()->movie_shown = v; }
 };
 
 // The image words docs/functions/type2-dialog.md's code uses.
