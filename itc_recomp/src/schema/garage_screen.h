@@ -50,93 +50,143 @@ struct GarageScreenMode : View {
 };
 
 // allocated; measure: new<104>@GarageScreen::Create
+struct GarageScreenDataData {
+  uint32_t set_up = 0;  // +0
+  uint8_t pick[20] = {};  // +4, guest order
+  uint32_t money = 0;  // +24
+  uint32_t day = 0;  // +28
+  uint32_t weekday = 0;  // +32
+  uint32_t save = 0;  // +36
+  uint32_t selection = 0;  // +44
+  uint32_t scroll = 0;  // +48
+  uint32_t action = 0;  // +52
+  uint32_t unknown_56 = 0;  // +56
+  uint32_t plate_pending = 0;  // +60
+  uint32_t answered_yes = 0;  // +64
+  uint32_t question = 0;  // +68
+  uint32_t stand_shown = 0;  // +72
+  uint32_t stand_model = 0;  // +76
+  uint32_t toggles_shown = 0;  // +80
+  uint32_t busy_shown = 0;  // +84
+  uint32_t turning = 0;  // +88
+  uint32_t doors = 0;  // +92
+  uint32_t doors2 = 0;  // +96
+  uint32_t sale_price = 0;  // +100
+};
+
 struct GarageScreenData : View {
   using View::View;
   static constexpr uint32_t kSize = 104;
+  static constexpr bool kHost = true;
+  GarageScreenDataData* data() const { return static_cast<GarageScreenDataData*>(memory::HandleObject(address)); }
+  static GarageScreenData New(uint8_t* base) {
+    return GarageScreenData(base, memory::MakeHandle(new GarageScreenDataData(), kSize, "GarageScreenData"));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // 1 once the header is set (SetHeader)
-  uint32_t set_up() const { return guest::LoadU32(base, address + 0); }
-  void set_set_up(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t set_up_address() const { return address + 0; }
+  uint32_t set_up() const { return data()->set_up; }
+  void set_set_up(uint32_t v) const { data()->set_up = v; }
+  uint32_t set_up_bits() const { return data()->set_up; }
+  void set_set_up_bits(uint32_t v) const { data()->set_up = v; }
   // the career's pick (player 0's save data +8 to +27, shown as a name)
-  uint32_t pick_address() const { return address + 4; }
+  uint8_t* pick() const { return data()->pick; }
   // save data +6116; the sale adds its price
-  uint32_t money() const { return guest::LoadU32(base, address + 24); }
-  void set_money(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
-  uint32_t money_address() const { return address + 24; }
+  uint32_t money() const { return data()->money; }
+  void set_money(uint32_t v) const { data()->money = v; }
+  uint32_t money_bits() const { return data()->money; }
+  void set_money_bits(uint32_t v) const { data()->money = v; }
   // save data +6100, at most 999
-  uint32_t day() const { return guest::LoadU32(base, address + 28); }
-  void set_day(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
-  uint32_t day_address() const { return address + 28; }
+  uint32_t day() const { return data()->day; }
+  void set_day(uint32_t v) const { data()->day = v; }
+  uint32_t day_bits() const { return data()->day; }
+  void set_day_bits(uint32_t v) const { data()->day = v; }
   // the day mod 7
-  uint32_t weekday() const { return guest::LoadU32(base, address + 32); }
-  void set_weekday(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
-  uint32_t weekday_address() const { return address + 32; }
+  uint32_t weekday() const { return data()->weekday; }
+  void set_weekday(uint32_t v) const { data()->weekday = v; }
+  uint32_t weekday_bits() const { return data()->weekday; }
+  void set_weekday_bits(uint32_t v) const { data()->weekday = v; }
   // player 0's save data (SaveData::Of)
   template <typename T = SaveData>
-  T save() const { return T(base, guest::LoadU32(base, address + 36)); }
-  void set_save(const View& v) const { guest::StoreU32(base, address + 36, v.address); }
-  void set_save(uint32_t v) const { guest::StoreU32(base, address + 36, v); }
-  uint32_t save_address() const { return address + 36; }
+  T save() const { return T(base, data()->save); }
+  void set_save(const View& v) const { data()->save = v.address; }
+  void set_save(uint32_t v) const { data()->save = v; }
+  uint32_t save_bits() const { return data()->save; }
+  void set_save_bits(uint32_t v) const { data()->save = v; }
   // the selected row (+ scroll: the car's index in the garage)
-  uint32_t selection() const { return guest::LoadU32(base, address + 44); }
-  void set_selection(uint32_t v) const { guest::StoreU32(base, address + 44, v); }
-  uint32_t selection_address() const { return address + 44; }
+  uint32_t selection() const { return data()->selection; }
+  void set_selection(uint32_t v) const { data()->selection = v; }
+  uint32_t selection_bits() const { return data()->selection; }
+  void set_selection_bits(uint32_t v) const { data()->selection = v; }
   // the list's scroll
-  uint32_t scroll() const { return guest::LoadU32(base, address + 48); }
-  void set_scroll(uint32_t v) const { guest::StoreU32(base, address + 48, v); }
-  uint32_t scroll_address() const { return address + 48; }
+  uint32_t scroll() const { return data()->scroll; }
+  void set_scroll(uint32_t v) const { data()->scroll = v; }
+  uint32_t scroll_bits() const { return data()->scroll; }
+  void set_scroll_bits(uint32_t v) const { data()->scroll = v; }
   // the action to select when the actions are set up again
-  uint32_t action() const { return guest::LoadU32(base, address + 52); }
-  void set_action(uint32_t v) const { guest::StoreU32(base, address + 52, v); }
-  uint32_t action_address() const { return address + 52; }
+  uint32_t action() const { return data()->action; }
+  void set_action(uint32_t v) const { data()->action = v; }
+  uint32_t action_bits() const { return data()->action; }
+  void set_action_bits(uint32_t v) const { data()->action = v; }
   // 0 (Transition4)
-  uint32_t unknown_56() const { return guest::LoadU32(base, address + 56); }
-  void set_unknown_56(uint32_t v) const { guest::StoreU32(base, address + 56, v); }
-  uint32_t unknown_56_address() const { return address + 56; }
+  uint32_t unknown_56() const { return data()->unknown_56; }
+  void set_unknown_56(uint32_t v) const { data()->unknown_56 = v; }
+  uint32_t unknown_56_bits() const { return data()->unknown_56; }
+  void set_unknown_56_bits(uint32_t v) const { data()->unknown_56 = v; }
   // 1 while the plate editor's question is pending
-  uint32_t plate_pending() const { return guest::LoadU32(base, address + 60); }
-  void set_plate_pending(uint32_t v) const { guest::StoreU32(base, address + 60, v); }
-  uint32_t plate_pending_address() const { return address + 60; }
+  uint32_t plate_pending() const { return data()->plate_pending; }
+  void set_plate_pending(uint32_t v) const { data()->plate_pending = v; }
+  uint32_t plate_pending_bits() const { return data()->plate_pending; }
+  void set_plate_pending_bits(uint32_t v) const { data()->plate_pending = v; }
   // the dialog answered yes
-  uint32_t answered_yes() const { return guest::LoadU32(base, address + 64); }
-  void set_answered_yes(uint32_t v) const { guest::StoreU32(base, address + 64, v); }
-  uint32_t answered_yes_address() const { return address + 64; }
+  uint32_t answered_yes() const { return data()->answered_yes; }
+  void set_answered_yes(uint32_t v) const { data()->answered_yes = v; }
+  uint32_t answered_yes_bits() const { return data()->answered_yes; }
+  void set_answered_yes_bits(uint32_t v) const { data()->answered_yes = v; }
   // the question asked: 0 the new plate, 1 make the car current, 2 sell it
-  uint32_t question() const { return guest::LoadU32(base, address + 68); }
-  void set_question(uint32_t v) const { guest::StoreU32(base, address + 68, v); }
-  uint32_t question_address() const { return address + 68; }
+  uint32_t question() const { return data()->question; }
+  void set_question(uint32_t v) const { data()->question = v; }
+  uint32_t question_bits() const { return data()->question; }
+  void set_question_bits(uint32_t v) const { data()->question = v; }
   // the stand shown (Update loads and draws the car)
-  uint32_t stand_shown() const { return guest::LoadU32(base, address + 72); }
-  void set_stand_shown(uint32_t v) const { guest::StoreU32(base, address + 72, v); }
-  uint32_t stand_shown_address() const { return address + 72; }
+  uint32_t stand_shown() const { return data()->stand_shown; }
+  void set_stand_shown(uint32_t v) const { data()->stand_shown = v; }
+  uint32_t stand_shown_bits() const { return data()->stand_shown; }
+  void set_stand_shown_bits(uint32_t v) const { data()->stand_shown = v; }
   // GarageStage::ReloadModel's answer for the shown car (0 until loaded)
-  uint32_t stand_model() const { return guest::LoadU32(base, address + 76); }
-  void set_stand_model(uint32_t v) const { guest::StoreU32(base, address + 76, v); }
-  uint32_t stand_model_address() const { return address + 76; }
+  uint32_t stand_model() const { return data()->stand_model; }
+  void set_stand_model(uint32_t v) const { data()->stand_model = v; }
+  uint32_t stand_model_bits() const { return data()->stand_model; }
+  void set_stand_model_bits(uint32_t v) const { data()->stand_model = v; }
   // the view's options 1 and 2 (the doors) offered: the car spec's byte +771 is 1 (SetUpOptions)
-  uint32_t toggles_shown() const { return guest::LoadU32(base, address + 80); }
-  void set_toggles_shown(uint32_t v) const { guest::StoreU32(base, address + 80, v); }
-  uint32_t toggles_shown_address() const { return address + 80; }
+  uint32_t toggles_shown() const { return data()->toggles_shown; }
+  void set_toggles_shown(uint32_t v) const { data()->toggles_shown = v; }
+  uint32_t toggles_shown_bits() const { return data()->toggles_shown; }
+  void set_toggles_shown_bits(uint32_t v) const { data()->toggles_shown = v; }
   // the stand's busy marker shown
-  uint32_t busy_shown() const { return guest::LoadU32(base, address + 84); }
-  void set_busy_shown(uint32_t v) const { guest::StoreU32(base, address + 84, v); }
-  uint32_t busy_shown_address() const { return address + 84; }
+  uint32_t busy_shown() const { return data()->busy_shown; }
+  void set_busy_shown(uint32_t v) const { data()->busy_shown = v; }
+  uint32_t busy_shown_bits() const { return data()->busy_shown; }
+  void set_busy_shown_bits(uint32_t v) const { data()->busy_shown = v; }
   // the car turning on the stand (ToggleTurn)
-  uint32_t turning() const { return guest::LoadU32(base, address + 88); }
-  void set_turning(uint32_t v) const { guest::StoreU32(base, address + 88, v); }
-  uint32_t turning_address() const { return address + 88; }
+  uint32_t turning() const { return data()->turning; }
+  void set_turning(uint32_t v) const { data()->turning = v; }
+  uint32_t turning_bits() const { return data()->turning; }
+  void set_turning_bits(uint32_t v) const { data()->turning = v; }
   // the first door animation open (ToggleDoors)
-  uint32_t doors() const { return guest::LoadU32(base, address + 92); }
-  void set_doors(uint32_t v) const { guest::StoreU32(base, address + 92, v); }
-  uint32_t doors_address() const { return address + 92; }
+  uint32_t doors() const { return data()->doors; }
+  void set_doors(uint32_t v) const { data()->doors = v; }
+  uint32_t doors_bits() const { return data()->doors; }
+  void set_doors_bits(uint32_t v) const { data()->doors = v; }
   // the second door animation open (ToggleDoors2)
-  uint32_t doors2() const { return guest::LoadU32(base, address + 96); }
-  void set_doors2(uint32_t v) const { guest::StoreU32(base, address + 96, v); }
-  uint32_t doors2_address() const { return address + 96; }
+  uint32_t doors2() const { return data()->doors2; }
+  void set_doors2(uint32_t v) const { data()->doors2 = v; }
+  uint32_t doors2_bits() const { return data()->doors2; }
+  void set_doors2_bits(uint32_t v) const { data()->doors2 = v; }
   // SalePrice's answer (SetSaleQuestion)
-  uint32_t sale_price() const { return guest::LoadU32(base, address + 100); }
-  void set_sale_price(uint32_t v) const { guest::StoreU32(base, address + 100, v); }
-  uint32_t sale_price_address() const { return address + 100; }
+  uint32_t sale_price() const { return data()->sale_price; }
+  void set_sale_price(uint32_t v) const { data()->sale_price = v; }
+  uint32_t sale_price_bits() const { return data()->sale_price; }
+  void set_sale_price_bits(uint32_t v) const { data()->sale_price = v; }
 };
 
 // file; measure: Params::GetCarSpec.ret

@@ -105,14 +105,35 @@ struct MenuList : View {
   uint32_t fault_panel_set_1900_address() const { return address + 1900; }
 };
 
-// allocated; measure: new<4>@PauseMenu::Create, PauseMenu
+// allocated; measure: new<4>@PauseMenu::Create
+struct PauseMenuScreenData {
+  uint32_t movie = 0;  // +0
+};
+
 struct PauseMenuScreen : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
+  static constexpr bool kHost = true;
+  PauseMenuScreenData* data() const { return static_cast<PauseMenuScreenData*>(memory::HandleObject(address)); }
+  static PauseMenuScreen New(uint8_t* base) {
+    return PauseMenuScreen(base, memory::MakeHandle(new PauseMenuScreenData(), kSize, "PauseMenuScreen"));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // UI movie 4 (UiMovies::Find)
-  View movie() const { return View(base, guest::LoadU32(base, address + 0)); }
-  void set_movie(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t movie_address() const { return address + 0; }
+  View movie() const { return View(base, data()->movie); }
+  void set_movie(uint32_t v) const { data()->movie = v; }
+  uint32_t movie_bits() const { return data()->movie; }
+  void set_movie_bits(uint32_t v) const { data()->movie = v; }
+};
+
+// embedded; measure: PauseMenu
+struct PauseMenuStarted : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  // 0 on the step's first call; the transition sets 1
+  uint32_t started() const { return guest::LoadU32(base, address + 0); }
+  void set_started(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t started_address() const { return address + 0; }
 };
 
 // allocated; measure: new<160>@PauseMenu::Create

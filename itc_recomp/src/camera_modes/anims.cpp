@@ -58,7 +58,7 @@ void Copy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size,
 // shifted as rlwinm's, 32 bits).
 double Value(uint8_t* base, uint32_t block, uint32_t time) {
   const schema::CameraAnimBlock b(base, block);
-  return Lfs(base, b.data() + (time << 2));
+  return Lfs(base, b.values() + (time << 2));
 }
 
 // A (kind, value) pair: kind 2 made kind 1 with value x 24 + `curves`.
@@ -85,7 +85,7 @@ bool ObjectFreeable(uint8_t* base, uint32_t object) {
     if (!memory::IsHandle(block)) {  // host objects (E5 step 3)
       return false;
     }
-    const uint32_t data = schema::CameraAnimBlock(base, block).data();
+    const uint32_t data = schema::CameraAnimBlock(base, block).values();
     if (data != 0 && !memory::IsPages(data)) {
       return false;
     }
@@ -136,11 +136,11 @@ void FixKeys(uint8_t* base, uint32_t path, uint32_t keys, uint32_t curves) {
 void BlockFree(uint8_t* base, uint32_t block) {
   ITC_NATIVE_RUNNING("sub_8214FFF0 CameraAnimBlock::Free");
   const schema::CameraAnimBlock b(base, block);
-  const uint32_t data = b.data();
+  const uint32_t data = b.values();
   if (data != 0) {
     memory::FreePages(data);
   }
-  b.set_data(0);
+  b.set_values(0);
 }
 
 void AnimFree(uint8_t* base, uint32_t object) {
@@ -206,7 +206,7 @@ uint32_t AnimParseObject(uint8_t* base, uint32_t object, const GuestCopy& xmemcp
     schema::CameraAnimBlock(base, block).set_duration(float(zero));
     schema::CameraAnimBlock(base, block).set_header_size(0);
     schema::CameraAnimBlock(base, block).set_data_size(0);
-    schema::CameraAnimBlock(base, block).set_data(0);
+    schema::CameraAnimBlock(base, block).set_values(0);
     std::memset(schema::CameraAnimBlock(base, block).unknown_20(), 0, 40);
     const schema::CameraAnimFileBlock source_block(base, from);
     schema::CameraAnimBlock(base, block).set_channel(source_block.channel());
@@ -215,11 +215,11 @@ uint32_t AnimParseObject(uint8_t* base, uint32_t object, const GuestCopy& xmemcp
     schema::CameraAnimBlock(base, block).set_data_size(bytes);
     schema::CameraAnimBlock(base, block).set_unknown_12(source_block.unknown_12());
     schema::CameraAnimBlock(base, block).set_duration(source_block.duration());
-    schema::CameraAnimBlock(base, block).set_data(VirtualAlloc(bytes));
-    c_runtime::XMemSet(base, schema::CameraAnimBlock(base, block).data(), 0,
+    schema::CameraAnimBlock(base, block).set_values(VirtualAlloc(bytes));
+    c_runtime::XMemSet(base, schema::CameraAnimBlock(base, block).values(), 0,
                        schema::CameraAnimBlock(base, block).data_size());
     {
-      const uint32_t to = schema::CameraAnimBlock(base, block).data();
+      const uint32_t to = schema::CameraAnimBlock(base, block).values();
       const uint32_t source = schema::CameraAnimFileBlock(base, from).header_size() + from;
       const uint32_t size = schema::CameraAnimBlock(base, block).data_size();
       if (!c_runtime::XMemCpy(base, to, source, size)) {
@@ -469,7 +469,7 @@ double AnimsDuration(uint8_t* base, uint32_t id, uint32_t* r3) {
     }
     if (kind == 1 || kind == 6) {
       *r3 = slot;
-      return Lfs(base, schema::CameraAnim(base, object).first_block().duration_address());
+      return double(schema::CameraAnim(base, object).first_block().duration());
     }
   }
   *r3 = slot;

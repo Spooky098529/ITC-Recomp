@@ -513,7 +513,7 @@ fields = [
   { name = "unknown_12", offset = 12, type = "f32" },
   { name = "duration", offset = 16, type = "f32", note = "CameraAnims::Duration's answer" },
   { name = "unknown_20", offset = 20, type = "bytes", count = 40, note = "0" },
-  { name = "data", offset = 60, type = "u32", note = "its floats, one a frame" },
+  { name = "values", offset = 60, type = "u32", note = "its floats, one a frame (guest pages); \"data\" before E5 step 3 (a host view's data() is its struct)" },
 ]
 
 # An object in a camera animation file (CameraAnims::OnLoaded).

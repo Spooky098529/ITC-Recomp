@@ -90,7 +90,7 @@ loc_820A70DC:
   return {r3, f1};
 }
 
-// sub_820A70F8: lifted from generated/ by lift.py.
+// sub_820A70F8 game::FloatPairItem::Ctor: lifted from generated/ by lift.py.
 lifted::Result f820A70F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1) {
   ITC_NATIVE_RUNNING("sub_820A70F8 (lifted)");
   uint64_t r10 = 0, r11 = 0, r12 = 0, r30 = 0, r31 = 0;
@@ -180,7 +180,7 @@ uint64_t f820A7178(uint8_t* base) {
   return r3;
 }
 
-// sub_820A7180: lifted from generated/ by lift.py.
+// sub_820A7180 game::FloatPairItem::Dtor: lifted from generated/ by lift.py.
 lifted::Result f820A7180(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_820A7180 (lifted)");
   uint64_t r11 = 0, r12 = 0, r31 = 0;
@@ -252,7 +252,7 @@ lifted::Result f820A71C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r30 = r4;
   // bl 0x820a7180
   // (left out: dead in C++)
-  { const lifted::Result o = f820A7180(base, r1, r13, r3, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::FloatPairItem::Dtor(base, r1, r13, r3, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r30,31
   r11 = uint32_t(r30) & 0x1;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -1046,7 +1046,7 @@ loc_820A8224:
 loc_820A8244:
   // bl 0x820a70f8
   // (left out: dead in C++)
-  { const lifted::Result o = f820A70F8(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::FloatPairItem::Ctor(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, f1); r3 = o.r3; f1 = o.f1; }
   // b 0x820a82d4
   goto loc_820A82D4;
 loc_820A824C:

@@ -254,7 +254,7 @@ struct VectorHolderOwner : View {
   uint32_t holder_address() const { return address + 4; }
 };
 
-// allocated; measure: new<16>@sub_820A81C0#2
+// allocated; measure: new<16>@sub_820A81C0#2, FloatPairItem
 struct FloatPairItem : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
@@ -277,7 +277,7 @@ struct FloatPairItem : View {
   uint32_t value_address() const { return address + 12; }
 };
 
-// allocated; measure: new<12>@sub_820A70F8
+// allocated; measure: new<12>@FloatPairItem::FloatPairItem
 struct FloatPairData {
   uint8_t flag = 0;  // +0
   float a = 0;  // +4

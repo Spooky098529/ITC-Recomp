@@ -268,73 +268,117 @@ struct TodaysEventMachine : View {
 };
 
 // allocated; measure: new<68>@TodaysResult::Create#2
+struct TodaysResultDataData {
+  uint32_t ready = 0;  // +0
+  uint32_t movie_queued = 0;  // +4
+  uint32_t day_wins = 0;  // +8
+  uint32_t day_losses = 0;  // +12
+  uint32_t day_outcome3 = 0;  // +16
+  float day_win_rate = 0;  // +20
+  uint32_t day_win_streak = 0;  // +24
+  uint32_t day_word_4832 = 0;  // +28
+  uint32_t career_wins = 0;  // +32
+  uint32_t career_losses = 0;  // +36
+  uint32_t career_outcome3 = 0;  // +40
+  float career_win_rate = 0;  // +44
+  uint32_t best_win_streak = 0;  // +48
+  uint32_t money = 0;  // +52
+  uint32_t mode = 0;  // +56
+  uint32_t weekday = 0;  // +60
+  uint32_t day = 0;  // +64
+  uint8_t pick[20] = {};  // +68, guest order
+};
+
 struct TodaysResultData : View {
   using View::View;
   static constexpr uint32_t kSize = 88;
+  static constexpr bool kHost = true;
+  TodaysResultDataData* data() const { return static_cast<TodaysResultDataData*>(memory::HandleObject(address)); }
+  static TodaysResultData New(uint8_t* base) {
+    return TodaysResultData(base, memory::MakeHandle(new TodaysResultDataData(), kSize, "TodaysResultData"));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // 1 once the texts are set (SetUpMovie)
-  uint32_t ready() const { return guest::LoadU32(base, address + 0); }
-  void set_ready(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t ready_address() const { return address + 0; }
+  uint32_t ready() const { return data()->ready; }
+  void set_ready(uint32_t v) const { data()->ready = v; }
+  uint32_t ready_bits() const { return data()->ready; }
+  void set_ready_bits(uint32_t v) const { data()->ready = v; }
   // 1 when LeavePage queued a movie; Destroy then goes to state 20
-  uint32_t movie_queued() const { return guest::LoadU32(base, address + 4); }
-  void set_movie_queued(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
-  uint32_t movie_queued_address() const { return address + 4; }
-  uint32_t day_wins() const { return guest::LoadU32(base, address + 8); }
-  void set_day_wins(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t day_wins_address() const { return address + 8; }
-  uint32_t day_losses() const { return guest::LoadU32(base, address + 12); }
-  void set_day_losses(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
-  uint32_t day_losses_address() const { return address + 12; }
+  uint32_t movie_queued() const { return data()->movie_queued; }
+  void set_movie_queued(uint32_t v) const { data()->movie_queued = v; }
+  uint32_t movie_queued_bits() const { return data()->movie_queued; }
+  void set_movie_queued_bits(uint32_t v) const { data()->movie_queued = v; }
+  uint32_t day_wins() const { return data()->day_wins; }
+  void set_day_wins(uint32_t v) const { data()->day_wins = v; }
+  uint32_t day_wins_bits() const { return data()->day_wins; }
+  void set_day_wins_bits(uint32_t v) const { data()->day_wins = v; }
+  uint32_t day_losses() const { return data()->day_losses; }
+  void set_day_losses(uint32_t v) const { data()->day_losses = v; }
+  uint32_t day_losses_bits() const { return data()->day_losses; }
+  void set_day_losses_bits(uint32_t v) const { data()->day_losses = v; }
   // the day's outcome 3 count
-  uint32_t day_outcome3() const { return guest::LoadU32(base, address + 16); }
-  void set_day_outcome3(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
-  uint32_t day_outcome3_address() const { return address + 16; }
+  uint32_t day_outcome3() const { return data()->day_outcome3; }
+  void set_day_outcome3(uint32_t v) const { data()->day_outcome3 = v; }
+  uint32_t day_outcome3_bits() const { return data()->day_outcome3; }
+  void set_day_outcome3_bits(uint32_t v) const { data()->day_outcome3 = v; }
   // the day's win rate in percent
-  float day_win_rate() const { return guest::LoadFloat(base, address + 20); }
-  void set_day_win_rate(float v) const { guest::StoreFloat(base, address + 20, v); }
-  uint32_t day_win_rate_address() const { return address + 20; }
-  uint32_t day_win_streak() const { return guest::LoadU32(base, address + 24); }
-  void set_day_win_streak(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
-  uint32_t day_win_streak_address() const { return address + 24; }
+  float day_win_rate() const { return data()->day_win_rate; }
+  void set_day_win_rate(float v) const { data()->day_win_rate = v; }
+  uint32_t day_win_rate_bits() const { return std::bit_cast<uint32_t>(data()->day_win_rate); }
+  void set_day_win_rate_bits(uint32_t v) const { data()->day_win_rate = std::bit_cast<float>(v); }
+  uint32_t day_win_streak() const { return data()->day_win_streak; }
+  void set_day_win_streak(uint32_t v) const { data()->day_win_streak = v; }
+  uint32_t day_win_streak_bits() const { return data()->day_win_streak; }
+  void set_day_win_streak_bits(uint32_t v) const { data()->day_win_streak = v; }
   // the day block's +4832 (DayBlock::Word4832)
-  uint32_t day_word_4832() const { return guest::LoadU32(base, address + 28); }
-  void set_day_word_4832(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
-  uint32_t day_word_4832_address() const { return address + 28; }
-  uint32_t career_wins() const { return guest::LoadU32(base, address + 32); }
-  void set_career_wins(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
-  uint32_t career_wins_address() const { return address + 32; }
-  uint32_t career_losses() const { return guest::LoadU32(base, address + 36); }
-  void set_career_losses(uint32_t v) const { guest::StoreU32(base, address + 36, v); }
-  uint32_t career_losses_address() const { return address + 36; }
-  uint32_t career_outcome3() const { return guest::LoadU32(base, address + 40); }
-  void set_career_outcome3(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
-  uint32_t career_outcome3_address() const { return address + 40; }
+  uint32_t day_word_4832() const { return data()->day_word_4832; }
+  void set_day_word_4832(uint32_t v) const { data()->day_word_4832 = v; }
+  uint32_t day_word_4832_bits() const { return data()->day_word_4832; }
+  void set_day_word_4832_bits(uint32_t v) const { data()->day_word_4832 = v; }
+  uint32_t career_wins() const { return data()->career_wins; }
+  void set_career_wins(uint32_t v) const { data()->career_wins = v; }
+  uint32_t career_wins_bits() const { return data()->career_wins; }
+  void set_career_wins_bits(uint32_t v) const { data()->career_wins = v; }
+  uint32_t career_losses() const { return data()->career_losses; }
+  void set_career_losses(uint32_t v) const { data()->career_losses = v; }
+  uint32_t career_losses_bits() const { return data()->career_losses; }
+  void set_career_losses_bits(uint32_t v) const { data()->career_losses = v; }
+  uint32_t career_outcome3() const { return data()->career_outcome3; }
+  void set_career_outcome3(uint32_t v) const { data()->career_outcome3 = v; }
+  uint32_t career_outcome3_bits() const { return data()->career_outcome3; }
+  void set_career_outcome3_bits(uint32_t v) const { data()->career_outcome3 = v; }
   // in percent
-  float career_win_rate() const { return guest::LoadFloat(base, address + 44); }
-  void set_career_win_rate(float v) const { guest::StoreFloat(base, address + 44, v); }
-  uint32_t career_win_rate_address() const { return address + 44; }
+  float career_win_rate() const { return data()->career_win_rate; }
+  void set_career_win_rate(float v) const { data()->career_win_rate = v; }
+  uint32_t career_win_rate_bits() const { return std::bit_cast<uint32_t>(data()->career_win_rate); }
+  void set_career_win_rate_bits(uint32_t v) const { data()->career_win_rate = std::bit_cast<float>(v); }
   // the stats' +5968
-  uint32_t best_win_streak() const { return guest::LoadU32(base, address + 48); }
-  void set_best_win_streak(uint32_t v) const { guest::StoreU32(base, address + 48, v); }
-  uint32_t best_win_streak_address() const { return address + 48; }
+  uint32_t best_win_streak() const { return data()->best_win_streak; }
+  void set_best_win_streak(uint32_t v) const { data()->best_win_streak = v; }
+  uint32_t best_win_streak_bits() const { return data()->best_win_streak; }
+  void set_best_win_streak_bits(uint32_t v) const { data()->best_win_streak = v; }
   // the save's +6116
-  uint32_t money() const { return guest::LoadU32(base, address + 52); }
-  void set_money(uint32_t v) const { guest::StoreU32(base, address + 52, v); }
-  uint32_t money_address() const { return address + 52; }
+  uint32_t money() const { return data()->money; }
+  void set_money(uint32_t v) const { data()->money = v; }
+  uint32_t money_bits() const { return data()->money; }
+  void set_money_bits(uint32_t v) const { data()->money = v; }
   // the save's +6104
-  uint32_t mode() const { return guest::LoadU32(base, address + 56); }
-  void set_mode(uint32_t v) const { guest::StoreU32(base, address + 56, v); }
-  uint32_t mode_address() const { return address + 56; }
+  uint32_t mode() const { return data()->mode; }
+  void set_mode(uint32_t v) const { data()->mode = v; }
+  uint32_t mode_bits() const { return data()->mode; }
+  void set_mode_bits(uint32_t v) const { data()->mode = v; }
   // the day % 7
-  uint32_t weekday() const { return guest::LoadU32(base, address + 60); }
-  void set_weekday(uint32_t v) const { guest::StoreU32(base, address + 60, v); }
-  uint32_t weekday_address() const { return address + 60; }
+  uint32_t weekday() const { return data()->weekday; }
+  void set_weekday(uint32_t v) const { data()->weekday = v; }
+  uint32_t weekday_bits() const { return data()->weekday; }
+  void set_weekday_bits(uint32_t v) const { data()->weekday = v; }
   // the save's +6100, at most 999
-  uint32_t day() const { return guest::LoadU32(base, address + 64); }
-  void set_day(uint32_t v) const { guest::StoreU32(base, address + 64, v); }
-  uint32_t day_address() const { return address + 64; }
+  uint32_t day() const { return data()->day; }
+  void set_day(uint32_t v) const { data()->day = v; }
+  uint32_t day_bits() const { return data()->day; }
+  void set_day_bits(uint32_t v) const { data()->day = v; }
   // a copy of the save's 20-byte pick at +8 (five words)
-  uint32_t pick_address() const { return address + 68; }
+  uint8_t* pick() const { return data()->pick; }
 };
 
 // allocated; measure: -
@@ -394,32 +438,11 @@ struct TodaysEventData : View {
 struct TodaysEventImageList : View {
   using View::View;
   static constexpr uint32_t kSize = 188;
-  // 46 TodaysEventImage pointers
+  // 46 Type2HubImage pointers (type2-screens.toml)
   uint32_t records_address() const { return address + 0; }
   uint32_t count() const { return guest::LoadU32(base, address + 184); }
   void set_count(uint32_t v) const { guest::StoreU32(base, address + 184, v); }
   uint32_t count_address() const { return address + 184; }
-};
-
-// allocated; measure: new<16>@TodaysEvent::LoadImagePair, new<16>@TodaysEvent::LoadImagePair#2, TodaysEvent.+4, TodaysEvent.+192, TodaysEvent.+192.+4
-struct TodaysEventImage : View {
-  using View::View;
-  static constexpr uint32_t kSize = 16;
-  // set once the image is loaded
-  uint32_t loaded() const { return guest::LoadU32(base, address + 0); }
-  void set_loaded(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t loaded_address() const { return address + 0; }
-  uint32_t image_index() const { return guest::LoadU32(base, address + 4); }
-  void set_image_index(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
-  uint32_t image_index_address() const { return address + 4; }
-  // the texture record ShowImages hands movie 0's +28 object
-  uint32_t texture() const { return guest::LoadU32(base, address + 8); }
-  void set_texture(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t texture_address() const { return address + 8; }
-  // the XPR (probably)
-  uint32_t xpr() const { return guest::LoadU32(base, address + 12); }
-  void set_xpr(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
-  uint32_t xpr_address() const { return address + 12; }
 };
 
 // The image words docs/functions/todays-result.md's code uses.

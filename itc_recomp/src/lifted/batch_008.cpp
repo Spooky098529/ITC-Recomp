@@ -11176,11 +11176,11 @@ lifted::Result f82192958(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31700(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31700);
   // stw r10,64(r11)
-  guest::StoreU32(base, schema::GarageScreenData(base, uint32_t(r11)).answered_yes_address(), uint32_t(r10));
+  schema::GarageScreenData(base, uint32_t(r11)).set_answered_yes_bits(uint32_t(r10));
   // lwz r30,-31700(r31)
   r30 = guest::LoadU32(base, uint32_t(r31) + -31700);
   // lwz r11,68(r30)
-  r11 = guest::LoadU32(base, schema::GarageScreenData(base, uint32_t(r30)).question_address());
+  r11 = schema::GarageScreenData(base, uint32_t(r30)).question_bits();
   // cmplwi cr6,r11,1
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
   // blt cr6,0x82192ae4
@@ -11205,13 +11205,13 @@ lifted::Result f82192958(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x821929A8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,36(r30)
-  r11 = guest::LoadU32(base, schema::GarageScreenData(base, uint32_t(r30)).save_address());
+  r11 = schema::GarageScreenData(base, uint32_t(r30)).save_bits();
   // mr r10,r3
   r10 = r3;
   // lwz r9,48(r30)
-  r9 = guest::LoadU32(base, schema::GarageScreenData(base, uint32_t(r30)).scroll_address());
+  r9 = schema::GarageScreenData(base, uint32_t(r30)).scroll_bits();
   // lwz r8,44(r30)
-  r8 = guest::LoadU32(base, schema::GarageScreenData(base, uint32_t(r30)).selection_address());
+  r8 = schema::GarageScreenData(base, uint32_t(r30)).selection_bits();
   // mr r3,r11
   r3 = r11;
   // add r4,r9,r8
@@ -11226,9 +11226,9 @@ lifted::Result f82192958(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r10,-31700(r31)
   r10 = guest::LoadU32(base, uint32_t(r31) + -31700);
   // lwz r11,36(r10)
-  r11 = guest::LoadU32(base, schema::GarageScreenData(base, uint32_t(r10)).save_address());
+  r11 = schema::GarageScreenData(base, uint32_t(r10)).save_bits();
   // lwz r4,100(r10)
-  r4 = guest::LoadU32(base, schema::GarageScreenData(base, uint32_t(r10)).sale_price_address());
+  r4 = schema::GarageScreenData(base, uint32_t(r10)).sale_price_bits();
   // lis r10,152
   r10 = uint64_t(int64_t(9961472));
   // ori r9,r10,38527
@@ -11260,15 +11260,15 @@ loc_821929F4:
   // mr r3,r30
   r3 = r30;
   // lwz r10,36(r11)
-  r10 = guest::LoadU32(base, schema::GarageScreenData(base, uint32_t(r11)).save_address());
+  r10 = schema::GarageScreenData(base, uint32_t(r11)).save_bits();
   // lwz r10,6116(r10)
   r10 = guest::LoadU32(base, schema::CareerSave(base, uint32_t(r10)).money_address());
   // stw r10,24(r11)
-  guest::StoreU32(base, schema::GarageScreenData(base, uint32_t(r11)).money_address(), uint32_t(r10));
+  schema::GarageScreenData(base, uint32_t(r11)).set_money_bits(uint32_t(r10));
   // lwz r11,-31700(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31700);
   // lwz r6,24(r11)
-  r6 = guest::LoadU32(base, schema::GarageScreenData(base, uint32_t(r11)).money_address());
+  r6 = schema::GarageScreenData(base, uint32_t(r11)).money_bits();
   // bl 0x8211c740
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::SetNumberText(base, LIFTED_ARGS(0x82192A28, r31)); r3 = o.r3; f1 = o.f1; }
@@ -11277,9 +11277,9 @@ loc_821929F4:
   // addi r8,r29,-1
   r8 = uint64_t(int64_t(int64_t(r29) + -1));
   // lwz r10,48(r11)
-  r10 = guest::LoadU32(base, schema::GarageScreenData(base, uint32_t(r11)).scroll_address());
+  r10 = schema::GarageScreenData(base, uint32_t(r11)).scroll_bits();
   // lwz r9,44(r11)
-  r9 = guest::LoadU32(base, schema::GarageScreenData(base, uint32_t(r11)).selection_address());
+  r9 = schema::GarageScreenData(base, uint32_t(r11)).selection_bits();
   // add r10,r10,r9
   r10 = r10 + r9;
   // cmpw cr6,r8,r10
@@ -11291,7 +11291,7 @@ loc_821929F4:
   // addi r10,r10,-1
   r10 = uint64_t(int64_t(int64_t(r10) + -1));
   // stw r10,44(r11)
-  guest::StoreU32(base, schema::GarageScreenData(base, uint32_t(r11)).selection_address(), uint32_t(r10));
+  schema::GarageScreenData(base, uint32_t(r11)).set_selection_bits(uint32_t(r10));
   // b 0x82192b9c
   goto loc_82192B9C;
 loc_82192A54:
@@ -11340,7 +11340,7 @@ loc_82192A9C:
   // addi r10,r10,4
   r10 = uint64_t(int64_t(int64_t(r10) + 4));
   // stw r11,0(r9)
-  guest::StoreU32(base, schema::GarageScreenData(base, uint32_t(r9) - 4).pick_address(), uint32_t(r11));
+  schema::host::StoreU32(schema::GarageScreenData(base, uint32_t(r9) - 4).pick() + 0, uint32_t(r11));
   // addi r9,r9,4
   r9 = uint64_t(int64_t(int64_t(r9) + 4));
   // bdnz 0x82192a9c
@@ -11416,13 +11416,13 @@ loc_82192AE4:
   // lwz r11,-31700(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31700);
   // lwz r10,36(r11)
-  r10 = guest::LoadU32(base, schema::GarageScreenData(base, uint32_t(r11)).save_address());
+  r10 = schema::GarageScreenData(base, uint32_t(r11)).save_bits();
   // lwz r9,48(r11)
-  r9 = guest::LoadU32(base, schema::GarageScreenData(base, uint32_t(r11)).scroll_address());
+  r9 = schema::GarageScreenData(base, uint32_t(r11)).scroll_bits();
   // addi r10,r10,6120
   r10 = uint64_t(int64_t(int64_t(r10) + 6120));
   // lwz r11,44(r11)
-  r11 = guest::LoadU32(base, schema::GarageScreenData(base, uint32_t(r11)).selection_address());
+  r11 = schema::GarageScreenData(base, uint32_t(r11)).selection_bits();
   // add. r11,r9,r11
   r11 = r9 + r11;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -11591,7 +11591,7 @@ lifted::Result f82195F10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31700(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31700);
   // stw r10,52(r11)
-  guest::StoreU32(base, schema::GarageScreenData(base, uint32_t(r11)).action_address(), uint32_t(r10));
+  schema::GarageScreenData(base, uint32_t(r11)).set_action_bits(uint32_t(r10));
   // bl 0x82191b20
   // (left out: dead in C++)
   { const lifted::Result o = game::GarageScreen::ResetStand(base, LIFTED_ARGS(0x82195FD0, r31)); r3 = o.r3; f1 = o.f1; }
@@ -11776,7 +11776,7 @@ lifted::Result f82196030(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31700(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31700);
   // stw r10,52(r11)
-  guest::StoreU32(base, schema::GarageScreenData(base, uint32_t(r11)).action_address(), uint32_t(r10));
+  schema::GarageScreenData(base, uint32_t(r11)).set_action_bits(uint32_t(r10));
   // bl 0x82191b20
   // (left out: dead in C++)
   { const lifted::Result o = game::GarageScreen::ResetStand(base, LIFTED_ARGS(0x8219610C, r31)); r3 = o.r3; f1 = o.f1; }
