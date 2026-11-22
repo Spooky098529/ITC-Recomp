@@ -6951,3 +6951,14 @@ the pad replay (127 s) and frame dumps clean. `boundary_status.py` reads the
 docs' function rows, so its figures don't move: overridden 128, Native (with
 Lifted) 204, Dropped 24, never called 20, live 73; imports: 186 called, 30
 with a live caller.
+
+**2026-11-22, E5's step 3 (branch `e5-native-16-11-26`, merged into
+`rexglue-removal-project`; `docs/loops/e5-loop.md`, "Where step 3
+stands"):** 16 of the game's private objects in host memory behind handles
+(the pilot, three swarm batches and the lead's leftovers), lifted
+allocation and free sites replaced by `lift.py`'s `host_alloc` and
+`host_free`; the other 39 wait on step 4. Attract races, the pad replay by
+tick (both races matching the baseline) and frame dumps clean. The
+boundary's figures don't move: overridden 128, Native (with Lifted) 204,
+Dropped 24, never called 20, live 73; imports: 186 called, 30 with a live
+caller.
