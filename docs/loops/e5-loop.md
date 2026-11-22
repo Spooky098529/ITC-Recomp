@@ -499,4 +499,5 @@ args, in the same session) only when the user's current message says to.
   before the merge); the other 39 skipped wait on step 4 (virtual dispatch
   over handles, embedded objects, memcpy targets, addresses handed to other
   areas). The rows for the leftovers await the user's review.
-- Merged into `rexglue-removal-project` up to the pilot (`fc5e3b94`).
+- Merged into `rexglue-removal-project` up to the pilot (`fc5e3b94`), then
+  with the batches, the leftovers and their rows (2026-11-22).
