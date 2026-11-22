@@ -1193,9 +1193,11 @@ def host_site(st):
             f"  // host_free {st.lr} ({ty.name})")
 
 
-def check_host_sites(other_paths):
+def check_host_sites(other_paths, bodies=None, other_functions=()):
     """Every listed lifted allocation and free was emitted, by this run or
-    in the other generated files (`other_paths`, as they are on disk): the
+    in the other generated files (`other_paths`, as they are on disk), or is
+    a call in one of `other_functions` (the other tool's, which it emits:
+    their generated bodies, so the tools' order doesn't matter): the
     addresses missing (a wrong address can't pass silently)."""
     views()
     found = set(HOST_SITES_EMITTED)
@@ -1203,6 +1205,11 @@ def check_host_sites(other_paths):
         if os.path.exists(path):
             with open(path) as f:
                 found |= {int(a, 16) for a in HOST_SITE_MARK.findall(f.read())}
+    for name in other_functions:
+        for line in (bodies or {}).get(name, []):
+            m = re.match(r"\s*ctx\.lr = 0x([0-9A-Fa-f]+);", line)
+            if m:
+                found.add(int(m.group(1), 16))
     return sorted(set(_SCHEMA.host_sites) - found)
 
 
@@ -1372,7 +1379,9 @@ def main(argv):
         emitting = set(everything) | set(lifted_before)
         mark_needs_lr(infos, emitting)
         texts = {batch: emit_batch(batch, names, infos, emitting) for batch, names in batches.items()}
-        missing = check_host_sites([os.path.join(OUT, "originals.cpp")])
+        with open(os.path.join(OUT, "originals.h")) as f:
+            originals = re.findall(r"// (sub_8[0-9A-F]{7})'s original", f.read())
+        missing = check_host_sites([os.path.join(OUT, "originals.cpp")], bodies, originals)
         if missing:
             for a in missing:
                 print(f"host_alloc/host_free 0x{a:08X}: no lifted call returns there "

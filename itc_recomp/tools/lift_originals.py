@@ -135,7 +135,12 @@ def main(argv):
         h.append(f"// The same on a register view (in place of __imp__{n}).")
         h.append(f"inline void c{n[4:]}(Regs& regs, uint8_t* base) {{ regs.Apply({lift.ename(n)}(base, regs.ToArgs())); }}")
     h += ["", "}  // namespace lifted::original", ""]
-    missing = lift.check_host_sites(glob.glob(os.path.join(lift.OUT, "batch_*.cpp")))
+    batch_functions = set()
+    for path in glob.glob(os.path.join(lift.OUT, "batch_*.cpp")):
+        with open(path) as f:
+            batch_functions |= {"sub_" + a for a in re.findall(r"\{0x(8[0-9A-F]{7}), e8", f.read())}
+    missing = lift.check_host_sites(glob.glob(os.path.join(lift.OUT, "batch_*.cpp")), bodies,
+                                    batch_functions)
     if missing:
         for a in missing:
             print(f"host_alloc/host_free 0x{a:08X}: no lifted call returns there "

@@ -12,6 +12,7 @@
 #include "schema/career.h"
 #include "schema/race_event.h"
 #include "schema/race_screens.h"
+#include "schema/race_screens_unseen.h"
 #include "helpers/debug_output.h"
 #include "memory/handles.h"
 #include "memory/heap.h"
@@ -107,6 +108,13 @@ uint64_t FreePauseData(uint8_t* base) {
   return 1;
 }
 
+// Kind 4's pause menu's data in host memory (PauseMenu4::Create): deleted in
+// place of the original's VirtualFree at 0x8220FCF4, which returned 1.
+uint64_t FreePause4Data(uint8_t* base) {
+  schema::PauseMenu4Data(base, guest::LoadU32(base, kPause4Data)).Delete();
+  return 1;
+}
+
 // A one-block screen's teardown: freed and its global 0, or the text.
 std::optional<uint64_t> DestroyOne(uint8_t* base, uint32_t sp, uint32_t global, uint32_t text) {
   if (Get(base, global) == 0) {
@@ -173,7 +181,9 @@ uint64_t PauseMenu4Create(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82210868 PauseMenu4::Create");
   Frame(base, sp, 96);
   guest::StoreU32(base, kPause4Screen, Pages(4));
-  guest::StoreU32(base, kPause4Data, Pages(80));
+  // The data lives in host memory (E5 step 3): the original's
+  // VirtualAlloc(80) at 0x822108A4; the global holds its handle.
+  guest::StoreU32(base, kPause4Data, schema::PauseMenu4Data::New(base).address);
   const uint32_t list = Pages(72);
   guest::StoreU32(base, kPause4List, list);
   ListInit(base, list);
@@ -266,7 +276,7 @@ std::optional<uint64_t> PauseMenuDestroy(uint8_t* base, uint32_t sp) {
 std::optional<uint64_t> PauseMenu4Destroy(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8220FC98 PauseMenu4::Destroy");
   return DestroyFour(base, sp, kPause4Screen, kPause4Data, kPause4Pages, kPause4List,
-                     kTextBase - 12988);
+                     kTextBase - 12988, FreePause4Data);
 }
 
 std::optional<uint64_t> AfterRaceMenuDestroy(uint8_t* base, uint32_t sp) {

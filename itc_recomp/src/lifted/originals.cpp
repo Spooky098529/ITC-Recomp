@@ -302103,7 +302103,7 @@ lifted::Result f8220C4C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   r3 = guest::LoadU32(base, uint32_t(r29) + -31532);
   // bl 0x82295330
   // (left out: dead in C++)
-  { const lifted::Result o = game::VirtualFree(base, LIFTED_ARGS(0x8220C524, r31)); r3 = o.r3; f1 = o.f1; }
+  { schema::PauseMenuData(base, uint32_t(r3)).Delete(); r3 = 1; }  // host_free 0x8220C524 (PauseMenuData)
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // lwz r3,-31524(r31)
@@ -302272,7 +302272,7 @@ lifted::Result f8220D7E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r8, 
   r3 = uint64_t(int64_t(0));
   // bl 0x82295398
   // (left out: dead in C++)
-  { const lifted::Result o = game::VirtualAlloc(base, LIFTED_ARGS(0x8220D824, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = schema::PauseMenuData::New(base).address; f1 = 0; }  // host_alloc 0x8220D824 (PauseMenuData)
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // li r6,4
@@ -302463,7 +302463,7 @@ lifted::Result f8220FA88(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r9,-31532(r11)
   r9 = guest::LoadU32(base, uint32_t(r11) + -31532);
   // stw r10,132(r9)
-  guest::StoreU32(base, schema::PauseMenuData(base, uint32_t(r9)).kind_address(), uint32_t(r10));
+  schema::PauseMenuData(base, uint32_t(r9)).set_kind_bits(uint32_t(r10));
   // li r10,4
   r10 = uint64_t(int64_t(4));
   // lwz r11,-31532(r11)
@@ -302471,7 +302471,7 @@ lifted::Result f8220FA88(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r10,80(r1)
   guest::StoreU32(base, uint32_t(r1) + 80, uint32_t(r10));
   // stw r5,156(r11)
-  guest::StoreU32(base, schema::PauseMenuData(base, uint32_t(r11)).first_day_address(), uint32_t(r5));
+  schema::PauseMenuData(base, uint32_t(r11)).set_first_day_bits(uint32_t(r5));
   // bl 0x8211b3f0
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x8220FACC, r31)); r3 = o.r3; f1 = o.f1; }
@@ -302574,7 +302574,7 @@ lifted::Result f8220FC98(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   r3 = guest::LoadU32(base, uint32_t(r29) + -31516);
   // bl 0x82295330
   // (left out: dead in C++)
-  { const lifted::Result o = game::VirtualFree(base, LIFTED_ARGS(0x8220FCF4, r31)); r3 = o.r3; f1 = o.f1; }
+  { schema::PauseMenu4Data(base, uint32_t(r3)).Delete(); r3 = 1; }  // host_free 0x8220FCF4 (PauseMenu4Data)
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // lwz r3,-31508(r31)
@@ -302666,7 +302666,7 @@ lifted::Result f82210868(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r8, 
   r3 = uint64_t(int64_t(0));
   // bl 0x82295398
   // (left out: dead in C++)
-  { const lifted::Result o = game::VirtualAlloc(base, LIFTED_ARGS(0x822108A4, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = schema::PauseMenu4Data::New(base).address; f1 = 0; }  // host_alloc 0x822108A4 (PauseMenu4Data)
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // li r6,4

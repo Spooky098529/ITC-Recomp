@@ -2,6 +2,7 @@
 // (docs/functions/race-screens.md): see race_screens.h.
 
 #include "race_screens/race_screens.h"
+#include "race_screens/pause_data.h"
 #include "race_screens/ui_node.h"
 
 #include "base/log.h"
@@ -226,7 +227,7 @@ uint32_t PauseMenuShowOptions(uint8_t* base, uint32_t sp) {
   const schema::PauseMenuData data = G::pause_data(base);
   // The edits (hud_edit_0 to hud_edit_3) copied to the frame's +80.
   for (const uint32_t k : {0u, 4u, 8u, 12u}) {
-    guest::StoreU32(base, frame + 80 + k, guest::LoadU32(base, data.hud_edit_0_address() + k));
+    guest::StoreU32(base, frame + 80 + k, PauseWord(data, kPauseHudEdit0 + k));
   }
   guest::StoreU32(base, frame + 96, data.last_item_ok());
   const uint32_t group = ui_movies::FindNode(base, movie, 8, 2);
@@ -437,7 +438,7 @@ uint32_t PauseMenuShowAdjust(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 128);
   const schema::PauseMenuData data = G::pause_data(base);
   for (uint32_t k = 0; k < 3; k++) {
-    guest::StoreU32(base, frame + 80 + 4 * k, guest::LoadU32(base, data.adjust_0_address() + 4 * k));
+    guest::StoreU32(base, frame + 80 + 4 * k, PauseWord(data, kPauseAdjust0 + 4 * k));
   }
   const uint32_t group = ui_movies::FindNode(base, PauseMovie(base), 10, 0);
   uint32_t r3 = 0;
@@ -696,7 +697,7 @@ uint64_t PauseMenuShowAdjustB(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t movie = PauseMovie(base);
   const schema::PauseMenuData data = G::pause_data(base);
   for (uint32_t k = 0; k < 3; k++) {
-    guest::StoreU32(base, frame + 80 + 4 * k, guest::LoadU32(base, data.adjust_0_address() + 4 * k));
+    guest::StoreU32(base, frame + 80 + 4 * k, PauseWord(data, kPauseAdjust0 + 4 * k));
   }
   const uint32_t node = ui_movies::FindNode(base, movie, 10, 0);
   uint64_t r3 = 0;

@@ -340,60 +340,95 @@ struct PauseMenu4 : View {
 };
 
 // allocated; measure: new<80>@PauseMenu4::Create
+struct PauseMenu4DataData {
+  uint32_t music_volume = 0;  // +0
+  uint32_t effects_volume = 0;  // +4
+  uint32_t music_edit = 0;  // +8
+  uint32_t effects_edit = 0;  // +12
+  uint32_t music_default = 0;  // +16
+  uint32_t effects_default = 0;  // +20
+  uint32_t item_count = 0;  // +52
+  uint32_t answer = 0;  // +56
+  uint32_t volume_toggle = 0;  // +60
+  uint32_t main_selection = 0;  // +64
+  uint32_t run_count = 0;  // +68
+  uint32_t player = 0;  // +72
+  uint32_t kind = 0;  // +76
+};
+
 struct PauseMenu4Data : View {
   using View::View;
   static constexpr uint32_t kSize = 80;
+  static constexpr bool kHost = true;
+  PauseMenu4DataData* data() const { return static_cast<PauseMenu4DataData*>(memory::HandleObject(address)); }
+  static PauseMenu4Data New(uint8_t* base) {
+    return PauseMenu4Data(base, memory::MakeHandle(new PauseMenu4DataData(), kSize, "PauseMenu4Data"));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // player 0's save data's byte +0x1F878, sign-extended
-  uint32_t music_volume() const { return guest::LoadU32(base, address + 0); }
-  void set_music_volume(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t music_volume_address() const { return address + 0; }
+  uint32_t music_volume() const { return data()->music_volume; }
+  void set_music_volume(uint32_t v) const { data()->music_volume = v; }
+  uint32_t music_volume_bits() const { return data()->music_volume; }
+  void set_music_volume_bits(uint32_t v) const { data()->music_volume = v; }
   // player 0's save data's byte +0x1F879, sign-extended
-  uint32_t effects_volume() const { return guest::LoadU32(base, address + 4); }
-  void set_effects_volume(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
-  uint32_t effects_volume_address() const { return address + 4; }
+  uint32_t effects_volume() const { return data()->effects_volume; }
+  void set_effects_volume(uint32_t v) const { data()->effects_volume = v; }
+  uint32_t effects_volume_bits() const { return data()->effects_volume; }
+  void set_effects_volume_bits(uint32_t v) const { data()->effects_volume = v; }
   // the volume page's edit, 0 to 15
-  uint32_t music_edit() const { return guest::LoadU32(base, address + 8); }
-  void set_music_edit(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t music_edit_address() const { return address + 8; }
+  uint32_t music_edit() const { return data()->music_edit; }
+  void set_music_edit(uint32_t v) const { data()->music_edit = v; }
+  uint32_t music_edit_bits() const { return data()->music_edit; }
+  void set_music_edit_bits(uint32_t v) const { data()->music_edit = v; }
   // the volume page's edit, 0 to 15
-  uint32_t effects_edit() const { return guest::LoadU32(base, address + 12); }
-  void set_effects_edit(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
-  uint32_t effects_edit_address() const { return address + 12; }
+  uint32_t effects_edit() const { return data()->effects_edit; }
+  void set_effects_edit(uint32_t v) const { data()->effects_edit = v; }
+  uint32_t effects_edit_bits() const { return data()->effects_edit; }
+  void set_effects_edit_bits(uint32_t v) const { data()->effects_edit = v; }
   // 15
-  uint32_t music_default() const { return guest::LoadU32(base, address + 16); }
-  void set_music_default(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
-  uint32_t music_default_address() const { return address + 16; }
+  uint32_t music_default() const { return data()->music_default; }
+  void set_music_default(uint32_t v) const { data()->music_default = v; }
+  uint32_t music_default_bits() const { return data()->music_default; }
+  void set_music_default_bits(uint32_t v) const { data()->music_default = v; }
   // 15
-  uint32_t effects_default() const { return guest::LoadU32(base, address + 20); }
-  void set_effects_default(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
-  uint32_t effects_default_address() const { return address + 20; }
-  uint32_t item_count() const { return guest::LoadU32(base, address + 52); }
-  void set_item_count(uint32_t v) const { guest::StoreU32(base, address + 52, v); }
-  uint32_t item_count_address() const { return address + 52; }
+  uint32_t effects_default() const { return data()->effects_default; }
+  void set_effects_default(uint32_t v) const { data()->effects_default = v; }
+  uint32_t effects_default_bits() const { return data()->effects_default; }
+  void set_effects_default_bits(uint32_t v) const { data()->effects_default = v; }
+  uint32_t item_count() const { return data()->item_count; }
+  void set_item_count(uint32_t v) const { data()->item_count = v; }
+  uint32_t item_count_bits() const { return data()->item_count; }
+  void set_item_count_bits(uint32_t v) const { data()->item_count = v; }
   // what Update answers on the answer page
-  uint32_t answer() const { return guest::LoadU32(base, address + 56); }
-  void set_answer(uint32_t v) const { guest::StoreU32(base, address + 56, v); }
-  uint32_t answer_address() const { return address + 56; }
+  uint32_t answer() const { return data()->answer; }
+  void set_answer(uint32_t v) const { data()->answer = v; }
+  uint32_t answer_bits() const { return data()->answer; }
+  void set_answer_bits(uint32_t v) const { data()->answer = v; }
   // the volume page's last item's choice, 0 or 1
-  uint32_t volume_toggle() const { return guest::LoadU32(base, address + 60); }
-  void set_volume_toggle(uint32_t v) const { guest::StoreU32(base, address + 60, v); }
-  uint32_t volume_toggle_address() const { return address + 60; }
+  uint32_t volume_toggle() const { return data()->volume_toggle; }
+  void set_volume_toggle(uint32_t v) const { data()->volume_toggle = v; }
+  uint32_t volume_toggle_bits() const { return data()->volume_toggle; }
+  void set_volume_toggle_bits(uint32_t v) const { data()->volume_toggle = v; }
   // the main list's selection kept
-  uint32_t main_selection() const { return guest::LoadU32(base, address + 64); }
-  void set_main_selection(uint32_t v) const { guest::StoreU32(base, address + 64, v); }
-  uint32_t main_selection_address() const { return address + 64; }
+  uint32_t main_selection() const { return data()->main_selection; }
+  void set_main_selection(uint32_t v) const { data()->main_selection = v; }
+  uint32_t main_selection_bits() const { return data()->main_selection; }
+  void set_main_selection_bits(uint32_t v) const { data()->main_selection = v; }
   // RunTen's counter, done at 10
-  uint32_t run_count() const { return guest::LoadU32(base, address + 68); }
-  void set_run_count(uint32_t v) const { guest::StoreU32(base, address + 68, v); }
-  uint32_t run_count_address() const { return address + 68; }
+  uint32_t run_count() const { return data()->run_count; }
+  void set_run_count(uint32_t v) const { data()->run_count = v; }
+  uint32_t run_count_bits() const { return data()->run_count; }
+  void set_run_count_bits(uint32_t v) const { data()->run_count = v; }
   // the player who paused, 0 or 1
-  uint32_t player() const { return guest::LoadU32(base, address + 72); }
-  void set_player(uint32_t v) const { guest::StoreU32(base, address + 72, v); }
-  uint32_t player_address() const { return address + 72; }
+  uint32_t player() const { return data()->player; }
+  void set_player(uint32_t v) const { data()->player = v; }
+  uint32_t player_bits() const { return data()->player; }
+  void set_player_bits(uint32_t v) const { data()->player = v; }
   // the items' kind: 0 or 1 (the replay bit)
-  uint32_t kind() const { return guest::LoadU32(base, address + 76); }
-  void set_kind(uint32_t v) const { guest::StoreU32(base, address + 76, v); }
-  uint32_t kind_address() const { return address + 76; }
+  uint32_t kind() const { return data()->kind; }
+  void set_kind(uint32_t v) const { data()->kind = v; }
+  uint32_t kind_bits() const { return data()->kind; }
+  void set_kind_bits(uint32_t v) const { data()->kind = v; }
 };
 
 // allocated; measure: RaceResults

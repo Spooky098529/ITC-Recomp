@@ -137,6 +137,15 @@ fields = [
 measure = "new<80>@PauseMenu4::Create"
 size = 80
 origin = "allocated"
+# In host memory since E5 step 3 (2026-11-22, moved by the lead: its sites
+# are in race-screens' file): made by PauseMenu4::Create
+# (race_screens::PauseMenu4Create; the original's VirtualAlloc at
+# 0x822108A4, listed for its lifted original), freed by PauseMenu4::Destroy
+# (race_screens::PauseMenu4Destroy; the original's VirtualFree at 0x8220FCF4,
+# which returned 1); the global at 0x826D84E4 holds its handle.
+storage = "host"
+host_alloc = [0x822108A4]
+host_free = [{ call = 0x8220FCF4, reg = "r3", returns = 1 }]
 fields = [
   { name = "music_volume", offset = 0, type = "u32", note = "player 0's save data's byte +0x1F878, sign-extended" },
   { name = "effects_volume", offset = 4, type = "u32", note = "player 0's save data's byte +0x1F879, sign-extended" },

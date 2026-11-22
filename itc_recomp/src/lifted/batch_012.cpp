@@ -6402,7 +6402,7 @@ lifted::Result f8220DF30(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r5,4
   r5 = uint64_t(int64_t(4));
   // lwz r11,144(r11)
-  r11 = guest::LoadU32(base, schema::PauseMenuData(base, uint32_t(r11)).last_item_ok_address());
+  r11 = schema::PauseMenuData(base, uint32_t(r11)).last_item_ok_bits();
   // cmpwi cr6,r11,1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 1, so);
   // beq cr6,0x8220dfac
@@ -6438,7 +6438,7 @@ loc_8220DFD0:
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // stw r10,144(r11)
-  guest::StoreU32(base, schema::PauseMenuData(base, uint32_t(r11)).last_item_ok_address(), uint32_t(r10));
+  schema::PauseMenuData(base, uint32_t(r11)).set_last_item_ok_bits(uint32_t(r10));
   // b 0x8220dff8
   goto loc_8220DFF8;
 loc_8220DFE0:
@@ -6481,7 +6481,7 @@ loc_8220DFF8:
   // li r4,9
   r4 = uint64_t(int64_t(9));
   // lwz r11,144(r11)
-  r11 = guest::LoadU32(base, schema::PauseMenuData(base, uint32_t(r11)).last_item_ok_address());
+  r11 = schema::PauseMenuData(base, uint32_t(r11)).last_item_ok_bits();
   // mr r3,r30
   r3 = r30;
   // cmpwi cr6,r11,1
@@ -6656,7 +6656,7 @@ lifted::Result f8220E0F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31532(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31532);
   // lwz r11,144(r11)
-  r11 = guest::LoadU32(base, schema::PauseMenuData(base, uint32_t(r11)).last_item_ok_address());
+  r11 = schema::PauseMenuData(base, uint32_t(r11)).last_item_ok_bits();
   // cmpwi cr6,r11,1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 1, so);
   // bne cr6,0x8220e160
@@ -6727,7 +6727,7 @@ loc_8220E194:
   // lwz r11,-31532(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31532);
   // lwz r4,52(r11)
-  r4 = guest::LoadU32(base, schema::PauseMenuData(base, uint32_t(r11)).music_volume_address());
+  r4 = schema::PauseMenuData(base, uint32_t(r11)).music_volume_bits();
   // bl 0x8220d040
   // (left out: dead in C++)
   { const lifted::Result o = game::PauseMenu::ShowVolume(base, LIFTED_ARGS(0x8220E1C8, r31)); r3 = o.r3; f1 = o.f1; }
@@ -6736,7 +6736,7 @@ loc_8220E194:
   // mr r3,r29
   r3 = r29;
   // lwz r4,56(r11)
-  r4 = guest::LoadU32(base, schema::PauseMenuData(base, uint32_t(r11)).effects_volume_address());
+  r4 = schema::PauseMenuData(base, uint32_t(r11)).effects_volume_bits();
   // bl 0x8220d040
   // (left out: dead in C++)
   { const lifted::Result o = game::PauseMenu::ShowVolume(base, LIFTED_ARGS(0x8220E1D8, r31)); r3 = o.r3; f1 = o.f1; }
