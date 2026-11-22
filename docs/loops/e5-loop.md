@@ -476,5 +476,17 @@ args, in the same session) only when the user's current message says to.
 - Batch 2 done and checked (2026-11-22): 2 types moved (`PauseMenuData`,
   `PauseMenu4Data`, both seen in the replay), 18 skipped; both replay
   races match. Its proposed rows await the user's review.
-- Batch 3: not started.
+- Batch 3 done and checked (2026-11-22): 2 types moved (`CameraAnimLoad`,
+  `NetScreen7Data`; not on the replay's path), 18 skipped; both replay
+  races match. Its proposed rows await the user's review.
+- Step 3's swarm, in all: 11 types moved of the 58 (with `FloatPair`, the
+  lead's check), 47 skipped, mostly for vtables read raw, objects or
+  interfaces embedded at offsets, memcpy targets, and addresses handed to
+  other areas (the reports). What's left of step 3 is listed in the
+  reports file's batches: types movable after a small change (a field's
+  address staged in a guest buffer: `GarageScreenData`,
+  `TodaysResultData`; a measure fault split: `PauseMenuScreen`,
+  `CameraAnimBlock`; a shared record type: `TodaysEventImage` with
+  `Type2HubImage`), and the rest waiting on step 4 (virtual dispatch over
+  handles, embedded objects).
 - Merged into `rexglue-removal-project` up to the pilot (`fc5e3b94`).

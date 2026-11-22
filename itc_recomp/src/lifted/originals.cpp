@@ -219589,7 +219589,7 @@ lifted::Result f82150878(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // stw r30,80(r1)
   guest::StoreU32(base, uint32_t(r1) + 80, uint32_t(r30));
   // lwz r27,0(r28)
-  r27 = guest::LoadU32(base, schema::CameraAnimLoad(base, uint32_t(r28)).id_address());
+  r27 = schema::CameraAnimLoad(base, uint32_t(r28)).id_bits();
   // stw r30,340(r1)
   guest::StoreU32(base, uint32_t(r1) + 340, uint32_t(r30));
 loc_821508A0:
@@ -219677,7 +219677,7 @@ loc_821508E0:
   r3 = r28;
   // bl 0x82295330
   // (left out: dead in C++)
-  { const lifted::Result o = game::VirtualFree(base, LIFTED_ARGS(0x82150940, r31)); r3 = o.r3; f1 = o.f1; }
+  { schema::CameraAnimLoad(base, uint32_t(r3)).Delete(); r3 = 1; }  // host_free 0x82150940 (CameraAnimLoad)
   // lis r5,0
   r5 = uint64_t(int64_t(0));
   // li r4,0
@@ -219925,7 +219925,7 @@ lifted::Result f82150B10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = uint64_t(int64_t(0));
   // bl 0x82295398
   // (left out: dead in C++)
-  { const lifted::Result o = game::VirtualAlloc(base, LIFTED_ARGS(0x82150B3C, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = schema::CameraAnimLoad::New(base).address; f1 = 0; }  // host_alloc 0x82150B3C (CameraAnimLoad)
   // mr r30,r3
   r30 = r3;
   // li r6,4
@@ -219944,7 +219944,7 @@ lifted::Result f82150B10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r4,r3
   r4 = r3;
   // stw r31,0(r30)
-  guest::StoreU32(base, schema::CameraAnimLoad(base, uint32_t(r30)).id_address(), uint32_t(r31));
+  schema::CameraAnimLoad(base, uint32_t(r30)).set_id_bits(uint32_t(r31));
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0

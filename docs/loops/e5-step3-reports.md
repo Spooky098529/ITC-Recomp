@@ -43,9 +43,11 @@ Changes beyond the allocation and free sites:
 - network-mode: `NetModeSelect::Destroy`'s raw read of the data's +4 goes
   through the view.
 
-Known limit (as the pilot's): with a type's `--native_*` flag off (or
-`--native_heap=false` for type 6 and 7), the lifted originals allocate a
-guest block the host views can't read. The flags are on by default.
+With a type's `--native_*` flag off: checked during batch 3, none of
+these allocation and free sites (but `Type67Screen0Words`', not checked)
+is in a lifted original (the tools found no emitted call there), so
+there is no guest-block fallback: an address with no entry stops the game
+(stage 4's rule).
 
 ### Skipped
 
@@ -138,3 +140,45 @@ is a memcpy target.
 
 For the user's review (not written); Status unchanged (each function's
 other objects are still guest objects).
+
+## Batch 3 (2026-11-22, `lifted_sites: true`)
+
+9 areas, 9 agents (run `wf_a554839a-b7c`). 2 types moved, 18 skipped.
+Checked by the lead: schema_gen, schema_check (0), `lift.py reemit` (no
+host type's access left raw), `lift_originals.py --all`, the build (no
+errors), an attract race (no error lines), `tick_replay.sh` twice (both
+races all match), a frame dump (normal). Neither move is on the replay's
+path (the cutscene shots and parking area; the Xbox Live mode): the build
+is their check.
+
+### Moved
+
+| Type | Area | Allocation | Free |
+|---|---|---|---|
+| `CameraAnimLoad` (4 B) | camera-modes | `CameraAnims::Load` (`AnimsLoad`; the original's `VirtualAlloc` at `0x82150B3C`, `host_alloc` for its lifted original); the handle is the archive callback's context | `CameraAnims::OnLoaded` (`Delete()`; the original's `VirtualFree` at `0x82150940`, `host_free`, returns 1); the native path's guard asks for a handle |
+| `NetScreen7Data` (8 B) | system-services (sites in network-mode's `machines.cpp`, made by the lead) | `Type12Screen7::Create` (`0x82268D8C`), handle in `[0x82816168]` and r3 | `Type12Screen7::Destroy` (`DestroyOf<6>`, `0x82268F54`), r3 = 1 |
+
+### Skipped
+
+| Type | Area | Why |
+|---|---|---|
+| `TodaysResultData` | todays-result | Its `pick` text's address goes to `UiMovie::SetChildNameText` (as `GarageScreenData`). |
+| `TodaysEventImage` | todays-result | Shares the archive callback `Type2Hub::ImageLoaded` and `FreeImage` with type2-screens' image records: moves only with them, as one type. |
+| `SysUsers` | system-services | save-interface reads it through its own view and its vtable raw; allocated in lifted framework code. |
+| `SysLinkIdSetNode` | system-services | System link: unreachable. Drop from the pick list. |
+| `CarDealerEntry` | car-dealer | A memcpy target for the car's spec; its address read by other areas. |
+| `AppCamera` | cameras | Multiple inheritance (interfaces at +8, +12 handed out); its address in three delegates. |
+| `AppCameraList` | cameras | Its vtable read raw by the hand port's virtual call; the lifted `Add` passes its +4 on. |
+| `AppCameraEntry` | cameras | Its vtable read raw right after the lifted allocation. |
+| `CameraCubeFaceSurface` | cameras | A D3D surface header handed to the graphics code. |
+| `TrackCollisionObject` | collision-world | `TrackCollision::Load` stores through it raw (untyped). |
+| `Vector16Storage` | car-scene-draw | A vector's element array (variable size), walked by pointer arithmetic. |
+| `Type2Hub` | type2-screens | The hub's embedded state machine (a measure fault filed the data's allocation under it). |
+| `Type2HubImage` | type2-screens | Shares `ImageLoaded` with todays-result's records. |
+| `Type2HubTexture` | type2-screens | Its address stored into the hub movie's texture slots. |
+| `CollisionObjectBlock` | car-physics | An `operator new[]` block of 320-byte objects reached by address arithmetic. |
+| `CameraAnimBlock` | camera-modes | The originals read its +60 through `CameraAnimData`, a separate type (a measure fault); the agent lists how to make it movable. |
+
+### Proposed row changes
+
+For the user's review (not written); Status unchanged.

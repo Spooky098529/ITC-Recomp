@@ -483,6 +483,15 @@ uint64_t DestroyOf(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& ca
         continue;
       }
     }
+    if constexpr (I == 6) {
+      if (s.frees[i].global == G::screen7_data_address()) {
+        // The host data (Screen7Create): the original's VirtualFree at
+        // 0x82268F54, which returned 1.
+        schema::NetScreen7Data(base, Load(base, s.frees[i].global)).Delete();
+        r3 = 1;
+        continue;
+      }
+    }
     r3 = calls.Call(kVirtualFree, frame, s.frees[i].lr, Load(base, s.frees[i].global), 0,
                     kMemRelease);
   }
@@ -685,7 +694,9 @@ uint64_t Screen7Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls
   G::set_screen7_pages(base, uint32_t(Alloc(calls, frame, 0x82268D50, 28)));
   G::set_screen7_menu(base, uint32_t(Alloc(calls, frame, 0x82268D6C, 68)));
   Store(base, frame + 88, kGlobalsPage);
-  const uint64_t r3 = Alloc(calls, frame, 0x82268D8C, 8);
+  // The data lives in host memory (E5 step 3): the original's
+  // VirtualAlloc(8) at 0x82268D8C; the global holds its handle.
+  const uint64_t r3 = schema::NetScreen7Data::New(base).address;
   const uint32_t pages = G::screen7_pages(base).address;
   Store(base, frame + 80, 0);
   Store(base, frame + 92, kGlobalsPage);
