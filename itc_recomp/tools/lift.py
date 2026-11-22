@@ -913,6 +913,12 @@ def emit_function(info, infos, emitting):
             continue
         if st.kind == "call":
             lr = st.lr or "lr"  # a tail call passes on the function's own
+            site = host_site(st)
+            if site is not None:
+                body.append("  " + site)
+                used.update({"r3", "f1"} | HOST_SITE_REGS)
+                HOST_SITE_REGS.clear()
+                continue
             if is_direct(st, infos, emitting):
                 callee = infos[st.target]
                 call = f"{name_of(st.target, fname(st.target))}({', '.join(['base'] + callee.params + ([lr] if callee.needs_lr else []))})"
@@ -1098,6 +1104,7 @@ def emit_batch(batch, names, infos, emitting):
 
 
 _VIEWS = None
+_SCHEMA = None
 # The schema's headers the function being emitted names (emit_batch
 # includes them).
 VIEW_HEADERS = set()
@@ -1115,6 +1122,8 @@ def views():
         import schema_lib
         import type_map
         schema = schema_lib.load()
+        global _SCHEMA
+        _SCHEMA = schema
         _VIEWS = {}
         if schema.types:
             accesses, _ = type_map.typed_accesses()
@@ -1152,6 +1161,47 @@ def name_fields(fn, st, line):
 
 
 HOST_LEFT_RAW = []
+
+# Lifted allocation and free calls of host types (the schema's host_alloc
+# and host_free, docs/loops/e5-loop.md "lift.py's host_alloc and
+# host_free"): the return addresses replaced while emitting.
+HOST_SITES_EMITTED = set()
+HOST_SITE_REGS = set()
+HOST_SITE_MARK = re.compile(r"// host_(?:alloc|free) 0x(8[0-9A-F]{7})\b")
+
+
+def host_site(st):
+    """A call listed as a host type's lifted allocation or free: its
+    replacement statement (marked with the address), else None."""
+    if st.lr is None:
+        return None
+    views()  # loads the schema
+    site = _SCHEMA.host_sites.get(int(st.lr, 16))
+    if site is None:
+        return None
+    ty = site[1]
+    VIEW_HEADERS.add(ty.header())
+    HOST_SITES_EMITTED.add(int(st.lr, 16))
+    if site[0] == "alloc":
+        return (f"{{ r3 = schema::{ty.name}::New(base).address; f1 = 0; }}"
+                f"  // host_alloc {st.lr} ({ty.name})")
+    _, _, reg, returns = site
+    HOST_SITE_REGS.add(reg)
+    return (f"{{ schema::{ty.name}(base, uint32_t({reg})).Delete(); r3 = {returns}; }}"
+            f"  // host_free {st.lr} ({ty.name})")
+
+
+def check_host_sites(other_paths):
+    """Every listed lifted allocation and free was emitted, by this run or
+    in the other generated files (`other_paths`, as they are on disk): the
+    addresses missing (a wrong address can't pass silently)."""
+    views()
+    found = set(HOST_SITES_EMITTED)
+    for path in other_paths:
+        if os.path.exists(path):
+            with open(path) as f:
+                found |= {int(a, 16) for a in HOST_SITE_MARK.findall(f.read())}
+    return sorted(set(_SCHEMA.host_sites) - found)
 
 
 def host_access(fn, ty, f, obj, inside, m, line):
@@ -1319,9 +1369,16 @@ def main(argv):
             return 1
         emitting = set(everything) | set(lifted_before)
         mark_needs_lr(infos, emitting)
-        for batch, names in batches.items():
+        texts = {batch: emit_batch(batch, names, infos, emitting) for batch, names in batches.items()}
+        missing = check_host_sites([os.path.join(OUT, "originals.cpp")])
+        if missing:
+            for a in missing:
+                print(f"host_alloc/host_free 0x{a:08X}: no lifted call returns there "
+                      "(in the batches or originals.cpp); nothing written")
+            return 1
+        for batch, text in texts.items():
             with open(os.path.join(OUT, f"batch_{batch}.cpp"), "w") as f:
-                f.write(emit_batch(batch, names, infos, emitting))
+                f.write(text)
         with open(os.path.join(OUT, "functions.h"), "w") as f:
             f.write(emit_header(lifted_before))
         print(f"rewrote {len(batches)} batches: {len(everything)} functions")

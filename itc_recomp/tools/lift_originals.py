@@ -13,6 +13,7 @@ usage: lift_originals.py sub_X ...   (writes both files for exactly these)
                                          address lifted code or a hand port
                                          calls with no entry of its own)
 """
+import glob
 import os
 import re
 import sys
@@ -134,6 +135,12 @@ def main(argv):
         h.append(f"// The same on a register view (in place of __imp__{n}).")
         h.append(f"inline void c{n[4:]}(Regs& regs, uint8_t* base) {{ regs.Apply({lift.ename(n)}(base, regs.ToArgs())); }}")
     h += ["", "}  // namespace lifted::original", ""]
+    missing = lift.check_host_sites(glob.glob(os.path.join(lift.OUT, "batch_*.cpp")))
+    if missing:
+        for a in missing:
+            print(f"host_alloc/host_free 0x{a:08X}: no lifted call returns there "
+                  "(in originals or the batches); nothing written")
+        return 1
     with open(os.path.join(lift.OUT, "originals.cpp"), "w") as f:
         f.write(lift.own_spelling("\n".join(cpp)))
     with open(os.path.join(lift.OUT, "originals.h"), "w") as f:
