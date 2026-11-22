@@ -87,6 +87,14 @@ fields = [
 measure = "new<160>@PauseMenu::Create"
 size = 160
 origin = "allocated"
+# In host memory since E5 step 3 (2026-11-22): made by PauseMenu::Create
+# (race_screens::PauseMenuCreate; the original's VirtualAlloc at 0x8220D824,
+# listed for its lifted original), freed by PauseMenu::Destroy
+# (race_screens::PauseMenuDestroy; the original's VirtualFree at 0x8220C524,
+# which returned 1); the global at 0x826D84D4 holds its handle.
+storage = "host"
+host_alloc = [0x8220D824]
+host_free = [{ call = 0x8220C524, reg = "r3", returns = 1 }]
 fields = [
   { name = "hud_option_0", offset = 0, type = "u32", note = "the four HUD options (the save's options words +0 to +12)" },
   { name = "hud_option_1", offset = 4, type = "u32" },
