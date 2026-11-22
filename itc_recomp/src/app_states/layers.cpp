@@ -52,15 +52,15 @@ void LayerConstruct(uint8_t* base, uint32_t layer, uint32_t owner, std::optional
   l.set_vtable(kLayerVtable);
   l.set_state_vtable(kLayerStateVtable);
   l.set_owner(owner);
-  if (!std_list::Construct(base, l.children_address())) {
-    calls.call(kPtrListConstruct, l.children_address(), std::nullopt, std::nullopt,
+  if (!std_list::Construct(base, l.children_list().address)) {
+    calls.call(kPtrListConstruct, l.children_list().address, std::nullopt, std::nullopt,
                children_return);
   }
-  if (!std_list::Construct(base, l.states_address())) {
-    calls.call(kPtrListConstruct, l.states_address(), std::nullopt, std::nullopt, states_return);
+  if (!std_list::Construct(base, l.states_list().address)) {
+    calls.call(kPtrListConstruct, l.states_list().address, std::nullopt, std::nullopt, states_return);
   }
-  if (!OpConstruct(base, l.ops_address())) {
-    calls.call(kOpListConstruct, l.ops_address(), std::nullopt, std::nullopt, ops_return);
+  if (!OpConstruct(base, l.ops_list().address)) {
+    calls.call(kOpListConstruct, l.ops_list().address, std::nullopt, std::nullopt, ops_return);
   }
   if (state && !LayerPush(base, layer, *state)) {
     calls.call(kLayerPush, layer, uint64_t(*state), std::nullopt, 0x820ADC40);
@@ -73,10 +73,10 @@ void LayerAddChild(uint8_t* base, uint32_t layer, uint32_t child, uint32_t frame
   calls.set_register(31, layer);
   const uint32_t value = frame + 112 + 28;  // the caller's r1 + 28
   Store(base, value, child);
-  const uint32_t child_state = schema::StateLayer(base, child).state_vtable_address();
+  const uint32_t child_state = schema::StateLayer(base, child).address + 4;
   calls.call(VirtualTarget(base, child_state, 4), child_state, uint64_t(layer), std::nullopt,
              0x820ADA38);
-  const uint32_t list = schema::StateLayer(base, layer).children_address();
+  const uint32_t list = schema::StateLayer(base, layer).children_list().address;
   const uint32_t head = schema::PtrList(base, list).head().address;
   Store(base, frame + 80, list);
   Store(base, frame + 84, head);
@@ -88,7 +88,7 @@ void LayerAddChild(uint8_t* base, uint32_t layer, uint32_t child, uint32_t frame
 bool StatesAddLayer(uint8_t* base, uint32_t states, uint32_t state, uint32_t frame,
                     const AppCalls& calls) {
   (void)frame;
-  const auto layer = memory::crt::OperatorNew(base, schema::StateLayer::kSize);
+  const auto layer = std::optional<uint32_t>(schema::StateLayer::New(base).address);  // host memory (E5 step 4)
   if (!layer) {
     return false;
   }
@@ -115,7 +115,7 @@ bool StatesAddLayer(uint8_t* base, uint32_t states, uint32_t state, uint32_t fra
 
 bool StatesConstruct(uint8_t* base, uint32_t states, uint32_t setup, uint32_t frame,
                      const AppCalls& calls) {
-  const auto layer = memory::crt::OperatorNew(base, schema::StateLayer::kSize);
+  const auto layer = std::optional<uint32_t>(schema::StateLayer::New(base).address);  // host memory (E5 step 4)
   if (!layer) {
     return false;
   }
@@ -172,7 +172,7 @@ bool StatesConstruct(uint8_t* base, uint32_t states, uint32_t setup, uint32_t fr
 std::optional<uint32_t> StatesCreate(uint8_t* base, uint32_t setup, uint32_t frame,
                                      const AppCalls& calls) {
   (void)frame;
-  const auto block = memory::crt::OperatorNew(base, schema::AppStates::kSize);
+  const auto block = std::optional<uint32_t>(schema::AppStates::New(base).address);  // host memory (E5 step 4)
   if (!block) {
     return std::nullopt;
   }
@@ -224,7 +224,7 @@ std::optional<uint32_t> AppStart(uint8_t* base, uint32_t interface, uint32_t fra
   // r3 as the slot leaves it (AddLayer's: AddChild's, the root's children).
   uint32_t r3 = 0;
   if (ours) {
-    r3 = schema::AppStates(base, states).root().children_address();
+    r3 = schema::AppStates(base, states).root().children_list().address;
   } else {
     r3 = calls.call(target, states, uint64_t(state), std::nullopt, 0x82092908);
   }
@@ -303,7 +303,7 @@ uint32_t UpdateChild(uint8_t* base, uint32_t layer, uint32_t child, bool toggled
   } else {
     ITC_NATIVE_RUNNING("sub_820ACD80 StateLayer::Update's functor");
   }
-  const uint32_t state = schema::StateLayer(base, child).state_vtable_address();
+  const uint32_t state = schema::StateLayer(base, child).address + 4;
   calls.set_register(31, state);
   calls.set_register(30, layer);
   const uint32_t target = VirtualTarget(base, state, toggled ? 36 : 32);
@@ -323,7 +323,7 @@ uint32_t UpdateChild(uint8_t* base, uint32_t layer, uint32_t child, bool toggled
 uint32_t ToggleOffChild(uint8_t* base, uint32_t layer, uint32_t child, uint32_t return_address,
                         const AppCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820ACD60 StateLayer::OnToggleOff's functor");
-  const uint32_t state = schema::StateLayer(base, child).state_vtable_address();
+  const uint32_t state = schema::StateLayer(base, child).address + 4;
   calls.set_register(11, state);
   const uint32_t target = VirtualTarget(base, state, 20);
   if (target == kLayerStateToggleOff) {
@@ -334,7 +334,7 @@ uint32_t ToggleOffChild(uint8_t* base, uint32_t layer, uint32_t child, uint32_t 
 
 uint32_t LayerApplyOps(uint8_t* base, uint32_t layer, uint32_t frame, const AppCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820ADE68 StateLayer::ApplyOps");
-  const uint32_t list = schema::StateLayer(base, layer).ops_address();
+  const uint32_t list = schema::StateLayer(base, layer).ops_list().address;
   calls.set_register(31, list);
   Store(base, frame + 104, layer);
   Store(base, frame + 80, kApplyOp);
@@ -366,7 +366,7 @@ uint32_t LayerUpdate(uint8_t* base, uint32_t layer, bool toggled, uint32_t frame
   calls.set_register(31, layer);
   const schema::StateLayer l(base, layer);
   if (l.states_size() != 0) {
-    const uint32_t states = l.states_address();
+    const uint32_t states = l.states_list().address;
     calls.set_register(30, states);
     const uint32_t returns[2][2] = {{0x820ADF5C, 0x820ADF8C}, {0x820AE06C, 0x820AE09C}};
     const uint32_t slots[2] = {toggled ? 36u : 32u, 40u};
@@ -381,7 +381,7 @@ uint32_t LayerUpdate(uint8_t* base, uint32_t layer, bool toggled, uint32_t frame
                  returns[toggled][i]);
     }
   }
-  const uint32_t list = l.children_address();
+  const uint32_t list = l.children_list().address;
   Store(base, frame + 104, layer);
   Store(base, frame + 84, 0);
   Store(base, frame + 80, toggled ? kUpdateChildToggled : kUpdateChild);
@@ -439,7 +439,7 @@ std::optional<uint32_t> LayerApplyOp(uint8_t* base, uint32_t layer, uint64_t op,
   }
   const uint32_t caller = frame + 128;
   if (type == 0) {
-    const auto added = memory::crt::OperatorNew(base, schema::StateLayer::kSize);
+    const auto added = std::optional<uint32_t>(schema::StateLayer::New(base).address);  // host memory (E5 step 4)
     if (!added) {
       return std::nullopt;
     }
@@ -456,7 +456,7 @@ std::optional<uint32_t> LayerApplyOp(uint8_t* base, uint32_t layer, uint64_t op,
     }
     calls.in_frame(112, 0x820ADE5C,
                    [&](uint32_t inner) { LayerAddChild(base, layer, child, inner, calls); });
-    return schema::StateLayer(base, layer).children_address();
+    return schema::StateLayer(base, layer).children_list().address;
   }
   ITC_NATIVE_RUNNING("sub_820ADC60 StateLayer::ApplyOp");
   Store64(base, caller + 24, op);
@@ -465,7 +465,7 @@ std::optional<uint32_t> LayerApplyOp(uint8_t* base, uint32_t layer, uint64_t op,
     return layer;
   }
   const schema::StateLayer l(base, layer);
-  const uint32_t list = l.states_address();
+  const uint32_t list = l.states_list().address;
   if (l.states_size() != 0) {
     const auto head = schema::PtrList(base, list).head();
     const auto top = head.next();
@@ -499,7 +499,7 @@ uint32_t LayerToggle(uint8_t* base, uint32_t layer, bool off, uint32_t frame,
   calls.set_register(31, layer);
   const schema::StateLayer l(base, layer);
   if (l.states_size() != 0) {
-    const auto head = schema::PtrList(base, l.states_address()).head();
+    const auto head = schema::PtrList(base, l.states_list().address).head();
     const auto top = head.next();
     if (top.address == head.address) {
       ITC_LOG_WARN("{}: tw/td trap hit (type 22)", off ? "sub_820AD680" : "sub_820AD4E0");
@@ -508,7 +508,7 @@ uint32_t LayerToggle(uint8_t* base, uint32_t layer, bool off, uint32_t frame,
     calls.call(VirtualTarget(base, state, off ? 20 : 12), state, uint64_t(layer), std::nullopt,
                off ? 0x820AD6D8 : 0x820AD538);
   }
-  const uint32_t list = l.children_address();
+  const uint32_t list = l.children_list().address;
   Store(base, frame + 104, layer);
   Store(base, frame + 84, 0);
   Store(base, frame + 80, off ? kToggleOffChild : kToggleOnChild);

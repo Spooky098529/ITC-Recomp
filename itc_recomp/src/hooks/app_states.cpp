@@ -371,7 +371,7 @@ ITC_REGS_STEP(AppLayerPush) {
     lifted::original::c820ADAD0(ctx, base);
     return;
   }
-  ctx.r3.u64 = schema::StateLayer(base, ctx.r3.u32).ops_address();
+  ctx.r3.u64 = schema::StateLayer(base, ctx.r3.u32).ops_list().address;
 }
 
 ITC_REGS_STEP(AppMessagesInsertN) {
@@ -484,7 +484,7 @@ ITC_REGS_STEP(AppLayerAddChild) {
     lifted::original::c820ADA08(ctx, base);
     return;
   }
-  ctx.r3.u64 = schema::StateLayer(base, layer).children_address();
+  ctx.r3.u64 = schema::StateLayer(base, layer).children_list().address;
 }
 
 ITC_REGS_STEP(AppStatesAddLayer) {
@@ -496,7 +496,7 @@ ITC_REGS_STEP(AppStatesAddLayer) {
     lifted::original::c820AE130(ctx, base);
     return;
   }
-  ctx.r3.u64 = schema::AppStates(base, states).root().children_address();
+  ctx.r3.u64 = schema::AppStates(base, states).root().children_list().address;
 }
 
 ITC_REGS_STEP(AppStatesConstruct) {

@@ -5069,7 +5069,7 @@ lifted::Result f820958B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // ori r11,r11,65535
   r11 = r11 | 65535;
   // lwz r10,8(r31)
-  r10 = guest::LoadU32(base, schema::PtrList(base, uint32_t(r31)).size_address());
+  r10 = schema::PtrList(base, uint32_t(r31)).size_bits();
   // subf r11,r10,r11
   r11 = r11 - r10;
   // cmplw cr6,r11,r30
@@ -5117,11 +5117,11 @@ lifted::Result f820958B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   { const lifted::Result o = game::Std::string::_Tidy(base, LIFTED_ARGS(0x82095930, r31)); r3 = o.r3; f1 = o.f1; }
 loc_82095930:
   // lwz r11,8(r31)
-  r11 = guest::LoadU32(base, schema::PtrList(base, uint32_t(r31)).size_address());
+  r11 = schema::PtrList(base, uint32_t(r31)).size_bits();
   // add r11,r11,r30
   r11 = r11 + r30;
   // stw r11,8(r31)
-  guest::StoreU32(base, schema::PtrList(base, uint32_t(r31)).size_address(), uint32_t(r11));
+  schema::PtrList(base, uint32_t(r31)).set_size_bits(uint32_t(r11));
   // addi r1,r1,176
   r1 = uint64_t(int64_t(int64_t(r1) + 176));
   // lwz r12,-8(r1)
@@ -11400,7 +11400,7 @@ loc_82098EC8:
   // lwz r11,0(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 0);
   // lwz r10,4(r31)
-  r10 = guest::LoadU32(base, schema::PtrList(base, uint32_t(r31)).head_address());
+  r10 = schema::PtrList(base, uint32_t(r31)).head_bits();
   // stw r11,148(r1)
   guest::StoreU32(base, uint32_t(r1) + 148, uint32_t(r11));
   // lwz r11,84(r1)
@@ -11427,18 +11427,18 @@ loc_82098EC8:
   // (left out: dead in C++)
   { const lifted::Result o = lifted::entry::e825A70E8(base, LIFTED_ARGS(0x82098F00, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,8(r31)
-  r11 = guest::LoadU32(base, schema::PtrList(base, uint32_t(r31)).size_address());
+  r11 = schema::PtrList(base, uint32_t(r31)).size_bits();
   // addi r11,r11,-1
   r11 = uint64_t(int64_t(int64_t(r11) + -1));
   // stw r11,8(r31)
-  guest::StoreU32(base, schema::PtrList(base, uint32_t(r31)).size_address(), uint32_t(r11));
+  schema::PtrList(base, uint32_t(r31)).set_size_bits(uint32_t(r11));
 loc_82098F0C:
   // ld r11,144(r1)
   r11 = guest::LoadU64(base, uint32_t(r1) + 144);
   // mr r3,r30
   r3 = r30;
   // std r11,0(r30)
-  guest::StoreU64(base, schema::PtrList(base, uint32_t(r30)).fault_result_0_address(), r11);
+  schema::PtrList(base, uint32_t(r30)).set_fault_result_0_bits(r11);
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
@@ -40521,11 +40521,11 @@ loc_820AD090:
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // stw r11,4(r31)
-  guest::StoreU32(base, schema::PtrList(base, uint32_t(r31)).head_address(), uint32_t(r11));
+  schema::PtrList(base, uint32_t(r31)).set_head_bits(uint32_t(r11));
   // mr r3,r31
   r3 = r31;
   // stw r10,8(r31)
-  guest::StoreU32(base, schema::PtrList(base, uint32_t(r31)).size_address(), uint32_t(r10));
+  schema::PtrList(base, uint32_t(r31)).set_size_bits(uint32_t(r10));
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
@@ -40635,13 +40635,13 @@ lifted::Result f820AD118(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r3,r31,12
   r3 = uint64_t(int64_t(int64_t(r31) + 12));
   // stw r11,4(r31)
-  guest::StoreU32(base, schema::StateLayer(base, uint32_t(r31)).state_vtable_address(), uint32_t(r11));
+  schema::StateLayer(base, uint32_t(r31)).set_state_vtable_bits(uint32_t(r11));
   // stw r10,0(r31)
-  guest::StoreU32(base, schema::StateLayer(base, uint32_t(r31)).vtable_address(), uint32_t(r10));
+  schema::StateLayer(base, uint32_t(r31)).set_vtable_bits(uint32_t(r10));
   // stw r9,4(r31)
-  guest::StoreU32(base, schema::StateLayer(base, uint32_t(r31)).state_vtable_address(), uint32_t(r9));
+  schema::StateLayer(base, uint32_t(r31)).set_state_vtable_bits(uint32_t(r9));
   // stw r4,8(r31)
-  guest::StoreU32(base, schema::StateLayer(base, uint32_t(r31)).owner_address(), uint32_t(r4));
+  schema::StateLayer(base, uint32_t(r31)).set_owner_bits(uint32_t(r4));
   // bl 0x820ad058
   // (left out: dead in C++)
   { const lifted::Result o = game::PtrList::Ctor(base, LIFTED_ARGS(0x820AD15C, r31)); r3 = o.r3; f1 = o.f1; }
@@ -40746,9 +40746,9 @@ loc_820AD40C:
   // ld r11,8(r11)
   r11 = guest::LoadU64(base, uint32_t(r11) + 8);
   // std r10,0(r30)
-  guest::StoreU64(base, schema::PtrList(base, uint32_t(r30)).fault_result_0_address(), r10);
+  schema::PtrList(base, uint32_t(r30)).set_fault_result_0_bits(r10);
   // std r11,8(r30)
-  guest::StoreU64(base, schema::PtrList(base, uint32_t(r30)).fault_result_8_address(), r11);
+  schema::PtrList(base, uint32_t(r30)).set_fault_result_8_bits(r11);
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
@@ -40840,9 +40840,9 @@ loc_820AD4AC:
   // ld r11,8(r11)
   r11 = guest::LoadU64(base, uint32_t(r11) + 8);
   // std r10,0(r30)
-  guest::StoreU64(base, schema::OpList(base, uint32_t(r30)).fault_result_0_address(), r10);
+  schema::OpList(base, uint32_t(r30)).set_fault_result_0_bits(r10);
   // std r11,8(r30)
-  guest::StoreU64(base, schema::OpList(base, uint32_t(r30)).fault_result_8_address(), r11);
+  schema::OpList(base, uint32_t(r30)).set_fault_result_8_bits(r11);
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
@@ -40878,7 +40878,7 @@ lifted::Result f820AD4E0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r31,r3
   r31 = r3;
   // lwz r11,32(r31)
-  r11 = guest::LoadU32(base, schema::StateLayer(base, uint32_t(r31)).states_size_address());
+  r11 = schema::StateLayer(base, uint32_t(r31)).states_size_bits();
   // cntlzw r11,r11
   r11 = uint32_t(r11) == 0 ? 32 : __builtin_clz(uint32_t(r11));
   // rlwinm. r11,r11,27,31,31
@@ -40889,7 +40889,7 @@ lifted::Result f820AD4E0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r11,r31,24
   r11 = uint64_t(int64_t(int64_t(r31) + 24));
   // lwz r10,4(r11)
-  r10 = guest::LoadU32(base, schema::StateLayer(base, uint32_t(r11) - 24).states_head_address());
+  r10 = schema::StateLayer(base, uint32_t(r11) - 24).states_head_bits();
   // rotlwi r9,r10,0
   r9 = __builtin_rotateleft32(uint32_t(r10), 0);
   // lwz r11,0(r10)
@@ -40944,7 +40944,7 @@ loc_820AD538:
   // std r10,96(r1)
   guest::StoreU64(base, uint32_t(r1) + 96, r10);
   // lwz r10,4(r11)
-  r10 = guest::LoadU32(base, schema::StateLayer(base, uint32_t(r11) - 12).children_head_address());
+  r10 = schema::StateLayer(base, uint32_t(r11) - 12).children_head_bits();
   // ld r6,0(r9)
   r6 = guest::LoadU64(base, uint32_t(r9) + 0);
   // ld r7,8(r9)
@@ -40999,7 +40999,7 @@ lifted::Result f820AD680(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r31,r3
   r31 = r3;
   // lwz r11,32(r31)
-  r11 = guest::LoadU32(base, schema::StateLayer(base, uint32_t(r31)).states_size_address());
+  r11 = schema::StateLayer(base, uint32_t(r31)).states_size_bits();
   // cntlzw r11,r11
   r11 = uint32_t(r11) == 0 ? 32 : __builtin_clz(uint32_t(r11));
   // rlwinm. r11,r11,27,31,31
@@ -41010,7 +41010,7 @@ lifted::Result f820AD680(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r11,r31,24
   r11 = uint64_t(int64_t(int64_t(r31) + 24));
   // lwz r10,4(r11)
-  r10 = guest::LoadU32(base, schema::StateLayer(base, uint32_t(r11) - 24).states_head_address());
+  r10 = schema::StateLayer(base, uint32_t(r11) - 24).states_head_bits();
   // rotlwi r9,r10,0
   r9 = __builtin_rotateleft32(uint32_t(r10), 0);
   // lwz r11,0(r10)
@@ -41065,7 +41065,7 @@ loc_820AD6D8:
   // std r10,96(r1)
   guest::StoreU64(base, uint32_t(r1) + 96, r10);
   // lwz r10,4(r11)
-  r10 = guest::LoadU32(base, schema::StateLayer(base, uint32_t(r11) - 12).children_head_address());
+  r10 = schema::StateLayer(base, uint32_t(r11) - 12).children_head_bits();
   // ld r6,0(r9)
   r6 = guest::LoadU64(base, uint32_t(r9) + 0);
   // ld r7,8(r9)
@@ -41128,7 +41128,7 @@ lifted::Result f820AD768(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // ori r11,r11,65535
   r11 = r11 | 65535;
   // lwz r10,8(r31)
-  r10 = guest::LoadU32(base, schema::OpList(base, uint32_t(r31)).size_address());
+  r10 = schema::OpList(base, uint32_t(r31)).size_bits();
   // subf r11,r10,r11
   r11 = r11 - r10;
   // cmplw cr6,r11,r30
@@ -41176,11 +41176,11 @@ lifted::Result f820AD768(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   { const lifted::Result o = game::Std::string::_Tidy(base, LIFTED_ARGS(0x820AD7E0, r31)); r3 = o.r3; f1 = o.f1; }
 loc_820AD7E0:
   // lwz r11,8(r31)
-  r11 = guest::LoadU32(base, schema::OpList(base, uint32_t(r31)).size_address());
+  r11 = schema::OpList(base, uint32_t(r31)).size_bits();
   // add r11,r11,r30
   r11 = r11 + r30;
   // stw r11,8(r31)
-  guest::StoreU32(base, schema::OpList(base, uint32_t(r31)).size_address(), uint32_t(r11));
+  schema::OpList(base, uint32_t(r31)).set_size_bits(uint32_t(r11));
   // addi r1,r1,176
   r1 = uint64_t(int64_t(int64_t(r1) + 176));
   // lwz r12,-8(r1)
@@ -41235,7 +41235,7 @@ lifted::Result f820ADA08(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r5,r1,140
   r5 = uint64_t(int64_t(int64_t(r1) + 140));
   // lwz r10,4(r3)
-  r10 = guest::LoadU32(base, schema::StateLayer(base, uint32_t(r3) - 12).children_head_address());
+  r10 = schema::StateLayer(base, uint32_t(r3) - 12).children_head_bits();
   // stw r3,80(r1)
   guest::StoreU32(base, uint32_t(r1) + 80, uint32_t(r3));
   // stw r10,84(r1)
@@ -41283,7 +41283,7 @@ lifted::Result f820ADAD0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r3,r31
   r3 = r31;
   // lwz r30,4(r31)
-  r30 = guest::LoadU32(base, schema::StateLayer(base, uint32_t(r31) - 36).ops_head_address());
+  r30 = schema::StateLayer(base, uint32_t(r31) - 36).ops_head_bits();
   // stw r11,80(r1)
   guest::StoreU32(base, uint32_t(r1) + 80, uint32_t(r11));
   // mr r4,r30
@@ -41352,13 +41352,13 @@ lifted::Result f820ADBD8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r30,r5
   r30 = r5;
   // stw r11,4(r31)
-  guest::StoreU32(base, schema::StateLayer(base, uint32_t(r31)).state_vtable_address(), uint32_t(r11));
+  schema::StateLayer(base, uint32_t(r31)).set_state_vtable_bits(uint32_t(r11));
   // stw r10,0(r31)
-  guest::StoreU32(base, schema::StateLayer(base, uint32_t(r31)).vtable_address(), uint32_t(r10));
+  schema::StateLayer(base, uint32_t(r31)).set_vtable_bits(uint32_t(r10));
   // stw r9,4(r31)
-  guest::StoreU32(base, schema::StateLayer(base, uint32_t(r31)).state_vtable_address(), uint32_t(r9));
+  schema::StateLayer(base, uint32_t(r31)).set_state_vtable_bits(uint32_t(r9));
   // stw r4,8(r31)
-  guest::StoreU32(base, schema::StateLayer(base, uint32_t(r31)).owner_address(), uint32_t(r4));
+  schema::StateLayer(base, uint32_t(r31)).set_owner_bits(uint32_t(r4));
   // bl 0x820ad058
   // (left out: dead in C++)
   { const lifted::Result o = game::PtrList::Ctor(base, LIFTED_ARGS(0x820ADC24, r31)); r3 = o.r3; f1 = o.f1; }
@@ -41433,7 +41433,7 @@ lifted::Result f820ADC60(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r31,r30,24
   r31 = uint64_t(int64_t(int64_t(r30) + 24));
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, schema::StateLayer(base, uint32_t(r31) - 24).states_head_address());
+  r11 = schema::StateLayer(base, uint32_t(r31) - 24).states_head_bits();
   // rotlwi r10,r11,0
   r10 = __builtin_rotateleft32(uint32_t(r11), 0);
   // lwz r11,0(r11)
@@ -41450,7 +41450,7 @@ loc_820ADCAC:
   // addi r10,r1,88
   r10 = uint64_t(int64_t(int64_t(r1) + 88));
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, schema::StateLayer(base, uint32_t(r31) - 24).states_head_address());
+  r11 = schema::StateLayer(base, uint32_t(r31) - 24).states_head_bits();
   // addi r3,r1,88
   r3 = uint64_t(int64_t(int64_t(r1) + 88));
   // mr r4,r31
@@ -41487,7 +41487,7 @@ loc_820ADCAC:
   // (left out: dead in C++)
   { const lifted::Result o = f82090380(base, r1, r13, r3, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, schema::StateLayer(base, uint32_t(r31) - 24).states_head_address());
+  r11 = schema::StateLayer(base, uint32_t(r31) - 24).states_head_bits();
   // mr r3,r31
   r3 = r31;
   // stw r31,88(r1)
@@ -41516,7 +41516,7 @@ loc_820ADD04:
   goto loc_820ADE1C;
 loc_820ADD2C:
   // lwz r11,32(r30)
-  r11 = guest::LoadU32(base, schema::StateLayer(base, uint32_t(r30)).states_size_address());
+  r11 = schema::StateLayer(base, uint32_t(r30)).states_size_bits();
   // cntlzw r11,r11
   r11 = uint32_t(r11) == 0 ? 32 : __builtin_clz(uint32_t(r11));
   // rlwinm. r11,r11,27,31,31
@@ -41527,7 +41527,7 @@ loc_820ADD2C:
   // addi r11,r30,24
   r11 = uint64_t(int64_t(int64_t(r30) + 24));
   // lwz r10,4(r11)
-  r10 = guest::LoadU32(base, schema::StateLayer(base, uint32_t(r11) - 24).states_head_address());
+  r10 = schema::StateLayer(base, uint32_t(r11) - 24).states_head_bits();
   // rotlwi r9,r10,0
   r9 = __builtin_rotateleft32(uint32_t(r10), 0);
   // lwz r11,0(r10)
@@ -41556,7 +41556,7 @@ loc_820ADD70:
   // addi r3,r30,24
   r3 = uint64_t(int64_t(int64_t(r30) + 24));
   // lwz r11,4(r3)
-  r11 = guest::LoadU32(base, schema::StateLayer(base, uint32_t(r3) - 24).states_head_address());
+  r11 = schema::StateLayer(base, uint32_t(r3) - 24).states_head_bits();
   // stw r3,88(r1)
   guest::StoreU32(base, uint32_t(r1) + 88, uint32_t(r3));
   // b 0x820add04
@@ -41565,7 +41565,7 @@ loc_820ADD80:
   // addi r31,r30,24
   r31 = uint64_t(int64_t(int64_t(r30) + 24));
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, schema::StateLayer(base, uint32_t(r31) - 24).states_head_address());
+  r11 = schema::StateLayer(base, uint32_t(r31) - 24).states_head_bits();
   // rotlwi r10,r11,0
   r10 = __builtin_rotateleft32(uint32_t(r11), 0);
   // lwz r11,0(r11)
@@ -41582,7 +41582,7 @@ loc_820ADD9C:
   // addi r10,r1,88
   r10 = uint64_t(int64_t(int64_t(r1) + 88));
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, schema::StateLayer(base, uint32_t(r31) - 24).states_head_address());
+  r11 = schema::StateLayer(base, uint32_t(r31) - 24).states_head_bits();
   // addi r3,r1,88
   r3 = uint64_t(int64_t(int64_t(r1) + 88));
   // mr r4,r31
@@ -41619,7 +41619,7 @@ loc_820ADD9C:
   // (left out: dead in C++)
   { const lifted::Result o = f82090380(base, r1, r13, r3, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   // lwz r11,32(r30)
-  r11 = guest::LoadU32(base, schema::StateLayer(base, uint32_t(r30)).states_size_address());
+  r11 = schema::StateLayer(base, uint32_t(r30)).states_size_bits();
   // cntlzw r11,r11
   r11 = uint32_t(r11) == 0 ? 32 : __builtin_clz(uint32_t(r11));
   // rlwinm. r11,r11,27,31,31
@@ -41628,7 +41628,7 @@ loc_820ADD9C:
   // beq 0x820ade5c
   if (cr0.eq) goto loc_820ADE5C;
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, schema::StateLayer(base, uint32_t(r31) - 24).states_head_address());
+  r11 = schema::StateLayer(base, uint32_t(r31) - 24).states_head_bits();
   // rotlwi r10,r11,0
   r10 = __builtin_rotateleft32(uint32_t(r11), 0);
   // lwz r11,0(r11)
@@ -41661,7 +41661,7 @@ loc_820ADE2C:
   r3 = uint64_t(int64_t(48));
   // bl 0x825a6880
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A6880(base, LIFTED_ARGS(0x820ADE34, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = schema::StateLayer::New(base).address; f1 = 0; }  // host_alloc 0x820ADE34 (StateLayer)
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq 0x820ade50
@@ -41669,7 +41669,7 @@ loc_820ADE2C:
   // lwz r5,156(r1)
   r5 = guest::LoadU32(base, uint32_t(r1) + 156);
   // lwz r4,8(r30)
-  r4 = guest::LoadU32(base, schema::StateLayer(base, uint32_t(r30)).owner_address());
+  r4 = schema::StateLayer(base, uint32_t(r30)).owner_bits();
   // bl 0x820adbd8
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x820ADBD8, LIFTED_ARGS(0x820ADE48, r31)); r3 = o.r3; f1 = o.f1; }
@@ -41737,7 +41737,7 @@ lifted::Result f820ADE68(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // ld r10,80(r1)
   r10 = guest::LoadU64(base, uint32_t(r1) + 80);
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, schema::StateLayer(base, uint32_t(r31) - 36).ops_head_address());
+  r11 = schema::StateLayer(base, uint32_t(r31) - 36).ops_head_bits();
   // stw r31,80(r1)
   guest::StoreU32(base, uint32_t(r1) + 80, uint32_t(r31));
   // std r10,96(r1)
@@ -41805,14 +41805,14 @@ lifted::Result f820AE130(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r29 = r4;
   // bl 0x825a6880
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A6880(base, LIFTED_ARGS(0x820AE14C, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = schema::StateLayer::New(base).address; f1 = 0; }  // host_alloc 0x820AE14C (StateLayer)
   // mr. r31,r3
   r31 = r3;
   cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
   // beq 0x820ae180
   if (cr0.eq) goto loc_820AE180;
   // lwz r3,4(r30)
-  r3 = guest::LoadU32(base, schema::AppStates(base, uint32_t(r30)).app_address());
+  r3 = schema::AppStates(base, uint32_t(r30)).app_bits();
   // lwz r11,0(r3)
   r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,8(r11)
@@ -41840,7 +41840,7 @@ loc_820AE180:
   r4 = uint64_t(int64_t(0));
 loc_820AE184:
   // lwz r3,8(r30)
-  r3 = guest::LoadU32(base, schema::AppStates(base, uint32_t(r30)).root_address());
+  r3 = schema::AppStates(base, uint32_t(r30)).root_bits();
   // bl 0x820ada08
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x820ADA08, LIFTED_ARGS(0x820AE18C, r31)); r3 = o.r3; f1 = o.f1; }
@@ -41892,7 +41892,7 @@ lifted::Result f820AE1C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // bne cr6,0x820ae29c
   if (!cr6.eq) goto loc_820AE29C;
   // lwz r3,8(r3)
-  r3 = guest::LoadU32(base, schema::AppStates(base, uint32_t(r3)).root_address());
+  r3 = schema::AppStates(base, uint32_t(r3)).root_bits();
   // bl 0x820ad8d0
   // (left out: dead in C++)
   { const lifted::Result o = f820AD8D0(base, r1, r13, r3, f1); r3 = o.r3; f1 = o.f1; }
@@ -41959,7 +41959,7 @@ loc_820AE270:
   goto loc_820AE29C;
 loc_820AE27C:
   // lwz r3,8(r3)
-  r3 = guest::LoadU32(base, schema::AppStates(base, uint32_t(r3)).root_address());
+  r3 = schema::AppStates(base, uint32_t(r3)).root_bits();
   // bl 0x820ad680
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x820AD680, LIFTED_ARGS(0x820AE284, r31)); r3 = o.r3; f1 = o.f1; }
@@ -41967,7 +41967,7 @@ loc_820AE27C:
   goto loc_820AE29C;
 loc_820AE288:
   // lwz r3,8(r3)
-  r3 = guest::LoadU32(base, schema::PtrList(base, uint32_t(r3)).size_address());
+  r3 = schema::PtrList(base, uint32_t(r3)).size_bits();
   // bl 0x820ad5b0
   // (left out: dead in C++)
   { const lifted::Result o = f820AD5B0(base, r1, r13, r3, r5, r6, r7, r8, f1); r3 = o.r3; f1 = o.f1; }
@@ -41975,7 +41975,7 @@ loc_820AE288:
   goto loc_820AE29C;
 loc_820AE294:
   // lwz r3,8(r3)
-  r3 = guest::LoadU32(base, schema::PtrList(base, uint32_t(r3)).size_address());
+  r3 = schema::PtrList(base, uint32_t(r3)).size_bits();
   // bl 0x820ad4e0
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x820AD4E0, LIFTED_ARGS(0x820AE29C, r31)); r3 = o.r3; f1 = o.f1; }
@@ -42018,21 +42018,21 @@ lifted::Result f820AE348(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r3,48
   r3 = uint64_t(int64_t(48));
   // stw r11,0(r31)
-  guest::StoreU32(base, schema::AppStates(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
+  schema::AppStates(base, uint32_t(r31)).set_vtable_bits(uint32_t(r11));
   // lwz r11,0(r4)
   r11 = guest::LoadU32(base, schema::AppStatesSetup(base, uint32_t(r4)).app_address());
   // stw r11,4(r31)
-  guest::StoreU32(base, schema::AppStates(base, uint32_t(r31)).app_address(), uint32_t(r11));
+  schema::AppStates(base, uint32_t(r31)).set_app_bits(uint32_t(r11));
   // bl 0x825a6880
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A6880(base, LIFTED_ARGS(0x820AE374, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = schema::StateLayer::New(base).address; f1 = 0; }  // host_alloc 0x820AE374 (StateLayer)
   // mr. r30,r3
   r30 = r3;
   cr0 = lifted::Compare<int32_t>(int32_t(r30), 0, so);
   // beq 0x820ae3a0
   if (cr0.eq) goto loc_820AE3A0;
   // lwz r3,4(r31)
-  r3 = guest::LoadU32(base, schema::AppStates(base, uint32_t(r31)).app_address());
+  r3 = schema::AppStates(base, uint32_t(r31)).app_bits();
   // lwz r11,0(r3)
   r11 = lifted::VtableWord(base, uint32_t(r3));
   // lwz r11,8(r11)
@@ -42056,9 +42056,9 @@ loc_820AE3A0:
   r3 = uint64_t(int64_t(0));
 loc_820AE3A4:
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, schema::AppStates(base, uint32_t(r31)).app_address());
+  r11 = schema::AppStates(base, uint32_t(r31)).app_bits();
   // stw r3,8(r31)
-  guest::StoreU32(base, schema::AppStates(base, uint32_t(r31)).root_address(), uint32_t(r3));
+  schema::AppStates(base, uint32_t(r31)).set_root_bits(uint32_t(r3));
   // mr r3,r11
   r3 = r11;
   // lwz r10,0(r11)
@@ -42206,7 +42206,7 @@ lifted::Result f820AE498(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = uint64_t(int64_t(12));
   // bl 0x825a6880
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A6880(base, LIFTED_ARGS(0x820AE4B4, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = schema::AppStates::New(base).address; f1 = 0; }  // host_alloc 0x820AE4B4 (AppStates)
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq 0x820ae4c8

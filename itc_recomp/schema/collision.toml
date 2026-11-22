@@ -197,6 +197,7 @@ fields = [
 measure = "sub_822BE2C8.r3"
 size = 12
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "word_8", offset = 8, type = "u32", note = "the word sub_822BE2C8 returns (a shape record's current copy in collision)" },
 ]

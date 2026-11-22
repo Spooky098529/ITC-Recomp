@@ -192,9 +192,12 @@ def embed_accessors(f, view_address):
     handle, whose interior values name the object inside) plus its offset;
     an array of them takes an index."""
     to, off, n = f["to"], f["offset"], f["name"]
+    # A template, as a pointer field's: the type may be defined further on.
     if f.get("count", 1) > 1:
-        return [f"  {to} {n}(uint32_t i) const {{ return {to}(base, {view_address} + {off} + i * {to}::kSize); }}"]
-    return [f"  {to} {n}() const {{ return {to}(base, {view_address} + {off}); }}"]
+        return [f"  template <typename T = {to}>",
+                f"  T {n}(uint32_t i) const {{ return T(base, {view_address} + {off} + i * T::kSize); }}"]
+    return [f"  template <typename T = {to}>",
+            f"  T {n}() const {{ return T(base, {view_address} + {off}); }}"]
 
 
 def accessors(fname, f, at, static):

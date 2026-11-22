@@ -39,6 +39,8 @@ BLOCKING_TAGS = {"file", "gpu", "save"}
 UNREACHABLE = {
     "ModeType8": "the type 8 (two-player) mode",
     "SysLinkIdSetNode": "System Link",
+    "StandModelsSpecCopy": "the Xbox Live mode",
+    "Kind6MenuPart": "the Xbox Live mode",
 }
 
 

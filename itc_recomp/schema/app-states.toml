@@ -191,6 +191,8 @@ fields = [
 measures = ["AppStates", "App.+96", "sub_820AD8D0.ret"]
 size = 12
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820AE4B4]
 vtable = 0x820028F8
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "AppStatesVtable" },
@@ -224,8 +226,13 @@ fields = [
 measures = ["StateLayer", "AppStates.+8", "sub_820ADBD8.r3", "sub_820AD350.ret", "sub_820AD5B0.r3", "sub_820AD8D0.r3", "sub_820ADA70.r3", "sub_820ADB28.r3", "sub_820ADB80.r3", "sub_820ACD60.r4", "sub_820ACD80.r4", "sub_820ACDE8.r4", "StateLayer::AddChild.r4"]
 size = 48
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820ADE34, 0x820AE14C, 0x820AE374]
 vtable = 0x820028E0
 fields = [
+  { name = "children_list", offset = 12, type = "embed", to = "PtrList", note = "the child layers" },
+  { name = "states_list", offset = 24, type = "embed", to = "PtrList", note = "the states, the top at the front" },
+  { name = "ops_list", offset = 36, type = "embed", to = "OpList", note = "the queued operations" },
   { name = "vtable", offset = 0, type = "u32", note = "0x820028E0" },
   { name = "state_vtable", offset = 4, type = "ptr", to = "AppStateVtable", note = "0x820028B0 (the state base's 0x82002880 first): the layer + 4 is a state" },
   { name = "owner", offset = 8, type = "u32", note = "the app's interface at app + 16 (the app's slot 2)" },
@@ -275,6 +282,7 @@ measure = "PtrList"
 measures = ["PtrList::Erase.r4", "PtrList::PtrList.r3"]
 size = 12
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "fault_result_0", offset = 0, type = "u64", note = "measure fault: PtrList::ForEach's and Erase's r3 is the result (functor or iterator), not the list; HandleList::Remove's and sub_82118850's reads are an iterator's" },
   { name = "head", offset = 4, type = "ptr", to = "StateListNode", note = "the head node (new<?>@PtrList::AllocateNodes, input's)" },
@@ -301,6 +309,7 @@ measure = "OpList"
 measures = ["OpList::IncSize.r3"]
 size = 12
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "fault_result_0", offset = 0, type = "u64", note = "measure fault: OpList::ForEach's r3 is the result functor, not the list" },
   { name = "head", offset = 4, type = "ptr", to = "AppOpListNode" },

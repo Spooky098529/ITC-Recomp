@@ -478,13 +478,32 @@ struct CollisionShape : View {
 };
 
 // embedded; measure: sub_822BE2C8.r3
+#pragma pack(push, 1)
+struct WordAt8ObjectData {
+  uint8_t pad_0[8] = {};
+  uint32_t word_8 = 0;  // +8
+};
+#pragma pack(pop)
+static_assert(sizeof(WordAt8ObjectData) == 12);
+inline constexpr memory::LayoutField kWordAt8ObjectFields[] = {{8, 4}};
+inline constexpr memory::Layout kWordAt8ObjectLayout = {kWordAt8ObjectFields, 1};
+
 struct WordAt8Object : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  WordAt8ObjectData* data() const { return static_cast<WordAt8ObjectData*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static WordAt8Object New(uint8_t* base) {
+    return WordAt8Object(base, memory::MakeHandle(new WordAt8ObjectData(), sizeof(WordAt8ObjectData), "WordAt8Object", &kWordAt8ObjectLayout));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // the word sub_822BE2C8 returns (a shape record's current copy in collision)
-  uint32_t word_8() const { return guest::LoadU32(base, address + 8); }
-  void set_word_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t word_8_address() const { return address + 8; }
+  uint32_t word_8() const { return on_host() ? uint32_t(data()->word_8) : uint32_t(guest::LoadU32(base, address + 8)); }
+  void set_word_8(uint32_t v) const { if (on_host()) data()->word_8 = v; else guest::StoreU32(base, address + 8, v); }
+  uint32_t word_8_bits() const { return on_host() ? data()->word_8 : guest::LoadU32(base, address + 8); }
+  void set_word_8_bits(uint32_t v) const { if (on_host()) data()->word_8 = v; else guest::StoreU32(base, address + 8, v); }
 };
 
 // embedded; measure: Query, sub_820BD8F8.r3, sub_820BDE40.r3, sub_820BE4F0.r3, sub_820BE8A8.r3, sub_820BF690.r3

@@ -73,7 +73,7 @@ uint32_t VirtualTarget(uint8_t* base, uint32_t object, uint32_t offset) {
 
 uint32_t StatesIsEmpty(uint8_t* base, uint32_t states, const AppCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820AE1A0 AppStates::IsEmpty");
-  const uint32_t root = schema::AppStates(base, states).root().state_vtable_address();
+  const uint32_t root = schema::AppStates(base, states).root().address + 4;
   const uint32_t target = VirtualTarget(base, root, 44);
   if (target == kLayerIsEmpty) {
     return LayerIsEmpty(base, root);
@@ -88,7 +88,7 @@ uint32_t AppIsRunning(uint8_t* base, uint32_t interface, const AppCalls& calls) 
   uint32_t answer = 0;
   if (target == kAppStatesIsEmpty) {
     // Its guest call, if any, a tail call from this frame.
-    const uint32_t root = schema::AppStates(base, states).root().state_vtable_address();
+    const uint32_t root = schema::AppStates(base, states).root().address + 4;
     if (VirtualTarget(base, root, 44) == kLayerIsEmpty) {
       answer = StatesIsEmpty(base, states, calls);
     } else {

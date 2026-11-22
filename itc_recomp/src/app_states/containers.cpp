@@ -135,7 +135,7 @@ std::optional<uint32_t> OpBuyNode(uint8_t* base, uint32_t next, uint32_t previou
 }
 
 bool LayerPush(uint8_t* base, uint32_t layer, uint32_t state) {
-  const uint32_t list = schema::StateLayer(base, layer).ops_address();
+  const uint32_t list = schema::StateLayer(base, layer).ops_list().address;
   const schema::OpList ops(base, list);
   if (kOpListMaxSize - ops.size() < 1) {
     return false;

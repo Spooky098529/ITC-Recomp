@@ -273,7 +273,7 @@ loc_82118800:
   // (left out: dead in C++)
   { const lifted::Result o = game::PtrList::Erase(base, LIFTED_ARGS(0x82118820, r31)); r3 = o.r3; f1 = o.f1; }
   // ld r11,0(r3)
-  r11 = guest::LoadU64(base, schema::PtrList(base, uint32_t(r3)).fault_result_0_address());
+  r11 = schema::PtrList(base, uint32_t(r3)).fault_result_0_bits();
   // std r11,80(r1)
   guest::StoreU64(base, uint32_t(r1) + 80, r11);
   // lwz r11,84(r1)
@@ -408,7 +408,7 @@ loc_821188C4:
   // (left out: dead in C++)
   { const lifted::Result o = game::PtrList::Erase(base, LIFTED_ARGS(0x821188F8, r31)); r3 = o.r3; f1 = o.f1; }
   // ld r11,0(r3)
-  r11 = guest::LoadU64(base, schema::PtrList(base, uint32_t(r3)).fault_result_0_address());
+  r11 = schema::PtrList(base, uint32_t(r3)).fault_result_0_bits();
   // std r11,80(r1)
   guest::StoreU64(base, uint32_t(r1) + 80, r11);
   // lwz r31,84(r1)

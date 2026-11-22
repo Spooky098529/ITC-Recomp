@@ -502,10 +502,12 @@ args, in the same session) only when the user's current message says to.
 - Merged into `rexglue-removal-project` up to the pilot (`fc5e3b94`), then
   with the batches, the leftovers and their rows (2026-11-22).
 
-## Step 4: shared objects (draft, 2026-11-22)
+## Step 4: shared objects (2026-11-22)
 
-`docs/e5-native.md` step 4 is the why. A draft for the user's review:
-nothing below is started.
+`docs/e5-native.md` step 4 is the why. The user's call (2026-11-22): the
+goal is guest memory out of the picture; the lead takes its own
+recommendations below (the open points at the end, now decided) and goes
+ahead.
 
 ### The ground (measured 2026-11-22, after step 3)
 
@@ -740,26 +742,51 @@ Step 3's ("The lead's check after each batch"), plus:
   if the user wants it now): the counts after each wave, in
   `docs/e5-native.md`.
 
-### Open points for the user
+### Decided (2026-11-22)
 
-1. Host structs at the guest offsets (groundwork piece 2), or packed with
-   an offset map for interior pointers? Recommended: the guest offsets,
-   repacked at step 9.
-2. Virtual calls: the bridge first (`VtableSlot`, the vtable word kept as
-   the image table's address, dispatch by address), C++ virtual functions
-   per hierarchy after the moves? Or C++ virtual functions as each class
-   moves? Recommended: the bridge first.
-3. Agents per unit, allowed to edit every area's files touching their
-   unit (batches with disjoint files)? Or per area as in step 3?
-   Recommended: per unit.
-4. The pilot: `AppStates` with `StateLayer` and `AppDelegate`, or
-   `CarOverlays` with `OverlayView`? Recommended: `AppStates`.
-5. Types tagged file, GPU or save left for steps 5 and 7 even when
-   otherwise movable in step 4? Recommended: yes.
-6. memcpy between host and guest objects of one type: a generated per-type
-   copy (groundwork piece 6), or refused (such types move only with every
-   copy's other side)? Recommended: the generated copy.
-7. `StandModelsSpecCopy` and `Kind6MenuPart` (the Xbox Live mode) added to
-   `e5_movable.py`'s `UNREACHABLE`? Recommended: yes.
-8. `tools/e5_status.py` written now, in the groundwork, or at step 4's
-   end? Recommended: now, so each wave has its figures.
+The lead's recommendations, by the user's call ("I don't care about any of
+these details, what I want is guest memory out of the picture"): host
+structs at the guest offsets (repacked at step 9); virtual calls through
+the bridge first (`VtableWord`), C++ virtual functions per hierarchy after
+the moves; agents per unit; the pilot `AppStates` with `StateLayer`; types
+tagged file, GPU or save left for steps 5 and 7; memcpy between host and
+guest objects swapping each field (`memory/host_copy.h`);
+`StandModelsSpecCopy` and `Kind6MenuPart` unreachable; `tools/e5_status.py`
+written now. Overlapping fields no longer stop a move: a field over
+another is read at its offset (a measure's `fault_` field never a member).
+
+### Groundwork: done (2026-11-22, `895f9731`)
+
+- `schema_gen.py`: host structs at the guest offsets (packed, padded,
+  `static_assert`ed); `embed` fields (a view at the owner's address +
+  offset, from either shape); `storage = "dual"` (each access tells a
+  handle from a guest address); overlapping fields read at their offset;
+  each host type's layout of scalar fields (`k<Type>Layout`) handed to
+  `MakeHandle`.
+- `memory::HandleObject` takes any value inside a live object's span;
+  `DescribeHandle`.
+- `lift.py`: the vtable idiom's first load through `lifted::VtableWord`
+  (1,151 sites in the batches, 1,015 in the originals); `guest::VtableWord`
+  in `guest.h` for the hand ports (the generic `VirtualTarget` helpers in
+  six files call it).
+- `memory/host_copy.h`: the game's memcpy (both), memmove, memset, `XMemCpy`
+  and `XMemSet` over handles: host to host a byte copy, host and guest with
+  each field of the host type's layout swapped.
+- Checked: build, attract race (38 s, no error lines), `tick_replay.sh`
+  (both races all match).
+
+### The pilot: done (2026-11-22)
+
+`AppStates` and `StateLayer` (`app-states`) in host memory, with their
+lists (`PtrList` at the layer's +12 and +24, `OpList` at +36) as `embed`
+fields of dual types: the stack made by `AppStates::Create`, the layers by
+`AppStates::AppStates`, `AddLayer` and `ApplyOp` (`New`; `host_alloc` for
+the four lifted originals' operator new calls). The hand ports' uses of the
+layer's interface and lists switched from `_address()` to `address + 4`
+and the embed views. One raw access found by the run: the shared getter
+`WordAt8` (`sub_822BE2C8`, the layer's vtable slot 1) read the layer's +8;
+its parameter type `WordAt8Object` made dual (a generic accessor's type is
+dual by rule: its callers pass both shapes). Checked: build, attract race
+(38 s, no error lines, no handle fault), `tick_replay.sh` twice (both races
+all match), a frame dump (normal). The replay reaches `AppStates::Create`,
+`AddLayer`, `StateLayer::ApplyOp` and `Update` (every tick).
