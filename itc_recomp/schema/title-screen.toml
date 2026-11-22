@@ -143,6 +143,12 @@ fields = [
 measure = "new<68>@TitleLoad::Create"
 size = 68
 origin = "allocated"
+# In host memory since E5 step 3 (2026-11-22): made by TitleLoad::Create (the
+# original's VirtualAlloc(68) at 0x82220BDC), freed by TitleLoad::Destroy
+# (its VirtualFree at 0x82220490); the global at 0x82814E28 holds its handle.
+# Update passes the transitions handle + 16 (the started word's place); they
+# read the word through the global's view.
+storage = "host"
 fields = [
   { name = "unknown_0", offset = 0, type = "u32", note = "0 from Create; not read" },
   { name = "tick_count", offset = 4, type = "u32", note = "the debug sequence's tick count" },

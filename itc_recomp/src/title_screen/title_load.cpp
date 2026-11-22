@@ -22,12 +22,17 @@ constexpr uint32_t kTransitionTable[13] = {
 
 uint64_t LoadCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82220BA8 TitleLoad::Create");
-  const uint32_t frame = Frame(base, sp, 112);
+  Frame(base, sp, 112);
   const Machine m(base, machine);
   m.set_loaded(0);
-  const uint64_t r3 = calls.Call(kVirtualAlloc, frame, 0x82220BDC, 0, 68, 0x1000, 4);
-  G::set_load_block(base, uint32_t(r3));
-  schema::TitleLoadBlock(base, uint32_t(r3)).set_unknown_0(0);
+  // The block lives in host memory (E5 step 3): the original's
+  // VirtualAlloc(68) at 0x82220BDC (zeroed, as New's); the global holds its
+  // handle, returned as the original returned the address.
+  (void)calls;
+  const schema::TitleLoadBlock block = schema::TitleLoadBlock::New(base);
+  const uint64_t r3 = block.address;
+  G::set_load_block(base, block);
+  block.set_unknown_0(0);
   m.set_state(m.reenter() != 0 ? 1 : 9);
   return r3;
 }
@@ -87,8 +92,11 @@ uint64_t LoadUpdate(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& call
   }
   if (transition != kNone) {
     // No bounds check: the word at the table's index.
+    // r3: the started word's place, the handle + 16 (the block is in host
+    // memory, E5 step 3); the transitions (PlayLogo, the debug steps, only
+    // reached from this table) read the word through the global's view.
     return calls.Call(Load(base, frame + 80 + (transition << 2)), frame, 0x82221318,
-                      block.transition_started_address());
+                      block.address + 16);
   }
   // The original's r3 holds the table's eighth entry here (sign-extended).
   uint64_t r3 = uint64_t(int64_t(int32_t(kTransitionTable[7])));
@@ -108,16 +116,19 @@ uint64_t LoadPlayLogo(uint8_t* base, uint32_t started, uint32_t sp, const Calls&
   ITC_NATIVE_RUNNING("sub_822210C8 TitleLoad::PlayLogo");
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t movie = FindMovie(base, kLoadMovie, frame + 80);
-  if (Started(base, started).started() == 0) {
+  // `started` is the load block's +16 (Update's only caller): the block is
+  // in host memory (E5 step 3), so the word is read through its view.
+  (void)started;
+  if (G::load_block(base).transition_started() == 0) {
     calls.CallArgs(kPlayNamed, frame, 0x82221124, {movie, 0, 0, 0, 0, 0, 0, 0});
     calls.CallArgs(kFadeIn, frame, 0x82221140, {G::fades_passes(base), 0, 0, 0, 0, 0, 0, 0});
-    Started(base, started).set_started(1);
+    G::load_block(base).set_transition_started(1);
   }
   const uint64_t r3 = calls.Call(kRun, frame, 0x82221154, movie, 0);
   if (uint32_t(r3) == 0) {
     G::load_block(base).set_transition(kNone);
     G::load_block(base).set_page(5);
-    Started(base, started).set_started(0);
+    G::load_block(base).set_transition_started(0);
   }
   return r3;
 }
@@ -174,9 +185,12 @@ uint64_t LoadLeave(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp,
 
 uint64_t LoadDestroy(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82220468 TitleLoad::Destroy");
-  const uint32_t frame = Frame(base, sp, 96);
-  const uint64_t r3 =
-      calls.Call(kVirtualFree, frame, 0x82220490, G::load_block(base).address, 0, kMemRelease);
+  Frame(base, sp, 96);
+  // The host block (Create): the original's VirtualFree at 0x82220490,
+  // which returned 1.
+  (void)calls;
+  G::load_block(base).Delete();
+  const uint64_t r3 = 1;
   G::set_load_block(base, 0u);
   return r3;
 }

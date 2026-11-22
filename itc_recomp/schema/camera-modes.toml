@@ -494,9 +494,18 @@ fields = [
 # A camera animation's block (64 bytes): one channel's values by frame.
 [CameraAnimBlock]
 measure = "CameraAnimBlock"
-measures = ["new<64>@CameraAnim::ParseObject", "CameraAnim::EvalTarget.r4.+80", "CameraAnims::Find.ret.+0.+80"]
+measures = ["new<64>@CameraAnim::ParseObject", "CameraAnim::EvalTarget.r4.+80", "CameraAnims::Find.ret.+0.+80", "CameraAnim::EvalTarget.r4.+80.+60"]
 size = 64
 origin = "allocated"
+# In host memory since E5 step 3 (2026-11-22): made by CameraAnim::ParseObject
+# (the original's VirtualAlloc(64) at 0x82150220), freed by CameraAnim::Free
+# (its VirtualFree at 0x821500E8); the anim's +80 list holds their handles,
+# their data (+60) stays guest pages. The measure's
+# "CameraAnim::EvalTarget.r4.+80.+60" (once CameraAnimData) is this +60
+# read in EvalTarget's other switch cases (a measure fault, folded in).
+storage = "host"
+host_alloc = [0x82150220]
+host_free = [{ call = 0x821500E8, reg = "r3", returns = 1 }]
 fields = [
   { name = "channel", offset = 0, type = "u32", note = "0 x, 1 y, 2 -z, 101 the film's height, 102 the focal length, 109 -roll" },
   { name = "header_size", offset = 4, type = "u32", note = "the file block's (CameraAnimFileBlock)" },
@@ -504,16 +513,7 @@ fields = [
   { name = "unknown_12", offset = 12, type = "f32" },
   { name = "duration", offset = 16, type = "f32", note = "CameraAnims::Duration's answer" },
   { name = "unknown_20", offset = 20, type = "bytes", count = 40, note = "0" },
-  { name = "data", offset = 60, type = "u32", note = "its floats, one a frame" },
-]
-
-# Seen by the measure as a block's data with a +60 word (CameraAnim::EvalTarget).
-[CameraAnimData]
-measure = "CameraAnim::EvalTarget.r4.+80.+60"
-size = 64
-origin = "embedded"
-fields = [
-  { name = "unknown_60", offset = 60, type = "u32", note = "measure fault, probably: the blocks' data reached as an object" },
+  { name = "values", offset = 60, type = "u32", note = "its floats, one a frame (guest pages); \"data\" before E5 step 3 (a host view's data() is its struct)" },
 ]
 
 # An object in a camera animation file (CameraAnims::OnLoaded).
@@ -546,6 +546,14 @@ measure = "new<4>@CameraAnims::Load"
 measures = ["CameraAnims::OnLoaded.r6"]
 size = 4
 origin = "allocated"
+# In host memory since E5 step 3 (batch 3): made by CameraAnims::Load
+# (camera_modes::AnimsLoad; the original's VirtualAlloc(4) at 0x82150B3C),
+# freed by CameraAnims::OnLoaded (camera_modes::AnimsOnLoaded; the
+# original's VirtualFree at 0x82150940, which returned 1). Its handle is the
+# archive load's callback context (the queue entry's +32, handed back as r6).
+storage = "host"
+host_alloc = [0x82150B3C]
+host_free = [{ call = 0x82150940, reg = "r3", returns = 1 }]
 fields = [
   { name = "id", offset = 0, type = "u32", note = "the asset id" },
 ]

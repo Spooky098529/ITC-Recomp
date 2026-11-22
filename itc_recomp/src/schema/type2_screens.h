@@ -139,27 +139,44 @@ struct Type2HubTexture : View {
   uint32_t height_address() const { return address + 8; }
 };
 
-// allocated; measure: new<16>@Type2Hub::LoadNoticeImage, new<16>@Type2Hub::LoadNoticeImage#2, Type2Hub::ImageLoaded.r6, Type2Hub.+32, Type2Hub.+220, Type2Hub.+220.+4
+// allocated; measure: new<16>@Type2Hub::LoadNoticeImage, new<16>@Type2Hub::LoadNoticeImage#2, Type2Hub::ImageLoaded.r6, Type2Hub.+32, Type2Hub.+220, Type2Hub.+220.+4, new<16>@TodaysEvent::LoadImagePair, new<16>@TodaysEvent::LoadImagePair#2, TodaysEvent.+4, TodaysEvent.+192, TodaysEvent.+192.+4
+struct Type2HubImageData {
+  uint32_t loaded = 0;  // +0
+  uint32_t index = 0;  // +4
+  uint32_t texture = 0;  // +8
+  uint32_t xpr = 0;  // +12
+};
+
 struct Type2HubImage : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
+  static constexpr bool kHost = true;
+  Type2HubImageData* data() const { return static_cast<Type2HubImageData*>(memory::HandleObject(address)); }
+  static Type2HubImage New(uint8_t* base) {
+    return Type2HubImage(base, memory::MakeHandle(new Type2HubImageData(), kSize, "Type2HubImage"));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // 1 once ImageLoaded ran
-  uint32_t loaded() const { return guest::LoadU32(base, address + 0); }
-  void set_loaded(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t loaded_address() const { return address + 0; }
+  uint32_t loaded() const { return data()->loaded; }
+  void set_loaded(uint32_t v) const { data()->loaded = v; }
+  uint32_t loaded_bits() const { return data()->loaded; }
+  void set_loaded_bits(uint32_t v) const { data()->loaded = v; }
   // the image (0 to 45)
-  uint32_t index() const { return guest::LoadU32(base, address + 4); }
-  void set_index(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
-  uint32_t index_address() const { return address + 4; }
+  uint32_t index() const { return data()->index; }
+  void set_index(uint32_t v) const { data()->index = v; }
+  uint32_t index_bits() const { return data()->index; }
+  void set_index_bits(uint32_t v) const { data()->index = v; }
   template <typename T = Type2HubTexture>
-  T texture() const { return T(base, guest::LoadU32(base, address + 8)); }
-  void set_texture(const View& v) const { guest::StoreU32(base, address + 8, v.address); }
-  void set_texture(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t texture_address() const { return address + 8; }
+  T texture() const { return T(base, data()->texture); }
+  void set_texture(const View& v) const { data()->texture = v.address; }
+  void set_texture(uint32_t v) const { data()->texture = v; }
+  uint32_t texture_bits() const { return data()->texture; }
+  void set_texture_bits(uint32_t v) const { data()->texture = v; }
   // XPR::Create's 24-byte block
-  uint32_t xpr() const { return guest::LoadU32(base, address + 12); }
-  void set_xpr(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
-  uint32_t xpr_address() const { return address + 12; }
+  uint32_t xpr() const { return data()->xpr; }
+  void set_xpr(uint32_t v) const { data()->xpr = v; }
+  uint32_t xpr_bits() const { return data()->xpr; }
+  void set_xpr_bits(uint32_t v) const { data()->xpr = v; }
 };
 
 // embedded; measure: Type2Hub::OpenSelected.r4, Type2Hub::Close.r4, Type2Hub::OnDialogDone.r4, PlateEditor::Close.r4, BuildScreen::Close.r4, PowerGraphScreen::Close.r4, Screen::LeaveToHub.r4

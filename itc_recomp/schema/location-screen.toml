@@ -132,10 +132,17 @@ fields = [
 
 # A screen picture (16 bytes, VirtualAlloc by OnPictureLoadedA and B; freed
 # by Picture::Free and FreePictures; known-data.md: "screen picture").
+# Since E5 step 3: in host memory, made by OnPictureLoadedA and B
+# (LocationScreenPicture::New in place of their VirtualAlloc(16) at
+# 0x82228EB4 and 0x82228FF4), freed by FreePictures (Delete in place of its
+# VirtualFree at 0x822284E8 and 0x82228534); its handle kept in the
+# screen's lists A (+8) and B (+276). Its texture record and XPR stay
+# guest objects.
 [LocationScreenPicture]
 measures = ["Picture", "LocationScreen.+8", "new<16>@LocationScreen::OnPictureLoadedA", "new<16>@LocationScreen::OnPictureLoadedB"]
 size = 16
 origin = "allocated"
+storage = "host"
 fields = [
   { name = "loaded", offset = 0, type = "u32" },
   { name = "id", offset = 4, type = "u32", note = "the picture id (a 56- or 20-byte data table entry's +16), -1 until the ring's front is taken" },

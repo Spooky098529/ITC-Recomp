@@ -12,4 +12,9 @@ void StateDigest_OnRaceTick();
 // Main thread, when a race is entered (the tick count starts again).
 void StateDigest_OnRaceEntered();
 
+// Main thread, when the race starts (the race world loaded: the course
+// set-up's message 4): the first one in a race starts the count again; ticks
+// before it aren't logged.
+void StateDigest_OnRaceStarted();
+
 }  // namespace debug

@@ -245,29 +245,48 @@ struct Type4Machine : View {
 };
 
 // allocated; measure: new<68>@TitleLoad::Create
+struct TitleLoadBlockData {
+  uint32_t unknown_0 = 0;  // +0
+  uint32_t tick_count = 0;  // +4
+  uint32_t transition = 0;  // +8
+  uint32_t page = 0;  // +12
+  uint32_t transition_started = 0;  // +16
+};
+
 struct TitleLoadBlock : View {
   using View::View;
   static constexpr uint32_t kSize = 68;
+  static constexpr bool kHost = true;
+  TitleLoadBlockData* data() const { return static_cast<TitleLoadBlockData*>(memory::HandleObject(address)); }
+  static TitleLoadBlock New(uint8_t* base) {
+    return TitleLoadBlock(base, memory::MakeHandle(new TitleLoadBlockData(), kSize, "TitleLoadBlock"));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // 0 from Create; not read
-  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
-  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_0() const { return data()->unknown_0; }
+  void set_unknown_0(uint32_t v) const { data()->unknown_0 = v; }
+  uint32_t unknown_0_bits() const { return data()->unknown_0; }
+  void set_unknown_0_bits(uint32_t v) const { data()->unknown_0 = v; }
   // the debug sequence's tick count
-  uint32_t tick_count() const { return guest::LoadU32(base, address + 4); }
-  void set_tick_count(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
-  uint32_t tick_count_address() const { return address + 4; }
+  uint32_t tick_count() const { return data()->tick_count; }
+  void set_tick_count(uint32_t v) const { data()->tick_count = v; }
+  uint32_t tick_count_bits() const { return data()->tick_count; }
+  void set_tick_count_bits(uint32_t v) const { data()->tick_count = v; }
   // the transition Update runs (-1 none; 12 the logo)
-  uint32_t transition() const { return guest::LoadU32(base, address + 8); }
-  void set_transition(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t transition_address() const { return address + 8; }
+  uint32_t transition() const { return data()->transition; }
+  void set_transition(uint32_t v) const { data()->transition = v; }
+  uint32_t transition_bits() const { return data()->transition; }
+  void set_transition_bits(uint32_t v) const { data()->transition = v; }
   // the page Draw runs (-1 none; 4 posts the close, 5 waits for the archive)
-  uint32_t page() const { return guest::LoadU32(base, address + 12); }
-  void set_page(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
-  uint32_t page_address() const { return address + 12; }
+  uint32_t page() const { return data()->page; }
+  void set_page(uint32_t v) const { data()->page = v; }
+  uint32_t page_bits() const { return data()->page; }
+  void set_page_bits(uint32_t v) const { data()->page = v; }
   // the transition's started word
-  uint32_t transition_started() const { return guest::LoadU32(base, address + 16); }
-  void set_transition_started(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
-  uint32_t transition_started_address() const { return address + 16; }
+  uint32_t transition_started() const { return data()->transition_started; }
+  void set_transition_started(uint32_t v) const { data()->transition_started = v; }
+  uint32_t transition_started_bits() const { return data()->transition_started; }
+  void set_transition_started_bits(uint32_t v) const { data()->transition_started = v; }
 };
 
 // allocated; measure: new<68>@TitleScreen::Create#2

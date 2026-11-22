@@ -1794,7 +1794,7 @@ void f822339B0(uint8_t* base, uint64_t r3) {
   // li r10,2
   r10 = uint64_t(int64_t(2));
   // stw r10,72(r11)
-  guest::StoreU32(base, schema::Type67Screen0Words(base, uint32_t(r11)).pick_address(), uint32_t(r10));
+  schema::Type67Screen0Words(base, uint32_t(r11)).set_pick_bits(uint32_t(r10));
   // blr
   return;
 }
@@ -2801,7 +2801,7 @@ void f82243F38(uint8_t* base, uint64_t r3) {
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // stw r10,72(r11)
-  guest::StoreU32(base, schema::Type67Screen0Words(base, uint32_t(r11)).pick_address(), uint32_t(r10));
+  schema::Type67Screen0Words(base, uint32_t(r11)).set_pick_bits(uint32_t(r10));
   // blr
   return;
 }
@@ -2815,7 +2815,7 @@ void f82243F48(uint8_t* base, uint64_t r3) {
   // li r10,2
   r10 = uint64_t(int64_t(2));
   // stw r10,72(r11)
-  guest::StoreU32(base, schema::Type67Screen0Words(base, uint32_t(r11)).pick_address(), uint32_t(r10));
+  schema::Type67Screen0Words(base, uint32_t(r11)).set_pick_bits(uint32_t(r10));
   // blr
   return;
 }

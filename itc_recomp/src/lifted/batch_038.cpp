@@ -12602,11 +12602,11 @@ uint64_t f82269898(uint8_t* base, uint64_t r1, uint64_t r13) {
   // lwz r10,24936(r11)
   r10 = guest::LoadU32(base, uint32_t(r11) + 24936);
   // stw r9,0(r10)
-  guest::StoreU32(base, schema::NetScreen7Data(base, uint32_t(r10)).unknown_0_address(), uint32_t(r9));
+  schema::NetScreen7Data(base, uint32_t(r10)).set_unknown_0_bits(uint32_t(r9));
   // lwz r11,24936(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 24936);
   // stw r8,4(r11)
-  guest::StoreU32(base, schema::NetScreen7Data(base, uint32_t(r11)).unknown_4_address(), uint32_t(r8));
+  schema::NetScreen7Data(base, uint32_t(r11)).set_unknown_4_bits(uint32_t(r8));
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)

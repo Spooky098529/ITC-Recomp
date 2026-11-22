@@ -2,6 +2,7 @@
 // see race_screens.h.
 
 #include "race_screens/race_screens.h"
+#include "race_screens/pause_data.h"
 #include "race_screens/ui_node.h"
 
 #include "base/log.h"
@@ -29,13 +30,6 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
 }
 
 uint32_t PauseMovie(uint8_t* base) { return G::pause_screen(base).movie().address; }
-
-// Four words copied from `from` to `to`, one at a time.
-void CopyFour(uint8_t* base, uint32_t to, uint32_t from) {
-  for (uint32_t k = 0; k < 16; k += 4) {
-    guest::StoreU32(base, to + k, guest::LoadU32(base, from + k));
-  }
-}
 
 // UiMovie::SetNodeText(movie, node, id) through its override, its varargs 0.
 uint64_t NodeText(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t movie, uint32_t node,
@@ -133,20 +127,23 @@ uint32_t PauseMenuToggleOption(uint8_t* base, uint32_t sp) {
   const int32_t side = int32_t(schema::MenuList(base, list).side());
   const uint32_t selection = ListSelection(base, list);
   const schema::PauseMenuData data = G::pause_data(base);
-  // The edits' addresses (hud_edit_0 to hud_edit_3) at the frame's +80.
+  // The edits' places (hud_edit_0 to hud_edit_3, then last_item_ok) at the
+  // frame's +80: the original's field addresses, the handle plus the field's
+  // offset since the data is in host memory (E5 step 3), read back as the
+  // offset into the host struct.
   for (const uint32_t k : {0u, 4u, 8u, 12u}) {
-    guest::StoreU32(base, frame + 80 + k, data.hud_edit_0_address() + k);
+    guest::StoreU32(base, frame + 80 + k, data.address + kPauseHudEdit0 + k);
   }
-  guest::StoreU32(base, frame + 96, data.last_item_ok_address());
+  guest::StoreU32(base, frame + 96, data.address + kPauseLastItemOk);
   if (side != -1 && side != 1) {
     return 0;
   }
-  const uint32_t edit = guest::LoadU32(base, ((selection << 2) + frame + 80));
-  const int32_t value = int32_t(guest::LoadU32(base, edit));
+  const uint32_t edit = guest::LoadU32(base, ((selection << 2) + frame + 80)) - data.address;
+  const int32_t value = int32_t(PauseWord(data, edit));
   if (side == -1 ? value != 0 : value != 1) {
     return 0;
   }
-  guest::StoreU32(base, edit, side == -1 ? 1 : 0);
+  SetPauseWord(data, edit, side == -1 ? 1 : 0);
   PauseMenuShowOptions(base, frame);
   return 1;
 }
@@ -179,14 +176,14 @@ uint64_t PauseMenuOptionsPage(uint8_t* base, uint32_t sp, const Calls& calls) {
     if (int32_t(ListSelection(base, G::pause_list(base).address)) == 4) {
       const schema::PauseMenuData data = G::pause_data(base);
       if (int32_t(data.last_item_ok()) == 1) {
-        CopyFour(base, data.hud_option_0_address(), data.hud_edit_0_address());
+        CopyPauseWords(data, kPauseHudOption0, kPauseHudEdit0, 4);
         return back();
       }
     }
     if (int32_t(ListSelection(base, G::pause_list(base).address)) == 4) {
       const schema::PauseMenuData data = G::pause_data(base);
       if (int32_t(data.last_item_ok()) == 0) {
-        CopyFour(base, data.hud_edit_0_address(), data.hud_default_0_address());
+        CopyPauseWords(data, kPauseHudEdit0, kPauseHudDefault0, 4);
         PauseMenuShowOptions(base, frame);
         PauseMenuSaveHudOptions(base, frame);
         return 8;
@@ -202,7 +199,7 @@ uint64_t PauseMenuOptionsPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   }
   calls.Call(kMenuSoundPlay, frame, 0x8220DD68, 2);
   const schema::PauseMenuData data = G::pause_data(base);
-  CopyFour(base, data.hud_edit_0_address(), data.hud_option_0_address());
+  CopyPauseWords(data, kPauseHudEdit0, kPauseHudOption0, 4);
   return back();
 }
 
@@ -221,12 +218,6 @@ uint64_t PauseMenuAdjustPage(uint8_t* base, uint32_t sp, const Calls& calls) {
     calls.Call(kMenuSoundPlay, frame, 0x8220EC3C, 4);
     return 0;
   }
-  // Three words copied from `from` to `to`, one at a time.
-  auto copy_three = [&](uint32_t to, uint32_t from) {
-    for (uint32_t k = 0; k < 12; k += 4) {
-      guest::StoreU32(base, to + k, guest::LoadU32(base, from + k));
-    }
-  };
   // Back to the list: Go(-1, 0, then 20).
   auto back = [&]() {
     calls.Call(kPagesGo, frame, 0x8220ED70, G::pause_pages(base).address, kNone, 0, 20);
@@ -237,7 +228,7 @@ uint64_t PauseMenuAdjustPage(uint8_t* base, uint32_t sp, const Calls& calls) {
     if (int32_t(ListSelection(base, G::pause_list(base).address)) == 3) {
       const schema::PauseMenuData data = G::pause_data(base);
       if (data.last_item_ok() == 0) {
-        copy_three(data.adjust_saved_0_address(), data.adjust_0_address());
+        CopyPauseWords(data, kPauseAdjustSaved0, kPauseAdjust0, 3);
         PauseMenuShowAdjustB(base, frame, calls);
         return back();
       }
@@ -245,7 +236,7 @@ uint64_t PauseMenuAdjustPage(uint8_t* base, uint32_t sp, const Calls& calls) {
     if (int32_t(ListSelection(base, G::pause_list(base).address)) == 3) {
       const schema::PauseMenuData data = G::pause_data(base);
       if (int32_t(data.last_item_ok()) == 1) {
-        copy_three(data.adjust_0_address(), data.adjust_default_0_address());
+        CopyPauseWords(data, kPauseAdjust0, kPauseAdjustDefault0, 3);
         PauseMenuShowAdjust(base, frame, calls);
         return 0;
       }
@@ -260,7 +251,7 @@ uint64_t PauseMenuAdjustPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   }
   calls.Call(kMenuSoundPlay, frame, 0x8220ED2C, 2);
   const schema::PauseMenuData data = G::pause_data(base);
-  copy_three(data.adjust_0_address(), data.adjust_saved_0_address());
+  CopyPauseWords(data, kPauseAdjust0, kPauseAdjustSaved0, 3);
   PauseMenuShowAdjust(base, frame, calls);
   return back();
 }
@@ -293,11 +284,6 @@ uint64_t PauseMenuVolumePage(uint8_t* base, uint32_t sp, const Calls& calls) {
                setting(saved ? G::pause_data(base).music_volume_saved()
                              : G::pause_data(base).music_volume()));
   };
-  // Two words copied from `from` to `to`, one at a time.
-  auto copy_two = [&](uint32_t to, uint32_t from) {
-    guest::StoreU32(base, to, guest::LoadU32(base, from));
-    guest::StoreU32(base, to + 4, guest::LoadU32(base, from + 4));
-  };
   auto sound = [&](uint64_t cue) {
     calls.Call(kMenuSoundPlay, frame, 0x8220EBBC, cue);
     return 0;
@@ -318,7 +304,7 @@ uint64_t PauseMenuVolumePage(uint8_t* base, uint32_t sp, const Calls& calls) {
     if (int32_t(ListSelection(base, G::pause_list(base).address)) == 2) {
       const schema::PauseMenuData data = G::pause_data(base);
       if (data.last_item_ok() == 0) {
-        copy_two(data.music_volume_saved_address(), data.music_volume_address());
+        CopyPauseWords(data, kPauseMusicVolumeSaved, kPauseMusicVolume, 2);
         PauseMenuShowVolumesB(base, frame, calls);
         calls.Call(kPagesGo, frame, 0x8220EA98, G::pause_pages(base).address, kNone, 0, 15);
         set_volumes(true, 0x8220EAA8, 0x8220EB10);
@@ -328,7 +314,7 @@ uint64_t PauseMenuVolumePage(uint8_t* base, uint32_t sp, const Calls& calls) {
     if (int32_t(ListSelection(base, G::pause_list(base).address)) == 2) {
       const schema::PauseMenuData data = G::pause_data(base);
       if (int32_t(data.last_item_ok()) == 1) {
-        copy_two(data.music_volume_address(), data.music_volume_default_address());
+        CopyPauseWords(data, kPauseMusicVolume, kPauseMusicVolumeDefault, 2);
         PauseMenuShowVolumes(base, frame, calls);
         set_volumes(false, 0x8220EB00, 0x8220EB10);
         return sound(0);
@@ -344,7 +330,7 @@ uint64_t PauseMenuVolumePage(uint8_t* base, uint32_t sp, const Calls& calls) {
   }
   {
     const schema::PauseMenuData data = G::pause_data(base);
-    copy_two(data.music_volume_address(), data.music_volume_saved_address());
+    CopyPauseWords(data, kPauseMusicVolume, kPauseMusicVolumeSaved, 2);
   }
   PauseMenuShowVolumes(base, frame, calls);
   calls.Call(kPagesGo, frame, 0x8220EB94, G::pause_pages(base).address, kNone, 0, 15);
@@ -362,7 +348,7 @@ uint64_t PauseMenuSetUpOptions(uint8_t* base, uint32_t sp, const Calls& calls) {
   calls.CallArgs(kListInit, frame, 0x8220E580, init);
   {
     const schema::PauseMenuData data = G::pause_data(base);
-    CopyFour(base, data.hud_edit_0_address(), data.hud_option_0_address());
+    CopyPauseWords(data, kPauseHudEdit0, kPauseHudOption0, 4);
   }
   G::pause_data(base).set_last_item_ok(1);
   PauseMenuRestoreNodes(base, 0xFFFFFFFFu, 8, frame, calls);
@@ -420,9 +406,7 @@ uint64_t PauseMenuSetUpAdjust(uint8_t* base, uint32_t sp, const Calls& calls) {
   calls.CallArgs(kListInit, frame, 0x8220F550, init);
   {
     const schema::PauseMenuData data = G::pause_data(base);
-    for (uint32_t k = 0; k < 12; k += 4) {
-      guest::StoreU32(base, data.adjust_0_address() + k, guest::LoadU32(base, data.adjust_saved_0_address() + k));
-    }
+    CopyPauseWords(data, kPauseAdjust0, kPauseAdjustSaved0, 3);
   }
   G::pause_data(base).set_last_item_ok(0);
   PauseMenuRestoreNodes(base, 0xFFFFFFFFu, 10, frame, calls);

@@ -75,9 +75,12 @@ uint64_t DebugPage(uint8_t* base, uint32_t which, uint64_t r3, uint32_t sp, cons
 uint64_t DebugStep(uint8_t* base, uint32_t which, uint32_t started, uint32_t sp) {
   const DebugStepSpec& spec = kSteps[which];
   Frame(base, sp, spec.frame);
-  if (Started(base, started).started() == 0) {
+  // `started` is the load block's +16 (Update's only caller): the block is
+  // in host memory (E5 step 3), so the word is read through its view.
+  (void)started;
+  if (G::load_block(base).transition_started() == 0) {
     G::load_block(base).set_tick_count(0);
-    Started(base, started).set_started(1);
+    G::load_block(base).set_transition_started(1);
   }
   const auto block = G::load_block(base);
   block.set_tick_count(block.tick_count() + 1);
@@ -86,7 +89,7 @@ uint64_t DebugStep(uint8_t* base, uint32_t which, uint32_t started, uint32_t sp)
     now.set_transition(spec.transition);
     G::load_block(base).set_page(spec.page);
     if (spec.reset) {
-      Started(base, started).set_started(0);
+      G::load_block(base).set_transition_started(0);
     }
   }
   // The original's r3: the debug print's first argument.

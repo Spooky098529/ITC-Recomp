@@ -580,6 +580,38 @@ std::optional<uint32_t> SetNodeNumberText(uint8_t* base,
 std::optional<uint32_t> SetNameText(uint8_t* base, const strings_and_font::FormatCalls& calls,
                                     uint32_t stack, uint32_t movie, uint32_t node, uint32_t name);
 
+// A name record's values (UiMovieNameRecord: +4 the kind, +8 its index,
+// +10 its flag, +12 the second kind, +16 its index, +18 its flag), read
+// from guest memory or from 20 bytes in guest order (a host object's copy,
+// E5 step 3): SetNameText needs only these, not the record's address.
+struct NameRecord {
+  uint32_t kind = 0;
+  uint16_t index = 0;
+  uint8_t flag = 0;
+  uint32_t second_kind = 0;
+  uint16_t second_index = 0;
+  uint8_t second_flag = 0;
+};
+NameRecord NameRecordAt(uint8_t* base, uint32_t address);
+NameRecord NameRecordFromBytes(const uint8_t* bytes);
+// The string SetNameText sets for `record` and its five varargs (kind 5:
+// 5837 + index; else 532 with the two ids), or nullopt where it sets
+// nothing (r3 left `movie`).
+struct NameText {
+  uint32_t id = 0;
+  uint64_t varargs[5] = {};
+};
+std::optional<NameText> NameTextOf(const NameRecord& record);
+// SetChildNameText for a record held by value: `args` = r3 to r10 for
+// UiMovie::SetNodeText (sub_8211C7E8, through its entry: the original
+// where its plain C++ refuses) on the child's node (FindNode), or false
+// where nothing is set (r3 left `movie`). For the host objects' name
+// records, which have no guest address (garage-screen's and
+// todays-result's `pick`).
+bool ChildNameTextArgs(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child,
+                       const NameRecord& record, uint64_t (&args)[8]);
+constexpr uint32_t kSetNodeTextFunction = 0x8211C7E8;
+
 // sub_8211D930 UiMovie::SetChildNameText: the node (FindNode), then
 // SetNameText from its 112-byte frame below `stack`.
 std::optional<uint32_t> SetChildNameText(uint8_t* base,

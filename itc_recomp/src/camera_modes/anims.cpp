@@ -15,8 +15,11 @@
 #include "guest.h"
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
+#include "memory/handles.h"
 #include "memory/heap.h"
 #include "models/xpr.h"
+
+#include <cstring>
 #include "ui_movies/game.h"
 #include "schema/camera_modes.h"
 #include "schema/game_modes.h"
@@ -55,7 +58,7 @@ void Copy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size,
 // shifted as rlwinm's, 32 bits).
 double Value(uint8_t* base, uint32_t block, uint32_t time) {
   const schema::CameraAnimBlock b(base, block);
-  return Lfs(base, b.data() + (time << 2));
+  return Lfs(base, b.values() + (time << 2));
 }
 
 // A (kind, value) pair: kind 2 made kind 1 with value x 24 + `curves`.
@@ -79,10 +82,10 @@ bool ObjectFreeable(uint8_t* base, uint32_t object) {
   }
   for (uint32_t i = 0; i < count; i++) {
     const uint32_t block = guest::LoadU32(base, anim.blocks_address() + 4 * i);
-    if (!memory::IsPages(block)) {
+    if (!memory::IsHandle(block)) {  // host objects (E5 step 3)
       return false;
     }
-    const uint32_t data = schema::CameraAnimBlock(base, block).data();
+    const uint32_t data = schema::CameraAnimBlock(base, block).values();
     if (data != 0 && !memory::IsPages(data)) {
       return false;
     }
@@ -133,11 +136,11 @@ void FixKeys(uint8_t* base, uint32_t path, uint32_t keys, uint32_t curves) {
 void BlockFree(uint8_t* base, uint32_t block) {
   ITC_NATIVE_RUNNING("sub_8214FFF0 CameraAnimBlock::Free");
   const schema::CameraAnimBlock b(base, block);
-  const uint32_t data = b.data();
+  const uint32_t data = b.values();
   if (data != 0) {
     memory::FreePages(data);
   }
-  b.set_data(0);
+  b.set_values(0);
 }
 
 void AnimFree(uint8_t* base, uint32_t object) {
@@ -148,7 +151,9 @@ void AnimFree(uint8_t* base, uint32_t object) {
     anim.set_blocks_used(count);
     const uint32_t block = guest::LoadU32(base, anim.blocks_address() + (count << 2));
     BlockFree(base, block);
-    memory::FreePages(block);
+    // A host object (E5 step 3): deleted in place of the VirtualFree at
+    // 0x821500E8.
+    schema::CameraAnimBlock(base, block).Delete();
   }
 }
 
@@ -157,10 +162,13 @@ void AnimFree(uint8_t* base, uint32_t object) {
 int64_t AnimsLoad(uint8_t* base, uint32_t id, const archive::LoadCall& load) {
   ITC_NATIVE_RUNNING("sub_82150B10 CameraAnims::Load");
   const uint32_t size = archive::AssetSize(base, id);
-  const uint32_t record = VirtualAlloc(4);
+  // The record lives in host memory (E5 step 3): the original's
+  // VirtualAlloc(4) at 0x82150B3C; the archive keeps its handle as the
+  // callback's context.
+  const schema::CameraAnimLoad record = schema::CameraAnimLoad::New(base);
   const uint32_t buffer = VirtualAlloc(size);
-  schema::CameraAnimLoad(base, record).set_id(id);
-  return load(id, buffer, kAnimsOnLoaded, record);
+  record.set_id(id);
+  return load(id, buffer, kAnimsOnLoaded, record.address);
 }
 
 uint32_t AnimParseObject(uint8_t* base, uint32_t object, const GuestCopy& xmemcpy) {
@@ -190,16 +198,16 @@ uint32_t AnimParseObject(uint8_t* base, uint32_t object, const GuestCopy& xmemcp
   }
   uint32_t n = 0;
   do {
-    const uint32_t block = VirtualAlloc(schema::CameraAnimBlock::kSize);
+    // A host object (E5 step 3) in place of the VirtualAlloc(64) at
+    // 0x82150220; the anim's list holds its handle.
+    const uint32_t block = schema::CameraAnimBlock::New(base).address;
     schema::CameraAnimBlock(base, block).set_unknown_12(float(zero));
     schema::CameraAnimBlock(base, block).set_channel(0);
     schema::CameraAnimBlock(base, block).set_duration(float(zero));
     schema::CameraAnimBlock(base, block).set_header_size(0);
     schema::CameraAnimBlock(base, block).set_data_size(0);
-    schema::CameraAnimBlock(base, block).set_data(0);
-    for (uint32_t i = 0; i < 10; i++) {
-      guest::StoreU32(base, schema::CameraAnimBlock(base, block).unknown_20_address() + 4 * i, 0);
-    }
+    schema::CameraAnimBlock(base, block).set_values(0);
+    std::memset(schema::CameraAnimBlock(base, block).unknown_20(), 0, 40);
     const schema::CameraAnimFileBlock source_block(base, from);
     schema::CameraAnimBlock(base, block).set_channel(source_block.channel());
     schema::CameraAnimBlock(base, block).set_header_size(source_block.header_size());
@@ -207,11 +215,11 @@ uint32_t AnimParseObject(uint8_t* base, uint32_t object, const GuestCopy& xmemcp
     schema::CameraAnimBlock(base, block).set_data_size(bytes);
     schema::CameraAnimBlock(base, block).set_unknown_12(source_block.unknown_12());
     schema::CameraAnimBlock(base, block).set_duration(source_block.duration());
-    schema::CameraAnimBlock(base, block).set_data(VirtualAlloc(bytes));
-    c_runtime::XMemSet(base, schema::CameraAnimBlock(base, block).data(), 0,
+    schema::CameraAnimBlock(base, block).set_values(VirtualAlloc(bytes));
+    c_runtime::XMemSet(base, schema::CameraAnimBlock(base, block).values(), 0,
                        schema::CameraAnimBlock(base, block).data_size());
     {
-      const uint32_t to = schema::CameraAnimBlock(base, block).data();
+      const uint32_t to = schema::CameraAnimBlock(base, block).values();
       const uint32_t source = schema::CameraAnimFileBlock(base, from).header_size() + from;
       const uint32_t size = schema::CameraAnimBlock(base, block).data_size();
       if (!c_runtime::XMemCpy(base, to, source, size)) {
@@ -230,7 +238,8 @@ uint32_t AnimParseObject(uint8_t* base, uint32_t object, const GuestCopy& xmemcp
 
 bool AnimsOnLoaded(uint8_t* base, uint32_t data, uint32_t record, uint32_t frame,
                    const GuestCopy& memcpy, const GuestCopy& xmemcpy) {
-  if (!memory::IsPages(record) || !memory::IsPages(data)) {
+  // The record is a host object's handle (E5 step 3, CameraAnims::Load).
+  if (!memory::IsHandle(record) || !memory::IsPages(data)) {
     return false;
   }
   ITC_NATIVE_RUNNING("sub_82150878 CameraAnims::OnLoaded");
@@ -257,7 +266,7 @@ bool AnimsOnLoaded(uint8_t* base, uint32_t data, uint32_t record, uint32_t frame
   G::set_anim_count(base, n + 1);
   Copy(base, n * schema::CameraAnimEntry::kSize + G::anims_address(), frame + 80,
        schema::CameraAnimEntry::kSize, memcpy);
-  memory::FreePages(record);
+  schema::CameraAnimLoad(base, record).Delete();  // the original's VirtualFree at 0x82150940
   memory::FreePages(data);
   return true;
 }
@@ -460,7 +469,7 @@ double AnimsDuration(uint8_t* base, uint32_t id, uint32_t* r3) {
     }
     if (kind == 1 || kind == 6) {
       *r3 = slot;
-      return Lfs(base, schema::CameraAnim(base, object).first_block().duration_address());
+      return double(schema::CameraAnim(base, object).first_block().duration());
     }
   }
   *r3 = slot;

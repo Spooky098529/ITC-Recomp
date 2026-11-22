@@ -103,6 +103,41 @@ def check(areas):
                     errors.append(f"{area}: {name} claims the measure's {m!r}, "
                                   f"also {claimed[m][1]}'s ({claimed[m][0]})")
                 claimed[m] = (area, name)
+    # Lifted allocation and free sites (docs/loops/e5-loop.md, "lift.py's
+    # host_alloc and host_free"): host types only, return addresses in the
+    # image, each listed once.
+    sites = {}
+    for area, data in areas.items():
+        for name, t in data.items():
+            if name == "globals" or ("host_alloc" not in t and "host_free" not in t):
+                continue
+            if t.get("storage") != "host":
+                errors.append(f"{area}: {name}: host_alloc and host_free are for host types only")
+                continue
+            calls = []
+            alloc = t.get("host_alloc", [])
+            if not isinstance(alloc, list) or not all(isinstance(a, int) for a in alloc):
+                errors.append(f"{area}: {name}: host_alloc is a list of call return addresses")
+            else:
+                calls += alloc
+            frees = t.get("host_free", [])
+            if not isinstance(frees, list):
+                errors.append(f"{area}: {name}: host_free is a list of {{ call, reg, returns }}")
+                frees = []
+            for fr in frees:
+                if (not isinstance(fr, dict) or not {"call", "reg"} <= set(fr) <= {"call", "reg", "returns"}
+                        or not isinstance(fr["call"], int) or not isinstance(fr.get("returns", 0), int)
+                        or not isinstance(fr["reg"], str) or not re.fullmatch(r"r([3-9]|10)", fr["reg"])):
+                    errors.append(f"{area}: {name}: host_free entry {fr!r}: "
+                                  "{ call = <return address>, reg = \"r3\"..\"r10\", returns = <int> (left out: r3 kept) }")
+                    continue
+                calls.append(fr["call"])
+            for a in calls:
+                if not 0x82000000 <= a < 0x83000000 or a % 4:
+                    errors.append(f"{area}: {name}: 0x{a:08X} isn't a return address in the image")
+                if a in sites:
+                    errors.append(f"{area}: {name}: 0x{a:08X} also listed by {sites[a]}")
+                sites[a] = name
     for area, data in areas.items():
         for name, t in data.items():
             if name == "globals" or t.get("storage", "guest") == "guest":

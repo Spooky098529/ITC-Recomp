@@ -159,6 +159,11 @@ fields = [
 measures = ["new<76>@Type6Screen0::OnEnter", "new<76>@Type7Screen0::OnEnter"]
 size = 76
 origin = "allocated"
+# In host memory since E5 step 3 (batch 1, 2026-11-22): made by
+# Type6Screen0::OnEnter and Type7Screen0::OnEnter (their VirtualAlloc(76)),
+# freed by their OnLeft (VirtualFree); the screen's +9640 (type 6) or +9644
+# (type 7) holds its handle.
+storage = "host"
 fields = [
   { name = "loading_shown", offset = 0, type = "u32", note = "the stand's loading animation shown (named 44 to 46; Update)" },
   { name = "unknown_68", offset = 68, type = "u32", note = "0 from OnEnter; readers not found" },

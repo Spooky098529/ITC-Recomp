@@ -1765,6 +1765,11 @@ inline constexpr auto& Seek = lifted::entry::e8258C768;  // sub_8258C768
 inline constexpr auto& Write = lifted::f8258C898;  // sub_8258C898
 }  // namespace game::File
 
+namespace game::FloatPairItem {
+inline constexpr auto& Ctor = lifted::f820A70F8;  // sub_820A70F8
+inline constexpr auto& Dtor = lifted::f820A7180;  // sub_820A7180
+}  // namespace game::FloatPairItem
+
 namespace game::Font {
 inline constexpr auto& Draw = lifted::entry::e8210A400;  // sub_8210A400
 inline constexpr auto& DrawPass = lifted::entry::e82109EF0;  // sub_82109EF0

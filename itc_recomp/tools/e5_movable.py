@@ -33,6 +33,14 @@ import type_map  # noqa: E402
 ROOT = os.path.dirname(os.path.dirname(HERE))
 COVERAGE = os.path.join(ROOT, "itc_recomp", "coverage")
 BLOCKING_TAGS = {"file", "gpu", "save"}
+# Types whose code play never reaches (left out of the pick list, the
+# lead's call after step 3's batches, 2026-11-22): the multiplayer modes are
+# unreachable (--multiplayer_menu_items, off), and the game has no System
+# Link mode.
+UNREACHABLE = {
+    "ModeType8": "the type 8 (two-player) mode",
+    "SysLinkIdSetNode": "System Link",
+}
 
 
 def overlaps(ty):
@@ -92,6 +100,8 @@ def main(argv):
             reasons.append("no allocation seen")
         if overlaps(ty):
             reasons.append("overlapping fields")
+        if name in UNREACHABLE:
+            reasons.append(f"unreachable ({UNREACHABLE[name]})")
         risky = sorted(fn for fn in touch if m.unattributed.get(fn))
         rows.append({
             "type": name, "area": ty.area, "movable": "yes" if not reasons else "no",

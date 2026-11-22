@@ -154,6 +154,11 @@ fields = [
 measure = "new<36>@NetModeSelect::Create"
 size = 36
 origin = "allocated"
+# In host memory since E5 step 3 (2026-11-22): made by NetModeSelect::Create
+# (the original's VirtualAlloc at 0x8227C45C), freed by NetModeSelect::Destroy
+# (its VirtualFree at 0x8227C540); the global select_data (0x82816198) holds
+# its handle.
+storage = "host"
 fields = [
   { name = "shown_before", offset = 0, type = "u32", note = "1 once set up (SetUp): Open starts with ShowCursor, not Intro" },
   { name = "back", offset = 4, type = "u32", note = "back to the title (Destroy goes to state 14)" },

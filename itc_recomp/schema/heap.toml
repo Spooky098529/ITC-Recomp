@@ -192,6 +192,9 @@ fields = [
 # a vtable, +4 0, +8 their argument and +12 a value block of their own.
 [FloatPairItem]
 measure = "new<16>@sub_820A81C0#2"
+# "FloatPairItem": its constructor's r3 since sub_820A70F8 was named
+# (2026-11-22).
+measures = ["FloatPairItem"]
 size = 16
 origin = "allocated"
 vtable = 0x82002518
@@ -203,9 +206,16 @@ fields = [
 ]
 
 [FloatPair]
-measure = "new<12>@sub_820A70F8"
+measure = "new<12>@FloatPairItem::FloatPairItem"
 size = 12
 origin = "allocated"
+# In host memory (E5 step 3; the lead's check of lift.py's host_alloc and
+# host_free, 2026-11-22): made by sub_820A70F8's operator new (returning at
+# 0x820A7130), freed by FloatPairItem's destructor sub_820A7180's operator
+# delete (0x820A71A8, r3 kept as operator delete leaves it). Not seen in play.
+storage = "host"
+host_alloc = [0x820A7130]
+host_free = [{ call = 0x820A71A8, reg = "r3" }]
 fields = [
   { name = "flag", offset = 0, type = "u8", note = "1 when made" },
   { name = "a", offset = 4, type = "f32", note = "both set to the float at 0x82000A34" },

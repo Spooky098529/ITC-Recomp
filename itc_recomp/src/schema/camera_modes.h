@@ -1082,45 +1082,57 @@ struct CameraAnim : View {
   uint32_t blocks_used_address() const { return address + 336; }
 };
 
-// allocated; measure: CameraAnimBlock, new<64>@CameraAnim::ParseObject, CameraAnim::EvalTarget.r4.+80, CameraAnims::Find.ret.+0.+80
+// allocated; measure: CameraAnimBlock, new<64>@CameraAnim::ParseObject, CameraAnim::EvalTarget.r4.+80, CameraAnims::Find.ret.+0.+80, CameraAnim::EvalTarget.r4.+80.+60
+struct CameraAnimBlockData {
+  uint32_t channel = 0;  // +0
+  uint32_t header_size = 0;  // +4
+  uint32_t data_size = 0;  // +8
+  float unknown_12 = 0;  // +12
+  float duration = 0;  // +16
+  uint8_t unknown_20[40] = {};  // +20, guest order
+  uint32_t values = 0;  // +60
+};
+
 struct CameraAnimBlock : View {
   using View::View;
   static constexpr uint32_t kSize = 64;
+  static constexpr bool kHost = true;
+  CameraAnimBlockData* data() const { return static_cast<CameraAnimBlockData*>(memory::HandleObject(address)); }
+  static CameraAnimBlock New(uint8_t* base) {
+    return CameraAnimBlock(base, memory::MakeHandle(new CameraAnimBlockData(), kSize, "CameraAnimBlock"));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // 0 x, 1 y, 2 -z, 101 the film's height, 102 the focal length, 109 -roll
-  uint32_t channel() const { return guest::LoadU32(base, address + 0); }
-  void set_channel(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t channel_address() const { return address + 0; }
+  uint32_t channel() const { return data()->channel; }
+  void set_channel(uint32_t v) const { data()->channel = v; }
+  uint32_t channel_bits() const { return data()->channel; }
+  void set_channel_bits(uint32_t v) const { data()->channel = v; }
   // the file block's (CameraAnimFileBlock)
-  uint32_t header_size() const { return guest::LoadU32(base, address + 4); }
-  void set_header_size(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
-  uint32_t header_size_address() const { return address + 4; }
+  uint32_t header_size() const { return data()->header_size; }
+  void set_header_size(uint32_t v) const { data()->header_size = v; }
+  uint32_t header_size_bits() const { return data()->header_size; }
+  void set_header_size_bits(uint32_t v) const { data()->header_size = v; }
   // its data's bytes
-  uint32_t data_size() const { return guest::LoadU32(base, address + 8); }
-  void set_data_size(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t data_size_address() const { return address + 8; }
-  float unknown_12() const { return guest::LoadFloat(base, address + 12); }
-  void set_unknown_12(float v) const { guest::StoreFloat(base, address + 12, v); }
-  uint32_t unknown_12_address() const { return address + 12; }
+  uint32_t data_size() const { return data()->data_size; }
+  void set_data_size(uint32_t v) const { data()->data_size = v; }
+  uint32_t data_size_bits() const { return data()->data_size; }
+  void set_data_size_bits(uint32_t v) const { data()->data_size = v; }
+  float unknown_12() const { return data()->unknown_12; }
+  void set_unknown_12(float v) const { data()->unknown_12 = v; }
+  uint32_t unknown_12_bits() const { return std::bit_cast<uint32_t>(data()->unknown_12); }
+  void set_unknown_12_bits(uint32_t v) const { data()->unknown_12 = std::bit_cast<float>(v); }
   // CameraAnims::Duration's answer
-  float duration() const { return guest::LoadFloat(base, address + 16); }
-  void set_duration(float v) const { guest::StoreFloat(base, address + 16, v); }
-  uint32_t duration_address() const { return address + 16; }
+  float duration() const { return data()->duration; }
+  void set_duration(float v) const { data()->duration = v; }
+  uint32_t duration_bits() const { return std::bit_cast<uint32_t>(data()->duration); }
+  void set_duration_bits(uint32_t v) const { data()->duration = std::bit_cast<float>(v); }
   // 0
-  uint32_t unknown_20_address() const { return address + 20; }
-  // its floats, one a frame
-  uint32_t data() const { return guest::LoadU32(base, address + 60); }
-  void set_data(uint32_t v) const { guest::StoreU32(base, address + 60, v); }
-  uint32_t data_address() const { return address + 60; }
-};
-
-// embedded; measure: CameraAnim::EvalTarget.r4.+80.+60
-struct CameraAnimData : View {
-  using View::View;
-  static constexpr uint32_t kSize = 64;
-  // measure fault, probably: the blocks' data reached as an object
-  uint32_t unknown_60() const { return guest::LoadU32(base, address + 60); }
-  void set_unknown_60(uint32_t v) const { guest::StoreU32(base, address + 60, v); }
-  uint32_t unknown_60_address() const { return address + 60; }
+  uint8_t* unknown_20() const { return data()->unknown_20; }
+  // its floats, one a frame (guest pages); "data" before E5 step 3 (a host view's data() is its struct)
+  uint32_t values() const { return data()->values; }
+  void set_values(uint32_t v) const { data()->values = v; }
+  uint32_t values_bits() const { return data()->values; }
+  void set_values_bits(uint32_t v) const { data()->values = v; }
 };
 
 // embedded; measure: CameraAnims::OnLoaded.r4
@@ -1165,13 +1177,24 @@ struct CameraAnimFileBlock : View {
 };
 
 // allocated; measure: new<4>@CameraAnims::Load, CameraAnims::OnLoaded.r6
+struct CameraAnimLoadData {
+  uint32_t id = 0;  // +0
+};
+
 struct CameraAnimLoad : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
+  static constexpr bool kHost = true;
+  CameraAnimLoadData* data() const { return static_cast<CameraAnimLoadData*>(memory::HandleObject(address)); }
+  static CameraAnimLoad New(uint8_t* base) {
+    return CameraAnimLoad(base, memory::MakeHandle(new CameraAnimLoadData(), kSize, "CameraAnimLoad"));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // the asset id
-  uint32_t id() const { return guest::LoadU32(base, address + 0); }
-  void set_id(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t id_address() const { return address + 0; }
+  uint32_t id() const { return data()->id; }
+  void set_id(uint32_t v) const { data()->id = v; }
+  uint32_t id_bits() const { return data()->id; }
+  void set_id_bits(uint32_t v) const { data()->id = v; }
 };
 
 // embedded; measure: CameraAnim::EvalCamera.r5

@@ -141,6 +141,10 @@ fields = [
 measure = "new<16>@ReplayTheater::Create"
 size = 16
 origin = "allocated"
+# In host memory since E5 step 3 (2026-11-22): made by ReplayTheater::Create
+# (the original's VirtualAlloc(16) at 0x822894A4), freed by Destroy (its
+# VirtualFree at 0x82289554); the global at 0x828161E8 holds its handle.
+storage = "host"
 fields = [
   { name = "started", offset = 0, type = "u32", note = "0 from Create, 1 from StartPage" },
   { name = "asked", offset = 4, type = "u32", note = "what was asked of the save screen: 0 the list, 1 a replay's load, 2 the device lost, 3 back, -1 after an interrupt" },

@@ -348,3 +348,156 @@ merge into `rexglue-removal-project`.
 - Vtables: a moved object's vtable word stays the guest address of the
   image's table until step 4 (virtual calls through the dispatch table as
   now).
+
+## Step 3 as a swarm (the user's call, 2026-11-22)
+
+The rest of step 3's movable types, moved by agents in **batches** (the
+user's call: a mistake changes how the game plays, so each batch is
+checked before the next, and a difference is narrowed to one batch). The
+script: `itc_recomp/tools/workflows/e5-step3-swarm.js`, one batch a run,
+`args`: `{"areas": [...], "lifted_sites": false}`; one agent per area, 6
+at a time, edits only (no builds, no git, own files only, rows proposed in
+the report, not written). Each agent lists its area's movable types
+(`tools/e5_movable.py <area>`), finds every allocation, free and user,
+moves what it can (`storage = "host"`, `New` and `Delete` at the sites, the
+users through the view) and skips (with the reason) what it can't: memory
+used as memory, an array allocated at once, a lifted function that may
+reach it raw, overlapping fields, and (until `lifted_sites`) a type
+allocated or freed in lifted code.
+
+### The batches
+
+From `coverage/e5_movable.tsv` (2026-11-22): 68 movable types; the pilot's
+done, the movie library's 9 left out (a replaced library: it never runs),
+58 left in 29 areas, in order of fewest ties to other areas:
+
+1. **Batch 1** (every type allocated in hand ports; `lifted_sites: false`):
+   boot-mode, track-zones, game-modes, type5-mode, type10-mode,
+   title-screen, location-screen, garage-screen, car-sounds, network-mode,
+   type6-type7-modes.
+2. **Before batch 2: `lift.py`'s `host_alloc` and `host_free`** (below), done
+   by the lead directly, built and checked with one type.
+3. **Batch 2** (`lifted_sites: true`): heap, framework, app-states,
+   car-list, race-overlays, material-passes, stand-models, race-screens,
+   race-screens-unseen.
+4. **Batch 3** (`lifted_sites: true`): todays-result, system-services,
+   car-dealer, cameras, collision-world, car-scene-draw, type2-screens,
+   car-physics, camera-modes.
+
+Run `tools/e5_movable.py` again before each batch: a batch's moves don't
+change the others' lists, but the table is the record.
+
+### lift.py's host_alloc and host_free (to write before batch 2)
+
+40 of the 58 types are allocated (or freed) in lifted code, which agents
+can't edit. Lifted code calls an allocator as
+`{ const lifted::Result o = game::VirtualAlloc(base, LIFTED_ARGS(0x820F77DC, r31)); r3 = o.r3; f1 = o.f1; }`,
+the first argument being the call's return address (the instruction after
+the `bl`; the same address the hand ports' `calls.Call(..., 0x82186A7C, ...)`
+name). The spec:
+
+- A host type's schema entry may list its lifted allocations,
+  `host_alloc = [0x820F77DC]` (the calls' return addresses), and its lifted
+  frees, `host_free = [{ call = 0x8215E2C4, reg = "r3", returns = 1 }]` (the
+  register holding the object's pointer: r3 for VirtualFree, operator
+  delete and free, r5 for HeapFree; what the call returned: 1 for
+  VirtualFree and HeapFree; left out for operator delete and free, which
+  leave r3 as it was, so the replacement doesn't set it).
+- `lift.py` (where it emits a call statement) replaces a listed allocation
+  with `{ r3 = schema::<Type>::New(base).address; f1 = 0; }` and a listed
+  free with `{ schema::<Type>(base, uint32_t(<reg>)).Delete(); r3 = <returns>; }`,
+  adding the type's header; `lift_originals.py` the same in `originals.cpp`.
+  An address listed that no emitted call has is an error (the tool stops
+  with it), so a wrong address can't pass silently. Each replacement is marked with
+  its address (`// host_alloc 0x820A7130 (FloatPair)`), which is how each
+  tool finds the sites the other emitted. A free of 0 does nothing
+  (`Delete()` on handle 0), as operator delete's and free's.
+- `schema_gen.py` accepts the two keys (on host types only) and checks
+  their form.
+- Checked on one type first (built, an attract race, `tick_replay.sh`),
+  committed, then batch 2 with `lifted_sites: true` (the script's prompt
+  then tells agents to list sites instead of skipping).
+
+### The lead's check after each batch
+
+1. Commit the tree as a WIP snapshot (explicit paths, no `/home/` paths,
+   push), and add the batch's report to `docs/loops/e5-step3-reports.md`
+   (from the Workflow's `journal.jsonl`; what moved, what was skipped and
+   why, the lifted concerns, proposed rows, notes).
+2. `python3 -I itc_recomp/tools/schema_gen.py`,
+   `python3 -I itc_recomp/tools/schema_check.py` (0 accesses that fit no
+   field), `python3 -I itc_recomp/tools/lift.py reemit` (its list of host
+   types' accesses left raw: each is a place that faults if reached; read
+   them), `python3 -I itc_recomp/tools/lift_originals.py --all`.
+3. The build, in the background:
+   `cmake --build itc_recomp/out/build/linux-amd64-release -j$(nproc) -- -k 0`;
+   every error is a use of a moved type's guest address: fix it (through
+   the view), or put the type back (`storage` removed and its sites as they
+   were) when it can't be.
+4. `timeout 120 itc_recomp/tools/attract_race.sh 40` (no error lines; `pkill
+   -9 -x itc` after), `timeout 400 itc_recomp/tools/tick_replay.sh` (both
+   races "all match"), a frame dump (`attract_race.sh 25
+   --native_renderer_dump=<dir in the scratchpad>`, look at `shown.pfm`).
+   A **handle fault** in a log names the type and the offset: find the raw
+   access (the stack in the log, or run the game under gdb, which may only
+   attach to a process it starts: `gdb -batch -ex run -ex "thread apply all
+   bt" --args ...`), fix it or put the type back. A **digest that differs**:
+   find the batch's area by putting areas back half at a time (commit
+   first; then restore an area's files from the commit before the batch in
+   a new commit, rebuild, `tick_replay.sh` again).
+5. Commit and push; update "Where step 3 stands" below.
+6. Show the user the proposed row changes (from the reports) for review;
+   write them only after the user agrees, then
+   `itc_recomp/tools/check_function_statuses.py`.
+
+### If a run stops (a usage limit, an error)
+
+Commit the tree as a WIP snapshot (explicit paths, push), update "Where
+step 3 stands" and the reports file, tell the user where it stopped, and
+wait: resume (Workflow with the same `scriptPath`, `resumeFromRunId` and
+args, in the same session) only when the user's current message says to.
+
+### Where step 3 stands (2026-11-22)
+
+- Groundwork done; the pilot (`Type2DialogData`) done, `98123e00`.
+- Batch 1 done and checked (2026-11-22): 6 types moved, 12 skipped
+  (`docs/loops/e5-step3-reports.md`); both replay races match. Only
+  `TitleLoadBlock` is on the replay's path; the other five are checked by
+  the build only. Its proposed rows await the user's review.
+- `lift.py`'s `host_alloc` and `host_free`: done and checked (2026-11-22)
+  on `FloatPair` (heap; made by `sub_820A70F8`, freed by `FloatPairItem`'s
+  destructor; not seen in play, so the emission and the build are what's
+  checked). `host_free`'s `returns` may be left out (operator delete and
+  free leave r3). Its first `tick_replay.sh` showed race 1 a tick late from
+  tick 12: not the move (it never ran) but the replay's lineup, which
+  didn't cover the race's own loads; fixed with a start mark
+  (`docs/pad-replay.md`, "By tick"), the recording and baseline made again,
+  then both races matched twice.
+- Batch 2 done and checked (2026-11-22): 2 types moved (`PauseMenuData`,
+  `PauseMenu4Data`, both seen in the replay), 18 skipped; both replay
+  races match. Its proposed rows await the user's review.
+- Batch 3 done and checked (2026-11-22): 2 types moved (`CameraAnimLoad`,
+  `NetScreen7Data`; not on the replay's path), 18 skipped; both replay
+  races match. Its proposed rows await the user's review.
+- Step 3's swarm, in all: 11 types moved of the 58 (with `FloatPair`, the
+  lead's check), 47 skipped, mostly for vtables read raw, objects or
+  interfaces embedded at offsets, memcpy targets, and addresses handed to
+  other areas (the reports). What's left of step 3 is listed in the
+  reports file's batches: types movable after a small change (a field's
+  address staged in a guest buffer: `GarageScreenData`,
+  `TodaysResultData`; a measure fault split: `PauseMenuScreen`,
+  `CameraAnimBlock`; a shared record type: `TodaysEventImage` with
+  `Type2HubImage`), and the rest waiting on step 4 (virtual dispatch over
+  handles, embedded objects).
+- The leftovers (2026-11-22, the lead, the user's call): `GarageScreenData`
+  and `TodaysResultData` (their pick passed to the movie by value, no guest
+  buffer), `PauseMenuScreen` and `CameraAnimBlock` (their measure faults
+  split or folded in) and `Type2HubImage` with `TodaysEventImage` merged in
+  moved; `ModeType8` and `SysLinkIdSetNode` left out of the pick list
+  (unreachable). Checked: build, attract race, `tick_replay.sh` twice (both
+  races match), frame dump. Step 3 in all: 16 types moved (17 schema names
+  before the merge); the other 39 skipped wait on step 4 (virtual dispatch
+  over handles, embedded objects, memcpy targets, addresses handed to other
+  areas). The rows for the leftovers await the user's review.
+- Merged into `rexglue-removal-project` up to the pilot (`fc5e3b94`), then
+  with the batches, the leftovers and their rows (2026-11-22).

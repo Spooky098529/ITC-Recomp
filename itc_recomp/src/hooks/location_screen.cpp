@@ -60,7 +60,7 @@ ITC_FLAG_BOOL(native_location_screen, true, "ITC",
               "PoseCar's, the UI movies' and Scenery::IsLoaded's plain C++, CarScene::Update, "
               "Draw and SceneModel::PollLoad through their adapters) "
               "natively instead of through the translated code (the same writes; checked by "
-              "--run_harnesses=location_screen). PictureA, PictureB, Picture::Free, KindText, "
+              "--run_harnesses=location_screen). Picture::Free, KindText, "
               "SetCursor, ShowUnlockEntry, ShowCard, ListNode, ShowListEntry, HidePictures, "
               "SetCarColor, ShowArrows, ShowOpponentSpecs, ResetMovie, ShowOpponentPictures and "
               "ShowOpponentInfo have no adapters: only native callers reach them, and the flag "
@@ -514,9 +514,14 @@ LOCATION_SCREEN_ADAPTER(822279A8, LocationScreenReset)
 LOCATION_SCREEN_ADAPTER(8222C9B0, LocationScreenApplyQueuedPage)
 LOCATION_SCREEN_ADAPTER(8222EC08, LocationScreenUpdatePage)
 LOCATION_SCREEN_ADAPTER(8222F258, LocationScreenInitStates)
+// PictureA and PictureB: their adapters back since E5 step 3 (the screen's
+// pictures are host objects, which their originals would read raw), for
+// the lifted Transition6, Transition30 and Transition32 calling them through
+// the dispatch table.
+LOCATION_SCREEN_ADAPTER(82229108, LocationScreenPictureA)
+LOCATION_SCREEN_ADAPTER(82229158, LocationScreenPictureB)
 // No adapters (only native callers reach them in play, and the flag switches
-// those; their steps above are the harness's): PictureA sub_82229108 and
-// PictureB sub_82229158, Picture::Free sub_82228438, KindText sub_82227690,
+// those; their steps above are the harness's): Picture::Free sub_82228438, KindText sub_82227690,
 // SetCursor sub_8222BFE8, ShowUnlockEntry sub_8222A978, ShowCard
 // sub_8222BBD0, ListNode sub_8222C058, ShowListEntry sub_8222B048,
 // HidePictures sub_8222A150, SetCarColor sub_8222AC18, ShowArrows

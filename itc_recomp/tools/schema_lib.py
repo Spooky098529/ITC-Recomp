@@ -21,6 +21,7 @@ class Type:
         self.size = data.get("size", 0)
         self.storage = data.get("storage", "guest")
         self.fields = data.get("fields", [])
+        self.data = data
         self.by_offset = {}
         for f in self.fields:
             self.by_offset.setdefault(f["offset"], []).append(f)
@@ -60,6 +61,17 @@ class Schema:
         for ty in self.types.values():
             for m in ty.measures or [ty.name]:
                 self.by_measure[m] = ty
+        # Lifted allocation and free sites of host types (schema_gen.py
+        # checks their form), by the call's return address:
+        # ("alloc", type) or ("free", type, register, returned value).
+        self.host_sites = {}
+        for ty in self.types.values():
+            if ty.storage != "host":
+                continue
+            for a in ty.data.get("host_alloc", []):
+                self.host_sites[a] = ("alloc", ty)
+            for fr in ty.data.get("host_free", []):
+                self.host_sites[fr["call"]] = ("free", ty, fr["reg"], fr.get("returns"))
 
     def of_measure(self, measure_name):
         return self.by_measure.get(measure_name)

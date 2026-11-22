@@ -52,8 +52,10 @@ uint64_t Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls
     list.set_enabled(0u);
     list.set_player(0);
   }
-  const uint64_t r3 = calls.Call(kVirtualAlloc, frame, 0x822894A4, 0, 16, 0x1000, 4);
-  const schema::ReplayTheaterData data(base, uint32_t(r3));
+  // The data block lives in host memory (E5 step 3): the original's
+  // VirtualAlloc(16) at 0x822894A4; the global holds its handle.
+  const schema::ReplayTheaterData data = schema::ReplayTheaterData::New(base);
+  const uint64_t r3 = data.address;
   G::set_data(base, data);
   data.set_started(0);
   data.set_interrupted(0);
@@ -336,8 +338,10 @@ uint64_t Destroy(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& call
   Machine(base, machine).set_state(Data(base).replay_loaded() != 0 ? 11 : 14);
   calls.Call(kVirtualFree, frame, 0x82289530, Pages(base).address, 0, kMemRelease);
   calls.Call(kVirtualFree, frame, 0x82289544, List(base).address, 0, kMemRelease);
-  const uint64_t r3 =
-      calls.Call(kVirtualFree, frame, 0x82289554, Data(base).address, 0, kMemRelease);
+  // The host data block (Create): the original's VirtualFree at
+  // 0x82289554, which returned 1.
+  Data(base).Delete();
+  const uint64_t r3 = 1;
   G::set_pages(base, 0u);
   G::set_list(base, 0u);
   G::set_data(base, 0u);

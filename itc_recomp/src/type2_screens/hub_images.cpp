@@ -123,7 +123,10 @@ uint64_t HubFreeImages(uint8_t* base, uint32_t data, uint32_t sp, const Calls& c
       (hub.*list.set_count)(count);
       const uint32_t record = Load(base, (hub.*list.images)() + 4 * count);
       HubFreeImage(base, record, frame, calls);
-      r3 = calls.Call(kVirtualFree, frame, list.lr, record, 0, kMemRelease);
+      // Deleted in place of the VirtualFree at list.lr (r3 = 1, as it
+      // returned).
+      schema::Type2HubImage(base, record).Delete();
+      r3 = 1;
     }
   }
   return r3;
@@ -170,7 +173,9 @@ uint64_t HubLoadNoticeImage(uint8_t* base, uint32_t data, uint32_t index, uint32
     const uint32_t size = archive::AssetSize(base, asset);
     const uint32_t buffer = uint32_t(Alloc(calls, frame, image.alloc, size));
     calls.Call(kXMemSet, frame, image.memset, buffer, 0, size);
-    const schema::Type2HubImage record = schema::Type2HubImage(base, uint32_t(Alloc(calls, frame, image.record, 16)));
+    // A host object (E5 step 3) in place of the VirtualAlloc(16) at
+    // image.record; the list holds its handle.
+    const schema::Type2HubImage record = schema::Type2HubImage::New(base);
     record.set_index(index);
     record.set_loaded(0);
     record.set_texture(0);

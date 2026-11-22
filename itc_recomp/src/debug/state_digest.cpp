@@ -32,6 +32,10 @@ constexpr uint32_t kVehicleMatrix = 3312;
 constexpr uint32_t kVehicleSpeedSquared = 2440;
 
 uint64_t g_tick = 0;
+// Whether the race entered has started (its world loaded): the ticks before
+// (the world still, for as long as the race's loads take, which varies) are
+// left out, so two runs' ticks line up from the start.
+bool g_started = false;
 
 float LoadFloat(uint8_t* base, uint32_t address) {
   return std::bit_cast<float>(guest::LoadU32(base, address));
@@ -41,10 +45,18 @@ float LoadFloat(uint8_t* base, uint32_t address) {
 
 void StateDigest_OnRaceEntered() {
   g_tick = 0;
+  g_started = false;
+}
+
+void StateDigest_OnRaceStarted() {
+  if (!g_started) {
+    g_started = true;
+    g_tick = 0;
+  }
 }
 
 void StateDigest_OnRaceTick() {
-  if (!ITC_FLAG(state_digest)) {
+  if (!ITC_FLAG(state_digest) || !g_started) {
     return;
   }
   uint8_t* base = memory::Base();

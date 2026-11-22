@@ -8,6 +8,8 @@
 #include "guest.h"
 #include "course_scenery/course_scenery.h"
 #include "data_tables/data_tables.h"
+#include "debug/state_digest.h"
+#include "input/pad_ticks.h"
 #include "mode_tick/mode_tick.h"
 #include "schema/boot_mode.h"
 #include "schema/car_draw.h"
@@ -161,6 +163,10 @@ uint64_t WaitDraw(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
     }
   } else if (int32_t(G::layer0_alpha(base)) == 255) {
     Post(base, dispatcher, 4);
+    // The race starts (the pad replay's and state digest's mark,
+    // docs/pad-replay.md "By tick").
+    input::PadTicks_OnRaceStarted();
+    debug::StateDigest_OnRaceStarted();
     m.set_unknown_9608(0);
     m.set_draw_step(0);
     return r3;

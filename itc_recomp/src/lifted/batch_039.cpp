@@ -19051,7 +19051,7 @@ lifted::Result f822785E0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,24984(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 24984);
   // stw r9,32(r11)
-  guest::StoreU32(base, schema::NetModeSelectData(base, uint32_t(r11)).sign_in_continues_address(), uint32_t(r9));
+  schema::NetModeSelectData(base, uint32_t(r11)).set_sign_in_continues_bits(uint32_t(r9));
   // lwz r11,816(r31)
   r11 = guest::LoadU32(base, schema::ModeType12(base, uint32_t(r31)).ring_address() + 576);
   // lwzx r10,r11,r10

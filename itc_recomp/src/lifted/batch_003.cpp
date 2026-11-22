@@ -90,11 +90,11 @@ loc_820A70DC:
   return {r3, f1};
 }
 
-// sub_820A70F8: lifted from generated/ by lift.py.
+// sub_820A70F8 game::FloatPairItem::Ctor: lifted from generated/ by lift.py.
 lifted::Result f820A70F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1) {
   ITC_NATIVE_RUNNING("sub_820A70F8 (lifted)");
   uint64_t r10 = 0, r11 = 0, r12 = 0, r30 = 0, r31 = 0;
-  double f0 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  double f0 = 0.0;
   lifted::Temp temp{};
   uint32_t ea{};
   // mflr r12
@@ -127,7 +127,7 @@ lifted::Result f820A70F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   guest::StoreU32(base, schema::FloatPairItem(base, uint32_t(r31)).unknown_4_address(), uint32_t(r10));
   // bl 0x825a6880
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A6880(base, LIFTED_ARGS(0x820A7130, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = schema::FloatPair::New(base).address; f1 = 0; }  // host_alloc 0x820A7130 (FloatPair)
   // lis r10,-32256
   r10 = uint64_t(int64_t(-2113929216));
   // stw r30,8(r31)
@@ -145,17 +145,17 @@ lifted::Result f820A70F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r11,12(r31)
   guest::StoreU32(base, schema::FloatPairItem(base, uint32_t(r31)).value_address(), uint32_t(r11));
   // stb r10,0(r11)
-  guest::StoreU8(base, schema::FloatPair(base, uint32_t(r11)).flag_address(), uint8_t(r10));
+  schema::FloatPair(base, uint32_t(r11)).set_flag_bits(uint8_t(r10));
   // lwz r11,12(r31)
   r11 = guest::LoadU32(base, schema::FloatPairItem(base, uint32_t(r31)).value_address());
   // stfs f0,4(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, schema::FloatPair(base, uint32_t(r11)).a_address(), temp.u32);
+  schema::FloatPair(base, uint32_t(r11)).set_a_bits(temp.u32);
   // lwz r11,12(r31)
   r11 = guest::LoadU32(base, schema::FloatPairItem(base, uint32_t(r31)).value_address());
   // stfs f0,8(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, schema::FloatPair(base, uint32_t(r11)).b_address(), temp.u32);
+  schema::FloatPair(base, uint32_t(r11)).set_b_bits(temp.u32);
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
@@ -180,11 +180,10 @@ uint64_t f820A7178(uint8_t* base) {
   return r3;
 }
 
-// sub_820A7180: lifted from generated/ by lift.py.
+// sub_820A7180 game::FloatPairItem::Dtor: lifted from generated/ by lift.py.
 lifted::Result f820A7180(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_820A7180 (lifted)");
-  uint64_t r4 = 0, r5 = 0, r11 = 0, r12 = 0, r31 = 0;
-  double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  uint64_t r11 = 0, r12 = 0, r31 = 0;
   uint32_t ea{};
   // mflr r12
   r12 = 0;
@@ -208,7 +207,7 @@ lifted::Result f820A7180(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
   // bl 0x825a70e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A70E8(base, LIFTED_ARGS(0x820A71A8, r31)); r3 = o.r3; f1 = o.f1; }
+  { schema::FloatPair(base, uint32_t(r3)).Delete(); }  // host_free 0x820A71A8 (FloatPair)
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // addi r11,r11,9416
@@ -253,7 +252,7 @@ lifted::Result f820A71C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r30 = r4;
   // bl 0x820a7180
   // (left out: dead in C++)
-  { const lifted::Result o = f820A7180(base, r1, r13, r3, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::FloatPairItem::Dtor(base, r1, r13, r3, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r30,31
   r11 = uint32_t(r30) & 0x1;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -1047,7 +1046,7 @@ loc_820A8224:
 loc_820A8244:
   // bl 0x820a70f8
   // (left out: dead in C++)
-  { const lifted::Result o = f820A70F8(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::FloatPairItem::Ctor(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, f1); r3 = o.r3; f1 = o.f1; }
   // b 0x820a82d4
   goto loc_820A82D4;
 loc_820A824C:

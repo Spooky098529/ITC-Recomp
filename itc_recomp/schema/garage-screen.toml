@@ -52,6 +52,10 @@ fields = [
 measure = "new<104>@GarageScreen::Create"
 size = 104
 origin = "allocated"
+# A host object (E5 step 3, 2026-11-22): GarageScreen::Create's New and
+# Destroy's Delete (no lifted call allocates or frees it); the pick goes to
+# the movie by value (ui_movies::NameRecordFromBytes).
+storage = "host"
 fields = [
   { name = "set_up", offset = 0, type = "u32", note = "1 once the header is set (SetHeader)" },
   { name = "pick", offset = 4, type = "bytes", count = 20, note = "the career's pick (player 0's save data +8 to +27, shown as a name)" },

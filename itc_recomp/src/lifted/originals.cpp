@@ -218463,7 +218463,7 @@ loc_821500B8:
   r3 = r30;
   // bl 0x82295330
   // (left out: dead in C++)
-  { const lifted::Result o = game::VirtualFree(base, LIFTED_ARGS(0x821500E8, r31)); r3 = o.r3; f1 = o.f1; }
+  { schema::CameraAnimBlock(base, uint32_t(r3)).Delete(); r3 = 1; }  // host_free 0x821500E8 (CameraAnimBlock)
   // lwz r11,336(r29)
   r11 = guest::LoadU32(base, schema::CameraAnim(base, uint32_t(r29)).blocks_used_address());
   // cmplwi r11,0
@@ -218654,7 +218654,7 @@ loc_8215020C:
   r3 = uint64_t(int64_t(0));
   // bl 0x82295398
   // (left out: dead in C++)
-  { const lifted::Result o = game::VirtualAlloc(base, LIFTED_ARGS(0x82150220, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = schema::CameraAnimBlock::New(base).address; f1 = 0; }  // host_alloc 0x82150220 (CameraAnimBlock)
   // mr r30,r3
   r30 = r3;
   // mr r9,r28
@@ -218666,23 +218666,23 @@ loc_8215020C:
   // stfs f31,12(r30)
   lifted::ScalarFloatMode();
   temp.f32 = float(f31);
-  guest::StoreU32(base, schema::CameraAnimBlock(base, uint32_t(r30)).unknown_12_address(), temp.u32);
+  schema::CameraAnimBlock(base, uint32_t(r30)).set_unknown_12_bits(temp.u32);
   // stw r28,0(r30)
-  guest::StoreU32(base, schema::CameraAnimBlock(base, uint32_t(r30)).channel_address(), uint32_t(r28));
+  schema::CameraAnimBlock(base, uint32_t(r30)).set_channel_bits(uint32_t(r28));
   // stfs f31,16(r30)
   temp.f32 = float(f31);
-  guest::StoreU32(base, schema::CameraAnimBlock(base, uint32_t(r30)).duration_address(), temp.u32);
+  schema::CameraAnimBlock(base, uint32_t(r30)).set_duration_bits(temp.u32);
   // stw r28,4(r30)
-  guest::StoreU32(base, schema::CameraAnimBlock(base, uint32_t(r30)).header_size_address(), uint32_t(r28));
+  schema::CameraAnimBlock(base, uint32_t(r30)).set_header_size_bits(uint32_t(r28));
   // stw r28,8(r30)
-  guest::StoreU32(base, schema::CameraAnimBlock(base, uint32_t(r30)).data_size_address(), uint32_t(r28));
+  schema::CameraAnimBlock(base, uint32_t(r30)).set_data_size_bits(uint32_t(r28));
   // stw r28,60(r30)
-  guest::StoreU32(base, schema::CameraAnimBlock(base, uint32_t(r30)).data_address(), uint32_t(r28));
+  schema::CameraAnimBlock(base, uint32_t(r30)).set_values_bits(uint32_t(r28));
   // mtctr r10
   ctr = r10;
 loc_8215024C:
   // stw r9,0(r11)
-  guest::StoreU32(base, schema::CameraAnimBlock(base, uint32_t(r11) - 20).unknown_20_address(), uint32_t(r9));
+  schema::host::StoreU32(schema::CameraAnimBlock(base, uint32_t(r11) - 20).unknown_20() + 0, uint32_t(r9));
   // addi r11,r11,4
   r11 = uint64_t(int64_t(int64_t(r11) + 4));
   // bdnz 0x8215024c
@@ -218697,50 +218697,50 @@ loc_8215024C:
   // li r3,0
   r3 = uint64_t(int64_t(0));
   // stw r11,0(r30)
-  guest::StoreU32(base, schema::CameraAnimBlock(base, uint32_t(r30)).channel_address(), uint32_t(r11));
+  schema::CameraAnimBlock(base, uint32_t(r30)).set_channel_bits(uint32_t(r11));
   // lwz r11,4(r29)
   r11 = guest::LoadU32(base, uint32_t(r29) + 4);
   // stw r11,4(r30)
-  guest::StoreU32(base, schema::CameraAnimBlock(base, uint32_t(r30)).header_size_address(), uint32_t(r11));
+  schema::CameraAnimBlock(base, uint32_t(r30)).set_header_size_bits(uint32_t(r11));
   // lwz r11,8(r29)
   r11 = guest::LoadU32(base, uint32_t(r29) + 8);
   // rotlwi r4,r11,0
   r4 = __builtin_rotateleft32(uint32_t(r11), 0);
   // stw r11,8(r30)
-  guest::StoreU32(base, schema::CameraAnimBlock(base, uint32_t(r30)).data_size_address(), uint32_t(r11));
+  schema::CameraAnimBlock(base, uint32_t(r30)).set_data_size_bits(uint32_t(r11));
   // lfs f0,12(r29)
   lifted::ScalarFloatMode();
   temp.u32 = guest::LoadU32(base, uint32_t(r29) + 12);
   f0 = double(temp.f32);
   // stfs f0,12(r30)
   temp.f32 = float(f0);
-  guest::StoreU32(base, schema::CameraAnimBlock(base, uint32_t(r30)).unknown_12_address(), temp.u32);
+  schema::CameraAnimBlock(base, uint32_t(r30)).set_unknown_12_bits(temp.u32);
   // lfs f0,16(r29)
   temp.u32 = guest::LoadU32(base, uint32_t(r29) + 16);
   f0 = double(temp.f32);
   // stfs f0,16(r30)
   temp.f32 = float(f0);
-  guest::StoreU32(base, schema::CameraAnimBlock(base, uint32_t(r30)).duration_address(), temp.u32);
+  schema::CameraAnimBlock(base, uint32_t(r30)).set_duration_bits(temp.u32);
   // bl 0x82295398
   // (left out: dead in C++)
   { const lifted::Result o = game::VirtualAlloc(base, LIFTED_ARGS(0x82150294, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // lwz r5,8(r30)
-  r5 = guest::LoadU32(base, schema::CameraAnimBlock(base, uint32_t(r30)).data_size_address());
+  r5 = schema::CameraAnimBlock(base, uint32_t(r30)).data_size_bits();
   // stw r3,60(r30)
-  guest::StoreU32(base, schema::CameraAnimBlock(base, uint32_t(r30)).data_address(), uint32_t(r3));
+  schema::CameraAnimBlock(base, uint32_t(r30)).set_values_bits(uint32_t(r3));
   // bl 0x822962b0
   // (left out: dead in C++)
   { const lifted::Result o = game::XMemSet(base, LIFTED_ARGS(0x821502A4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,4(r29)
   r11 = guest::LoadU32(base, uint32_t(r29) + 4);
   // lwz r5,8(r30)
-  r5 = guest::LoadU32(base, schema::CameraAnimBlock(base, uint32_t(r30)).data_size_address());
+  r5 = schema::CameraAnimBlock(base, uint32_t(r30)).data_size_bits();
   // add r4,r11,r29
   r4 = r11 + r29;
   // lwz r3,60(r30)
-  r3 = guest::LoadU32(base, schema::CameraAnimBlock(base, uint32_t(r30)).data_address());
+  r3 = schema::CameraAnimBlock(base, uint32_t(r30)).values_bits();
   // bl 0x82295890
   // (left out: dead in C++)
   { const lifted::Result o = game::XMemCpy(base, LIFTED_ARGS(0x821502B8, r31)); r3 = o.r3; f1 = o.f1; }
@@ -218888,7 +218888,7 @@ loc_8215039C:
   // lwz r11,0(r9)
   r11 = guest::LoadU32(base, schema::CameraAnim(base, uint32_t(r9) - 80).first_block_address());
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, schema::CameraAnimBlock(base, uint32_t(r11)).channel_address());
+  r10 = schema::CameraAnimBlock(base, uint32_t(r11)).channel_bits();
   // cmplwi cr6,r10,1
   cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 1, so);
   // blt cr6,0x82150428
@@ -218912,7 +218912,7 @@ loc_8215039C:
   // bne cr6,0x82150434
   if (!cr6.eq) goto loc_82150434;
   // lwz r11,60(r11)
-  r11 = guest::LoadU32(base, schema::CameraAnimBlock(base, uint32_t(r11)).data_address());
+  r11 = schema::CameraAnimBlock(base, uint32_t(r11)).values_bits();
   // rlwinm r10,r6,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r6) | (r6 << 32), 2) & 0xFFFFFFFC;
   // lfsx f0,r11,r10
@@ -218925,7 +218925,7 @@ loc_8215039C:
   goto loc_82150434;
 loc_821503E4:
   // lwz r11,60(r11)
-  r11 = guest::LoadU32(base, schema::CameraAnimData(base, uint32_t(r11)).unknown_60_address());
+  r11 = schema::CameraAnimBlock(base, uint32_t(r11)).values_bits();
   // rlwinm r10,r6,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r6) | (r6 << 32), 2) & 0xFFFFFFFC;
   // lfsx f12,r11,r10
@@ -218936,7 +218936,7 @@ loc_821503E4:
   goto loc_82150434;
 loc_821503F4:
   // lwz r11,60(r11)
-  r11 = guest::LoadU32(base, schema::CameraAnimData(base, uint32_t(r11)).unknown_60_address());
+  r11 = schema::CameraAnimBlock(base, uint32_t(r11)).values_bits();
   // rlwinm r10,r6,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r6) | (r6 << 32), 2) & 0xFFFFFFFC;
   // lfsx f13,r11,r10
@@ -218947,7 +218947,7 @@ loc_821503F4:
   goto loc_82150434;
 loc_82150404:
   // lwz r11,60(r11)
-  r11 = guest::LoadU32(base, schema::CameraAnimData(base, uint32_t(r11)).unknown_60_address());
+  r11 = schema::CameraAnimBlock(base, uint32_t(r11)).values_bits();
   // rlwinm r10,r6,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r6) | (r6 << 32), 2) & 0xFFFFFFFC;
   // lfsx f0,r11,r10
@@ -218960,7 +218960,7 @@ loc_82150404:
   goto loc_82150434;
 loc_82150418:
   // lwz r11,60(r11)
-  r11 = guest::LoadU32(base, schema::CameraAnimData(base, uint32_t(r11)).unknown_60_address());
+  r11 = schema::CameraAnimBlock(base, uint32_t(r11)).values_bits();
   // rlwinm r10,r6,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r6) | (r6 << 32), 2) & 0xFFFFFFFC;
   // lfsx f29,r11,r10
@@ -218971,7 +218971,7 @@ loc_82150418:
   goto loc_82150434;
 loc_82150428:
   // lwz r11,60(r11)
-  r11 = guest::LoadU32(base, schema::CameraAnimData(base, uint32_t(r11)).unknown_60_address());
+  r11 = schema::CameraAnimBlock(base, uint32_t(r11)).values_bits();
   // rlwinm r10,r6,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r6) | (r6 << 32), 2) & 0xFFFFFFFC;
   // lfsx f31,r11,r10
@@ -219198,7 +219198,7 @@ loc_82150630:
   // lwz r11,0(r9)
   r11 = guest::LoadU32(base, schema::CameraAnim(base, uint32_t(r9) - 80).first_block_address());
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, schema::CameraAnimBlock(base, uint32_t(r11)).channel_address());
+  r10 = schema::CameraAnimBlock(base, uint32_t(r11)).channel_bits();
   // cmplwi cr6,r10,1
   cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 1, so);
   // blt cr6,0x821506b4
@@ -219218,7 +219218,7 @@ loc_82150630:
   // bne cr6,0x821506c0
   if (!cr6.eq) goto loc_821506C0;
   // lwz r11,60(r11)
-  r11 = guest::LoadU32(base, schema::CameraAnimBlock(base, uint32_t(r11)).data_address());
+  r11 = schema::CameraAnimBlock(base, uint32_t(r11)).values_bits();
   // rlwinm r10,r30,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r30) | (r30 << 32), 2) & 0xFFFFFFFC;
   // lfsx f0,r11,r10
@@ -219231,7 +219231,7 @@ loc_82150630:
   goto loc_821506C0;
 loc_82150670:
   // lwz r11,60(r11)
-  r11 = guest::LoadU32(base, schema::CameraAnimData(base, uint32_t(r11)).unknown_60_address());
+  r11 = schema::CameraAnimBlock(base, uint32_t(r11)).values_bits();
   // rlwinm r10,r30,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r30) | (r30 << 32), 2) & 0xFFFFFFFC;
   // lfsx f27,r11,r10
@@ -219242,7 +219242,7 @@ loc_82150670:
   goto loc_821506C0;
 loc_82150680:
   // lwz r11,60(r11)
-  r11 = guest::LoadU32(base, schema::CameraAnimData(base, uint32_t(r11)).unknown_60_address());
+  r11 = schema::CameraAnimBlock(base, uint32_t(r11)).values_bits();
   // rlwinm r10,r30,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r30) | (r30 << 32), 2) & 0xFFFFFFFC;
   // lfsx f30,r11,r10
@@ -219253,7 +219253,7 @@ loc_82150680:
   goto loc_821506C0;
 loc_82150690:
   // lwz r11,60(r11)
-  r11 = guest::LoadU32(base, schema::CameraAnimData(base, uint32_t(r11)).unknown_60_address());
+  r11 = schema::CameraAnimBlock(base, uint32_t(r11)).values_bits();
   // rlwinm r10,r30,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r30) | (r30 << 32), 2) & 0xFFFFFFFC;
   // lfsx f0,r11,r10
@@ -219266,7 +219266,7 @@ loc_82150690:
   goto loc_821506C0;
 loc_821506A4:
   // lwz r11,60(r11)
-  r11 = guest::LoadU32(base, schema::CameraAnimData(base, uint32_t(r11)).unknown_60_address());
+  r11 = schema::CameraAnimBlock(base, uint32_t(r11)).values_bits();
   // rlwinm r10,r30,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r30) | (r30 << 32), 2) & 0xFFFFFFFC;
   // lfsx f29,r11,r10
@@ -219277,7 +219277,7 @@ loc_821506A4:
   goto loc_821506C0;
 loc_821506B4:
   // lwz r11,60(r11)
-  r11 = guest::LoadU32(base, schema::CameraAnimData(base, uint32_t(r11)).unknown_60_address());
+  r11 = schema::CameraAnimBlock(base, uint32_t(r11)).values_bits();
   // rlwinm r10,r30,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r30) | (r30 << 32), 2) & 0xFFFFFFFC;
   // lfsx f31,r11,r10
@@ -219589,7 +219589,7 @@ lifted::Result f82150878(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // stw r30,80(r1)
   guest::StoreU32(base, uint32_t(r1) + 80, uint32_t(r30));
   // lwz r27,0(r28)
-  r27 = guest::LoadU32(base, schema::CameraAnimLoad(base, uint32_t(r28)).id_address());
+  r27 = schema::CameraAnimLoad(base, uint32_t(r28)).id_bits();
   // stw r30,340(r1)
   guest::StoreU32(base, uint32_t(r1) + 340, uint32_t(r30));
 loc_821508A0:
@@ -219677,7 +219677,7 @@ loc_821508E0:
   r3 = r28;
   // bl 0x82295330
   // (left out: dead in C++)
-  { const lifted::Result o = game::VirtualFree(base, LIFTED_ARGS(0x82150940, r31)); r3 = o.r3; f1 = o.f1; }
+  { schema::CameraAnimLoad(base, uint32_t(r3)).Delete(); r3 = 1; }  // host_free 0x82150940 (CameraAnimLoad)
   // lis r5,0
   r5 = uint64_t(int64_t(0));
   // li r4,0
@@ -219925,7 +219925,7 @@ lifted::Result f82150B10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = uint64_t(int64_t(0));
   // bl 0x82295398
   // (left out: dead in C++)
-  { const lifted::Result o = game::VirtualAlloc(base, LIFTED_ARGS(0x82150B3C, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = schema::CameraAnimLoad::New(base).address; f1 = 0; }  // host_alloc 0x82150B3C (CameraAnimLoad)
   // mr r30,r3
   r30 = r3;
   // li r6,4
@@ -219944,7 +219944,7 @@ lifted::Result f82150B10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r4,r3
   r4 = r3;
   // stw r31,0(r30)
-  guest::StoreU32(base, schema::CameraAnimLoad(base, uint32_t(r30)).id_address(), uint32_t(r31));
+  schema::CameraAnimLoad(base, uint32_t(r30)).set_id_bits(uint32_t(r31));
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -302088,7 +302088,7 @@ lifted::Result f8220C4C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   r5 = r30;
   // bl 0x82295330
   // (left out: dead in C++)
-  { const lifted::Result o = game::VirtualFree(base, LIFTED_ARGS(0x8220C508, r31)); r3 = o.r3; f1 = o.f1; }
+  { schema::PauseMenuScreen(base, uint32_t(r3)).Delete(); r3 = 1; }  // host_free 0x8220C508 (PauseMenuScreen)
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // lis r29,-32146
@@ -302103,7 +302103,7 @@ lifted::Result f8220C4C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   r3 = guest::LoadU32(base, uint32_t(r29) + -31532);
   // bl 0x82295330
   // (left out: dead in C++)
-  { const lifted::Result o = game::VirtualFree(base, LIFTED_ARGS(0x8220C524, r31)); r3 = o.r3; f1 = o.f1; }
+  { schema::PauseMenuData(base, uint32_t(r3)).Delete(); r3 = 1; }  // host_free 0x8220C524 (PauseMenuData)
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // lwz r3,-31524(r31)
@@ -302182,7 +302182,7 @@ lifted::Result f8220D040(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31536(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31536);
   // lwz r31,0(r11)
-  r31 = guest::LoadU32(base, schema::PauseMenuScreen(base, uint32_t(r11)).movie_address());
+  r31 = schema::PauseMenuScreen(base, uint32_t(r11)).movie_bits();
   // bl 0x8259d658
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::Child(base, LIFTED_ARGS(0x8220D068, r31)); r3 = o.r3; f1 = o.f1; }
@@ -302257,7 +302257,7 @@ lifted::Result f8220D7E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r8, 
   r3 = uint64_t(int64_t(0));
   // bl 0x82295398
   // (left out: dead in C++)
-  { const lifted::Result o = game::VirtualAlloc(base, LIFTED_ARGS(0x8220D808, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = schema::PauseMenuScreen::New(base).address; f1 = 0; }  // host_alloc 0x8220D808 (PauseMenuScreen)
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // li r6,4
@@ -302272,7 +302272,7 @@ lifted::Result f8220D7E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r8, 
   r3 = uint64_t(int64_t(0));
   // bl 0x82295398
   // (left out: dead in C++)
-  { const lifted::Result o = game::VirtualAlloc(base, LIFTED_ARGS(0x8220D824, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = schema::PauseMenuData::New(base).address; f1 = 0; }  // host_alloc 0x8220D824 (PauseMenuData)
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // li r6,4
@@ -302463,7 +302463,7 @@ lifted::Result f8220FA88(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r9,-31532(r11)
   r9 = guest::LoadU32(base, uint32_t(r11) + -31532);
   // stw r10,132(r9)
-  guest::StoreU32(base, schema::PauseMenuData(base, uint32_t(r9)).kind_address(), uint32_t(r10));
+  schema::PauseMenuData(base, uint32_t(r9)).set_kind_bits(uint32_t(r10));
   // li r10,4
   r10 = uint64_t(int64_t(4));
   // lwz r11,-31532(r11)
@@ -302471,14 +302471,14 @@ lifted::Result f8220FA88(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r10,80(r1)
   guest::StoreU32(base, uint32_t(r1) + 80, uint32_t(r10));
   // stw r5,156(r11)
-  guest::StoreU32(base, schema::PauseMenuData(base, uint32_t(r11)).first_day_address(), uint32_t(r5));
+  schema::PauseMenuData(base, uint32_t(r11)).set_first_day_bits(uint32_t(r5));
   // bl 0x8211b3f0
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x8220FACC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r3,0(r3)
   r3 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // stw r3,0(r31)
-  guest::StoreU32(base, schema::PauseMenuScreen(base, uint32_t(r31)).movie_address(), uint32_t(r3));
+  guest::StoreU32(base, schema::PauseMenuStarted(base, uint32_t(r31)).started_address(), uint32_t(r3));
   // bl 0x8211aba8
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::ResetPose(base, LIFTED_ARGS(0x8220FAD8, r31)); r3 = o.r3; f1 = o.f1; }
@@ -302574,7 +302574,7 @@ lifted::Result f8220FC98(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   r3 = guest::LoadU32(base, uint32_t(r29) + -31516);
   // bl 0x82295330
   // (left out: dead in C++)
-  { const lifted::Result o = game::VirtualFree(base, LIFTED_ARGS(0x8220FCF4, r31)); r3 = o.r3; f1 = o.f1; }
+  { schema::PauseMenu4Data(base, uint32_t(r3)).Delete(); r3 = 1; }  // host_free 0x8220FCF4 (PauseMenu4Data)
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // lwz r3,-31508(r31)
@@ -302666,7 +302666,7 @@ lifted::Result f82210868(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r8, 
   r3 = uint64_t(int64_t(0));
   // bl 0x82295398
   // (left out: dead in C++)
-  { const lifted::Result o = game::VirtualAlloc(base, LIFTED_ARGS(0x822108A4, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = schema::PauseMenu4Data::New(base).address; f1 = 0; }  // host_alloc 0x822108A4 (PauseMenu4Data)
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // li r6,4
@@ -311999,7 +311999,7 @@ loc_8222946C:
   // lwz r8,0(r11)
   r8 = guest::LoadU32(base, schema::LocationScreen(base, uint32_t(r11) - 8).pictures_a_address());
   // lwz r8,0(r8)
-  r8 = guest::LoadU32(base, schema::LocationScreenPicture(base, uint32_t(r8)).loaded_address());
+  r8 = schema::LocationScreenPicture(base, uint32_t(r8)).loaded_bits();
   // cmpwi cr6,r8,0
   cr6 = lifted::Compare<int32_t>(int32_t(r8), 0, so);
   // beq cr6,0x8222956c
@@ -320972,11 +320972,11 @@ loc_82233A80:
   // li r6,5
   r6 = uint64_t(int64_t(5));
   // stw r9,72(r10)
-  guest::StoreU32(base, schema::Type67Screen0Words(base, uint32_t(r10)).pick_address(), uint32_t(r9));
+  schema::Type67Screen0Words(base, uint32_t(r10)).set_pick_bits(uint32_t(r9));
   // stw r11,68(r10)
-  guest::StoreU32(base, schema::Type67Screen0Words(base, uint32_t(r10)).unknown_68_address(), uint32_t(r11));
+  schema::Type67Screen0Words(base, uint32_t(r10)).set_unknown_68_bits(uint32_t(r11));
   // stw r11,0(r10)
-  guest::StoreU32(base, schema::Type67Screen0Words(base, uint32_t(r10)).loading_shown_address(), uint32_t(r11));
+  schema::Type67Screen0Words(base, uint32_t(r10)).set_loading_shown_bits(uint32_t(r11));
   // lwz r10,9648(r31)
   r10 = guest::LoadU32(base, schema::Type6Screen0(base, uint32_t(r31)).menu_address());
   // stw r11,9652(r31)
@@ -321236,7 +321236,7 @@ lifted::Result f82233C80(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,9640(r28)
   r11 = guest::LoadU32(base, schema::Type6Screen0(base, uint32_t(r28)).words_address());
   // stw r27,0(r11)
-  guest::StoreU32(base, schema::Type67Screen0Words(base, uint32_t(r11)).loading_shown_address(), uint32_t(r27));
+  schema::Type67Screen0Words(base, uint32_t(r11)).set_loading_shown_bits(uint32_t(r27));
   // lwz r11,1972(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 1972);
   // cmpwi cr6,r11,-1
@@ -326882,11 +326882,11 @@ loc_82243FE8:
   // li r6,4
   r6 = uint64_t(int64_t(4));
   // stw r9,72(r10)
-  guest::StoreU32(base, schema::Type67Screen0Words(base, uint32_t(r10)).pick_address(), uint32_t(r9));
+  schema::Type67Screen0Words(base, uint32_t(r10)).set_pick_bits(uint32_t(r9));
   // stw r11,68(r10)
-  guest::StoreU32(base, schema::Type67Screen0Words(base, uint32_t(r10)).unknown_68_address(), uint32_t(r11));
+  schema::Type67Screen0Words(base, uint32_t(r10)).set_unknown_68_bits(uint32_t(r11));
   // stw r11,0(r10)
-  guest::StoreU32(base, schema::Type67Screen0Words(base, uint32_t(r10)).loading_shown_address(), uint32_t(r11));
+  schema::Type67Screen0Words(base, uint32_t(r10)).set_loading_shown_bits(uint32_t(r11));
   // lwz r10,9652(r31)
   r10 = guest::LoadU32(base, schema::Type7Screen0(base, uint32_t(r31)).menu_address());
   // stw r11,9656(r31)
@@ -327138,7 +327138,7 @@ lifted::Result f822441D8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,9644(r28)
   r11 = guest::LoadU32(base, schema::Type7Screen0(base, uint32_t(r28)).words_address());
   // stw r27,0(r11)
-  guest::StoreU32(base, schema::Type67Screen0Words(base, uint32_t(r11)).loading_shown_address(), uint32_t(r27));
+  schema::Type67Screen0Words(base, uint32_t(r11)).set_loading_shown_bits(uint32_t(r27));
   // lwz r11,1972(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 1972);
   // cmpwi cr6,r11,-1

@@ -99,10 +99,19 @@ For checks that need the same game twice (E5's step 3, `docs/e5-native.md`
 - `--pad_ticks_play=<file>` answers the game's reads from such a file, in
   order, with no virtual pad (only user 0 connected, rumble ignored). The
   number of ticks before a race varies with load times, so playback lines
-  up on each race's mark: reads left before it are skipped when the game
-  enters the race sooner, the last read repeated while it hasn't yet. Each
-  race then gets its recorded input from its first tick.
-- `--state_digest` logs a line each race tick (`src/debug/state_digest.cpp`):
+  up on each race's marks: reads left before one are skipped when the game
+  gets there sooner, the last read repeated while it hasn't yet. Each race
+  has two: `race <n>`, entered (its draw step seen), and `start <n>`, the
+  race world loaded (the course set-up's message 4,
+  `CourseSetup::WaitDraw`, after the race's loads; since 2026-11-22). The
+  second is needed because the race's loads vary in length too: with only
+  the first, a build whose loads ended one tick later started the race a
+  tick later, and the recorded input then fell a tick early for the whole
+  race (the world the same, one tick late, until the input differed). A
+  file without start marks plays as before.
+- `--state_digest` logs a line each race tick from the race's start (its
+  first `start` mark; the still ticks of its loading left out)
+  (`src/debug/state_digest.cpp`):
   the racers' count, a hash of each racer's body matrix and squared speed,
   a hash of user 0's last pad read, and the player's position.
 - `itc_recomp/tools/tick_replay.sh [ticks] [baseline]` plays
@@ -112,7 +121,13 @@ For checks that need the same game twice (E5's step 3, `docs/e5-native.md`
   (the run's `<log>.digest`).
 
 `race_test.ticks` was recorded from `race_test.jsonl` with
-`scripted_run.sh ... --pad_ticks_record` (user 0's lines kept). Checked
+`scripted_run.sh ... --pad_ticks_record --state_digest` (user 0's lines and
+the marks kept); recorded again 2026-11-22 with the start marks, on E5 step
+3's batch 1 build with `FloatPair`'s move left out (that build had matched
+the old baseline, from the build before step 3, in both races), the
+recording run's digest the baseline (`race_test.digest`: 112 and 1,183
+ticks); two playbacks matched it, one lined up a read later at race 1's
+start. Before that: Checked
 2026-11-22: the recording run and three playbacks matched in both races,
 all 124 and 1,196 ticks (a playback skipped 47 or 58 reads at the first
 race, 0 at the second). Tried and dropped: waiting for the archive's

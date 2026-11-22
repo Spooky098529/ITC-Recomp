@@ -134,20 +134,28 @@ uint32_t PauseMenuStepVolume(uint8_t* base, uint32_t sp) {
     data.set_last_item_ok(side == -1 ? 0 : 1);
     return 1;
   }
-  // The selected volume: music_volume (0) or effects_volume (1).
-  const auto volume = [&](const schema::PauseMenuData& data) {
-    return data.music_volume_address() + 4 * selection;
+  // The selected volume: music_volume (0) or effects_volume (1), through
+  // the view (the data is in host memory since E5 step 3).
+  const auto get = [&](const schema::PauseMenuData& data) {
+    return selection == 0 ? data.music_volume() : data.effects_volume();
+  };
+  const auto set = [&](const schema::PauseMenuData& data, uint32_t v) {
+    if (selection == 0) {
+      data.set_music_volume(v);
+    } else {
+      data.set_effects_volume(v);
+    }
   };
   {
     const schema::PauseMenuData data = G::pause_data(base);
-    guest::StoreU32(base, volume(data), guest::LoadU32(base, volume(data)) + uint32_t(side));
+    set(data, get(data) + uint32_t(side));
   }
   const schema::PauseMenuData data = G::pause_data(base);
-  const int32_t value = int32_t(guest::LoadU32(base, volume(data)));
+  const int32_t value = int32_t(get(data));
   if (side == -1 ? value >= 0 : value <= 15) {
     return 1;
   }
-  guest::StoreU32(base, volume(data), side == -1 ? 0 : 15);
+  set(data, side == -1 ? 0 : 15);
   return 0;
 }
 
@@ -174,13 +182,22 @@ uint32_t PauseMenuStepAdjust(uint8_t* base, uint32_t sp) {
     data.set_last_item_ok(side == -1 ? 0 : 1);
     return 1;
   }
-  // The selected value, adjust_0 to adjust_2.
-  const uint32_t field = data.adjust_0_address() + 4 * selection;
-  const int32_t value = int32_t(guest::LoadU32(base, field));
+  // The selected value, adjust_0 to adjust_2, through the view (the data is
+  // in host memory since E5 step 3).
+  const int32_t value = int32_t(selection == 0   ? data.adjust_0()
+                                : selection == 1 ? data.adjust_1()
+                                                 : data.adjust_2());
   if (side == -1 ? !(value > -10) : !(value < 10)) {
     return 0;
   }
-  guest::StoreU32(base, field, uint32_t(value + side));
+  const uint32_t next = uint32_t(value + side);
+  if (selection == 0) {
+    data.set_adjust_0(next);
+  } else if (selection == 1) {
+    data.set_adjust_1(next);
+  } else {
+    data.set_adjust_2(next);
+  }
   return 1;
 }
 

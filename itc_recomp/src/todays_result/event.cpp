@@ -16,7 +16,7 @@ namespace {
 using Machine = schema::TodaysEventMachine;
 using Data_ = schema::TodaysEventData;
 using List = schema::TodaysEventImageList;
-using Image = schema::TodaysEventImage;
+using Image = schema::Type2HubImage;  // the type 2 hub's image record
 
 Pages EventPages(uint8_t* base) { return G::event_pages(base); }
 Data_ Data(uint8_t* base) { return G::event_data(base); }
@@ -163,10 +163,11 @@ uint64_t LoadImagePair(uint8_t* base, uint32_t data, uint32_t index, uint32_t sp
     const uint32_t buffer =
         uint32_t(calls.Call(kVirtualAlloc, frame, pair.lrs[1], 0, size, 0x1000, 4));
     calls.Call(kXMemSet, frame, pair.lrs[2], buffer, 0, size);
-    const uint32_t record =
-        uint32_t(calls.Call(kVirtualAlloc, frame, pair.lrs[3], 0, 16, 0x1000, 4));
-    const Image image(base, record);
-    image.set_image_index(index);
+    // A host object (E5 step 3) in place of the VirtualAlloc(16) at
+    // pair.lrs[3]; the list and the callback's context hold its handle.
+    const Image image = Image::New(base);
+    const uint32_t record = image.address;
+    image.set_index(index);
     image.set_loaded(0);
     image.set_texture(0);
     image.set_xpr(0);
@@ -380,7 +381,10 @@ uint64_t FreeImages(uint8_t* base, uint32_t data, uint32_t sp, const Calls& call
       list.set_count(count);
       const uint32_t record = Load(base, list.records_address() + (count << 2));
       calls.Call(kFreeImage, frame, l.free_image, record);
-      r3 = calls.Call(kVirtualFree, frame, l.free, record, 0, kMemRelease);
+      // Deleted in place of the VirtualFree at l.free (r3 = 1, as it
+      // returned).
+      Image(base, record).Delete();
+      r3 = 1;
     }
   }
   return r3;
@@ -590,8 +594,8 @@ uint64_t ShowImages(uint8_t* base, uint32_t index, uint32_t sp) {
     const uint32_t count = list.count();
     for (uint32_t k = 0; k < count; k++) {
       const Image record(base, Load(base, list.records_address() + 4 * k));
-      if (record.image_index() == index) {
-        return record.texture();
+      if (record.index() == index) {
+        return record.texture().address;
       }
     }
     return 0u;

@@ -269,44 +269,71 @@ struct NetModeDispatcher : View {
 };
 
 // allocated; measure: new<36>@NetModeSelect::Create
+struct NetModeSelectDataData {
+  uint32_t shown_before = 0;  // +0
+  uint32_t back = 0;  // +4
+  uint32_t back_to_title = 0;  // +8
+  uint32_t sign_in_ui_shown = 0;  // +12
+  uint32_t privilege_dialog = 0;  // +16
+  uint32_t dialog_page = 0;  // +20
+  uint32_t dialog_transition = 0;  // +24
+  uint32_t sign_in_ticks = 0;  // +28
+  uint32_t sign_in_continues = 0;  // +32
+};
+
 struct NetModeSelectData : View {
   using View::View;
   static constexpr uint32_t kSize = 36;
+  static constexpr bool kHost = true;
+  NetModeSelectDataData* data() const { return static_cast<NetModeSelectDataData*>(memory::HandleObject(address)); }
+  static NetModeSelectData New(uint8_t* base) {
+    return NetModeSelectData(base, memory::MakeHandle(new NetModeSelectDataData(), kSize, "NetModeSelectData"));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // 1 once set up (SetUp): Open starts with ShowCursor, not Intro
-  uint32_t shown_before() const { return guest::LoadU32(base, address + 0); }
-  void set_shown_before(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t shown_before_address() const { return address + 0; }
+  uint32_t shown_before() const { return data()->shown_before; }
+  void set_shown_before(uint32_t v) const { data()->shown_before = v; }
+  uint32_t shown_before_bits() const { return data()->shown_before; }
+  void set_shown_before_bits(uint32_t v) const { data()->shown_before = v; }
   // back to the title (Destroy goes to state 14)
-  uint32_t back() const { return guest::LoadU32(base, address + 4); }
-  void set_back(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
-  uint32_t back_address() const { return address + 4; }
+  uint32_t back() const { return data()->back; }
+  void set_back(uint32_t v) const { data()->back = v; }
+  uint32_t back_bits() const { return data()->back; }
+  void set_back_bits(uint32_t v) const { data()->back = v; }
   // set by BackPage: Unloaded goes to state 14
-  uint32_t back_to_title() const { return guest::LoadU32(base, address + 8); }
-  void set_back_to_title(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t back_to_title_address() const { return address + 8; }
-  uint32_t sign_in_ui_shown() const { return guest::LoadU32(base, address + 12); }
-  void set_sign_in_ui_shown(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
-  uint32_t sign_in_ui_shown_address() const { return address + 12; }
+  uint32_t back_to_title() const { return data()->back_to_title; }
+  void set_back_to_title(uint32_t v) const { data()->back_to_title = v; }
+  uint32_t back_to_title_bits() const { return data()->back_to_title; }
+  void set_back_to_title_bits(uint32_t v) const { data()->back_to_title = v; }
+  uint32_t sign_in_ui_shown() const { return data()->sign_in_ui_shown; }
+  void set_sign_in_ui_shown(uint32_t v) const { data()->sign_in_ui_shown = v; }
+  uint32_t sign_in_ui_shown_bits() const { return data()->sign_in_ui_shown; }
+  void set_sign_in_ui_shown_bits(uint32_t v) const { data()->sign_in_ui_shown = v; }
   // dialog 12 (no privilege) up
-  uint32_t privilege_dialog() const { return guest::LoadU32(base, address + 16); }
-  void set_privilege_dialog(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
-  uint32_t privilege_dialog_address() const { return address + 16; }
+  uint32_t privilege_dialog() const { return data()->privilege_dialog; }
+  void set_privilege_dialog(uint32_t v) const { data()->privilege_dialog = v; }
+  uint32_t privilege_dialog_bits() const { return data()->privilege_dialog; }
+  void set_privilege_dialog_bits(uint32_t v) const { data()->privilege_dialog = v; }
   // the page a dialog's close goes to (-1 none)
-  uint32_t dialog_page() const { return guest::LoadU32(base, address + 20); }
-  void set_dialog_page(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
-  uint32_t dialog_page_address() const { return address + 20; }
+  uint32_t dialog_page() const { return data()->dialog_page; }
+  void set_dialog_page(uint32_t v) const { data()->dialog_page = v; }
+  uint32_t dialog_page_bits() const { return data()->dialog_page; }
+  void set_dialog_page_bits(uint32_t v) const { data()->dialog_page = v; }
   // the transition a dialog's close runs (-1 none)
-  uint32_t dialog_transition() const { return guest::LoadU32(base, address + 24); }
-  void set_dialog_transition(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
-  uint32_t dialog_transition_address() const { return address + 24; }
+  uint32_t dialog_transition() const { return data()->dialog_transition; }
+  void set_dialog_transition(uint32_t v) const { data()->dialog_transition = v; }
+  uint32_t dialog_transition_bits() const { return data()->dialog_transition; }
+  void set_dialog_transition_bits(uint32_t v) const { data()->dialog_transition = v; }
   // the sign-in pages' tick count, to 10
-  uint32_t sign_in_ticks() const { return guest::LoadU32(base, address + 28); }
-  void set_sign_in_ticks(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
-  uint32_t sign_in_ticks_address() const { return address + 28; }
+  uint32_t sign_in_ticks() const { return data()->sign_in_ticks; }
+  void set_sign_in_ticks(uint32_t v) const { data()->sign_in_ticks = v; }
+  uint32_t sign_in_ticks_bits() const { return data()->sign_in_ticks; }
+  void set_sign_in_ticks_bits(uint32_t v) const { data()->sign_in_ticks = v; }
   // 1 from Create and SetUp, 0 from Interrupt: a signed-in Live user goes on to the battle or time attack page
-  uint32_t sign_in_continues() const { return guest::LoadU32(base, address + 32); }
-  void set_sign_in_continues(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
-  uint32_t sign_in_continues_address() const { return address + 32; }
+  uint32_t sign_in_continues() const { return data()->sign_in_continues; }
+  void set_sign_in_continues(uint32_t v) const { data()->sign_in_continues = v; }
+  uint32_t sign_in_continues_bits() const { return data()->sign_in_continues; }
+  void set_sign_in_continues_bits(uint32_t v) const { data()->sign_in_continues = v; }
 };
 
 // allocated; measure: new<108>@NetRanking::Create, sub_822822C0.r3, sub_822822C0.ret

@@ -294,21 +294,36 @@ struct Type7Screen0 : View {
 };
 
 // allocated; measure: new<76>@Type6Screen0::OnEnter, new<76>@Type7Screen0::OnEnter
+struct Type67Screen0WordsData {
+  uint32_t loading_shown = 0;  // +0
+  uint32_t unknown_68 = 0;  // +68
+  uint32_t pick = 0;  // +72
+};
+
 struct Type67Screen0Words : View {
   using View::View;
   static constexpr uint32_t kSize = 76;
+  static constexpr bool kHost = true;
+  Type67Screen0WordsData* data() const { return static_cast<Type67Screen0WordsData*>(memory::HandleObject(address)); }
+  static Type67Screen0Words New(uint8_t* base) {
+    return Type67Screen0Words(base, memory::MakeHandle(new Type67Screen0WordsData(), kSize, "Type67Screen0Words"));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // the stand's loading animation shown (named 44 to 46; Update)
-  uint32_t loading_shown() const { return guest::LoadU32(base, address + 0); }
-  void set_loading_shown(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t loading_shown_address() const { return address + 0; }
+  uint32_t loading_shown() const { return data()->loading_shown; }
+  void set_loading_shown(uint32_t v) const { data()->loading_shown = v; }
+  uint32_t loading_shown_bits() const { return data()->loading_shown; }
+  void set_loading_shown_bits(uint32_t v) const { data()->loading_shown = v; }
   // 0 from OnEnter; readers not found
-  uint32_t unknown_68() const { return guest::LoadU32(base, address + 68); }
-  void set_unknown_68(uint32_t v) const { guest::StoreU32(base, address + 68, v); }
-  uint32_t unknown_68_address() const { return address + 68; }
+  uint32_t unknown_68() const { return data()->unknown_68; }
+  void set_unknown_68(uint32_t v) const { data()->unknown_68 = v; }
+  uint32_t unknown_68_bits() const { return data()->unknown_68; }
+  void set_unknown_68_bits(uint32_t v) const { data()->unknown_68 = v; }
   // the dialog's answer: PickYes 1, PickNo 0, PickBack; 2 the power graph; -1 none
-  uint32_t pick() const { return guest::LoadU32(base, address + 72); }
-  void set_pick(uint32_t v) const { guest::StoreU32(base, address + 72, v); }
-  uint32_t pick_address() const { return address + 72; }
+  uint32_t pick() const { return data()->pick; }
+  void set_pick(uint32_t v) const { data()->pick = v; }
+  uint32_t pick_bits() const { return data()->pick; }
+  void set_pick_bits(uint32_t v) const { data()->pick = v; }
 };
 
 // embedded; measure: Type6Dialog, Type7Dialog, Dialog, Type6Mode.+816, Type7Mode.+816

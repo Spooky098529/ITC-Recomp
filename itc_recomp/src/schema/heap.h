@@ -254,7 +254,7 @@ struct VectorHolderOwner : View {
   uint32_t holder_address() const { return address + 4; }
 };
 
-// allocated; measure: new<16>@sub_820A81C0#2
+// allocated; measure: new<16>@sub_820A81C0#2, FloatPairItem
 struct FloatPairItem : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
@@ -277,21 +277,36 @@ struct FloatPairItem : View {
   uint32_t value_address() const { return address + 12; }
 };
 
-// allocated; measure: new<12>@sub_820A70F8
+// allocated; measure: new<12>@FloatPairItem::FloatPairItem
+struct FloatPairData {
+  uint8_t flag = 0;  // +0
+  float a = 0;  // +4
+  float b = 0;  // +8
+};
+
 struct FloatPair : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
+  static constexpr bool kHost = true;
+  FloatPairData* data() const { return static_cast<FloatPairData*>(memory::HandleObject(address)); }
+  static FloatPair New(uint8_t* base) {
+    return FloatPair(base, memory::MakeHandle(new FloatPairData(), kSize, "FloatPair"));
+  }
+  void Delete() const { delete data(); memory::ReleaseHandle(address); }
   // 1 when made
-  uint8_t flag() const { return guest::LoadU8(base, address + 0); }
-  void set_flag(uint8_t v) const { guest::StoreU8(base, address + 0, v); }
-  uint32_t flag_address() const { return address + 0; }
+  uint8_t flag() const { return data()->flag; }
+  void set_flag(uint8_t v) const { data()->flag = v; }
+  uint8_t flag_bits() const { return data()->flag; }
+  void set_flag_bits(uint8_t v) const { data()->flag = v; }
   // both set to the float at 0x82000A34
-  float a() const { return guest::LoadFloat(base, address + 4); }
-  void set_a(float v) const { guest::StoreFloat(base, address + 4, v); }
-  uint32_t a_address() const { return address + 4; }
-  float b() const { return guest::LoadFloat(base, address + 8); }
-  void set_b(float v) const { guest::StoreFloat(base, address + 8, v); }
-  uint32_t b_address() const { return address + 8; }
+  float a() const { return data()->a; }
+  void set_a(float v) const { data()->a = v; }
+  uint32_t a_bits() const { return std::bit_cast<uint32_t>(data()->a); }
+  void set_a_bits(uint32_t v) const { data()->a = std::bit_cast<float>(v); }
+  float b() const { return data()->b; }
+  void set_b(float v) const { data()->b = v; }
+  uint32_t b_bits() const { return std::bit_cast<uint32_t>(data()->b); }
+  void set_b_bits(uint32_t v) const { data()->b = std::bit_cast<float>(v); }
 };
 
 // allocated; measure: new<16>@sub_820A81C0
