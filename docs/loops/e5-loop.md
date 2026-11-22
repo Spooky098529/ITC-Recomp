@@ -489,4 +489,14 @@ args, in the same session) only when the user's current message says to.
   `CameraAnimBlock`; a shared record type: `TodaysEventImage` with
   `Type2HubImage`), and the rest waiting on step 4 (virtual dispatch over
   handles, embedded objects).
+- The leftovers (2026-11-22, the lead, the user's call): `GarageScreenData`
+  and `TodaysResultData` (their pick passed to the movie by value, no guest
+  buffer), `PauseMenuScreen` and `CameraAnimBlock` (their measure faults
+  split or folded in) and `Type2HubImage` with `TodaysEventImage` merged in
+  moved; `ModeType8` and `SysLinkIdSetNode` left out of the pick list
+  (unreachable). Checked: build, attract race, `tick_replay.sh` twice (both
+  races match), frame dump. Step 3 in all: 16 types moved (17 schema names
+  before the merge); the other 39 skipped wait on step 4 (virtual dispatch
+  over handles, embedded objects, memcpy targets, addresses handed to other
+  areas). The rows for the leftovers await the user's review.
 - Merged into `rexglue-removal-project` up to the pilot (`fc5e3b94`).

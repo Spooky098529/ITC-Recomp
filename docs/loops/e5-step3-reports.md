@@ -182,3 +182,45 @@ is their check.
 ### Proposed row changes
 
 For the user's review (not written); Status unchanged.
+
+## The leftovers (2026-11-22, the lead)
+
+The user's call after batch 3: the types movable after a small change, moved
+by the lead, and the two unreachable ones left out of the pick list. Checked:
+schema_gen, schema_check (0 accesses that fit no field), `lift.py reemit`,
+`lift_originals.py --all`, the build (clean after two fixes, below), an
+attract race (no error lines, no handle fault), `tick_replay.sh` twice (both
+races all match both times), a frame dump (normal). The replay reaches
+`GarageScreen::Create` and `Destroy`, `TodaysResult::Create`, `SetUpMovie`
+(the pick by value) and `Destroy`, `TodaysEvent::FreeImages`,
+`Type2Hub::LoadNoticeImage` and `FreeImages`, and `PauseMenu::Create` and
+`Destroy`; not the garage screen's `SetHeader`, today's event's
+`LoadImagePair` or the camera animations' `ParseObject`, whose moves the
+build alone checks so far.
+
+### Moved
+
+| Type | Area | Change | Allocation | Free |
+|---|---|---|---|---|
+| `GarageScreenData` (104 B) | garage-screen | The pick (a 20-byte name record) goes to the movie by value: `ui_movies::NameRecord` and `NameTextOf` (`SetNameText`'s plain C++ split from its guest read), `ChildNameTextArgs` for `SetNodeText` on the child's node; no guest buffer | `GarageScreen::Create` (`0x82191D20`), handle in `[0x826D842C]` and r3 | `GarageScreen::Destroy` (`0x82191600`), r3 = 1 |
+| `TodaysResultData` (88 B) | todays-result | The same for its pick (`SetTexts`) | `TodaysResult::Create` (`0x8225A86C`), handle in `[0x828160D0]` and r3 | `TodaysResult::Destroy` (`0x8225A914`), r3 = 1 |
+| `PauseMenuScreen` (4 B) | race-screens | The measure's "PauseMenu" (the transitions' started word, 44 accesses) split into a guest type of its own, `PauseMenuStarted` | `PauseMenu::Create` (`0x8220D808`, `host_alloc`), handle in `[0x826D84D0]` and the race HUD holder's +1012 | `PauseMenu::Destroy` (`0x8220C508`, `host_free`, returns 1) |
+| `CameraAnimBlock` (64 B) | camera-modes | The measure's `CameraAnimData` (12 loads of +60 in `EvalTarget`'s other switch cases) folded in; its +60 renamed `values` (a host view's `data()` is its struct) | `CameraAnim::ParseObject` (`0x82150220`, `host_alloc`), handles in the anim's +80 list | `CameraAnim::Free` (`0x821500E8`, `host_free`, returns 1) |
+| `Type2HubImage` (16 B), with `TodaysEventImage` merged in | type2-screens, todays-result | One type: the same callback (`ImageLoaded`) fills both areas' records and `FreeImage` frees their blocks; `TodaysEventImage` removed | `Type2Hub::LoadNoticeImage` (`0x8218DF94`, `0x8218E028`), `TodaysEvent::LoadImagePair` (`0x8225BD6C`, `0x8225BE00`); handles in the lists and the archive callback's context | `Type2Hub::FreeImages` (`0x8218DED8`, `0x8218DF24`), `TodaysEvent::FreeImages` (`0x8225BCB0`, `0x8225BCFC`), r3 = 1 |
+
+Left out of the pick list (`e5_movable.py`'s `UNREACHABLE`): `ModeType8` (the
+type 8, two-player mode) and `SysLinkIdSetNode` (System Link).
+
+### Fixed on the way
+
+- The rows written after batch 3 named `sub_820A70F8` and `sub_820A7180`
+  (`FloatPairItem`'s constructor and destructor). The measure names types by
+  their functions' names, so `FloatPair`'s and `FloatPairItem`'s measure
+  names changed, the re-emit lost their typed accesses (`FloatPair` is a host
+  type: they would have faulted), and the calls by name failed to build
+  (`names.h` not yet made again). Fixed: their measure names follow
+  (`new<12>@FloatPairItem::FloatPairItem`, `FloatPairItem`), and
+  `function_names.py` run. A row's new name can change measure names: run
+  `function_names.py`, then the re-emit, and read the lifted diff.
+- `CameraAnimBlock`'s field `data` clashed with the host view's `data()`;
+  renamed `values`.
