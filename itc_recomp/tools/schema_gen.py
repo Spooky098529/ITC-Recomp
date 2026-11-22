@@ -11,7 +11,8 @@ the game sees. For each field `name` at +offset:
   name()              its value (a ptr field: a view of the type it points to)
   set_name(v)         stores it (a ptr field: a view or an address)
   name_address()      the field's own guest address
-and `kSize`, the type's size. The `[globals]` table of an area becomes a
+and `kSize`, the type's size. A type with `storage = "host"` (step 3) lives
+in host memory instead: see host_type. The `[globals]` table of an area becomes a
 struct `<Area>Globals` with the same accessors, static, taking `base`.
 
 usage: schema_gen.py              (writes every header; checks names and pointees)
@@ -41,6 +42,16 @@ SCALARS = {
     "f32": ("float", "guest::LoadFloat(base, {a})", "guest::StoreFloat(base, {a}, v)"),
     "f64": ("double", "std::bit_cast<double>(guest::LoadU64(base, {a}))",
             "guest::StoreU64(base, {a}, std::bit_cast<uint64_t>(v))"),
+}
+WIDTHS = {"u8": 1, "s8": 1, "u16": 2, "s16": 2, "u32": 4, "s32": 4, "fn": 4, "ptr": 4,
+          "f32": 4, "u64": 8, "f64": 8}
+# A host type's members (C++ type) and the raw bits of the field's width.
+HOST = {
+    "u8": ("uint8_t", "uint8_t"), "s8": ("int8_t", "uint8_t"),
+    "u16": ("uint16_t", "uint16_t"), "s16": ("int16_t", "uint16_t"),
+    "u32": ("uint32_t", "uint32_t"), "s32": ("int32_t", "uint32_t"),
+    "fn": ("uint32_t", "uint32_t"), "ptr": ("uint32_t", "uint32_t"),
+    "u64": ("uint64_t", "uint64_t"), "f32": ("float", "uint32_t"), "f64": ("double", "uint64_t"),
 }
 IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 # C++ keywords a field can't be named (its accessor would be one).
@@ -94,6 +105,22 @@ def check(areas):
                 claimed[m] = (area, name)
     for area, data in areas.items():
         for name, t in data.items():
+            if name == "globals" or t.get("storage", "guest") == "guest":
+                continue
+            if t.get("storage") != "host":
+                errors.append(f"{area}: {name}: storage {t.get('storage')!r} (guest or host)")
+                continue
+            spans = []
+            for f in t.get("fields", []):
+                width = f.get("count", 0) if f.get("type") == "bytes" else WIDTHS.get(f.get("type"), 0)
+                spans.append((f["offset"], f["offset"] + width, f["name"]))
+            spans.sort()
+            for (a0, a1, an), (b0, b1, bn) in zip(spans, spans[1:]):
+                if b0 < a1:
+                    errors.append(f"{area}: {name} (host): {an} and {bn} overlap; a host type's "
+                                  "fields are members")
+    for area, data in areas.items():
+        for name, t in data.items():
             fields = (t.items() if name == "globals" else
                       ((f["name"], f) for f in t.get("fields", [])))
             seen = set()
@@ -137,6 +164,62 @@ def accessors(fname, f, at, static):
     return out
 
 
+def host_type(name, t):
+    """A host type (`storage = "host"`, docs/loops/e5-loop.md step 3): its
+    members in `<name>Data`, and a view over a handle (memory/handles.h) with
+    the same accessors as a guest view's but no `_address()`, plus
+    `<field>_bits()` and `set_<field>_bits()` (the raw bits of the field's
+    width, what lifted code loads and stores) and `New` and `Delete`."""
+    out = [f"struct {name}Data {{"]
+    for f in sorted(t.get("fields", []), key=lambda f: f["offset"]):
+        if f["type"] == "bytes":
+            out.append(f"  uint8_t {f['name']}[{f['count']}] = {{}};  // +{f['offset']}, guest order")
+        else:
+            out.append(f"  {HOST[f['type']][0]} {f['name']} = 0;  // +{f['offset']}")
+    out.append("};")
+    out.append("")
+    out.append(f"struct {name} : View {{")
+    out.append("  using View::View;")
+    out.append(f"  static constexpr uint32_t kSize = {t.get('size', 0)};")
+    out.append("  static constexpr bool kHost = true;")
+    if "vtable" in t:
+        out.append(f"  static constexpr uint32_t kVtable = 0x{t['vtable']:08X};")
+    out.append(f"  {name}Data* data() const {{ return static_cast<{name}Data*>(memory::HandleObject(address)); }}")
+    out.append(f"  static {name} New(uint8_t* base) {{")
+    out.append(f"    return {name}(base, memory::MakeHandle(new {name}Data(), kSize, \"{name}\"));")
+    out.append("  }")
+    out.append(f"  void Delete() const {{ delete data(); memory::ReleaseHandle(address); }}")
+    for f in t.get("fields", []):
+        n, ty = f["name"], f["type"]
+        if f.get("note"):
+            out.append(f"  // {f['note']}")
+        if ty == "bytes":
+            out.append(f"  uint8_t* {n}() const {{ return data()->{n}; }}")
+            continue
+        member, bits = HOST[ty]
+        if ty == "ptr":
+            to = f.get("to")
+            if to:
+                out.append(f"  template <typename T = {to}>")
+                out.append(f"  T {n}() const {{ return T(base, data()->{n}); }}")
+                out.append(f"  void set_{n}(const View& v) const {{ data()->{n} = v.address; }}")
+            else:
+                out.append(f"  View {n}() const {{ return View(base, data()->{n}); }}")
+            out.append(f"  void set_{n}(uint32_t v) const {{ data()->{n} = v; }}")
+        else:
+            out.append(f"  {member} {n}() const {{ return data()->{n}; }}")
+            out.append(f"  void set_{n}({member} v) const {{ data()->{n} = v; }}")
+        if member == bits:
+            out.append(f"  {bits} {n}_bits() const {{ return data()->{n}; }}")
+            out.append(f"  void set_{n}_bits({bits} v) const {{ data()->{n} = v; }}")
+        else:
+            out.append(f"  {bits} {n}_bits() const {{ return std::bit_cast<{bits}>(data()->{n}); }}")
+            out.append(f"  void set_{n}_bits({bits} v) const {{ data()->{n} = std::bit_cast<{member}>(v); }}")
+    out.append("};")
+    out.append("")
+    return out
+
+
 def camel(area):
     return "".join(p.capitalize() for p in re.split(r"[-_]", area))
 
@@ -160,6 +243,9 @@ def emit_area(area, data):
         measures = ([t["measure"]] if t.get("measure") else []) + t.get("measures", [])
         if measures or t.get("origin"):
             lines.append(f"// {t.get('origin', '?')}; measure: {', '.join(measures) or '-'}")
+        if t.get("storage") == "host":
+            lines.extend(host_type(name, t))
+            continue
         lines.append(f"struct {name} : View {{")
         lines.append("  using View::View;")
         lines.append(f"  static constexpr uint32_t kSize = {t.get('size', 0)};")
