@@ -1234,3 +1234,28 @@ leaving their block) and converts each site to `guest.h`'s calls, the same
 bytes in the same order. The script:
 `itc_recomp/tools/workflows/e5-step9-swarm.js`, `args`:
 `{"units": [{name, files}]}`; reports in `docs/loops/e5-step9-reports.md`.
+
+### The swarm: done (2026-11-24)
+
+16 agents (run `wf_6f32ad81-49b`); reports in `docs/loops/e5-step9-reports.md`.
+No unit had a site left to change: every hand port reaches memory through
+`guest.h` (the groundwork had converted the raw sites there were). Their
+notes, read by the lead: the remaining single-object spans through
+`guest::Pointer` (debug strings, the camera passes' snapshot in the image,
+the XMA buffer, the car list's records) stay inside one block; the copy
+checks in `c_runtime/strings.cpp` (`Behind`, `InOneView`) still describe
+the old views but only compare guest addresses, the copies themselves made
+per address through `guest::Pointer` or `memory::CopyWithHandles`. Left
+for step 10 with `base`: `native/state.h`'s unused `kPhysicalMemoryOffset`
+and its comment, the copy checks' view table.
+
+**Checked:** the build; an attract race (38 s, no error lines, 150 to 151
+fps); `tick_replay.sh` twice (both races all match, 112 and 1,183 ticks); a
+frame dump (normal).
+
+The game's memory is now all host memory: the heap, the image and the
+physical memory in blocks of their own, the stacks, blobs and host objects
+behind handles. Nothing is reached through `base` any more; what's left is
+step 10 (the guest addresses themselves: `base`, `guest.h`'s translation,
+the lifted code's 32-bit addresses).
+
