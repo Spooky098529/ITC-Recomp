@@ -1091,3 +1091,22 @@ switches kept only where a result depends on them. The script:
 `{"units": [{name, areas, files}]}`; reports in
 `docs/loops/e5-step6-reports.md`. The lifted code's import calls (each
 through `lifted::Import`'s lookup) are a `lift.py` change, the lead's.
+
+### The swarm: done (2026-11-24)
+
+16 agents (run `wf_aa92f2e9-852`); reports in `docs/loops/e5-step6-reports.md`:
+282 changes (frames' slots only the port used made C++ locals, empty
+pass-through frames dropped, import calls straight to our answers, float
+mode switches dropped where nothing depends on them), 124 kept (slots
+handed to other code by address, or the guest fallbacks reading them).
+The lead: the lifted code's 564 import calls go straight to our answers
+(`lifted::ImportAt<&import_records::X>`: found at a site's first call,
+then called with no lookup; through `lifted::Import` with
+`--log_imports`). It built clean at once. Checked: attract race (38 s, no
+error lines, 150 to 151 fps), `tick_replay.sh` twice (both races all
+match), a frame dump (normal).
+
+Left of step 6: the lifted code's own frames stay (on the PC memory
+stacks: their slots' addresses go to their callees); the per-thread block
+is a blob read through r13 as before (not yet `thread_local` state); the
+lifted code's float mode switches are as the original made them.

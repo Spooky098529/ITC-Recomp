@@ -70,7 +70,11 @@ handle (`direct()`), else by address through the owner's layout. Step 5
 order, `memory::NewBlob`, `storage = "blob"`), a pilot and one swarm of 17
 units (2026-11-24, `docs/loops/e5-loop.md` "Step 5 as one swarm", reports in
 `docs/loops/e5-step5-reports.md`); what the renderer reads stays in guest
-memory until step 7. A row's
+memory until step 7. Step 6 (2026-11-24, "Step 6 as one swarm"): every
+thread's stack, thread object, per-thread block and TLS slots are blobs
+(the calling thread's stack found first in `guest.h`); 16 agents took the
+hand ports' frames, import calls and float modes off guest shape; lifted
+import calls go straight to our answers (`lifted::ImportAt`). A row's
 new name can change the measure's type names: after renaming, run
 `tools/function_names.py`, re-emit, and read the lifted diff.
 `docs/old-hardware.md` is the plan (not started) for running below
