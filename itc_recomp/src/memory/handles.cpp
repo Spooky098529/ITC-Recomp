@@ -26,6 +26,7 @@ struct Entry {
   uint32_t size = 0;
   const char* type = nullptr;
   const Layout* layout = nullptr;
+  uint32_t element = 0;  // an array's element size; 0 for one object
 };
 
 Entry* g_entries = nullptr;            // kGranules, allocated once
@@ -95,7 +96,8 @@ bool ProtectHandles(uint8_t* base) {
   return true;
 }
 
-uint32_t MakeHandle(void* object, uint32_t size, const char* type, const Layout* layout) {
+uint32_t MakeHandle(void* object, uint32_t size, const char* type, const Layout* layout,
+                    uint32_t element) {
   const uint32_t count = std::max<uint32_t>(1, (size + kHandleGranule - 1) / kHandleGranule);
   std::lock_guard lock(g_mutex);
   uint32_t first = UINT32_MAX;
@@ -116,7 +118,7 @@ uint32_t MakeHandle(void* object, uint32_t size, const char* type, const Layout*
   }
   const uint32_t handle = kHandlesStart + first * kHandleGranule;
   for (uint32_t i = 0; i < count; i++) {
-    g_entries[first + i] = {object, handle, size, type, layout};
+    g_entries[first + i] = {object, handle, size, type, layout, element};
   }
   return handle;
 }
@@ -164,7 +166,8 @@ bool DescribeHandle(uint32_t value, HandleInfo* info) {
   if (!e.object || value - e.start >= std::max<uint32_t>(e.size, 1)) {
     return false;
   }
-  *info = {e.object, value - e.start, e.size, e.type, e.layout};
+  *info = {e.object, value - e.start, e.size, e.type, e.layout,
+           e.element ? e.element : std::max<uint32_t>(e.size, 1)};
   return true;
 }
 

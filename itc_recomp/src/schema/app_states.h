@@ -319,9 +319,18 @@ struct AppFrameworkIface : View {
   static AppFrameworkIface New(uint8_t* base) {
     return AppFrameworkIface(base, memory::MakeHandle(new AppFrameworkIfaceData(), sizeof(AppFrameworkIfaceData), "AppFrameworkIface", &kAppFrameworkIfaceLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static AppFrameworkIface NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(AppFrameworkIfaceData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<AppFrameworkIfaceData*>(::operator new(sizeof(AppFrameworkIfaceData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) AppFrameworkIfaceData();
+    return AppFrameworkIface(base, memory::MakeHandle(p, sizeof(AppFrameworkIfaceData) * count, "AppFrameworkIface", &kAppFrameworkIfaceLayout, sizeof(AppFrameworkIfaceData)));
+  }
+  AppFrameworkIface at(uint32_t i) const { return AppFrameworkIface(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kAppFrameworkIfaceLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppFrameworkIfaceLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
+  uint32_t vtable_address() const { return address + 0; }
   template <typename T = AppFrameworkIfaceVtable>
   T vtable() const { return T(base, on_host() ? data()->vtable : guest::LoadU32(base, address + 0)); }
   void set_vtable(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
@@ -361,10 +370,19 @@ struct AppHandlerMapHead : View {
   static AppHandlerMapHead New(uint8_t* base) {
     return AppHandlerMapHead(base, memory::MakeHandle(new AppHandlerMapHeadData(), sizeof(AppHandlerMapHeadData), "AppHandlerMapHead", &kAppHandlerMapHeadLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static AppHandlerMapHead NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(AppHandlerMapHeadData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<AppHandlerMapHeadData*>(::operator new(sizeof(AppHandlerMapHeadData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) AppHandlerMapHeadData();
+    return AppHandlerMapHead(base, memory::MakeHandle(p, sizeof(AppHandlerMapHeadData) * count, "AppHandlerMapHead", &kAppHandlerMapHeadLayout, sizeof(AppHandlerMapHeadData)));
+  }
+  AppHandlerMapHead at(uint32_t i) const { return AppHandlerMapHead(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kAppHandlerMapHeadLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppHandlerMapHeadLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // the leftmost node (begin)
+  uint32_t left_address() const { return address + 0; }
   uint32_t left() const { return on_host() ? uint32_t(data()->left) : uint32_t(guest::LoadU32(base, address + 0)); }
   void set_left(uint32_t v) const { if (on_host()) data()->left = v; else guest::StoreU32(base, address + 0, v); }
   uint32_t left_bits() const { return on_host() ? data()->left : guest::LoadU32(base, address + 0); }
@@ -453,26 +471,38 @@ struct MessageVector : View {
   static MessageVector New(uint8_t* base) {
     return MessageVector(base, memory::MakeHandle(new MessageVectorData(), sizeof(MessageVectorData), "MessageVector", &kMessageVectorLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static MessageVector NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(MessageVectorData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<MessageVectorData*>(::operator new(sizeof(MessageVectorData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) MessageVectorData();
+    return MessageVector(base, memory::MakeHandle(p, sizeof(MessageVectorData) * count, "MessageVector", &kMessageVectorLayout, sizeof(MessageVectorData)));
+  }
+  MessageVector at(uint32_t i) const { return MessageVector(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kMessageVectorLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kMessageVectorLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // measure fault: Erase's and Insert's r3 is the result iterator (vector, element), not the vector
+  uint32_t fault_result_address() const { return address + 0; }
   uint64_t fault_result_bits() const { return on_host() ? uint64_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kMessageVectorLayout, 0, 8)) : guest::LoadU64(base, address + 0); }
   void set_fault_result_bits(uint64_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kMessageVectorLayout, 0, 8, v); else guest::StoreU64(base, address + 0, v); }
   uint64_t fault_result() const { return uint64_t(fault_result_bits()); }
   void set_fault_result(uint64_t v) const { set_fault_result_bits(uint64_t(v)); }
+  uint32_t first_address() const { return address + 4; }
   template <typename T = AppMessageWord>
   T first() const { return T(base, on_host() ? data()->first : guest::LoadU32(base, address + 4)); }
   void set_first(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->first = v; else guest::StoreU32(base, address + 4, v); }
   void set_first(uint32_t v) const { if (on_host()) data()->first = v; else guest::StoreU32(base, address + 4, v); }
   uint32_t first_bits() const { return on_host() ? data()->first : guest::LoadU32(base, address + 4); }
   void set_first_bits(uint32_t v) const { if (on_host()) data()->first = v; else guest::StoreU32(base, address + 4, v); }
+  uint32_t last_address() const { return address + 8; }
   template <typename T = AppMessageWord>
   T last() const { return T(base, on_host() ? data()->last : guest::LoadU32(base, address + 8)); }
   void set_last(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->last = v; else guest::StoreU32(base, address + 8, v); }
   void set_last(uint32_t v) const { if (on_host()) data()->last = v; else guest::StoreU32(base, address + 8, v); }
   uint32_t last_bits() const { return on_host() ? data()->last : guest::LoadU32(base, address + 8); }
   void set_last_bits(uint32_t v) const { if (on_host()) data()->last = v; else guest::StoreU32(base, address + 8, v); }
+  uint32_t end_address() const { return address + 12; }
   template <typename T = AppMessageWord>
   T end() const { return T(base, on_host() ? data()->end : guest::LoadU32(base, address + 12)); }
   void set_end(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->end = v; else guest::StoreU32(base, address + 12, v); }
@@ -503,15 +533,25 @@ struct AppStates : View {
   static AppStates New(uint8_t* base) {
     return AppStates(base, memory::MakeHandle(new AppStatesData(), sizeof(AppStatesData), "AppStates", &kAppStatesLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static AppStates NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(AppStatesData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<AppStatesData*>(::operator new(sizeof(AppStatesData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) AppStatesData();
+    return AppStates(base, memory::MakeHandle(p, sizeof(AppStatesData) * count, "AppStates", &kAppStatesLayout, sizeof(AppStatesData)));
+  }
+  AppStates at(uint32_t i) const { return AppStates(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kAppStatesLayout, offset, width); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppStatesLayout, offset, width, v); }
+  uint32_t vtable_address() const { return address + 0; }
   template <typename T = AppStatesVtable>
   T vtable() const { return T(base, data()->vtable); }
   void set_vtable(const View& w) const { const uint32_t v = w.address; data()->vtable = v; }
   void set_vtable(uint32_t v) const { data()->vtable = v; }
   uint32_t vtable_bits() const { return data()->vtable; }
   void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
+  uint32_t app_address() const { return address + 4; }
   template <typename T = App>
   T app() const { return T(base, data()->app); }
   void set_app(const View& w) const { const uint32_t v = w.address; data()->app = v; }
@@ -519,6 +559,7 @@ struct AppStates : View {
   uint32_t app_bits() const { return data()->app; }
   void set_app_bits(uint32_t v) const { data()->app = v; }
   // the root layer (no states; one child in play); sub_820AD8D0.ret's read is AppStates::OnMessage's r3, the stack (a measure fault)
+  uint32_t root_address() const { return address + 8; }
   template <typename T = StateLayer>
   T root() const { return T(base, data()->root); }
   void set_root(const View& w) const { const uint32_t v = w.address; data()->root = v; }
@@ -591,7 +632,15 @@ struct StateLayer : View {
   static StateLayer New(uint8_t* base) {
     return StateLayer(base, memory::MakeHandle(new StateLayerData(), sizeof(StateLayerData), "StateLayer", &kStateLayerLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static StateLayer NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(StateLayerData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<StateLayerData*>(::operator new(sizeof(StateLayerData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) StateLayerData();
+    return StateLayer(base, memory::MakeHandle(p, sizeof(StateLayerData) * count, "StateLayer", &kStateLayerLayout, sizeof(StateLayerData)));
+  }
+  StateLayer at(uint32_t i) const { return StateLayer(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kStateLayerLayout, offset, width); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kStateLayerLayout, offset, width, v); }
   // the child layers
@@ -604,11 +653,13 @@ struct StateLayer : View {
   template <typename T = OpList>
   T ops_list() const { return T(base, address + 36); }
   // 0x820028E0
+  uint32_t vtable_address() const { return address + 0; }
   uint32_t vtable() const { return data()->vtable; }
   void set_vtable(uint32_t v) const { data()->vtable = v; }
   uint32_t vtable_bits() const { return data()->vtable; }
   void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
   // 0x820028B0 (the state base's 0x82002880 first): the layer + 4 is a state
+  uint32_t state_vtable_address() const { return address + 4; }
   template <typename T = AppStateVtable>
   T state_vtable() const { return T(base, data()->state_vtable); }
   void set_state_vtable(const View& w) const { const uint32_t v = w.address; data()->state_vtable = v; }
@@ -616,51 +667,61 @@ struct StateLayer : View {
   uint32_t state_vtable_bits() const { return data()->state_vtable; }
   void set_state_vtable_bits(uint32_t v) const { data()->state_vtable = v; }
   // the app's interface at app + 16 (the app's slot 2)
+  uint32_t owner_address() const { return address + 8; }
   uint32_t owner() const { return data()->owner; }
   void set_owner(uint32_t v) const { data()->owner = v; }
   uint32_t owner_bits() const { return data()->owner; }
   void set_owner_bits(uint32_t v) const { data()->owner = v; }
   // the child layers (a PtrList): its first word, not read
+  uint32_t children_address() const { return address + 12; }
   uint32_t children() const { return data()->children; }
   void set_children(uint32_t v) const { data()->children = v; }
   uint32_t children_bits() const { return data()->children; }
   void set_children_bits(uint32_t v) const { data()->children = v; }
+  uint32_t children_head_address() const { return address + 16; }
   template <typename T = StateListNode>
   T children_head() const { return T(base, data()->children_head); }
   void set_children_head(const View& w) const { const uint32_t v = w.address; data()->children_head = v; }
   void set_children_head(uint32_t v) const { data()->children_head = v; }
   uint32_t children_head_bits() const { return data()->children_head; }
   void set_children_head_bits(uint32_t v) const { data()->children_head = v; }
+  uint32_t children_size_address() const { return address + 20; }
   uint32_t children_size() const { return data()->children_size; }
   void set_children_size(uint32_t v) const { data()->children_size = v; }
   uint32_t children_size_bits() const { return data()->children_size; }
   void set_children_size_bits(uint32_t v) const { data()->children_size = v; }
   // the states (a PtrList, the top at the front): its first word, not read
+  uint32_t states_address() const { return address + 24; }
   uint32_t states() const { return data()->states; }
   void set_states(uint32_t v) const { data()->states = v; }
   uint32_t states_bits() const { return data()->states; }
   void set_states_bits(uint32_t v) const { data()->states = v; }
+  uint32_t states_head_address() const { return address + 28; }
   template <typename T = StateListNode>
   T states_head() const { return T(base, data()->states_head); }
   void set_states_head(const View& w) const { const uint32_t v = w.address; data()->states_head = v; }
   void set_states_head(uint32_t v) const { data()->states_head = v; }
   uint32_t states_head_bits() const { return data()->states_head; }
   void set_states_head_bits(uint32_t v) const { data()->states_head = v; }
+  uint32_t states_size_address() const { return address + 32; }
   uint32_t states_size() const { return data()->states_size; }
   void set_states_size(uint32_t v) const { data()->states_size = v; }
   uint32_t states_size_bits() const { return data()->states_size; }
   void set_states_size_bits(uint32_t v) const { data()->states_size = v; }
   // the queued operations (an OpList): its first word, not read
+  uint32_t ops_address() const { return address + 36; }
   uint32_t ops() const { return data()->ops; }
   void set_ops(uint32_t v) const { data()->ops = v; }
   uint32_t ops_bits() const { return data()->ops; }
   void set_ops_bits(uint32_t v) const { data()->ops = v; }
+  uint32_t ops_head_address() const { return address + 40; }
   template <typename T = AppOpListNode>
   T ops_head() const { return T(base, data()->ops_head); }
   void set_ops_head(const View& w) const { const uint32_t v = w.address; data()->ops_head = v; }
   void set_ops_head(uint32_t v) const { data()->ops_head = v; }
   uint32_t ops_head_bits() const { return data()->ops_head; }
   void set_ops_head_bits(uint32_t v) const { data()->ops_head = v; }
+  uint32_t ops_size_address() const { return address + 44; }
   uint32_t ops_size() const { return data()->ops_size; }
   void set_ops_size(uint32_t v) const { data()->ops_size = v; }
   uint32_t ops_size_bits() const { return data()->ops_size; }
@@ -748,26 +809,38 @@ struct PtrList : View {
   static PtrList New(uint8_t* base) {
     return PtrList(base, memory::MakeHandle(new PtrListData(), sizeof(PtrListData), "PtrList", &kPtrListLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static PtrList NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(PtrListData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<PtrListData*>(::operator new(sizeof(PtrListData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) PtrListData();
+    return PtrList(base, memory::MakeHandle(p, sizeof(PtrListData) * count, "PtrList", &kPtrListLayout, sizeof(PtrListData)));
+  }
+  PtrList at(uint32_t i) const { return PtrList(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kPtrListLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kPtrListLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // measure fault: PtrList::ForEach's and Erase's r3 is the result (functor or iterator), not the list; HandleList::Remove's and sub_82118850's reads are an iterator's
+  uint32_t fault_result_0_address() const { return address + 0; }
   uint64_t fault_result_0_bits() const { return on_host() ? uint64_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kPtrListLayout, 0, 8)) : guest::LoadU64(base, address + 0); }
   void set_fault_result_0_bits(uint64_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kPtrListLayout, 0, 8, v); else guest::StoreU64(base, address + 0, v); }
   uint64_t fault_result_0() const { return uint64_t(fault_result_0_bits()); }
   void set_fault_result_0(uint64_t v) const { set_fault_result_0_bits(uint64_t(v)); }
   // the head node (new<?>@PtrList::AllocateNodes, input's)
+  uint32_t head_address() const { return address + 4; }
   template <typename T = StateListNode>
   T head() const { return T(base, on_host() ? data()->head : guest::LoadU32(base, address + 4)); }
   void set_head(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->head = v; else guest::StoreU32(base, address + 4, v); }
   void set_head(uint32_t v) const { if (on_host()) data()->head = v; else guest::StoreU32(base, address + 4, v); }
   uint32_t head_bits() const { return on_host() ? data()->head : guest::LoadU32(base, address + 4); }
   void set_head_bits(uint32_t v) const { if (on_host()) data()->head = v; else guest::StoreU32(base, address + 4, v); }
+  uint32_t size_address() const { return address + 8; }
   uint32_t size() const { return on_host() ? uint32_t(data()->size) : uint32_t(guest::LoadU32(base, address + 8)); }
   void set_size(uint32_t v) const { if (on_host()) data()->size = v; else guest::StoreU32(base, address + 8, v); }
   uint32_t size_bits() const { return on_host() ? data()->size : guest::LoadU32(base, address + 8); }
   void set_size_bits(uint32_t v) const { if (on_host()) data()->size = v; else guest::StoreU32(base, address + 8, v); }
   // measure fault: as fault_result_0
+  uint32_t fault_result_8_address() const { return address + 8; }
   uint64_t fault_result_8_bits() const { return on_host() ? uint64_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kPtrListLayout, 8, 8)) : guest::LoadU64(base, address + 8); }
   void set_fault_result_8_bits(uint64_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kPtrListLayout, 8, 8, v); else guest::StoreU64(base, address + 8, v); }
   uint64_t fault_result_8() const { return uint64_t(fault_result_8_bits()); }
@@ -817,25 +890,37 @@ struct OpList : View {
   static OpList New(uint8_t* base) {
     return OpList(base, memory::MakeHandle(new OpListData(), sizeof(OpListData), "OpList", &kOpListLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static OpList NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(OpListData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<OpListData*>(::operator new(sizeof(OpListData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) OpListData();
+    return OpList(base, memory::MakeHandle(p, sizeof(OpListData) * count, "OpList", &kOpListLayout, sizeof(OpListData)));
+  }
+  OpList at(uint32_t i) const { return OpList(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kOpListLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kOpListLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // measure fault: OpList::ForEach's r3 is the result functor, not the list
+  uint32_t fault_result_0_address() const { return address + 0; }
   uint64_t fault_result_0_bits() const { return on_host() ? uint64_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kOpListLayout, 0, 8)) : guest::LoadU64(base, address + 0); }
   void set_fault_result_0_bits(uint64_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kOpListLayout, 0, 8, v); else guest::StoreU64(base, address + 0, v); }
   uint64_t fault_result_0() const { return uint64_t(fault_result_0_bits()); }
   void set_fault_result_0(uint64_t v) const { set_fault_result_0_bits(uint64_t(v)); }
+  uint32_t head_address() const { return address + 4; }
   template <typename T = AppOpListNode>
   T head() const { return T(base, on_host() ? data()->head : guest::LoadU32(base, address + 4)); }
   void set_head(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->head = v; else guest::StoreU32(base, address + 4, v); }
   void set_head(uint32_t v) const { if (on_host()) data()->head = v; else guest::StoreU32(base, address + 4, v); }
   uint32_t head_bits() const { return on_host() ? data()->head : guest::LoadU32(base, address + 4); }
   void set_head_bits(uint32_t v) const { if (on_host()) data()->head = v; else guest::StoreU32(base, address + 4, v); }
+  uint32_t size_address() const { return address + 8; }
   uint32_t size() const { return on_host() ? uint32_t(data()->size) : uint32_t(guest::LoadU32(base, address + 8)); }
   void set_size(uint32_t v) const { if (on_host()) data()->size = v; else guest::StoreU32(base, address + 8, v); }
   uint32_t size_bits() const { return on_host() ? data()->size : guest::LoadU32(base, address + 8); }
   void set_size_bits(uint32_t v) const { if (on_host()) data()->size = v; else guest::StoreU32(base, address + 8, v); }
   // measure fault: as fault_result_0
+  uint32_t fault_result_8_address() const { return address + 8; }
   uint64_t fault_result_8_bits() const { return on_host() ? uint64_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kOpListLayout, 8, 8)) : guest::LoadU64(base, address + 8); }
   void set_fault_result_8_bits(uint64_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kOpListLayout, 8, 8, v); else guest::StoreU64(base, address + 8, v); }
   uint64_t fault_result_8() const { return uint64_t(fault_result_8_bits()); }
@@ -864,15 +949,25 @@ struct AppOpListNode : View {
   static AppOpListNode New(uint8_t* base) {
     return AppOpListNode(base, memory::MakeHandle(new AppOpListNodeData(), sizeof(AppOpListNodeData), "AppOpListNode", &kAppOpListNodeLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static AppOpListNode NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(AppOpListNodeData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<AppOpListNodeData*>(::operator new(sizeof(AppOpListNodeData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) AppOpListNodeData();
+    return AppOpListNode(base, memory::MakeHandle(p, sizeof(AppOpListNodeData) * count, "AppOpListNode", &kAppOpListNodeLayout, sizeof(AppOpListNodeData)));
+  }
+  AppOpListNode at(uint32_t i) const { return AppOpListNode(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kAppOpListNodeLayout, offset, width); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppOpListNodeLayout, offset, width, v); }
+  uint32_t next_address() const { return address + 0; }
   template <typename T = AppOpListNode>
   T next() const { return T(base, data()->next); }
   void set_next(const View& w) const { const uint32_t v = w.address; data()->next = v; }
   void set_next(uint32_t v) const { data()->next = v; }
   uint32_t next_bits() const { return data()->next; }
   void set_next_bits(uint32_t v) const { data()->next = v; }
+  uint32_t previous_address() const { return address + 4; }
   template <typename T = AppOpListNode>
   T previous() const { return T(base, data()->previous); }
   void set_previous(const View& w) const { const uint32_t v = w.address; data()->previous = v; }
@@ -880,15 +975,18 @@ struct AppOpListNode : View {
   uint32_t previous_bits() const { return data()->previous; }
   void set_previous_bits(uint32_t v) const { data()->previous = v; }
   // 0 add a child layer, 1 pop, 2 push, 3 replace
+  uint32_t op_type_address() const { return address + 8; }
   uint32_t op_type() const { return data()->op_type; }
   void set_op_type(uint32_t v) const { data()->op_type = v; }
   uint32_t op_type_bits() const { return data()->op_type; }
   void set_op_type_bits(uint32_t v) const { data()->op_type = v; }
+  uint32_t op_state_address() const { return address + 12; }
   uint32_t op_state() const { return data()->op_state; }
   void set_op_state(uint32_t v) const { data()->op_state = v; }
   uint32_t op_state_bits() const { return data()->op_state; }
   void set_op_state_bits(uint32_t v) const { data()->op_state = v; }
   // the operation: its type (high word), then a state (in host memory the two words are the members: read them, not this doubleword)
+  uint32_t op_address() const { return address + 8; }
   uint64_t op_bits() const { return uint64_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kAppOpListNodeLayout, 8, 8)); }
   void set_op_bits(uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppOpListNodeLayout, 8, 8, v); }
   uint64_t op() const { return uint64_t(op_bits()); }

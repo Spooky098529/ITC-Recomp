@@ -605,7 +605,7 @@ FrameworkAppInterface	framework	no	no allocation seen	4		1
 FrameworkAppInterfaceVtable	framework	no	no allocation seen	48		1	
 FrameworkAt44	framework	no	no allocation seen	4		1	
 FrameworkAt48	framework	no	no allocation seen	4		1	
-FrameworkGetterSelf	framework	no	no allocation seen	92		5	
+FrameworkGetterSelf	framework	no	no allocation seen	96		5	
 FrameworkHolder	framework	no	no allocation seen	4		1	
 FrameworkInterface	framework	no	no allocation seen	4		2	FrameStart::OnTick
 FrameworkInterfaceVtable	framework	no	no allocation seen	44		2	FrameStart::OnTick

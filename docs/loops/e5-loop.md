@@ -846,3 +846,56 @@ model), then the lead's build, checks and fixes:
   fields the modes agent removed (block reads joined to the mode, which
   stay guest reads, and the `ForceExit` stores at -28, never reached).
 
+
+## Step 4 as one swarm (the user's call, 2026-11-24)
+
+The rest of step 4 in one Workflow instead of batches, validated once at
+the end by the lead (build, attract race, `tick_replay.sh` twice, a frame
+dump; every `[error]` line and handle fault fixed; a replay race that
+differs is narrowed with logs, not guesses: the two builds' race data
+diffed at the race's first tick, each draw of the game's random generator
+logged with its caller). The script: `itc_recomp/tools/workflows/e5-step4-swarm.js`,
+`args`: `{"units": [{name, types, embedded, areas, files}]}`; one agent
+per unit, 6 at a time, and never two units sharing a file at once (the
+script holds each running unit's files). Agents edit only (the rules of
+step 3's swarm); their reports go into `docs/loops/e5-step4-reports.md`.
+
+### The swarm's groundwork (done 2026-11-24, before the swarm)
+
+- **`_address()` on host and dual views** (`schema_gen.py`): the field's
+  address, `address + offset`, an interior handle on the host, which every
+  guest load and store resolves (`memory::RawHandleLoad` and `Store`). The
+  build no longer lists raw uses; the runtime log does ("handles: a raw
+  N-byte access at +X of a T", once per type and offset). This unblocks
+  types whose field addresses go to the vector library and the matrix
+  math (`RigidBody`, `BoxShape`, `CollisionHit`, `CollisionContact`),
+  which read through `guest::Load*` and `Store*`.
+- **Raw accesses without a lock** (`memory/host_copy.cpp`): the sites
+  already logged are found in a lock-free table; logging stops after 512.
+- **Host arrays**: `T::NewArray(base, count)` makes `count` objects in one
+  block behind one handle (element `i` is the handle + `i * kSize`, its
+  view `at(i)`); the handle's entry records the element size, and
+  overlays, copies and raw accesses use the element's layout at
+  `offset % size`. `Delete()` frees the whole block (through
+  `memory::FreeHandle`; 0 does nothing). In the schema,
+  `host_alloc_array = [{ call = 0x<return address>, reg = "r3" }]` (the
+  register holding the byte size) makes `lift.py` emit
+  `NewArray(base, reg / kSize)` for a lifted `new[]` without a count
+  header.
+- Checked: build, attract race (38 s, no error lines; the known raw read at
+  a `Framework`'s +72), `tick_replay.sh` twice (both races all match), a
+  frame dump (normal).
+
+### The units
+
+From `tools/e5_movable.py` (`coverage/e5_movable.tsv`, 2026-11-24): every
+type allocated and not tagged file, GPU or save, shared or not (shared no
+longer stops a move), less what's host or dual already, `UNREACHABLE`, the
+movie library's 9 (a replaced library), `CarSoundWaveBank` (file-backed:
+step 5), `HeapBlock` and `CString` (raw memory and strings, sizes 0): 72
+owners in 35 units, each with the types found inside it (embed fields,
+"Split from" notes, `T@+N` measure names; agents find the rest, such as
+the menus' machines carved out of a mode's block). Batch 1's skipped
+types are among them (`InputManager` with `ActionMapper`, `App`, the
+`AppCamera` family, `CarDealerEntry` and `CarDealerData`, the collision
+types, the modes' blocks).

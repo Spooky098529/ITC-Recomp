@@ -124,10 +124,19 @@ struct PauseMenuScreen : View {
   static PauseMenuScreen New(uint8_t* base) {
     return PauseMenuScreen(base, memory::MakeHandle(new PauseMenuScreenData(), sizeof(PauseMenuScreenData), "PauseMenuScreen", &kPauseMenuScreenLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static PauseMenuScreen NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(PauseMenuScreenData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<PauseMenuScreenData*>(::operator new(sizeof(PauseMenuScreenData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) PauseMenuScreenData();
+    return PauseMenuScreen(base, memory::MakeHandle(p, sizeof(PauseMenuScreenData) * count, "PauseMenuScreen", &kPauseMenuScreenLayout, sizeof(PauseMenuScreenData)));
+  }
+  PauseMenuScreen at(uint32_t i) const { return PauseMenuScreen(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kPauseMenuScreenLayout, offset, width); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kPauseMenuScreenLayout, offset, width, v); }
   // UI movie 4 (UiMovies::Find)
+  uint32_t movie_address() const { return address + 0; }
   View movie() const { return View(base, data()->movie); }
   void set_movie(uint32_t v) const { data()->movie = v; }
   uint32_t movie_bits() const { return data()->movie; }
@@ -202,194 +211,242 @@ struct PauseMenuData : View {
   static PauseMenuData New(uint8_t* base) {
     return PauseMenuData(base, memory::MakeHandle(new PauseMenuDataData(), sizeof(PauseMenuDataData), "PauseMenuData", &kPauseMenuDataLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static PauseMenuData NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(PauseMenuDataData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<PauseMenuDataData*>(::operator new(sizeof(PauseMenuDataData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) PauseMenuDataData();
+    return PauseMenuData(base, memory::MakeHandle(p, sizeof(PauseMenuDataData) * count, "PauseMenuData", &kPauseMenuDataLayout, sizeof(PauseMenuDataData)));
+  }
+  PauseMenuData at(uint32_t i) const { return PauseMenuData(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kPauseMenuDataLayout, offset, width); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kPauseMenuDataLayout, offset, width, v); }
   // the four HUD options (the save's options words +0 to +12)
+  uint32_t hud_option_0_address() const { return address + 0; }
   uint32_t hud_option_0() const { return data()->hud_option_0; }
   void set_hud_option_0(uint32_t v) const { data()->hud_option_0 = v; }
   uint32_t hud_option_0_bits() const { return data()->hud_option_0; }
   void set_hud_option_0_bits(uint32_t v) const { data()->hud_option_0 = v; }
+  uint32_t hud_option_1_address() const { return address + 4; }
   uint32_t hud_option_1() const { return data()->hud_option_1; }
   void set_hud_option_1(uint32_t v) const { data()->hud_option_1 = v; }
   uint32_t hud_option_1_bits() const { return data()->hud_option_1; }
   void set_hud_option_1_bits(uint32_t v) const { data()->hud_option_1 = v; }
+  uint32_t hud_option_2_address() const { return address + 8; }
   uint32_t hud_option_2() const { return data()->hud_option_2; }
   void set_hud_option_2(uint32_t v) const { data()->hud_option_2 = v; }
   uint32_t hud_option_2_bits() const { return data()->hud_option_2; }
   void set_hud_option_2_bits(uint32_t v) const { data()->hud_option_2 = v; }
+  uint32_t hud_option_3_address() const { return address + 12; }
   uint32_t hud_option_3() const { return data()->hud_option_3; }
   void set_hud_option_3(uint32_t v) const { data()->hud_option_3 = v; }
   uint32_t hud_option_3_bits() const { return data()->hud_option_3; }
   void set_hud_option_3_bits(uint32_t v) const { data()->hud_option_3 = v; }
   // the options' byte +28, sign-extended (the music's: VolumePage sets SetMusicVolume with it)
+  uint32_t music_volume_saved_address() const { return address + 16; }
   uint32_t music_volume_saved() const { return data()->music_volume_saved; }
   void set_music_volume_saved(uint32_t v) const { data()->music_volume_saved = v; }
   uint32_t music_volume_saved_bits() const { return data()->music_volume_saved; }
   void set_music_volume_saved_bits(uint32_t v) const { data()->music_volume_saved = v; }
   // the options' byte +29
+  uint32_t effects_volume_saved_address() const { return address + 20; }
   uint32_t effects_volume_saved() const { return data()->effects_volume_saved; }
   void set_effects_volume_saved(uint32_t v) const { data()->effects_volume_saved = v; }
   uint32_t effects_volume_saved_bits() const { return data()->effects_volume_saved; }
   void set_effects_volume_saved_bits(uint32_t v) const { data()->effects_volume_saved = v; }
   // three values -10 to 10 (the options' bytes +36 to +38)
+  uint32_t adjust_saved_0_address() const { return address + 24; }
   uint32_t adjust_saved_0() const { return data()->adjust_saved_0; }
   void set_adjust_saved_0(uint32_t v) const { data()->adjust_saved_0 = v; }
   uint32_t adjust_saved_0_bits() const { return data()->adjust_saved_0; }
   void set_adjust_saved_0_bits(uint32_t v) const { data()->adjust_saved_0 = v; }
+  uint32_t adjust_saved_1_address() const { return address + 28; }
   uint32_t adjust_saved_1() const { return data()->adjust_saved_1; }
   void set_adjust_saved_1(uint32_t v) const { data()->adjust_saved_1 = v; }
   uint32_t adjust_saved_1_bits() const { return data()->adjust_saved_1; }
   void set_adjust_saved_1_bits(uint32_t v) const { data()->adjust_saved_1 = v; }
+  uint32_t adjust_saved_2_address() const { return address + 32; }
   uint32_t adjust_saved_2() const { return data()->adjust_saved_2; }
   void set_adjust_saved_2(uint32_t v) const { data()->adjust_saved_2 = v; }
   uint32_t adjust_saved_2_bits() const { return data()->adjust_saved_2; }
   void set_adjust_saved_2_bits(uint32_t v) const { data()->adjust_saved_2 = v; }
   // the HUD options' edits (page 1)
+  uint32_t hud_edit_0_address() const { return address + 36; }
   uint32_t hud_edit_0() const { return data()->hud_edit_0; }
   void set_hud_edit_0(uint32_t v) const { data()->hud_edit_0 = v; }
   uint32_t hud_edit_0_bits() const { return data()->hud_edit_0; }
   void set_hud_edit_0_bits(uint32_t v) const { data()->hud_edit_0 = v; }
+  uint32_t hud_edit_1_address() const { return address + 40; }
   uint32_t hud_edit_1() const { return data()->hud_edit_1; }
   void set_hud_edit_1(uint32_t v) const { data()->hud_edit_1 = v; }
   uint32_t hud_edit_1_bits() const { return data()->hud_edit_1; }
   void set_hud_edit_1_bits(uint32_t v) const { data()->hud_edit_1 = v; }
+  uint32_t hud_edit_2_address() const { return address + 44; }
   uint32_t hud_edit_2() const { return data()->hud_edit_2; }
   void set_hud_edit_2(uint32_t v) const { data()->hud_edit_2 = v; }
   uint32_t hud_edit_2_bits() const { return data()->hud_edit_2; }
   void set_hud_edit_2_bits(uint32_t v) const { data()->hud_edit_2 = v; }
+  uint32_t hud_edit_3_address() const { return address + 48; }
   uint32_t hud_edit_3() const { return data()->hud_edit_3; }
   void set_hud_edit_3(uint32_t v) const { data()->hud_edit_3 = v; }
   uint32_t hud_edit_3_bits() const { return data()->hud_edit_3; }
   void set_hud_edit_3_bits(uint32_t v) const { data()->hud_edit_3 = v; }
   // the volumes' edits (page 2), 0 to 15: SoundOptions::SetMusicVolume's (+52) and SetEffectsVolume's (+56)
+  uint32_t music_volume_address() const { return address + 52; }
   uint32_t music_volume() const { return data()->music_volume; }
   void set_music_volume(uint32_t v) const { data()->music_volume = v; }
   uint32_t music_volume_bits() const { return data()->music_volume; }
   void set_music_volume_bits(uint32_t v) const { data()->music_volume = v; }
+  uint32_t effects_volume_address() const { return address + 56; }
   uint32_t effects_volume() const { return data()->effects_volume; }
   void set_effects_volume(uint32_t v) const { data()->effects_volume = v; }
   uint32_t effects_volume_bits() const { return data()->effects_volume; }
   void set_effects_volume_bits(uint32_t v) const { data()->effects_volume = v; }
   // the three values' edits (page 3), -10 to 10
+  uint32_t adjust_0_address() const { return address + 60; }
   uint32_t adjust_0() const { return data()->adjust_0; }
   void set_adjust_0(uint32_t v) const { data()->adjust_0 = v; }
   uint32_t adjust_0_bits() const { return data()->adjust_0; }
   void set_adjust_0_bits(uint32_t v) const { data()->adjust_0 = v; }
+  uint32_t adjust_1_address() const { return address + 64; }
   uint32_t adjust_1() const { return data()->adjust_1; }
   void set_adjust_1(uint32_t v) const { data()->adjust_1 = v; }
   uint32_t adjust_1_bits() const { return data()->adjust_1; }
   void set_adjust_1_bits(uint32_t v) const { data()->adjust_1 = v; }
+  uint32_t adjust_2_address() const { return address + 68; }
   uint32_t adjust_2() const { return data()->adjust_2; }
   void set_adjust_2(uint32_t v) const { data()->adjust_2 = v; }
   uint32_t adjust_2_bits() const { return data()->adjust_2; }
   void set_adjust_2_bits(uint32_t v) const { data()->adjust_2 = v; }
   // the HUD options' defaults (the last item's Default), 1 at LoadData
+  uint32_t hud_default_0_address() const { return address + 72; }
   uint32_t hud_default_0() const { return data()->hud_default_0; }
   void set_hud_default_0(uint32_t v) const { data()->hud_default_0 = v; }
   uint32_t hud_default_0_bits() const { return data()->hud_default_0; }
   void set_hud_default_0_bits(uint32_t v) const { data()->hud_default_0 = v; }
   // 1 at LoadData
+  uint32_t hud_default_1_address() const { return address + 76; }
   uint32_t hud_default_1() const { return data()->hud_default_1; }
   void set_hud_default_1(uint32_t v) const { data()->hud_default_1 = v; }
   uint32_t hud_default_1_bits() const { return data()->hud_default_1; }
   void set_hud_default_1_bits(uint32_t v) const { data()->hud_default_1 = v; }
   // 1 at LoadData
+  uint32_t hud_default_2_address() const { return address + 80; }
   uint32_t hud_default_2() const { return data()->hud_default_2; }
   void set_hud_default_2(uint32_t v) const { data()->hud_default_2 = v; }
   uint32_t hud_default_2_bits() const { return data()->hud_default_2; }
   void set_hud_default_2_bits(uint32_t v) const { data()->hud_default_2 = v; }
   // 1 at LoadData
+  uint32_t hud_default_3_address() const { return address + 84; }
   uint32_t hud_default_3() const { return data()->hud_default_3; }
   void set_hud_default_3(uint32_t v) const { data()->hud_default_3 = v; }
   uint32_t hud_default_3_bits() const { return data()->hud_default_3; }
   void set_hud_default_3_bits(uint32_t v) const { data()->hud_default_3 = v; }
   // the volumes' defaults, 15 at LoadData
+  uint32_t music_volume_default_address() const { return address + 88; }
   uint32_t music_volume_default() const { return data()->music_volume_default; }
   void set_music_volume_default(uint32_t v) const { data()->music_volume_default = v; }
   uint32_t music_volume_default_bits() const { return data()->music_volume_default; }
   void set_music_volume_default_bits(uint32_t v) const { data()->music_volume_default = v; }
   // 15 at LoadData (probably)
+  uint32_t effects_volume_default_address() const { return address + 92; }
   uint32_t effects_volume_default() const { return data()->effects_volume_default; }
   void set_effects_volume_default(uint32_t v) const { data()->effects_volume_default = v; }
   uint32_t effects_volume_default_bits() const { return data()->effects_volume_default; }
   void set_effects_volume_default_bits(uint32_t v) const { data()->effects_volume_default = v; }
   // the three values' defaults, 0 at LoadData
+  uint32_t adjust_default_0_address() const { return address + 96; }
   uint32_t adjust_default_0() const { return data()->adjust_default_0; }
   void set_adjust_default_0(uint32_t v) const { data()->adjust_default_0 = v; }
   uint32_t adjust_default_0_bits() const { return data()->adjust_default_0; }
   void set_adjust_default_0_bits(uint32_t v) const { data()->adjust_default_0 = v; }
   // 0 at LoadData
+  uint32_t adjust_default_1_address() const { return address + 100; }
   uint32_t adjust_default_1() const { return data()->adjust_default_1; }
   void set_adjust_default_1(uint32_t v) const { data()->adjust_default_1 = v; }
   uint32_t adjust_default_1_bits() const { return data()->adjust_default_1; }
   void set_adjust_default_1_bits(uint32_t v) const { data()->adjust_default_1 = v; }
   // 0 at LoadData
+  uint32_t adjust_default_2_address() const { return address + 104; }
   uint32_t adjust_default_2() const { return data()->adjust_default_2; }
   void set_adjust_default_2(uint32_t v) const { data()->adjust_default_2 = v; }
   uint32_t adjust_default_2_bits() const { return data()->adjust_default_2; }
   void set_adjust_default_2_bits(uint32_t v) const { data()->adjust_default_2 = v; }
   // the save data's +6116 (kinds 0 to 2)
+  uint32_t money_address() const { return address + 108; }
   uint32_t money() const { return data()->money; }
   void set_money(uint32_t v) const { data()->money = v; }
   uint32_t money_bits() const { return data()->money; }
   void set_money_bits(uint32_t v) const { data()->money = v; }
   // the day (save +6100) mod 7
+  uint32_t weekday_address() const { return address + 112; }
   uint32_t weekday() const { return data()->weekday; }
   void set_weekday(uint32_t v) const { data()->weekday = v; }
   uint32_t weekday_bits() const { return data()->weekday; }
   void set_weekday_bits(uint32_t v) const { data()->weekday = v; }
   // the day, at most 999
+  uint32_t day_address() const { return address + 116; }
   uint32_t day() const { return data()->day; }
   void set_day(uint32_t v) const { data()->day = v; }
   uint32_t day_bits() const { return data()->day; }
   void set_day_bits(uint32_t v) const { data()->day = v; }
   // Stats::WinStreak, 0 to 999
+  uint32_t win_streak_address() const { return address + 120; }
   uint32_t win_streak() const { return data()->win_streak; }
   void set_win_streak(uint32_t v) const { data()->win_streak = v; }
   uint32_t win_streak_bits() const { return data()->win_streak; }
   void set_win_streak_bits(uint32_t v) const { data()->win_streak = v; }
   // the car's float +6248, clamped and truncated
+  uint32_t car_value_a_address() const { return address + 124; }
   uint32_t car_value_a() const { return data()->car_value_a; }
   void set_car_value_a(uint32_t v) const { data()->car_value_a = v; }
   uint32_t car_value_a_bits() const { return data()->car_value_a; }
   void set_car_value_a_bits(uint32_t v) const { data()->car_value_a = v; }
   // the car's float +6244, clamped and truncated
+  uint32_t car_value_b_address() const { return address + 128; }
   uint32_t car_value_b() const { return data()->car_value_b; }
   void set_car_value_b(uint32_t v) const { data()->car_value_b = v; }
   uint32_t car_value_b_bits() const { return data()->car_value_b; }
   void set_car_value_b_bits(uint32_t v) const { data()->car_value_b = v; }
   // 0 to 8: which items (the table at 0x8200CBF0)
+  uint32_t kind_address() const { return address + 132; }
   uint32_t kind() const { return data()->kind; }
   void set_kind(uint32_t v) const { data()->kind = v; }
   uint32_t kind_bits() const { return data()->kind; }
   void set_kind_bits(uint32_t v) const { data()->kind = v; }
   // the kind's items, at most 6
+  uint32_t item_count_address() const { return address + 136; }
   uint32_t item_count() const { return data()->item_count; }
   void set_item_count(uint32_t v) const { data()->item_count = v; }
   uint32_t item_count_bits() const { return data()->item_count; }
   void set_item_count_bits(uint32_t v) const { data()->item_count = v; }
   // 1 the resume, 2 to 9 the items ending or restarting the race
+  uint32_t answer_address() const { return address + 140; }
   uint32_t answer() const { return data()->answer; }
   void set_answer(uint32_t v) const { data()->answer = v; }
   uint32_t answer_bits() const { return data()->answer; }
   void set_answer_bits(uint32_t v) const { data()->answer = v; }
   // the sub-pages' last item: 1 OK (the edits kept), 0 Default (the defaults); the arrow's row
+  uint32_t last_item_ok_address() const { return address + 144; }
   uint32_t last_item_ok() const { return data()->last_item_ok; }
   void set_last_item_ok(uint32_t v) const { data()->last_item_ok = v; }
   uint32_t last_item_ok_bits() const { return data()->last_item_ok; }
   void set_last_item_ok_bits(uint32_t v) const { data()->last_item_ok = v; }
   // the main list's selection kept while a sub-page shows
+  uint32_t main_selection_address() const { return address + 148; }
   uint32_t main_selection() const { return data()->main_selection; }
   void set_main_selection(uint32_t v) const { data()->main_selection = v; }
   uint32_t main_selection_bits() const { return data()->main_selection; }
   void set_main_selection_bits(uint32_t v) const { data()->main_selection = v; }
   // PauseMenu::RunTen's count, done at 10
+  uint32_t run_count_address() const { return address + 152; }
   uint32_t run_count() const { return data()->run_count; }
   void set_run_count(uint32_t v) const { data()->run_count = v; }
   uint32_t run_count_bits() const { return data()->run_count; }
   void set_run_count_bits(uint32_t v) const { data()->run_count = v; }
   // Open's flag (RaceHudMachine::IsFirstDay): the items of id 4 disabled
+  uint32_t first_day_address() const { return address + 156; }
   uint32_t first_day() const { return data()->first_day; }
   void set_first_day(uint32_t v) const { data()->first_day = v; }
   uint32_t first_day_bits() const { return data()->first_day; }
@@ -424,54 +481,72 @@ struct RaceDialogData : View {
   static RaceDialogData New(uint8_t* base) {
     return RaceDialogData(base, memory::MakeHandle(new RaceDialogDataData(), sizeof(RaceDialogDataData), "RaceDialogData", &kRaceDialogDataLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static RaceDialogData NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(RaceDialogDataData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<RaceDialogDataData*>(::operator new(sizeof(RaceDialogDataData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) RaceDialogDataData();
+    return RaceDialogData(base, memory::MakeHandle(p, sizeof(RaceDialogDataData) * count, "RaceDialogData", &kRaceDialogDataLayout, sizeof(RaceDialogDataData)));
+  }
+  RaceDialogData at(uint32_t i) const { return RaceDialogData(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kRaceDialogDataLayout, offset, width); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kRaceDialogDataLayout, offset, width, v); }
   // 1 when the question was answered yes
+  uint32_t yes_address() const { return address + 0; }
   uint32_t yes() const { return data()->yes; }
   void set_yes(uint32_t v) const { data()->yes = v; }
   uint32_t yes_bits() const { return data()->yes; }
   void set_yes_bits(uint32_t v) const { data()->yes = v; }
   // AskSlot's slot (0 a new one)
+  uint32_t slot_address() const { return address + 4; }
   uint32_t slot() const { return data()->slot; }
   void set_slot(uint32_t v) const { data()->slot = v; }
   uint32_t slot_bits() const { return data()->slot; }
   void set_slot_bits(uint32_t v) const { data()->slot = v; }
   // 0 before Replays::Delete (Question's message 5)
+  uint32_t unknown_8_address() const { return address + 8; }
   uint32_t unknown_8() const { return data()->unknown_8; }
   void set_unknown_8(uint32_t v) const { data()->unknown_8 = v; }
   uint32_t unknown_8_bits() const { return data()->unknown_8; }
   void set_unknown_8_bits(uint32_t v) const { data()->unknown_8 = v; }
   // the message (ShowMessage's jump table, 0 to 11), 13 the question
+  uint32_t message_address() const { return address + 12; }
   uint32_t message() const { return data()->message; }
   void set_message(uint32_t v) const { data()->message = v; }
   uint32_t message_bits() const { return data()->message; }
   void set_message_bits(uint32_t v) const { data()->message = v; }
   // how OpenAnim and ShowMessage open it: 0, 1 (with the list) or 2
+  uint32_t open_style_address() const { return address + 16; }
   uint32_t open_style() const { return data()->open_style; }
   void set_open_style(uint32_t v) const { data()->open_style = v; }
   uint32_t open_style_bits() const { return data()->open_style; }
   void set_open_style_bits(uint32_t v) const { data()->open_style = v; }
   // open_style after OpenAnim
+  uint32_t next_open_style_address() const { return address + 20; }
   uint32_t next_open_style() const { return data()->next_open_style; }
   void set_next_open_style(uint32_t v) const { data()->next_open_style = v; }
   uint32_t next_open_style_bits() const { return data()->next_open_style; }
   void set_next_open_style_bits(uint32_t v) const { data()->next_open_style = v; }
+  uint32_t unknown_24_address() const { return address + 24; }
   uint32_t unknown_24() const { return data()->unknown_24; }
   void set_unknown_24(uint32_t v) const { data()->unknown_24 = v; }
   uint32_t unknown_24_bits() const { return data()->unknown_24; }
   void set_unknown_24_bits(uint32_t v) const { data()->unknown_24 = v; }
   // the list's selection at opening
+  uint32_t selection_address() const { return address + 28; }
   uint32_t selection() const { return data()->selection; }
   void set_selection(uint32_t v) const { data()->selection = v; }
   uint32_t selection_bits() const { return data()->selection; }
   void set_selection_bits(uint32_t v) const { data()->selection = v; }
   // 1 while the dialog shows (RaceDialog::Answer clears it)
+  uint32_t showing_address() const { return address + 32; }
   uint32_t showing() const { return data()->showing; }
   void set_showing(uint32_t v) const { data()->showing = v; }
   uint32_t showing_bits() const { return data()->showing; }
   void set_showing_bits(uint32_t v) const { data()->showing = v; }
   // 1: Update goes to page 5
+  uint32_t close_asked_address() const { return address + 36; }
   uint32_t close_asked() const { return data()->close_asked; }
   void set_close_asked(uint32_t v) const { data()->close_asked = v; }
   uint32_t close_asked_bits() const { return data()->close_asked; }
@@ -590,60 +665,79 @@ struct AfterRaceMenuScreen : View {
   static AfterRaceMenuScreen New(uint8_t* base) {
     return AfterRaceMenuScreen(base, memory::MakeHandle(new AfterRaceMenuScreenData(), sizeof(AfterRaceMenuScreenData), "AfterRaceMenuScreen", &kAfterRaceMenuScreenLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static AfterRaceMenuScreen NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(AfterRaceMenuScreenData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<AfterRaceMenuScreenData*>(::operator new(sizeof(AfterRaceMenuScreenData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) AfterRaceMenuScreenData();
+    return AfterRaceMenuScreen(base, memory::MakeHandle(p, sizeof(AfterRaceMenuScreenData) * count, "AfterRaceMenuScreen", &kAfterRaceMenuScreenLayout, sizeof(AfterRaceMenuScreenData)));
+  }
+  AfterRaceMenuScreen at(uint32_t i) const { return AfterRaceMenuScreen(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kAfterRaceMenuScreenLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAfterRaceMenuScreenLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // UI movie 9 (UiMovies::Find)
+  uint32_t movie_address() const { return address + 0; }
   View movie() const { return View(base, on_host() ? data()->movie : guest::LoadU32(base, address + 0)); }
   void set_movie(uint32_t v) const { if (on_host()) data()->movie = v; else guest::StoreU32(base, address + 0, v); }
   uint32_t movie_bits() const { return on_host() ? data()->movie : guest::LoadU32(base, address + 0); }
   void set_movie_bits(uint32_t v) const { if (on_host()) data()->movie = v; else guest::StoreU32(base, address + 0, v); }
   // measure fault: a replay record's halfwords +0 to +10, the date and time (probably a SYSTEMTIME's)
+  uint32_t fault_replay_year_address() const { return address + 0; }
   uint16_t fault_replay_year_bits() const { return on_host() ? uint16_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kAfterRaceMenuScreenLayout, 0, 2)) : guest::LoadU16(base, address + 0); }
   void set_fault_replay_year_bits(uint16_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAfterRaceMenuScreenLayout, 0, 2, v); else guest::StoreU16(base, address + 0, v); }
   uint16_t fault_replay_year() const { return uint16_t(fault_replay_year_bits()); }
   void set_fault_replay_year(uint16_t v) const { set_fault_replay_year_bits(uint16_t(v)); }
   // measure fault
+  uint32_t fault_replay_month_address() const { return address + 2; }
   uint16_t fault_replay_month_bits() const { return on_host() ? uint16_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kAfterRaceMenuScreenLayout, 2, 2)) : guest::LoadU16(base, address + 2); }
   void set_fault_replay_month_bits(uint16_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAfterRaceMenuScreenLayout, 2, 2, v); else guest::StoreU16(base, address + 2, v); }
   uint16_t fault_replay_month() const { return uint16_t(fault_replay_month_bits()); }
   void set_fault_replay_month(uint16_t v) const { set_fault_replay_month_bits(uint16_t(v)); }
   // measure fault
+  uint32_t fault_replay_day_address() const { return address + 6; }
   uint16_t fault_replay_day() const { return on_host() ? uint16_t(data()->fault_replay_day) : uint16_t(guest::LoadU16(base, address + 6)); }
   void set_fault_replay_day(uint16_t v) const { if (on_host()) data()->fault_replay_day = v; else guest::StoreU16(base, address + 6, v); }
   uint16_t fault_replay_day_bits() const { return on_host() ? data()->fault_replay_day : guest::LoadU16(base, address + 6); }
   void set_fault_replay_day_bits(uint16_t v) const { if (on_host()) data()->fault_replay_day = v; else guest::StoreU16(base, address + 6, v); }
   // measure fault
+  uint32_t fault_replay_hour_address() const { return address + 8; }
   uint16_t fault_replay_hour() const { return on_host() ? uint16_t(data()->fault_replay_hour) : uint16_t(guest::LoadU16(base, address + 8)); }
   void set_fault_replay_hour(uint16_t v) const { if (on_host()) data()->fault_replay_hour = v; else guest::StoreU16(base, address + 8, v); }
   uint16_t fault_replay_hour_bits() const { return on_host() ? data()->fault_replay_hour : guest::LoadU16(base, address + 8); }
   void set_fault_replay_hour_bits(uint16_t v) const { if (on_host()) data()->fault_replay_hour = v; else guest::StoreU16(base, address + 8, v); }
   // measure fault
+  uint32_t fault_replay_minute_address() const { return address + 10; }
   uint16_t fault_replay_minute() const { return on_host() ? uint16_t(data()->fault_replay_minute) : uint16_t(guest::LoadU16(base, address + 10)); }
   void set_fault_replay_minute(uint16_t v) const { if (on_host()) data()->fault_replay_minute = v; else guest::StoreU16(base, address + 10, v); }
   uint16_t fault_replay_minute_bits() const { return on_host() ? data()->fault_replay_minute : guest::LoadU16(base, address + 10); }
   void set_fault_replay_minute_bits(uint16_t v) const { if (on_host()) data()->fault_replay_minute = v; else guest::StoreU16(base, address + 10, v); }
   // measure fault: minutes, seconds and thousandths packed
+  uint32_t fault_replay_time_address() const { return address + 16; }
   uint32_t fault_replay_time() const { return on_host() ? uint32_t(data()->fault_replay_time) : uint32_t(guest::LoadU32(base, address + 16)); }
   void set_fault_replay_time(uint32_t v) const { if (on_host()) data()->fault_replay_time = v; else guest::StoreU32(base, address + 16, v); }
   uint32_t fault_replay_time_bits() const { return on_host() ? data()->fault_replay_time : guest::LoadU32(base, address + 16); }
   void set_fault_replay_time_bits(uint32_t v) const { if (on_host()) data()->fault_replay_time = v; else guest::StoreU32(base, address + 16, v); }
   // measure fault
+  uint32_t fault_replay_mode_address() const { return address + 20; }
   uint32_t fault_replay_mode() const { return on_host() ? uint32_t(data()->fault_replay_mode) : uint32_t(guest::LoadU32(base, address + 20)); }
   void set_fault_replay_mode(uint32_t v) const { if (on_host()) data()->fault_replay_mode = v; else guest::StoreU32(base, address + 20, v); }
   uint32_t fault_replay_mode_bits() const { return on_host() ? data()->fault_replay_mode : guest::LoadU32(base, address + 20); }
   void set_fault_replay_mode_bits(uint32_t v) const { if (on_host()) data()->fault_replay_mode = v; else guest::StoreU32(base, address + 20, v); }
   // measure fault
+  uint32_t fault_replay_course_address() const { return address + 24; }
   uint32_t fault_replay_course() const { return on_host() ? uint32_t(data()->fault_replay_course) : uint32_t(guest::LoadU32(base, address + 24)); }
   void set_fault_replay_course(uint32_t v) const { if (on_host()) data()->fault_replay_course = v; else guest::StoreU32(base, address + 24, v); }
   uint32_t fault_replay_course_bits() const { return on_host() ? data()->fault_replay_course : guest::LoadU32(base, address + 24); }
   void set_fault_replay_course_bits(uint32_t v) const { if (on_host()) data()->fault_replay_course = v; else guest::StoreU32(base, address + 24, v); }
   // measure fault: the replay's number, 0 for none
+  uint32_t fault_replay_number_address() const { return address + 28; }
   uint32_t fault_replay_number() const { return on_host() ? uint32_t(data()->fault_replay_number) : uint32_t(guest::LoadU32(base, address + 28)); }
   void set_fault_replay_number(uint32_t v) const { if (on_host()) data()->fault_replay_number = v; else guest::StoreU32(base, address + 28, v); }
   uint32_t fault_replay_number_bits() const { return on_host() ? data()->fault_replay_number : guest::LoadU32(base, address + 28); }
   void set_fault_replay_number_bits(uint32_t v) const { if (on_host()) data()->fault_replay_number = v; else guest::StoreU32(base, address + 28, v); }
   // measure fault
+  uint32_t fault_replay_result_address() const { return address + 32; }
   uint32_t fault_replay_result() const { return on_host() ? uint32_t(data()->fault_replay_result) : uint32_t(guest::LoadU32(base, address + 32)); }
   void set_fault_replay_result(uint32_t v) const { if (on_host()) data()->fault_replay_result = v; else guest::StoreU32(base, address + 32, v); }
   uint32_t fault_replay_result_bits() const { return on_host() ? data()->fault_replay_result : guest::LoadU32(base, address + 32); }
@@ -674,34 +768,48 @@ struct AfterRaceMenuData : View {
   static AfterRaceMenuData New(uint8_t* base) {
     return AfterRaceMenuData(base, memory::MakeHandle(new AfterRaceMenuDataData(), sizeof(AfterRaceMenuDataData), "AfterRaceMenuData", &kAfterRaceMenuDataLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static AfterRaceMenuData NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(AfterRaceMenuDataData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<AfterRaceMenuDataData*>(::operator new(sizeof(AfterRaceMenuDataData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) AfterRaceMenuDataData();
+    return AfterRaceMenuData(base, memory::MakeHandle(p, sizeof(AfterRaceMenuDataData) * count, "AfterRaceMenuData", &kAfterRaceMenuDataLayout, sizeof(AfterRaceMenuDataData)));
+  }
+  AfterRaceMenuData at(uint32_t i) const { return AfterRaceMenuData(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kAfterRaceMenuDataLayout, offset, width); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAfterRaceMenuDataLayout, offset, width, v); }
   // 0 to 6: which items (the table at 0x82010428)
+  uint32_t kind_address() const { return address + 0; }
   uint32_t kind() const { return data()->kind; }
   void set_kind(uint32_t v) const { data()->kind = v; }
   uint32_t kind_bits() const { return data()->kind; }
   void set_kind_bits(uint32_t v) const { data()->kind = v; }
   // the kind's items, at most 4
+  uint32_t item_count_address() const { return address + 4; }
   uint32_t item_count() const { return data()->item_count; }
   void set_item_count(uint32_t v) const { data()->item_count = v; }
   uint32_t item_count_bits() const { return data()->item_count; }
   void set_item_count_bits(uint32_t v) const { data()->item_count = v; }
   // Open's flag: items 1 and 2 (the replay's) disabled
+  uint32_t no_replay_address() const { return address + 8; }
   uint32_t no_replay() const { return data()->no_replay; }
   void set_no_replay(uint32_t v) const { data()->no_replay = v; }
   uint32_t no_replay_bits() const { return data()->no_replay; }
   void set_no_replay_bits(uint32_t v) const { data()->no_replay = v; }
+  uint32_t answer_address() const { return address + 12; }
   uint32_t answer() const { return data()->answer; }
   void set_answer(uint32_t v) const { data()->answer = v; }
   uint32_t answer_bits() const { return data()->answer; }
   void set_answer_bits(uint32_t v) const { data()->answer = v; }
   // the main list's selection kept
+  uint32_t selection_address() const { return address + 16; }
   uint32_t selection() const { return data()->selection; }
   void set_selection(uint32_t v) const { data()->selection = v; }
   uint32_t selection_bits() const { return data()->selection; }
   void set_selection_bits(uint32_t v) const { data()->selection = v; }
   // 0 at Open; 1 from sub_82211E90, 0 from sub_82211F18
+  uint32_t unknown_20_address() const { return address + 20; }
   uint32_t unknown_20() const { return data()->unknown_20; }
   void set_unknown_20(uint32_t v) const { data()->unknown_20 = v; }
   uint32_t unknown_20_bits() const { return data()->unknown_20; }

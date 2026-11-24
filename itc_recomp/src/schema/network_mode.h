@@ -42,65 +42,87 @@ struct ModeType12 : View {
   static ModeType12 New(uint8_t* base) {
     return ModeType12(base, memory::MakeHandle(new ModeType12Data(), sizeof(ModeType12Data), "ModeType12", &kModeType12Layout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static ModeType12 NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(ModeType12Data) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<ModeType12Data*>(::operator new(sizeof(ModeType12Data) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) ModeType12Data();
+    return ModeType12(base, memory::MakeHandle(p, sizeof(ModeType12Data) * count, "ModeType12", &kModeType12Layout, sizeof(ModeType12Data)));
+  }
+  ModeType12 at(uint32_t i) const { return ModeType12(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kModeType12Layout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kModeType12Layout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0x82006C6C
+  uint32_t vtable_address() const { return address + 0; }
   uint32_t vtable() const { return on_host() ? uint32_t(data()->vtable) : uint32_t(guest::LoadU32(base, address + 0)); }
   void set_vtable(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_bits() const { return on_host() ? data()->vtable : guest::LoadU32(base, address + 0); }
   void set_vtable_bits(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
   // measure fault: the next-mode answer's byte +0 (the delegate functions' r3), not the mode's
+  uint32_t answer_changed_address() const { return address + 0; }
   uint8_t answer_changed_bits() const { return on_host() ? uint8_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kModeType12Layout, 0, 1)) : guest::LoadU8(base, address + 0); }
   void set_answer_changed_bits(uint8_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kModeType12Layout, 0, 1, v); else guest::StoreU8(base, address + 0, v); }
   uint8_t answer_changed() const { return uint8_t(answer_changed_bits()); }
   void set_answer_changed(uint8_t v) const { set_answer_changed_bits(uint8_t(v)); }
   // the delegate at +8, 0 when none (also the answer's +4 by the measure's join)
+  uint32_t delegate_ptr_address() const { return address + 4; }
   uint32_t delegate_ptr() const { return on_host() ? uint32_t(data()->delegate_ptr) : uint32_t(guest::LoadU32(base, address + 4)); }
   void set_delegate_ptr(uint32_t v) const { if (on_host()) data()->delegate_ptr = v; else guest::StoreU32(base, address + 4, v); }
   uint32_t delegate_ptr_bits() const { return on_host() ? data()->delegate_ptr : guest::LoadU32(base, address + 4); }
   void set_delegate_ptr_bits(uint32_t v) const { if (on_host()) data()->delegate_ptr = v; else guest::StoreU32(base, address + 4, v); }
   // the delegate: vtable 0x82010FA0
+  uint32_t delegate_vtable_address() const { return address + 8; }
   uint32_t delegate_vtable() const { return on_host() ? uint32_t(data()->delegate_vtable) : uint32_t(guest::LoadU32(base, address + 8)); }
   void set_delegate_vtable(uint32_t v) const { if (on_host()) data()->delegate_vtable = v; else guest::StoreU32(base, address + 8, v); }
   uint32_t delegate_vtable_bits() const { return on_host() ? data()->delegate_vtable : guest::LoadU32(base, address + 8); }
   void set_delegate_vtable_bits(uint32_t v) const { if (on_host()) data()->delegate_vtable = v; else guest::StoreU32(base, address + 8, v); }
   // the delegate's object: the mode
+  uint32_t delegate_object_address() const { return address + 12; }
   uint32_t delegate_object() const { return on_host() ? uint32_t(data()->delegate_object) : uint32_t(guest::LoadU32(base, address + 12)); }
   void set_delegate_object(uint32_t v) const { if (on_host()) data()->delegate_object = v; else guest::StoreU32(base, address + 12, v); }
   uint32_t delegate_object_bits() const { return on_host() ? data()->delegate_object : guest::LoadU32(base, address + 12); }
   void set_delegate_object_bits(uint32_t v) const { if (on_host()) data()->delegate_object = v; else guest::StoreU32(base, address + 12, v); }
   // the delegate function's thunk (Mode::Slot8Thunk, NextModeThunk, Slot10Thunk to Slot12Thunk)
+  uint32_t delegate_function_address() const { return address + 16; }
   uint32_t delegate_function() const { return on_host() ? uint32_t(data()->delegate_function) : uint32_t(guest::LoadU32(base, address + 16)); }
   void set_delegate_function(uint32_t v) const { if (on_host()) data()->delegate_function = v; else guest::StoreU32(base, address + 16, v); }
   uint32_t delegate_function_bits() const { return on_host() ? data()->delegate_function : guest::LoadU32(base, address + 16); }
   void set_delegate_function_bits(uint32_t v) const { if (on_host()) data()->delegate_function = v; else guest::StoreU32(base, address + 16, v); }
+  uint32_t delegate_adjustment_address() const { return address + 20; }
   uint32_t delegate_adjustment() const { return on_host() ? uint32_t(data()->delegate_adjustment) : uint32_t(guest::LoadU32(base, address + 20)); }
   void set_delegate_adjustment(uint32_t v) const { if (on_host()) data()->delegate_adjustment = v; else guest::StoreU32(base, address + 20, v); }
   uint32_t delegate_adjustment_bits() const { return on_host() ? data()->delegate_adjustment : guest::LoadU32(base, address + 20); }
   void set_delegate_adjustment_bits(uint32_t v) const { if (on_host()) data()->delegate_adjustment = v; else guest::StoreU32(base, address + 20, v); }
   // the +32 interface's vtable 0x82006C60 (Interrupt, ForceExit, Resume)
+  uint32_t vtable32_address() const { return address + 32; }
   uint32_t vtable32() const { return on_host() ? uint32_t(data()->vtable32) : uint32_t(guest::LoadU32(base, address + 32)); }
   void set_vtable32(uint32_t v) const { if (on_host()) data()->vtable32 = v; else guest::StoreU32(base, address + 32, v); }
   uint32_t vtable32_bits() const { return on_host() ? data()->vtable32 : guest::LoadU32(base, address + 32); }
   void set_vtable32_bits(uint32_t v) const { if (on_host()) data()->vtable32 = v; else guest::StoreU32(base, address + 32, v); }
   // the dispatcher (+36, ModeDispatcher): 50 handler pointers (the fourteen machines)
+  uint32_t handlers_address() const { return address + 36; }
   uint8_t* handlers() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 36 : guest::Pointer(base, address + 36); }
+  uint32_t handler_count_address() const { return address + 236; }
   uint32_t handler_count() const { return on_host() ? uint32_t(data()->handler_count) : uint32_t(guest::LoadU32(base, address + 236)); }
   void set_handler_count(uint32_t v) const { if (on_host()) data()->handler_count = v; else guest::StoreU32(base, address + 236, v); }
   uint32_t handler_count_bits() const { return on_host() ? data()->handler_count : guest::LoadU32(base, address + 236); }
   void set_handler_count_bits(uint32_t v) const { if (on_host()) data()->handler_count = v; else guest::StoreU32(base, address + 236, v); }
   // the dispatcher's ring: 50 messages of 12 bytes (id, two words); the +32 interface's +808 and +812 are ring_count and ring_start
+  uint32_t ring_address() const { return address + 240; }
   uint8_t* ring() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 240 : guest::Pointer(base, address + 240); }
+  uint32_t ring_count_address() const { return address + 840; }
   uint32_t ring_count() const { return on_host() ? uint32_t(data()->ring_count) : uint32_t(guest::LoadU32(base, address + 840)); }
   void set_ring_count(uint32_t v) const { if (on_host()) data()->ring_count = v; else guest::StoreU32(base, address + 840, v); }
   uint32_t ring_count_bits() const { return on_host() ? data()->ring_count : guest::LoadU32(base, address + 840); }
   void set_ring_count_bits(uint32_t v) const { if (on_host()) data()->ring_count = v; else guest::StoreU32(base, address + 840, v); }
+  uint32_t ring_start_address() const { return address + 844; }
   uint32_t ring_start() const { return on_host() ? uint32_t(data()->ring_start) : uint32_t(guest::LoadU32(base, address + 844)); }
   void set_ring_start(uint32_t v) const { if (on_host()) data()->ring_start = v; else guest::StoreU32(base, address + 844, v); }
   uint32_t ring_start_bits() const { return on_host() ? data()->ring_start : guest::LoadU32(base, address + 844); }
   void set_ring_start_bits(uint32_t v) const { if (on_host()) data()->ring_start = v; else guest::StoreU32(base, address + 844, v); }
   // the block, VirtualAlloc'ed by Init (the +32 interface's +816)
+  uint32_t block_address() const { return address + 848; }
   template <typename T = NetModeBlock>
   T block() const { return T(base, on_host() ? data()->block : guest::LoadU32(base, address + 848)); }
   void set_block(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->block = v; else guest::StoreU32(base, address + 848, v); }
@@ -304,22 +326,35 @@ struct NetModeDispatcher : View {
   static NetModeDispatcher New(uint8_t* base) {
     return NetModeDispatcher(base, memory::MakeHandle(new NetModeDispatcherData(), sizeof(NetModeDispatcherData), "NetModeDispatcher", &kNetModeDispatcherLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static NetModeDispatcher NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(NetModeDispatcherData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<NetModeDispatcherData*>(::operator new(sizeof(NetModeDispatcherData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) NetModeDispatcherData();
+    return NetModeDispatcher(base, memory::MakeHandle(p, sizeof(NetModeDispatcherData) * count, "NetModeDispatcher", &kNetModeDispatcherLayout, sizeof(NetModeDispatcherData)));
+  }
+  NetModeDispatcher at(uint32_t i) const { return NetModeDispatcher(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kNetModeDispatcherLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kNetModeDispatcherLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 50 handler pointers (the machines)
+  uint32_t handlers_address() const { return address + 0; }
   uint8_t* handlers() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 0 : guest::Pointer(base, address + 0); }
+  uint32_t handler_count_address() const { return address + 200; }
   uint32_t handler_count() const { return on_host() ? uint32_t(data()->handler_count) : uint32_t(guest::LoadU32(base, address + 200)); }
   void set_handler_count(uint32_t v) const { if (on_host()) data()->handler_count = v; else guest::StoreU32(base, address + 200, v); }
   uint32_t handler_count_bits() const { return on_host() ? data()->handler_count : guest::LoadU32(base, address + 200); }
   void set_handler_count_bits(uint32_t v) const { if (on_host()) data()->handler_count = v; else guest::StoreU32(base, address + 200, v); }
   // 50 messages of 12 bytes (id, two words)
+  uint32_t ring_address() const { return address + 204; }
   uint8_t* ring() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 204 : guest::Pointer(base, address + 204); }
+  uint32_t ring_count_address() const { return address + 804; }
   uint32_t ring_count() const { return on_host() ? uint32_t(data()->ring_count) : uint32_t(guest::LoadU32(base, address + 804)); }
   void set_ring_count(uint32_t v) const { if (on_host()) data()->ring_count = v; else guest::StoreU32(base, address + 804, v); }
   uint32_t ring_count_bits() const { return on_host() ? data()->ring_count : guest::LoadU32(base, address + 804); }
   void set_ring_count_bits(uint32_t v) const { if (on_host()) data()->ring_count = v; else guest::StoreU32(base, address + 804, v); }
   // the ring's first slot
+  uint32_t ring_start_address() const { return address + 808; }
   uint32_t ring_start() const { return on_host() ? uint32_t(data()->ring_start) : uint32_t(guest::LoadU32(base, address + 808)); }
   void set_ring_start(uint32_t v) const { if (on_host()) data()->ring_start = v; else guest::StoreU32(base, address + 808, v); }
   uint32_t ring_start_bits() const { return on_host() ? data()->ring_start : guest::LoadU32(base, address + 808); }
@@ -353,49 +388,66 @@ struct NetModeSelectData : View {
   static NetModeSelectData New(uint8_t* base) {
     return NetModeSelectData(base, memory::MakeHandle(new NetModeSelectDataData(), sizeof(NetModeSelectDataData), "NetModeSelectData", &kNetModeSelectDataLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static NetModeSelectData NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(NetModeSelectDataData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<NetModeSelectDataData*>(::operator new(sizeof(NetModeSelectDataData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) NetModeSelectDataData();
+    return NetModeSelectData(base, memory::MakeHandle(p, sizeof(NetModeSelectDataData) * count, "NetModeSelectData", &kNetModeSelectDataLayout, sizeof(NetModeSelectDataData)));
+  }
+  NetModeSelectData at(uint32_t i) const { return NetModeSelectData(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kNetModeSelectDataLayout, offset, width); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kNetModeSelectDataLayout, offset, width, v); }
   // 1 once set up (SetUp): Open starts with ShowCursor, not Intro
+  uint32_t shown_before_address() const { return address + 0; }
   uint32_t shown_before() const { return data()->shown_before; }
   void set_shown_before(uint32_t v) const { data()->shown_before = v; }
   uint32_t shown_before_bits() const { return data()->shown_before; }
   void set_shown_before_bits(uint32_t v) const { data()->shown_before = v; }
   // back to the title (Destroy goes to state 14)
+  uint32_t back_address() const { return address + 4; }
   uint32_t back() const { return data()->back; }
   void set_back(uint32_t v) const { data()->back = v; }
   uint32_t back_bits() const { return data()->back; }
   void set_back_bits(uint32_t v) const { data()->back = v; }
   // set by BackPage: Unloaded goes to state 14
+  uint32_t back_to_title_address() const { return address + 8; }
   uint32_t back_to_title() const { return data()->back_to_title; }
   void set_back_to_title(uint32_t v) const { data()->back_to_title = v; }
   uint32_t back_to_title_bits() const { return data()->back_to_title; }
   void set_back_to_title_bits(uint32_t v) const { data()->back_to_title = v; }
+  uint32_t sign_in_ui_shown_address() const { return address + 12; }
   uint32_t sign_in_ui_shown() const { return data()->sign_in_ui_shown; }
   void set_sign_in_ui_shown(uint32_t v) const { data()->sign_in_ui_shown = v; }
   uint32_t sign_in_ui_shown_bits() const { return data()->sign_in_ui_shown; }
   void set_sign_in_ui_shown_bits(uint32_t v) const { data()->sign_in_ui_shown = v; }
   // dialog 12 (no privilege) up
+  uint32_t privilege_dialog_address() const { return address + 16; }
   uint32_t privilege_dialog() const { return data()->privilege_dialog; }
   void set_privilege_dialog(uint32_t v) const { data()->privilege_dialog = v; }
   uint32_t privilege_dialog_bits() const { return data()->privilege_dialog; }
   void set_privilege_dialog_bits(uint32_t v) const { data()->privilege_dialog = v; }
   // the page a dialog's close goes to (-1 none)
+  uint32_t dialog_page_address() const { return address + 20; }
   uint32_t dialog_page() const { return data()->dialog_page; }
   void set_dialog_page(uint32_t v) const { data()->dialog_page = v; }
   uint32_t dialog_page_bits() const { return data()->dialog_page; }
   void set_dialog_page_bits(uint32_t v) const { data()->dialog_page = v; }
   // the transition a dialog's close runs (-1 none)
+  uint32_t dialog_transition_address() const { return address + 24; }
   uint32_t dialog_transition() const { return data()->dialog_transition; }
   void set_dialog_transition(uint32_t v) const { data()->dialog_transition = v; }
   uint32_t dialog_transition_bits() const { return data()->dialog_transition; }
   void set_dialog_transition_bits(uint32_t v) const { data()->dialog_transition = v; }
   // the sign-in pages' tick count, to 10
+  uint32_t sign_in_ticks_address() const { return address + 28; }
   uint32_t sign_in_ticks() const { return data()->sign_in_ticks; }
   void set_sign_in_ticks(uint32_t v) const { data()->sign_in_ticks = v; }
   uint32_t sign_in_ticks_bits() const { return data()->sign_in_ticks; }
   void set_sign_in_ticks_bits(uint32_t v) const { data()->sign_in_ticks = v; }
   // 1 from Create and SetUp, 0 from Interrupt: a signed-in Live user goes on to the battle or time attack page
+  uint32_t sign_in_continues_address() const { return address + 32; }
   uint32_t sign_in_continues() const { return data()->sign_in_continues; }
   void set_sign_in_continues(uint32_t v) const { data()->sign_in_continues = v; }
   uint32_t sign_in_continues_bits() const { return data()->sign_in_continues; }

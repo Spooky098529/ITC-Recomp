@@ -223,9 +223,18 @@ struct VtableObject : View {
   static VtableObject New(uint8_t* base) {
     return VtableObject(base, memory::MakeHandle(new VtableObjectData(), sizeof(VtableObjectData), "VtableObject", &kVtableObjectLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static VtableObject NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(VtableObjectData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<VtableObjectData*>(::operator new(sizeof(VtableObjectData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) VtableObjectData();
+    return VtableObject(base, memory::MakeHandle(p, sizeof(VtableObjectData) * count, "VtableObject", &kVtableObjectLayout, sizeof(VtableObjectData)));
+  }
+  VtableObject at(uint32_t i) const { return VtableObject(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kVtableObjectLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kVtableObjectLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
+  uint32_t vtable_address() const { return address + 0; }
   uint32_t vtable() const { return on_host() ? uint32_t(data()->vtable) : uint32_t(guest::LoadU32(base, address + 0)); }
   void set_vtable(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_bits() const { return on_host() ? data()->vtable : guest::LoadU32(base, address + 0); }
@@ -319,19 +328,30 @@ struct FloatPair : View {
   static FloatPair New(uint8_t* base) {
     return FloatPair(base, memory::MakeHandle(new FloatPairData(), sizeof(FloatPairData), "FloatPair", &kFloatPairLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static FloatPair NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(FloatPairData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<FloatPairData*>(::operator new(sizeof(FloatPairData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) FloatPairData();
+    return FloatPair(base, memory::MakeHandle(p, sizeof(FloatPairData) * count, "FloatPair", &kFloatPairLayout, sizeof(FloatPairData)));
+  }
+  FloatPair at(uint32_t i) const { return FloatPair(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kFloatPairLayout, offset, width); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kFloatPairLayout, offset, width, v); }
   // 1 when made
+  uint32_t flag_address() const { return address + 0; }
   uint8_t flag() const { return data()->flag; }
   void set_flag(uint8_t v) const { data()->flag = v; }
   uint8_t flag_bits() const { return data()->flag; }
   void set_flag_bits(uint8_t v) const { data()->flag = v; }
   // both set to the float at 0x82000A34
+  uint32_t a_address() const { return address + 4; }
   float a() const { return data()->a; }
   void set_a(float v) const { data()->a = v; }
   uint32_t a_bits() const { return std::bit_cast<uint32_t>(data()->a); }
   void set_a_bits(uint32_t v) const { data()->a = std::bit_cast<float>(v); }
+  uint32_t b_address() const { return address + 8; }
   float b() const { return data()->b; }
   void set_b(float v) const { data()->b = v; }
   uint32_t b_bits() const { return std::bit_cast<uint32_t>(data()->b); }

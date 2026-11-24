@@ -161,19 +161,30 @@ struct Type2HubImage : View {
   static Type2HubImage New(uint8_t* base) {
     return Type2HubImage(base, memory::MakeHandle(new Type2HubImageData(), sizeof(Type2HubImageData), "Type2HubImage", &kType2HubImageLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static Type2HubImage NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(Type2HubImageData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<Type2HubImageData*>(::operator new(sizeof(Type2HubImageData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) Type2HubImageData();
+    return Type2HubImage(base, memory::MakeHandle(p, sizeof(Type2HubImageData) * count, "Type2HubImage", &kType2HubImageLayout, sizeof(Type2HubImageData)));
+  }
+  Type2HubImage at(uint32_t i) const { return Type2HubImage(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kType2HubImageLayout, offset, width); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kType2HubImageLayout, offset, width, v); }
   // 1 once ImageLoaded ran
+  uint32_t loaded_address() const { return address + 0; }
   uint32_t loaded() const { return data()->loaded; }
   void set_loaded(uint32_t v) const { data()->loaded = v; }
   uint32_t loaded_bits() const { return data()->loaded; }
   void set_loaded_bits(uint32_t v) const { data()->loaded = v; }
   // the image (0 to 45)
+  uint32_t index_address() const { return address + 4; }
   uint32_t index() const { return data()->index; }
   void set_index(uint32_t v) const { data()->index = v; }
   uint32_t index_bits() const { return data()->index; }
   void set_index_bits(uint32_t v) const { data()->index = v; }
+  uint32_t texture_address() const { return address + 8; }
   template <typename T = Type2HubTexture>
   T texture() const { return T(base, data()->texture); }
   void set_texture(const View& w) const { const uint32_t v = w.address; data()->texture = v; }
@@ -181,6 +192,7 @@ struct Type2HubImage : View {
   uint32_t texture_bits() const { return data()->texture; }
   void set_texture_bits(uint32_t v) const { data()->texture = v; }
   // XPR::Create's 24-byte block
+  uint32_t xpr_address() const { return address + 12; }
   uint32_t xpr() const { return data()->xpr; }
   void set_xpr(uint32_t v) const { data()->xpr = v; }
   uint32_t xpr_bits() const { return data()->xpr; }
@@ -210,16 +222,27 @@ struct Type2ScreensMode : View {
   static Type2ScreensMode New(uint8_t* base) {
     return Type2ScreensMode(base, memory::MakeHandle(new Type2ScreensModeData(), sizeof(Type2ScreensModeData), "Type2ScreensMode", &kType2ScreensModeLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static Type2ScreensMode NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(Type2ScreensModeData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<Type2ScreensModeData*>(::operator new(sizeof(Type2ScreensModeData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) Type2ScreensModeData();
+    return Type2ScreensMode(base, memory::MakeHandle(p, sizeof(Type2ScreensModeData) * count, "Type2ScreensMode", &kType2ScreensModeLayout, sizeof(Type2ScreensModeData)));
+  }
+  Type2ScreensMode at(uint32_t i) const { return Type2ScreensMode(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kType2ScreensModeLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kType2ScreensModeLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 50 messages of 12 bytes (id, two words)
+  uint32_t messages_address() const { return address + 204; }
   uint8_t* messages() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 204 : guest::Pointer(base, address + 204); }
+  uint32_t message_count_address() const { return address + 804; }
   uint32_t message_count() const { return on_host() ? uint32_t(data()->message_count) : uint32_t(guest::LoadU32(base, address + 804)); }
   void set_message_count(uint32_t v) const { if (on_host()) data()->message_count = v; else guest::StoreU32(base, address + 804, v); }
   uint32_t message_count_bits() const { return on_host() ? data()->message_count : guest::LoadU32(base, address + 804); }
   void set_message_count_bits(uint32_t v) const { if (on_host()) data()->message_count = v; else guest::StoreU32(base, address + 804, v); }
   // the ring's first slot
+  uint32_t message_start_address() const { return address + 808; }
   uint32_t message_start() const { return on_host() ? uint32_t(data()->message_start) : uint32_t(guest::LoadU32(base, address + 808)); }
   void set_message_start(uint32_t v) const { if (on_host()) data()->message_start = v; else guest::StoreU32(base, address + 808, v); }
   uint32_t message_start_bits() const { return on_host() ? data()->message_start : guest::LoadU32(base, address + 808); }

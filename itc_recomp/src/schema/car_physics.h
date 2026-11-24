@@ -1596,30 +1596,43 @@ struct CollisionWorld : View {
   static CollisionWorld New(uint8_t* base) {
     return CollisionWorld(base, memory::MakeHandle(new CollisionWorldData(), sizeof(CollisionWorldData), "CollisionWorld", &kCollisionWorldLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static CollisionWorld NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(CollisionWorldData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<CollisionWorldData*>(::operator new(sizeof(CollisionWorldData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) CollisionWorldData();
+    return CollisionWorld(base, memory::MakeHandle(p, sizeof(CollisionWorldData) * count, "CollisionWorld", &kCollisionWorldLayout, sizeof(CollisionWorldData)));
+  }
+  CollisionWorld at(uint32_t i) const { return CollisionWorld(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCollisionWorldLayout, offset, width); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCollisionWorldLayout, offset, width, v); }
   // a caller's buffer (0)
+  uint32_t buffer_address() const { return address + 0; }
   uint32_t buffer() const { return data()->buffer; }
   void set_buffer(uint32_t v) const { data()->buffer = v; }
   uint32_t buffer_bits() const { return data()->buffer; }
   void set_buffer_bits(uint32_t v) const { data()->buffer = v; }
   // 1/30
+  uint32_t default_step_address() const { return address + 4; }
   float default_step() const { return data()->default_step; }
   void set_default_step(float v) const { data()->default_step = v; }
   uint32_t default_step_bits() const { return std::bit_cast<uint32_t>(data()->default_step); }
   void set_default_step_bits(uint32_t v) const { data()->default_step = std::bit_cast<float>(v); }
   // 0x820FEAB0 in play
+  uint32_t ground_callback_address() const { return address + 8; }
   uint32_t ground_callback() const { return data()->ground_callback; }
   void set_ground_callback(uint32_t v) const { data()->ground_callback = v; }
   uint32_t ground_callback_bits() const { return data()->ground_callback; }
   void set_ground_callback_bits(uint32_t v) const { data()->ground_callback = v; }
   // 50
+  uint32_t object_count_address() const { return address + 12; }
   uint32_t object_count() const { return data()->object_count; }
   void set_object_count(uint32_t v) const { data()->object_count = v; }
   uint32_t object_count_bits() const { return data()->object_count; }
   void set_object_count_bits(uint32_t v) const { data()->object_count = v; }
   // the 320-byte collision objects (a count header at -16)
+  uint32_t objects_address() const { return address + 16; }
   template <typename T = CollisionWorldObject>
   T objects() const { return T(base, data()->objects); }
   void set_objects(const View& w) const { const uint32_t v = w.address; data()->objects = v; }
@@ -1627,6 +1640,7 @@ struct CollisionWorld : View {
   uint32_t objects_bits() const { return data()->objects; }
   void set_objects_bits(uint32_t v) const { data()->objects = v; }
   // the active list
+  uint32_t active_address() const { return address + 20; }
   template <typename T = CollisionWorldObject>
   T active() const { return T(base, data()->active); }
   void set_active(const View& w) const { const uint32_t v = w.address; data()->active = v; }
@@ -1634,57 +1648,68 @@ struct CollisionWorld : View {
   uint32_t active_bits() const { return data()->active; }
   void set_active_bits(uint32_t v) const { data()->active = v; }
   // the free list
+  uint32_t free_address() const { return address + 24; }
   template <typename T = CollisionWorldObject>
   T free() const { return T(base, data()->free); }
   void set_free(const View& w) const { const uint32_t v = w.address; data()->free = v; }
   void set_free(uint32_t v) const { data()->free = v; }
   uint32_t free_bits() const { return data()->free; }
   void set_free_bits(uint32_t v) const { data()->free = v; }
+  uint32_t active_count_address() const { return address + 28; }
   uint32_t active_count() const { return data()->active_count; }
   void set_active_count(uint32_t v) const { data()->active_count = v; }
   uint32_t active_count_bits() const { return data()->active_count; }
   void set_active_count_bits(uint32_t v) const { data()->active_count = v; }
   // 1,000; never checked
+  uint32_t pair_capacity_address() const { return address + 32; }
   uint32_t pair_capacity() const { return data()->pair_capacity; }
   void set_pair_capacity(uint32_t v) const { data()->pair_capacity = v; }
   uint32_t pair_capacity_bits() const { return data()->pair_capacity; }
   void set_pair_capacity_bits(uint32_t v) const { data()->pair_capacity = v; }
+  uint32_t pairs_address() const { return address + 36; }
   template <typename T = CollisionPair>
   T pairs() const { return T(base, data()->pairs); }
   void set_pairs(const View& w) const { const uint32_t v = w.address; data()->pairs = v; }
   void set_pairs(uint32_t v) const { data()->pairs = v; }
   uint32_t pairs_bits() const { return data()->pairs; }
   void set_pairs_bits(uint32_t v) const { data()->pairs = v; }
+  uint32_t pair_count_address() const { return address + 40; }
   uint32_t pair_count() const { return data()->pair_count; }
   void set_pair_count(uint32_t v) const { data()->pair_count = v; }
   uint32_t pair_count_bits() const { return data()->pair_count; }
   void set_pair_count_bits(uint32_t v) const { data()->pair_count = v; }
   // 100
+  uint32_t contact_capacity_address() const { return address + 44; }
   uint32_t contact_capacity() const { return data()->contact_capacity; }
   void set_contact_capacity(uint32_t v) const { data()->contact_capacity = v; }
   uint32_t contact_capacity_bits() const { return data()->contact_capacity; }
   void set_contact_capacity_bits(uint32_t v) const { data()->contact_capacity = v; }
+  uint32_t contacts_address() const { return address + 48; }
   template <typename T = CollisionContact>
   T contacts() const { return T(base, data()->contacts); }
   void set_contacts(const View& w) const { const uint32_t v = w.address; data()->contacts = v; }
   void set_contacts(uint32_t v) const { data()->contacts = v; }
   uint32_t contacts_bits() const { return data()->contacts; }
   void set_contacts_bits(uint32_t v) const { data()->contacts = v; }
+  uint32_t contacts_used_address() const { return address + 52; }
   uint32_t contacts_used() const { return data()->contacts_used; }
   void set_contacts_used(uint32_t v) const { data()->contacts_used = v; }
   uint32_t contacts_used_bits() const { return data()->contacts_used; }
   void set_contacts_used_bits(uint32_t v) const { data()->contacts_used = v; }
   // 1 during CollisionWorld::Update
+  uint32_t updating_address() const { return address + 56; }
   uint32_t updating() const { return data()->updating; }
   void set_updating(uint32_t v) const { data()->updating = v; }
   uint32_t updating_bits() const { return data()->updating; }
   void set_updating_bits(uint32_t v) const { data()->updating = v; }
   // n (32)
+  uint32_t query_count_address() const { return address + 60; }
   uint32_t query_count() const { return data()->query_count; }
   void set_query_count(uint32_t v) const { data()->query_count = v; }
   uint32_t query_count_bits() const { return data()->query_count; }
   void set_query_count_bits(uint32_t v) const { data()->query_count = v; }
   // 2n hit records (the raw hits)
+  uint32_t hits_address() const { return address + 64; }
   template <typename T = CollisionHit>
   T hits() const { return T(base, data()->hits); }
   void set_hits(const View& w) const { const uint32_t v = w.address; data()->hits = v; }
@@ -1692,6 +1717,7 @@ struct CollisionWorld : View {
   uint32_t hits_bits() const { return data()->hits; }
   void set_hits_bits(uint32_t v) const { data()->hits = v; }
   // their second half (the merged hits)
+  uint32_t merged_hits_address() const { return address + 68; }
   template <typename T = CollisionHit>
   T merged_hits() const { return T(base, data()->merged_hits); }
   void set_merged_hits(const View& w) const { const uint32_t v = w.address; data()->merged_hits = v; }

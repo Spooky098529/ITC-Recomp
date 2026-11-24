@@ -49,121 +49,153 @@ struct PowerGraphScreenData : View {
   static PowerGraphScreenData New(uint8_t* base) {
     return PowerGraphScreenData(base, memory::MakeHandle(new PowerGraphScreenDataData(), sizeof(PowerGraphScreenDataData), "PowerGraphScreenData", &kPowerGraphScreenDataLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static PowerGraphScreenData NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(PowerGraphScreenDataData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<PowerGraphScreenDataData*>(::operator new(sizeof(PowerGraphScreenDataData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) PowerGraphScreenDataData();
+    return PowerGraphScreenData(base, memory::MakeHandle(p, sizeof(PowerGraphScreenDataData) * count, "PowerGraphScreenData", &kPowerGraphScreenDataLayout, sizeof(PowerGraphScreenDataData)));
+  }
+  PowerGraphScreenData at(uint32_t i) const { return PowerGraphScreenData(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kPowerGraphScreenDataLayout, offset, width); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kPowerGraphScreenDataLayout, offset, width, v); }
   // 1 once movie 9 is loaded (WaitForLoad)
+  uint32_t movie_loaded_address() const { return address + 0; }
   uint32_t movie_loaded() const { return data()->movie_loaded; }
   void set_movie_loaded(uint32_t v) const { data()->movie_loaded = v; }
   uint32_t movie_loaded_bits() const { return data()->movie_loaded; }
   void set_movie_loaded_bits(uint32_t v) const { data()->movie_loaded = v; }
   // measure fault: SetParts' r4 is the data's +68 (parts), joined with the block; its byte +1 (the part icon), not the data's +1
+  uint32_t part_icon_address() const { return address + 1; }
   uint8_t part_icon_bits() const { return uint8_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kPowerGraphScreenDataLayout, 1, 1)); }
   void set_part_icon_bits(uint8_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kPowerGraphScreenDataLayout, 1, 1, v); }
   uint8_t part_icon() const { return uint8_t(part_icon_bits()); }
   void set_part_icon(uint8_t v) const { set_part_icon_bits(uint8_t(v)); }
   // the machine's state Update applies; 21 none, 9 from ClosedPage
+  uint32_t queued_state_address() const { return address + 4; }
   uint32_t queued_state() const { return data()->queued_state; }
   void set_queued_state(uint32_t v) const { data()->queued_state = v; }
   uint32_t queued_state_bits() const { return data()->queued_state; }
   void set_queued_state_bits(uint32_t v) const { data()->queued_state = v; }
   // the record (+8 to +92; its words below) +0: 0 (SetEntry) or int(the car's +1892 float) (SetFromCar); SetTexts' node 10
+  uint32_t car_value_address() const { return address + 8; }
   uint32_t car_value() const { return data()->car_value; }
   void set_car_value(uint32_t v) const { data()->car_value = v; }
   uint32_t car_value_bits() const { return data()->car_value; }
   void set_car_value_bits(uint32_t v) const { data()->car_value = v; }
   // record +4: the spec's +712 (SetEntry) or a value from the car data (SetFromCar); node 11
+  uint32_t rating_address() const { return address + 12; }
   uint32_t rating() const { return data()->rating; }
   void set_rating(uint32_t v) const { data()->rating = v; }
   uint32_t rating_bits() const { return data()->rating; }
   void set_rating_bits(uint32_t v) const { data()->rating = v; }
   // record +8: the spec's +716 (s +76); node 12
+  uint32_t spec_word_0_address() const { return address + 16; }
   uint32_t spec_word_0() const { return data()->spec_word_0; }
   void set_spec_word_0(uint32_t v) const { data()->spec_word_0 = v; }
   uint32_t spec_word_0_bits() const { return data()->spec_word_0; }
   void set_spec_word_0_bits(uint32_t v) const { data()->spec_word_0 = v; }
   // record +12: the spec's +724 (s +84); node 13
+  uint32_t spec_word_1_address() const { return address + 20; }
   uint32_t spec_word_1() const { return data()->spec_word_1; }
   void set_spec_word_1(uint32_t v) const { data()->spec_word_1 = v; }
   uint32_t spec_word_1_bits() const { return data()->spec_word_1; }
   void set_spec_word_1_bits(uint32_t v) const { data()->spec_word_1 = v; }
   // record +16: the spec's +720 (s +80); node 14
+  uint32_t spec_word_2_address() const { return address + 24; }
   uint32_t spec_word_2() const { return data()->spec_word_2; }
   void set_spec_word_2(uint32_t v) const { data()->spec_word_2 = v; }
   uint32_t spec_word_2_bits() const { return data()->spec_word_2; }
   void set_spec_word_2_bits(uint32_t v) const { data()->spec_word_2 = v; }
   // record +20: the car id; strings 1646, 1790, 1718 + it
+  uint32_t car_id_address() const { return address + 28; }
   uint32_t car_id() const { return data()->car_id; }
   void set_car_id(uint32_t v) const { data()->car_id = v; }
   uint32_t car_id_bits() const { return data()->car_id; }
   void set_car_id_bits(uint32_t v) const { data()->car_id = v; }
   // record +24: a spec byte (+769, s +129); string 1934 + it
+  uint32_t spec_byte_0_address() const { return address + 32; }
   uint32_t spec_byte_0() const { return data()->spec_byte_0; }
   void set_spec_byte_0(uint32_t v) const { data()->spec_byte_0 = v; }
   uint32_t spec_byte_0_bits() const { return data()->spec_byte_0; }
   void set_spec_byte_0_bits(uint32_t v) const { data()->spec_byte_0 = v; }
   // record +28: a spec byte (+770, s +130); string 421 + it
+  uint32_t spec_byte_1_address() const { return address + 36; }
   uint32_t spec_byte_1() const { return data()->spec_byte_1; }
   void set_spec_byte_1(uint32_t v) const { data()->spec_byte_1 = v; }
   uint32_t spec_byte_1_bits() const { return data()->spec_byte_1; }
   void set_spec_byte_1_bits(uint32_t v) const { data()->spec_byte_1 = v; }
   // record +32: a class 0 to 6 from the spec byte +708 (s +68); string 428 + it
+  uint32_t engine_class_address() const { return address + 40; }
   uint32_t engine_class() const { return data()->engine_class; }
   void set_engine_class(uint32_t v) const { data()->engine_class = v; }
   uint32_t engine_class_bits() const { return data()->engine_class; }
   void set_engine_class_bits(uint32_t v) const { data()->engine_class = v; }
   // record +36: the spec byte +709 (s +69) set, 1 or 0; string 426 + it
+  uint32_t spec_flag_address() const { return address + 44; }
   uint32_t spec_flag() const { return data()->spec_flag; }
   void set_spec_flag(uint32_t v) const { data()->spec_flag = v; }
   uint32_t spec_flag_bits() const { return data()->spec_flag; }
   void set_spec_flag_bits(uint32_t v) const { data()->spec_flag = v; }
   // record +40: the spec's +648 (s +8); node 39
+  uint32_t spec_word_3_address() const { return address + 48; }
   uint32_t spec_word_3() const { return data()->spec_word_3; }
   void set_spec_word_3(uint32_t v) const { data()->spec_word_3 = v; }
   uint32_t spec_word_3_bits() const { return data()->spec_word_3; }
   void set_spec_word_3_bits(uint32_t v) const { data()->spec_word_3 = v; }
   // record +44: int(the power curve's +1056) (+652); node 33
+  uint32_t curve_value_0_address() const { return address + 52; }
   uint32_t curve_value_0() const { return data()->curve_value_0; }
   void set_curve_value_0(uint32_t v) const { data()->curve_value_0 = v; }
   uint32_t curve_value_0_bits() const { return data()->curve_value_0; }
   void set_curve_value_0_bits(uint32_t v) const { data()->curve_value_0 = v; }
   // record +48: int(the curve's +1060) (+656); node 40
+  uint32_t curve_value_1_address() const { return address + 56; }
   uint32_t curve_value_1() const { return data()->curve_value_1; }
   void set_curve_value_1(uint32_t v) const { data()->curve_value_1 = v; }
   uint32_t curve_value_1_bits() const { return data()->curve_value_1; }
   void set_curve_value_1_bits(uint32_t v) const { data()->curve_value_1 = v; }
   // record +52: the peak torque in kgf·m (probably); node 34
+  uint32_t peak_torque_address() const { return address + 60; }
   float peak_torque() const { return data()->peak_torque; }
   void set_peak_torque(float v) const { data()->peak_torque = v; }
   uint32_t peak_torque_bits() const { return std::bit_cast<uint32_t>(data()->peak_torque); }
   void set_peak_torque_bits(uint32_t v) const { data()->peak_torque = std::bit_cast<float>(v); }
   // record +56: int(the curve's +1052), the peak's index; node 41
+  uint32_t peak_index_address() const { return address + 64; }
   uint32_t peak_index() const { return data()->peak_index; }
   void set_peak_index(uint32_t v) const { data()->peak_index = v; }
   uint32_t peak_index_bits() const { return data()->peak_index; }
   void set_peak_index_bits(uint32_t v) const { data()->peak_index = v; }
   // record +60 to +76 (the parts): five words from the car's +1568 (SetFromCar only); SetParts reads their bytes +1 to +11 in guest order (each word's most significant byte first)
+  uint32_t parts_word_0_address() const { return address + 68; }
   uint32_t parts_word_0() const { return data()->parts_word_0; }
   void set_parts_word_0(uint32_t v) const { data()->parts_word_0 = v; }
   uint32_t parts_word_0_bits() const { return data()->parts_word_0; }
   void set_parts_word_0_bits(uint32_t v) const { data()->parts_word_0 = v; }
+  uint32_t parts_word_1_address() const { return address + 72; }
   uint32_t parts_word_1() const { return data()->parts_word_1; }
   void set_parts_word_1(uint32_t v) const { data()->parts_word_1 = v; }
   uint32_t parts_word_1_bits() const { return data()->parts_word_1; }
   void set_parts_word_1_bits(uint32_t v) const { data()->parts_word_1 = v; }
+  uint32_t parts_word_2_address() const { return address + 76; }
   uint32_t parts_word_2() const { return data()->parts_word_2; }
   void set_parts_word_2(uint32_t v) const { data()->parts_word_2 = v; }
   uint32_t parts_word_2_bits() const { return data()->parts_word_2; }
   void set_parts_word_2_bits(uint32_t v) const { data()->parts_word_2 = v; }
+  uint32_t parts_word_3_address() const { return address + 80; }
   uint32_t parts_word_3() const { return data()->parts_word_3; }
   void set_parts_word_3(uint32_t v) const { data()->parts_word_3 = v; }
   uint32_t parts_word_3_bits() const { return data()->parts_word_3; }
   void set_parts_word_3_bits(uint32_t v) const { data()->parts_word_3 = v; }
+  uint32_t parts_word_4_address() const { return address + 84; }
   uint32_t parts_word_4() const { return data()->parts_word_4; }
   void set_parts_word_4(uint32_t v) const { data()->parts_word_4 = v; }
   uint32_t parts_word_4_bits() const { return data()->parts_word_4; }
   void set_parts_word_4_bits(uint32_t v) const { data()->parts_word_4 = v; }
   // record +80: the tab word the caller passes (r4); node 3 shown for 2 and 5
+  uint32_t tab_address() const { return address + 88; }
   uint32_t tab() const { return data()->tab; }
   void set_tab(uint32_t v) const { data()->tab = v; }
   uint32_t tab_bits() const { return data()->tab; }

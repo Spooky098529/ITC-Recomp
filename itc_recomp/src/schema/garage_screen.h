@@ -57,16 +57,27 @@ struct GarageScreenMode : View {
   static GarageScreenMode New(uint8_t* base) {
     return GarageScreenMode(base, memory::MakeHandle(new GarageScreenModeData(), sizeof(GarageScreenModeData), "GarageScreenMode", &kGarageScreenModeLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static GarageScreenMode NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(GarageScreenModeData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<GarageScreenModeData*>(::operator new(sizeof(GarageScreenModeData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) GarageScreenModeData();
+    return GarageScreenMode(base, memory::MakeHandle(p, sizeof(GarageScreenModeData) * count, "GarageScreenMode", &kGarageScreenModeLayout, sizeof(GarageScreenModeData)));
+  }
+  GarageScreenMode at(uint32_t i) const { return GarageScreenMode(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kGarageScreenModeLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kGarageScreenModeLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 50 messages of 12 bytes (id, two words)
+  uint32_t messages_address() const { return address + 204; }
   uint8_t* messages() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 204 : guest::Pointer(base, address + 204); }
+  uint32_t message_count_address() const { return address + 804; }
   uint32_t message_count() const { return on_host() ? uint32_t(data()->message_count) : uint32_t(guest::LoadU32(base, address + 804)); }
   void set_message_count(uint32_t v) const { if (on_host()) data()->message_count = v; else guest::StoreU32(base, address + 804, v); }
   uint32_t message_count_bits() const { return on_host() ? data()->message_count : guest::LoadU32(base, address + 804); }
   void set_message_count_bits(uint32_t v) const { if (on_host()) data()->message_count = v; else guest::StoreU32(base, address + 804, v); }
   // the ring's first slot
+  uint32_t message_start_address() const { return address + 808; }
   uint32_t message_start() const { return on_host() ? uint32_t(data()->message_start) : uint32_t(guest::LoadU32(base, address + 808)); }
   void set_message_start(uint32_t v) const { if (on_host()) data()->message_start = v; else guest::StoreU32(base, address + 808, v); }
   uint32_t message_start_bits() const { return on_host() ? data()->message_start : guest::LoadU32(base, address + 808); }
@@ -113,32 +124,46 @@ struct GarageScreenData : View {
   static GarageScreenData New(uint8_t* base) {
     return GarageScreenData(base, memory::MakeHandle(new GarageScreenDataData(), sizeof(GarageScreenDataData), "GarageScreenData", &kGarageScreenDataLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static GarageScreenData NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(GarageScreenDataData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<GarageScreenDataData*>(::operator new(sizeof(GarageScreenDataData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) GarageScreenDataData();
+    return GarageScreenData(base, memory::MakeHandle(p, sizeof(GarageScreenDataData) * count, "GarageScreenData", &kGarageScreenDataLayout, sizeof(GarageScreenDataData)));
+  }
+  GarageScreenData at(uint32_t i) const { return GarageScreenData(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kGarageScreenDataLayout, offset, width); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kGarageScreenDataLayout, offset, width, v); }
   // 1 once the header is set (SetHeader)
+  uint32_t set_up_address() const { return address + 0; }
   uint32_t set_up() const { return data()->set_up; }
   void set_set_up(uint32_t v) const { data()->set_up = v; }
   uint32_t set_up_bits() const { return data()->set_up; }
   void set_set_up_bits(uint32_t v) const { data()->set_up = v; }
   // the career's pick (player 0's save data +8 to +27, shown as a name)
+  uint32_t pick_address() const { return address + 4; }
   uint8_t* pick() const { return reinterpret_cast<uint8_t*>(data()) + 4; }
   // save data +6116; the sale adds its price
+  uint32_t money_address() const { return address + 24; }
   uint32_t money() const { return data()->money; }
   void set_money(uint32_t v) const { data()->money = v; }
   uint32_t money_bits() const { return data()->money; }
   void set_money_bits(uint32_t v) const { data()->money = v; }
   // save data +6100, at most 999
+  uint32_t day_address() const { return address + 28; }
   uint32_t day() const { return data()->day; }
   void set_day(uint32_t v) const { data()->day = v; }
   uint32_t day_bits() const { return data()->day; }
   void set_day_bits(uint32_t v) const { data()->day = v; }
   // the day mod 7
+  uint32_t weekday_address() const { return address + 32; }
   uint32_t weekday() const { return data()->weekday; }
   void set_weekday(uint32_t v) const { data()->weekday = v; }
   uint32_t weekday_bits() const { return data()->weekday; }
   void set_weekday_bits(uint32_t v) const { data()->weekday = v; }
   // player 0's save data (SaveData::Of)
+  uint32_t save_address() const { return address + 36; }
   template <typename T = SaveData>
   T save() const { return T(base, data()->save); }
   void set_save(const View& w) const { const uint32_t v = w.address; data()->save = v; }
@@ -146,76 +171,91 @@ struct GarageScreenData : View {
   uint32_t save_bits() const { return data()->save; }
   void set_save_bits(uint32_t v) const { data()->save = v; }
   // the selected row (+ scroll: the car's index in the garage)
+  uint32_t selection_address() const { return address + 44; }
   uint32_t selection() const { return data()->selection; }
   void set_selection(uint32_t v) const { data()->selection = v; }
   uint32_t selection_bits() const { return data()->selection; }
   void set_selection_bits(uint32_t v) const { data()->selection = v; }
   // the list's scroll
+  uint32_t scroll_address() const { return address + 48; }
   uint32_t scroll() const { return data()->scroll; }
   void set_scroll(uint32_t v) const { data()->scroll = v; }
   uint32_t scroll_bits() const { return data()->scroll; }
   void set_scroll_bits(uint32_t v) const { data()->scroll = v; }
   // the action to select when the actions are set up again
+  uint32_t action_address() const { return address + 52; }
   uint32_t action() const { return data()->action; }
   void set_action(uint32_t v) const { data()->action = v; }
   uint32_t action_bits() const { return data()->action; }
   void set_action_bits(uint32_t v) const { data()->action = v; }
   // 0 (Transition4)
+  uint32_t unknown_56_address() const { return address + 56; }
   uint32_t unknown_56() const { return data()->unknown_56; }
   void set_unknown_56(uint32_t v) const { data()->unknown_56 = v; }
   uint32_t unknown_56_bits() const { return data()->unknown_56; }
   void set_unknown_56_bits(uint32_t v) const { data()->unknown_56 = v; }
   // 1 while the plate editor's question is pending
+  uint32_t plate_pending_address() const { return address + 60; }
   uint32_t plate_pending() const { return data()->plate_pending; }
   void set_plate_pending(uint32_t v) const { data()->plate_pending = v; }
   uint32_t plate_pending_bits() const { return data()->plate_pending; }
   void set_plate_pending_bits(uint32_t v) const { data()->plate_pending = v; }
   // the dialog answered yes
+  uint32_t answered_yes_address() const { return address + 64; }
   uint32_t answered_yes() const { return data()->answered_yes; }
   void set_answered_yes(uint32_t v) const { data()->answered_yes = v; }
   uint32_t answered_yes_bits() const { return data()->answered_yes; }
   void set_answered_yes_bits(uint32_t v) const { data()->answered_yes = v; }
   // the question asked: 0 the new plate, 1 make the car current, 2 sell it
+  uint32_t question_address() const { return address + 68; }
   uint32_t question() const { return data()->question; }
   void set_question(uint32_t v) const { data()->question = v; }
   uint32_t question_bits() const { return data()->question; }
   void set_question_bits(uint32_t v) const { data()->question = v; }
   // the stand shown (Update loads and draws the car)
+  uint32_t stand_shown_address() const { return address + 72; }
   uint32_t stand_shown() const { return data()->stand_shown; }
   void set_stand_shown(uint32_t v) const { data()->stand_shown = v; }
   uint32_t stand_shown_bits() const { return data()->stand_shown; }
   void set_stand_shown_bits(uint32_t v) const { data()->stand_shown = v; }
   // GarageStage::ReloadModel's answer for the shown car (0 until loaded)
+  uint32_t stand_model_address() const { return address + 76; }
   uint32_t stand_model() const { return data()->stand_model; }
   void set_stand_model(uint32_t v) const { data()->stand_model = v; }
   uint32_t stand_model_bits() const { return data()->stand_model; }
   void set_stand_model_bits(uint32_t v) const { data()->stand_model = v; }
   // the view's options 1 and 2 (the doors) offered: the car spec's byte +771 is 1 (SetUpOptions)
+  uint32_t toggles_shown_address() const { return address + 80; }
   uint32_t toggles_shown() const { return data()->toggles_shown; }
   void set_toggles_shown(uint32_t v) const { data()->toggles_shown = v; }
   uint32_t toggles_shown_bits() const { return data()->toggles_shown; }
   void set_toggles_shown_bits(uint32_t v) const { data()->toggles_shown = v; }
   // the stand's busy marker shown
+  uint32_t busy_shown_address() const { return address + 84; }
   uint32_t busy_shown() const { return data()->busy_shown; }
   void set_busy_shown(uint32_t v) const { data()->busy_shown = v; }
   uint32_t busy_shown_bits() const { return data()->busy_shown; }
   void set_busy_shown_bits(uint32_t v) const { data()->busy_shown = v; }
   // the car turning on the stand (ToggleTurn)
+  uint32_t turning_address() const { return address + 88; }
   uint32_t turning() const { return data()->turning; }
   void set_turning(uint32_t v) const { data()->turning = v; }
   uint32_t turning_bits() const { return data()->turning; }
   void set_turning_bits(uint32_t v) const { data()->turning = v; }
   // the first door animation open (ToggleDoors)
+  uint32_t doors_address() const { return address + 92; }
   uint32_t doors() const { return data()->doors; }
   void set_doors(uint32_t v) const { data()->doors = v; }
   uint32_t doors_bits() const { return data()->doors; }
   void set_doors_bits(uint32_t v) const { data()->doors = v; }
   // the second door animation open (ToggleDoors2)
+  uint32_t doors2_address() const { return address + 96; }
   uint32_t doors2() const { return data()->doors2; }
   void set_doors2(uint32_t v) const { data()->doors2 = v; }
   uint32_t doors2_bits() const { return data()->doors2; }
   void set_doors2_bits(uint32_t v) const { data()->doors2 = v; }
   // SalePrice's answer (SetSaleQuestion)
+  uint32_t sale_price_address() const { return address + 100; }
   uint32_t sale_price() const { return data()->sale_price; }
   void set_sale_price(uint32_t v) const { data()->sale_price = v; }
   uint32_t sale_price_bits() const { return data()->sale_price; }

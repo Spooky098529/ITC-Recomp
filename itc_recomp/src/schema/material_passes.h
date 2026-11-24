@@ -337,33 +337,47 @@ struct CarDealerSwatch : View {
   static CarDealerSwatch New(uint8_t* base) {
     return CarDealerSwatch(base, memory::MakeHandle(new CarDealerSwatchData(), sizeof(CarDealerSwatchData), "CarDealerSwatch", &kCarDealerSwatchLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static CarDealerSwatch NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(CarDealerSwatchData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<CarDealerSwatchData*>(::operator new(sizeof(CarDealerSwatchData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) CarDealerSwatchData();
+    return CarDealerSwatch(base, memory::MakeHandle(p, sizeof(CarDealerSwatchData) * count, "CarDealerSwatch", &kCarDealerSwatchLayout, sizeof(CarDealerSwatchData)));
+  }
+  CarDealerSwatch at(uint32_t i) const { return CarDealerSwatch(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCarDealerSwatchLayout, offset, width); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarDealerSwatchLayout, offset, width, v); }
   // HsvToRgb's red x [0x82000C44], truncated (fctiwz)
+  uint32_t red_address() const { return address + 0; }
   uint32_t red() const { return data()->red; }
   void set_red(uint32_t v) const { data()->red = v; }
   uint32_t red_bits() const { return data()->red; }
   void set_red_bits(uint32_t v) const { data()->red = v; }
+  uint32_t green_address() const { return address + 4; }
   uint32_t green() const { return data()->green; }
   void set_green(uint32_t v) const { data()->green = v; }
   uint32_t green_bits() const { return data()->green; }
   void set_green_bits(uint32_t v) const { data()->green = v; }
+  uint32_t blue_address() const { return address + 8; }
   uint32_t blue() const { return data()->blue; }
   void set_blue(uint32_t v) const { data()->blue = v; }
   uint32_t blue_bits() const { return data()->blue; }
   void set_blue_bits(uint32_t v) const { data()->blue = v; }
   // the color record's halfword +4
+  uint32_t hue_address() const { return address + 16; }
   float hue() const { return data()->hue; }
   void set_hue(float v) const { data()->hue = v; }
   uint32_t hue_bits() const { return std::bit_cast<uint32_t>(data()->hue); }
   void set_hue_bits(uint32_t v) const { data()->hue = std::bit_cast<float>(v); }
   // the color record's byte +6 x [0x82002200]
+  uint32_t saturation_address() const { return address + 20; }
   float saturation() const { return data()->saturation; }
   void set_saturation(float v) const { data()->saturation = v; }
   uint32_t saturation_bits() const { return std::bit_cast<uint32_t>(data()->saturation); }
   void set_saturation_bits(uint32_t v) const { data()->saturation = std::bit_cast<float>(v); }
   // the color record's byte +7 plus a kind's offset, clamped to 0-255, x [0x82002200]
+  uint32_t value_address() const { return address + 24; }
   float value() const { return data()->value; }
   void set_value(float v) const { data()->value = v; }
   uint32_t value_bits() const { return std::bit_cast<uint32_t>(data()->value); }

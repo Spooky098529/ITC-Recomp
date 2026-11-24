@@ -371,69 +371,90 @@ struct PauseMenu4Data : View {
   static PauseMenu4Data New(uint8_t* base) {
     return PauseMenu4Data(base, memory::MakeHandle(new PauseMenu4DataData(), sizeof(PauseMenu4DataData), "PauseMenu4Data", &kPauseMenu4DataLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static PauseMenu4Data NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(PauseMenu4DataData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<PauseMenu4DataData*>(::operator new(sizeof(PauseMenu4DataData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) PauseMenu4DataData();
+    return PauseMenu4Data(base, memory::MakeHandle(p, sizeof(PauseMenu4DataData) * count, "PauseMenu4Data", &kPauseMenu4DataLayout, sizeof(PauseMenu4DataData)));
+  }
+  PauseMenu4Data at(uint32_t i) const { return PauseMenu4Data(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kPauseMenu4DataLayout, offset, width); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kPauseMenu4DataLayout, offset, width, v); }
   // player 0's save data's byte +0x1F878, sign-extended
+  uint32_t music_volume_address() const { return address + 0; }
   uint32_t music_volume() const { return data()->music_volume; }
   void set_music_volume(uint32_t v) const { data()->music_volume = v; }
   uint32_t music_volume_bits() const { return data()->music_volume; }
   void set_music_volume_bits(uint32_t v) const { data()->music_volume = v; }
   // player 0's save data's byte +0x1F879, sign-extended
+  uint32_t effects_volume_address() const { return address + 4; }
   uint32_t effects_volume() const { return data()->effects_volume; }
   void set_effects_volume(uint32_t v) const { data()->effects_volume = v; }
   uint32_t effects_volume_bits() const { return data()->effects_volume; }
   void set_effects_volume_bits(uint32_t v) const { data()->effects_volume = v; }
   // the volume page's edit, 0 to 15
+  uint32_t music_edit_address() const { return address + 8; }
   uint32_t music_edit() const { return data()->music_edit; }
   void set_music_edit(uint32_t v) const { data()->music_edit = v; }
   uint32_t music_edit_bits() const { return data()->music_edit; }
   void set_music_edit_bits(uint32_t v) const { data()->music_edit = v; }
   // the volume page's edit, 0 to 15
+  uint32_t effects_edit_address() const { return address + 12; }
   uint32_t effects_edit() const { return data()->effects_edit; }
   void set_effects_edit(uint32_t v) const { data()->effects_edit = v; }
   uint32_t effects_edit_bits() const { return data()->effects_edit; }
   void set_effects_edit_bits(uint32_t v) const { data()->effects_edit = v; }
   // 15
+  uint32_t music_default_address() const { return address + 16; }
   uint32_t music_default() const { return data()->music_default; }
   void set_music_default(uint32_t v) const { data()->music_default = v; }
   uint32_t music_default_bits() const { return data()->music_default; }
   void set_music_default_bits(uint32_t v) const { data()->music_default = v; }
   // 15
+  uint32_t effects_default_address() const { return address + 20; }
   uint32_t effects_default() const { return data()->effects_default; }
   void set_effects_default(uint32_t v) const { data()->effects_default = v; }
   uint32_t effects_default_bits() const { return data()->effects_default; }
   void set_effects_default_bits(uint32_t v) const { data()->effects_default = v; }
+  uint32_t item_count_address() const { return address + 52; }
   uint32_t item_count() const { return data()->item_count; }
   void set_item_count(uint32_t v) const { data()->item_count = v; }
   uint32_t item_count_bits() const { return data()->item_count; }
   void set_item_count_bits(uint32_t v) const { data()->item_count = v; }
   // what Update answers on the answer page
+  uint32_t answer_address() const { return address + 56; }
   uint32_t answer() const { return data()->answer; }
   void set_answer(uint32_t v) const { data()->answer = v; }
   uint32_t answer_bits() const { return data()->answer; }
   void set_answer_bits(uint32_t v) const { data()->answer = v; }
   // the volume page's last item's choice, 0 or 1
+  uint32_t volume_toggle_address() const { return address + 60; }
   uint32_t volume_toggle() const { return data()->volume_toggle; }
   void set_volume_toggle(uint32_t v) const { data()->volume_toggle = v; }
   uint32_t volume_toggle_bits() const { return data()->volume_toggle; }
   void set_volume_toggle_bits(uint32_t v) const { data()->volume_toggle = v; }
   // the main list's selection kept
+  uint32_t main_selection_address() const { return address + 64; }
   uint32_t main_selection() const { return data()->main_selection; }
   void set_main_selection(uint32_t v) const { data()->main_selection = v; }
   uint32_t main_selection_bits() const { return data()->main_selection; }
   void set_main_selection_bits(uint32_t v) const { data()->main_selection = v; }
   // RunTen's counter, done at 10
+  uint32_t run_count_address() const { return address + 68; }
   uint32_t run_count() const { return data()->run_count; }
   void set_run_count(uint32_t v) const { data()->run_count = v; }
   uint32_t run_count_bits() const { return data()->run_count; }
   void set_run_count_bits(uint32_t v) const { data()->run_count = v; }
   // the player who paused, 0 or 1
+  uint32_t player_address() const { return address + 72; }
   uint32_t player() const { return data()->player; }
   void set_player(uint32_t v) const { data()->player = v; }
   uint32_t player_bits() const { return data()->player; }
   void set_player_bits(uint32_t v) const { data()->player = v; }
   // the items' kind: 0 or 1 (the replay bit)
+  uint32_t kind_address() const { return address + 76; }
   uint32_t kind() const { return data()->kind; }
   void set_kind(uint32_t v) const { data()->kind = v; }
   uint32_t kind_bits() const { return data()->kind; }

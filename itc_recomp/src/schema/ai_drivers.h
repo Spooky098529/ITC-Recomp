@@ -809,60 +809,79 @@ struct CarInput : View {
   static CarInput New(uint8_t* base) {
     return CarInput(base, memory::MakeHandle(new CarInputData(), sizeof(CarInputData), "CarInput", &kCarInputLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static CarInput NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(CarInputData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<CarInputData*>(::operator new(sizeof(CarInputData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) CarInputData();
+    return CarInput(base, memory::MakeHandle(p, sizeof(CarInputData) * count, "CarInput", &kCarInputLayout, sizeof(CarInputData)));
+  }
+  CarInput at(uint32_t i) const { return CarInput(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCarInputLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarInputLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0x200 set by a stuck AI driver (probably reverse); the pad's in known-data.md
+  uint32_t flags_address() const { return address + 0; }
   uint32_t flags() const { return on_host() ? uint32_t(data()->flags) : uint32_t(guest::LoadU32(base, address + 0)); }
   void set_flags(uint32_t v) const { if (on_host()) data()->flags = v; else guest::StoreU32(base, address + 0, v); }
   uint32_t flags_bits() const { return on_host() ? data()->flags : guest::LoadU32(base, address + 0); }
   void set_flags_bits(uint32_t v) const { if (on_host()) data()->flags = v; else guest::StoreU32(base, address + 0, v); }
   // signed, out of 32,767
+  uint32_t throttle_address() const { return address + 4; }
   uint16_t throttle() const { return on_host() ? uint16_t(data()->throttle) : uint16_t(guest::LoadU16(base, address + 4)); }
   void set_throttle(uint16_t v) const { if (on_host()) data()->throttle = v; else guest::StoreU16(base, address + 4, v); }
   uint16_t throttle_bits() const { return on_host() ? data()->throttle : guest::LoadU16(base, address + 4); }
   void set_throttle_bits(uint16_t v) const { if (on_host()) data()->throttle = v; else guest::StoreU16(base, address + 4, v); }
   // signed, out of 32,767
+  uint32_t brake_address() const { return address + 6; }
   uint16_t brake() const { return on_host() ? uint16_t(data()->brake) : uint16_t(guest::LoadU16(base, address + 6)); }
   void set_brake(uint16_t v) const { if (on_host()) data()->brake = v; else guest::StoreU16(base, address + 6, v); }
   uint16_t brake_bits() const { return on_host() ? data()->brake : guest::LoadU16(base, address + 6); }
   void set_brake_bits(uint16_t v) const { if (on_host()) data()->brake = v; else guest::StoreU16(base, address + 6, v); }
   // signed, out of 32,767
+  uint32_t steering_address() const { return address + 8; }
   uint16_t steering() const { return on_host() ? uint16_t(data()->steering) : uint16_t(guest::LoadU16(base, address + 8)); }
   void set_steering(uint16_t v) const { if (on_host()) data()->steering = v; else guest::StoreU16(base, address + 8, v); }
   uint16_t steering_bits() const { return on_host() ? data()->steering : guest::LoadU16(base, address + 8); }
   void set_steering_bits(uint16_t v) const { if (on_host()) data()->steering = v; else guest::StoreU16(base, address + 8, v); }
   // 32,767 for the handbrake, probably
+  uint32_t handbrake_address() const { return address + 10; }
   uint16_t handbrake() const { return on_host() ? uint16_t(data()->handbrake) : uint16_t(guest::LoadU16(base, address + 10)); }
   void set_handbrake(uint16_t v) const { if (on_host()) data()->handbrake = v; else guest::StoreU16(base, address + 10, v); }
   uint16_t handbrake_bits() const { return on_host() ? data()->handbrake : guest::LoadU16(base, address + 10); }
   void set_handbrake_bits(uint16_t v) const { if (on_host()) data()->handbrake = v; else guest::StoreU16(base, address + 10, v); }
   // signed: probably the camera (from the pad)
+  uint32_t camera_address() const { return address + 12; }
   uint16_t camera() const { return on_host() ? uint16_t(data()->camera) : uint16_t(guest::LoadU16(base, address + 12)); }
   void set_camera(uint16_t v) const { if (on_host()) data()->camera = v; else guest::StoreU16(base, address + 12, v); }
   uint16_t camera_bits() const { return on_host() ? data()->camera : guest::LoadU16(base, address + 12); }
   void set_camera_bits(uint16_t v) const { if (on_host()) data()->camera = v; else guest::StoreU16(base, address + 12, v); }
   // from the pad: the player's settings byte +1; signed: the throttle's curve (Vehicle::ApplyInput)
+  uint32_t throttle_rate_address() const { return address + 14; }
   uint8_t throttle_rate() const { return on_host() ? uint8_t(data()->throttle_rate) : uint8_t(guest::LoadU8(base, address + 14)); }
   void set_throttle_rate(uint8_t v) const { if (on_host()) data()->throttle_rate = v; else guest::StoreU8(base, address + 14, v); }
   uint8_t throttle_rate_bits() const { return on_host() ? data()->throttle_rate : guest::LoadU8(base, address + 14); }
   void set_throttle_rate_bits(uint8_t v) const { if (on_host()) data()->throttle_rate = v; else guest::StoreU8(base, address + 14, v); }
   // the settings byte +2; signed: the brake's curve
+  uint32_t brake_rate_address() const { return address + 15; }
   uint8_t brake_rate() const { return on_host() ? uint8_t(data()->brake_rate) : uint8_t(guest::LoadU8(base, address + 15)); }
   void set_brake_rate(uint8_t v) const { if (on_host()) data()->brake_rate = v; else guest::StoreU8(base, address + 15, v); }
   uint8_t brake_rate_bits() const { return on_host() ? data()->brake_rate : guest::LoadU8(base, address + 15); }
   void set_brake_rate_bits(uint8_t v) const { if (on_host()) data()->brake_rate = v; else guest::StoreU8(base, address + 15, v); }
   // the settings byte +0; signed: the pad's or wheel's steering rate
+  uint32_t steering_rate_address() const { return address + 16; }
   uint8_t steering_rate() const { return on_host() ? uint8_t(data()->steering_rate) : uint8_t(guest::LoadU8(base, address + 16)); }
   void set_steering_rate(uint8_t v) const { if (on_host()) data()->steering_rate = v; else guest::StoreU8(base, address + 16, v); }
   uint8_t steering_rate_bits() const { return on_host() ? data()->steering_rate : guest::LoadU8(base, address + 16); }
   void set_steering_rate_bits(uint8_t v) const { if (on_host()) data()->steering_rate = v; else guest::StoreU8(base, address + 16, v); }
   // 0 the pad, 1 a wheel, 2 an AI driver
+  uint32_t kind_address() const { return address + 17; }
   uint8_t kind() const { return on_host() ? uint8_t(data()->kind) : uint8_t(guest::LoadU8(base, address + 17)); }
   void set_kind(uint8_t v) const { if (on_host()) data()->kind = v; else guest::StoreU8(base, address + 17, v); }
   uint8_t kind_bits() const { return on_host() ? data()->kind : guest::LoadU8(base, address + 17); }
   void set_kind_bits(uint8_t v) const { if (on_host()) data()->kind = v; else guest::StoreU8(base, address + 17, v); }
   // the player's three settings bytes (from the pad) (from CarInputRecord, car-sounds)
+  uint32_t settings_address() const { return address + 14; }
   uint8_t* settings() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 14 : guest::Pointer(base, address + 14); }
 };
 

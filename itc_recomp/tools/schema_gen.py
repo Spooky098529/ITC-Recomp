@@ -110,10 +110,10 @@ def check(areas):
     sites = {}
     for area, data in areas.items():
         for name, t in data.items():
-            if name == "globals" or ("host_alloc" not in t and "host_free" not in t):
+            if name == "globals" or not {"host_alloc", "host_alloc_array", "host_free"} & set(t):
                 continue
             if t.get("storage") not in ("host", "dual"):
-                errors.append(f"{area}: {name}: host_alloc and host_free are for host types only")
+                errors.append(f"{area}: {name}: host_alloc, host_alloc_array and host_free are for host types only")
                 continue
             calls = []
             alloc = t.get("host_alloc", [])
@@ -121,6 +121,18 @@ def check(areas):
                 errors.append(f"{area}: {name}: host_alloc is a list of call return addresses")
             else:
                 calls += alloc
+            # An array allocated at once (new[] without a count header): the
+            # call's size register, divided by the type's size for NewArray.
+            arrays = t.get("host_alloc_array", [])
+            if not isinstance(arrays, list):
+                arrays = [None]
+            for ar in arrays:
+                if (not isinstance(ar, dict) or set(ar) != {"call", "reg"} or not isinstance(ar["call"], int)
+                        or not isinstance(ar["reg"], str) or not re.fullmatch(r"r([3-9]|10)", ar["reg"])):
+                    errors.append(f"{area}: {name}: host_alloc_array entry {ar!r}: "
+                                  "{ call = <return address>, reg = <the size's register, \"r3\"..\"r10\"> }")
+                    continue
+                calls.append(ar["call"])
             frees = t.get("host_free", [])
             if not isinstance(frees, list):
                 errors.append(f"{area}: {name}: host_free is a list of {{ call, reg, returns }}")
@@ -275,10 +287,10 @@ def host_type(name, t):
     handle's span names the member there (memory::HandleObject) and an
     embedded object is a member where the guest code expects it. Its view
     holds a handle (a dual view: a handle or a guest address, told apart at
-    each access) with the same accessors as a guest view's but no
-    `_address()`, plus `<field>_bits()` and `set_<field>_bits()` (the raw
-    bits of the field's width, what lifted code loads and stores) and `New`
-    and `Delete`."""
+    each access) with the same accessors as a guest view's (`_address()` an
+    interior handle on the host), plus `<field>_bits()` and `set_<field>_bits()` (the raw
+    bits of the field's width, what lifted code loads and stores), `New`,
+    `NewArray`, `at` and `Delete`."""
     dual = t.get("storage") == "dual"
     fields = sorted(t.get("fields", []), key=lambda f: f["offset"])
     size = max([t.get("size", 0)] + [f["offset"] + field_width(f, ALLTYPES) for f in fields])
@@ -332,7 +344,19 @@ def host_type(name, t):
     out.append(f"  static {name} New(uint8_t* base) {{")
     out.append(f"    return {name}(base, memory::MakeHandle(new {name}Data(), sizeof({name}Data), \"{name}\", &k{name}Layout));")
     out.append("  }")
-    out.append(f"  void Delete() const {{ delete data(); memory::ReleaseHandle(address); }}")
+    # An array allocated at once (new[] without a count header, one block of
+    # `count` objects): one handle; element i is the handle + i * kSize, and
+    # copies and raw accesses use the element's layout at offset % kSize.
+    out.append(f"  template <uint32_t Stride = kSize>")
+    out.append(f"  static {name} NewArray(uint8_t* base, uint32_t count) {{")
+    out.append(f"    static_assert(sizeof({name}Data) == Stride, \"an array's stride is the guest size\");")
+    out.append(f"    auto* p = static_cast<{name}Data*>(::operator new(sizeof({name}Data) * std::max<uint32_t>(count, 1)));")
+    out.append(f"    for (uint32_t i = 0; i < count; i++) new (p + i) {name}Data();")
+    out.append(f"    return {name}(base, memory::MakeHandle(p, sizeof({name}Data) * count, \"{name}\", &k{name}Layout, sizeof({name}Data)));")
+    out.append("  }")
+    out.append(f"  {name} at(uint32_t i) const {{ return {name}(base, address + i * kSize); }}")
+    # One object or an array's first: the block freed whole (0 does nothing).
+    out.append(f"  void Delete() const {{ if (address) memory::FreeHandle(address); }}")
 
     # Any offset, any width (1, 2, 4 or 8 bytes), as the guest's bytes give it:
     # for accesses inside a field (a byte of a word) and code reading by offset.
@@ -361,6 +385,10 @@ def host_type(name, t):
         if ty == "embed":
             out.extend(embed_accessors(f, "address"))
             continue
+        # The field's address: a guest address, or an interior handle (the
+        # handle + offset), which every guest load and store resolves
+        # (memory::RawHandleLoad and Store; logged once per type and offset).
+        out.append(f"  uint32_t {n}_address() const {{ return address + {off}; }}")
         if ty == "bytes":
             # At its offset (a member, or bytes over scalar members).
             out.append(f"  uint8_t* {n}() const {{ return "

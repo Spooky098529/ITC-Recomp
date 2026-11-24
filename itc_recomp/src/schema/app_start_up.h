@@ -64,10 +64,19 @@ struct AppFrameworkInterface : View {
   static AppFrameworkInterface New(uint8_t* base) {
     return AppFrameworkInterface(base, memory::MakeHandle(new AppFrameworkInterfaceData(), sizeof(AppFrameworkInterfaceData), "AppFrameworkInterface", &kAppFrameworkInterfaceLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static AppFrameworkInterface NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(AppFrameworkInterfaceData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<AppFrameworkInterfaceData*>(::operator new(sizeof(AppFrameworkInterfaceData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) AppFrameworkInterfaceData();
+    return AppFrameworkInterface(base, memory::MakeHandle(p, sizeof(AppFrameworkInterfaceData) * count, "AppFrameworkInterface", &kAppFrameworkInterfaceLayout, sizeof(AppFrameworkInterfaceData)));
+  }
+  AppFrameworkInterface at(uint32_t i) const { return AppFrameworkInterface(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kAppFrameworkInterfaceLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppFrameworkInterfaceLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0x82000AFC
+  uint32_t vtable_address() const { return address + 0; }
   template <typename T = AppFrameworkInterfaceVtable>
   T vtable() const { return T(base, on_host() ? data()->vtable : guest::LoadU32(base, address + 0)); }
   void set_vtable(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }

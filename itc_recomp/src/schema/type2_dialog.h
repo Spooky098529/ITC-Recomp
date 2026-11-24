@@ -30,18 +30,29 @@ struct Type2DialogData : View {
   static Type2DialogData New(uint8_t* base) {
     return Type2DialogData(base, memory::MakeHandle(new Type2DialogDataData(), sizeof(Type2DialogDataData), "Type2DialogData", &kType2DialogDataLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static Type2DialogData NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(Type2DialogDataData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<Type2DialogDataData*>(::operator new(sizeof(Type2DialogDataData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) Type2DialogDataData();
+    return Type2DialogData(base, memory::MakeHandle(p, sizeof(Type2DialogDataData) * count, "Type2DialogData", &kType2DialogDataLayout, sizeof(Type2DialogDataData)));
+  }
+  Type2DialogData at(uint32_t i) const { return Type2DialogData(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kType2DialogDataLayout, offset, width); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kType2DialogDataLayout, offset, width, v); }
+  uint32_t movies_loaded_address() const { return address + 0; }
   uint32_t movies_loaded() const { return data()->movies_loaded; }
   void set_movies_loaded(uint32_t v) const { data()->movies_loaded = v; }
   uint32_t movies_loaded_bits() const { return data()->movies_loaded; }
   void set_movies_loaded_bits(uint32_t v) const { data()->movies_loaded = v; }
   // 21 none
+  uint32_t queued_state_address() const { return address + 4; }
   uint32_t queued_state() const { return data()->queued_state; }
   void set_queued_state(uint32_t v) const { data()->queued_state = v; }
   uint32_t queued_state_bits() const { return data()->queued_state; }
   void set_queued_state_bits(uint32_t v) const { data()->queued_state = v; }
+  uint32_t movie_shown_address() const { return address + 8; }
   uint32_t movie_shown() const { return data()->movie_shown; }
   void set_movie_shown(uint32_t v) const { data()->movie_shown = v; }
   uint32_t movie_shown_bits() const { return data()->movie_shown; }

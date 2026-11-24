@@ -293,16 +293,27 @@ struct LocationScreenDispatcher : View {
   static LocationScreenDispatcher New(uint8_t* base) {
     return LocationScreenDispatcher(base, memory::MakeHandle(new LocationScreenDispatcherData(), sizeof(LocationScreenDispatcherData), "LocationScreenDispatcher", &kLocationScreenDispatcherLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static LocationScreenDispatcher NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(LocationScreenDispatcherData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<LocationScreenDispatcherData*>(::operator new(sizeof(LocationScreenDispatcherData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) LocationScreenDispatcherData();
+    return LocationScreenDispatcher(base, memory::MakeHandle(p, sizeof(LocationScreenDispatcherData) * count, "LocationScreenDispatcher", &kLocationScreenDispatcherLayout, sizeof(LocationScreenDispatcherData)));
+  }
+  LocationScreenDispatcher at(uint32_t i) const { return LocationScreenDispatcher(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kLocationScreenDispatcherLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kLocationScreenDispatcherLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 50 messages of 12 bytes (id, two words)
+  uint32_t messages_address() const { return address + 204; }
   uint8_t* messages() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 204 : guest::Pointer(base, address + 204); }
+  uint32_t message_count_address() const { return address + 804; }
   uint32_t message_count() const { return on_host() ? uint32_t(data()->message_count) : uint32_t(guest::LoadU32(base, address + 804)); }
   void set_message_count(uint32_t v) const { if (on_host()) data()->message_count = v; else guest::StoreU32(base, address + 804, v); }
   uint32_t message_count_bits() const { return on_host() ? data()->message_count : guest::LoadU32(base, address + 804); }
   void set_message_count_bits(uint32_t v) const { if (on_host()) data()->message_count = v; else guest::StoreU32(base, address + 804, v); }
   // the ring's first slot
+  uint32_t message_start_address() const { return address + 808; }
   uint32_t message_start() const { return on_host() ? uint32_t(data()->message_start) : uint32_t(guest::LoadU32(base, address + 808)); }
   void set_message_start(uint32_t v) const { if (on_host()) data()->message_start = v; else guest::StoreU32(base, address + 808, v); }
   uint32_t message_start_bits() const { return on_host() ? data()->message_start : guest::LoadU32(base, address + 808); }
@@ -331,18 +342,29 @@ struct LocationScreenPicture : View {
   static LocationScreenPicture New(uint8_t* base) {
     return LocationScreenPicture(base, memory::MakeHandle(new LocationScreenPictureData(), sizeof(LocationScreenPictureData), "LocationScreenPicture", &kLocationScreenPictureLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static LocationScreenPicture NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(LocationScreenPictureData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<LocationScreenPictureData*>(::operator new(sizeof(LocationScreenPictureData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) LocationScreenPictureData();
+    return LocationScreenPicture(base, memory::MakeHandle(p, sizeof(LocationScreenPictureData) * count, "LocationScreenPicture", &kLocationScreenPictureLayout, sizeof(LocationScreenPictureData)));
+  }
+  LocationScreenPicture at(uint32_t i) const { return LocationScreenPicture(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kLocationScreenPictureLayout, offset, width); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kLocationScreenPictureLayout, offset, width, v); }
+  uint32_t loaded_address() const { return address + 0; }
   uint32_t loaded() const { return data()->loaded; }
   void set_loaded(uint32_t v) const { data()->loaded = v; }
   uint32_t loaded_bits() const { return data()->loaded; }
   void set_loaded_bits(uint32_t v) const { data()->loaded = v; }
   // the picture id (a 56- or 20-byte data table entry's +16), -1 until the ring's front is taken
+  uint32_t id_address() const { return address + 4; }
   uint32_t id() const { return data()->id; }
   void set_id(uint32_t v) const { data()->id = v; }
   uint32_t id_bits() const { return data()->id; }
   void set_id_bits(uint32_t v) const { data()->id = v; }
+  uint32_t texture_address() const { return address + 8; }
   template <typename T = LocationScreenPictureTexture>
   T texture() const { return T(base, data()->texture); }
   void set_texture(const View& w) const { const uint32_t v = w.address; data()->texture = v; }
@@ -350,6 +372,7 @@ struct LocationScreenPicture : View {
   uint32_t texture_bits() const { return data()->texture; }
   void set_texture_bits(uint32_t v) const { data()->texture = v; }
   // the XPR (24 bytes, XPR::XPR and XPR::Create over the loaded buffer)
+  uint32_t xpr_address() const { return address + 12; }
   View xpr() const { return View(base, data()->xpr); }
   void set_xpr(uint32_t v) const { data()->xpr = v; }
   uint32_t xpr_bits() const { return data()->xpr; }

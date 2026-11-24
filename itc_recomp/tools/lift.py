@@ -1228,6 +1228,11 @@ def host_site(st):
     if site[0] == "alloc":
         return (f"{{ r3 = schema::{ty.name}::New(base).address; f1 = 0; }}"
                 f"  // host_alloc {st.lr} ({ty.name})")
+    if site[0] == "alloc_array":
+        reg = site[2]
+        HOST_SITE_REGS.add(reg)
+        return (f"{{ r3 = schema::{ty.name}::NewArray(base, uint32_t({reg}) / schema::{ty.name}::kSize).address; f1 = 0; }}"
+                f"  // host_alloc {st.lr} ({ty.name}, an array)")
     _, _, reg, returns = site
     HOST_SITE_REGS.add(reg)
     # No `returns`: r3 as it was (operator delete and free leave it).

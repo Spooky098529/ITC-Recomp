@@ -174,15 +174,25 @@ struct ModeHolder : View {
   static ModeHolder New(uint8_t* base) {
     return ModeHolder(base, memory::MakeHandle(new ModeHolderData(), sizeof(ModeHolderData), "ModeHolder", &kModeHolderLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static ModeHolder NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(ModeHolderData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<ModeHolderData*>(::operator new(sizeof(ModeHolderData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) ModeHolderData();
+    return ModeHolder(base, memory::MakeHandle(p, sizeof(ModeHolderData) * count, "ModeHolder", &kModeHolderLayout, sizeof(ModeHolderData)));
+  }
+  ModeHolder at(uint32_t i) const { return ModeHolder(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kModeHolderLayout, offset, width); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kModeHolderLayout, offset, width, v); }
   // 0x82006AF0 (slot 0 sub_820ACCF0; 1 to 3 the empty sub_82106540)
+  uint32_t vtable_address() const { return address + 0; }
   uint32_t vtable() const { return data()->vtable; }
   void set_vtable(uint32_t v) const { data()->vtable = v; }
   uint32_t vtable_bits() const { return data()->vtable; }
   void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
   // the current mode, 0 until Modes::Tick makes one
+  uint32_t mode_address() const { return address + 4; }
   template <typename T = GameMode>
   T mode() const { return T(base, data()->mode); }
   void set_mode(const View& w) const { const uint32_t v = w.address; data()->mode = v; }
@@ -451,57 +461,78 @@ struct GameModeType6 : View {
   static GameModeType6 New(uint8_t* base) {
     return GameModeType6(base, memory::MakeHandle(new GameModeType6Data(), sizeof(GameModeType6Data), "GameModeType6", &kGameModeType6Layout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static GameModeType6 NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(GameModeType6Data) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<GameModeType6Data*>(::operator new(sizeof(GameModeType6Data) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) GameModeType6Data();
+    return GameModeType6(base, memory::MakeHandle(p, sizeof(GameModeType6Data) * count, "GameModeType6", &kGameModeType6Layout, sizeof(GameModeType6Data)));
+  }
+  GameModeType6 at(uint32_t i) const { return GameModeType6(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kGameModeType6Layout, offset, width); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kGameModeType6Layout, offset, width, v); }
   // 0x82010A48
+  uint32_t vtable_address() const { return address + 0; }
   uint32_t vtable() const { return data()->vtable; }
   void set_vtable(uint32_t v) const { data()->vtable = v; }
   uint32_t vtable_bits() const { return data()->vtable; }
   void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
   // the delegate at +8 (GameMode's)
+  uint32_t delegate_ptr_address() const { return address + 4; }
   uint32_t delegate_ptr() const { return data()->delegate_ptr; }
   void set_delegate_ptr(uint32_t v) const { data()->delegate_ptr = v; }
   uint32_t delegate_ptr_bits() const { return data()->delegate_ptr; }
   void set_delegate_ptr_bits(uint32_t v) const { data()->delegate_ptr = v; }
+  uint32_t delegate_vtable_address() const { return address + 8; }
   uint32_t delegate_vtable() const { return data()->delegate_vtable; }
   void set_delegate_vtable(uint32_t v) const { data()->delegate_vtable = v; }
   uint32_t delegate_vtable_bits() const { return data()->delegate_vtable; }
   void set_delegate_vtable_bits(uint32_t v) const { data()->delegate_vtable = v; }
+  uint32_t delegate_object_address() const { return address + 12; }
   uint32_t delegate_object() const { return data()->delegate_object; }
   void set_delegate_object(uint32_t v) const { data()->delegate_object = v; }
   uint32_t delegate_object_bits() const { return data()->delegate_object; }
   void set_delegate_object_bits(uint32_t v) const { data()->delegate_object = v; }
+  uint32_t delegate_function_address() const { return address + 16; }
   uint32_t delegate_function() const { return data()->delegate_function; }
   void set_delegate_function(uint32_t v) const { data()->delegate_function = v; }
   uint32_t delegate_function_bits() const { return data()->delegate_function; }
   void set_delegate_function_bits(uint32_t v) const { data()->delegate_function = v; }
+  uint32_t delegate_adjustment_address() const { return address + 20; }
   uint32_t delegate_adjustment() const { return data()->delegate_adjustment; }
   void set_delegate_adjustment(uint32_t v) const { data()->delegate_adjustment = v; }
   uint32_t delegate_adjustment_bits() const { return data()->delegate_adjustment; }
   void set_delegate_adjustment_bits(uint32_t v) const { data()->delegate_adjustment = v; }
   // 0x82010A3C
+  uint32_t vtable32_address() const { return address + 32; }
   uint32_t vtable32() const { return data()->vtable32; }
   void set_vtable32(uint32_t v) const { data()->vtable32 = v; }
   uint32_t vtable32_bits() const { return data()->vtable32; }
   void set_vtable32_bits(uint32_t v) const { data()->vtable32 = v; }
   // the dispatcher: 50 handler pointers
+  uint32_t handlers_address() const { return address + 36; }
   uint8_t* handlers() const { return reinterpret_cast<uint8_t*>(data()) + 36; }
+  uint32_t handler_count_address() const { return address + 236; }
   uint32_t handler_count() const { return data()->handler_count; }
   void set_handler_count(uint32_t v) const { data()->handler_count = v; }
   uint32_t handler_count_bits() const { return data()->handler_count; }
   void set_handler_count_bits(uint32_t v) const { data()->handler_count = v; }
   // 50 messages of 12 bytes (ModeMessage)
+  uint32_t ring_address() const { return address + 240; }
   uint8_t* ring() const { return reinterpret_cast<uint8_t*>(data()) + 240; }
+  uint32_t ring_count_address() const { return address + 840; }
   uint32_t ring_count() const { return data()->ring_count; }
   void set_ring_count(uint32_t v) const { data()->ring_count = v; }
   uint32_t ring_count_bits() const { return data()->ring_count; }
   void set_ring_count_bits(uint32_t v) const { data()->ring_count = v; }
+  uint32_t ring_start_address() const { return address + 844; }
   uint32_t ring_start() const { return data()->ring_start; }
   void set_ring_start(uint32_t v) const { data()->ring_start = v; }
   uint32_t ring_start_bits() const { return data()->ring_start; }
   void set_ring_start_bits(uint32_t v) const { data()->ring_start = v; }
   // 0 at construction (before the vtables); not read here
+  uint32_t word_848_address() const { return address + 848; }
   uint32_t word_848() const { return data()->word_848; }
   void set_word_848(uint32_t v) const { data()->word_848 = v; }
   uint32_t word_848_bits() const { return data()->word_848; }
@@ -541,57 +572,78 @@ struct GameModeType7 : View {
   static GameModeType7 New(uint8_t* base) {
     return GameModeType7(base, memory::MakeHandle(new GameModeType7Data(), sizeof(GameModeType7Data), "GameModeType7", &kGameModeType7Layout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static GameModeType7 NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(GameModeType7Data) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<GameModeType7Data*>(::operator new(sizeof(GameModeType7Data) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) GameModeType7Data();
+    return GameModeType7(base, memory::MakeHandle(p, sizeof(GameModeType7Data) * count, "GameModeType7", &kGameModeType7Layout, sizeof(GameModeType7Data)));
+  }
+  GameModeType7 at(uint32_t i) const { return GameModeType7(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kGameModeType7Layout, offset, width); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kGameModeType7Layout, offset, width, v); }
   // 0x82010FB0
+  uint32_t vtable_address() const { return address + 0; }
   uint32_t vtable() const { return data()->vtable; }
   void set_vtable(uint32_t v) const { data()->vtable = v; }
   uint32_t vtable_bits() const { return data()->vtable; }
   void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
   // the delegate at +8 (GameMode's)
+  uint32_t delegate_ptr_address() const { return address + 4; }
   uint32_t delegate_ptr() const { return data()->delegate_ptr; }
   void set_delegate_ptr(uint32_t v) const { data()->delegate_ptr = v; }
   uint32_t delegate_ptr_bits() const { return data()->delegate_ptr; }
   void set_delegate_ptr_bits(uint32_t v) const { data()->delegate_ptr = v; }
+  uint32_t delegate_vtable_address() const { return address + 8; }
   uint32_t delegate_vtable() const { return data()->delegate_vtable; }
   void set_delegate_vtable(uint32_t v) const { data()->delegate_vtable = v; }
   uint32_t delegate_vtable_bits() const { return data()->delegate_vtable; }
   void set_delegate_vtable_bits(uint32_t v) const { data()->delegate_vtable = v; }
+  uint32_t delegate_object_address() const { return address + 12; }
   uint32_t delegate_object() const { return data()->delegate_object; }
   void set_delegate_object(uint32_t v) const { data()->delegate_object = v; }
   uint32_t delegate_object_bits() const { return data()->delegate_object; }
   void set_delegate_object_bits(uint32_t v) const { data()->delegate_object = v; }
+  uint32_t delegate_function_address() const { return address + 16; }
   uint32_t delegate_function() const { return data()->delegate_function; }
   void set_delegate_function(uint32_t v) const { data()->delegate_function = v; }
   uint32_t delegate_function_bits() const { return data()->delegate_function; }
   void set_delegate_function_bits(uint32_t v) const { data()->delegate_function = v; }
+  uint32_t delegate_adjustment_address() const { return address + 20; }
   uint32_t delegate_adjustment() const { return data()->delegate_adjustment; }
   void set_delegate_adjustment(uint32_t v) const { data()->delegate_adjustment = v; }
   uint32_t delegate_adjustment_bits() const { return data()->delegate_adjustment; }
   void set_delegate_adjustment_bits(uint32_t v) const { data()->delegate_adjustment = v; }
   // 0x82010FA4
+  uint32_t vtable32_address() const { return address + 32; }
   uint32_t vtable32() const { return data()->vtable32; }
   void set_vtable32(uint32_t v) const { data()->vtable32 = v; }
   uint32_t vtable32_bits() const { return data()->vtable32; }
   void set_vtable32_bits(uint32_t v) const { data()->vtable32 = v; }
   // the dispatcher: 50 handler pointers
+  uint32_t handlers_address() const { return address + 36; }
   uint8_t* handlers() const { return reinterpret_cast<uint8_t*>(data()) + 36; }
+  uint32_t handler_count_address() const { return address + 236; }
   uint32_t handler_count() const { return data()->handler_count; }
   void set_handler_count(uint32_t v) const { data()->handler_count = v; }
   uint32_t handler_count_bits() const { return data()->handler_count; }
   void set_handler_count_bits(uint32_t v) const { data()->handler_count = v; }
   // 50 messages of 12 bytes (ModeMessage)
+  uint32_t ring_address() const { return address + 240; }
   uint8_t* ring() const { return reinterpret_cast<uint8_t*>(data()) + 240; }
+  uint32_t ring_count_address() const { return address + 840; }
   uint32_t ring_count() const { return data()->ring_count; }
   void set_ring_count(uint32_t v) const { data()->ring_count = v; }
   uint32_t ring_count_bits() const { return data()->ring_count; }
   void set_ring_count_bits(uint32_t v) const { data()->ring_count = v; }
+  uint32_t ring_start_address() const { return address + 844; }
   uint32_t ring_start() const { return data()->ring_start; }
   void set_ring_start(uint32_t v) const { data()->ring_start = v; }
   uint32_t ring_start_bits() const { return data()->ring_start; }
   void set_ring_start_bits(uint32_t v) const { data()->ring_start = v; }
   // the screen block (type6-type7-modes.toml's Type7Mode.block)
+  uint32_t block_address() const { return address + 848; }
   uint32_t block() const { return data()->block; }
   void set_block(uint32_t v) const { data()->block = v; }
   uint32_t block_bits() const { return data()->block; }

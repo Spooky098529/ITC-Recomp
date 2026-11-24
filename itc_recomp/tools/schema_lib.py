@@ -75,13 +75,16 @@ class Schema:
                 self.by_measure[m] = ty
         # Lifted allocation and free sites of host types (schema_gen.py
         # checks their form), by the call's return address:
-        # ("alloc", type) or ("free", type, register, returned value).
+        # ("alloc", type), ("alloc_array", type, the size's register) or
+        # ("free", type, register, returned value).
         self.host_sites = {}
         for ty in self.types.values():
             if not ty.host:
                 continue
             for a in ty.data.get("host_alloc", []):
                 self.host_sites[a] = ("alloc", ty)
+            for ar in ty.data.get("host_alloc_array", []):
+                self.host_sites[ar["call"]] = ("alloc_array", ty, ar["reg"])
             for fr in ty.data.get("host_free", []):
                 self.host_sites[fr["call"]] = ("free", ty, fr["reg"], fr.get("returns"))
 

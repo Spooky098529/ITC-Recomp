@@ -1058,64 +1058,87 @@ struct CameraAnim : View {
   static CameraAnim New(uint8_t* base) {
     return CameraAnim(base, memory::MakeHandle(new CameraAnimData(), sizeof(CameraAnimData), "CameraAnim", &kCameraAnimLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static CameraAnim NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(CameraAnimData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<CameraAnimData*>(::operator new(sizeof(CameraAnimData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) CameraAnimData();
+    return CameraAnim(base, memory::MakeHandle(p, sizeof(CameraAnimData) * count, "CameraAnim", &kCameraAnimLayout, sizeof(CameraAnimData)));
+  }
+  CameraAnim at(uint32_t i) const { return CameraAnim(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCameraAnimLayout, offset, width); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCameraAnimLayout, offset, width, v); }
   // 6 a camera, 7 a target, 1 a matrix, 14 the end
+  uint32_t kind_address() const { return address + 0; }
   uint32_t kind() const { return data()->kind; }
   void set_kind(uint32_t v) const { data()->kind = v; }
   uint32_t kind_bits() const { return data()->kind; }
   void set_kind_bits(uint32_t v) const { data()->kind = v; }
   // the file's +4: its blocks start there
+  uint32_t header_size_address() const { return address + 4; }
   uint32_t header_size() const { return data()->header_size; }
   void set_header_size(uint32_t v) const { data()->header_size = v; }
   uint32_t header_size_bits() const { return data()->header_size; }
   void set_header_size_bits(uint32_t v) const { data()->header_size = v; }
+  uint32_t unknown_8_address() const { return address + 8; }
   uint32_t unknown_8() const { return data()->unknown_8; }
   void set_unknown_8(uint32_t v) const { data()->unknown_8 = v; }
   uint32_t unknown_8_bits() const { return data()->unknown_8; }
   void set_unknown_8_bits(uint32_t v) const { data()->unknown_8 = v; }
   // the file object's blocks
+  uint32_t block_count_address() const { return address + 12; }
   uint32_t block_count() const { return data()->block_count; }
   void set_block_count(uint32_t v) const { data()->block_count = v; }
   uint32_t block_count_bits() const { return data()->block_count; }
   void set_block_count_bits(uint32_t v) const { data()->block_count = v; }
+  uint32_t unknown_16_address() const { return address + 16; }
   uint32_t unknown_16() const { return data()->unknown_16; }
   void set_unknown_16(uint32_t v) const { data()->unknown_16 = v; }
   uint32_t unknown_16_bits() const { return data()->unknown_16; }
   void set_unknown_16_bits(uint32_t v) const { data()->unknown_16 = v; }
+  uint32_t unknown_20_address() const { return address + 20; }
   uint32_t unknown_20() const { return data()->unknown_20; }
   void set_unknown_20(uint32_t v) const { data()->unknown_20 = v; }
   uint32_t unknown_20_bits() const { return data()->unknown_20; }
   void set_unknown_20_bits(uint32_t v) const { data()->unknown_20 = v; }
+  uint32_t unknown_24_address() const { return address + 24; }
   uint32_t unknown_24() const { return data()->unknown_24; }
   void set_unknown_24(uint32_t v) const { data()->unknown_24 = v; }
   uint32_t unknown_24_bits() const { return data()->unknown_24; }
   void set_unknown_24_bits(uint32_t v) const { data()->unknown_24 = v; }
+  uint32_t unknown_28_address() const { return address + 28; }
   uint32_t unknown_28() const { return data()->unknown_28; }
   void set_unknown_28(uint32_t v) const { data()->unknown_28 = v; }
   uint32_t unknown_28_bits() const { return data()->unknown_28; }
   void set_unknown_28_bits(uint32_t v) const { data()->unknown_28 = v; }
+  uint32_t unknown_32_address() const { return address + 32; }
   uint32_t unknown_32() const { return data()->unknown_32; }
   void set_unknown_32(uint32_t v) const { data()->unknown_32 = v; }
   uint32_t unknown_32_bits() const { return data()->unknown_32; }
   void set_unknown_32_bits(uint32_t v) const { data()->unknown_32 = v; }
+  uint32_t unknown_36_address() const { return address + 36; }
   uint32_t unknown_36() const { return data()->unknown_36; }
   void set_unknown_36(uint32_t v) const { data()->unknown_36 = v; }
   uint32_t unknown_36_bits() const { return data()->unknown_36; }
   void set_unknown_36_bits(uint32_t v) const { data()->unknown_36 = v; }
+  uint32_t unknown_40_address() const { return address + 40; }
   float unknown_40() const { return data()->unknown_40; }
   void set_unknown_40(float v) const { data()->unknown_40 = v; }
   uint32_t unknown_40_bits() const { return std::bit_cast<uint32_t>(data()->unknown_40); }
   void set_unknown_40_bits(uint32_t v) const { data()->unknown_40 = std::bit_cast<float>(v); }
+  uint32_t unknown_44_address() const { return address + 44; }
   float unknown_44() const { return data()->unknown_44; }
   void set_unknown_44(float v) const { data()->unknown_44 = v; }
   uint32_t unknown_44_bits() const { return std::bit_cast<uint32_t>(data()->unknown_44); }
   void set_unknown_44_bits(uint32_t v) const { data()->unknown_44 = std::bit_cast<float>(v); }
   // 0
+  uint32_t unknown_48_address() const { return address + 48; }
   uint8_t* unknown_48() const { return reinterpret_cast<uint8_t*>(data()) + 48; }
   // up to 64 CameraAnimBlock pointers
+  uint32_t blocks_address() const { return address + 80; }
   uint8_t* blocks() const { return reinterpret_cast<uint8_t*>(data()) + 80; }
+  uint32_t first_block_address() const { return address + 80; }
   template <typename T = CameraAnimBlock>
   T first_block() const { return T(base, data()->first_block); }
   void set_first_block(const View& w) const { const uint32_t v = w.address; data()->first_block = v; }
@@ -1123,6 +1146,7 @@ struct CameraAnim : View {
   uint32_t first_block_bits() const { return data()->first_block; }
   void set_first_block_bits(uint32_t v) const { data()->first_block = v; }
   // their count
+  uint32_t blocks_used_address() const { return address + 336; }
   uint32_t blocks_used() const { return data()->blocks_used; }
   void set_blocks_used(uint32_t v) const { data()->blocks_used = v; }
   uint32_t blocks_used_bits() const { return data()->blocks_used; }
@@ -1154,36 +1178,51 @@ struct CameraAnimBlock : View {
   static CameraAnimBlock New(uint8_t* base) {
     return CameraAnimBlock(base, memory::MakeHandle(new CameraAnimBlockData(), sizeof(CameraAnimBlockData), "CameraAnimBlock", &kCameraAnimBlockLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static CameraAnimBlock NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(CameraAnimBlockData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<CameraAnimBlockData*>(::operator new(sizeof(CameraAnimBlockData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) CameraAnimBlockData();
+    return CameraAnimBlock(base, memory::MakeHandle(p, sizeof(CameraAnimBlockData) * count, "CameraAnimBlock", &kCameraAnimBlockLayout, sizeof(CameraAnimBlockData)));
+  }
+  CameraAnimBlock at(uint32_t i) const { return CameraAnimBlock(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCameraAnimBlockLayout, offset, width); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCameraAnimBlockLayout, offset, width, v); }
   // 0 x, 1 y, 2 -z, 101 the film's height, 102 the focal length, 109 -roll
+  uint32_t channel_address() const { return address + 0; }
   uint32_t channel() const { return data()->channel; }
   void set_channel(uint32_t v) const { data()->channel = v; }
   uint32_t channel_bits() const { return data()->channel; }
   void set_channel_bits(uint32_t v) const { data()->channel = v; }
   // the file block's (CameraAnimFileBlock)
+  uint32_t header_size_address() const { return address + 4; }
   uint32_t header_size() const { return data()->header_size; }
   void set_header_size(uint32_t v) const { data()->header_size = v; }
   uint32_t header_size_bits() const { return data()->header_size; }
   void set_header_size_bits(uint32_t v) const { data()->header_size = v; }
   // its data's bytes
+  uint32_t data_size_address() const { return address + 8; }
   uint32_t data_size() const { return data()->data_size; }
   void set_data_size(uint32_t v) const { data()->data_size = v; }
   uint32_t data_size_bits() const { return data()->data_size; }
   void set_data_size_bits(uint32_t v) const { data()->data_size = v; }
+  uint32_t unknown_12_address() const { return address + 12; }
   float unknown_12() const { return data()->unknown_12; }
   void set_unknown_12(float v) const { data()->unknown_12 = v; }
   uint32_t unknown_12_bits() const { return std::bit_cast<uint32_t>(data()->unknown_12); }
   void set_unknown_12_bits(uint32_t v) const { data()->unknown_12 = std::bit_cast<float>(v); }
   // CameraAnims::Duration's answer
+  uint32_t duration_address() const { return address + 16; }
   float duration() const { return data()->duration; }
   void set_duration(float v) const { data()->duration = v; }
   uint32_t duration_bits() const { return std::bit_cast<uint32_t>(data()->duration); }
   void set_duration_bits(uint32_t v) const { data()->duration = std::bit_cast<float>(v); }
   // 0
+  uint32_t unknown_20_address() const { return address + 20; }
   uint8_t* unknown_20() const { return reinterpret_cast<uint8_t*>(data()) + 20; }
   // its floats, one a frame (guest pages); "data" before E5 step 3 (a host view's data() is its struct)
+  uint32_t values_address() const { return address + 60; }
   uint32_t values() const { return data()->values; }
   void set_values(uint32_t v) const { data()->values = v; }
   uint32_t values_bits() const { return data()->values; }
@@ -1250,10 +1289,19 @@ struct CameraAnimLoad : View {
   static CameraAnimLoad New(uint8_t* base) {
     return CameraAnimLoad(base, memory::MakeHandle(new CameraAnimLoadData(), sizeof(CameraAnimLoadData), "CameraAnimLoad", &kCameraAnimLoadLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static CameraAnimLoad NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(CameraAnimLoadData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<CameraAnimLoadData*>(::operator new(sizeof(CameraAnimLoadData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) CameraAnimLoadData();
+    return CameraAnimLoad(base, memory::MakeHandle(p, sizeof(CameraAnimLoadData) * count, "CameraAnimLoad", &kCameraAnimLoadLayout, sizeof(CameraAnimLoadData)));
+  }
+  CameraAnimLoad at(uint32_t i) const { return CameraAnimLoad(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCameraAnimLoadLayout, offset, width); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCameraAnimLoadLayout, offset, width, v); }
   // the asset id
+  uint32_t id_address() const { return address + 0; }
   uint32_t id() const { return data()->id; }
   void set_id(uint32_t v) const { data()->id = v; }
   uint32_t id_bits() const { return data()->id; }

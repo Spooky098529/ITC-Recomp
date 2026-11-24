@@ -44,25 +44,37 @@ struct ModeType9 : View {
   static ModeType9 New(uint8_t* base) {
     return ModeType9(base, memory::MakeHandle(new ModeType9Data(), sizeof(ModeType9Data), "ModeType9", &kModeType9Layout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static ModeType9 NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(ModeType9Data) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<ModeType9Data*>(::operator new(sizeof(ModeType9Data) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) ModeType9Data();
+    return ModeType9(base, memory::MakeHandle(p, sizeof(ModeType9Data) * count, "ModeType9", &kModeType9Layout, sizeof(ModeType9Data)));
+  }
+  ModeType9 at(uint32_t i) const { return ModeType9(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kModeType9Layout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kModeType9Layout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0x82006CAC (14 slots)
+  uint32_t vtable_address() const { return address + 0; }
   uint32_t vtable() const { return on_host() ? uint32_t(data()->vtable) : uint32_t(guest::LoadU32(base, address + 0)); }
   void set_vtable(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_bits() const { return on_host() ? data()->vtable : guest::LoadU32(base, address + 0); }
   void set_vtable_bits(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
   // measure fault: the next-mode answer's byte +0 (ModeAnswer), the delegates' r3
+  uint32_t answer_changed_address() const { return address + 0; }
   uint8_t answer_changed_bits() const { return on_host() ? uint8_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kModeType9Layout, 0, 1)) : guest::LoadU8(base, address + 0); }
   void set_answer_changed_bits(uint8_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kModeType9Layout, 0, 1, v); else guest::StoreU8(base, address + 0, v); }
   uint8_t answer_changed() const { return uint8_t(answer_changed_bits()); }
   void set_answer_changed(uint8_t v) const { set_answer_changed_bits(uint8_t(v)); }
   // measure fault: the next-mode answer's 8 bytes (ModeAnswer)
+  uint32_t answer_address() const { return address + 0; }
   uint64_t answer_bits() const { return on_host() ? uint64_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kModeType9Layout, 0, 8)) : guest::LoadU64(base, address + 0); }
   void set_answer_bits(uint64_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kModeType9Layout, 0, 8, v); else guest::StoreU64(base, address + 0, v); }
   uint64_t answer() const { return uint64_t(answer_bits()); }
   void set_answer(uint64_t v) const { set_answer_bits(uint64_t(v)); }
   // the delegate at +8, 0 none (also the answer's next type +4 by the measure's join)
+  uint32_t delegate_ptr_address() const { return address + 4; }
   template <typename T = ModeDelegate>
   T delegate_ptr() const { return T(base, on_host() ? data()->delegate_ptr : guest::LoadU32(base, address + 4)); }
   void set_delegate_ptr(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->delegate_ptr = v; else guest::StoreU32(base, address + 4, v); }
@@ -70,46 +82,57 @@ struct ModeType9 : View {
   uint32_t delegate_ptr_bits() const { return on_host() ? data()->delegate_ptr : guest::LoadU32(base, address + 4); }
   void set_delegate_ptr_bits(uint32_t v) const { if (on_host()) data()->delegate_ptr = v; else guest::StoreU32(base, address + 4, v); }
   // 0x82010FA0 (ModeDelegate::Invoke)
+  uint32_t delegate_vtable_address() const { return address + 8; }
   uint32_t delegate_vtable() const { return on_host() ? uint32_t(data()->delegate_vtable) : uint32_t(guest::LoadU32(base, address + 8)); }
   void set_delegate_vtable(uint32_t v) const { if (on_host()) data()->delegate_vtable = v; else guest::StoreU32(base, address + 8, v); }
   uint32_t delegate_vtable_bits() const { return on_host() ? data()->delegate_vtable : guest::LoadU32(base, address + 8); }
   void set_delegate_vtable_bits(uint32_t v) const { if (on_host()) data()->delegate_vtable = v; else guest::StoreU32(base, address + 8, v); }
   // the mode
+  uint32_t delegate_object_address() const { return address + 12; }
   uint32_t delegate_object() const { return on_host() ? uint32_t(data()->delegate_object) : uint32_t(guest::LoadU32(base, address + 12)); }
   void set_delegate_object(uint32_t v) const { if (on_host()) data()->delegate_object = v; else guest::StoreU32(base, address + 12, v); }
   uint32_t delegate_object_bits() const { return on_host() ? data()->delegate_object : guest::LoadU32(base, address + 12); }
   void set_delegate_object_bits(uint32_t v) const { if (on_host()) data()->delegate_object = v; else guest::StoreU32(base, address + 12, v); }
   // a Mode::SlotNThunk or Mode::NextModeThunk 0x82235C08
+  uint32_t delegate_function_address() const { return address + 16; }
   uint32_t delegate_function() const { return on_host() ? uint32_t(data()->delegate_function) : uint32_t(guest::LoadU32(base, address + 16)); }
   void set_delegate_function(uint32_t v) const { if (on_host()) data()->delegate_function = v; else guest::StoreU32(base, address + 16, v); }
   uint32_t delegate_function_bits() const { return on_host() ? data()->delegate_function : guest::LoadU32(base, address + 16); }
   void set_delegate_function_bits(uint32_t v) const { if (on_host()) data()->delegate_function = v; else guest::StoreU32(base, address + 16, v); }
+  uint32_t delegate_adjustment_address() const { return address + 20; }
   uint32_t delegate_adjustment() const { return on_host() ? uint32_t(data()->delegate_adjustment) : uint32_t(guest::LoadU32(base, address + 20)); }
   void set_delegate_adjustment(uint32_t v) const { if (on_host()) data()->delegate_adjustment = v; else guest::StoreU32(base, address + 20, v); }
   uint32_t delegate_adjustment_bits() const { return on_host() ? data()->delegate_adjustment : guest::LoadU32(base, address + 20); }
   void set_delegate_adjustment_bits(uint32_t v) const { if (on_host()) data()->delegate_adjustment = v; else guest::StoreU32(base, address + 20, v); }
   // 0x82006CA0: IsLoaded, ForceExit, an empty function
+  uint32_t vtable32_address() const { return address + 32; }
   uint32_t vtable32() const { return on_host() ? uint32_t(data()->vtable32) : uint32_t(guest::LoadU32(base, address + 32)); }
   void set_vtable32(uint32_t v) const { if (on_host()) data()->vtable32 = v; else guest::StoreU32(base, address + 32, v); }
   uint32_t vtable32_bits() const { return on_host() ? data()->vtable32 : guest::LoadU32(base, address + 32); }
   void set_vtable32_bits(uint32_t v) const { if (on_host()) data()->vtable32 = v; else guest::StoreU32(base, address + 32, v); }
   // the dispatcher (+36, ModeDispatcher): 50 handler pointers (the two machines)
+  uint32_t handlers_address() const { return address + 36; }
   uint8_t* handlers() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 36 : guest::Pointer(base, address + 36); }
+  uint32_t handler_count_address() const { return address + 236; }
   uint32_t handler_count() const { return on_host() ? uint32_t(data()->handler_count) : uint32_t(guest::LoadU32(base, address + 236)); }
   void set_handler_count(uint32_t v) const { if (on_host()) data()->handler_count = v; else guest::StoreU32(base, address + 236, v); }
   uint32_t handler_count_bits() const { return on_host() ? data()->handler_count : guest::LoadU32(base, address + 236); }
   void set_handler_count_bits(uint32_t v) const { if (on_host()) data()->handler_count = v; else guest::StoreU32(base, address + 236, v); }
   // the dispatcher's ring: 50 messages of 12 bytes (ModeMessage)
+  uint32_t ring_address() const { return address + 240; }
   uint8_t* ring() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 240 : guest::Pointer(base, address + 240); }
+  uint32_t ring_count_address() const { return address + 840; }
   uint32_t ring_count() const { return on_host() ? uint32_t(data()->ring_count) : uint32_t(guest::LoadU32(base, address + 840)); }
   void set_ring_count(uint32_t v) const { if (on_host()) data()->ring_count = v; else guest::StoreU32(base, address + 840, v); }
   uint32_t ring_count_bits() const { return on_host() ? data()->ring_count : guest::LoadU32(base, address + 840); }
   void set_ring_count_bits(uint32_t v) const { if (on_host()) data()->ring_count = v; else guest::StoreU32(base, address + 840, v); }
+  uint32_t ring_start_address() const { return address + 844; }
   uint32_t ring_start() const { return on_host() ? uint32_t(data()->ring_start) : uint32_t(guest::LoadU32(base, address + 844)); }
   void set_ring_start(uint32_t v) const { if (on_host()) data()->ring_start = v; else guest::StoreU32(base, address + 844, v); }
   uint32_t ring_start_bits() const { return on_host() ? data()->ring_start : guest::LoadU32(base, address + 844); }
   void set_ring_start_bits(uint32_t v) const { if (on_host()) data()->ring_start = v; else guest::StoreU32(base, address + 844, v); }
   // measure fault: IsLoaded's and ForceExit's r3 is the mode + 32, so this is the mode's +848 (block)
+  uint32_t iface_block_address() const { return address + 816; }
   template <typename T = ModeType9Block>
   T iface_block() const { return T(base, on_host() ? data()->iface_block : guest::LoadU32(base, address + 816)); }
   void set_iface_block(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->iface_block = v; else guest::StoreU32(base, address + 816, v); }
@@ -117,6 +140,7 @@ struct ModeType9 : View {
   uint32_t iface_block_bits() const { return on_host() ? data()->iface_block : guest::LoadU32(base, address + 816); }
   void set_iface_block_bits(uint32_t v) const { if (on_host()) data()->iface_block = v; else guest::StoreU32(base, address + 816, v); }
   // VirtualAlloc'ed by Init, freed by Release
+  uint32_t block_address() const { return address + 848; }
   template <typename T = ModeType9Block>
   T block() const { return T(base, on_host() ? data()->block : guest::LoadU32(base, address + 848)); }
   void set_block(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->block = v; else guest::StoreU32(base, address + 848, v); }
@@ -339,89 +363,115 @@ struct TodaysResultData : View {
   static TodaysResultData New(uint8_t* base) {
     return TodaysResultData(base, memory::MakeHandle(new TodaysResultDataData(), sizeof(TodaysResultDataData), "TodaysResultData", &kTodaysResultDataLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static TodaysResultData NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(TodaysResultDataData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<TodaysResultDataData*>(::operator new(sizeof(TodaysResultDataData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) TodaysResultDataData();
+    return TodaysResultData(base, memory::MakeHandle(p, sizeof(TodaysResultDataData) * count, "TodaysResultData", &kTodaysResultDataLayout, sizeof(TodaysResultDataData)));
+  }
+  TodaysResultData at(uint32_t i) const { return TodaysResultData(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kTodaysResultDataLayout, offset, width); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kTodaysResultDataLayout, offset, width, v); }
   // 1 once the texts are set (SetUpMovie)
+  uint32_t ready_address() const { return address + 0; }
   uint32_t ready() const { return data()->ready; }
   void set_ready(uint32_t v) const { data()->ready = v; }
   uint32_t ready_bits() const { return data()->ready; }
   void set_ready_bits(uint32_t v) const { data()->ready = v; }
   // 1 when LeavePage queued a movie; Destroy then goes to state 20
+  uint32_t movie_queued_address() const { return address + 4; }
   uint32_t movie_queued() const { return data()->movie_queued; }
   void set_movie_queued(uint32_t v) const { data()->movie_queued = v; }
   uint32_t movie_queued_bits() const { return data()->movie_queued; }
   void set_movie_queued_bits(uint32_t v) const { data()->movie_queued = v; }
+  uint32_t day_wins_address() const { return address + 8; }
   uint32_t day_wins() const { return data()->day_wins; }
   void set_day_wins(uint32_t v) const { data()->day_wins = v; }
   uint32_t day_wins_bits() const { return data()->day_wins; }
   void set_day_wins_bits(uint32_t v) const { data()->day_wins = v; }
+  uint32_t day_losses_address() const { return address + 12; }
   uint32_t day_losses() const { return data()->day_losses; }
   void set_day_losses(uint32_t v) const { data()->day_losses = v; }
   uint32_t day_losses_bits() const { return data()->day_losses; }
   void set_day_losses_bits(uint32_t v) const { data()->day_losses = v; }
   // the day's outcome 3 count
+  uint32_t day_outcome3_address() const { return address + 16; }
   uint32_t day_outcome3() const { return data()->day_outcome3; }
   void set_day_outcome3(uint32_t v) const { data()->day_outcome3 = v; }
   uint32_t day_outcome3_bits() const { return data()->day_outcome3; }
   void set_day_outcome3_bits(uint32_t v) const { data()->day_outcome3 = v; }
   // the day's win rate in percent
+  uint32_t day_win_rate_address() const { return address + 20; }
   float day_win_rate() const { return data()->day_win_rate; }
   void set_day_win_rate(float v) const { data()->day_win_rate = v; }
   uint32_t day_win_rate_bits() const { return std::bit_cast<uint32_t>(data()->day_win_rate); }
   void set_day_win_rate_bits(uint32_t v) const { data()->day_win_rate = std::bit_cast<float>(v); }
+  uint32_t day_win_streak_address() const { return address + 24; }
   uint32_t day_win_streak() const { return data()->day_win_streak; }
   void set_day_win_streak(uint32_t v) const { data()->day_win_streak = v; }
   uint32_t day_win_streak_bits() const { return data()->day_win_streak; }
   void set_day_win_streak_bits(uint32_t v) const { data()->day_win_streak = v; }
   // the day block's +4832 (DayBlock::Word4832)
+  uint32_t day_word_4832_address() const { return address + 28; }
   uint32_t day_word_4832() const { return data()->day_word_4832; }
   void set_day_word_4832(uint32_t v) const { data()->day_word_4832 = v; }
   uint32_t day_word_4832_bits() const { return data()->day_word_4832; }
   void set_day_word_4832_bits(uint32_t v) const { data()->day_word_4832 = v; }
+  uint32_t career_wins_address() const { return address + 32; }
   uint32_t career_wins() const { return data()->career_wins; }
   void set_career_wins(uint32_t v) const { data()->career_wins = v; }
   uint32_t career_wins_bits() const { return data()->career_wins; }
   void set_career_wins_bits(uint32_t v) const { data()->career_wins = v; }
+  uint32_t career_losses_address() const { return address + 36; }
   uint32_t career_losses() const { return data()->career_losses; }
   void set_career_losses(uint32_t v) const { data()->career_losses = v; }
   uint32_t career_losses_bits() const { return data()->career_losses; }
   void set_career_losses_bits(uint32_t v) const { data()->career_losses = v; }
+  uint32_t career_outcome3_address() const { return address + 40; }
   uint32_t career_outcome3() const { return data()->career_outcome3; }
   void set_career_outcome3(uint32_t v) const { data()->career_outcome3 = v; }
   uint32_t career_outcome3_bits() const { return data()->career_outcome3; }
   void set_career_outcome3_bits(uint32_t v) const { data()->career_outcome3 = v; }
   // in percent
+  uint32_t career_win_rate_address() const { return address + 44; }
   float career_win_rate() const { return data()->career_win_rate; }
   void set_career_win_rate(float v) const { data()->career_win_rate = v; }
   uint32_t career_win_rate_bits() const { return std::bit_cast<uint32_t>(data()->career_win_rate); }
   void set_career_win_rate_bits(uint32_t v) const { data()->career_win_rate = std::bit_cast<float>(v); }
   // the stats' +5968
+  uint32_t best_win_streak_address() const { return address + 48; }
   uint32_t best_win_streak() const { return data()->best_win_streak; }
   void set_best_win_streak(uint32_t v) const { data()->best_win_streak = v; }
   uint32_t best_win_streak_bits() const { return data()->best_win_streak; }
   void set_best_win_streak_bits(uint32_t v) const { data()->best_win_streak = v; }
   // the save's +6116
+  uint32_t money_address() const { return address + 52; }
   uint32_t money() const { return data()->money; }
   void set_money(uint32_t v) const { data()->money = v; }
   uint32_t money_bits() const { return data()->money; }
   void set_money_bits(uint32_t v) const { data()->money = v; }
   // the save's +6104
+  uint32_t mode_address() const { return address + 56; }
   uint32_t mode() const { return data()->mode; }
   void set_mode(uint32_t v) const { data()->mode = v; }
   uint32_t mode_bits() const { return data()->mode; }
   void set_mode_bits(uint32_t v) const { data()->mode = v; }
   // the day % 7
+  uint32_t weekday_address() const { return address + 60; }
   uint32_t weekday() const { return data()->weekday; }
   void set_weekday(uint32_t v) const { data()->weekday = v; }
   uint32_t weekday_bits() const { return data()->weekday; }
   void set_weekday_bits(uint32_t v) const { data()->weekday = v; }
   // the save's +6100, at most 999
+  uint32_t day_address() const { return address + 64; }
   uint32_t day() const { return data()->day; }
   void set_day(uint32_t v) const { data()->day = v; }
   uint32_t day_bits() const { return data()->day; }
   void set_day_bits(uint32_t v) const { data()->day = v; }
   // a copy of the save's 20-byte pick at +8 (five words)
+  uint32_t pick_address() const { return address + 68; }
   uint8_t* pick() const { return reinterpret_cast<uint8_t*>(data()) + 68; }
 };
 

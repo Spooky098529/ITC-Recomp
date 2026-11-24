@@ -1285,15 +1285,26 @@ struct TuningDispatcher : View {
   static TuningDispatcher New(uint8_t* base) {
     return TuningDispatcher(base, memory::MakeHandle(new TuningDispatcherData(), sizeof(TuningDispatcherData), "TuningDispatcher", &kTuningDispatcherLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static TuningDispatcher NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(TuningDispatcherData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<TuningDispatcherData*>(::operator new(sizeof(TuningDispatcherData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) TuningDispatcherData();
+    return TuningDispatcher(base, memory::MakeHandle(p, sizeof(TuningDispatcherData) * count, "TuningDispatcher", &kTuningDispatcherLayout, sizeof(TuningDispatcherData)));
+  }
+  TuningDispatcher at(uint32_t i) const { return TuningDispatcher(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kTuningDispatcherLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kTuningDispatcherLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 50 messages of 12 bytes (+0 the event, +4, +8)
+  uint32_t messages_address() const { return address + 204; }
   uint8_t* messages() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 204 : guest::Pointer(base, address + 204); }
+  uint32_t message_count_address() const { return address + 804; }
   uint32_t message_count() const { return on_host() ? uint32_t(data()->message_count) : uint32_t(guest::LoadU32(base, address + 804)); }
   void set_message_count(uint32_t v) const { if (on_host()) data()->message_count = v; else guest::StoreU32(base, address + 804, v); }
   uint32_t message_count_bits() const { return on_host() ? data()->message_count : guest::LoadU32(base, address + 804); }
   void set_message_count_bits(uint32_t v) const { if (on_host()) data()->message_count = v; else guest::StoreU32(base, address + 804, v); }
+  uint32_t message_first_address() const { return address + 808; }
   uint32_t message_first() const { return on_host() ? uint32_t(data()->message_first) : uint32_t(guest::LoadU32(base, address + 808)); }
   void set_message_first(uint32_t v) const { if (on_host()) data()->message_first = v; else guest::StoreU32(base, address + 808, v); }
   uint32_t message_first_bits() const { return on_host() ? data()->message_first : guest::LoadU32(base, address + 808); }

@@ -336,39 +336,54 @@ struct FrameDriverMapNode : View {
   static FrameDriverMapNode New(uint8_t* base) {
     return FrameDriverMapNode(base, memory::MakeHandle(new FrameDriverMapNodeData(), sizeof(FrameDriverMapNodeData), "FrameDriverMapNode", &kFrameDriverMapNodeLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static FrameDriverMapNode NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(FrameDriverMapNodeData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<FrameDriverMapNodeData*>(::operator new(sizeof(FrameDriverMapNodeData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) FrameDriverMapNodeData();
+    return FrameDriverMapNode(base, memory::MakeHandle(p, sizeof(FrameDriverMapNodeData) * count, "FrameDriverMapNode", &kFrameDriverMapNodeLayout, sizeof(FrameDriverMapNodeData)));
+  }
+  FrameDriverMapNode at(uint32_t i) const { return FrameDriverMapNode(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kFrameDriverMapNodeLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kFrameDriverMapNodeLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
+  uint32_t left_address() const { return address + 0; }
   template <typename T = FrameDriverMapNode>
   T left() const { return T(base, on_host() ? data()->left : guest::LoadU32(base, address + 0)); }
   void set_left(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->left = v; else guest::StoreU32(base, address + 0, v); }
   void set_left(uint32_t v) const { if (on_host()) data()->left = v; else guest::StoreU32(base, address + 0, v); }
   uint32_t left_bits() const { return on_host() ? data()->left : guest::LoadU32(base, address + 0); }
   void set_left_bits(uint32_t v) const { if (on_host()) data()->left = v; else guest::StoreU32(base, address + 0, v); }
+  uint32_t parent_address() const { return address + 4; }
   template <typename T = FrameDriverMapNode>
   T parent() const { return T(base, on_host() ? data()->parent : guest::LoadU32(base, address + 4)); }
   void set_parent(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->parent = v; else guest::StoreU32(base, address + 4, v); }
   void set_parent(uint32_t v) const { if (on_host()) data()->parent = v; else guest::StoreU32(base, address + 4, v); }
   uint32_t parent_bits() const { return on_host() ? data()->parent : guest::LoadU32(base, address + 4); }
   void set_parent_bits(uint32_t v) const { if (on_host()) data()->parent = v; else guest::StoreU32(base, address + 4, v); }
+  uint32_t right_address() const { return address + 8; }
   template <typename T = FrameDriverMapNode>
   T right() const { return T(base, on_host() ? data()->right : guest::LoadU32(base, address + 8)); }
   void set_right(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->right = v; else guest::StoreU32(base, address + 8, v); }
   void set_right(uint32_t v) const { if (on_host()) data()->right = v; else guest::StoreU32(base, address + 8, v); }
   uint32_t right_bits() const { return on_host() ? data()->right : guest::LoadU32(base, address + 8); }
   void set_right_bits(uint32_t v) const { if (on_host()) data()->right = v; else guest::StoreU32(base, address + 8, v); }
+  uint32_t key_address() const { return address + 12; }
   uint32_t key() const { return on_host() ? uint32_t(data()->key) : uint32_t(guest::LoadU32(base, address + 12)); }
   void set_key(uint32_t v) const { if (on_host()) data()->key = v; else guest::StoreU32(base, address + 12, v); }
   uint32_t key_bits() const { return on_host() ? data()->key : guest::LoadU32(base, address + 12); }
   void set_key_bits(uint32_t v) const { if (on_host()) data()->key = v; else guest::StoreU32(base, address + 12, v); }
+  uint32_t delegate_address() const { return address + 16; }
   uint32_t delegate() const { return on_host() ? uint32_t(data()->delegate) : uint32_t(guest::LoadU32(base, address + 16)); }
   void set_delegate(uint32_t v) const { if (on_host()) data()->delegate = v; else guest::StoreU32(base, address + 16, v); }
   uint32_t delegate_bits() const { return on_host() ? data()->delegate : guest::LoadU32(base, address + 16); }
   void set_delegate_bits(uint32_t v) const { if (on_host()) data()->delegate = v; else guest::StoreU32(base, address + 16, v); }
+  uint32_t color_address() const { return address + 20; }
   uint8_t color() const { return on_host() ? uint8_t(data()->color) : uint8_t(guest::LoadU8(base, address + 20)); }
   void set_color(uint8_t v) const { if (on_host()) data()->color = v; else guest::StoreU8(base, address + 20, v); }
   uint8_t color_bits() const { return on_host() ? data()->color : guest::LoadU8(base, address + 20); }
   void set_color_bits(uint8_t v) const { if (on_host()) data()->color = v; else guest::StoreU8(base, address + 20, v); }
+  uint32_t is_nil_address() const { return address + 21; }
   uint8_t is_nil() const { return on_host() ? uint8_t(data()->is_nil) : uint8_t(guest::LoadU8(base, address + 21)); }
   void set_is_nil(uint8_t v) const { if (on_host()) data()->is_nil = v; else guest::StoreU8(base, address + 21, v); }
   uint8_t is_nil_bits() const { return on_host() ? data()->is_nil : guest::LoadU8(base, address + 21); }
@@ -456,9 +471,18 @@ struct AppSceneFrameworkInterface : View {
   static AppSceneFrameworkInterface New(uint8_t* base) {
     return AppSceneFrameworkInterface(base, memory::MakeHandle(new AppSceneFrameworkInterfaceData(), sizeof(AppSceneFrameworkInterfaceData), "AppSceneFrameworkInterface", &kAppSceneFrameworkInterfaceLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static AppSceneFrameworkInterface NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(AppSceneFrameworkInterfaceData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<AppSceneFrameworkInterfaceData*>(::operator new(sizeof(AppSceneFrameworkInterfaceData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) AppSceneFrameworkInterfaceData();
+    return AppSceneFrameworkInterface(base, memory::MakeHandle(p, sizeof(AppSceneFrameworkInterfaceData) * count, "AppSceneFrameworkInterface", &kAppSceneFrameworkInterfaceLayout, sizeof(AppSceneFrameworkInterfaceData)));
+  }
+  AppSceneFrameworkInterface at(uint32_t i) const { return AppSceneFrameworkInterface(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kAppSceneFrameworkInterfaceLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppSceneFrameworkInterfaceLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
+  uint32_t vtable_address() const { return address + 0; }
   template <typename T = AppSceneFrameworkInterfaceVtable>
   T vtable() const { return T(base, on_host() ? data()->vtable : guest::LoadU32(base, address + 0)); }
   void set_vtable(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }

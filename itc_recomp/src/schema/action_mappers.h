@@ -528,20 +528,31 @@ struct InputClientList : View {
   static InputClientList New(uint8_t* base) {
     return InputClientList(base, memory::MakeHandle(new InputClientListData(), sizeof(InputClientListData), "InputClientList", &kInputClientListLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static InputClientList NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(InputClientListData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<InputClientListData*>(::operator new(sizeof(InputClientListData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) InputClientListData();
+    return InputClientList(base, memory::MakeHandle(p, sizeof(InputClientListData) * count, "InputClientList", &kInputClientListLayout, sizeof(InputClientListData)));
+  }
+  InputClientList at(uint32_t i) const { return InputClientList(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kInputClientListLayout, offset, width); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kInputClientListLayout, offset, width, v); }
   // 0x820713C0, then 0x82007F18
+  uint32_t vtable_address() const { return address + 0; }
   uint32_t vtable() const { return data()->vtable; }
   void set_vtable(uint32_t v) const { data()->vtable = v; }
   uint32_t vtable_bits() const { return data()->vtable; }
   void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
+  uint32_t first_address() const { return address + 4; }
   template <typename T = InputClientNode>
   T first() const { return T(base, data()->first); }
   void set_first(const View& w) const { const uint32_t v = w.address; data()->first = v; }
   void set_first(uint32_t v) const { data()->first = v; }
   uint32_t first_bits() const { return data()->first; }
   void set_first_bits(uint32_t v) const { data()->first = v; }
+  uint32_t last_address() const { return address + 8; }
   template <typename T = InputClientNode>
   T last() const { return T(base, data()->last); }
   void set_last(const View& w) const { const uint32_t v = w.address; data()->last = v; }
@@ -549,48 +560,58 @@ struct InputClientList : View {
   uint32_t last_bits() const { return data()->last; }
   void set_last_bits(uint32_t v) const { data()->last = v; }
   // 3 words: the nodes added of types 0-2
+  uint32_t added_counts_address() const { return address + 12; }
   uint32_t added_counts() const { return data()->added_counts; }
   void set_added_counts(uint32_t v) const { data()->added_counts = v; }
   uint32_t added_counts_bits() const { return data()->added_counts; }
   void set_added_counts_bits(uint32_t v) const { data()->added_counts = v; }
+  uint32_t added_count_1_address() const { return address + 16; }
   uint32_t added_count_1() const { return data()->added_count_1; }
   void set_added_count_1(uint32_t v) const { data()->added_count_1 = v; }
   uint32_t added_count_1_bits() const { return data()->added_count_1; }
   void set_added_count_1_bits(uint32_t v) const { data()->added_count_1 = v; }
   // the mappers
+  uint32_t added_count_2_address() const { return address + 20; }
   uint32_t added_count_2() const { return data()->added_count_2; }
   void set_added_count_2(uint32_t v) const { data()->added_count_2 = v; }
   uint32_t added_count_2_bits() const { return data()->added_count_2; }
   void set_added_count_2_bits(uint32_t v) const { data()->added_count_2 = v; }
   // 3 words: those bound, types 0-2
+  uint32_t bound_counts_address() const { return address + 24; }
   uint32_t bound_counts() const { return data()->bound_counts; }
   void set_bound_counts(uint32_t v) const { data()->bound_counts = v; }
   uint32_t bound_counts_bits() const { return data()->bound_counts; }
   void set_bound_counts_bits(uint32_t v) const { data()->bound_counts = v; }
+  uint32_t bound_count_1_address() const { return address + 28; }
   uint32_t bound_count_1() const { return data()->bound_count_1; }
   void set_bound_count_1(uint32_t v) const { data()->bound_count_1 = v; }
   uint32_t bound_count_1_bits() const { return data()->bound_count_1; }
   void set_bound_count_1_bits(uint32_t v) const { data()->bound_count_1 = v; }
   // the mappers bound
+  uint32_t bound_count_2_address() const { return address + 32; }
   uint32_t bound_count_2() const { return data()->bound_count_2; }
   void set_bound_count_2(uint32_t v) const { data()->bound_count_2 = v; }
   uint32_t bound_count_2_bits() const { return data()->bound_count_2; }
   void set_bound_count_2_bits(uint32_t v) const { data()->bound_count_2 = v; }
   // the object ActionMappers::Init was given
+  uint32_t manager_address() const { return address + 36; }
   template <typename T = ActionMappersOwner>
   T manager() const { return T(base, data()->manager); }
   void set_manager(const View& w) const { const uint32_t v = w.address; data()->manager = v; }
   void set_manager(uint32_t v) const { data()->manager = v; }
   uint32_t manager_bits() const { return data()->manager; }
   void set_manager_bits(uint32_t v) const { data()->manager = v; }
+  uint32_t unknown_40_address() const { return address + 40; }
   uint32_t unknown_40() const { return data()->unknown_40; }
   void set_unknown_40(uint32_t v) const { data()->unknown_40 = v; }
   uint32_t unknown_40_bits() const { return data()->unknown_40; }
   void set_unknown_40_bits(uint32_t v) const { data()->unknown_40 = v; }
+  uint32_t unknown_44_address() const { return address + 44; }
   uint32_t unknown_44() const { return data()->unknown_44; }
   void set_unknown_44(uint32_t v) const { data()->unknown_44 = v; }
   uint32_t unknown_44_bits() const { return data()->unknown_44; }
   void set_unknown_44_bits(uint32_t v) const { data()->unknown_44 = v; }
+  uint32_t unknown_48_address() const { return address + 48; }
   uint32_t unknown_48() const { return data()->unknown_48; }
   void set_unknown_48(uint32_t v) const { data()->unknown_48 = v; }
   uint32_t unknown_48_bits() const { return data()->unknown_48; }

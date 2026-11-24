@@ -31,9 +31,11 @@ bool ProtectHandles(uint8_t* base);
 // A handle for `object` (`size` bytes, of the schema type `type`, a string
 // that outlives it). Logs and aborts when the range is full.
 // `layout` (its scalar fields, for copies between it and guest memory:
-// memory/host_copy.h) may be null.
+// memory/host_copy.h) may be null. `element`: for an array allocated at
+// once (schema's NewArray), the size of one element, whose layout repeats
+// every `element` bytes; 0 for one object.
 uint32_t MakeHandle(void* object, uint32_t size, const char* type,
-                    const Layout* layout = nullptr);
+                    const Layout* layout = nullptr, uint32_t element = 0);
 
 // Frees `handle` (its object isn't deleted). 0 is ignored.
 void ReleaseHandle(uint32_t handle);
@@ -58,7 +60,8 @@ struct HandleInfo {
   uint32_t offset;       // the value's offset into it
   uint32_t size;
   const char* type;
-  const Layout* layout;  // may be null
+  const Layout* layout;  // may be null; an array's: one element's
+  uint32_t element;      // an array's element size, else the object's size
 };
 bool DescribeHandle(uint32_t value, HandleInfo* info);
 

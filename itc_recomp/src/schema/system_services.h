@@ -767,13 +767,23 @@ struct NetScreen7Data : View {
   static NetScreen7Data New(uint8_t* base) {
     return NetScreen7Data(base, memory::MakeHandle(new NetScreen7DataData(), sizeof(NetScreen7DataData), "NetScreen7Data", &kNetScreen7DataLayout));
   }
-  void Delete() const { delete data(); memory::ReleaseHandle(address); }
+  template <uint32_t Stride = kSize>
+  static NetScreen7Data NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(NetScreen7DataData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<NetScreen7DataData*>(::operator new(sizeof(NetScreen7DataData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) NetScreen7DataData();
+    return NetScreen7Data(base, memory::MakeHandle(p, sizeof(NetScreen7DataData) * count, "NetScreen7Data", &kNetScreen7DataLayout, sizeof(NetScreen7DataData)));
+  }
+  NetScreen7Data at(uint32_t i) const { return NetScreen7Data(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kNetScreen7DataLayout, offset, width); }
   void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kNetScreen7DataLayout, offset, width, v); }
+  uint32_t unknown_0_address() const { return address + 0; }
   uint32_t unknown_0() const { return data()->unknown_0; }
   void set_unknown_0(uint32_t v) const { data()->unknown_0 = v; }
   uint32_t unknown_0_bits() const { return data()->unknown_0; }
   void set_unknown_0_bits(uint32_t v) const { data()->unknown_0 = v; }
+  uint32_t unknown_4_address() const { return address + 4; }
   uint32_t unknown_4() const { return data()->unknown_4; }
   void set_unknown_4(uint32_t v) const { data()->unknown_4 = v; }
   uint32_t unknown_4_bits() const { return data()->unknown_4; }

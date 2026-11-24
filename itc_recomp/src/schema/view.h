@@ -14,9 +14,11 @@
 #include "memory/handles.h"
 #include "memory/host_copy.h"
 
+#include <algorithm>
 #include <bit>
 #include <cstdint>
 #include <cstring>
+#include <new>
 
 namespace schema {
 
