@@ -37,6 +37,20 @@ bool ProtectHandles(uint8_t* base);
 uint32_t MakeHandle(void* object, uint32_t size, const char* type,
                     const Layout* layout = nullptr, uint32_t element = 0);
 
+// A blob (E5 step 5): `size` bytes of a file's data or another buffer the
+// game uses as raw bytes, in PC memory behind a handle, zero-filled, kept in
+// the guest's byte order (no field layout). Everything reaching it behaves
+// as on guest memory: loads and stores by address (guest.h), raw pointers
+// (guest::Pointer gives the blob's bytes), copies and frees.
+uint32_t NewBlob(uint32_t size, const char* type);
+
+// The host bytes at `value` when it lies inside a live blob (`left`, when
+// given, the bytes from there to the blob's end); else nullptr.
+uint8_t* BlobPointer(uint32_t value, uint32_t* left = nullptr);
+
+// Whether `layout` is the blobs' (no fields; raw accesses aren't logged).
+bool IsBlobLayout(const Layout* layout);
+
 // Frees `handle` (its object isn't deleted). 0 is ignored.
 void ReleaseHandle(uint32_t handle);
 

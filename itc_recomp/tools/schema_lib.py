@@ -79,6 +79,12 @@ class Schema:
         # ("free", type, register, returned value).
         self.host_sites = {}
         for ty in self.types.values():
+            # A blob type's lifted allocations (E5 step 5): ("blob", type, the
+            # size's register).
+            if ty.storage == "blob":
+                for b in ty.data.get("blob_alloc", []):
+                    self.host_sites[b["call"]] = ("blob", ty, b["reg"])
+                continue
             if not ty.host:
                 continue
             for a in ty.data.get("host_alloc", []):

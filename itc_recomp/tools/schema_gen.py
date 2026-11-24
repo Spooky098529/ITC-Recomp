@@ -153,10 +153,22 @@ def check(areas):
                 sites[a] = name
     for area, data in areas.items():
         for name, t in data.items():
-            if name == "globals" or t.get("storage", "guest") == "guest":
+            if name == "globals" or t.get("storage", "guest") in ("guest", "blob"):
+                if name != "globals" and "blob_alloc" in t and t.get("storage") != "blob":
+                    errors.append(f"{area}: {name}: blob_alloc is for blob types only")
+                if name != "globals" and t.get("storage") == "blob":
+                    for b in t.get("blob_alloc", []):
+                        if (not isinstance(b, dict) or set(b) != {"call", "reg"} or not isinstance(b["call"], int)
+                                or not isinstance(b["reg"], str) or not re.fullmatch(r"r([3-9]|10)", b["reg"])):
+                            errors.append(f"{area}: {name}: blob_alloc entry {b!r}: "
+                                          "{ call = <return address>, reg = <the size's register> }")
+                        elif b["call"] in sites:
+                            errors.append(f"{area}: {name}: 0x{b['call']:08X} also listed by {sites[b['call']]}")
+                        else:
+                            sites[b["call"]] = name
                 continue
             if t.get("storage") not in ("host", "dual"):
-                errors.append(f"{area}: {name}: storage {t.get('storage')!r} (guest, host or dual)")
+                errors.append(f"{area}: {name}: storage {t.get('storage')!r} (guest, host, dual or blob)")
             # A host view's own members: a field of the same name would clash.
             for f in t.get("fields", []):
                 if f["name"] in HOST_VIEW_MEMBERS:
@@ -510,6 +522,13 @@ def emit_area(area, data):
         lines.append(f"  static constexpr uint32_t kSize = {t.get('size', 0)};")
         if "vtable" in t:
             lines.append(f"  static constexpr uint32_t kVtable = 0x{t['vtable']:08X};")
+        if t.get("storage") == "blob":
+            # A file's data or another raw buffer in PC memory, its bytes in
+            # the guest's order (memory::NewBlob, E5 step 5): read by address
+            # as guest memory is.
+            lines.append(f"  static {name} New(uint8_t* base, uint32_t size) {{ "
+                         f"return {name}(base, memory::NewBlob(size, \"{name}\")); }}")
+            lines.append("  void Delete() const { if (address) memory::FreeHandle(address); }")
         for f in t.get("fields", []):
             if f.get("note"):
                 lines.append(f"  // {f['note']}")

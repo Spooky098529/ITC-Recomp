@@ -1,6 +1,7 @@
 #include "memory/handles.h"
 
 #include "base/log.h"
+#include "memory/host_copy.h"
 
 #include <algorithm>
 #include <atomic>
@@ -169,6 +170,33 @@ bool DescribeHandle(uint32_t value, HandleInfo* info) {
   *info = {e.object, value - e.start, e.size, e.type, e.layout,
            e.element ? e.element : std::max<uint32_t>(e.size, 1)};
   return true;
+}
+
+namespace {
+const Layout kBlobLayout = {nullptr, 0};
+}  // namespace
+
+bool IsBlobLayout(const Layout* layout) { return layout == &kBlobLayout; }
+
+uint32_t NewBlob(uint32_t size, const char* type) {
+  void* bytes = ::operator new(std::max<uint32_t>(size, 1));
+  std::memset(bytes, 0, std::max<uint32_t>(size, 1));
+  return MakeHandle(bytes, size, type, &kBlobLayout);
+}
+
+uint8_t* BlobPointer(uint32_t value, uint32_t* left) {
+  if (!IsHandle(value) || !g_entries) {
+    return nullptr;
+  }
+  const Entry& e = g_entries[Granule(value)];
+  const uint32_t offset = value - e.start;
+  if (!e.object || e.layout != &kBlobLayout || offset > e.size) {
+    return nullptr;
+  }
+  if (left) {
+    *left = e.size - offset;
+  }
+  return static_cast<uint8_t*>(e.object) + offset;
 }
 
 void* HandleOwn(uint32_t value, const Layout* layout) {

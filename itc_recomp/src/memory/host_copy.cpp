@@ -213,12 +213,28 @@ const Layout kNoLayout = {nullptr, 0};
 }  // namespace
 
 uint64_t RawHandleLoad(uint32_t address, uint32_t width) {
+  // A blob: its bytes in the guest's order, read as guest memory would be.
+  uint32_t left = 0;
+  if (const uint8_t* p = BlobPointer(address, &left); p && left >= width) {
+    uint64_t v = 0;
+    for (uint32_t i = 0; i < width; i++) {
+      v = v << 8 | p[i];
+    }
+    return v;
+  }
   HandleInfo info;
   const uint8_t* object = RawObject(address, width, &info);
   return LoadOverlay(object, info.layout ? *info.layout : kNoLayout, info.offset, width);
 }
 
 void RawHandleStore(uint32_t address, uint32_t width, uint64_t value) {
+  uint32_t left = 0;
+  if (uint8_t* p = BlobPointer(address, &left); p && left >= width) {
+    for (uint32_t i = 0; i < width; i++) {
+      p[width - 1 - i] = uint8_t(value >> (8 * i));
+    }
+    return;
+  }
   HandleInfo info;
   uint8_t* object = RawObject(address, width, &info);
   StoreOverlay(object, info.layout ? *info.layout : kNoLayout, info.offset, width, value);

@@ -1228,6 +1228,11 @@ def host_site(st):
     if site[0] == "alloc":
         return (f"{{ r3 = schema::{ty.name}::New(base).address; f1 = 0; }}"
                 f"  // host_alloc {st.lr} ({ty.name})")
+    if site[0] == "blob":
+        reg = site[2]
+        HOST_SITE_REGS.add(reg)
+        return (f"{{ r3 = memory::NewBlob(uint32_t({reg}), \"{ty.name}\"); f1 = 0; }}"
+                f"  // host_alloc {st.lr} ({ty.name}, a blob)")
     if site[0] == "alloc_array":
         reg = site[2]
         HOST_SITE_REGS.add(reg)

@@ -42,7 +42,15 @@ namespace guest {
 // (src/memory/mapping.cpp): no offset to add here.
 
 // The host address of a guest address.
+// A blob's handle (memory/handles.h: a file's data in PC memory, in the
+// guest's byte order) gives the blob's bytes; a typed host object's handle
+// gives base + handle, which faults (and names the object) when used.
 inline uint8_t* Pointer(uint8_t* base, uint32_t address) {
+  if (memory::IsHandle(address)) [[unlikely]] {
+    if (uint8_t* bytes = memory::BlobPointer(address)) {
+      return bytes;
+    }
+  }
   return base + address;
 }
 
