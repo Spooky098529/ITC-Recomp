@@ -1141,3 +1141,25 @@ step 5 left (their files' buffers blobs where the pixels are copied out
 before the renderer reads them). The script:
 `itc_recomp/tools/workflows/e5-step7-swarm.js`; reports in
 `docs/loops/e5-step7-reports.md`.
+
+### The swarm: done (2026-11-24)
+
+7 agents (run `wf_21df284c-eb9`); reports in `docs/loops/e5-step7-reports.md`.
+Out of physical memory into blobs: the sound buffers (the race's slot wave
+banks, the effects bank pair's, `BankPair::Load`'s), the course scenery's
+blocks (the manager, the draw lists, the visible areas, the course set's
+first file, the object pools), and the image files step 5 left (the race
+overlays' textures, the location pictures, the day's event images, the
+type 2 hub's notice image, the decal images: their pixels are copied out
+before the renderer reads them). What the renderer reads stays in physical
+memory, outside guest memory since the groundwork: the models' vertex
+data, textures and XPR data, shader microcode, the surfaces, the rival
+logo's XPR. It built clean at once. Checked: attract race (38 s, no error
+lines, 150 to 151 fps), `tick_replay.sh` twice (both races all match), a
+frame dump (normal).
+
+The guest mapping's scaffolding (`memory/mapping.cpp`: the 4 GB
+reservation, the memory file and its views, now holding only the heap and
+the image) waits for step 8, the user's call (2026-11-24): then the heap
+and the image become blocks of their own, translated as the physical
+memory is, and the reservation goes.

@@ -74,7 +74,12 @@ memory until step 7. Step 6 (2026-11-24, "Step 6 as one swarm"): every
 thread's stack, thread object, per-thread block and TLS slots are blobs
 (the calling thread's stack found first in `guest.h`); 16 agents took the
 hand ports' frames, import calls and float modes off guest shape; lifted
-import calls go straight to our answers (`lifted::ImportAt`). A row's
+import calls go straight to our answers (`lifted::ImportAt`). Step 7
+(2026-11-24, "Step 7 as one swarm"): the physical memory (the GPU's) is
+mapped on its own outside guest memory, `guest.h` translating the guest's
+addresses for it; what the GPU never reads moved out of it into blobs. The
+guest mapping (`memory/mapping.cpp`, now the heap and the image) stays
+until step 8 (the user's call). A row's
 new name can change the measure's type names: after renaming, run
 `tools/function_names.py`, re-emit, and read the lifted diff.
 `docs/old-hardware.md` is the plan (not started) for running below
