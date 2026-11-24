@@ -86,7 +86,7 @@ void Reset(StreamState& s) {
 
 bool Start(uint8_t* base, StreamState& s, uint32_t data, uint32_t size) {
   FreeBuffer(s);
-  const uint8_t* host = base + data;
+  const uint8_t* host = guest::Pointer(base, data);  // a blob's bytes too (E5 step 5)
   const uint32_t samples = audio::xma::Stream::BufferSamples(host, size);
   const uint32_t bytes = std::max(samples, 1u) * s.channels * 2;
   s.buffer = SystemAlloc(bytes);
@@ -435,5 +435,5 @@ ITC_NATIVE_ENTRY_ALWAYS(8245D070) {
 ITC_NATIVE_ENTRY_ALWAYS(8246A5F8) {
   
   ctx.r3.u64 =
-      audio::xma::BitOffsetOfSample(base + ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+      audio::xma::BitOffsetOfSample(guest::Pointer(base, ctx.r3.u32), ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
 }

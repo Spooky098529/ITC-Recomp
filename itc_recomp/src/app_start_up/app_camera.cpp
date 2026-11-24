@@ -91,7 +91,9 @@ uint32_t AppCameraEntryConstruct(uint8_t* base, uint32_t entry) {
 std::optional<uint32_t> AppCameraListConstruct(uint8_t* base, uint32_t list) {
   const schema::AppCameraList l(base, list);
   l.set_vtable(0x82002780);
-  const auto block = memory::crt::OperatorNew(base, 16);
+  // A blob in PC memory (E5 step 5): the vector's words by address.
+  const auto block =
+      std::optional<uint32_t>(schema::NewAny_MessageVector_Allocate::New(base, 16).address);
   if (!block) {
     return std::nullopt;
   }

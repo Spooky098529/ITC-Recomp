@@ -664,7 +664,8 @@ void CopyWithRecords(uint8_t* base, uint32_t destination, uint32_t source, uint3
     }
   }
   bool log_write = size && destination >= 0xA0000000u && Buffers_LogPhysicalWrites();
-  bool same = log_write && !std::memcmp(base + destination, base + source, size);
+  bool same = log_write && !memory::IsHandle(source) &&
+              !std::memcmp(base + destination, base + source, size);
   copy();
   if (log_write) {
     LoggedWrite write;
@@ -702,6 +703,15 @@ bool Buffers_NativeMemcpy() {
 
 bool Buffers_Memcpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size,
                     uint32_t caller) {
+  // From a blob (E5 step 5: a file's data in PC memory) or a host object
+  // into guest memory, the physical views included (XPR::Create's textures,
+  // Model::Load's vertices, the shaders' microcode): recorded for the
+  // renderer as any copy.
+  if (memory::IsHandle(source) && !memory::IsHandle(destination)) {
+    CopyWithRecords(base, destination, source, size, caller,
+                    [&] { memory::CopyWithHandles(base, destination, source, size); });
+    return true;
+  }
   if (memory::CopyWithHandles(base, destination, source, size)) {
     return true;
   }
@@ -723,6 +733,13 @@ bool Buffers_Memcpy(uint8_t* base, uint32_t destination, uint32_t source, uint32
 // ranges don't share memory; r3 stays the destination either way, and the
 // other registers the original changes are read by no caller.
 ITC_NATIVE_ENTRY_ALWAYS(825A7410) {
+  if (memory::IsHandle(ctx.r4.u32) && !memory::IsHandle(ctx.r3.u32)) {
+    // From a blob into guest memory: recorded as Buffers_Memcpy's.
+    native::CopyWithRecords(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, uint32_t(ctx.lr), [&] {
+      memory::CopyWithHandles(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+    });
+    return;
+  }
   if (memory::CopyWithHandles(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
     return;  // a host object on either side (not the renderer's memory)
   }

@@ -98,7 +98,9 @@ bool SetupWithHeader(uint8_t* base, uint32_t set, uint32_t section, uint32_t str
   if (n == 0) {
     return true;
   }
-  const uint32_t block = NewArray(base, size);
+  // A blob in PC memory (E5 step 5): the header and values in the guest's
+  // byte order, read by address as before; operator delete[] frees it.
+  const uint32_t block = schema::TrackValueBlock::New(base, size).address;
   uint32_t values = 0;
   if (block != 0) {
     const schema::TrackValueBlock values_block(base, block);

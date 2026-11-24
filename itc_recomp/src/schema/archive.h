@@ -155,6 +155,8 @@ struct ArchiveListNode : View {
 struct ArchiveTocEntry : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
+  static ArchiveTocEntry New(uint8_t* base, uint32_t size) { return ArchiveTocEntry(base, memory::NewBlob(size, "ArchiveTocEntry")); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   // 2,048-byte sectors
   uint32_t start_sector() const { return guest::LoadU32(base, address + 0); }
   void set_start_sector(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
@@ -186,17 +188,50 @@ struct ArchiveLooseFile : View {
 };
 
 // file; measure: LoaderFunctor, new<8>@LoaderFunctor::Clone
+#pragma pack(push, 1)
+struct LoaderFunctorData {
+  uint32_t vtable = 0;  // +0
+  uint32_t target = 0;  // +4
+};
+#pragma pack(pop)
+static_assert(sizeof(LoaderFunctorData) == 8);
+inline constexpr memory::LayoutField kLoaderFunctorFields[] = {{0, 4}, {4, 4}};
+inline constexpr memory::Layout kLoaderFunctorLayout = {kLoaderFunctorFields, 2};
+
 struct LoaderFunctor : View {
   using View::View;
   static constexpr uint32_t kSize = 8;
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
   static constexpr uint32_t kVtable = 0x82001DDC;
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  LoaderFunctorData* data() const { return static_cast<LoaderFunctorData*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static LoaderFunctor New(uint8_t* base) {
+    return LoaderFunctor(base, memory::MakeHandle(new LoaderFunctorData(), sizeof(LoaderFunctorData), "LoaderFunctor", &kLoaderFunctorLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static LoaderFunctor NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(LoaderFunctorData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<LoaderFunctorData*>(::operator new(sizeof(LoaderFunctorData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) LoaderFunctorData();
+    return LoaderFunctor(base, memory::MakeHandle(p, sizeof(LoaderFunctorData) * count, "LoaderFunctor", &kLoaderFunctorLayout, sizeof(LoaderFunctorData)));
+  }
+  LoaderFunctor at(uint32_t i) const { return LoaderFunctor(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  LoaderFunctorData* direct() const { return static_cast<LoaderFunctorData*>(memory::HandleOwn(address, &kLoaderFunctorLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kLoaderFunctorLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kLoaderFunctorLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t vtable_address() const { return address + 0; }
+  uint32_t vtable_bits() const { if (auto* d = direct()) return d->vtable; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_vtable_bits(uint32_t v) const { if (auto* d = direct()) { d->vtable = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable() const { if (auto* d = direct()) return d->vtable; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_vtable(uint32_t v) const { if (auto* d = direct()) { d->vtable = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // the function Invoke calls (0x8209E118, the loader thread)
-  uint32_t target() const { return guest::LoadU32(base, address + 4); }
-  void set_target(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t target_address() const { return address + 4; }
+  uint32_t target_bits() const { if (auto* d = direct()) return d->target; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_target_bits(uint32_t v) const { if (auto* d = direct()) { d->target = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  uint32_t target() const { if (auto* d = direct()) return d->target; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_target(uint32_t v) const { if (auto* d = direct()) { d->target = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
 };
 
 // file; measure: sub_82094D20.r3

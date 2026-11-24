@@ -9,103 +9,194 @@
 namespace schema {
 
 // allocated; measure: new<468>@Params::Init, Params::OnWheelsLoaded.r6, Params::OnTable83Loaded.r6, Params::OnCarSpecsLoaded.r6, Params::OnLoaded.r6
+#pragma pack(push, 1)
+struct CarParamsData {
+  uint32_t loads_pending = 0;  // +0
+  uint32_t block = 0;  // +4
+  uint32_t wheels = 0;  // +8
+  uint32_t specs = 0;  // +12
+  uint32_t aero74 = 0;  // +16
+  uint32_t aero75 = 0;  // +20
+  uint32_t aero76 = 0;  // +24
+  uint32_t aero77 = 0;  // +28
+  uint32_t aero78 = 0;  // +32
+  uint32_t aero79 = 0;  // +36
+  uint32_t aero80 = 0;  // +40
+  uint32_t aero81 = 0;  // +44
+  uint32_t aero82 = 0;  // +48
+  uint32_t table83 = 0;  // +52
+  uint32_t spec_count = 0;  // +56
+  uint32_t wheel_count = 0;  // +60
+  uint8_t pad_64[4] = {};
+  uint32_t model1_first_wheel = 0;  // +68
+  uint8_t pad_72[392] = {};
+  uint32_t model_end = 0;  // +464
+};
+#pragma pack(pop)
+static_assert(sizeof(CarParamsData) == 468);
+inline constexpr memory::LayoutField kCarParamsFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 4}, {24, 4}, {28, 4}, {32, 4}, {36, 4}, {40, 4}, {44, 4}, {48, 4}, {52, 4}, {56, 4}, {60, 4}, {68, 4}, {464, 4}};
+inline constexpr memory::Layout kCarParamsLayout = {kCarParamsFields, 18};
+
 struct CarParams : View {
   using View::View;
   static constexpr uint32_t kSize = 468;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  CarParamsData* data() const { return static_cast<CarParamsData*>(memory::HandleObject(address)); }
+  static CarParams New(uint8_t* base) {
+    return CarParams(base, memory::MakeHandle(new CarParamsData(), sizeof(CarParamsData), "CarParams", &kCarParamsLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static CarParams NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(CarParamsData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<CarParamsData*>(::operator new(sizeof(CarParamsData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) CarParamsData();
+    return CarParams(base, memory::MakeHandle(p, sizeof(CarParamsData) * count, "CarParams", &kCarParamsLayout, sizeof(CarParamsData)));
+  }
+  CarParams at(uint32_t i) const { return CarParams(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  CarParamsData* direct() const { return static_cast<CarParamsData*>(memory::HandleOwn(address, &kCarParamsLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kCarParamsLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarParamsLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 12 at boot; each load's callback counts it down
-  uint32_t loads_pending() const { return guest::LoadU32(base, address + 0); }
-  void set_loads_pending(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t loads_pending_address() const { return address + 0; }
+  uint32_t loads_pending_bits() const { if (auto* d = direct()) return d->loads_pending; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_loads_pending_bits(uint32_t v) const { if (auto* d = direct()) { d->loads_pending = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t loads_pending() const { if (auto* d = direct()) return d->loads_pending; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_loads_pending(uint32_t v) const { if (auto* d = direct()) { d->loads_pending = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // the block (operator new[]) tables 72-83 are loaded into
-  uint32_t block() const { return guest::LoadU32(base, address + 4); }
-  void set_block(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t block_address() const { return address + 4; }
+  uint32_t block_bits() const { if (auto* d = direct()) return d->block; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_block_bits(uint32_t v) const { if (auto* d = direct()) { d->block = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  uint32_t block() const { if (auto* d = direct()) return d->block; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_block(uint32_t v) const { if (auto* d = direct()) { d->block = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
   // table 73: the aftermarket wheels (48-byte records; Params::GetWheel)
-  template <typename T = CarWheelRecord>
-  T wheels() const { return T(base, guest::LoadU32(base, address + 8)); }
-  void set_wheels(const View& v) const { guest::StoreU32(base, address + 8, v.address); }
-  void set_wheels(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t wheels_address() const { return address + 8; }
+  uint32_t wheels_bits() const { if (auto* d = direct()) return d->wheels; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_wheels_bits(uint32_t v) const { if (auto* d = direct()) { d->wheels = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  template <typename T = CarWheelRecord>
+  T wheels() const { return T(base, wheels_bits()); }
+  void set_wheels(const View& w) const { set_wheels_bits(w.address); }
+  void set_wheels(uint32_t v) const { set_wheels_bits(v); }
   // table 72: the car specs (8,432-byte records; Params::GetCarSpec)
-  uint32_t specs() const { return guest::LoadU32(base, address + 12); }
-  void set_specs(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
   uint32_t specs_address() const { return address + 12; }
+  uint32_t specs_bits() const { if (auto* d = direct()) return d->specs; return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_specs_bits(uint32_t v) const { if (auto* d = direct()) { d->specs = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
+  uint32_t specs() const { if (auto* d = direct()) return d->specs; return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_specs(uint32_t v) const { if (auto* d = direct()) { d->specs = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
   // table 74: aero part records (280 bytes a car)
-  template <typename T = AeroPartRecord>
-  T aero74() const { return T(base, guest::LoadU32(base, address + 16)); }
-  void set_aero74(const View& v) const { guest::StoreU32(base, address + 16, v.address); }
-  void set_aero74(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
   uint32_t aero74_address() const { return address + 16; }
+  uint32_t aero74_bits() const { if (auto* d = direct()) return d->aero74; return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_aero74_bits(uint32_t v) const { if (auto* d = direct()) { d->aero74 = v; return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
+  template <typename T = AeroPartRecord>
+  T aero74() const { return T(base, aero74_bits()); }
+  void set_aero74(const View& w) const { set_aero74_bits(w.address); }
+  void set_aero74(uint32_t v) const { set_aero74_bits(v); }
   // table 75: aero part records (280 bytes a car)
-  template <typename T = AeroPartRecord>
-  T aero75() const { return T(base, guest::LoadU32(base, address + 20)); }
-  void set_aero75(const View& v) const { guest::StoreU32(base, address + 20, v.address); }
-  void set_aero75(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
   uint32_t aero75_address() const { return address + 20; }
+  uint32_t aero75_bits() const { if (auto* d = direct()) return d->aero75; return uint32_t((memory::IsHandle(address + 20) ? uint32_t(memory::OwnerLoad(address + 20, 4)) : guest::LoadU32(base, address + 20))); }
+  void set_aero75_bits(uint32_t v) const { if (auto* d = direct()) { d->aero75 = v; return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 4, v); else guest::StoreU32(base, address + 20, v); }
+  template <typename T = AeroPartRecord>
+  T aero75() const { return T(base, aero75_bits()); }
+  void set_aero75(const View& w) const { set_aero75_bits(w.address); }
+  void set_aero75(uint32_t v) const { set_aero75_bits(v); }
   // table 76: aero part records (280 bytes a car)
-  template <typename T = AeroPartRecord>
-  T aero76() const { return T(base, guest::LoadU32(base, address + 24)); }
-  void set_aero76(const View& v) const { guest::StoreU32(base, address + 24, v.address); }
-  void set_aero76(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
   uint32_t aero76_address() const { return address + 24; }
+  uint32_t aero76_bits() const { if (auto* d = direct()) return d->aero76; return uint32_t((memory::IsHandle(address + 24) ? uint32_t(memory::OwnerLoad(address + 24, 4)) : guest::LoadU32(base, address + 24))); }
+  void set_aero76_bits(uint32_t v) const { if (auto* d = direct()) { d->aero76 = v; return; } if (memory::IsHandle(address + 24)) memory::OwnerStore(address + 24, 4, v); else guest::StoreU32(base, address + 24, v); }
+  template <typename T = AeroPartRecord>
+  T aero76() const { return T(base, aero76_bits()); }
+  void set_aero76(const View& w) const { set_aero76_bits(w.address); }
+  void set_aero76(uint32_t v) const { set_aero76_bits(v); }
   // table 77: aero part records (280 bytes a car)
-  template <typename T = AeroPartRecord>
-  T aero77() const { return T(base, guest::LoadU32(base, address + 28)); }
-  void set_aero77(const View& v) const { guest::StoreU32(base, address + 28, v.address); }
-  void set_aero77(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
   uint32_t aero77_address() const { return address + 28; }
+  uint32_t aero77_bits() const { if (auto* d = direct()) return d->aero77; return uint32_t((memory::IsHandle(address + 28) ? uint32_t(memory::OwnerLoad(address + 28, 4)) : guest::LoadU32(base, address + 28))); }
+  void set_aero77_bits(uint32_t v) const { if (auto* d = direct()) { d->aero77 = v; return; } if (memory::IsHandle(address + 28)) memory::OwnerStore(address + 28, 4, v); else guest::StoreU32(base, address + 28, v); }
+  template <typename T = AeroPartRecord>
+  T aero77() const { return T(base, aero77_bits()); }
+  void set_aero77(const View& w) const { set_aero77_bits(w.address); }
+  void set_aero77(uint32_t v) const { set_aero77_bits(v); }
   // table 78: aero part records (168 bytes a car)
-  template <typename T = AeroPartRecord>
-  T aero78() const { return T(base, guest::LoadU32(base, address + 32)); }
-  void set_aero78(const View& v) const { guest::StoreU32(base, address + 32, v.address); }
-  void set_aero78(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
   uint32_t aero78_address() const { return address + 32; }
+  uint32_t aero78_bits() const { if (auto* d = direct()) return d->aero78; return uint32_t((memory::IsHandle(address + 32) ? uint32_t(memory::OwnerLoad(address + 32, 4)) : guest::LoadU32(base, address + 32))); }
+  void set_aero78_bits(uint32_t v) const { if (auto* d = direct()) { d->aero78 = v; return; } if (memory::IsHandle(address + 32)) memory::OwnerStore(address + 32, 4, v); else guest::StoreU32(base, address + 32, v); }
+  template <typename T = AeroPartRecord>
+  T aero78() const { return T(base, aero78_bits()); }
+  void set_aero78(const View& w) const { set_aero78_bits(w.address); }
+  void set_aero78(uint32_t v) const { set_aero78_bits(v); }
   // table 79: aero part records (168 bytes a car)
-  template <typename T = AeroPartRecord>
-  T aero79() const { return T(base, guest::LoadU32(base, address + 36)); }
-  void set_aero79(const View& v) const { guest::StoreU32(base, address + 36, v.address); }
-  void set_aero79(uint32_t v) const { guest::StoreU32(base, address + 36, v); }
   uint32_t aero79_address() const { return address + 36; }
+  uint32_t aero79_bits() const { if (auto* d = direct()) return d->aero79; return uint32_t((memory::IsHandle(address + 36) ? uint32_t(memory::OwnerLoad(address + 36, 4)) : guest::LoadU32(base, address + 36))); }
+  void set_aero79_bits(uint32_t v) const { if (auto* d = direct()) { d->aero79 = v; return; } if (memory::IsHandle(address + 36)) memory::OwnerStore(address + 36, 4, v); else guest::StoreU32(base, address + 36, v); }
+  template <typename T = AeroPartRecord>
+  T aero79() const { return T(base, aero79_bits()); }
+  void set_aero79(const View& w) const { set_aero79_bits(w.address); }
+  void set_aero79(uint32_t v) const { set_aero79_bits(v); }
   // table 80: aero part records (84 bytes a car)
-  template <typename T = AeroPartRecord>
-  T aero80() const { return T(base, guest::LoadU32(base, address + 40)); }
-  void set_aero80(const View& v) const { guest::StoreU32(base, address + 40, v.address); }
-  void set_aero80(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
   uint32_t aero80_address() const { return address + 40; }
+  uint32_t aero80_bits() const { if (auto* d = direct()) return d->aero80; return uint32_t((memory::IsHandle(address + 40) ? uint32_t(memory::OwnerLoad(address + 40, 4)) : guest::LoadU32(base, address + 40))); }
+  void set_aero80_bits(uint32_t v) const { if (auto* d = direct()) { d->aero80 = v; return; } if (memory::IsHandle(address + 40)) memory::OwnerStore(address + 40, 4, v); else guest::StoreU32(base, address + 40, v); }
+  template <typename T = AeroPartRecord>
+  T aero80() const { return T(base, aero80_bits()); }
+  void set_aero80(const View& w) const { set_aero80_bits(w.address); }
+  void set_aero80(uint32_t v) const { set_aero80_bits(v); }
   // table 81: aero part records (108 bytes a car)
-  template <typename T = AeroPartRecord>
-  T aero81() const { return T(base, guest::LoadU32(base, address + 44)); }
-  void set_aero81(const View& v) const { guest::StoreU32(base, address + 44, v.address); }
-  void set_aero81(uint32_t v) const { guest::StoreU32(base, address + 44, v); }
   uint32_t aero81_address() const { return address + 44; }
-  // table 82: aero part records (72 bytes a car)
+  uint32_t aero81_bits() const { if (auto* d = direct()) return d->aero81; return uint32_t((memory::IsHandle(address + 44) ? uint32_t(memory::OwnerLoad(address + 44, 4)) : guest::LoadU32(base, address + 44))); }
+  void set_aero81_bits(uint32_t v) const { if (auto* d = direct()) { d->aero81 = v; return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 4, v); else guest::StoreU32(base, address + 44, v); }
   template <typename T = AeroPartRecord>
-  T aero82() const { return T(base, guest::LoadU32(base, address + 48)); }
-  void set_aero82(const View& v) const { guest::StoreU32(base, address + 48, v.address); }
-  void set_aero82(uint32_t v) const { guest::StoreU32(base, address + 48, v); }
+  T aero81() const { return T(base, aero81_bits()); }
+  void set_aero81(const View& w) const { set_aero81_bits(w.address); }
+  void set_aero81(uint32_t v) const { set_aero81_bits(v); }
+  // table 82: aero part records (72 bytes a car)
   uint32_t aero82_address() const { return address + 48; }
+  uint32_t aero82_bits() const { if (auto* d = direct()) return d->aero82; return uint32_t((memory::IsHandle(address + 48) ? uint32_t(memory::OwnerLoad(address + 48, 4)) : guest::LoadU32(base, address + 48))); }
+  void set_aero82_bits(uint32_t v) const { if (auto* d = direct()) { d->aero82 = v; return; } if (memory::IsHandle(address + 48)) memory::OwnerStore(address + 48, 4, v); else guest::StoreU32(base, address + 48, v); }
+  template <typename T = AeroPartRecord>
+  T aero82() const { return T(base, aero82_bits()); }
+  void set_aero82(const View& w) const { set_aero82_bits(w.address); }
+  void set_aero82(uint32_t v) const { set_aero82_bits(v); }
   // table 83: 23 records of 10 floats (all 1.0 in the data; no reader found)
-  uint32_t table83() const { return guest::LoadU32(base, address + 52); }
-  void set_table83(uint32_t v) const { guest::StoreU32(base, address + 52, v); }
   uint32_t table83_address() const { return address + 52; }
+  uint32_t table83_bits() const { if (auto* d = direct()) return d->table83; return uint32_t((memory::IsHandle(address + 52) ? uint32_t(memory::OwnerLoad(address + 52, 4)) : guest::LoadU32(base, address + 52))); }
+  void set_table83_bits(uint32_t v) const { if (auto* d = direct()) { d->table83 = v; return; } if (memory::IsHandle(address + 52)) memory::OwnerStore(address + 52, 4, v); else guest::StoreU32(base, address + 52, v); }
+  uint32_t table83() const { if (auto* d = direct()) return d->table83; return uint32_t((memory::IsHandle(address + 52) ? uint32_t(memory::OwnerLoad(address + 52, 4)) : guest::LoadU32(base, address + 52))); }
+  void set_table83(uint32_t v) const { if (auto* d = direct()) { d->table83 = v; return; } if (memory::IsHandle(address + 52)) memory::OwnerStore(address + 52, 4, v); else guest::StoreU32(base, address + 52, v); }
   // table 72's size / 8,432 (72)
-  uint32_t spec_count() const { return guest::LoadU32(base, address + 56); }
-  void set_spec_count(uint32_t v) const { guest::StoreU32(base, address + 56, v); }
   uint32_t spec_count_address() const { return address + 56; }
+  uint32_t spec_count_bits() const { if (auto* d = direct()) return d->spec_count; return uint32_t((memory::IsHandle(address + 56) ? uint32_t(memory::OwnerLoad(address + 56, 4)) : guest::LoadU32(base, address + 56))); }
+  void set_spec_count_bits(uint32_t v) const { if (auto* d = direct()) { d->spec_count = v; return; } if (memory::IsHandle(address + 56)) memory::OwnerStore(address + 56, 4, v); else guest::StoreU32(base, address + 56, v); }
+  uint32_t spec_count() const { if (auto* d = direct()) return d->spec_count; return uint32_t((memory::IsHandle(address + 56) ? uint32_t(memory::OwnerLoad(address + 56, 4)) : guest::LoadU32(base, address + 56))); }
+  void set_spec_count(uint32_t v) const { if (auto* d = direct()) { d->spec_count = v; return; } if (memory::IsHandle(address + 56)) memory::OwnerStore(address + 56, 4, v); else guest::StoreU32(base, address + 56, v); }
   // table 73's size / 48 (178)
-  uint32_t wheel_count() const { return guest::LoadU32(base, address + 60); }
-  void set_wheel_count(uint32_t v) const { guest::StoreU32(base, address + 60, v); }
   uint32_t wheel_count_address() const { return address + 60; }
+  uint32_t wheel_count_bits() const { if (auto* d = direct()) return d->wheel_count; return uint32_t((memory::IsHandle(address + 60) ? uint32_t(memory::OwnerLoad(address + 60, 4)) : guest::LoadU32(base, address + 60))); }
+  void set_wheel_count_bits(uint32_t v) const { if (auto* d = direct()) { d->wheel_count = v; return; } if (memory::IsHandle(address + 60)) memory::OwnerStore(address + 60, 4, v); else guest::StoreU32(base, address + 60, v); }
+  uint32_t wheel_count() const { if (auto* d = direct()) return d->wheel_count; return uint32_t((memory::IsHandle(address + 60) ? uint32_t(memory::OwnerLoad(address + 60, 4)) : guest::LoadU32(base, address + 60))); }
+  void set_wheel_count(uint32_t v) const { if (auto* d = direct()) { d->wheel_count = v; return; } if (memory::IsHandle(address + 60)) memory::OwnerStore(address + 60, 4, v); else guest::StoreU32(base, address + 60, v); }
   // +4m: the first wheel record of wheel model m (from 1; -1 before table 73's callback)
   uint32_t first_wheels_address() const { return address + 64; }
+  uint8_t* first_wheels() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 64 : guest::Pointer(base, address + 64); }
   // first_wheels' model 1 (0, written first by table 73's callback)
-  uint32_t model1_first_wheel() const { return guest::LoadU32(base, address + 68); }
-  void set_model1_first_wheel(uint32_t v) const { guest::StoreU32(base, address + 68, v); }
   uint32_t model1_first_wheel_address() const { return address + 68; }
+  uint32_t model1_first_wheel_bits() const { if (auto* d = direct()) return d->model1_first_wheel; return uint32_t((memory::IsHandle(address + 68) ? uint32_t(memory::OwnerLoad(address + 68, 4)) : guest::LoadU32(base, address + 68))); }
+  void set_model1_first_wheel_bits(uint32_t v) const { if (auto* d = direct()) { d->model1_first_wheel = v; return; } if (memory::IsHandle(address + 68)) memory::OwnerStore(address + 68, 4, v); else guest::StoreU32(base, address + 68, v); }
+  uint32_t model1_first_wheel() const { if (auto* d = direct()) return d->model1_first_wheel; return uint32_t((memory::IsHandle(address + 68) ? uint32_t(memory::OwnerLoad(address + 68, 4)) : guest::LoadU32(base, address + 68))); }
+  void set_model1_first_wheel(uint32_t v) const { if (auto* d = direct()) { d->model1_first_wheel = v; return; } if (memory::IsHandle(address + 68)) memory::OwnerStore(address + 68, 4, v); else guest::StoreU32(base, address + 68, v); }
   // the last wheel model + 1
-  uint32_t model_end() const { return guest::LoadU32(base, address + 464); }
-  void set_model_end(uint32_t v) const { guest::StoreU32(base, address + 464, v); }
   uint32_t model_end_address() const { return address + 464; }
+  uint32_t model_end_bits() const { if (auto* d = direct()) return d->model_end; return uint32_t((memory::IsHandle(address + 464) ? uint32_t(memory::OwnerLoad(address + 464, 4)) : guest::LoadU32(base, address + 464))); }
+  void set_model_end_bits(uint32_t v) const { if (auto* d = direct()) { d->model_end = v; return; } if (memory::IsHandle(address + 464)) memory::OwnerStore(address + 464, 4, v); else guest::StoreU32(base, address + 464, v); }
+  uint32_t model_end() const { if (auto* d = direct()) return d->model_end; return uint32_t((memory::IsHandle(address + 464) ? uint32_t(memory::OwnerLoad(address + 464, 4)) : guest::LoadU32(base, address + 464))); }
+  void set_model_end(uint32_t v) const { if (auto* d = direct()) { d->model_end = v; return; } if (memory::IsHandle(address + 464)) memory::OwnerStore(address + 464, 4, v); else guest::StoreU32(base, address + 464, v); }
+};
+
+// allocated; measure: -
+struct CarParamsBlock : View {
+  using View::View;
+  static constexpr uint32_t kSize = 0;
+  static CarParamsBlock New(uint8_t* base, uint32_t size) { return CarParamsBlock(base, memory::NewBlob(size, "CarParamsBlock")); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
 };
 
 // file; measure: Params, AeroParts::Get82.r4, AeroParts::Get79.r4, CountBodyKits.r3

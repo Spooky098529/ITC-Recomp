@@ -377,6 +377,12 @@ fields = [
 measure = "new<?>@RaceSounds::Begin"
 size = 44
 origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): the race's effects bank (asset 22889), read
+# whole by Archive::Load into the buffer RaceSounds::Begin (hand port) made
+# with XPhysicalAlloc, now schema::CarSoundWaveBank::New with the file's size;
+# its waves' XMA data read by our FFmpeg through guest::Pointer
+# (hooks/xma.cpp); freed by RaceSounds::Unload's XPhysicalFree.
+storage = "blob"
 fields = [
   { name = "data_offset", offset = 8, type = "u32", note = "the bank data's offset" },
   { name = "entries_offset", offset = 16, type = "u32", note = "the entries' offset" },

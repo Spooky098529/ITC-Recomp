@@ -80,6 +80,12 @@ fields = [
 [ArchiveTocEntry]
 size = 16
 origin = "file"
+# A blob (E5 step 5, 2026-11-24): each TOC's buffer, read whole by
+# Archive::Init's hand port (src/hooks/archive_streaming.cpp, New where the
+# original's VirtualAlloc returned at 0x8209E2D8 and 0x8209E2F4), in PC
+# memory with the file's bytes; read by address (Archive::Load, the asset
+# sizes); freed by the archive's teardown's VirtualFree (never in play).
+storage = "blob"
 fields = [
   { name = "start_sector", offset = 0, type = "u32", note = "2,048-byte sectors" },
   { name = "stored_size", offset = 4, type = "u32" },
@@ -104,6 +110,12 @@ fields = [
 measures = ["LoaderFunctor", "new<8>@LoaderFunctor::Clone"]
 size = 8
 origin = "file"
+# Dual (E5 step 5, 2026-11-24): the static instance stays in the loader
+# thread's parameters (guest); Clone's copy (lifted, its operator new
+# returning at 0x8209DF6C; never seen in play) in host memory, freed by the
+# deleting destructor's operator delete (the game's frees take handles).
+storage = "dual"
+host_alloc = [0x8209DF6C]
 vtable = 0x82001DDC
 fields = [
   { name = "vtable", offset = 0, type = "u32" },

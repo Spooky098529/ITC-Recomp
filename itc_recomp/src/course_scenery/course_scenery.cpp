@@ -401,8 +401,11 @@ bool Init(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set, uint3
     return false;
   }
   const int32_t pools = int32_t(count);
-  const uint32_t records = Round64(count * 24);
-  uint32_t size = records;
+  // The original puts the records (rounded up to 64) at the block's start;
+  // since E5 step 5 they're a host array of their own and the block holds
+  // only the objects and their data (pool 0's first object is its start,
+  // which Shutdown frees).
+  uint32_t size = 0;
   for (int32_t i = 0; i < pools; i++) {
     const schema::ObjectPoolDesc d(base, descriptors + 24 * uint32_t(i));
     size += Round64(d.object_size()) * d.object_count() + Round64(d.data_size()) * d.data_count();
@@ -410,11 +413,12 @@ bool Init(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set, uint3
   // XPhysicalAlloc(size, -1, 64, 4): any physical address; the protection
   // (PAGE_READWRITE) has no X_MEM_LARGE_PAGES for its check to clear.
   const uint32_t block = memory::AllocPhysical(size, 0, 0xFFFFFFFFu, 64, 4);
-  *r3 = block;
+  const uint32_t records = Record::NewArray(base, count).address;
+  *r3 = records;
   const Pools ps(base, set);
   ps.set_count(count);
-  ps.set_records(block);
-  uint32_t cursor = records + block;
+  ps.set_records(records);
+  uint32_t cursor = block;
   for (int32_t i = 0; i < pools; i++) {
     const schema::ObjectPoolDesc d(base, descriptors + 24 * uint32_t(i));
     const Record record(base, 24 * uint32_t(i) + ps.records().address);
@@ -472,10 +476,20 @@ bool Shutdown(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set, u
       }
     }
   }
-  const uint32_t block = ps.records().address;
-  *r3 = block;
-  if (block != 0) {
-    memory::FreePhysical(block);
+  const uint32_t records = ps.records().address;
+  *r3 = records;
+  if (records != 0) {
+    if (memory::IsHandle(records)) {
+      // Init's host records (E5 step 5): the objects' block apart, from
+      // pool 0's first object (the block's start).
+      const uint32_t block = ps.count() != 0 ? Record(base, records).first_object().address : 0;
+      if (block != 0) {
+        memory::FreePhysical(block);
+      }
+      Record(base, records).Delete();
+    } else {
+      memory::FreePhysical(records);  // the original's one block
+    }
     ps.set_count(0);
     ps.set_records(0);
   }

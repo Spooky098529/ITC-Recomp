@@ -86,7 +86,11 @@ uint32_t LoadSlotLoad(uint8_t* base, uint32_t slot, uint32_t id, uint32_t contex
     s.set_state(1);
     return 0;
   }
-  const uint32_t pages = memory::AllocPages(size, 4096);
+  // The file in PC memory (E5 step 5: a blob, its bytes in the guest's
+  // order, whole pages as VirtualAlloc's, zero past the file; the game's
+  // VirtualFree frees it through its handle).
+  const uint32_t whole_pages = uint32_t((uint64_t(size) + 0xFFF) & ~uint64_t(0xFFF));
+  const uint32_t pages = schema::CarModelsFile::New(base, whole_pages).address;
   s.set_buffer(pages);
   if (pages == 0) {
     last_error::Get(base, pcr);  // as the original, its answer not read

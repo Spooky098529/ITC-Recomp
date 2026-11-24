@@ -9,47 +9,107 @@
 namespace schema {
 
 // allocated; measure: new<64>@DataTables::Init, DataTables::OnItemsLoaded.r6
+#pragma pack(push, 1)
+struct DataTablesData {
+  uint32_t last_serial = 0;  // +0
+  uint32_t pending = 0;  // +4
+  uint32_t item_count = 0;  // +8
+  uint32_t block = 0;  // +12
+  uint32_t items = 0;  // +16
+  uint8_t tables56[32] = {};  // +20, guest order
+  uint32_t table20 = 0;  // +52
+  uint32_t table40 = 0;  // +56
+  uint32_t asset84 = 0;  // +60
+};
+#pragma pack(pop)
+static_assert(sizeof(DataTablesData) == 64);
+inline constexpr memory::LayoutField kDataTablesFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {52, 4}, {56, 4}, {60, 4}};
+inline constexpr memory::Layout kDataTablesLayout = {kDataTablesFields, 8};
+
 struct DataTables : View {
   using View::View;
   static constexpr uint32_t kSize = 64;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  DataTablesData* data() const { return static_cast<DataTablesData*>(memory::HandleObject(address)); }
+  static DataTables New(uint8_t* base) {
+    return DataTables(base, memory::MakeHandle(new DataTablesData(), sizeof(DataTablesData), "DataTables", &kDataTablesLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static DataTables NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(DataTablesData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<DataTablesData*>(::operator new(sizeof(DataTablesData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) DataTablesData();
+    return DataTables(base, memory::MakeHandle(p, sizeof(DataTablesData) * count, "DataTables", &kDataTablesLayout, sizeof(DataTablesData)));
+  }
+  DataTables at(uint32_t i) const { return DataTables(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  DataTablesData* direct() const { return static_cast<DataTablesData*>(memory::HandleOwn(address, &kDataTablesLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kDataTablesLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kDataTablesLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // the last load's serial (Archive::Load's; not read)
-  uint32_t last_serial() const { return guest::LoadU32(base, address + 0); }
-  void set_last_serial(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t last_serial_address() const { return address + 0; }
+  uint32_t last_serial_bits() const { if (auto* d = direct()) return d->last_serial; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_last_serial_bits(uint32_t v) const { if (auto* d = direct()) { d->last_serial = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t last_serial() const { if (auto* d = direct()) return d->last_serial; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_last_serial(uint32_t v) const { if (auto* d = direct()) { d->last_serial = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // the loads pending: 12 at boot, each callback counts down (DataTables::IsLoading)
-  uint32_t pending() const { return guest::LoadU32(base, address + 4); }
-  void set_pending(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t pending_address() const { return address + 4; }
+  uint32_t pending_bits() const { if (auto* d = direct()) return d->pending; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_pending_bits(uint32_t v) const { if (auto* d = direct()) { d->pending = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  uint32_t pending() const { if (auto* d = direct()) return d->pending; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_pending(uint32_t v) const { if (auto* d = direct()) { d->pending = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
   // 400, set by asset 94's callback
-  uint32_t item_count() const { return guest::LoadU32(base, address + 8); }
-  void set_item_count(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t item_count_address() const { return address + 8; }
-  // the block all the tables are in (operator new[])
-  View block() const { return View(base, guest::LoadU32(base, address + 12)); }
-  void set_block(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t item_count_bits() const { if (auto* d = direct()) return d->item_count; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_item_count_bits(uint32_t v) const { if (auto* d = direct()) { d->item_count = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  uint32_t item_count() const { if (auto* d = direct()) return d->item_count; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_item_count(uint32_t v) const { if (auto* d = direct()) { d->item_count = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  // the block all the tables are in (operator new[]; a blob)
   uint32_t block_address() const { return address + 12; }
+  uint32_t block_bits() const { if (auto* d = direct()) return d->block; return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_block_bits(uint32_t v) const { if (auto* d = direct()) { d->block = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
+  View block() const { return View(base, block_bits()); }
+  void set_block(uint32_t v) const { set_block_bits(v); }
   // asset 94: 400 entries of 3,008 bytes (DataTables::Item)
-  View items() const { return View(base, guest::LoadU32(base, address + 16)); }
-  void set_items(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
   uint32_t items_address() const { return address + 16; }
+  uint32_t items_bits() const { if (auto* d = direct()) return d->items; return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_items_bits(uint32_t v) const { if (auto* d = direct()) { d->items = v; return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
+  View items() const { return View(base, items_bits()); }
+  void set_items(uint32_t v) const { set_items_bits(v); }
   // eight pointers: the 56-byte tables (asset ids at 0x82616C64; DataTables::Entry56)
   uint32_t tables56_address() const { return address + 20; }
+  uint8_t* tables56() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 20 : guest::Pointer(base, address + 20); }
   // asset 95: 20-byte entries, -1 at +0 ends it
-  template <typename T = DataTablesEntry20>
-  T table20() const { return T(base, guest::LoadU32(base, address + 52)); }
-  void set_table20(const View& v) const { guest::StoreU32(base, address + 52, v.address); }
-  void set_table20(uint32_t v) const { guest::StoreU32(base, address + 52, v); }
   uint32_t table20_address() const { return address + 52; }
+  uint32_t table20_bits() const { if (auto* d = direct()) return d->table20; return uint32_t((memory::IsHandle(address + 52) ? uint32_t(memory::OwnerLoad(address + 52, 4)) : guest::LoadU32(base, address + 52))); }
+  void set_table20_bits(uint32_t v) const { if (auto* d = direct()) { d->table20 = v; return; } if (memory::IsHandle(address + 52)) memory::OwnerStore(address + 52, 4, v); else guest::StoreU32(base, address + 52, v); }
+  template <typename T = DataTablesEntry20>
+  T table20() const { return T(base, table20_bits()); }
+  void set_table20(const View& w) const { set_table20_bits(w.address); }
+  void set_table20(uint32_t v) const { set_table20_bits(v); }
   // asset 96: 40-byte entries, -1 at +4 ends it
-  template <typename T = DataTablesEntry40>
-  T table40() const { return T(base, guest::LoadU32(base, address + 56)); }
-  void set_table40(const View& v) const { guest::StoreU32(base, address + 56, v.address); }
-  void set_table40(uint32_t v) const { guest::StoreU32(base, address + 56, v); }
   uint32_t table40_address() const { return address + 56; }
+  uint32_t table40_bits() const { if (auto* d = direct()) return d->table40; return uint32_t((memory::IsHandle(address + 56) ? uint32_t(memory::OwnerLoad(address + 56, 4)) : guest::LoadU32(base, address + 56))); }
+  void set_table40_bits(uint32_t v) const { if (auto* d = direct()) { d->table40 = v; return; } if (memory::IsHandle(address + 56)) memory::OwnerStore(address + 56, 4, v); else guest::StoreU32(base, address + 56, v); }
+  template <typename T = DataTablesEntry40>
+  T table40() const { return T(base, table40_bits()); }
+  void set_table40(const View& w) const { set_table40_bits(w.address); }
+  void set_table40(uint32_t v) const { set_table40_bits(v); }
   // asset 84 (no reader found besides the load)
-  View asset84() const { return View(base, guest::LoadU32(base, address + 60)); }
-  void set_asset84(uint32_t v) const { guest::StoreU32(base, address + 60, v); }
   uint32_t asset84_address() const { return address + 60; }
+  uint32_t asset84_bits() const { if (auto* d = direct()) return d->asset84; return uint32_t((memory::IsHandle(address + 60) ? uint32_t(memory::OwnerLoad(address + 60, 4)) : guest::LoadU32(base, address + 60))); }
+  void set_asset84_bits(uint32_t v) const { if (auto* d = direct()) { d->asset84 = v; return; } if (memory::IsHandle(address + 60)) memory::OwnerStore(address + 60, 4, v); else guest::StoreU32(base, address + 60, v); }
+  View asset84() const { return View(base, asset84_bits()); }
+  void set_asset84(uint32_t v) const { set_asset84_bits(v); }
+};
+
+// allocated; measure: -
+struct DataTablesBlock : View {
+  using View::View;
+  static constexpr uint32_t kSize = 0;
+  static DataTablesBlock New(uint8_t* base, uint32_t size) { return DataTablesBlock(base, memory::NewBlob(size, "DataTablesBlock")); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
 };
 
 // file; measure: new<64>@DataTables::Init.+52, DataTables::On20Loaded.r6

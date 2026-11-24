@@ -133,9 +133,11 @@ bool CarRefresh(uint8_t* base, uint32_t car, uint32_t* r3);
 // the block for tables 72-83 sized from the archive's TOC (`tocs[k]` = its
 // TOC for asset 72 + k, sub_8209D868's answer, a guest call the adapter
 // makes) in two passes, the second with the block, and the table pointers
-// set. `r3` as the original leaves it (the TOC for 83). Allocates through
-// the native allocation layer (only while --native_heap routes the game's
-// heap there: the adapter checks). False, with nothing done, where an
+// set. `r3` as the original leaves it (the TOC for 83). The object is made
+// in host memory (schema::CarParams::New) and the block a blob
+// (schema::CarParamsBlock::New, E5 step 5); natively only while
+// --native_heap routes the game's heap to the allocation layer (the adapter
+// checks). False, with nothing done, where an
 // allocation would fail or the sizes add up to 0 (the original loops there
 // for good): the original runs there.
 bool ParamsInit(uint8_t* base, const uint32_t tocs[12], uint32_t* r3);

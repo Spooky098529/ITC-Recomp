@@ -419,7 +419,7 @@ struct ObjectPools : View {
   uint32_t count() const { return guest::LoadU32(base, address + 0); }
   void set_count(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t count_address() const { return address + 0; }
-  // the block (XPhysicalAlloc): the records, then the objects
+  // the records (the original: one XPhysicalAlloc block, the records, then the objects; since E5 step 5 a host array, the objects' block apart)
   template <typename T = ObjectPoolRecord>
   T records() const { return T(base, guest::LoadU32(base, address + 4)); }
   void set_records(const View& v) const { guest::StoreU32(base, address + 4, v.address); }
@@ -428,33 +428,77 @@ struct ObjectPools : View {
 };
 
 // allocated; measure: new<?>@ObjectPools::Init, ObjectPools::Pool.ret
+#pragma pack(push, 1)
+struct ObjectPoolRecordData {
+  uint32_t object_count = 0;  // +0
+  uint32_t object_size = 0;  // +4
+  uint32_t data_size = 0;  // +8
+  uint32_t first_object = 0;  // +12
+  uint32_t free_head = 0;  // +16
+  uint32_t used_head = 0;  // +20
+};
+#pragma pack(pop)
+static_assert(sizeof(ObjectPoolRecordData) == 24);
+inline constexpr memory::LayoutField kObjectPoolRecordFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 4}};
+inline constexpr memory::Layout kObjectPoolRecordLayout = {kObjectPoolRecordFields, 6};
+
 struct ObjectPoolRecord : View {
   using View::View;
   static constexpr uint32_t kSize = 24;
-  uint32_t object_count() const { return guest::LoadU32(base, address + 0); }
-  void set_object_count(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  ObjectPoolRecordData* data() const { return static_cast<ObjectPoolRecordData*>(memory::HandleObject(address)); }
+  static ObjectPoolRecord New(uint8_t* base) {
+    return ObjectPoolRecord(base, memory::MakeHandle(new ObjectPoolRecordData(), sizeof(ObjectPoolRecordData), "ObjectPoolRecord", &kObjectPoolRecordLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static ObjectPoolRecord NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(ObjectPoolRecordData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<ObjectPoolRecordData*>(::operator new(sizeof(ObjectPoolRecordData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) ObjectPoolRecordData();
+    return ObjectPoolRecord(base, memory::MakeHandle(p, sizeof(ObjectPoolRecordData) * count, "ObjectPoolRecord", &kObjectPoolRecordLayout, sizeof(ObjectPoolRecordData)));
+  }
+  ObjectPoolRecord at(uint32_t i) const { return ObjectPoolRecord(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  ObjectPoolRecordData* direct() const { return static_cast<ObjectPoolRecordData*>(memory::HandleOwn(address, &kObjectPoolRecordLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kObjectPoolRecordLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kObjectPoolRecordLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t object_count_address() const { return address + 0; }
-  uint32_t object_size() const { return guest::LoadU32(base, address + 4); }
-  void set_object_size(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t object_count_bits() const { if (auto* d = direct()) return d->object_count; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_object_count_bits(uint32_t v) const { if (auto* d = direct()) { d->object_count = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t object_count() const { if (auto* d = direct()) return d->object_count; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_object_count(uint32_t v) const { if (auto* d = direct()) { d->object_count = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   uint32_t object_size_address() const { return address + 4; }
-  uint32_t data_size() const { return guest::LoadU32(base, address + 8); }
-  void set_data_size(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t object_size_bits() const { if (auto* d = direct()) return d->object_size; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_object_size_bits(uint32_t v) const { if (auto* d = direct()) { d->object_size = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  uint32_t object_size() const { if (auto* d = direct()) return d->object_size; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_object_size(uint32_t v) const { if (auto* d = direct()) { d->object_size = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
   uint32_t data_size_address() const { return address + 8; }
-  template <typename T = PoolObject>
-  T first_object() const { return T(base, guest::LoadU32(base, address + 12)); }
-  void set_first_object(const View& v) const { guest::StoreU32(base, address + 12, v.address); }
-  void set_first_object(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t data_size_bits() const { if (auto* d = direct()) return d->data_size; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_data_size_bits(uint32_t v) const { if (auto* d = direct()) { d->data_size = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  uint32_t data_size() const { if (auto* d = direct()) return d->data_size; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_data_size(uint32_t v) const { if (auto* d = direct()) { d->data_size = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
   uint32_t first_object_address() const { return address + 12; }
+  uint32_t first_object_bits() const { if (auto* d = direct()) return d->first_object; return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_first_object_bits(uint32_t v) const { if (auto* d = direct()) { d->first_object = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
   template <typename T = PoolObject>
-  T free_head() const { return T(base, guest::LoadU32(base, address + 16)); }
-  void set_free_head(const View& v) const { guest::StoreU32(base, address + 16, v.address); }
-  void set_free_head(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  T first_object() const { return T(base, first_object_bits()); }
+  void set_first_object(const View& w) const { set_first_object_bits(w.address); }
+  void set_first_object(uint32_t v) const { set_first_object_bits(v); }
   uint32_t free_head_address() const { return address + 16; }
+  uint32_t free_head_bits() const { if (auto* d = direct()) return d->free_head; return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_free_head_bits(uint32_t v) const { if (auto* d = direct()) { d->free_head = v; return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
   template <typename T = PoolObject>
-  T used_head() const { return T(base, guest::LoadU32(base, address + 20)); }
-  void set_used_head(const View& v) const { guest::StoreU32(base, address + 20, v.address); }
-  void set_used_head(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
+  T free_head() const { return T(base, free_head_bits()); }
+  void set_free_head(const View& w) const { set_free_head_bits(w.address); }
+  void set_free_head(uint32_t v) const { set_free_head_bits(v); }
   uint32_t used_head_address() const { return address + 20; }
+  uint32_t used_head_bits() const { if (auto* d = direct()) return d->used_head; return uint32_t((memory::IsHandle(address + 20) ? uint32_t(memory::OwnerLoad(address + 20, 4)) : guest::LoadU32(base, address + 20))); }
+  void set_used_head_bits(uint32_t v) const { if (auto* d = direct()) { d->used_head = v; return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 4, v); else guest::StoreU32(base, address + 20, v); }
+  template <typename T = PoolObject>
+  T used_head() const { return T(base, used_head_bits()); }
+  void set_used_head(const View& w) const { set_used_head_bits(w.address); }
+  void set_used_head(uint32_t v) const { set_used_head_bits(v); }
 };
 
 // stack; measure: ObjectPools::Init.r5

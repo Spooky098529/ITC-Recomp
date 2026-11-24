@@ -9,249 +9,463 @@
 namespace schema {
 
 // allocated; measure: SceneModel, ScenePools::SetUpB.ret
+#pragma pack(push, 1)
+struct SceneModelData {
+  uint32_t vtable = 0;  // +0
+  float joined_vector_y = 0;  // +4
+  float joined_vector_z = 0;  // +8
+  float joined_vector_w = 0;  // +12
+  uint32_t state = 0;  // +16
+  uint32_t index = 0;  // +20
+  uint8_t pad_24[8] = {};
+  uint32_t kind = 0;  // +32
+  uint8_t pad_36[12] = {};
+  uint32_t block = 0;  // +48
+  uint8_t pad_52[12] = {};
+  uint8_t paint[48] = {};  // +64, guest order
+  uint8_t wheel_paint[96] = {};  // +112, guest order
+  uint8_t pad_208[3520] = {};
+  uint32_t selected_texture = 0;  // +3728
+  uint8_t pad_3732[32] = {};
+  uint32_t parts_bonnet = 0;  // +3764
+  uint32_t parts_aero_kit = 0;  // +3768
+  uint32_t parts_aero6 = 0;  // +3772
+  uint32_t parts_aero7 = 0;  // +3776
+  uint8_t pad_3780[4] = {};
+  uint32_t parts_aero9 = 0;  // +3784
+  uint32_t parts_engine_stage = 0;  // +3788
+  uint8_t pad_3792[32] = {};
+  uint32_t interior_gauge1_present = 0;  // +3824
+  uint32_t interior_gauge1_kind = 0;  // +3828
+  uint8_t pad_3832[92] = {};
+  uint32_t cockpit_bonnet = 0;  // +3924
+  uint32_t cockpit_aero_kit = 0;  // +3928
+  uint32_t cockpit_aero6 = 0;  // +3932
+  uint32_t cockpit_aero7 = 0;  // +3936
+  uint32_t cockpit_aero9 = 0;  // +3940
+  uint32_t cockpit_selected_texture = 0;  // +3944
+  uint8_t pad_3948[120] = {};
+  uint32_t wheels_kind = 0;  // +4068
+  uint32_t wheels_painted = 0;  // +4072
+  uint8_t pad_4076[148] = {};
+  uint8_t light_kit_record[52] = {};  // +4224, guest order
+  uint8_t pad_4276[20] = {};
+  uint32_t draw_enabled = 0;  // +4296
+  uint32_t cockpit_only = 0;  // +4300
+  uint8_t matrix[64] = {};  // +4304, guest order
+  uint8_t pad_4368[548] = {};
+  float windows_alpha = 0;  // +4916
+  uint8_t pad_4920[104] = {};
+  uint32_t set_up = 0;  // +5024
+  uint32_t release_pending = 0;  // +5028
+  uint32_t second_wheels_claimed = 0;  // +5032
+  uint32_t ready = 0;  // +5036
+  uint32_t build_pending = 0;  // +5040
+  uint32_t build_delay = 0;  // +5044
+  uint32_t car_model = 0;  // +5048
+  uint32_t car_model_ready = 0;  // +5052
+  uint32_t decals_reloaded = 0;  // +5056
+  uint32_t parts = 0;  // +5060
+  uint32_t parts_ready = 0;  // +5064
+  uint32_t interior = 0;  // +5068
+  uint32_t interior_ready = 0;  // +5072
+  uint32_t cockpit = 0;  // +5076
+  uint32_t cockpit_ready = 0;  // +5080
+  uint32_t light_kit = 0;  // +5084
+  uint32_t light_kit_ready = 0;  // +5088
+  uint32_t traffic_body = 0;  // +5092
+  uint32_t traffic_body_ready = 0;  // +5096
+  uint32_t wheels = 0;  // +5100
+  uint32_t wheels_ready = 0;  // +5104
+  uint32_t second_wheels = 0;  // +5108
+  uint32_t second_wheels_ready = 0;  // +5112
+  uint32_t scene = 0;  // +5116
+};
+#pragma pack(pop)
+static_assert(sizeof(SceneModelData) == 5120);
+inline constexpr memory::LayoutField kSceneModelFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 4}, {32, 4}, {48, 4}, {3728, 4}, {3764, 4}, {3768, 4}, {3772, 4}, {3776, 4}, {3784, 4}, {3788, 4}, {3824, 4}, {3828, 4}, {3924, 4}, {3928, 4}, {3932, 4}, {3936, 4}, {3940, 4}, {3944, 4}, {4068, 4}, {4072, 4}, {4296, 4}, {4300, 4}, {4916, 4}, {5024, 4}, {5028, 4}, {5032, 4}, {5036, 4}, {5040, 4}, {5044, 4}, {5048, 4}, {5052, 4}, {5056, 4}, {5060, 4}, {5064, 4}, {5068, 4}, {5072, 4}, {5076, 4}, {5080, 4}, {5084, 4}, {5088, 4}, {5092, 4}, {5096, 4}, {5100, 4}, {5104, 4}, {5108, 4}, {5112, 4}, {5116, 4}};
+inline constexpr memory::Layout kSceneModelLayout = {kSceneModelFields, 52};
+
 struct SceneModel : View {
   using View::View;
   static constexpr uint32_t kSize = 5120;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   static constexpr uint32_t kVtable = 0x82004F90;
+  SceneModelData* data() const { return static_cast<SceneModelData*>(memory::HandleObject(address)); }
+  static SceneModel New(uint8_t* base) {
+    return SceneModel(base, memory::MakeHandle(new SceneModelData(), sizeof(SceneModelData), "SceneModel", &kSceneModelLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static SceneModel NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(SceneModelData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<SceneModelData*>(::operator new(sizeof(SceneModelData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) SceneModelData();
+    return SceneModel(base, memory::MakeHandle(p, sizeof(SceneModelData) * count, "SceneModel", &kSceneModelLayout, sizeof(SceneModelData)));
+  }
+  SceneModel at(uint32_t i) const { return SceneModel(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  SceneModelData* direct() const { return static_cast<SceneModelData*>(memory::HandleOwn(address, &kSceneModelLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kSceneModelLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kSceneModelLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0x82004F90 (measure fault: also SceneModel::Beam, BeamShape and BeamColor's out vector and CarScene::Draw's reads of it, filed at +0 to +15)
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
+  uint32_t vtable_bits() const { if (auto* d = direct()) return d->vtable; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_vtable_bits(uint32_t v) const { if (auto* d = direct()) { d->vtable = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable() const { if (auto* d = direct()) return d->vtable; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_vtable(uint32_t v) const { if (auto* d = direct()) { d->vtable = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // measure fault: the beam functions' out vector's x and y (ld/std)
-  uint64_t joined_vector_xy() const { return guest::LoadU64(base, address + 0); }
-  void set_joined_vector_xy(uint64_t v) const { guest::StoreU64(base, address + 0, v); }
   uint32_t joined_vector_xy_address() const { return address + 0; }
+  uint64_t joined_vector_xy_bits() const { if (auto* d = direct()) return uint64_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(d), kSceneModelLayout, 0, 8)); return uint64_t((memory::IsHandle(address + 0) ? uint64_t(memory::OwnerLoad(address + 0, 8)) : guest::LoadU64(base, address + 0))); }
+  void set_joined_vector_xy_bits(uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kSceneModelLayout, 0, 8, v); return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 8, v); else guest::StoreU64(base, address + 0, v); }
+  uint64_t joined_vector_xy() const { return uint64_t(joined_vector_xy_bits()); }
+  void set_joined_vector_xy(uint64_t v) const { set_joined_vector_xy_bits(uint64_t(v)); }
   // measure fault: the out vector's y
-  float joined_vector_y() const { return guest::LoadFloat(base, address + 4); }
-  void set_joined_vector_y(float v) const { guest::StoreFloat(base, address + 4, v); }
   uint32_t joined_vector_y_address() const { return address + 4; }
+  uint32_t joined_vector_y_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->joined_vector_y); return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_joined_vector_y_bits(uint32_t v) const { if (auto* d = direct()) { d->joined_vector_y = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  float joined_vector_y() const { return std::bit_cast<float>(joined_vector_y_bits()); }
+  void set_joined_vector_y(float v) const { set_joined_vector_y_bits(std::bit_cast<uint32_t>(v)); }
   // measure fault: the out vector's z
-  float joined_vector_z() const { return guest::LoadFloat(base, address + 8); }
-  void set_joined_vector_z(float v) const { guest::StoreFloat(base, address + 8, v); }
   uint32_t joined_vector_z_address() const { return address + 8; }
+  uint32_t joined_vector_z_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->joined_vector_z); return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_joined_vector_z_bits(uint32_t v) const { if (auto* d = direct()) { d->joined_vector_z = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  float joined_vector_z() const { return std::bit_cast<float>(joined_vector_z_bits()); }
+  void set_joined_vector_z(float v) const { set_joined_vector_z_bits(std::bit_cast<uint32_t>(v)); }
   // measure fault: the out vector's z and w (ld/std)
-  uint64_t joined_vector_zw() const { return guest::LoadU64(base, address + 8); }
-  void set_joined_vector_zw(uint64_t v) const { guest::StoreU64(base, address + 8, v); }
   uint32_t joined_vector_zw_address() const { return address + 8; }
+  uint64_t joined_vector_zw_bits() const { if (auto* d = direct()) return uint64_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(d), kSceneModelLayout, 8, 8)); return uint64_t((memory::IsHandle(address + 8) ? uint64_t(memory::OwnerLoad(address + 8, 8)) : guest::LoadU64(base, address + 8))); }
+  void set_joined_vector_zw_bits(uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kSceneModelLayout, 8, 8, v); return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 8, v); else guest::StoreU64(base, address + 8, v); }
+  uint64_t joined_vector_zw() const { return uint64_t(joined_vector_zw_bits()); }
+  void set_joined_vector_zw(uint64_t v) const { set_joined_vector_zw_bits(uint64_t(v)); }
   // measure fault: the out vector's w
-  float joined_vector_w() const { return guest::LoadFloat(base, address + 12); }
-  void set_joined_vector_w(float v) const { guest::StoreFloat(base, address + 12, v); }
   uint32_t joined_vector_w_address() const { return address + 12; }
+  uint32_t joined_vector_w_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->joined_vector_w); return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_joined_vector_w_bits(uint32_t v) const { if (auto* d = direct()) { d->joined_vector_w = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
+  float joined_vector_w() const { return std::bit_cast<float>(joined_vector_w_bits()); }
+  void set_joined_vector_w(float v) const { set_joined_vector_w_bits(std::bit_cast<uint32_t>(v)); }
   // the pool object's: 3 in use
-  uint32_t state() const { return guest::LoadU32(base, address + 16); }
-  void set_state(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
   uint32_t state_address() const { return address + 16; }
+  uint32_t state_bits() const { if (auto* d = direct()) return d->state; return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_state_bits(uint32_t v) const { if (auto* d = direct()) { d->state = v; return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
+  uint32_t state() const { if (auto* d = direct()) return d->state; return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_state(uint32_t v) const { if (auto* d = direct()) { d->state = v; return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
   // its index in the pool: the sound slot (0x826D8334 + 4i and the others)
-  uint32_t index() const { return guest::LoadU32(base, address + 20); }
-  void set_index(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
   uint32_t index_address() const { return address + 20; }
+  uint32_t index_bits() const { if (auto* d = direct()) return d->index; return uint32_t((memory::IsHandle(address + 20) ? uint32_t(memory::OwnerLoad(address + 20, 4)) : guest::LoadU32(base, address + 20))); }
+  void set_index_bits(uint32_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 4, v); else guest::StoreU32(base, address + 20, v); }
+  uint32_t index() const { if (auto* d = direct()) return d->index; return uint32_t((memory::IsHandle(address + 20) ? uint32_t(memory::OwnerLoad(address + 20, 4)) : guest::LoadU32(base, address + 20))); }
+  void set_index(uint32_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 4, v); else guest::StoreU32(base, address + 20, v); }
   // a copy of its 4,244-byte record (SceneModelRecord; SceneModel::SetUp's SceneModelRecord::Copy). Measure fault: SceneModel::Accessory's interior loading object +140 (the interior record's +112, the accessory) is filed at +140
   uint32_t record_address() const { return address + 32; }
+  uint8_t* record() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 32 : guest::Pointer(base, address + 32); }
   // the record's +0: 1 and 2 cars (2 the players', the only kind with a cockpit), 3 traffic
-  uint32_t kind() const { return guest::LoadU32(base, address + 32); }
-  void set_kind(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
   uint32_t kind_address() const { return address + 32; }
+  uint32_t kind_bits() const { if (auto* d = direct()) return d->kind; return uint32_t((memory::IsHandle(address + 32) ? uint32_t(memory::OwnerLoad(address + 32, 4)) : guest::LoadU32(base, address + 32))); }
+  void set_kind_bits(uint32_t v) const { if (auto* d = direct()) { d->kind = v; return; } if (memory::IsHandle(address + 32)) memory::OwnerStore(address + 32, 4, v); else guest::StoreU32(base, address + 32, v); }
+  uint32_t kind() const { if (auto* d = direct()) return d->kind; return uint32_t((memory::IsHandle(address + 32) ? uint32_t(memory::OwnerLoad(address + 32, 4)) : guest::LoadU32(base, address + 32))); }
+  void set_kind(uint32_t v) const { if (auto* d = direct()) { d->kind = v; return; } if (memory::IsHandle(address + 32)) memory::OwnerStore(address + 32, 4, v); else guest::StoreU32(base, address + 32, v); }
   // the record's +16: the car record (CarRecord)
   uint32_t car_record_address() const { return address + 48; }
+  uint8_t* car_record() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 48 : guest::Pointer(base, address + 48); }
   // the car record's +0: the model block (5 sets interior_gauge1_present and _kind)
-  uint32_t block() const { return guest::LoadU32(base, address + 48); }
-  void set_block(uint32_t v) const { guest::StoreU32(base, address + 48, v); }
   uint32_t block_address() const { return address + 48; }
+  uint32_t block_bits() const { if (auto* d = direct()) return d->block; return uint32_t((memory::IsHandle(address + 48) ? uint32_t(memory::OwnerLoad(address + 48, 4)) : guest::LoadU32(base, address + 48))); }
+  void set_block_bits(uint32_t v) const { if (auto* d = direct()) { d->block = v; return; } if (memory::IsHandle(address + 48)) memory::OwnerStore(address + 48, 4, v); else guest::StoreU32(base, address + 48, v); }
+  uint32_t block() const { if (auto* d = direct()) return d->block; return uint32_t((memory::IsHandle(address + 48) ? uint32_t(memory::OwnerLoad(address + 48, 4)) : guest::LoadU32(base, address + 48))); }
+  void set_block(uint32_t v) const { if (auto* d = direct()) { d->block = v; return; } if (memory::IsHandle(address + 48)) memory::OwnerStore(address + 48, 4, v); else guest::StoreU32(base, address + 48, v); }
   // the car record's +16: three 16-byte hue, saturation, value rows (SceneModel::ApplyPaint, load-poll.md)
   uint32_t paint_address() const { return address + 64; }
+  uint8_t* paint() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 64 : guest::Pointer(base, address + 64); }
   // the car record's +64: six rows for the wheels, front then rear (SceneModel::ApplyWheelPaint)
   uint32_t wheel_paint_address() const { return address + 112; }
+  uint8_t* wheel_paint() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 112 : guest::Pointer(base, address + 112); }
   // the car record's +3680 (the car model's selected texture); copied to the cockpit record's +20 by SceneModel::Build
-  uint32_t selected_texture() const { return guest::LoadU32(base, address + 3728); }
-  void set_selected_texture(uint32_t v) const { guest::StoreU32(base, address + 3728, v); }
   uint32_t selected_texture_address() const { return address + 3728; }
+  uint32_t selected_texture_bits() const { if (auto* d = direct()) return d->selected_texture; return uint32_t((memory::IsHandle(address + 3728) ? uint32_t(memory::OwnerLoad(address + 3728, 4)) : guest::LoadU32(base, address + 3728))); }
+  void set_selected_texture_bits(uint32_t v) const { if (auto* d = direct()) { d->selected_texture = v; return; } if (memory::IsHandle(address + 3728)) memory::OwnerStore(address + 3728, 4, v); else guest::StoreU32(base, address + 3728, v); }
+  uint32_t selected_texture() const { if (auto* d = direct()) return d->selected_texture; return uint32_t((memory::IsHandle(address + 3728) ? uint32_t(memory::OwnerLoad(address + 3728, 4)) : guest::LoadU32(base, address + 3728))); }
+  void set_selected_texture(uint32_t v) const { if (auto* d = direct()) { d->selected_texture = v; return; } if (memory::IsHandle(address + 3728)) memory::OwnerStore(address + 3728, 4, v); else guest::StoreU32(base, address + 3728, v); }
   // the record's +3712: the parts' 60 bytes (PartsRecord), handed to ScenePools::SetUpB and SceneParts::Apply
   uint32_t parts_record_address() const { return address + 3744; }
+  uint8_t* parts_record() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 3744 : guest::Pointer(base, address + 3744); }
   // the parts record's +20: the cockpit record's +0 (plus 5 when 6 or more, SceneModel::Build)
-  uint32_t parts_bonnet() const { return guest::LoadU32(base, address + 3764); }
-  void set_parts_bonnet(uint32_t v) const { guest::StoreU32(base, address + 3764, v); }
   uint32_t parts_bonnet_address() const { return address + 3764; }
+  uint32_t parts_bonnet_bits() const { if (auto* d = direct()) return d->parts_bonnet; return uint32_t((memory::IsHandle(address + 3764) ? uint32_t(memory::OwnerLoad(address + 3764, 4)) : guest::LoadU32(base, address + 3764))); }
+  void set_parts_bonnet_bits(uint32_t v) const { if (auto* d = direct()) { d->parts_bonnet = v; return; } if (memory::IsHandle(address + 3764)) memory::OwnerStore(address + 3764, 4, v); else guest::StoreU32(base, address + 3764, v); }
+  uint32_t parts_bonnet() const { if (auto* d = direct()) return d->parts_bonnet; return uint32_t((memory::IsHandle(address + 3764) ? uint32_t(memory::OwnerLoad(address + 3764, 4)) : guest::LoadU32(base, address + 3764))); }
+  void set_parts_bonnet(uint32_t v) const { if (auto* d = direct()) { d->parts_bonnet = v; return; } if (memory::IsHandle(address + 3764)) memory::OwnerStore(address + 3764, 4, v); else guest::StoreU32(base, address + 3764, v); }
   // the parts record's +24: the cockpit record's +4
-  uint32_t parts_aero_kit() const { return guest::LoadU32(base, address + 3768); }
-  void set_parts_aero_kit(uint32_t v) const { guest::StoreU32(base, address + 3768, v); }
   uint32_t parts_aero_kit_address() const { return address + 3768; }
+  uint32_t parts_aero_kit_bits() const { if (auto* d = direct()) return d->parts_aero_kit; return uint32_t((memory::IsHandle(address + 3768) ? uint32_t(memory::OwnerLoad(address + 3768, 4)) : guest::LoadU32(base, address + 3768))); }
+  void set_parts_aero_kit_bits(uint32_t v) const { if (auto* d = direct()) { d->parts_aero_kit = v; return; } if (memory::IsHandle(address + 3768)) memory::OwnerStore(address + 3768, 4, v); else guest::StoreU32(base, address + 3768, v); }
+  uint32_t parts_aero_kit() const { if (auto* d = direct()) return d->parts_aero_kit; return uint32_t((memory::IsHandle(address + 3768) ? uint32_t(memory::OwnerLoad(address + 3768, 4)) : guest::LoadU32(base, address + 3768))); }
+  void set_parts_aero_kit(uint32_t v) const { if (auto* d = direct()) { d->parts_aero_kit = v; return; } if (memory::IsHandle(address + 3768)) memory::OwnerStore(address + 3768, 4, v); else guest::StoreU32(base, address + 3768, v); }
   // the parts record's +28: the cockpit record's +8
-  uint32_t parts_aero6() const { return guest::LoadU32(base, address + 3772); }
-  void set_parts_aero6(uint32_t v) const { guest::StoreU32(base, address + 3772, v); }
   uint32_t parts_aero6_address() const { return address + 3772; }
+  uint32_t parts_aero6_bits() const { if (auto* d = direct()) return d->parts_aero6; return uint32_t((memory::IsHandle(address + 3772) ? uint32_t(memory::OwnerLoad(address + 3772, 4)) : guest::LoadU32(base, address + 3772))); }
+  void set_parts_aero6_bits(uint32_t v) const { if (auto* d = direct()) { d->parts_aero6 = v; return; } if (memory::IsHandle(address + 3772)) memory::OwnerStore(address + 3772, 4, v); else guest::StoreU32(base, address + 3772, v); }
+  uint32_t parts_aero6() const { if (auto* d = direct()) return d->parts_aero6; return uint32_t((memory::IsHandle(address + 3772) ? uint32_t(memory::OwnerLoad(address + 3772, 4)) : guest::LoadU32(base, address + 3772))); }
+  void set_parts_aero6(uint32_t v) const { if (auto* d = direct()) { d->parts_aero6 = v; return; } if (memory::IsHandle(address + 3772)) memory::OwnerStore(address + 3772, 4, v); else guest::StoreU32(base, address + 3772, v); }
   // the parts record's +32: the cockpit record's +12
-  uint32_t parts_aero7() const { return guest::LoadU32(base, address + 3776); }
-  void set_parts_aero7(uint32_t v) const { guest::StoreU32(base, address + 3776, v); }
   uint32_t parts_aero7_address() const { return address + 3776; }
+  uint32_t parts_aero7_bits() const { if (auto* d = direct()) return d->parts_aero7; return uint32_t((memory::IsHandle(address + 3776) ? uint32_t(memory::OwnerLoad(address + 3776, 4)) : guest::LoadU32(base, address + 3776))); }
+  void set_parts_aero7_bits(uint32_t v) const { if (auto* d = direct()) { d->parts_aero7 = v; return; } if (memory::IsHandle(address + 3776)) memory::OwnerStore(address + 3776, 4, v); else guest::StoreU32(base, address + 3776, v); }
+  uint32_t parts_aero7() const { if (auto* d = direct()) return d->parts_aero7; return uint32_t((memory::IsHandle(address + 3776) ? uint32_t(memory::OwnerLoad(address + 3776, 4)) : guest::LoadU32(base, address + 3776))); }
+  void set_parts_aero7(uint32_t v) const { if (auto* d = direct()) { d->parts_aero7 = v; return; } if (memory::IsHandle(address + 3776)) memory::OwnerStore(address + 3776, 4, v); else guest::StoreU32(base, address + 3776, v); }
   // the parts record's +40: the cockpit record's +16 (plus 7 when 4 or more)
-  uint32_t parts_aero9() const { return guest::LoadU32(base, address + 3784); }
-  void set_parts_aero9(uint32_t v) const { guest::StoreU32(base, address + 3784, v); }
   uint32_t parts_aero9_address() const { return address + 3784; }
+  uint32_t parts_aero9_bits() const { if (auto* d = direct()) return d->parts_aero9; return uint32_t((memory::IsHandle(address + 3784) ? uint32_t(memory::OwnerLoad(address + 3784, 4)) : guest::LoadU32(base, address + 3784))); }
+  void set_parts_aero9_bits(uint32_t v) const { if (auto* d = direct()) { d->parts_aero9 = v; return; } if (memory::IsHandle(address + 3784)) memory::OwnerStore(address + 3784, 4, v); else guest::StoreU32(base, address + 3784, v); }
+  uint32_t parts_aero9() const { if (auto* d = direct()) return d->parts_aero9; return uint32_t((memory::IsHandle(address + 3784) ? uint32_t(memory::OwnerLoad(address + 3784, 4)) : guest::LoadU32(base, address + 3784))); }
+  void set_parts_aero9(uint32_t v) const { if (auto* d = direct()) { d->parts_aero9 = v; return; } if (memory::IsHandle(address + 3784)) memory::OwnerStore(address + 3784, 4, v); else guest::StoreU32(base, address + 3784, v); }
   // the parts record's +44: picks the sound assets' index (SceneModel::SetUp, blocks below 18)
-  uint32_t parts_engine_stage() const { return guest::LoadU32(base, address + 3788); }
-  void set_parts_engine_stage(uint32_t v) const { guest::StoreU32(base, address + 3788, v); }
   uint32_t parts_engine_stage_address() const { return address + 3788; }
+  uint32_t parts_engine_stage_bits() const { if (auto* d = direct()) return d->parts_engine_stage; return uint32_t((memory::IsHandle(address + 3788) ? uint32_t(memory::OwnerLoad(address + 3788, 4)) : guest::LoadU32(base, address + 3788))); }
+  void set_parts_engine_stage_bits(uint32_t v) const { if (auto* d = direct()) { d->parts_engine_stage = v; return; } if (memory::IsHandle(address + 3788)) memory::OwnerStore(address + 3788, 4, v); else guest::StoreU32(base, address + 3788, v); }
+  uint32_t parts_engine_stage() const { if (auto* d = direct()) return d->parts_engine_stage; return uint32_t((memory::IsHandle(address + 3788) ? uint32_t(memory::OwnerLoad(address + 3788, 4)) : guest::LoadU32(base, address + 3788))); }
+  void set_parts_engine_stage(uint32_t v) const { if (auto* d = direct()) { d->parts_engine_stage = v; return; } if (memory::IsHandle(address + 3788)) memory::OwnerStore(address + 3788, 4, v); else guest::StoreU32(base, address + 3788, v); }
   // the record's +3772: the interior's 120 bytes (InteriorRecord), handed to ScenePools::SetUpB and SceneInterior::Apply, copied to the cockpit record's +24
   uint32_t interior_record_address() const { return address + 3804; }
+  uint8_t* interior_record() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 3804 : guest::Pointer(base, address + 3804); }
   // the interior record's +20: 1 for block 5 (SceneModel::SetUp, ApplyRecord)
-  uint32_t interior_gauge1_present() const { return guest::LoadU32(base, address + 3824); }
-  void set_interior_gauge1_present(uint32_t v) const { guest::StoreU32(base, address + 3824, v); }
   uint32_t interior_gauge1_present_address() const { return address + 3824; }
+  uint32_t interior_gauge1_present_bits() const { if (auto* d = direct()) return d->interior_gauge1_present; return uint32_t((memory::IsHandle(address + 3824) ? uint32_t(memory::OwnerLoad(address + 3824, 4)) : guest::LoadU32(base, address + 3824))); }
+  void set_interior_gauge1_present_bits(uint32_t v) const { if (auto* d = direct()) { d->interior_gauge1_present = v; return; } if (memory::IsHandle(address + 3824)) memory::OwnerStore(address + 3824, 4, v); else guest::StoreU32(base, address + 3824, v); }
+  uint32_t interior_gauge1_present() const { if (auto* d = direct()) return d->interior_gauge1_present; return uint32_t((memory::IsHandle(address + 3824) ? uint32_t(memory::OwnerLoad(address + 3824, 4)) : guest::LoadU32(base, address + 3824))); }
+  void set_interior_gauge1_present(uint32_t v) const { if (auto* d = direct()) { d->interior_gauge1_present = v; return; } if (memory::IsHandle(address + 3824)) memory::OwnerStore(address + 3824, 4, v); else guest::StoreU32(base, address + 3824, v); }
   // the interior record's +24: 0 for block 5
-  uint32_t interior_gauge1_kind() const { return guest::LoadU32(base, address + 3828); }
-  void set_interior_gauge1_kind(uint32_t v) const { guest::StoreU32(base, address + 3828, v); }
   uint32_t interior_gauge1_kind_address() const { return address + 3828; }
+  uint32_t interior_gauge1_kind_bits() const { if (auto* d = direct()) return d->interior_gauge1_kind; return uint32_t((memory::IsHandle(address + 3828) ? uint32_t(memory::OwnerLoad(address + 3828, 4)) : guest::LoadU32(base, address + 3828))); }
+  void set_interior_gauge1_kind_bits(uint32_t v) const { if (auto* d = direct()) { d->interior_gauge1_kind = v; return; } if (memory::IsHandle(address + 3828)) memory::OwnerStore(address + 3828, 4, v); else guest::StoreU32(base, address + 3828, v); }
+  uint32_t interior_gauge1_kind() const { if (auto* d = direct()) return d->interior_gauge1_kind; return uint32_t((memory::IsHandle(address + 3828) ? uint32_t(memory::OwnerLoad(address + 3828, 4)) : guest::LoadU32(base, address + 3828))); }
+  void set_interior_gauge1_kind(uint32_t v) const { if (auto* d = direct()) { d->interior_gauge1_kind = v; return; } if (memory::IsHandle(address + 3828)) memory::OwnerStore(address + 3828, 4, v); else guest::StoreU32(base, address + 3828, v); }
   // the record's +3892: the cockpit's 144 bytes (SceneModelsCockpitRecord), filled by SceneModel::Build for kind 2 in a race
   uint32_t cockpit_record_address() const { return address + 3924; }
+  uint8_t* cockpit_record() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 3924 : guest::Pointer(base, address + 3924); }
   // the cockpit record's +0
-  uint32_t cockpit_bonnet() const { return guest::LoadU32(base, address + 3924); }
-  void set_cockpit_bonnet(uint32_t v) const { guest::StoreU32(base, address + 3924, v); }
   uint32_t cockpit_bonnet_address() const { return address + 3924; }
+  uint32_t cockpit_bonnet_bits() const { if (auto* d = direct()) return d->cockpit_bonnet; return uint32_t((memory::IsHandle(address + 3924) ? uint32_t(memory::OwnerLoad(address + 3924, 4)) : guest::LoadU32(base, address + 3924))); }
+  void set_cockpit_bonnet_bits(uint32_t v) const { if (auto* d = direct()) { d->cockpit_bonnet = v; return; } if (memory::IsHandle(address + 3924)) memory::OwnerStore(address + 3924, 4, v); else guest::StoreU32(base, address + 3924, v); }
+  uint32_t cockpit_bonnet() const { if (auto* d = direct()) return d->cockpit_bonnet; return uint32_t((memory::IsHandle(address + 3924) ? uint32_t(memory::OwnerLoad(address + 3924, 4)) : guest::LoadU32(base, address + 3924))); }
+  void set_cockpit_bonnet(uint32_t v) const { if (auto* d = direct()) { d->cockpit_bonnet = v; return; } if (memory::IsHandle(address + 3924)) memory::OwnerStore(address + 3924, 4, v); else guest::StoreU32(base, address + 3924, v); }
   // the cockpit record's +4
-  uint32_t cockpit_aero_kit() const { return guest::LoadU32(base, address + 3928); }
-  void set_cockpit_aero_kit(uint32_t v) const { guest::StoreU32(base, address + 3928, v); }
   uint32_t cockpit_aero_kit_address() const { return address + 3928; }
+  uint32_t cockpit_aero_kit_bits() const { if (auto* d = direct()) return d->cockpit_aero_kit; return uint32_t((memory::IsHandle(address + 3928) ? uint32_t(memory::OwnerLoad(address + 3928, 4)) : guest::LoadU32(base, address + 3928))); }
+  void set_cockpit_aero_kit_bits(uint32_t v) const { if (auto* d = direct()) { d->cockpit_aero_kit = v; return; } if (memory::IsHandle(address + 3928)) memory::OwnerStore(address + 3928, 4, v); else guest::StoreU32(base, address + 3928, v); }
+  uint32_t cockpit_aero_kit() const { if (auto* d = direct()) return d->cockpit_aero_kit; return uint32_t((memory::IsHandle(address + 3928) ? uint32_t(memory::OwnerLoad(address + 3928, 4)) : guest::LoadU32(base, address + 3928))); }
+  void set_cockpit_aero_kit(uint32_t v) const { if (auto* d = direct()) { d->cockpit_aero_kit = v; return; } if (memory::IsHandle(address + 3928)) memory::OwnerStore(address + 3928, 4, v); else guest::StoreU32(base, address + 3928, v); }
   // the cockpit record's +8
-  uint32_t cockpit_aero6() const { return guest::LoadU32(base, address + 3932); }
-  void set_cockpit_aero6(uint32_t v) const { guest::StoreU32(base, address + 3932, v); }
   uint32_t cockpit_aero6_address() const { return address + 3932; }
+  uint32_t cockpit_aero6_bits() const { if (auto* d = direct()) return d->cockpit_aero6; return uint32_t((memory::IsHandle(address + 3932) ? uint32_t(memory::OwnerLoad(address + 3932, 4)) : guest::LoadU32(base, address + 3932))); }
+  void set_cockpit_aero6_bits(uint32_t v) const { if (auto* d = direct()) { d->cockpit_aero6 = v; return; } if (memory::IsHandle(address + 3932)) memory::OwnerStore(address + 3932, 4, v); else guest::StoreU32(base, address + 3932, v); }
+  uint32_t cockpit_aero6() const { if (auto* d = direct()) return d->cockpit_aero6; return uint32_t((memory::IsHandle(address + 3932) ? uint32_t(memory::OwnerLoad(address + 3932, 4)) : guest::LoadU32(base, address + 3932))); }
+  void set_cockpit_aero6(uint32_t v) const { if (auto* d = direct()) { d->cockpit_aero6 = v; return; } if (memory::IsHandle(address + 3932)) memory::OwnerStore(address + 3932, 4, v); else guest::StoreU32(base, address + 3932, v); }
   // the cockpit record's +12
-  uint32_t cockpit_aero7() const { return guest::LoadU32(base, address + 3936); }
-  void set_cockpit_aero7(uint32_t v) const { guest::StoreU32(base, address + 3936, v); }
   uint32_t cockpit_aero7_address() const { return address + 3936; }
+  uint32_t cockpit_aero7_bits() const { if (auto* d = direct()) return d->cockpit_aero7; return uint32_t((memory::IsHandle(address + 3936) ? uint32_t(memory::OwnerLoad(address + 3936, 4)) : guest::LoadU32(base, address + 3936))); }
+  void set_cockpit_aero7_bits(uint32_t v) const { if (auto* d = direct()) { d->cockpit_aero7 = v; return; } if (memory::IsHandle(address + 3936)) memory::OwnerStore(address + 3936, 4, v); else guest::StoreU32(base, address + 3936, v); }
+  uint32_t cockpit_aero7() const { if (auto* d = direct()) return d->cockpit_aero7; return uint32_t((memory::IsHandle(address + 3936) ? uint32_t(memory::OwnerLoad(address + 3936, 4)) : guest::LoadU32(base, address + 3936))); }
+  void set_cockpit_aero7(uint32_t v) const { if (auto* d = direct()) { d->cockpit_aero7 = v; return; } if (memory::IsHandle(address + 3936)) memory::OwnerStore(address + 3936, 4, v); else guest::StoreU32(base, address + 3936, v); }
   // the cockpit record's +16
-  uint32_t cockpit_aero9() const { return guest::LoadU32(base, address + 3940); }
-  void set_cockpit_aero9(uint32_t v) const { guest::StoreU32(base, address + 3940, v); }
   uint32_t cockpit_aero9_address() const { return address + 3940; }
+  uint32_t cockpit_aero9_bits() const { if (auto* d = direct()) return d->cockpit_aero9; return uint32_t((memory::IsHandle(address + 3940) ? uint32_t(memory::OwnerLoad(address + 3940, 4)) : guest::LoadU32(base, address + 3940))); }
+  void set_cockpit_aero9_bits(uint32_t v) const { if (auto* d = direct()) { d->cockpit_aero9 = v; return; } if (memory::IsHandle(address + 3940)) memory::OwnerStore(address + 3940, 4, v); else guest::StoreU32(base, address + 3940, v); }
+  uint32_t cockpit_aero9() const { if (auto* d = direct()) return d->cockpit_aero9; return uint32_t((memory::IsHandle(address + 3940) ? uint32_t(memory::OwnerLoad(address + 3940, 4)) : guest::LoadU32(base, address + 3940))); }
+  void set_cockpit_aero9(uint32_t v) const { if (auto* d = direct()) { d->cockpit_aero9 = v; return; } if (memory::IsHandle(address + 3940)) memory::OwnerStore(address + 3940, 4, v); else guest::StoreU32(base, address + 3940, v); }
   // the cockpit record's +20
-  uint32_t cockpit_selected_texture() const { return guest::LoadU32(base, address + 3944); }
-  void set_cockpit_selected_texture(uint32_t v) const { guest::StoreU32(base, address + 3944, v); }
   uint32_t cockpit_selected_texture_address() const { return address + 3944; }
+  uint32_t cockpit_selected_texture_bits() const { if (auto* d = direct()) return d->cockpit_selected_texture; return uint32_t((memory::IsHandle(address + 3944) ? uint32_t(memory::OwnerLoad(address + 3944, 4)) : guest::LoadU32(base, address + 3944))); }
+  void set_cockpit_selected_texture_bits(uint32_t v) const { if (auto* d = direct()) { d->cockpit_selected_texture = v; return; } if (memory::IsHandle(address + 3944)) memory::OwnerStore(address + 3944, 4, v); else guest::StoreU32(base, address + 3944, v); }
+  uint32_t cockpit_selected_texture() const { if (auto* d = direct()) return d->cockpit_selected_texture; return uint32_t((memory::IsHandle(address + 3944) ? uint32_t(memory::OwnerLoad(address + 3944, 4)) : guest::LoadU32(base, address + 3944))); }
+  void set_cockpit_selected_texture(uint32_t v) const { if (auto* d = direct()) { d->cockpit_selected_texture = v; return; } if (memory::IsHandle(address + 3944)) memory::OwnerStore(address + 3944, 4, v); else guest::StoreU32(base, address + 3944, v); }
   // the record's +4036: the wheels' 156 bytes (SceneModelsWheelsRecord), handed to ScenePools::SetUpB
   uint32_t wheels_record_address() const { return address + 4068; }
+  uint8_t* wheels_record() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 4068 : guest::Pointer(base, address + 4068); }
   // the wheels record's +0: the kind, stored by SceneModel::SetUp
-  uint32_t wheels_kind() const { return guest::LoadU32(base, address + 4068); }
-  void set_wheels_kind(uint32_t v) const { guest::StoreU32(base, address + 4068, v); }
   uint32_t wheels_kind_address() const { return address + 4068; }
+  uint32_t wheels_kind_bits() const { if (auto* d = direct()) return d->wheels_kind; return uint32_t((memory::IsHandle(address + 4068) ? uint32_t(memory::OwnerLoad(address + 4068, 4)) : guest::LoadU32(base, address + 4068))); }
+  void set_wheels_kind_bits(uint32_t v) const { if (auto* d = direct()) { d->wheels_kind = v; return; } if (memory::IsHandle(address + 4068)) memory::OwnerStore(address + 4068, 4, v); else guest::StoreU32(base, address + 4068, v); }
+  uint32_t wheels_kind() const { if (auto* d = direct()) return d->wheels_kind; return uint32_t((memory::IsHandle(address + 4068) ? uint32_t(memory::OwnerLoad(address + 4068, 4)) : guest::LoadU32(base, address + 4068))); }
+  void set_wheels_kind(uint32_t v) const { if (auto* d = direct()) { d->wheels_kind = v; return; } if (memory::IsHandle(address + 4068)) memory::OwnerStore(address + 4068, 4, v); else guest::StoreU32(base, address + 4068, v); }
   // the wheels record's +4 (SceneModel::ApplyWheelPaint)
-  uint32_t wheels_painted() const { return guest::LoadU32(base, address + 4072); }
-  void set_wheels_painted(uint32_t v) const { guest::StoreU32(base, address + 4072, v); }
   uint32_t wheels_painted_address() const { return address + 4072; }
+  uint32_t wheels_painted_bits() const { if (auto* d = direct()) return d->wheels_painted; return uint32_t((memory::IsHandle(address + 4072) ? uint32_t(memory::OwnerLoad(address + 4072, 4)) : guest::LoadU32(base, address + 4072))); }
+  void set_wheels_painted_bits(uint32_t v) const { if (auto* d = direct()) { d->wheels_painted = v; return; } if (memory::IsHandle(address + 4072)) memory::OwnerStore(address + 4072, 4, v); else guest::StoreU32(base, address + 4072, v); }
+  uint32_t wheels_painted() const { if (auto* d = direct()) return d->wheels_painted; return uint32_t((memory::IsHandle(address + 4072) ? uint32_t(memory::OwnerLoad(address + 4072, 4)) : guest::LoadU32(base, address + 4072))); }
+  void set_wheels_painted(uint32_t v) const { if (auto* d = direct()) { d->wheels_painted = v; return; } if (memory::IsHandle(address + 4072)) memory::OwnerStore(address + 4072, 4, v); else guest::StoreU32(base, address + 4072, v); }
   // the record's +4192: the light kit's 52 bytes (LightKitRecord), handed to ScenePools::SetUpB
   uint32_t light_kit_record_address() const { return address + 4224; }
+  uint8_t* light_kit_record() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 4224 : guest::Pointer(base, address + 4224); }
   // the 736-byte block of matrices and draw words (car-draw.toml's CarDrawBlock, second-set.md's SceneModelBlock)
   uint32_t draw_block_address() const { return address + 4288; }
+  uint8_t* draw_block() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 4288 : guest::Pointer(base, address + 4288); }
   // the block's +8: a word from its owner (sub_8217FCB0); 0 makes Car::DrawUpdate draw nothing; SceneModel::Update's accessory waits for it in the front end
-  uint32_t draw_enabled() const { return guest::LoadU32(base, address + 4296); }
-  void set_draw_enabled(uint32_t v) const { guest::StoreU32(base, address + 4296, v); }
   uint32_t draw_enabled_address() const { return address + 4296; }
+  uint32_t draw_enabled_bits() const { if (auto* d = direct()) return d->draw_enabled; return uint32_t((memory::IsHandle(address + 4296) ? uint32_t(memory::OwnerLoad(address + 4296, 4)) : guest::LoadU32(base, address + 4296))); }
+  void set_draw_enabled_bits(uint32_t v) const { if (auto* d = direct()) { d->draw_enabled = v; return; } if (memory::IsHandle(address + 4296)) memory::OwnerStore(address + 4296, 4, v); else guest::StoreU32(base, address + 4296, v); }
+  uint32_t draw_enabled() const { if (auto* d = direct()) return d->draw_enabled; return uint32_t((memory::IsHandle(address + 4296) ? uint32_t(memory::OwnerLoad(address + 4296, 4)) : guest::LoadU32(base, address + 4296))); }
+  void set_draw_enabled(uint32_t v) const { if (auto* d = direct()) { d->draw_enabled = v; return; } if (memory::IsHandle(address + 4296)) memory::OwnerStore(address + 4296, 4, v); else guest::StoreU32(base, address + 4296, v); }
   // the block's +12: with kind 2 only the cockpit is drawn (probably the cockpit view)
-  uint32_t cockpit_only() const { return guest::LoadU32(base, address + 4300); }
-  void set_cockpit_only(uint32_t v) const { guest::StoreU32(base, address + 4300, v); }
   uint32_t cockpit_only_address() const { return address + 4300; }
+  uint32_t cockpit_only_bits() const { if (auto* d = direct()) return d->cockpit_only; return uint32_t((memory::IsHandle(address + 4300) ? uint32_t(memory::OwnerLoad(address + 4300, 4)) : guest::LoadU32(base, address + 4300))); }
+  void set_cockpit_only_bits(uint32_t v) const { if (auto* d = direct()) { d->cockpit_only = v; return; } if (memory::IsHandle(address + 4300)) memory::OwnerStore(address + 4300, 4, v); else guest::StoreU32(base, address + 4300, v); }
+  uint32_t cockpit_only() const { if (auto* d = direct()) return d->cockpit_only; return uint32_t((memory::IsHandle(address + 4300) ? uint32_t(memory::OwnerLoad(address + 4300, 4)) : guest::LoadU32(base, address + 4300))); }
+  void set_cockpit_only(uint32_t v) const { if (auto* d = direct()) { d->cockpit_only = v; return; } if (memory::IsHandle(address + 4300)) memory::OwnerStore(address + 4300, 4, v); else guest::StoreU32(base, address + 4300, v); }
   // the block's +16: the world matrix (SceneModel::Update's accessory placement, CarOverlays::FindModel)
   uint32_t matrix_address() const { return address + 4304; }
+  uint8_t* matrix() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 4304 : guest::Pointer(base, address + 4304); }
   // the block's +628: the *_02 windows' alpha ([0x8200296C] in the front end, else [0x82001FBC], probably 0.1)
-  float windows_alpha() const { return guest::LoadFloat(base, address + 4916); }
-  void set_windows_alpha(float v) const { guest::StoreFloat(base, address + 4916, v); }
   uint32_t windows_alpha_address() const { return address + 4916; }
+  uint32_t windows_alpha_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->windows_alpha); return uint32_t((memory::IsHandle(address + 4916) ? uint32_t(memory::OwnerLoad(address + 4916, 4)) : guest::LoadU32(base, address + 4916))); }
+  void set_windows_alpha_bits(uint32_t v) const { if (auto* d = direct()) { d->windows_alpha = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 4916)) memory::OwnerStore(address + 4916, 4, v); else guest::StoreU32(base, address + 4916, v); }
+  float windows_alpha() const { return std::bit_cast<float>(windows_alpha_bits()); }
+  void set_windows_alpha(float v) const { set_windows_alpha_bits(std::bit_cast<uint32_t>(v)); }
   // 1 once SceneModel::SetUp ran
-  uint32_t set_up() const { return guest::LoadU32(base, address + 5024); }
-  void set_set_up(uint32_t v) const { guest::StoreU32(base, address + 5024, v); }
   uint32_t set_up_address() const { return address + 5024; }
+  uint32_t set_up_bits() const { if (auto* d = direct()) return d->set_up; return uint32_t((memory::IsHandle(address + 5024) ? uint32_t(memory::OwnerLoad(address + 5024, 4)) : guest::LoadU32(base, address + 5024))); }
+  void set_set_up_bits(uint32_t v) const { if (auto* d = direct()) { d->set_up = v; return; } if (memory::IsHandle(address + 5024)) memory::OwnerStore(address + 5024, 4, v); else guest::StoreU32(base, address + 5024, v); }
+  uint32_t set_up() const { if (auto* d = direct()) return d->set_up; return uint32_t((memory::IsHandle(address + 5024) ? uint32_t(memory::OwnerLoad(address + 5024, 4)) : guest::LoadU32(base, address + 5024))); }
+  void set_set_up(uint32_t v) const { if (auto* d = direct()) { d->set_up = v; return; } if (memory::IsHandle(address + 5024)) memory::OwnerStore(address + 5024, 4, v); else guest::StoreU32(base, address + 5024, v); }
   // the load poll waits while it's set (probably a release pending)
-  uint32_t release_pending() const { return guest::LoadU32(base, address + 5028); }
-  void set_release_pending(uint32_t v) const { guest::StoreU32(base, address + 5028, v); }
   uint32_t release_pending_address() const { return address + 5028; }
+  uint32_t release_pending_bits() const { if (auto* d = direct()) return d->release_pending; return uint32_t((memory::IsHandle(address + 5028) ? uint32_t(memory::OwnerLoad(address + 5028, 4)) : guest::LoadU32(base, address + 5028))); }
+  void set_release_pending_bits(uint32_t v) const { if (auto* d = direct()) { d->release_pending = v; return; } if (memory::IsHandle(address + 5028)) memory::OwnerStore(address + 5028, 4, v); else guest::StoreU32(base, address + 5028, v); }
+  uint32_t release_pending() const { if (auto* d = direct()) return d->release_pending; return uint32_t((memory::IsHandle(address + 5028) ? uint32_t(memory::OwnerLoad(address + 5028, 4)) : guest::LoadU32(base, address + 5028))); }
+  void set_release_pending(uint32_t v) const { if (auto* d = direct()) { d->release_pending = v; return; } if (memory::IsHandle(address + 5028)) memory::OwnerStore(address + 5028, 4, v); else guest::StoreU32(base, address + 5028, v); }
   // SceneModel::AddSecondWheels ran (the tuning screen waits for 0)
-  uint32_t second_wheels_claimed() const { return guest::LoadU32(base, address + 5032); }
-  void set_second_wheels_claimed(uint32_t v) const { guest::StoreU32(base, address + 5032, v); }
   uint32_t second_wheels_claimed_address() const { return address + 5032; }
+  uint32_t second_wheels_claimed_bits() const { if (auto* d = direct()) return d->second_wheels_claimed; return uint32_t((memory::IsHandle(address + 5032) ? uint32_t(memory::OwnerLoad(address + 5032, 4)) : guest::LoadU32(base, address + 5032))); }
+  void set_second_wheels_claimed_bits(uint32_t v) const { if (auto* d = direct()) { d->second_wheels_claimed = v; return; } if (memory::IsHandle(address + 5032)) memory::OwnerStore(address + 5032, 4, v); else guest::StoreU32(base, address + 5032, v); }
+  uint32_t second_wheels_claimed() const { if (auto* d = direct()) return d->second_wheels_claimed; return uint32_t((memory::IsHandle(address + 5032) ? uint32_t(memory::OwnerLoad(address + 5032, 4)) : guest::LoadU32(base, address + 5032))); }
+  void set_second_wheels_claimed(uint32_t v) const { if (auto* d = direct()) { d->second_wheels_claimed = v; return; } if (memory::IsHandle(address + 5032)) memory::OwnerStore(address + 5032, 4, v); else guest::StoreU32(base, address + 5032, v); }
   // the parts finished (the load poll; not for traffic)
-  uint32_t ready() const { return guest::LoadU32(base, address + 5036); }
-  void set_ready(uint32_t v) const { guest::StoreU32(base, address + 5036, v); }
   uint32_t ready_address() const { return address + 5036; }
+  uint32_t ready_bits() const { if (auto* d = direct()) return d->ready; return uint32_t((memory::IsHandle(address + 5036) ? uint32_t(memory::OwnerLoad(address + 5036, 4)) : guest::LoadU32(base, address + 5036))); }
+  void set_ready_bits(uint32_t v) const { if (auto* d = direct()) { d->ready = v; return; } if (memory::IsHandle(address + 5036)) memory::OwnerStore(address + 5036, 4, v); else guest::StoreU32(base, address + 5036, v); }
+  uint32_t ready() const { if (auto* d = direct()) return d->ready; return uint32_t((memory::IsHandle(address + 5036) ? uint32_t(memory::OwnerLoad(address + 5036, 4)) : guest::LoadU32(base, address + 5036))); }
+  void set_ready(uint32_t v) const { if (auto* d = direct()) { d->ready = v; return; } if (memory::IsHandle(address + 5036)) memory::OwnerStore(address + 5036, 4, v); else guest::StoreU32(base, address + 5036, v); }
   // SceneModel::Build deferred to SceneModel::Update
-  uint32_t build_pending() const { return guest::LoadU32(base, address + 5040); }
-  void set_build_pending(uint32_t v) const { guest::StoreU32(base, address + 5040, v); }
   uint32_t build_pending_address() const { return address + 5040; }
+  uint32_t build_pending_bits() const { if (auto* d = direct()) return d->build_pending; return uint32_t((memory::IsHandle(address + 5040) ? uint32_t(memory::OwnerLoad(address + 5040, 4)) : guest::LoadU32(base, address + 5040))); }
+  void set_build_pending_bits(uint32_t v) const { if (auto* d = direct()) { d->build_pending = v; return; } if (memory::IsHandle(address + 5040)) memory::OwnerStore(address + 5040, 4, v); else guest::StoreU32(base, address + 5040, v); }
+  uint32_t build_pending() const { if (auto* d = direct()) return d->build_pending; return uint32_t((memory::IsHandle(address + 5040) ? uint32_t(memory::OwnerLoad(address + 5040, 4)) : guest::LoadU32(base, address + 5040))); }
+  void set_build_pending(uint32_t v) const { if (auto* d = direct()) { d->build_pending = v; return; } if (memory::IsHandle(address + 5040)) memory::OwnerStore(address + 5040, 4, v); else guest::StoreU32(base, address + 5040, v); }
   // the updates until the deferred build (signed)
-  uint32_t build_delay() const { return guest::LoadU32(base, address + 5044); }
-  void set_build_delay(uint32_t v) const { guest::StoreU32(base, address + 5044, v); }
   uint32_t build_delay_address() const { return address + 5044; }
+  uint32_t build_delay_bits() const { if (auto* d = direct()) return d->build_delay; return uint32_t((memory::IsHandle(address + 5044) ? uint32_t(memory::OwnerLoad(address + 5044, 4)) : guest::LoadU32(base, address + 5044))); }
+  void set_build_delay_bits(uint32_t v) const { if (auto* d = direct()) { d->build_delay = v; return; } if (memory::IsHandle(address + 5044)) memory::OwnerStore(address + 5044, 4, v); else guest::StoreU32(base, address + 5044, v); }
+  uint32_t build_delay() const { if (auto* d = direct()) return d->build_delay; return uint32_t((memory::IsHandle(address + 5044) ? uint32_t(memory::OwnerLoad(address + 5044, 4)) : guest::LoadU32(base, address + 5044))); }
+  void set_build_delay(uint32_t v) const { if (auto* d = direct()) { d->build_delay = v; return; } if (memory::IsHandle(address + 5044)) memory::OwnerStore(address + 5044, 4, v); else guest::StoreU32(base, address + 5044, v); }
   // pool 0 of the second set (-1 for traffic)
-  template <typename T = CarModelsSceneCarModel>
-  T car_model() const { return T(base, guest::LoadU32(base, address + 5048)); }
-  void set_car_model(const View& v) const { guest::StoreU32(base, address + 5048, v.address); }
-  void set_car_model(uint32_t v) const { guest::StoreU32(base, address + 5048, v); }
   uint32_t car_model_address() const { return address + 5048; }
-  uint32_t car_model_ready() const { return guest::LoadU32(base, address + 5052); }
-  void set_car_model_ready(uint32_t v) const { guest::StoreU32(base, address + 5052, v); }
+  uint32_t car_model_bits() const { if (auto* d = direct()) return d->car_model; return uint32_t((memory::IsHandle(address + 5048) ? uint32_t(memory::OwnerLoad(address + 5048, 4)) : guest::LoadU32(base, address + 5048))); }
+  void set_car_model_bits(uint32_t v) const { if (auto* d = direct()) { d->car_model = v; return; } if (memory::IsHandle(address + 5048)) memory::OwnerStore(address + 5048, 4, v); else guest::StoreU32(base, address + 5048, v); }
+  template <typename T = CarModelsSceneCarModel>
+  T car_model() const { return T(base, car_model_bits()); }
+  void set_car_model(const View& w) const { set_car_model_bits(w.address); }
+  void set_car_model(uint32_t v) const { set_car_model_bits(v); }
   uint32_t car_model_ready_address() const { return address + 5052; }
+  uint32_t car_model_ready_bits() const { if (auto* d = direct()) return d->car_model_ready; return uint32_t((memory::IsHandle(address + 5052) ? uint32_t(memory::OwnerLoad(address + 5052, 4)) : guest::LoadU32(base, address + 5052))); }
+  void set_car_model_ready_bits(uint32_t v) const { if (auto* d = direct()) { d->car_model_ready = v; return; } if (memory::IsHandle(address + 5052)) memory::OwnerStore(address + 5052, 4, v); else guest::StoreU32(base, address + 5052, v); }
+  uint32_t car_model_ready() const { if (auto* d = direct()) return d->car_model_ready; return uint32_t((memory::IsHandle(address + 5052) ? uint32_t(memory::OwnerLoad(address + 5052, 4)) : guest::LoadU32(base, address + 5052))); }
+  void set_car_model_ready(uint32_t v) const { if (auto* d = direct()) { d->car_model_ready = v; return; } if (memory::IsHandle(address + 5052)) memory::OwnerStore(address + 5052, 4, v); else guest::StoreU32(base, address + 5052, v); }
   // 1 when the first-set car model's decals are done (+4088 3); 0 from ReloadDecals
-  uint32_t decals_reloaded() const { return guest::LoadU32(base, address + 5056); }
-  void set_decals_reloaded(uint32_t v) const { guest::StoreU32(base, address + 5056, v); }
   uint32_t decals_reloaded_address() const { return address + 5056; }
+  uint32_t decals_reloaded_bits() const { if (auto* d = direct()) return d->decals_reloaded; return uint32_t((memory::IsHandle(address + 5056) ? uint32_t(memory::OwnerLoad(address + 5056, 4)) : guest::LoadU32(base, address + 5056))); }
+  void set_decals_reloaded_bits(uint32_t v) const { if (auto* d = direct()) { d->decals_reloaded = v; return; } if (memory::IsHandle(address + 5056)) memory::OwnerStore(address + 5056, 4, v); else guest::StoreU32(base, address + 5056, v); }
+  uint32_t decals_reloaded() const { if (auto* d = direct()) return d->decals_reloaded; return uint32_t((memory::IsHandle(address + 5056) ? uint32_t(memory::OwnerLoad(address + 5056, 4)) : guest::LoadU32(base, address + 5056))); }
+  void set_decals_reloaded(uint32_t v) const { if (auto* d = direct()) { d->decals_reloaded = v; return; } if (memory::IsHandle(address + 5056)) memory::OwnerStore(address + 5056, 4, v); else guest::StoreU32(base, address + 5056, v); }
   // pool 1
-  template <typename T = SceneParts>
-  T parts() const { return T(base, guest::LoadU32(base, address + 5060)); }
-  void set_parts(const View& v) const { guest::StoreU32(base, address + 5060, v.address); }
-  void set_parts(uint32_t v) const { guest::StoreU32(base, address + 5060, v); }
   uint32_t parts_address() const { return address + 5060; }
-  uint32_t parts_ready() const { return guest::LoadU32(base, address + 5064); }
-  void set_parts_ready(uint32_t v) const { guest::StoreU32(base, address + 5064, v); }
+  uint32_t parts_bits() const { if (auto* d = direct()) return d->parts; return uint32_t((memory::IsHandle(address + 5060) ? uint32_t(memory::OwnerLoad(address + 5060, 4)) : guest::LoadU32(base, address + 5060))); }
+  void set_parts_bits(uint32_t v) const { if (auto* d = direct()) { d->parts = v; return; } if (memory::IsHandle(address + 5060)) memory::OwnerStore(address + 5060, 4, v); else guest::StoreU32(base, address + 5060, v); }
+  template <typename T = SceneParts>
+  T parts() const { return T(base, parts_bits()); }
+  void set_parts(const View& w) const { set_parts_bits(w.address); }
+  void set_parts(uint32_t v) const { set_parts_bits(v); }
   uint32_t parts_ready_address() const { return address + 5064; }
+  uint32_t parts_ready_bits() const { if (auto* d = direct()) return d->parts_ready; return uint32_t((memory::IsHandle(address + 5064) ? uint32_t(memory::OwnerLoad(address + 5064, 4)) : guest::LoadU32(base, address + 5064))); }
+  void set_parts_ready_bits(uint32_t v) const { if (auto* d = direct()) { d->parts_ready = v; return; } if (memory::IsHandle(address + 5064)) memory::OwnerStore(address + 5064, 4, v); else guest::StoreU32(base, address + 5064, v); }
+  uint32_t parts_ready() const { if (auto* d = direct()) return d->parts_ready; return uint32_t((memory::IsHandle(address + 5064) ? uint32_t(memory::OwnerLoad(address + 5064, 4)) : guest::LoadU32(base, address + 5064))); }
+  void set_parts_ready(uint32_t v) const { if (auto* d = direct()) { d->parts_ready = v; return; } if (memory::IsHandle(address + 5064)) memory::OwnerStore(address + 5064, 4, v); else guest::StoreU32(base, address + 5064, v); }
   // pool 3 (SceneInterior): +36 its first-set interior
-  uint32_t interior() const { return guest::LoadU32(base, address + 5068); }
-  void set_interior(uint32_t v) const { guest::StoreU32(base, address + 5068, v); }
   uint32_t interior_address() const { return address + 5068; }
-  uint32_t interior_ready() const { return guest::LoadU32(base, address + 5072); }
-  void set_interior_ready(uint32_t v) const { guest::StoreU32(base, address + 5072, v); }
+  uint32_t interior_bits() const { if (auto* d = direct()) return d->interior; return uint32_t((memory::IsHandle(address + 5068) ? uint32_t(memory::OwnerLoad(address + 5068, 4)) : guest::LoadU32(base, address + 5068))); }
+  void set_interior_bits(uint32_t v) const { if (auto* d = direct()) { d->interior = v; return; } if (memory::IsHandle(address + 5068)) memory::OwnerStore(address + 5068, 4, v); else guest::StoreU32(base, address + 5068, v); }
+  uint32_t interior() const { if (auto* d = direct()) return d->interior; return uint32_t((memory::IsHandle(address + 5068) ? uint32_t(memory::OwnerLoad(address + 5068, 4)) : guest::LoadU32(base, address + 5068))); }
+  void set_interior(uint32_t v) const { if (auto* d = direct()) { d->interior = v; return; } if (memory::IsHandle(address + 5068)) memory::OwnerStore(address + 5068, 4, v); else guest::StoreU32(base, address + 5068, v); }
   uint32_t interior_ready_address() const { return address + 5072; }
+  uint32_t interior_ready_bits() const { if (auto* d = direct()) return d->interior_ready; return uint32_t((memory::IsHandle(address + 5072) ? uint32_t(memory::OwnerLoad(address + 5072, 4)) : guest::LoadU32(base, address + 5072))); }
+  void set_interior_ready_bits(uint32_t v) const { if (auto* d = direct()) { d->interior_ready = v; return; } if (memory::IsHandle(address + 5072)) memory::OwnerStore(address + 5072, 4, v); else guest::StoreU32(base, address + 5072, v); }
+  uint32_t interior_ready() const { if (auto* d = direct()) return d->interior_ready; return uint32_t((memory::IsHandle(address + 5072) ? uint32_t(memory::OwnerLoad(address + 5072, 4)) : guest::LoadU32(base, address + 5072))); }
+  void set_interior_ready(uint32_t v) const { if (auto* d = direct()) { d->interior_ready = v; return; } if (memory::IsHandle(address + 5072)) memory::OwnerStore(address + 5072, 4, v); else guest::StoreU32(base, address + 5072, v); }
   // pool 2 (SceneCockpit)
-  uint32_t cockpit() const { return guest::LoadU32(base, address + 5076); }
-  void set_cockpit(uint32_t v) const { guest::StoreU32(base, address + 5076, v); }
   uint32_t cockpit_address() const { return address + 5076; }
+  uint32_t cockpit_bits() const { if (auto* d = direct()) return d->cockpit; return uint32_t((memory::IsHandle(address + 5076) ? uint32_t(memory::OwnerLoad(address + 5076, 4)) : guest::LoadU32(base, address + 5076))); }
+  void set_cockpit_bits(uint32_t v) const { if (auto* d = direct()) { d->cockpit = v; return; } if (memory::IsHandle(address + 5076)) memory::OwnerStore(address + 5076, 4, v); else guest::StoreU32(base, address + 5076, v); }
+  uint32_t cockpit() const { if (auto* d = direct()) return d->cockpit; return uint32_t((memory::IsHandle(address + 5076) ? uint32_t(memory::OwnerLoad(address + 5076, 4)) : guest::LoadU32(base, address + 5076))); }
+  void set_cockpit(uint32_t v) const { if (auto* d = direct()) { d->cockpit = v; return; } if (memory::IsHandle(address + 5076)) memory::OwnerStore(address + 5076, 4, v); else guest::StoreU32(base, address + 5076, v); }
   // 1 when there's no cockpit
-  uint32_t cockpit_ready() const { return guest::LoadU32(base, address + 5080); }
-  void set_cockpit_ready(uint32_t v) const { guest::StoreU32(base, address + 5080, v); }
   uint32_t cockpit_ready_address() const { return address + 5080; }
+  uint32_t cockpit_ready_bits() const { if (auto* d = direct()) return d->cockpit_ready; return uint32_t((memory::IsHandle(address + 5080) ? uint32_t(memory::OwnerLoad(address + 5080, 4)) : guest::LoadU32(base, address + 5080))); }
+  void set_cockpit_ready_bits(uint32_t v) const { if (auto* d = direct()) { d->cockpit_ready = v; return; } if (memory::IsHandle(address + 5080)) memory::OwnerStore(address + 5080, 4, v); else guest::StoreU32(base, address + 5080, v); }
+  uint32_t cockpit_ready() const { if (auto* d = direct()) return d->cockpit_ready; return uint32_t((memory::IsHandle(address + 5080) ? uint32_t(memory::OwnerLoad(address + 5080, 4)) : guest::LoadU32(base, address + 5080))); }
+  void set_cockpit_ready(uint32_t v) const { if (auto* d = direct()) { d->cockpit_ready = v; return; } if (memory::IsHandle(address + 5080)) memory::OwnerStore(address + 5080, 4, v); else guest::StoreU32(base, address + 5080, v); }
   // pool 4
-  template <typename T = SceneLightKit>
-  T light_kit() const { return T(base, guest::LoadU32(base, address + 5084)); }
-  void set_light_kit(const View& v) const { guest::StoreU32(base, address + 5084, v.address); }
-  void set_light_kit(uint32_t v) const { guest::StoreU32(base, address + 5084, v); }
   uint32_t light_kit_address() const { return address + 5084; }
-  uint32_t light_kit_ready() const { return guest::LoadU32(base, address + 5088); }
-  void set_light_kit_ready(uint32_t v) const { guest::StoreU32(base, address + 5088, v); }
+  uint32_t light_kit_bits() const { if (auto* d = direct()) return d->light_kit; return uint32_t((memory::IsHandle(address + 5084) ? uint32_t(memory::OwnerLoad(address + 5084, 4)) : guest::LoadU32(base, address + 5084))); }
+  void set_light_kit_bits(uint32_t v) const { if (auto* d = direct()) { d->light_kit = v; return; } if (memory::IsHandle(address + 5084)) memory::OwnerStore(address + 5084, 4, v); else guest::StoreU32(base, address + 5084, v); }
+  template <typename T = SceneLightKit>
+  T light_kit() const { return T(base, light_kit_bits()); }
+  void set_light_kit(const View& w) const { set_light_kit_bits(w.address); }
+  void set_light_kit(uint32_t v) const { set_light_kit_bits(v); }
   uint32_t light_kit_ready_address() const { return address + 5088; }
+  uint32_t light_kit_ready_bits() const { if (auto* d = direct()) return d->light_kit_ready; return uint32_t((memory::IsHandle(address + 5088) ? uint32_t(memory::OwnerLoad(address + 5088, 4)) : guest::LoadU32(base, address + 5088))); }
+  void set_light_kit_ready_bits(uint32_t v) const { if (auto* d = direct()) { d->light_kit_ready = v; return; } if (memory::IsHandle(address + 5088)) memory::OwnerStore(address + 5088, 4, v); else guest::StoreU32(base, address + 5088, v); }
+  uint32_t light_kit_ready() const { if (auto* d = direct()) return d->light_kit_ready; return uint32_t((memory::IsHandle(address + 5088) ? uint32_t(memory::OwnerLoad(address + 5088, 4)) : guest::LoadU32(base, address + 5088))); }
+  void set_light_kit_ready(uint32_t v) const { if (auto* d = direct()) { d->light_kit_ready = v; return; } if (memory::IsHandle(address + 5088)) memory::OwnerStore(address + 5088, 4, v); else guest::StoreU32(base, address + 5088, v); }
   // pool 6 (SceneTraffic)
-  uint32_t traffic_body() const { return guest::LoadU32(base, address + 5092); }
-  void set_traffic_body(uint32_t v) const { guest::StoreU32(base, address + 5092, v); }
   uint32_t traffic_body_address() const { return address + 5092; }
-  uint32_t traffic_body_ready() const { return guest::LoadU32(base, address + 5096); }
-  void set_traffic_body_ready(uint32_t v) const { guest::StoreU32(base, address + 5096, v); }
+  uint32_t traffic_body_bits() const { if (auto* d = direct()) return d->traffic_body; return uint32_t((memory::IsHandle(address + 5092) ? uint32_t(memory::OwnerLoad(address + 5092, 4)) : guest::LoadU32(base, address + 5092))); }
+  void set_traffic_body_bits(uint32_t v) const { if (auto* d = direct()) { d->traffic_body = v; return; } if (memory::IsHandle(address + 5092)) memory::OwnerStore(address + 5092, 4, v); else guest::StoreU32(base, address + 5092, v); }
+  uint32_t traffic_body() const { if (auto* d = direct()) return d->traffic_body; return uint32_t((memory::IsHandle(address + 5092) ? uint32_t(memory::OwnerLoad(address + 5092, 4)) : guest::LoadU32(base, address + 5092))); }
+  void set_traffic_body(uint32_t v) const { if (auto* d = direct()) { d->traffic_body = v; return; } if (memory::IsHandle(address + 5092)) memory::OwnerStore(address + 5092, 4, v); else guest::StoreU32(base, address + 5092, v); }
   uint32_t traffic_body_ready_address() const { return address + 5096; }
+  uint32_t traffic_body_ready_bits() const { if (auto* d = direct()) return d->traffic_body_ready; return uint32_t((memory::IsHandle(address + 5096) ? uint32_t(memory::OwnerLoad(address + 5096, 4)) : guest::LoadU32(base, address + 5096))); }
+  void set_traffic_body_ready_bits(uint32_t v) const { if (auto* d = direct()) { d->traffic_body_ready = v; return; } if (memory::IsHandle(address + 5096)) memory::OwnerStore(address + 5096, 4, v); else guest::StoreU32(base, address + 5096, v); }
+  uint32_t traffic_body_ready() const { if (auto* d = direct()) return d->traffic_body_ready; return uint32_t((memory::IsHandle(address + 5096) ? uint32_t(memory::OwnerLoad(address + 5096, 4)) : guest::LoadU32(base, address + 5096))); }
+  void set_traffic_body_ready(uint32_t v) const { if (auto* d = direct()) { d->traffic_body_ready = v; return; } if (memory::IsHandle(address + 5096)) memory::OwnerStore(address + 5096, 4, v); else guest::StoreU32(base, address + 5096, v); }
   // pool 5 (SceneWheels)
-  uint32_t wheels() const { return guest::LoadU32(base, address + 5100); }
-  void set_wheels(uint32_t v) const { guest::StoreU32(base, address + 5100, v); }
   uint32_t wheels_address() const { return address + 5100; }
-  uint32_t wheels_ready() const { return guest::LoadU32(base, address + 5104); }
-  void set_wheels_ready(uint32_t v) const { guest::StoreU32(base, address + 5104, v); }
+  uint32_t wheels_bits() const { if (auto* d = direct()) return d->wheels; return uint32_t((memory::IsHandle(address + 5100) ? uint32_t(memory::OwnerLoad(address + 5100, 4)) : guest::LoadU32(base, address + 5100))); }
+  void set_wheels_bits(uint32_t v) const { if (auto* d = direct()) { d->wheels = v; return; } if (memory::IsHandle(address + 5100)) memory::OwnerStore(address + 5100, 4, v); else guest::StoreU32(base, address + 5100, v); }
+  uint32_t wheels() const { if (auto* d = direct()) return d->wheels; return uint32_t((memory::IsHandle(address + 5100) ? uint32_t(memory::OwnerLoad(address + 5100, 4)) : guest::LoadU32(base, address + 5100))); }
+  void set_wheels(uint32_t v) const { if (auto* d = direct()) { d->wheels = v; return; } if (memory::IsHandle(address + 5100)) memory::OwnerStore(address + 5100, 4, v); else guest::StoreU32(base, address + 5100, v); }
   uint32_t wheels_ready_address() const { return address + 5104; }
+  uint32_t wheels_ready_bits() const { if (auto* d = direct()) return d->wheels_ready; return uint32_t((memory::IsHandle(address + 5104) ? uint32_t(memory::OwnerLoad(address + 5104, 4)) : guest::LoadU32(base, address + 5104))); }
+  void set_wheels_ready_bits(uint32_t v) const { if (auto* d = direct()) { d->wheels_ready = v; return; } if (memory::IsHandle(address + 5104)) memory::OwnerStore(address + 5104, 4, v); else guest::StoreU32(base, address + 5104, v); }
+  uint32_t wheels_ready() const { if (auto* d = direct()) return d->wheels_ready; return uint32_t((memory::IsHandle(address + 5104) ? uint32_t(memory::OwnerLoad(address + 5104, 4)) : guest::LoadU32(base, address + 5104))); }
+  void set_wheels_ready(uint32_t v) const { if (auto* d = direct()) { d->wheels_ready = v; return; } if (memory::IsHandle(address + 5104)) memory::OwnerStore(address + 5104, 4, v); else guest::StoreU32(base, address + 5104, v); }
   // a second pool 5 object (SceneModel::AddSecondWheels)
-  uint32_t second_wheels() const { return guest::LoadU32(base, address + 5108); }
-  void set_second_wheels(uint32_t v) const { guest::StoreU32(base, address + 5108, v); }
   uint32_t second_wheels_address() const { return address + 5108; }
+  uint32_t second_wheels_bits() const { if (auto* d = direct()) return d->second_wheels; return uint32_t((memory::IsHandle(address + 5108) ? uint32_t(memory::OwnerLoad(address + 5108, 4)) : guest::LoadU32(base, address + 5108))); }
+  void set_second_wheels_bits(uint32_t v) const { if (auto* d = direct()) { d->second_wheels = v; return; } if (memory::IsHandle(address + 5108)) memory::OwnerStore(address + 5108, 4, v); else guest::StoreU32(base, address + 5108, v); }
+  uint32_t second_wheels() const { if (auto* d = direct()) return d->second_wheels; return uint32_t((memory::IsHandle(address + 5108) ? uint32_t(memory::OwnerLoad(address + 5108, 4)) : guest::LoadU32(base, address + 5108))); }
+  void set_second_wheels(uint32_t v) const { if (auto* d = direct()) { d->second_wheels = v; return; } if (memory::IsHandle(address + 5108)) memory::OwnerStore(address + 5108, 4, v); else guest::StoreU32(base, address + 5108, v); }
   // the second wheels' finisher answer: once 1 they replace +5100
-  uint32_t second_wheels_ready() const { return guest::LoadU32(base, address + 5112); }
-  void set_second_wheels_ready(uint32_t v) const { guest::StoreU32(base, address + 5112, v); }
   uint32_t second_wheels_ready_address() const { return address + 5112; }
-  template <typename T = CarScene>
-  T scene() const { return T(base, guest::LoadU32(base, address + 5116)); }
-  void set_scene(const View& v) const { guest::StoreU32(base, address + 5116, v.address); }
-  void set_scene(uint32_t v) const { guest::StoreU32(base, address + 5116, v); }
+  uint32_t second_wheels_ready_bits() const { if (auto* d = direct()) return d->second_wheels_ready; return uint32_t((memory::IsHandle(address + 5112) ? uint32_t(memory::OwnerLoad(address + 5112, 4)) : guest::LoadU32(base, address + 5112))); }
+  void set_second_wheels_ready_bits(uint32_t v) const { if (auto* d = direct()) { d->second_wheels_ready = v; return; } if (memory::IsHandle(address + 5112)) memory::OwnerStore(address + 5112, 4, v); else guest::StoreU32(base, address + 5112, v); }
+  uint32_t second_wheels_ready() const { if (auto* d = direct()) return d->second_wheels_ready; return uint32_t((memory::IsHandle(address + 5112) ? uint32_t(memory::OwnerLoad(address + 5112, 4)) : guest::LoadU32(base, address + 5112))); }
+  void set_second_wheels_ready(uint32_t v) const { if (auto* d = direct()) { d->second_wheels_ready = v; return; } if (memory::IsHandle(address + 5112)) memory::OwnerStore(address + 5112, 4, v); else guest::StoreU32(base, address + 5112, v); }
   uint32_t scene_address() const { return address + 5116; }
+  uint32_t scene_bits() const { if (auto* d = direct()) return d->scene; return uint32_t((memory::IsHandle(address + 5116) ? uint32_t(memory::OwnerLoad(address + 5116, 4)) : guest::LoadU32(base, address + 5116))); }
+  void set_scene_bits(uint32_t v) const { if (auto* d = direct()) { d->scene = v; return; } if (memory::IsHandle(address + 5116)) memory::OwnerStore(address + 5116, 4, v); else guest::StoreU32(base, address + 5116, v); }
+  template <typename T = CarScene>
+  T scene() const { return T(base, scene_bits()); }
+  void set_scene(const View& w) const { set_scene_bits(w.address); }
+  void set_scene(uint32_t v) const { set_scene_bits(v); }
 };
 
 // embedded; measure: CarRecord::Copy.r4, sub_820D45B0.r3, CarRecord::Copy.r3, CarRecord::Reset.r3, SceneModelRecord@+16, SceneModelRecord::FromCar.r3@+16@+3632, WheelPoints::SetUpTire.r3.+4, WheelPoints::DrawTireMorphed.r3.+4

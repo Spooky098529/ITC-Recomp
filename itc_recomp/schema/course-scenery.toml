@@ -183,7 +183,7 @@ size = 8
 origin = "embedded"
 fields = [
   { name = "count", offset = 0, type = "u32" },
-  { name = "records", offset = 4, type = "ptr", to = "ObjectPoolRecord", note = "the block (XPhysicalAlloc): the records, then the objects" },
+  { name = "records", offset = 4, type = "ptr", to = "ObjectPoolRecord", note = "the records (the original: one XPhysicalAlloc block, the records, then the objects; since E5 step 5 a host array, the objects' block apart)" },
 ]
 
 # A pool's 24-byte record.
@@ -191,6 +191,12 @@ fields = [
 measures = ["new<?>@ObjectPools::Init", "ObjectPools::Pool.ret"]
 size = 24
 origin = "allocated"
+# Host (E5 step 5, 2026-11-24): the records as a host array of their own
+# (ObjectPools::Init's hand port, NewArray; freed by ObjectPools::Shutdown's
+# Delete), out of the pools' physical block, which keeps the objects and
+# their data (pool 0's first object is its start). Only the hand ports
+# reach them.
+storage = "host"
 fields = [
   { name = "object_count", offset = 0, type = "u32" },
   { name = "object_size", offset = 4, type = "u32" },

@@ -288,7 +288,7 @@ uint32_t OnWheelsLoaded(uint8_t* base, uint32_t object, uint32_t toc) {
     record.set_model(m);
     if (m != model) {
       model = m;
-      guest::StoreU32(base, params.first_wheels_address() + 4 * m, uint32_t(i));
+      params.store_at(64 + 4 * m, 4, uint32_t(i));
     }
   }
   params.set_model_end(model + 1);
@@ -332,7 +332,7 @@ uint32_t FirstWheelOfModel(uint8_t* base, int32_t m) {
   if (m < 1) {
     return 0;
   }
-  return guest::LoadU32(base, G::params(base).first_wheels_address() + 4 * uint32_t(m)) + 1;
+  return uint32_t(G::params(base).load_at(64 + 4 * uint32_t(m), 4)) + 1;
 }
 
 void GetCarParts(uint8_t* base, uint32_t car, uint32_t parts[9]) {
@@ -340,7 +340,7 @@ void GetCarParts(uint8_t* base, uint32_t car, uint32_t parts[9]) {
   static constexpr uint32_t kStrides[9] = {280, 280, 280, 280, 168, 168, 84, 108, 72};
   const CarParams params = G::params(base);
   for (uint32_t i = 0; i < 9; i++) {
-    parts[i] = guest::LoadU32(base, params.aero74_address() + 4 * i) + kStrides[i] * car;
+    parts[i] = uint32_t(params.load_at(16 + 4 * i, 4)) + kStrides[i] * car;
   }
 }
 
@@ -689,38 +689,27 @@ bool ParamsInit(uint8_t* base, const uint32_t tocs[12], uint32_t* r3) {
   if (total == 0 || total > kMaxAllocation || memory::crt::GetProcessHeap(base) == 0) {
     return false;
   }
-  const auto made = memory::crt::OperatorNew(base, 468);
-  if (!made) {
-    ITC_LOG_ERROR("car specs: operator new(468) failed after its checks");
-    std::abort();
-  }
-  const uint32_t object = *made;
+  // The object in host memory and the block a blob (E5 steps 4 and 5): the
+  // original's operator new and new[] (the checks above stay theirs).
+  const uint32_t object = CarParams::New(base).address;
   G::set_params(base, object);
   CarParams(base, object).set_block(0);
   G::params(base).set_spec_count(0);
   G::params(base).set_wheel_count(0);
   for (uint32_t i = 0; i < 100; i++) {
-    guest::StoreU32(base, G::params(base).first_wheels_address() + 4 * i, 0xFFFFFFFFu);
+    G::params(base).store_at(64 + 4 * i, 4, 0xFFFFFFFFu);
   }
   G::params(base).set_loads_pending(0);
   // Two passes (the original's loop until the block is made): the first
   // with no block (every pointer 0) for the total, the second with it.
   // The table pointers' slots by asset: 72 at +12, 73 at +8, 74 to 82 at
   // +16 to +48, 83 at +52.
-  static constexpr uint32_t (CarParams::*kSlots[12])() const = {
-      &CarParams::specs_address,  &CarParams::wheels_address, &CarParams::aero74_address,
-      &CarParams::aero75_address, &CarParams::aero76_address, &CarParams::aero77_address,
-      &CarParams::aero78_address, &CarParams::aero79_address, &CarParams::aero80_address,
-      &CarParams::aero81_address, &CarParams::aero82_address, &CarParams::table83_address};
+  // By offset (the view's store_at: the object is in host memory).
+  static constexpr uint32_t kSlots[12] = {12, 8, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52};
   uint32_t r30 = 0;
   while (G::params(base).block() == 0) {
     if (r30 != 0) {
-      const auto block = memory::crt::OperatorNewArray(base, r30);
-      if (!block) {
-        ITC_LOG_ERROR("car specs: operator new[]({}) failed after its checks", r30);
-        std::abort();
-      }
-      G::params(base).set_block(*block);
+      G::params(base).set_block(schema::CarParamsBlock::New(base, r30).address);
     }
     r30 = G::params(base).block();
     G::params(base).set_loads_pending(0);
@@ -731,7 +720,7 @@ bool ParamsInit(uint8_t* base, const uint32_t tocs[12], uint32_t* r3) {
       }
       const CarParams params = G::params(base);
       params.set_loads_pending(params.loads_pending() + 1);
-      guest::StoreU32(base, (params.*kSlots[k])(), r30);
+      params.store_at(kSlots[k], 4, r30);
       sum += sizes[k];
     }
     r30 = sum;
@@ -743,20 +732,17 @@ bool ParamsInit(uint8_t* base, const uint32_t tocs[12], uint32_t* r3) {
 int64_t ParamsLoad(uint8_t* base, const archive::LoadCall& load) {
   ITC_NATIVE_RUNNING("sub_820CC2A8 Params::Load");
   struct Asset {
-    uint32_t (CarParams::*slot)() const;  // the table's pointer
+    uint32_t slot;  // the table's pointer's offset in the object (host memory: load_at)
     uint32_t callback;
   };
   static constexpr Asset kAssets[12] = {
-      {&CarParams::specs_address, 0x820CC248},  {&CarParams::wheels_address, 0x820CC0A8},
-      {&CarParams::aero74_address, 0x820C9DF0}, {&CarParams::aero75_address, 0x820C9DF0},
-      {&CarParams::aero76_address, 0x820C9DF0}, {&CarParams::aero77_address, 0x820C9DF0},
-      {&CarParams::aero78_address, 0x820C9DF0}, {&CarParams::aero79_address, 0x820C9DF0},
-      {&CarParams::aero80_address, 0x820C9DF0}, {&CarParams::aero81_address, 0x820C9DF0},
-      {&CarParams::aero82_address, 0x820C9DF0}, {&CarParams::table83_address, 0x820CBD90}};
+      {12, 0x820CC248}, {8, 0x820CC0A8},  {16, 0x820C9DF0}, {20, 0x820C9DF0},
+      {24, 0x820C9DF0}, {28, 0x820C9DF0}, {32, 0x820C9DF0}, {36, 0x820C9DF0},
+      {40, 0x820C9DF0}, {44, 0x820C9DF0}, {48, 0x820C9DF0}, {52, 0x820CBD90}};
   int64_t serial = 0;
   for (uint32_t k = 0; k < 12; k++) {
     const CarParams params = G::params(base);
-    serial = load(72 + k, guest::LoadU32(base, (params.*kAssets[k].slot)()), kAssets[k].callback,
+    serial = load(72 + k, uint32_t(params.load_at(kAssets[k].slot, 4)), kAssets[k].callback,
                   params.address);
   }
   return serial;

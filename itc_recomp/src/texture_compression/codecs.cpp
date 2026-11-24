@@ -3,8 +3,11 @@
 // the destructors sub_823EA070, sub_823EA770, sub_823F6B70 and
 // sub_823F6BC0, and the codecs made: ImageCodec::ImageCodec sub_823EA800,
 // Prepare sub_823EAA90, DxtCodec::DxtCodec sub_823F5FA0 and
-// ImageCodec::Create sub_823F6C60; as the translated code does them, on the
-// codecs in guest memory.
+// ImageCodec::Create sub_823F6C60; as the translated code does them. The
+// codecs are host objects (E5 step 5: schema::ImageCodec and DxtCodec), their
+// float4 rows and the DXT codec's cache blobs (TcFloat4, DxtBlockCacheEntry);
+// the surfaces they read and write stay in guest memory (the renderer reads
+// them).
 
 #include "texture_compression/codecs.h"
 
@@ -72,7 +75,7 @@ uint32_t BlockRowBytes(uint32_t columns) {
 uint32_t BlockAddress(uint8_t* base, uint32_t codec, uint32_t x, uint32_t y, uint32_t z) {
   const schema::DxtCodec c(base, codec);
   return (x >> 2) * c.block_bytes() + (y >> 2) * c.row_pitch() + c.slice_pitch() * z +
-         c.data().address;
+         c.surface().address;
 }
 
 // The DXT codec's block encode (+144): Dxt45::EncodeBlock's plain C++ for
@@ -105,7 +108,7 @@ std::optional<uint32_t> DecodeA8R8G8B8Row(uint8_t* base, uint32_t codec, uint32_
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_823F2620 A8R8G8B8Codec::DecodeRow");
-  uint32_t from = c.row_pitch() * row + c.slice_pitch() * slice + c.data().address;
+  uint32_t from = c.row_pitch() * row + c.slice_pitch() * slice + c.surface().address;
   const uint32_t end = (c.width() << 2) + from;
   if (from < end) {
     const double scale = Lfs(base, kInv255);  // f0
@@ -151,18 +154,11 @@ std::optional<uint32_t> DxtEncodeRow(uint8_t* base, uint32_t codec, uint32_t row
   const uint32_t frame = stack - kEncodeRowFrameBytes;
   uint32_t r3 = codec;
 
-  // The cache, on the first row.
+  // The cache, on the first row (a blob: operator new's block in PC memory).
   if (c.cache().address == 0) {
-    const auto made =
-        memory::crt::OperatorNew(base, CacheBytes(c.block_rows() * c.slices()));
-    const uint32_t cache = made ? *made : 0;
-    if (!made) {
-      ITC_LOG_ERROR("DxtCodec::EncodeRow: operator new refused the cache");
-    }
+    const uint32_t cache =
+        schema::DxtBlockCacheEntry::New(base, CacheBytes(c.block_rows() * c.slices())).address;
     c.set_cache(cache);
-    if (cache == 0) {
-      return 0;
-    }
     Clear(base, cache, (c.block_rows() * c.slices()) << 3);
     r3 = cache;
   }
@@ -174,15 +170,8 @@ std::optional<uint32_t> DxtEncodeRow(uint8_t* base, uint32_t codec, uint32_t row
       ITC_LOG_ERROR("DxtCodec::EncodeRow: a block row of {} bytes", bytes);
       return 0;
     }
-    const auto made = memory::crt::OperatorNew(base, bytes);
-    const uint32_t block_row = made ? *made : 0;
-    if (!made) {
-      ITC_LOG_ERROR("DxtCodec::EncodeRow: operator new refused a block row");
-    }
+    const uint32_t block_row = schema::TcFloat4::New(base, bytes).address;  // a blob
     e.set_pixels(block_row);
-    if (block_row == 0) {
-      return 0;
-    }
     r3 = block_row;
     e.set_rows_in(0);
     c.set_cache_count(c.cache_count() + 1);
@@ -442,24 +431,24 @@ bool Overlap(uint32_t a, uint32_t a_bytes, uint32_t b, uint32_t b_bytes) {
   return uint64_t(a) < uint64_t(b) + b_bytes && uint64_t(b) < uint64_t(a) + a_bytes;
 }
 
-// memcpy's 24 bytes (the ranges don't overlap: the same bytes).
-void Copy24(uint8_t* base, uint32_t to, uint32_t from) {
-  for (uint32_t w = 0; w < 24; w += 4) {
-    Store(base, to + w, Load(base, from + w));
-  }
-}
-
 uint32_t ImageCodecConstructChecked(uint8_t* base, uint32_t codec, uint32_t description,
                                     uint32_t bits, uint32_t kind) {
   ITC_NATIVE_RUNNING("sub_823EA800 ImageCodec::ImageCodec");
   const schema::ImageCodec c(base, codec);
   const schema::ImageDescription d(base, description);
   c.set_vtable(schema::ImageCodec::kVtable);
-  c.set_data(d.data());
+  c.set_surface(d.data());
   c.set_format(d.format() & ~kTiledBit);
   c.set_row_pitch(d.row_pitch());
   c.set_slice_pitch(d.slice_pitch());
-  Copy24(base, c.box_left_address(), d.box_left_address());
+  // memcpy's 24 bytes, word by word (the box: left, top, right, bottom,
+  // front, back).
+  c.set_box_left(d.box_left());
+  c.set_box_top(d.box_top());
+  c.set_box_right(d.box_right());
+  c.set_box_bottom(d.box_bottom());
+  c.set_box_front(d.box_front());
+  c.set_box_back(d.box_back());
   c.set_rounding(d.dither() != 0 ? kDitherTable : kRounding);
   const uint32_t bytes = bits >> 3;
   const uint32_t has_bits = bits != 0 ? 1 : 0;
@@ -500,25 +489,19 @@ uint32_t ImageCodecConstructChecked(uint8_t* base, uint32_t codec, uint32_t desc
   if (has_bits != 0) {
     // The data moved to the box's corner (signed products, 32-bit sums).
     const uint32_t data =
-        left * bytes + front * c.slice_pitch() + top * c.row_pitch() + c.data().address;
+        left * bytes + front * c.slice_pitch() + top * c.row_pitch() + c.surface().address;
     c.set_box_left(0);
     c.set_box_top(0);
     c.set_box_right(width);
     c.set_box_bottom(height);
     c.set_box_back(depth);
     c.set_box_front(0);
-    c.set_data(data);
+    c.set_surface(data);
   }
   if (d.diffusion() != 0) {
-    const auto made = memory::crt::OperatorNew(base, ErrorRowBytes(c.width()));
-    const uint32_t row = made ? *made : 0;
+    const uint32_t row = schema::TcFloat4::New(base, ErrorRowBytes(c.width())).address;  // a blob
     c.set_error_row(row);
-    if (row == 0) {
-      // The original would clear from address 0.
-      ITC_LOG_ERROR("ImageCodec::ImageCodec: operator new refused the error row");
-    } else {
-      Clear(base, row, (c.width() + 2) << 4);
-    }
+    Clear(base, row, (c.width() + 2) << 4);
   } else {
     c.set_error_row(0);
   }
@@ -555,7 +538,13 @@ uint32_t DxtCodecConstructChecked(uint8_t* base, uint32_t codec, uint32_t descri
       c.set_decode_block(b.decode);
     }
   }
-  Copy24(base, c.extent_left_address(), d.extent_left_address());
+  // memcpy's 24 bytes, word by word (the surface's extent).
+  c.set_extent_left(d.extent_left());
+  c.set_extent_top(d.extent_top());
+  c.set_extent_right(d.extent_right());
+  c.set_extent_bottom(d.extent_bottom());
+  c.set_extent_front(d.extent_front());
+  c.set_extent_back(d.extent_back());
   c.set_unknown_232(0xFFFFFFFF);
   c.set_decode_cache(0);
   c.set_cache_count(0);
@@ -690,13 +679,7 @@ std::optional<uint32_t> PrepareCodecs(uint8_t* base, uint32_t destination, uint3
     to.set_convert_from(source_kind);
   }
   if (row) {
-    const auto made = memory::crt::OperatorNew(base, RowBytes(to.width()));
-    const uint32_t block = made ? *made : 0;
-    to.set_row(block);
-    if (block == 0) {
-      ITC_LOG_ERROR("ImageCodec::Prepare: operator new refused the row");
-      return kOutOfMemory;
-    }
+    to.set_row(schema::TcFloat4::New(base, RowBytes(to.width())).address);  // a blob
   }
   if (to.srgb() != 0 && from.srgb() != 0) {
     from.set_srgb_both(1);
@@ -716,12 +699,9 @@ std::optional<uint32_t> CreateCodec(uint8_t* base, uint32_t description, uint32_
   if (format == nullptr) {
     return 0;
   }
-  const auto made = memory::crt::OperatorNew(base, format->size);
-  if (!made || *made == 0) {
-    ITC_LOG_ERROR("ImageCodec::Create: operator new refused the codec");
-    return 0;
-  }
-  const uint32_t codec = *made;
+  // The codec in host memory (E5 step 5): operator new's 128 or 256 bytes.
+  const uint32_t codec = format->maker == Maker::kDxt ? schema::DxtCodec::New(base).address
+                                                      : schema::ImageCodec::New(base).address;
   if (format->maker == Maker::kDxt) {
     DxtCodecConstructChecked(base, codec, description);
   } else {

@@ -201,6 +201,8 @@ struct TrackValues : View {
 struct TrackValueBlock : View {
   using View::View;
   static constexpr uint32_t kSize = 224;
+  static TrackValueBlock New(uint8_t* base, uint32_t size) { return TrackValueBlock(base, memory::NewBlob(size, "TrackValueBlock")); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   // operator new[]'s count header: the track count
   uint32_t count() const { return guest::LoadU32(base, address + 0); }
   void set_count(uint32_t v) const { guest::StoreU32(base, address + 0, v); }

@@ -228,8 +228,10 @@ uint64_t Begin(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
     size = entry.stored_size();
   }
   Sounds(base, machine).set_effects_bank(0);
-  const uint64_t buffer =
-      calls.Call(kXPhysicalAlloc, frame, 0x8217667C, 4, size, 0xFFFFFFFFFFFFFFFFull, 2048, 4);
+  // A blob in PC memory (E5 step 5) where the original called XPhysicalAlloc
+  // (size, -1, 2048, 4; returning at 0x8217667C): the file's bytes, read by
+  // the car sounds' views and our FFmpeg, freed by Unload's XPhysicalFree.
+  const uint64_t buffer = schema::CarSoundWaveBank::New(base, size).address;
   Sounds(base, machine).set_effects_bank(uint32_t(buffer));
   Globals::set_effects_bank_arrived(base, 0);
   const uint32_t destination = Sounds(base, machine).effects_bank().address;

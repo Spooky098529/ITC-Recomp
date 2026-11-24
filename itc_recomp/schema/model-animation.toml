@@ -142,6 +142,15 @@ fields = [
 measures = ["new<4294967295>@TrackSet::SetupFloat4", "new<4294967295>@TrackSet::Setup32", "new<4294967295>@TrackSet::Setup208"]
 size = 224
 origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): the count header and the values, read by
+# address (the samplers, the model draws' float4 table at Model +320, copied
+# into constants by guest loads; never by the renderer by address), in PC
+# memory in the guest's byte order. Made by the set-ups' hand ports
+# (SetupWithHeader's New) and the lifted originals' operator new[] (returning
+# at 0x825A1E84, 0x825A1294, 0x825A1AB4; r3 the size); freed by operator
+# delete[] on the block (TrackSet::ReleaseArray, the set-ups' old values).
+storage = "blob"
+blob_alloc = [{ call = 0x825A1E84, reg = "r3" }, { call = 0x825A1294, reg = "r3" }, { call = 0x825A1AB4, reg = "r3" }]
 fields = [
   { name = "count", offset = 0, type = "u32", note = "operator new[]'s count header: the track count" },
   { name = "values", offset = 16, type = "bytes", count = 208, note = "the values (TrackSet +16 points here)" },

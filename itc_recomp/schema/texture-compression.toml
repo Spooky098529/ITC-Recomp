@@ -55,6 +55,12 @@ measures = [
 size = 128
 origin = "allocated"
 vtable = 0x8203B778
+# Host (E5 step 5, 2026-11-24): made only by ImageCodec::Create's plain C++
+# (src/texture_compression/codecs.cpp, schema::ImageCodec::New; its lifted
+# original has no entry), freed by the scalar deleting destructor's plain C++
+# or its lifted original (operator delete, which frees handles). The surface
+# (+32) stays in guest memory: the renderer reads it (step 7).
+storage = "host"
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "ImageCodecVtable", note = "the base 0x8203B778 (constructor, destructor), then the format's (0x8203B808-0x8203B9D8)" },
   { name = "format", offset = 4, type = "u32", note = "the description's, without bit 8 (tiled)" },
@@ -64,7 +70,7 @@ fields = [
   { name = "srgb_both", offset = 20, type = "u32", note = "both sides sRGB (ImageCodec::Prepare)" },
   { name = "color_key", offset = 24, type = "u32", note = "the color key (0: none)" },
   { name = "palette_set", offset = 28, type = "u32", note = "0 (ImageCodec::Create's LoadPalette test)" },
-  { name = "data", offset = 32, type = "ptr", to = "ImageCodecData", note = "the data, at the box's corner for a plain format" },
+  { name = "surface", offset = 32, type = "ptr", to = "ImageCodecData", note = "the data, at the box's corner for a plain format (named `data` before E5 step 5: a host view's member)" },
   { name = "color_key_red", offset = 36, type = "f32", note = "the color key's channels times 1/255" },
   { name = "color_key_green", offset = 40, type = "f32" },
   { name = "color_key_blue", offset = 44, type = "f32" },
@@ -237,6 +243,42 @@ measures = [
 ]
 size = 16
 origin = "file"
+# A blob (E5 step 5, 2026-11-24): the float4 rows and block rows, raw float
+# buffers read by address and by the lifted code's vector loads. Made by
+# the plain C++ (codecs.cpp: Prepare's row, the error row, EncodeRow's
+# block rows; blitter.cpp: ConvertRows' row; schema::TcFloat4::New) and in
+# lifted code by operator new (the size in r3): EncodeRow's original's
+# block row (0x823F6378), DxtCodec::DecodeRow's block row (0x823F68AC), and
+# the filters' rows (FilterNone 0x82369BE0, 0x82369C08; FilterPoint
+# 0x82369E08, 0x82369E3C; FilterBox2D 0x8236A27C, 0x8236A2BC, 0x8236A2E0;
+# FilterBox3D 0x8236A618, 0x8236A65C, 0x8236A698; FilterLinear2D 0x8236ABC4,
+# 0x8236ABF0; FilterLinear3D 0x8236AF8C, 0x8236AFB8; FilterTriangle3D
+# 0x8236B910, 0x8236BA00; FilterTriangle2D 0x8236C090, 0x8236C16C; never
+# seen in play). Freed by operator delete. Stack float4s stay where they
+# are (the view is by address).
+storage = "blob"
+blob_alloc = [
+  { call = 0x823F6378, reg = "r3" },
+  { call = 0x823F68AC, reg = "r3" },
+  { call = 0x82369BE0, reg = "r3" },
+  { call = 0x82369C08, reg = "r3" },
+  { call = 0x82369E08, reg = "r3" },
+  { call = 0x82369E3C, reg = "r3" },
+  { call = 0x8236A27C, reg = "r3" },
+  { call = 0x8236A2BC, reg = "r3" },
+  { call = 0x8236A2E0, reg = "r3" },
+  { call = 0x8236A618, reg = "r3" },
+  { call = 0x8236A65C, reg = "r3" },
+  { call = 0x8236A698, reg = "r3" },
+  { call = 0x8236ABC4, reg = "r3" },
+  { call = 0x8236ABF0, reg = "r3" },
+  { call = 0x8236AF8C, reg = "r3" },
+  { call = 0x8236AFB8, reg = "r3" },
+  { call = 0x8236B910, reg = "r3" },
+  { call = 0x8236BA00, reg = "r3" },
+  { call = 0x8236C090, reg = "r3" },
+  { call = 0x8236C16C, reg = "r3" },
+]
 fields = [
   { name = "red", offset = 0, type = "f32" },
   { name = "green", offset = 4, type = "f32" },
@@ -251,6 +293,10 @@ measure = "DxtCodec"
 size = 256
 origin = "allocated"
 vtable = 0x8203B9E8
+# Host (E5 step 5, 2026-11-24): as ImageCodec (ImageCodec::Create's plain
+# C++, schema::DxtCodec::New); ImageCodec's views reach it through this
+# layout.
+storage = "host"
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "ImageCodecVtable", note = "0x8203B9E8 (the base 0x8203B778 inside ImageCodec's constructor and destructor)" },
   { name = "format", offset = 4, type = "u32", note = "as ImageCodec's" },
@@ -260,7 +306,7 @@ fields = [
   { name = "srgb_both", offset = 20, type = "u32" },
   { name = "color_key", offset = 24, type = "u32" },
   { name = "palette_set", offset = 28, type = "u32" },
-  { name = "data", offset = 32, type = "ptr", to = "ImageCodecData" },
+  { name = "surface", offset = 32, type = "ptr", to = "ImageCodecData" },
   { name = "color_key_red", offset = 36, type = "f32" },
   { name = "color_key_green", offset = 40, type = "f32" },
   { name = "color_key_blue", offset = 44, type = "f32" },
@@ -311,7 +357,7 @@ fields = [
   { name = "slices", offset = 228, type = "u32" },
   { name = "unknown_232", offset = 232, type = "u32", note = "-1 from DxtCodec::DxtCodec" },
   { name = "unknown_236", offset = 236, type = "u32", note = "-1 from DxtCodec::DxtCodec" },
-  { name = "decode_cache", offset = 240, type = "ptr", to = "DxtBlockCacheEntry", note = "DxtCodec::DecodeRow's block cache (operator new, probably; never seen set), freed by ~DxtCodec" },
+  { name = "decode_cache", offset = 240, type = "ptr", to = "DxtBlockCacheEntry", note = "DxtCodec::DecodeRow's block row (operator new of block columns x 256 bytes: float4s, a TcFloat4 blob; never seen set), freed by ~DxtCodec" },
   { name = "cache_count", offset = 244, type = "u32", note = "block rows held" },
   { name = "cache", offset = 248, type = "ptr", to = "DxtBlockCacheEntry", note = "EncodeRow's: an entry a block row (by slice and block row)" },
   { name = "dither", offset = 252, type = "u32", note = "the description's dither" },
@@ -323,6 +369,12 @@ fields = [
 measures = ["new<4294967295>@DxtCodec::EncodeRow", "new<4294967295>@DxtCodec::DecodeRow"]
 size = 8
 origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): the cache, one block of entries read by
+# address (DxtCodec::EncodeRow's plain C++, schema::DxtBlockCacheEntry::New;
+# its lifted original's operator new returning at 0x823F62F4, the size in
+# r3), cleared by memset; freed by ~DxtCodec (operator delete).
+storage = "blob"
+blob_alloc = [{ call = 0x823F62F4, reg = "r3" }]
 fields = [
   { name = "rows_in", offset = 0, type = "u32", note = "a bit for each of the block row's four rows in" },
   { name = "pixels", offset = 4, type = "ptr", to = "TcFloat4", note = "the block row's 16 float4s a block column (operator new)" },
@@ -449,6 +501,11 @@ fields = [
 measures = ["Blitter::LinearWeights.ret", "new<4294967295>@Blitter::LinearWeights"]
 size = 16
 origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): the table, read by address (entry - 8 in
+# the filters); operator new returning at 0x8236A9FC (lifted, size in r3);
+# freed by the linear filters' operator delete. Never seen in play.
+storage = "blob"
+blob_alloc = [{ call = 0x8236A9FC, reg = "r3" }]
 fields = [
   { name = "first_index", offset = 0, type = "u32", note = "probably" },
   { name = "first_weight", offset = 4, type = "f32", note = "probably" },
@@ -462,6 +519,11 @@ fields = [
 measures = ["Blitter::TriangleWeights.ret", "new<?>@Blitter::TriangleWeights"]
 size = 24
 origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): the list, read by address; operator new
+# returning at 0x8236B510 (lifted, size in r3); freed by
+# Blitter::FreeWeights (operator delete). Never seen in play.
+storage = "blob"
+blob_alloc = [{ call = 0x8236B510, reg = "r3" }]
 fields = [
   { name = "unknown_0", offset = 0, type = "u32" },
   { name = "unknown_4", offset = 4, type = "u32" },
@@ -522,6 +584,19 @@ fields = [
   { name = "pixel0_alpha", offset = 12, type = "f32", note = "the pixels' (the measure's join)" },
   { name = "pixel8_alpha", offset = 140, type = "f32" },
 ]
+
+# The triangle filters' arrays of 12-byte entries (operator new of count x
+# 12 + 4: a count word, then the entries, set up in a loop; not read in
+# detail; FilterTriangle3D's 0x8236B8A4, FilterTriangle2D's 0x8236C024, the
+# size in r3; freed by the filters' operator delete; never seen in play). The
+# measure joins them to TcFloat4 (the count's store).
+[BlitTriangleArray]
+size = 0
+origin = "allocated"
+# A blob (E5 step 5, 2026-11-24).
+storage = "blob"
+blob_alloc = [{ call = 0x8236B8A4, reg = "r3" }, { call = 0x8236C024, reg = "r3" }]
+fields = []
 
 [globals]
 one = { address = 0x82000A30, type = "f32", note = "1.0" }

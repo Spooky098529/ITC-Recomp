@@ -48,11 +48,12 @@ uint32_t LoadSlotLoadShared(uint8_t* base, uint32_t slot, uint32_t id, uint32_t 
                             uint32_t callback, const archive::LoadCall& load);
 
 // LoadSlot::Load (sub_820D07C8): +0 = id, +8 = Archive::AssetSize(id); 0:
-// +20 = 1, returning 0; else +16 = VirtualAlloc(size) (the allocation
-// layer's AllocPages; GetLastError on the PCR `pcr` when that fails, its
-// answer not read), +4 = Archive::Load(id, +16, `callback`, `context`), +20
-// = 2, returning 1. Only while --native_heap routes VirtualAlloc to the
-// layer (the adapter's condition).
+// +20 = 1, returning 0; else +16 = VirtualAlloc(size) (since E5 step 5 a
+// blob in PC memory, car-models.toml's CarModelsFile, whole pages;
+// GetLastError on the PCR `pcr` when that fails, its answer not read), +4 =
+// Archive::Load(id, +16, `callback`, `context`), +20 = 2, returning 1. Only
+// while --native_heap routes VirtualAlloc to the layer (the adapter's
+// condition).
 uint32_t LoadSlotLoad(uint8_t* base, uint32_t slot, uint32_t id, uint32_t context,
                       uint32_t callback, uint32_t pcr, const archive::LoadCall& load);
 

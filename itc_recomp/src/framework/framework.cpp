@@ -369,7 +369,8 @@ std::optional<uint32_t> DebugTextCreate(
   if (!CanAllocate(base)) {
     return std::nullopt;
   }
-  const auto text = memory::crt::OperatorNew(base, 52);
+  // Host memory (E5 step 5).
+  const auto text = std::optional<uint32_t>(schema::DebugText::New(base).address);
   if (!text) {
     return std::nullopt;
   }

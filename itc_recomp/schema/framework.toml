@@ -420,6 +420,14 @@ fields = [
 measures = ["DebugText", "sub_82091070.r3"]
 size = 52
 origin = "allocated"
+# Host memory (E5 step 5, 2026-11-24): made by DebugText::Create
+# (framework::DebugTextCreate's New; the lifted original's operator new at
+# 0x8209117C), its job at +8 posted to the first worker pool and reached
+# there by address (raw, through the handle, as MorphJob's work item); the
+# font it loads (+48, DEBFONT.XPR) stays guest (a texture pack). Freed by
+# its deleting destructor (sub_82091110, never seen in play).
+storage = "host"
+host_alloc = [0x8209117C]
 vtable = 0x82000BC8
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82000BC8: 0 sub_82091110, 1 sub_82090F88, 2 DebugText::SetPosition, 3 sub_82091060" },

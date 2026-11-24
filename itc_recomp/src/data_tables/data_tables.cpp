@@ -5,7 +5,6 @@
 #include "base/log.h"
 #include "archive/archive.h"
 #include "guest.h"
-#include "memory/c_runtime_heap.h"
 #include "schema/archive.h"
 #include "schema/data_tables.h"
 
@@ -130,7 +129,7 @@ uint32_t RecordsItem(uint8_t* base, uint32_t id) {
 
 uint32_t Entry56(uint8_t* base, uint32_t table, uint32_t entry) {
   ITC_NATIVE_RUNNING("sub_82117190 DataTables::Entry56");
-  return guest::LoadU32(base, G::tables(base).tables56_address() + 4 * table) + 56 * entry;
+  return uint32_t(G::tables(base).load_at(20 + 4 * table, 4)) + 56 * entry;
 }
 
 int32_t Find20(uint8_t* base, uint32_t key8, uint32_t key0) {
@@ -178,11 +177,8 @@ void CountUp(const schema::DataTables& object) {
 
 std::optional<uint32_t> Init(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82116DB0 DataTables::Init");
-  const auto made = memory::crt::OperatorNew(base, 64);
-  if (!made) {
-    return std::nullopt;
-  }
-  const schema::DataTables object(base, *made);
+  // In host memory (E5 step 5): the original's operator new(64).
+  const schema::DataTables object = schema::DataTables::New(base);
   G::set_tables(base, object);
   object.set_block(0);
   object.set_pending(0);
@@ -194,11 +190,14 @@ std::optional<uint32_t> Init(uint8_t* base) {
   uint32_t toc = 0;
   for (;;) {
     if (total != 0) {
-      const auto block = memory::crt::OperatorNewArray(base, total);
-      if (!block) {
-        return std::nullopt;
-      }
-      object.set_block(*block);
+      // A blob (E5 step 5): the files' bytes in PC memory, read by address
+      // as guest memory is; the original's operator new[](total). 2,048
+      // bytes more: the archive reads an asset stored unpacked in whole
+      // 2,048-byte sectors straight into its destination
+      // (archive_streaming.cpp), so the last table's read runs up to a
+      // sector past the block's end (into the guest heap's next bytes in
+      // the original; past a blob's end, a host heap overrun).
+      object.set_block(schema::DataTablesBlock::New(base, total + 2048));
     }
     const uint32_t block = object.block().address;
     // Each table pointer: the block plus the sizes so far, or 0 when the
@@ -218,7 +217,7 @@ std::optional<uint32_t> Init(uint8_t* base) {
     next(size);
     for (uint32_t i = 0; i < 8; i++) {
       CountUp(object);
-      guest::StoreU32(base, object.tables56_address() + 4 * i, pointer);
+      object.store_at(20 + 4 * i, 4, pointer);  // tables56's i-th pointer
       size += archive::AssetSize(base, guest::LoadU32(base, G::table_ids_address() + 4 * i));
       next(size);
     }
@@ -240,22 +239,21 @@ std::optional<uint32_t> Init(uint8_t* base) {
 int64_t Load(uint8_t* base, const LoadCall& load) {
   ITC_NATIVE_RUNNING("sub_82117240 DataTables::Load");
   int64_t serial = 0;
-  // `field`: the table's pointer's address in the object.
-  const auto one = [&](uint32_t id, auto field, uint32_t callback, bool table_context) {
+  // `offset`: the table's pointer's offset in the object (+16 items, +60
+  // asset 84, +20 to +48 the 56-byte tables, +52 table20, +56 table40).
+  const auto one = [&](uint32_t id, uint32_t offset, uint32_t callback, bool table_context) {
     const schema::DataTables object = G::tables(base);
-    const uint32_t table = guest::LoadU32(base, field(object));
+    const uint32_t table = uint32_t(object.load_at(offset, 4));
     serial = load(id, table, callback, table_context ? table : object.address);
     G::tables(base).set_last_serial(uint32_t(serial));
   };
-  using T = const schema::DataTables&;
-  one(94, [](T t) { return t.items_address(); }, 0x821170D8, false);
-  one(84, [](T t) { return t.asset84_address(); }, 0x821170C0, false);
+  one(94, 16, 0x821170D8, false);
+  one(84, 60, 0x821170C0, false);
   for (uint32_t i = 0; i < 8; i++) {
-    one(guest::LoadU32(base, G::table_ids_address() + 4 * i),
-        [i](T t) { return t.tables56_address() + 4 * i; }, 0x821170F0, true);
+    one(guest::LoadU32(base, G::table_ids_address() + 4 * i), 20 + 4 * i, 0x821170F0, true);
   }
-  one(95, [](T t) { return t.table20_address(); }, 0x82116FF0, true);
-  one(96, [](T t) { return t.table40_address(); }, 0x82117058, true);
+  one(95, 52, 0x82116FF0, true);
+  one(96, 56, 0x82117058, true);
   return serial;
 }
 

@@ -78,6 +78,8 @@ fields = [
 measure = "AudioManager::RemoveHandle.r3@+1540"
 size = 12
 origin = "embedded"
+# Dual (E5 step 5, 2026-11-24): the host AudioManager's +1540.
+storage = "dual"
 fields = [
   { name = "allocator", offset = 0, type = "u32", note = "probably the allocator word (std::list's first)" },
   { name = "head", offset = 4, type = "ptr", to = "SoundHandleNode", note = "the head node" },
@@ -93,11 +95,20 @@ measures = ["AudioManager", "[826C5C80]",
 size = 1624
 origin = "allocated"
 vtable = 0x82008388
+# Host (E5 step 5, 2026-11-24): made by AudioManager::Create (New in
+# src/app_start_up/audio_manager.cpp); freed by its deleting destructor's
+# operator delete (sub_82119450, never in play). Its interfaces (+4, +8),
+# the handler (+1584) and the lists' and vector's words are reached by
+# address (the owner's layout); the audio engine (+16) and the listener
+# (+1456) are embed fields of dual types.
+storage = "host"
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "AudioManagerVtable", note = "0x82008388 (0x820082B8, the base's, in the destructor)" },
   { name = "bank_owner_vtable", offset = 4, type = "u32", note = "0x82008374 (0x82000D48 first): the interface the bank pairs' owner is (+36 of a BankPair); AudioManager::GetEngine's r3" },
   { name = "sound_owner_vtable", offset = 8, type = "u32", note = "0x82008364 (0x82000D48 first): the interface the Sounds' owner is (Sound +0); AudioManager::GetSoundBank's r3" },
   { name = "owner", offset = 12, type = "u32", note = "the constructor's r4; its vtable's slot +8 gives the dispatcher the handler at +1584 is registered with" },
+  { name = "engine", offset = 16, type = "embed", to = "AudioEngine", note = "the audio engine (sound-cues.toml): the game's XACT and X3DAudio state" },
+  { name = "listener", offset = 1456, type = "embed", to = "SoundListener", note = "the listener (sound-cues.toml, Listener::Listener)" },
   { name = "fault_1508", offset = 1508, type = "u32", note = "probably a measure fault: the +8 interface's +1508 (the bank pairs' first, +1516)" },
   { name = "bank_pairs", offset = 1512, type = "u32", note = "the bank pairs' vector (WordVector::Fill; one slot a bank index): +1512 its allocator word" },
   { name = "bank_pairs_first", offset = 1516, type = "u32", note = "the vector's first slot (a BankPair pointer, 0 for an empty slot)" },

@@ -22,11 +22,20 @@
 # the record's +n is the model's +32 + n. Car::DrawUpdate's view of it is
 # race-setup.toml's Car (joined by the measure) and its 736-byte block at
 # +4288 car-draw.toml's CarDrawBlock.
+# In host memory (E5 step 5): made by CarScene::SetUp (the hand port's
+# pool loop, src/car_models/scene_fill.cpp; the lifted original's
+# VirtualAlloc returning to 0x820C90C8), freed by ScenePools::DestroyB's
+# VirtualFree (a handle; src/scene/scene.cpp). Its scalar fields are the
+# layout; its record copy and draw block stay guest-shaped views (the
+# second set's records, race-setup.toml's Car, car-draw.toml's
+# CarDrawBlock) reaching it through raw accesses.
 [SceneModel]
 measure = "SceneModel"
 measures = ["ScenePools::SetUpB.ret"]
 size = 5120
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820C90C8]
 vtable = 0x82004F90
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82004F90 (measure fault: also SceneModel::Beam, BeamShape and BeamColor's out vector and CarScene::Draw's reads of it, filed at +0 to +15)" },

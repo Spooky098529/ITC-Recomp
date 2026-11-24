@@ -1014,6 +1014,8 @@ struct AppCameraServiceVtable : View {
 struct NewAny_MessageVector_Allocate : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
+  static NewAny_MessageVector_Allocate New(uint8_t* base, uint32_t size) { return NewAny_MessageVector_Allocate(base, memory::NewBlob(size, "NewAny_MessageVector_Allocate")); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   // as storage: the first element; a vector object leaves it unwritten
   uint32_t word_0() const { return guest::LoadU32(base, address + 0); }
   void set_word_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }

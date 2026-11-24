@@ -15,17 +15,41 @@
 measures = ["new<64>@DataTables::Init", "DataTables::OnItemsLoaded.r6"]
 size = 64
 origin = "allocated"
+# In host memory since E5 step 5 (2026-11-24): made by DataTables::Init (the
+# hand port's New; the original's operator new returning at 0x82116DCC), freed
+# by sub_82116FB0's operator delete (lifted, never seen in play; the game's
+# frees take handles). Its twelve table pointers point into the block
+# (DataTablesBlock, a blob).
+storage = "host"
+host_alloc = [0x82116DCC]
 fields = [
   { name = "last_serial", offset = 0, type = "u32", note = "the last load's serial (Archive::Load's; not read)" },
   { name = "pending", offset = 4, type = "u32", note = "the loads pending: 12 at boot, each callback counts down (DataTables::IsLoading)" },
   { name = "item_count", offset = 8, type = "u32", note = "400, set by asset 94's callback" },
-  { name = "block", offset = 12, type = "ptr", note = "the block all the tables are in (operator new[])" },
+  { name = "block", offset = 12, type = "ptr", note = "the block all the tables are in (operator new[]; a blob)" },
   { name = "items", offset = 16, type = "ptr", note = "asset 94: 400 entries of 3,008 bytes (DataTables::Item)" },
   { name = "tables56", offset = 20, type = "bytes", count = 32, note = "eight pointers: the 56-byte tables (asset ids at 0x82616C64; DataTables::Entry56)" },
   { name = "table20", offset = 52, type = "ptr", to = "DataTablesEntry20", note = "asset 95: 20-byte entries, -1 at +0 ends it" },
   { name = "table40", offset = 56, type = "ptr", to = "DataTablesEntry40", note = "asset 96: 40-byte entries, -1 at +4 ends it" },
   { name = "asset84", offset = 60, type = "ptr", note = "asset 84 (no reader found besides the load)" },
 ]
+
+# The block the twelve assets are read into (DataTables::Init's operator new[]
+# of their TOC sizes summed): a blob since E5 step 5 (2026-11-24), the files'
+# bytes in PC memory, byte-swapped in place by the loads' callbacks and read
+# by address all through the game (DataTables::Item and the like hand out
+# addresses inside it). Made by the hand port's New (2,048 bytes over the
+# total: the archive reads an unpacked asset in whole sectors, so the last
+# table's read runs past the end), or the original's operator new[]
+# returning at 0x82116E14 (the size in r3; no slack there); freed by
+# sub_82116FB0's operator delete[] (lifted, never seen in play). Nothing the
+# renderer reads is in it.
+[DataTablesBlock]
+size = 0
+origin = "allocated"
+storage = "blob"
+blob_alloc = [{ call = 0x82116E14, reg = "r3" }]
+fields = []
 
 # Asset 95's entries as the walks read them (DataTables::Find20 from the
 # table's start, On20Loaded's end check one entry on).

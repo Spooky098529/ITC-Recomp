@@ -11,6 +11,7 @@
 #include "schema/car_models.h"
 #include "schema/load_poll.h"
 #include "schema/scene_loaders.h"
+#include "schema/scene_models.h"
 #include "schema/second_set.h"
 #include "scene/scene.h"
 #include "second_set/objects.h"
@@ -94,6 +95,11 @@ uint32_t SceneSetUp(uint8_t* base, uint32_t scene, uint32_t record, uint32_t r5,
           break;
         case 6:
           object = schema::SceneTraffic::New(base).address;
+          break;
+        case 7:
+          // The scene models (E5 step 5): handles, freed by DestroyB's
+          // VirtualFree as the others.
+          object = schema::SceneModel::New(base).address;
           break;
         default:
           object = memory::AllocPages(kSecondSetBytes[pool], 4096);

@@ -2,7 +2,8 @@
 // Blitter::Blitter sub_82368D20, Blitter::Release sub_82368D30,
 // Blitter::CopyRows sub_82369860, Blitter::ConvertRows sub_823699F8 and
 // Blitter::Init sub_8236C630, as the translated code does them, on the blit
-// object and the descriptions in guest memory.
+// object and the descriptions in guest memory (XGCompressSurface's stack);
+// the codecs are host objects and the float4 row a blob (E5 step 5).
 
 #include "texture_compression/blitter.h"
 
@@ -104,8 +105,8 @@ uint32_t BlitterCopyRows(uint8_t* base, uint32_t blitter, uint32_t stack, const 
   auto to_codec = [&]() { return blit.destination(); };
   auto from_codec = [&]() { return blit.source(); };
   for (uint32_t z = 0; z < to_codec().depth(); z++) {
-    uint32_t from = from_codec().slice_pitch() * z + from_codec().data().address;
-    uint32_t to = to_codec().slice_pitch() * z + to_codec().data().address;
+    uint32_t from = from_codec().slice_pitch() * z + from_codec().surface().address;
+    uint32_t to = to_codec().slice_pitch() * z + to_codec().surface().address;
     for (uint32_t y = 0; y < to_codec().height(); y++) {
       Copy(base, to, from, to_codec().row_bytes(), frame, call);
       to += to_codec().row_pitch();
@@ -132,12 +133,7 @@ std::optional<uint32_t> BlitterConvertRows(uint8_t* base, uint32_t blitter, uint
     return kFail;
   }
   const uint32_t frame = stack - kConvertRowsFrameBytes;
-  const auto made = memory::crt::OperatorNew(base, bytes);
-  const uint32_t row = made ? *made : 0;  // r28
-  if (row == 0) {
-    ITC_LOG_ERROR("Blitter::ConvertRows: operator new refused the row");
-    return kFail;
-  }
+  const uint32_t row = schema::TcFloat4::New(base, bytes).address;  // r28, a blob
   auto to_codec = [&]() { return blit.destination(); };
   auto from_codec = [&]() { return blit.source(); };
   if (to_codec().srgb() != 0 && from_codec().srgb() != 0) {

@@ -1174,73 +1174,145 @@ struct FrameStartBlock : View {
 };
 
 // allocated; measure: DebugText, sub_82091070.r3
+#pragma pack(push, 1)
+struct DebugTextData {
+  uint32_t vtable = 0;  // +0
+  uint32_t framework_interface = 0;  // +4
+  uint32_t job_vtable = 0;  // +8
+  uint32_t job_vtable_4 = 0;  // +12
+  uint32_t job_unknown_8 = 0;  // +16
+  uint32_t job_state = 0;  // +20
+  uint8_t job_unknown_16 = 0;  // +24
+  uint8_t job_unknown_17 = 0;  // +25
+  uint8_t job_unknown_18 = 0;  // +26
+  uint8_t pad_27[1] = {};
+  uint32_t job_unknown_20 = 0;  // +28
+  uint32_t job_delegate_vtable = 0;  // +32
+  uint32_t job_delegate_object = 0;  // +36
+  uint32_t job_delegate_function = 0;  // +40
+  uint32_t font_size = 0;  // +44
+  uint32_t font_data = 0;  // +48
+};
+#pragma pack(pop)
+static_assert(sizeof(DebugTextData) == 52);
+inline constexpr memory::LayoutField kDebugTextFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 4}, {28, 4}, {32, 4}, {36, 4}, {40, 4}, {44, 4}, {48, 4}};
+inline constexpr memory::Layout kDebugTextLayout = {kDebugTextFields, 12};
+
 struct DebugText : View {
   using View::View;
   static constexpr uint32_t kSize = 52;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   static constexpr uint32_t kVtable = 0x82000BC8;
+  DebugTextData* data() const { return static_cast<DebugTextData*>(memory::HandleObject(address)); }
+  static DebugText New(uint8_t* base) {
+    return DebugText(base, memory::MakeHandle(new DebugTextData(), sizeof(DebugTextData), "DebugText", &kDebugTextLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static DebugText NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(DebugTextData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<DebugTextData*>(::operator new(sizeof(DebugTextData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) DebugTextData();
+    return DebugText(base, memory::MakeHandle(p, sizeof(DebugTextData) * count, "DebugText", &kDebugTextLayout, sizeof(DebugTextData)));
+  }
+  DebugText at(uint32_t i) const { return DebugText(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  DebugTextData* direct() const { return static_cast<DebugTextData*>(memory::HandleOwn(address, &kDebugTextLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kDebugTextLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kDebugTextLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0x82000BC8: 0 sub_82091110, 1 sub_82090F88, 2 DebugText::SetPosition, 3 sub_82091060
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
+  uint32_t vtable_bits() const { if (auto* d = direct()) return d->vtable; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_vtable_bits(uint32_t v) const { if (auto* d = direct()) { d->vtable = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable() const { if (auto* d = direct()) return d->vtable; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_vtable(uint32_t v) const { if (auto* d = direct()) { d->vtable = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // the block's +0: the framework's +20 interface
-  template <typename T = FrameworkInterface>
-  T framework_interface() const { return T(base, guest::LoadU32(base, address + 4)); }
-  void set_framework_interface(const View& v) const { guest::StoreU32(base, address + 4, v.address); }
-  void set_framework_interface(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t framework_interface_address() const { return address + 4; }
+  uint32_t framework_interface_bits() const { if (auto* d = direct()) return d->framework_interface; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_framework_interface_bits(uint32_t v) const { if (auto* d = direct()) { d->framework_interface = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  template <typename T = FrameworkInterface>
+  T framework_interface() const { return T(base, framework_interface_bits()); }
+  void set_framework_interface(const View& w) const { set_framework_interface_bits(w.address); }
+  void set_framework_interface(uint32_t v) const { set_framework_interface_bits(v); }
   // 0x820066DC (0x82000EB8 after its destructor)
-  uint32_t job_vtable() const { return guest::LoadU32(base, address + 8); }
-  void set_job_vtable(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t job_vtable_address() const { return address + 8; }
+  uint32_t job_vtable_bits() const { if (auto* d = direct()) return d->job_vtable; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_job_vtable_bits(uint32_t v) const { if (auto* d = direct()) { d->job_vtable = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  uint32_t job_vtable() const { if (auto* d = direct()) return d->job_vtable; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_job_vtable(uint32_t v) const { if (auto* d = direct()) { d->job_vtable = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
   // 0x82002908 (0x82000AB4 its base's)
-  uint32_t job_vtable_4() const { return guest::LoadU32(base, address + 12); }
-  void set_job_vtable_4(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
   uint32_t job_vtable_4_address() const { return address + 12; }
+  uint32_t job_vtable_4_bits() const { if (auto* d = direct()) return d->job_vtable_4; return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_job_vtable_4_bits(uint32_t v) const { if (auto* d = direct()) { d->job_vtable_4 = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
+  uint32_t job_vtable_4() const { if (auto* d = direct()) return d->job_vtable_4; return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_job_vtable_4(uint32_t v) const { if (auto* d = direct()) { d->job_vtable_4 = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
   // 0 at construction
-  uint32_t job_unknown_8() const { return guest::LoadU32(base, address + 16); }
-  void set_job_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
   uint32_t job_unknown_8_address() const { return address + 16; }
+  uint32_t job_unknown_8_bits() const { if (auto* d = direct()) return d->job_unknown_8; return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_job_unknown_8_bits(uint32_t v) const { if (auto* d = direct()) { d->job_unknown_8 = v; return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
+  uint32_t job_unknown_8() const { if (auto* d = direct()) return d->job_unknown_8; return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_job_unknown_8(uint32_t v) const { if (auto* d = direct()) { d->job_unknown_8 = v; return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
   // 0 at construction; sub_82090F88 prints when 3
-  uint32_t job_state() const { return guest::LoadU32(base, address + 20); }
-  void set_job_state(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
   uint32_t job_state_address() const { return address + 20; }
+  uint32_t job_state_bits() const { if (auto* d = direct()) return d->job_state; return uint32_t((memory::IsHandle(address + 20) ? uint32_t(memory::OwnerLoad(address + 20, 4)) : guest::LoadU32(base, address + 20))); }
+  void set_job_state_bits(uint32_t v) const { if (auto* d = direct()) { d->job_state = v; return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 4, v); else guest::StoreU32(base, address + 20, v); }
+  uint32_t job_state() const { if (auto* d = direct()) return d->job_state; return uint32_t((memory::IsHandle(address + 20) ? uint32_t(memory::OwnerLoad(address + 20, 4)) : guest::LoadU32(base, address + 20))); }
+  void set_job_state(uint32_t v) const { if (auto* d = direct()) { d->job_state = v; return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 4, v); else guest::StoreU32(base, address + 20, v); }
   // 0 at construction
-  uint8_t job_unknown_16() const { return guest::LoadU8(base, address + 24); }
-  void set_job_unknown_16(uint8_t v) const { guest::StoreU8(base, address + 24, v); }
   uint32_t job_unknown_16_address() const { return address + 24; }
+  uint8_t job_unknown_16_bits() const { if (auto* d = direct()) return d->job_unknown_16; return uint8_t((memory::IsHandle(address + 24) ? uint8_t(memory::OwnerLoad(address + 24, 1)) : guest::LoadU8(base, address + 24))); }
+  void set_job_unknown_16_bits(uint8_t v) const { if (auto* d = direct()) { d->job_unknown_16 = v; return; } if (memory::IsHandle(address + 24)) memory::OwnerStore(address + 24, 1, v); else guest::StoreU8(base, address + 24, v); }
+  uint8_t job_unknown_16() const { if (auto* d = direct()) return d->job_unknown_16; return uint8_t((memory::IsHandle(address + 24) ? uint8_t(memory::OwnerLoad(address + 24, 1)) : guest::LoadU8(base, address + 24))); }
+  void set_job_unknown_16(uint8_t v) const { if (auto* d = direct()) { d->job_unknown_16 = v; return; } if (memory::IsHandle(address + 24)) memory::OwnerStore(address + 24, 1, v); else guest::StoreU8(base, address + 24, v); }
   // 1 at construction
-  uint8_t job_unknown_17() const { return guest::LoadU8(base, address + 25); }
-  void set_job_unknown_17(uint8_t v) const { guest::StoreU8(base, address + 25, v); }
   uint32_t job_unknown_17_address() const { return address + 25; }
+  uint8_t job_unknown_17_bits() const { if (auto* d = direct()) return d->job_unknown_17; return uint8_t((memory::IsHandle(address + 25) ? uint8_t(memory::OwnerLoad(address + 25, 1)) : guest::LoadU8(base, address + 25))); }
+  void set_job_unknown_17_bits(uint8_t v) const { if (auto* d = direct()) { d->job_unknown_17 = v; return; } if (memory::IsHandle(address + 25)) memory::OwnerStore(address + 25, 1, v); else guest::StoreU8(base, address + 25, v); }
+  uint8_t job_unknown_17() const { if (auto* d = direct()) return d->job_unknown_17; return uint8_t((memory::IsHandle(address + 25) ? uint8_t(memory::OwnerLoad(address + 25, 1)) : guest::LoadU8(base, address + 25))); }
+  void set_job_unknown_17(uint8_t v) const { if (auto* d = direct()) { d->job_unknown_17 = v; return; } if (memory::IsHandle(address + 25)) memory::OwnerStore(address + 25, 1, v); else guest::StoreU8(base, address + 25, v); }
   // 0 at construction
-  uint8_t job_unknown_18() const { return guest::LoadU8(base, address + 26); }
-  void set_job_unknown_18(uint8_t v) const { guest::StoreU8(base, address + 26, v); }
   uint32_t job_unknown_18_address() const { return address + 26; }
+  uint8_t job_unknown_18_bits() const { if (auto* d = direct()) return d->job_unknown_18; return uint8_t((memory::IsHandle(address + 26) ? uint8_t(memory::OwnerLoad(address + 26, 1)) : guest::LoadU8(base, address + 26))); }
+  void set_job_unknown_18_bits(uint8_t v) const { if (auto* d = direct()) { d->job_unknown_18 = v; return; } if (memory::IsHandle(address + 26)) memory::OwnerStore(address + 26, 1, v); else guest::StoreU8(base, address + 26, v); }
+  uint8_t job_unknown_18() const { if (auto* d = direct()) return d->job_unknown_18; return uint8_t((memory::IsHandle(address + 26) ? uint8_t(memory::OwnerLoad(address + 26, 1)) : guest::LoadU8(base, address + 26))); }
+  void set_job_unknown_18(uint8_t v) const { if (auto* d = direct()) { d->job_unknown_18 = v; return; } if (memory::IsHandle(address + 26)) memory::OwnerStore(address + 26, 1, v); else guest::StoreU8(base, address + 26, v); }
   // a word the constructor copies from its own frame, never set there
-  uint32_t job_unknown_20() const { return guest::LoadU32(base, address + 28); }
-  void set_job_unknown_20(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
   uint32_t job_unknown_20_address() const { return address + 28; }
+  uint32_t job_unknown_20_bits() const { if (auto* d = direct()) return d->job_unknown_20; return uint32_t((memory::IsHandle(address + 28) ? uint32_t(memory::OwnerLoad(address + 28, 4)) : guest::LoadU32(base, address + 28))); }
+  void set_job_unknown_20_bits(uint32_t v) const { if (auto* d = direct()) { d->job_unknown_20 = v; return; } if (memory::IsHandle(address + 28)) memory::OwnerStore(address + 28, 4, v); else guest::StoreU32(base, address + 28, v); }
+  uint32_t job_unknown_20() const { if (auto* d = direct()) return d->job_unknown_20; return uint32_t((memory::IsHandle(address + 28) ? uint32_t(memory::OwnerLoad(address + 28, 4)) : guest::LoadU32(base, address + 28))); }
+  void set_job_unknown_20(uint32_t v) const { if (auto* d = direct()) { d->job_unknown_20 = v; return; } if (memory::IsHandle(address + 28)) memory::OwnerStore(address + 28, 4, v); else guest::StoreU32(base, address + 28, v); }
   // 0x82002850 (Delegate)
-  uint32_t job_delegate_vtable() const { return guest::LoadU32(base, address + 32); }
-  void set_job_delegate_vtable(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
   uint32_t job_delegate_vtable_address() const { return address + 32; }
-  template <typename T = DebugText>
-  T job_delegate_object() const { return T(base, guest::LoadU32(base, address + 36)); }
-  void set_job_delegate_object(const View& v) const { guest::StoreU32(base, address + 36, v.address); }
-  void set_job_delegate_object(uint32_t v) const { guest::StoreU32(base, address + 36, v); }
+  uint32_t job_delegate_vtable_bits() const { if (auto* d = direct()) return d->job_delegate_vtable; return uint32_t((memory::IsHandle(address + 32) ? uint32_t(memory::OwnerLoad(address + 32, 4)) : guest::LoadU32(base, address + 32))); }
+  void set_job_delegate_vtable_bits(uint32_t v) const { if (auto* d = direct()) { d->job_delegate_vtable = v; return; } if (memory::IsHandle(address + 32)) memory::OwnerStore(address + 32, 4, v); else guest::StoreU32(base, address + 32, v); }
+  uint32_t job_delegate_vtable() const { if (auto* d = direct()) return d->job_delegate_vtable; return uint32_t((memory::IsHandle(address + 32) ? uint32_t(memory::OwnerLoad(address + 32, 4)) : guest::LoadU32(base, address + 32))); }
+  void set_job_delegate_vtable(uint32_t v) const { if (auto* d = direct()) { d->job_delegate_vtable = v; return; } if (memory::IsHandle(address + 32)) memory::OwnerStore(address + 32, 4, v); else guest::StoreU32(base, address + 32, v); }
   uint32_t job_delegate_object_address() const { return address + 36; }
+  uint32_t job_delegate_object_bits() const { if (auto* d = direct()) return d->job_delegate_object; return uint32_t((memory::IsHandle(address + 36) ? uint32_t(memory::OwnerLoad(address + 36, 4)) : guest::LoadU32(base, address + 36))); }
+  void set_job_delegate_object_bits(uint32_t v) const { if (auto* d = direct()) { d->job_delegate_object = v; return; } if (memory::IsHandle(address + 36)) memory::OwnerStore(address + 36, 4, v); else guest::StoreU32(base, address + 36, v); }
+  template <typename T = DebugText>
+  T job_delegate_object() const { return T(base, job_delegate_object_bits()); }
+  void set_job_delegate_object(const View& w) const { set_job_delegate_object_bits(w.address); }
+  void set_job_delegate_object(uint32_t v) const { set_job_delegate_object_bits(v); }
   // sub_82090CC0, DebugText::LoadFont
-  uint32_t job_delegate_function() const { return guest::LoadU32(base, address + 40); }
-  void set_job_delegate_function(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
   uint32_t job_delegate_function_address() const { return address + 40; }
+  uint32_t job_delegate_function_bits() const { if (auto* d = direct()) return d->job_delegate_function; return uint32_t((memory::IsHandle(address + 40) ? uint32_t(memory::OwnerLoad(address + 40, 4)) : guest::LoadU32(base, address + 40))); }
+  void set_job_delegate_function_bits(uint32_t v) const { if (auto* d = direct()) { d->job_delegate_function = v; return; } if (memory::IsHandle(address + 40)) memory::OwnerStore(address + 40, 4, v); else guest::StoreU32(base, address + 40, v); }
+  uint32_t job_delegate_function() const { if (auto* d = direct()) return d->job_delegate_function; return uint32_t((memory::IsHandle(address + 40) ? uint32_t(memory::OwnerLoad(address + 40, 4)) : guest::LoadU32(base, address + 40))); }
+  void set_job_delegate_function(uint32_t v) const { if (auto* d = direct()) { d->job_delegate_function = v; return; } if (memory::IsHandle(address + 40)) memory::OwnerStore(address + 40, 4, v); else guest::StoreU32(base, address + 40, v); }
   // DEBFONT.XPR's size
-  uint32_t font_size() const { return guest::LoadU32(base, address + 44); }
-  void set_font_size(uint32_t v) const { guest::StoreU32(base, address + 44, v); }
   uint32_t font_size_address() const { return address + 44; }
+  uint32_t font_size_bits() const { if (auto* d = direct()) return d->font_size; return uint32_t((memory::IsHandle(address + 44) ? uint32_t(memory::OwnerLoad(address + 44, 4)) : guest::LoadU32(base, address + 44))); }
+  void set_font_size_bits(uint32_t v) const { if (auto* d = direct()) { d->font_size = v; return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 4, v); else guest::StoreU32(base, address + 44, v); }
+  uint32_t font_size() const { if (auto* d = direct()) return d->font_size; return uint32_t((memory::IsHandle(address + 44) ? uint32_t(memory::OwnerLoad(address + 44, 4)) : guest::LoadU32(base, address + 44))); }
+  void set_font_size(uint32_t v) const { if (auto* d = direct()) { d->font_size = v; return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 4, v); else guest::StoreU32(base, address + 44, v); }
   // its contents (operator new; freed with operator delete[])
-  uint32_t font_data() const { return guest::LoadU32(base, address + 48); }
-  void set_font_data(uint32_t v) const { guest::StoreU32(base, address + 48, v); }
   uint32_t font_data_address() const { return address + 48; }
+  uint32_t font_data_bits() const { if (auto* d = direct()) return d->font_data; return uint32_t((memory::IsHandle(address + 48) ? uint32_t(memory::OwnerLoad(address + 48, 4)) : guest::LoadU32(base, address + 48))); }
+  void set_font_data_bits(uint32_t v) const { if (auto* d = direct()) { d->font_data = v; return; } if (memory::IsHandle(address + 48)) memory::OwnerStore(address + 48, 4, v); else guest::StoreU32(base, address + 48, v); }
+  uint32_t font_data() const { if (auto* d = direct()) return d->font_data; return uint32_t((memory::IsHandle(address + 48) ? uint32_t(memory::OwnerLoad(address + 48, 4)) : guest::LoadU32(base, address + 48))); }
+  void set_font_data(uint32_t v) const { if (auto* d = direct()) { d->font_data = v; return; } if (memory::IsHandle(address + 48)) memory::OwnerStore(address + 48, 4, v); else guest::StoreU32(base, address + 48, v); }
 };
 
 // embedded; measure: DebugText::DebugText.r4

@@ -20,21 +20,29 @@ using G = schema::SoundCuesGlobals;
 constexpr uint32_t kZero = G::float_zero_address();  // the game's float 0.0
 constexpr uint32_t kOne = G::float_one_address();    // the game's float 1.0
 
-// The manager's listener: AudioManager (menu-sounds.toml) has no field
-// for it yet.
-constexpr uint32_t kListener = 1456;
-
-// A float moved as lfs and stfs move it (single to double and back).
-void CopyFloat(uint8_t* base, uint32_t to, uint32_t from) {
-  guest::StoreFloat(base, to, float(double(guest::LoadFloat(base, from))));
+// The manager's listener (AudioManager's embed field, menu-sounds.toml).
+uint32_t ManagerListener(uint8_t* base, uint32_t manager) {
+  return schema::AudioManager(base, manager).listener().address;
 }
 
-// Three floats from a vector given by address to `to` and the two after it.
-void CopyVector3(uint8_t* base, uint32_t to, uint32_t from) {
+// A float moved as lfs and stfs move it (single to double and back).
+uint32_t FloatBits(float value) { return std::bit_cast<uint32_t>(float(double(value))); }
+
+// The float at `from` (an image constant) stored at `to`, inside `object`'s
+// view (a host object's member, or guest memory: store_at picks).
+template <typename View>
+void CopyFloat(uint8_t* base, const View& object, uint32_t to, uint32_t from) {
+  object.store_at(to - object.address, 4, FloatBits(guest::LoadFloat(base, from)));
+}
+
+// Three floats from a vector given by address to `to` and the two after it,
+// inside `object`'s view; each loaded then stored, as the original does.
+template <typename View>
+void CopyVector3(uint8_t* base, const View& object, uint32_t to, uint32_t from) {
   const schema::SoundVector3 v(base, from);
-  CopyFloat(base, to + 0, v.x_address());
-  CopyFloat(base, to + 4, v.y_address());
-  CopyFloat(base, to + 8, v.z_address());
+  object.store_at(to - object.address + 0, 4, FloatBits(v.x()));
+  object.store_at(to - object.address + 4, 4, FloatBits(v.y()));
+  object.store_at(to - object.address + 8, 4, FloatBits(v.z()));
 }
 
 // The bank slot's word for the index at `index_address`, from the
@@ -65,42 +73,44 @@ void ListenerConstruct(uint8_t* base, uint32_t listener) {
                               kZero, kZero, kZero};
   // front, top, position and velocity: the first 12 floats.
   for (uint32_t i = 0; i < 12; i++) {
-    CopyFloat(base, l.front_x_address() + 4 * i, words[i]);
+    CopyFloat(base, l, l.front_x_address() + 4 * i, words[i]);
   }
-  CopyFloat(base, l.param_0_address(), G::listener_start_param_0_address());
-  CopyFloat(base, l.param_1_address(), G::listener_start_param_1_address());
+  CopyFloat(base, l, l.param_0_address(), G::listener_start_param_0_address());
+  CopyFloat(base, l, l.param_1_address(), G::listener_start_param_1_address());
 }
 
 void ListenerSetOrientation(uint8_t* base, uint32_t listener, uint32_t front, uint32_t top) {
   ITC_NATIVE_RUNNING("sub_8259D550 Listener::SetOrientation");
   const schema::SoundListener l(base, listener);
-  CopyVector3(base, l.front_x_address(), front);
-  CopyVector3(base, l.top_x_address(), top);
+  CopyVector3(base, l, l.front_x_address(), front);
+  CopyVector3(base, l, l.top_x_address(), top);
 }
 
 void ListenerSetPosition(uint8_t* base, uint32_t listener, uint32_t position) {
   ITC_NATIVE_RUNNING("sub_8259D588 Listener::SetPosition");
-  CopyVector3(base, schema::SoundListener(base, listener).position_x_address(), position);
+  const schema::SoundListener l(base, listener);
+  CopyVector3(base, l, l.position_x_address(), position);
 }
 
 void SetVector36(uint8_t* base, uint32_t object, uint32_t vector) {
   ITC_NATIVE_RUNNING("sub_8259CC80 SetVector36");
-  CopyVector3(base, schema::SoundVector36Target(base, object).vector_x_address(), vector);
+  const schema::SoundVector36Target t(base, object);
+  CopyVector3(base, t, t.vector_x_address(), vector);
 }
 
 void ManagerSetListenerPosition(uint8_t* base, uint32_t manager, uint32_t position) {
   ITC_NATIVE_RUNNING("sub_82117E08 AudioManager::SetListenerPosition");
-  ListenerSetPosition(base, manager + kListener, position);
+  ListenerSetPosition(base, ManagerListener(base, manager), position);
 }
 
 void ManagerSetListenerOrientation(uint8_t* base, uint32_t manager, uint32_t front, uint32_t top) {
   ITC_NATIVE_RUNNING("sub_82117E10 AudioManager::SetListenerOrientation");
-  ListenerSetOrientation(base, manager + kListener, front, top);
+  ListenerSetOrientation(base, ManagerListener(base, manager), front, top);
 }
 
 void ManagerSetListenerVelocity(uint8_t* base, uint32_t manager, uint32_t velocity) {
   ITC_NATIVE_RUNNING("sub_82117E18 AudioManager::SetListenerVelocity");
-  SetVector36(base, manager + kListener, velocity);
+  SetVector36(base, ManagerListener(base, manager), velocity);
 }
 
 uint32_t ManagerGetEngine(uint32_t interface) {
@@ -208,8 +218,8 @@ uint32_t SoundIsCue(uint8_t* base, uint32_t sound, uint32_t index_address) {
 void EmitterConstruct(uint8_t* base, uint32_t emitter) {
   ITC_NATIVE_RUNNING("sub_8259C9B0 Emitter::Emitter");
   const schema::SoundEmitter e(base, emitter);
-  auto zero = [&](uint32_t address) { CopyFloat(base, address, kZero); };
-  auto one = [&](uint32_t address) { CopyFloat(base, address, kOne); };
+  auto zero = [&](uint32_t address) { CopyFloat(base, e, address, kZero); };
+  auto one = [&](uint32_t address) { CopyFloat(base, e, address, kOne); };
   e.set_cue(0);  // no cue
   // The X3DAudio emitter at +8: the cone's pointer, front (0, 0, 1), top
   // (0, 1, 0), position and velocity 0, one channel, radius 0, the
@@ -232,13 +242,13 @@ void EmitterConstruct(uint8_t* base, uint32_t emitter) {
   one(e.curve_distance_scaler_address()), one(e.doppler_scaler_address());
   // The cone (0, 0, 0, 1, 0, 1, 0, 1) and the one azimuth (0).
   for (uint32_t i = 0; i < 8; i++) {
-    CopyFloat(base, e.cone_inner_angle_address() + 4 * i, i % 2 && i > 2 ? kOne : kZero);
+    CopyFloat(base, e, e.cone_inner_angle_address() + 4 * i, i % 2 && i > 2 ? kOne : kZero);
   }
   zero(e.azimuth_address());
   // The cue's 3D settings: six (index byte, 1.0) pairs from +164.
   for (uint32_t i = 0; i < 6; i++) {
     one(e.map_0_gain_address() + 8 * i);
-    guest::StoreU8(base, e.map_0_index_address() + 8 * i, uint8_t(i));
+    e.store_at(e.map_0_index_address() - e.address + 8 * i, 1, uint8_t(i));
   }
   one(e.single_map_gain_address()), one(e.unknown_152_address()), one(e.unknown_156_address());
   e.set_unknown_284(1);
@@ -328,13 +338,10 @@ uint32_t ManagerIsCuePlaying(uint8_t* base, uint32_t manager, uint32_t bank_addr
 
 bool DelegateClone(uint8_t* base, uint32_t delegate, uint32_t* copy) {
   ITC_NATIVE_RUNNING("sub_82118720 DelegateClone");
-  const auto block = memory::crt::OperatorNew(base, 16);
-  if (!block) {
-    return false;
-  }
-  *copy = *block;
-  if (*block != 0) {
-    const schema::AudioManagerDelegate to(base, *block);
+  // In host memory (E5 step 5): operator new's 16 bytes as a host object.
+  const schema::AudioManagerDelegate to = schema::AudioManagerDelegate::New(base);
+  *copy = to.address;
+  {
     const schema::AudioManagerDelegate from(base, delegate);
     to.set_vtable(0x8200833Cu);
     to.set_object(from.object());
@@ -373,7 +380,7 @@ uint32_t AudioEngineStart3D(uint8_t* base, uint32_t engine) {
   e.set_dsp_destination_channels(6);
   // The matrix: six 1.0.
   for (uint32_t i = 0; i < 6; i++) {
-    guest::StoreU32(base, e.matrix_0_address() + 4 * i, 0x3F800000u);
+    e.store_at(e.matrix_0_address() - e.address + 4 * i, 4, 0x3F800000u);
   }
   return r3;
 }

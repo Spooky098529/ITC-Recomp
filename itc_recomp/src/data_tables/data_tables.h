@@ -2,8 +2,9 @@
 // docs/rexglue-removal.md; the functions are in docs/functions/data-tables.md):
 // twelve assets loaded once at boot into one block, their entries
 // byte-swapped in place by the loads' callbacks, then read by index all
-// through the game. The tables are guest memory shared with the recompiled
-// code, so these work on guest memory. Adapters: src/hooks/data_tables.cpp.
+// through the game. Since E5 step 5 the object is in host memory and the
+// block is a blob (the files' bytes in PC memory, read by address as guest
+// memory is). Adapters: src/hooks/data_tables.cpp.
 
 #pragma once
 
@@ -58,17 +59,16 @@ uint32_t Entry40(uint8_t* base, uint32_t index);
 
 // --- The set-up and the loads (from BootData::CreateObjects, once) ---
 
-// sub_82116DB0 DataTables::Init: the 64-byte object (operator new's plain
-// C++) into 0x826C5CA0, its +12, +4 and +8 = 0; then two passes over the
-// twelve assets (94 at +16, 84 at +60, the eight at +20 to +48, 95 at +52,
+// sub_82116DB0 DataTables::Init: the 64-byte object (in host memory since
+// E5 step 5, schema::DataTables::New) into 0x826C5CA0, its +12, +4 and +8 =
+// 0; then two passes over the twelve assets (94 at +16, 84 at +60, the eight at +20 to +48, 95 at +52,
 // 96 at +56), each table pointer the block (+12) plus the sizes so far (0
 // while there's no block) and +4 counted up from 0; the sizes from the TOC
 // (Archive::Toc(id) + 16 x id + 24, or + 20 when that's 0;
-// Archive::AssetSize for the eight); between the passes the block (operator
-// new[] of the total). Returns r3 as the original leaves it (the last
-// Archive::Toc's), or nullopt where operator new's plain C++ can't answer
-// (the original runs: before anything is written for the object, or, for the
-// block, never in play).
+// Archive::AssetSize for the eight); between the passes the block (the
+// original's operator new[] of the total; a blob since E5 step 5,
+// schema::DataTablesBlock). Returns r3 as the original leaves it (the last
+// Archive::Toc's); no longer nullopt (kept for the adapter).
 std::optional<uint32_t> Init(uint8_t* base);
 
 using LoadCall = archive::LoadCall;

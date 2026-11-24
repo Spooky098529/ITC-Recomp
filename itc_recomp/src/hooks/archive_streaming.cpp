@@ -192,8 +192,11 @@ ITC_NATIVE_ENTRY_ALWAYS(8209E210) {
     schema::ArchiveRequestSlot(base, G::slots_address() + schema::ArchiveRequestSlot::kSize * i)
         .set_serial(0xFFFFFFFF);
   }
-  const uint32_t toc[2] = {allocate(toc_size[0], 4096, 0x8209E2D8),
-                           allocate(toc_size[1], 4096, 0x8209E2F4)};
+  // The TOCs' buffers: blobs in PC memory (E5 step 5) where the original
+  // VirtualAllocs them (returning at 0x8209E2D8 and 0x8209E2F4); read whole
+  // below through guest::ForEachHostPart, then read by address.
+  const uint32_t toc[2] = {schema::ArchiveTocEntry::New(base, toc_size[0]).address,
+                           schema::ArchiveTocEntry::New(base, toc_size[1]).address};
   G::set_build_toc(base, toc[0]);
   G::set_load_buffer_size(base, extra_size);
   G::set_crs_toc(base, toc[1]);

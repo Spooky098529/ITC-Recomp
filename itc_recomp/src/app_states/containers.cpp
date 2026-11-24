@@ -8,6 +8,7 @@
 #include "base/log.h"
 #include "memory/c_runtime_heap.h"
 #include "schema/app_states.h"
+#include "schema/cameras.h"
 
 namespace app_states {
 
@@ -64,7 +65,9 @@ std::optional<uint32_t> MessagesAllocate(uint8_t* base, uint32_t count) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_82092B78 MessageVector::Allocate");
-  return memory::crt::OperatorNew(base, count * 4);
+  // A blob in PC memory (E5 step 5): the words by address, in the guest's
+  // byte order; operator delete frees it.
+  return std::optional<uint32_t>(schema::NewAny_MessageVector_Allocate::New(base, count * 4).address);
 }
 
 std::optional<uint32_t> OpAllocateNodes(uint8_t* base, uint32_t count) {

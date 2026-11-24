@@ -104,7 +104,12 @@ uint32_t CreateA(uint8_t* base, uint32_t set, uint32_t record, const CreateCalls
     const int32_t count = LoadS(base, counts[pool]);
     const uint32_t list = s.pools_address() + 12 * pool;
     for (int32_t i = 0; i < count; i++) {
-      const uint32_t object = memory::AllocPages(kPoolObjectBytes[pool], 4096);
+      // Pools 0 and 5 (the car models and the wheels) in host memory (E5
+      // step 5: handles, freed by ScenePools::DestroyA's VirtualFree); the
+      // others the layer's pages.
+      const uint32_t object = pool == 0   ? schema::CarModel::New(base).address
+                              : pool == 5 ? schema::CarWheels::New(base).address
+                                          : memory::AllocPages(kPoolObjectBytes[pool], 4096);
       r3 = object;
       if (object != 0 && !kConstructs[pool](base, object, list)) {
         calls.construct(calls.user, pool, object, list);

@@ -7,6 +7,7 @@
 #include "base/log.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/menu_sounds.h"
 
 namespace app_start_up {
 
@@ -176,15 +177,12 @@ uint32_t AudioManagerConstruct(uint8_t* base, uint32_t manager, uint32_t owner, 
 std::optional<uint32_t> AudioManagerCreate(uint8_t* base, uint32_t owner, uint32_t name,
                                            uint32_t count, uint32_t frame, uint32_t start_frame,
                                            const AudioManagerCalls& calls) {
-  const auto block = memory::crt::OperatorNew(base, kAudioManagerBytes);
-  if (!block) {
-    return std::nullopt;
-  }
+  // In host memory (E5 step 5): operator new's 1,624 bytes as a host
+  // object (menu-sounds.toml's AudioManager, storage "host").
+  static_assert(schema::AudioManager::kSize == kAudioManagerBytes);
+  const uint32_t block = schema::AudioManager::New(base).address;
   ITC_NATIVE_RUNNING("sub_82119B38 AudioManager::Create");
-  if (*block == 0) {
-    return 0;
-  }
-  return AudioManagerConstruct(base, *block, owner, name, count, frame, start_frame, calls);
+  return AudioManagerConstruct(base, block, owner, name, count, frame, start_frame, calls);
 }
 
 }  // namespace app_start_up

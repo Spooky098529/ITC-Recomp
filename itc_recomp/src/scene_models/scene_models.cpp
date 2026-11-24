@@ -490,7 +490,11 @@ uint32_t SceneModelRecordReset(uint8_t* base, uint32_t record) {
 
 uint32_t AllocPages(uint8_t* base, uint32_t out, uint32_t size) {
   ITC_NATIVE_RUNNING("sub_820C3CA0 CarModel::AllocPages");
-  const uint32_t pages = memory::AllocPages(size, 4096);
+  // CarModel::LoadSetA's node file and body XPR2 in PC memory (E5 step 5: a
+  // blob, whole pages as VirtualAlloc's; freed by sub_820C3CE0's VirtualFree
+  // through its handle); a size of 0 gives 0, as VirtualAlloc's.
+  const uint32_t whole_pages = uint32_t((uint64_t(size) + 0xFFF) & ~uint64_t(0xFFF));
+  const uint32_t pages = size == 0 ? 0 : schema::CarModelsFile::New(base, whole_pages).address;
   guest::StoreU32(base, out, pages);
   return pages;
 }

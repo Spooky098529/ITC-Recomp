@@ -1548,6 +1548,8 @@ struct CarSoundPassBy : View {
 struct CarSoundWaveBank : View {
   using View::View;
   static constexpr uint32_t kSize = 44;
+  static CarSoundWaveBank New(uint8_t* base, uint32_t size) { return CarSoundWaveBank(base, memory::NewBlob(size, "CarSoundWaveBank")); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   // the bank data's offset
   uint32_t data_offset() const { return guest::LoadU32(base, address + 8); }
   void set_data_offset(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
