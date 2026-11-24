@@ -84,7 +84,9 @@ set(ITC_SOURCES
     src/memory/c_runtime_heap.cpp
     src/memory/memory_imports.cpp
     src/memory/kernel_variables.cpp
-    src/app/image_load.cpp
+    src/image/image.cpp
+    src/image/image_rdata.cpp
+    src/image/image_data.cpp
     src/imports/native_imports.cpp
     src/threads/spin_locks.cpp
     src/threads/critical_sections.cpp

@@ -1,7 +1,7 @@
 // The program's start ("A4 brought forward" in docs/rexglue-removal.md):
 // our own `main`, which sets up the flags, the paths, the log and SDL, maps
-// guest memory (src/memory/mapping.h), loads default.xex into it
-// (src/app/image_load.h), starts our audio output and the game's main
+// guest memory (src/memory/mapping.h), writes the image's data into it
+// (compiled in since E5's step 8: src/image/image.h), starts our audio output and the game's main
 // thread (one of ours, in our start-up, src/app/start_up.cpp, in place of
 // the game's xstart), and runs the main thread's event loop. Since E2 (step
 // 5) the SDK's Runtime (its memory, kernel, loader and VFS) isn't made, and
@@ -15,7 +15,7 @@
 #include "app/app.h"
 #include "threads/threads.h"
 #include "memory/kernel_variables.h"
-#include "app/image_load.h"
+#include "image/image.h"
 #include "memory/mapping.h"
 
 #include "audio/native_audio.h"
@@ -44,7 +44,7 @@
 // user_data_root, update_data_root, cache_root and metadata_root, which
 // nothing used, are gone: given, they're reported as unknown).
 ITC_FLAG_STRING(game_data_root, "", "Runtime",
-                "The game's files (default.xex, DATA/); empty: the executable's folder. "
+                "The game's files (DATA/); empty: the executable's folder. "
                 "itc.toml may set it too");
 ITC_FLAG_STRING(log_level, "info", "Log",
                 "Log level: trace, debug, info, warn, error, critical, off (off: no log file)");
@@ -134,15 +134,10 @@ void Fail(const std::string& message) {
   SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, kName, message.c_str(), nullptr);
 }
 
-// The game's files: default.xex where they are, and the root our file
-// layer reads from (src/game_data/).
+// The game's files: the root our file layer reads from (src/game_data/).
 bool CheckGameData(const Paths& paths) {
   if (!std::filesystem::is_directory(paths.game_data)) {
     Fail("--game_data_root does not exist: " + paths.game_data.string());
-    return false;
-  }
-  if (!std::filesystem::is_regular_file(paths.game_data / "default.xex")) {
-    Fail("Entrypoint XEX not found: " + (paths.game_data / "default.xex").string());
     return false;
   }
   game_data::SetRoot(paths.game_data);
@@ -231,16 +226,10 @@ int main(int argc, char* argv[]) {
   input::Gamepads_Start([](std::function<void()> function) {
     app::RunOnMainThread(std::move(function));
   });
-  // The image in guest memory (our own loader: src/app/image_load.cpp), the
+  // The image's data in guest memory (compiled in: src/image/image.h), the
   // kernel variables bound.
   uint8_t* base = memory::Base();
-  app::Image image;
-  std::string error;
-  if (!app::LoadImage(paths.game_data / "default.xex", image, error)) {
-    app::Fail("Failed to load default.xex: " + error);
-    return EXIT_FAILURE;
-  }
-  std::memcpy(base + image.load_address, image.bytes.data(), image.bytes.size());
+  image::CopyInto(base);
   memory::BindKernelVariables(base);
   native_audio::Start();
   // The game's main thread: one of our threads (E1, src/threads/) running
@@ -249,7 +238,7 @@ int main(int argc, char* argv[]) {
     app::Fail("--native_threads=false is no longer supported");
     return EXIT_FAILURE;
   }
-  std::thread main_thread = threads::StartMainThread(base, image.stack_size, app::StartUp);
+  std::thread main_thread = threads::StartMainThread(base, image::kStackSize, app::StartUp);
   std::thread waiter([thread = std::move(main_thread)]() mutable {
     thread.join();
     ITC_LOG_INFO("Execution complete");
