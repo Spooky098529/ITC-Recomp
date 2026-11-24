@@ -171,6 +171,19 @@ fields = [
   { name = "height", offset = 8, type = "u32", note = "Texture::GetLevelDesc's +28" },
 ]
 
+# A picture's file (an XPR2 file read whole by Archive::Load). In PC memory
+# since E5 step 7 (2026-11-24): New in place of LocationScreen::LoadPicture's
+# VirtualAlloc(size) (0x8222C2A8). Read only by the game's code:
+# OnPictureLoadedA and B's XPR::Create copies its header into a block of its
+# own and its texture data into physical memory (the renderer reads that
+# copy, never this file); then deleted by them in place of their VirtualFree
+# (0x82228FA4, 0x822290E4), which returned 1.
+[LocationScreenPictureFile]
+size = 0
+origin = "allocated"
+storage = "blob"
+fields = []
+
 # A 20-byte data table entry (asset 95) as the screen's text walks read it
 # (DataTables::Entry20; data-tables.toml's DataTablesEntry20 is the same
 # entry as the tables' own walks read it).

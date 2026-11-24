@@ -2546,11 +2546,11 @@ struct CarSoundsGlobals {
   static uint8_t unknown_826C5C85(uint8_t* base) { return guest::LoadU8(base, 0x826C5C85u); }
   static void set_unknown_826C5C85(uint8_t* base, uint8_t v) { guest::StoreU8(base, 0x826C5C85u, v); }
   static constexpr uint32_t unknown_826C5C85_address() { return 0x826C5C85u; }
-  // bank pair 2's 3 MiB physical buffer
+  // bank pair 2's 3 MiB wave bank buffer (a memory block, a blob since E5 step 7)
   static uint32_t bank_pair_buffer(uint8_t* base) { return guest::LoadU32(base, 0x826C5C88u); }
   static void set_bank_pair_buffer(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C5C88u, v); }
   static constexpr uint32_t bank_pair_buffer_address() { return 0x826C5C88u; }
-  // bank pair 2's 512-byte physical buffer
+  // bank pair 2's 512-byte sound bank buffer (a memory block, a blob since E5 step 7)
   static uint32_t bank_pair_small_buffer(uint8_t* base) { return guest::LoadU32(base, 0x826C5C8Cu); }
   static void set_bank_pair_small_buffer(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C5C8Cu, v); }
   static constexpr uint32_t bank_pair_small_buffer_address() { return 0x826C5C8Cu; }

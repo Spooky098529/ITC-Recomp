@@ -642,6 +642,22 @@ struct PoolObjectVtable : View {
   uint32_t reset_address() const { return address + 8; }
 };
 
+// allocated; measure: -
+struct SceneryBlock : View {
+  using View::View;
+  static constexpr uint32_t kSize = 0;
+  static SceneryBlock New(uint8_t* base, uint32_t size) { return SceneryBlock(base, memory::NewBlob(size, "SceneryBlock")); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+};
+
+// allocated; measure: -
+struct ObjectPoolsBlock : View {
+  using View::View;
+  static constexpr uint32_t kSize = 0;
+  static ObjectPoolsBlock New(uint8_t* base, uint32_t size) { return ObjectPoolsBlock(base, memory::NewBlob(size, "ObjectPoolsBlock")); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+};
+
 // allocated; measure: sub_820F1098.r3
 struct SceneryBlockObject : View {
   using View::View;

@@ -6,6 +6,7 @@
 #include "base/log.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
+#include "memory/handles.h"
 #include "memory/heap.h"
 #include "schema/models.h"
 #include "std_list/ptr_list.h"
@@ -192,6 +193,12 @@ uint32_t AllocPhysicalEx(uint8_t* base, uint32_t bytes, uint32_t low, uint32_t h
               memory::crt::XPhysicalAllocEx(base, PagesFor(bytes), low, high, alignment,
                                             protection),
               1);
+}
+
+uint32_t AllocPhysicalExBlob(uint8_t* base, uint32_t bytes, const char* type) {
+  ITC_NATIVE_RUNNING("sub_8258E098 Memory::AllocPhysicalEx (a blob)");
+  std::lock_guard<std::recursive_mutex> lock(MemoryBlocksMutex());
+  return Made(base, memory::NewBlob(PagesFor(bytes), type), 1);
 }
 
 uint32_t AllocPhysical(uint8_t* base, uint32_t bytes, uint32_t attributes) {

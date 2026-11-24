@@ -134,8 +134,9 @@ uint32_t Release(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set
                  uint32_t index);
 // ObjectPools::Init (sub_820FBBE8): `count` pools from their 24-byte
 // descriptors (+4 the object size, +8 the data size, +12 and +16 the object
-// and data counts, +20 the factory) in one block of physical memory
-// (XPhysicalAlloc(size, -1, 64, 4)); objects made by the factory (through
+// and data counts, +20 the factory) in one block (the original's
+// XPhysicalAlloc(size, -1, 64, 4); a blob since E5 step 7,
+// schema::ObjectPoolsBlock: the GPU reads none of it); objects made by the factory (through
 // `calls`) or as plain pool objects. False, with nothing done, when the
 // native heap isn't active (the original runs). `r3` is what the original
 // leaves there (the last factory's return, else the block).
@@ -198,9 +199,10 @@ void ClearGlobal(uint8_t* base);
 // The physical bytes the scenery holds ([0x826C5518], schema::
 // CourseSceneryGlobals' physical_held), kept by AllocPhysical and
 // FreePhysical.
-// Scenery::AllocPhysical (sub_820F1490): XPhysicalAlloc(size, -1, 0, 4)
-// (the layer's AllocPhysical), its allocated size (XPhysicalSize, the
-// layer's PhysicalSize: the user's call, 2026-11-06) added to
+// Scenery::AllocPhysical (sub_820F1490): the original's XPhysicalAlloc(size,
+// -1, 0, 4), a blob since E5 step 7 (schema::SceneryBlock: the GPU reads
+// none of its blocks), its allocated size (XPhysicalSize, the layer's
+// PhysicalSize, whole 4 KB pages: the user's call, 2026-11-06) added to
 // [0x826C5518]; returns the block. Only while hooks::NativeHeapActive().
 uint32_t AllocPhysical(uint8_t* base, uint32_t size);
 // Scenery::FreePhysical (sub_820F14E8): the block's allocated size taken

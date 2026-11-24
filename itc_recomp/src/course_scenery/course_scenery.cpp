@@ -410,9 +410,11 @@ bool Init(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set, uint3
     const schema::ObjectPoolDesc d(base, descriptors + 24 * uint32_t(i));
     size += Round64(d.object_size()) * d.object_count() + Round64(d.data_size()) * d.data_count();
   }
-  // XPhysicalAlloc(size, -1, 64, 4): any physical address; the protection
-  // (PAGE_READWRITE) has no X_MEM_LARGE_PAGES for its check to clear.
-  const uint32_t block = memory::AllocPhysical(size, 0, 0xFFFFFFFFu, 64, 4);
+  // The original's XPhysicalAlloc(size, -1, 64, 4); the GPU reads nothing
+  // in it (the models' vertex data and the XPRs' textures are copied into
+  // their own physical blocks), so a blob since E5 step 7 (page-aligned, past
+  // the 64 the objects' cursor relies on), freed by Shutdown as before.
+  const uint32_t block = schema::ObjectPoolsBlock::New(base, size).address;
   const uint32_t records = Record::NewArray(base, count).address;
   *r3 = records;
   const Pools ps(base, set);
@@ -755,9 +757,12 @@ void ClearGlobal(uint8_t* base) {
 
 uint32_t AllocPhysical(uint8_t* base, uint32_t size) {
   ITC_NATIVE_RUNNING("sub_820F1490 Scenery::AllocPhysical");
-  // XPhysicalAlloc(size, -1, 0, 4): any physical address, no alignment;
-  // PAGE_READWRITE has no X_MEM_LARGE_PAGES for its check to clear.
-  const uint32_t block = memory::AllocPhysical(size, 0, 0xFFFFFFFFu, 0, 4);
+  // The original's XPhysicalAlloc(size, -1, 0, 4); the GPU reads none of
+  // its blocks (the manager, the lists, the visible areas, pool 0's block,
+  // the course set's first file, whose textures and vertex data are copied
+  // out), so a blob since E5 step 7. XPhysicalSize answers its whole 4 KB
+  // pages, as the physical block's.
+  const uint32_t block = schema::SceneryBlock::New(base, size).address;
   const uint32_t held = memory::PhysicalSize(block);
   G::set_physical_held(base, held + G::physical_held(base));
   return block;

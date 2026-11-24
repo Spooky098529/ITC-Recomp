@@ -1,7 +1,7 @@
 // RaceSounds::Init (sub_82177378, docs/functions/race-sounds.md) as plain
 // C++: the race kind (+9652) from the race data, the scene models' seven
-// sound slots reset with their two buffers allocated (XPhysicalAlloc) and
-// cleared, CarSounds::Init, the state (+9604) = 1, then the race sounds'
+// sound slots reset with their two buffers allocated (XPhysicalAlloc's; blobs
+// since E5 step 7) and cleared, CarSounds::Init, the state (+9604) = 1, then the race sounds'
 // transitions added (StateMachine::Add), the kind deciding which. As
 // RaceHudMachine::Init (src/race_hud_machine/race_hud_machine_init.cpp),
 // the original builds each transition's functor and key in its own stack
@@ -720,11 +720,14 @@ uint32_t Init(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls, 
     Store(base, Globals::slot_contexts_address() + 4 * i, i);
     Store(base, Globals::slot_buffers_1_address() + 4 * i, 0);
     Store(base, Globals::slot_buffers_0_address() + 4 * i, 0);
-    const uint64_t buffer1 = calls.Call(kXPhysicalAlloc, frame, 0x82177410, 4, kBuffer1Bytes,
-                                        0xFFFFFFFFFFFFFFFFull, 2048, 4);
+    // Blobs in PC memory (E5 step 7) where the original called XPhysicalAlloc
+    // (size, -1, 2048, 4; returning at 0x82177410 and 0x82177430): the car's
+    // two wave banks, read whole by Archive::Load (SceneModel::SetUp), read by
+    // the car sounds' views and our FFmpeg (hooks/xma.cpp, guest::Pointer),
+    // never by the renderer; freed by Unload's XPhysicalFree (the handles').
+    const uint64_t buffer1 = schema::CarSoundWaveBank::New(base, kBuffer1Bytes).address;
     Store(base, Globals::slot_buffers_1_address() + 4 * i, uint32_t(buffer1));
-    last = calls.Call(kXPhysicalAlloc, frame, 0x82177430, 4, kBuffer0Bytes,
-                      0xFFFFFFFFFFFFFFFFull, 2048, 4);
+    last = schema::CarSoundWaveBank::New(base, kBuffer0Bytes).address;
     Store(base, Globals::slot_buffers_0_address() + 4 * i, uint32_t(last));
     Clear(base, uint32_t(last), kBuffer0Bytes);
     last = guest::LoadU32(base, Globals::slot_buffers_1_address() + 4 * i);

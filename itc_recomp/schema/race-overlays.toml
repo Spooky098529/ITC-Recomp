@@ -721,3 +721,17 @@ origin = "embedded"
 fields = [
   { name = "unknown_24", offset = 24, type = "u32" },
 ]
+
+# The car overlays' texture pack file (archive file 71, an XPR2 file read
+# whole by Archive::Load). In PC memory since E5 step 7 (2026-11-24): a blob
+# where CarOverlays::LoadTextures' VirtualAlloc(size) returned (0x821258C0,
+# the size in r4). Read only by the game's code: OnTexturesLoaded's
+# XPR::Create copies its header into a block of its own and its texture data
+# into physical memory (the renderer reads that copy, never this file); then
+# freed by OnTexturesLoaded's VirtualFree (0x821256A8).
+[CarOverlaysTextureFile]
+size = 0
+origin = "allocated"
+storage = "blob"
+blob_alloc = [{ call = 0x821258C0, reg = "r4" }]
+fields = []

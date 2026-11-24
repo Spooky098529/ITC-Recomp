@@ -7639,7 +7639,7 @@ lifted::Result f82125888(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = uint64_t(int64_t(0));
   // bl 0x82295398
   // (left out: dead in C++)
-  { const lifted::Result o = game::VirtualAlloc(base, LIFTED_ARGS(0x821258C0, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = memory::NewBlob(uint32_t(r4), "CarOverlaysTextureFile"); f1 = 0; }  // host_alloc 0x821258C0 (CarOverlaysTextureFile, a blob)
   // lis r11,-32238
   r11 = uint64_t(int64_t(-2112749568));
   // mr r4,r3

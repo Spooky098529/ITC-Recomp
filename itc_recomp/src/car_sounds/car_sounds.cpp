@@ -383,8 +383,15 @@ void SoundGlobalsInit(uint8_t* base, uint32_t music_player) {
   for (uint32_t i = 0; i < 7; i++) {
     Store(base, G::sound_picks_a_address() + 4 * i, 0);
   }
-  G::set_bank_pair_small_buffer(base, models::AllocPhysicalEx(base, 512, 0, 0xFFFFFFFFu, 0, 4));
-  G::set_bank_pair_buffer(base, models::AllocPhysicalEx(base, 3145728, 0, 0xFFFFFFFFu, 2048, 4));
+  // Bank pair 2's (the race's effects) files' buffers, the original's
+  // Memory::AllocPhysicalEx (512, 0, -1, 0, 4 and 3 MiB, 0, -1, 2048, 4):
+  // memory blocks whose header and data are blobs in PC memory (E5 step 7).
+  // BankPair::Load reads the sound bank (.xsb, used in place by XACT) and the
+  // wave bank (its XMA data read by our FFmpeg through guest::Pointer) into
+  // them; the renderer never reads them. Freed by sub_82110388's
+  // Memory::FreeLater (FreeDue's XPhysicalFree releases the blobs).
+  G::set_bank_pair_small_buffer(base, models::AllocPhysicalExBlob(base, 512, "SoundBankFile"));
+  G::set_bank_pair_buffer(base, models::AllocPhysicalExBlob(base, 3145728, "CarSoundWaveBank"));
 }
 
 uint32_t SoundGlobalsInit3D(uint8_t* base) {

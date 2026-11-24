@@ -136245,7 +136245,7 @@ lifted::Result f820F1490(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r4 = uint64_t(int64_t(-1));
   // bl 0x822964c8
   // (left out: dead in C++)
-  { const lifted::Result o = game::XPhysicalAlloc(base, LIFTED_ARGS(0x820F14B0, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = memory::NewBlob(uint32_t(r3), "SceneryBlock"); f1 = 0; }  // host_alloc 0x820F14B0 (SceneryBlock, a blob)
   // mr r31,r3
   r31 = r3;
   // bl 0x822965c0

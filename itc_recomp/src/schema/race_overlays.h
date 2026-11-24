@@ -1554,6 +1554,14 @@ struct OverlayVtablePart : View {
   uint32_t unknown_24_address() const { return address + 24; }
 };
 
+// allocated; measure: -
+struct CarOverlaysTextureFile : View {
+  using View::View;
+  static constexpr uint32_t kSize = 0;
+  static CarOverlaysTextureFile New(uint8_t* base, uint32_t size) { return CarOverlaysTextureFile(base, memory::NewBlob(size, "CarOverlaysTextureFile")); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+};
+
 // The image words docs/functions/race-overlays.md's code uses.
 struct RaceOverlaysGlobals {
   // 0.0

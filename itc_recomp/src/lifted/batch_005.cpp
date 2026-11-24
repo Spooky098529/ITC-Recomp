@@ -5341,7 +5341,7 @@ loc_821179A0:
   r3 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 0) & 0xFFFFF800;
   // bl 0x822964c8
   // (left out: dead in C++)
-  { const lifted::Result o = game::XPhysicalAlloc(base, LIFTED_ARGS(0x821179F0, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = memory::NewBlob(uint32_t(r3), "CarSoundWaveBank"); f1 = 0; }  // host_alloc 0x821179F0 (CarSoundWaveBank, a blob)
   // mr r4,r3
   r4 = r3;
   // lis r11,-32239

@@ -8,6 +8,7 @@
 #include "c_runtime/strings.h"
 #include "guest.h"
 #include "hooks/heap.h"
+#include "memory/handles.h"
 #include "memory/heap.h"
 #include "schema/location_screen.h"
 
@@ -15,7 +16,6 @@ namespace location_screen {
 
 namespace {
 
-constexpr uint32_t kMemCommit = 0x1000;
 constexpr uint32_t kMemRelease = 0x8000;
 // The archive's load callbacks: LocationScreen::OnPictureLoadedA and B.
 constexpr uint32_t kOnPictureLoadedA = 0x82228E88;
@@ -29,11 +29,11 @@ uint64_t LoadPicture(uint8_t* base, uint32_t sp, uint32_t screen, uint32_t id, u
   // The original's 128-byte frame held no slots (E5 step 6): the calls are
   // made from `sp`, their frames below it.
   const uint32_t size = archive::AssetSize(base, id);
-  // VirtualAlloc(0, size, MEM_COMMIT, read-write): the allocation layer's
-  // pages, as its adapter answers (E5 step 6), where the adapters route there.
-  const uint64_t pages = hooks::NativeHeapActive()
-                             ? memory::AllocPages(size, 4096)
-                             : calls.Call(kVirtualAlloc, sp, 0x8222C2A8, 0, size, kMemCommit, 4);
+  // The picture's file is a blob (E5 step 7) in place of the original's
+  // VirtualAlloc(0, size, MEM_COMMIT, read-write) at 0x8222C2A8: whole pages,
+  // as VirtualAlloc's. Only the game's code reads it (XPR::Create copies the
+  // texture data out into physical memory); OnPictureLoaded deletes it.
+  const uint64_t pages = schema::LocationScreenPictureFile::New(base, size).address;
   c_runtime::XMemSet(base, uint32_t(pages), 0, size);
   uint32_t callback;
   if (list == 0) {
@@ -158,10 +158,15 @@ uint64_t OnPictureLoaded(uint8_t* base, uint32_t sp, uint32_t screen, uint32_t b
   calls.Call(kGetLevelDesc, frame, 0x82228F78 + at, p.texture().texture(), 0, frame + 80);
   p.texture().set_width(guest::LoadU32(base, frame + 104));
   p.texture().set_height(guest::LoadU32(base, frame + 108));
-  // VirtualFree(buffer, 0, MEM_RELEASE) as its adapter answers it (E5 step
-  // 6: hooks::VirtualFree), else the call.
+  // VirtualFree(buffer, 0, MEM_RELEASE): the picture's file is a blob (E5
+  // step 7, LoadPicture), deleted (the original's VirtualFree returned 1);
+  // anything else as its adapter answers it (E5 step 6: hooks::VirtualFree),
+  // else the call.
   std::optional<uint32_t> freed;
-  if (buffer != 0) {
+  if (buffer != 0 && memory::IsHandle(buffer)) {
+    schema::LocationScreenPictureFile(base, buffer).Delete();
+    freed = 1;
+  } else if (buffer != 0) {
     freed = hooks::VirtualFree(buffer, 0, kMemRelease, 0x82228FA4 + at);
   }
   const uint64_t r3 =

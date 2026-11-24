@@ -94,7 +94,6 @@ constexpr uint32_t kCarSoundStart = 0x8210E030;
 constexpr uint32_t kCarSoundUpdate = 0x82110048;
 constexpr uint32_t kMusicPlay = 0x821063B0;          // Music::Play (mode-tick.md)
 constexpr uint32_t kSoundPlay = 0x82175850;
-constexpr uint32_t kXPhysicalAlloc = 0x822964C8;
 constexpr uint32_t kXPhysicalFree = 0x822965C8;
 constexpr uint32_t kSoundHolderDelete = 0x82117B30;  // sound-cues.md
 constexpr uint32_t kArchiveLoad = 0x8209DE48;
@@ -267,7 +266,8 @@ uint64_t Begin(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
 // Init's frame (its r1 is `sp` less this).
 constexpr uint32_t kInitFrame = 3280;
 // sub_82177378 RaceSounds::Init: the race kind (+9652) from the race data,
-// the seven sound slots reset, their buffers allocated (XPhysicalAlloc) and
+// the seven sound slots reset, their buffers allocated (XPhysicalAlloc; blobs
+// in PC memory since E5 step 7) and
 // cleared, CarSounds::Init, the state (+9604) = 1 and the transitions for
 // the kind (StateMachine::Add), replayed in the original's frame (see
 // race_sounds_init.cpp). Returns the last Add's answer (`replaced` as it

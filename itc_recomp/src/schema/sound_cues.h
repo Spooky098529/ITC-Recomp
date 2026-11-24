@@ -781,13 +781,13 @@ struct SoundBankPair : View {
   void set_sound_bank_size_bits(uint32_t v) const { if (auto* d = direct()) { d->sound_bank_size = v; return; } if (memory::IsHandle(address + 96)) memory::OwnerStore(address + 96, 4, v); else guest::StoreU32(base, address + 96, v); }
   uint32_t sound_bank_size() const { if (auto* d = direct()) return d->sound_bank_size; return uint32_t((memory::IsHandle(address + 96) ? uint32_t(memory::OwnerLoad(address + 96, 4)) : guest::LoadU32(base, address + 96))); }
   void set_sound_bank_size(uint32_t v) const { if (auto* d = direct()) { d->sound_bank_size = v; return; } if (memory::IsHandle(address + 96)) memory::OwnerStore(address + 96, 4, v); else guest::StoreU32(base, address + 96, v); }
-  // XPhysicalAlloc's (bank 2: [0x826C5C88])
+  // XPhysicalAlloc's, a CarSoundWaveBank blob (bank 2: [0x826C5C88], a blob block)
   uint32_t wave_bank_buffer_address() const { return address + 100; }
   uint32_t wave_bank_buffer_bits() const { if (auto* d = direct()) return d->wave_bank_buffer; return uint32_t((memory::IsHandle(address + 100) ? uint32_t(memory::OwnerLoad(address + 100, 4)) : guest::LoadU32(base, address + 100))); }
   void set_wave_bank_buffer_bits(uint32_t v) const { if (auto* d = direct()) { d->wave_bank_buffer = v; return; } if (memory::IsHandle(address + 100)) memory::OwnerStore(address + 100, 4, v); else guest::StoreU32(base, address + 100, v); }
   uint32_t wave_bank_buffer() const { if (auto* d = direct()) return d->wave_bank_buffer; return uint32_t((memory::IsHandle(address + 100) ? uint32_t(memory::OwnerLoad(address + 100, 4)) : guest::LoadU32(base, address + 100))); }
   void set_wave_bank_buffer(uint32_t v) const { if (auto* d = direct()) { d->wave_bank_buffer = v; return; } if (memory::IsHandle(address + 100)) memory::OwnerStore(address + 100, 4, v); else guest::StoreU32(base, address + 100, v); }
-  // operator new[]'s, a SoundBankFile blob (bank 2: [0x826C5C8C], physical)
+  // operator new[]'s, a SoundBankFile blob (bank 2: [0x826C5C8C], a blob block)
   uint32_t sound_bank_buffer_address() const { return address + 104; }
   uint32_t sound_bank_buffer_bits() const { if (auto* d = direct()) return d->sound_bank_buffer; return uint32_t((memory::IsHandle(address + 104) ? uint32_t(memory::OwnerLoad(address + 104, 4)) : guest::LoadU32(base, address + 104))); }
   void set_sound_bank_buffer_bits(uint32_t v) const { if (auto* d = direct()) { d->sound_bank_buffer = v; return; } if (memory::IsHandle(address + 104)) memory::OwnerStore(address + 104, 4, v); else guest::StoreU32(base, address + 104, v); }

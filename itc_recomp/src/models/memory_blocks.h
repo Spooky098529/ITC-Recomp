@@ -107,6 +107,18 @@ uint32_t AllocPhysicalEx(uint8_t* base, uint32_t bytes, uint32_t low, uint32_t h
 // `attributes`).
 uint32_t AllocPhysical(uint8_t* base, uint32_t bytes, uint32_t attributes);
 
+// E5 step 7: Memory::AllocPhysicalEx for a native caller whose block holds
+// data only the game's code reads (never the renderer, never by a physical
+// address): the same header (kind 1) and store order, the header and block a
+// blob (memory::NewBlob, `type` its name) instead of physical memory. The
+// block is the blob's handle + 4096 (page-aligned, so any alignment up to
+// 4096 the caller asked for holds); FreeLater, FreePhysicalLater and
+// FreeDue take it as any block (FreeDue's XPhysicalFree of the header
+// releases the blob). 0 when the blob can't be made. In the models' own
+// code nothing uses it: their physical blocks (XPR::Create's texture data,
+// Model::Load's vertex data, the shaders' microcode) are the renderer's.
+uint32_t AllocPhysicalExBlob(uint8_t* base, uint32_t bytes, const char* type);
+
 // sub_8258E1D8 PendingFrees::FreeDue: under the lock, the pending frees
 // walked from the first node; a header whose +8 is 0 has its +0 cleared and
 // is freed by its kind (+4: 0 VirtualFree, 1 XPhysicalFree, 2 XMemFree with

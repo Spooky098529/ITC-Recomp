@@ -382,7 +382,14 @@ origin = "allocated"
 # with XPhysicalAlloc, now schema::CarSoundWaveBank::New with the file's size;
 # its waves' XMA data read by our FFmpeg through guest::Pointer
 # (hooks/xma.cpp); freed by RaceSounds::Unload's XPhysicalFree.
+# E5 step 7 (2026-11-24): the other wave banks too, never read by the
+# renderer: RaceSounds::Init's slot buffers (hand port, New), bank pair 2's
+# 3 MiB block (SoundGlobals::Init, models::AllocPhysicalExBlob) and the other
+# bank pairs' (BankPair::Load's lifted XPhysicalAlloc, returning at
+# 0x821179F0, the size rounded up to 2 KB in r3; freed by BankPair's
+# release, XPhysicalFree at 0x82117BF0).
 storage = "blob"
+blob_alloc = [{ call = 0x821179F0, reg = "r3" }]
 fields = [
   { name = "data_offset", offset = 8, type = "u32", note = "the bank data's offset" },
   { name = "entries_offset", offset = 16, type = "u32", note = "the entries' offset" },
@@ -615,8 +622,8 @@ sound_picks_b = { address = 0x826C5C64, type = "bytes", count = 28, note = "seve
 sound_manager = { address = 0x826C5C80, type = "u32", note = "the sound manager (AudioManager, app + 124)" }
 music_byte = { address = 0x826C5C84, type = "u8", note = "0 by SoundGlobals::Init and the race's music fades" }
 unknown_826C5C85 = { address = 0x826C5C85, type = "u8", note = "0 by SoundGlobals::Init" }
-bank_pair_buffer = { address = 0x826C5C88, type = "u32", note = "bank pair 2's 3 MiB physical buffer" }
-bank_pair_small_buffer = { address = 0x826C5C8C, type = "u32", note = "bank pair 2's 512-byte physical buffer" }
+bank_pair_buffer = { address = 0x826C5C88, type = "u32", note = "bank pair 2's 3 MiB wave bank buffer (a memory block, a blob since E5 step 7)" }
+bank_pair_small_buffer = { address = 0x826C5C8C, type = "u32", note = "bank pair 2's 512-byte sound bank buffer (a memory block, a blob since E5 step 7)" }
 x3daudio = { address = 0x826C5C90, type = "bytes", count = 16, note = "an X3DAudioHandle (X3DAudioInitialize's, 5.1)" }
 channel_azimuths = { address = 0x826C5C38, type = "f32", note = "the emitter's one channel azimuth" }
 horn_record = { address = 0x826C62CC, type = "bytes", count = 20, note = "a CarInputRecord: race mode 8's other player's" }

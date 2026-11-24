@@ -477,6 +477,11 @@ void FreePhysical(uint32_t address) {
 
 uint32_t PhysicalSize(uint32_t address) {
   ITC_NATIVE_RUNNING("sub_822965C0 XPhysicalSize");
+  if (HandleInfo info; IsHandle(address) && DescribeHandle(address, &info)) {
+    // A blob made where the game asked for physical memory (E5 step 7):
+    // whole 4 KB pages, as a 4 KB-page physical block's size.
+    return info.size;
+  }
   std::lock_guard lock(mutex);
   const auto it = physical_sizes.find(address);
   if (it == physical_sizes.end()) {

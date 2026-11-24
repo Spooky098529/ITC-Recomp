@@ -7,6 +7,7 @@
 #include "base/log.h"
 #include "car_models/vinyl.h"
 #include "guest.h"
+#include "memory/handles.h"
 #include "schema/tuning_screen.h"
 #include "tuning_screen/tuning_screen.h"
 
@@ -27,22 +28,26 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   return sp - bytes;
 }
 
-constexpr uint32_t kVirtualAlloc = 0x82295398;
 constexpr uint32_t kArchiveLoad = 0x8209DE48;
-constexpr uint32_t kMemCommit = 0x1000;
 constexpr uint32_t kOnImageLoaded = 0x821FE608;  // the entry's load callback
 constexpr uint32_t kTextureFree = 0x820ECFC8;   // Texture::Free(header_in, data_in)
 
 // The load both functions end with, for the entry `e` (all 64 bits, as
 // Archive::Load's context) whose +0 holds the id (`size` its asset size
-// already asked): the file's pages (VirtualAlloc(0, size, MEM_COMMIT, 4))
-// into +12, Archive::Load(+0, the pages, the callback, e) into +4, +8 = +24
-// = 1, +16 the size asked again, +20 = 0. The callers' frame and return
+// already asked): the file's pages (a blob, in place of VirtualAlloc(0, size,
+// MEM_COMMIT, 4)) into +12, Archive::Load(+0, the pages, the callback, e)
+// into +4, +8 = +24 = 1, +16 the size asked again, +20 = 0. The callers' frame and return
 // addresses. The second AssetSize's r3.
 uint64_t LoadEntry(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t e, uint32_t size,
-                   uint32_t frame, uint32_t alloc_lr, uint32_t load_lr) {
+                   uint32_t frame, uint32_t load_lr) {
   const schema::DecalImageEntry entry(base, uint32_t(e));
-  const uint64_t pages = call(kVirtualAlloc, {0, size, kMemCommit, 4}, frame, alloc_lr);
+  // A blob (E5 step 7: the file in PC memory, in the guest's byte order) in
+  // place of the VirtualAlloc(size) at 0x821FE8FC (Request) or 0x821F6D78
+  // (Load): a TGA only the game's code reads (Texture::FromTga decodes it
+  // into pages of its own and copies the rows into the texture's physical
+  // data; Reload reads another file into it; Unload's VirtualFree frees it);
+  // whole pages, as the original's.
+  const uint64_t pages = memory::NewBlob(size, "DecalImageFile");
   const uint32_t id = entry.asset_id();
   entry.set_file(uint32_t(pages));
   const uint64_t serial = call(kArchiveLoad, {id, pages, kOnImageLoaded, e, 0, 0}, frame, load_lr);
@@ -94,7 +99,7 @@ uint64_t RequestImage(uint8_t* base, const tuning_screen::GuestCall& call, uint6
     swap(382, 22604);
   }
   const uint32_t size = archive::AssetSize(base, entry.asset_id());
-  return LoadEntry(base, call, e, size, frame, 0x821FE8FC, 0x821FE920);
+  return LoadEntry(base, call, e, size, frame, 0x821FE920);
 }
 
 uint64_t LoadImage(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t images,
@@ -104,7 +109,7 @@ uint64_t LoadImage(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t
   const uint64_t e = i * 36 + images;
   schema::DecalImageEntry(base, uint32_t(e)).set_asset_id(uint32_t(id));
   const uint32_t size = archive::AssetSize(base, uint32_t(id));
-  return LoadEntry(base, call, e, size, frame, 0x821F6D78, 0x821F6D9C);
+  return LoadEntry(base, call, e, size, frame, 0x821F6D9C);
 }
 
 uint64_t LoadDecalImages(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,

@@ -28,7 +28,7 @@ ITC_FLAG_BOOL(native_race_sounds, true, "ITC",
               "RollingStartTick sub_82177130, AfterRaceTick sub_82176C10, OnCountdown "
               "sub_82176968, OnRaceEnd sub_82176BA0, OnLeaveAfterRace sub_82176E60, OnNextStage "
               "sub_82176EC8, OnRollingStart sub_821770C0, PlayStartMusic sub_82175DB0 (rand's plain "
-              "C++), IdleTick sub_821767A8, Begin sub_82176618, Init sub_82177378 (XPhysicalAlloc through the function table, CarSounds::Init's and StateMachine::Add's plain C++), OnAbort sub_82175CA0, OnAbortDone sub_82175CF8 (both not seen in play), Unload sub_821772D8 (XPhysicalFree and the views' delete sub_82117B30 through the function table); the car sounds, Music::Play and Sound::Play through their plain C++, the sound manager's slots through the "
+              "C++), IdleTick sub_821767A8, Begin sub_82176618, Init sub_82177378 (its buffers blobs since E5 step 7, CarSounds::Init's and StateMachine::Add's plain C++), OnAbort sub_82175CA0, OnAbortDone sub_82175CF8 (both not seen in play), Unload sub_821772D8 (XPhysicalFree and the views' delete sub_82117B30 through the function table); the car sounds, Music::Play and Sound::Play through their plain C++, the sound manager's slots through the "
               "function table) natively instead of through the translated code (the same "
               "words; checked by --run_harnesses=race_sounds)");
 

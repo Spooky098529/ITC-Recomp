@@ -434,6 +434,14 @@ struct LocationScreenPictureTexture : View {
   void set_height(uint32_t v) const { if (auto* d = direct()) { d->height = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
 };
 
+// allocated; measure: -
+struct LocationScreenPictureFile : View {
+  using View::View;
+  static constexpr uint32_t kSize = 0;
+  static LocationScreenPictureFile New(uint8_t* base, uint32_t size) { return LocationScreenPictureFile(base, memory::NewBlob(size, "LocationScreenPictureFile")); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+};
+
 // file; measure: DataTables::Entry20.ret
 struct LocationScreenEntry20 : View {
   using View::View;

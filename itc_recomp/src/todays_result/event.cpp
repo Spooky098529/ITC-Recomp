@@ -6,6 +6,7 @@
 #include "base/log.h"
 #include "career/career.h"
 #include "data_tables/data_tables.h"
+#include "memory/handles.h"
 #include "todays_result/internal.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -189,8 +190,12 @@ uint64_t LoadImagePair(uint8_t* base, uint32_t data, uint32_t index, uint32_t sp
   for (const Pair& pair : kPairs) {
     const uint32_t asset = pair.asset + index;
     const uint64_t size = calls.Call(kAssetSize, frame, pair.lrs[0], asset);
-    const uint32_t buffer =
-        uint32_t(calls.Call(kVirtualAlloc, frame, pair.lrs[1], 0, size, 0x1000, 4));
+    // A blob (E5 step 7: the file in PC memory, in the guest's byte order)
+    // in place of the VirtualAlloc(size) at pair.lrs[1]: an XPR2 pack only
+    // the game's code reads (Type2Hub::ImageLoaded's XPR::Create copies its
+    // header and data out, the data into physical memory, then VirtualFree
+    // frees it); whole pages, as the original's, for the archive's sectors.
+    const uint32_t buffer = memory::NewBlob(uint32_t(size), "TodaysEventImageFile");
     calls.Call(kXMemSet, frame, pair.lrs[2], buffer, 0, size);
     // A host object (E5 step 3) in place of the VirtualAlloc(16) at
     // pair.lrs[3]; the list and the callback's context hold its handle.

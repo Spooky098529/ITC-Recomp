@@ -201,8 +201,8 @@ fields = [
   { name = "sound_bank_file_id", offset = 88, type = "u32" },
   { name = "wave_bank_size", offset = 92, type = "u32" },
   { name = "sound_bank_size", offset = 96, type = "u32" },
-  { name = "wave_bank_buffer", offset = 100, type = "u32", note = "XPhysicalAlloc's (bank 2: [0x826C5C88])" },
-  { name = "sound_bank_buffer", offset = 104, type = "u32", note = "operator new[]'s, a SoundBankFile blob (bank 2: [0x826C5C8C], physical)" },
+  { name = "wave_bank_buffer", offset = 100, type = "u32", note = "XPhysicalAlloc's, a CarSoundWaveBank blob (bank 2: [0x826C5C88], a blob block)" },
+  { name = "sound_bank_buffer", offset = 104, type = "u32", note = "operator new[]'s, a SoundBankFile blob (bank 2: [0x826C5C8C], a blob block)" },
   { name = "wave_bank_loaded", offset = 108, type = "u8" },
   { name = "sound_bank_loaded", offset = 109, type = "u8" },
 ]
@@ -217,9 +217,9 @@ origin = "allocated"
 # (lifted, returning at 0x82117900 and 0x82117944); freed by
 # WaveBankHolderDelete (sub_82117AD8, operator delete). XACT's
 # CreateInMemoryWaveBank writes the bank into +8 by address (the raw path).
-# Its buffer stays in guest memory: XPhysicalAlloc's (GPU memory), and the
-# XMA data in it is read by our FFmpeg through base + address
-# (src/hooks/xma.cpp).
+# Its buffer is a CarSoundWaveBank blob since E5 step 7 (BankPair::Load's
+# XPhysicalAlloc; bank 2's SoundGlobals::Init's block), the XMA data in it
+# read by our FFmpeg through guest::Pointer (src/hooks/xma.cpp).
 storage = "host"
 host_alloc = [0x82117900, 0x82117944]
 fields = [
@@ -253,8 +253,8 @@ fields = [
 # entries from it). A blob (E5 step 5, 2026-11-24): in PC memory with the
 # file's bytes (lifted operator new[], returning at 0x82117A38, the size in
 # r3); freed by BankPair::~BankPair's operator delete (the game's free takes
-# handles). Bank 2's (the race's effects) is SoundGlobals::Init's physical
-# 512-byte buffer and stays in guest memory.
+# handles). Bank 2's (the race's effects) is SoundGlobals::Init's 512-byte
+# memory block, a blob too since E5 step 7 (models::AllocPhysicalExBlob).
 [SoundBankFile]
 size = 0
 origin = "allocated"

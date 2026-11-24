@@ -8,6 +8,7 @@
 #include "build_screen/build_screen.h"
 #include "car_makers/car_makers.h"
 #include "data_tables/data_tables.h"
+#include "memory/handles.h"
 #include "stand_models/stand_models.h"
 #include "type2_screens/internal.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -180,7 +181,12 @@ uint64_t HubLoadNoticeImage(uint8_t* base, uint32_t data, uint32_t index, uint32
   for (const auto& image : kImages) {
     const uint32_t asset = image.asset + index;
     const uint32_t size = archive::AssetSize(base, asset);
-    const uint32_t buffer = uint32_t(Alloc(calls, frame, image.alloc, size));
+    // A blob (E5 step 7: the file in PC memory, in the guest's byte order)
+    // in place of the VirtualAlloc(size) at image.alloc: an XPR2 pack only
+    // the game's code reads (ImageLoaded's XPR::Create copies its header and
+    // data out, the data into physical memory, then VirtualFree frees it);
+    // whole pages, as the original's, for the archive's sectors.
+    const uint32_t buffer = memory::NewBlob(size, "Type2HubImageFile");
     calls.Call(kXMemSet, frame, image.memset, buffer, 0, size);
     // A host object (E5 step 3) in place of the VirtualAlloc(16) at
     // image.record; the list holds its handle.
