@@ -1196,3 +1196,41 @@ Next is step 9: the heap and the image become blocks of their own,
 outside the guest mapping (the image's block can be the compiled-in data
 itself).
 
+
+## Step 9 as one swarm (2026-11-24)
+
+`docs/e5-native.md` step 9 (the heap and the image out of the guest
+mapping), the user's call (2026-11-24: "do step 9, make use of a swarm").
+
+### Groundwork: the heap and the image in blocks of their own (done 2026-11-24, `95c5f19f`)
+
+There is no guest mapping any more: no memory file, no views. The heap
+(our allocation layer's range, `0x10000` + 384 MiB) and the image
+(`0x82000000` + `0x9B0000`, its data compiled in since step 8) are blocks
+of host memory of their own (`memory::g_heap`, `memory::g_image`,
+`memory/mapping.cpp`), as the physical memory is since step 7
+(`memory::g_physical`, now anonymous memory too). `guest.h` translates
+their addresses in every load, store and `guest::Pointer`
+(`memory::BlockPointer`). `base`, still passed through the code until step
+10, is a 4 GB range with nothing mapped: a raw `base + address` faults, and
+the fault handler names it ("guest fault: a raw access at X (the heap /
+the image / a null pointer / no block)"). Raw sites converted: the native
+audio's sample read, the per-frame logic's state copies, the kernel
+variables' strings, the debug scans and captures (their ranges now the
+heap's and the image's blocks instead of `/proc/self/maps` under `base`).
+Checked: build, attract race (38 s, no error lines, 150 fps at the cap),
+`tick_replay.sh` (both races all match).
+
+### The swarm
+
+The races and the tick replay only reach the paths they play; a raw access
+on another path (a menu, the saves, the replay theater) would fault for a
+player. The swarm reads every hand port (`src/` but `lifted/`, `schema/`,
+`image/`, `memory/`, `harnesses/`: about 395,000 lines in 16 units of
+about 25,000, `hooks/` split by file) for code that assumes the old flat
+mapping (host addresses made from `base`, guest addresses recovered from
+host pointers, a host pointer for one address walked to another, spans
+leaving their block) and converts each site to `guest.h`'s calls, the same
+bytes in the same order. The script:
+`itc_recomp/tools/workflows/e5-step9-swarm.js`, `args`:
+`{"units": [{name, files}]}`; reports in `docs/loops/e5-step9-reports.md`.
