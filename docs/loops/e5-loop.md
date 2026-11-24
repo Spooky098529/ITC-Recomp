@@ -1110,3 +1110,34 @@ Left of step 6: the lifted code's own frames stay (on the PC memory
 stacks: their slots' addresses go to their callees); the per-thread block
 is a blob read through r13 as before (not yet `thread_local` state); the
 lifted code's float mode switches are as the original made them.
+
+## Step 7 as one swarm (2026-11-24)
+
+`docs/e5-native.md` step 7 (the renderer's memory), the user's call
+(2026-11-24: "do step 7 with another swarm").
+
+### Groundwork: the physical memory out of guest memory (done 2026-11-24, `3987bc46`)
+
+The physical memory (the GPU's: textures, vertex and index data, shader
+microcode, the command buffer, the tiling workers' signals) is mapped on
+its own (`memory::g_physical`, `memory/mapping.cpp`), outside the guest
+mapping, and the renderer reads it there (`native::PhysicalHostAddress`).
+The guest's addresses for it (0x7F000000: physical 0 to 16 MB;
+0xA0000000 and 0xC0000000; 0xE0000000, + 4 KB) are no longer views of
+guest memory: `guest.h` translates them in every load, store and
+`guest::Pointer`, so the game's code and our ports reach the same bytes. A
+raw `base + address` into them faults, named by the fault handler
+("physical fault"); two were found (the shader microcode's copy in
+`native/replay_hooks.cpp`, a resource word in `graphics/resources.cpp`).
+Checked: build, attract race (38 s, no error lines, 150 fps at the cap),
+`tick_replay.sh` twice (both races all match), a frame dump.
+
+### The swarm
+
+Seven units: what the GPU never reads out of physical memory (the sound
+buffers, the course scenery's lists, the models' and shaders' blocks, the
+surfaces, the lifted direct allocations) into blobs; the image loaders
+step 5 left (their files' buffers blobs where the pixels are copied out
+before the renderer reads them). The script:
+`itc_recomp/tools/workflows/e5-step7-swarm.js`; reports in
+`docs/loops/e5-step7-reports.md`.
