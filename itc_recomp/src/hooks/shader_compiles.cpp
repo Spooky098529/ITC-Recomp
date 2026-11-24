@@ -73,7 +73,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822B8F10) {
   if (ctx.r3.s32 < 0) {
     return;
   }
-  const uint32_t data = schema::D3DXBufferOut(base, shader_out).buffer().data();
+  const uint32_t data = schema::D3DXBufferOut(base, shader_out).buffer().contents();
   for (uint32_t i = 0; i < shader->size; i++) {
     guest::StoreU8(base, data + i, shader->data[i]);
   }

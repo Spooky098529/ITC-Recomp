@@ -42,4 +42,12 @@ uint64_t LoadOverlay(const uint8_t* object, const Layout& layout, uint32_t offse
 void StoreOverlay(uint8_t* object, const Layout& layout, uint32_t offset, uint32_t width,
                   uint64_t value);
 
+// A load or store of `width` bytes at a handle's value (an interior one
+// too), as the guest's bytes there would give it, by the owner object's
+// layout: what a view does where its type isn't the handle's own (an
+// object embedded in a host owner). As RawHandleLoad and Store (guest.h)
+// without their log line.
+uint64_t OwnerLoad(uint32_t address, uint32_t width);
+void OwnerStore(uint32_t address, uint32_t width, uint64_t value);
+
 }  // namespace memory

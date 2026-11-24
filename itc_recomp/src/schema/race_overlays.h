@@ -146,241 +146,242 @@ struct CarOverlays : View {
   }
   CarOverlays at(uint32_t i) const { return CarOverlays(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCarOverlaysLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarOverlaysLayout, offset, width, v); }
+  CarOverlaysData* direct() const { return static_cast<CarOverlaysData*>(memory::HandleOwn(address, &kCarOverlaysLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kCarOverlaysLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarOverlaysLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0x82008524 (OverlayVtable)
   uint32_t vtable_address() const { return address + 0; }
-  uint32_t vtable() const { return data()->vtable; }
-  void set_vtable(uint32_t v) const { data()->vtable = v; }
-  uint32_t vtable_bits() const { return data()->vtable; }
-  void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
+  uint32_t vtable_bits() const { if (auto* d = direct()) return d->vtable; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_vtable_bits(uint32_t v) const { if (auto* d = direct()) { d->vtable = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable() const { if (auto* d = direct()) return d->vtable; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_vtable(uint32_t v) const { if (auto* d = direct()) { d->vtable = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // 25 OverlayView pointers, one a view slot (0 none)
   uint32_t views_address() const { return address + 4; }
-  uint8_t* views() const { return reinterpret_cast<uint8_t*>(data()) + 4; }
+  uint8_t* views() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 4 : guest::Pointer(base, address + 4); }
   // the texture table (42 textures, loaded by overlay 0 and shared)
   uint32_t textures_address() const { return address + 104; }
-  uint32_t textures() const { return data()->textures; }
-  void set_textures(uint32_t v) const { data()->textures = v; }
-  uint32_t textures_bits() const { return data()->textures; }
-  void set_textures_bits(uint32_t v) const { data()->textures = v; }
+  uint32_t textures_bits() const { if (auto* d = direct()) return d->textures; return uint32_t((memory::IsHandle(address + 104) ? uint32_t(memory::OwnerLoad(address + 104, 4)) : guest::LoadU32(base, address + 104))); }
+  void set_textures_bits(uint32_t v) const { if (auto* d = direct()) { d->textures = v; return; } if (memory::IsHandle(address + 104)) memory::OwnerStore(address + 104, 4, v); else guest::StoreU32(base, address + 104, v); }
+  uint32_t textures() const { if (auto* d = direct()) return d->textures; return uint32_t((memory::IsHandle(address + 104) ? uint32_t(memory::OwnerLoad(address + 104, 4)) : guest::LoadU32(base, address + 104))); }
+  void set_textures(uint32_t v) const { if (auto* d = direct()) { d->textures = v; return; } if (memory::IsHandle(address + 104)) memory::OwnerStore(address + 104, 4, v); else guest::StoreU32(base, address + 104, v); }
   uint32_t texture_set_address() const { return address + 108; }
-  uint32_t texture_set() const { return data()->texture_set; }
-  void set_texture_set(uint32_t v) const { data()->texture_set = v; }
-  uint32_t texture_set_bits() const { return data()->texture_set; }
-  void set_texture_set_bits(uint32_t v) const { data()->texture_set = v; }
+  uint32_t texture_set_bits() const { if (auto* d = direct()) return d->texture_set; return uint32_t((memory::IsHandle(address + 108) ? uint32_t(memory::OwnerLoad(address + 108, 4)) : guest::LoadU32(base, address + 108))); }
+  void set_texture_set_bits(uint32_t v) const { if (auto* d = direct()) { d->texture_set = v; return; } if (memory::IsHandle(address + 108)) memory::OwnerStore(address + 108, 4, v); else guest::StoreU32(base, address + 108, v); }
+  uint32_t texture_set() const { if (auto* d = direct()) return d->texture_set; return uint32_t((memory::IsHandle(address + 108) ? uint32_t(memory::OwnerLoad(address + 108, 4)) : guest::LoadU32(base, address + 108))); }
+  void set_texture_set(uint32_t v) const { if (auto* d = direct()) { d->texture_set = v; return; } if (memory::IsHandle(address + 108)) memory::OwnerStore(address + 108, 4, v); else guest::StoreU32(base, address + 108, v); }
   uint32_t loaded_address() const { return address + 112; }
-  uint32_t loaded() const { return data()->loaded; }
-  void set_loaded(uint32_t v) const { data()->loaded = v; }
-  uint32_t loaded_bits() const { return data()->loaded; }
-  void set_loaded_bits(uint32_t v) const { data()->loaded = v; }
+  uint32_t loaded_bits() const { if (auto* d = direct()) return d->loaded; return uint32_t((memory::IsHandle(address + 112) ? uint32_t(memory::OwnerLoad(address + 112, 4)) : guest::LoadU32(base, address + 112))); }
+  void set_loaded_bits(uint32_t v) const { if (auto* d = direct()) { d->loaded = v; return; } if (memory::IsHandle(address + 112)) memory::OwnerStore(address + 112, 4, v); else guest::StoreU32(base, address + 112, v); }
+  uint32_t loaded() const { if (auto* d = direct()) return d->loaded; return uint32_t((memory::IsHandle(address + 112) ? uint32_t(memory::OwnerLoad(address + 112, 4)) : guest::LoadU32(base, address + 112))); }
+  void set_loaded(uint32_t v) const { if (auto* d = direct()) { d->loaded = v; return; } if (memory::IsHandle(address + 112)) memory::OwnerStore(address + 112, 4, v); else guest::StoreU32(base, address + 112, v); }
   // an index into the 12-byte entries at 0x82008558 (the set-up's +0)
   uint32_t viewport_entry_address() const { return address + 116; }
-  uint32_t viewport_entry() const { return data()->viewport_entry; }
-  void set_viewport_entry(uint32_t v) const { data()->viewport_entry = v; }
-  uint32_t viewport_entry_bits() const { return data()->viewport_entry; }
-  void set_viewport_entry_bits(uint32_t v) const { data()->viewport_entry = v; }
+  uint32_t viewport_entry_bits() const { if (auto* d = direct()) return d->viewport_entry; return uint32_t((memory::IsHandle(address + 116) ? uint32_t(memory::OwnerLoad(address + 116, 4)) : guest::LoadU32(base, address + 116))); }
+  void set_viewport_entry_bits(uint32_t v) const { if (auto* d = direct()) { d->viewport_entry = v; return; } if (memory::IsHandle(address + 116)) memory::OwnerStore(address + 116, 4, v); else guest::StoreU32(base, address + 116, v); }
+  uint32_t viewport_entry() const { if (auto* d = direct()) return d->viewport_entry; return uint32_t((memory::IsHandle(address + 116) ? uint32_t(memory::OwnerLoad(address + 116, 4)) : guest::LoadU32(base, address + 116))); }
+  void set_viewport_entry(uint32_t v) const { if (auto* d = direct()) { d->viewport_entry = v; return; } if (memory::IsHandle(address + 116)) memory::OwnerStore(address + 116, 4, v); else guest::StoreU32(base, address + 116, v); }
   // an index into the pairs at 0x820085A0 (the set-up's +4)
   uint32_t second_index_address() const { return address + 120; }
-  uint32_t second_index() const { return data()->second_index; }
-  void set_second_index(uint32_t v) const { data()->second_index = v; }
-  uint32_t second_index_bits() const { return data()->second_index; }
-  void set_second_index_bits(uint32_t v) const { data()->second_index = v; }
+  uint32_t second_index_bits() const { if (auto* d = direct()) return d->second_index; return uint32_t((memory::IsHandle(address + 120) ? uint32_t(memory::OwnerLoad(address + 120, 4)) : guest::LoadU32(base, address + 120))); }
+  void set_second_index_bits(uint32_t v) const { if (auto* d = direct()) { d->second_index = v; return; } if (memory::IsHandle(address + 120)) memory::OwnerStore(address + 120, 4, v); else guest::StoreU32(base, address + 120, v); }
+  uint32_t second_index() const { if (auto* d = direct()) return d->second_index; return uint32_t((memory::IsHandle(address + 120) ? uint32_t(memory::OwnerLoad(address + 120, 4)) : guest::LoadU32(base, address + 120))); }
+  void set_second_index(uint32_t v) const { if (auto* d = direct()) { d->second_index = v; return; } if (memory::IsHandle(address + 120)) memory::OwnerStore(address + 120, 4, v); else guest::StoreU32(base, address + 120, v); }
   uint32_t unknown_124_address() const { return address + 124; }
-  uint32_t unknown_124() const { return data()->unknown_124; }
-  void set_unknown_124(uint32_t v) const { data()->unknown_124 = v; }
-  uint32_t unknown_124_bits() const { return data()->unknown_124; }
-  void set_unknown_124_bits(uint32_t v) const { data()->unknown_124 = v; }
+  uint32_t unknown_124_bits() const { if (auto* d = direct()) return d->unknown_124; return uint32_t((memory::IsHandle(address + 124) ? uint32_t(memory::OwnerLoad(address + 124, 4)) : guest::LoadU32(base, address + 124))); }
+  void set_unknown_124_bits(uint32_t v) const { if (auto* d = direct()) { d->unknown_124 = v; return; } if (memory::IsHandle(address + 124)) memory::OwnerStore(address + 124, 4, v); else guest::StoreU32(base, address + 124, v); }
+  uint32_t unknown_124() const { if (auto* d = direct()) return d->unknown_124; return uint32_t((memory::IsHandle(address + 124) ? uint32_t(memory::OwnerLoad(address + 124, 4)) : guest::LoadU32(base, address + 124))); }
+  void set_unknown_124(uint32_t v) const { if (auto* d = direct()) { d->unknown_124 = v; return; } if (memory::IsHandle(address + 124)) memory::OwnerStore(address + 124, 4, v); else guest::StoreU32(base, address + 124, v); }
   // the slot of the car's own view
   uint32_t view_slot_address() const { return address + 128; }
-  uint32_t view_slot() const { return data()->view_slot; }
-  void set_view_slot(uint32_t v) const { data()->view_slot = v; }
-  uint32_t view_slot_bits() const { return data()->view_slot; }
-  void set_view_slot_bits(uint32_t v) const { data()->view_slot = v; }
+  uint32_t view_slot_bits() const { if (auto* d = direct()) return d->view_slot; return uint32_t((memory::IsHandle(address + 128) ? uint32_t(memory::OwnerLoad(address + 128, 4)) : guest::LoadU32(base, address + 128))); }
+  void set_view_slot_bits(uint32_t v) const { if (auto* d = direct()) { d->view_slot = v; return; } if (memory::IsHandle(address + 128)) memory::OwnerStore(address + 128, 4, v); else guest::StoreU32(base, address + 128, v); }
+  uint32_t view_slot() const { if (auto* d = direct()) return d->view_slot; return uint32_t((memory::IsHandle(address + 128) ? uint32_t(memory::OwnerLoad(address + 128, 4)) : guest::LoadU32(base, address + 128))); }
+  void set_view_slot(uint32_t v) const { if (auto* d = direct()) { d->view_slot = v; return; } if (memory::IsHandle(address + 128)) memory::OwnerStore(address + 128, 4, v); else guest::StoreU32(base, address + 128, v); }
   // [0x826C5B2C] + 4 at the set-up
   uint32_t race_word_4_address() const { return address + 132; }
-  uint32_t race_word_4() const { return data()->race_word_4; }
-  void set_race_word_4(uint32_t v) const { data()->race_word_4 = v; }
-  uint32_t race_word_4_bits() const { return data()->race_word_4; }
-  void set_race_word_4_bits(uint32_t v) const { data()->race_word_4 = v; }
+  uint32_t race_word_4_bits() const { if (auto* d = direct()) return d->race_word_4; return uint32_t((memory::IsHandle(address + 132) ? uint32_t(memory::OwnerLoad(address + 132, 4)) : guest::LoadU32(base, address + 132))); }
+  void set_race_word_4_bits(uint32_t v) const { if (auto* d = direct()) { d->race_word_4 = v; return; } if (memory::IsHandle(address + 132)) memory::OwnerStore(address + 132, 4, v); else guest::StoreU32(base, address + 132, v); }
+  uint32_t race_word_4() const { if (auto* d = direct()) return d->race_word_4; return uint32_t((memory::IsHandle(address + 132) ? uint32_t(memory::OwnerLoad(address + 132, 4)) : guest::LoadU32(base, address + 132))); }
+  void set_race_word_4(uint32_t v) const { if (auto* d = direct()) { d->race_word_4 = v; return; } if (memory::IsHandle(address + 132)) memory::OwnerStore(address + 132, 4, v); else guest::StoreU32(base, address + 132, v); }
   // [0x826C5B2C] + 28 at the set-up; the effects update with 0 or 3
   uint32_t race_word_28_address() const { return address + 136; }
-  uint32_t race_word_28() const { return data()->race_word_28; }
-  void set_race_word_28(uint32_t v) const { data()->race_word_28 = v; }
-  uint32_t race_word_28_bits() const { return data()->race_word_28; }
-  void set_race_word_28_bits(uint32_t v) const { data()->race_word_28 = v; }
+  uint32_t race_word_28_bits() const { if (auto* d = direct()) return d->race_word_28; return uint32_t((memory::IsHandle(address + 136) ? uint32_t(memory::OwnerLoad(address + 136, 4)) : guest::LoadU32(base, address + 136))); }
+  void set_race_word_28_bits(uint32_t v) const { if (auto* d = direct()) { d->race_word_28 = v; return; } if (memory::IsHandle(address + 136)) memory::OwnerStore(address + 136, 4, v); else guest::StoreU32(base, address + 136, v); }
+  uint32_t race_word_28() const { if (auto* d = direct()) return d->race_word_28; return uint32_t((memory::IsHandle(address + 136) ? uint32_t(memory::OwnerLoad(address + 136, 4)) : guest::LoadU32(base, address + 136))); }
+  void set_race_word_28(uint32_t v) const { if (auto* d = direct()) { d->race_word_28 = v; return; } if (memory::IsHandle(address + 136)) memory::OwnerStore(address + 136, 4, v); else guest::StoreU32(base, address + 136, v); }
   // [0x826C5B2C] + 32 at the set-up
   uint32_t race_word_32_address() const { return address + 140; }
-  uint32_t race_word_32() const { return data()->race_word_32; }
-  void set_race_word_32(uint32_t v) const { data()->race_word_32 = v; }
-  uint32_t race_word_32_bits() const { return data()->race_word_32; }
-  void set_race_word_32_bits(uint32_t v) const { data()->race_word_32 = v; }
+  uint32_t race_word_32_bits() const { if (auto* d = direct()) return d->race_word_32; return uint32_t((memory::IsHandle(address + 140) ? uint32_t(memory::OwnerLoad(address + 140, 4)) : guest::LoadU32(base, address + 140))); }
+  void set_race_word_32_bits(uint32_t v) const { if (auto* d = direct()) { d->race_word_32 = v; return; } if (memory::IsHandle(address + 140)) memory::OwnerStore(address + 140, 4, v); else guest::StoreU32(base, address + 140, v); }
+  uint32_t race_word_32() const { if (auto* d = direct()) return d->race_word_32; return uint32_t((memory::IsHandle(address + 140) ? uint32_t(memory::OwnerLoad(address + 140, 4)) : guest::LoadU32(base, address + 140))); }
+  void set_race_word_32(uint32_t v) const { if (auto* d = direct()) { d->race_word_32 = v; return; } if (memory::IsHandle(address + 140)) memory::OwnerStore(address + 140, 4, v); else guest::StoreU32(base, address + 140, v); }
   // the effects' parameter table 0x82616F50
   uint32_t params_address() const { return address + 144; }
+  uint32_t params_bits() const { if (auto* d = direct()) return d->params; return uint32_t((memory::IsHandle(address + 144) ? uint32_t(memory::OwnerLoad(address + 144, 4)) : guest::LoadU32(base, address + 144))); }
+  void set_params_bits(uint32_t v) const { if (auto* d = direct()) { d->params = v; return; } if (memory::IsHandle(address + 144)) memory::OwnerStore(address + 144, 4, v); else guest::StoreU32(base, address + 144, v); }
   template <typename T = CarOverlaysParams>
-  T params() const { return T(base, data()->params); }
-  void set_params(const View& w) const { const uint32_t v = w.address; data()->params = v; }
-  void set_params(uint32_t v) const { data()->params = v; }
-  uint32_t params_bits() const { return data()->params; }
-  void set_params_bits(uint32_t v) const { data()->params = v; }
+  T params() const { return T(base, params_bits()); }
+  void set_params(const View& w) const { set_params_bits(w.address); }
+  void set_params(uint32_t v) const { set_params_bits(v); }
   // 4 Trail pointers, one a wheel
   uint32_t trails_address() const { return address + 148; }
-  uint8_t* trails() const { return reinterpret_cast<uint8_t*>(data()) + 148; }
+  uint8_t* trails() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 148 : guest::Pointer(base, address + 148); }
   // 4 Smoke pointers, one a wheel
   uint32_t smokes_address() const { return address + 164; }
-  uint8_t* smokes() const { return reinterpret_cast<uint8_t*>(data()) + 164; }
+  uint8_t* smokes() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 164 : guest::Pointer(base, address + 164); }
   // five words cleared by CreateChildren
   uint32_t unknown_180_address() const { return address + 180; }
-  uint8_t* unknown_180() const { return reinterpret_cast<uint8_t*>(data()) + 180; }
+  uint8_t* unknown_180() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 180 : guest::Pointer(base, address + 180); }
   // 4 LightSprite pointers (model points 4-7)
   uint32_t light_sprites_address() const { return address + 200; }
-  uint8_t* light_sprites() const { return reinterpret_cast<uint8_t*>(data()) + 200; }
+  uint8_t* light_sprites() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 200 : guest::Pointer(base, address + 200); }
   // 14 words cleared by CreateChildren
   uint32_t unknown_216_address() const { return address + 216; }
-  uint8_t* unknown_216() const { return reinterpret_cast<uint8_t*>(data()) + 216; }
+  uint8_t* unknown_216() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 216 : guest::Pointer(base, address + 216); }
   // 14 words cleared by CreateChildren
   uint32_t unknown_272_address() const { return address + 272; }
-  uint8_t* unknown_272() const { return reinterpret_cast<uint8_t*>(data()) + 272; }
+  uint8_t* unknown_272() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 272 : guest::Pointer(base, address + 272); }
   // 8 Sparks pointers
   uint32_t sparks_address() const { return address + 328; }
-  uint8_t* sparks() const { return reinterpret_cast<uint8_t*>(data()) + 328; }
+  uint8_t* sparks() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 328 : guest::Pointer(base, address + 328); }
   // 4 ParticlesB pointers (model points 4-7)
   uint32_t particles_b_address() const { return address + 360; }
-  uint8_t* particles_b() const { return reinterpret_cast<uint8_t*>(data()) + 360; }
+  uint8_t* particles_b() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 360 : guest::Pointer(base, address + 360); }
   // the marker above the car
   uint32_t marker_address() const { return address + 376; }
+  uint32_t marker_bits() const { if (auto* d = direct()) return d->marker; return uint32_t((memory::IsHandle(address + 376) ? uint32_t(memory::OwnerLoad(address + 376, 4)) : guest::LoadU32(base, address + 376))); }
+  void set_marker_bits(uint32_t v) const { if (auto* d = direct()) { d->marker = v; return; } if (memory::IsHandle(address + 376)) memory::OwnerStore(address + 376, 4, v); else guest::StoreU32(base, address + 376, v); }
   template <typename T = Marker>
-  T marker() const { return T(base, data()->marker); }
-  void set_marker(const View& w) const { const uint32_t v = w.address; data()->marker = v; }
-  void set_marker(uint32_t v) const { data()->marker = v; }
-  uint32_t marker_bits() const { return data()->marker; }
-  void set_marker_bits(uint32_t v) const { data()->marker = v; }
+  T marker() const { return T(base, marker_bits()); }
+  void set_marker(const View& w) const { set_marker_bits(w.address); }
+  void set_marker(uint32_t v) const { set_marker_bits(v); }
   // 4 ParticlesC pointers (model points 14-17; probably the exhausts)
   uint32_t particles_c_address() const { return address + 380; }
-  uint8_t* particles_c() const { return reinterpret_cast<uint8_t*>(data()) + 380; }
+  uint8_t* particles_c() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 380 : guest::Pointer(base, address + 380); }
   // 9 ModelSprite pointers
   uint32_t model_sprites_address() const { return address + 396; }
-  uint8_t* model_sprites() const { return reinterpret_cast<uint8_t*>(data()) + 396; }
+  uint8_t* model_sprites() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 396 : guest::Pointer(base, address + 396); }
   // 12 bytes a wheel
   template <typename T = CarOverlaysWheel>
   T wheels(uint32_t i) const { return T(base, address + 432 + i * T::kSize); }
   // cleared by the reset (with the rates after it)
   uint32_t unknown_480_address() const { return address + 480; }
-  uint8_t* unknown_480() const { return reinterpret_cast<uint8_t*>(data()) + 480; }
+  uint8_t* unknown_480() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 480 : guest::Pointer(base, address + 480); }
   // +48 x wheel: the wheel's smoke rate accumulator (f32), the rest of each 48 bytes cleared by the reset
   uint32_t smoke_rates_address() const { return address + 528; }
-  uint8_t* smoke_rates() const { return reinterpret_cast<uint8_t*>(data()) + 528; }
+  uint8_t* smoke_rates() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 528 : guest::Pointer(base, address + 528); }
   // the vehicle's word +2252
   uint32_t vehicle_word_2252_address() const { return address + 720; }
-  uint32_t vehicle_word_2252() const { return data()->vehicle_word_2252; }
-  void set_vehicle_word_2252(uint32_t v) const { data()->vehicle_word_2252 = v; }
-  uint32_t vehicle_word_2252_bits() const { return data()->vehicle_word_2252; }
-  void set_vehicle_word_2252_bits(uint32_t v) const { data()->vehicle_word_2252 = v; }
+  uint32_t vehicle_word_2252_bits() const { if (auto* d = direct()) return d->vehicle_word_2252; return uint32_t((memory::IsHandle(address + 720) ? uint32_t(memory::OwnerLoad(address + 720, 4)) : guest::LoadU32(base, address + 720))); }
+  void set_vehicle_word_2252_bits(uint32_t v) const { if (auto* d = direct()) { d->vehicle_word_2252 = v; return; } if (memory::IsHandle(address + 720)) memory::OwnerStore(address + 720, 4, v); else guest::StoreU32(base, address + 720, v); }
+  uint32_t vehicle_word_2252() const { if (auto* d = direct()) return d->vehicle_word_2252; return uint32_t((memory::IsHandle(address + 720) ? uint32_t(memory::OwnerLoad(address + 720, 4)) : guest::LoadU32(base, address + 720))); }
+  void set_vehicle_word_2252(uint32_t v) const { if (auto* d = direct()) { d->vehicle_word_2252 = v; return; } if (memory::IsHandle(address + 720)) memory::OwnerStore(address + 720, 4, v); else guest::StoreU32(base, address + 720, v); }
   // 1.0 at construction
   uint32_t unknown_748_address() const { return address + 748; }
-  float unknown_748() const { return data()->unknown_748; }
-  void set_unknown_748(float v) const { data()->unknown_748 = v; }
-  uint32_t unknown_748_bits() const { return std::bit_cast<uint32_t>(data()->unknown_748); }
-  void set_unknown_748_bits(uint32_t v) const { data()->unknown_748 = std::bit_cast<float>(v); }
+  uint32_t unknown_748_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->unknown_748); return uint32_t((memory::IsHandle(address + 748) ? uint32_t(memory::OwnerLoad(address + 748, 4)) : guest::LoadU32(base, address + 748))); }
+  void set_unknown_748_bits(uint32_t v) const { if (auto* d = direct()) { d->unknown_748 = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 748)) memory::OwnerStore(address + 748, 4, v); else guest::StoreU32(base, address + 748, v); }
+  float unknown_748() const { return std::bit_cast<float>(unknown_748_bits()); }
+  void set_unknown_748(float v) const { set_unknown_748_bits(std::bit_cast<uint32_t>(v)); }
   // probably a vector, 1.0 at construction
   uint32_t unknown_752_address() const { return address + 752; }
-  uint8_t* unknown_752() const { return reinterpret_cast<uint8_t*>(data()) + 752; }
+  uint8_t* unknown_752() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 752 : guest::Pointer(base, address + 752); }
   // 1.0 at construction
   uint32_t unknown_764_address() const { return address + 764; }
-  float unknown_764() const { return data()->unknown_764; }
-  void set_unknown_764(float v) const { data()->unknown_764 = v; }
-  uint32_t unknown_764_bits() const { return std::bit_cast<uint32_t>(data()->unknown_764); }
-  void set_unknown_764_bits(uint32_t v) const { data()->unknown_764 = std::bit_cast<float>(v); }
+  uint32_t unknown_764_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->unknown_764); return uint32_t((memory::IsHandle(address + 764) ? uint32_t(memory::OwnerLoad(address + 764, 4)) : guest::LoadU32(base, address + 764))); }
+  void set_unknown_764_bits(uint32_t v) const { if (auto* d = direct()) { d->unknown_764 = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 764)) memory::OwnerStore(address + 764, 4, v); else guest::StoreU32(base, address + 764, v); }
+  float unknown_764() const { return std::bit_cast<float>(unknown_764_bits()); }
+  void set_unknown_764(float v) const { set_unknown_764_bits(std::bit_cast<uint32_t>(v)); }
   // 0.0 at construction and reset
   uint32_t color_r_address() const { return address + 768; }
-  float color_r() const { return data()->color_r; }
-  void set_color_r(float v) const { data()->color_r = v; }
-  uint32_t color_r_bits() const { return std::bit_cast<uint32_t>(data()->color_r); }
-  void set_color_r_bits(uint32_t v) const { data()->color_r = std::bit_cast<float>(v); }
+  uint32_t color_r_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->color_r); return uint32_t((memory::IsHandle(address + 768) ? uint32_t(memory::OwnerLoad(address + 768, 4)) : guest::LoadU32(base, address + 768))); }
+  void set_color_r_bits(uint32_t v) const { if (auto* d = direct()) { d->color_r = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 768)) memory::OwnerStore(address + 768, 4, v); else guest::StoreU32(base, address + 768, v); }
+  float color_r() const { return std::bit_cast<float>(color_r_bits()); }
+  void set_color_r(float v) const { set_color_r_bits(std::bit_cast<uint32_t>(v)); }
   // 0.0 at construction and reset
   uint32_t color_g_address() const { return address + 772; }
-  float color_g() const { return data()->color_g; }
-  void set_color_g(float v) const { data()->color_g = v; }
-  uint32_t color_g_bits() const { return std::bit_cast<uint32_t>(data()->color_g); }
-  void set_color_g_bits(uint32_t v) const { data()->color_g = std::bit_cast<float>(v); }
+  uint32_t color_g_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->color_g); return uint32_t((memory::IsHandle(address + 772) ? uint32_t(memory::OwnerLoad(address + 772, 4)) : guest::LoadU32(base, address + 772))); }
+  void set_color_g_bits(uint32_t v) const { if (auto* d = direct()) { d->color_g = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 772)) memory::OwnerStore(address + 772, 4, v); else guest::StoreU32(base, address + 772, v); }
+  float color_g() const { return std::bit_cast<float>(color_g_bits()); }
+  void set_color_g(float v) const { set_color_g_bits(std::bit_cast<uint32_t>(v)); }
   // 0.0 at construction and reset
   uint32_t color_b_address() const { return address + 776; }
-  float color_b() const { return data()->color_b; }
-  void set_color_b(float v) const { data()->color_b = v; }
-  uint32_t color_b_bits() const { return std::bit_cast<uint32_t>(data()->color_b); }
-  void set_color_b_bits(uint32_t v) const { data()->color_b = std::bit_cast<float>(v); }
+  uint32_t color_b_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->color_b); return uint32_t((memory::IsHandle(address + 776) ? uint32_t(memory::OwnerLoad(address + 776, 4)) : guest::LoadU32(base, address + 776))); }
+  void set_color_b_bits(uint32_t v) const { if (auto* d = direct()) { d->color_b = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 776)) memory::OwnerStore(address + 776, 4, v); else guest::StoreU32(base, address + 776, v); }
+  float color_b() const { return std::bit_cast<float>(color_b_bits()); }
+  void set_color_b(float v) const { set_color_b_bits(std::bit_cast<uint32_t>(v)); }
   // 1.0 at construction and reset
   uint32_t color_a_address() const { return address + 780; }
-  float color_a() const { return data()->color_a; }
-  void set_color_a(float v) const { data()->color_a = v; }
-  uint32_t color_a_bits() const { return std::bit_cast<uint32_t>(data()->color_a); }
-  void set_color_a_bits(uint32_t v) const { data()->color_a = std::bit_cast<float>(v); }
+  uint32_t color_a_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->color_a); return uint32_t((memory::IsHandle(address + 780) ? uint32_t(memory::OwnerLoad(address + 780, 4)) : guest::LoadU32(base, address + 780))); }
+  void set_color_a_bits(uint32_t v) const { if (auto* d = direct()) { d->color_a = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 780)) memory::OwnerStore(address + 780, 4, v); else guest::StoreU32(base, address + 780, v); }
+  float color_a() const { return std::bit_cast<float>(color_a_bits()); }
+  void set_color_a(float v) const { set_color_a_bits(std::bit_cast<uint32_t>(v)); }
   // the viewport's +1860: 1 and 2 turn some effects off
   uint32_t view_mode_address() const { return address + 784; }
-  uint32_t view_mode() const { return data()->view_mode; }
-  void set_view_mode(uint32_t v) const { data()->view_mode = v; }
-  uint32_t view_mode_bits() const { return data()->view_mode; }
-  void set_view_mode_bits(uint32_t v) const { data()->view_mode = v; }
+  uint32_t view_mode_bits() const { if (auto* d = direct()) return d->view_mode; return uint32_t((memory::IsHandle(address + 784) ? uint32_t(memory::OwnerLoad(address + 784, 4)) : guest::LoadU32(base, address + 784))); }
+  void set_view_mode_bits(uint32_t v) const { if (auto* d = direct()) { d->view_mode = v; return; } if (memory::IsHandle(address + 784)) memory::OwnerStore(address + 784, 4, v); else guest::StoreU32(base, address + 784, v); }
+  uint32_t view_mode() const { if (auto* d = direct()) return d->view_mode; return uint32_t((memory::IsHandle(address + 784) ? uint32_t(memory::OwnerLoad(address + 784, 4)) : guest::LoadU32(base, address + 784))); }
+  void set_view_mode(uint32_t v) const { if (auto* d = direct()) { d->view_mode = v; return; } if (memory::IsHandle(address + 784)) memory::OwnerStore(address + 784, 4, v); else guest::StoreU32(base, address + 784, v); }
   // 6 at construction and reset
   uint32_t unknown_788_address() const { return address + 788; }
-  uint32_t unknown_788() const { return data()->unknown_788; }
-  void set_unknown_788(uint32_t v) const { data()->unknown_788 = v; }
-  uint32_t unknown_788_bits() const { return data()->unknown_788; }
-  void set_unknown_788_bits(uint32_t v) const { data()->unknown_788 = v; }
+  uint32_t unknown_788_bits() const { if (auto* d = direct()) return d->unknown_788; return uint32_t((memory::IsHandle(address + 788) ? uint32_t(memory::OwnerLoad(address + 788, 4)) : guest::LoadU32(base, address + 788))); }
+  void set_unknown_788_bits(uint32_t v) const { if (auto* d = direct()) { d->unknown_788 = v; return; } if (memory::IsHandle(address + 788)) memory::OwnerStore(address + 788, 4, v); else guest::StoreU32(base, address + 788, v); }
+  uint32_t unknown_788() const { if (auto* d = direct()) return d->unknown_788; return uint32_t((memory::IsHandle(address + 788) ? uint32_t(memory::OwnerLoad(address + 788, 4)) : guest::LoadU32(base, address + 788))); }
+  void set_unknown_788(uint32_t v) const { if (auto* d = direct()) { d->unknown_788 = v; return; } if (memory::IsHandle(address + 788)) memory::OwnerStore(address + 788, 4, v); else guest::StoreU32(base, address + 788, v); }
   // the bound viewport's camera entry (CarOverlays::BindViewport's out +0)
   uint32_t viewport_record_address() const { return address + 796; }
-  uint32_t viewport_record() const { return data()->viewport_record; }
-  void set_viewport_record(uint32_t v) const { data()->viewport_record = v; }
-  uint32_t viewport_record_bits() const { return data()->viewport_record; }
-  void set_viewport_record_bits(uint32_t v) const { data()->viewport_record = v; }
+  uint32_t viewport_record_bits() const { if (auto* d = direct()) return d->viewport_record; return uint32_t((memory::IsHandle(address + 796) ? uint32_t(memory::OwnerLoad(address + 796, 4)) : guest::LoadU32(base, address + 796))); }
+  void set_viewport_record_bits(uint32_t v) const { if (auto* d = direct()) { d->viewport_record = v; return; } if (memory::IsHandle(address + 796)) memory::OwnerStore(address + 796, 4, v); else guest::StoreU32(base, address + 796, v); }
+  uint32_t viewport_record() const { if (auto* d = direct()) return d->viewport_record; return uint32_t((memory::IsHandle(address + 796) ? uint32_t(memory::OwnerLoad(address + 796, 4)) : guest::LoadU32(base, address + 796))); }
+  void set_viewport_record(uint32_t v) const { if (auto* d = direct()) { d->viewport_record = v; return; } if (memory::IsHandle(address + 796)) memory::OwnerStore(address + 796, 4, v); else guest::StoreU32(base, address + 796, v); }
   // the bound camera pass (its eye at +400)
   uint32_t camera_pass_address() const { return address + 800; }
-  uint32_t camera_pass() const { return data()->camera_pass; }
-  void set_camera_pass(uint32_t v) const { data()->camera_pass = v; }
-  uint32_t camera_pass_bits() const { return data()->camera_pass; }
-  void set_camera_pass_bits(uint32_t v) const { data()->camera_pass = v; }
+  uint32_t camera_pass_bits() const { if (auto* d = direct()) return d->camera_pass; return uint32_t((memory::IsHandle(address + 800) ? uint32_t(memory::OwnerLoad(address + 800, 4)) : guest::LoadU32(base, address + 800))); }
+  void set_camera_pass_bits(uint32_t v) const { if (auto* d = direct()) { d->camera_pass = v; return; } if (memory::IsHandle(address + 800)) memory::OwnerStore(address + 800, 4, v); else guest::StoreU32(base, address + 800, v); }
+  uint32_t camera_pass() const { if (auto* d = direct()) return d->camera_pass; return uint32_t((memory::IsHandle(address + 800) ? uint32_t(memory::OwnerLoad(address + 800, 4)) : guest::LoadU32(base, address + 800))); }
+  void set_camera_pass(uint32_t v) const { if (auto* d = direct()) { d->camera_pass = v; return; } if (memory::IsHandle(address + 800)) memory::OwnerStore(address + 800, 4, v); else guest::StoreU32(base, address + 800, v); }
   // the two words at 0x820085A0 + 8 x the second index
   uint32_t viewport_pair_address() const { return address + 804; }
-  uint8_t* viewport_pair() const { return reinterpret_cast<uint8_t*>(data()) + 804; }
+  uint8_t* viewport_pair() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 804 : guest::Pointer(base, address + 804); }
   // 1 during UpdateSparks (0 again in view modes 1 and 2)
   uint32_t sparks_updating_address() const { return address + 812; }
-  uint32_t sparks_updating() const { return data()->sparks_updating; }
-  void set_sparks_updating(uint32_t v) const { data()->sparks_updating = v; }
-  uint32_t sparks_updating_bits() const { return data()->sparks_updating; }
-  void set_sparks_updating_bits(uint32_t v) const { data()->sparks_updating = v; }
+  uint32_t sparks_updating_bits() const { if (auto* d = direct()) return d->sparks_updating; return uint32_t((memory::IsHandle(address + 812) ? uint32_t(memory::OwnerLoad(address + 812, 4)) : guest::LoadU32(base, address + 812))); }
+  void set_sparks_updating_bits(uint32_t v) const { if (auto* d = direct()) { d->sparks_updating = v; return; } if (memory::IsHandle(address + 812)) memory::OwnerStore(address + 812, 4, v); else guest::StoreU32(base, address + 812, v); }
+  uint32_t sparks_updating() const { if (auto* d = direct()) return d->sparks_updating; return uint32_t((memory::IsHandle(address + 812) ? uint32_t(memory::OwnerLoad(address + 812, 4)) : guest::LoadU32(base, address + 812))); }
+  void set_sparks_updating(uint32_t v) const { if (auto* d = direct()) { d->sparks_updating = v; return; } if (memory::IsHandle(address + 812)) memory::OwnerStore(address + 812, 4, v); else guest::StoreU32(base, address + 812, v); }
   uint32_t marker_shown_address() const { return address + 816; }
-  uint32_t marker_shown() const { return data()->marker_shown; }
-  void set_marker_shown(uint32_t v) const { data()->marker_shown = v; }
-  uint32_t marker_shown_bits() const { return data()->marker_shown; }
-  void set_marker_shown_bits(uint32_t v) const { data()->marker_shown = v; }
+  uint32_t marker_shown_bits() const { if (auto* d = direct()) return d->marker_shown; return uint32_t((memory::IsHandle(address + 816) ? uint32_t(memory::OwnerLoad(address + 816, 4)) : guest::LoadU32(base, address + 816))); }
+  void set_marker_shown_bits(uint32_t v) const { if (auto* d = direct()) { d->marker_shown = v; return; } if (memory::IsHandle(address + 816)) memory::OwnerStore(address + 816, 4, v); else guest::StoreU32(base, address + 816, v); }
+  uint32_t marker_shown() const { if (auto* d = direct()) return d->marker_shown; return uint32_t((memory::IsHandle(address + 816) ? uint32_t(memory::OwnerLoad(address + 816, 4)) : guest::LoadU32(base, address + 816))); }
+  void set_marker_shown(uint32_t v) const { if (auto* d = direct()) { d->marker_shown = v; return; } if (memory::IsHandle(address + 816)) memory::OwnerStore(address + 816, 4, v); else guest::StoreU32(base, address + 816, v); }
   // 0 at the set-up; read by the marker's and model sprites' kinds
   uint32_t unknown_820_address() const { return address + 820; }
-  uint32_t unknown_820() const { return data()->unknown_820; }
-  void set_unknown_820(uint32_t v) const { data()->unknown_820 = v; }
-  uint32_t unknown_820_bits() const { return data()->unknown_820; }
-  void set_unknown_820_bits(uint32_t v) const { data()->unknown_820 = v; }
+  uint32_t unknown_820_bits() const { if (auto* d = direct()) return d->unknown_820; return uint32_t((memory::IsHandle(address + 820) ? uint32_t(memory::OwnerLoad(address + 820, 4)) : guest::LoadU32(base, address + 820))); }
+  void set_unknown_820_bits(uint32_t v) const { if (auto* d = direct()) { d->unknown_820 = v; return; } if (memory::IsHandle(address + 820)) memory::OwnerStore(address + 820, 4, v); else guest::StoreU32(base, address + 820, v); }
+  uint32_t unknown_820() const { if (auto* d = direct()) return d->unknown_820; return uint32_t((memory::IsHandle(address + 820) ? uint32_t(memory::OwnerLoad(address + 820, 4)) : guest::LoadU32(base, address + 820))); }
+  void set_unknown_820(uint32_t v) const { if (auto* d = direct()) { d->unknown_820 = v; return; } if (memory::IsHandle(address + 820)) memory::OwnerStore(address + 820, 4, v); else guest::StoreU32(base, address + 820, v); }
   // 0 at the set-up; read by the marker's kind
   uint32_t unknown_824_address() const { return address + 824; }
-  uint32_t unknown_824() const { return data()->unknown_824; }
-  void set_unknown_824(uint32_t v) const { data()->unknown_824 = v; }
-  uint32_t unknown_824_bits() const { return data()->unknown_824; }
-  void set_unknown_824_bits(uint32_t v) const { data()->unknown_824 = v; }
+  uint32_t unknown_824_bits() const { if (auto* d = direct()) return d->unknown_824; return uint32_t((memory::IsHandle(address + 824) ? uint32_t(memory::OwnerLoad(address + 824, 4)) : guest::LoadU32(base, address + 824))); }
+  void set_unknown_824_bits(uint32_t v) const { if (auto* d = direct()) { d->unknown_824 = v; return; } if (memory::IsHandle(address + 824)) memory::OwnerStore(address + 824, 4, v); else guest::StoreU32(base, address + 824, v); }
+  uint32_t unknown_824() const { if (auto* d = direct()) return d->unknown_824; return uint32_t((memory::IsHandle(address + 824) ? uint32_t(memory::OwnerLoad(address + 824, 4)) : guest::LoadU32(base, address + 824))); }
+  void set_unknown_824(uint32_t v) const { if (auto* d = direct()) { d->unknown_824 = v; return; } if (memory::IsHandle(address + 824)) memory::OwnerStore(address + 824, 4, v); else guest::StoreU32(base, address + 824, v); }
   // 0 at the set-up; read by the marker's and model sprites' kinds
   uint32_t unknown_828_address() const { return address + 828; }
-  uint32_t unknown_828() const { return data()->unknown_828; }
-  void set_unknown_828(uint32_t v) const { data()->unknown_828 = v; }
-  uint32_t unknown_828_bits() const { return data()->unknown_828; }
-  void set_unknown_828_bits(uint32_t v) const { data()->unknown_828 = v; }
+  uint32_t unknown_828_bits() const { if (auto* d = direct()) return d->unknown_828; return uint32_t((memory::IsHandle(address + 828) ? uint32_t(memory::OwnerLoad(address + 828, 4)) : guest::LoadU32(base, address + 828))); }
+  void set_unknown_828_bits(uint32_t v) const { if (auto* d = direct()) { d->unknown_828 = v; return; } if (memory::IsHandle(address + 828)) memory::OwnerStore(address + 828, 4, v); else guest::StoreU32(base, address + 828, v); }
+  uint32_t unknown_828() const { if (auto* d = direct()) return d->unknown_828; return uint32_t((memory::IsHandle(address + 828) ? uint32_t(memory::OwnerLoad(address + 828, 4)) : guest::LoadU32(base, address + 828))); }
+  void set_unknown_828(uint32_t v) const { if (auto* d = direct()) { d->unknown_828 = v; return; } if (memory::IsHandle(address + 828)) memory::OwnerStore(address + 828, 4, v); else guest::StoreU32(base, address + 828, v); }
   uint32_t last_vehicle_address() const { return address + 832; }
-  uint32_t last_vehicle() const { return data()->last_vehicle; }
-  void set_last_vehicle(uint32_t v) const { data()->last_vehicle = v; }
-  uint32_t last_vehicle_bits() const { return data()->last_vehicle; }
-  void set_last_vehicle_bits(uint32_t v) const { data()->last_vehicle = v; }
+  uint32_t last_vehicle_bits() const { if (auto* d = direct()) return d->last_vehicle; return uint32_t((memory::IsHandle(address + 832) ? uint32_t(memory::OwnerLoad(address + 832, 4)) : guest::LoadU32(base, address + 832))); }
+  void set_last_vehicle_bits(uint32_t v) const { if (auto* d = direct()) { d->last_vehicle = v; return; } if (memory::IsHandle(address + 832)) memory::OwnerStore(address + 832, 4, v); else guest::StoreU32(base, address + 832, v); }
+  uint32_t last_vehicle() const { if (auto* d = direct()) return d->last_vehicle; return uint32_t((memory::IsHandle(address + 832) ? uint32_t(memory::OwnerLoad(address + 832, 4)) : guest::LoadU32(base, address + 832))); }
+  void set_last_vehicle(uint32_t v) const { if (auto* d = direct()) { d->last_vehicle = v; return; } if (memory::IsHandle(address + 832)) memory::OwnerStore(address + 832, 4, v); else guest::StoreU32(base, address + 832, v); }
   // -1 none
   uint32_t racer_id_address() const { return address + 836; }
-  int32_t racer_id() const { return data()->racer_id; }
-  void set_racer_id(int32_t v) const { data()->racer_id = v; }
-  uint32_t racer_id_bits() const { return std::bit_cast<uint32_t>(data()->racer_id); }
-  void set_racer_id_bits(uint32_t v) const { data()->racer_id = std::bit_cast<int32_t>(v); }
+  uint32_t racer_id_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->racer_id); return uint32_t((memory::IsHandle(address + 836) ? uint32_t(memory::OwnerLoad(address + 836, 4)) : guest::LoadU32(base, address + 836))); }
+  void set_racer_id_bits(uint32_t v) const { if (auto* d = direct()) { d->racer_id = std::bit_cast<int32_t>(v); return; } if (memory::IsHandle(address + 836)) memory::OwnerStore(address + 836, 4, v); else guest::StoreU32(base, address + 836, v); }
+  int32_t racer_id() const { return int32_t(racer_id_bits()); }
+  void set_racer_id(int32_t v) const { set_racer_id_bits(uint32_t(v)); }
 };
 
 // embedded; measure: -
@@ -413,26 +414,27 @@ struct CarOverlaysWheel : View {
   }
   CarOverlaysWheel at(uint32_t i) const { return CarOverlaysWheel(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCarOverlaysWheelLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarOverlaysWheelLayout, offset, width, v); }
+  CarOverlaysWheelData* direct() const { return static_cast<CarOverlaysWheelData*>(memory::HandleOwn(address, &kCarOverlaysWheelLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kCarOverlaysWheelLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarOverlaysWheelLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // counts the slipping ticks against the table's +156 and +160
   uint32_t trail_counter_address() const { return address + 0; }
-  uint32_t trail_counter() const { return data()->trail_counter; }
-  void set_trail_counter(uint32_t v) const { data()->trail_counter = v; }
-  uint32_t trail_counter_bits() const { return data()->trail_counter; }
-  void set_trail_counter_bits(uint32_t v) const { data()->trail_counter = v; }
+  uint32_t trail_counter_bits() const { if (auto* d = direct()) return d->trail_counter; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_trail_counter_bits(uint32_t v) const { if (auto* d = direct()) { d->trail_counter = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t trail_counter() const { if (auto* d = direct()) return d->trail_counter; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_trail_counter(uint32_t v) const { if (auto* d = direct()) { d->trail_counter = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // up to 25 on surface 8, then counts down while smoke is emitted
   uint32_t smoke_counter_address() const { return address + 4; }
-  uint32_t smoke_counter() const { return data()->smoke_counter; }
-  void set_smoke_counter(uint32_t v) const { data()->smoke_counter = v; }
-  uint32_t smoke_counter_bits() const { return data()->smoke_counter; }
-  void set_smoke_counter_bits(uint32_t v) const { data()->smoke_counter = v; }
+  uint32_t smoke_counter_bits() const { if (auto* d = direct()) return d->smoke_counter; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_smoke_counter_bits(uint32_t v) const { if (auto* d = direct()) { d->smoke_counter = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  uint32_t smoke_counter() const { if (auto* d = direct()) return d->smoke_counter; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_smoke_counter(uint32_t v) const { if (auto* d = direct()) { d->smoke_counter = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
   // whether the last tick added a trail point
   uint32_t trail_added_address() const { return address + 8; }
-  uint32_t trail_added() const { return data()->trail_added; }
-  void set_trail_added(uint32_t v) const { data()->trail_added = v; }
-  uint32_t trail_added_bits() const { return data()->trail_added; }
-  void set_trail_added_bits(uint32_t v) const { data()->trail_added = v; }
+  uint32_t trail_added_bits() const { if (auto* d = direct()) return d->trail_added; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_trail_added_bits(uint32_t v) const { if (auto* d = direct()) { d->trail_added = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  uint32_t trail_added() const { if (auto* d = direct()) return d->trail_added; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_trail_added(uint32_t v) const { if (auto* d = direct()) { d->trail_added = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
 };
 
 // image; measure: -
@@ -552,30 +554,31 @@ struct OverlayView : View {
   }
   OverlayView at(uint32_t i) const { return OverlayView(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kOverlayViewLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kOverlayViewLayout, offset, width, v); }
+  OverlayViewData* direct() const { return static_cast<OverlayViewData*>(memory::HandleOwn(address, &kOverlayViewLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kOverlayViewLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kOverlayViewLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0x82010B5C (OverlayViewVtable)
   uint32_t vtable_address() const { return address + 0; }
-  uint32_t vtable() const { return data()->vtable; }
-  void set_vtable(uint32_t v) const { data()->vtable = v; }
-  uint32_t vtable_bits() const { return data()->vtable; }
-  void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
+  uint32_t vtable_bits() const { if (auto* d = direct()) return d->vtable; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_vtable_bits(uint32_t v) const { if (auto* d = direct()) { d->vtable = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable() const { if (auto* d = direct()) return d->vtable; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_vtable(uint32_t v) const { if (auto* d = direct()) { d->vtable = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   uint32_t vehicle_address() const { return address + 4; }
-  uint32_t vehicle() const { return data()->vehicle; }
-  void set_vehicle(uint32_t v) const { data()->vehicle = v; }
-  uint32_t vehicle_bits() const { return data()->vehicle; }
-  void set_vehicle_bits(uint32_t v) const { data()->vehicle = v; }
+  uint32_t vehicle_bits() const { if (auto* d = direct()) return d->vehicle; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_vehicle_bits(uint32_t v) const { if (auto* d = direct()) { d->vehicle = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  uint32_t vehicle() const { if (auto* d = direct()) return d->vehicle; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_vehicle(uint32_t v) const { if (auto* d = direct()) { d->vehicle = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
   // its scene model (0 none)
   uint32_t model_address() const { return address + 8; }
-  uint32_t model() const { return data()->model; }
-  void set_model(uint32_t v) const { data()->model = v; }
-  uint32_t model_bits() const { return data()->model; }
-  void set_model_bits(uint32_t v) const { data()->model = v; }
+  uint32_t model_bits() const { if (auto* d = direct()) return d->model; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_model_bits(uint32_t v) const { if (auto* d = direct()) { d->model = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  uint32_t model() const { if (auto* d = direct()) return d->model; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_model(uint32_t v) const { if (auto* d = direct()) { d->model = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
   uint32_t viewport_address() const { return address + 12; }
-  uint32_t viewport() const { return data()->viewport; }
-  void set_viewport(uint32_t v) const { data()->viewport = v; }
-  uint32_t viewport_bits() const { return data()->viewport; }
-  void set_viewport_bits(uint32_t v) const { data()->viewport = v; }
+  uint32_t viewport_bits() const { if (auto* d = direct()) return d->viewport; return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_viewport_bits(uint32_t v) const { if (auto* d = direct()) { d->viewport = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
+  uint32_t viewport() const { if (auto* d = direct()) return d->viewport; return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_viewport(uint32_t v) const { if (auto* d = direct()) { d->viewport = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
 };
 
 // embedded; measure: ViewDesc, OverlayView::Set.r4
@@ -664,26 +667,27 @@ struct Overlay : View {
   }
   Overlay at(uint32_t i) const { return Overlay(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kOverlayLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kOverlayLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
+  OverlayData* direct() const { return static_cast<OverlayData*>(memory::HandleOwn(address, &kOverlayLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kOverlayLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kOverlayLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0x820085D8 for the base class
   uint32_t vtable_address() const { return address + 0; }
-  uint32_t vtable() const { return on_host() ? uint32_t(data()->vtable) : uint32_t(guest::LoadU32(base, address + 0)); }
-  void set_vtable(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
-  uint32_t vtable_bits() const { return on_host() ? data()->vtable : guest::LoadU32(base, address + 0); }
-  void set_vtable_bits(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable_bits() const { if (auto* d = direct()) return d->vtable; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_vtable_bits(uint32_t v) const { if (auto* d = direct()) { d->vtable = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable() const { if (auto* d = direct()) return d->vtable; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_vtable(uint32_t v) const { if (auto* d = direct()) { d->vtable = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // SetTextures104 (the car overlays' texture table; particle effect C's texture)
   uint32_t textures_address() const { return address + 104; }
-  uint32_t textures() const { return on_host() ? uint32_t(data()->textures) : uint32_t(guest::LoadU32(base, address + 104)); }
-  void set_textures(uint32_t v) const { if (on_host()) data()->textures = v; else guest::StoreU32(base, address + 104, v); }
-  uint32_t textures_bits() const { return on_host() ? data()->textures : guest::LoadU32(base, address + 104); }
-  void set_textures_bits(uint32_t v) const { if (on_host()) data()->textures = v; else guest::StoreU32(base, address + 104, v); }
+  uint32_t textures_bits() const { if (auto* d = direct()) return d->textures; return uint32_t((memory::IsHandle(address + 104) ? uint32_t(memory::OwnerLoad(address + 104, 4)) : guest::LoadU32(base, address + 104))); }
+  void set_textures_bits(uint32_t v) const { if (auto* d = direct()) { d->textures = v; return; } if (memory::IsHandle(address + 104)) memory::OwnerStore(address + 104, 4, v); else guest::StoreU32(base, address + 104, v); }
+  uint32_t textures() const { if (auto* d = direct()) return d->textures; return uint32_t((memory::IsHandle(address + 104) ? uint32_t(memory::OwnerLoad(address + 104, 4)) : guest::LoadU32(base, address + 104))); }
+  void set_textures(uint32_t v) const { if (auto* d = direct()) { d->textures = v; return; } if (memory::IsHandle(address + 104)) memory::OwnerStore(address + 104, 4, v); else guest::StoreU32(base, address + 104, v); }
   // SetTextures108 (the texture holder of the trails, smoke, sparks and particle effect B)
   uint32_t textures_108_address() const { return address + 108; }
-  uint32_t textures_108() const { return on_host() ? uint32_t(data()->textures_108) : uint32_t(guest::LoadU32(base, address + 108)); }
-  void set_textures_108(uint32_t v) const { if (on_host()) data()->textures_108 = v; else guest::StoreU32(base, address + 108, v); }
-  uint32_t textures_108_bits() const { return on_host() ? data()->textures_108 : guest::LoadU32(base, address + 108); }
-  void set_textures_108_bits(uint32_t v) const { if (on_host()) data()->textures_108 = v; else guest::StoreU32(base, address + 108, v); }
+  uint32_t textures_108_bits() const { if (auto* d = direct()) return d->textures_108; return uint32_t((memory::IsHandle(address + 108) ? uint32_t(memory::OwnerLoad(address + 108, 4)) : guest::LoadU32(base, address + 108))); }
+  void set_textures_108_bits(uint32_t v) const { if (auto* d = direct()) { d->textures_108 = v; return; } if (memory::IsHandle(address + 108)) memory::OwnerStore(address + 108, 4, v); else guest::StoreU32(base, address + 108, v); }
+  uint32_t textures_108() const { if (auto* d = direct()) return d->textures_108; return uint32_t((memory::IsHandle(address + 108) ? uint32_t(memory::OwnerLoad(address + 108, 4)) : guest::LoadU32(base, address + 108))); }
+  void set_textures_108(uint32_t v) const { if (auto* d = direct()) { d->textures_108 = v; return; } if (memory::IsHandle(address + 108)) memory::OwnerStore(address + 108, 4, v); else guest::StoreU32(base, address + 108, v); }
 };
 
 // allocated; measure: -

@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <utility>
+#include <vector>
 
 namespace memory {
 namespace {
@@ -39,6 +40,17 @@ Span SpanOf(uint32_t address, uint32_t size) {
           info.element};
 }
 
+// The first field of `layout` (sorted by offset, at most 8 bytes wide) that
+// may reach `offset` or past it: the search's start, so big layouts (a
+// track's zones, 18,555 fields) aren't scanned from the start.
+uint32_t FirstFrom(const Layout& layout, uint32_t offset) {
+  const uint32_t from = offset >= 8 ? offset - 8 : 0;
+  const LayoutField* f = std::lower_bound(
+      layout.fields, layout.fields + layout.count, from,
+      [](const LayoutField& a, uint32_t o) { return a.offset < o; });
+  return uint32_t(f - layout.fields);
+}
+
 void Swap(uint8_t* p, uint32_t width) {
   for (uint32_t i = 0; i < width / 2; i++) {
     std::swap(p[i], p[width - 1 - i]);
@@ -53,10 +65,13 @@ void SwapFieldsOne(uint8_t* bytes, const Layout* layout, uint32_t offset, uint32
   if (!layout) {
     return;
   }
-  for (uint32_t i = 0; i < layout->count; i++) {
+  const uint64_t end = uint64_t(offset) + size;
+  for (uint32_t i = FirstFrom(*layout, offset); i < layout->count; i++) {
     const LayoutField& f = layout->fields[i];
-    const uint64_t end = uint64_t(offset) + size;
-    if (f.offset + f.width <= offset || f.offset >= end) {
+    if (f.offset >= end) {
+      break;
+    }
+    if (f.offset + f.width <= offset) {
       continue;
     }
     if (f.offset < offset || f.offset + f.width > end) {
@@ -95,9 +110,12 @@ void OverlayWindow(const Layout& layout, uint32_t offset, uint32_t width, uint32
                    uint32_t* hi) {
   *lo = offset;
   *hi = offset + width;
-  for (uint32_t i = 0; i < layout.count; i++) {
+  for (uint32_t i = FirstFrom(layout, offset); i < layout.count; i++) {
     const LayoutField& f = layout.fields[i];
-    if (f.offset < *hi && *lo < f.offset + f.width) {
+    if (f.offset >= *hi) {
+      break;
+    }
+    if (*lo < f.offset + f.width) {
       *lo = std::min(*lo, f.offset);
       *hi = std::max(*hi, f.offset + f.width);
     }
@@ -143,8 +161,8 @@ namespace {
 // Raw accesses logged once per (type, offset): a lock-free table of the
 // sites seen (a hash of both, never 0), checked without a lock on every
 // access; full after kRawSites sites, then nothing more is logged.
-constexpr uint32_t kRawSites = 512;
-constexpr uint32_t kRawSlots = 2048;
+constexpr uint32_t kRawSites = 4096;
+constexpr uint32_t kRawSlots = 16384;
 std::atomic<uint64_t> g_raw_seen[kRawSlots];
 std::atomic<uint32_t> g_raw_count{0};
 
@@ -177,12 +195,14 @@ void NoteRaw(const HandleInfo& info, uint32_t width) {
 
 // The element (an array's, or the object) holding the access, with
 // info->offset made the offset into it.
-uint8_t* RawObject(uint32_t address, uint32_t width, HandleInfo* info) {
+uint8_t* RawObject(uint32_t address, uint32_t width, HandleInfo* info, bool note = true) {
   if (!DescribeHandle(address, info) || uint64_t(info->offset) + width > info->size) {
     ITC_LOG_ERROR("handles: a raw {}-byte access at {:08X}, no live object there", width, address);
     std::abort();
   }
-  NoteRaw(*info, width);
+  if (note) {
+    NoteRaw(*info, width);
+  }
   const uint32_t inside = info->offset % info->element;
   uint8_t* element = static_cast<uint8_t*>(info->object) + (info->offset - inside);
   info->offset = inside;
@@ -204,6 +224,18 @@ void RawHandleStore(uint32_t address, uint32_t width, uint64_t value) {
   StoreOverlay(object, info.layout ? *info.layout : kNoLayout, info.offset, width, value);
 }
 
+uint64_t OwnerLoad(uint32_t address, uint32_t width) {
+  HandleInfo info;
+  const uint8_t* object = RawObject(address, width, &info, false);
+  return LoadOverlay(object, info.layout ? *info.layout : kNoLayout, info.offset, width);
+}
+
+void OwnerStore(uint32_t address, uint32_t width, uint64_t value) {
+  HandleInfo info;
+  uint8_t* object = RawObject(address, width, &info, false);
+  StoreOverlay(object, info.layout ? *info.layout : kNoLayout, info.offset, width, value);
+}
+
 bool CopyWithHandles(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size) {
   const bool to_host = IsHandle(destination), from_host = IsHandle(source);
   if (!to_host && !from_host) {
@@ -214,7 +246,19 @@ bool CopyWithHandles(uint8_t* base, uint32_t destination, uint32_t source, uint3
   }
   if (to_host && from_host) {
     const Span to = SpanOf(destination, size), from = SpanOf(source, size);
-    std::memmove(to.bytes, from.bytes, size);
+    // The same layout at the same place in it: the bytes are ordered alike.
+    if (to.layout == from.layout && to.offset % to.element == from.offset % from.element &&
+        to.element == from.element) {
+      std::memmove(to.bytes, from.bytes, size);
+      return true;
+    }
+    // Else through the guest's order: the source's fields swapped by its
+    // layout, then the destination's by its own (a record kept as bytes in
+    // one owner and as members in another).
+    std::vector<uint8_t> bytes(from.bytes, from.bytes + size);
+    SwapFields(bytes.data(), from.layout, from.offset, size, from.type, from.element);
+    SwapFields(bytes.data(), to.layout, to.offset, size, to.type, to.element);
+    std::memcpy(to.bytes, bytes.data(), size);
     return true;
   }
   if (to_host) {

@@ -71,28 +71,29 @@ struct RaceHud_436 : View {
   }
   RaceHud_436 at(uint32_t i) const { return RaceHud_436(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kRaceHud_436Layout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kRaceHud_436Layout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
+  RaceHud_436Data* direct() const { return static_cast<RaceHud_436Data*>(memory::HandleOwn(address, &kRaceHud_436Layout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kRaceHud_436Layout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kRaceHud_436Layout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // measure fault: RaceHud::RunMovie's HUD +456 (its movie +604 run when not 0)
   uint32_t fault_hud_movie_running_address() const { return address + 456; }
-  uint32_t fault_hud_movie_running() const { return on_host() ? uint32_t(data()->fault_hud_movie_running) : uint32_t(guest::LoadU32(base, address + 456)); }
-  void set_fault_hud_movie_running(uint32_t v) const { if (on_host()) data()->fault_hud_movie_running = v; else guest::StoreU32(base, address + 456, v); }
-  uint32_t fault_hud_movie_running_bits() const { return on_host() ? data()->fault_hud_movie_running : guest::LoadU32(base, address + 456); }
-  void set_fault_hud_movie_running_bits(uint32_t v) const { if (on_host()) data()->fault_hud_movie_running = v; else guest::StoreU32(base, address + 456, v); }
+  uint32_t fault_hud_movie_running_bits() const { if (auto* d = direct()) return d->fault_hud_movie_running; return uint32_t((memory::IsHandle(address + 456) ? uint32_t(memory::OwnerLoad(address + 456, 4)) : guest::LoadU32(base, address + 456))); }
+  void set_fault_hud_movie_running_bits(uint32_t v) const { if (auto* d = direct()) { d->fault_hud_movie_running = v; return; } if (memory::IsHandle(address + 456)) memory::OwnerStore(address + 456, 4, v); else guest::StoreU32(base, address + 456, v); }
+  uint32_t fault_hud_movie_running() const { if (auto* d = direct()) return d->fault_hud_movie_running; return uint32_t((memory::IsHandle(address + 456) ? uint32_t(memory::OwnerLoad(address + 456, 4)) : guest::LoadU32(base, address + 456))); }
+  void set_fault_hud_movie_running(uint32_t v) const { if (auto* d = direct()) { d->fault_hud_movie_running = v; return; } if (memory::IsHandle(address + 456)) memory::OwnerStore(address + 456, 4, v); else guest::StoreU32(base, address + 456, v); }
   // measure fault: RaceHud::RunMovie's HUD +604 (a UI movie)
   uint32_t fault_hud_movie_address() const { return address + 604; }
-  uint32_t fault_hud_movie() const { return on_host() ? uint32_t(data()->fault_hud_movie) : uint32_t(guest::LoadU32(base, address + 604)); }
-  void set_fault_hud_movie(uint32_t v) const { if (on_host()) data()->fault_hud_movie = v; else guest::StoreU32(base, address + 604, v); }
-  uint32_t fault_hud_movie_bits() const { return on_host() ? data()->fault_hud_movie : guest::LoadU32(base, address + 604); }
-  void set_fault_hud_movie_bits(uint32_t v) const { if (on_host()) data()->fault_hud_movie = v; else guest::StoreU32(base, address + 604, v); }
+  uint32_t fault_hud_movie_bits() const { if (auto* d = direct()) return d->fault_hud_movie; return uint32_t((memory::IsHandle(address + 604) ? uint32_t(memory::OwnerLoad(address + 604, 4)) : guest::LoadU32(base, address + 604))); }
+  void set_fault_hud_movie_bits(uint32_t v) const { if (auto* d = direct()) { d->fault_hud_movie = v; return; } if (memory::IsHandle(address + 604)) memory::OwnerStore(address + 604, 4, v); else guest::StoreU32(base, address + 604, v); }
+  uint32_t fault_hud_movie() const { if (auto* d = direct()) return d->fault_hud_movie; return uint32_t((memory::IsHandle(address + 604) ? uint32_t(memory::OwnerLoad(address + 604, 4)) : guest::LoadU32(base, address + 604))); }
+  void set_fault_hud_movie(uint32_t v) const { if (auto* d = direct()) { d->fault_hud_movie = v; return; } if (memory::IsHandle(address + 604)) memory::OwnerStore(address + 604, 4, v); else guest::StoreU32(base, address + 604, v); }
   // measure fault: the machine's +9608 (the holder), read by CountdownDraw and RaceDraw
   uint32_t fault_machine_holder_address() const { return address + 9608; }
+  uint32_t fault_machine_holder_bits() const { if (auto* d = direct()) return d->fault_machine_holder; return uint32_t((memory::IsHandle(address + 9608) ? uint32_t(memory::OwnerLoad(address + 9608, 4)) : guest::LoadU32(base, address + 9608))); }
+  void set_fault_machine_holder_bits(uint32_t v) const { if (auto* d = direct()) { d->fault_machine_holder = v; return; } if (memory::IsHandle(address + 9608)) memory::OwnerStore(address + 9608, 4, v); else guest::StoreU32(base, address + 9608, v); }
   template <typename T = RaceScreens>
-  T fault_machine_holder() const { return T(base, on_host() ? data()->fault_machine_holder : guest::LoadU32(base, address + 9608)); }
-  void set_fault_machine_holder(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->fault_machine_holder = v; else guest::StoreU32(base, address + 9608, v); }
-  void set_fault_machine_holder(uint32_t v) const { if (on_host()) data()->fault_machine_holder = v; else guest::StoreU32(base, address + 9608, v); }
-  uint32_t fault_machine_holder_bits() const { return on_host() ? data()->fault_machine_holder : guest::LoadU32(base, address + 9608); }
-  void set_fault_machine_holder_bits(uint32_t v) const { if (on_host()) data()->fault_machine_holder = v; else guest::StoreU32(base, address + 9608, v); }
+  T fault_machine_holder() const { return T(base, fault_machine_holder_bits()); }
+  void set_fault_machine_holder(const View& w) const { set_fault_machine_holder_bits(w.address); }
+  void set_fault_machine_holder(uint32_t v) const { set_fault_machine_holder_bits(v); }
 };
 
 // allocated; measure: RaceScreens, PauseMenu4::Open.ret.+9608, AltHud::ToggleView.ret.+9608, RaceScreens@+16.+436.+9608
@@ -144,92 +145,93 @@ struct RaceScreens : View {
   }
   RaceScreens at(uint32_t i) const { return RaceScreens(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kRaceScreensLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kRaceScreensLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
+  RaceScreensData* direct() const { return static_cast<RaceScreensData*>(memory::HandleOwn(address, &kRaceScreensLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kRaceScreensLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kRaceScreensLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0 at set-up; bit 0 the replay bit (set when the menu after the race picks the replay: the alternate HUD drawn in place of the race HUD)
   uint32_t flags_address() const { return address + 8; }
-  uint32_t flags() const { return on_host() ? uint32_t(data()->flags) : uint32_t(guest::LoadU32(base, address + 8)); }
-  void set_flags(uint32_t v) const { if (on_host()) data()->flags = v; else guest::StoreU32(base, address + 8, v); }
-  uint32_t flags_bits() const { return on_host() ? data()->flags : guest::LoadU32(base, address + 8); }
-  void set_flags_bits(uint32_t v) const { if (on_host()) data()->flags = v; else guest::StoreU32(base, address + 8, v); }
+  uint32_t flags_bits() const { if (auto* d = direct()) return d->flags; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_flags_bits(uint32_t v) const { if (auto* d = direct()) { d->flags = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  uint32_t flags() const { if (auto* d = direct()) return d->flags; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_flags(uint32_t v) const { if (auto* d = direct()) { d->flags = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
   // the race HUD (race-hud-object.toml)
   template <typename T = RaceHud>
   T hud() const { return T(base, address + 16); }
   // the race HUD's +424 (signs_on; 1 by CloseResults, 0 by OnRaceEnd): a word of the hud embed
   uint32_t hud_signs_on_address() const { return address + 440; }
-  uint8_t* hud_signs_on() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 440 : guest::Pointer(base, address + 440); }
+  uint8_t* hud_signs_on() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 440 : guest::Pointer(base, address + 440); }
   // the race HUD's +436 (countdown_running; CountdownUpdate goes to the race once it's 0): a word of the hud embed
   uint32_t hud_countdown_running_address() const { return address + 452; }
-  uint8_t* hud_countdown_running() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 452 : guest::Pointer(base, address + 452); }
+  uint8_t* hud_countdown_running() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 452 : guest::Pointer(base, address + 452); }
   // the race HUD's +444 (racers): the race progress's ([0x826D82E8]) +2184, its results record (StartCountdown); a word of the hud embed
   uint32_t hud_results_address() const { return address + 460; }
-  uint8_t* hud_results() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 460 : guest::Pointer(base, address + 460); }
+  uint8_t* hud_results() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 460 : guest::Pointer(base, address + 460); }
   // the +656 object (kind 4's, never seen in play)
   template <typename T = SplitHud>
   T split_hud() const { return T(base, address + 656); }
   // measure fault: RaceUpdate's post, the race mode's dispatcher's ring count (+804)
   uint32_t fault_ring_count_address() const { return address + 820; }
-  uint32_t fault_ring_count() const { return on_host() ? uint32_t(data()->fault_ring_count) : uint32_t(guest::LoadU32(base, address + 820)); }
-  void set_fault_ring_count(uint32_t v) const { if (on_host()) data()->fault_ring_count = v; else guest::StoreU32(base, address + 820, v); }
-  uint32_t fault_ring_count_bits() const { return on_host() ? data()->fault_ring_count : guest::LoadU32(base, address + 820); }
-  void set_fault_ring_count_bits(uint32_t v) const { if (on_host()) data()->fault_ring_count = v; else guest::StoreU32(base, address + 820, v); }
+  uint32_t fault_ring_count_bits() const { if (auto* d = direct()) return d->fault_ring_count; return uint32_t((memory::IsHandle(address + 820) ? uint32_t(memory::OwnerLoad(address + 820, 4)) : guest::LoadU32(base, address + 820))); }
+  void set_fault_ring_count_bits(uint32_t v) const { if (auto* d = direct()) { d->fault_ring_count = v; return; } if (memory::IsHandle(address + 820)) memory::OwnerStore(address + 820, 4, v); else guest::StoreU32(base, address + 820, v); }
+  uint32_t fault_ring_count() const { if (auto* d = direct()) return d->fault_ring_count; return uint32_t((memory::IsHandle(address + 820) ? uint32_t(memory::OwnerLoad(address + 820, 4)) : guest::LoadU32(base, address + 820))); }
+  void set_fault_ring_count(uint32_t v) const { if (auto* d = direct()) { d->fault_ring_count = v; return; } if (memory::IsHandle(address + 820)) memory::OwnerStore(address + 820, 4, v); else guest::StoreU32(base, address + 820, v); }
   // measure fault: RaceUpdate's post, the dispatcher's ring start (+808)
   uint32_t fault_ring_start_address() const { return address + 824; }
-  uint32_t fault_ring_start() const { return on_host() ? uint32_t(data()->fault_ring_start) : uint32_t(guest::LoadU32(base, address + 824)); }
-  void set_fault_ring_start(uint32_t v) const { if (on_host()) data()->fault_ring_start = v; else guest::StoreU32(base, address + 824, v); }
-  uint32_t fault_ring_start_bits() const { return on_host() ? data()->fault_ring_start : guest::LoadU32(base, address + 824); }
-  void set_fault_ring_start_bits(uint32_t v) const { if (on_host()) data()->fault_ring_start = v; else guest::StoreU32(base, address + 824, v); }
+  uint32_t fault_ring_start_bits() const { if (auto* d = direct()) return d->fault_ring_start; return uint32_t((memory::IsHandle(address + 824) ? uint32_t(memory::OwnerLoad(address + 824, 4)) : guest::LoadU32(base, address + 824))); }
+  void set_fault_ring_start_bits(uint32_t v) const { if (auto* d = direct()) { d->fault_ring_start = v; return; } if (memory::IsHandle(address + 824)) memory::OwnerStore(address + 824, 4, v); else guest::StoreU32(base, address + 824, v); }
+  uint32_t fault_ring_start() const { if (auto* d = direct()) return d->fault_ring_start; return uint32_t((memory::IsHandle(address + 824) ? uint32_t(memory::OwnerLoad(address + 824, 4)) : guest::LoadU32(base, address + 824))); }
+  void set_fault_ring_start(uint32_t v) const { if (auto* d = direct()) { d->fault_ring_start = v; return; } if (memory::IsHandle(address + 824)) memory::OwnerStore(address + 824, 4, v); else guest::StoreU32(base, address + 824, v); }
   // the +656 object's +344 (results): the race progress's +2184 (StartCountdown, kind 4); a word of the split_hud embed
   uint32_t split_results_address() const { return address + 1000; }
-  uint8_t* split_results() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 1000 : guest::Pointer(base, address + 1000); }
+  uint8_t* split_results() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 1000 : guest::Pointer(base, address + 1000); }
   // the alternate HUD's holder's bytes (alt_hud_holder's words)
   uint32_t alt_hud_address() const { return address + 1004; }
-  uint8_t* alt_hud() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 1004 : guest::Pointer(base, address + 1004); }
+  uint8_t* alt_hud() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 1004 : guest::Pointer(base, address + 1004); }
   // the alternate HUD's holder (alt-hud.toml): the object and its menu list
   template <typename T = AltHudHolder>
   T alt_hud_holder() const { return T(base, address + 1004); }
   // [0x826D84D0], the pause menu (the measure's PauseMenu4 ... new<4>@sub_8220D7E8; race-screens.md)
   uint32_t pause_menu_address() const { return address + 1012; }
-  View pause_menu() const { return View(base, on_host() ? data()->pause_menu : guest::LoadU32(base, address + 1012)); }
-  void set_pause_menu(uint32_t v) const { if (on_host()) data()->pause_menu = v; else guest::StoreU32(base, address + 1012, v); }
-  uint32_t pause_menu_bits() const { return on_host() ? data()->pause_menu : guest::LoadU32(base, address + 1012); }
-  void set_pause_menu_bits(uint32_t v) const { if (on_host()) data()->pause_menu = v; else guest::StoreU32(base, address + 1012, v); }
+  uint32_t pause_menu_bits() const { if (auto* d = direct()) return d->pause_menu; return uint32_t((memory::IsHandle(address + 1012) ? uint32_t(memory::OwnerLoad(address + 1012, 4)) : guest::LoadU32(base, address + 1012))); }
+  void set_pause_menu_bits(uint32_t v) const { if (auto* d = direct()) { d->pause_menu = v; return; } if (memory::IsHandle(address + 1012)) memory::OwnerStore(address + 1012, 4, v); else guest::StoreU32(base, address + 1012, v); }
+  View pause_menu() const { return View(base, pause_menu_bits()); }
+  void set_pause_menu(uint32_t v) const { set_pause_menu_bits(v); }
   // [0x826D84E0], kind 4's pause menu, probably (the measure's PauseMenu4)
   uint32_t kind4_pause_menu_address() const { return address + 1016; }
-  View kind4_pause_menu() const { return View(base, on_host() ? data()->kind4_pause_menu : guest::LoadU32(base, address + 1016)); }
-  void set_kind4_pause_menu(uint32_t v) const { if (on_host()) data()->kind4_pause_menu = v; else guest::StoreU32(base, address + 1016, v); }
-  uint32_t kind4_pause_menu_bits() const { return on_host() ? data()->kind4_pause_menu : guest::LoadU32(base, address + 1016); }
-  void set_kind4_pause_menu_bits(uint32_t v) const { if (on_host()) data()->kind4_pause_menu = v; else guest::StoreU32(base, address + 1016, v); }
+  uint32_t kind4_pause_menu_bits() const { if (auto* d = direct()) return d->kind4_pause_menu; return uint32_t((memory::IsHandle(address + 1016) ? uint32_t(memory::OwnerLoad(address + 1016, 4)) : guest::LoadU32(base, address + 1016))); }
+  void set_kind4_pause_menu_bits(uint32_t v) const { if (auto* d = direct()) { d->kind4_pause_menu = v; return; } if (memory::IsHandle(address + 1016)) memory::OwnerStore(address + 1016, 4, v); else guest::StoreU32(base, address + 1016, v); }
+  View kind4_pause_menu() const { return View(base, kind4_pause_menu_bits()); }
+  void set_kind4_pause_menu(uint32_t v) const { set_kind4_pause_menu_bits(v); }
   // [0x826D8510], the menu after the race (the measure's new<4>@sub_8221B1F0)
   uint32_t after_race_menu_address() const { return address + 1020; }
-  View after_race_menu() const { return View(base, on_host() ? data()->after_race_menu : guest::LoadU32(base, address + 1020)); }
-  void set_after_race_menu(uint32_t v) const { if (on_host()) data()->after_race_menu = v; else guest::StoreU32(base, address + 1020, v); }
-  uint32_t after_race_menu_bits() const { return on_host() ? data()->after_race_menu : guest::LoadU32(base, address + 1020); }
-  void set_after_race_menu_bits(uint32_t v) const { if (on_host()) data()->after_race_menu = v; else guest::StoreU32(base, address + 1020, v); }
+  uint32_t after_race_menu_bits() const { if (auto* d = direct()) return d->after_race_menu; return uint32_t((memory::IsHandle(address + 1020) ? uint32_t(memory::OwnerLoad(address + 1020, 4)) : guest::LoadU32(base, address + 1020))); }
+  void set_after_race_menu_bits(uint32_t v) const { if (auto* d = direct()) { d->after_race_menu = v; return; } if (memory::IsHandle(address + 1020)) memory::OwnerStore(address + 1020, 4, v); else guest::StoreU32(base, address + 1020, v); }
+  View after_race_menu() const { return View(base, after_race_menu_bits()); }
+  void set_after_race_menu(uint32_t v) const { set_after_race_menu_bits(v); }
   // [0x826D8500], the career's results (the measure's CareerResults, race-screens.md)
   uint32_t career_results_address() const { return address + 1024; }
-  View career_results() const { return View(base, on_host() ? data()->career_results : guest::LoadU32(base, address + 1024)); }
-  void set_career_results(uint32_t v) const { if (on_host()) data()->career_results = v; else guest::StoreU32(base, address + 1024, v); }
-  uint32_t career_results_bits() const { return on_host() ? data()->career_results : guest::LoadU32(base, address + 1024); }
-  void set_career_results_bits(uint32_t v) const { if (on_host()) data()->career_results = v; else guest::StoreU32(base, address + 1024, v); }
+  uint32_t career_results_bits() const { if (auto* d = direct()) return d->career_results; return uint32_t((memory::IsHandle(address + 1024) ? uint32_t(memory::OwnerLoad(address + 1024, 4)) : guest::LoadU32(base, address + 1024))); }
+  void set_career_results_bits(uint32_t v) const { if (auto* d = direct()) { d->career_results = v; return; } if (memory::IsHandle(address + 1024)) memory::OwnerStore(address + 1024, 4, v); else guest::StoreU32(base, address + 1024, v); }
+  View career_results() const { return View(base, career_results_bits()); }
+  void set_career_results(uint32_t v) const { set_career_results_bits(v); }
   // [0x82814E18], the results of kinds 1 (mode 0) and 2 (the measure's RaceResults)
   uint32_t race_results_address() const { return address + 1028; }
-  View race_results() const { return View(base, on_host() ? data()->race_results : guest::LoadU32(base, address + 1028)); }
-  void set_race_results(uint32_t v) const { if (on_host()) data()->race_results = v; else guest::StoreU32(base, address + 1028, v); }
-  uint32_t race_results_bits() const { return on_host() ? data()->race_results : guest::LoadU32(base, address + 1028); }
-  void set_race_results_bits(uint32_t v) const { if (on_host()) data()->race_results = v; else guest::StoreU32(base, address + 1028, v); }
+  uint32_t race_results_bits() const { if (auto* d = direct()) return d->race_results; return uint32_t((memory::IsHandle(address + 1028) ? uint32_t(memory::OwnerLoad(address + 1028, 4)) : guest::LoadU32(base, address + 1028))); }
+  void set_race_results_bits(uint32_t v) const { if (auto* d = direct()) { d->race_results = v; return; } if (memory::IsHandle(address + 1028)) memory::OwnerStore(address + 1028, 4, v); else guest::StoreU32(base, address + 1028, v); }
+  View race_results() const { return View(base, race_results_bits()); }
+  void set_race_results(uint32_t v) const { set_race_results_bits(v); }
   // [0x82814E1C], the results of kinds 4 and 6 (the measure's SplitResults)
   uint32_t split_results_screen_address() const { return address + 1032; }
-  View split_results_screen() const { return View(base, on_host() ? data()->split_results_screen : guest::LoadU32(base, address + 1032)); }
-  void set_split_results_screen(uint32_t v) const { if (on_host()) data()->split_results_screen = v; else guest::StoreU32(base, address + 1032, v); }
-  uint32_t split_results_screen_bits() const { return on_host() ? data()->split_results_screen : guest::LoadU32(base, address + 1032); }
-  void set_split_results_screen_bits(uint32_t v) const { if (on_host()) data()->split_results_screen = v; else guest::StoreU32(base, address + 1032, v); }
+  uint32_t split_results_screen_bits() const { if (auto* d = direct()) return d->split_results_screen; return uint32_t((memory::IsHandle(address + 1032) ? uint32_t(memory::OwnerLoad(address + 1032, 4)) : guest::LoadU32(base, address + 1032))); }
+  void set_split_results_screen_bits(uint32_t v) const { if (auto* d = direct()) { d->split_results_screen = v; return; } if (memory::IsHandle(address + 1032)) memory::OwnerStore(address + 1032, 4, v); else guest::StoreU32(base, address + 1032, v); }
+  View split_results_screen() const { return View(base, split_results_screen_bits()); }
+  void set_split_results_screen(uint32_t v) const { set_split_results_screen_bits(v); }
   // [0x82814E10], kind 6's screen after the race (the measure's Kind6Menu)
   uint32_t kind6_menu_address() const { return address + 1036; }
-  View kind6_menu() const { return View(base, on_host() ? data()->kind6_menu : guest::LoadU32(base, address + 1036)); }
-  void set_kind6_menu(uint32_t v) const { if (on_host()) data()->kind6_menu = v; else guest::StoreU32(base, address + 1036, v); }
-  uint32_t kind6_menu_bits() const { return on_host() ? data()->kind6_menu : guest::LoadU32(base, address + 1036); }
-  void set_kind6_menu_bits(uint32_t v) const { if (on_host()) data()->kind6_menu = v; else guest::StoreU32(base, address + 1036, v); }
+  uint32_t kind6_menu_bits() const { if (auto* d = direct()) return d->kind6_menu; return uint32_t((memory::IsHandle(address + 1036) ? uint32_t(memory::OwnerLoad(address + 1036, 4)) : guest::LoadU32(base, address + 1036))); }
+  void set_kind6_menu_bits(uint32_t v) const { if (auto* d = direct()) { d->kind6_menu = v; return; } if (memory::IsHandle(address + 1036)) memory::OwnerStore(address + 1036, 4, v); else guest::StoreU32(base, address + 1036, v); }
+  View kind6_menu() const { return View(base, kind6_menu_bits()); }
+  void set_kind6_menu(uint32_t v) const { set_kind6_menu_bits(v); }
 };
 
 // embedded; measure: RaceHudMachine::PauseUpdate.r4, RaceHudMachine::AfterRaceUpdate.r4, RaceHudMachine::ResultsUpdate.r4
@@ -415,79 +417,80 @@ struct SplitHud : View {
   }
   SplitHud at(uint32_t i) const { return SplitHud(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kSplitHudLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kSplitHudLayout, offset, width, v); }
+  SplitHudData* direct() const { return static_cast<SplitHudData*>(memory::HandleOwn(address, &kSplitHudLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kSplitHudLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kSplitHudLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t unknown_248_address() const { return address + 248; }
-  float unknown_248() const { return data()->unknown_248; }
-  void set_unknown_248(float v) const { data()->unknown_248 = v; }
-  uint32_t unknown_248_bits() const { return std::bit_cast<uint32_t>(data()->unknown_248); }
-  void set_unknown_248_bits(uint32_t v) const { data()->unknown_248 = std::bit_cast<float>(v); }
+  uint32_t unknown_248_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->unknown_248); return uint32_t((memory::IsHandle(address + 248) ? uint32_t(memory::OwnerLoad(address + 248, 4)) : guest::LoadU32(base, address + 248))); }
+  void set_unknown_248_bits(uint32_t v) const { if (auto* d = direct()) { d->unknown_248 = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 248)) memory::OwnerStore(address + 248, 4, v); else guest::StoreU32(base, address + 248, v); }
+  float unknown_248() const { return std::bit_cast<float>(unknown_248_bits()); }
+  void set_unknown_248(float v) const { set_unknown_248_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t unknown_252_address() const { return address + 252; }
-  float unknown_252() const { return data()->unknown_252; }
-  void set_unknown_252(float v) const { data()->unknown_252 = v; }
-  uint32_t unknown_252_bits() const { return std::bit_cast<uint32_t>(data()->unknown_252); }
-  void set_unknown_252_bits(uint32_t v) const { data()->unknown_252 = std::bit_cast<float>(v); }
+  uint32_t unknown_252_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->unknown_252); return uint32_t((memory::IsHandle(address + 252) ? uint32_t(memory::OwnerLoad(address + 252, 4)) : guest::LoadU32(base, address + 252))); }
+  void set_unknown_252_bits(uint32_t v) const { if (auto* d = direct()) { d->unknown_252 = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 252)) memory::OwnerStore(address + 252, 4, v); else guest::StoreU32(base, address + 252, v); }
+  float unknown_252() const { return std::bit_cast<float>(unknown_252_bits()); }
+  void set_unknown_252(float v) const { set_unknown_252_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t unknown_256_address() const { return address + 256; }
-  float unknown_256() const { return data()->unknown_256; }
-  void set_unknown_256(float v) const { data()->unknown_256 = v; }
-  uint32_t unknown_256_bits() const { return std::bit_cast<uint32_t>(data()->unknown_256); }
-  void set_unknown_256_bits(uint32_t v) const { data()->unknown_256 = std::bit_cast<float>(v); }
+  uint32_t unknown_256_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->unknown_256); return uint32_t((memory::IsHandle(address + 256) ? uint32_t(memory::OwnerLoad(address + 256, 4)) : guest::LoadU32(base, address + 256))); }
+  void set_unknown_256_bits(uint32_t v) const { if (auto* d = direct()) { d->unknown_256 = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 256)) memory::OwnerStore(address + 256, 4, v); else guest::StoreU32(base, address + 256, v); }
+  float unknown_256() const { return std::bit_cast<float>(unknown_256_bits()); }
+  void set_unknown_256(float v) const { set_unknown_256_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t unknown_260_address() const { return address + 260; }
-  float unknown_260() const { return data()->unknown_260; }
-  void set_unknown_260(float v) const { data()->unknown_260 = v; }
-  uint32_t unknown_260_bits() const { return std::bit_cast<uint32_t>(data()->unknown_260); }
-  void set_unknown_260_bits(uint32_t v) const { data()->unknown_260 = std::bit_cast<float>(v); }
+  uint32_t unknown_260_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->unknown_260); return uint32_t((memory::IsHandle(address + 260) ? uint32_t(memory::OwnerLoad(address + 260, 4)) : guest::LoadU32(base, address + 260))); }
+  void set_unknown_260_bits(uint32_t v) const { if (auto* d = direct()) { d->unknown_260 = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 260)) memory::OwnerStore(address + 260, 4, v); else guest::StoreU32(base, address + 260, v); }
+  float unknown_260() const { return std::bit_cast<float>(unknown_260_bits()); }
+  void set_unknown_260(float v) const { set_unknown_260_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t unknown_264_address() const { return address + 264; }
-  float unknown_264() const { return data()->unknown_264; }
-  void set_unknown_264(float v) const { data()->unknown_264 = v; }
-  uint32_t unknown_264_bits() const { return std::bit_cast<uint32_t>(data()->unknown_264); }
-  void set_unknown_264_bits(uint32_t v) const { data()->unknown_264 = std::bit_cast<float>(v); }
+  uint32_t unknown_264_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->unknown_264); return uint32_t((memory::IsHandle(address + 264) ? uint32_t(memory::OwnerLoad(address + 264, 4)) : guest::LoadU32(base, address + 264))); }
+  void set_unknown_264_bits(uint32_t v) const { if (auto* d = direct()) { d->unknown_264 = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 264)) memory::OwnerStore(address + 264, 4, v); else guest::StoreU32(base, address + 264, v); }
+  float unknown_264() const { return std::bit_cast<float>(unknown_264_bits()); }
+  void set_unknown_264(float v) const { set_unknown_264_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t unknown_268_address() const { return address + 268; }
-  float unknown_268() const { return data()->unknown_268; }
-  void set_unknown_268(float v) const { data()->unknown_268 = v; }
-  uint32_t unknown_268_bits() const { return std::bit_cast<uint32_t>(data()->unknown_268); }
-  void set_unknown_268_bits(uint32_t v) const { data()->unknown_268 = std::bit_cast<float>(v); }
+  uint32_t unknown_268_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->unknown_268); return uint32_t((memory::IsHandle(address + 268) ? uint32_t(memory::OwnerLoad(address + 268, 4)) : guest::LoadU32(base, address + 268))); }
+  void set_unknown_268_bits(uint32_t v) const { if (auto* d = direct()) { d->unknown_268 = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 268)) memory::OwnerStore(address + 268, 4, v); else guest::StoreU32(base, address + 268, v); }
+  float unknown_268() const { return std::bit_cast<float>(unknown_268_bits()); }
+  void set_unknown_268(float v) const { set_unknown_268_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t unknown_272_address() const { return address + 272; }
-  float unknown_272() const { return data()->unknown_272; }
-  void set_unknown_272(float v) const { data()->unknown_272 = v; }
-  uint32_t unknown_272_bits() const { return std::bit_cast<uint32_t>(data()->unknown_272); }
-  void set_unknown_272_bits(uint32_t v) const { data()->unknown_272 = std::bit_cast<float>(v); }
+  uint32_t unknown_272_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->unknown_272); return uint32_t((memory::IsHandle(address + 272) ? uint32_t(memory::OwnerLoad(address + 272, 4)) : guest::LoadU32(base, address + 272))); }
+  void set_unknown_272_bits(uint32_t v) const { if (auto* d = direct()) { d->unknown_272 = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 272)) memory::OwnerStore(address + 272, 4, v); else guest::StoreU32(base, address + 272, v); }
+  float unknown_272() const { return std::bit_cast<float>(unknown_272_bits()); }
+  void set_unknown_272(float v) const { set_unknown_272_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t unknown_280_address() const { return address + 280; }
-  uint32_t unknown_280() const { return data()->unknown_280; }
-  void set_unknown_280(uint32_t v) const { data()->unknown_280 = v; }
-  uint32_t unknown_280_bits() const { return data()->unknown_280; }
-  void set_unknown_280_bits(uint32_t v) const { data()->unknown_280 = v; }
+  uint32_t unknown_280_bits() const { if (auto* d = direct()) return d->unknown_280; return uint32_t((memory::IsHandle(address + 280) ? uint32_t(memory::OwnerLoad(address + 280, 4)) : guest::LoadU32(base, address + 280))); }
+  void set_unknown_280_bits(uint32_t v) const { if (auto* d = direct()) { d->unknown_280 = v; return; } if (memory::IsHandle(address + 280)) memory::OwnerStore(address + 280, 4, v); else guest::StoreU32(base, address + 280, v); }
+  uint32_t unknown_280() const { if (auto* d = direct()) return d->unknown_280; return uint32_t((memory::IsHandle(address + 280) ? uint32_t(memory::OwnerLoad(address + 280, 4)) : guest::LoadU32(base, address + 280))); }
+  void set_unknown_280(uint32_t v) const { if (auto* d = direct()) { d->unknown_280 = v; return; } if (memory::IsHandle(address + 280)) memory::OwnerStore(address + 280, 4, v); else guest::StoreU32(base, address + 280, v); }
   uint32_t unknown_284_address() const { return address + 284; }
-  uint32_t unknown_284() const { return data()->unknown_284; }
-  void set_unknown_284(uint32_t v) const { data()->unknown_284 = v; }
-  uint32_t unknown_284_bits() const { return data()->unknown_284; }
-  void set_unknown_284_bits(uint32_t v) const { data()->unknown_284 = v; }
+  uint32_t unknown_284_bits() const { if (auto* d = direct()) return d->unknown_284; return uint32_t((memory::IsHandle(address + 284) ? uint32_t(memory::OwnerLoad(address + 284, 4)) : guest::LoadU32(base, address + 284))); }
+  void set_unknown_284_bits(uint32_t v) const { if (auto* d = direct()) { d->unknown_284 = v; return; } if (memory::IsHandle(address + 284)) memory::OwnerStore(address + 284, 4, v); else guest::StoreU32(base, address + 284, v); }
+  uint32_t unknown_284() const { if (auto* d = direct()) return d->unknown_284; return uint32_t((memory::IsHandle(address + 284) ? uint32_t(memory::OwnerLoad(address + 284, 4)) : guest::LoadU32(base, address + 284))); }
+  void set_unknown_284(uint32_t v) const { if (auto* d = direct()) { d->unknown_284 = v; return; } if (memory::IsHandle(address + 284)) memory::OwnerStore(address + 284, 4, v); else guest::StoreU32(base, address + 284, v); }
   // RaceHudAt656's +328 (sub_82215B48's stores and loads, lifted), named here so the holder's layout has it
   uint32_t unknown_328_address() const { return address + 328; }
-  uint32_t unknown_328() const { return data()->unknown_328; }
-  void set_unknown_328(uint32_t v) const { data()->unknown_328 = v; }
-  uint32_t unknown_328_bits() const { return data()->unknown_328; }
-  void set_unknown_328_bits(uint32_t v) const { data()->unknown_328 = v; }
+  uint32_t unknown_328_bits() const { if (auto* d = direct()) return d->unknown_328; return uint32_t((memory::IsHandle(address + 328) ? uint32_t(memory::OwnerLoad(address + 328, 4)) : guest::LoadU32(base, address + 328))); }
+  void set_unknown_328_bits(uint32_t v) const { if (auto* d = direct()) { d->unknown_328 = v; return; } if (memory::IsHandle(address + 328)) memory::OwnerStore(address + 328, 4, v); else guest::StoreU32(base, address + 328, v); }
+  uint32_t unknown_328() const { if (auto* d = direct()) return d->unknown_328; return uint32_t((memory::IsHandle(address + 328) ? uint32_t(memory::OwnerLoad(address + 328, 4)) : guest::LoadU32(base, address + 328))); }
+  void set_unknown_328(uint32_t v) const { if (auto* d = direct()) { d->unknown_328 = v; return; } if (memory::IsHandle(address + 328)) memory::OwnerStore(address + 328, 4, v); else guest::StoreU32(base, address + 328, v); }
   // as the race HUD's +436, probably: CountdownUpdate's kind 4 goes to the race once it's 0; written by sub_822159F0 (the start), sub_82215D08 (the stop) and sub_82215DA8
   uint32_t countdown_running_address() const { return address + 336; }
-  uint32_t countdown_running() const { return data()->countdown_running; }
-  void set_countdown_running(uint32_t v) const { data()->countdown_running = v; }
-  uint32_t countdown_running_bits() const { return data()->countdown_running; }
-  void set_countdown_running_bits(uint32_t v) const { data()->countdown_running = v; }
+  uint32_t countdown_running_bits() const { if (auto* d = direct()) return d->countdown_running; return uint32_t((memory::IsHandle(address + 336) ? uint32_t(memory::OwnerLoad(address + 336, 4)) : guest::LoadU32(base, address + 336))); }
+  void set_countdown_running_bits(uint32_t v) const { if (auto* d = direct()) { d->countdown_running = v; return; } if (memory::IsHandle(address + 336)) memory::OwnerStore(address + 336, 4, v); else guest::StoreU32(base, address + 336, v); }
+  uint32_t countdown_running() const { if (auto* d = direct()) return d->countdown_running; return uint32_t((memory::IsHandle(address + 336) ? uint32_t(memory::OwnerLoad(address + 336, 4)) : guest::LoadU32(base, address + 336))); }
+  void set_countdown_running(uint32_t v) const { if (auto* d = direct()) { d->countdown_running = v; return; } if (memory::IsHandle(address + 336)) memory::OwnerStore(address + 336, 4, v); else guest::StoreU32(base, address + 336, v); }
   // probably the mode sub_82216810 sets (StartCountdown's kind 4); read by sub_82216A40 and sub_82216830
   uint32_t mode_address() const { return address + 340; }
-  uint32_t mode() const { return data()->mode; }
-  void set_mode(uint32_t v) const { data()->mode = v; }
-  uint32_t mode_bits() const { return data()->mode; }
-  void set_mode_bits(uint32_t v) const { data()->mode = v; }
+  uint32_t mode_bits() const { if (auto* d = direct()) return d->mode; return uint32_t((memory::IsHandle(address + 340) ? uint32_t(memory::OwnerLoad(address + 340, 4)) : guest::LoadU32(base, address + 340))); }
+  void set_mode_bits(uint32_t v) const { if (auto* d = direct()) { d->mode = v; return; } if (memory::IsHandle(address + 340)) memory::OwnerStore(address + 340, 4, v); else guest::StoreU32(base, address + 340, v); }
+  uint32_t mode() const { if (auto* d = direct()) return d->mode; return uint32_t((memory::IsHandle(address + 340) ? uint32_t(memory::OwnerLoad(address + 340, 4)) : guest::LoadU32(base, address + 340))); }
+  void set_mode(uint32_t v) const { if (auto* d = direct()) { d->mode = v; return; } if (memory::IsHandle(address + 340)) memory::OwnerStore(address + 340, 4, v); else guest::StoreU32(base, address + 340, v); }
   // the race progress's +2184 (the holder's +1000, StartCountdown)
   uint32_t results_address() const { return address + 344; }
+  uint32_t results_bits() const { if (auto* d = direct()) return d->results; return uint32_t((memory::IsHandle(address + 344) ? uint32_t(memory::OwnerLoad(address + 344, 4)) : guest::LoadU32(base, address + 344))); }
+  void set_results_bits(uint32_t v) const { if (auto* d = direct()) { d->results = v; return; } if (memory::IsHandle(address + 344)) memory::OwnerStore(address + 344, 4, v); else guest::StoreU32(base, address + 344, v); }
   template <typename T = RacerResultsRecord>
-  T results() const { return T(base, data()->results); }
-  void set_results(const View& w) const { const uint32_t v = w.address; data()->results = v; }
-  void set_results(uint32_t v) const { data()->results = v; }
-  uint32_t results_bits() const { return data()->results; }
-  void set_results_bits(uint32_t v) const { data()->results = v; }
+  T results() const { return T(base, results_bits()); }
+  void set_results(const View& w) const { set_results_bits(w.address); }
+  void set_results(uint32_t v) const { set_results_bits(v); }
 };
 
 // embedded; measure: sub_82216428.r5

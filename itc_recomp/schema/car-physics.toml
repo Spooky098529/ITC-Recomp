@@ -341,8 +341,10 @@ size = 528
 origin = "allocated"
 # Host memory (E5 step 4): made only by Vehicle::SetUpPhysics (its hand port's
 # New; host_alloc its original's operator new), freed by Vehicle::DestroyPhysics
-# (operator delete takes the handle).
-storage = "host"
+# (operator delete takes the handle). Dual: RigidBody::Mass (sub_820B6708, the
+# float at +4) is a shared leaf the render queue's sort also calls on its guest
+# entries (RenderQueue::Partition's getter).
+storage = "dual"
 host_alloc = [0x820B5738]
 fields = [
   { name = "fixed", offset = 0, type = "u8", note = "set: no inverse mass" },

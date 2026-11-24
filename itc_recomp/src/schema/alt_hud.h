@@ -50,86 +50,87 @@ struct AltHud : View {
   }
   AltHud at(uint32_t i) const { return AltHud(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kAltHudLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAltHudLayout, offset, width, v); }
+  AltHudData* direct() const { return static_cast<AltHudData*>(memory::HandleOwn(address, &kAltHudLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kAltHudLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kAltHudLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // node 3's flag, the toggle AltHud::Tick flips on X
   uint32_t shown_address() const { return address + 0; }
-  uint32_t shown() const { return data()->shown; }
-  void set_shown(uint32_t v) const { data()->shown = v; }
-  uint32_t shown_bits() const { return data()->shown; }
-  void set_shown_bits(uint32_t v) const { data()->shown = v; }
+  uint32_t shown_bits() const { if (auto* d = direct()) return d->shown; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_shown_bits(uint32_t v) const { if (auto* d = direct()) { d->shown = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t shown() const { if (auto* d = direct()) return d->shown; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_shown(uint32_t v) const { if (auto* d = direct()) { d->shown = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // the tachometer's HudCurve (one of three at 0x8200FD28)
   uint32_t tach_curve_address() const { return address + 4; }
-  uint8_t* tach_curve() const { return reinterpret_cast<uint8_t*>(data()) + 4; }
+  uint8_t* tach_curve() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 4 : guest::Pointer(base, address + 4); }
   // the tachometer curve's output (its +100): the needle's rotation
   uint32_t tach_output_address() const { return address + 104; }
-  float tach_output() const { return data()->tach_output; }
-  void set_tach_output(float v) const { data()->tach_output = v; }
-  uint32_t tach_output_bits() const { return std::bit_cast<uint32_t>(data()->tach_output); }
-  void set_tach_output_bits(uint32_t v) const { data()->tach_output = std::bit_cast<float>(v); }
+  uint32_t tach_output_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->tach_output); return uint32_t((memory::IsHandle(address + 104) ? uint32_t(memory::OwnerLoad(address + 104, 4)) : guest::LoadU32(base, address + 104))); }
+  void set_tach_output_bits(uint32_t v) const { if (auto* d = direct()) { d->tach_output = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 104)) memory::OwnerStore(address + 104, 4, v); else guest::StoreU32(base, address + 104, v); }
+  float tach_output() const { return std::bit_cast<float>(tach_output_bits()); }
+  void set_tach_output(float v) const { set_tach_output_bits(std::bit_cast<uint32_t>(v)); }
   // the boost's HudCurve (copied from 0x8200FE78)
   uint32_t boost_curve_address() const { return address + 116; }
-  uint8_t* boost_curve() const { return reinterpret_cast<uint8_t*>(data()) + 116; }
+  uint8_t* boost_curve() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 116 : guest::Pointer(base, address + 116); }
   // the boost curve's output (its +100): the needle's rotation
   uint32_t boost_output_address() const { return address + 216; }
-  float boost_output() const { return data()->boost_output; }
-  void set_boost_output(float v) const { data()->boost_output = v; }
-  uint32_t boost_output_bits() const { return std::bit_cast<uint32_t>(data()->boost_output); }
-  void set_boost_output_bits(uint32_t v) const { data()->boost_output = std::bit_cast<float>(v); }
+  uint32_t boost_output_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->boost_output); return uint32_t((memory::IsHandle(address + 216) ? uint32_t(memory::OwnerLoad(address + 216, 4)) : guest::LoadU32(base, address + 216))); }
+  void set_boost_output_bits(uint32_t v) const { if (auto* d = direct()) { d->boost_output = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 216)) memory::OwnerStore(address + 216, 4, v); else guest::StoreU32(base, address + 216, v); }
+  float boost_output() const { return std::bit_cast<float>(boost_output_bits()); }
+  void set_boost_output(float v) const { set_boost_output_bits(std::bit_cast<uint32_t>(v)); }
   // the bar's value (the car's +2420)
   uint32_t bar_address() const { return address + 228; }
-  float bar() const { return data()->bar; }
-  void set_bar(float v) const { data()->bar = v; }
-  uint32_t bar_bits() const { return std::bit_cast<uint32_t>(data()->bar); }
-  void set_bar_bits(uint32_t v) const { data()->bar = std::bit_cast<float>(v); }
+  uint32_t bar_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->bar); return uint32_t((memory::IsHandle(address + 228) ? uint32_t(memory::OwnerLoad(address + 228, 4)) : guest::LoadU32(base, address + 228))); }
+  void set_bar_bits(uint32_t v) const { if (auto* d = direct()) { d->bar = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 228)) memory::OwnerStore(address + 228, 4, v); else guest::StoreU32(base, address + 228, v); }
+  float bar() const { return std::bit_cast<float>(bar_bits()); }
+  void set_bar(float v) const { set_bar_bits(std::bit_cast<uint32_t>(v)); }
   // the bar's range top; nothing found writes it (0.0)
   uint32_t bar_high_address() const { return address + 232; }
-  float bar_high() const { return data()->bar_high; }
-  void set_bar_high(float v) const { data()->bar_high = v; }
-  uint32_t bar_high_bits() const { return std::bit_cast<uint32_t>(data()->bar_high); }
-  void set_bar_high_bits(uint32_t v) const { data()->bar_high = std::bit_cast<float>(v); }
+  uint32_t bar_high_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->bar_high); return uint32_t((memory::IsHandle(address + 232) ? uint32_t(memory::OwnerLoad(address + 232, 4)) : guest::LoadU32(base, address + 232))); }
+  void set_bar_high_bits(uint32_t v) const { if (auto* d = direct()) { d->bar_high = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 232)) memory::OwnerStore(address + 232, 4, v); else guest::StoreU32(base, address + 232, v); }
+  float bar_high() const { return std::bit_cast<float>(bar_high_bits()); }
+  void set_bar_high(float v) const { set_bar_high_bits(std::bit_cast<uint32_t>(v)); }
   // the bar's range bottom; nothing found writes it (0.0)
   uint32_t bar_low_address() const { return address + 236; }
-  float bar_low() const { return data()->bar_low; }
-  void set_bar_low(float v) const { data()->bar_low = v; }
-  uint32_t bar_low_bits() const { return std::bit_cast<uint32_t>(data()->bar_low); }
-  void set_bar_low_bits(uint32_t v) const { data()->bar_low = std::bit_cast<float>(v); }
+  uint32_t bar_low_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->bar_low); return uint32_t((memory::IsHandle(address + 236) ? uint32_t(memory::OwnerLoad(address + 236, 4)) : guest::LoadU32(base, address + 236))); }
+  void set_bar_low_bits(uint32_t v) const { if (auto* d = direct()) { d->bar_low = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 236)) memory::OwnerStore(address + 236, 4, v); else guest::StoreU32(base, address + 236, v); }
+  float bar_low() const { return std::bit_cast<float>(bar_low_bits()); }
+  void set_bar_low(float v) const { set_bar_low_bits(std::bit_cast<uint32_t>(v)); }
   // a Vehicle: Vehicle::Get(player)
   uint32_t car_address() const { return address + 240; }
-  View car() const { return View(base, data()->car); }
-  void set_car(uint32_t v) const { data()->car = v; }
-  uint32_t car_bits() const { return data()->car; }
-  void set_car_bits(uint32_t v) const { data()->car = v; }
+  uint32_t car_bits() const { if (auto* d = direct()) return d->car; return uint32_t((memory::IsHandle(address + 240) ? uint32_t(memory::OwnerLoad(address + 240, 4)) : guest::LoadU32(base, address + 240))); }
+  void set_car_bits(uint32_t v) const { if (auto* d = direct()) { d->car = v; return; } if (memory::IsHandle(address + 240)) memory::OwnerStore(address + 240, 4, v); else guest::StoreU32(base, address + 240, v); }
+  View car() const { return View(base, car_bits()); }
+  void set_car(uint32_t v) const { set_car_bits(v); }
   // the first extra gauge: 0 float, 1 int to 119, 2 int to 149, -1 none
   uint32_t slot0_address() const { return address + 244; }
-  int32_t slot0() const { return data()->slot0; }
-  void set_slot0(int32_t v) const { data()->slot0 = v; }
-  uint32_t slot0_bits() const { return std::bit_cast<uint32_t>(data()->slot0); }
-  void set_slot0_bits(uint32_t v) const { data()->slot0 = std::bit_cast<int32_t>(v); }
+  uint32_t slot0_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->slot0); return uint32_t((memory::IsHandle(address + 244) ? uint32_t(memory::OwnerLoad(address + 244, 4)) : guest::LoadU32(base, address + 244))); }
+  void set_slot0_bits(uint32_t v) const { if (auto* d = direct()) { d->slot0 = std::bit_cast<int32_t>(v); return; } if (memory::IsHandle(address + 244)) memory::OwnerStore(address + 244, 4, v); else guest::StoreU32(base, address + 244, v); }
+  int32_t slot0() const { return int32_t(slot0_bits()); }
+  void set_slot0(int32_t v) const { set_slot0_bits(uint32_t(v)); }
   // the second extra gauge, as slot0
   uint32_t slot1_address() const { return address + 248; }
-  int32_t slot1() const { return data()->slot1; }
-  void set_slot1(int32_t v) const { data()->slot1 = v; }
-  uint32_t slot1_bits() const { return std::bit_cast<uint32_t>(data()->slot1); }
-  void set_slot1_bits(uint32_t v) const { data()->slot1 = std::bit_cast<int32_t>(v); }
+  uint32_t slot1_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->slot1); return uint32_t((memory::IsHandle(address + 248) ? uint32_t(memory::OwnerLoad(address + 248, 4)) : guest::LoadU32(base, address + 248))); }
+  void set_slot1_bits(uint32_t v) const { if (auto* d = direct()) { d->slot1 = std::bit_cast<int32_t>(v); return; } if (memory::IsHandle(address + 248)) memory::OwnerStore(address + 248, 4, v); else guest::StoreU32(base, address + 248, v); }
+  int32_t slot1() const { return int32_t(slot1_bits()); }
+  void set_slot1(int32_t v) const { set_slot1_bits(uint32_t(v)); }
   // the third extra gauge, as slot0
   uint32_t slot2_address() const { return address + 252; }
-  int32_t slot2() const { return data()->slot2; }
-  void set_slot2(int32_t v) const { data()->slot2 = v; }
-  uint32_t slot2_bits() const { return std::bit_cast<uint32_t>(data()->slot2); }
-  void set_slot2_bits(uint32_t v) const { data()->slot2 = std::bit_cast<int32_t>(v); }
+  uint32_t slot2_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->slot2); return uint32_t((memory::IsHandle(address + 252) ? uint32_t(memory::OwnerLoad(address + 252, 4)) : guest::LoadU32(base, address + 252))); }
+  void set_slot2_bits(uint32_t v) const { if (auto* d = direct()) { d->slot2 = std::bit_cast<int32_t>(v); return; } if (memory::IsHandle(address + 252)) memory::OwnerStore(address + 252, 4, v); else guest::StoreU32(base, address + 252, v); }
+  int32_t slot2() const { return int32_t(slot2_bits()); }
+  void set_slot2(int32_t v) const { set_slot2_bits(uint32_t(v)); }
   // AltHud::ToggleView's flag: the big speed readout shown
   uint32_t big_view_address() const { return address + 256; }
-  uint32_t big_view() const { return data()->big_view; }
-  void set_big_view(uint32_t v) const { data()->big_view = v; }
-  uint32_t big_view_bits() const { return data()->big_view; }
-  void set_big_view_bits(uint32_t v) const { data()->big_view = v; }
+  uint32_t big_view_bits() const { if (auto* d = direct()) return d->big_view; return uint32_t((memory::IsHandle(address + 256) ? uint32_t(memory::OwnerLoad(address + 256, 4)) : guest::LoadU32(base, address + 256))); }
+  void set_big_view_bits(uint32_t v) const { if (auto* d = direct()) { d->big_view = v; return; } if (memory::IsHandle(address + 256)) memory::OwnerStore(address + 256, 4, v); else guest::StoreU32(base, address + 256, v); }
+  uint32_t big_view() const { if (auto* d = direct()) return d->big_view; return uint32_t((memory::IsHandle(address + 256) ? uint32_t(memory::OwnerLoad(address + 256, 4)) : guest::LoadU32(base, address + 256))); }
+  void set_big_view(uint32_t v) const { if (auto* d = direct()) { d->big_view = v; return; } if (memory::IsHandle(address + 256)) memory::OwnerStore(address + 256, 4, v); else guest::StoreU32(base, address + 256, v); }
   // the player (0 or 1)
   uint32_t player_address() const { return address + 260; }
-  uint32_t player() const { return data()->player; }
-  void set_player(uint32_t v) const { data()->player = v; }
-  uint32_t player_bits() const { return data()->player; }
-  void set_player_bits(uint32_t v) const { data()->player = v; }
+  uint32_t player_bits() const { if (auto* d = direct()) return d->player; return uint32_t((memory::IsHandle(address + 260) ? uint32_t(memory::OwnerLoad(address + 260, 4)) : guest::LoadU32(base, address + 260))); }
+  void set_player_bits(uint32_t v) const { if (auto* d = direct()) { d->player = v; return; } if (memory::IsHandle(address + 260)) memory::OwnerStore(address + 260, 4, v); else guest::StoreU32(base, address + 260, v); }
+  uint32_t player() const { if (auto* d = direct()) return d->player; return uint32_t((memory::IsHandle(address + 260) ? uint32_t(memory::OwnerLoad(address + 260, 4)) : guest::LoadU32(base, address + 260))); }
+  void set_player(uint32_t v) const { if (auto* d = direct()) { d->player = v; return; } if (memory::IsHandle(address + 260)) memory::OwnerStore(address + 260, 4, v); else guest::StoreU32(base, address + 260, v); }
 };
 
 // embedded; measure: RaceScreens@+1004, RaceScreens::~RaceScreens.r3@+1004, AltHud::ToggleView.r3
@@ -161,22 +162,23 @@ struct AltHudHolder : View {
   }
   AltHudHolder at(uint32_t i) const { return AltHudHolder(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kAltHudHolderLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAltHudHolderLayout, offset, width, v); }
+  AltHudHolderData* direct() const { return static_cast<AltHudHolderData*>(memory::HandleOwn(address, &kAltHudHolderLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kAltHudHolderLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kAltHudHolderLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 264 bytes, cleared
   uint32_t object_address() const { return address + 0; }
+  uint32_t object_bits() const { if (auto* d = direct()) return d->object; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_object_bits(uint32_t v) const { if (auto* d = direct()) { d->object = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   template <typename T = AltHud>
-  T object() const { return T(base, data()->object); }
-  void set_object(const View& w) const { const uint32_t v = w.address; data()->object = v; }
-  void set_object(uint32_t v) const { data()->object = v; }
-  uint32_t object_bits() const { return data()->object; }
-  void set_object_bits(uint32_t v) const { data()->object = v; }
+  T object() const { return T(base, object_bits()); }
+  void set_object(const View& w) const { set_object_bits(w.address); }
+  void set_object(uint32_t v) const { set_object_bits(v); }
   // a MenuList (72 bytes, one item); its X press flips the toggle
   uint32_t menu_list_address() const { return address + 4; }
-  View menu_list() const { return View(base, data()->menu_list); }
-  void set_menu_list(uint32_t v) const { data()->menu_list = v; }
-  uint32_t menu_list_bits() const { return data()->menu_list; }
-  void set_menu_list_bits(uint32_t v) const { data()->menu_list = v; }
+  uint32_t menu_list_bits() const { if (auto* d = direct()) return d->menu_list; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_menu_list_bits(uint32_t v) const { if (auto* d = direct()) { d->menu_list = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  View menu_list() const { return View(base, menu_list_bits()); }
+  void set_menu_list(uint32_t v) const { set_menu_list_bits(v); }
 };
 
 // The image words docs/functions/alt-hud.md's code uses.

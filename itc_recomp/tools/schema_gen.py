@@ -157,6 +157,11 @@ def check(areas):
                 continue
             if t.get("storage") not in ("host", "dual"):
                 errors.append(f"{area}: {name}: storage {t.get('storage')!r} (guest, host or dual)")
+            # A host view's own members: a field of the same name would clash.
+            for f in t.get("fields", []):
+                if f["name"] in HOST_VIEW_MEMBERS:
+                    errors.append(f"{area}: {name}: field {f['name']!r} clashes with the host view's "
+                                  f"{f['name']}() (rename the field)")
                 continue
             spans = []
             for f in t.get("fields", []):
@@ -197,6 +202,8 @@ def field_width(f, alltypes):
 
 
 ALLTYPES = {}
+HOST_VIEW_MEMBERS = {"data", "on_host", "New", "NewArray", "Delete", "at", "load_at", "store_at",
+                     "base", "address"}
 TYPE_AREA = {}
 
 
@@ -263,19 +270,38 @@ def members(t):
 def layout_fields(t, at=0, depth=0):
     """A host type's scalar fields wider than a byte, embedded objects'
     included (their own fields at the owner's offset), for copies between it
-    and guest memory (memory/host_copy.h); a field over an earlier one is
-    left out (the earlier one decides the bytes' order)."""
-    out = []
+    and guest memory (memory/host_copy.h). The owner's own members come
+    first; an embedded object's field over a byte already listed is left out
+    (the member holding those bytes decides their order: listed twice, a
+    field would be swapped twice, that is, not at all)."""
+    out, taken = [], []
+
+    def free(lo, hi):
+        return not any(lo < b and a < hi for a, b in taken)
+
     mem = members(t)
-    for f in sorted(t.get("fields", []), key=lambda f: f["offset"]):
-        if f["type"] != "embed" and f["name"] not in mem:
+    fields = sorted(t.get("fields", []), key=lambda f: f["offset"])
+    for f in fields:
+        if f["type"] == "embed" or f["name"] not in mem:
             continue
-        if f["type"] == "embed" and depth < 8:
+        # Scalar members only: a bytes member over an embedded object (kept
+        # for the lifted code's _address()) leaves its bytes to the object's
+        # own fields.
+        if f["type"] in WIDTHS:
+            lo = at + f["offset"]
+            if WIDTHS[f["type"]] > 1:
+                out.append((lo, WIDTHS[f["type"]]))
+            taken.append((lo, lo + WIDTHS[f["type"]]))
+    if depth < 8:
+        for f in fields:
+            if f["type"] != "embed":
+                continue
             inner = ALLTYPES.get(f["to"], {})
             for i in range(f.get("count", 1)):
-                out += layout_fields(inner, at + f["offset"] + i * inner.get("size", 0), depth + 1)
-        elif f["type"] in WIDTHS and WIDTHS[f["type"]] > 1:
-            out.append((at + f["offset"], WIDTHS[f["type"]]))
+                for o, w in layout_fields(inner, at + f["offset"] + i * inner.get("size", 0), depth + 1):
+                    if free(o, o + w):
+                        out.append((o, w))
+                        taken.append((o, o + w))
     return sorted(out)
 
 
@@ -292,9 +318,12 @@ def host_type(name, t):
     bits of the field's width, what lifted code loads and stores), `New`,
     `NewArray`, `at` and `Delete`."""
     dual = t.get("storage") == "dual"
+    # The members' struct, `<name>Data`, or `<name>HostData` when the schema
+    # has a type of that name (SaveScreen beside SaveScreenData).
+    dn = f"{name}HostData" if f"{name}Data" in ALLTYPES else f"{name}Data"
     fields = sorted(t.get("fields", []), key=lambda f: f["offset"])
     size = max([t.get("size", 0)] + [f["offset"] + field_width(f, ALLTYPES) for f in fields])
-    out = ["#pragma pack(push, 1)", f"struct {name}Data {{"]
+    out = ["#pragma pack(push, 1)", f"struct {dn} {{"]
     at = 0
     mem = members(t)
     overlaid = {f["name"] for f in fields if f["name"] not in mem and f["type"] != "embed"}
@@ -322,7 +351,7 @@ def host_type(name, t):
         out.append(f"  uint8_t pad_{at}[{size - at}] = {{}};")
     out.append("};")
     out.append("#pragma pack(pop)")
-    out.append(f"static_assert(sizeof({name}Data) == {size});")
+    out.append(f"static_assert(sizeof({dn}) == {size});")
     lay = layout_fields(t)
     if lay:
         out.append(f"inline constexpr memory::LayoutField k{name}Fields[] = {{"
@@ -338,45 +367,57 @@ def host_type(name, t):
     out.append(f"  static constexpr bool kDual = {'true' if dual else 'false'};")
     if "vtable" in t:
         out.append(f"  static constexpr uint32_t kVtable = 0x{t['vtable']:08X};")
-    out.append(f"  {name}Data* data() const {{ return static_cast<{name}Data*>(memory::HandleObject(address)); }}")
+    out.append(f"  {dn}* data() const {{ return static_cast<{dn}*>(memory::HandleObject(address)); }}")
     if dual:
         out.append("  bool on_host() const { return memory::IsHandle(address); }")
     out.append(f"  static {name} New(uint8_t* base) {{")
-    out.append(f"    return {name}(base, memory::MakeHandle(new {name}Data(), sizeof({name}Data), \"{name}\", &k{name}Layout));")
+    out.append(f"    return {name}(base, memory::MakeHandle(new {dn}(), sizeof({dn}), \"{name}\", &k{name}Layout));")
     out.append("  }")
     # An array allocated at once (new[] without a count header, one block of
     # `count` objects): one handle; element i is the handle + i * kSize, and
     # copies and raw accesses use the element's layout at offset % kSize.
     out.append(f"  template <uint32_t Stride = kSize>")
     out.append(f"  static {name} NewArray(uint8_t* base, uint32_t count) {{")
-    out.append(f"    static_assert(sizeof({name}Data) == Stride, \"an array's stride is the guest size\");")
-    out.append(f"    auto* p = static_cast<{name}Data*>(::operator new(sizeof({name}Data) * std::max<uint32_t>(count, 1)));")
-    out.append(f"    for (uint32_t i = 0; i < count; i++) new (p + i) {name}Data();")
-    out.append(f"    return {name}(base, memory::MakeHandle(p, sizeof({name}Data) * count, \"{name}\", &k{name}Layout, sizeof({name}Data)));")
+    out.append(f"    static_assert(sizeof({dn}) == Stride, \"an array's stride is the guest size\");")
+    out.append(f"    auto* p = static_cast<{dn}*>(::operator new(sizeof({dn}) * std::max<uint32_t>(count, 1)));")
+    out.append(f"    for (uint32_t i = 0; i < count; i++) new (p + i) {dn}();")
+    out.append(f"    return {name}(base, memory::MakeHandle(p, sizeof({dn}) * count, \"{name}\", &k{name}Layout, sizeof({dn})));")
     out.append("  }")
     out.append(f"  {name} at(uint32_t i) const {{ return {name}(base, address + i * kSize); }}")
     # One object or an array's first: the block freed whole (0 does nothing).
     out.append(f"  void Delete() const {{ if (address) memory::FreeHandle(address); }}")
 
+    # Where the view's own members are: the object when the handle is one of
+    # this type's (memory::HandleOwn). Else (a guest address, or an object
+    # inside a host owner of another type, whose bytes the owner's layout
+    # orders) each access goes by address: guest memory, or the owner through
+    # memory::OwnerLoad and OwnerStore.
+    out.append(f"  {dn}* direct() const {{ return static_cast<{dn}*>(memory::HandleOwn(address, &k{name}Layout)); }}")
+    U = {1: "U8", 2: "U16", 4: "U32", 8: "U64"}
+    BT = {1: "uint8_t", 2: "uint16_t", 4: "uint32_t", 8: "uint64_t"}
+
+    def by_address(at, w):
+        return (f"(memory::IsHandle({at}) ? {BT[w]}(memory::OwnerLoad({at}, {w})) "
+                f": guest::Load{U[w]}(base, {at}))")
+
+    def by_address_store(at, w, v):
+        return (f"if (memory::IsHandle({at})) memory::OwnerStore({at}, {w}, {v}); "
+                f"else guest::Store{U[w]}(base, {at}, {v});")
+
     # Any offset, any width (1, 2, 4 or 8 bytes), as the guest's bytes give it:
     # for accesses inside a field (a byte of a word) and code reading by offset.
-    hl = f"memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), k{name}Layout, offset, width)"
-    hs = f"memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), k{name}Layout, offset, width, v)"
-    gl = ("width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? "
+    hl = f"memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), k{name}Layout, offset, width)"
+    hs = f"memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), k{name}Layout, offset, width, v)"
+    gl = ("memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : "
+          "width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? "
           "guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) "
           ": guest::LoadU64(base, address + offset)")
-    gs = ("if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) "
+    gs = ("if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); "
+          "else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) "
           "guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) "
           "guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v);")
-    if dual:
-        out.append(f"  uint64_t load_at(uint32_t offset, uint32_t width) const {{ if (on_host()) return {hl}; return {gl}; }}")
-        out.append(f"  void store_at(uint32_t offset, uint32_t width, uint64_t v) const {{ if (on_host()) {{ {hs}; return; }} {gs} }}")
-    else:
-        out.append(f"  uint64_t load_at(uint32_t offset, uint32_t width) const {{ return {hl}; }}")
-        out.append(f"  void store_at(uint32_t offset, uint32_t width, uint64_t v) const {{ {hs}; }}")
-
-    def pick(host, guest):
-        return f"on_host() ? {host} : {guest}" if dual else host
+    out.append(f"  uint64_t load_at(uint32_t offset, uint32_t width) const {{ if (auto* d = direct()) return {hl}; return {gl}; }}")
+    out.append(f"  void store_at(uint32_t offset, uint32_t width, uint64_t v) const {{ if (auto* d = direct()) {{ {hs}; return; }} {gs} }}")
 
     for f in t.get("fields", []):
         n, ty, off = f["name"], f["type"], f["offset"]
@@ -390,75 +431,49 @@ def host_type(name, t):
         # (memory::RawHandleLoad and Store; logged once per type and offset).
         out.append(f"  uint32_t {n}_address() const {{ return address + {off}; }}")
         if ty == "bytes":
-            # At its offset (a member, or bytes over scalar members).
-            out.append(f"  uint8_t* {n}() const {{ return "
-                       + pick(f"reinterpret_cast<uint8_t*>(data()) + {off}",
-                              f"guest::Pointer(base, address + {off})") + "; }")
+            # At its offset: the object's bytes there (a member, or bytes over
+            # scalar members), or guest memory's.
+            out.append(f"  uint8_t* {n}() const {{ return memory::IsHandle(address) ? "
+                       f"static_cast<uint8_t*>(memory::HandleObject(address)) + {off} : "
+                       f"guest::Pointer(base, address + {off}); }}")
             continue
         member, bits = HOST[ty]
+        w = WIDTHS[ty]
+        at = f"address + {off}"
+        # Its raw bits: the member (or, for a field over others, the guest-order
+        # image of the members it covers), else by address.
         if n in overlaid:
-            # A field over an earlier one (a union, or a measure fault): its
-            # bytes at its offset, in host order.
-            # Its value as the guest's bytes give it (memory::LoadOverlay).
-            p = "reinterpret_cast<uint8_t*>(data())"
-            w = {1: "U8", 2: "U16", 4: "U32", 8: "U64"}[WIDTHS[ty]]
-            hget = f"{bits}(memory::LoadOverlay({p}, k{name}Layout, {off}, {WIDTHS[ty]}))"
-            gbits = f"guest::Load{w}(base, address + {off})"
-            getbits = f"on_host() ? {hget} : {gbits}" if dual else hget
-            out.append(f"  {bits} {n}_bits() const {{ return {getbits}; }}")
-            hput = f"memory::StoreOverlay({p}, k{name}Layout, {off}, {WIDTHS[ty]}, v)"
-            gput = f"guest::Store{w}(base, address + {off}, v)"
-            putbits = f"if (on_host()) {hput}; else {gput};" if dual else f"{hput};"
-            out.append(f"  void set_{n}_bits({bits} v) const {{ {putbits} }}")
-            if ty == "ptr":
-                out.append(f"  View {n}() const {{ return View(base, {n}_bits()); }}")
-                out.append(f"  void set_{n}(uint32_t v) const {{ set_{n}_bits(v); }}")
-            else:
-                cv = f"std::bit_cast<{member}>({n}_bits())" if member != bits and ty in ("f32", "f64") else f"{member}({n}_bits())"
-                out.append(f"  {member} {n}() const {{ return {cv}; }}")
-                sv = f"std::bit_cast<{bits}>(v)" if ty in ("f32", "f64") else f"{bits}(v)"
-                out.append(f"  void set_{n}({member} v) const {{ set_{n}_bits({sv}); }}")
-            continue
-        if ty in SCALARS:
-            ctype, gload, gstore = SCALARS[ty]
-        else:  # ptr
-            ctype, gload, gstore = SCALARS["u32"]
-        ga = f"address + {off}"
-        gl = gload.format(a=ga)
-        gs = gstore.format(a=ga)
-        if dual:
-            get = f"return on_host() ? {member}(data()->{n}) : {member}({gl});"
-            put = f"if (on_host()) data()->{n} = v; else {gs};"
+            p = "reinterpret_cast<uint8_t*>(d)"
+            dget = f"{bits}(memory::LoadOverlay({p}, k{name}Layout, {off}, {w}))"
+            dput = f"memory::StoreOverlay({p}, k{name}Layout, {off}, {w}, v)"
+        elif member == bits:
+            dget, dput = f"d->{n}", f"d->{n} = v"
         else:
-            get = f"return data()->{n};"
-            put = f"data()->{n} = v;"
+            dget, dput = f"std::bit_cast<{bits}>(d->{n})", f"d->{n} = std::bit_cast<{member}>(v)"
+        out.append(f"  {bits} {n}_bits() const {{ if (auto* d = direct()) return {dget}; "
+                   f"return {bits}({by_address(at, w)}); }}")
+        out.append(f"  void set_{n}_bits({bits} v) const {{ if (auto* d = direct()) {{ {dput}; return; }} "
+                   f"{by_address_store(at, w, 'v')} }}")
+        to_member = (f"std::bit_cast<{member}>({n}_bits())" if ty in ("f32", "f64")
+                     else f"{member}({n}_bits())")
+        from_member = "std::bit_cast<{b}>(v)".format(b=bits) if ty in ("f32", "f64") else f"{bits}(v)"
         if ty == "ptr":
             to = f.get("to")
-            pget = get.replace("return ", "return T(base, ").rstrip(";") + ");" if not dual else \
-                f"return T(base, on_host() ? data()->{n} : {gl});"
             if to:
                 out.append(f"  template <typename T = {to}>")
-                out.append(f"  T {n}() const {{ {pget} }}")
-                out.append(f"  void set_{n}(const View& w) const {{ const uint32_t v = w.address; {put} }}")
+                out.append(f"  T {n}() const {{ return T(base, {n}_bits()); }}")
+                out.append(f"  void set_{n}(const View& w) const {{ set_{n}_bits(w.address); }}")
             else:
-                vget = pget.replace("T(base", "View(base")
-                out.append(f"  View {n}() const {{ {vget} }}")
-            out.append(f"  void set_{n}(uint32_t v) const {{ {put} }}")
+                out.append(f"  View {n}() const {{ return View(base, {n}_bits()); }}")
+            out.append(f"  void set_{n}(uint32_t v) const {{ set_{n}_bits(v); }}")
+        elif n in overlaid or member != bits or ty in ("s8", "s16", "s32"):
+            out.append(f"  {member} {n}() const {{ return {to_member}; }}")
+            out.append(f"  void set_{n}({member} v) const {{ set_{n}_bits({from_member}); }}")
         else:
-            out.append(f"  {member} {n}() const {{ {get} }}")
-            out.append(f"  void set_{n}({member} v) const {{ {put} }}")
-        # The raw bits of the field's width, what lifted code loads and stores.
-        if member == bits:
-            bget, bput = f"data()->{n}", f"data()->{n} = v"
-        else:
-            bget, bput = f"std::bit_cast<{bits}>(data()->{n})", f"data()->{n} = std::bit_cast<{member}>(v)"
-        if dual:
-            w = {1: "U8", 2: "U16", 4: "U32", 8: "U64"}[WIDTHS[ty]]
-            out.append(f"  {bits} {n}_bits() const {{ return on_host() ? {bget} : guest::Load{w}(base, {ga}); }}")
-            out.append(f"  void set_{n}_bits({bits} v) const {{ if (on_host()) {bput}; else guest::Store{w}(base, {ga}, v); }}")
-        else:
-            out.append(f"  {bits} {n}_bits() const {{ return {bget}; }}")
-            out.append(f"  void set_{n}_bits({bits} v) const {{ {bput}; }}")
+            out.append(f"  {member} {n}() const {{ if (auto* d = direct()) return d->{n}; "
+                       f"return {member}({by_address(at, w)}); }}")
+            out.append(f"  void set_{n}({member} v) const {{ if (auto* d = direct()) {{ d->{n} = v; return; }} "
+                       f"{by_address_store(at, w, 'v')} }}")
     out.append("};")
     out.append("")
     return out

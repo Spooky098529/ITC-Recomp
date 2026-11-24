@@ -757,14 +757,15 @@ struct TrackCollisionObject : View {
   }
   TrackCollisionObject at(uint32_t i) const { return TrackCollisionObject(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kTrackCollisionObjectLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kTrackCollisionObjectLayout, offset, width, v); }
+  TrackCollisionObjectData* direct() const { return static_cast<TrackCollisionObjectData*>(memory::HandleOwn(address, &kTrackCollisionObjectLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kTrackCollisionObjectLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kTrackCollisionObjectLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0, then 4; what it is isn't known
   uint32_t value_address() const { return address + 0; }
-  uint32_t value() const { return data()->value; }
-  void set_value(uint32_t v) const { data()->value = v; }
-  uint32_t value_bits() const { return data()->value; }
-  void set_value_bits(uint32_t v) const { data()->value = v; }
+  uint32_t value_bits() const { if (auto* d = direct()) return d->value; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_value_bits(uint32_t v) const { if (auto* d = direct()) { d->value = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t value() const { if (auto* d = direct()) return d->value; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_value(uint32_t v) const { if (auto* d = direct()) { d->value = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
 };
 
 // embedded; measure: TrackPosition@+16

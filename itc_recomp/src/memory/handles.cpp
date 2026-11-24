@@ -171,6 +171,21 @@ bool DescribeHandle(uint32_t value, HandleInfo* info) {
   return true;
 }
 
+void* HandleOwn(uint32_t value, const Layout* layout) {
+  if (!IsHandle(value) || !g_entries) {
+    return nullptr;
+  }
+  const Entry& e = g_entries[Granule(value)];
+  const uint32_t offset = value - e.start;
+  if (!e.object || e.layout != layout || offset >= std::max<uint32_t>(e.size, 1)) {
+    return nullptr;
+  }
+  if (offset % (e.element ? e.element : std::max<uint32_t>(e.size, 1)) != 0) {
+    return nullptr;
+  }
+  return static_cast<uint8_t*>(e.object) + offset;
+}
+
 void* HandleObject(uint32_t handle) {
   if (handle == 0) {
     return nullptr;

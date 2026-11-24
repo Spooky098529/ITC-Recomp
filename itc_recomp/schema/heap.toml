@@ -106,7 +106,7 @@ fields = [
   { name = "vtable", offset = 0, type = "u32" },
   { name = "ref_count", offset = 4, type = "u32" },
   { name = "size", offset = 8, type = "u32" },
-  { name = "data", offset = 12, type = "u32", note = "the buffer's bytes (vtable slot 6's XMemAlloc)" },
+  { name = "contents", offset = 12, type = "u32", note = "the buffer's bytes (vtable slot 6's XMemAlloc)" },
 ]
 
 # D3DXCreateBuffer's r4: where the buffer goes.

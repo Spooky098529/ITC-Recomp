@@ -871,7 +871,8 @@ step 3's swarm); their reports go into `docs/loops/e5-step4-reports.md`.
   math (`RigidBody`, `BoxShape`, `CollisionHit`, `CollisionContact`),
   which read through `guest::Load*` and `Store*`.
 - **Raw accesses without a lock** (`memory/host_copy.cpp`): the sites
-  already logged are found in a lock-free table; logging stops after 512.
+  already logged are found in a lock-free table; logging stops after 512
+  (4,096 since the swarm's validation: `RaceMode` alone logs ~3,100).
 - **Host arrays**: `T::NewArray(base, count)` makes `count` objects in one
   block behind one handle (element `i` is the handle + `i * kSize`, its
   view `at(i)`); the handle's entry records the element size, and
@@ -899,3 +900,73 @@ the menus' machines carved out of a mode's block). Batch 1's skipped
 types are among them (`InputManager` with `ActionMapper`, `App`, the
 `AppCamera` family, `CarDealerEntry` and `CarDealerData`, the collision
 types, the modes' blocks).
+
+### The swarm: done (2026-11-24)
+
+35 agents, one per unit (run `wf_46642786-785`, ~46 minutes); their
+reports in `docs/loops/e5-step4-reports.md`. Schema types by storage:
+host 38 -> 155, dual 54 -> 118, guest 1,845 -> 1,665. Nothing moved in
+four units, by their agents' reading: `TrackRouteFile` is file-backed
+(read in place by the archive: step 5, as its twin `TrackMeshFile`);
+`AppScene` holds the command list and render queue (tagged GPU: step 7);
+`WorkerPool`'s worker loop reaches it through `lwarx`/`stwcx.` on a
+`guest::Pointer` (to do: a handle-aware atomic in `lift.py`, or the loop
+ported); `XAudioAllocBlock` is the measure's join of every `XAudio::Alloc`
+answer, not an object (the type that matters is `XAudioBumpAllocator`,
+whose block holds every XAudio object as interior addresses: a unit of its
+own). The big blocks moved whole with their machines and screens still
+reached through guest views (`RaceMode`, `Type4Block`, `Type2ModeBlock`,
+`Type5ModeBlock`, the type 9 and 10 blocks): correct through the owner's
+layout, logged as raw accesses; embedding them waits on `StateMachine`
+made dual and the owners' copies of their machines' words removed.
+
+**The lead's fixes in validation:**
+- `layout_fields` listed a field twice where an owner's scalar and an
+  embedded object's field share an offset (five agents found it; the
+  pilot's `StateLayer` had it): swapped twice, it came out in the wrong
+  order in copies and raw accesses. The owner's members now come first, an
+  embedded field over one of them is left out; no layout has overlaps.
+- **Views on objects inside other owners**: a host or dual view reached
+  through an interior handle read its own struct's members, while the bytes
+  there are laid out by the owner (an 80-byte record kept as bytes in guest
+  order): `collision::WordAt8` (`WordAt8Object`, dual) read a shape's
+  pointer byte-swapped and the collision query dereferenced it. Views now
+  read their members only when the handle's own object has their type
+  (`memory::HandleOwn`, by the layout's address, at an element boundary;
+  `direct()`), else by address through the owner's layout
+  (`memory::OwnerLoad` and `OwnerStore`, the raw path without its log
+  line).
+- **Copies between two host objects** whose layouts differ (a record kept
+  as bytes in `RaceCarSlot`, as members in `SceneInterior`) went byte for
+  byte: an interior's accessory index came out as `0x03000000` and its
+  load asked for a missing asset. Now through the guest's order (the
+  source's fields swapped by its layout, then the destination's).
+- `RigidBody` dual, not host: `RigidBody::Mass` (`sub_820B6708`, the float
+  at +4) is a shared leaf the render queue's sort also calls on its guest
+  entries.
+- schema_gen: the members' struct is `<Type>HostData` when `<Type>Data` is
+  also a type (`SaveScreen`, dual, beside `SaveScreenData`); a field named
+  like a host view's member (`data`, `at`, `New`, ...) is refused
+  (`D3DXBuffer`'s `data` renamed `contents`).
+- Layout scans by binary search (`TrackZones` has 18,555 fields); the raw
+  log's cap 4,096.
+
+**Checked:** the build; an attract race (38 s, no error lines); `tick_replay.sh`
+twice (both races all match, 112 and 1,183 ticks); a frame dump (the same
+frame as before the swarm). The replay and the attract race reach every
+unit's allocation but the type 5, 6, 7, 10 and 12 modes' blocks and the
+morph job maker (checked by the build only). Race 0's line-up skips 474
+reads now (24 to 34 before): the race is entered at the same time from
+launch (~0.33 s) but the boot's loading ran fewer ticks before it, the
+raw path over the big blocks being slower (races hold the 144 cap as
+before). `schema_check.py` lists 106 accesses that fit no field (23
+before): reads inside embed fields and arrays' later elements, which it
+doesn't resolve (`field_at` ignores embeds and strides), and the modes'
+fault fields batch 1 left. Raw accesses logged in the replay, by type:
+`RaceMode` ~3,100 sites, `Type4Block` ~800, `AppCameraCamera` 100,
+`PtrListNode` 63, `SysUsers` 17, a few each for `D3DXBuffer`,
+`AppCamera`, `AppDelegate`, `ActionMapper`, `ByteCountedList`,
+`InputManager`, `Framework`, `App` (to convert: the machines' views,
+`Camera` as a dual base, `StateListNode` and `Request` dual).
+
+Rows proposed by the agents await the user's review (not written).

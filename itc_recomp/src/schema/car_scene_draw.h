@@ -38,39 +38,40 @@ struct CarScenePoint : View {
   }
   CarScenePoint at(uint32_t i) const { return CarScenePoint(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCarScenePointLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarScenePointLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
+  CarScenePointData* direct() const { return static_cast<CarScenePointData*>(memory::HandleOwn(address, &kCarScenePointLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kCarScenePointLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarScenePointLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // x and y as one doubleword (the copies' ld/std)
   uint32_t xy_address() const { return address + 0; }
-  uint64_t xy() const { return on_host() ? uint64_t(data()->xy) : uint64_t(guest::LoadU64(base, address + 0)); }
-  void set_xy(uint64_t v) const { if (on_host()) data()->xy = v; else guest::StoreU64(base, address + 0, v); }
-  uint64_t xy_bits() const { return on_host() ? data()->xy : guest::LoadU64(base, address + 0); }
-  void set_xy_bits(uint64_t v) const { if (on_host()) data()->xy = v; else guest::StoreU64(base, address + 0, v); }
+  uint64_t xy_bits() const { if (auto* d = direct()) return d->xy; return uint64_t((memory::IsHandle(address + 0) ? uint64_t(memory::OwnerLoad(address + 0, 8)) : guest::LoadU64(base, address + 0))); }
+  void set_xy_bits(uint64_t v) const { if (auto* d = direct()) { d->xy = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 8, v); else guest::StoreU64(base, address + 0, v); }
+  uint64_t xy() const { if (auto* d = direct()) return d->xy; return uint64_t((memory::IsHandle(address + 0) ? uint64_t(memory::OwnerLoad(address + 0, 8)) : guest::LoadU64(base, address + 0))); }
+  void set_xy(uint64_t v) const { if (auto* d = direct()) { d->xy = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 8, v); else guest::StoreU64(base, address + 0, v); }
   uint32_t x_address() const { return address + 0; }
-  uint32_t x_bits() const { return on_host() ? uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kCarScenePointLayout, 0, 4)) : guest::LoadU32(base, address + 0); }
-  void set_x_bits(uint32_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarScenePointLayout, 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t x_bits() const { if (auto* d = direct()) return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(d), kCarScenePointLayout, 0, 4)); return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_x_bits(uint32_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarScenePointLayout, 0, 4, v); return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   float x() const { return std::bit_cast<float>(x_bits()); }
   void set_x(float v) const { set_x_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t y_address() const { return address + 4; }
-  uint32_t y_bits() const { return on_host() ? uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kCarScenePointLayout, 4, 4)) : guest::LoadU32(base, address + 4); }
-  void set_y_bits(uint32_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarScenePointLayout, 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  uint32_t y_bits() const { if (auto* d = direct()) return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(d), kCarScenePointLayout, 4, 4)); return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_y_bits(uint32_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarScenePointLayout, 4, 4, v); return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
   float y() const { return std::bit_cast<float>(y_bits()); }
   void set_y(float v) const { set_y_bits(std::bit_cast<uint32_t>(v)); }
   // z and w as one doubleword
   uint32_t zw_address() const { return address + 8; }
-  uint64_t zw() const { return on_host() ? uint64_t(data()->zw) : uint64_t(guest::LoadU64(base, address + 8)); }
-  void set_zw(uint64_t v) const { if (on_host()) data()->zw = v; else guest::StoreU64(base, address + 8, v); }
-  uint64_t zw_bits() const { return on_host() ? data()->zw : guest::LoadU64(base, address + 8); }
-  void set_zw_bits(uint64_t v) const { if (on_host()) data()->zw = v; else guest::StoreU64(base, address + 8, v); }
+  uint64_t zw_bits() const { if (auto* d = direct()) return d->zw; return uint64_t((memory::IsHandle(address + 8) ? uint64_t(memory::OwnerLoad(address + 8, 8)) : guest::LoadU64(base, address + 8))); }
+  void set_zw_bits(uint64_t v) const { if (auto* d = direct()) { d->zw = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 8, v); else guest::StoreU64(base, address + 8, v); }
+  uint64_t zw() const { if (auto* d = direct()) return d->zw; return uint64_t((memory::IsHandle(address + 8) ? uint64_t(memory::OwnerLoad(address + 8, 8)) : guest::LoadU64(base, address + 8))); }
+  void set_zw(uint64_t v) const { if (auto* d = direct()) { d->zw = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 8, v); else guest::StoreU64(base, address + 8, v); }
   uint32_t z_address() const { return address + 8; }
-  uint32_t z_bits() const { return on_host() ? uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kCarScenePointLayout, 8, 4)) : guest::LoadU32(base, address + 8); }
-  void set_z_bits(uint32_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarScenePointLayout, 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  uint32_t z_bits() const { if (auto* d = direct()) return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(d), kCarScenePointLayout, 8, 4)); return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_z_bits(uint32_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarScenePointLayout, 8, 4, v); return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
   float z() const { return std::bit_cast<float>(z_bits()); }
   void set_z(float v) const { set_z_bits(std::bit_cast<uint32_t>(v)); }
   // 1.0 for a position
   uint32_t w_address() const { return address + 12; }
-  uint32_t w_bits() const { return on_host() ? uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kCarScenePointLayout, 12, 4)) : guest::LoadU32(base, address + 12); }
-  void set_w_bits(uint32_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarScenePointLayout, 12, 4, v); else guest::StoreU32(base, address + 12, v); }
+  uint32_t w_bits() const { if (auto* d = direct()) return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(d), kCarScenePointLayout, 12, 4)); return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_w_bits(uint32_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarScenePointLayout, 12, 4, v); return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
   float w() const { return std::bit_cast<float>(w_bits()); }
   void set_w(float v) const { set_w_bits(std::bit_cast<uint32_t>(v)); }
 };
@@ -105,39 +106,40 @@ struct Vector16Storage : View {
   }
   Vector16Storage at(uint32_t i) const { return Vector16Storage(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kVector16StorageLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kVector16StorageLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
+  Vector16StorageData* direct() const { return static_cast<Vector16StorageData*>(memory::HandleOwn(address, &kVector16StorageLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kVector16StorageLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kVector16StorageLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // x and y as one doubleword (the copies' ld/std); the vector's first, last and end are handles into the array
   uint32_t xy_address() const { return address + 0; }
-  uint64_t xy() const { return on_host() ? uint64_t(data()->xy) : uint64_t(guest::LoadU64(base, address + 0)); }
-  void set_xy(uint64_t v) const { if (on_host()) data()->xy = v; else guest::StoreU64(base, address + 0, v); }
-  uint64_t xy_bits() const { return on_host() ? data()->xy : guest::LoadU64(base, address + 0); }
-  void set_xy_bits(uint64_t v) const { if (on_host()) data()->xy = v; else guest::StoreU64(base, address + 0, v); }
+  uint64_t xy_bits() const { if (auto* d = direct()) return d->xy; return uint64_t((memory::IsHandle(address + 0) ? uint64_t(memory::OwnerLoad(address + 0, 8)) : guest::LoadU64(base, address + 0))); }
+  void set_xy_bits(uint64_t v) const { if (auto* d = direct()) { d->xy = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 8, v); else guest::StoreU64(base, address + 0, v); }
+  uint64_t xy() const { if (auto* d = direct()) return d->xy; return uint64_t((memory::IsHandle(address + 0) ? uint64_t(memory::OwnerLoad(address + 0, 8)) : guest::LoadU64(base, address + 0))); }
+  void set_xy(uint64_t v) const { if (auto* d = direct()) { d->xy = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 8, v); else guest::StoreU64(base, address + 0, v); }
   uint32_t x_address() const { return address + 0; }
-  uint32_t x_bits() const { return on_host() ? uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kVector16StorageLayout, 0, 4)) : guest::LoadU32(base, address + 0); }
-  void set_x_bits(uint32_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kVector16StorageLayout, 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t x_bits() const { if (auto* d = direct()) return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(d), kVector16StorageLayout, 0, 4)); return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_x_bits(uint32_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kVector16StorageLayout, 0, 4, v); return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   float x() const { return std::bit_cast<float>(x_bits()); }
   void set_x(float v) const { set_x_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t y_address() const { return address + 4; }
-  uint32_t y_bits() const { return on_host() ? uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kVector16StorageLayout, 4, 4)) : guest::LoadU32(base, address + 4); }
-  void set_y_bits(uint32_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kVector16StorageLayout, 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  uint32_t y_bits() const { if (auto* d = direct()) return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(d), kVector16StorageLayout, 4, 4)); return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_y_bits(uint32_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kVector16StorageLayout, 4, 4, v); return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
   float y() const { return std::bit_cast<float>(y_bits()); }
   void set_y(float v) const { set_y_bits(std::bit_cast<uint32_t>(v)); }
   // z and w as one doubleword
   uint32_t zw_address() const { return address + 8; }
-  uint64_t zw() const { return on_host() ? uint64_t(data()->zw) : uint64_t(guest::LoadU64(base, address + 8)); }
-  void set_zw(uint64_t v) const { if (on_host()) data()->zw = v; else guest::StoreU64(base, address + 8, v); }
-  uint64_t zw_bits() const { return on_host() ? data()->zw : guest::LoadU64(base, address + 8); }
-  void set_zw_bits(uint64_t v) const { if (on_host()) data()->zw = v; else guest::StoreU64(base, address + 8, v); }
+  uint64_t zw_bits() const { if (auto* d = direct()) return d->zw; return uint64_t((memory::IsHandle(address + 8) ? uint64_t(memory::OwnerLoad(address + 8, 8)) : guest::LoadU64(base, address + 8))); }
+  void set_zw_bits(uint64_t v) const { if (auto* d = direct()) { d->zw = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 8, v); else guest::StoreU64(base, address + 8, v); }
+  uint64_t zw() const { if (auto* d = direct()) return d->zw; return uint64_t((memory::IsHandle(address + 8) ? uint64_t(memory::OwnerLoad(address + 8, 8)) : guest::LoadU64(base, address + 8))); }
+  void set_zw(uint64_t v) const { if (auto* d = direct()) { d->zw = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 8, v); else guest::StoreU64(base, address + 8, v); }
   uint32_t z_address() const { return address + 8; }
-  uint32_t z_bits() const { return on_host() ? uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kVector16StorageLayout, 8, 4)) : guest::LoadU32(base, address + 8); }
-  void set_z_bits(uint32_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kVector16StorageLayout, 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  uint32_t z_bits() const { if (auto* d = direct()) return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(d), kVector16StorageLayout, 8, 4)); return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_z_bits(uint32_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kVector16StorageLayout, 8, 4, v); return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
   float z() const { return std::bit_cast<float>(z_bits()); }
   void set_z(float v) const { set_z_bits(std::bit_cast<uint32_t>(v)); }
   // 1.0 for a position
   uint32_t w_address() const { return address + 12; }
-  uint32_t w_bits() const { return on_host() ? uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kVector16StorageLayout, 12, 4)) : guest::LoadU32(base, address + 12); }
-  void set_w_bits(uint32_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kVector16StorageLayout, 12, 4, v); else guest::StoreU32(base, address + 12, v); }
+  uint32_t w_bits() const { if (auto* d = direct()) return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(d), kVector16StorageLayout, 12, 4)); return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_w_bits(uint32_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kVector16StorageLayout, 12, 4, v); return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
   float w() const { return std::bit_cast<float>(w_bits()); }
   void set_w(float v) const { set_w_bits(std::bit_cast<uint32_t>(v)); }
 };

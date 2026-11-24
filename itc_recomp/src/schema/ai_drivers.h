@@ -818,71 +818,72 @@ struct CarInput : View {
   }
   CarInput at(uint32_t i) const { return CarInput(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCarInputLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarInputLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
+  CarInputData* direct() const { return static_cast<CarInputData*>(memory::HandleOwn(address, &kCarInputLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kCarInputLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarInputLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0x200 set by a stuck AI driver (probably reverse); the pad's in known-data.md
   uint32_t flags_address() const { return address + 0; }
-  uint32_t flags() const { return on_host() ? uint32_t(data()->flags) : uint32_t(guest::LoadU32(base, address + 0)); }
-  void set_flags(uint32_t v) const { if (on_host()) data()->flags = v; else guest::StoreU32(base, address + 0, v); }
-  uint32_t flags_bits() const { return on_host() ? data()->flags : guest::LoadU32(base, address + 0); }
-  void set_flags_bits(uint32_t v) const { if (on_host()) data()->flags = v; else guest::StoreU32(base, address + 0, v); }
+  uint32_t flags_bits() const { if (auto* d = direct()) return d->flags; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_flags_bits(uint32_t v) const { if (auto* d = direct()) { d->flags = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t flags() const { if (auto* d = direct()) return d->flags; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_flags(uint32_t v) const { if (auto* d = direct()) { d->flags = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // signed, out of 32,767
   uint32_t throttle_address() const { return address + 4; }
-  uint16_t throttle() const { return on_host() ? uint16_t(data()->throttle) : uint16_t(guest::LoadU16(base, address + 4)); }
-  void set_throttle(uint16_t v) const { if (on_host()) data()->throttle = v; else guest::StoreU16(base, address + 4, v); }
-  uint16_t throttle_bits() const { return on_host() ? data()->throttle : guest::LoadU16(base, address + 4); }
-  void set_throttle_bits(uint16_t v) const { if (on_host()) data()->throttle = v; else guest::StoreU16(base, address + 4, v); }
+  uint16_t throttle_bits() const { if (auto* d = direct()) return d->throttle; return uint16_t((memory::IsHandle(address + 4) ? uint16_t(memory::OwnerLoad(address + 4, 2)) : guest::LoadU16(base, address + 4))); }
+  void set_throttle_bits(uint16_t v) const { if (auto* d = direct()) { d->throttle = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 2, v); else guest::StoreU16(base, address + 4, v); }
+  uint16_t throttle() const { if (auto* d = direct()) return d->throttle; return uint16_t((memory::IsHandle(address + 4) ? uint16_t(memory::OwnerLoad(address + 4, 2)) : guest::LoadU16(base, address + 4))); }
+  void set_throttle(uint16_t v) const { if (auto* d = direct()) { d->throttle = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 2, v); else guest::StoreU16(base, address + 4, v); }
   // signed, out of 32,767
   uint32_t brake_address() const { return address + 6; }
-  uint16_t brake() const { return on_host() ? uint16_t(data()->brake) : uint16_t(guest::LoadU16(base, address + 6)); }
-  void set_brake(uint16_t v) const { if (on_host()) data()->brake = v; else guest::StoreU16(base, address + 6, v); }
-  uint16_t brake_bits() const { return on_host() ? data()->brake : guest::LoadU16(base, address + 6); }
-  void set_brake_bits(uint16_t v) const { if (on_host()) data()->brake = v; else guest::StoreU16(base, address + 6, v); }
+  uint16_t brake_bits() const { if (auto* d = direct()) return d->brake; return uint16_t((memory::IsHandle(address + 6) ? uint16_t(memory::OwnerLoad(address + 6, 2)) : guest::LoadU16(base, address + 6))); }
+  void set_brake_bits(uint16_t v) const { if (auto* d = direct()) { d->brake = v; return; } if (memory::IsHandle(address + 6)) memory::OwnerStore(address + 6, 2, v); else guest::StoreU16(base, address + 6, v); }
+  uint16_t brake() const { if (auto* d = direct()) return d->brake; return uint16_t((memory::IsHandle(address + 6) ? uint16_t(memory::OwnerLoad(address + 6, 2)) : guest::LoadU16(base, address + 6))); }
+  void set_brake(uint16_t v) const { if (auto* d = direct()) { d->brake = v; return; } if (memory::IsHandle(address + 6)) memory::OwnerStore(address + 6, 2, v); else guest::StoreU16(base, address + 6, v); }
   // signed, out of 32,767
   uint32_t steering_address() const { return address + 8; }
-  uint16_t steering() const { return on_host() ? uint16_t(data()->steering) : uint16_t(guest::LoadU16(base, address + 8)); }
-  void set_steering(uint16_t v) const { if (on_host()) data()->steering = v; else guest::StoreU16(base, address + 8, v); }
-  uint16_t steering_bits() const { return on_host() ? data()->steering : guest::LoadU16(base, address + 8); }
-  void set_steering_bits(uint16_t v) const { if (on_host()) data()->steering = v; else guest::StoreU16(base, address + 8, v); }
+  uint16_t steering_bits() const { if (auto* d = direct()) return d->steering; return uint16_t((memory::IsHandle(address + 8) ? uint16_t(memory::OwnerLoad(address + 8, 2)) : guest::LoadU16(base, address + 8))); }
+  void set_steering_bits(uint16_t v) const { if (auto* d = direct()) { d->steering = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 2, v); else guest::StoreU16(base, address + 8, v); }
+  uint16_t steering() const { if (auto* d = direct()) return d->steering; return uint16_t((memory::IsHandle(address + 8) ? uint16_t(memory::OwnerLoad(address + 8, 2)) : guest::LoadU16(base, address + 8))); }
+  void set_steering(uint16_t v) const { if (auto* d = direct()) { d->steering = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 2, v); else guest::StoreU16(base, address + 8, v); }
   // 32,767 for the handbrake, probably
   uint32_t handbrake_address() const { return address + 10; }
-  uint16_t handbrake() const { return on_host() ? uint16_t(data()->handbrake) : uint16_t(guest::LoadU16(base, address + 10)); }
-  void set_handbrake(uint16_t v) const { if (on_host()) data()->handbrake = v; else guest::StoreU16(base, address + 10, v); }
-  uint16_t handbrake_bits() const { return on_host() ? data()->handbrake : guest::LoadU16(base, address + 10); }
-  void set_handbrake_bits(uint16_t v) const { if (on_host()) data()->handbrake = v; else guest::StoreU16(base, address + 10, v); }
+  uint16_t handbrake_bits() const { if (auto* d = direct()) return d->handbrake; return uint16_t((memory::IsHandle(address + 10) ? uint16_t(memory::OwnerLoad(address + 10, 2)) : guest::LoadU16(base, address + 10))); }
+  void set_handbrake_bits(uint16_t v) const { if (auto* d = direct()) { d->handbrake = v; return; } if (memory::IsHandle(address + 10)) memory::OwnerStore(address + 10, 2, v); else guest::StoreU16(base, address + 10, v); }
+  uint16_t handbrake() const { if (auto* d = direct()) return d->handbrake; return uint16_t((memory::IsHandle(address + 10) ? uint16_t(memory::OwnerLoad(address + 10, 2)) : guest::LoadU16(base, address + 10))); }
+  void set_handbrake(uint16_t v) const { if (auto* d = direct()) { d->handbrake = v; return; } if (memory::IsHandle(address + 10)) memory::OwnerStore(address + 10, 2, v); else guest::StoreU16(base, address + 10, v); }
   // signed: probably the camera (from the pad)
   uint32_t camera_address() const { return address + 12; }
-  uint16_t camera() const { return on_host() ? uint16_t(data()->camera) : uint16_t(guest::LoadU16(base, address + 12)); }
-  void set_camera(uint16_t v) const { if (on_host()) data()->camera = v; else guest::StoreU16(base, address + 12, v); }
-  uint16_t camera_bits() const { return on_host() ? data()->camera : guest::LoadU16(base, address + 12); }
-  void set_camera_bits(uint16_t v) const { if (on_host()) data()->camera = v; else guest::StoreU16(base, address + 12, v); }
+  uint16_t camera_bits() const { if (auto* d = direct()) return d->camera; return uint16_t((memory::IsHandle(address + 12) ? uint16_t(memory::OwnerLoad(address + 12, 2)) : guest::LoadU16(base, address + 12))); }
+  void set_camera_bits(uint16_t v) const { if (auto* d = direct()) { d->camera = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 2, v); else guest::StoreU16(base, address + 12, v); }
+  uint16_t camera() const { if (auto* d = direct()) return d->camera; return uint16_t((memory::IsHandle(address + 12) ? uint16_t(memory::OwnerLoad(address + 12, 2)) : guest::LoadU16(base, address + 12))); }
+  void set_camera(uint16_t v) const { if (auto* d = direct()) { d->camera = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 2, v); else guest::StoreU16(base, address + 12, v); }
   // from the pad: the player's settings byte +1; signed: the throttle's curve (Vehicle::ApplyInput)
   uint32_t throttle_rate_address() const { return address + 14; }
-  uint8_t throttle_rate() const { return on_host() ? uint8_t(data()->throttle_rate) : uint8_t(guest::LoadU8(base, address + 14)); }
-  void set_throttle_rate(uint8_t v) const { if (on_host()) data()->throttle_rate = v; else guest::StoreU8(base, address + 14, v); }
-  uint8_t throttle_rate_bits() const { return on_host() ? data()->throttle_rate : guest::LoadU8(base, address + 14); }
-  void set_throttle_rate_bits(uint8_t v) const { if (on_host()) data()->throttle_rate = v; else guest::StoreU8(base, address + 14, v); }
+  uint8_t throttle_rate_bits() const { if (auto* d = direct()) return d->throttle_rate; return uint8_t((memory::IsHandle(address + 14) ? uint8_t(memory::OwnerLoad(address + 14, 1)) : guest::LoadU8(base, address + 14))); }
+  void set_throttle_rate_bits(uint8_t v) const { if (auto* d = direct()) { d->throttle_rate = v; return; } if (memory::IsHandle(address + 14)) memory::OwnerStore(address + 14, 1, v); else guest::StoreU8(base, address + 14, v); }
+  uint8_t throttle_rate() const { if (auto* d = direct()) return d->throttle_rate; return uint8_t((memory::IsHandle(address + 14) ? uint8_t(memory::OwnerLoad(address + 14, 1)) : guest::LoadU8(base, address + 14))); }
+  void set_throttle_rate(uint8_t v) const { if (auto* d = direct()) { d->throttle_rate = v; return; } if (memory::IsHandle(address + 14)) memory::OwnerStore(address + 14, 1, v); else guest::StoreU8(base, address + 14, v); }
   // the settings byte +2; signed: the brake's curve
   uint32_t brake_rate_address() const { return address + 15; }
-  uint8_t brake_rate() const { return on_host() ? uint8_t(data()->brake_rate) : uint8_t(guest::LoadU8(base, address + 15)); }
-  void set_brake_rate(uint8_t v) const { if (on_host()) data()->brake_rate = v; else guest::StoreU8(base, address + 15, v); }
-  uint8_t brake_rate_bits() const { return on_host() ? data()->brake_rate : guest::LoadU8(base, address + 15); }
-  void set_brake_rate_bits(uint8_t v) const { if (on_host()) data()->brake_rate = v; else guest::StoreU8(base, address + 15, v); }
+  uint8_t brake_rate_bits() const { if (auto* d = direct()) return d->brake_rate; return uint8_t((memory::IsHandle(address + 15) ? uint8_t(memory::OwnerLoad(address + 15, 1)) : guest::LoadU8(base, address + 15))); }
+  void set_brake_rate_bits(uint8_t v) const { if (auto* d = direct()) { d->brake_rate = v; return; } if (memory::IsHandle(address + 15)) memory::OwnerStore(address + 15, 1, v); else guest::StoreU8(base, address + 15, v); }
+  uint8_t brake_rate() const { if (auto* d = direct()) return d->brake_rate; return uint8_t((memory::IsHandle(address + 15) ? uint8_t(memory::OwnerLoad(address + 15, 1)) : guest::LoadU8(base, address + 15))); }
+  void set_brake_rate(uint8_t v) const { if (auto* d = direct()) { d->brake_rate = v; return; } if (memory::IsHandle(address + 15)) memory::OwnerStore(address + 15, 1, v); else guest::StoreU8(base, address + 15, v); }
   // the settings byte +0; signed: the pad's or wheel's steering rate
   uint32_t steering_rate_address() const { return address + 16; }
-  uint8_t steering_rate() const { return on_host() ? uint8_t(data()->steering_rate) : uint8_t(guest::LoadU8(base, address + 16)); }
-  void set_steering_rate(uint8_t v) const { if (on_host()) data()->steering_rate = v; else guest::StoreU8(base, address + 16, v); }
-  uint8_t steering_rate_bits() const { return on_host() ? data()->steering_rate : guest::LoadU8(base, address + 16); }
-  void set_steering_rate_bits(uint8_t v) const { if (on_host()) data()->steering_rate = v; else guest::StoreU8(base, address + 16, v); }
+  uint8_t steering_rate_bits() const { if (auto* d = direct()) return d->steering_rate; return uint8_t((memory::IsHandle(address + 16) ? uint8_t(memory::OwnerLoad(address + 16, 1)) : guest::LoadU8(base, address + 16))); }
+  void set_steering_rate_bits(uint8_t v) const { if (auto* d = direct()) { d->steering_rate = v; return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 1, v); else guest::StoreU8(base, address + 16, v); }
+  uint8_t steering_rate() const { if (auto* d = direct()) return d->steering_rate; return uint8_t((memory::IsHandle(address + 16) ? uint8_t(memory::OwnerLoad(address + 16, 1)) : guest::LoadU8(base, address + 16))); }
+  void set_steering_rate(uint8_t v) const { if (auto* d = direct()) { d->steering_rate = v; return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 1, v); else guest::StoreU8(base, address + 16, v); }
   // 0 the pad, 1 a wheel, 2 an AI driver
   uint32_t kind_address() const { return address + 17; }
-  uint8_t kind() const { return on_host() ? uint8_t(data()->kind) : uint8_t(guest::LoadU8(base, address + 17)); }
-  void set_kind(uint8_t v) const { if (on_host()) data()->kind = v; else guest::StoreU8(base, address + 17, v); }
-  uint8_t kind_bits() const { return on_host() ? data()->kind : guest::LoadU8(base, address + 17); }
-  void set_kind_bits(uint8_t v) const { if (on_host()) data()->kind = v; else guest::StoreU8(base, address + 17, v); }
+  uint8_t kind_bits() const { if (auto* d = direct()) return d->kind; return uint8_t((memory::IsHandle(address + 17) ? uint8_t(memory::OwnerLoad(address + 17, 1)) : guest::LoadU8(base, address + 17))); }
+  void set_kind_bits(uint8_t v) const { if (auto* d = direct()) { d->kind = v; return; } if (memory::IsHandle(address + 17)) memory::OwnerStore(address + 17, 1, v); else guest::StoreU8(base, address + 17, v); }
+  uint8_t kind() const { if (auto* d = direct()) return d->kind; return uint8_t((memory::IsHandle(address + 17) ? uint8_t(memory::OwnerLoad(address + 17, 1)) : guest::LoadU8(base, address + 17))); }
+  void set_kind(uint8_t v) const { if (auto* d = direct()) { d->kind = v; return; } if (memory::IsHandle(address + 17)) memory::OwnerStore(address + 17, 1, v); else guest::StoreU8(base, address + 17, v); }
   // the player's three settings bytes (from the pad) (from CarInputRecord, car-sounds)
   uint32_t settings_address() const { return address + 14; }
-  uint8_t* settings() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 14 : guest::Pointer(base, address + 14); }
+  uint8_t* settings() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 14 : guest::Pointer(base, address + 14); }
 };
 
 // file; measure: AiCorner.+0, AiPath.+5164, AiCorner::Init.r4, sub_8213AB40.r4.+0, sub_8213BDF0.r4.+0, sub_8213BDF0.r5.+0, sub_8213BE80.r4.+0, sub_8213BE80.r5.+0, AiPath::JoinCornersShort.r4.+0, AiPath::JoinCornersShort.r5.+0, AiPath::SharesSections.r4, AiDriver::LimitSpeedBlend.r5, AiDriver@+5676.+0@+8

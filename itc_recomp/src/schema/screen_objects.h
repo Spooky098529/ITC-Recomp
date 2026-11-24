@@ -319,45 +319,46 @@ struct ScreenObjectUvMapNode : View {
   }
   ScreenObjectUvMapNode at(uint32_t i) const { return ScreenObjectUvMapNode(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kScreenObjectUvMapNodeLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvMapNodeLayout, offset, width, v); }
+  ScreenObjectUvMapNodeData* direct() const { return static_cast<ScreenObjectUvMapNodeData*>(memory::HandleOwn(address, &kScreenObjectUvMapNodeLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kScreenObjectUvMapNodeLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kScreenObjectUvMapNodeLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t left_address() const { return address + 0; }
+  uint32_t left_bits() const { if (auto* d = direct()) return d->left; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_left_bits(uint32_t v) const { if (auto* d = direct()) { d->left = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   template <typename T = ScreenObjectUvMapNode>
-  T left() const { return T(base, data()->left); }
-  void set_left(const View& w) const { const uint32_t v = w.address; data()->left = v; }
-  void set_left(uint32_t v) const { data()->left = v; }
-  uint32_t left_bits() const { return data()->left; }
-  void set_left_bits(uint32_t v) const { data()->left = v; }
+  T left() const { return T(base, left_bits()); }
+  void set_left(const View& w) const { set_left_bits(w.address); }
+  void set_left(uint32_t v) const { set_left_bits(v); }
   uint32_t parent_address() const { return address + 4; }
+  uint32_t parent_bits() const { if (auto* d = direct()) return d->parent; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_parent_bits(uint32_t v) const { if (auto* d = direct()) { d->parent = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
   template <typename T = ScreenObjectUvMapNode>
-  T parent() const { return T(base, data()->parent); }
-  void set_parent(const View& w) const { const uint32_t v = w.address; data()->parent = v; }
-  void set_parent(uint32_t v) const { data()->parent = v; }
-  uint32_t parent_bits() const { return data()->parent; }
-  void set_parent_bits(uint32_t v) const { data()->parent = v; }
+  T parent() const { return T(base, parent_bits()); }
+  void set_parent(const View& w) const { set_parent_bits(w.address); }
+  void set_parent(uint32_t v) const { set_parent_bits(v); }
   uint32_t right_address() const { return address + 8; }
+  uint32_t right_bits() const { if (auto* d = direct()) return d->right; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_right_bits(uint32_t v) const { if (auto* d = direct()) { d->right = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
   template <typename T = ScreenObjectUvMapNode>
-  T right() const { return T(base, data()->right); }
-  void set_right(const View& w) const { const uint32_t v = w.address; data()->right = v; }
-  void set_right(uint32_t v) const { data()->right = v; }
-  uint32_t right_bits() const { return data()->right; }
-  void set_right_bits(uint32_t v) const { data()->right = v; }
+  T right() const { return T(base, right_bits()); }
+  void set_right(const View& w) const { set_right_bits(w.address); }
+  void set_right(uint32_t v) const { set_right_bits(v); }
   // x rounded to 0.001
   uint32_t key_address() const { return address + 16; }
-  double key() const { return data()->key; }
-  void set_key(double v) const { data()->key = v; }
-  uint64_t key_bits() const { return std::bit_cast<uint64_t>(data()->key); }
-  void set_key_bits(uint64_t v) const { data()->key = std::bit_cast<double>(v); }
+  uint64_t key_bits() const { if (auto* d = direct()) return std::bit_cast<uint64_t>(d->key); return uint64_t((memory::IsHandle(address + 16) ? uint64_t(memory::OwnerLoad(address + 16, 8)) : guest::LoadU64(base, address + 16))); }
+  void set_key_bits(uint64_t v) const { if (auto* d = direct()) { d->key = std::bit_cast<double>(v); return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 8, v); else guest::StoreU64(base, address + 16, v); }
+  double key() const { return std::bit_cast<double>(key_bits()); }
+  void set_key(double v) const { set_key_bits(std::bit_cast<uint64_t>(v)); }
   // the key's high word
   uint32_t key_high_address() const { return address + 16; }
-  uint32_t key_high_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvMapNodeLayout, 16, 4)); }
-  void set_key_high_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvMapNodeLayout, 16, 4, v); }
+  uint32_t key_high_bits() const { if (auto* d = direct()) return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(d), kScreenObjectUvMapNodeLayout, 16, 4)); return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_key_high_bits(uint32_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kScreenObjectUvMapNodeLayout, 16, 4, v); return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
   uint32_t key_high() const { return uint32_t(key_high_bits()); }
   void set_key_high(uint32_t v) const { set_key_high_bits(uint32_t(v)); }
   // the key's low word
   uint32_t key_low_address() const { return address + 20; }
-  uint32_t key_low_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvMapNodeLayout, 20, 4)); }
-  void set_key_low_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvMapNodeLayout, 20, 4, v); }
+  uint32_t key_low_bits() const { if (auto* d = direct()) return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(d), kScreenObjectUvMapNodeLayout, 20, 4)); return uint32_t((memory::IsHandle(address + 20) ? uint32_t(memory::OwnerLoad(address + 20, 4)) : guest::LoadU32(base, address + 20))); }
+  void set_key_low_bits(uint32_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kScreenObjectUvMapNodeLayout, 20, 4, v); return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 4, v); else guest::StoreU32(base, address + 20, v); }
   uint32_t key_low() const { return uint32_t(key_low_bits()); }
   void set_key_low(uint32_t v) const { set_key_low_bits(uint32_t(v)); }
   // its head at +28, its size at +32
@@ -365,16 +366,16 @@ struct ScreenObjectUvMapNode : View {
   T column() const { return T(base, address + 24); }
   // 0 red, 1 black
   uint32_t color_address() const { return address + 40; }
-  uint8_t color() const { return data()->color; }
-  void set_color(uint8_t v) const { data()->color = v; }
-  uint8_t color_bits() const { return data()->color; }
-  void set_color_bits(uint8_t v) const { data()->color = v; }
+  uint8_t color_bits() const { if (auto* d = direct()) return d->color; return uint8_t((memory::IsHandle(address + 40) ? uint8_t(memory::OwnerLoad(address + 40, 1)) : guest::LoadU8(base, address + 40))); }
+  void set_color_bits(uint8_t v) const { if (auto* d = direct()) { d->color = v; return; } if (memory::IsHandle(address + 40)) memory::OwnerStore(address + 40, 1, v); else guest::StoreU8(base, address + 40, v); }
+  uint8_t color() const { if (auto* d = direct()) return d->color; return uint8_t((memory::IsHandle(address + 40) ? uint8_t(memory::OwnerLoad(address + 40, 1)) : guest::LoadU8(base, address + 40))); }
+  void set_color(uint8_t v) const { if (auto* d = direct()) { d->color = v; return; } if (memory::IsHandle(address + 40)) memory::OwnerStore(address + 40, 1, v); else guest::StoreU8(base, address + 40, v); }
   // 1 only for the head
   uint32_t is_nil_address() const { return address + 41; }
-  uint8_t is_nil() const { return data()->is_nil; }
-  void set_is_nil(uint8_t v) const { data()->is_nil = v; }
-  uint8_t is_nil_bits() const { return data()->is_nil; }
-  void set_is_nil_bits(uint8_t v) const { data()->is_nil = v; }
+  uint8_t is_nil_bits() const { if (auto* d = direct()) return d->is_nil; return uint8_t((memory::IsHandle(address + 41) ? uint8_t(memory::OwnerLoad(address + 41, 1)) : guest::LoadU8(base, address + 41))); }
+  void set_is_nil_bits(uint8_t v) const { if (auto* d = direct()) { d->is_nil = v; return; } if (memory::IsHandle(address + 41)) memory::OwnerStore(address + 41, 1, v); else guest::StoreU8(base, address + 41, v); }
+  uint8_t is_nil() const { if (auto* d = direct()) return d->is_nil; return uint8_t((memory::IsHandle(address + 41) ? uint8_t(memory::OwnerLoad(address + 41, 1)) : guest::LoadU8(base, address + 41))); }
+  void set_is_nil(uint8_t v) const { if (auto* d = direct()) { d->is_nil = v; return; } if (memory::IsHandle(address + 41)) memory::OwnerStore(address + 41, 1, v); else guest::StoreU8(base, address + 41, v); }
 };
 
 // embedded; measure: UvMap::InsertUnique.r5, UvMap::ConstructNode.r7, UvMap::ConstructNode.r7@+8.+4
@@ -433,36 +434,37 @@ struct ScreenObjectUvColumn : View {
   }
   ScreenObjectUvColumn at(uint32_t i) const { return ScreenObjectUvColumn(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kScreenObjectUvColumnLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
+  ScreenObjectUvColumnData* direct() const { return static_cast<ScreenObjectUvColumnData*>(memory::HandleOwn(address, &kScreenObjectUvColumnLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kScreenObjectUvColumnLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kScreenObjectUvColumnLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t head_address() const { return address + 4; }
+  uint32_t head_bits() const { if (auto* d = direct()) return d->head; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_head_bits(uint32_t v) const { if (auto* d = direct()) { d->head = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
   template <typename T = ScreenObjectUvColumnNode>
-  T head() const { return T(base, on_host() ? data()->head : guest::LoadU32(base, address + 4)); }
-  void set_head(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->head = v; else guest::StoreU32(base, address + 4, v); }
-  void set_head(uint32_t v) const { if (on_host()) data()->head = v; else guest::StoreU32(base, address + 4, v); }
-  uint32_t head_bits() const { return on_host() ? data()->head : guest::LoadU32(base, address + 4); }
-  void set_head_bits(uint32_t v) const { if (on_host()) data()->head = v; else guest::StoreU32(base, address + 4, v); }
+  T head() const { return T(base, head_bits()); }
+  void set_head(const View& w) const { set_head_bits(w.address); }
+  void set_head(uint32_t v) const { set_head_bits(v); }
   uint32_t size_address() const { return address + 8; }
-  uint32_t size() const { return on_host() ? uint32_t(data()->size) : uint32_t(guest::LoadU32(base, address + 8)); }
-  void set_size(uint32_t v) const { if (on_host()) data()->size = v; else guest::StoreU32(base, address + 8, v); }
-  uint32_t size_bits() const { return on_host() ? data()->size : guest::LoadU32(base, address + 8); }
-  void set_size_bits(uint32_t v) const { if (on_host()) data()->size = v; else guest::StoreU32(base, address + 8, v); }
+  uint32_t size_bits() const { if (auto* d = direct()) return d->size; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_size_bits(uint32_t v) const { if (auto* d = direct()) { d->size = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  uint32_t size() const { if (auto* d = direct()) return d->size; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_size(uint32_t v) const { if (auto* d = direct()) { d->size = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
   // measure fault: a node's left met as the column
   uint32_t fault_node_left_address() const { return address + 0; }
-  uint32_t fault_node_left() const { return on_host() ? uint32_t(data()->fault_node_left) : uint32_t(guest::LoadU32(base, address + 0)); }
-  void set_fault_node_left(uint32_t v) const { if (on_host()) data()->fault_node_left = v; else guest::StoreU32(base, address + 0, v); }
-  uint32_t fault_node_left_bits() const { return on_host() ? data()->fault_node_left : guest::LoadU32(base, address + 0); }
-  void set_fault_node_left_bits(uint32_t v) const { if (on_host()) data()->fault_node_left = v; else guest::StoreU32(base, address + 0, v); }
+  uint32_t fault_node_left_bits() const { if (auto* d = direct()) return d->fault_node_left; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_fault_node_left_bits(uint32_t v) const { if (auto* d = direct()) { d->fault_node_left = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t fault_node_left() const { if (auto* d = direct()) return d->fault_node_left; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_fault_node_left(uint32_t v) const { if (auto* d = direct()) { d->fault_node_left = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // measure fault: Erase's and InsertUnique's result out (an iterator, stored as one doubleword)
   uint32_t fault_iterator_address() const { return address + 0; }
-  uint64_t fault_iterator_bits() const { return on_host() ? uint64_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnLayout, 0, 8)) : guest::LoadU64(base, address + 0); }
-  void set_fault_iterator_bits(uint64_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnLayout, 0, 8, v); else guest::StoreU64(base, address + 0, v); }
+  uint64_t fault_iterator_bits() const { if (auto* d = direct()) return uint64_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(d), kScreenObjectUvColumnLayout, 0, 8)); return uint64_t((memory::IsHandle(address + 0) ? uint64_t(memory::OwnerLoad(address + 0, 8)) : guest::LoadU64(base, address + 0))); }
+  void set_fault_iterator_bits(uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kScreenObjectUvColumnLayout, 0, 8, v); return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 8, v); else guest::StoreU64(base, address + 0, v); }
   uint64_t fault_iterator() const { return uint64_t(fault_iterator_bits()); }
   void set_fault_iterator(uint64_t v) const { set_fault_iterator_bits(uint64_t(v)); }
   // measure fault: a byte met at +8
   uint32_t fault_size_byte_address() const { return address + 8; }
-  uint8_t fault_size_byte_bits() const { return on_host() ? uint8_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnLayout, 8, 1)) : guest::LoadU8(base, address + 8); }
-  void set_fault_size_byte_bits(uint8_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnLayout, 8, 1, v); else guest::StoreU8(base, address + 8, v); }
+  uint8_t fault_size_byte_bits() const { if (auto* d = direct()) return uint8_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(d), kScreenObjectUvColumnLayout, 8, 1)); return uint8_t((memory::IsHandle(address + 8) ? uint8_t(memory::OwnerLoad(address + 8, 1)) : guest::LoadU8(base, address + 8))); }
+  void set_fault_size_byte_bits(uint8_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kScreenObjectUvColumnLayout, 8, 1, v); return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 1, v); else guest::StoreU8(base, address + 8, v); }
   uint8_t fault_size_byte() const { return uint8_t(fault_size_byte_bits()); }
   void set_fault_size_byte(uint8_t v) const { set_fault_size_byte_bits(uint8_t(v)); }
 };
@@ -504,71 +506,72 @@ struct ScreenObjectUvColumnNode : View {
   }
   ScreenObjectUvColumnNode at(uint32_t i) const { return ScreenObjectUvColumnNode(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kScreenObjectUvColumnNodeLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnNodeLayout, offset, width, v); }
+  ScreenObjectUvColumnNodeData* direct() const { return static_cast<ScreenObjectUvColumnNodeData*>(memory::HandleOwn(address, &kScreenObjectUvColumnNodeLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kScreenObjectUvColumnNodeLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kScreenObjectUvColumnNodeLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t left_address() const { return address + 0; }
+  uint32_t left_bits() const { if (auto* d = direct()) return d->left; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_left_bits(uint32_t v) const { if (auto* d = direct()) { d->left = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   template <typename T = ScreenObjectUvColumnNode>
-  T left() const { return T(base, data()->left); }
-  void set_left(const View& w) const { const uint32_t v = w.address; data()->left = v; }
-  void set_left(uint32_t v) const { data()->left = v; }
-  uint32_t left_bits() const { return data()->left; }
-  void set_left_bits(uint32_t v) const { data()->left = v; }
+  T left() const { return T(base, left_bits()); }
+  void set_left(const View& w) const { set_left_bits(w.address); }
+  void set_left(uint32_t v) const { set_left_bits(v); }
   uint32_t parent_address() const { return address + 4; }
+  uint32_t parent_bits() const { if (auto* d = direct()) return d->parent; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_parent_bits(uint32_t v) const { if (auto* d = direct()) { d->parent = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
   template <typename T = ScreenObjectUvColumnNode>
-  T parent() const { return T(base, data()->parent); }
-  void set_parent(const View& w) const { const uint32_t v = w.address; data()->parent = v; }
-  void set_parent(uint32_t v) const { data()->parent = v; }
-  uint32_t parent_bits() const { return data()->parent; }
-  void set_parent_bits(uint32_t v) const { data()->parent = v; }
+  T parent() const { return T(base, parent_bits()); }
+  void set_parent(const View& w) const { set_parent_bits(w.address); }
+  void set_parent(uint32_t v) const { set_parent_bits(v); }
   uint32_t right_address() const { return address + 8; }
+  uint32_t right_bits() const { if (auto* d = direct()) return d->right; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_right_bits(uint32_t v) const { if (auto* d = direct()) { d->right = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
   template <typename T = ScreenObjectUvColumnNode>
-  T right() const { return T(base, data()->right); }
-  void set_right(const View& w) const { const uint32_t v = w.address; data()->right = v; }
-  void set_right(uint32_t v) const { data()->right = v; }
-  uint32_t right_bits() const { return data()->right; }
-  void set_right_bits(uint32_t v) const { data()->right = v; }
+  T right() const { return T(base, right_bits()); }
+  void set_right(const View& w) const { set_right_bits(w.address); }
+  void set_right(uint32_t v) const { set_right_bits(v); }
   // y rounded to 0.001
   uint32_t key_address() const { return address + 16; }
-  double key() const { return data()->key; }
-  void set_key(double v) const { data()->key = v; }
-  uint64_t key_bits() const { return std::bit_cast<uint64_t>(data()->key); }
-  void set_key_bits(uint64_t v) const { data()->key = std::bit_cast<double>(v); }
+  uint64_t key_bits() const { if (auto* d = direct()) return std::bit_cast<uint64_t>(d->key); return uint64_t((memory::IsHandle(address + 16) ? uint64_t(memory::OwnerLoad(address + 16, 8)) : guest::LoadU64(base, address + 16))); }
+  void set_key_bits(uint64_t v) const { if (auto* d = direct()) { d->key = std::bit_cast<double>(v); return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 8, v); else guest::StoreU64(base, address + 16, v); }
+  double key() const { return std::bit_cast<double>(key_bits()); }
+  void set_key(double v) const { set_key_bits(std::bit_cast<uint64_t>(v)); }
   // the key's high word
   uint32_t key_high_address() const { return address + 16; }
-  uint32_t key_high_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnNodeLayout, 16, 4)); }
-  void set_key_high_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnNodeLayout, 16, 4, v); }
+  uint32_t key_high_bits() const { if (auto* d = direct()) return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(d), kScreenObjectUvColumnNodeLayout, 16, 4)); return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_key_high_bits(uint32_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kScreenObjectUvColumnNodeLayout, 16, 4, v); return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
   uint32_t key_high() const { return uint32_t(key_high_bits()); }
   void set_key_high(uint32_t v) const { set_key_high_bits(uint32_t(v)); }
   // the key's low word
   uint32_t key_low_address() const { return address + 20; }
-  uint32_t key_low_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnNodeLayout, 20, 4)); }
-  void set_key_low_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnNodeLayout, 20, 4, v); }
+  uint32_t key_low_bits() const { if (auto* d = direct()) return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(d), kScreenObjectUvColumnNodeLayout, 20, 4)); return uint32_t((memory::IsHandle(address + 20) ? uint32_t(memory::OwnerLoad(address + 20, 4)) : guest::LoadU32(base, address + 20))); }
+  void set_key_low_bits(uint32_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kScreenObjectUvColumnNodeLayout, 20, 4, v); return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 4, v); else guest::StoreU32(base, address + 20, v); }
   uint32_t key_low() const { return uint32_t(key_low_bits()); }
   void set_key_low(uint32_t v) const { set_key_low_bits(uint32_t(v)); }
   // the float u's bits
   uint32_t u_address() const { return address + 24; }
-  uint32_t u() const { return data()->u; }
-  void set_u(uint32_t v) const { data()->u = v; }
-  uint32_t u_bits() const { return data()->u; }
-  void set_u_bits(uint32_t v) const { data()->u = v; }
+  uint32_t u_bits() const { if (auto* d = direct()) return d->u; return uint32_t((memory::IsHandle(address + 24) ? uint32_t(memory::OwnerLoad(address + 24, 4)) : guest::LoadU32(base, address + 24))); }
+  void set_u_bits(uint32_t v) const { if (auto* d = direct()) { d->u = v; return; } if (memory::IsHandle(address + 24)) memory::OwnerStore(address + 24, 4, v); else guest::StoreU32(base, address + 24, v); }
+  uint32_t u() const { if (auto* d = direct()) return d->u; return uint32_t((memory::IsHandle(address + 24) ? uint32_t(memory::OwnerLoad(address + 24, 4)) : guest::LoadU32(base, address + 24))); }
+  void set_u(uint32_t v) const { if (auto* d = direct()) { d->u = v; return; } if (memory::IsHandle(address + 24)) memory::OwnerStore(address + 24, 4, v); else guest::StoreU32(base, address + 24, v); }
   // the float v's bits
   uint32_t v_address() const { return address + 28; }
-  uint32_t v() const { return data()->v; }
-  void set_v(uint32_t v) const { data()->v = v; }
-  uint32_t v_bits() const { return data()->v; }
-  void set_v_bits(uint32_t v) const { data()->v = v; }
+  uint32_t v_bits() const { if (auto* d = direct()) return d->v; return uint32_t((memory::IsHandle(address + 28) ? uint32_t(memory::OwnerLoad(address + 28, 4)) : guest::LoadU32(base, address + 28))); }
+  void set_v_bits(uint32_t v) const { if (auto* d = direct()) { d->v = v; return; } if (memory::IsHandle(address + 28)) memory::OwnerStore(address + 28, 4, v); else guest::StoreU32(base, address + 28, v); }
+  uint32_t v() const { if (auto* d = direct()) return d->v; return uint32_t((memory::IsHandle(address + 28) ? uint32_t(memory::OwnerLoad(address + 28, 4)) : guest::LoadU32(base, address + 28))); }
+  void set_v(uint32_t v) const { if (auto* d = direct()) { d->v = v; return; } if (memory::IsHandle(address + 28)) memory::OwnerStore(address + 28, 4, v); else guest::StoreU32(base, address + 28, v); }
   // 0 red, 1 black
   uint32_t color_address() const { return address + 32; }
-  uint8_t color() const { return data()->color; }
-  void set_color(uint8_t v) const { data()->color = v; }
-  uint8_t color_bits() const { return data()->color; }
-  void set_color_bits(uint8_t v) const { data()->color = v; }
+  uint8_t color_bits() const { if (auto* d = direct()) return d->color; return uint8_t((memory::IsHandle(address + 32) ? uint8_t(memory::OwnerLoad(address + 32, 1)) : guest::LoadU8(base, address + 32))); }
+  void set_color_bits(uint8_t v) const { if (auto* d = direct()) { d->color = v; return; } if (memory::IsHandle(address + 32)) memory::OwnerStore(address + 32, 1, v); else guest::StoreU8(base, address + 32, v); }
+  uint8_t color() const { if (auto* d = direct()) return d->color; return uint8_t((memory::IsHandle(address + 32) ? uint8_t(memory::OwnerLoad(address + 32, 1)) : guest::LoadU8(base, address + 32))); }
+  void set_color(uint8_t v) const { if (auto* d = direct()) { d->color = v; return; } if (memory::IsHandle(address + 32)) memory::OwnerStore(address + 32, 1, v); else guest::StoreU8(base, address + 32, v); }
   // 1 only for the head
   uint32_t is_nil_address() const { return address + 33; }
-  uint8_t is_nil() const { return data()->is_nil; }
-  void set_is_nil(uint8_t v) const { data()->is_nil = v; }
-  uint8_t is_nil_bits() const { return data()->is_nil; }
-  void set_is_nil_bits(uint8_t v) const { data()->is_nil = v; }
+  uint8_t is_nil_bits() const { if (auto* d = direct()) return d->is_nil; return uint8_t((memory::IsHandle(address + 33) ? uint8_t(memory::OwnerLoad(address + 33, 1)) : guest::LoadU8(base, address + 33))); }
+  void set_is_nil_bits(uint8_t v) const { if (auto* d = direct()) { d->is_nil = v; return; } if (memory::IsHandle(address + 33)) memory::OwnerStore(address + 33, 1, v); else guest::StoreU8(base, address + 33, v); }
+  uint8_t is_nil() const { if (auto* d = direct()) return d->is_nil; return uint8_t((memory::IsHandle(address + 33) ? uint8_t(memory::OwnerLoad(address + 33, 1)) : guest::LoadU8(base, address + 33))); }
+  void set_is_nil(uint8_t v) const { if (auto* d = direct()) { d->is_nil = v; return; } if (memory::IsHandle(address + 33)) memory::OwnerStore(address + 33, 1, v); else guest::StoreU8(base, address + 33, v); }
 };
 
 // embedded; measure: UvColumn::InsertUnique.r5, UvColumn::NewNode.r7
@@ -602,35 +605,36 @@ struct ScreenObjectUvColumnValue : View {
   }
   ScreenObjectUvColumnValue at(uint32_t i) const { return ScreenObjectUvColumnValue(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kScreenObjectUvColumnValueLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnValueLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
+  ScreenObjectUvColumnValueData* direct() const { return static_cast<ScreenObjectUvColumnValueData*>(memory::HandleOwn(address, &kScreenObjectUvColumnValueLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kScreenObjectUvColumnValueLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kScreenObjectUvColumnValueLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t key_address() const { return address + 0; }
-  double key() const { return on_host() ? double(data()->key) : double(std::bit_cast<double>(guest::LoadU64(base, address + 0))); }
-  void set_key(double v) const { if (on_host()) data()->key = v; else guest::StoreU64(base, address + 0, std::bit_cast<uint64_t>(v)); }
-  uint64_t key_bits() const { return on_host() ? std::bit_cast<uint64_t>(data()->key) : guest::LoadU64(base, address + 0); }
-  void set_key_bits(uint64_t v) const { if (on_host()) data()->key = std::bit_cast<double>(v); else guest::StoreU64(base, address + 0, v); }
+  uint64_t key_bits() const { if (auto* d = direct()) return std::bit_cast<uint64_t>(d->key); return uint64_t((memory::IsHandle(address + 0) ? uint64_t(memory::OwnerLoad(address + 0, 8)) : guest::LoadU64(base, address + 0))); }
+  void set_key_bits(uint64_t v) const { if (auto* d = direct()) { d->key = std::bit_cast<double>(v); return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 8, v); else guest::StoreU64(base, address + 0, v); }
+  double key() const { return std::bit_cast<double>(key_bits()); }
+  void set_key(double v) const { set_key_bits(std::bit_cast<uint64_t>(v)); }
   uint32_t key_high_address() const { return address + 0; }
-  uint32_t key_high_bits() const { return on_host() ? uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnValueLayout, 0, 4)) : guest::LoadU32(base, address + 0); }
-  void set_key_high_bits(uint32_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnValueLayout, 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t key_high_bits() const { if (auto* d = direct()) return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(d), kScreenObjectUvColumnValueLayout, 0, 4)); return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_key_high_bits(uint32_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kScreenObjectUvColumnValueLayout, 0, 4, v); return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   uint32_t key_high() const { return uint32_t(key_high_bits()); }
   void set_key_high(uint32_t v) const { set_key_high_bits(uint32_t(v)); }
   uint32_t key_low_address() const { return address + 4; }
-  uint32_t key_low_bits() const { return on_host() ? uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnValueLayout, 4, 4)) : guest::LoadU32(base, address + 4); }
-  void set_key_low_bits(uint32_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnValueLayout, 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  uint32_t key_low_bits() const { if (auto* d = direct()) return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(d), kScreenObjectUvColumnValueLayout, 4, 4)); return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_key_low_bits(uint32_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kScreenObjectUvColumnValueLayout, 4, 4, v); return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
   uint32_t key_low() const { return uint32_t(key_low_bits()); }
   void set_key_low(uint32_t v) const { set_key_low_bits(uint32_t(v)); }
   // the float u's bits
   uint32_t u_address() const { return address + 8; }
-  uint32_t u() const { return on_host() ? uint32_t(data()->u) : uint32_t(guest::LoadU32(base, address + 8)); }
-  void set_u(uint32_t v) const { if (on_host()) data()->u = v; else guest::StoreU32(base, address + 8, v); }
-  uint32_t u_bits() const { return on_host() ? data()->u : guest::LoadU32(base, address + 8); }
-  void set_u_bits(uint32_t v) const { if (on_host()) data()->u = v; else guest::StoreU32(base, address + 8, v); }
+  uint32_t u_bits() const { if (auto* d = direct()) return d->u; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_u_bits(uint32_t v) const { if (auto* d = direct()) { d->u = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  uint32_t u() const { if (auto* d = direct()) return d->u; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_u(uint32_t v) const { if (auto* d = direct()) { d->u = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
   // the float v's bits
   uint32_t v_address() const { return address + 12; }
-  uint32_t v() const { return on_host() ? uint32_t(data()->v) : uint32_t(guest::LoadU32(base, address + 12)); }
-  void set_v(uint32_t v) const { if (on_host()) data()->v = v; else guest::StoreU32(base, address + 12, v); }
-  uint32_t v_bits() const { return on_host() ? data()->v : guest::LoadU32(base, address + 12); }
-  void set_v_bits(uint32_t v) const { if (on_host()) data()->v = v; else guest::StoreU32(base, address + 12, v); }
+  uint32_t v_bits() const { if (auto* d = direct()) return d->v; return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_v_bits(uint32_t v) const { if (auto* d = direct()) { d->v = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
+  uint32_t v() const { if (auto* d = direct()) return d->v; return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_v(uint32_t v) const { if (auto* d = direct()) { d->v = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
 };
 
 // embedded; measure: UvColumn::LowerBoundNode.r4, UvMap::LowerBoundNode.r4, UvColumn::Find.r5, UvMap::Find.r5

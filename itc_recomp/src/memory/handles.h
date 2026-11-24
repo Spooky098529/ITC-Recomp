@@ -46,6 +46,14 @@ void ReleaseHandle(uint32_t handle);
 // and for a value no live handle covers (logged once with the value).
 void* HandleObject(uint32_t handle);
 
+// The object a view of the type whose layout is `layout` stands for, when
+// `value` is a handle to an object of that type (one allocated with that
+// layout, or an element of such an array): `object + offset`. nullptr for
+// anything else: a guest address, or an object inside a host owner of
+// another type (an embedded object, a record kept in the owner's bytes),
+// whose bytes the owner's layout orders (memory::OwnerLoad).
+void* HandleOwn(uint32_t value, const Layout* layout);
+
 // The game's frees (HeapFree, VirtualFree, XPhysicalFree, free and operator
 // delete, all through memory/heap.h) given a handle: the host object deleted
 // and its handle released, true; false for a value that isn't a live

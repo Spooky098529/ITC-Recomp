@@ -608,3 +608,12 @@ Decided (the user, 2026-11-16), on `e5-native-16-11-26`:
   state digest and drives are the check.
 - **Saves.** A save written from host structures must load back the same
   game state (older builds' saves need not load: "Decided").
+
+## The counts over time
+
+From `tools/e5_status.py` (lifted code / hand ports) and the schema's
+storage.
+
+| When | Guest loads and stores | `guest::Pointer` | Calls by constant address | Calls through a pointer | Vtable words through `VtableWord` | Guest frames | Image addresses | Schema types host / dual / guest |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Step 4's swarm (2026-11-24) | 118,428 / 24,566 | 3,041 / 45 | 4,007 | 2,515 | 2,166 / 20 | 4,286 | 11,660 | 155 / 118 / 1,665 (before it: 38 / 54 / 1,845) |

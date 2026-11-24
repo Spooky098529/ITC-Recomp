@@ -634,7 +634,7 @@ loc_822BE478:
   // mr r31,r3
   r31 = r3;
   // stw r10,12(r3)
-  schema::D3DXBuffer(base, uint32_t(r3)).set_data_bits(uint32_t(r10));
+  schema::D3DXBuffer(base, uint32_t(r3)).set_contents_bits(uint32_t(r10));
   // stw r11,0(r3)
   schema::D3DXBuffer(base, uint32_t(r3)).set_vtable_bits(uint32_t(r11));
   // stw r10,8(r3)

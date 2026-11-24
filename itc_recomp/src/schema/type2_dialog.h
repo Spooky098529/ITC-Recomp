@@ -39,24 +39,25 @@ struct Type2DialogData : View {
   }
   Type2DialogData at(uint32_t i) const { return Type2DialogData(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kType2DialogDataLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kType2DialogDataLayout, offset, width, v); }
+  Type2DialogDataData* direct() const { return static_cast<Type2DialogDataData*>(memory::HandleOwn(address, &kType2DialogDataLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kType2DialogDataLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kType2DialogDataLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t movies_loaded_address() const { return address + 0; }
-  uint32_t movies_loaded() const { return data()->movies_loaded; }
-  void set_movies_loaded(uint32_t v) const { data()->movies_loaded = v; }
-  uint32_t movies_loaded_bits() const { return data()->movies_loaded; }
-  void set_movies_loaded_bits(uint32_t v) const { data()->movies_loaded = v; }
+  uint32_t movies_loaded_bits() const { if (auto* d = direct()) return d->movies_loaded; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_movies_loaded_bits(uint32_t v) const { if (auto* d = direct()) { d->movies_loaded = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t movies_loaded() const { if (auto* d = direct()) return d->movies_loaded; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_movies_loaded(uint32_t v) const { if (auto* d = direct()) { d->movies_loaded = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // 21 none
   uint32_t queued_state_address() const { return address + 4; }
-  uint32_t queued_state() const { return data()->queued_state; }
-  void set_queued_state(uint32_t v) const { data()->queued_state = v; }
-  uint32_t queued_state_bits() const { return data()->queued_state; }
-  void set_queued_state_bits(uint32_t v) const { data()->queued_state = v; }
+  uint32_t queued_state_bits() const { if (auto* d = direct()) return d->queued_state; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_queued_state_bits(uint32_t v) const { if (auto* d = direct()) { d->queued_state = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  uint32_t queued_state() const { if (auto* d = direct()) return d->queued_state; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_queued_state(uint32_t v) const { if (auto* d = direct()) { d->queued_state = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
   uint32_t movie_shown_address() const { return address + 8; }
-  uint32_t movie_shown() const { return data()->movie_shown; }
-  void set_movie_shown(uint32_t v) const { data()->movie_shown = v; }
-  uint32_t movie_shown_bits() const { return data()->movie_shown; }
-  void set_movie_shown_bits(uint32_t v) const { data()->movie_shown = v; }
+  uint32_t movie_shown_bits() const { if (auto* d = direct()) return d->movie_shown; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_movie_shown_bits(uint32_t v) const { if (auto* d = direct()) { d->movie_shown = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  uint32_t movie_shown() const { if (auto* d = direct()) return d->movie_shown; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_movie_shown(uint32_t v) const { if (auto* d = direct()) { d->movie_shown = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
 };
 
 // The image words docs/functions/type2-dialog.md's code uses.

@@ -59,111 +59,112 @@ struct SysUsers : View {
   }
   SysUsers at(uint32_t i) const { return SysUsers(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kSysUsersLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kSysUsersLayout, offset, width, v); }
+  SysUsersData* direct() const { return static_cast<SysUsersData*>(memory::HandleOwn(address, &kSysUsersLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kSysUsersLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kSysUsersLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0x82000FA0
   uint32_t vtable_address() const { return address + 0; }
-  uint32_t vtable() const { return data()->vtable; }
-  void set_vtable(uint32_t v) const { data()->vtable = v; }
-  uint32_t vtable_bits() const { return data()->vtable; }
-  void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
+  uint32_t vtable_bits() const { if (auto* d = direct()) return d->vtable; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_vtable_bits(uint32_t v) const { if (auto* d = direct()) { d->vtable = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable() const { if (auto* d = direct()) return d->vtable; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_vtable(uint32_t v) const { if (auto* d = direct()) { d->vtable = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // the four 40-byte user records from +8 (user n at +8 + 40n): XUserGetSigninState's answer (1 local, 2 Live)
   uint32_t user0_signin_state_address() const { return address + 8; }
-  uint32_t user0_signin_state() const { return data()->user0_signin_state; }
-  void set_user0_signin_state(uint32_t v) const { data()->user0_signin_state = v; }
-  uint32_t user0_signin_state_bits() const { return data()->user0_signin_state; }
-  void set_user0_signin_state_bits(uint32_t v) const { data()->user0_signin_state = v; }
+  uint32_t user0_signin_state_bits() const { if (auto* d = direct()) return d->user0_signin_state; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_user0_signin_state_bits(uint32_t v) const { if (auto* d = direct()) { d->user0_signin_state = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  uint32_t user0_signin_state() const { if (auto* d = direct()) return d->user0_signin_state; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_user0_signin_state(uint32_t v) const { if (auto* d = direct()) { d->user0_signin_state = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
   // the record's +8: XUserGetXUID's answer
   uint32_t user0_xuid_address() const { return address + 16; }
-  uint64_t user0_xuid() const { return data()->user0_xuid; }
-  void set_user0_xuid(uint64_t v) const { data()->user0_xuid = v; }
-  uint64_t user0_xuid_bits() const { return data()->user0_xuid; }
-  void set_user0_xuid_bits(uint64_t v) const { data()->user0_xuid = v; }
+  uint64_t user0_xuid_bits() const { if (auto* d = direct()) return d->user0_xuid; return uint64_t((memory::IsHandle(address + 16) ? uint64_t(memory::OwnerLoad(address + 16, 8)) : guest::LoadU64(base, address + 16))); }
+  void set_user0_xuid_bits(uint64_t v) const { if (auto* d = direct()) { d->user0_xuid = v; return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 8, v); else guest::StoreU64(base, address + 16, v); }
+  uint64_t user0_xuid() const { if (auto* d = direct()) return d->user0_xuid; return uint64_t((memory::IsHandle(address + 16) ? uint64_t(memory::OwnerLoad(address + 16, 8)) : guest::LoadU64(base, address + 16))); }
+  void set_user0_xuid(uint64_t v) const { if (auto* d = direct()) { d->user0_xuid = v; return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 8, v); else guest::StoreU64(base, address + 16, v); }
   // the record's +16: XUserGetName's 16 bytes
   uint32_t user0_name_address() const { return address + 24; }
-  uint8_t* user0_name() const { return reinterpret_cast<uint8_t*>(data()) + 24; }
+  uint8_t* user0_name() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 24 : guest::Pointer(base, address + 24); }
   // the record's +32: 1 when signed in to Live (state 2)
   uint32_t user0_on_live_address() const { return address + 40; }
-  uint8_t user0_on_live() const { return data()->user0_on_live; }
-  void set_user0_on_live(uint8_t v) const { data()->user0_on_live = v; }
-  uint8_t user0_on_live_bits() const { return data()->user0_on_live; }
-  void set_user0_on_live_bits(uint8_t v) const { data()->user0_on_live = v; }
+  uint8_t user0_on_live_bits() const { if (auto* d = direct()) return d->user0_on_live; return uint8_t((memory::IsHandle(address + 40) ? uint8_t(memory::OwnerLoad(address + 40, 1)) : guest::LoadU8(base, address + 40))); }
+  void set_user0_on_live_bits(uint8_t v) const { if (auto* d = direct()) { d->user0_on_live = v; return; } if (memory::IsHandle(address + 40)) memory::OwnerStore(address + 40, 1, v); else guest::StoreU8(base, address + 40, v); }
+  uint8_t user0_on_live() const { if (auto* d = direct()) return d->user0_on_live; return uint8_t((memory::IsHandle(address + 40) ? uint8_t(memory::OwnerLoad(address + 40, 1)) : guest::LoadU8(base, address + 40))); }
+  void set_user0_on_live(uint8_t v) const { if (auto* d = direct()) { d->user0_on_live = v; return; } if (memory::IsHandle(address + 40)) memory::OwnerStore(address + 40, 1, v); else guest::StoreU8(base, address + 40, v); }
   // the Live users' list (8 bytes each: the record's address, then the user at +172)
   uint32_t live_users_address() const { return address + 168; }
-  uint32_t live_users() const { return data()->live_users; }
-  void set_live_users(uint32_t v) const { data()->live_users = v; }
-  uint32_t live_users_bits() const { return data()->live_users; }
-  void set_live_users_bits(uint32_t v) const { data()->live_users = v; }
+  uint32_t live_users_bits() const { if (auto* d = direct()) return d->live_users; return uint32_t((memory::IsHandle(address + 168) ? uint32_t(memory::OwnerLoad(address + 168, 4)) : guest::LoadU32(base, address + 168))); }
+  void set_live_users_bits(uint32_t v) const { if (auto* d = direct()) { d->live_users = v; return; } if (memory::IsHandle(address + 168)) memory::OwnerStore(address + 168, 4, v); else guest::StoreU32(base, address + 168, v); }
+  uint32_t live_users() const { if (auto* d = direct()) return d->live_users; return uint32_t((memory::IsHandle(address + 168) ? uint32_t(memory::OwnerLoad(address + 168, 4)) : guest::LoadU32(base, address + 168))); }
+  void set_live_users(uint32_t v) const { if (auto* d = direct()) { d->live_users = v; return; } if (memory::IsHandle(address + 168)) memory::OwnerStore(address + 168, 4, v); else guest::StoreU32(base, address + 168, v); }
   // the first Live entry's user index
   uint32_t live_user0_index_address() const { return address + 172; }
-  uint32_t live_user0_index() const { return data()->live_user0_index; }
-  void set_live_user0_index(uint32_t v) const { data()->live_user0_index = v; }
-  uint32_t live_user0_index_bits() const { return data()->live_user0_index; }
-  void set_live_user0_index_bits(uint32_t v) const { data()->live_user0_index = v; }
+  uint32_t live_user0_index_bits() const { if (auto* d = direct()) return d->live_user0_index; return uint32_t((memory::IsHandle(address + 172) ? uint32_t(memory::OwnerLoad(address + 172, 4)) : guest::LoadU32(base, address + 172))); }
+  void set_live_user0_index_bits(uint32_t v) const { if (auto* d = direct()) { d->live_user0_index = v; return; } if (memory::IsHandle(address + 172)) memory::OwnerStore(address + 172, 4, v); else guest::StoreU32(base, address + 172, v); }
+  uint32_t live_user0_index() const { if (auto* d = direct()) return d->live_user0_index; return uint32_t((memory::IsHandle(address + 172) ? uint32_t(memory::OwnerLoad(address + 172, 4)) : guest::LoadU32(base, address + 172))); }
+  void set_live_user0_index(uint32_t v) const { if (auto* d = direct()) { d->live_user0_index = v; return; } if (memory::IsHandle(address + 172)) memory::OwnerStore(address + 172, 4, v); else guest::StoreU32(base, address + 172, v); }
   // the signed-in users' indices (a word each, 4)
   uint32_t signed_in_users_address() const { return address + 200; }
-  uint32_t signed_in_users() const { return data()->signed_in_users; }
-  void set_signed_in_users(uint32_t v) const { data()->signed_in_users = v; }
-  uint32_t signed_in_users_bits() const { return data()->signed_in_users; }
-  void set_signed_in_users_bits(uint32_t v) const { data()->signed_in_users = v; }
+  uint32_t signed_in_users_bits() const { if (auto* d = direct()) return d->signed_in_users; return uint32_t((memory::IsHandle(address + 200) ? uint32_t(memory::OwnerLoad(address + 200, 4)) : guest::LoadU32(base, address + 200))); }
+  void set_signed_in_users_bits(uint32_t v) const { if (auto* d = direct()) { d->signed_in_users = v; return; } if (memory::IsHandle(address + 200)) memory::OwnerStore(address + 200, 4, v); else guest::StoreU32(base, address + 200, v); }
+  uint32_t signed_in_users() const { if (auto* d = direct()) return d->signed_in_users; return uint32_t((memory::IsHandle(address + 200) ? uint32_t(memory::OwnerLoad(address + 200, 4)) : guest::LoadU32(base, address + 200))); }
+  void set_signed_in_users(uint32_t v) const { if (auto* d = direct()) { d->signed_in_users = v; return; } if (memory::IsHandle(address + 200)) memory::OwnerStore(address + 200, 4, v); else guest::StoreU32(base, address + 200, v); }
   uint32_t signed_in_count_address() const { return address + 216; }
-  uint32_t signed_in_count() const { return data()->signed_in_count; }
-  void set_signed_in_count(uint32_t v) const { data()->signed_in_count = v; }
-  uint32_t signed_in_count_bits() const { return data()->signed_in_count; }
-  void set_signed_in_count_bits(uint32_t v) const { data()->signed_in_count = v; }
+  uint32_t signed_in_count_bits() const { if (auto* d = direct()) return d->signed_in_count; return uint32_t((memory::IsHandle(address + 216) ? uint32_t(memory::OwnerLoad(address + 216, 4)) : guest::LoadU32(base, address + 216))); }
+  void set_signed_in_count_bits(uint32_t v) const { if (auto* d = direct()) { d->signed_in_count = v; return; } if (memory::IsHandle(address + 216)) memory::OwnerStore(address + 216, 4, v); else guest::StoreU32(base, address + 216, v); }
+  uint32_t signed_in_count() const { if (auto* d = direct()) return d->signed_in_count; return uint32_t((memory::IsHandle(address + 216) ? uint32_t(memory::OwnerLoad(address + 216, 4)) : guest::LoadU32(base, address + 216))); }
+  void set_signed_in_count(uint32_t v) const { if (auto* d = direct()) { d->signed_in_count = v; return; } if (memory::IsHandle(address + 216)) memory::OwnerStore(address + 216, 4, v); else guest::StoreU32(base, address + 216, v); }
   uint32_t live_count_address() const { return address + 220; }
-  uint32_t live_count() const { return data()->live_count; }
-  void set_live_count(uint32_t v) const { data()->live_count = v; }
-  uint32_t live_count_bits() const { return data()->live_count; }
-  void set_live_count_bits(uint32_t v) const { data()->live_count = v; }
+  uint32_t live_count_bits() const { if (auto* d = direct()) return d->live_count; return uint32_t((memory::IsHandle(address + 220) ? uint32_t(memory::OwnerLoad(address + 220, 4)) : guest::LoadU32(base, address + 220))); }
+  void set_live_count_bits(uint32_t v) const { if (auto* d = direct()) { d->live_count = v; return; } if (memory::IsHandle(address + 220)) memory::OwnerStore(address + 220, 4, v); else guest::StoreU32(base, address + 220, v); }
+  uint32_t live_count() const { if (auto* d = direct()) return d->live_count; return uint32_t((memory::IsHandle(address + 220) ? uint32_t(memory::OwnerLoad(address + 220, 4)) : guest::LoadU32(base, address + 220))); }
+  void set_live_count(uint32_t v) const { if (auto* d = direct()) { d->live_count = v; return; } if (memory::IsHandle(address + 220)) memory::OwnerStore(address + 220, 4, v); else guest::StoreU32(base, address + 220, v); }
   // the set-up block's +8
   uint32_t tick_key_address() const { return address + 224; }
-  uint32_t tick_key() const { return data()->tick_key; }
-  void set_tick_key(uint32_t v) const { data()->tick_key = v; }
-  uint32_t tick_key_bits() const { return data()->tick_key; }
-  void set_tick_key_bits(uint32_t v) const { data()->tick_key = v; }
+  uint32_t tick_key_bits() const { if (auto* d = direct()) return d->tick_key; return uint32_t((memory::IsHandle(address + 224) ? uint32_t(memory::OwnerLoad(address + 224, 4)) : guest::LoadU32(base, address + 224))); }
+  void set_tick_key_bits(uint32_t v) const { if (auto* d = direct()) { d->tick_key = v; return; } if (memory::IsHandle(address + 224)) memory::OwnerStore(address + 224, 4, v); else guest::StoreU32(base, address + 224, v); }
+  uint32_t tick_key() const { if (auto* d = direct()) return d->tick_key; return uint32_t((memory::IsHandle(address + 224) ? uint32_t(memory::OwnerLoad(address + 224, 4)) : guest::LoadU32(base, address + 224))); }
+  void set_tick_key(uint32_t v) const { if (auto* d = direct()) { d->tick_key = v; return; } if (memory::IsHandle(address + 224)) memory::OwnerStore(address + 224, 4, v); else guest::StoreU32(base, address + 224, v); }
   // the set-up block's +12
   uint32_t listener_key_address() const { return address + 228; }
-  uint32_t listener_key() const { return data()->listener_key; }
-  void set_listener_key(uint32_t v) const { data()->listener_key = v; }
-  uint32_t listener_key_bits() const { return data()->listener_key; }
-  void set_listener_key_bits(uint32_t v) const { data()->listener_key = v; }
+  uint32_t listener_key_bits() const { if (auto* d = direct()) return d->listener_key; return uint32_t((memory::IsHandle(address + 228) ? uint32_t(memory::OwnerLoad(address + 228, 4)) : guest::LoadU32(base, address + 228))); }
+  void set_listener_key_bits(uint32_t v) const { if (auto* d = direct()) { d->listener_key = v; return; } if (memory::IsHandle(address + 228)) memory::OwnerStore(address + 228, 4, v); else guest::StoreU32(base, address + 228, v); }
+  uint32_t listener_key() const { if (auto* d = direct()) return d->listener_key; return uint32_t((memory::IsHandle(address + 228) ? uint32_t(memory::OwnerLoad(address + 228, 4)) : guest::LoadU32(base, address + 228))); }
+  void set_listener_key(uint32_t v) const { if (auto* d = direct()) { d->listener_key = v; return; } if (memory::IsHandle(address + 228)) memory::OwnerStore(address + 228, 4, v); else guest::StoreU32(base, address + 228, v); }
   // the set-up block's +4
   uint32_t framework_interface_address() const { return address + 232; }
-  uint32_t framework_interface() const { return data()->framework_interface; }
-  void set_framework_interface(uint32_t v) const { data()->framework_interface = v; }
-  uint32_t framework_interface_bits() const { return data()->framework_interface; }
-  void set_framework_interface_bits(uint32_t v) const { data()->framework_interface = v; }
+  uint32_t framework_interface_bits() const { if (auto* d = direct()) return d->framework_interface; return uint32_t((memory::IsHandle(address + 232) ? uint32_t(memory::OwnerLoad(address + 232, 4)) : guest::LoadU32(base, address + 232))); }
+  void set_framework_interface_bits(uint32_t v) const { if (auto* d = direct()) { d->framework_interface = v; return; } if (memory::IsHandle(address + 232)) memory::OwnerStore(address + 232, 4, v); else guest::StoreU32(base, address + 232, v); }
+  uint32_t framework_interface() const { if (auto* d = direct()) return d->framework_interface; return uint32_t((memory::IsHandle(address + 232) ? uint32_t(memory::OwnerLoad(address + 232, 4)) : guest::LoadU32(base, address + 232))); }
+  void set_framework_interface(uint32_t v) const { if (auto* d = direct()) { d->framework_interface = v; return; } if (memory::IsHandle(address + 232)) memory::OwnerStore(address + 232, 4, v); else guest::StoreU32(base, address + 232, v); }
   // set by sub_820998B8 (not read in detail)
   uint32_t unknown_236_address() const { return address + 236; }
-  uint32_t unknown_236() const { return data()->unknown_236; }
-  void set_unknown_236(uint32_t v) const { data()->unknown_236 = v; }
-  uint32_t unknown_236_bits() const { return data()->unknown_236; }
-  void set_unknown_236_bits(uint32_t v) const { data()->unknown_236 = v; }
+  uint32_t unknown_236_bits() const { if (auto* d = direct()) return d->unknown_236; return uint32_t((memory::IsHandle(address + 236) ? uint32_t(memory::OwnerLoad(address + 236, 4)) : guest::LoadU32(base, address + 236))); }
+  void set_unknown_236_bits(uint32_t v) const { if (auto* d = direct()) { d->unknown_236 = v; return; } if (memory::IsHandle(address + 236)) memory::OwnerStore(address + 236, 4, v); else guest::StoreU32(base, address + 236, v); }
+  uint32_t unknown_236() const { if (auto* d = direct()) return d->unknown_236; return uint32_t((memory::IsHandle(address + 236) ? uint32_t(memory::OwnerLoad(address + 236, 4)) : guest::LoadU32(base, address + 236))); }
+  void set_unknown_236(uint32_t v) const { if (auto* d = direct()) { d->unknown_236 = v; return; } if (memory::IsHandle(address + 236)) memory::OwnerStore(address + 236, 4, v); else guest::StoreU32(base, address + 236, v); }
   // the notification listener (XNotifyCreateListener mask 3; user::kNoListener since B5)
   uint32_t listener_address() const { return address + 240; }
-  uint32_t listener() const { return data()->listener; }
-  void set_listener(uint32_t v) const { data()->listener = v; }
-  uint32_t listener_bits() const { return data()->listener; }
-  void set_listener_bits(uint32_t v) const { data()->listener = v; }
+  uint32_t listener_bits() const { if (auto* d = direct()) return d->listener; return uint32_t((memory::IsHandle(address + 240) ? uint32_t(memory::OwnerLoad(address + 240, 4)) : guest::LoadU32(base, address + 240))); }
+  void set_listener_bits(uint32_t v) const { if (auto* d = direct()) { d->listener = v; return; } if (memory::IsHandle(address + 240)) memory::OwnerStore(address + 240, 4, v); else guest::StoreU32(base, address + 240, v); }
+  uint32_t listener() const { if (auto* d = direct()) return d->listener; return uint32_t((memory::IsHandle(address + 240) ? uint32_t(memory::OwnerLoad(address + 240, 4)) : guest::LoadU32(base, address + 240))); }
+  void set_listener(uint32_t v) const { if (auto* d = direct()) { d->listener = v; return; } if (memory::IsHandle(address + 240)) memory::OwnerStore(address + 240, 4, v); else guest::StoreU32(base, address + 240, v); }
   // set when the users were rebuilt (sign-in changed)
   uint32_t users_changed_address() const { return address + 244; }
-  uint32_t users_changed() const { return data()->users_changed; }
-  void set_users_changed(uint32_t v) const { data()->users_changed = v; }
-  uint32_t users_changed_bits() const { return data()->users_changed; }
-  void set_users_changed_bits(uint32_t v) const { data()->users_changed = v; }
+  uint32_t users_changed_bits() const { if (auto* d = direct()) return d->users_changed; return uint32_t((memory::IsHandle(address + 244) ? uint32_t(memory::OwnerLoad(address + 244, 4)) : guest::LoadU32(base, address + 244))); }
+  void set_users_changed_bits(uint32_t v) const { if (auto* d = direct()) { d->users_changed = v; return; } if (memory::IsHandle(address + 244)) memory::OwnerStore(address + 244, 4, v); else guest::StoreU32(base, address + 244, v); }
+  uint32_t users_changed() const { if (auto* d = direct()) return d->users_changed; return uint32_t((memory::IsHandle(address + 244) ? uint32_t(memory::OwnerLoad(address + 244, 4)) : guest::LoadU32(base, address + 244))); }
+  void set_users_changed(uint32_t v) const { if (auto* d = direct()) { d->users_changed = v; return; } if (memory::IsHandle(address + 244)) memory::OwnerStore(address + 244, 4, v); else guest::StoreU32(base, address + 244, v); }
   // set by Live connection changed (never sent); App's Live connection state answer
   uint32_t live_connection_changed_address() const { return address + 248; }
-  uint32_t live_connection_changed() const { return data()->live_connection_changed; }
-  void set_live_connection_changed(uint32_t v) const { data()->live_connection_changed = v; }
-  uint32_t live_connection_changed_bits() const { return data()->live_connection_changed; }
-  void set_live_connection_changed_bits(uint32_t v) const { data()->live_connection_changed = v; }
+  uint32_t live_connection_changed_bits() const { if (auto* d = direct()) return d->live_connection_changed; return uint32_t((memory::IsHandle(address + 248) ? uint32_t(memory::OwnerLoad(address + 248, 4)) : guest::LoadU32(base, address + 248))); }
+  void set_live_connection_changed_bits(uint32_t v) const { if (auto* d = direct()) { d->live_connection_changed = v; return; } if (memory::IsHandle(address + 248)) memory::OwnerStore(address + 248, 4, v); else guest::StoreU32(base, address + 248, v); }
+  uint32_t live_connection_changed() const { if (auto* d = direct()) return d->live_connection_changed; return uint32_t((memory::IsHandle(address + 248) ? uint32_t(memory::OwnerLoad(address + 248, 4)) : guest::LoadU32(base, address + 248))); }
+  void set_live_connection_changed(uint32_t v) const { if (auto* d = direct()) { d->live_connection_changed = v; return; } if (memory::IsHandle(address + 248)) memory::OwnerStore(address + 248, 4, v); else guest::StoreU32(base, address + 248, v); }
   // Live connection changed's parameter
   uint32_t live_connection_state_address() const { return address + 252; }
-  uint32_t live_connection_state() const { return data()->live_connection_state; }
-  void set_live_connection_state(uint32_t v) const { data()->live_connection_state = v; }
-  uint32_t live_connection_state_bits() const { return data()->live_connection_state; }
-  void set_live_connection_state_bits(uint32_t v) const { data()->live_connection_state = v; }
+  uint32_t live_connection_state_bits() const { if (auto* d = direct()) return d->live_connection_state; return uint32_t((memory::IsHandle(address + 252) ? uint32_t(memory::OwnerLoad(address + 252, 4)) : guest::LoadU32(base, address + 252))); }
+  void set_live_connection_state_bits(uint32_t v) const { if (auto* d = direct()) { d->live_connection_state = v; return; } if (memory::IsHandle(address + 252)) memory::OwnerStore(address + 252, 4, v); else guest::StoreU32(base, address + 252, v); }
+  uint32_t live_connection_state() const { if (auto* d = direct()) return d->live_connection_state; return uint32_t((memory::IsHandle(address + 252) ? uint32_t(memory::OwnerLoad(address + 252, 4)) : guest::LoadU32(base, address + 252))); }
+  void set_live_connection_state(uint32_t v) const { if (auto* d = direct()) { d->live_connection_state = v; return; } if (memory::IsHandle(address + 252)) memory::OwnerStore(address + 252, 4, v); else guest::StoreU32(base, address + 252, v); }
 };
 
 // embedded; measure: sub_820998B8.r4
@@ -859,18 +860,19 @@ struct NetScreen7Data : View {
   }
   NetScreen7Data at(uint32_t i) const { return NetScreen7Data(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kNetScreen7DataLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kNetScreen7DataLayout, offset, width, v); }
+  NetScreen7DataData* direct() const { return static_cast<NetScreen7DataData*>(memory::HandleOwn(address, &kNetScreen7DataLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kNetScreen7DataLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kNetScreen7DataLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t unknown_0_address() const { return address + 0; }
-  uint32_t unknown_0() const { return data()->unknown_0; }
-  void set_unknown_0(uint32_t v) const { data()->unknown_0 = v; }
-  uint32_t unknown_0_bits() const { return data()->unknown_0; }
-  void set_unknown_0_bits(uint32_t v) const { data()->unknown_0 = v; }
+  uint32_t unknown_0_bits() const { if (auto* d = direct()) return d->unknown_0; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_unknown_0_bits(uint32_t v) const { if (auto* d = direct()) { d->unknown_0 = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0() const { if (auto* d = direct()) return d->unknown_0; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_unknown_0(uint32_t v) const { if (auto* d = direct()) { d->unknown_0 = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   uint32_t unknown_4_address() const { return address + 4; }
-  uint32_t unknown_4() const { return data()->unknown_4; }
-  void set_unknown_4(uint32_t v) const { data()->unknown_4 = v; }
-  uint32_t unknown_4_bits() const { return data()->unknown_4; }
-  void set_unknown_4_bits(uint32_t v) const { data()->unknown_4 = v; }
+  uint32_t unknown_4_bits() const { if (auto* d = direct()) return d->unknown_4; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_unknown_4_bits(uint32_t v) const { if (auto* d = direct()) { d->unknown_4 = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4() const { if (auto* d = direct()) return d->unknown_4; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_unknown_4(uint32_t v) const { if (auto* d = direct()) { d->unknown_4 = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
 };
 
 // embedded; measure: sub_82577788.r3@+28, sub_82577850.r3@+8, sub_82577850.r3, sub_82577850.r3@+28

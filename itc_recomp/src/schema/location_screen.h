@@ -302,22 +302,23 @@ struct LocationScreenDispatcher : View {
   }
   LocationScreenDispatcher at(uint32_t i) const { return LocationScreenDispatcher(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kLocationScreenDispatcherLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kLocationScreenDispatcherLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
+  LocationScreenDispatcherData* direct() const { return static_cast<LocationScreenDispatcherData*>(memory::HandleOwn(address, &kLocationScreenDispatcherLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kLocationScreenDispatcherLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kLocationScreenDispatcherLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 50 messages of 12 bytes (id, two words)
   uint32_t messages_address() const { return address + 204; }
-  uint8_t* messages() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 204 : guest::Pointer(base, address + 204); }
+  uint8_t* messages() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 204 : guest::Pointer(base, address + 204); }
   uint32_t message_count_address() const { return address + 804; }
-  uint32_t message_count() const { return on_host() ? uint32_t(data()->message_count) : uint32_t(guest::LoadU32(base, address + 804)); }
-  void set_message_count(uint32_t v) const { if (on_host()) data()->message_count = v; else guest::StoreU32(base, address + 804, v); }
-  uint32_t message_count_bits() const { return on_host() ? data()->message_count : guest::LoadU32(base, address + 804); }
-  void set_message_count_bits(uint32_t v) const { if (on_host()) data()->message_count = v; else guest::StoreU32(base, address + 804, v); }
+  uint32_t message_count_bits() const { if (auto* d = direct()) return d->message_count; return uint32_t((memory::IsHandle(address + 804) ? uint32_t(memory::OwnerLoad(address + 804, 4)) : guest::LoadU32(base, address + 804))); }
+  void set_message_count_bits(uint32_t v) const { if (auto* d = direct()) { d->message_count = v; return; } if (memory::IsHandle(address + 804)) memory::OwnerStore(address + 804, 4, v); else guest::StoreU32(base, address + 804, v); }
+  uint32_t message_count() const { if (auto* d = direct()) return d->message_count; return uint32_t((memory::IsHandle(address + 804) ? uint32_t(memory::OwnerLoad(address + 804, 4)) : guest::LoadU32(base, address + 804))); }
+  void set_message_count(uint32_t v) const { if (auto* d = direct()) { d->message_count = v; return; } if (memory::IsHandle(address + 804)) memory::OwnerStore(address + 804, 4, v); else guest::StoreU32(base, address + 804, v); }
   // the ring's first slot
   uint32_t message_start_address() const { return address + 808; }
-  uint32_t message_start() const { return on_host() ? uint32_t(data()->message_start) : uint32_t(guest::LoadU32(base, address + 808)); }
-  void set_message_start(uint32_t v) const { if (on_host()) data()->message_start = v; else guest::StoreU32(base, address + 808, v); }
-  uint32_t message_start_bits() const { return on_host() ? data()->message_start : guest::LoadU32(base, address + 808); }
-  void set_message_start_bits(uint32_t v) const { if (on_host()) data()->message_start = v; else guest::StoreU32(base, address + 808, v); }
+  uint32_t message_start_bits() const { if (auto* d = direct()) return d->message_start; return uint32_t((memory::IsHandle(address + 808) ? uint32_t(memory::OwnerLoad(address + 808, 4)) : guest::LoadU32(base, address + 808))); }
+  void set_message_start_bits(uint32_t v) const { if (auto* d = direct()) { d->message_start = v; return; } if (memory::IsHandle(address + 808)) memory::OwnerStore(address + 808, 4, v); else guest::StoreU32(base, address + 808, v); }
+  uint32_t message_start() const { if (auto* d = direct()) return d->message_start; return uint32_t((memory::IsHandle(address + 808) ? uint32_t(memory::OwnerLoad(address + 808, 4)) : guest::LoadU32(base, address + 808))); }
+  void set_message_start(uint32_t v) const { if (auto* d = direct()) { d->message_start = v; return; } if (memory::IsHandle(address + 808)) memory::OwnerStore(address + 808, 4, v); else guest::StoreU32(base, address + 808, v); }
 };
 
 // allocated; measure: Picture, LocationScreen.+8, new<16>@LocationScreen::OnPictureLoadedA, new<16>@LocationScreen::OnPictureLoadedB
@@ -351,32 +352,33 @@ struct LocationScreenPicture : View {
   }
   LocationScreenPicture at(uint32_t i) const { return LocationScreenPicture(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kLocationScreenPictureLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kLocationScreenPictureLayout, offset, width, v); }
+  LocationScreenPictureData* direct() const { return static_cast<LocationScreenPictureData*>(memory::HandleOwn(address, &kLocationScreenPictureLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kLocationScreenPictureLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kLocationScreenPictureLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t loaded_address() const { return address + 0; }
-  uint32_t loaded() const { return data()->loaded; }
-  void set_loaded(uint32_t v) const { data()->loaded = v; }
-  uint32_t loaded_bits() const { return data()->loaded; }
-  void set_loaded_bits(uint32_t v) const { data()->loaded = v; }
+  uint32_t loaded_bits() const { if (auto* d = direct()) return d->loaded; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_loaded_bits(uint32_t v) const { if (auto* d = direct()) { d->loaded = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t loaded() const { if (auto* d = direct()) return d->loaded; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_loaded(uint32_t v) const { if (auto* d = direct()) { d->loaded = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // the picture id (a 56- or 20-byte data table entry's +16), -1 until the ring's front is taken
   uint32_t id_address() const { return address + 4; }
-  uint32_t id() const { return data()->id; }
-  void set_id(uint32_t v) const { data()->id = v; }
-  uint32_t id_bits() const { return data()->id; }
-  void set_id_bits(uint32_t v) const { data()->id = v; }
+  uint32_t id_bits() const { if (auto* d = direct()) return d->id; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_id_bits(uint32_t v) const { if (auto* d = direct()) { d->id = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  uint32_t id() const { if (auto* d = direct()) return d->id; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_id(uint32_t v) const { if (auto* d = direct()) { d->id = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
   uint32_t texture_address() const { return address + 8; }
+  uint32_t texture_bits() const { if (auto* d = direct()) return d->texture; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_texture_bits(uint32_t v) const { if (auto* d = direct()) { d->texture = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
   template <typename T = LocationScreenPictureTexture>
-  T texture() const { return T(base, data()->texture); }
-  void set_texture(const View& w) const { const uint32_t v = w.address; data()->texture = v; }
-  void set_texture(uint32_t v) const { data()->texture = v; }
-  uint32_t texture_bits() const { return data()->texture; }
-  void set_texture_bits(uint32_t v) const { data()->texture = v; }
+  T texture() const { return T(base, texture_bits()); }
+  void set_texture(const View& w) const { set_texture_bits(w.address); }
+  void set_texture(uint32_t v) const { set_texture_bits(v); }
   // the XPR (24 bytes, XPR::XPR and XPR::Create over the loaded buffer)
   uint32_t xpr_address() const { return address + 12; }
-  View xpr() const { return View(base, data()->xpr); }
-  void set_xpr(uint32_t v) const { data()->xpr = v; }
-  uint32_t xpr_bits() const { return data()->xpr; }
-  void set_xpr_bits(uint32_t v) const { data()->xpr = v; }
+  uint32_t xpr_bits() const { if (auto* d = direct()) return d->xpr; return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_xpr_bits(uint32_t v) const { if (auto* d = direct()) { d->xpr = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
+  View xpr() const { return View(base, xpr_bits()); }
+  void set_xpr(uint32_t v) const { set_xpr_bits(v); }
 };
 
 // allocated; measure: Picture.+8, new<12>@LocationScreen::OnPictureLoadedA, new<12>@LocationScreen::OnPictureLoadedB, new<16>@LocationScreen::OnPictureLoadedA.+8, new<16>@LocationScreen::OnPictureLoadedB.+8
@@ -409,26 +411,27 @@ struct LocationScreenPictureTexture : View {
   }
   LocationScreenPictureTexture at(uint32_t i) const { return LocationScreenPictureTexture(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kLocationScreenPictureTextureLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kLocationScreenPictureTextureLayout, offset, width, v); }
+  LocationScreenPictureTextureData* direct() const { return static_cast<LocationScreenPictureTextureData*>(memory::HandleOwn(address, &kLocationScreenPictureTextureLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kLocationScreenPictureTextureLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kLocationScreenPictureTextureLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // the XPR's texture 0 (XPR::GetTexture)
   uint32_t texture_address() const { return address + 0; }
-  uint32_t texture() const { return data()->texture; }
-  void set_texture(uint32_t v) const { data()->texture = v; }
-  uint32_t texture_bits() const { return data()->texture; }
-  void set_texture_bits(uint32_t v) const { data()->texture = v; }
+  uint32_t texture_bits() const { if (auto* d = direct()) return d->texture; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_texture_bits(uint32_t v) const { if (auto* d = direct()) { d->texture = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t texture() const { if (auto* d = direct()) return d->texture; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_texture(uint32_t v) const { if (auto* d = direct()) { d->texture = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // Texture::GetLevelDesc's +24
   uint32_t width_address() const { return address + 4; }
-  uint32_t width() const { return data()->width; }
-  void set_width(uint32_t v) const { data()->width = v; }
-  uint32_t width_bits() const { return data()->width; }
-  void set_width_bits(uint32_t v) const { data()->width = v; }
+  uint32_t width_bits() const { if (auto* d = direct()) return d->width; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_width_bits(uint32_t v) const { if (auto* d = direct()) { d->width = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  uint32_t width() const { if (auto* d = direct()) return d->width; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_width(uint32_t v) const { if (auto* d = direct()) { d->width = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
   // Texture::GetLevelDesc's +28
   uint32_t height_address() const { return address + 8; }
-  uint32_t height() const { return data()->height; }
-  void set_height(uint32_t v) const { data()->height = v; }
-  uint32_t height_bits() const { return data()->height; }
-  void set_height_bits(uint32_t v) const { data()->height = v; }
+  uint32_t height_bits() const { if (auto* d = direct()) return d->height; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_height_bits(uint32_t v) const { if (auto* d = direct()) { d->height = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  uint32_t height() const { if (auto* d = direct()) return d->height; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_height(uint32_t v) const { if (auto* d = direct()) { d->height = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
 };
 
 // file; measure: DataTables::Entry20.ret

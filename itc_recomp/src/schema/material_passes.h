@@ -346,42 +346,43 @@ struct CarDealerSwatch : View {
   }
   CarDealerSwatch at(uint32_t i) const { return CarDealerSwatch(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCarDealerSwatchLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarDealerSwatchLayout, offset, width, v); }
+  CarDealerSwatchData* direct() const { return static_cast<CarDealerSwatchData*>(memory::HandleOwn(address, &kCarDealerSwatchLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kCarDealerSwatchLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarDealerSwatchLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // HsvToRgb's red x [0x82000C44], truncated (fctiwz)
   uint32_t red_address() const { return address + 0; }
-  uint32_t red() const { return data()->red; }
-  void set_red(uint32_t v) const { data()->red = v; }
-  uint32_t red_bits() const { return data()->red; }
-  void set_red_bits(uint32_t v) const { data()->red = v; }
+  uint32_t red_bits() const { if (auto* d = direct()) return d->red; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_red_bits(uint32_t v) const { if (auto* d = direct()) { d->red = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t red() const { if (auto* d = direct()) return d->red; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_red(uint32_t v) const { if (auto* d = direct()) { d->red = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   uint32_t green_address() const { return address + 4; }
-  uint32_t green() const { return data()->green; }
-  void set_green(uint32_t v) const { data()->green = v; }
-  uint32_t green_bits() const { return data()->green; }
-  void set_green_bits(uint32_t v) const { data()->green = v; }
+  uint32_t green_bits() const { if (auto* d = direct()) return d->green; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_green_bits(uint32_t v) const { if (auto* d = direct()) { d->green = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  uint32_t green() const { if (auto* d = direct()) return d->green; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_green(uint32_t v) const { if (auto* d = direct()) { d->green = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
   uint32_t blue_address() const { return address + 8; }
-  uint32_t blue() const { return data()->blue; }
-  void set_blue(uint32_t v) const { data()->blue = v; }
-  uint32_t blue_bits() const { return data()->blue; }
-  void set_blue_bits(uint32_t v) const { data()->blue = v; }
+  uint32_t blue_bits() const { if (auto* d = direct()) return d->blue; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_blue_bits(uint32_t v) const { if (auto* d = direct()) { d->blue = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  uint32_t blue() const { if (auto* d = direct()) return d->blue; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_blue(uint32_t v) const { if (auto* d = direct()) { d->blue = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
   // the color record's halfword +4
   uint32_t hue_address() const { return address + 16; }
-  float hue() const { return data()->hue; }
-  void set_hue(float v) const { data()->hue = v; }
-  uint32_t hue_bits() const { return std::bit_cast<uint32_t>(data()->hue); }
-  void set_hue_bits(uint32_t v) const { data()->hue = std::bit_cast<float>(v); }
+  uint32_t hue_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->hue); return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_hue_bits(uint32_t v) const { if (auto* d = direct()) { d->hue = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
+  float hue() const { return std::bit_cast<float>(hue_bits()); }
+  void set_hue(float v) const { set_hue_bits(std::bit_cast<uint32_t>(v)); }
   // the color record's byte +6 x [0x82002200]
   uint32_t saturation_address() const { return address + 20; }
-  float saturation() const { return data()->saturation; }
-  void set_saturation(float v) const { data()->saturation = v; }
-  uint32_t saturation_bits() const { return std::bit_cast<uint32_t>(data()->saturation); }
-  void set_saturation_bits(uint32_t v) const { data()->saturation = std::bit_cast<float>(v); }
+  uint32_t saturation_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->saturation); return uint32_t((memory::IsHandle(address + 20) ? uint32_t(memory::OwnerLoad(address + 20, 4)) : guest::LoadU32(base, address + 20))); }
+  void set_saturation_bits(uint32_t v) const { if (auto* d = direct()) { d->saturation = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 4, v); else guest::StoreU32(base, address + 20, v); }
+  float saturation() const { return std::bit_cast<float>(saturation_bits()); }
+  void set_saturation(float v) const { set_saturation_bits(std::bit_cast<uint32_t>(v)); }
   // the color record's byte +7 plus a kind's offset, clamped to 0-255, x [0x82002200]
   uint32_t value_address() const { return address + 24; }
-  float value() const { return data()->value; }
-  void set_value(float v) const { data()->value = v; }
-  uint32_t value_bits() const { return std::bit_cast<uint32_t>(data()->value); }
-  void set_value_bits(uint32_t v) const { data()->value = std::bit_cast<float>(v); }
+  uint32_t value_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->value); return uint32_t((memory::IsHandle(address + 24) ? uint32_t(memory::OwnerLoad(address + 24, 4)) : guest::LoadU32(base, address + 24))); }
+  void set_value_bits(uint32_t v) const { if (auto* d = direct()) { d->value = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 24)) memory::OwnerStore(address + 24, 4, v); else guest::StoreU32(base, address + 24, v); }
+  float value() const { return std::bit_cast<float>(value_bits()); }
+  void set_value(float v) const { set_value_bits(std::bit_cast<uint32_t>(v)); }
 };
 
 // file; measure: Color::HsvToRgb8.r4

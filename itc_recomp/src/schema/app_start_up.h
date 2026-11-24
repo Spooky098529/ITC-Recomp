@@ -42,34 +42,35 @@ struct AppInterface16 : View {
   }
   AppInterface16 at(uint32_t i) const { return AppInterface16(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kAppInterface16Layout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppInterface16Layout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
+  AppInterface16Data* direct() const { return static_cast<AppInterface16Data*>(memory::HandleOwn(address, &kAppInterface16Layout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kAppInterface16Layout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kAppInterface16Layout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0x82000E38
   uint32_t vtable_address() const { return address + 0; }
-  uint32_t vtable() const { return on_host() ? uint32_t(data()->vtable) : uint32_t(guest::LoadU32(base, address + 0)); }
-  void set_vtable(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
-  uint32_t vtable_bits() const { return on_host() ? data()->vtable : guest::LoadU32(base, address + 0); }
-  void set_vtable_bits(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable_bits() const { if (auto* d = direct()) return d->vtable; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_vtable_bits(uint32_t v) const { if (auto* d = direct()) { d->vtable = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable() const { if (auto* d = direct()) return d->vtable; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_vtable(uint32_t v) const { if (auto* d = direct()) { d->vtable = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // app + 124: the sound manager (AudioManager::Create, sound-cues.md), slot +48's answer
   uint32_t sound_manager_address() const { return address + 108; }
-  uint32_t sound_manager() const { return on_host() ? uint32_t(data()->sound_manager) : uint32_t(guest::LoadU32(base, address + 108)); }
-  void set_sound_manager(uint32_t v) const { if (on_host()) data()->sound_manager = v; else guest::StoreU32(base, address + 108, v); }
-  uint32_t sound_manager_bits() const { return on_host() ? data()->sound_manager : guest::LoadU32(base, address + 108); }
-  void set_sound_manager_bits(uint32_t v) const { if (on_host()) data()->sound_manager = v; else guest::StoreU32(base, address + 108, v); }
+  uint32_t sound_manager_bits() const { if (auto* d = direct()) return d->sound_manager; return uint32_t((memory::IsHandle(address + 108) ? uint32_t(memory::OwnerLoad(address + 108, 4)) : guest::LoadU32(base, address + 108))); }
+  void set_sound_manager_bits(uint32_t v) const { if (auto* d = direct()) { d->sound_manager = v; return; } if (memory::IsHandle(address + 108)) memory::OwnerStore(address + 108, 4, v); else guest::StoreU32(base, address + 108, v); }
+  uint32_t sound_manager() const { if (auto* d = direct()) return d->sound_manager; return uint32_t((memory::IsHandle(address + 108) ? uint32_t(memory::OwnerLoad(address + 108, 4)) : guest::LoadU32(base, address + 108))); }
+  void set_sound_manager(uint32_t v) const { if (auto* d = direct()) { d->sound_manager = v; return; } if (memory::IsHandle(address + 108)) memory::OwnerStore(address + 108, 4, v); else guest::StoreU32(base, address + 108, v); }
   // app + 128: the movie class (Movie::Movie, movies.md), slot +44's answer
   uint32_t movie_address() const { return address + 112; }
-  uint32_t movie() const { return on_host() ? uint32_t(data()->movie) : uint32_t(guest::LoadU32(base, address + 112)); }
-  void set_movie(uint32_t v) const { if (on_host()) data()->movie = v; else guest::StoreU32(base, address + 112, v); }
-  uint32_t movie_bits() const { return on_host() ? data()->movie : guest::LoadU32(base, address + 112); }
-  void set_movie_bits(uint32_t v) const { if (on_host()) data()->movie = v; else guest::StoreU32(base, address + 112, v); }
+  uint32_t movie_bits() const { if (auto* d = direct()) return d->movie; return uint32_t((memory::IsHandle(address + 112) ? uint32_t(memory::OwnerLoad(address + 112, 4)) : guest::LoadU32(base, address + 112))); }
+  void set_movie_bits(uint32_t v) const { if (auto* d = direct()) { d->movie = v; return; } if (memory::IsHandle(address + 112)) memory::OwnerStore(address + 112, 4, v); else guest::StoreU32(base, address + 112, v); }
+  uint32_t movie() const { if (auto* d = direct()) return d->movie; return uint32_t((memory::IsHandle(address + 112) ? uint32_t(memory::OwnerLoad(address + 112, 4)) : guest::LoadU32(base, address + 112))); }
+  void set_movie(uint32_t v) const { if (auto* d = direct()) { d->movie = v; return; } if (memory::IsHandle(address + 112)) memory::OwnerStore(address + 112, 4, v); else guest::StoreU32(base, address + 112, v); }
   // app + 24: the framework's interface, read by the vtable's +8 users getter sub_820943C8 and +12 save-devices getter sub_820943B0 (save-interface's and system-services' reports)
   uint32_t framework_interface_address() const { return address + 8; }
+  uint32_t framework_interface_bits() const { if (auto* d = direct()) return d->framework_interface; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_framework_interface_bits(uint32_t v) const { if (auto* d = direct()) { d->framework_interface = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
   template <typename T = AppFrameworkInterface>
-  T framework_interface() const { return T(base, on_host() ? data()->framework_interface : guest::LoadU32(base, address + 8)); }
-  void set_framework_interface(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->framework_interface = v; else guest::StoreU32(base, address + 8, v); }
-  void set_framework_interface(uint32_t v) const { if (on_host()) data()->framework_interface = v; else guest::StoreU32(base, address + 8, v); }
-  uint32_t framework_interface_bits() const { return on_host() ? data()->framework_interface : guest::LoadU32(base, address + 8); }
-  void set_framework_interface_bits(uint32_t v) const { if (on_host()) data()->framework_interface = v; else guest::StoreU32(base, address + 8, v); }
+  T framework_interface() const { return T(base, framework_interface_bits()); }
+  void set_framework_interface(const View& w) const { set_framework_interface_bits(w.address); }
+  void set_framework_interface(uint32_t v) const { set_framework_interface_bits(v); }
 };
 
 // embedded; measure: sub_82094368.r3
@@ -102,16 +103,17 @@ struct AppInterface8 : View {
   }
   AppInterface8 at(uint32_t i) const { return AppInterface8(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kAppInterface8Layout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppInterface8Layout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
+  AppInterface8Data* direct() const { return static_cast<AppInterface8Data*>(memory::HandleOwn(address, &kAppInterface8Layout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kAppInterface8Layout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kAppInterface8Layout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // app + 24: the framework's +36 interface
   uint32_t framework_interface_address() const { return address + 16; }
+  uint32_t framework_interface_bits() const { if (auto* d = direct()) return d->framework_interface; return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_framework_interface_bits(uint32_t v) const { if (auto* d = direct()) { d->framework_interface = v; return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
   template <typename T = AppFrameworkInterface>
-  T framework_interface() const { return T(base, on_host() ? data()->framework_interface : guest::LoadU32(base, address + 16)); }
-  void set_framework_interface(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->framework_interface = v; else guest::StoreU32(base, address + 16, v); }
-  void set_framework_interface(uint32_t v) const { if (on_host()) data()->framework_interface = v; else guest::StoreU32(base, address + 16, v); }
-  uint32_t framework_interface_bits() const { return on_host() ? data()->framework_interface : guest::LoadU32(base, address + 16); }
-  void set_framework_interface_bits(uint32_t v) const { if (on_host()) data()->framework_interface = v; else guest::StoreU32(base, address + 16, v); }
+  T framework_interface() const { return T(base, framework_interface_bits()); }
+  void set_framework_interface(const View& w) const { set_framework_interface_bits(w.address); }
+  void set_framework_interface(uint32_t v) const { set_framework_interface_bits(v); }
 };
 
 // embedded; measure: sub_82094368.r3.+16, sub_820943B0.r3.+8, sub_820943C8.r3.+8, App::SceneFromInterface16.r3@-8.+16
@@ -143,16 +145,17 @@ struct AppFrameworkInterface : View {
   }
   AppFrameworkInterface at(uint32_t i) const { return AppFrameworkInterface(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kAppFrameworkInterfaceLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppFrameworkInterfaceLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
+  AppFrameworkInterfaceData* direct() const { return static_cast<AppFrameworkInterfaceData*>(memory::HandleOwn(address, &kAppFrameworkInterfaceLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kAppFrameworkInterfaceLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kAppFrameworkInterfaceLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0x82000AFC
   uint32_t vtable_address() const { return address + 0; }
+  uint32_t vtable_bits() const { if (auto* d = direct()) return d->vtable; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_vtable_bits(uint32_t v) const { if (auto* d = direct()) { d->vtable = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   template <typename T = AppFrameworkInterfaceVtable>
-  T vtable() const { return T(base, on_host() ? data()->vtable : guest::LoadU32(base, address + 0)); }
-  void set_vtable(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
-  void set_vtable(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
-  uint32_t vtable_bits() const { return on_host() ? data()->vtable : guest::LoadU32(base, address + 0); }
-  void set_vtable_bits(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
+  T vtable() const { return T(base, vtable_bits()); }
+  void set_vtable(const View& w) const { set_vtable_bits(w.address); }
+  void set_vtable(uint32_t v) const { set_vtable_bits(v); }
 };
 
 // image; measure: sub_82094368.r3.+16.+0, sub_820943B0.r3.+8.+0, sub_820943C8.r3.+8.+0, App::SceneFromInterface16.r3@-8.+16.+0, App::FrameDriver.r3.+20.+0

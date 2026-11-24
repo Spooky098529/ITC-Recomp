@@ -60,7 +60,12 @@ as a swarm"; the script `itc_recomp/tools/workflows/e5-step3-swarm.js`;
 sites) and the lead's leftovers: 16 types in host memory, each checked
 (build, attract race, `tick_replay.sh` twice, frame dump); the other 39 wait
 on step 4 (virtual dispatch over handles, embedded objects, memcpy targets,
-addresses handed to other areas; `docs/loops/e5-step3-reports.md`). A row's
+addresses handed to other areas; `docs/loops/e5-step3-reports.md`). Step 4
+(shared objects): groundwork, pilot and batch 1 (2026-11-22), then one
+swarm of 35 units (2026-11-24, `docs/loops/e5-loop.md` "Step 4 as one
+swarm", reports in `docs/loops/e5-step4-reports.md`): host types 38 -> 155,
+dual 54 -> 118; views read their own members only on their own type's
+handle (`direct()`), else by address through the owner's layout. A row's
 new name can change the measure's type names: after renaming, run
 `tools/function_names.py`, re-emit, and read the lifted diff.
 `docs/old-hardware.md` is the plan (not started) for running below

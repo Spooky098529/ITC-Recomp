@@ -58,121 +58,122 @@ struct RouteRange : View {
   }
   RouteRange at(uint32_t i) const { return RouteRange(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kRouteRangeLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kRouteRangeLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
+  RouteRangeData* direct() const { return static_cast<RouteRangeData*>(memory::HandleOwn(address, &kRouteRangeLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kRouteRangeLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kRouteRangeLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0 off, 1 set up or outside, 2 on the range (RouteRange::Update)
   uint32_t state_address() const { return address + 0; }
-  uint32_t state() const { return on_host() ? uint32_t(data()->state) : uint32_t(guest::LoadU32(base, address + 0)); }
-  void set_state(uint32_t v) const { if (on_host()) data()->state = v; else guest::StoreU32(base, address + 0, v); }
-  uint32_t state_bits() const { return on_host() ? data()->state : guest::LoadU32(base, address + 0); }
-  void set_state_bits(uint32_t v) const { if (on_host()) data()->state = v; else guest::StoreU32(base, address + 0, v); }
+  uint32_t state_bits() const { if (auto* d = direct()) return d->state; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_state_bits(uint32_t v) const { if (auto* d = direct()) { d->state = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t state() const { if (auto* d = direct()) return d->state; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_state(uint32_t v) const { if (auto* d = direct()) { d->state = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // the start: a section of the course's route (0x826C5B10)
   uint32_t start_section_address() const { return address + 4; }
-  uint16_t start_section() const { return on_host() ? uint16_t(data()->start_section) : uint16_t(guest::LoadU16(base, address + 4)); }
-  void set_start_section(uint16_t v) const { if (on_host()) data()->start_section = v; else guest::StoreU16(base, address + 4, v); }
-  uint16_t start_section_bits() const { return on_host() ? data()->start_section : guest::LoadU16(base, address + 4); }
-  void set_start_section_bits(uint16_t v) const { if (on_host()) data()->start_section = v; else guest::StoreU16(base, address + 4, v); }
+  uint16_t start_section_bits() const { if (auto* d = direct()) return d->start_section; return uint16_t((memory::IsHandle(address + 4) ? uint16_t(memory::OwnerLoad(address + 4, 2)) : guest::LoadU16(base, address + 4))); }
+  void set_start_section_bits(uint16_t v) const { if (auto* d = direct()) { d->start_section = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 2, v); else guest::StoreU16(base, address + 4, v); }
+  uint16_t start_section() const { if (auto* d = direct()) return d->start_section; return uint16_t((memory::IsHandle(address + 4) ? uint16_t(memory::OwnerLoad(address + 4, 2)) : guest::LoadU16(base, address + 4))); }
+  void set_start_section(uint16_t v) const { if (auto* d = direct()) { d->start_section = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 2, v); else guest::StoreU16(base, address + 4, v); }
   // the start's slice in it
   uint32_t start_slice_address() const { return address + 6; }
-  uint16_t start_slice() const { return on_host() ? uint16_t(data()->start_slice) : uint16_t(guest::LoadU16(base, address + 6)); }
-  void set_start_slice(uint16_t v) const { if (on_host()) data()->start_slice = v; else guest::StoreU16(base, address + 6, v); }
-  uint16_t start_slice_bits() const { return on_host() ? data()->start_slice : guest::LoadU16(base, address + 6); }
-  void set_start_slice_bits(uint16_t v) const { if (on_host()) data()->start_slice = v; else guest::StoreU16(base, address + 6, v); }
+  uint16_t start_slice_bits() const { if (auto* d = direct()) return d->start_slice; return uint16_t((memory::IsHandle(address + 6) ? uint16_t(memory::OwnerLoad(address + 6, 2)) : guest::LoadU16(base, address + 6))); }
+  void set_start_slice_bits(uint16_t v) const { if (auto* d = direct()) { d->start_slice = v; return; } if (memory::IsHandle(address + 6)) memory::OwnerStore(address + 6, 2, v); else guest::StoreU16(base, address + 6, v); }
+  uint16_t start_slice() const { if (auto* d = direct()) return d->start_slice; return uint16_t((memory::IsHandle(address + 6) ? uint16_t(memory::OwnerLoad(address + 6, 2)) : guest::LoadU16(base, address + 6))); }
+  void set_start_slice(uint16_t v) const { if (auto* d = direct()) { d->start_slice = v; return; } if (memory::IsHandle(address + 6)) memory::OwnerStore(address + 6, 2, v); else guest::StoreU16(base, address + 6, v); }
   uint32_t end_section_address() const { return address + 8; }
-  uint16_t end_section() const { return on_host() ? uint16_t(data()->end_section) : uint16_t(guest::LoadU16(base, address + 8)); }
-  void set_end_section(uint16_t v) const { if (on_host()) data()->end_section = v; else guest::StoreU16(base, address + 8, v); }
-  uint16_t end_section_bits() const { return on_host() ? data()->end_section : guest::LoadU16(base, address + 8); }
-  void set_end_section_bits(uint16_t v) const { if (on_host()) data()->end_section = v; else guest::StoreU16(base, address + 8, v); }
+  uint16_t end_section_bits() const { if (auto* d = direct()) return d->end_section; return uint16_t((memory::IsHandle(address + 8) ? uint16_t(memory::OwnerLoad(address + 8, 2)) : guest::LoadU16(base, address + 8))); }
+  void set_end_section_bits(uint16_t v) const { if (auto* d = direct()) { d->end_section = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 2, v); else guest::StoreU16(base, address + 8, v); }
+  uint16_t end_section() const { if (auto* d = direct()) return d->end_section; return uint16_t((memory::IsHandle(address + 8) ? uint16_t(memory::OwnerLoad(address + 8, 2)) : guest::LoadU16(base, address + 8))); }
+  void set_end_section(uint16_t v) const { if (auto* d = direct()) { d->end_section = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 2, v); else guest::StoreU16(base, address + 8, v); }
   uint32_t end_slice_address() const { return address + 10; }
-  uint16_t end_slice() const { return on_host() ? uint16_t(data()->end_slice) : uint16_t(guest::LoadU16(base, address + 10)); }
-  void set_end_slice(uint16_t v) const { if (on_host()) data()->end_slice = v; else guest::StoreU16(base, address + 10, v); }
-  uint16_t end_slice_bits() const { return on_host() ? data()->end_slice : guest::LoadU16(base, address + 10); }
-  void set_end_slice_bits(uint16_t v) const { if (on_host()) data()->end_slice = v; else guest::StoreU16(base, address + 10, v); }
+  uint16_t end_slice_bits() const { if (auto* d = direct()) return d->end_slice; return uint16_t((memory::IsHandle(address + 10) ? uint16_t(memory::OwnerLoad(address + 10, 2)) : guest::LoadU16(base, address + 10))); }
+  void set_end_slice_bits(uint16_t v) const { if (auto* d = direct()) { d->end_slice = v; return; } if (memory::IsHandle(address + 10)) memory::OwnerStore(address + 10, 2, v); else guest::StoreU16(base, address + 10, v); }
+  uint16_t end_slice() const { if (auto* d = direct()) return d->end_slice; return uint16_t((memory::IsHandle(address + 10) ? uint16_t(memory::OwnerLoad(address + 10, 2)) : guest::LoadU16(base, address + 10))); }
+  void set_end_slice(uint16_t v) const { if (auto* d = direct()) { d->end_slice = v; return; } if (memory::IsHandle(address + 10)) memory::OwnerStore(address + 10, 2, v); else guest::StoreU16(base, address + 10, v); }
   // the sections to take at forks: a List64 from +12, its 64 nodes
   uint32_t take_nodes_address() const { return address + 12; }
-  uint8_t* take_nodes() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 12 : guest::Pointer(base, address + 12); }
+  uint8_t* take_nodes() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 12 : guest::Pointer(base, address + 12); }
   // the take list's free head (its +256)
   uint32_t take_free_address() const { return address + 268; }
-  uint16_t take_free() const { return on_host() ? uint16_t(data()->take_free) : uint16_t(guest::LoadU16(base, address + 268)); }
-  void set_take_free(uint16_t v) const { if (on_host()) data()->take_free = v; else guest::StoreU16(base, address + 268, v); }
-  uint16_t take_free_bits() const { return on_host() ? data()->take_free : guest::LoadU16(base, address + 268); }
-  void set_take_free_bits(uint16_t v) const { if (on_host()) data()->take_free = v; else guest::StoreU16(base, address + 268, v); }
+  uint16_t take_free_bits() const { if (auto* d = direct()) return d->take_free; return uint16_t((memory::IsHandle(address + 268) ? uint16_t(memory::OwnerLoad(address + 268, 2)) : guest::LoadU16(base, address + 268))); }
+  void set_take_free_bits(uint16_t v) const { if (auto* d = direct()) { d->take_free = v; return; } if (memory::IsHandle(address + 268)) memory::OwnerStore(address + 268, 2, v); else guest::StoreU16(base, address + 268, v); }
+  uint16_t take_free() const { if (auto* d = direct()) return d->take_free; return uint16_t((memory::IsHandle(address + 268) ? uint16_t(memory::OwnerLoad(address + 268, 2)) : guest::LoadU16(base, address + 268))); }
+  void set_take_free(uint16_t v) const { if (auto* d = direct()) { d->take_free = v; return; } if (memory::IsHandle(address + 268)) memory::OwnerStore(address + 268, 2, v); else guest::StoreU16(base, address + 268, v); }
   // the take list's +258: -1 at reset, not read
   uint32_t take_258_address() const { return address + 270; }
-  uint16_t take_258() const { return on_host() ? uint16_t(data()->take_258) : uint16_t(guest::LoadU16(base, address + 270)); }
-  void set_take_258(uint16_t v) const { if (on_host()) data()->take_258 = v; else guest::StoreU16(base, address + 270, v); }
-  uint16_t take_258_bits() const { return on_host() ? data()->take_258 : guest::LoadU16(base, address + 270); }
-  void set_take_258_bits(uint16_t v) const { if (on_host()) data()->take_258 = v; else guest::StoreU16(base, address + 270, v); }
+  uint16_t take_258_bits() const { if (auto* d = direct()) return d->take_258; return uint16_t((memory::IsHandle(address + 270) ? uint16_t(memory::OwnerLoad(address + 270, 2)) : guest::LoadU16(base, address + 270))); }
+  void set_take_258_bits(uint16_t v) const { if (auto* d = direct()) { d->take_258 = v; return; } if (memory::IsHandle(address + 270)) memory::OwnerStore(address + 270, 2, v); else guest::StoreU16(base, address + 270, v); }
+  uint16_t take_258() const { if (auto* d = direct()) return d->take_258; return uint16_t((memory::IsHandle(address + 270) ? uint16_t(memory::OwnerLoad(address + 270, 2)) : guest::LoadU16(base, address + 270))); }
+  void set_take_258(uint16_t v) const { if (auto* d = direct()) { d->take_258 = v; return; } if (memory::IsHandle(address + 270)) memory::OwnerStore(address + 270, 2, v); else guest::StoreU16(base, address + 270, v); }
   // the take list's head (its +260)
   uint32_t take_head_address() const { return address + 272; }
-  uint16_t take_head() const { return on_host() ? uint16_t(data()->take_head) : uint16_t(guest::LoadU16(base, address + 272)); }
-  void set_take_head(uint16_t v) const { if (on_host()) data()->take_head = v; else guest::StoreU16(base, address + 272, v); }
-  uint16_t take_head_bits() const { return on_host() ? data()->take_head : guest::LoadU16(base, address + 272); }
-  void set_take_head_bits(uint16_t v) const { if (on_host()) data()->take_head = v; else guest::StoreU16(base, address + 272, v); }
+  uint16_t take_head_bits() const { if (auto* d = direct()) return d->take_head; return uint16_t((memory::IsHandle(address + 272) ? uint16_t(memory::OwnerLoad(address + 272, 2)) : guest::LoadU16(base, address + 272))); }
+  void set_take_head_bits(uint16_t v) const { if (auto* d = direct()) { d->take_head = v; return; } if (memory::IsHandle(address + 272)) memory::OwnerStore(address + 272, 2, v); else guest::StoreU16(base, address + 272, v); }
+  uint16_t take_head() const { if (auto* d = direct()) return d->take_head; return uint16_t((memory::IsHandle(address + 272) ? uint16_t(memory::OwnerLoad(address + 272, 2)) : guest::LoadU16(base, address + 272))); }
+  void set_take_head(uint16_t v) const { if (auto* d = direct()) { d->take_head = v; return; } if (memory::IsHandle(address + 272)) memory::OwnerStore(address + 272, 2, v); else guest::StoreU16(base, address + 272, v); }
   // the take list's +262: -1 at reset, not read (probably the tail)
   uint32_t take_262_address() const { return address + 274; }
-  uint16_t take_262() const { return on_host() ? uint16_t(data()->take_262) : uint16_t(guest::LoadU16(base, address + 274)); }
-  void set_take_262(uint16_t v) const { if (on_host()) data()->take_262 = v; else guest::StoreU16(base, address + 274, v); }
-  uint16_t take_262_bits() const { return on_host() ? data()->take_262 : guest::LoadU16(base, address + 274); }
-  void set_take_262_bits(uint16_t v) const { if (on_host()) data()->take_262 = v; else guest::StoreU16(base, address + 274, v); }
+  uint16_t take_262_bits() const { if (auto* d = direct()) return d->take_262; return uint16_t((memory::IsHandle(address + 274) ? uint16_t(memory::OwnerLoad(address + 274, 2)) : guest::LoadU16(base, address + 274))); }
+  void set_take_262_bits(uint16_t v) const { if (auto* d = direct()) { d->take_262 = v; return; } if (memory::IsHandle(address + 274)) memory::OwnerStore(address + 274, 2, v); else guest::StoreU16(base, address + 274, v); }
+  uint16_t take_262() const { if (auto* d = direct()) return d->take_262; return uint16_t((memory::IsHandle(address + 274) ? uint16_t(memory::OwnerLoad(address + 274, 2)) : guest::LoadU16(base, address + 274))); }
+  void set_take_262(uint16_t v) const { if (auto* d = direct()) { d->take_262 = v; return; } if (memory::IsHandle(address + 274)) memory::OwnerStore(address + 274, 2, v); else guest::StoreU16(base, address + 274, v); }
   // the take list's count (its +264)
   uint32_t take_count_address() const { return address + 276; }
-  uint16_t take_count() const { return on_host() ? uint16_t(data()->take_count) : uint16_t(guest::LoadU16(base, address + 276)); }
-  void set_take_count(uint16_t v) const { if (on_host()) data()->take_count = v; else guest::StoreU16(base, address + 276, v); }
-  uint16_t take_count_bits() const { return on_host() ? data()->take_count : guest::LoadU16(base, address + 276); }
-  void set_take_count_bits(uint16_t v) const { if (on_host()) data()->take_count = v; else guest::StoreU16(base, address + 276, v); }
+  uint16_t take_count_bits() const { if (auto* d = direct()) return d->take_count; return uint16_t((memory::IsHandle(address + 276) ? uint16_t(memory::OwnerLoad(address + 276, 2)) : guest::LoadU16(base, address + 276))); }
+  void set_take_count_bits(uint16_t v) const { if (auto* d = direct()) { d->take_count = v; return; } if (memory::IsHandle(address + 276)) memory::OwnerStore(address + 276, 2, v); else guest::StoreU16(base, address + 276, v); }
+  uint16_t take_count() const { if (auto* d = direct()) return d->take_count; return uint16_t((memory::IsHandle(address + 276) ? uint16_t(memory::OwnerLoad(address + 276, 2)) : guest::LoadU16(base, address + 276))); }
+  void set_take_count(uint16_t v) const { if (auto* d = direct()) { d->take_count = v; return; } if (memory::IsHandle(address + 276)) memory::OwnerStore(address + 276, 2, v); else guest::StoreU16(base, address + 276, v); }
   // the take list's 64 words: sections
   uint32_t take_sections_address() const { return address + 280; }
-  uint8_t* take_sections() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 280 : guest::Pointer(base, address + 280); }
+  uint8_t* take_sections() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 280 : guest::Pointer(base, address + 280); }
   // the sections to leave out: a List64 from +536 (empty in play), its nodes
   uint32_t leave_nodes_address() const { return address + 536; }
-  uint8_t* leave_nodes() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 536 : guest::Pointer(base, address + 536); }
+  uint8_t* leave_nodes() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 536 : guest::Pointer(base, address + 536); }
   uint32_t leave_free_address() const { return address + 792; }
-  uint16_t leave_free() const { return on_host() ? uint16_t(data()->leave_free) : uint16_t(guest::LoadU16(base, address + 792)); }
-  void set_leave_free(uint16_t v) const { if (on_host()) data()->leave_free = v; else guest::StoreU16(base, address + 792, v); }
-  uint16_t leave_free_bits() const { return on_host() ? data()->leave_free : guest::LoadU16(base, address + 792); }
-  void set_leave_free_bits(uint16_t v) const { if (on_host()) data()->leave_free = v; else guest::StoreU16(base, address + 792, v); }
+  uint16_t leave_free_bits() const { if (auto* d = direct()) return d->leave_free; return uint16_t((memory::IsHandle(address + 792) ? uint16_t(memory::OwnerLoad(address + 792, 2)) : guest::LoadU16(base, address + 792))); }
+  void set_leave_free_bits(uint16_t v) const { if (auto* d = direct()) { d->leave_free = v; return; } if (memory::IsHandle(address + 792)) memory::OwnerStore(address + 792, 2, v); else guest::StoreU16(base, address + 792, v); }
+  uint16_t leave_free() const { if (auto* d = direct()) return d->leave_free; return uint16_t((memory::IsHandle(address + 792) ? uint16_t(memory::OwnerLoad(address + 792, 2)) : guest::LoadU16(base, address + 792))); }
+  void set_leave_free(uint16_t v) const { if (auto* d = direct()) { d->leave_free = v; return; } if (memory::IsHandle(address + 792)) memory::OwnerStore(address + 792, 2, v); else guest::StoreU16(base, address + 792, v); }
   // -1 at reset, not read
   uint32_t leave_258_address() const { return address + 794; }
-  uint16_t leave_258() const { return on_host() ? uint16_t(data()->leave_258) : uint16_t(guest::LoadU16(base, address + 794)); }
-  void set_leave_258(uint16_t v) const { if (on_host()) data()->leave_258 = v; else guest::StoreU16(base, address + 794, v); }
-  uint16_t leave_258_bits() const { return on_host() ? data()->leave_258 : guest::LoadU16(base, address + 794); }
-  void set_leave_258_bits(uint16_t v) const { if (on_host()) data()->leave_258 = v; else guest::StoreU16(base, address + 794, v); }
+  uint16_t leave_258_bits() const { if (auto* d = direct()) return d->leave_258; return uint16_t((memory::IsHandle(address + 794) ? uint16_t(memory::OwnerLoad(address + 794, 2)) : guest::LoadU16(base, address + 794))); }
+  void set_leave_258_bits(uint16_t v) const { if (auto* d = direct()) { d->leave_258 = v; return; } if (memory::IsHandle(address + 794)) memory::OwnerStore(address + 794, 2, v); else guest::StoreU16(base, address + 794, v); }
+  uint16_t leave_258() const { if (auto* d = direct()) return d->leave_258; return uint16_t((memory::IsHandle(address + 794) ? uint16_t(memory::OwnerLoad(address + 794, 2)) : guest::LoadU16(base, address + 794))); }
+  void set_leave_258(uint16_t v) const { if (auto* d = direct()) { d->leave_258 = v; return; } if (memory::IsHandle(address + 794)) memory::OwnerStore(address + 794, 2, v); else guest::StoreU16(base, address + 794, v); }
   uint32_t leave_head_address() const { return address + 796; }
-  uint16_t leave_head() const { return on_host() ? uint16_t(data()->leave_head) : uint16_t(guest::LoadU16(base, address + 796)); }
-  void set_leave_head(uint16_t v) const { if (on_host()) data()->leave_head = v; else guest::StoreU16(base, address + 796, v); }
-  uint16_t leave_head_bits() const { return on_host() ? data()->leave_head : guest::LoadU16(base, address + 796); }
-  void set_leave_head_bits(uint16_t v) const { if (on_host()) data()->leave_head = v; else guest::StoreU16(base, address + 796, v); }
+  uint16_t leave_head_bits() const { if (auto* d = direct()) return d->leave_head; return uint16_t((memory::IsHandle(address + 796) ? uint16_t(memory::OwnerLoad(address + 796, 2)) : guest::LoadU16(base, address + 796))); }
+  void set_leave_head_bits(uint16_t v) const { if (auto* d = direct()) { d->leave_head = v; return; } if (memory::IsHandle(address + 796)) memory::OwnerStore(address + 796, 2, v); else guest::StoreU16(base, address + 796, v); }
+  uint16_t leave_head() const { if (auto* d = direct()) return d->leave_head; return uint16_t((memory::IsHandle(address + 796) ? uint16_t(memory::OwnerLoad(address + 796, 2)) : guest::LoadU16(base, address + 796))); }
+  void set_leave_head(uint16_t v) const { if (auto* d = direct()) { d->leave_head = v; return; } if (memory::IsHandle(address + 796)) memory::OwnerStore(address + 796, 2, v); else guest::StoreU16(base, address + 796, v); }
   // -1 at reset, not read
   uint32_t leave_262_address() const { return address + 798; }
-  uint16_t leave_262() const { return on_host() ? uint16_t(data()->leave_262) : uint16_t(guest::LoadU16(base, address + 798)); }
-  void set_leave_262(uint16_t v) const { if (on_host()) data()->leave_262 = v; else guest::StoreU16(base, address + 798, v); }
-  uint16_t leave_262_bits() const { return on_host() ? data()->leave_262 : guest::LoadU16(base, address + 798); }
-  void set_leave_262_bits(uint16_t v) const { if (on_host()) data()->leave_262 = v; else guest::StoreU16(base, address + 798, v); }
+  uint16_t leave_262_bits() const { if (auto* d = direct()) return d->leave_262; return uint16_t((memory::IsHandle(address + 798) ? uint16_t(memory::OwnerLoad(address + 798, 2)) : guest::LoadU16(base, address + 798))); }
+  void set_leave_262_bits(uint16_t v) const { if (auto* d = direct()) { d->leave_262 = v; return; } if (memory::IsHandle(address + 798)) memory::OwnerStore(address + 798, 2, v); else guest::StoreU16(base, address + 798, v); }
+  uint16_t leave_262() const { if (auto* d = direct()) return d->leave_262; return uint16_t((memory::IsHandle(address + 798) ? uint16_t(memory::OwnerLoad(address + 798, 2)) : guest::LoadU16(base, address + 798))); }
+  void set_leave_262(uint16_t v) const { if (auto* d = direct()) { d->leave_262 = v; return; } if (memory::IsHandle(address + 798)) memory::OwnerStore(address + 798, 2, v); else guest::StoreU16(base, address + 798, v); }
   uint32_t leave_count_address() const { return address + 800; }
-  uint16_t leave_count() const { return on_host() ? uint16_t(data()->leave_count) : uint16_t(guest::LoadU16(base, address + 800)); }
-  void set_leave_count(uint16_t v) const { if (on_host()) data()->leave_count = v; else guest::StoreU16(base, address + 800, v); }
-  uint16_t leave_count_bits() const { return on_host() ? data()->leave_count : guest::LoadU16(base, address + 800); }
-  void set_leave_count_bits(uint16_t v) const { if (on_host()) data()->leave_count = v; else guest::StoreU16(base, address + 800, v); }
+  uint16_t leave_count_bits() const { if (auto* d = direct()) return d->leave_count; return uint16_t((memory::IsHandle(address + 800) ? uint16_t(memory::OwnerLoad(address + 800, 2)) : guest::LoadU16(base, address + 800))); }
+  void set_leave_count_bits(uint16_t v) const { if (auto* d = direct()) { d->leave_count = v; return; } if (memory::IsHandle(address + 800)) memory::OwnerStore(address + 800, 2, v); else guest::StoreU16(base, address + 800, v); }
+  uint16_t leave_count() const { if (auto* d = direct()) return d->leave_count; return uint16_t((memory::IsHandle(address + 800) ? uint16_t(memory::OwnerLoad(address + 800, 2)) : guest::LoadU16(base, address + 800))); }
+  void set_leave_count(uint16_t v) const { if (auto* d = direct()) { d->leave_count = v; return; } if (memory::IsHandle(address + 800)) memory::OwnerStore(address + 800, 2, v); else guest::StoreU16(base, address + 800, v); }
   // the leave list's 64 words: sections
   uint32_t leave_sections_address() const { return address + 804; }
-  uint8_t* leave_sections() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 804 : guest::Pointer(base, address + 804); }
+  uint8_t* leave_sections() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 804 : guest::Pointer(base, address + 804); }
   // 1 to check the sections beside the ends (links 6 to 9)
   uint32_t check_beside_address() const { return address + 1060; }
-  uint32_t check_beside() const { return on_host() ? uint32_t(data()->check_beside) : uint32_t(guest::LoadU32(base, address + 1060)); }
-  void set_check_beside(uint32_t v) const { if (on_host()) data()->check_beside = v; else guest::StoreU32(base, address + 1060, v); }
-  uint32_t check_beside_bits() const { return on_host() ? data()->check_beside : guest::LoadU32(base, address + 1060); }
-  void set_check_beside_bits(uint32_t v) const { if (on_host()) data()->check_beside = v; else guest::StoreU32(base, address + 1060, v); }
+  uint32_t check_beside_bits() const { if (auto* d = direct()) return d->check_beside; return uint32_t((memory::IsHandle(address + 1060) ? uint32_t(memory::OwnerLoad(address + 1060, 4)) : guest::LoadU32(base, address + 1060))); }
+  void set_check_beside_bits(uint32_t v) const { if (auto* d = direct()) { d->check_beside = v; return; } if (memory::IsHandle(address + 1060)) memory::OwnerStore(address + 1060, 4, v); else guest::StoreU32(base, address + 1060, v); }
+  uint32_t check_beside() const { if (auto* d = direct()) return d->check_beside; return uint32_t((memory::IsHandle(address + 1060) ? uint32_t(memory::OwnerLoad(address + 1060, 4)) : guest::LoadU32(base, address + 1060))); }
+  void set_check_beside(uint32_t v) const { if (auto* d = direct()) { d->check_beside = v; return; } if (memory::IsHandle(address + 1060)) memory::OwnerStore(address + 1060, 4, v); else guest::StoreU32(base, address + 1060, v); }
   // measure fault: RouteRange::Advance's and ToNeighbor's r3 is an out position on the stack (section at +0), joined with the range; tools/type_map.py should split it
   uint32_t fault_out_section_address() const { return address + 0; }
-  uint16_t fault_out_section_bits() const { return on_host() ? uint16_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kRouteRangeLayout, 0, 2)) : guest::LoadU16(base, address + 0); }
-  void set_fault_out_section_bits(uint16_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kRouteRangeLayout, 0, 2, v); else guest::StoreU16(base, address + 0, v); }
+  uint16_t fault_out_section_bits() const { if (auto* d = direct()) return uint16_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(d), kRouteRangeLayout, 0, 2)); return uint16_t((memory::IsHandle(address + 0) ? uint16_t(memory::OwnerLoad(address + 0, 2)) : guest::LoadU16(base, address + 0))); }
+  void set_fault_out_section_bits(uint16_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kRouteRangeLayout, 0, 2, v); return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 2, v); else guest::StoreU16(base, address + 0, v); }
   uint16_t fault_out_section() const { return uint16_t(fault_out_section_bits()); }
   void set_fault_out_section(uint16_t v) const { set_fault_out_section_bits(uint16_t(v)); }
   // measure fault: the out position's slice at +2 (Advance, ToNeighbor)
   uint32_t fault_out_slice_address() const { return address + 2; }
-  uint16_t fault_out_slice_bits() const { return on_host() ? uint16_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kRouteRangeLayout, 2, 2)) : guest::LoadU16(base, address + 2); }
-  void set_fault_out_slice_bits(uint16_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kRouteRangeLayout, 2, 2, v); else guest::StoreU16(base, address + 2, v); }
+  uint16_t fault_out_slice_bits() const { if (auto* d = direct()) return uint16_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(d), kRouteRangeLayout, 2, 2)); return uint16_t((memory::IsHandle(address + 2) ? uint16_t(memory::OwnerLoad(address + 2, 2)) : guest::LoadU16(base, address + 2))); }
+  void set_fault_out_slice_bits(uint16_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kRouteRangeLayout, 2, 2, v); return; } if (memory::IsHandle(address + 2)) memory::OwnerStore(address + 2, 2, v); else guest::StoreU16(base, address + 2, v); }
   uint16_t fault_out_slice() const { return uint16_t(fault_out_slice_bits()); }
   void set_fault_out_slice(uint16_t v) const { set_fault_out_slice_bits(uint16_t(v)); }
 };
@@ -213,47 +214,48 @@ struct TrackZones : View {
   }
   TrackZones at(uint32_t i) const { return TrackZones(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kTrackZonesLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kTrackZonesLayout, offset, width, v); }
+  TrackZonesData* direct() const { return static_cast<TrackZonesData*>(memory::HandleOwn(address, &kTrackZonesLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kTrackZonesLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kTrackZonesLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // the zone list (a List128 from +0): its 128 nodes
   uint32_t nodes_address() const { return address + 0; }
-  uint8_t* nodes() const { return reinterpret_cast<uint8_t*>(data()) + 0; }
+  uint8_t* nodes() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 0 : guest::Pointer(base, address + 0); }
   // the zone list's free head
   uint32_t free_address() const { return address + 512; }
-  uint16_t free() const { return data()->free; }
-  void set_free(uint16_t v) const { data()->free = v; }
-  uint16_t free_bits() const { return data()->free; }
-  void set_free_bits(uint16_t v) const { data()->free = v; }
+  uint16_t free_bits() const { if (auto* d = direct()) return d->free; return uint16_t((memory::IsHandle(address + 512) ? uint16_t(memory::OwnerLoad(address + 512, 2)) : guest::LoadU16(base, address + 512))); }
+  void set_free_bits(uint16_t v) const { if (auto* d = direct()) { d->free = v; return; } if (memory::IsHandle(address + 512)) memory::OwnerStore(address + 512, 2, v); else guest::StoreU16(base, address + 512, v); }
+  uint16_t free() const { if (auto* d = direct()) return d->free; return uint16_t((memory::IsHandle(address + 512) ? uint16_t(memory::OwnerLoad(address + 512, 2)) : guest::LoadU16(base, address + 512))); }
+  void set_free(uint16_t v) const { if (auto* d = direct()) { d->free = v; return; } if (memory::IsHandle(address + 512)) memory::OwnerStore(address + 512, 2, v); else guest::StoreU16(base, address + 512, v); }
   // -1 at reset, not read
   uint32_t list_514_address() const { return address + 514; }
-  uint16_t list_514() const { return data()->list_514; }
-  void set_list_514(uint16_t v) const { data()->list_514 = v; }
-  uint16_t list_514_bits() const { return data()->list_514; }
-  void set_list_514_bits(uint16_t v) const { data()->list_514 = v; }
+  uint16_t list_514_bits() const { if (auto* d = direct()) return d->list_514; return uint16_t((memory::IsHandle(address + 514) ? uint16_t(memory::OwnerLoad(address + 514, 2)) : guest::LoadU16(base, address + 514))); }
+  void set_list_514_bits(uint16_t v) const { if (auto* d = direct()) { d->list_514 = v; return; } if (memory::IsHandle(address + 514)) memory::OwnerStore(address + 514, 2, v); else guest::StoreU16(base, address + 514, v); }
+  uint16_t list_514() const { if (auto* d = direct()) return d->list_514; return uint16_t((memory::IsHandle(address + 514) ? uint16_t(memory::OwnerLoad(address + 514, 2)) : guest::LoadU16(base, address + 514))); }
+  void set_list_514(uint16_t v) const { if (auto* d = direct()) { d->list_514 = v; return; } if (memory::IsHandle(address + 514)) memory::OwnerStore(address + 514, 2, v); else guest::StoreU16(base, address + 514, v); }
   // the zone list's head
   uint32_t head_address() const { return address + 516; }
-  uint16_t head() const { return data()->head; }
-  void set_head(uint16_t v) const { data()->head = v; }
-  uint16_t head_bits() const { return data()->head; }
-  void set_head_bits(uint16_t v) const { data()->head = v; }
+  uint16_t head_bits() const { if (auto* d = direct()) return d->head; return uint16_t((memory::IsHandle(address + 516) ? uint16_t(memory::OwnerLoad(address + 516, 2)) : guest::LoadU16(base, address + 516))); }
+  void set_head_bits(uint16_t v) const { if (auto* d = direct()) { d->head = v; return; } if (memory::IsHandle(address + 516)) memory::OwnerStore(address + 516, 2, v); else guest::StoreU16(base, address + 516, v); }
+  uint16_t head() const { if (auto* d = direct()) return d->head; return uint16_t((memory::IsHandle(address + 516) ? uint16_t(memory::OwnerLoad(address + 516, 2)) : guest::LoadU16(base, address + 516))); }
+  void set_head(uint16_t v) const { if (auto* d = direct()) { d->head = v; return; } if (memory::IsHandle(address + 516)) memory::OwnerStore(address + 516, 2, v); else guest::StoreU16(base, address + 516, v); }
   // -1 at reset, not read
   uint32_t list_518_address() const { return address + 518; }
-  uint16_t list_518() const { return data()->list_518; }
-  void set_list_518(uint16_t v) const { data()->list_518 = v; }
-  uint16_t list_518_bits() const { return data()->list_518; }
-  void set_list_518_bits(uint16_t v) const { data()->list_518 = v; }
+  uint16_t list_518_bits() const { if (auto* d = direct()) return d->list_518; return uint16_t((memory::IsHandle(address + 518) ? uint16_t(memory::OwnerLoad(address + 518, 2)) : guest::LoadU16(base, address + 518))); }
+  void set_list_518_bits(uint16_t v) const { if (auto* d = direct()) { d->list_518 = v; return; } if (memory::IsHandle(address + 518)) memory::OwnerStore(address + 518, 2, v); else guest::StoreU16(base, address + 518, v); }
+  uint16_t list_518() const { if (auto* d = direct()) return d->list_518; return uint16_t((memory::IsHandle(address + 518) ? uint16_t(memory::OwnerLoad(address + 518, 2)) : guest::LoadU16(base, address + 518))); }
+  void set_list_518(uint16_t v) const { if (auto* d = direct()) { d->list_518 = v; return; } if (memory::IsHandle(address + 518)) memory::OwnerStore(address + 518, 2, v); else guest::StoreU16(base, address + 518, v); }
   // the zone list's count (70 once made)
   uint32_t count_address() const { return address + 520; }
-  uint16_t count() const { return data()->count; }
-  void set_count(uint16_t v) const { data()->count = v; }
-  uint16_t count_bits() const { return data()->count; }
-  void set_count_bits(uint16_t v) const { data()->count = v; }
+  uint16_t count_bits() const { if (auto* d = direct()) return d->count; return uint16_t((memory::IsHandle(address + 520) ? uint16_t(memory::OwnerLoad(address + 520, 2)) : guest::LoadU16(base, address + 520))); }
+  void set_count_bits(uint16_t v) const { if (auto* d = direct()) { d->count = v; return; } if (memory::IsHandle(address + 520)) memory::OwnerStore(address + 520, 2, v); else guest::StoreU16(base, address + 520, v); }
+  uint16_t count() const { if (auto* d = direct()) return d->count; return uint16_t((memory::IsHandle(address + 520) ? uint16_t(memory::OwnerLoad(address + 520, 2)) : guest::LoadU16(base, address + 520))); }
+  void set_count(uint16_t v) const { if (auto* d = direct()) { d->count = v; return; } if (memory::IsHandle(address + 520)) memory::OwnerStore(address + 520, 2, v); else guest::StoreU16(base, address + 520, v); }
   // the zone list's 128 words: the zones' addresses
   uint32_t listed_zones_address() const { return address + 524; }
-  uint8_t* listed_zones() const { return reinterpret_cast<uint8_t*>(data()) + 524; }
+  uint8_t* listed_zones() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 524 : guest::Pointer(base, address + 524); }
   // the 70 zones (TrackZone), 17,116 bytes apart; zone i's vtable 0x82011AF0 + 12 x i
   uint32_t zones_address() const { return address + 1036; }
-  uint8_t* zones() const { return reinterpret_cast<uint8_t*>(data()) + 1036; }
+  uint8_t* zones() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 1036 : guest::Pointer(base, address + 1036); }
   // the 70 zones
   template <typename T = TrackZone>
   T zone(uint32_t i) const { return T(base, address + 1036 + i * T::kSize); }
@@ -298,71 +300,72 @@ struct TrackZone : View {
   }
   TrackZone at(uint32_t i) const { return TrackZone(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kTrackZoneLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kTrackZoneLayout, offset, width, v); }
+  TrackZoneData* direct() const { return static_cast<TrackZoneData*>(memory::HandleOwn(address, &kTrackZoneLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kTrackZoneLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kTrackZoneLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0x82011AF0 + 12 x the zone: its set-up, Zone::Update, Zone::IsInside
   uint32_t vtable_address() const { return address + 0; }
-  uint32_t vtable() const { return data()->vtable; }
-  void set_vtable(uint32_t v) const { data()->vtable = v; }
-  uint32_t vtable_bits() const { return data()->vtable; }
-  void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
+  uint32_t vtable_bits() const { if (auto* d = direct()) return d->vtable; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_vtable_bits(uint32_t v) const { if (auto* d = direct()) { d->vtable = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable() const { if (auto* d = direct()) return d->vtable; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_vtable(uint32_t v) const { if (auto* d = direct()) { d->vtable = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // the range list (a 16-slot list from +4, TrackZoneRangeList): its nodes
   uint32_t range_nodes_address() const { return address + 4; }
-  uint8_t* range_nodes() const { return reinterpret_cast<uint8_t*>(data()) + 4; }
+  uint8_t* range_nodes() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 4 : guest::Pointer(base, address + 4); }
   // the range list's free head
   uint32_t range_free_address() const { return address + 68; }
-  uint16_t range_free() const { return data()->range_free; }
-  void set_range_free(uint16_t v) const { data()->range_free = v; }
-  uint16_t range_free_bits() const { return data()->range_free; }
-  void set_range_free_bits(uint16_t v) const { data()->range_free = v; }
+  uint16_t range_free_bits() const { if (auto* d = direct()) return d->range_free; return uint16_t((memory::IsHandle(address + 68) ? uint16_t(memory::OwnerLoad(address + 68, 2)) : guest::LoadU16(base, address + 68))); }
+  void set_range_free_bits(uint16_t v) const { if (auto* d = direct()) { d->range_free = v; return; } if (memory::IsHandle(address + 68)) memory::OwnerStore(address + 68, 2, v); else guest::StoreU16(base, address + 68, v); }
+  uint16_t range_free() const { if (auto* d = direct()) return d->range_free; return uint16_t((memory::IsHandle(address + 68) ? uint16_t(memory::OwnerLoad(address + 68, 2)) : guest::LoadU16(base, address + 68))); }
+  void set_range_free(uint16_t v) const { if (auto* d = direct()) { d->range_free = v; return; } if (memory::IsHandle(address + 68)) memory::OwnerStore(address + 68, 2, v); else guest::StoreU16(base, address + 68, v); }
   // the range list's +66: -1 at reset, not read
   uint32_t range_list_66_address() const { return address + 70; }
-  uint16_t range_list_66() const { return data()->range_list_66; }
-  void set_range_list_66(uint16_t v) const { data()->range_list_66 = v; }
-  uint16_t range_list_66_bits() const { return data()->range_list_66; }
-  void set_range_list_66_bits(uint16_t v) const { data()->range_list_66 = v; }
+  uint16_t range_list_66_bits() const { if (auto* d = direct()) return d->range_list_66; return uint16_t((memory::IsHandle(address + 70) ? uint16_t(memory::OwnerLoad(address + 70, 2)) : guest::LoadU16(base, address + 70))); }
+  void set_range_list_66_bits(uint16_t v) const { if (auto* d = direct()) { d->range_list_66 = v; return; } if (memory::IsHandle(address + 70)) memory::OwnerStore(address + 70, 2, v); else guest::StoreU16(base, address + 70, v); }
+  uint16_t range_list_66() const { if (auto* d = direct()) return d->range_list_66; return uint16_t((memory::IsHandle(address + 70) ? uint16_t(memory::OwnerLoad(address + 70, 2)) : guest::LoadU16(base, address + 70))); }
+  void set_range_list_66(uint16_t v) const { if (auto* d = direct()) { d->range_list_66 = v; return; } if (memory::IsHandle(address + 70)) memory::OwnerStore(address + 70, 2, v); else guest::StoreU16(base, address + 70, v); }
   // the range list's head
   uint32_t range_head_address() const { return address + 72; }
-  uint16_t range_head() const { return data()->range_head; }
-  void set_range_head(uint16_t v) const { data()->range_head = v; }
-  uint16_t range_head_bits() const { return data()->range_head; }
-  void set_range_head_bits(uint16_t v) const { data()->range_head = v; }
+  uint16_t range_head_bits() const { if (auto* d = direct()) return d->range_head; return uint16_t((memory::IsHandle(address + 72) ? uint16_t(memory::OwnerLoad(address + 72, 2)) : guest::LoadU16(base, address + 72))); }
+  void set_range_head_bits(uint16_t v) const { if (auto* d = direct()) { d->range_head = v; return; } if (memory::IsHandle(address + 72)) memory::OwnerStore(address + 72, 2, v); else guest::StoreU16(base, address + 72, v); }
+  uint16_t range_head() const { if (auto* d = direct()) return d->range_head; return uint16_t((memory::IsHandle(address + 72) ? uint16_t(memory::OwnerLoad(address + 72, 2)) : guest::LoadU16(base, address + 72))); }
+  void set_range_head(uint16_t v) const { if (auto* d = direct()) { d->range_head = v; return; } if (memory::IsHandle(address + 72)) memory::OwnerStore(address + 72, 2, v); else guest::StoreU16(base, address + 72, v); }
   // the range list's +70: -1 at reset, not read
   uint32_t range_list_70_address() const { return address + 74; }
-  uint16_t range_list_70() const { return data()->range_list_70; }
-  void set_range_list_70(uint16_t v) const { data()->range_list_70 = v; }
-  uint16_t range_list_70_bits() const { return data()->range_list_70; }
-  void set_range_list_70_bits(uint16_t v) const { data()->range_list_70 = v; }
+  uint16_t range_list_70_bits() const { if (auto* d = direct()) return d->range_list_70; return uint16_t((memory::IsHandle(address + 74) ? uint16_t(memory::OwnerLoad(address + 74, 2)) : guest::LoadU16(base, address + 74))); }
+  void set_range_list_70_bits(uint16_t v) const { if (auto* d = direct()) { d->range_list_70 = v; return; } if (memory::IsHandle(address + 74)) memory::OwnerStore(address + 74, 2, v); else guest::StoreU16(base, address + 74, v); }
+  uint16_t range_list_70() const { if (auto* d = direct()) return d->range_list_70; return uint16_t((memory::IsHandle(address + 74) ? uint16_t(memory::OwnerLoad(address + 74, 2)) : guest::LoadU16(base, address + 74))); }
+  void set_range_list_70(uint16_t v) const { if (auto* d = direct()) { d->range_list_70 = v; return; } if (memory::IsHandle(address + 74)) memory::OwnerStore(address + 74, 2, v); else guest::StoreU16(base, address + 74, v); }
   // the range list's count
   uint32_t range_count_address() const { return address + 76; }
-  uint16_t range_count() const { return data()->range_count; }
-  void set_range_count(uint16_t v) const { data()->range_count = v; }
-  uint16_t range_count_bits() const { return data()->range_count; }
-  void set_range_count_bits(uint16_t v) const { data()->range_count = v; }
+  uint16_t range_count_bits() const { if (auto* d = direct()) return d->range_count; return uint16_t((memory::IsHandle(address + 76) ? uint16_t(memory::OwnerLoad(address + 76, 2)) : guest::LoadU16(base, address + 76))); }
+  void set_range_count_bits(uint16_t v) const { if (auto* d = direct()) { d->range_count = v; return; } if (memory::IsHandle(address + 76)) memory::OwnerStore(address + 76, 2, v); else guest::StoreU16(base, address + 76, v); }
+  uint16_t range_count() const { if (auto* d = direct()) return d->range_count; return uint16_t((memory::IsHandle(address + 76) ? uint16_t(memory::OwnerLoad(address + 76, 2)) : guest::LoadU16(base, address + 76))); }
+  void set_range_count(uint16_t v) const { if (auto* d = direct()) { d->range_count = v; return; } if (memory::IsHandle(address + 76)) memory::OwnerStore(address + 76, 2, v); else guest::StoreU16(base, address + 76, v); }
   // the range list's 16 RouteRanges, 1,064 bytes apart
   uint32_t ranges_address() const { return address + 80; }
-  uint8_t* ranges() const { return reinterpret_cast<uint8_t*>(data()) + 80; }
+  uint8_t* ranges() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 80 : guest::Pointer(base, address + 80); }
   // the range list's 16 RouteRanges
   template <typename T = RouteRange>
   T range(uint32_t i) const { return T(base, address + 80 + i * T::kSize); }
   // its position in the owner's list
   uint32_t index_address() const { return address + 17104; }
-  uint32_t index() const { return data()->index; }
-  void set_index(uint32_t v) const { data()->index = v; }
-  uint32_t index_bits() const { return data()->index; }
-  void set_index_bits(uint32_t v) const { data()->index = v; }
+  uint32_t index_bits() const { if (auto* d = direct()) return d->index; return uint32_t((memory::IsHandle(address + 17104) ? uint32_t(memory::OwnerLoad(address + 17104, 4)) : guest::LoadU32(base, address + 17104))); }
+  void set_index_bits(uint32_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 17104)) memory::OwnerStore(address + 17104, 4, v); else guest::StoreU32(base, address + 17104, v); }
+  uint32_t index() const { if (auto* d = direct()) return d->index; return uint32_t((memory::IsHandle(address + 17104) ? uint32_t(memory::OwnerLoad(address + 17104, 4)) : guest::LoadU32(base, address + 17104))); }
+  void set_index(uint32_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 17104)) memory::OwnerStore(address + 17104, 4, v); else guest::StoreU32(base, address + 17104, v); }
   // the vehicle checked (Racers::Vehicle)
   uint32_t vehicle_address() const { return address + 17108; }
-  uint32_t vehicle() const { return data()->vehicle; }
-  void set_vehicle(uint32_t v) const { data()->vehicle = v; }
-  uint32_t vehicle_bits() const { return data()->vehicle; }
-  void set_vehicle_bits(uint32_t v) const { data()->vehicle = v; }
+  uint32_t vehicle_bits() const { if (auto* d = direct()) return d->vehicle; return uint32_t((memory::IsHandle(address + 17108) ? uint32_t(memory::OwnerLoad(address + 17108, 4)) : guest::LoadU32(base, address + 17108))); }
+  void set_vehicle_bits(uint32_t v) const { if (auto* d = direct()) { d->vehicle = v; return; } if (memory::IsHandle(address + 17108)) memory::OwnerStore(address + 17108, 4, v); else guest::StoreU32(base, address + 17108, v); }
+  uint32_t vehicle() const { if (auto* d = direct()) return d->vehicle; return uint32_t((memory::IsHandle(address + 17108) ? uint32_t(memory::OwnerLoad(address + 17108, 4)) : guest::LoadU32(base, address + 17108))); }
+  void set_vehicle(uint32_t v) const { if (auto* d = direct()) { d->vehicle = v; return; } if (memory::IsHandle(address + 17108)) memory::OwnerStore(address + 17108, 4, v); else guest::StoreU32(base, address + 17108, v); }
   // 1 while the vehicle's track position is in one of its ranges
   uint32_t inside_address() const { return address + 17112; }
-  uint32_t inside() const { return data()->inside; }
-  void set_inside(uint32_t v) const { data()->inside = v; }
-  uint32_t inside_bits() const { return data()->inside; }
-  void set_inside_bits(uint32_t v) const { data()->inside = v; }
+  uint32_t inside_bits() const { if (auto* d = direct()) return d->inside; return uint32_t((memory::IsHandle(address + 17112) ? uint32_t(memory::OwnerLoad(address + 17112, 4)) : guest::LoadU32(base, address + 17112))); }
+  void set_inside_bits(uint32_t v) const { if (auto* d = direct()) { d->inside = v; return; } if (memory::IsHandle(address + 17112)) memory::OwnerStore(address + 17112, 4, v); else guest::StoreU32(base, address + 17112, v); }
+  uint32_t inside() const { if (auto* d = direct()) return d->inside; return uint32_t((memory::IsHandle(address + 17112) ? uint32_t(memory::OwnerLoad(address + 17112, 4)) : guest::LoadU32(base, address + 17112))); }
+  void set_inside(uint32_t v) const { if (auto* d = direct()) { d->inside = v; return; } if (memory::IsHandle(address + 17112)) memory::OwnerStore(address + 17112, 4, v); else guest::StoreU32(base, address + 17112, v); }
 };
 
 // embedded; measure: ZoneRanges::Insert.r3
@@ -400,42 +403,43 @@ struct TrackZoneRangeList : View {
   }
   TrackZoneRangeList at(uint32_t i) const { return TrackZoneRangeList(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kTrackZoneRangeListLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kTrackZoneRangeListLayout, offset, width, v); }
+  TrackZoneRangeListData* direct() const { return static_cast<TrackZoneRangeListData*>(memory::HandleOwn(address, &kTrackZoneRangeListLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kTrackZoneRangeListLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kTrackZoneRangeListLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 16 nodes: (next, slot) halfwords
   uint32_t nodes_address() const { return address + 0; }
-  uint8_t* nodes() const { return reinterpret_cast<uint8_t*>(data()) + 0; }
+  uint8_t* nodes() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 0 : guest::Pointer(base, address + 0); }
   // the free list's head
   uint32_t free_address() const { return address + 64; }
-  uint16_t free() const { return data()->free; }
-  void set_free(uint16_t v) const { data()->free = v; }
-  uint16_t free_bits() const { return data()->free; }
-  void set_free_bits(uint16_t v) const { data()->free = v; }
+  uint16_t free_bits() const { if (auto* d = direct()) return d->free; return uint16_t((memory::IsHandle(address + 64) ? uint16_t(memory::OwnerLoad(address + 64, 2)) : guest::LoadU16(base, address + 64))); }
+  void set_free_bits(uint16_t v) const { if (auto* d = direct()) { d->free = v; return; } if (memory::IsHandle(address + 64)) memory::OwnerStore(address + 64, 2, v); else guest::StoreU16(base, address + 64, v); }
+  uint16_t free() const { if (auto* d = direct()) return d->free; return uint16_t((memory::IsHandle(address + 64) ? uint16_t(memory::OwnerLoad(address + 64, 2)) : guest::LoadU16(base, address + 64))); }
+  void set_free(uint16_t v) const { if (auto* d = direct()) { d->free = v; return; } if (memory::IsHandle(address + 64)) memory::OwnerStore(address + 64, 2, v); else guest::StoreU16(base, address + 64, v); }
   // -1 at reset, not read
   uint32_t list_66_address() const { return address + 66; }
-  uint16_t list_66() const { return data()->list_66; }
-  void set_list_66(uint16_t v) const { data()->list_66 = v; }
-  uint16_t list_66_bits() const { return data()->list_66; }
-  void set_list_66_bits(uint16_t v) const { data()->list_66 = v; }
+  uint16_t list_66_bits() const { if (auto* d = direct()) return d->list_66; return uint16_t((memory::IsHandle(address + 66) ? uint16_t(memory::OwnerLoad(address + 66, 2)) : guest::LoadU16(base, address + 66))); }
+  void set_list_66_bits(uint16_t v) const { if (auto* d = direct()) { d->list_66 = v; return; } if (memory::IsHandle(address + 66)) memory::OwnerStore(address + 66, 2, v); else guest::StoreU16(base, address + 66, v); }
+  uint16_t list_66() const { if (auto* d = direct()) return d->list_66; return uint16_t((memory::IsHandle(address + 66) ? uint16_t(memory::OwnerLoad(address + 66, 2)) : guest::LoadU16(base, address + 66))); }
+  void set_list_66(uint16_t v) const { if (auto* d = direct()) { d->list_66 = v; return; } if (memory::IsHandle(address + 66)) memory::OwnerStore(address + 66, 2, v); else guest::StoreU16(base, address + 66, v); }
   uint32_t head_address() const { return address + 68; }
-  uint16_t head() const { return data()->head; }
-  void set_head(uint16_t v) const { data()->head = v; }
-  uint16_t head_bits() const { return data()->head; }
-  void set_head_bits(uint16_t v) const { data()->head = v; }
+  uint16_t head_bits() const { if (auto* d = direct()) return d->head; return uint16_t((memory::IsHandle(address + 68) ? uint16_t(memory::OwnerLoad(address + 68, 2)) : guest::LoadU16(base, address + 68))); }
+  void set_head_bits(uint16_t v) const { if (auto* d = direct()) { d->head = v; return; } if (memory::IsHandle(address + 68)) memory::OwnerStore(address + 68, 2, v); else guest::StoreU16(base, address + 68, v); }
+  uint16_t head() const { if (auto* d = direct()) return d->head; return uint16_t((memory::IsHandle(address + 68) ? uint16_t(memory::OwnerLoad(address + 68, 2)) : guest::LoadU16(base, address + 68))); }
+  void set_head(uint16_t v) const { if (auto* d = direct()) { d->head = v; return; } if (memory::IsHandle(address + 68)) memory::OwnerStore(address + 68, 2, v); else guest::StoreU16(base, address + 68, v); }
   // -1 at reset, not read
   uint32_t list_70_address() const { return address + 70; }
-  uint16_t list_70() const { return data()->list_70; }
-  void set_list_70(uint16_t v) const { data()->list_70 = v; }
-  uint16_t list_70_bits() const { return data()->list_70; }
-  void set_list_70_bits(uint16_t v) const { data()->list_70 = v; }
+  uint16_t list_70_bits() const { if (auto* d = direct()) return d->list_70; return uint16_t((memory::IsHandle(address + 70) ? uint16_t(memory::OwnerLoad(address + 70, 2)) : guest::LoadU16(base, address + 70))); }
+  void set_list_70_bits(uint16_t v) const { if (auto* d = direct()) { d->list_70 = v; return; } if (memory::IsHandle(address + 70)) memory::OwnerStore(address + 70, 2, v); else guest::StoreU16(base, address + 70, v); }
+  uint16_t list_70() const { if (auto* d = direct()) return d->list_70; return uint16_t((memory::IsHandle(address + 70) ? uint16_t(memory::OwnerLoad(address + 70, 2)) : guest::LoadU16(base, address + 70))); }
+  void set_list_70(uint16_t v) const { if (auto* d = direct()) { d->list_70 = v; return; } if (memory::IsHandle(address + 70)) memory::OwnerStore(address + 70, 2, v); else guest::StoreU16(base, address + 70, v); }
   uint32_t count_address() const { return address + 72; }
-  uint16_t count() const { return data()->count; }
-  void set_count(uint16_t v) const { data()->count = v; }
-  uint16_t count_bits() const { return data()->count; }
-  void set_count_bits(uint16_t v) const { data()->count = v; }
+  uint16_t count_bits() const { if (auto* d = direct()) return d->count; return uint16_t((memory::IsHandle(address + 72) ? uint16_t(memory::OwnerLoad(address + 72, 2)) : guest::LoadU16(base, address + 72))); }
+  void set_count_bits(uint16_t v) const { if (auto* d = direct()) { d->count = v; return; } if (memory::IsHandle(address + 72)) memory::OwnerStore(address + 72, 2, v); else guest::StoreU16(base, address + 72, v); }
+  uint16_t count() const { if (auto* d = direct()) return d->count; return uint16_t((memory::IsHandle(address + 72) ? uint16_t(memory::OwnerLoad(address + 72, 2)) : guest::LoadU16(base, address + 72))); }
+  void set_count(uint16_t v) const { if (auto* d = direct()) { d->count = v; return; } if (memory::IsHandle(address + 72)) memory::OwnerStore(address + 72, 2, v); else guest::StoreU16(base, address + 72, v); }
   // 16 RouteRanges, 1,064 bytes apart
   uint32_t ranges_address() const { return address + 76; }
-  uint8_t* ranges() const { return reinterpret_cast<uint8_t*>(data()) + 76; }
+  uint8_t* ranges() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 76 : guest::Pointer(base, address + 76); }
 };
 
 // embedded; measure: List128
@@ -473,42 +477,43 @@ struct List128 : View {
   }
   List128 at(uint32_t i) const { return List128(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kList128Layout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kList128Layout, offset, width, v); }
+  List128Data* direct() const { return static_cast<List128Data*>(memory::HandleOwn(address, &kList128Layout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kList128Layout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kList128Layout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 128 nodes: (next, slot) halfwords
   uint32_t nodes_address() const { return address + 0; }
-  uint8_t* nodes() const { return reinterpret_cast<uint8_t*>(data()) + 0; }
+  uint8_t* nodes() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 0 : guest::Pointer(base, address + 0); }
   // the free list's head
   uint32_t free_address() const { return address + 512; }
-  uint16_t free() const { return data()->free; }
-  void set_free(uint16_t v) const { data()->free = v; }
-  uint16_t free_bits() const { return data()->free; }
-  void set_free_bits(uint16_t v) const { data()->free = v; }
+  uint16_t free_bits() const { if (auto* d = direct()) return d->free; return uint16_t((memory::IsHandle(address + 512) ? uint16_t(memory::OwnerLoad(address + 512, 2)) : guest::LoadU16(base, address + 512))); }
+  void set_free_bits(uint16_t v) const { if (auto* d = direct()) { d->free = v; return; } if (memory::IsHandle(address + 512)) memory::OwnerStore(address + 512, 2, v); else guest::StoreU16(base, address + 512, v); }
+  uint16_t free() const { if (auto* d = direct()) return d->free; return uint16_t((memory::IsHandle(address + 512) ? uint16_t(memory::OwnerLoad(address + 512, 2)) : guest::LoadU16(base, address + 512))); }
+  void set_free(uint16_t v) const { if (auto* d = direct()) { d->free = v; return; } if (memory::IsHandle(address + 512)) memory::OwnerStore(address + 512, 2, v); else guest::StoreU16(base, address + 512, v); }
   // -1 at reset, not read
   uint32_t list_514_address() const { return address + 514; }
-  uint16_t list_514() const { return data()->list_514; }
-  void set_list_514(uint16_t v) const { data()->list_514 = v; }
-  uint16_t list_514_bits() const { return data()->list_514; }
-  void set_list_514_bits(uint16_t v) const { data()->list_514 = v; }
+  uint16_t list_514_bits() const { if (auto* d = direct()) return d->list_514; return uint16_t((memory::IsHandle(address + 514) ? uint16_t(memory::OwnerLoad(address + 514, 2)) : guest::LoadU16(base, address + 514))); }
+  void set_list_514_bits(uint16_t v) const { if (auto* d = direct()) { d->list_514 = v; return; } if (memory::IsHandle(address + 514)) memory::OwnerStore(address + 514, 2, v); else guest::StoreU16(base, address + 514, v); }
+  uint16_t list_514() const { if (auto* d = direct()) return d->list_514; return uint16_t((memory::IsHandle(address + 514) ? uint16_t(memory::OwnerLoad(address + 514, 2)) : guest::LoadU16(base, address + 514))); }
+  void set_list_514(uint16_t v) const { if (auto* d = direct()) { d->list_514 = v; return; } if (memory::IsHandle(address + 514)) memory::OwnerStore(address + 514, 2, v); else guest::StoreU16(base, address + 514, v); }
   uint32_t head_address() const { return address + 516; }
-  uint16_t head() const { return data()->head; }
-  void set_head(uint16_t v) const { data()->head = v; }
-  uint16_t head_bits() const { return data()->head; }
-  void set_head_bits(uint16_t v) const { data()->head = v; }
+  uint16_t head_bits() const { if (auto* d = direct()) return d->head; return uint16_t((memory::IsHandle(address + 516) ? uint16_t(memory::OwnerLoad(address + 516, 2)) : guest::LoadU16(base, address + 516))); }
+  void set_head_bits(uint16_t v) const { if (auto* d = direct()) { d->head = v; return; } if (memory::IsHandle(address + 516)) memory::OwnerStore(address + 516, 2, v); else guest::StoreU16(base, address + 516, v); }
+  uint16_t head() const { if (auto* d = direct()) return d->head; return uint16_t((memory::IsHandle(address + 516) ? uint16_t(memory::OwnerLoad(address + 516, 2)) : guest::LoadU16(base, address + 516))); }
+  void set_head(uint16_t v) const { if (auto* d = direct()) { d->head = v; return; } if (memory::IsHandle(address + 516)) memory::OwnerStore(address + 516, 2, v); else guest::StoreU16(base, address + 516, v); }
   // -1 at reset, not read
   uint32_t list_518_address() const { return address + 518; }
-  uint16_t list_518() const { return data()->list_518; }
-  void set_list_518(uint16_t v) const { data()->list_518 = v; }
-  uint16_t list_518_bits() const { return data()->list_518; }
-  void set_list_518_bits(uint16_t v) const { data()->list_518 = v; }
+  uint16_t list_518_bits() const { if (auto* d = direct()) return d->list_518; return uint16_t((memory::IsHandle(address + 518) ? uint16_t(memory::OwnerLoad(address + 518, 2)) : guest::LoadU16(base, address + 518))); }
+  void set_list_518_bits(uint16_t v) const { if (auto* d = direct()) { d->list_518 = v; return; } if (memory::IsHandle(address + 518)) memory::OwnerStore(address + 518, 2, v); else guest::StoreU16(base, address + 518, v); }
+  uint16_t list_518() const { if (auto* d = direct()) return d->list_518; return uint16_t((memory::IsHandle(address + 518) ? uint16_t(memory::OwnerLoad(address + 518, 2)) : guest::LoadU16(base, address + 518))); }
+  void set_list_518(uint16_t v) const { if (auto* d = direct()) { d->list_518 = v; return; } if (memory::IsHandle(address + 518)) memory::OwnerStore(address + 518, 2, v); else guest::StoreU16(base, address + 518, v); }
   uint32_t count_address() const { return address + 520; }
-  uint16_t count() const { return data()->count; }
-  void set_count(uint16_t v) const { data()->count = v; }
-  uint16_t count_bits() const { return data()->count; }
-  void set_count_bits(uint16_t v) const { data()->count = v; }
+  uint16_t count_bits() const { if (auto* d = direct()) return d->count; return uint16_t((memory::IsHandle(address + 520) ? uint16_t(memory::OwnerLoad(address + 520, 2)) : guest::LoadU16(base, address + 520))); }
+  void set_count_bits(uint16_t v) const { if (auto* d = direct()) { d->count = v; return; } if (memory::IsHandle(address + 520)) memory::OwnerStore(address + 520, 2, v); else guest::StoreU16(base, address + 520, v); }
+  uint16_t count() const { if (auto* d = direct()) return d->count; return uint16_t((memory::IsHandle(address + 520) ? uint16_t(memory::OwnerLoad(address + 520, 2)) : guest::LoadU16(base, address + 520))); }
+  void set_count(uint16_t v) const { if (auto* d = direct()) { d->count = v; return; } if (memory::IsHandle(address + 520)) memory::OwnerStore(address + 520, 2, v); else guest::StoreU16(base, address + 520, v); }
   // the 128 data words
   uint32_t words_address() const { return address + 524; }
-  uint8_t* words() const { return reinterpret_cast<uint8_t*>(data()) + 524; }
+  uint8_t* words() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 524 : guest::Pointer(base, address + 524); }
 };
 
 // embedded; measure: List64, List64::Insert.r3
@@ -547,42 +552,43 @@ struct List64 : View {
   }
   List64 at(uint32_t i) const { return List64(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kList64Layout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kList64Layout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
+  List64Data* direct() const { return static_cast<List64Data*>(memory::HandleOwn(address, &kList64Layout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kList64Layout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kList64Layout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 64 nodes: (next, slot) halfwords
   uint32_t nodes_address() const { return address + 0; }
-  uint8_t* nodes() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 0 : guest::Pointer(base, address + 0); }
+  uint8_t* nodes() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 0 : guest::Pointer(base, address + 0); }
   // the free list's head
   uint32_t free_address() const { return address + 256; }
-  uint16_t free() const { return on_host() ? uint16_t(data()->free) : uint16_t(guest::LoadU16(base, address + 256)); }
-  void set_free(uint16_t v) const { if (on_host()) data()->free = v; else guest::StoreU16(base, address + 256, v); }
-  uint16_t free_bits() const { return on_host() ? data()->free : guest::LoadU16(base, address + 256); }
-  void set_free_bits(uint16_t v) const { if (on_host()) data()->free = v; else guest::StoreU16(base, address + 256, v); }
+  uint16_t free_bits() const { if (auto* d = direct()) return d->free; return uint16_t((memory::IsHandle(address + 256) ? uint16_t(memory::OwnerLoad(address + 256, 2)) : guest::LoadU16(base, address + 256))); }
+  void set_free_bits(uint16_t v) const { if (auto* d = direct()) { d->free = v; return; } if (memory::IsHandle(address + 256)) memory::OwnerStore(address + 256, 2, v); else guest::StoreU16(base, address + 256, v); }
+  uint16_t free() const { if (auto* d = direct()) return d->free; return uint16_t((memory::IsHandle(address + 256) ? uint16_t(memory::OwnerLoad(address + 256, 2)) : guest::LoadU16(base, address + 256))); }
+  void set_free(uint16_t v) const { if (auto* d = direct()) { d->free = v; return; } if (memory::IsHandle(address + 256)) memory::OwnerStore(address + 256, 2, v); else guest::StoreU16(base, address + 256, v); }
   // -1 at reset, not read
   uint32_t list_258_address() const { return address + 258; }
-  uint16_t list_258() const { return on_host() ? uint16_t(data()->list_258) : uint16_t(guest::LoadU16(base, address + 258)); }
-  void set_list_258(uint16_t v) const { if (on_host()) data()->list_258 = v; else guest::StoreU16(base, address + 258, v); }
-  uint16_t list_258_bits() const { return on_host() ? data()->list_258 : guest::LoadU16(base, address + 258); }
-  void set_list_258_bits(uint16_t v) const { if (on_host()) data()->list_258 = v; else guest::StoreU16(base, address + 258, v); }
+  uint16_t list_258_bits() const { if (auto* d = direct()) return d->list_258; return uint16_t((memory::IsHandle(address + 258) ? uint16_t(memory::OwnerLoad(address + 258, 2)) : guest::LoadU16(base, address + 258))); }
+  void set_list_258_bits(uint16_t v) const { if (auto* d = direct()) { d->list_258 = v; return; } if (memory::IsHandle(address + 258)) memory::OwnerStore(address + 258, 2, v); else guest::StoreU16(base, address + 258, v); }
+  uint16_t list_258() const { if (auto* d = direct()) return d->list_258; return uint16_t((memory::IsHandle(address + 258) ? uint16_t(memory::OwnerLoad(address + 258, 2)) : guest::LoadU16(base, address + 258))); }
+  void set_list_258(uint16_t v) const { if (auto* d = direct()) { d->list_258 = v; return; } if (memory::IsHandle(address + 258)) memory::OwnerStore(address + 258, 2, v); else guest::StoreU16(base, address + 258, v); }
   uint32_t head_address() const { return address + 260; }
-  uint16_t head() const { return on_host() ? uint16_t(data()->head) : uint16_t(guest::LoadU16(base, address + 260)); }
-  void set_head(uint16_t v) const { if (on_host()) data()->head = v; else guest::StoreU16(base, address + 260, v); }
-  uint16_t head_bits() const { return on_host() ? data()->head : guest::LoadU16(base, address + 260); }
-  void set_head_bits(uint16_t v) const { if (on_host()) data()->head = v; else guest::StoreU16(base, address + 260, v); }
+  uint16_t head_bits() const { if (auto* d = direct()) return d->head; return uint16_t((memory::IsHandle(address + 260) ? uint16_t(memory::OwnerLoad(address + 260, 2)) : guest::LoadU16(base, address + 260))); }
+  void set_head_bits(uint16_t v) const { if (auto* d = direct()) { d->head = v; return; } if (memory::IsHandle(address + 260)) memory::OwnerStore(address + 260, 2, v); else guest::StoreU16(base, address + 260, v); }
+  uint16_t head() const { if (auto* d = direct()) return d->head; return uint16_t((memory::IsHandle(address + 260) ? uint16_t(memory::OwnerLoad(address + 260, 2)) : guest::LoadU16(base, address + 260))); }
+  void set_head(uint16_t v) const { if (auto* d = direct()) { d->head = v; return; } if (memory::IsHandle(address + 260)) memory::OwnerStore(address + 260, 2, v); else guest::StoreU16(base, address + 260, v); }
   // -1 at reset, not read
   uint32_t list_262_address() const { return address + 262; }
-  uint16_t list_262() const { return on_host() ? uint16_t(data()->list_262) : uint16_t(guest::LoadU16(base, address + 262)); }
-  void set_list_262(uint16_t v) const { if (on_host()) data()->list_262 = v; else guest::StoreU16(base, address + 262, v); }
-  uint16_t list_262_bits() const { return on_host() ? data()->list_262 : guest::LoadU16(base, address + 262); }
-  void set_list_262_bits(uint16_t v) const { if (on_host()) data()->list_262 = v; else guest::StoreU16(base, address + 262, v); }
+  uint16_t list_262_bits() const { if (auto* d = direct()) return d->list_262; return uint16_t((memory::IsHandle(address + 262) ? uint16_t(memory::OwnerLoad(address + 262, 2)) : guest::LoadU16(base, address + 262))); }
+  void set_list_262_bits(uint16_t v) const { if (auto* d = direct()) { d->list_262 = v; return; } if (memory::IsHandle(address + 262)) memory::OwnerStore(address + 262, 2, v); else guest::StoreU16(base, address + 262, v); }
+  uint16_t list_262() const { if (auto* d = direct()) return d->list_262; return uint16_t((memory::IsHandle(address + 262) ? uint16_t(memory::OwnerLoad(address + 262, 2)) : guest::LoadU16(base, address + 262))); }
+  void set_list_262(uint16_t v) const { if (auto* d = direct()) { d->list_262 = v; return; } if (memory::IsHandle(address + 262)) memory::OwnerStore(address + 262, 2, v); else guest::StoreU16(base, address + 262, v); }
   uint32_t count_address() const { return address + 264; }
-  uint16_t count() const { return on_host() ? uint16_t(data()->count) : uint16_t(guest::LoadU16(base, address + 264)); }
-  void set_count(uint16_t v) const { if (on_host()) data()->count = v; else guest::StoreU16(base, address + 264, v); }
-  uint16_t count_bits() const { return on_host() ? data()->count : guest::LoadU16(base, address + 264); }
-  void set_count_bits(uint16_t v) const { if (on_host()) data()->count = v; else guest::StoreU16(base, address + 264, v); }
+  uint16_t count_bits() const { if (auto* d = direct()) return d->count; return uint16_t((memory::IsHandle(address + 264) ? uint16_t(memory::OwnerLoad(address + 264, 2)) : guest::LoadU16(base, address + 264))); }
+  void set_count_bits(uint16_t v) const { if (auto* d = direct()) { d->count = v; return; } if (memory::IsHandle(address + 264)) memory::OwnerStore(address + 264, 2, v); else guest::StoreU16(base, address + 264, v); }
+  uint16_t count() const { if (auto* d = direct()) return d->count; return uint16_t((memory::IsHandle(address + 264) ? uint16_t(memory::OwnerLoad(address + 264, 2)) : guest::LoadU16(base, address + 264))); }
+  void set_count(uint16_t v) const { if (auto* d = direct()) { d->count = v; return; } if (memory::IsHandle(address + 264)) memory::OwnerStore(address + 264, 2, v); else guest::StoreU16(base, address + 264, v); }
   // the 64 data words
   uint32_t words_address() const { return address + 268; }
-  uint8_t* words() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 268 : guest::Pointer(base, address + 268); }
+  uint8_t* words() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 268 : guest::Pointer(base, address + 268); }
 };
 
 // embedded; measure: RouteRange::OnPath.r4, RouteRange::Test.r4, RouteRange::ToNeighbor.r5, RouteRange::Update.r4

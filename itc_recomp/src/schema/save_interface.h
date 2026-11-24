@@ -291,20 +291,21 @@ struct SignedInUsers : View {
   }
   SignedInUsers at(uint32_t i) const { return SignedInUsers(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kSignedInUsersLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kSignedInUsersLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
+  SignedInUsersData* direct() const { return static_cast<SignedInUsersData*>(memory::HandleOwn(address, &kSignedInUsersLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kSignedInUsersLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kSignedInUsersLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 4 users of 40 bytes; a user's +8 is nonzero when signed in
   uint32_t users_address() const { return address + 0; }
-  uint8_t* users() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 0 : guest::Pointer(base, address + 0); }
+  uint8_t* users() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 0 : guest::Pointer(base, address + 0); }
   // the users by index (4 words; Users::SignedIn's (index + 50) x 4)
   uint32_t order_address() const { return address + 200; }
-  uint8_t* order() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 200 : guest::Pointer(base, address + 200); }
+  uint8_t* order() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 200 : guest::Pointer(base, address + 200); }
   // the signed-in count
   uint32_t count_address() const { return address + 216; }
-  uint32_t count() const { return on_host() ? uint32_t(data()->count) : uint32_t(guest::LoadU32(base, address + 216)); }
-  void set_count(uint32_t v) const { if (on_host()) data()->count = v; else guest::StoreU32(base, address + 216, v); }
-  uint32_t count_bits() const { return on_host() ? data()->count : guest::LoadU32(base, address + 216); }
-  void set_count_bits(uint32_t v) const { if (on_host()) data()->count = v; else guest::StoreU32(base, address + 216, v); }
+  uint32_t count_bits() const { if (auto* d = direct()) return d->count; return uint32_t((memory::IsHandle(address + 216) ? uint32_t(memory::OwnerLoad(address + 216, 4)) : guest::LoadU32(base, address + 216))); }
+  void set_count_bits(uint32_t v) const { if (auto* d = direct()) { d->count = v; return; } if (memory::IsHandle(address + 216)) memory::OwnerStore(address + 216, 4, v); else guest::StoreU32(base, address + 216, v); }
+  uint32_t count() const { if (auto* d = direct()) return d->count; return uint32_t((memory::IsHandle(address + 216) ? uint32_t(memory::OwnerLoad(address + 216, 4)) : guest::LoadU32(base, address + 216))); }
+  void set_count(uint32_t v) const { if (auto* d = direct()) { d->count = v; return; } if (memory::IsHandle(address + 216)) memory::OwnerStore(address + 216, 4, v); else guest::StoreU32(base, address + 216, v); }
 };
 
 // image; measure: SaveDevices::SetRootName.r4, SaveSlot::RequestSave.r6, SaveSlot::RequestSave.r7, SaveSlot::RequestLoad.r6, SaveSlot::RequestLoad.r7, SaveSlot::RequestDelete.r6

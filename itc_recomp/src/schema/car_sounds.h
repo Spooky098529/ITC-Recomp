@@ -95,310 +95,311 @@ struct CarSound : View {
   }
   CarSound at(uint32_t i) const { return CarSound(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCarSoundLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarSoundLayout, offset, width, v); }
+  CarSoundData* direct() const { return static_cast<CarSoundData*>(memory::HandleOwn(address, &kCarSoundLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kCarSoundLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarSoundLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // the first element only: CarSoundArray's count (7), read as the array's count (no member: outside the sound; CarSoundArray(base, array_count_address()).count())
   uint32_t array_count_address() const { return address + -16; }
-  uint8_t* array_count() const { return reinterpret_cast<uint8_t*>(data()) + -16; }
+  uint8_t* array_count() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + -16 : guest::Pointer(base, address + -16); }
   // the submix's reverb state: 1 the block 0x826166F8 set (the vehicle's +5314 bit 1, probably a tunnel), 0 the block 0x82616638
   uint32_t tunnel_reverb_address() const { return address + 0; }
-  uint32_t tunnel_reverb() const { return data()->tunnel_reverb; }
-  void set_tunnel_reverb(uint32_t v) const { data()->tunnel_reverb = v; }
-  uint32_t tunnel_reverb_bits() const { return data()->tunnel_reverb; }
-  void set_tunnel_reverb_bits(uint32_t v) const { data()->tunnel_reverb = v; }
+  uint32_t tunnel_reverb_bits() const { if (auto* d = direct()) return d->tunnel_reverb; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_tunnel_reverb_bits(uint32_t v) const { if (auto* d = direct()) { d->tunnel_reverb = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t tunnel_reverb() const { if (auto* d = direct()) return d->tunnel_reverb; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_tunnel_reverb(uint32_t v) const { if (auto* d = direct()) { d->tunnel_reverb = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // an X3DAudioListener; its cone pointer is the emitter's +0 (+52). Not an embed (the emitter's cone would be a second layout entry at +52): its floats below, which X3DAudioListener's dual view reads
   uint32_t listener_address() const { return address + 4; }
-  uint8_t* listener() const { return reinterpret_cast<uint8_t*>(data()) + 4; }
+  uint8_t* listener() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 4 : guest::Pointer(base, address + 4); }
   uint32_t x3d_listener_front_x_address() const { return address + 4; }
-  float x3d_listener_front_x() const { return data()->x3d_listener_front_x; }
-  void set_x3d_listener_front_x(float v) const { data()->x3d_listener_front_x = v; }
-  uint32_t x3d_listener_front_x_bits() const { return std::bit_cast<uint32_t>(data()->x3d_listener_front_x); }
-  void set_x3d_listener_front_x_bits(uint32_t v) const { data()->x3d_listener_front_x = std::bit_cast<float>(v); }
+  uint32_t x3d_listener_front_x_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->x3d_listener_front_x); return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_x3d_listener_front_x_bits(uint32_t v) const { if (auto* d = direct()) { d->x3d_listener_front_x = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  float x3d_listener_front_x() const { return std::bit_cast<float>(x3d_listener_front_x_bits()); }
+  void set_x3d_listener_front_x(float v) const { set_x3d_listener_front_x_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t x3d_listener_front_y_address() const { return address + 8; }
-  float x3d_listener_front_y() const { return data()->x3d_listener_front_y; }
-  void set_x3d_listener_front_y(float v) const { data()->x3d_listener_front_y = v; }
-  uint32_t x3d_listener_front_y_bits() const { return std::bit_cast<uint32_t>(data()->x3d_listener_front_y); }
-  void set_x3d_listener_front_y_bits(uint32_t v) const { data()->x3d_listener_front_y = std::bit_cast<float>(v); }
+  uint32_t x3d_listener_front_y_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->x3d_listener_front_y); return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_x3d_listener_front_y_bits(uint32_t v) const { if (auto* d = direct()) { d->x3d_listener_front_y = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  float x3d_listener_front_y() const { return std::bit_cast<float>(x3d_listener_front_y_bits()); }
+  void set_x3d_listener_front_y(float v) const { set_x3d_listener_front_y_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t x3d_listener_front_z_address() const { return address + 12; }
-  float x3d_listener_front_z() const { return data()->x3d_listener_front_z; }
-  void set_x3d_listener_front_z(float v) const { data()->x3d_listener_front_z = v; }
-  uint32_t x3d_listener_front_z_bits() const { return std::bit_cast<uint32_t>(data()->x3d_listener_front_z); }
-  void set_x3d_listener_front_z_bits(uint32_t v) const { data()->x3d_listener_front_z = std::bit_cast<float>(v); }
+  uint32_t x3d_listener_front_z_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->x3d_listener_front_z); return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_x3d_listener_front_z_bits(uint32_t v) const { if (auto* d = direct()) { d->x3d_listener_front_z = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
+  float x3d_listener_front_z() const { return std::bit_cast<float>(x3d_listener_front_z_bits()); }
+  void set_x3d_listener_front_z(float v) const { set_x3d_listener_front_z_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t x3d_listener_top_x_address() const { return address + 16; }
-  float x3d_listener_top_x() const { return data()->x3d_listener_top_x; }
-  void set_x3d_listener_top_x(float v) const { data()->x3d_listener_top_x = v; }
-  uint32_t x3d_listener_top_x_bits() const { return std::bit_cast<uint32_t>(data()->x3d_listener_top_x); }
-  void set_x3d_listener_top_x_bits(uint32_t v) const { data()->x3d_listener_top_x = std::bit_cast<float>(v); }
+  uint32_t x3d_listener_top_x_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->x3d_listener_top_x); return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_x3d_listener_top_x_bits(uint32_t v) const { if (auto* d = direct()) { d->x3d_listener_top_x = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
+  float x3d_listener_top_x() const { return std::bit_cast<float>(x3d_listener_top_x_bits()); }
+  void set_x3d_listener_top_x(float v) const { set_x3d_listener_top_x_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t x3d_listener_top_y_address() const { return address + 20; }
-  float x3d_listener_top_y() const { return data()->x3d_listener_top_y; }
-  void set_x3d_listener_top_y(float v) const { data()->x3d_listener_top_y = v; }
-  uint32_t x3d_listener_top_y_bits() const { return std::bit_cast<uint32_t>(data()->x3d_listener_top_y); }
-  void set_x3d_listener_top_y_bits(uint32_t v) const { data()->x3d_listener_top_y = std::bit_cast<float>(v); }
+  uint32_t x3d_listener_top_y_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->x3d_listener_top_y); return uint32_t((memory::IsHandle(address + 20) ? uint32_t(memory::OwnerLoad(address + 20, 4)) : guest::LoadU32(base, address + 20))); }
+  void set_x3d_listener_top_y_bits(uint32_t v) const { if (auto* d = direct()) { d->x3d_listener_top_y = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 4, v); else guest::StoreU32(base, address + 20, v); }
+  float x3d_listener_top_y() const { return std::bit_cast<float>(x3d_listener_top_y_bits()); }
+  void set_x3d_listener_top_y(float v) const { set_x3d_listener_top_y_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t x3d_listener_top_z_address() const { return address + 24; }
-  float x3d_listener_top_z() const { return data()->x3d_listener_top_z; }
-  void set_x3d_listener_top_z(float v) const { data()->x3d_listener_top_z = v; }
-  uint32_t x3d_listener_top_z_bits() const { return std::bit_cast<uint32_t>(data()->x3d_listener_top_z); }
-  void set_x3d_listener_top_z_bits(uint32_t v) const { data()->x3d_listener_top_z = std::bit_cast<float>(v); }
+  uint32_t x3d_listener_top_z_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->x3d_listener_top_z); return uint32_t((memory::IsHandle(address + 24) ? uint32_t(memory::OwnerLoad(address + 24, 4)) : guest::LoadU32(base, address + 24))); }
+  void set_x3d_listener_top_z_bits(uint32_t v) const { if (auto* d = direct()) { d->x3d_listener_top_z = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 24)) memory::OwnerStore(address + 24, 4, v); else guest::StoreU32(base, address + 24, v); }
+  float x3d_listener_top_z() const { return std::bit_cast<float>(x3d_listener_top_z_bits()); }
+  void set_x3d_listener_top_z(float v) const { set_x3d_listener_top_z_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t x3d_listener_position_x_address() const { return address + 28; }
-  float x3d_listener_position_x() const { return data()->x3d_listener_position_x; }
-  void set_x3d_listener_position_x(float v) const { data()->x3d_listener_position_x = v; }
-  uint32_t x3d_listener_position_x_bits() const { return std::bit_cast<uint32_t>(data()->x3d_listener_position_x); }
-  void set_x3d_listener_position_x_bits(uint32_t v) const { data()->x3d_listener_position_x = std::bit_cast<float>(v); }
+  uint32_t x3d_listener_position_x_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->x3d_listener_position_x); return uint32_t((memory::IsHandle(address + 28) ? uint32_t(memory::OwnerLoad(address + 28, 4)) : guest::LoadU32(base, address + 28))); }
+  void set_x3d_listener_position_x_bits(uint32_t v) const { if (auto* d = direct()) { d->x3d_listener_position_x = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 28)) memory::OwnerStore(address + 28, 4, v); else guest::StoreU32(base, address + 28, v); }
+  float x3d_listener_position_x() const { return std::bit_cast<float>(x3d_listener_position_x_bits()); }
+  void set_x3d_listener_position_x(float v) const { set_x3d_listener_position_x_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t x3d_listener_position_y_address() const { return address + 32; }
-  float x3d_listener_position_y() const { return data()->x3d_listener_position_y; }
-  void set_x3d_listener_position_y(float v) const { data()->x3d_listener_position_y = v; }
-  uint32_t x3d_listener_position_y_bits() const { return std::bit_cast<uint32_t>(data()->x3d_listener_position_y); }
-  void set_x3d_listener_position_y_bits(uint32_t v) const { data()->x3d_listener_position_y = std::bit_cast<float>(v); }
+  uint32_t x3d_listener_position_y_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->x3d_listener_position_y); return uint32_t((memory::IsHandle(address + 32) ? uint32_t(memory::OwnerLoad(address + 32, 4)) : guest::LoadU32(base, address + 32))); }
+  void set_x3d_listener_position_y_bits(uint32_t v) const { if (auto* d = direct()) { d->x3d_listener_position_y = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 32)) memory::OwnerStore(address + 32, 4, v); else guest::StoreU32(base, address + 32, v); }
+  float x3d_listener_position_y() const { return std::bit_cast<float>(x3d_listener_position_y_bits()); }
+  void set_x3d_listener_position_y(float v) const { set_x3d_listener_position_y_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t x3d_listener_position_z_address() const { return address + 36; }
-  float x3d_listener_position_z() const { return data()->x3d_listener_position_z; }
-  void set_x3d_listener_position_z(float v) const { data()->x3d_listener_position_z = v; }
-  uint32_t x3d_listener_position_z_bits() const { return std::bit_cast<uint32_t>(data()->x3d_listener_position_z); }
-  void set_x3d_listener_position_z_bits(uint32_t v) const { data()->x3d_listener_position_z = std::bit_cast<float>(v); }
+  uint32_t x3d_listener_position_z_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->x3d_listener_position_z); return uint32_t((memory::IsHandle(address + 36) ? uint32_t(memory::OwnerLoad(address + 36, 4)) : guest::LoadU32(base, address + 36))); }
+  void set_x3d_listener_position_z_bits(uint32_t v) const { if (auto* d = direct()) { d->x3d_listener_position_z = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 36)) memory::OwnerStore(address + 36, 4, v); else guest::StoreU32(base, address + 36, v); }
+  float x3d_listener_position_z() const { return std::bit_cast<float>(x3d_listener_position_z_bits()); }
+  void set_x3d_listener_position_z(float v) const { set_x3d_listener_position_z_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t x3d_listener_velocity_x_address() const { return address + 40; }
-  float x3d_listener_velocity_x() const { return data()->x3d_listener_velocity_x; }
-  void set_x3d_listener_velocity_x(float v) const { data()->x3d_listener_velocity_x = v; }
-  uint32_t x3d_listener_velocity_x_bits() const { return std::bit_cast<uint32_t>(data()->x3d_listener_velocity_x); }
-  void set_x3d_listener_velocity_x_bits(uint32_t v) const { data()->x3d_listener_velocity_x = std::bit_cast<float>(v); }
+  uint32_t x3d_listener_velocity_x_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->x3d_listener_velocity_x); return uint32_t((memory::IsHandle(address + 40) ? uint32_t(memory::OwnerLoad(address + 40, 4)) : guest::LoadU32(base, address + 40))); }
+  void set_x3d_listener_velocity_x_bits(uint32_t v) const { if (auto* d = direct()) { d->x3d_listener_velocity_x = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 40)) memory::OwnerStore(address + 40, 4, v); else guest::StoreU32(base, address + 40, v); }
+  float x3d_listener_velocity_x() const { return std::bit_cast<float>(x3d_listener_velocity_x_bits()); }
+  void set_x3d_listener_velocity_x(float v) const { set_x3d_listener_velocity_x_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t x3d_listener_velocity_y_address() const { return address + 44; }
-  float x3d_listener_velocity_y() const { return data()->x3d_listener_velocity_y; }
-  void set_x3d_listener_velocity_y(float v) const { data()->x3d_listener_velocity_y = v; }
-  uint32_t x3d_listener_velocity_y_bits() const { return std::bit_cast<uint32_t>(data()->x3d_listener_velocity_y); }
-  void set_x3d_listener_velocity_y_bits(uint32_t v) const { data()->x3d_listener_velocity_y = std::bit_cast<float>(v); }
+  uint32_t x3d_listener_velocity_y_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->x3d_listener_velocity_y); return uint32_t((memory::IsHandle(address + 44) ? uint32_t(memory::OwnerLoad(address + 44, 4)) : guest::LoadU32(base, address + 44))); }
+  void set_x3d_listener_velocity_y_bits(uint32_t v) const { if (auto* d = direct()) { d->x3d_listener_velocity_y = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 4, v); else guest::StoreU32(base, address + 44, v); }
+  float x3d_listener_velocity_y() const { return std::bit_cast<float>(x3d_listener_velocity_y_bits()); }
+  void set_x3d_listener_velocity_y(float v) const { set_x3d_listener_velocity_y_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t x3d_listener_velocity_z_address() const { return address + 48; }
-  float x3d_listener_velocity_z() const { return data()->x3d_listener_velocity_z; }
-  void set_x3d_listener_velocity_z(float v) const { data()->x3d_listener_velocity_z = v; }
-  uint32_t x3d_listener_velocity_z_bits() const { return std::bit_cast<uint32_t>(data()->x3d_listener_velocity_z); }
-  void set_x3d_listener_velocity_z_bits(uint32_t v) const { data()->x3d_listener_velocity_z = std::bit_cast<float>(v); }
+  uint32_t x3d_listener_velocity_z_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->x3d_listener_velocity_z); return uint32_t((memory::IsHandle(address + 48) ? uint32_t(memory::OwnerLoad(address + 48, 4)) : guest::LoadU32(base, address + 48))); }
+  void set_x3d_listener_velocity_z_bits(uint32_t v) const { if (auto* d = direct()) { d->x3d_listener_velocity_z = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 48)) memory::OwnerStore(address + 48, 4, v); else guest::StoreU32(base, address + 48, v); }
+  float x3d_listener_velocity_z() const { return std::bit_cast<float>(x3d_listener_velocity_z_bits()); }
+  void set_x3d_listener_velocity_z(float v) const { set_x3d_listener_velocity_z_bits(std::bit_cast<uint32_t>(v)); }
   // an X3DAudioEmitter (its cone pointer +52 points at +144)
   uint32_t emitter_address() const { return address + 52; }
-  uint8_t* emitter() const { return reinterpret_cast<uint8_t*>(data()) + 52; }
+  uint8_t* emitter() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 52 : guest::Pointer(base, address + 52); }
   template <typename T = X3DAudioEmitter>
   T emitter_object() const { return T(base, address + 52); }
   // an X3DAudioCone
   uint32_t cone_address() const { return address + 144; }
-  uint8_t* cone() const { return reinterpret_cast<uint8_t*>(data()) + 144; }
+  uint8_t* cone() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 144 : guest::Pointer(base, address + 144); }
   template <typename T = X3DAudioCone>
   T cone_object() const { return T(base, address + 144); }
   // an X3DAudioDspSettings: +176 the matrix (24 bytes from operator new[]), +184 1 source, +188 6 destination channels, +200 the reverb level, +204 the Doppler factor
   uint32_t dsp_address() const { return address + 176; }
-  uint8_t* dsp() const { return reinterpret_cast<uint8_t*>(data()) + 176; }
+  uint8_t* dsp() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 176 : guest::Pointer(base, address + 176); }
   template <typename T = X3DAudioDspSettings>
   T dsp_object() const { return T(base, address + 176); }
   // six {channel byte, gain float} pairs: the reverb level times the volume
   uint32_t reverb_map_address() const { return address + 224; }
-  uint8_t* reverb_map() const { return reinterpret_cast<uint8_t*>(data()) + 224; }
+  uint8_t* reverb_map() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 224 : guest::Pointer(base, address + 224); }
   // six {channel byte, gain float} pairs: the matrix times the volume
   uint32_t output_map_address() const { return address + 272; }
-  uint8_t* output_map() const { return reinterpret_cast<uint8_t*>(data()) + 272; }
+  uint8_t* output_map() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 272 : guest::Pointer(base, address + 272); }
   // 6
   uint32_t reverb_map_count_address() const { return address + 320; }
-  uint8_t reverb_map_count() const { return data()->reverb_map_count; }
-  void set_reverb_map_count(uint8_t v) const { data()->reverb_map_count = v; }
-  uint8_t reverb_map_count_bits() const { return data()->reverb_map_count; }
-  void set_reverb_map_count_bits(uint8_t v) const { data()->reverb_map_count = v; }
+  uint8_t reverb_map_count_bits() const { if (auto* d = direct()) return d->reverb_map_count; return uint8_t((memory::IsHandle(address + 320) ? uint8_t(memory::OwnerLoad(address + 320, 1)) : guest::LoadU8(base, address + 320))); }
+  void set_reverb_map_count_bits(uint8_t v) const { if (auto* d = direct()) { d->reverb_map_count = v; return; } if (memory::IsHandle(address + 320)) memory::OwnerStore(address + 320, 1, v); else guest::StoreU8(base, address + 320, v); }
+  uint8_t reverb_map_count() const { if (auto* d = direct()) return d->reverb_map_count; return uint8_t((memory::IsHandle(address + 320) ? uint8_t(memory::OwnerLoad(address + 320, 1)) : guest::LoadU8(base, address + 320))); }
+  void set_reverb_map_count(uint8_t v) const { if (auto* d = direct()) { d->reverb_map_count = v; return; } if (memory::IsHandle(address + 320)) memory::OwnerStore(address + 320, 1, v); else guest::StoreU8(base, address + 320, v); }
   // +224
   uint32_t reverb_map_pointer_address() const { return address + 324; }
-  uint32_t reverb_map_pointer() const { return data()->reverb_map_pointer; }
-  void set_reverb_map_pointer(uint32_t v) const { data()->reverb_map_pointer = v; }
-  uint32_t reverb_map_pointer_bits() const { return data()->reverb_map_pointer; }
-  void set_reverb_map_pointer_bits(uint32_t v) const { data()->reverb_map_pointer = v; }
+  uint32_t reverb_map_pointer_bits() const { if (auto* d = direct()) return d->reverb_map_pointer; return uint32_t((memory::IsHandle(address + 324) ? uint32_t(memory::OwnerLoad(address + 324, 4)) : guest::LoadU32(base, address + 324))); }
+  void set_reverb_map_pointer_bits(uint32_t v) const { if (auto* d = direct()) { d->reverb_map_pointer = v; return; } if (memory::IsHandle(address + 324)) memory::OwnerStore(address + 324, 4, v); else guest::StoreU32(base, address + 324, v); }
+  uint32_t reverb_map_pointer() const { if (auto* d = direct()) return d->reverb_map_pointer; return uint32_t((memory::IsHandle(address + 324) ? uint32_t(memory::OwnerLoad(address + 324, 4)) : guest::LoadU32(base, address + 324))); }
+  void set_reverb_map_pointer(uint32_t v) const { if (auto* d = direct()) { d->reverb_map_pointer = v; return; } if (memory::IsHandle(address + 324)) memory::OwnerStore(address + 324, 4, v); else guest::StoreU32(base, address + 324, v); }
   // 6
   uint32_t output_map_count_address() const { return address + 328; }
-  uint8_t output_map_count() const { return data()->output_map_count; }
-  void set_output_map_count(uint8_t v) const { data()->output_map_count = v; }
-  uint8_t output_map_count_bits() const { return data()->output_map_count; }
-  void set_output_map_count_bits(uint8_t v) const { data()->output_map_count = v; }
+  uint8_t output_map_count_bits() const { if (auto* d = direct()) return d->output_map_count; return uint8_t((memory::IsHandle(address + 328) ? uint8_t(memory::OwnerLoad(address + 328, 1)) : guest::LoadU8(base, address + 328))); }
+  void set_output_map_count_bits(uint8_t v) const { if (auto* d = direct()) { d->output_map_count = v; return; } if (memory::IsHandle(address + 328)) memory::OwnerStore(address + 328, 1, v); else guest::StoreU8(base, address + 328, v); }
+  uint8_t output_map_count() const { if (auto* d = direct()) return d->output_map_count; return uint8_t((memory::IsHandle(address + 328) ? uint8_t(memory::OwnerLoad(address + 328, 1)) : guest::LoadU8(base, address + 328))); }
+  void set_output_map_count(uint8_t v) const { if (auto* d = direct()) { d->output_map_count = v; return; } if (memory::IsHandle(address + 328)) memory::OwnerStore(address + 328, 1, v); else guest::StoreU8(base, address + 328, v); }
   // +272
   uint32_t output_map_pointer_address() const { return address + 332; }
-  uint32_t output_map_pointer() const { return data()->output_map_pointer; }
-  void set_output_map_pointer(uint32_t v) const { data()->output_map_pointer = v; }
-  uint32_t output_map_pointer_bits() const { return data()->output_map_pointer; }
-  void set_output_map_pointer_bits(uint32_t v) const { data()->output_map_pointer = v; }
+  uint32_t output_map_pointer_bits() const { if (auto* d = direct()) return d->output_map_pointer; return uint32_t((memory::IsHandle(address + 332) ? uint32_t(memory::OwnerLoad(address + 332, 4)) : guest::LoadU32(base, address + 332))); }
+  void set_output_map_pointer_bits(uint32_t v) const { if (auto* d = direct()) { d->output_map_pointer = v; return; } if (memory::IsHandle(address + 332)) memory::OwnerStore(address + 332, 4, v); else guest::StoreU32(base, address + 332, v); }
+  uint32_t output_map_pointer() const { if (auto* d = direct()) return d->output_map_pointer; return uint32_t((memory::IsHandle(address + 332) ? uint32_t(memory::OwnerLoad(address + 332, 4)) : guest::LoadU32(base, address + 332))); }
+  void set_output_map_pointer(uint32_t v) const { if (auto* d = direct()) { d->output_map_pointer = v; return; } if (memory::IsHandle(address + 332)) memory::OwnerStore(address + 332, 4, v); else guest::StoreU32(base, address + 332, v); }
   // 0
   uint32_t sends_0_kind_address() const { return address + 336; }
-  uint8_t sends_0_kind() const { return data()->sends_0_kind; }
-  void set_sends_0_kind(uint8_t v) const { data()->sends_0_kind = v; }
-  uint8_t sends_0_kind_bits() const { return data()->sends_0_kind; }
-  void set_sends_0_kind_bits(uint8_t v) const { data()->sends_0_kind = v; }
+  uint8_t sends_0_kind_bits() const { if (auto* d = direct()) return d->sends_0_kind; return uint8_t((memory::IsHandle(address + 336) ? uint8_t(memory::OwnerLoad(address + 336, 1)) : guest::LoadU8(base, address + 336))); }
+  void set_sends_0_kind_bits(uint8_t v) const { if (auto* d = direct()) { d->sends_0_kind = v; return; } if (memory::IsHandle(address + 336)) memory::OwnerStore(address + 336, 1, v); else guest::StoreU8(base, address + 336, v); }
+  uint8_t sends_0_kind() const { if (auto* d = direct()) return d->sends_0_kind; return uint8_t((memory::IsHandle(address + 336) ? uint8_t(memory::OwnerLoad(address + 336, 1)) : guest::LoadU8(base, address + 336))); }
+  void set_sends_0_kind(uint8_t v) const { if (auto* d = direct()) { d->sends_0_kind = v; return; } if (memory::IsHandle(address + 336)) memory::OwnerStore(address + 336, 1, v); else guest::StoreU8(base, address + 336, v); }
   // +328
   uint32_t sends_0_address() const { return address + 340; }
-  uint32_t sends_0() const { return data()->sends_0; }
-  void set_sends_0(uint32_t v) const { data()->sends_0 = v; }
-  uint32_t sends_0_bits() const { return data()->sends_0; }
-  void set_sends_0_bits(uint32_t v) const { data()->sends_0 = v; }
+  uint32_t sends_0_bits() const { if (auto* d = direct()) return d->sends_0; return uint32_t((memory::IsHandle(address + 340) ? uint32_t(memory::OwnerLoad(address + 340, 4)) : guest::LoadU32(base, address + 340))); }
+  void set_sends_0_bits(uint32_t v) const { if (auto* d = direct()) { d->sends_0 = v; return; } if (memory::IsHandle(address + 340)) memory::OwnerStore(address + 340, 4, v); else guest::StoreU32(base, address + 340, v); }
+  uint32_t sends_0() const { if (auto* d = direct()) return d->sends_0; return uint32_t((memory::IsHandle(address + 340) ? uint32_t(memory::OwnerLoad(address + 340, 4)) : guest::LoadU32(base, address + 340))); }
+  void set_sends_0(uint32_t v) const { if (auto* d = direct()) { d->sends_0 = v; return; } if (memory::IsHandle(address + 340)) memory::OwnerStore(address + 340, 4, v); else guest::StoreU32(base, address + 340, v); }
   // 1
   uint32_t sends_1_kind_address() const { return address + 344; }
-  uint8_t sends_1_kind() const { return data()->sends_1_kind; }
-  void set_sends_1_kind(uint8_t v) const { data()->sends_1_kind = v; }
-  uint8_t sends_1_kind_bits() const { return data()->sends_1_kind; }
-  void set_sends_1_kind_bits(uint8_t v) const { data()->sends_1_kind = v; }
+  uint8_t sends_1_kind_bits() const { if (auto* d = direct()) return d->sends_1_kind; return uint8_t((memory::IsHandle(address + 344) ? uint8_t(memory::OwnerLoad(address + 344, 1)) : guest::LoadU8(base, address + 344))); }
+  void set_sends_1_kind_bits(uint8_t v) const { if (auto* d = direct()) { d->sends_1_kind = v; return; } if (memory::IsHandle(address + 344)) memory::OwnerStore(address + 344, 1, v); else guest::StoreU8(base, address + 344, v); }
+  uint8_t sends_1_kind() const { if (auto* d = direct()) return d->sends_1_kind; return uint8_t((memory::IsHandle(address + 344) ? uint8_t(memory::OwnerLoad(address + 344, 1)) : guest::LoadU8(base, address + 344))); }
+  void set_sends_1_kind(uint8_t v) const { if (auto* d = direct()) { d->sends_1_kind = v; return; } if (memory::IsHandle(address + 344)) memory::OwnerStore(address + 344, 1, v); else guest::StoreU8(base, address + 344, v); }
   // +320
   uint32_t sends_1_address() const { return address + 348; }
-  uint32_t sends_1() const { return data()->sends_1; }
-  void set_sends_1(uint32_t v) const { data()->sends_1 = v; }
-  uint32_t sends_1_bits() const { return data()->sends_1; }
-  void set_sends_1_bits(uint32_t v) const { data()->sends_1 = v; }
+  uint32_t sends_1_bits() const { if (auto* d = direct()) return d->sends_1; return uint32_t((memory::IsHandle(address + 348) ? uint32_t(memory::OwnerLoad(address + 348, 4)) : guest::LoadU32(base, address + 348))); }
+  void set_sends_1_bits(uint32_t v) const { if (auto* d = direct()) { d->sends_1 = v; return; } if (memory::IsHandle(address + 348)) memory::OwnerStore(address + 348, 4, v); else guest::StoreU32(base, address + 348, v); }
+  uint32_t sends_1() const { if (auto* d = direct()) return d->sends_1; return uint32_t((memory::IsHandle(address + 348) ? uint32_t(memory::OwnerLoad(address + 348, 4)) : guest::LoadU32(base, address + 348))); }
+  void set_sends_1(uint32_t v) const { if (auto* d = direct()) { d->sends_1 = v; return; } if (memory::IsHandle(address + 348)) memory::OwnerStore(address + 348, 4, v); else guest::StoreU32(base, address + 348, v); }
   // the DSP output: the 8 bytes the parts' updates are given as r5 (+352 2, +356 +336)
   uint32_t output_address() const { return address + 352; }
-  uint64_t output() const { return data()->output; }
-  void set_output(uint64_t v) const { data()->output = v; }
-  uint64_t output_bits() const { return data()->output; }
-  void set_output_bits(uint64_t v) const { data()->output = v; }
+  uint64_t output_bits() const { if (auto* d = direct()) return d->output; return uint64_t((memory::IsHandle(address + 352) ? uint64_t(memory::OwnerLoad(address + 352, 8)) : guest::LoadU64(base, address + 352))); }
+  void set_output_bits(uint64_t v) const { if (auto* d = direct()) { d->output = v; return; } if (memory::IsHandle(address + 352)) memory::OwnerStore(address + 352, 8, v); else guest::StoreU64(base, address + 352, v); }
+  uint64_t output() const { if (auto* d = direct()) return d->output; return uint64_t((memory::IsHandle(address + 352) ? uint64_t(memory::OwnerLoad(address + 352, 8)) : guest::LoadU64(base, address + 352))); }
+  void set_output(uint64_t v) const { if (auto* d = direct()) { d->output = v; return; } if (memory::IsHandle(address + 352)) memory::OwnerStore(address + 352, 8, v); else guest::StoreU64(base, address + 352, v); }
   // 2
   uint32_t output_count_address() const { return address + 352; }
-  uint8_t output_count_bits() const { return uint8_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kCarSoundLayout, 352, 1)); }
-  void set_output_count_bits(uint8_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarSoundLayout, 352, 1, v); }
+  uint8_t output_count_bits() const { if (auto* d = direct()) return uint8_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(d), kCarSoundLayout, 352, 1)); return uint8_t((memory::IsHandle(address + 352) ? uint8_t(memory::OwnerLoad(address + 352, 1)) : guest::LoadU8(base, address + 352))); }
+  void set_output_count_bits(uint8_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarSoundLayout, 352, 1, v); return; } if (memory::IsHandle(address + 352)) memory::OwnerStore(address + 352, 1, v); else guest::StoreU8(base, address + 352, v); }
   uint8_t output_count() const { return uint8_t(output_count_bits()); }
   void set_output_count(uint8_t v) const { set_output_count_bits(uint8_t(v)); }
   // +336
   uint32_t output_sends_address() const { return address + 356; }
-  uint32_t output_sends_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kCarSoundLayout, 356, 4)); }
-  void set_output_sends_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarSoundLayout, 356, 4, v); }
+  uint32_t output_sends_bits() const { if (auto* d = direct()) return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(d), kCarSoundLayout, 356, 4)); return uint32_t((memory::IsHandle(address + 356) ? uint32_t(memory::OwnerLoad(address + 356, 4)) : guest::LoadU32(base, address + 356))); }
+  void set_output_sends_bits(uint32_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarSoundLayout, 356, 4, v); return; } if (memory::IsHandle(address + 356)) memory::OwnerStore(address + 356, 4, v); else guest::StoreU32(base, address + 356, v); }
   uint32_t output_sends() const { return uint32_t(output_sends_bits()); }
   void set_output_sends(uint32_t v) const { set_output_sends_bits(uint32_t(v)); }
   // the emitter's position as a vector (x, y, z, w; stvx and lvx), last tick's for the velocity
   uint32_t emitter_position_x_address() const { return address + 368; }
-  float emitter_position_x() const { return data()->emitter_position_x; }
-  void set_emitter_position_x(float v) const { data()->emitter_position_x = v; }
-  uint32_t emitter_position_x_bits() const { return std::bit_cast<uint32_t>(data()->emitter_position_x); }
-  void set_emitter_position_x_bits(uint32_t v) const { data()->emitter_position_x = std::bit_cast<float>(v); }
+  uint32_t emitter_position_x_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->emitter_position_x); return uint32_t((memory::IsHandle(address + 368) ? uint32_t(memory::OwnerLoad(address + 368, 4)) : guest::LoadU32(base, address + 368))); }
+  void set_emitter_position_x_bits(uint32_t v) const { if (auto* d = direct()) { d->emitter_position_x = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 368)) memory::OwnerStore(address + 368, 4, v); else guest::StoreU32(base, address + 368, v); }
+  float emitter_position_x() const { return std::bit_cast<float>(emitter_position_x_bits()); }
+  void set_emitter_position_x(float v) const { set_emitter_position_x_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t emitter_position_y_address() const { return address + 372; }
-  float emitter_position_y() const { return data()->emitter_position_y; }
-  void set_emitter_position_y(float v) const { data()->emitter_position_y = v; }
-  uint32_t emitter_position_y_bits() const { return std::bit_cast<uint32_t>(data()->emitter_position_y); }
-  void set_emitter_position_y_bits(uint32_t v) const { data()->emitter_position_y = std::bit_cast<float>(v); }
+  uint32_t emitter_position_y_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->emitter_position_y); return uint32_t((memory::IsHandle(address + 372) ? uint32_t(memory::OwnerLoad(address + 372, 4)) : guest::LoadU32(base, address + 372))); }
+  void set_emitter_position_y_bits(uint32_t v) const { if (auto* d = direct()) { d->emitter_position_y = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 372)) memory::OwnerStore(address + 372, 4, v); else guest::StoreU32(base, address + 372, v); }
+  float emitter_position_y() const { return std::bit_cast<float>(emitter_position_y_bits()); }
+  void set_emitter_position_y(float v) const { set_emitter_position_y_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t emitter_position_z_address() const { return address + 376; }
-  float emitter_position_z() const { return data()->emitter_position_z; }
-  void set_emitter_position_z(float v) const { data()->emitter_position_z = v; }
-  uint32_t emitter_position_z_bits() const { return std::bit_cast<uint32_t>(data()->emitter_position_z); }
-  void set_emitter_position_z_bits(uint32_t v) const { data()->emitter_position_z = std::bit_cast<float>(v); }
+  uint32_t emitter_position_z_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->emitter_position_z); return uint32_t((memory::IsHandle(address + 376) ? uint32_t(memory::OwnerLoad(address + 376, 4)) : guest::LoadU32(base, address + 376))); }
+  void set_emitter_position_z_bits(uint32_t v) const { if (auto* d = direct()) { d->emitter_position_z = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 376)) memory::OwnerStore(address + 376, 4, v); else guest::StoreU32(base, address + 376, v); }
+  float emitter_position_z() const { return std::bit_cast<float>(emitter_position_z_bits()); }
+  void set_emitter_position_z(float v) const { set_emitter_position_z_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t emitter_position_w_address() const { return address + 380; }
-  float emitter_position_w() const { return data()->emitter_position_w; }
-  void set_emitter_position_w(float v) const { data()->emitter_position_w = v; }
-  uint32_t emitter_position_w_bits() const { return std::bit_cast<uint32_t>(data()->emitter_position_w); }
-  void set_emitter_position_w_bits(uint32_t v) const { data()->emitter_position_w = std::bit_cast<float>(v); }
+  uint32_t emitter_position_w_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->emitter_position_w); return uint32_t((memory::IsHandle(address + 380) ? uint32_t(memory::OwnerLoad(address + 380, 4)) : guest::LoadU32(base, address + 380))); }
+  void set_emitter_position_w_bits(uint32_t v) const { if (auto* d = direct()) { d->emitter_position_w = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 380)) memory::OwnerStore(address + 380, 4, v); else guest::StoreU32(base, address + 380, v); }
+  float emitter_position_w() const { return std::bit_cast<float>(emitter_position_w_bits()); }
+  void set_emitter_position_w(float v) const { set_emitter_position_w_bits(std::bit_cast<uint32_t>(v)); }
   // the listener's position as a vector (x, y, z, w), last tick's for the velocity
   uint32_t listener_position_x_address() const { return address + 384; }
-  float listener_position_x() const { return data()->listener_position_x; }
-  void set_listener_position_x(float v) const { data()->listener_position_x = v; }
-  uint32_t listener_position_x_bits() const { return std::bit_cast<uint32_t>(data()->listener_position_x); }
-  void set_listener_position_x_bits(uint32_t v) const { data()->listener_position_x = std::bit_cast<float>(v); }
+  uint32_t listener_position_x_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->listener_position_x); return uint32_t((memory::IsHandle(address + 384) ? uint32_t(memory::OwnerLoad(address + 384, 4)) : guest::LoadU32(base, address + 384))); }
+  void set_listener_position_x_bits(uint32_t v) const { if (auto* d = direct()) { d->listener_position_x = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 384)) memory::OwnerStore(address + 384, 4, v); else guest::StoreU32(base, address + 384, v); }
+  float listener_position_x() const { return std::bit_cast<float>(listener_position_x_bits()); }
+  void set_listener_position_x(float v) const { set_listener_position_x_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t listener_position_y_address() const { return address + 388; }
-  float listener_position_y() const { return data()->listener_position_y; }
-  void set_listener_position_y(float v) const { data()->listener_position_y = v; }
-  uint32_t listener_position_y_bits() const { return std::bit_cast<uint32_t>(data()->listener_position_y); }
-  void set_listener_position_y_bits(uint32_t v) const { data()->listener_position_y = std::bit_cast<float>(v); }
+  uint32_t listener_position_y_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->listener_position_y); return uint32_t((memory::IsHandle(address + 388) ? uint32_t(memory::OwnerLoad(address + 388, 4)) : guest::LoadU32(base, address + 388))); }
+  void set_listener_position_y_bits(uint32_t v) const { if (auto* d = direct()) { d->listener_position_y = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 388)) memory::OwnerStore(address + 388, 4, v); else guest::StoreU32(base, address + 388, v); }
+  float listener_position_y() const { return std::bit_cast<float>(listener_position_y_bits()); }
+  void set_listener_position_y(float v) const { set_listener_position_y_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t listener_position_z_address() const { return address + 392; }
-  float listener_position_z() const { return data()->listener_position_z; }
-  void set_listener_position_z(float v) const { data()->listener_position_z = v; }
-  uint32_t listener_position_z_bits() const { return std::bit_cast<uint32_t>(data()->listener_position_z); }
-  void set_listener_position_z_bits(uint32_t v) const { data()->listener_position_z = std::bit_cast<float>(v); }
+  uint32_t listener_position_z_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->listener_position_z); return uint32_t((memory::IsHandle(address + 392) ? uint32_t(memory::OwnerLoad(address + 392, 4)) : guest::LoadU32(base, address + 392))); }
+  void set_listener_position_z_bits(uint32_t v) const { if (auto* d = direct()) { d->listener_position_z = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 392)) memory::OwnerStore(address + 392, 4, v); else guest::StoreU32(base, address + 392, v); }
+  float listener_position_z() const { return std::bit_cast<float>(listener_position_z_bits()); }
+  void set_listener_position_z(float v) const { set_listener_position_z_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t listener_position_w_address() const { return address + 396; }
-  float listener_position_w() const { return data()->listener_position_w; }
-  void set_listener_position_w(float v) const { data()->listener_position_w = v; }
-  uint32_t listener_position_w_bits() const { return std::bit_cast<uint32_t>(data()->listener_position_w); }
-  void set_listener_position_w_bits(uint32_t v) const { data()->listener_position_w = std::bit_cast<float>(v); }
+  uint32_t listener_position_w_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->listener_position_w); return uint32_t((memory::IsHandle(address + 396) ? uint32_t(memory::OwnerLoad(address + 396, 4)) : guest::LoadU32(base, address + 396))); }
+  void set_listener_position_w_bits(uint32_t v) const { if (auto* d = direct()) { d->listener_position_w = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 396)) memory::OwnerStore(address + 396, 4, v); else guest::StoreU32(base, address + 396, v); }
+  float listener_position_w() const { return std::bit_cast<float>(listener_position_w_bits()); }
+  void set_listener_position_w(float v) const { set_listener_position_w_bits(std::bit_cast<uint32_t>(v)); }
   // 0 when the car sound has no racer
   uint32_t vehicle_address() const { return address + 400; }
+  uint32_t vehicle_bits() const { if (auto* d = direct()) return d->vehicle; return uint32_t((memory::IsHandle(address + 400) ? uint32_t(memory::OwnerLoad(address + 400, 4)) : guest::LoadU32(base, address + 400))); }
+  void set_vehicle_bits(uint32_t v) const { if (auto* d = direct()) { d->vehicle = v; return; } if (memory::IsHandle(address + 400)) memory::OwnerStore(address + 400, 4, v); else guest::StoreU32(base, address + 400, v); }
   template <typename T = Vehicle>
-  T vehicle() const { return T(base, data()->vehicle); }
-  void set_vehicle(const View& w) const { const uint32_t v = w.address; data()->vehicle = v; }
-  void set_vehicle(uint32_t v) const { data()->vehicle = v; }
-  uint32_t vehicle_bits() const { return data()->vehicle; }
-  void set_vehicle_bits(uint32_t v) const { data()->vehicle = v; }
+  T vehicle() const { return T(base, vehicle_bits()); }
+  void set_vehicle(const View& w) const { set_vehicle_bits(w.address); }
+  void set_vehicle(uint32_t v) const { set_vehicle_bits(v); }
   // the car's index, 0 to 6
   uint32_t index_address() const { return address + 404; }
-  uint8_t index() const { return data()->index; }
-  void set_index(uint8_t v) const { data()->index = v; }
-  uint8_t index_bits() const { return data()->index; }
-  void set_index_bits(uint8_t v) const { data()->index = v; }
+  uint8_t index_bits() const { if (auto* d = direct()) return d->index; return uint8_t((memory::IsHandle(address + 404) ? uint8_t(memory::OwnerLoad(address + 404, 1)) : guest::LoadU8(base, address + 404))); }
+  void set_index_bits(uint8_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 404)) memory::OwnerStore(address + 404, 1, v); else guest::StoreU8(base, address + 404, v); }
+  uint8_t index() const { if (auto* d = direct()) return d->index; return uint8_t((memory::IsHandle(address + 404) ? uint8_t(memory::OwnerLoad(address + 404, 1)) : guest::LoadU8(base, address + 404))); }
+  void set_index(uint8_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 404)) memory::OwnerStore(address + 404, 1, v); else guest::StoreU8(base, address + 404, v); }
   // a CarSoundEngine
   uint32_t engine_address() const { return address + 408; }
-  uint8_t* engine() const { return reinterpret_cast<uint8_t*>(data()) + 408; }
+  uint8_t* engine() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 408 : guest::Pointer(base, address + 408); }
   template <typename T = CarSoundEngine>
   T engine_object() const { return T(base, address + 408); }
   // a CarSoundHits
   uint32_t hits_address() const { return address + 584; }
-  uint8_t* hits() const { return reinterpret_cast<uint8_t*>(data()) + 584; }
+  uint8_t* hits() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 584 : guest::Pointer(base, address + 584); }
   template <typename T = CarSoundHits>
   T hits_object() const { return T(base, address + 584); }
   // a CarSoundTires (its voice holder at +676)
   uint32_t tires_address() const { return address + 652; }
-  uint8_t* tires() const { return reinterpret_cast<uint8_t*>(data()) + 652; }
+  uint8_t* tires() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 652 : guest::Pointer(base, address + 652); }
   template <typename T = CarSoundTires>
   T tires_object() const { return T(base, address + 652); }
   // a CarSoundGear (sub_8210EBF0, probably the gear change)
   uint32_t gear_address() const { return address + 736; }
-  uint8_t* gear() const { return reinterpret_cast<uint8_t*>(data()) + 736; }
+  uint8_t* gear() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 736 : guest::Pointer(base, address + 736); }
   template <typename T = CarSoundGear>
   T gear_object() const { return T(base, address + 736); }
   // a CarSoundRoll
   uint32_t roll_address() const { return address + 792; }
-  uint8_t* roll() const { return reinterpret_cast<uint8_t*>(data()) + 792; }
+  uint8_t* roll() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 792 : guest::Pointer(base, address + 792); }
   template <typename T = CarSoundRoll>
   T roll_object() const { return T(base, address + 792); }
   // a CarSoundEvents (sub_8210ECF0)
   uint32_t events_address() const { return address + 840; }
-  uint8_t* events() const { return reinterpret_cast<uint8_t*>(data()) + 840; }
+  uint8_t* events() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 840 : guest::Pointer(base, address + 840); }
   template <typename T = CarSoundEvents>
   T events_object() const { return T(base, address + 840); }
   // a CarSoundFade (sub_8210EEE0)
   uint32_t fade_address() const { return address + 888; }
-  uint8_t* fade() const { return reinterpret_cast<uint8_t*>(data()) + 888; }
+  uint8_t* fade() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 888 : guest::Pointer(base, address + 888); }
   template <typename T = CarSoundFade>
   T fade_object() const { return T(base, address + 888); }
   // a CarSoundTurbo (probably)
   uint32_t turbo_address() const { return address + 952; }
-  uint8_t* turbo() const { return reinterpret_cast<uint8_t*>(data()) + 952; }
+  uint8_t* turbo() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 952 : guest::Pointer(base, address + 952); }
   template <typename T = CarSoundTurbo>
   T turbo_object() const { return T(base, address + 952); }
   // a CarSoundWind
   uint32_t wind_address() const { return address + 1016; }
-  uint8_t* wind() const { return reinterpret_cast<uint8_t*>(data()) + 1016; }
+  uint8_t* wind() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 1016 : guest::Pointer(base, address + 1016); }
   template <typename T = CarSoundWind>
   T wind_object() const { return T(base, address + 1016); }
   // a CarSoundHorn (probably)
   uint32_t horn_address() const { return address + 1072; }
-  uint8_t* horn() const { return reinterpret_cast<uint8_t*>(data()) + 1072; }
+  uint8_t* horn() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 1072 : guest::Pointer(base, address + 1072); }
   template <typename T = CarSoundHorn>
   T horn_object() const { return T(base, address + 1072); }
   // a CarSoundPassBy
   uint32_t pass_by_address() const { return address + 1136; }
-  uint8_t* pass_by() const { return reinterpret_cast<uint8_t*>(data()) + 1136; }
+  uint8_t* pass_by() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 1136 : guest::Pointer(base, address + 1136); }
   template <typename T = CarSoundPassBy>
   T pass_by_object() const { return T(base, address + 1136); }
   // the emitter's volume curve: six {distance, value} float pairs
   uint32_t volume_curve_points_address() const { return address + 1192; }
-  uint8_t* volume_curve_points() const { return reinterpret_cast<uint8_t*>(data()) + 1192; }
+  uint8_t* volume_curve_points() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 1192 : guest::Pointer(base, address + 1192); }
   // an X3DAudioCurve over +1192 (six points), the emitter's +64
   uint32_t volume_curve_address() const { return address + 1240; }
-  uint8_t* volume_curve() const { return reinterpret_cast<uint8_t*>(data()) + 1240; }
+  uint8_t* volume_curve() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 1240 : guest::Pointer(base, address + 1240); }
   template <typename T = X3DAudioCurve>
   T volume_curve_object() const { return T(base, address + 1240); }
   // 1 once CarSounds::SetBanks gave it its banks; 0 stopped
   uint32_t live_address() const { return address + 1248; }
-  uint32_t live() const { return data()->live; }
-  void set_live(uint32_t v) const { data()->live = v; }
-  uint32_t live_bits() const { return data()->live; }
-  void set_live_bits(uint32_t v) const { data()->live = v; }
+  uint32_t live_bits() const { if (auto* d = direct()) return d->live; return uint32_t((memory::IsHandle(address + 1248) ? uint32_t(memory::OwnerLoad(address + 1248, 4)) : guest::LoadU32(base, address + 1248))); }
+  void set_live_bits(uint32_t v) const { if (auto* d = direct()) { d->live = v; return; } if (memory::IsHandle(address + 1248)) memory::OwnerStore(address + 1248, 4, v); else guest::StoreU32(base, address + 1248, v); }
+  uint32_t live() const { if (auto* d = direct()) return d->live; return uint32_t((memory::IsHandle(address + 1248) ? uint32_t(memory::OwnerLoad(address + 1248, 4)) : guest::LoadU32(base, address + 1248))); }
+  void set_live(uint32_t v) const { if (auto* d = direct()) { d->live = v; return; } if (memory::IsHandle(address + 1248)) memory::OwnerStore(address + 1248, 4, v); else guest::StoreU32(base, address + 1248, v); }
   // 1.0; EngineSound::Update's f2
   uint32_t engine_gain_address() const { return address + 1252; }
-  float engine_gain() const { return data()->engine_gain; }
-  void set_engine_gain(float v) const { data()->engine_gain = v; }
-  uint32_t engine_gain_bits() const { return std::bit_cast<uint32_t>(data()->engine_gain); }
-  void set_engine_gain_bits(uint32_t v) const { data()->engine_gain = std::bit_cast<float>(v); }
+  uint32_t engine_gain_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->engine_gain); return uint32_t((memory::IsHandle(address + 1252) ? uint32_t(memory::OwnerLoad(address + 1252, 4)) : guest::LoadU32(base, address + 1252))); }
+  void set_engine_gain_bits(uint32_t v) const { if (auto* d = direct()) { d->engine_gain = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 1252)) memory::OwnerStore(address + 1252, 4, v); else guest::StoreU32(base, address + 1252, v); }
+  float engine_gain() const { return std::bit_cast<float>(engine_gain_bits()); }
+  void set_engine_gain(float v) const { set_engine_gain_bits(std::bit_cast<uint32_t>(v)); }
   // the last tick's Doppler factor (+204)
   uint32_t last_doppler_address() const { return address + 1256; }
-  float last_doppler() const { return data()->last_doppler; }
-  void set_last_doppler(float v) const { data()->last_doppler = v; }
-  uint32_t last_doppler_bits() const { return std::bit_cast<uint32_t>(data()->last_doppler); }
-  void set_last_doppler_bits(uint32_t v) const { data()->last_doppler = std::bit_cast<float>(v); }
+  uint32_t last_doppler_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->last_doppler); return uint32_t((memory::IsHandle(address + 1256) ? uint32_t(memory::OwnerLoad(address + 1256, 4)) : guest::LoadU32(base, address + 1256))); }
+  void set_last_doppler_bits(uint32_t v) const { if (auto* d = direct()) { d->last_doppler = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 1256)) memory::OwnerStore(address + 1256, 4, v); else guest::StoreU32(base, address + 1256, v); }
+  float last_doppler() const { return std::bit_cast<float>(last_doppler_bits()); }
+  void set_last_doppler(float v) const { set_last_doppler_bits(std::bit_cast<uint32_t>(v)); }
   // 1 the tick a car passed close (PassBySound::Update's r6)
   uint32_t passed_close_address() const { return address + 1260; }
-  uint32_t passed_close() const { return data()->passed_close; }
-  void set_passed_close(uint32_t v) const { data()->passed_close = v; }
-  uint32_t passed_close_bits() const { return data()->passed_close; }
-  void set_passed_close_bits(uint32_t v) const { data()->passed_close = v; }
+  uint32_t passed_close_bits() const { if (auto* d = direct()) return d->passed_close; return uint32_t((memory::IsHandle(address + 1260) ? uint32_t(memory::OwnerLoad(address + 1260, 4)) : guest::LoadU32(base, address + 1260))); }
+  void set_passed_close_bits(uint32_t v) const { if (auto* d = direct()) { d->passed_close = v; return; } if (memory::IsHandle(address + 1260)) memory::OwnerStore(address + 1260, 4, v); else guest::StoreU32(base, address + 1260, v); }
+  uint32_t passed_close() const { if (auto* d = direct()) return d->passed_close; return uint32_t((memory::IsHandle(address + 1260) ? uint32_t(memory::OwnerLoad(address + 1260, 4)) : guest::LoadU32(base, address + 1260))); }
+  void set_passed_close(uint32_t v) const { if (auto* d = direct()) { d->passed_close = v; return; } if (memory::IsHandle(address + 1260)) memory::OwnerStore(address + 1260, 4, v); else guest::StoreU32(base, address + 1260, v); }
 };
 
 // allocated; measure: new<8864>@CarSounds::Init
@@ -431,17 +432,18 @@ struct CarSoundArray : View {
   }
   CarSoundArray at(uint32_t i) const { return CarSoundArray(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCarSoundArrayLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarSoundArrayLayout, offset, width, v); }
+  CarSoundArrayData* direct() const { return static_cast<CarSoundArrayData*>(memory::HandleOwn(address, &kCarSoundArrayLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kCarSoundArrayLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarSoundArrayLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 7 (operator new[]'s count; CarSounds::Destroy reads it at the first sound's -16)
   uint32_t count_address() const { return address + 0; }
-  uint32_t count() const { return data()->count; }
-  void set_count(uint32_t v) const { data()->count = v; }
-  uint32_t count_bits() const { return data()->count; }
-  void set_count_bits(uint32_t v) const { data()->count = v; }
+  uint32_t count_bits() const { if (auto* d = direct()) return d->count; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_count_bits(uint32_t v) const { if (auto* d = direct()) { d->count = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t count() const { if (auto* d = direct()) return d->count; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_count(uint32_t v) const { if (auto* d = direct()) { d->count = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // seven CarSounds (the embedded sound)
   uint32_t sounds_address() const { return address + 16; }
-  uint8_t* sounds() const { return reinterpret_cast<uint8_t*>(data()) + 16; }
+  uint8_t* sounds() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 16 : guest::Pointer(base, address + 16); }
   template <typename T = CarSound>
   T sound(uint32_t i) const { return T(base, address + 16 + i * T::kSize); }
 };
@@ -478,25 +480,26 @@ struct CarSoundVoiceHolder : View {
   }
   CarSoundVoiceHolder at(uint32_t i) const { return CarSoundVoiceHolder(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCarSoundVoiceHolderLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarSoundVoiceHolderLayout, offset, width, v); }
+  CarSoundVoiceHolderData* direct() const { return static_cast<CarSoundVoiceHolderData*>(memory::HandleOwn(address, &kCarSoundVoiceHolderLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kCarSoundVoiceHolderLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarSoundVoiceHolderLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0x82010B5C
   uint32_t vtable_address() const { return address + 0; }
-  uint32_t vtable() const { return data()->vtable; }
-  void set_vtable(uint32_t v) const { data()->vtable = v; }
-  uint32_t vtable_bits() const { return data()->vtable; }
-  void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
+  uint32_t vtable_bits() const { if (auto* d = direct()) return d->vtable; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_vtable_bits(uint32_t v) const { if (auto* d = direct()) { d->vtable = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable() const { if (auto* d = direct()) return d->vtable; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_vtable(uint32_t v) const { if (auto* d = direct()) { d->vtable = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // four XAudio source voices by slot (0 a free slot)
   uint32_t voices_address() const { return address + 4; }
-  uint8_t* voices() const { return reinterpret_cast<uint8_t*>(data()) + 4; }
+  uint8_t* voices() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 4 : guest::Pointer(base, address + 4); }
   uint32_t voice_count_address() const { return address + 20; }
-  uint32_t voice_count() const { return data()->voice_count; }
-  void set_voice_count(uint32_t v) const { data()->voice_count = v; }
-  uint32_t voice_count_bits() const { return data()->voice_count; }
-  void set_voice_count_bits(uint32_t v) const { data()->voice_count = v; }
+  uint32_t voice_count_bits() const { if (auto* d = direct()) return d->voice_count; return uint32_t((memory::IsHandle(address + 20) ? uint32_t(memory::OwnerLoad(address + 20, 4)) : guest::LoadU32(base, address + 20))); }
+  void set_voice_count_bits(uint32_t v) const { if (auto* d = direct()) { d->voice_count = v; return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 4, v); else guest::StoreU32(base, address + 20, v); }
+  uint32_t voice_count() const { if (auto* d = direct()) return d->voice_count; return uint32_t((memory::IsHandle(address + 20) ? uint32_t(memory::OwnerLoad(address + 20, 4)) : guest::LoadU32(base, address + 20))); }
+  void set_voice_count(uint32_t v) const { if (auto* d = direct()) { d->voice_count = v; return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 4, v); else guest::StoreU32(base, address + 20, v); }
   // four words: which voices were playing when paused
   uint32_t paused_address() const { return address + 24; }
-  uint8_t* paused() const { return reinterpret_cast<uint8_t*>(data()) + 24; }
+  uint8_t* paused() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 24 : guest::Pointer(base, address + 24); }
 };
 
 // embedded; measure: -
@@ -530,27 +533,28 @@ struct CarSoundPart : View {
   }
   CarSoundPart at(uint32_t i) const { return CarSoundPart(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCarSoundPartLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarSoundPartLayout, offset, width, v); }
+  CarSoundPartData* direct() const { return static_cast<CarSoundPartData*>(memory::HandleOwn(address, &kCarSoundPartLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kCarSoundPartLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarSoundPartLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // a CarSoundVoiceHolder
   uint32_t holder_address() const { return address + 0; }
-  uint8_t* holder() const { return reinterpret_cast<uint8_t*>(data()) + 0; }
+  uint8_t* holder() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 0 : guest::Pointer(base, address + 0); }
   template <typename T = CarSoundVoiceHolder>
   T voice_holder() const { return T(base, address + 0); }
   // the effects' bank
   uint32_t view_address() const { return address + 40; }
+  uint32_t view_bits() const { if (auto* d = direct()) return d->view; return uint32_t((memory::IsHandle(address + 40) ? uint32_t(memory::OwnerLoad(address + 40, 4)) : guest::LoadU32(base, address + 40))); }
+  void set_view_bits(uint32_t v) const { if (auto* d = direct()) { d->view = v; return; } if (memory::IsHandle(address + 40)) memory::OwnerStore(address + 40, 4, v); else guest::StoreU32(base, address + 40, v); }
   template <typename T = CarSoundWaveBankView>
-  T view() const { return T(base, data()->view); }
-  void set_view(const View& w) const { const uint32_t v = w.address; data()->view = v; }
-  void set_view(uint32_t v) const { data()->view = v; }
-  uint32_t view_bits() const { return data()->view; }
-  void set_view_bits(uint32_t v) const { data()->view = v; }
+  T view() const { return T(base, view_bits()); }
+  void set_view(const View& w) const { set_view_bits(w.address); }
+  void set_view(uint32_t v) const { set_view_bits(v); }
   // the car's index
   uint32_t index_address() const { return address + 44; }
-  uint8_t index() const { return data()->index; }
-  void set_index(uint8_t v) const { data()->index = v; }
-  uint8_t index_bits() const { return data()->index; }
-  void set_index_bits(uint8_t v) const { data()->index = v; }
+  uint8_t index_bits() const { if (auto* d = direct()) return d->index; return uint8_t((memory::IsHandle(address + 44) ? uint8_t(memory::OwnerLoad(address + 44, 1)) : guest::LoadU8(base, address + 44))); }
+  void set_index_bits(uint8_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 1, v); else guest::StoreU8(base, address + 44, v); }
+  uint8_t index() const { if (auto* d = direct()) return d->index; return uint8_t((memory::IsHandle(address + 44) ? uint8_t(memory::OwnerLoad(address + 44, 1)) : guest::LoadU8(base, address + 44))); }
+  void set_index(uint8_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 1, v); else guest::StoreU8(base, address + 44, v); }
 };
 
 // embedded; measure: new<8864>@CarSounds::Init@+16@+408, CarSound@+408
@@ -585,30 +589,31 @@ struct CarSoundEngine : View {
   }
   CarSoundEngine at(uint32_t i) const { return CarSoundEngine(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCarSoundEngineLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarSoundEngineLayout, offset, width, v); }
+  CarSoundEngineData* direct() const { return static_cast<CarSoundEngineData*>(memory::HandleOwn(address, &kCarSoundEngineLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kCarSoundEngineLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarSoundEngineLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // a CarSoundEngineLayer (from the second wave bank view)
   uint32_t layer_address() const { return address + 0; }
-  uint8_t* layer() const { return reinterpret_cast<uint8_t*>(data()) + 0; }
+  uint8_t* layer() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 0 : guest::Pointer(base, address + 0); }
   // a CarSoundEngineLayer (from the first wave bank view)
   uint32_t pitched_layer_address() const { return address + 84; }
-  uint8_t* pitched_layer() const { return reinterpret_cast<uint8_t*>(data()) + 84; }
+  uint8_t* pitched_layer() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 84 : guest::Pointer(base, address + 84); }
   template <typename T = CarSoundEngineLayer>
   T layer_object() const { return T(base, address + 0); }
   template <typename T = CarSoundEngineLayer>
   T pitched_layer_object() const { return T(base, address + 84); }
   // the load, eased toward the throttle's target (probably)
   uint32_t load_address() const { return address + 168; }
-  float load() const { return data()->load; }
-  void set_load(float v) const { data()->load = v; }
-  uint32_t load_bits() const { return std::bit_cast<uint32_t>(data()->load); }
-  void set_load_bits(uint32_t v) const { data()->load = std::bit_cast<float>(v); }
+  uint32_t load_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->load); return uint32_t((memory::IsHandle(address + 168) ? uint32_t(memory::OwnerLoad(address + 168, 4)) : guest::LoadU32(base, address + 168))); }
+  void set_load_bits(uint32_t v) const { if (auto* d = direct()) { d->load = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 168)) memory::OwnerStore(address + 168, 4, v); else guest::StoreU32(base, address + 168, v); }
+  float load() const { return std::bit_cast<float>(load_bits()); }
+  void set_load(float v) const { set_load_bits(std::bit_cast<uint32_t>(v)); }
   // the speed without a vehicle: up by 10 a tick, back to 800 past 7,000
   uint32_t idle_speed_address() const { return address + 172; }
-  float idle_speed() const { return data()->idle_speed; }
-  void set_idle_speed(float v) const { data()->idle_speed = v; }
-  uint32_t idle_speed_bits() const { return std::bit_cast<uint32_t>(data()->idle_speed); }
-  void set_idle_speed_bits(uint32_t v) const { data()->idle_speed = std::bit_cast<float>(v); }
+  uint32_t idle_speed_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->idle_speed); return uint32_t((memory::IsHandle(address + 172) ? uint32_t(memory::OwnerLoad(address + 172, 4)) : guest::LoadU32(base, address + 172))); }
+  void set_idle_speed_bits(uint32_t v) const { if (auto* d = direct()) { d->idle_speed = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 172)) memory::OwnerStore(address + 172, 4, v); else guest::StoreU32(base, address + 172, v); }
+  float idle_speed() const { return std::bit_cast<float>(idle_speed_bits()); }
+  void set_idle_speed(float v) const { set_idle_speed_bits(std::bit_cast<uint32_t>(v)); }
 };
 
 // embedded; measure: EngineLayer, EngineLayer::Update.r3, EngineLayer::Start.r3
@@ -646,46 +651,47 @@ struct CarSoundEngineLayer : View {
   }
   CarSoundEngineLayer at(uint32_t i) const { return CarSoundEngineLayer(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCarSoundEngineLayerLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarSoundEngineLayerLayout, offset, width, v); }
+  CarSoundEngineLayerData* direct() const { return static_cast<CarSoundEngineLayerData*>(memory::HandleOwn(address, &kCarSoundEngineLayerLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kCarSoundEngineLayerLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarSoundEngineLayerLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0x82008018
   uint32_t vtable_address() const { return address + 0; }
-  uint32_t vtable() const { return data()->vtable; }
-  void set_vtable(uint32_t v) const { data()->vtable = v; }
-  uint32_t vtable_bits() const { return data()->vtable; }
-  void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
+  uint32_t vtable_bits() const { if (auto* d = direct()) return d->vtable; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_vtable_bits(uint32_t v) const { if (auto* d = direct()) { d->vtable = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable() const { if (auto* d = direct()) return d->vtable; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_vtable(uint32_t v) const { if (auto* d = direct()) { d->vtable = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // the car's sound parameters (CarSounds::SetBanks; 0 none)
   uint32_t table_address() const { return address + 4; }
+  uint32_t table_bits() const { if (auto* d = direct()) return d->table; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_table_bits(uint32_t v) const { if (auto* d = direct()) { d->table = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
   template <typename T = CarSoundEngineTable>
-  T table() const { return T(base, data()->table); }
-  void set_table(const View& w) const { const uint32_t v = w.address; data()->table = v; }
-  void set_table(uint32_t v) const { data()->table = v; }
-  uint32_t table_bits() const { return data()->table; }
-  void set_table_bits(uint32_t v) const { data()->table = v; }
+  T table() const { return T(base, table_bits()); }
+  void set_table(const View& w) const { set_table_bits(w.address); }
+  void set_table(uint32_t v) const { set_table_bits(v); }
   // the same pointer
   uint32_t table_copy_address() const { return address + 8; }
-  uint32_t table_copy() const { return data()->table_copy; }
-  void set_table_copy(uint32_t v) const { data()->table_copy = v; }
-  uint32_t table_copy_bits() const { return data()->table_copy; }
-  void set_table_copy_bits(uint32_t v) const { data()->table_copy = v; }
+  uint32_t table_copy_bits() const { if (auto* d = direct()) return d->table_copy; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_table_copy_bits(uint32_t v) const { if (auto* d = direct()) { d->table_copy = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  uint32_t table_copy() const { if (auto* d = direct()) return d->table_copy; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_table_copy(uint32_t v) const { if (auto* d = direct()) { d->table_copy = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
   // the table's first word
   uint32_t table_volume_address() const { return address + 12; }
-  uint32_t table_volume() const { return data()->table_volume; }
-  void set_table_volume(uint32_t v) const { data()->table_volume = v; }
-  uint32_t table_volume_bits() const { return data()->table_volume; }
-  void set_table_volume_bits(uint32_t v) const { data()->table_volume = v; }
+  uint32_t table_volume_bits() const { if (auto* d = direct()) return d->table_volume; return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_table_volume_bits(uint32_t v) const { if (auto* d = direct()) { d->table_volume = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
+  uint32_t table_volume() const { if (auto* d = direct()) return d->table_volume; return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_table_volume(uint32_t v) const { if (auto* d = direct()) { d->table_volume = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
   // the same word
   uint32_t table_volume_copy_address() const { return address + 16; }
-  uint32_t table_volume_copy() const { return data()->table_volume_copy; }
-  void set_table_volume_copy(uint32_t v) const { data()->table_volume_copy = v; }
-  uint32_t table_volume_copy_bits() const { return data()->table_volume_copy; }
-  void set_table_volume_copy_bits(uint32_t v) const { data()->table_volume_copy = v; }
+  uint32_t table_volume_copy_bits() const { if (auto* d = direct()) return d->table_volume_copy; return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_table_volume_copy_bits(uint32_t v) const { if (auto* d = direct()) { d->table_volume_copy = v; return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
+  uint32_t table_volume_copy() const { if (auto* d = direct()) return d->table_volume_copy; return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_table_volume_copy(uint32_t v) const { if (auto* d = direct()) { d->table_volume_copy = v; return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
   // a float per table entry: the volume's amount from its first curve
   uint32_t amounts_address() const { return address + 20; }
-  uint8_t* amounts() const { return reinterpret_cast<uint8_t*>(data()) + 20; }
+  uint8_t* amounts() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 20 : guest::Pointer(base, address + 20); }
   // a CarSoundVoiceHolder: one voice per table entry
   uint32_t holder_address() const { return address + 44; }
-  uint8_t* holder() const { return reinterpret_cast<uint8_t*>(data()) + 44; }
+  uint8_t* holder() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 44 : guest::Pointer(base, address + 44); }
   template <typename T = CarSoundVoiceHolder>
   T voice_holder() const { return T(base, address + 44); }
 };
@@ -772,57 +778,58 @@ struct CarSoundHits : View {
   }
   CarSoundHits at(uint32_t i) const { return CarSoundHits(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCarSoundHitsLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarSoundHitsLayout, offset, width, v); }
+  CarSoundHitsData* direct() const { return static_cast<CarSoundHitsData*>(memory::HandleOwn(address, &kCarSoundHitsLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kCarSoundHitsLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarSoundHitsLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // a CarSoundVoiceHolder
   uint32_t holder_address() const { return address + 0; }
-  uint8_t* holder() const { return reinterpret_cast<uint8_t*>(data()) + 0; }
+  uint8_t* holder() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 0 : guest::Pointer(base, address + 0); }
   template <typename T = CarSoundVoiceHolder>
   T voice_holder() const { return T(base, address + 0); }
   // the effects' bank
   uint32_t view_address() const { return address + 40; }
+  uint32_t view_bits() const { if (auto* d = direct()) return d->view; return uint32_t((memory::IsHandle(address + 40) ? uint32_t(memory::OwnerLoad(address + 40, 4)) : guest::LoadU32(base, address + 40))); }
+  void set_view_bits(uint32_t v) const { if (auto* d = direct()) { d->view = v; return; } if (memory::IsHandle(address + 40)) memory::OwnerStore(address + 40, 4, v); else guest::StoreU32(base, address + 40, v); }
   template <typename T = CarSoundWaveBankView>
-  T view() const { return T(base, data()->view); }
-  void set_view(const View& w) const { const uint32_t v = w.address; data()->view = v; }
-  void set_view(uint32_t v) const { data()->view = v; }
-  uint32_t view_bits() const { return data()->view; }
-  void set_view_bits(uint32_t v) const { data()->view = v; }
+  T view() const { return T(base, view_bits()); }
+  void set_view(const View& w) const { set_view_bits(w.address); }
+  void set_view(uint32_t v) const { set_view_bits(v); }
   // the car's index
   uint32_t index_address() const { return address + 44; }
-  uint8_t index() const { return data()->index; }
-  void set_index(uint8_t v) const { data()->index = v; }
-  uint8_t index_bits() const { return data()->index; }
-  void set_index_bits(uint8_t v) const { data()->index = v; }
+  uint8_t index_bits() const { if (auto* d = direct()) return d->index; return uint8_t((memory::IsHandle(address + 44) ? uint8_t(memory::OwnerLoad(address + 44, 1)) : guest::LoadU8(base, address + 44))); }
+  void set_index_bits(uint8_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 1, v); else guest::StoreU8(base, address + 44, v); }
+  uint8_t index() const { if (auto* d = direct()) return d->index; return uint8_t((memory::IsHandle(address + 44) ? uint8_t(memory::OwnerLoad(address + 44, 1)) : guest::LoadU8(base, address + 44))); }
+  void set_index(uint8_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 1, v); else guest::StoreU8(base, address + 44, v); }
   // ticks to wait before the next hit (unsigned)
   uint32_t wait_ticks_address() const { return address + 48; }
-  uint32_t wait_ticks() const { return data()->wait_ticks; }
-  void set_wait_ticks(uint32_t v) const { data()->wait_ticks = v; }
-  uint32_t wait_ticks_bits() const { return data()->wait_ticks; }
-  void set_wait_ticks_bits(uint32_t v) const { data()->wait_ticks = v; }
+  uint32_t wait_ticks_bits() const { if (auto* d = direct()) return d->wait_ticks; return uint32_t((memory::IsHandle(address + 48) ? uint32_t(memory::OwnerLoad(address + 48, 4)) : guest::LoadU32(base, address + 48))); }
+  void set_wait_ticks_bits(uint32_t v) const { if (auto* d = direct()) { d->wait_ticks = v; return; } if (memory::IsHandle(address + 48)) memory::OwnerStore(address + 48, 4, v); else guest::StoreU32(base, address + 48, v); }
+  uint32_t wait_ticks() const { if (auto* d = direct()) return d->wait_ticks; return uint32_t((memory::IsHandle(address + 48) ? uint32_t(memory::OwnerLoad(address + 48, 4)) : guest::LoadU32(base, address + 48))); }
+  void set_wait_ticks(uint32_t v) const { if (auto* d = direct()) { d->wait_ticks = v; return; } if (memory::IsHandle(address + 48)) memory::OwnerStore(address + 48, 4, v); else guest::StoreU32(base, address + 48, v); }
   // ticks out of contact while the scrape plays
   uint32_t scrape_ticks_address() const { return address + 52; }
-  uint32_t scrape_ticks() const { return data()->scrape_ticks; }
-  void set_scrape_ticks(uint32_t v) const { data()->scrape_ticks = v; }
-  uint32_t scrape_ticks_bits() const { return data()->scrape_ticks; }
-  void set_scrape_ticks_bits(uint32_t v) const { data()->scrape_ticks = v; }
+  uint32_t scrape_ticks_bits() const { if (auto* d = direct()) return d->scrape_ticks; return uint32_t((memory::IsHandle(address + 52) ? uint32_t(memory::OwnerLoad(address + 52, 4)) : guest::LoadU32(base, address + 52))); }
+  void set_scrape_ticks_bits(uint32_t v) const { if (auto* d = direct()) { d->scrape_ticks = v; return; } if (memory::IsHandle(address + 52)) memory::OwnerStore(address + 52, 4, v); else guest::StoreU32(base, address + 52, v); }
+  uint32_t scrape_ticks() const { if (auto* d = direct()) return d->scrape_ticks; return uint32_t((memory::IsHandle(address + 52) ? uint32_t(memory::OwnerLoad(address + 52, 4)) : guest::LoadU32(base, address + 52))); }
+  void set_scrape_ticks(uint32_t v) const { if (auto* d = direct()) { d->scrape_ticks = v; return; } if (memory::IsHandle(address + 52)) memory::OwnerStore(address + 52, 4, v); else guest::StoreU32(base, address + 52, v); }
   // the looping wave 10's slot, -1 none
   uint32_t scrape_slot_address() const { return address + 56; }
-  uint32_t scrape_slot() const { return data()->scrape_slot; }
-  void set_scrape_slot(uint32_t v) const { data()->scrape_slot = v; }
-  uint32_t scrape_slot_bits() const { return data()->scrape_slot; }
-  void set_scrape_slot_bits(uint32_t v) const { data()->scrape_slot = v; }
+  uint32_t scrape_slot_bits() const { if (auto* d = direct()) return d->scrape_slot; return uint32_t((memory::IsHandle(address + 56) ? uint32_t(memory::OwnerLoad(address + 56, 4)) : guest::LoadU32(base, address + 56))); }
+  void set_scrape_slot_bits(uint32_t v) const { if (auto* d = direct()) { d->scrape_slot = v; return; } if (memory::IsHandle(address + 56)) memory::OwnerStore(address + 56, 4, v); else guest::StoreU32(base, address + 56, v); }
+  uint32_t scrape_slot() const { if (auto* d = direct()) return d->scrape_slot; return uint32_t((memory::IsHandle(address + 56) ? uint32_t(memory::OwnerLoad(address + 56, 4)) : guest::LoadU32(base, address + 56))); }
+  void set_scrape_slot(uint32_t v) const { if (auto* d = direct()) { d->scrape_slot = v; return; } if (memory::IsHandle(address + 56)) memory::OwnerStore(address + 56, 4, v); else guest::StoreU32(base, address + 56, v); }
   // the last impact's strength (fctiwz)
   uint32_t strength_address() const { return address + 60; }
-  uint32_t strength() const { return data()->strength; }
-  void set_strength(uint32_t v) const { data()->strength = v; }
-  uint32_t strength_bits() const { return data()->strength; }
-  void set_strength_bits(uint32_t v) const { data()->strength = v; }
+  uint32_t strength_bits() const { if (auto* d = direct()) return d->strength; return uint32_t((memory::IsHandle(address + 60) ? uint32_t(memory::OwnerLoad(address + 60, 4)) : guest::LoadU32(base, address + 60))); }
+  void set_strength_bits(uint32_t v) const { if (auto* d = direct()) { d->strength = v; return; } if (memory::IsHandle(address + 60)) memory::OwnerStore(address + 60, 4, v); else guest::StoreU32(base, address + 60, v); }
+  uint32_t strength() const { if (auto* d = direct()) return d->strength; return uint32_t((memory::IsHandle(address + 60) ? uint32_t(memory::OwnerLoad(address + 60, 4)) : guest::LoadU32(base, address + 60))); }
+  void set_strength(uint32_t v) const { if (auto* d = direct()) { d->strength = v; return; } if (memory::IsHandle(address + 60)) memory::OwnerStore(address + 60, 4, v); else guest::StoreU32(base, address + 60, v); }
   // ticks since the last impact, up to 32 (then -1)
   uint32_t since_impact_address() const { return address + 64; }
-  uint32_t since_impact() const { return data()->since_impact; }
-  void set_since_impact(uint32_t v) const { data()->since_impact = v; }
-  uint32_t since_impact_bits() const { return data()->since_impact; }
-  void set_since_impact_bits(uint32_t v) const { data()->since_impact = v; }
+  uint32_t since_impact_bits() const { if (auto* d = direct()) return d->since_impact; return uint32_t((memory::IsHandle(address + 64) ? uint32_t(memory::OwnerLoad(address + 64, 4)) : guest::LoadU32(base, address + 64))); }
+  void set_since_impact_bits(uint32_t v) const { if (auto* d = direct()) { d->since_impact = v; return; } if (memory::IsHandle(address + 64)) memory::OwnerStore(address + 64, 4, v); else guest::StoreU32(base, address + 64, v); }
+  uint32_t since_impact() const { if (auto* d = direct()) return d->since_impact; return uint32_t((memory::IsHandle(address + 64) ? uint32_t(memory::OwnerLoad(address + 64, 4)) : guest::LoadU32(base, address + 64))); }
+  void set_since_impact(uint32_t v) const { if (auto* d = direct()) { d->since_impact = v; return; } if (memory::IsHandle(address + 64)) memory::OwnerStore(address + 64, 4, v); else guest::StoreU32(base, address + 64, v); }
 };
 
 // embedded; measure: CarSound@+652
@@ -873,102 +880,103 @@ struct CarSoundTires : View {
   }
   CarSoundTires at(uint32_t i) const { return CarSoundTires(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCarSoundTiresLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarSoundTiresLayout, offset, width, v); }
+  CarSoundTiresData* direct() const { return static_cast<CarSoundTiresData*>(memory::HandleOwn(address, &kCarSoundTiresLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kCarSoundTiresLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarSoundTiresLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // the layer record (TireLayer::Update's r4): the voice's slot
   uint32_t slot_address() const { return address + 0; }
-  uint32_t slot() const { return data()->slot; }
-  void set_slot(uint32_t v) const { data()->slot = v; }
-  uint32_t slot_bits() const { return data()->slot; }
-  void set_slot_bits(uint32_t v) const { data()->slot = v; }
+  uint32_t slot_bits() const { if (auto* d = direct()) return d->slot; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_slot_bits(uint32_t v) const { if (auto* d = direct()) { d->slot = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t slot() const { if (auto* d = direct()) return d->slot; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_slot(uint32_t v) const { if (auto* d = direct()) { d->slot = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // the last tick's `active`
   uint32_t was_active_address() const { return address + 4; }
-  uint32_t was_active() const { return data()->was_active; }
-  void set_was_active(uint32_t v) const { data()->was_active = v; }
-  uint32_t was_active_bits() const { return data()->was_active; }
-  void set_was_active_bits(uint32_t v) const { data()->was_active = v; }
+  uint32_t was_active_bits() const { if (auto* d = direct()) return d->was_active; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_was_active_bits(uint32_t v) const { if (auto* d = direct()) { d->was_active = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  uint32_t was_active() const { if (auto* d = direct()) return d->was_active; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_was_active(uint32_t v) const { if (auto* d = direct()) { d->was_active = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
   // the ticks slipped
   uint32_t slip_ticks_address() const { return address + 8; }
-  uint8_t slip_ticks() const { return data()->slip_ticks; }
-  void set_slip_ticks(uint8_t v) const { data()->slip_ticks = v; }
-  uint8_t slip_ticks_bits() const { return data()->slip_ticks; }
-  void set_slip_ticks_bits(uint8_t v) const { data()->slip_ticks = v; }
+  uint8_t slip_ticks_bits() const { if (auto* d = direct()) return d->slip_ticks; return uint8_t((memory::IsHandle(address + 8) ? uint8_t(memory::OwnerLoad(address + 8, 1)) : guest::LoadU8(base, address + 8))); }
+  void set_slip_ticks_bits(uint8_t v) const { if (auto* d = direct()) { d->slip_ticks = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 1, v); else guest::StoreU8(base, address + 8, v); }
+  uint8_t slip_ticks() const { if (auto* d = direct()) return d->slip_ticks; return uint8_t((memory::IsHandle(address + 8) ? uint8_t(memory::OwnerLoad(address + 8, 1)) : guest::LoadU8(base, address + 8))); }
+  void set_slip_ticks(uint8_t v) const { if (auto* d = direct()) { d->slip_ticks = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 1, v); else guest::StoreU8(base, address + 8, v); }
   uint32_t ramp_step_address() const { return address + 9; }
-  uint8_t ramp_step() const { return data()->ramp_step; }
-  void set_ramp_step(uint8_t v) const { data()->ramp_step = v; }
-  uint8_t ramp_step_bits() const { return data()->ramp_step; }
-  void set_ramp_step_bits(uint8_t v) const { data()->ramp_step = v; }
+  uint8_t ramp_step_bits() const { if (auto* d = direct()) return d->ramp_step; return uint8_t((memory::IsHandle(address + 9) ? uint8_t(memory::OwnerLoad(address + 9, 1)) : guest::LoadU8(base, address + 9))); }
+  void set_ramp_step_bits(uint8_t v) const { if (auto* d = direct()) { d->ramp_step = v; return; } if (memory::IsHandle(address + 9)) memory::OwnerStore(address + 9, 1, v); else guest::StoreU8(base, address + 9, v); }
+  uint8_t ramp_step() const { if (auto* d = direct()) return d->ramp_step; return uint8_t((memory::IsHandle(address + 9) ? uint8_t(memory::OwnerLoad(address + 9, 1)) : guest::LoadU8(base, address + 9))); }
+  void set_ramp_step(uint8_t v) const { if (auto* d = direct()) { d->ramp_step = v; return; } if (memory::IsHandle(address + 9)) memory::OwnerStore(address + 9, 1, v); else guest::StoreU8(base, address + 9, v); }
   uint32_t ramp_length_address() const { return address + 10; }
-  uint8_t ramp_length() const { return data()->ramp_length; }
-  void set_ramp_length(uint8_t v) const { data()->ramp_length = v; }
-  uint8_t ramp_length_bits() const { return data()->ramp_length; }
-  void set_ramp_length_bits(uint8_t v) const { data()->ramp_length = v; }
+  uint8_t ramp_length_bits() const { if (auto* d = direct()) return d->ramp_length; return uint8_t((memory::IsHandle(address + 10) ? uint8_t(memory::OwnerLoad(address + 10, 1)) : guest::LoadU8(base, address + 10))); }
+  void set_ramp_length_bits(uint8_t v) const { if (auto* d = direct()) { d->ramp_length = v; return; } if (memory::IsHandle(address + 10)) memory::OwnerStore(address + 10, 1, v); else guest::StoreU8(base, address + 10, v); }
+  uint8_t ramp_length() const { if (auto* d = direct()) return d->ramp_length; return uint8_t((memory::IsHandle(address + 10) ? uint8_t(memory::OwnerLoad(address + 10, 1)) : guest::LoadU8(base, address + 10))); }
+  void set_ramp_length(uint8_t v) const { if (auto* d = direct()) { d->ramp_length = v; return; } if (memory::IsHandle(address + 10)) memory::OwnerStore(address + 10, 1, v); else guest::StoreU8(base, address + 10, v); }
   // the second layer record's (set 1 by TireSound::Start)
   uint32_t slot_2_address() const { return address + 12; }
-  uint32_t slot_2() const { return data()->slot_2; }
-  void set_slot_2(uint32_t v) const { data()->slot_2 = v; }
-  uint32_t slot_2_bits() const { return data()->slot_2; }
-  void set_slot_2_bits(uint32_t v) const { data()->slot_2 = v; }
+  uint32_t slot_2_bits() const { if (auto* d = direct()) return d->slot_2; return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_slot_2_bits(uint32_t v) const { if (auto* d = direct()) { d->slot_2 = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
+  uint32_t slot_2() const { if (auto* d = direct()) return d->slot_2; return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_slot_2(uint32_t v) const { if (auto* d = direct()) { d->slot_2 = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
   uint32_t was_active_2_address() const { return address + 16; }
-  uint32_t was_active_2() const { return data()->was_active_2; }
-  void set_was_active_2(uint32_t v) const { data()->was_active_2 = v; }
-  uint32_t was_active_2_bits() const { return data()->was_active_2; }
-  void set_was_active_2_bits(uint32_t v) const { data()->was_active_2 = v; }
+  uint32_t was_active_2_bits() const { if (auto* d = direct()) return d->was_active_2; return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_was_active_2_bits(uint32_t v) const { if (auto* d = direct()) { d->was_active_2 = v; return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
+  uint32_t was_active_2() const { if (auto* d = direct()) return d->was_active_2; return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_was_active_2(uint32_t v) const { if (auto* d = direct()) { d->was_active_2 = v; return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
   uint32_t slip_ticks_2_address() const { return address + 20; }
-  uint8_t slip_ticks_2() const { return data()->slip_ticks_2; }
-  void set_slip_ticks_2(uint8_t v) const { data()->slip_ticks_2 = v; }
-  uint8_t slip_ticks_2_bits() const { return data()->slip_ticks_2; }
-  void set_slip_ticks_2_bits(uint8_t v) const { data()->slip_ticks_2 = v; }
+  uint8_t slip_ticks_2_bits() const { if (auto* d = direct()) return d->slip_ticks_2; return uint8_t((memory::IsHandle(address + 20) ? uint8_t(memory::OwnerLoad(address + 20, 1)) : guest::LoadU8(base, address + 20))); }
+  void set_slip_ticks_2_bits(uint8_t v) const { if (auto* d = direct()) { d->slip_ticks_2 = v; return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 1, v); else guest::StoreU8(base, address + 20, v); }
+  uint8_t slip_ticks_2() const { if (auto* d = direct()) return d->slip_ticks_2; return uint8_t((memory::IsHandle(address + 20) ? uint8_t(memory::OwnerLoad(address + 20, 1)) : guest::LoadU8(base, address + 20))); }
+  void set_slip_ticks_2(uint8_t v) const { if (auto* d = direct()) { d->slip_ticks_2 = v; return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 1, v); else guest::StoreU8(base, address + 20, v); }
   uint32_t ramp_step_2_address() const { return address + 21; }
-  uint8_t ramp_step_2() const { return data()->ramp_step_2; }
-  void set_ramp_step_2(uint8_t v) const { data()->ramp_step_2 = v; }
-  uint8_t ramp_step_2_bits() const { return data()->ramp_step_2; }
-  void set_ramp_step_2_bits(uint8_t v) const { data()->ramp_step_2 = v; }
+  uint8_t ramp_step_2_bits() const { if (auto* d = direct()) return d->ramp_step_2; return uint8_t((memory::IsHandle(address + 21) ? uint8_t(memory::OwnerLoad(address + 21, 1)) : guest::LoadU8(base, address + 21))); }
+  void set_ramp_step_2_bits(uint8_t v) const { if (auto* d = direct()) { d->ramp_step_2 = v; return; } if (memory::IsHandle(address + 21)) memory::OwnerStore(address + 21, 1, v); else guest::StoreU8(base, address + 21, v); }
+  uint8_t ramp_step_2() const { if (auto* d = direct()) return d->ramp_step_2; return uint8_t((memory::IsHandle(address + 21) ? uint8_t(memory::OwnerLoad(address + 21, 1)) : guest::LoadU8(base, address + 21))); }
+  void set_ramp_step_2(uint8_t v) const { if (auto* d = direct()) { d->ramp_step_2 = v; return; } if (memory::IsHandle(address + 21)) memory::OwnerStore(address + 21, 1, v); else guest::StoreU8(base, address + 21, v); }
   uint32_t ramp_length_2_address() const { return address + 22; }
-  uint8_t ramp_length_2() const { return data()->ramp_length_2; }
-  void set_ramp_length_2(uint8_t v) const { data()->ramp_length_2 = v; }
-  uint8_t ramp_length_2_bits() const { return data()->ramp_length_2; }
-  void set_ramp_length_2_bits(uint8_t v) const { data()->ramp_length_2 = v; }
+  uint8_t ramp_length_2_bits() const { if (auto* d = direct()) return d->ramp_length_2; return uint8_t((memory::IsHandle(address + 22) ? uint8_t(memory::OwnerLoad(address + 22, 1)) : guest::LoadU8(base, address + 22))); }
+  void set_ramp_length_2_bits(uint8_t v) const { if (auto* d = direct()) { d->ramp_length_2 = v; return; } if (memory::IsHandle(address + 22)) memory::OwnerStore(address + 22, 1, v); else guest::StoreU8(base, address + 22, v); }
+  uint8_t ramp_length_2() const { if (auto* d = direct()) return d->ramp_length_2; return uint8_t((memory::IsHandle(address + 22) ? uint8_t(memory::OwnerLoad(address + 22, 1)) : guest::LoadU8(base, address + 22))); }
+  void set_ramp_length_2(uint8_t v) const { if (auto* d = direct()) { d->ramp_length_2 = v; return; } if (memory::IsHandle(address + 22)) memory::OwnerStore(address + 22, 1, v); else guest::StoreU8(base, address + 22, v); }
   // a CarSoundVoiceHolder (+28 and +32 its voices)
   uint32_t holder_address() const { return address + 24; }
-  uint8_t* holder() const { return reinterpret_cast<uint8_t*>(data()) + 24; }
+  uint8_t* holder() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 24 : guest::Pointer(base, address + 24); }
   template <typename T = CarSoundVoiceHolder>
   T voice_holder() const { return T(base, address + 24); }
   uint32_t view_address() const { return address + 64; }
+  uint32_t view_bits() const { if (auto* d = direct()) return d->view; return uint32_t((memory::IsHandle(address + 64) ? uint32_t(memory::OwnerLoad(address + 64, 4)) : guest::LoadU32(base, address + 64))); }
+  void set_view_bits(uint32_t v) const { if (auto* d = direct()) { d->view = v; return; } if (memory::IsHandle(address + 64)) memory::OwnerStore(address + 64, 4, v); else guest::StoreU32(base, address + 64, v); }
   template <typename T = CarSoundWaveBankView>
-  T view() const { return T(base, data()->view); }
-  void set_view(const View& w) const { const uint32_t v = w.address; data()->view = v; }
-  void set_view(uint32_t v) const { data()->view = v; }
-  uint32_t view_bits() const { return data()->view; }
-  void set_view_bits(uint32_t v) const { data()->view = v; }
+  T view() const { return T(base, view_bits()); }
+  void set_view(const View& w) const { set_view_bits(w.address); }
+  void set_view(uint32_t v) const { set_view_bits(v); }
   uint32_t index_address() const { return address + 68; }
-  uint8_t index() const { return data()->index; }
-  void set_index(uint8_t v) const { data()->index = v; }
-  uint8_t index_bits() const { return data()->index; }
-  void set_index_bits(uint8_t v) const { data()->index = v; }
+  uint8_t index_bits() const { if (auto* d = direct()) return d->index; return uint8_t((memory::IsHandle(address + 68) ? uint8_t(memory::OwnerLoad(address + 68, 1)) : guest::LoadU8(base, address + 68))); }
+  void set_index_bits(uint8_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 68)) memory::OwnerStore(address + 68, 1, v); else guest::StoreU8(base, address + 68, v); }
+  uint8_t index() const { if (auto* d = direct()) return d->index; return uint8_t((memory::IsHandle(address + 68) ? uint8_t(memory::OwnerLoad(address + 68, 1)) : guest::LoadU8(base, address + 68))); }
+  void set_index(uint8_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 68)) memory::OwnerStore(address + 68, 1, v); else guest::StoreU8(base, address + 68, v); }
   // up by one a slipping tick
   uint32_t slip_steps_address() const { return address + 70; }
-  uint16_t slip_steps() const { return data()->slip_steps; }
-  void set_slip_steps(uint16_t v) const { data()->slip_steps = v; }
-  uint16_t slip_steps_bits() const { return data()->slip_steps; }
-  void set_slip_steps_bits(uint16_t v) const { data()->slip_steps = v; }
+  uint16_t slip_steps_bits() const { if (auto* d = direct()) return d->slip_steps; return uint16_t((memory::IsHandle(address + 70) ? uint16_t(memory::OwnerLoad(address + 70, 2)) : guest::LoadU16(base, address + 70))); }
+  void set_slip_steps_bits(uint16_t v) const { if (auto* d = direct()) { d->slip_steps = v; return; } if (memory::IsHandle(address + 70)) memory::OwnerStore(address + 70, 2, v); else guest::StoreU16(base, address + 70, v); }
+  uint16_t slip_steps() const { if (auto* d = direct()) return d->slip_steps; return uint16_t((memory::IsHandle(address + 70) ? uint16_t(memory::OwnerLoad(address + 70, 2)) : guest::LoadU16(base, address + 70))); }
+  void set_slip_steps(uint16_t v) const { if (auto* d = direct()) { d->slip_steps = v; return; } if (memory::IsHandle(address + 70)) memory::OwnerStore(address + 70, 2, v); else guest::StoreU16(base, address + 70, v); }
   // up by 1.0 a slipping tick
   uint32_t slip_time_address() const { return address + 72; }
-  float slip_time() const { return data()->slip_time; }
-  void set_slip_time(float v) const { data()->slip_time = v; }
-  uint32_t slip_time_bits() const { return std::bit_cast<uint32_t>(data()->slip_time); }
-  void set_slip_time_bits(uint32_t v) const { data()->slip_time = std::bit_cast<float>(v); }
+  uint32_t slip_time_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->slip_time); return uint32_t((memory::IsHandle(address + 72) ? uint32_t(memory::OwnerLoad(address + 72, 4)) : guest::LoadU32(base, address + 72))); }
+  void set_slip_time_bits(uint32_t v) const { if (auto* d = direct()) { d->slip_time = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 72)) memory::OwnerStore(address + 72, 4, v); else guest::StoreU32(base, address + 72, v); }
+  float slip_time() const { return std::bit_cast<float>(slip_time_bits()); }
+  void set_slip_time(float v) const { set_slip_time_bits(std::bit_cast<uint32_t>(v)); }
   // a signed half-word, stepped a third of the way to its target
   uint32_t pitch_address() const { return address + 76; }
-  uint16_t pitch() const { return data()->pitch; }
-  void set_pitch(uint16_t v) const { data()->pitch = v; }
-  uint16_t pitch_bits() const { return data()->pitch; }
-  void set_pitch_bits(uint16_t v) const { data()->pitch = v; }
+  uint16_t pitch_bits() const { if (auto* d = direct()) return d->pitch; return uint16_t((memory::IsHandle(address + 76) ? uint16_t(memory::OwnerLoad(address + 76, 2)) : guest::LoadU16(base, address + 76))); }
+  void set_pitch_bits(uint16_t v) const { if (auto* d = direct()) { d->pitch = v; return; } if (memory::IsHandle(address + 76)) memory::OwnerStore(address + 76, 2, v); else guest::StoreU16(base, address + 76, v); }
+  uint16_t pitch() const { if (auto* d = direct()) return d->pitch; return uint16_t((memory::IsHandle(address + 76) ? uint16_t(memory::OwnerLoad(address + 76, 2)) : guest::LoadU16(base, address + 76))); }
+  void set_pitch(uint16_t v) const { if (auto* d = direct()) { d->pitch = v; return; } if (memory::IsHandle(address + 76)) memory::OwnerStore(address + 76, 2, v); else guest::StoreU16(base, address + 76, v); }
   uint32_t volume_address() const { return address + 80; }
-  float volume() const { return data()->volume; }
-  void set_volume(float v) const { data()->volume = v; }
-  uint32_t volume_bits() const { return std::bit_cast<uint32_t>(data()->volume); }
-  void set_volume_bits(uint32_t v) const { data()->volume = std::bit_cast<float>(v); }
+  uint32_t volume_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->volume); return uint32_t((memory::IsHandle(address + 80) ? uint32_t(memory::OwnerLoad(address + 80, 4)) : guest::LoadU32(base, address + 80))); }
+  void set_volume_bits(uint32_t v) const { if (auto* d = direct()) { d->volume = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 80)) memory::OwnerStore(address + 80, 4, v); else guest::StoreU32(base, address + 80, v); }
+  float volume() const { return std::bit_cast<float>(volume_bits()); }
+  void set_volume(float v) const { set_volume_bits(std::bit_cast<uint32_t>(v)); }
 };
 
 // embedded; measure: -
@@ -1004,37 +1012,38 @@ struct CarSoundGear : View {
   }
   CarSoundGear at(uint32_t i) const { return CarSoundGear(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCarSoundGearLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarSoundGearLayout, offset, width, v); }
+  CarSoundGearData* direct() const { return static_cast<CarSoundGearData*>(memory::HandleOwn(address, &kCarSoundGearLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kCarSoundGearLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarSoundGearLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // a CarSoundVoiceHolder
   uint32_t holder_address() const { return address + 0; }
-  uint8_t* holder() const { return reinterpret_cast<uint8_t*>(data()) + 0; }
+  uint8_t* holder() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 0 : guest::Pointer(base, address + 0); }
   template <typename T = CarSoundVoiceHolder>
   T voice_holder() const { return T(base, address + 0); }
   uint32_t view_address() const { return address + 40; }
+  uint32_t view_bits() const { if (auto* d = direct()) return d->view; return uint32_t((memory::IsHandle(address + 40) ? uint32_t(memory::OwnerLoad(address + 40, 4)) : guest::LoadU32(base, address + 40))); }
+  void set_view_bits(uint32_t v) const { if (auto* d = direct()) { d->view = v; return; } if (memory::IsHandle(address + 40)) memory::OwnerStore(address + 40, 4, v); else guest::StoreU32(base, address + 40, v); }
   template <typename T = CarSoundWaveBankView>
-  T view() const { return T(base, data()->view); }
-  void set_view(const View& w) const { const uint32_t v = w.address; data()->view = v; }
-  void set_view(uint32_t v) const { data()->view = v; }
-  uint32_t view_bits() const { return data()->view; }
-  void set_view_bits(uint32_t v) const { data()->view = v; }
+  T view() const { return T(base, view_bits()); }
+  void set_view(const View& w) const { set_view_bits(w.address); }
+  void set_view(uint32_t v) const { set_view_bits(v); }
   uint32_t index_address() const { return address + 44; }
-  uint8_t index() const { return data()->index; }
-  void set_index(uint8_t v) const { data()->index = v; }
-  uint8_t index_bits() const { return data()->index; }
-  void set_index_bits(uint8_t v) const { data()->index = v; }
+  uint8_t index_bits() const { if (auto* d = direct()) return d->index; return uint8_t((memory::IsHandle(address + 44) ? uint8_t(memory::OwnerLoad(address + 44, 1)) : guest::LoadU8(base, address + 44))); }
+  void set_index_bits(uint8_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 1, v); else guest::StoreU8(base, address + 44, v); }
+  uint8_t index() const { if (auto* d = direct()) return d->index; return uint8_t((memory::IsHandle(address + 44) ? uint8_t(memory::OwnerLoad(address + 44, 1)) : guest::LoadU8(base, address + 44))); }
+  void set_index(uint8_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 1, v); else guest::StoreU8(base, address + 44, v); }
   // 32 when played, down by one while the vehicle's byte +2948 is clear
   uint32_t wait_ticks_address() const { return address + 48; }
-  uint32_t wait_ticks() const { return data()->wait_ticks; }
-  void set_wait_ticks(uint32_t v) const { data()->wait_ticks = v; }
-  uint32_t wait_ticks_bits() const { return data()->wait_ticks; }
-  void set_wait_ticks_bits(uint32_t v) const { data()->wait_ticks = v; }
+  uint32_t wait_ticks_bits() const { if (auto* d = direct()) return d->wait_ticks; return uint32_t((memory::IsHandle(address + 48) ? uint32_t(memory::OwnerLoad(address + 48, 4)) : guest::LoadU32(base, address + 48))); }
+  void set_wait_ticks_bits(uint32_t v) const { if (auto* d = direct()) { d->wait_ticks = v; return; } if (memory::IsHandle(address + 48)) memory::OwnerStore(address + 48, 4, v); else guest::StoreU32(base, address + 48, v); }
+  uint32_t wait_ticks() const { if (auto* d = direct()) return d->wait_ticks; return uint32_t((memory::IsHandle(address + 48) ? uint32_t(memory::OwnerLoad(address + 48, 4)) : guest::LoadU32(base, address + 48))); }
+  void set_wait_ticks(uint32_t v) const { if (auto* d = direct()) { d->wait_ticks = v; return; } if (memory::IsHandle(address + 48)) memory::OwnerStore(address + 48, 4, v); else guest::StoreU32(base, address + 48, v); }
   // -1 none
   uint32_t slot_address() const { return address + 52; }
-  uint32_t slot() const { return data()->slot; }
-  void set_slot(uint32_t v) const { data()->slot = v; }
-  uint32_t slot_bits() const { return data()->slot; }
-  void set_slot_bits(uint32_t v) const { data()->slot = v; }
+  uint32_t slot_bits() const { if (auto* d = direct()) return d->slot; return uint32_t((memory::IsHandle(address + 52) ? uint32_t(memory::OwnerLoad(address + 52, 4)) : guest::LoadU32(base, address + 52))); }
+  void set_slot_bits(uint32_t v) const { if (auto* d = direct()) { d->slot = v; return; } if (memory::IsHandle(address + 52)) memory::OwnerStore(address + 52, 4, v); else guest::StoreU32(base, address + 52, v); }
+  uint32_t slot() const { if (auto* d = direct()) return d->slot; return uint32_t((memory::IsHandle(address + 52) ? uint32_t(memory::OwnerLoad(address + 52, 4)) : guest::LoadU32(base, address + 52))); }
+  void set_slot(uint32_t v) const { if (auto* d = direct()) { d->slot = v; return; } if (memory::IsHandle(address + 52)) memory::OwnerStore(address + 52, 4, v); else guest::StoreU32(base, address + 52, v); }
 };
 
 // embedded; measure: CarSound@+792
@@ -1068,25 +1077,26 @@ struct CarSoundRoll : View {
   }
   CarSoundRoll at(uint32_t i) const { return CarSoundRoll(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCarSoundRollLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarSoundRollLayout, offset, width, v); }
+  CarSoundRollData* direct() const { return static_cast<CarSoundRollData*>(memory::HandleOwn(address, &kCarSoundRollLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kCarSoundRollLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarSoundRollLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // a CarSoundVoiceHolder (+4 the voice)
   uint32_t holder_address() const { return address + 0; }
-  uint8_t* holder() const { return reinterpret_cast<uint8_t*>(data()) + 0; }
+  uint8_t* holder() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 0 : guest::Pointer(base, address + 0); }
   template <typename T = CarSoundVoiceHolder>
   T voice_holder() const { return T(base, address + 0); }
   uint32_t view_address() const { return address + 40; }
+  uint32_t view_bits() const { if (auto* d = direct()) return d->view; return uint32_t((memory::IsHandle(address + 40) ? uint32_t(memory::OwnerLoad(address + 40, 4)) : guest::LoadU32(base, address + 40))); }
+  void set_view_bits(uint32_t v) const { if (auto* d = direct()) { d->view = v; return; } if (memory::IsHandle(address + 40)) memory::OwnerStore(address + 40, 4, v); else guest::StoreU32(base, address + 40, v); }
   template <typename T = CarSoundWaveBankView>
-  T view() const { return T(base, data()->view); }
-  void set_view(const View& w) const { const uint32_t v = w.address; data()->view = v; }
-  void set_view(uint32_t v) const { data()->view = v; }
-  uint32_t view_bits() const { return data()->view; }
-  void set_view_bits(uint32_t v) const { data()->view = v; }
+  T view() const { return T(base, view_bits()); }
+  void set_view(const View& w) const { set_view_bits(w.address); }
+  void set_view(uint32_t v) const { set_view_bits(v); }
   uint32_t index_address() const { return address + 44; }
-  uint8_t index() const { return data()->index; }
-  void set_index(uint8_t v) const { data()->index = v; }
-  uint8_t index_bits() const { return data()->index; }
-  void set_index_bits(uint8_t v) const { data()->index = v; }
+  uint8_t index_bits() const { if (auto* d = direct()) return d->index; return uint8_t((memory::IsHandle(address + 44) ? uint8_t(memory::OwnerLoad(address + 44, 1)) : guest::LoadU8(base, address + 44))); }
+  void set_index_bits(uint8_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 1, v); else guest::StoreU8(base, address + 44, v); }
+  uint8_t index() const { if (auto* d = direct()) return d->index; return uint8_t((memory::IsHandle(address + 44) ? uint8_t(memory::OwnerLoad(address + 44, 1)) : guest::LoadU8(base, address + 44))); }
+  void set_index(uint8_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 1, v); else guest::StoreU8(base, address + 44, v); }
 };
 
 // embedded; measure: -
@@ -1121,31 +1131,32 @@ struct CarSoundEvents : View {
   }
   CarSoundEvents at(uint32_t i) const { return CarSoundEvents(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCarSoundEventsLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarSoundEventsLayout, offset, width, v); }
+  CarSoundEventsData* direct() const { return static_cast<CarSoundEventsData*>(memory::HandleOwn(address, &kCarSoundEventsLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kCarSoundEventsLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarSoundEventsLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // a CarSoundVoiceHolder
   uint32_t holder_address() const { return address + 0; }
-  uint8_t* holder() const { return reinterpret_cast<uint8_t*>(data()) + 0; }
+  uint8_t* holder() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 0 : guest::Pointer(base, address + 0); }
   template <typename T = CarSoundVoiceHolder>
   T voice_holder() const { return T(base, address + 0); }
   uint32_t view_address() const { return address + 40; }
+  uint32_t view_bits() const { if (auto* d = direct()) return d->view; return uint32_t((memory::IsHandle(address + 40) ? uint32_t(memory::OwnerLoad(address + 40, 4)) : guest::LoadU32(base, address + 40))); }
+  void set_view_bits(uint32_t v) const { if (auto* d = direct()) { d->view = v; return; } if (memory::IsHandle(address + 40)) memory::OwnerStore(address + 40, 4, v); else guest::StoreU32(base, address + 40, v); }
   template <typename T = CarSoundWaveBankView>
-  T view() const { return T(base, data()->view); }
-  void set_view(const View& w) const { const uint32_t v = w.address; data()->view = v; }
-  void set_view(uint32_t v) const { data()->view = v; }
-  uint32_t view_bits() const { return data()->view; }
-  void set_view_bits(uint32_t v) const { data()->view = v; }
+  T view() const { return T(base, view_bits()); }
+  void set_view(const View& w) const { set_view_bits(w.address); }
+  void set_view(uint32_t v) const { set_view_bits(v); }
   uint32_t index_address() const { return address + 44; }
-  uint8_t index() const { return data()->index; }
-  void set_index(uint8_t v) const { data()->index = v; }
-  uint8_t index_bits() const { return data()->index; }
-  void set_index_bits(uint8_t v) const { data()->index = v; }
+  uint8_t index_bits() const { if (auto* d = direct()) return d->index; return uint8_t((memory::IsHandle(address + 44) ? uint8_t(memory::OwnerLoad(address + 44, 1)) : guest::LoadU8(base, address + 44))); }
+  void set_index_bits(uint8_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 1, v); else guest::StoreU8(base, address + 44, v); }
+  uint8_t index() const { if (auto* d = direct()) return d->index; return uint8_t((memory::IsHandle(address + 44) ? uint8_t(memory::OwnerLoad(address + 44, 1)) : guest::LoadU8(base, address + 44))); }
+  void set_index(uint8_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 1, v); else guest::StoreU8(base, address + 44, v); }
   // 2 when wave 18 played, down by one a tick
   uint32_t wave18_wait_address() const { return address + 45; }
-  uint8_t wave18_wait() const { return data()->wave18_wait; }
-  void set_wave18_wait(uint8_t v) const { data()->wave18_wait = v; }
-  uint8_t wave18_wait_bits() const { return data()->wave18_wait; }
-  void set_wave18_wait_bits(uint8_t v) const { data()->wave18_wait = v; }
+  uint8_t wave18_wait_bits() const { if (auto* d = direct()) return d->wave18_wait; return uint8_t((memory::IsHandle(address + 45) ? uint8_t(memory::OwnerLoad(address + 45, 1)) : guest::LoadU8(base, address + 45))); }
+  void set_wave18_wait_bits(uint8_t v) const { if (auto* d = direct()) { d->wave18_wait = v; return; } if (memory::IsHandle(address + 45)) memory::OwnerStore(address + 45, 1, v); else guest::StoreU8(base, address + 45, v); }
+  uint8_t wave18_wait() const { if (auto* d = direct()) return d->wave18_wait; return uint8_t((memory::IsHandle(address + 45) ? uint8_t(memory::OwnerLoad(address + 45, 1)) : guest::LoadU8(base, address + 45))); }
+  void set_wave18_wait(uint8_t v) const { if (auto* d = direct()) { d->wave18_wait = v; return; } if (memory::IsHandle(address + 45)) memory::OwnerStore(address + 45, 1, v); else guest::StoreU8(base, address + 45, v); }
 };
 
 // embedded; measure: -
@@ -1183,48 +1194,49 @@ struct CarSoundFade : View {
   }
   CarSoundFade at(uint32_t i) const { return CarSoundFade(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCarSoundFadeLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarSoundFadeLayout, offset, width, v); }
+  CarSoundFadeData* direct() const { return static_cast<CarSoundFadeData*>(memory::HandleOwn(address, &kCarSoundFadeLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kCarSoundFadeLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarSoundFadeLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // a CarSoundVoiceHolder
   uint32_t holder_address() const { return address + 0; }
-  uint8_t* holder() const { return reinterpret_cast<uint8_t*>(data()) + 0; }
+  uint8_t* holder() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 0 : guest::Pointer(base, address + 0); }
   template <typename T = CarSoundVoiceHolder>
   T voice_holder() const { return T(base, address + 0); }
   uint32_t view_address() const { return address + 40; }
+  uint32_t view_bits() const { if (auto* d = direct()) return d->view; return uint32_t((memory::IsHandle(address + 40) ? uint32_t(memory::OwnerLoad(address + 40, 4)) : guest::LoadU32(base, address + 40))); }
+  void set_view_bits(uint32_t v) const { if (auto* d = direct()) { d->view = v; return; } if (memory::IsHandle(address + 40)) memory::OwnerStore(address + 40, 4, v); else guest::StoreU32(base, address + 40, v); }
   template <typename T = CarSoundWaveBankView>
-  T view() const { return T(base, data()->view); }
-  void set_view(const View& w) const { const uint32_t v = w.address; data()->view = v; }
-  void set_view(uint32_t v) const { data()->view = v; }
-  uint32_t view_bits() const { return data()->view; }
-  void set_view_bits(uint32_t v) const { data()->view = v; }
+  T view() const { return T(base, view_bits()); }
+  void set_view(const View& w) const { set_view_bits(w.address); }
+  void set_view(uint32_t v) const { set_view_bits(v); }
   uint32_t index_address() const { return address + 44; }
-  uint8_t index() const { return data()->index; }
-  void set_index(uint8_t v) const { data()->index = v; }
-  uint8_t index_bits() const { return data()->index; }
-  void set_index_bits(uint8_t v) const { data()->index = v; }
+  uint8_t index_bits() const { if (auto* d = direct()) return d->index; return uint8_t((memory::IsHandle(address + 44) ? uint8_t(memory::OwnerLoad(address + 44, 1)) : guest::LoadU8(base, address + 44))); }
+  void set_index_bits(uint8_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 1, v); else guest::StoreU8(base, address + 44, v); }
+  uint8_t index() const { if (auto* d = direct()) return d->index; return uint8_t((memory::IsHandle(address + 44) ? uint8_t(memory::OwnerLoad(address + 44, 1)) : guest::LoadU8(base, address + 44))); }
+  void set_index(uint8_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 1, v); else guest::StoreU8(base, address + 44, v); }
   uint32_t playing_address() const { return address + 48; }
-  uint32_t playing() const { return data()->playing; }
-  void set_playing(uint32_t v) const { data()->playing = v; }
-  uint32_t playing_bits() const { return data()->playing; }
-  void set_playing_bits(uint32_t v) const { data()->playing = v; }
+  uint32_t playing_bits() const { if (auto* d = direct()) return d->playing; return uint32_t((memory::IsHandle(address + 48) ? uint32_t(memory::OwnerLoad(address + 48, 4)) : guest::LoadU32(base, address + 48))); }
+  void set_playing_bits(uint32_t v) const { if (auto* d = direct()) { d->playing = v; return; } if (memory::IsHandle(address + 48)) memory::OwnerStore(address + 48, 4, v); else guest::StoreU32(base, address + 48, v); }
+  uint32_t playing() const { if (auto* d = direct()) return d->playing; return uint32_t((memory::IsHandle(address + 48) ? uint32_t(memory::OwnerLoad(address + 48, 4)) : guest::LoadU32(base, address + 48))); }
+  void set_playing(uint32_t v) const { if (auto* d = direct()) { d->playing = v; return; } if (memory::IsHandle(address + 48)) memory::OwnerStore(address + 48, 4, v); else guest::StoreU32(base, address + 48, v); }
   // -1 none (used without a check)
   uint32_t slot_address() const { return address + 52; }
-  uint32_t slot() const { return data()->slot; }
-  void set_slot(uint32_t v) const { data()->slot = v; }
-  uint32_t slot_bits() const { return data()->slot; }
-  void set_slot_bits(uint32_t v) const { data()->slot = v; }
+  uint32_t slot_bits() const { if (auto* d = direct()) return d->slot; return uint32_t((memory::IsHandle(address + 52) ? uint32_t(memory::OwnerLoad(address + 52, 4)) : guest::LoadU32(base, address + 52))); }
+  void set_slot_bits(uint32_t v) const { if (auto* d = direct()) { d->slot = v; return; } if (memory::IsHandle(address + 52)) memory::OwnerStore(address + 52, 4, v); else guest::StoreU32(base, address + 52, v); }
+  uint32_t slot() const { if (auto* d = direct()) return d->slot; return uint32_t((memory::IsHandle(address + 52) ? uint32_t(memory::OwnerLoad(address + 52, 4)) : guest::LoadU32(base, address + 52))); }
+  void set_slot(uint32_t v) const { if (auto* d = direct()) { d->slot = v; return; } if (memory::IsHandle(address + 52)) memory::OwnerStore(address + 52, 4, v); else guest::StoreU32(base, address + 52, v); }
   // -1.0 none
   uint32_t fade_out_address() const { return address + 56; }
-  float fade_out() const { return data()->fade_out; }
-  void set_fade_out(float v) const { data()->fade_out = v; }
-  uint32_t fade_out_bits() const { return std::bit_cast<uint32_t>(data()->fade_out); }
-  void set_fade_out_bits(uint32_t v) const { data()->fade_out = std::bit_cast<float>(v); }
+  uint32_t fade_out_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->fade_out); return uint32_t((memory::IsHandle(address + 56) ? uint32_t(memory::OwnerLoad(address + 56, 4)) : guest::LoadU32(base, address + 56))); }
+  void set_fade_out_bits(uint32_t v) const { if (auto* d = direct()) { d->fade_out = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 56)) memory::OwnerStore(address + 56, 4, v); else guest::StoreU32(base, address + 56, v); }
+  float fade_out() const { return std::bit_cast<float>(fade_out_bits()); }
+  void set_fade_out(float v) const { set_fade_out_bits(std::bit_cast<uint32_t>(v)); }
   // -1.0 none
   uint32_t fade_in_address() const { return address + 60; }
-  float fade_in() const { return data()->fade_in; }
-  void set_fade_in(float v) const { data()->fade_in = v; }
-  uint32_t fade_in_bits() const { return std::bit_cast<uint32_t>(data()->fade_in); }
-  void set_fade_in_bits(uint32_t v) const { data()->fade_in = std::bit_cast<float>(v); }
+  uint32_t fade_in_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->fade_in); return uint32_t((memory::IsHandle(address + 60) ? uint32_t(memory::OwnerLoad(address + 60, 4)) : guest::LoadU32(base, address + 60))); }
+  void set_fade_in_bits(uint32_t v) const { if (auto* d = direct()) { d->fade_in = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 60)) memory::OwnerStore(address + 60, 4, v); else guest::StoreU32(base, address + 60, v); }
+  float fade_in() const { return std::bit_cast<float>(fade_in_bits()); }
+  void set_fade_in(float v) const { set_fade_in_bits(std::bit_cast<uint32_t>(v)); }
 };
 
 // embedded; measure: CarSound@+952
@@ -1264,58 +1276,59 @@ struct CarSoundTurbo : View {
   }
   CarSoundTurbo at(uint32_t i) const { return CarSoundTurbo(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCarSoundTurboLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarSoundTurboLayout, offset, width, v); }
+  CarSoundTurboData* direct() const { return static_cast<CarSoundTurboData*>(memory::HandleOwn(address, &kCarSoundTurboLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kCarSoundTurboLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarSoundTurboLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // a CarSoundVoiceHolder
   uint32_t holder_address() const { return address + 0; }
-  uint8_t* holder() const { return reinterpret_cast<uint8_t*>(data()) + 0; }
+  uint8_t* holder() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 0 : guest::Pointer(base, address + 0); }
   template <typename T = CarSoundVoiceHolder>
   T voice_holder() const { return T(base, address + 0); }
   uint32_t view_address() const { return address + 40; }
+  uint32_t view_bits() const { if (auto* d = direct()) return d->view; return uint32_t((memory::IsHandle(address + 40) ? uint32_t(memory::OwnerLoad(address + 40, 4)) : guest::LoadU32(base, address + 40))); }
+  void set_view_bits(uint32_t v) const { if (auto* d = direct()) { d->view = v; return; } if (memory::IsHandle(address + 40)) memory::OwnerStore(address + 40, 4, v); else guest::StoreU32(base, address + 40, v); }
   template <typename T = CarSoundWaveBankView>
-  T view() const { return T(base, data()->view); }
-  void set_view(const View& w) const { const uint32_t v = w.address; data()->view = v; }
-  void set_view(uint32_t v) const { data()->view = v; }
-  uint32_t view_bits() const { return data()->view; }
-  void set_view_bits(uint32_t v) const { data()->view = v; }
+  T view() const { return T(base, view_bits()); }
+  void set_view(const View& w) const { set_view_bits(w.address); }
+  void set_view(uint32_t v) const { set_view_bits(v); }
   uint32_t index_address() const { return address + 44; }
-  uint8_t index() const { return data()->index; }
-  void set_index(uint8_t v) const { data()->index = v; }
-  uint8_t index_bits() const { return data()->index; }
-  void set_index_bits(uint8_t v) const { data()->index = v; }
+  uint8_t index_bits() const { if (auto* d = direct()) return d->index; return uint8_t((memory::IsHandle(address + 44) ? uint8_t(memory::OwnerLoad(address + 44, 1)) : guest::LoadU8(base, address + 44))); }
+  void set_index_bits(uint8_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 1, v); else guest::StoreU8(base, address + 44, v); }
+  uint8_t index() const { if (auto* d = direct()) return d->index; return uint8_t((memory::IsHandle(address + 44) ? uint8_t(memory::OwnerLoad(address + 44, 1)) : guest::LoadU8(base, address + 44))); }
+  void set_index(uint8_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 1, v); else guest::StoreU8(base, address + 44, v); }
   // the looping wave 3's slot, -1 none
   uint32_t slot_address() const { return address + 48; }
-  uint32_t slot() const { return data()->slot; }
-  void set_slot(uint32_t v) const { data()->slot = v; }
-  uint32_t slot_bits() const { return data()->slot; }
-  void set_slot_bits(uint32_t v) const { data()->slot = v; }
+  uint32_t slot_bits() const { if (auto* d = direct()) return d->slot; return uint32_t((memory::IsHandle(address + 48) ? uint32_t(memory::OwnerLoad(address + 48, 4)) : guest::LoadU32(base, address + 48))); }
+  void set_slot_bits(uint32_t v) const { if (auto* d = direct()) { d->slot = v; return; } if (memory::IsHandle(address + 48)) memory::OwnerStore(address + 48, 4, v); else guest::StoreU32(base, address + 48, v); }
+  uint32_t slot() const { if (auto* d = direct()) return d->slot; return uint32_t((memory::IsHandle(address + 48) ? uint32_t(memory::OwnerLoad(address + 48, 4)) : guest::LoadU32(base, address + 48))); }
+  void set_slot(uint32_t v) const { if (auto* d = direct()) { d->slot = v; return; } if (memory::IsHandle(address + 48)) memory::OwnerStore(address + 48, 4, v); else guest::StoreU32(base, address + 48, v); }
   uint32_t last_boost_address() const { return address + 52; }
-  float last_boost() const { return data()->last_boost; }
-  void set_last_boost(float v) const { data()->last_boost = v; }
-  uint32_t last_boost_bits() const { return std::bit_cast<uint32_t>(data()->last_boost); }
-  void set_last_boost_bits(uint32_t v) const { data()->last_boost = std::bit_cast<float>(v); }
+  uint32_t last_boost_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->last_boost); return uint32_t((memory::IsHandle(address + 52) ? uint32_t(memory::OwnerLoad(address + 52, 4)) : guest::LoadU32(base, address + 52))); }
+  void set_last_boost_bits(uint32_t v) const { if (auto* d = direct()) { d->last_boost = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 52)) memory::OwnerStore(address + 52, 4, v); else guest::StoreU32(base, address + 52, v); }
+  float last_boost() const { return std::bit_cast<float>(last_boost_bits()); }
+  void set_last_boost(float v) const { set_last_boost_bits(std::bit_cast<uint32_t>(v)); }
   // 0 to 3072 (+ 8192 for SetPitch)
   uint32_t pitch_address() const { return address + 56; }
-  uint16_t pitch() const { return data()->pitch; }
-  void set_pitch(uint16_t v) const { data()->pitch = v; }
-  uint16_t pitch_bits() const { return data()->pitch; }
-  void set_pitch_bits(uint16_t v) const { data()->pitch = v; }
+  uint16_t pitch_bits() const { if (auto* d = direct()) return d->pitch; return uint16_t((memory::IsHandle(address + 56) ? uint16_t(memory::OwnerLoad(address + 56, 2)) : guest::LoadU16(base, address + 56))); }
+  void set_pitch_bits(uint16_t v) const { if (auto* d = direct()) { d->pitch = v; return; } if (memory::IsHandle(address + 56)) memory::OwnerStore(address + 56, 2, v); else guest::StoreU16(base, address + 56, v); }
+  uint16_t pitch() const { if (auto* d = direct()) return d->pitch; return uint16_t((memory::IsHandle(address + 56) ? uint16_t(memory::OwnerLoad(address + 56, 2)) : guest::LoadU16(base, address + 56))); }
+  void set_pitch(uint16_t v) const { if (auto* d = direct()) { d->pitch = v; return; } if (memory::IsHandle(address + 56)) memory::OwnerStore(address + 56, 2, v); else guest::StoreU16(base, address + 56, v); }
   // 16 when started, counted down
   uint32_t wait_ticks_address() const { return address + 58; }
-  uint8_t wait_ticks() const { return data()->wait_ticks; }
-  void set_wait_ticks(uint8_t v) const { data()->wait_ticks = v; }
-  uint8_t wait_ticks_bits() const { return data()->wait_ticks; }
-  void set_wait_ticks_bits(uint8_t v) const { data()->wait_ticks = v; }
+  uint8_t wait_ticks_bits() const { if (auto* d = direct()) return d->wait_ticks; return uint8_t((memory::IsHandle(address + 58) ? uint8_t(memory::OwnerLoad(address + 58, 1)) : guest::LoadU8(base, address + 58))); }
+  void set_wait_ticks_bits(uint8_t v) const { if (auto* d = direct()) { d->wait_ticks = v; return; } if (memory::IsHandle(address + 58)) memory::OwnerStore(address + 58, 1, v); else guest::StoreU8(base, address + 58, v); }
+  uint8_t wait_ticks() const { if (auto* d = direct()) return d->wait_ticks; return uint8_t((memory::IsHandle(address + 58) ? uint8_t(memory::OwnerLoad(address + 58, 1)) : guest::LoadU8(base, address + 58))); }
+  void set_wait_ticks(uint8_t v) const { if (auto* d = direct()) { d->wait_ticks = v; return; } if (memory::IsHandle(address + 58)) memory::OwnerStore(address + 58, 1, v); else guest::StoreU8(base, address + 58, v); }
   uint32_t volume_steps_address() const { return address + 59; }
-  uint8_t volume_steps() const { return data()->volume_steps; }
-  void set_volume_steps(uint8_t v) const { data()->volume_steps = v; }
-  uint8_t volume_steps_bits() const { return data()->volume_steps; }
-  void set_volume_steps_bits(uint8_t v) const { data()->volume_steps = v; }
+  uint8_t volume_steps_bits() const { if (auto* d = direct()) return d->volume_steps; return uint8_t((memory::IsHandle(address + 59) ? uint8_t(memory::OwnerLoad(address + 59, 1)) : guest::LoadU8(base, address + 59))); }
+  void set_volume_steps_bits(uint8_t v) const { if (auto* d = direct()) { d->volume_steps = v; return; } if (memory::IsHandle(address + 59)) memory::OwnerStore(address + 59, 1, v); else guest::StoreU8(base, address + 59, v); }
+  uint8_t volume_steps() const { if (auto* d = direct()) return d->volume_steps; return uint8_t((memory::IsHandle(address + 59) ? uint8_t(memory::OwnerLoad(address + 59, 1)) : guest::LoadU8(base, address + 59))); }
+  void set_volume_steps(uint8_t v) const { if (auto* d = direct()) { d->volume_steps = v; return; } if (memory::IsHandle(address + 59)) memory::OwnerStore(address + 59, 1, v); else guest::StoreU8(base, address + 59, v); }
   uint32_t volume_address() const { return address + 60; }
-  float volume() const { return data()->volume; }
-  void set_volume(float v) const { data()->volume = v; }
-  uint32_t volume_bits() const { return std::bit_cast<uint32_t>(data()->volume); }
-  void set_volume_bits(uint32_t v) const { data()->volume = std::bit_cast<float>(v); }
+  uint32_t volume_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->volume); return uint32_t((memory::IsHandle(address + 60) ? uint32_t(memory::OwnerLoad(address + 60, 4)) : guest::LoadU32(base, address + 60))); }
+  void set_volume_bits(uint32_t v) const { if (auto* d = direct()) { d->volume = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 60)) memory::OwnerStore(address + 60, 4, v); else guest::StoreU32(base, address + 60, v); }
+  float volume() const { return std::bit_cast<float>(volume_bits()); }
+  void set_volume(float v) const { set_volume_bits(std::bit_cast<uint32_t>(v)); }
 };
 
 // embedded; measure: CarSound@+1016
@@ -1351,37 +1364,38 @@ struct CarSoundWind : View {
   }
   CarSoundWind at(uint32_t i) const { return CarSoundWind(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCarSoundWindLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarSoundWindLayout, offset, width, v); }
+  CarSoundWindData* direct() const { return static_cast<CarSoundWindData*>(memory::HandleOwn(address, &kCarSoundWindLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kCarSoundWindLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarSoundWindLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // a CarSoundVoiceHolder
   uint32_t holder_address() const { return address + 0; }
-  uint8_t* holder() const { return reinterpret_cast<uint8_t*>(data()) + 0; }
+  uint8_t* holder() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 0 : guest::Pointer(base, address + 0); }
   template <typename T = CarSoundVoiceHolder>
   T voice_holder() const { return T(base, address + 0); }
   uint32_t view_address() const { return address + 40; }
+  uint32_t view_bits() const { if (auto* d = direct()) return d->view; return uint32_t((memory::IsHandle(address + 40) ? uint32_t(memory::OwnerLoad(address + 40, 4)) : guest::LoadU32(base, address + 40))); }
+  void set_view_bits(uint32_t v) const { if (auto* d = direct()) { d->view = v; return; } if (memory::IsHandle(address + 40)) memory::OwnerStore(address + 40, 4, v); else guest::StoreU32(base, address + 40, v); }
   template <typename T = CarSoundWaveBankView>
-  T view() const { return T(base, data()->view); }
-  void set_view(const View& w) const { const uint32_t v = w.address; data()->view = v; }
-  void set_view(uint32_t v) const { data()->view = v; }
-  uint32_t view_bits() const { return data()->view; }
-  void set_view_bits(uint32_t v) const { data()->view = v; }
+  T view() const { return T(base, view_bits()); }
+  void set_view(const View& w) const { set_view_bits(w.address); }
+  void set_view(uint32_t v) const { set_view_bits(v); }
   uint32_t index_address() const { return address + 44; }
-  uint8_t index() const { return data()->index; }
-  void set_index(uint8_t v) const { data()->index = v; }
-  uint8_t index_bits() const { return data()->index; }
-  void set_index_bits(uint8_t v) const { data()->index = v; }
+  uint8_t index_bits() const { if (auto* d = direct()) return d->index; return uint8_t((memory::IsHandle(address + 44) ? uint8_t(memory::OwnerLoad(address + 44, 1)) : guest::LoadU8(base, address + 44))); }
+  void set_index_bits(uint8_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 1, v); else guest::StoreU8(base, address + 44, v); }
+  uint8_t index() const { if (auto* d = direct()) return d->index; return uint8_t((memory::IsHandle(address + 44) ? uint8_t(memory::OwnerLoad(address + 44, 1)) : guest::LoadU8(base, address + 44))); }
+  void set_index(uint8_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 1, v); else guest::StoreU8(base, address + 44, v); }
   // 1 once wave 5 played
   uint32_t played_address() const { return address + 48; }
-  uint32_t played() const { return data()->played; }
-  void set_played(uint32_t v) const { data()->played = v; }
-  uint32_t played_bits() const { return data()->played; }
-  void set_played_bits(uint32_t v) const { data()->played = v; }
+  uint32_t played_bits() const { if (auto* d = direct()) return d->played; return uint32_t((memory::IsHandle(address + 48) ? uint32_t(memory::OwnerLoad(address + 48, 4)) : guest::LoadU32(base, address + 48))); }
+  void set_played_bits(uint32_t v) const { if (auto* d = direct()) { d->played = v; return; } if (memory::IsHandle(address + 48)) memory::OwnerStore(address + 48, 4, v); else guest::StoreU32(base, address + 48, v); }
+  uint32_t played() const { if (auto* d = direct()) return d->played; return uint32_t((memory::IsHandle(address + 48) ? uint32_t(memory::OwnerLoad(address + 48, 4)) : guest::LoadU32(base, address + 48))); }
+  void set_played(uint32_t v) const { if (auto* d = direct()) { d->played = v; return; } if (memory::IsHandle(address + 48)) memory::OwnerStore(address + 48, 4, v); else guest::StoreU32(base, address + 48, v); }
   // -1 from CarSound::Start; not read
   uint32_t unknown_52_address() const { return address + 52; }
-  uint32_t unknown_52() const { return data()->unknown_52; }
-  void set_unknown_52(uint32_t v) const { data()->unknown_52 = v; }
-  uint32_t unknown_52_bits() const { return data()->unknown_52; }
-  void set_unknown_52_bits(uint32_t v) const { data()->unknown_52 = v; }
+  uint32_t unknown_52_bits() const { if (auto* d = direct()) return d->unknown_52; return uint32_t((memory::IsHandle(address + 52) ? uint32_t(memory::OwnerLoad(address + 52, 4)) : guest::LoadU32(base, address + 52))); }
+  void set_unknown_52_bits(uint32_t v) const { if (auto* d = direct()) { d->unknown_52 = v; return; } if (memory::IsHandle(address + 52)) memory::OwnerStore(address + 52, 4, v); else guest::StoreU32(base, address + 52, v); }
+  uint32_t unknown_52() const { if (auto* d = direct()) return d->unknown_52; return uint32_t((memory::IsHandle(address + 52) ? uint32_t(memory::OwnerLoad(address + 52, 4)) : guest::LoadU32(base, address + 52))); }
+  void set_unknown_52(uint32_t v) const { if (auto* d = direct()) { d->unknown_52 = v; return; } if (memory::IsHandle(address + 52)) memory::OwnerStore(address + 52, 4, v); else guest::StoreU32(base, address + 52, v); }
 };
 
 // embedded; measure: CarSound@+1072
@@ -1419,47 +1433,48 @@ struct CarSoundHorn : View {
   }
   CarSoundHorn at(uint32_t i) const { return CarSoundHorn(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCarSoundHornLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarSoundHornLayout, offset, width, v); }
+  CarSoundHornData* direct() const { return static_cast<CarSoundHornData*>(memory::HandleOwn(address, &kCarSoundHornLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kCarSoundHornLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarSoundHornLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // a CarSoundVoiceHolder
   uint32_t holder_address() const { return address + 0; }
-  uint8_t* holder() const { return reinterpret_cast<uint8_t*>(data()) + 0; }
+  uint8_t* holder() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 0 : guest::Pointer(base, address + 0); }
   template <typename T = CarSoundVoiceHolder>
   T voice_holder() const { return T(base, address + 0); }
   uint32_t view_address() const { return address + 40; }
+  uint32_t view_bits() const { if (auto* d = direct()) return d->view; return uint32_t((memory::IsHandle(address + 40) ? uint32_t(memory::OwnerLoad(address + 40, 4)) : guest::LoadU32(base, address + 40))); }
+  void set_view_bits(uint32_t v) const { if (auto* d = direct()) { d->view = v; return; } if (memory::IsHandle(address + 40)) memory::OwnerStore(address + 40, 4, v); else guest::StoreU32(base, address + 40, v); }
   template <typename T = CarSoundWaveBankView>
-  T view() const { return T(base, data()->view); }
-  void set_view(const View& w) const { const uint32_t v = w.address; data()->view = v; }
-  void set_view(uint32_t v) const { data()->view = v; }
-  uint32_t view_bits() const { return data()->view; }
-  void set_view_bits(uint32_t v) const { data()->view = v; }
+  T view() const { return T(base, view_bits()); }
+  void set_view(const View& w) const { set_view_bits(w.address); }
+  void set_view(uint32_t v) const { set_view_bits(v); }
   uint32_t index_address() const { return address + 44; }
-  uint8_t index() const { return data()->index; }
-  void set_index(uint8_t v) const { data()->index = v; }
-  uint8_t index_bits() const { return data()->index; }
-  void set_index_bits(uint8_t v) const { data()->index = v; }
+  uint8_t index_bits() const { if (auto* d = direct()) return d->index; return uint8_t((memory::IsHandle(address + 44) ? uint8_t(memory::OwnerLoad(address + 44, 1)) : guest::LoadU8(base, address + 44))); }
+  void set_index_bits(uint8_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 1, v); else guest::StoreU8(base, address + 44, v); }
+  uint8_t index() const { if (auto* d = direct()) return d->index; return uint8_t((memory::IsHandle(address + 44) ? uint8_t(memory::OwnerLoad(address + 44, 1)) : guest::LoadU8(base, address + 44))); }
+  void set_index(uint8_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 1, v); else guest::StoreU8(base, address + 44, v); }
   // -1 none
   uint32_t slot_address() const { return address + 48; }
-  uint32_t slot() const { return data()->slot; }
-  void set_slot(uint32_t v) const { data()->slot = v; }
-  uint32_t slot_bits() const { return data()->slot; }
-  void set_slot_bits(uint32_t v) const { data()->slot = v; }
+  uint32_t slot_bits() const { if (auto* d = direct()) return d->slot; return uint32_t((memory::IsHandle(address + 48) ? uint32_t(memory::OwnerLoad(address + 48, 4)) : guest::LoadU32(base, address + 48))); }
+  void set_slot_bits(uint32_t v) const { if (auto* d = direct()) { d->slot = v; return; } if (memory::IsHandle(address + 48)) memory::OwnerStore(address + 48, 4, v); else guest::StoreU32(base, address + 48, v); }
+  uint32_t slot() const { if (auto* d = direct()) return d->slot; return uint32_t((memory::IsHandle(address + 48) ? uint32_t(memory::OwnerLoad(address + 48, 4)) : guest::LoadU32(base, address + 48))); }
+  void set_slot(uint32_t v) const { if (auto* d = direct()) { d->slot = v; return; } if (memory::IsHandle(address + 48)) memory::OwnerStore(address + 48, 4, v); else guest::StoreU32(base, address + 48, v); }
   // race mode 8's other record's
   uint32_t slot_2_address() const { return address + 52; }
-  uint32_t slot_2() const { return data()->slot_2; }
-  void set_slot_2(uint32_t v) const { data()->slot_2 = v; }
-  uint32_t slot_2_bits() const { return data()->slot_2; }
-  void set_slot_2_bits(uint32_t v) const { data()->slot_2 = v; }
+  uint32_t slot_2_bits() const { if (auto* d = direct()) return d->slot_2; return uint32_t((memory::IsHandle(address + 52) ? uint32_t(memory::OwnerLoad(address + 52, 4)) : guest::LoadU32(base, address + 52))); }
+  void set_slot_2_bits(uint32_t v) const { if (auto* d = direct()) { d->slot_2 = v; return; } if (memory::IsHandle(address + 52)) memory::OwnerStore(address + 52, 4, v); else guest::StoreU32(base, address + 52, v); }
+  uint32_t slot_2() const { if (auto* d = direct()) return d->slot_2; return uint32_t((memory::IsHandle(address + 52) ? uint32_t(memory::OwnerLoad(address + 52, 4)) : guest::LoadU32(base, address + 52))); }
+  void set_slot_2(uint32_t v) const { if (auto* d = direct()) { d->slot_2 = v; return; } if (memory::IsHandle(address + 52)) memory::OwnerStore(address + 52, 4, v); else guest::StoreU32(base, address + 52, v); }
   uint32_t playing_address() const { return address + 56; }
-  uint32_t playing() const { return data()->playing; }
-  void set_playing(uint32_t v) const { data()->playing = v; }
-  uint32_t playing_bits() const { return data()->playing; }
-  void set_playing_bits(uint32_t v) const { data()->playing = v; }
+  uint32_t playing_bits() const { if (auto* d = direct()) return d->playing; return uint32_t((memory::IsHandle(address + 56) ? uint32_t(memory::OwnerLoad(address + 56, 4)) : guest::LoadU32(base, address + 56))); }
+  void set_playing_bits(uint32_t v) const { if (auto* d = direct()) { d->playing = v; return; } if (memory::IsHandle(address + 56)) memory::OwnerStore(address + 56, 4, v); else guest::StoreU32(base, address + 56, v); }
+  uint32_t playing() const { if (auto* d = direct()) return d->playing; return uint32_t((memory::IsHandle(address + 56) ? uint32_t(memory::OwnerLoad(address + 56, 4)) : guest::LoadU32(base, address + 56))); }
+  void set_playing(uint32_t v) const { if (auto* d = direct()) { d->playing = v; return; } if (memory::IsHandle(address + 56)) memory::OwnerStore(address + 56, 4, v); else guest::StoreU32(base, address + 56, v); }
   uint32_t playing_2_address() const { return address + 60; }
-  uint32_t playing_2() const { return data()->playing_2; }
-  void set_playing_2(uint32_t v) const { data()->playing_2 = v; }
-  uint32_t playing_2_bits() const { return data()->playing_2; }
-  void set_playing_2_bits(uint32_t v) const { data()->playing_2 = v; }
+  uint32_t playing_2_bits() const { if (auto* d = direct()) return d->playing_2; return uint32_t((memory::IsHandle(address + 60) ? uint32_t(memory::OwnerLoad(address + 60, 4)) : guest::LoadU32(base, address + 60))); }
+  void set_playing_2_bits(uint32_t v) const { if (auto* d = direct()) { d->playing_2 = v; return; } if (memory::IsHandle(address + 60)) memory::OwnerStore(address + 60, 4, v); else guest::StoreU32(base, address + 60, v); }
+  uint32_t playing_2() const { if (auto* d = direct()) return d->playing_2; return uint32_t((memory::IsHandle(address + 60) ? uint32_t(memory::OwnerLoad(address + 60, 4)) : guest::LoadU32(base, address + 60))); }
+  void set_playing_2(uint32_t v) const { if (auto* d = direct()) { d->playing_2 = v; return; } if (memory::IsHandle(address + 60)) memory::OwnerStore(address + 60, 4, v); else guest::StoreU32(base, address + 60, v); }
 };
 
 // embedded; measure: CarSound@+1136
@@ -1495,37 +1510,38 @@ struct CarSoundPassBy : View {
   }
   CarSoundPassBy at(uint32_t i) const { return CarSoundPassBy(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCarSoundPassByLayout, offset, width); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarSoundPassByLayout, offset, width, v); }
+  CarSoundPassByData* direct() const { return static_cast<CarSoundPassByData*>(memory::HandleOwn(address, &kCarSoundPassByLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kCarSoundPassByLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kCarSoundPassByLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // a CarSoundVoiceHolder
   uint32_t holder_address() const { return address + 0; }
-  uint8_t* holder() const { return reinterpret_cast<uint8_t*>(data()) + 0; }
+  uint8_t* holder() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 0 : guest::Pointer(base, address + 0); }
   template <typename T = CarSoundVoiceHolder>
   T voice_holder() const { return T(base, address + 0); }
   uint32_t view_address() const { return address + 40; }
+  uint32_t view_bits() const { if (auto* d = direct()) return d->view; return uint32_t((memory::IsHandle(address + 40) ? uint32_t(memory::OwnerLoad(address + 40, 4)) : guest::LoadU32(base, address + 40))); }
+  void set_view_bits(uint32_t v) const { if (auto* d = direct()) { d->view = v; return; } if (memory::IsHandle(address + 40)) memory::OwnerStore(address + 40, 4, v); else guest::StoreU32(base, address + 40, v); }
   template <typename T = CarSoundWaveBankView>
-  T view() const { return T(base, data()->view); }
-  void set_view(const View& w) const { const uint32_t v = w.address; data()->view = v; }
-  void set_view(uint32_t v) const { data()->view = v; }
-  uint32_t view_bits() const { return data()->view; }
-  void set_view_bits(uint32_t v) const { data()->view = v; }
+  T view() const { return T(base, view_bits()); }
+  void set_view(const View& w) const { set_view_bits(w.address); }
+  void set_view(uint32_t v) const { set_view_bits(v); }
   uint32_t index_address() const { return address + 44; }
-  uint8_t index() const { return data()->index; }
-  void set_index(uint8_t v) const { data()->index = v; }
-  uint8_t index_bits() const { return data()->index; }
-  void set_index_bits(uint8_t v) const { data()->index = v; }
+  uint8_t index_bits() const { if (auto* d = direct()) return d->index; return uint8_t((memory::IsHandle(address + 44) ? uint8_t(memory::OwnerLoad(address + 44, 1)) : guest::LoadU8(base, address + 44))); }
+  void set_index_bits(uint8_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 1, v); else guest::StoreU8(base, address + 44, v); }
+  uint8_t index() const { if (auto* d = direct()) return d->index; return uint8_t((memory::IsHandle(address + 44) ? uint8_t(memory::OwnerLoad(address + 44, 1)) : guest::LoadU8(base, address + 44))); }
+  void set_index(uint8_t v) const { if (auto* d = direct()) { d->index = v; return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 1, v); else guest::StoreU8(base, address + 44, v); }
   // -1 from CarSound::Start; not read
   uint32_t unknown_48_address() const { return address + 48; }
-  uint32_t unknown_48() const { return data()->unknown_48; }
-  void set_unknown_48(uint32_t v) const { data()->unknown_48 = v; }
-  uint32_t unknown_48_bits() const { return data()->unknown_48; }
-  void set_unknown_48_bits(uint32_t v) const { data()->unknown_48 = v; }
+  uint32_t unknown_48_bits() const { if (auto* d = direct()) return d->unknown_48; return uint32_t((memory::IsHandle(address + 48) ? uint32_t(memory::OwnerLoad(address + 48, 4)) : guest::LoadU32(base, address + 48))); }
+  void set_unknown_48_bits(uint32_t v) const { if (auto* d = direct()) { d->unknown_48 = v; return; } if (memory::IsHandle(address + 48)) memory::OwnerStore(address + 48, 4, v); else guest::StoreU32(base, address + 48, v); }
+  uint32_t unknown_48() const { if (auto* d = direct()) return d->unknown_48; return uint32_t((memory::IsHandle(address + 48) ? uint32_t(memory::OwnerLoad(address + 48, 4)) : guest::LoadU32(base, address + 48))); }
+  void set_unknown_48(uint32_t v) const { if (auto* d = direct()) { d->unknown_48 = v; return; } if (memory::IsHandle(address + 48)) memory::OwnerStore(address + 48, 4, v); else guest::StoreU32(base, address + 48, v); }
   // 0 from CarSound::Start; not read
   uint32_t unknown_52_address() const { return address + 52; }
-  uint32_t unknown_52() const { return data()->unknown_52; }
-  void set_unknown_52(uint32_t v) const { data()->unknown_52 = v; }
-  uint32_t unknown_52_bits() const { return data()->unknown_52; }
-  void set_unknown_52_bits(uint32_t v) const { data()->unknown_52 = v; }
+  uint32_t unknown_52_bits() const { if (auto* d = direct()) return d->unknown_52; return uint32_t((memory::IsHandle(address + 52) ? uint32_t(memory::OwnerLoad(address + 52, 4)) : guest::LoadU32(base, address + 52))); }
+  void set_unknown_52_bits(uint32_t v) const { if (auto* d = direct()) { d->unknown_52 = v; return; } if (memory::IsHandle(address + 52)) memory::OwnerStore(address + 52, 4, v); else guest::StoreU32(base, address + 52, v); }
+  uint32_t unknown_52() const { if (auto* d = direct()) return d->unknown_52; return uint32_t((memory::IsHandle(address + 52) ? uint32_t(memory::OwnerLoad(address + 52, 4)) : guest::LoadU32(base, address + 52))); }
+  void set_unknown_52(uint32_t v) const { if (auto* d = direct()) { d->unknown_52 = v; return; } if (memory::IsHandle(address + 52)) memory::OwnerStore(address + 52, 4, v); else guest::StoreU32(base, address + 52, v); }
 };
 
 // allocated; measure: new<?>@RaceSounds::Begin
@@ -1712,75 +1728,76 @@ struct X3DAudioListener : View {
   }
   X3DAudioListener at(uint32_t i) const { return X3DAudioListener(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kX3DAudioListenerLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kX3DAudioListenerLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
+  X3DAudioListenerData* direct() const { return static_cast<X3DAudioListenerData*>(memory::HandleOwn(address, &kX3DAudioListenerLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kX3DAudioListenerLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kX3DAudioListenerLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t front_x_address() const { return address + 0; }
-  float front_x() const { return on_host() ? float(data()->front_x) : float(guest::LoadFloat(base, address + 0)); }
-  void set_front_x(float v) const { if (on_host()) data()->front_x = v; else guest::StoreFloat(base, address + 0, v); }
-  uint32_t front_x_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->front_x) : guest::LoadU32(base, address + 0); }
-  void set_front_x_bits(uint32_t v) const { if (on_host()) data()->front_x = std::bit_cast<float>(v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t front_x_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->front_x); return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_front_x_bits(uint32_t v) const { if (auto* d = direct()) { d->front_x = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  float front_x() const { return std::bit_cast<float>(front_x_bits()); }
+  void set_front_x(float v) const { set_front_x_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t front_y_address() const { return address + 4; }
-  float front_y() const { return on_host() ? float(data()->front_y) : float(guest::LoadFloat(base, address + 4)); }
-  void set_front_y(float v) const { if (on_host()) data()->front_y = v; else guest::StoreFloat(base, address + 4, v); }
-  uint32_t front_y_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->front_y) : guest::LoadU32(base, address + 4); }
-  void set_front_y_bits(uint32_t v) const { if (on_host()) data()->front_y = std::bit_cast<float>(v); else guest::StoreU32(base, address + 4, v); }
+  uint32_t front_y_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->front_y); return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_front_y_bits(uint32_t v) const { if (auto* d = direct()) { d->front_y = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  float front_y() const { return std::bit_cast<float>(front_y_bits()); }
+  void set_front_y(float v) const { set_front_y_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t front_z_address() const { return address + 8; }
-  float front_z() const { return on_host() ? float(data()->front_z) : float(guest::LoadFloat(base, address + 8)); }
-  void set_front_z(float v) const { if (on_host()) data()->front_z = v; else guest::StoreFloat(base, address + 8, v); }
-  uint32_t front_z_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->front_z) : guest::LoadU32(base, address + 8); }
-  void set_front_z_bits(uint32_t v) const { if (on_host()) data()->front_z = std::bit_cast<float>(v); else guest::StoreU32(base, address + 8, v); }
+  uint32_t front_z_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->front_z); return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_front_z_bits(uint32_t v) const { if (auto* d = direct()) { d->front_z = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  float front_z() const { return std::bit_cast<float>(front_z_bits()); }
+  void set_front_z(float v) const { set_front_z_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t top_x_address() const { return address + 12; }
-  float top_x() const { return on_host() ? float(data()->top_x) : float(guest::LoadFloat(base, address + 12)); }
-  void set_top_x(float v) const { if (on_host()) data()->top_x = v; else guest::StoreFloat(base, address + 12, v); }
-  uint32_t top_x_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->top_x) : guest::LoadU32(base, address + 12); }
-  void set_top_x_bits(uint32_t v) const { if (on_host()) data()->top_x = std::bit_cast<float>(v); else guest::StoreU32(base, address + 12, v); }
+  uint32_t top_x_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->top_x); return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_top_x_bits(uint32_t v) const { if (auto* d = direct()) { d->top_x = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
+  float top_x() const { return std::bit_cast<float>(top_x_bits()); }
+  void set_top_x(float v) const { set_top_x_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t top_y_address() const { return address + 16; }
-  float top_y() const { return on_host() ? float(data()->top_y) : float(guest::LoadFloat(base, address + 16)); }
-  void set_top_y(float v) const { if (on_host()) data()->top_y = v; else guest::StoreFloat(base, address + 16, v); }
-  uint32_t top_y_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->top_y) : guest::LoadU32(base, address + 16); }
-  void set_top_y_bits(uint32_t v) const { if (on_host()) data()->top_y = std::bit_cast<float>(v); else guest::StoreU32(base, address + 16, v); }
+  uint32_t top_y_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->top_y); return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_top_y_bits(uint32_t v) const { if (auto* d = direct()) { d->top_y = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
+  float top_y() const { return std::bit_cast<float>(top_y_bits()); }
+  void set_top_y(float v) const { set_top_y_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t top_z_address() const { return address + 20; }
-  float top_z() const { return on_host() ? float(data()->top_z) : float(guest::LoadFloat(base, address + 20)); }
-  void set_top_z(float v) const { if (on_host()) data()->top_z = v; else guest::StoreFloat(base, address + 20, v); }
-  uint32_t top_z_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->top_z) : guest::LoadU32(base, address + 20); }
-  void set_top_z_bits(uint32_t v) const { if (on_host()) data()->top_z = std::bit_cast<float>(v); else guest::StoreU32(base, address + 20, v); }
+  uint32_t top_z_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->top_z); return uint32_t((memory::IsHandle(address + 20) ? uint32_t(memory::OwnerLoad(address + 20, 4)) : guest::LoadU32(base, address + 20))); }
+  void set_top_z_bits(uint32_t v) const { if (auto* d = direct()) { d->top_z = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 4, v); else guest::StoreU32(base, address + 20, v); }
+  float top_z() const { return std::bit_cast<float>(top_z_bits()); }
+  void set_top_z(float v) const { set_top_z_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t position_x_address() const { return address + 24; }
-  float position_x() const { return on_host() ? float(data()->position_x) : float(guest::LoadFloat(base, address + 24)); }
-  void set_position_x(float v) const { if (on_host()) data()->position_x = v; else guest::StoreFloat(base, address + 24, v); }
-  uint32_t position_x_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->position_x) : guest::LoadU32(base, address + 24); }
-  void set_position_x_bits(uint32_t v) const { if (on_host()) data()->position_x = std::bit_cast<float>(v); else guest::StoreU32(base, address + 24, v); }
+  uint32_t position_x_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->position_x); return uint32_t((memory::IsHandle(address + 24) ? uint32_t(memory::OwnerLoad(address + 24, 4)) : guest::LoadU32(base, address + 24))); }
+  void set_position_x_bits(uint32_t v) const { if (auto* d = direct()) { d->position_x = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 24)) memory::OwnerStore(address + 24, 4, v); else guest::StoreU32(base, address + 24, v); }
+  float position_x() const { return std::bit_cast<float>(position_x_bits()); }
+  void set_position_x(float v) const { set_position_x_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t position_y_address() const { return address + 28; }
-  float position_y() const { return on_host() ? float(data()->position_y) : float(guest::LoadFloat(base, address + 28)); }
-  void set_position_y(float v) const { if (on_host()) data()->position_y = v; else guest::StoreFloat(base, address + 28, v); }
-  uint32_t position_y_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->position_y) : guest::LoadU32(base, address + 28); }
-  void set_position_y_bits(uint32_t v) const { if (on_host()) data()->position_y = std::bit_cast<float>(v); else guest::StoreU32(base, address + 28, v); }
+  uint32_t position_y_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->position_y); return uint32_t((memory::IsHandle(address + 28) ? uint32_t(memory::OwnerLoad(address + 28, 4)) : guest::LoadU32(base, address + 28))); }
+  void set_position_y_bits(uint32_t v) const { if (auto* d = direct()) { d->position_y = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 28)) memory::OwnerStore(address + 28, 4, v); else guest::StoreU32(base, address + 28, v); }
+  float position_y() const { return std::bit_cast<float>(position_y_bits()); }
+  void set_position_y(float v) const { set_position_y_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t position_z_address() const { return address + 32; }
-  float position_z() const { return on_host() ? float(data()->position_z) : float(guest::LoadFloat(base, address + 32)); }
-  void set_position_z(float v) const { if (on_host()) data()->position_z = v; else guest::StoreFloat(base, address + 32, v); }
-  uint32_t position_z_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->position_z) : guest::LoadU32(base, address + 32); }
-  void set_position_z_bits(uint32_t v) const { if (on_host()) data()->position_z = std::bit_cast<float>(v); else guest::StoreU32(base, address + 32, v); }
+  uint32_t position_z_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->position_z); return uint32_t((memory::IsHandle(address + 32) ? uint32_t(memory::OwnerLoad(address + 32, 4)) : guest::LoadU32(base, address + 32))); }
+  void set_position_z_bits(uint32_t v) const { if (auto* d = direct()) { d->position_z = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 32)) memory::OwnerStore(address + 32, 4, v); else guest::StoreU32(base, address + 32, v); }
+  float position_z() const { return std::bit_cast<float>(position_z_bits()); }
+  void set_position_z(float v) const { set_position_z_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t velocity_x_address() const { return address + 36; }
-  float velocity_x() const { return on_host() ? float(data()->velocity_x) : float(guest::LoadFloat(base, address + 36)); }
-  void set_velocity_x(float v) const { if (on_host()) data()->velocity_x = v; else guest::StoreFloat(base, address + 36, v); }
-  uint32_t velocity_x_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->velocity_x) : guest::LoadU32(base, address + 36); }
-  void set_velocity_x_bits(uint32_t v) const { if (on_host()) data()->velocity_x = std::bit_cast<float>(v); else guest::StoreU32(base, address + 36, v); }
+  uint32_t velocity_x_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->velocity_x); return uint32_t((memory::IsHandle(address + 36) ? uint32_t(memory::OwnerLoad(address + 36, 4)) : guest::LoadU32(base, address + 36))); }
+  void set_velocity_x_bits(uint32_t v) const { if (auto* d = direct()) { d->velocity_x = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 36)) memory::OwnerStore(address + 36, 4, v); else guest::StoreU32(base, address + 36, v); }
+  float velocity_x() const { return std::bit_cast<float>(velocity_x_bits()); }
+  void set_velocity_x(float v) const { set_velocity_x_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t velocity_y_address() const { return address + 40; }
-  float velocity_y() const { return on_host() ? float(data()->velocity_y) : float(guest::LoadFloat(base, address + 40)); }
-  void set_velocity_y(float v) const { if (on_host()) data()->velocity_y = v; else guest::StoreFloat(base, address + 40, v); }
-  uint32_t velocity_y_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->velocity_y) : guest::LoadU32(base, address + 40); }
-  void set_velocity_y_bits(uint32_t v) const { if (on_host()) data()->velocity_y = std::bit_cast<float>(v); else guest::StoreU32(base, address + 40, v); }
+  uint32_t velocity_y_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->velocity_y); return uint32_t((memory::IsHandle(address + 40) ? uint32_t(memory::OwnerLoad(address + 40, 4)) : guest::LoadU32(base, address + 40))); }
+  void set_velocity_y_bits(uint32_t v) const { if (auto* d = direct()) { d->velocity_y = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 40)) memory::OwnerStore(address + 40, 4, v); else guest::StoreU32(base, address + 40, v); }
+  float velocity_y() const { return std::bit_cast<float>(velocity_y_bits()); }
+  void set_velocity_y(float v) const { set_velocity_y_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t velocity_z_address() const { return address + 44; }
-  float velocity_z() const { return on_host() ? float(data()->velocity_z) : float(guest::LoadFloat(base, address + 44)); }
-  void set_velocity_z(float v) const { if (on_host()) data()->velocity_z = v; else guest::StoreFloat(base, address + 44, v); }
-  uint32_t velocity_z_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->velocity_z) : guest::LoadU32(base, address + 44); }
-  void set_velocity_z_bits(uint32_t v) const { if (on_host()) data()->velocity_z = std::bit_cast<float>(v); else guest::StoreU32(base, address + 44, v); }
+  uint32_t velocity_z_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->velocity_z); return uint32_t((memory::IsHandle(address + 44) ? uint32_t(memory::OwnerLoad(address + 44, 4)) : guest::LoadU32(base, address + 44))); }
+  void set_velocity_z_bits(uint32_t v) const { if (auto* d = direct()) { d->velocity_z = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 4, v); else guest::StoreU32(base, address + 44, v); }
+  float velocity_z() const { return std::bit_cast<float>(velocity_z_bits()); }
+  void set_velocity_z(float v) const { set_velocity_z_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t cone_address() const { return address + 48; }
+  uint32_t cone_bits() const { if (auto* d = direct()) return d->cone; return uint32_t((memory::IsHandle(address + 48) ? uint32_t(memory::OwnerLoad(address + 48, 4)) : guest::LoadU32(base, address + 48))); }
+  void set_cone_bits(uint32_t v) const { if (auto* d = direct()) { d->cone = v; return; } if (memory::IsHandle(address + 48)) memory::OwnerStore(address + 48, 4, v); else guest::StoreU32(base, address + 48, v); }
   template <typename T = X3DAudioCone>
-  T cone() const { return T(base, on_host() ? data()->cone : guest::LoadU32(base, address + 48)); }
-  void set_cone(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->cone = v; else guest::StoreU32(base, address + 48, v); }
-  void set_cone(uint32_t v) const { if (on_host()) data()->cone = v; else guest::StoreU32(base, address + 48, v); }
-  uint32_t cone_bits() const { return on_host() ? data()->cone : guest::LoadU32(base, address + 48); }
-  void set_cone_bits(uint32_t v) const { if (on_host()) data()->cone = v; else guest::StoreU32(base, address + 48, v); }
+  T cone() const { return T(base, cone_bits()); }
+  void set_cone(const View& w) const { set_cone_bits(w.address); }
+  void set_cone(uint32_t v) const { set_cone_bits(v); }
 };
 
 // embedded; measure: X3DAudio::Delay.r5, X3DAudioCalculate.r5
@@ -1834,138 +1851,139 @@ struct X3DAudioEmitter : View {
   }
   X3DAudioEmitter at(uint32_t i) const { return X3DAudioEmitter(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kX3DAudioEmitterLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kX3DAudioEmitterLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
+  X3DAudioEmitterData* direct() const { return static_cast<X3DAudioEmitterData*>(memory::HandleOwn(address, &kX3DAudioEmitterLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kX3DAudioEmitterLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kX3DAudioEmitterLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0 none
   uint32_t cone_address() const { return address + 0; }
+  uint32_t cone_bits() const { if (auto* d = direct()) return d->cone; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_cone_bits(uint32_t v) const { if (auto* d = direct()) { d->cone = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   template <typename T = X3DAudioCone>
-  T cone() const { return T(base, on_host() ? data()->cone : guest::LoadU32(base, address + 0)); }
-  void set_cone(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->cone = v; else guest::StoreU32(base, address + 0, v); }
-  void set_cone(uint32_t v) const { if (on_host()) data()->cone = v; else guest::StoreU32(base, address + 0, v); }
-  uint32_t cone_bits() const { return on_host() ? data()->cone : guest::LoadU32(base, address + 0); }
-  void set_cone_bits(uint32_t v) const { if (on_host()) data()->cone = v; else guest::StoreU32(base, address + 0, v); }
+  T cone() const { return T(base, cone_bits()); }
+  void set_cone(const View& w) const { set_cone_bits(w.address); }
+  void set_cone(uint32_t v) const { set_cone_bits(v); }
   uint32_t front_x_address() const { return address + 4; }
-  float front_x() const { return on_host() ? float(data()->front_x) : float(guest::LoadFloat(base, address + 4)); }
-  void set_front_x(float v) const { if (on_host()) data()->front_x = v; else guest::StoreFloat(base, address + 4, v); }
-  uint32_t front_x_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->front_x) : guest::LoadU32(base, address + 4); }
-  void set_front_x_bits(uint32_t v) const { if (on_host()) data()->front_x = std::bit_cast<float>(v); else guest::StoreU32(base, address + 4, v); }
+  uint32_t front_x_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->front_x); return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_front_x_bits(uint32_t v) const { if (auto* d = direct()) { d->front_x = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  float front_x() const { return std::bit_cast<float>(front_x_bits()); }
+  void set_front_x(float v) const { set_front_x_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t front_y_address() const { return address + 8; }
-  float front_y() const { return on_host() ? float(data()->front_y) : float(guest::LoadFloat(base, address + 8)); }
-  void set_front_y(float v) const { if (on_host()) data()->front_y = v; else guest::StoreFloat(base, address + 8, v); }
-  uint32_t front_y_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->front_y) : guest::LoadU32(base, address + 8); }
-  void set_front_y_bits(uint32_t v) const { if (on_host()) data()->front_y = std::bit_cast<float>(v); else guest::StoreU32(base, address + 8, v); }
+  uint32_t front_y_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->front_y); return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_front_y_bits(uint32_t v) const { if (auto* d = direct()) { d->front_y = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  float front_y() const { return std::bit_cast<float>(front_y_bits()); }
+  void set_front_y(float v) const { set_front_y_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t front_z_address() const { return address + 12; }
-  float front_z() const { return on_host() ? float(data()->front_z) : float(guest::LoadFloat(base, address + 12)); }
-  void set_front_z(float v) const { if (on_host()) data()->front_z = v; else guest::StoreFloat(base, address + 12, v); }
-  uint32_t front_z_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->front_z) : guest::LoadU32(base, address + 12); }
-  void set_front_z_bits(uint32_t v) const { if (on_host()) data()->front_z = std::bit_cast<float>(v); else guest::StoreU32(base, address + 12, v); }
+  uint32_t front_z_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->front_z); return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_front_z_bits(uint32_t v) const { if (auto* d = direct()) { d->front_z = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
+  float front_z() const { return std::bit_cast<float>(front_z_bits()); }
+  void set_front_z(float v) const { set_front_z_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t top_x_address() const { return address + 16; }
-  float top_x() const { return on_host() ? float(data()->top_x) : float(guest::LoadFloat(base, address + 16)); }
-  void set_top_x(float v) const { if (on_host()) data()->top_x = v; else guest::StoreFloat(base, address + 16, v); }
-  uint32_t top_x_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->top_x) : guest::LoadU32(base, address + 16); }
-  void set_top_x_bits(uint32_t v) const { if (on_host()) data()->top_x = std::bit_cast<float>(v); else guest::StoreU32(base, address + 16, v); }
+  uint32_t top_x_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->top_x); return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_top_x_bits(uint32_t v) const { if (auto* d = direct()) { d->top_x = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
+  float top_x() const { return std::bit_cast<float>(top_x_bits()); }
+  void set_top_x(float v) const { set_top_x_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t top_y_address() const { return address + 20; }
-  float top_y() const { return on_host() ? float(data()->top_y) : float(guest::LoadFloat(base, address + 20)); }
-  void set_top_y(float v) const { if (on_host()) data()->top_y = v; else guest::StoreFloat(base, address + 20, v); }
-  uint32_t top_y_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->top_y) : guest::LoadU32(base, address + 20); }
-  void set_top_y_bits(uint32_t v) const { if (on_host()) data()->top_y = std::bit_cast<float>(v); else guest::StoreU32(base, address + 20, v); }
+  uint32_t top_y_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->top_y); return uint32_t((memory::IsHandle(address + 20) ? uint32_t(memory::OwnerLoad(address + 20, 4)) : guest::LoadU32(base, address + 20))); }
+  void set_top_y_bits(uint32_t v) const { if (auto* d = direct()) { d->top_y = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 4, v); else guest::StoreU32(base, address + 20, v); }
+  float top_y() const { return std::bit_cast<float>(top_y_bits()); }
+  void set_top_y(float v) const { set_top_y_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t top_z_address() const { return address + 24; }
-  float top_z() const { return on_host() ? float(data()->top_z) : float(guest::LoadFloat(base, address + 24)); }
-  void set_top_z(float v) const { if (on_host()) data()->top_z = v; else guest::StoreFloat(base, address + 24, v); }
-  uint32_t top_z_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->top_z) : guest::LoadU32(base, address + 24); }
-  void set_top_z_bits(uint32_t v) const { if (on_host()) data()->top_z = std::bit_cast<float>(v); else guest::StoreU32(base, address + 24, v); }
+  uint32_t top_z_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->top_z); return uint32_t((memory::IsHandle(address + 24) ? uint32_t(memory::OwnerLoad(address + 24, 4)) : guest::LoadU32(base, address + 24))); }
+  void set_top_z_bits(uint32_t v) const { if (auto* d = direct()) { d->top_z = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 24)) memory::OwnerStore(address + 24, 4, v); else guest::StoreU32(base, address + 24, v); }
+  float top_z() const { return std::bit_cast<float>(top_z_bits()); }
+  void set_top_z(float v) const { set_top_z_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t position_x_address() const { return address + 28; }
-  float position_x() const { return on_host() ? float(data()->position_x) : float(guest::LoadFloat(base, address + 28)); }
-  void set_position_x(float v) const { if (on_host()) data()->position_x = v; else guest::StoreFloat(base, address + 28, v); }
-  uint32_t position_x_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->position_x) : guest::LoadU32(base, address + 28); }
-  void set_position_x_bits(uint32_t v) const { if (on_host()) data()->position_x = std::bit_cast<float>(v); else guest::StoreU32(base, address + 28, v); }
+  uint32_t position_x_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->position_x); return uint32_t((memory::IsHandle(address + 28) ? uint32_t(memory::OwnerLoad(address + 28, 4)) : guest::LoadU32(base, address + 28))); }
+  void set_position_x_bits(uint32_t v) const { if (auto* d = direct()) { d->position_x = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 28)) memory::OwnerStore(address + 28, 4, v); else guest::StoreU32(base, address + 28, v); }
+  float position_x() const { return std::bit_cast<float>(position_x_bits()); }
+  void set_position_x(float v) const { set_position_x_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t position_y_address() const { return address + 32; }
-  float position_y() const { return on_host() ? float(data()->position_y) : float(guest::LoadFloat(base, address + 32)); }
-  void set_position_y(float v) const { if (on_host()) data()->position_y = v; else guest::StoreFloat(base, address + 32, v); }
-  uint32_t position_y_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->position_y) : guest::LoadU32(base, address + 32); }
-  void set_position_y_bits(uint32_t v) const { if (on_host()) data()->position_y = std::bit_cast<float>(v); else guest::StoreU32(base, address + 32, v); }
+  uint32_t position_y_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->position_y); return uint32_t((memory::IsHandle(address + 32) ? uint32_t(memory::OwnerLoad(address + 32, 4)) : guest::LoadU32(base, address + 32))); }
+  void set_position_y_bits(uint32_t v) const { if (auto* d = direct()) { d->position_y = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 32)) memory::OwnerStore(address + 32, 4, v); else guest::StoreU32(base, address + 32, v); }
+  float position_y() const { return std::bit_cast<float>(position_y_bits()); }
+  void set_position_y(float v) const { set_position_y_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t position_z_address() const { return address + 36; }
-  float position_z() const { return on_host() ? float(data()->position_z) : float(guest::LoadFloat(base, address + 36)); }
-  void set_position_z(float v) const { if (on_host()) data()->position_z = v; else guest::StoreFloat(base, address + 36, v); }
-  uint32_t position_z_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->position_z) : guest::LoadU32(base, address + 36); }
-  void set_position_z_bits(uint32_t v) const { if (on_host()) data()->position_z = std::bit_cast<float>(v); else guest::StoreU32(base, address + 36, v); }
+  uint32_t position_z_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->position_z); return uint32_t((memory::IsHandle(address + 36) ? uint32_t(memory::OwnerLoad(address + 36, 4)) : guest::LoadU32(base, address + 36))); }
+  void set_position_z_bits(uint32_t v) const { if (auto* d = direct()) { d->position_z = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 36)) memory::OwnerStore(address + 36, 4, v); else guest::StoreU32(base, address + 36, v); }
+  float position_z() const { return std::bit_cast<float>(position_z_bits()); }
+  void set_position_z(float v) const { set_position_z_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t velocity_x_address() const { return address + 40; }
-  float velocity_x() const { return on_host() ? float(data()->velocity_x) : float(guest::LoadFloat(base, address + 40)); }
-  void set_velocity_x(float v) const { if (on_host()) data()->velocity_x = v; else guest::StoreFloat(base, address + 40, v); }
-  uint32_t velocity_x_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->velocity_x) : guest::LoadU32(base, address + 40); }
-  void set_velocity_x_bits(uint32_t v) const { if (on_host()) data()->velocity_x = std::bit_cast<float>(v); else guest::StoreU32(base, address + 40, v); }
+  uint32_t velocity_x_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->velocity_x); return uint32_t((memory::IsHandle(address + 40) ? uint32_t(memory::OwnerLoad(address + 40, 4)) : guest::LoadU32(base, address + 40))); }
+  void set_velocity_x_bits(uint32_t v) const { if (auto* d = direct()) { d->velocity_x = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 40)) memory::OwnerStore(address + 40, 4, v); else guest::StoreU32(base, address + 40, v); }
+  float velocity_x() const { return std::bit_cast<float>(velocity_x_bits()); }
+  void set_velocity_x(float v) const { set_velocity_x_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t velocity_y_address() const { return address + 44; }
-  float velocity_y() const { return on_host() ? float(data()->velocity_y) : float(guest::LoadFloat(base, address + 44)); }
-  void set_velocity_y(float v) const { if (on_host()) data()->velocity_y = v; else guest::StoreFloat(base, address + 44, v); }
-  uint32_t velocity_y_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->velocity_y) : guest::LoadU32(base, address + 44); }
-  void set_velocity_y_bits(uint32_t v) const { if (on_host()) data()->velocity_y = std::bit_cast<float>(v); else guest::StoreU32(base, address + 44, v); }
+  uint32_t velocity_y_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->velocity_y); return uint32_t((memory::IsHandle(address + 44) ? uint32_t(memory::OwnerLoad(address + 44, 4)) : guest::LoadU32(base, address + 44))); }
+  void set_velocity_y_bits(uint32_t v) const { if (auto* d = direct()) { d->velocity_y = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 4, v); else guest::StoreU32(base, address + 44, v); }
+  float velocity_y() const { return std::bit_cast<float>(velocity_y_bits()); }
+  void set_velocity_y(float v) const { set_velocity_y_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t velocity_z_address() const { return address + 48; }
-  float velocity_z() const { return on_host() ? float(data()->velocity_z) : float(guest::LoadFloat(base, address + 48)); }
-  void set_velocity_z(float v) const { if (on_host()) data()->velocity_z = v; else guest::StoreFloat(base, address + 48, v); }
-  uint32_t velocity_z_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->velocity_z) : guest::LoadU32(base, address + 48); }
-  void set_velocity_z_bits(uint32_t v) const { if (on_host()) data()->velocity_z = std::bit_cast<float>(v); else guest::StoreU32(base, address + 48, v); }
+  uint32_t velocity_z_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->velocity_z); return uint32_t((memory::IsHandle(address + 48) ? uint32_t(memory::OwnerLoad(address + 48, 4)) : guest::LoadU32(base, address + 48))); }
+  void set_velocity_z_bits(uint32_t v) const { if (auto* d = direct()) { d->velocity_z = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 48)) memory::OwnerStore(address + 48, 4, v); else guest::StoreU32(base, address + 48, v); }
+  float velocity_z() const { return std::bit_cast<float>(velocity_z_bits()); }
+  void set_velocity_z(float v) const { set_velocity_z_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t channel_count_address() const { return address + 52; }
-  uint32_t channel_count() const { return on_host() ? uint32_t(data()->channel_count) : uint32_t(guest::LoadU32(base, address + 52)); }
-  void set_channel_count(uint32_t v) const { if (on_host()) data()->channel_count = v; else guest::StoreU32(base, address + 52, v); }
-  uint32_t channel_count_bits() const { return on_host() ? data()->channel_count : guest::LoadU32(base, address + 52); }
-  void set_channel_count_bits(uint32_t v) const { if (on_host()) data()->channel_count = v; else guest::StoreU32(base, address + 52, v); }
+  uint32_t channel_count_bits() const { if (auto* d = direct()) return d->channel_count; return uint32_t((memory::IsHandle(address + 52) ? uint32_t(memory::OwnerLoad(address + 52, 4)) : guest::LoadU32(base, address + 52))); }
+  void set_channel_count_bits(uint32_t v) const { if (auto* d = direct()) { d->channel_count = v; return; } if (memory::IsHandle(address + 52)) memory::OwnerStore(address + 52, 4, v); else guest::StoreU32(base, address + 52, v); }
+  uint32_t channel_count() const { if (auto* d = direct()) return d->channel_count; return uint32_t((memory::IsHandle(address + 52) ? uint32_t(memory::OwnerLoad(address + 52, 4)) : guest::LoadU32(base, address + 52))); }
+  void set_channel_count(uint32_t v) const { if (auto* d = direct()) { d->channel_count = v; return; } if (memory::IsHandle(address + 52)) memory::OwnerStore(address + 52, 4, v); else guest::StoreU32(base, address + 52, v); }
   uint32_t channel_radius_address() const { return address + 56; }
-  float channel_radius() const { return on_host() ? float(data()->channel_radius) : float(guest::LoadFloat(base, address + 56)); }
-  void set_channel_radius(float v) const { if (on_host()) data()->channel_radius = v; else guest::StoreFloat(base, address + 56, v); }
-  uint32_t channel_radius_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->channel_radius) : guest::LoadU32(base, address + 56); }
-  void set_channel_radius_bits(uint32_t v) const { if (on_host()) data()->channel_radius = std::bit_cast<float>(v); else guest::StoreU32(base, address + 56, v); }
+  uint32_t channel_radius_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->channel_radius); return uint32_t((memory::IsHandle(address + 56) ? uint32_t(memory::OwnerLoad(address + 56, 4)) : guest::LoadU32(base, address + 56))); }
+  void set_channel_radius_bits(uint32_t v) const { if (auto* d = direct()) { d->channel_radius = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 56)) memory::OwnerStore(address + 56, 4, v); else guest::StoreU32(base, address + 56, v); }
+  float channel_radius() const { return std::bit_cast<float>(channel_radius_bits()); }
+  void set_channel_radius(float v) const { set_channel_radius_bits(std::bit_cast<uint32_t>(v)); }
   // a float per channel (X3DAUDIO_2PI the LFE)
   uint32_t channel_azimuths_address() const { return address + 60; }
-  uint32_t channel_azimuths() const { return on_host() ? uint32_t(data()->channel_azimuths) : uint32_t(guest::LoadU32(base, address + 60)); }
-  void set_channel_azimuths(uint32_t v) const { if (on_host()) data()->channel_azimuths = v; else guest::StoreU32(base, address + 60, v); }
-  uint32_t channel_azimuths_bits() const { return on_host() ? data()->channel_azimuths : guest::LoadU32(base, address + 60); }
-  void set_channel_azimuths_bits(uint32_t v) const { if (on_host()) data()->channel_azimuths = v; else guest::StoreU32(base, address + 60, v); }
+  uint32_t channel_azimuths_bits() const { if (auto* d = direct()) return d->channel_azimuths; return uint32_t((memory::IsHandle(address + 60) ? uint32_t(memory::OwnerLoad(address + 60, 4)) : guest::LoadU32(base, address + 60))); }
+  void set_channel_azimuths_bits(uint32_t v) const { if (auto* d = direct()) { d->channel_azimuths = v; return; } if (memory::IsHandle(address + 60)) memory::OwnerStore(address + 60, 4, v); else guest::StoreU32(base, address + 60, v); }
+  uint32_t channel_azimuths() const { if (auto* d = direct()) return d->channel_azimuths; return uint32_t((memory::IsHandle(address + 60) ? uint32_t(memory::OwnerLoad(address + 60, 4)) : guest::LoadU32(base, address + 60))); }
+  void set_channel_azimuths(uint32_t v) const { if (auto* d = direct()) { d->channel_azimuths = v; return; } if (memory::IsHandle(address + 60)) memory::OwnerStore(address + 60, 4, v); else guest::StoreU32(base, address + 60, v); }
   // 0: the library's default
   uint32_t volume_curve_address() const { return address + 64; }
+  uint32_t volume_curve_bits() const { if (auto* d = direct()) return d->volume_curve; return uint32_t((memory::IsHandle(address + 64) ? uint32_t(memory::OwnerLoad(address + 64, 4)) : guest::LoadU32(base, address + 64))); }
+  void set_volume_curve_bits(uint32_t v) const { if (auto* d = direct()) { d->volume_curve = v; return; } if (memory::IsHandle(address + 64)) memory::OwnerStore(address + 64, 4, v); else guest::StoreU32(base, address + 64, v); }
   template <typename T = X3DAudioCurve>
-  T volume_curve() const { return T(base, on_host() ? data()->volume_curve : guest::LoadU32(base, address + 64)); }
-  void set_volume_curve(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->volume_curve = v; else guest::StoreU32(base, address + 64, v); }
-  void set_volume_curve(uint32_t v) const { if (on_host()) data()->volume_curve = v; else guest::StoreU32(base, address + 64, v); }
-  uint32_t volume_curve_bits() const { return on_host() ? data()->volume_curve : guest::LoadU32(base, address + 64); }
-  void set_volume_curve_bits(uint32_t v) const { if (on_host()) data()->volume_curve = v; else guest::StoreU32(base, address + 64, v); }
+  T volume_curve() const { return T(base, volume_curve_bits()); }
+  void set_volume_curve(const View& w) const { set_volume_curve_bits(w.address); }
+  void set_volume_curve(uint32_t v) const { set_volume_curve_bits(v); }
   uint32_t lfe_curve_address() const { return address + 68; }
+  uint32_t lfe_curve_bits() const { if (auto* d = direct()) return d->lfe_curve; return uint32_t((memory::IsHandle(address + 68) ? uint32_t(memory::OwnerLoad(address + 68, 4)) : guest::LoadU32(base, address + 68))); }
+  void set_lfe_curve_bits(uint32_t v) const { if (auto* d = direct()) { d->lfe_curve = v; return; } if (memory::IsHandle(address + 68)) memory::OwnerStore(address + 68, 4, v); else guest::StoreU32(base, address + 68, v); }
   template <typename T = X3DAudioCurve>
-  T lfe_curve() const { return T(base, on_host() ? data()->lfe_curve : guest::LoadU32(base, address + 68)); }
-  void set_lfe_curve(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->lfe_curve = v; else guest::StoreU32(base, address + 68, v); }
-  void set_lfe_curve(uint32_t v) const { if (on_host()) data()->lfe_curve = v; else guest::StoreU32(base, address + 68, v); }
-  uint32_t lfe_curve_bits() const { return on_host() ? data()->lfe_curve : guest::LoadU32(base, address + 68); }
-  void set_lfe_curve_bits(uint32_t v) const { if (on_host()) data()->lfe_curve = v; else guest::StoreU32(base, address + 68, v); }
+  T lfe_curve() const { return T(base, lfe_curve_bits()); }
+  void set_lfe_curve(const View& w) const { set_lfe_curve_bits(w.address); }
+  void set_lfe_curve(uint32_t v) const { set_lfe_curve_bits(v); }
   uint32_t lpf_direct_curve_address() const { return address + 72; }
+  uint32_t lpf_direct_curve_bits() const { if (auto* d = direct()) return d->lpf_direct_curve; return uint32_t((memory::IsHandle(address + 72) ? uint32_t(memory::OwnerLoad(address + 72, 4)) : guest::LoadU32(base, address + 72))); }
+  void set_lpf_direct_curve_bits(uint32_t v) const { if (auto* d = direct()) { d->lpf_direct_curve = v; return; } if (memory::IsHandle(address + 72)) memory::OwnerStore(address + 72, 4, v); else guest::StoreU32(base, address + 72, v); }
   template <typename T = X3DAudioCurve>
-  T lpf_direct_curve() const { return T(base, on_host() ? data()->lpf_direct_curve : guest::LoadU32(base, address + 72)); }
-  void set_lpf_direct_curve(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->lpf_direct_curve = v; else guest::StoreU32(base, address + 72, v); }
-  void set_lpf_direct_curve(uint32_t v) const { if (on_host()) data()->lpf_direct_curve = v; else guest::StoreU32(base, address + 72, v); }
-  uint32_t lpf_direct_curve_bits() const { return on_host() ? data()->lpf_direct_curve : guest::LoadU32(base, address + 72); }
-  void set_lpf_direct_curve_bits(uint32_t v) const { if (on_host()) data()->lpf_direct_curve = v; else guest::StoreU32(base, address + 72, v); }
+  T lpf_direct_curve() const { return T(base, lpf_direct_curve_bits()); }
+  void set_lpf_direct_curve(const View& w) const { set_lpf_direct_curve_bits(w.address); }
+  void set_lpf_direct_curve(uint32_t v) const { set_lpf_direct_curve_bits(v); }
   uint32_t lpf_reverb_curve_address() const { return address + 76; }
+  uint32_t lpf_reverb_curve_bits() const { if (auto* d = direct()) return d->lpf_reverb_curve; return uint32_t((memory::IsHandle(address + 76) ? uint32_t(memory::OwnerLoad(address + 76, 4)) : guest::LoadU32(base, address + 76))); }
+  void set_lpf_reverb_curve_bits(uint32_t v) const { if (auto* d = direct()) { d->lpf_reverb_curve = v; return; } if (memory::IsHandle(address + 76)) memory::OwnerStore(address + 76, 4, v); else guest::StoreU32(base, address + 76, v); }
   template <typename T = X3DAudioCurve>
-  T lpf_reverb_curve() const { return T(base, on_host() ? data()->lpf_reverb_curve : guest::LoadU32(base, address + 76)); }
-  void set_lpf_reverb_curve(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->lpf_reverb_curve = v; else guest::StoreU32(base, address + 76, v); }
-  void set_lpf_reverb_curve(uint32_t v) const { if (on_host()) data()->lpf_reverb_curve = v; else guest::StoreU32(base, address + 76, v); }
-  uint32_t lpf_reverb_curve_bits() const { return on_host() ? data()->lpf_reverb_curve : guest::LoadU32(base, address + 76); }
-  void set_lpf_reverb_curve_bits(uint32_t v) const { if (on_host()) data()->lpf_reverb_curve = v; else guest::StoreU32(base, address + 76, v); }
+  T lpf_reverb_curve() const { return T(base, lpf_reverb_curve_bits()); }
+  void set_lpf_reverb_curve(const View& w) const { set_lpf_reverb_curve_bits(w.address); }
+  void set_lpf_reverb_curve(uint32_t v) const { set_lpf_reverb_curve_bits(v); }
   uint32_t reverb_curve_address() const { return address + 80; }
+  uint32_t reverb_curve_bits() const { if (auto* d = direct()) return d->reverb_curve; return uint32_t((memory::IsHandle(address + 80) ? uint32_t(memory::OwnerLoad(address + 80, 4)) : guest::LoadU32(base, address + 80))); }
+  void set_reverb_curve_bits(uint32_t v) const { if (auto* d = direct()) { d->reverb_curve = v; return; } if (memory::IsHandle(address + 80)) memory::OwnerStore(address + 80, 4, v); else guest::StoreU32(base, address + 80, v); }
   template <typename T = X3DAudioCurve>
-  T reverb_curve() const { return T(base, on_host() ? data()->reverb_curve : guest::LoadU32(base, address + 80)); }
-  void set_reverb_curve(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->reverb_curve = v; else guest::StoreU32(base, address + 80, v); }
-  void set_reverb_curve(uint32_t v) const { if (on_host()) data()->reverb_curve = v; else guest::StoreU32(base, address + 80, v); }
-  uint32_t reverb_curve_bits() const { return on_host() ? data()->reverb_curve : guest::LoadU32(base, address + 80); }
-  void set_reverb_curve_bits(uint32_t v) const { if (on_host()) data()->reverb_curve = v; else guest::StoreU32(base, address + 80, v); }
+  T reverb_curve() const { return T(base, reverb_curve_bits()); }
+  void set_reverb_curve(const View& w) const { set_reverb_curve_bits(w.address); }
+  void set_reverb_curve(uint32_t v) const { set_reverb_curve_bits(v); }
   uint32_t curve_distance_scaler_address() const { return address + 84; }
-  float curve_distance_scaler() const { return on_host() ? float(data()->curve_distance_scaler) : float(guest::LoadFloat(base, address + 84)); }
-  void set_curve_distance_scaler(float v) const { if (on_host()) data()->curve_distance_scaler = v; else guest::StoreFloat(base, address + 84, v); }
-  uint32_t curve_distance_scaler_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->curve_distance_scaler) : guest::LoadU32(base, address + 84); }
-  void set_curve_distance_scaler_bits(uint32_t v) const { if (on_host()) data()->curve_distance_scaler = std::bit_cast<float>(v); else guest::StoreU32(base, address + 84, v); }
+  uint32_t curve_distance_scaler_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->curve_distance_scaler); return uint32_t((memory::IsHandle(address + 84) ? uint32_t(memory::OwnerLoad(address + 84, 4)) : guest::LoadU32(base, address + 84))); }
+  void set_curve_distance_scaler_bits(uint32_t v) const { if (auto* d = direct()) { d->curve_distance_scaler = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 84)) memory::OwnerStore(address + 84, 4, v); else guest::StoreU32(base, address + 84, v); }
+  float curve_distance_scaler() const { return std::bit_cast<float>(curve_distance_scaler_bits()); }
+  void set_curve_distance_scaler(float v) const { set_curve_distance_scaler_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t doppler_scaler_address() const { return address + 88; }
-  float doppler_scaler() const { return on_host() ? float(data()->doppler_scaler) : float(guest::LoadFloat(base, address + 88)); }
-  void set_doppler_scaler(float v) const { if (on_host()) data()->doppler_scaler = v; else guest::StoreFloat(base, address + 88, v); }
-  uint32_t doppler_scaler_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->doppler_scaler) : guest::LoadU32(base, address + 88); }
-  void set_doppler_scaler_bits(uint32_t v) const { if (on_host()) data()->doppler_scaler = std::bit_cast<float>(v); else guest::StoreU32(base, address + 88, v); }
+  uint32_t doppler_scaler_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->doppler_scaler); return uint32_t((memory::IsHandle(address + 88) ? uint32_t(memory::OwnerLoad(address + 88, 4)) : guest::LoadU32(base, address + 88))); }
+  void set_doppler_scaler_bits(uint32_t v) const { if (auto* d = direct()) { d->doppler_scaler = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 88)) memory::OwnerStore(address + 88, 4, v); else guest::StoreU32(base, address + 88, v); }
+  float doppler_scaler() const { return std::bit_cast<float>(doppler_scaler_bits()); }
+  void set_doppler_scaler(float v) const { set_doppler_scaler_bits(std::bit_cast<uint32_t>(v)); }
 };
 
 // embedded; measure: CarSound.+52, X3DAudio::Delay.r5.+0
@@ -2004,48 +2022,49 @@ struct X3DAudioCone : View {
   }
   X3DAudioCone at(uint32_t i) const { return X3DAudioCone(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kX3DAudioConeLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kX3DAudioConeLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
+  X3DAudioConeData* direct() const { return static_cast<X3DAudioConeData*>(memory::HandleOwn(address, &kX3DAudioConeLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kX3DAudioConeLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kX3DAudioConeLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t inner_angle_address() const { return address + 0; }
-  float inner_angle() const { return on_host() ? float(data()->inner_angle) : float(guest::LoadFloat(base, address + 0)); }
-  void set_inner_angle(float v) const { if (on_host()) data()->inner_angle = v; else guest::StoreFloat(base, address + 0, v); }
-  uint32_t inner_angle_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->inner_angle) : guest::LoadU32(base, address + 0); }
-  void set_inner_angle_bits(uint32_t v) const { if (on_host()) data()->inner_angle = std::bit_cast<float>(v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t inner_angle_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->inner_angle); return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_inner_angle_bits(uint32_t v) const { if (auto* d = direct()) { d->inner_angle = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  float inner_angle() const { return std::bit_cast<float>(inner_angle_bits()); }
+  void set_inner_angle(float v) const { set_inner_angle_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t outer_angle_address() const { return address + 4; }
-  float outer_angle() const { return on_host() ? float(data()->outer_angle) : float(guest::LoadFloat(base, address + 4)); }
-  void set_outer_angle(float v) const { if (on_host()) data()->outer_angle = v; else guest::StoreFloat(base, address + 4, v); }
-  uint32_t outer_angle_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->outer_angle) : guest::LoadU32(base, address + 4); }
-  void set_outer_angle_bits(uint32_t v) const { if (on_host()) data()->outer_angle = std::bit_cast<float>(v); else guest::StoreU32(base, address + 4, v); }
+  uint32_t outer_angle_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->outer_angle); return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_outer_angle_bits(uint32_t v) const { if (auto* d = direct()) { d->outer_angle = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  float outer_angle() const { return std::bit_cast<float>(outer_angle_bits()); }
+  void set_outer_angle(float v) const { set_outer_angle_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t inner_volume_address() const { return address + 8; }
-  float inner_volume() const { return on_host() ? float(data()->inner_volume) : float(guest::LoadFloat(base, address + 8)); }
-  void set_inner_volume(float v) const { if (on_host()) data()->inner_volume = v; else guest::StoreFloat(base, address + 8, v); }
-  uint32_t inner_volume_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->inner_volume) : guest::LoadU32(base, address + 8); }
-  void set_inner_volume_bits(uint32_t v) const { if (on_host()) data()->inner_volume = std::bit_cast<float>(v); else guest::StoreU32(base, address + 8, v); }
+  uint32_t inner_volume_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->inner_volume); return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_inner_volume_bits(uint32_t v) const { if (auto* d = direct()) { d->inner_volume = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  float inner_volume() const { return std::bit_cast<float>(inner_volume_bits()); }
+  void set_inner_volume(float v) const { set_inner_volume_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t outer_volume_address() const { return address + 12; }
-  float outer_volume() const { return on_host() ? float(data()->outer_volume) : float(guest::LoadFloat(base, address + 12)); }
-  void set_outer_volume(float v) const { if (on_host()) data()->outer_volume = v; else guest::StoreFloat(base, address + 12, v); }
-  uint32_t outer_volume_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->outer_volume) : guest::LoadU32(base, address + 12); }
-  void set_outer_volume_bits(uint32_t v) const { if (on_host()) data()->outer_volume = std::bit_cast<float>(v); else guest::StoreU32(base, address + 12, v); }
+  uint32_t outer_volume_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->outer_volume); return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_outer_volume_bits(uint32_t v) const { if (auto* d = direct()) { d->outer_volume = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
+  float outer_volume() const { return std::bit_cast<float>(outer_volume_bits()); }
+  void set_outer_volume(float v) const { set_outer_volume_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t inner_lpf_address() const { return address + 16; }
-  float inner_lpf() const { return on_host() ? float(data()->inner_lpf) : float(guest::LoadFloat(base, address + 16)); }
-  void set_inner_lpf(float v) const { if (on_host()) data()->inner_lpf = v; else guest::StoreFloat(base, address + 16, v); }
-  uint32_t inner_lpf_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->inner_lpf) : guest::LoadU32(base, address + 16); }
-  void set_inner_lpf_bits(uint32_t v) const { if (on_host()) data()->inner_lpf = std::bit_cast<float>(v); else guest::StoreU32(base, address + 16, v); }
+  uint32_t inner_lpf_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->inner_lpf); return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_inner_lpf_bits(uint32_t v) const { if (auto* d = direct()) { d->inner_lpf = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
+  float inner_lpf() const { return std::bit_cast<float>(inner_lpf_bits()); }
+  void set_inner_lpf(float v) const { set_inner_lpf_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t outer_lpf_address() const { return address + 20; }
-  float outer_lpf() const { return on_host() ? float(data()->outer_lpf) : float(guest::LoadFloat(base, address + 20)); }
-  void set_outer_lpf(float v) const { if (on_host()) data()->outer_lpf = v; else guest::StoreFloat(base, address + 20, v); }
-  uint32_t outer_lpf_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->outer_lpf) : guest::LoadU32(base, address + 20); }
-  void set_outer_lpf_bits(uint32_t v) const { if (on_host()) data()->outer_lpf = std::bit_cast<float>(v); else guest::StoreU32(base, address + 20, v); }
+  uint32_t outer_lpf_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->outer_lpf); return uint32_t((memory::IsHandle(address + 20) ? uint32_t(memory::OwnerLoad(address + 20, 4)) : guest::LoadU32(base, address + 20))); }
+  void set_outer_lpf_bits(uint32_t v) const { if (auto* d = direct()) { d->outer_lpf = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 4, v); else guest::StoreU32(base, address + 20, v); }
+  float outer_lpf() const { return std::bit_cast<float>(outer_lpf_bits()); }
+  void set_outer_lpf(float v) const { set_outer_lpf_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t inner_reverb_address() const { return address + 24; }
-  float inner_reverb() const { return on_host() ? float(data()->inner_reverb) : float(guest::LoadFloat(base, address + 24)); }
-  void set_inner_reverb(float v) const { if (on_host()) data()->inner_reverb = v; else guest::StoreFloat(base, address + 24, v); }
-  uint32_t inner_reverb_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->inner_reverb) : guest::LoadU32(base, address + 24); }
-  void set_inner_reverb_bits(uint32_t v) const { if (on_host()) data()->inner_reverb = std::bit_cast<float>(v); else guest::StoreU32(base, address + 24, v); }
+  uint32_t inner_reverb_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->inner_reverb); return uint32_t((memory::IsHandle(address + 24) ? uint32_t(memory::OwnerLoad(address + 24, 4)) : guest::LoadU32(base, address + 24))); }
+  void set_inner_reverb_bits(uint32_t v) const { if (auto* d = direct()) { d->inner_reverb = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 24)) memory::OwnerStore(address + 24, 4, v); else guest::StoreU32(base, address + 24, v); }
+  float inner_reverb() const { return std::bit_cast<float>(inner_reverb_bits()); }
+  void set_inner_reverb(float v) const { set_inner_reverb_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t outer_reverb_address() const { return address + 28; }
-  float outer_reverb() const { return on_host() ? float(data()->outer_reverb) : float(guest::LoadFloat(base, address + 28)); }
-  void set_outer_reverb(float v) const { if (on_host()) data()->outer_reverb = v; else guest::StoreFloat(base, address + 28, v); }
-  uint32_t outer_reverb_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->outer_reverb) : guest::LoadU32(base, address + 28); }
-  void set_outer_reverb_bits(uint32_t v) const { if (on_host()) data()->outer_reverb = std::bit_cast<float>(v); else guest::StoreU32(base, address + 28, v); }
+  uint32_t outer_reverb_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->outer_reverb); return uint32_t((memory::IsHandle(address + 28) ? uint32_t(memory::OwnerLoad(address + 28, 4)) : guest::LoadU32(base, address + 28))); }
+  void set_outer_reverb_bits(uint32_t v) const { if (auto* d = direct()) { d->outer_reverb = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 28)) memory::OwnerStore(address + 28, 4, v); else guest::StoreU32(base, address + 28, v); }
+  float outer_reverb() const { return std::bit_cast<float>(outer_reverb_bits()); }
+  void set_outer_reverb(float v) const { set_outer_reverb_bits(std::bit_cast<uint32_t>(v)); }
 };
 
 // embedded; measure: -
@@ -2078,19 +2097,20 @@ struct X3DAudioCurve : View {
   }
   X3DAudioCurve at(uint32_t i) const { return X3DAudioCurve(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kX3DAudioCurveLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kX3DAudioCurveLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
+  X3DAudioCurveData* direct() const { return static_cast<X3DAudioCurveData*>(memory::HandleOwn(address, &kX3DAudioCurveLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kX3DAudioCurveLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kX3DAudioCurveLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // {distance, value} float pairs
   uint32_t points_address() const { return address + 0; }
-  uint32_t points() const { return on_host() ? uint32_t(data()->points) : uint32_t(guest::LoadU32(base, address + 0)); }
-  void set_points(uint32_t v) const { if (on_host()) data()->points = v; else guest::StoreU32(base, address + 0, v); }
-  uint32_t points_bits() const { return on_host() ? data()->points : guest::LoadU32(base, address + 0); }
-  void set_points_bits(uint32_t v) const { if (on_host()) data()->points = v; else guest::StoreU32(base, address + 0, v); }
+  uint32_t points_bits() const { if (auto* d = direct()) return d->points; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_points_bits(uint32_t v) const { if (auto* d = direct()) { d->points = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t points() const { if (auto* d = direct()) return d->points; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_points(uint32_t v) const { if (auto* d = direct()) { d->points = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   uint32_t count_address() const { return address + 4; }
-  uint32_t count() const { return on_host() ? uint32_t(data()->count) : uint32_t(guest::LoadU32(base, address + 4)); }
-  void set_count(uint32_t v) const { if (on_host()) data()->count = v; else guest::StoreU32(base, address + 4, v); }
-  uint32_t count_bits() const { return on_host() ? data()->count : guest::LoadU32(base, address + 4); }
-  void set_count_bits(uint32_t v) const { if (on_host()) data()->count = v; else guest::StoreU32(base, address + 4, v); }
+  uint32_t count_bits() const { if (auto* d = direct()) return d->count; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_count_bits(uint32_t v) const { if (auto* d = direct()) { d->count = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  uint32_t count() const { if (auto* d = direct()) return d->count; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_count(uint32_t v) const { if (auto* d = direct()) { d->count = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
 };
 
 // embedded; measure: X3DAudio::Delay.r6, X3DAudioCalculate.r7
@@ -2133,75 +2153,76 @@ struct X3DAudioDspSettings : View {
   }
   X3DAudioDspSettings at(uint32_t i) const { return X3DAudioDspSettings(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kX3DAudioDspSettingsLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kX3DAudioDspSettingsLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
+  X3DAudioDspSettingsData* direct() const { return static_cast<X3DAudioDspSettingsData*>(memory::HandleOwn(address, &kX3DAudioDspSettingsLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kX3DAudioDspSettingsLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kX3DAudioDspSettingsLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // destination rows of source-channel floats
   uint32_t matrix_address() const { return address + 0; }
+  uint32_t matrix_bits() const { if (auto* d = direct()) return d->matrix; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_matrix_bits(uint32_t v) const { if (auto* d = direct()) { d->matrix = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   template <typename T = X3DAudioMatrix>
-  T matrix() const { return T(base, on_host() ? data()->matrix : guest::LoadU32(base, address + 0)); }
-  void set_matrix(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->matrix = v; else guest::StoreU32(base, address + 0, v); }
-  void set_matrix(uint32_t v) const { if (on_host()) data()->matrix = v; else guest::StoreU32(base, address + 0, v); }
-  uint32_t matrix_bits() const { return on_host() ? data()->matrix : guest::LoadU32(base, address + 0); }
-  void set_matrix_bits(uint32_t v) const { if (on_host()) data()->matrix = v; else guest::StoreU32(base, address + 0, v); }
+  T matrix() const { return T(base, matrix_bits()); }
+  void set_matrix(const View& w) const { set_matrix_bits(w.address); }
+  void set_matrix(uint32_t v) const { set_matrix_bits(v); }
   uint32_t delays_address() const { return address + 4; }
+  uint32_t delays_bits() const { if (auto* d = direct()) return d->delays; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_delays_bits(uint32_t v) const { if (auto* d = direct()) { d->delays = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
   template <typename T = X3DAudioDelays>
-  T delays() const { return T(base, on_host() ? data()->delays : guest::LoadU32(base, address + 4)); }
-  void set_delays(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->delays = v; else guest::StoreU32(base, address + 4, v); }
-  void set_delays(uint32_t v) const { if (on_host()) data()->delays = v; else guest::StoreU32(base, address + 4, v); }
-  uint32_t delays_bits() const { return on_host() ? data()->delays : guest::LoadU32(base, address + 4); }
-  void set_delays_bits(uint32_t v) const { if (on_host()) data()->delays = v; else guest::StoreU32(base, address + 4, v); }
+  T delays() const { return T(base, delays_bits()); }
+  void set_delays(const View& w) const { set_delays_bits(w.address); }
+  void set_delays(uint32_t v) const { set_delays_bits(v); }
   uint32_t source_channels_address() const { return address + 8; }
-  uint32_t source_channels() const { return on_host() ? uint32_t(data()->source_channels) : uint32_t(guest::LoadU32(base, address + 8)); }
-  void set_source_channels(uint32_t v) const { if (on_host()) data()->source_channels = v; else guest::StoreU32(base, address + 8, v); }
-  uint32_t source_channels_bits() const { return on_host() ? data()->source_channels : guest::LoadU32(base, address + 8); }
-  void set_source_channels_bits(uint32_t v) const { if (on_host()) data()->source_channels = v; else guest::StoreU32(base, address + 8, v); }
+  uint32_t source_channels_bits() const { if (auto* d = direct()) return d->source_channels; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_source_channels_bits(uint32_t v) const { if (auto* d = direct()) { d->source_channels = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  uint32_t source_channels() const { if (auto* d = direct()) return d->source_channels; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_source_channels(uint32_t v) const { if (auto* d = direct()) { d->source_channels = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
   uint32_t destination_channels_address() const { return address + 12; }
-  uint32_t destination_channels() const { return on_host() ? uint32_t(data()->destination_channels) : uint32_t(guest::LoadU32(base, address + 12)); }
-  void set_destination_channels(uint32_t v) const { if (on_host()) data()->destination_channels = v; else guest::StoreU32(base, address + 12, v); }
-  uint32_t destination_channels_bits() const { return on_host() ? data()->destination_channels : guest::LoadU32(base, address + 12); }
-  void set_destination_channels_bits(uint32_t v) const { if (on_host()) data()->destination_channels = v; else guest::StoreU32(base, address + 12, v); }
+  uint32_t destination_channels_bits() const { if (auto* d = direct()) return d->destination_channels; return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_destination_channels_bits(uint32_t v) const { if (auto* d = direct()) { d->destination_channels = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
+  uint32_t destination_channels() const { if (auto* d = direct()) return d->destination_channels; return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_destination_channels(uint32_t v) const { if (auto* d = direct()) { d->destination_channels = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
   uint32_t lpf_direct_address() const { return address + 16; }
-  float lpf_direct() const { return on_host() ? float(data()->lpf_direct) : float(guest::LoadFloat(base, address + 16)); }
-  void set_lpf_direct(float v) const { if (on_host()) data()->lpf_direct = v; else guest::StoreFloat(base, address + 16, v); }
-  uint32_t lpf_direct_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->lpf_direct) : guest::LoadU32(base, address + 16); }
-  void set_lpf_direct_bits(uint32_t v) const { if (on_host()) data()->lpf_direct = std::bit_cast<float>(v); else guest::StoreU32(base, address + 16, v); }
+  uint32_t lpf_direct_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->lpf_direct); return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_lpf_direct_bits(uint32_t v) const { if (auto* d = direct()) { d->lpf_direct = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
+  float lpf_direct() const { return std::bit_cast<float>(lpf_direct_bits()); }
+  void set_lpf_direct(float v) const { set_lpf_direct_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t lpf_reverb_address() const { return address + 20; }
-  float lpf_reverb() const { return on_host() ? float(data()->lpf_reverb) : float(guest::LoadFloat(base, address + 20)); }
-  void set_lpf_reverb(float v) const { if (on_host()) data()->lpf_reverb = v; else guest::StoreFloat(base, address + 20, v); }
-  uint32_t lpf_reverb_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->lpf_reverb) : guest::LoadU32(base, address + 20); }
-  void set_lpf_reverb_bits(uint32_t v) const { if (on_host()) data()->lpf_reverb = std::bit_cast<float>(v); else guest::StoreU32(base, address + 20, v); }
+  uint32_t lpf_reverb_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->lpf_reverb); return uint32_t((memory::IsHandle(address + 20) ? uint32_t(memory::OwnerLoad(address + 20, 4)) : guest::LoadU32(base, address + 20))); }
+  void set_lpf_reverb_bits(uint32_t v) const { if (auto* d = direct()) { d->lpf_reverb = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 4, v); else guest::StoreU32(base, address + 20, v); }
+  float lpf_reverb() const { return std::bit_cast<float>(lpf_reverb_bits()); }
+  void set_lpf_reverb(float v) const { set_lpf_reverb_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t reverb_level_address() const { return address + 24; }
-  float reverb_level() const { return on_host() ? float(data()->reverb_level) : float(guest::LoadFloat(base, address + 24)); }
-  void set_reverb_level(float v) const { if (on_host()) data()->reverb_level = v; else guest::StoreFloat(base, address + 24, v); }
-  uint32_t reverb_level_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->reverb_level) : guest::LoadU32(base, address + 24); }
-  void set_reverb_level_bits(uint32_t v) const { if (on_host()) data()->reverb_level = std::bit_cast<float>(v); else guest::StoreU32(base, address + 24, v); }
+  uint32_t reverb_level_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->reverb_level); return uint32_t((memory::IsHandle(address + 24) ? uint32_t(memory::OwnerLoad(address + 24, 4)) : guest::LoadU32(base, address + 24))); }
+  void set_reverb_level_bits(uint32_t v) const { if (auto* d = direct()) { d->reverb_level = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 24)) memory::OwnerStore(address + 24, 4, v); else guest::StoreU32(base, address + 24, v); }
+  float reverb_level() const { return std::bit_cast<float>(reverb_level_bits()); }
+  void set_reverb_level(float v) const { set_reverb_level_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t doppler_factor_address() const { return address + 28; }
-  float doppler_factor() const { return on_host() ? float(data()->doppler_factor) : float(guest::LoadFloat(base, address + 28)); }
-  void set_doppler_factor(float v) const { if (on_host()) data()->doppler_factor = v; else guest::StoreFloat(base, address + 28, v); }
-  uint32_t doppler_factor_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->doppler_factor) : guest::LoadU32(base, address + 28); }
-  void set_doppler_factor_bits(uint32_t v) const { if (on_host()) data()->doppler_factor = std::bit_cast<float>(v); else guest::StoreU32(base, address + 28, v); }
+  uint32_t doppler_factor_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->doppler_factor); return uint32_t((memory::IsHandle(address + 28) ? uint32_t(memory::OwnerLoad(address + 28, 4)) : guest::LoadU32(base, address + 28))); }
+  void set_doppler_factor_bits(uint32_t v) const { if (auto* d = direct()) { d->doppler_factor = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 28)) memory::OwnerStore(address + 28, 4, v); else guest::StoreU32(base, address + 28, v); }
+  float doppler_factor() const { return std::bit_cast<float>(doppler_factor_bits()); }
+  void set_doppler_factor(float v) const { set_doppler_factor_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t emitter_angle_address() const { return address + 32; }
-  float emitter_angle() const { return on_host() ? float(data()->emitter_angle) : float(guest::LoadFloat(base, address + 32)); }
-  void set_emitter_angle(float v) const { if (on_host()) data()->emitter_angle = v; else guest::StoreFloat(base, address + 32, v); }
-  uint32_t emitter_angle_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->emitter_angle) : guest::LoadU32(base, address + 32); }
-  void set_emitter_angle_bits(uint32_t v) const { if (on_host()) data()->emitter_angle = std::bit_cast<float>(v); else guest::StoreU32(base, address + 32, v); }
+  uint32_t emitter_angle_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->emitter_angle); return uint32_t((memory::IsHandle(address + 32) ? uint32_t(memory::OwnerLoad(address + 32, 4)) : guest::LoadU32(base, address + 32))); }
+  void set_emitter_angle_bits(uint32_t v) const { if (auto* d = direct()) { d->emitter_angle = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 32)) memory::OwnerStore(address + 32, 4, v); else guest::StoreU32(base, address + 32, v); }
+  float emitter_angle() const { return std::bit_cast<float>(emitter_angle_bits()); }
+  void set_emitter_angle(float v) const { set_emitter_angle_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t distance_address() const { return address + 36; }
-  float distance() const { return on_host() ? float(data()->distance) : float(guest::LoadFloat(base, address + 36)); }
-  void set_distance(float v) const { if (on_host()) data()->distance = v; else guest::StoreFloat(base, address + 36, v); }
-  uint32_t distance_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->distance) : guest::LoadU32(base, address + 36); }
-  void set_distance_bits(uint32_t v) const { if (on_host()) data()->distance = std::bit_cast<float>(v); else guest::StoreU32(base, address + 36, v); }
+  uint32_t distance_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->distance); return uint32_t((memory::IsHandle(address + 36) ? uint32_t(memory::OwnerLoad(address + 36, 4)) : guest::LoadU32(base, address + 36))); }
+  void set_distance_bits(uint32_t v) const { if (auto* d = direct()) { d->distance = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 36)) memory::OwnerStore(address + 36, 4, v); else guest::StoreU32(base, address + 36, v); }
+  float distance() const { return std::bit_cast<float>(distance_bits()); }
+  void set_distance(float v) const { set_distance_bits(std::bit_cast<uint32_t>(v)); }
   // the emitter's velocity along the line to the listener
   uint32_t emitter_velocity_address() const { return address + 40; }
-  float emitter_velocity() const { return on_host() ? float(data()->emitter_velocity) : float(guest::LoadFloat(base, address + 40)); }
-  void set_emitter_velocity(float v) const { if (on_host()) data()->emitter_velocity = v; else guest::StoreFloat(base, address + 40, v); }
-  uint32_t emitter_velocity_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->emitter_velocity) : guest::LoadU32(base, address + 40); }
-  void set_emitter_velocity_bits(uint32_t v) const { if (on_host()) data()->emitter_velocity = std::bit_cast<float>(v); else guest::StoreU32(base, address + 40, v); }
+  uint32_t emitter_velocity_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->emitter_velocity); return uint32_t((memory::IsHandle(address + 40) ? uint32_t(memory::OwnerLoad(address + 40, 4)) : guest::LoadU32(base, address + 40))); }
+  void set_emitter_velocity_bits(uint32_t v) const { if (auto* d = direct()) { d->emitter_velocity = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 40)) memory::OwnerStore(address + 40, 4, v); else guest::StoreU32(base, address + 40, v); }
+  float emitter_velocity() const { return std::bit_cast<float>(emitter_velocity_bits()); }
+  void set_emitter_velocity(float v) const { set_emitter_velocity_bits(std::bit_cast<uint32_t>(v)); }
   // the listener's
   uint32_t listener_velocity_address() const { return address + 44; }
-  float listener_velocity() const { return on_host() ? float(data()->listener_velocity) : float(guest::LoadFloat(base, address + 44)); }
-  void set_listener_velocity(float v) const { if (on_host()) data()->listener_velocity = v; else guest::StoreFloat(base, address + 44, v); }
-  uint32_t listener_velocity_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->listener_velocity) : guest::LoadU32(base, address + 44); }
-  void set_listener_velocity_bits(uint32_t v) const { if (on_host()) data()->listener_velocity = std::bit_cast<float>(v); else guest::StoreU32(base, address + 44, v); }
+  uint32_t listener_velocity_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->listener_velocity); return uint32_t((memory::IsHandle(address + 44) ? uint32_t(memory::OwnerLoad(address + 44, 4)) : guest::LoadU32(base, address + 44))); }
+  void set_listener_velocity_bits(uint32_t v) const { if (auto* d = direct()) { d->listener_velocity = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 4, v); else guest::StoreU32(base, address + 44, v); }
+  float listener_velocity() const { return std::bit_cast<float>(listener_velocity_bits()); }
+  void set_listener_velocity(float v) const { set_listener_velocity_bits(std::bit_cast<uint32_t>(v)); }
 };
 
 // allocated; measure: X3DAudio::Delay.r6.+0, X3DAudio.+0
@@ -2280,23 +2301,24 @@ struct X3DAudioVector : View {
   }
   X3DAudioVector at(uint32_t i) const { return X3DAudioVector(base, address + i * kSize); }
   void Delete() const { if (address) memory::FreeHandle(address); }
-  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kX3DAudioVectorLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
-  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kX3DAudioVectorLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
+  X3DAudioVectorData* direct() const { return static_cast<X3DAudioVectorData*>(memory::HandleOwn(address, &kX3DAudioVectorLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kX3DAudioVectorLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kX3DAudioVectorLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t x_address() const { return address + 0; }
-  float x() const { return on_host() ? float(data()->x) : float(guest::LoadFloat(base, address + 0)); }
-  void set_x(float v) const { if (on_host()) data()->x = v; else guest::StoreFloat(base, address + 0, v); }
-  uint32_t x_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->x) : guest::LoadU32(base, address + 0); }
-  void set_x_bits(uint32_t v) const { if (on_host()) data()->x = std::bit_cast<float>(v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t x_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->x); return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_x_bits(uint32_t v) const { if (auto* d = direct()) { d->x = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  float x() const { return std::bit_cast<float>(x_bits()); }
+  void set_x(float v) const { set_x_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t y_address() const { return address + 4; }
-  float y() const { return on_host() ? float(data()->y) : float(guest::LoadFloat(base, address + 4)); }
-  void set_y(float v) const { if (on_host()) data()->y = v; else guest::StoreFloat(base, address + 4, v); }
-  uint32_t y_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->y) : guest::LoadU32(base, address + 4); }
-  void set_y_bits(uint32_t v) const { if (on_host()) data()->y = std::bit_cast<float>(v); else guest::StoreU32(base, address + 4, v); }
+  uint32_t y_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->y); return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_y_bits(uint32_t v) const { if (auto* d = direct()) { d->y = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  float y() const { return std::bit_cast<float>(y_bits()); }
+  void set_y(float v) const { set_y_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t z_address() const { return address + 8; }
-  float z() const { return on_host() ? float(data()->z) : float(guest::LoadFloat(base, address + 8)); }
-  void set_z(float v) const { if (on_host()) data()->z = v; else guest::StoreFloat(base, address + 8, v); }
-  uint32_t z_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->z) : guest::LoadU32(base, address + 8); }
-  void set_z_bits(uint32_t v) const { if (on_host()) data()->z = std::bit_cast<float>(v); else guest::StoreU32(base, address + 8, v); }
+  uint32_t z_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->z); return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_z_bits(uint32_t v) const { if (auto* d = direct()) { d->z = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  float z() const { return std::bit_cast<float>(z_bits()); }
+  void set_z(float v) const { set_z_bits(std::bit_cast<uint32_t>(v)); }
 };
 
 // embedded; measure: CarSound@+736
