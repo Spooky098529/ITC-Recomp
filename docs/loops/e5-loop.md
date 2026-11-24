@@ -1057,3 +1057,37 @@ data, shader microcode, the image loaders' texture packs) until step 7.
 **Checked:** the build; an attract race (38 s, no error lines, 150 to 151
 fps); `tick_replay.sh` twice (both races all match, 112 and 1,183 ticks, the
 pause menu included); a frame dump (normal).
+
+## Step 6 as one swarm (2026-11-24)
+
+`docs/e5-native.md` step 6 (control flow and threads), the user's call
+(2026-11-24: "do step 6", "make use of an agent swarm for this too").
+
+### Groundwork: the stacks in PC memory (done 2026-11-24, `db5a8a0d`)
+
+The lifted code passes the addresses of its frames' slots to its callees
+everywhere (over 10,000 `rX = r1 + N`), so frames can't become C++ locals
+by a tool; the stacks themselves moved instead. Every thread's stack,
+thread object, per-thread block (r13) and TLS slots are blobs
+(`threads/threads.cpp`'s `Make`): r1 and r13 are handles. `guest.h` keeps
+the calling thread's stack (`memory::t_stack`, set when our thread starts)
+and finds its bytes first in every load, store and `guest::Pointer`,
+before the handles' lookup. Eleven hand-port sites reading frames through
+`base + address` (the car draws' and track route's word copies, the
+resolve's clear color, the inline draws' data, the memcpy check, a file
+path, the spin-lock words, the state digest) now go through
+`guest::Pointer`. Checked: build, attract race (38 s, no error lines, 150
+fps at the cap), `tick_replay.sh` twice (both races all match).
+
+### The swarm
+
+The hand ports' own work, by area (16 groups of the ~65 areas with guest
+frames, import calls or float mode switches; `threads/`, `imports/` and
+`memory/` are the lead's): frames' slots only the port reads become C++
+locals, slots handed to other code stay on the (PC memory) stack; import
+calls whose answer is a plain host operation called directly; float mode
+switches kept only where a result depends on them. The script:
+`itc_recomp/tools/workflows/e5-step6-swarm.js`, `args`:
+`{"units": [{name, areas, files}]}`; reports in
+`docs/loops/e5-step6-reports.md`. The lifted code's import calls (each
+through `lifted::Import`'s lookup) are a `lift.py` change, the lead's.
