@@ -489,15 +489,44 @@ struct FrameworkInterfaceVtable : View {
 };
 
 // embedded; measure: Framework.+120
+#pragma pack(push, 1)
+struct FrameworkAppInterfaceData {
+  uint32_t vtable = 0;  // +0
+};
+#pragma pack(pop)
+static_assert(sizeof(FrameworkAppInterfaceData) == 4);
+inline constexpr memory::LayoutField kFrameworkAppInterfaceFields[] = {{0, 4}};
+inline constexpr memory::Layout kFrameworkAppInterfaceLayout = {kFrameworkAppInterfaceFields, 1};
+
 struct FrameworkAppInterface : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  FrameworkAppInterfaceData* data() const { return static_cast<FrameworkAppInterfaceData*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static FrameworkAppInterface New(uint8_t* base) {
+    return FrameworkAppInterface(base, memory::MakeHandle(new FrameworkAppInterfaceData(), sizeof(FrameworkAppInterfaceData), "FrameworkAppInterface", &kFrameworkAppInterfaceLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static FrameworkAppInterface NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(FrameworkAppInterfaceData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<FrameworkAppInterfaceData*>(::operator new(sizeof(FrameworkAppInterfaceData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) FrameworkAppInterfaceData();
+    return FrameworkAppInterface(base, memory::MakeHandle(p, sizeof(FrameworkAppInterfaceData) * count, "FrameworkAppInterface", &kFrameworkAppInterfaceLayout, sizeof(FrameworkAppInterfaceData)));
+  }
+  FrameworkAppInterface at(uint32_t i) const { return FrameworkAppInterface(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kFrameworkAppInterfaceLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kFrameworkAppInterfaceLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0x82000E08
-  template <typename T = FrameworkAppInterfaceVtable>
-  T vtable() const { return T(base, guest::LoadU32(base, address + 0)); }
-  void set_vtable(const View& v) const { guest::StoreU32(base, address + 0, v.address); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
+  template <typename T = FrameworkAppInterfaceVtable>
+  T vtable() const { return T(base, on_host() ? data()->vtable : guest::LoadU32(base, address + 0)); }
+  void set_vtable(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
+  void set_vtable(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable_bits() const { return on_host() ? data()->vtable : guest::LoadU32(base, address + 0); }
+  void set_vtable_bits(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
 };
 
 // image; measure: Framework.+120.+0
@@ -515,15 +544,45 @@ struct FrameworkAppInterfaceVtable : View {
 };
 
 // embedded; measure: sub_820944C8.r3@-12
+#pragma pack(push, 1)
+struct AppPart4Data {
+  uint8_t pad_0[20] = {};
+  uint32_t framework_interface = 0;  // +20
+};
+#pragma pack(pop)
+static_assert(sizeof(AppPart4Data) == 24);
+inline constexpr memory::LayoutField kAppPart4Fields[] = {{20, 4}};
+inline constexpr memory::Layout kAppPart4Layout = {kAppPart4Fields, 1};
+
 struct AppPart4 : View {
   using View::View;
   static constexpr uint32_t kSize = 24;
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  AppPart4Data* data() const { return static_cast<AppPart4Data*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static AppPart4 New(uint8_t* base) {
+    return AppPart4(base, memory::MakeHandle(new AppPart4Data(), sizeof(AppPart4Data), "AppPart4", &kAppPart4Layout));
+  }
+  template <uint32_t Stride = kSize>
+  static AppPart4 NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(AppPart4Data) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<AppPart4Data*>(::operator new(sizeof(AppPart4Data) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) AppPart4Data();
+    return AppPart4(base, memory::MakeHandle(p, sizeof(AppPart4Data) * count, "AppPart4", &kAppPart4Layout, sizeof(AppPart4Data)));
+  }
+  AppPart4 at(uint32_t i) const { return AppPart4(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kAppPart4Layout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppPart4Layout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // app + 24: the framework's +36 interface
-  template <typename T = FrameworkInterface>
-  T framework_interface() const { return T(base, guest::LoadU32(base, address + 20)); }
-  void set_framework_interface(const View& v) const { guest::StoreU32(base, address + 20, v.address); }
-  void set_framework_interface(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
   uint32_t framework_interface_address() const { return address + 20; }
+  template <typename T = FrameworkInterface>
+  T framework_interface() const { return T(base, on_host() ? data()->framework_interface : guest::LoadU32(base, address + 20)); }
+  void set_framework_interface(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->framework_interface = v; else guest::StoreU32(base, address + 20, v); }
+  void set_framework_interface(uint32_t v) const { if (on_host()) data()->framework_interface = v; else guest::StoreU32(base, address + 20, v); }
+  uint32_t framework_interface_bits() const { return on_host() ? data()->framework_interface : guest::LoadU32(base, address + 20); }
+  void set_framework_interface_bits(uint32_t v) const { if (on_host()) data()->framework_interface = v; else guest::StoreU32(base, address + 20, v); }
 };
 
 // embedded; measure: RunLoop, Framework::Init.r4, sub_8209A6E0.r3, sub_8209A008.r3

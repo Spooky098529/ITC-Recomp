@@ -313,7 +313,11 @@ void AddRacers(uint8_t* base, uint32_t manager, uint32_t records, uint32_t frame
         } else if (int32_t(record.item_id()) >= 0 && int32_t(record.entry_index()) >= 0) {
           const uint32_t event_entry = RaceEventEntry(base, record.entry_index_address());
           further += 30;
-          CopyPosition(base, schema::RaceEventEntry(base, event_entry).start_address(), start);
+          // CopyPosition from the entry's start (a host object, E5 step 4).
+          const schema::RaceEventEntry from(base, event_entry);
+          const schema::TrackRoutePosition to(base, start);
+          to.set_section(from.start_section());
+          to.set_slice(from.start_slice());
         } else {
           StepToMainRoad(base, start, S16(uint32_t(further)), 0xFFFFFFFFu, frame - 112);
           further += 30;

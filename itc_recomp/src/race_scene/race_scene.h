@@ -24,10 +24,9 @@ constexpr uint32_t kInitFrame = 864;
 // 11 light entries' five vectors (+30080 + 96 i, +28 to +92) = the float at
 // 0x82000A30. Returns the object.
 uint32_t SceneConstruct(uint8_t* base, uint32_t scene);
-// sub_8215D738 RaceScene::Create: [scene] = 0, operator new(31,168) and,
-// when made, RaceScene::RaceScene on it into [scene] (else 0). False, with
-// only [scene] = 0 written, where operator new's plain C++ refuses (the
-// original then runs).
+// sub_8215D738 RaceScene::Create: [scene] = 0, the object made in host
+// memory (E5 step 4: schema::RaceScene::New, for the original's operator
+// new(31,168)) and RaceScene::RaceScene on it into [scene]. True.
 bool SceneCreate(uint8_t* base);
 // sub_8215D808 RaceSceneMachine::Init: RaceScene::Create, the state = 1 and
 // the 11 transitions added (StateMachine::Add), built in the original's
@@ -97,7 +96,8 @@ void DestroyCars(uint8_t* base, uint32_t cars);
 // or a block of the allocation layer's.
 bool DestroyReady(uint8_t* base);
 // sub_8215D790 RaceScene::Destroy: when [scene] is set, DestroyCars(+16)
-// and operator delete of it (the pointer left). Returns the scene (0: r3
+// and the object freed (schema::RaceScene::Delete, for the original's
+// operator delete; the pointer left). Returns the scene (0: r3
 // left as it was). Only where DestroyReady.
 uint32_t Destroy(uint8_t* base);
 

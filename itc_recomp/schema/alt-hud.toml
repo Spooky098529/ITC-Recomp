@@ -8,12 +8,17 @@
 # replay's, made by RaceScreens::Make1004 at the race HUD holder's +1004
 # (src/alt_hud/).
 
-# The object (264 bytes, cleared by RaceScreens::Make1004).
+# The object (264 bytes, cleared by RaceScreens::Make1004). In host memory
+# (E5 step 4): Make1004's New (the hand port; no lifted allocation), freed by
+# AltHud::Destroy's Delete (its lifted original's operator delete takes the
+# handle). Its curves stay bytes (guest order): HudCurve is a guest view
+# over them.
 [AltHud]
 measure = "RaceScreens@+1004.+0"
 measures = ["AltHud::ToggleView.r3.+0"]
 size = 264
 origin = "allocated"
+storage = "host"
 fields = [
   { name = "shown", offset = 0, type = "u32", note = "node 3's flag, the toggle AltHud::Tick flips on X" },
   { name = "tach_curve", offset = 4, type = "bytes", count = 112, note = "the tachometer's HudCurve (one of three at 0x8200FD28)" },
@@ -38,6 +43,8 @@ measure = "RaceScreens@+1004"
 measures = ["RaceScreens::~RaceScreens.r3@+1004", "AltHud::ToggleView.r3"]
 size = 8
 origin = "embedded"
+# Host (E5 step 4): embedded in the host holder only (RaceScreens' alt_hud_holder).
+storage = "host"
 fields = [
   { name = "object", offset = 0, type = "ptr", to = "AltHud", note = "264 bytes, cleared" },
   { name = "menu_list", offset = 4, type = "ptr", note = "a MenuList (72 bytes, one item); its X press flips the toggle" },

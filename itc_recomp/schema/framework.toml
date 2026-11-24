@@ -141,6 +141,7 @@ fields = [
 measure = "Framework.+120"
 size = 4
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "FrameworkAppInterfaceVtable", note = "0x82000E08" },
 ]
@@ -159,6 +160,7 @@ fields = [
 measure = "sub_820944C8.r3@-12"
 size = 24
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "framework_interface", offset = 20, type = "ptr", to = "FrameworkInterface", note = "app + 24: the framework's +36 interface" },
 ]

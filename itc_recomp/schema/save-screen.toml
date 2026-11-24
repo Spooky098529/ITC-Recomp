@@ -32,10 +32,13 @@
 # modes' three words after it. The measure's +0 and +804/+808 are the
 # transitions (StateMachine::Add) and the mode's ring words reached from the
 # handlers (SaveScreenMode's), joined into the machine.
+# Dual (E5 step 4): embedded in the type 10 mode's host block
+# (ModeType10Block's +9640) and in the other modes' blocks, guest or host.
 [SaveScreen]
 measure = "SaveScreen"
 size = 9616
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "transitions", offset = 0, type = "bytes", count = 9600, note = "200 transitions, 48 bytes each (StateMachine's)" },
   { name = "transition_count", offset = 9600, type = "u32" },

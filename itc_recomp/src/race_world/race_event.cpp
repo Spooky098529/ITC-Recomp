@@ -61,7 +61,7 @@ int32_t Count(uint8_t* base, uint32_t list) {
 // A group's list: the event's +36 + 12 x group (the original's
 // event + 12 x (group + 3)).
 uint32_t GroupList(uint8_t* base, uint32_t event, uint32_t group) {
-  return schema::RaceEvent(base, event).groups_address() + guest::LoadU32(base, group) * Group::kSize;
+  return schema::RaceEvent(base, event).group(guest::LoadU32(base, group)).address;
 }
 
 // Entry `i`'s list index (+2), PlaceEntry's `index`.

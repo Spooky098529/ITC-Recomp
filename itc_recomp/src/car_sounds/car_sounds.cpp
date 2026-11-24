@@ -10,6 +10,7 @@
 #include "sound_cues/sound_cues.h"
 
 #include <array>
+#include <bit>
 #include <climits>
 #include <cmath>
 
@@ -79,8 +80,8 @@ void ConstructHolder(uint8_t* base, uint32_t holder) {
   h.set_vtable(kHolderVtable);
   h.set_voice_count(0);
   for (uint32_t i = 0; i < 4; i++) {
-    Store(base, h.voices_address() + 4 * i, 0);
-    Store(base, h.paused_address() + 4 * i, 0);
+    h.store_at(4 + 4 * i, 4, 0);   // voices
+    h.store_at(24 + 4 * i, 4, 0);  // paused
   }
 }
 
@@ -269,8 +270,9 @@ uint32_t CarSoundConstruct(uint8_t* base, uint32_t sound) {
 Destroyed CarSoundsDestroy(uint8_t* base, uint32_t sound, uint32_t flags) {
   ITC_NATIVE_RUNNING("sub_8210DCA8 CarSounds::Destroy");
   if ((flags & 2) != 0) {
+    // operator new[]'s count, 16 bytes before the first sound: the array's.
     const uint32_t block = Sound(base, sound).array_count_address();
-    const uint32_t count = Sound(base, sound).array_count();
+    const uint32_t count = schema::CarSoundArray(base, block).count();
     // From the last element down; the loop's count is signed.
     uint32_t at = sound + count * Sound::kSize;
     for (int32_t left = int32_t(count - 1); left >= 0; left--) {
@@ -285,11 +287,14 @@ Destroyed CarSoundsDestroy(uint8_t* base, uint32_t sound, uint32_t flags) {
 
 uint32_t SetUp(uint8_t* base, uint32_t sound, uint32_t matrix) {
   ITC_NATIVE_RUNNING("sub_8210DDC8 CarSound::SetUp");
-  // The floats move as lfs and stfs move them.
-  const auto copy = [&](uint32_t to, uint32_t from) { StoreF(base, to, LoadF(base, from)); };
   constexpr uint32_t kA = 0x82000A34;
   constexpr uint32_t kB = 0x82007FC8;
   const Sound s(base, sound);
+  // The floats move as lfs and stfs move them, into the sound (in host
+  // memory since E5 step 4: stored through its view at their offsets).
+  const auto copy = [&](uint32_t to, uint32_t from) {
+    s.store_at(to - sound, 4, std::bit_cast<uint32_t>(float(LoadF(base, from))));
+  };
   const schema::X3DAudioListener l(base, s.listener_address());
   const schema::X3DAudioEmitter e(base, s.emitter_address());
   const schema::X3DAudioDspSettings dsp(base, s.dsp_address());
@@ -354,10 +359,10 @@ uint32_t SetUp(uint8_t* base, uint32_t sound, uint32_t matrix) {
   const uint32_t first = s.emitter_position_x_address() & ~15u;
   const uint32_t second = s.listener_position_x_address() & ~15u;
   for (uint32_t i = 0; i < 4; i++) {
-    Store(base, first + 4 * i, one);
+    s.store_at(first - sound + 4 * i, 4, one);
   }
   for (uint32_t i = 0; i < 4; i++) {
-    Store(base, second + 4 * i, i == 2 ? z : one);
+    s.store_at(second - sound + 4 * i, 4, i == 2 ? z : one);
   }
   return matrix;
 }

@@ -23,10 +23,24 @@
 
 # Pool 1 of the second set: a car's parts (37,296 bytes, SceneParts::SceneParts
 # sub_820E2F18, second-set.md), a PoolNode at +0.
+# In host memory (E5 step 4): made by CarScene::SetUp (the hand port's
+# pool loop, src/car_models/scene_fill.cpp; the lifted original's
+# VirtualAlloc returning to 0x820C8FC0), freed by its deleting destructor's
+# operator delete (sub_820E2F78, a handle). Its scalar fields are the
+# layout; the record (+108) and the point block (+176: PartsPoints, its
+# groups, the 240-byte point records) stay guest-shaped views reaching the
+# host object through raw accesses (guest order but for the fields here):
+# PartsPoints is a view at the block and at its groups' addresses alike, so
+# it can't be an embedded dual type without its members disagreeing with
+# the bytes other views read, and the choice and points_ fields here would
+# be swapped twice in the layout under an embed of PartsRecord or
+# PartsPoints.
 [SceneParts]
 measure = "SceneParts"
 size = 37296
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820C8FC0]
 vtable = 0x82006024
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82006024" },

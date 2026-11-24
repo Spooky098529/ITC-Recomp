@@ -22,13 +22,25 @@
 
 # Pool 0 of the second set: a car model (3,744 bytes, vtable 0x82005130,
 # SceneCarModel::SceneCarModel sub_820DB770), a PoolNode at +0.
+# In host memory (E5 step 4): made by CarScene::SetUp (the hand port's
+# pool loop, src/car_models/scene_fill.cpp; the lifted original's
+# VirtualAlloc returning to 0x820C8F90), freed by ScenePools::DestroyB's
+# VirtualFree (a handle; src/scene/scene.cpp, the original's returning to
+# 0x820C5A34). As SceneParts (load-poll.toml): its scalar fields are the
+# layout; the car record (+32, scene-models.toml's CarRecord) stay guest-shaped views reaching the host object through
+# raw accesses (guest order but for the fields here).
 [SceneCarModel]
 measure = "SceneCarModel"
 size = 3744
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820C8F90]
 vtable = 0x82005130
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82005130; the pool objects' base 0x82004F90 before ~PoolNode" },
+  { name = "list", offset = 4, type = "u32", note = "the PoolNode's list" },
+  { name = "next", offset = 8, type = "u32", note = "the PoolNode's links" },
+  { name = "previous", offset = 12, type = "u32" },
   { name = "state", offset = 16, type = "u32", note = "the pool object's: 0 free, 3 in use" },
   { name = "index", offset = 20, type = "u32", note = "its index in the pool (-1 from the constructor)" },
   { name = "car_model", offset = 24, type = "ptr", to = "SecondSetFirstSetObject", note = "the first set's car model (car-models.toml's CarModel); handed back by ScenePools::ReleaseA with its +20" },
@@ -48,10 +60,21 @@ fields = [
 
 # Pool 2 of the second set: the cockpit body (4,320 bytes, vtable
 # 0x8200527C, SceneCockpit::SceneCockpit sub_820DC3E8).
+# In host memory (E5 step 4): made by CarScene::SetUp (the hand port's
+# pool loop, src/car_models/scene_fill.cpp; the lifted original's
+# VirtualAlloc returning to 0x820C9018), freed by ScenePools::DestroyB's
+# VirtualFree (a handle; src/scene/scene.cpp, the original's returning to
+# 0x820C5A34). As SceneParts (load-poll.toml): its scalar fields are the
+# layout; the record (+36), the point block (+192:
+# SecondSetCockpitPoints, its groups, the 240-byte point records) and the
+# part models (+4288, SceneCockpitAt4288) stay guest-shaped views reaching the host object through
+# raw accesses (guest order but for the fields here).
 [SceneCockpit]
 measure = "SceneCockpit"
 size = 4320
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820C9018]
 vtable = 0x8200527C
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x8200527C; the pool objects' base 0x82004F90 before ~PoolNode. Measure fault: CockpitPoints::Find's r4 (the part models at +4288) is filed here, its +0 to +20 the six part models" },
@@ -68,6 +91,11 @@ fields = [
   { name = "record_address", offset = 4272, type = "ptr", to = "SceneModelsCockpitRecord", note = "the record's address (+36)" },
   { name = "part_models", offset = 4288, type = "bytes", count = 24, note = "the body's six part models (its +688 + 464i; SceneCockpit::Finish)" },
   { name = "part_model_0", offset = 4288, type = "u32" },
+  { name = "part_model_1", offset = 4292, type = "u32" },
+  { name = "part_model_2", offset = 4296, type = "u32" },
+  { name = "part_model_3", offset = 4300, type = "u32" },
+  { name = "part_model_4", offset = 4304, type = "u32" },
+  { name = "part_model_5", offset = 4308, type = "u32" },
   { name = "part_models_01", offset = 4288, type = "u64", note = "part models 0 and 1 (cleared as doublewords by Reset)" },
   { name = "part_models_23", offset = 4296, type = "u64" },
   { name = "part_models_45", offset = 4304, type = "u64" },
@@ -103,11 +131,23 @@ fields = [
 
 # Pool 3 of the second set: the interior (11,680 bytes, vtable 0x820062E4,
 # SceneInterior::SceneInterior sub_820E5340).
+# In host memory (E5 step 4): made by CarScene::SetUp (the hand port's
+# pool loop, src/car_models/scene_fill.cpp; the lifted original's
+# VirtualAlloc returning to 0x820C8FEC), freed by ScenePools::DestroyB's
+# VirtualFree (a handle; src/scene/scene.cpp, the original's returning to
+# 0x820C5A34). As SceneParts (load-poll.toml): its scalar fields are the
+# layout; the record (+40, car-draw.toml's InteriorRecord), the point
+# block (+160: SecondSetInteriorPoints, the dials' InteriorDials and Dash,
+# the meters' InteriorMeters, the 240-byte point records) and the part
+# models (+11632, SceneInteriorAt11632) stay guest-shaped views reaching the host object through
+# raw accesses (guest order but for the fields here).
 [SceneInterior]
 measure = "SceneInterior"
 measures = ["List::At.ret.+5068"]
 size = 11680
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820C8FEC]
 vtable = 0x820062E4
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x820062E4; the pool objects' base 0x82004F90 before ~PoolNode. Measure fault: InteriorPoints::Find's r4 (the part models at +11632) is filed here, its +0 to +20 the six part models" },
@@ -137,6 +177,11 @@ fields = [
   { name = "points_accessory_shown", offset = 11616, type = "u32", note = "the point block's +11456: the accessory drawn (CarScene::SetInteriorWord; 1 from Reset)" },
   { name = "part_models", offset = 11632, type = "bytes", count = 24, note = "six part models (the first set's interior's +304 + 464i)" },
   { name = "part_model_0", offset = 11632, type = "u32" },
+  { name = "part_model_1", offset = 11636, type = "u32" },
+  { name = "part_model_2", offset = 11640, type = "u32" },
+  { name = "part_model_3", offset = 11644, type = "u32" },
+  { name = "part_model_4", offset = 11648, type = "u32" },
+  { name = "part_model_5", offset = 11652, type = "u32" },
   { name = "cockpit", offset = 11656, type = "u32", note = "1 under a cockpit (the cockpit set c)" },
   { name = "finished", offset = 11660, type = "u32", note = "SceneInterior::Finish" },
   { name = "cockpit_texture", offset = 11664, type = "u32", note = "the cockpit body's texture (SceneCockpit::Finish)" },
@@ -394,10 +439,21 @@ fields = [
 
 # Pool 6 of the second set: a traffic car's body (9,808 bytes, vtable
 # 0x82006424, SceneTraffic::SceneTraffic sub_820E6E70).
+# In host memory (E5 step 4): made by CarScene::SetUp (the hand port's
+# pool loop, src/car_models/scene_fill.cpp; the lifted original's
+# VirtualAlloc returning to 0x820C909C), freed by ScenePools::DestroyB's
+# VirtualFree (a handle; src/scene/scene.cpp, the original's returning to
+# 0x820C5A34). As SceneParts (load-poll.toml): its scalar fields are the
+# layout; the car record (+32), the point block (+3728: car-draw.toml's
+# TrafficPoints, the 240-byte point records) and the part models (+9768,
+# SceneTrafficAt9768) stay guest-shaped views reaching the host object through
+# raw accesses (guest order but for the fields here).
 [SceneTraffic]
 measure = "SceneTraffic"
 size = 9808
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820C909C]
 vtable = 0x82006424
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82006424; the pool objects' base 0x82004F90 before ~PoolNode. Measure fault: TrafficPoints::Find's r4 (the part models at +9768) is filed here, its +0 to +20 the six part models" },
@@ -414,6 +470,11 @@ fields = [
   { name = "skeleton", offset = 9764, type = "u32", note = "the body's +3776" },
   { name = "part_models", offset = 9768, type = "bytes", count = 24, note = "the body's six part models (its +4256 + 464i)" },
   { name = "part_model_0", offset = 9768, type = "u32" },
+  { name = "part_model_1", offset = 9772, type = "u32" },
+  { name = "part_model_2", offset = 9776, type = "u32" },
+  { name = "part_model_3", offset = 9780, type = "u32" },
+  { name = "part_model_4", offset = 9784, type = "u32" },
+  { name = "part_model_5", offset = 9788, type = "u32" },
   { name = "finished", offset = 9792, type = "u32", note = "checked by SceneTraffic::Finish, never set there" },
   { name = "scene", offset = 9796, type = "ptr", to = "CarScene" },
 ]

@@ -380,21 +380,55 @@ struct LocationScreenPicture : View {
 };
 
 // allocated; measure: Picture.+8, new<12>@LocationScreen::OnPictureLoadedA, new<12>@LocationScreen::OnPictureLoadedB, new<16>@LocationScreen::OnPictureLoadedA.+8, new<16>@LocationScreen::OnPictureLoadedB.+8
+#pragma pack(push, 1)
+struct LocationScreenPictureTextureData {
+  uint32_t texture = 0;  // +0
+  uint32_t width = 0;  // +4
+  uint32_t height = 0;  // +8
+};
+#pragma pack(pop)
+static_assert(sizeof(LocationScreenPictureTextureData) == 12);
+inline constexpr memory::LayoutField kLocationScreenPictureTextureFields[] = {{0, 4}, {4, 4}, {8, 4}};
+inline constexpr memory::Layout kLocationScreenPictureTextureLayout = {kLocationScreenPictureTextureFields, 3};
+
 struct LocationScreenPictureTexture : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  LocationScreenPictureTextureData* data() const { return static_cast<LocationScreenPictureTextureData*>(memory::HandleObject(address)); }
+  static LocationScreenPictureTexture New(uint8_t* base) {
+    return LocationScreenPictureTexture(base, memory::MakeHandle(new LocationScreenPictureTextureData(), sizeof(LocationScreenPictureTextureData), "LocationScreenPictureTexture", &kLocationScreenPictureTextureLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static LocationScreenPictureTexture NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(LocationScreenPictureTextureData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<LocationScreenPictureTextureData*>(::operator new(sizeof(LocationScreenPictureTextureData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) LocationScreenPictureTextureData();
+    return LocationScreenPictureTexture(base, memory::MakeHandle(p, sizeof(LocationScreenPictureTextureData) * count, "LocationScreenPictureTexture", &kLocationScreenPictureTextureLayout, sizeof(LocationScreenPictureTextureData)));
+  }
+  LocationScreenPictureTexture at(uint32_t i) const { return LocationScreenPictureTexture(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kLocationScreenPictureTextureLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kLocationScreenPictureTextureLayout, offset, width, v); }
   // the XPR's texture 0 (XPR::GetTexture)
-  uint32_t texture() const { return guest::LoadU32(base, address + 0); }
-  void set_texture(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t texture_address() const { return address + 0; }
+  uint32_t texture() const { return data()->texture; }
+  void set_texture(uint32_t v) const { data()->texture = v; }
+  uint32_t texture_bits() const { return data()->texture; }
+  void set_texture_bits(uint32_t v) const { data()->texture = v; }
   // Texture::GetLevelDesc's +24
-  uint32_t width() const { return guest::LoadU32(base, address + 4); }
-  void set_width(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t width_address() const { return address + 4; }
+  uint32_t width() const { return data()->width; }
+  void set_width(uint32_t v) const { data()->width = v; }
+  uint32_t width_bits() const { return data()->width; }
+  void set_width_bits(uint32_t v) const { data()->width = v; }
   // Texture::GetLevelDesc's +28
-  uint32_t height() const { return guest::LoadU32(base, address + 8); }
-  void set_height(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t height_address() const { return address + 8; }
+  uint32_t height() const { return data()->height; }
+  void set_height(uint32_t v) const { data()->height = v; }
+  uint32_t height_bits() const { return data()->height; }
+  void set_height_bits(uint32_t v) const { data()->height = v; }
 };
 
 // file; measure: DataTables::Entry20.ret
@@ -473,36 +507,6 @@ struct LocationScreenAt804 : View {
   uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
   void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t unknown_0_address() const { return address + 0; }
-};
-
-// embedded; measure: new<28940>@ModeType5::Init
-struct LocationScreenPart : View {
-  using View::View;
-  static constexpr uint32_t kSize = 28928;
-  uint32_t unknown_9612() const { return guest::LoadU32(base, address + 9612); }
-  void set_unknown_9612(uint32_t v) const { guest::StoreU32(base, address + 9612, v); }
-  uint32_t unknown_9612_address() const { return address + 9612; }
-  uint32_t unknown_9616() const { return guest::LoadU32(base, address + 9616); }
-  void set_unknown_9616(uint32_t v) const { guest::StoreU32(base, address + 9616, v); }
-  uint32_t unknown_9616_address() const { return address + 9616; }
-  uint32_t unknown_19252() const { return guest::LoadU32(base, address + 19252); }
-  void set_unknown_19252(uint32_t v) const { guest::StoreU32(base, address + 19252, v); }
-  uint32_t unknown_19252_address() const { return address + 19252; }
-  uint32_t unknown_19256() const { return guest::LoadU32(base, address + 19256); }
-  void set_unknown_19256(uint32_t v) const { guest::StoreU32(base, address + 19256, v); }
-  uint32_t unknown_19256_address() const { return address + 19256; }
-  uint32_t unknown_28892() const { return guest::LoadU32(base, address + 28892); }
-  void set_unknown_28892(uint32_t v) const { guest::StoreU32(base, address + 28892, v); }
-  uint32_t unknown_28892_address() const { return address + 28892; }
-  uint32_t unknown_28896() const { return guest::LoadU32(base, address + 28896); }
-  void set_unknown_28896(uint32_t v) const { guest::StoreU32(base, address + 28896, v); }
-  uint32_t unknown_28896_address() const { return address + 28896; }
-  uint32_t unknown_28920() const { return guest::LoadU32(base, address + 28920); }
-  void set_unknown_28920(uint32_t v) const { guest::StoreU32(base, address + 28920, v); }
-  uint32_t unknown_28920_address() const { return address + 28920; }
-  uint32_t unknown_28924() const { return guest::LoadU32(base, address + 28924); }
-  void set_unknown_28924(uint32_t v) const { guest::StoreU32(base, address + 28924, v); }
-  uint32_t unknown_28924_address() const { return address + 28924; }
 };
 
 // embedded; measure: LocationScreen@+560

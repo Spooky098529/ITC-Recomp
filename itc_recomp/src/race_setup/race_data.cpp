@@ -255,7 +255,10 @@ uint32_t EventCurrent(uint8_t* base) {
 
 uint32_t EventCount(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_821434F8 RaceEvent::Count");
-  return G::event(base).count();
+  // Read without a check (as the original): with no event, guest memory's
+  // halfword at 20 (the event itself is a host object, E5 step 4).
+  const schema::RaceEvent event = G::event(base);
+  return event.address != 0 ? event.count() : guest::LoadU16(base, event.count_address());
 }
 
 uint32_t StagesReset(uint8_t* base, uint32_t list) {

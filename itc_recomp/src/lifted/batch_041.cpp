@@ -5318,7 +5318,7 @@ lifted::Result f82480780(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f13,36(r31)
-  temp.u32 = guest::LoadU32(base, schema::X3DAudioDspSettings(base, uint32_t(r31)).distance_address());
+  temp.u32 = schema::X3DAudioDspSettings(base, uint32_t(r31)).distance_bits();
   f13 = double(temp.f32);
   // lfs f0,26896(r11)
   temp.u32 = guest::LoadU32(base, uint32_t(r11) + 26896);
@@ -5345,7 +5345,7 @@ lifted::Result f82480780(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   { const lifted::Result o = lifted::Call(base, 0x824819B8, LIFTED_ARGS(0x824807DC, r31)); r3 = o.r3; f1 = o.f1; }
   // lfs f0,36(r31)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, schema::X3DAudioDspSettings(base, uint32_t(r31)).distance_address());
+  temp.u32 = schema::X3DAudioDspSettings(base, uint32_t(r31)).distance_bits();
   f0 = double(temp.f32);
   // fdivs f31,f1,f0
   f31 = double(float(f1 / f0));
@@ -5365,7 +5365,7 @@ loc_824807E4:
   f0 = double(float(f0));
   // stfs f0,32(r31)
   temp.f32 = float(f0);
-  guest::StoreU32(base, schema::X3DAudioDspSettings(base, uint32_t(r31)).emitter_angle_address(), temp.u32);
+  schema::X3DAudioDspSettings(base, uint32_t(r31)).set_emitter_angle_bits(temp.u32);
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
   // lwz r12,-8(r1)
@@ -5415,17 +5415,17 @@ lifted::Result f82481708(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r31,12
   r3 = uint64_t(int64_t(int64_t(r31) + 12));
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, schema::X3DAudioVector(base, uint32_t(r31)).x_address());
+  r11 = schema::X3DAudioVector(base, uint32_t(r31)).x_bits();
   // mr r30,r6
   r30 = r6;
   // stw r11,80(r1)
   guest::StoreU32(base, uint32_t(r1) + 80, uint32_t(r11));
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, schema::X3DAudioVector(base, uint32_t(r31)).y_address());
+  r11 = schema::X3DAudioVector(base, uint32_t(r31)).y_bits();
   // stw r11,84(r1)
   guest::StoreU32(base, uint32_t(r1) + 84, uint32_t(r11));
   // lwz r11,8(r31)
-  r11 = guest::LoadU32(base, schema::X3DAudioVector(base, uint32_t(r31)).z_address());
+  r11 = schema::X3DAudioVector(base, uint32_t(r31)).z_bits();
   // stw r11,88(r1)
   guest::StoreU32(base, uint32_t(r1) + 88, uint32_t(r11));
   // bl 0x82481a18
@@ -5449,13 +5449,13 @@ lifted::Result f82481708(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r1,112
   r3 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, schema::X3DAudioEmitter(base, uint32_t(r11) - 28).position_x_address());
+  r10 = schema::X3DAudioEmitter(base, uint32_t(r11) - 28).position_x_bits();
   // stw r10,112(r1)
   guest::StoreU32(base, uint32_t(r1) + 112, uint32_t(r10));
   // lwz r10,4(r11)
-  r10 = guest::LoadU32(base, schema::X3DAudioEmitter(base, uint32_t(r11) - 28).position_y_address());
+  r10 = schema::X3DAudioEmitter(base, uint32_t(r11) - 28).position_y_bits();
   // lwz r11,8(r11)
-  r11 = guest::LoadU32(base, schema::X3DAudioEmitter(base, uint32_t(r11) - 28).position_z_address());
+  r11 = schema::X3DAudioEmitter(base, uint32_t(r11) - 28).position_z_bits();
   // stw r10,116(r1)
   guest::StoreU32(base, uint32_t(r1) + 116, uint32_t(r10));
   // stw r11,120(r1)
@@ -5535,7 +5535,7 @@ lifted::Result f82481708(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   temp.u32 = guest::LoadU32(base, uint32_t(r11) + 2612);
   f0 = double(temp.f32);
   // lwz r11,4(r30)
-  r11 = guest::LoadU32(base, schema::X3DAudioDspSettings(base, uint32_t(r30)).delays_address());
+  r11 = schema::X3DAudioDspSettings(base, uint32_t(r30)).delays_bits();
   // stfs f0,0(r11)
   temp.f32 = float(f0);
   guest::StoreU32(base, schema::X3DAudioDelays(base, uint32_t(r11)).delay_0_address(), temp.u32);
@@ -5564,7 +5564,7 @@ loc_8248180C:
   // (left out: dead in C++)
   { const lifted::Result o = game::sin(base, LIFTED_ARGS(0x8248182C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,4(r30)
-  r11 = guest::LoadU32(base, schema::X3DAudioDspSettings(base, uint32_t(r30)).delays_address());
+  r11 = schema::X3DAudioDspSettings(base, uint32_t(r30)).delays_bits();
   // frsp f0,f1
   lifted::ScalarFloatMode();
   f0 = double(float(f1));
@@ -5572,7 +5572,7 @@ loc_8248180C:
   temp.f32 = float(f0);
   guest::StoreU32(base, schema::X3DAudioDelays(base, uint32_t(r11)).delay_0_address(), temp.u32);
   // lwz r11,4(r30)
-  r11 = guest::LoadU32(base, schema::X3DAudioDspSettings(base, uint32_t(r30)).delays_address());
+  r11 = schema::X3DAudioDspSettings(base, uint32_t(r30)).delays_bits();
   // stfs f30,4(r11)
   temp.f32 = float(f30);
   guest::StoreU32(base, schema::X3DAudioDelays(base, uint32_t(r11)).delay_1_address(), temp.u32);
@@ -5587,7 +5587,7 @@ loc_8248180C:
   return {r3, f1};
 loc_82481850:
   // lwz r11,4(r30)
-  r11 = guest::LoadU32(base, schema::X3DAudioDspSettings(base, uint32_t(r30)).delays_address());
+  r11 = schema::X3DAudioDspSettings(base, uint32_t(r30)).delays_bits();
   // fneg f1,f1
   lifted::ScalarFloatMode();
   f1 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f1) ^ 0x8000000000000000));
@@ -5602,7 +5602,7 @@ loc_82481850:
   f0 = double(float(f1));
 loc_82481864:
   // lwz r11,4(r30)
-  r11 = guest::LoadU32(base, schema::X3DAudioDspSettings(base, uint32_t(r30)).delays_address());
+  r11 = schema::X3DAudioDspSettings(base, uint32_t(r30)).delays_bits();
   // stfs f0,4(r11)
   lifted::ScalarFloatMode();
   temp.f32 = float(f0);

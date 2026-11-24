@@ -485,7 +485,9 @@ ITC_NATIVE_ENTRY_ALWAYS(8215DEA0) {
         continue;
       }
       ctx.r3.u64 = overlay;
-      lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, overlay) + slot));
+      // The car overlays are host objects since E5 step 4: their vtable
+      // word through the handle.
+      lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::VtableWord(base, overlay) + slot));
     }
   };
   if (!render_only) {

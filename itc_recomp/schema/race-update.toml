@@ -29,11 +29,13 @@
 measure = "RaceScene"
 size = 31168
 origin = "allocated"
+storage = "host"  # E5 step 4: made by RaceScene::Create (race_scene::SceneCreate's New; lifted, operator new at 0x8215D75C), freed by RaceScene::Destroy (Delete; lifted, operator delete at 0x8215D7C0, which takes handles)
+host_alloc = [0x8215D75C]
 fields = [
   { name = "scenery", offset = 0, type = "ptr", to = "Scenery", note = "the course scenery's manager ([0x826C551C], set by RaceScene::LoadScenery)" },
   { name = "car_slot_count", offset = 16, type = "u32", note = "the car slots' count (7); Car::TickUpdate's r3 is this word's address" },
-  { name = "car_slots", offset = 32, type = "bytes", count = 30016, note = "seven RaceCarSlots of 4,288 bytes, by vehicle index" },
-  { name = "lights", offset = 30064, type = "bytes", count = 1076, note = "the light set (RaceLights)" },
+  { name = "car_slots", offset = 32, type = "embed", to = "RaceCarSlot", count = 7, note = "seven car slots of 4,288 bytes, by vehicle index" },
+  { name = "lights", offset = 30064, type = "embed", to = "RaceLights", note = "the light set" },
   { name = "screen_object", offset = 31152, type = "ptr", to = "ScreenObject", note = "the race's screen object (1024 x 576; 0 when not made)" },
   { name = "screen_object_first", offset = 31156, type = "ptr", to = "ScreenObject", note = "split screen: player 1's screen object" },
   { name = "screen_object_second", offset = 31160, type = "ptr", to = "ScreenObject", note = "split screen: player 2's screen object" },
@@ -46,6 +48,7 @@ fields = [
 measure = "RaceScene::RemakeCarModel.r5"
 size = 4288
 origin = "embedded"
+storage = "host"  # only inside RaceScene (its car_slots)
 fields = [
   { name = "model", offset = 0, type = "ptr", to = "SceneModel", note = "its pool 7 scene model (ScenePools::SetUpB's; 0 none)" },
   { name = "record", offset = 16, type = "bytes", count = 4244, note = "its scene model record (car-makers.toml's SceneModelRecord, from SceneModelRecord::FromCar)" },
@@ -60,11 +63,12 @@ measure = "RaceScene@+30064@+16"
 measures = ["RaceScene@+30064"]
 size = 1076
 origin = "embedded"
+storage = "host"  # only inside RaceScene (its lights)
 fields = [
   { name = "count", offset = 0, type = "u32", note = "the entries of kind 1 or 2 (11)" },
   { name = "kind1_count", offset = 4, type = "u32", note = "3" },
   { name = "kind2_count", offset = 8, type = "u32", note = "8" },
-  { name = "entries", offset = 16, type = "bytes", count = 1056, note = "eleven RaceLightEntries of 96 bytes" },
+  { name = "entries", offset = 16, type = "embed", to = "RaceLightEntry", count = 11, note = "eleven entries of 96 bytes" },
   { name = "unknown_1072", offset = 1072, type = "u32", note = "0 at SetUp" },
 ]
 
@@ -72,6 +76,7 @@ fields = [
 [RaceLightEntry]
 size = 96
 origin = "embedded"
+storage = "host"  # only inside RaceLights (its entries); the vectors are bytes fields (guest order), read and written through load_at and store_at
 fields = [
   { name = "kind", offset = 0, type = "u32", note = "1 directional (entries 0 to 2), 2 (3 to 10; probably spot lights)" },
   { name = "direction", offset = 16, type = "bytes", count = 16, note = "the direction (earlier taken for the color): normalized into the scene lights' 0x8296B950 by RaceLights::Update" },

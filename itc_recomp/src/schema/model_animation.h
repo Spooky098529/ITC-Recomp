@@ -390,57 +390,163 @@ struct PrimitiveDrawerDeclaration : View {
   uint32_t vertex_declaration_address() const { return address + 0; }
 };
 
-// file; measure: InputManager@+988
+// embedded; measure: InputManager@+988
+#pragma pack(push, 1)
+struct PhysicalPadData {
+  uint32_t vtable = 0;  // +0
+  uint32_t unknown_4 = 0;  // +4
+  uint8_t values[160] = {};  // +8, 1 x ActionPadValues
+  uint8_t record_a[12] = {};  // +168, 1 x PhysicalPadRecord
+  uint8_t record_b[12] = {};  // +180, 1 x PhysicalPadRecord
+  uint8_t pad_192[20] = {};
+};
+#pragma pack(pop)
+static_assert(sizeof(PhysicalPadData) == 212);
+inline constexpr memory::LayoutField kPhysicalPadFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 4}, {24, 4}, {28, 4}, {32, 4}, {168, 4}, {172, 4}, {176, 4}, {180, 4}, {184, 4}, {188, 4}};
+inline constexpr memory::Layout kPhysicalPadLayout = {kPhysicalPadFields, 15};
+
 struct PhysicalPad : View {
   using View::View;
   static constexpr uint32_t kSize = 212;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   static constexpr uint32_t kVtable = 0x8206CBF4;
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  PhysicalPadData* data() const { return static_cast<PhysicalPadData*>(memory::HandleObject(address)); }
+  static PhysicalPad New(uint8_t* base) {
+    return PhysicalPad(base, memory::MakeHandle(new PhysicalPadData(), sizeof(PhysicalPadData), "PhysicalPad", &kPhysicalPadLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static PhysicalPad NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(PhysicalPadData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<PhysicalPadData*>(::operator new(sizeof(PhysicalPadData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) PhysicalPadData();
+    return PhysicalPad(base, memory::MakeHandle(p, sizeof(PhysicalPadData) * count, "PhysicalPad", &kPhysicalPadLayout, sizeof(PhysicalPadData)));
+  }
+  PhysicalPad at(uint32_t i) const { return PhysicalPad(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kPhysicalPadLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kPhysicalPadLayout, offset, width, v); }
   uint32_t vtable_address() const { return address + 0; }
+  uint32_t vtable() const { return data()->vtable; }
+  void set_vtable(uint32_t v) const { data()->vtable = v; }
+  uint32_t vtable_bits() const { return data()->vtable; }
+  void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
   // 0 when made
-  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
-  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t unknown_4_address() const { return address + 4; }
-  // the 40 values (slot 1, PhysicalPad::Values)
-  uint32_t values_address() const { return address + 8; }
-  // a PhysicalPadRecord
-  uint32_t record_a_address() const { return address + 168; }
-  // a PhysicalPadRecord
-  uint32_t record_b_address() const { return address + 180; }
+  uint32_t unknown_4() const { return data()->unknown_4; }
+  void set_unknown_4(uint32_t v) const { data()->unknown_4 = v; }
+  uint32_t unknown_4_bits() const { return data()->unknown_4; }
+  void set_unknown_4_bits(uint32_t v) const { data()->unknown_4 = v; }
+  // the 40 values (slot 1, PhysicalPad::Values; action-mappers.toml's ActionPadValues, as a logical pad's)
+  template <typename T = ActionPadValues>
+  T values() const { return T(base, address + 8); }
+  // the first motor
+  template <typename T = PhysicalPadRecord>
+  T record_a() const { return T(base, address + 168); }
+  // the second motor
+  template <typename T = PhysicalPadRecord>
+  T record_b() const { return T(base, address + 180); }
 };
 
-// file; measure: -
+// embedded; measure: -
+#pragma pack(push, 1)
+struct PhysicalPadRecordData {
+  float unknown_0 = 0;  // +0
+  uint32_t unknown_4 = 0;  // +4
+  uint32_t unknown_8 = 0;  // +8
+};
+#pragma pack(pop)
+static_assert(sizeof(PhysicalPadRecordData) == 12);
+inline constexpr memory::LayoutField kPhysicalPadRecordFields[] = {{0, 4}, {4, 4}, {8, 4}};
+inline constexpr memory::Layout kPhysicalPadRecordLayout = {kPhysicalPadRecordFields, 3};
+
 struct PhysicalPadRecord : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  PhysicalPadRecordData* data() const { return static_cast<PhysicalPadRecordData*>(memory::HandleObject(address)); }
+  static PhysicalPadRecord New(uint8_t* base) {
+    return PhysicalPadRecord(base, memory::MakeHandle(new PhysicalPadRecordData(), sizeof(PhysicalPadRecordData), "PhysicalPadRecord", &kPhysicalPadRecordLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static PhysicalPadRecord NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(PhysicalPadRecordData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<PhysicalPadRecordData*>(::operator new(sizeof(PhysicalPadRecordData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) PhysicalPadRecordData();
+    return PhysicalPadRecord(base, memory::MakeHandle(p, sizeof(PhysicalPadRecordData) * count, "PhysicalPadRecord", &kPhysicalPadRecordLayout, sizeof(PhysicalPadRecordData)));
+  }
+  PhysicalPadRecord at(uint32_t i) const { return PhysicalPadRecord(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kPhysicalPadRecordLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kPhysicalPadRecordLayout, offset, width, v); }
   // 0.0 when made
-  float unknown_0() const { return guest::LoadFloat(base, address + 0); }
-  void set_unknown_0(float v) const { guest::StoreFloat(base, address + 0, v); }
   uint32_t unknown_0_address() const { return address + 0; }
+  float unknown_0() const { return data()->unknown_0; }
+  void set_unknown_0(float v) const { data()->unknown_0 = v; }
+  uint32_t unknown_0_bits() const { return std::bit_cast<uint32_t>(data()->unknown_0); }
+  void set_unknown_0_bits(uint32_t v) const { data()->unknown_0 = std::bit_cast<float>(v); }
   // 0 when made
-  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
-  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_4() const { return data()->unknown_4; }
+  void set_unknown_4(uint32_t v) const { data()->unknown_4 = v; }
+  uint32_t unknown_4_bits() const { return data()->unknown_4; }
+  void set_unknown_4_bits(uint32_t v) const { data()->unknown_4 = v; }
   // 0 when made
-  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
-  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t unknown_8_address() const { return address + 8; }
+  uint32_t unknown_8() const { return data()->unknown_8; }
+  void set_unknown_8(uint32_t v) const { data()->unknown_8 = v; }
+  uint32_t unknown_8_bits() const { return data()->unknown_8; }
+  void set_unknown_8_bits(uint32_t v) const { data()->unknown_8 = v; }
 };
 
 // embedded; measure: InputManager@+988@+168
+#pragma pack(push, 1)
+struct PhysicalPadAt168Data {
+  float unknown_0 = 0;  // +0
+  uint32_t unknown_4 = 0;  // +4
+  uint32_t unknown_8 = 0;  // +8
+};
+#pragma pack(pop)
+static_assert(sizeof(PhysicalPadAt168Data) == 12);
+inline constexpr memory::LayoutField kPhysicalPadAt168Fields[] = {{0, 4}, {4, 4}, {8, 4}};
+inline constexpr memory::Layout kPhysicalPadAt168Layout = {kPhysicalPadAt168Fields, 3};
+
 struct PhysicalPadAt168 : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
-  float unknown_0() const { return guest::LoadFloat(base, address + 0); }
-  void set_unknown_0(float v) const { guest::StoreFloat(base, address + 0, v); }
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  PhysicalPadAt168Data* data() const { return static_cast<PhysicalPadAt168Data*>(memory::HandleObject(address)); }
+  static PhysicalPadAt168 New(uint8_t* base) {
+    return PhysicalPadAt168(base, memory::MakeHandle(new PhysicalPadAt168Data(), sizeof(PhysicalPadAt168Data), "PhysicalPadAt168", &kPhysicalPadAt168Layout));
+  }
+  template <uint32_t Stride = kSize>
+  static PhysicalPadAt168 NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(PhysicalPadAt168Data) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<PhysicalPadAt168Data*>(::operator new(sizeof(PhysicalPadAt168Data) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) PhysicalPadAt168Data();
+    return PhysicalPadAt168(base, memory::MakeHandle(p, sizeof(PhysicalPadAt168Data) * count, "PhysicalPadAt168", &kPhysicalPadAt168Layout, sizeof(PhysicalPadAt168Data)));
+  }
+  PhysicalPadAt168 at(uint32_t i) const { return PhysicalPadAt168(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kPhysicalPadAt168Layout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kPhysicalPadAt168Layout, offset, width, v); }
   uint32_t unknown_0_address() const { return address + 0; }
-  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
-  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  float unknown_0() const { return data()->unknown_0; }
+  void set_unknown_0(float v) const { data()->unknown_0 = v; }
+  uint32_t unknown_0_bits() const { return std::bit_cast<uint32_t>(data()->unknown_0); }
+  void set_unknown_0_bits(uint32_t v) const { data()->unknown_0 = std::bit_cast<float>(v); }
   uint32_t unknown_4_address() const { return address + 4; }
-  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
-  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_4() const { return data()->unknown_4; }
+  void set_unknown_4(uint32_t v) const { data()->unknown_4 = v; }
+  uint32_t unknown_4_bits() const { return data()->unknown_4; }
+  void set_unknown_4_bits(uint32_t v) const { data()->unknown_4 = v; }
   uint32_t unknown_8_address() const { return address + 8; }
+  uint32_t unknown_8() const { return data()->unknown_8; }
+  void set_unknown_8(uint32_t v) const { data()->unknown_8 = v; }
+  uint32_t unknown_8_bits() const { return data()->unknown_8; }
+  void set_unknown_8_bits(uint32_t v) const { data()->unknown_8 = v; }
 };
 
 // embedded; measure: Mesh@+112
@@ -553,3 +659,5 @@ struct ModelAnimationGlobals {
 };
 
 }  // namespace schema
+
+#include "schema/action_mappers.h"

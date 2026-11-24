@@ -9,6 +9,7 @@
 #include "base/log.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
+#include "memory/host_copy.h"
 #include "schema/car_sounds.h"
 
 #include <array>
@@ -47,13 +48,28 @@ void SetRegs(const GuestCall& call, xa::Regs regs) { call(0, 0, regs); }
 constexpr uint32_t kApiFrame = 112;
 
 // The voice word in `slot` (the original's (slot + 1) x 4 from the holder)
-// and the voice in it.
+// and the voice in it, by its offset in the holder (in host memory since
+// E5 step 4: the voice words are read and written through the holder's
+// view; the offset wraps as the original's address does for slot -1).
+uint32_t VoiceOffset(uint32_t slot) { return 4 + (slot << 2); }
 uint32_t VoiceWord(uint8_t* base, uint32_t holder, uint32_t slot) {
   return Holder(base, holder).voices_address() + (slot << 2);
 }
 uint32_t VoiceAt(uint8_t* base, uint32_t holder, uint32_t slot) {
-  return Load(base, VoiceWord(base, holder, slot));
+  return uint32_t(Holder(base, holder).load_at(VoiceOffset(slot), 4));
 }
+void SetVoiceAt(uint8_t* base, uint32_t holder, uint32_t slot, uint32_t voice) {
+  Holder(base, holder).store_at(VoiceOffset(slot), 4, voice);
+}
+// The paused word of slot `i` (+24 + 4 i).
+uint32_t PausedAt(uint8_t* base, uint32_t holder, uint32_t i) {
+  return uint32_t(Holder(base, holder).load_at(24 + 4 * i, 4));
+}
+void SetPausedAt(uint8_t* base, uint32_t holder, uint32_t i, uint32_t value) {
+  Holder(base, holder).store_at(24 + 4 * i, 4, value);
+}
+// A float constant's value, for a setter (lfs then stfs: the same bits).
+float Constant(uint8_t* base, uint32_t constant) { return guest::LoadFloat(base, constant); }
 
 // The constants.
 constexpr uint32_t kZero = 0x82000A34;           // 0.0
@@ -187,8 +203,7 @@ uint32_t UpdateVoices(uint8_t* base, uint32_t holder, uint64_t output, uint32_t 
   Store(base, frame + 140, uint32_t(output));
   uint32_t r3 = 0;
   for (uint32_t i = 0; i < 4; i++) {
-    const uint32_t at = Holder(base, holder).voices_address() + 4 * i;
-    uint32_t voice = Load(base, at);
+    uint32_t voice = VoiceAt(base, holder, i);
     r3 = voice;
     if (voice == 0) {
       continue;
@@ -198,17 +213,17 @@ uint32_t UpdateVoices(uint8_t* base, uint32_t holder, uint64_t output, uint32_t 
     r3 = xa::ApiGetState(base, voice, frame + 80, 0, 0, 0, call);
     const uint8_t state = guest::LoadU8(base, frame + 80);
     if ((state & 4) != 0) {
-      voice = Load(base, at);
+      voice = VoiceAt(base, holder, i);
       SetRegs(call, Args({voice, 0}));
       xa::FrameBelow(base, frame, kApiFrame);
       xa::ApiStop(base, voice, 0, 0, 0, 0, call);
-      voice = Load(base, at);
+      voice = VoiceAt(base, holder, i);
       SetRegs(call, Args({voice}));
       xa::FrameBelow(base, frame, kApiFrame);
       r3 = xa::ApiRelease(base, voice, 0, 0, 0, 0, call);
-      Store(base, at, 0);
+      SetVoiceAt(base, holder, i, 0);
     } else if ((state & 1) != 0) {
-      voice = Load(base, at);
+      voice = VoiceAt(base, holder, i);
       SetRegs(call, Args({voice, frame + 136}));
       xa::FrameBelow(base, frame, kApiFrame);
       r3 = xa::ApiSetOutputMatrix(base, voice, frame + 136, 0, 0, 0, call);
@@ -221,8 +236,7 @@ uint32_t Clear(uint8_t* base, uint32_t holder, uint32_t frame, const GuestCall& 
   ITC_NATIVE_RUNNING("sub_8210D320 CarSound::Clear");
   uint32_t r3 = holder;
   for (uint32_t i = 0; i < 4; i++) {
-    const uint32_t at = Holder(base, holder).voices_address() + 4 * i;
-    uint32_t voice = Load(base, at);
+    uint32_t voice = VoiceAt(base, holder, i);
     if (voice == 0) {
       // The original's r3: the slot's word, 0.
       r3 = 0;
@@ -231,11 +245,11 @@ uint32_t Clear(uint8_t* base, uint32_t holder, uint32_t frame, const GuestCall& 
     SetRegs(call, Args({voice, 0}));
     xa::FrameBelow(base, frame, kApiFrame);
     xa::ApiStop(base, voice, 0, 0, 0, 0, call);
-    voice = Load(base, at);
+    voice = VoiceAt(base, holder, i);
     SetRegs(call, Args({voice}));
     xa::FrameBelow(base, frame, kApiFrame);
     r3 = xa::ApiRelease(base, voice, 0, 0, 0, 0, call);
-    Store(base, at, 0);
+    SetVoiceAt(base, holder, i, 0);
   }
   Holder(base, holder).set_voice_count(0);
   return r3;
@@ -245,9 +259,8 @@ uint32_t Pause(uint8_t* base, uint32_t holder, uint32_t frame, const GuestCall& 
   ITC_NATIVE_RUNNING("sub_8210D240 CarSound::Pause");
   uint32_t r3 = holder;
   for (uint32_t i = 0; i < 4; i++) {
-    const uint32_t at = Holder(base, holder).voices_address() + 4 * i;
-    uint32_t voice = Load(base, at);
-    Store(base, Holder(base, holder).paused_address() + 4 * i, 0);
+    uint32_t voice = VoiceAt(base, holder, i);
+    SetPausedAt(base, holder, i, 0);
     r3 = voice;
     if (voice == 0) {
       continue;
@@ -258,8 +271,8 @@ uint32_t Pause(uint8_t* base, uint32_t holder, uint32_t frame, const GuestCall& 
     if ((guest::LoadU8(base, frame + 80) & 1) == 0) {
       continue;
     }
-    voice = Load(base, at);
-    Store(base, Holder(base, holder).paused_address() + 4 * i, 1);
+    voice = VoiceAt(base, holder, i);
+    SetPausedAt(base, holder, i, 1);
     SetRegs(call, Args({voice, 0}));
     xa::FrameBelow(base, frame, kApiFrame);
     r3 = xa::ApiStop(base, voice, 0, 0, 0, 0, call);
@@ -272,10 +285,9 @@ uint32_t Resume(uint8_t* base, uint32_t holder, const Thread& thread, uint32_t f
   ITC_NATIVE_RUNNING("sub_8210D2C0 CarSound::Resume");
   uint32_t r3 = holder;
   for (uint32_t i = 0; i < 4; i++) {
-    const uint32_t at = Holder(base, holder).voices_address() + 4 * i;
-    const uint32_t voice = Load(base, at);
+    const uint32_t voice = VoiceAt(base, holder, i);
     r3 = voice;
-    if (voice == 0 || Load(base, Holder(base, holder).paused_address() + 4 * i) == 0) {
+    if (voice == 0 || PausedAt(base, holder, i) == 0) {
       continue;
     }
     SetRegs(call, Args({voice, 0}));
@@ -337,7 +349,7 @@ uint32_t AddVoice(uint8_t* base, uint32_t holder, uint32_t view, uint32_t wave, 
   Store(base, f + 168, G::submix(base));
   Store(base, f + 172, f + 80);
   uint32_t slot = 0;
-  while (Load(base, VoiceWord(base, holder, slot)) != 0) {
+  while (VoiceAt(base, holder, slot) != 0) {
     if (++slot >= 4) {
       return 0xFFFFFFFFu;
     }
@@ -351,8 +363,10 @@ uint32_t AddVoice(uint8_t* base, uint32_t holder, uint32_t view, uint32_t wave, 
   StoreB(base, f + 361, 2);
   StoreB(base, f + 362, 6);
   StoreB(base, f + 363, 1);
+  // The voice word, where XAudio's CreateSourceVoice writes the voice (an
+  // interior handle: its store resolves it).
   const uint32_t out = VoiceWord(base, holder, slot);
-  Store(base, out, 0);
+  SetVoiceAt(base, holder, slot, 0);
   Store(base, f + 376, f + 144);
   SetRegs(call, Args({f + 304, out}));
   xa::ApiCreateSourceVoice(base, f + 304, out, voices.native_heap, voices.thread,
@@ -384,7 +398,7 @@ uint32_t AddVoice(uint8_t* base, uint32_t holder, uint32_t view, uint32_t wave, 
     Store(base, f + 216, 0xFFFFFFFFu);
     Store(base, f + 224, frame_bytes * Load(base, f + 196));
   }
-  const uint32_t voice = Load(base, out);
+  const uint32_t voice = VoiceAt(base, holder, slot);
   SetRegs(call, Args({voice, f + 208, 1}));
   xa::FrameBelow(base, f, kSubmitFrame);
   xa::ApiSubmitPacket(base, voice, f + 208, 1, 0, 0, call);
@@ -432,7 +446,7 @@ uint32_t EngineLayerStart(uint8_t* base, uint32_t layer, uint32_t view, const Vo
   l.set_table_volume_copy(0);
   // memset (sub_825A71D0) with 0: the same bytes.
   for (uint32_t i = 0; i < 24; i += 4) {
-    Store(base, l.amounts_address() + i, 0);
+    l.store_at(20 + i, 4, 0);  // amounts
   }
   uint32_t r3 = 0;
   for (uint32_t wave = 0; wave < 4; wave++) {
@@ -454,8 +468,8 @@ uint32_t EngineSoundStart(uint8_t* base, uint32_t engine, uint64_t index, uint32
   SetRegs(call, Args({e.layer_address(), index, vs.layer_view().address}));
   const uint32_t r3 = EngineLayerStart(base, e.layer_address(), vs.layer_view().address, voices,
                                        xa::FrameBelow(base, frame, 112), call);
-  StoreF(base, e.load_address(), kZero);
-  StoreF(base, e.idle_speed_address(), kEngineRest);
+  e.set_load(Constant(base, kZero));
+  e.set_idle_speed(Constant(base, kEngineRest));
   return r3;
 }
 
@@ -464,8 +478,8 @@ uint32_t TireSoundStart(uint8_t* base, uint32_t part, uint32_t index, uint32_t v
   ITC_NATIVE_RUNNING("sub_8210D7F8 TireSound::Start");
   const schema::CarSoundTires t(base, part);
   t.set_index(uint8_t(index));
-  StoreF(base, t.volume_address(), kZero);
-  StoreF(base, t.slip_time_address(), kZero);
+  t.set_volume(Constant(base, kZero));
+  t.set_slip_time(Constant(base, kZero));
   t.set_view(view);
   t.set_slip_steps(0);
   t.set_pitch(0);
@@ -533,14 +547,14 @@ uint32_t CarSoundStart(uint8_t* base, uint32_t sound, uint32_t views, uint32_t v
   fade.set_view(view);
   fade.set_playing(0);
   fade.set_slot(kNone);
-  StoreF(base, fade.fade_out_address(), kPitchFloor);
+  fade.set_fade_out(Constant(base, kPitchFloor));
   fade.set_index(uint8_t(i));
-  StoreF(base, fade.fade_in_address(), kPitchFloor);
+  fade.set_fade_in(Constant(base, kPitchFloor));
   i = index();
   const schema::CarSoundTurbo turbo(base, s.turbo_address());
-  StoreF(base, turbo.last_boost_address(), kZero);
+  turbo.set_last_boost(Constant(base, kZero));
   turbo.set_view(view);
-  StoreF(base, turbo.volume_address(), kZero);
+  turbo.set_volume(Constant(base, kZero));
   turbo.set_slot(kNone);
   turbo.set_pitch(0);
   turbo.set_wait_ticks(0);
@@ -566,7 +580,7 @@ uint32_t CarSoundStart(uint8_t* base, uint32_t sound, uint32_t views, uint32_t v
   pass_by.set_unknown_48(kNone);
   pass_by.set_unknown_52(0);
   pass_by.set_index(uint8_t(i));
-  StoreF(base, s.last_doppler_address(), kZero);
+  s.set_last_doppler(Constant(base, kZero));
   return r3;
 }
 
@@ -632,10 +646,12 @@ uint32_t CarSoundsRelease(uint8_t* base, uint32_t frame, const GuestCall& call) 
     SetRegs(call, Args({array, 3}));
     const Destroyed done = CarSoundsDestroy(base, array, 3);
     if (done.to_free != 0) {
-      const bool freed = done.array ? memory::crt::OperatorDeleteArray(done.to_free)
-                                    : memory::crt::OperatorDelete(done.to_free);
-      if (!freed) {
-        call(done.array ? 0x825A71C0 : 0x825A70E8, 0x8210F7A4, Args({done.to_free}));
+      // operator delete[] of the array's block: in host memory since E5
+      // step 4 (CarSoundArray, made by CarSounds::Init).
+      if (done.array) {
+        schema::CarSoundArray(base, done.to_free).Delete();
+      } else if (!memory::crt::OperatorDelete(done.to_free)) {
+        call(0x825A70E8, 0x8210F7A4, Args({done.to_free}));
       }
     }
     SetRegs(call, Args({done.r3}));
@@ -664,11 +680,13 @@ uint32_t CarSoundsInit(uint8_t* base, const Voices& voices, uint32_t frame,
   ITC_NATIVE_RUNNING("sub_8210FE00 CarSounds::Init");
   const uint32_t f = frame;
   SetRegs(call, Args({8864}));
-  const uint32_t made = NewArray(base, 8864, 0x8210FE18, call);
+  // operator new[] of 8,864 bytes (0x8210FE18): the array's block in host
+  // memory since E5 step 4 (freed by CarSounds::Release).
+  const uint32_t made = schema::CarSoundArray::New(base).address;
   uint32_t array = 0;
   if (made != 0) {
     const schema::CarSoundArray block(base, made);
-    array = block.sounds_address();
+    array = block.sound(0).address;
     block.set_count(7);
     for (uint32_t k = 0; k < 7; k++) {
       SetRegs(call, Args({array + Sound::kSize * k}));
@@ -676,9 +694,12 @@ uint32_t CarSoundsInit(uint8_t* base, const Voices& voices, uint32_t frame,
     }
   }
   G::set_sounds(base, array);
-  // memset (sub_825A71D0) with 0: the same bytes.
-  for (uint32_t i = 0; i < 7 * Sound::kSize; i += 4) {
-    Store(base, array + i, 0);
+  // memset (sub_825A71D0) with 0: the same bytes (the game's memset over a
+  // handle, memory/host_copy.h).
+  if (!memory::FillWithHandles(base, array, 0, 7 * Sound::kSize)) {
+    for (uint32_t i = 0; i < 7 * Sound::kSize; i += 4) {
+      Store(base, array + i, 0);
+    }
   }
   for (uint32_t k = 0; k < 7; k++) {
     const uint32_t at = G::sounds(base).address;
@@ -688,7 +709,7 @@ uint32_t CarSoundsInit(uint8_t* base, const Voices& voices, uint32_t frame,
       CarSoundConstruct(base, sound);
     }
     const Sound s(base, sound);
-    StoreF(base, s.engine_gain_address(), kOne);
+    s.set_engine_gain(Constant(base, kOne));
     s.set_index(uint8_t(k));
     s.set_vehicle(0);
     s.set_tunnel_reverb(0);

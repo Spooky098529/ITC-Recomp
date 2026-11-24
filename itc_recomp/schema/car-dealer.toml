@@ -42,13 +42,15 @@ fields = [
   { name = "message_start", offset = 808, type = "u32", note = "the ring's first slot" },
 ]
 
-# A list of cars in the dealer's data (+104 and +620): an embedded part of
-# CarDealerData the measure doesn't split off (it files shown_list's
-# pointee as the data itself). Before CarDealerData: its shown_list points
-# here.
+# A list of cars in the dealer's data (+104 and +620): embedded in
+# CarDealerData (host memory with it, E5 step 4). Its shown_list points
+# here (an interior handle); the measure's name for that pointee is
+# "new<1196>@CarDealer::Create.+1136" (only its count at +512 seen).
 [CarDealerList]
+measures = ["new<1196>@CarDealer::Create.+1136"]
 size = 516
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "entries", offset = 0, type = "bytes", count = 512, note = "128 pointers to CarDealerEntry" },
   { name = "count", offset = 512, type = "u32" },
@@ -60,18 +62,21 @@ fields = [
 [CarDealerColors]
 size = 56
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "records", offset = 0, type = "bytes", count = 52, note = "13 pointers to color records" },
   { name = "count", offset = 52, type = "u32" },
 ]
 
 # The dealer's data ([0x826D83F4], 1,196 bytes, VirtualAlloc by
-# CarDealer::Create, freed by CarDealer::Destroy; docs/known-data.md).
+# CarDealer::Create, freed by CarDealer::Destroy; docs/known-data.md). In
+# host memory (E5 step 4): CarDealer::Create's New, Destroy's Delete (both
+# hand ports; no lifted allocation or free).
 [CarDealerData]
 measure = "new<1196>@CarDealer::Create"
-measures = ["new<1196>@CarDealer::Create.+1136"]
 size = 1196
 origin = "allocated"
+storage = "host"
 fields = [
   { name = "started", offset = 0, type = "u32", note = "1 once started (FillStatus)" },
   { name = "first_car", offset = 4, type = "u32", note = "1 with an empty garage (the first car's purchase)" },
@@ -95,18 +100,22 @@ fields = [
   { name = "day", offset = 92, type = "u32", note = "save data +6100, at most 999" },
   { name = "garage_count", offset = 96, type = "u32", note = "save data +6328" },
   { name = "garage_size", offset = 100, type = "u32", note = "save data +0x1991C (probably the garage's size)" },
-  { name = "first_list", offset = 104, type = "bytes", count = 516, note = "a CarDealerList (128 entries, count at +616)" },
-  { name = "second_list", offset = 620, type = "bytes", count = 516, note = "a CarDealerList (count at +1132)" },
-  { name = "shown_list", offset = 1136, type = "ptr", to = "CarDealerList", note = "first_list or second_list" },
-  { name = "colors", offset = 1140, type = "bytes", count = 56, note = "a CarDealerColors (13 records, count at +1192)" },
+  { name = "first_list", offset = 104, type = "embed", to = "CarDealerList", note = "128 entries, count at +616" },
+  { name = "second_list", offset = 620, type = "embed", to = "CarDealerList", note = "count at +1132" },
+  { name = "shown_list", offset = 1136, type = "ptr", to = "CarDealerList", note = "first_list or second_list (an interior handle)" },
+  { name = "colors", offset = 1140, type = "embed", to = "CarDealerColors", note = "13 records, count at +1192" },
 ]
 
 # A car in a list (8,448 bytes, VirtualAlloc by BuildLists): a copy of the
-# car's spec (Params::GetCarSpec, 8,432 bytes; car-specs.md) and its id.
+# car's spec (Params::GetCarSpec, 8,432 bytes; car-specs.md) and its id. In
+# host memory (E5 step 4): BuildLists' New (the spec's memcpy over the
+# handle swaps each field), freed by its Delete in BuildLists (not sold),
+# Unload and Close (hand ports; no lifted allocation or free).
 [CarDealerEntry]
 measure = "new<8448>@CarDealer::BuildLists"
 size = 8448
 origin = "allocated"
+storage = "host"
 fields = [
   { name = "unknown_648", offset = 648, type = "u32", note = "shown by SetSpecTexts; CheckLimits: at most 2000" },
   { name = "unknown_652", offset = 652, type = "f32", note = "shown by SetSpecTexts (truncated)" },
@@ -120,7 +129,7 @@ fields = [
   { name = "maker", offset = 769, type = "u8", note = "string 1934 + it (the maker's name)" },
   { name = "unknown_770", offset = 770, type = "u8", note = "shown by SetSpecTexts (string 421 + it)" },
   { name = "list_kind", offset = 771, type = "u8", note = "0 the first list, 1 the second, others not sold" },
-  { name = "color_records", offset = 8116, type = "bytes", count = 260, note = "13 CarDealerSpecColor records of 20 bytes" },
+  { name = "color_records", offset = 8116, type = "embed", to = "CarDealerSpecColor", count = 13 },
   { name = "color_count", offset = 8376, type = "u32" },
   { name = "car_id", offset = 8432, type = "u32" },
 ]
@@ -130,6 +139,7 @@ fields = [
 [CarDealerSpecColor]
 size = 20
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "kind", offset = 0, type = "u16", note = "1 picks the value's offset at 0x82002FF4, else 0x82002FF8" },
   { name = "hue", offset = 4, type = "u16" },

@@ -9,7 +9,9 @@
 #include "memory/heap.h"
 #include "schema/car_draw.h"
 #include "schema/car_models.h"
+#include "schema/load_poll.h"
 #include "schema/scene_loaders.h"
+#include "schema/second_set.h"
 #include "scene/scene.h"
 #include "second_set/objects.h"
 
@@ -72,7 +74,31 @@ uint32_t SceneSetUp(uint8_t* base, uint32_t scene, uint32_t record, uint32_t r5,
   for (uint32_t pool = 0; pool < 8; pool++) {
     const int32_t count = int32_t((s.*kCounts[pool])());
     for (int32_t i = 0; i < count; i++) {
-      const uint32_t object = memory::AllocPages(kSecondSetBytes[pool], 4096);
+      // Pool 1's parts objects in host memory (E5 step 4: a handle, freed by
+      // their deleting destructor's operator delete), and pools 0, 2, 3 and 6
+      // (the car models, cockpit bodies, interiors and traffic bodies: freed
+      // by ScenePools::DestroyB's VirtualFree).
+      uint32_t object;
+      switch (pool) {
+        case 0:
+          object = schema::SceneCarModel::New(base).address;
+          break;
+        case 1:
+          object = schema::SceneParts::New(base).address;
+          break;
+        case 2:
+          object = schema::SceneCockpit::New(base).address;
+          break;
+        case 3:
+          object = schema::SceneInterior::New(base).address;
+          break;
+        case 6:
+          object = schema::SceneTraffic::New(base).address;
+          break;
+        default:
+          object = memory::AllocPages(kSecondSetBytes[pool], 4096);
+          break;
+      }
       if (object != 0) {
         kConstructs[pool](base, object, s.car_models_first_address() + 12 * pool, frame);
       }

@@ -226,142 +226,260 @@ struct ModeType10Interface32 : View {
 };
 
 // allocated; measure: new<19300>@ModeType10::Init, ModeType10.+816, ModeType10::WaitForLoads.r4.+848, ModeType10::WaitForShown.r4.+848, ModeType10::NextMode.r4.+848, ModeType10::Leaving.r4.+848, ModeType9::NextModeAnswer.r4.+848
+#pragma pack(push, 1)
+struct ModeType10BlockData {
+  uint8_t pad_0[9604] = {};
+  uint8_t theater_state[4] = {};  // +9604, guest order
+  uint8_t theater_loaded[4] = {};  // +9608, guest order
+  uint8_t theater_reenter[4] = {};  // +9612, guest order
+  uint8_t theater_delete_movie[4] = {};  // +9616, guest order
+  uint8_t pad_9620[9624] = {};
+  uint8_t save_screen_state[4] = {};  // +19244, guest order
+  uint8_t save_screen_loaded[4] = {};  // +19248, guest order
+  uint8_t save_screen_reenter[4] = {};  // +19252, guest order
+  uint32_t save_screen_delete_movie = 0;  // +19256
+  uint8_t pad_19260[20] = {};
+  uint32_t shown = 0;  // +19280
+  uint32_t shown_at_init = 0;  // +19284
+  uint8_t pad_19288[4] = {};
+  uint32_t answer_word0 = 0;  // +19292
+  uint32_t answer_next_type = 0;  // +19296
+};
+#pragma pack(pop)
+static_assert(sizeof(ModeType10BlockData) == 19300);
+inline constexpr memory::LayoutField kModeType10BlockFields[] = {{9600, 4}, {9604, 4}, {9608, 4}, {9612, 4}, {9616, 4}, {19240, 4}, {19244, 4}, {19248, 4}, {19252, 4}, {19256, 4}, {19280, 4}, {19284, 4}, {19292, 4}, {19296, 4}};
+inline constexpr memory::Layout kModeType10BlockLayout = {kModeType10BlockFields, 14};
+
 struct ModeType10Block : View {
   using View::View;
   static constexpr uint32_t kSize = 19300;
-  // the replay theater's machine (ReplayTheaterMachine)
-  uint32_t theater_address() const { return address + 0; }
-  uint32_t theater_state() const { return guest::LoadU32(base, address + 9604); }
-  void set_theater_state(uint32_t v) const { guest::StoreU32(base, address + 9604, v); }
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  ModeType10BlockData* data() const { return static_cast<ModeType10BlockData*>(memory::HandleObject(address)); }
+  static ModeType10Block New(uint8_t* base) {
+    return ModeType10Block(base, memory::MakeHandle(new ModeType10BlockData(), sizeof(ModeType10BlockData), "ModeType10Block", &kModeType10BlockLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static ModeType10Block NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(ModeType10BlockData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<ModeType10BlockData*>(::operator new(sizeof(ModeType10BlockData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) ModeType10BlockData();
+    return ModeType10Block(base, memory::MakeHandle(p, sizeof(ModeType10BlockData) * count, "ModeType10Block", &kModeType10BlockLayout, sizeof(ModeType10BlockData)));
+  }
+  ModeType10Block at(uint32_t i) const { return ModeType10Block(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kModeType10BlockLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kModeType10BlockLayout, offset, width, v); }
+  // the replay theater's machine
+  template <typename T = ReplayTheaterMachine>
+  T theater() const { return T(base, address + 0); }
+  // the theater's state (a word of the theater embed)
   uint32_t theater_state_address() const { return address + 9604; }
-  // movie 45 loaded
-  uint32_t theater_loaded() const { return guest::LoadU32(base, address + 9608); }
-  void set_theater_loaded(uint32_t v) const { guest::StoreU32(base, address + 9608, v); }
+  uint8_t* theater_state() const { return reinterpret_cast<uint8_t*>(data()) + 9604; }
+  // movie 45 loaded (a word of the theater embed)
   uint32_t theater_loaded_address() const { return address + 9608; }
-  // 1 at Init: open on message 5
-  uint32_t theater_reenter() const { return guest::LoadU32(base, address + 9612); }
-  void set_theater_reenter(uint32_t v) const { guest::StoreU32(base, address + 9612, v); }
+  uint8_t* theater_loaded() const { return reinterpret_cast<uint8_t*>(data()) + 9608; }
+  // 1 at Init: open on message 5 (a word of the theater embed)
   uint32_t theater_reenter_address() const { return address + 9612; }
-  // 0 at Init
-  uint32_t theater_delete_movie() const { return guest::LoadU32(base, address + 9616); }
-  void set_theater_delete_movie(uint32_t v) const { guest::StoreU32(base, address + 9616, v); }
+  uint8_t* theater_reenter() const { return reinterpret_cast<uint8_t*>(data()) + 9612; }
+  // 0 at Init (a word of the theater embed)
   uint32_t theater_delete_movie_address() const { return address + 9616; }
+  uint8_t* theater_delete_movie() const { return reinterpret_cast<uint8_t*>(data()) + 9616; }
   // the save screen's machine (Type10SaveScreen::Init, save-screen.md)
-  uint32_t save_screen_address() const { return address + 9640; }
-  // 5 shown (Interrupt)
-  uint32_t save_screen_state() const { return guest::LoadU32(base, address + 19244); }
-  void set_save_screen_state(uint32_t v) const { guest::StoreU32(base, address + 19244, v); }
+  template <typename T = SaveScreen>
+  T save_screen() const { return T(base, address + 9640); }
+  // 5 shown (Interrupt; a word of the save_screen embed)
   uint32_t save_screen_state_address() const { return address + 19244; }
-  uint32_t save_screen_loaded() const { return guest::LoadU32(base, address + 19248); }
-  void set_save_screen_loaded(uint32_t v) const { guest::StoreU32(base, address + 19248, v); }
+  uint8_t* save_screen_state() const { return reinterpret_cast<uint8_t*>(data()) + 19244; }
+  // a word of the save_screen embed
   uint32_t save_screen_loaded_address() const { return address + 19248; }
-  // 1 at Init
-  uint32_t save_screen_reenter() const { return guest::LoadU32(base, address + 19252); }
-  void set_save_screen_reenter(uint32_t v) const { guest::StoreU32(base, address + 19252, v); }
+  uint8_t* save_screen_loaded() const { return reinterpret_cast<uint8_t*>(data()) + 19248; }
+  // 1 at Init (the embed's load_at_once)
   uint32_t save_screen_reenter_address() const { return address + 19252; }
-  // 0 at Init
-  uint32_t save_screen_delete_movie() const { return guest::LoadU32(base, address + 19256); }
-  void set_save_screen_delete_movie(uint32_t v) const { guest::StoreU32(base, address + 19256, v); }
+  uint8_t* save_screen_reenter() const { return reinterpret_cast<uint8_t*>(data()) + 19252; }
+  // 0 at Init (the machine's word after SaveScreen's 9,616 bytes)
   uint32_t save_screen_delete_movie_address() const { return address + 19256; }
+  uint32_t save_screen_delete_movie() const { return data()->save_screen_delete_movie; }
+  void set_save_screen_delete_movie(uint32_t v) const { data()->save_screen_delete_movie = v; }
+  uint32_t save_screen_delete_movie_bits() const { return data()->save_screen_delete_movie; }
+  void set_save_screen_delete_movie_bits(uint32_t v) const { data()->save_screen_delete_movie = v; }
   // the shown machine's index: 0 the theater, 1 the save screen (FindShown)
-  uint32_t shown() const { return guest::LoadU32(base, address + 19280); }
-  void set_shown(uint32_t v) const { guest::StoreU32(base, address + 19280, v); }
   uint32_t shown_address() const { return address + 19280; }
+  uint32_t shown() const { return data()->shown; }
+  void set_shown(uint32_t v) const { data()->shown = v; }
+  uint32_t shown_bits() const { return data()->shown; }
+  void set_shown_bits(uint32_t v) const { data()->shown = v; }
   // 0 at Init (readers not looked for)
-  uint32_t shown_at_init() const { return guest::LoadU32(base, address + 19284); }
-  void set_shown_at_init(uint32_t v) const { guest::StoreU32(base, address + 19284, v); }
   uint32_t shown_at_init_address() const { return address + 19284; }
-  // the next mode's 8-byte answer ForceExit writes and NextModeAnswer hands to Modes::Tick (ModeAnswer)
-  uint64_t answer() const { return guest::LoadU64(base, address + 19292); }
-  void set_answer(uint64_t v) const { guest::StoreU64(base, address + 19292, v); }
-  uint32_t answer_address() const { return address + 19292; }
+  uint32_t shown_at_init() const { return data()->shown_at_init; }
+  void set_shown_at_init(uint32_t v) const { data()->shown_at_init = v; }
+  uint32_t shown_at_init_bits() const { return data()->shown_at_init; }
+  void set_shown_at_init_bits(uint32_t v) const { data()->shown_at_init = v; }
   // the answer's first word (changed and three bytes), as NextModeAnswer copies it
-  uint32_t answer_word0() const { return guest::LoadU32(base, address + 19292); }
-  void set_answer_word0(uint32_t v) const { guest::StoreU32(base, address + 19292, v); }
   uint32_t answer_word0_address() const { return address + 19292; }
+  uint32_t answer_word0() const { return data()->answer_word0; }
+  void set_answer_word0(uint32_t v) const { data()->answer_word0 = v; }
+  uint32_t answer_word0_bits() const { return data()->answer_word0; }
+  void set_answer_word0_bits(uint32_t v) const { data()->answer_word0 = v; }
+  // the next mode's 8-byte answer ForceExit writes and NextModeAnswer hands to Modes::Tick (ModeAnswer)
+  uint32_t answer_address() const { return address + 19292; }
+  uint64_t answer_bits() const { return uint64_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kModeType10BlockLayout, 19292, 8)); }
+  void set_answer_bits(uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kModeType10BlockLayout, 19292, 8, v); }
+  uint64_t answer() const { return uint64_t(answer_bits()); }
+  void set_answer(uint64_t v) const { set_answer_bits(uint64_t(v)); }
   // the answer's next mode type (4 or 12 from ForceExit)
-  uint32_t answer_next_type() const { return guest::LoadU32(base, address + 19296); }
-  void set_answer_next_type(uint32_t v) const { guest::StoreU32(base, address + 19296, v); }
   uint32_t answer_next_type_address() const { return address + 19296; }
+  uint32_t answer_next_type() const { return data()->answer_next_type; }
+  void set_answer_next_type(uint32_t v) const { data()->answer_next_type = v; }
+  uint32_t answer_next_type_bits() const { return data()->answer_next_type; }
+  void set_answer_next_type_bits(uint32_t v) const { data()->answer_next_type = v; }
 };
 
 // embedded; measure: ReplayTheater
+#pragma pack(push, 1)
+struct ReplayTheaterMachineData {
+  uint8_t transitions[9600] = {};  // +0, guest order
+  uint32_t transition_count = 0;  // +9600
+  uint32_t state = 0;  // +9604
+  uint32_t loaded = 0;  // +9608
+  uint32_t reenter = 0;  // +9612
+  uint32_t delete_movie = 0;  // +9616
+};
+#pragma pack(pop)
+static_assert(sizeof(ReplayTheaterMachineData) == 9620);
+inline constexpr memory::LayoutField kReplayTheaterMachineFields[] = {{9600, 4}, {9604, 4}, {9608, 4}, {9612, 4}, {9616, 4}};
+inline constexpr memory::Layout kReplayTheaterMachineLayout = {kReplayTheaterMachineFields, 5};
+
 struct ReplayTheaterMachine : View {
   using View::View;
   static constexpr uint32_t kSize = 9620;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  ReplayTheaterMachineData* data() const { return static_cast<ReplayTheaterMachineData*>(memory::HandleObject(address)); }
+  static ReplayTheaterMachine New(uint8_t* base) {
+    return ReplayTheaterMachine(base, memory::MakeHandle(new ReplayTheaterMachineData(), sizeof(ReplayTheaterMachineData), "ReplayTheaterMachine", &kReplayTheaterMachineLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static ReplayTheaterMachine NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(ReplayTheaterMachineData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<ReplayTheaterMachineData*>(::operator new(sizeof(ReplayTheaterMachineData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) ReplayTheaterMachineData();
+    return ReplayTheaterMachine(base, memory::MakeHandle(p, sizeof(ReplayTheaterMachineData) * count, "ReplayTheaterMachine", &kReplayTheaterMachineLayout, sizeof(ReplayTheaterMachineData)));
+  }
+  ReplayTheaterMachine at(uint32_t i) const { return ReplayTheaterMachine(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kReplayTheaterMachineLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, offset, width, v); }
   // 200 transitions, 48 bytes each (StateTransition)
   uint32_t transitions_address() const { return address + 0; }
+  uint8_t* transitions() const { return reinterpret_cast<uint8_t*>(data()) + 0; }
   // measure fault: the transitions' r3 (PageObject.step_started), and ShowRecord's record's word_0 (SaveReplayRecord)
-  uint32_t step_started() const { return guest::LoadU32(base, address + 0); }
-  void set_step_started(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t step_started_address() const { return address + 0; }
+  uint32_t fault_step_started_address() const { return address + 0; }
+  uint32_t fault_step_started_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, 0, 4)); }
+  void set_fault_step_started_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, 0, 4, v); }
+  uint32_t fault_step_started() const { return uint32_t(fault_step_started_bits()); }
+  void set_fault_step_started(uint32_t v) const { set_fault_step_started_bits(uint32_t(v)); }
   // measure fault: ShowRecord's record (SaveReplayRecord.year)
-  uint16_t record_year() const { return guest::LoadU16(base, address + 0); }
-  void set_record_year(uint16_t v) const { guest::StoreU16(base, address + 0, v); }
-  uint32_t record_year_address() const { return address + 0; }
+  uint32_t fault_record_year_address() const { return address + 0; }
+  uint16_t fault_record_year_bits() const { return uint16_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, 0, 2)); }
+  void set_fault_record_year_bits(uint16_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, 0, 2, v); }
+  uint16_t fault_record_year() const { return uint16_t(fault_record_year_bits()); }
+  void set_fault_record_year(uint16_t v) const { set_fault_record_year_bits(uint16_t(v)); }
   // measure fault: SaveReplayRecord.month
-  uint16_t record_month() const { return guest::LoadU16(base, address + 2); }
-  void set_record_month(uint16_t v) const { guest::StoreU16(base, address + 2, v); }
-  uint32_t record_month_address() const { return address + 2; }
+  uint32_t fault_record_month_address() const { return address + 2; }
+  uint16_t fault_record_month_bits() const { return uint16_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, 2, 2)); }
+  void set_fault_record_month_bits(uint16_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, 2, 2, v); }
+  uint16_t fault_record_month() const { return uint16_t(fault_record_month_bits()); }
+  void set_fault_record_month(uint16_t v) const { set_fault_record_month_bits(uint16_t(v)); }
   // measure fault: SaveReplayRecord.day
-  uint16_t record_day() const { return guest::LoadU16(base, address + 6); }
-  void set_record_day(uint16_t v) const { guest::StoreU16(base, address + 6, v); }
-  uint32_t record_day_address() const { return address + 6; }
+  uint32_t fault_record_day_address() const { return address + 6; }
+  uint16_t fault_record_day_bits() const { return uint16_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, 6, 2)); }
+  void set_fault_record_day_bits(uint16_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, 6, 2, v); }
+  uint16_t fault_record_day() const { return uint16_t(fault_record_day_bits()); }
+  void set_fault_record_day(uint16_t v) const { set_fault_record_day_bits(uint16_t(v)); }
   // measure fault: SaveReplayRecord.hour
-  uint16_t record_hour() const { return guest::LoadU16(base, address + 8); }
-  void set_record_hour(uint16_t v) const { guest::StoreU16(base, address + 8, v); }
-  uint32_t record_hour_address() const { return address + 8; }
+  uint32_t fault_record_hour_address() const { return address + 8; }
+  uint16_t fault_record_hour_bits() const { return uint16_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, 8, 2)); }
+  void set_fault_record_hour_bits(uint16_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, 8, 2, v); }
+  uint16_t fault_record_hour() const { return uint16_t(fault_record_hour_bits()); }
+  void set_fault_record_hour(uint16_t v) const { set_fault_record_hour_bits(uint16_t(v)); }
   // measure fault: SaveReplayRecord.minute
-  uint16_t record_minute() const { return guest::LoadU16(base, address + 10); }
-  void set_record_minute(uint16_t v) const { guest::StoreU16(base, address + 10, v); }
-  uint32_t record_minute_address() const { return address + 10; }
+  uint32_t fault_record_minute_address() const { return address + 10; }
+  uint16_t fault_record_minute_bits() const { return uint16_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, 10, 2)); }
+  void set_fault_record_minute_bits(uint16_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, 10, 2, v); }
+  uint16_t fault_record_minute() const { return uint16_t(fault_record_minute_bits()); }
+  void set_fault_record_minute(uint16_t v) const { set_fault_record_minute_bits(uint16_t(v)); }
   // measure fault: SaveReplayRecord.time
-  uint32_t record_time() const { return guest::LoadU32(base, address + 16); }
-  void set_record_time(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
-  uint32_t record_time_address() const { return address + 16; }
+  uint32_t fault_record_time_address() const { return address + 16; }
+  uint32_t fault_record_time_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, 16, 4)); }
+  void set_fault_record_time_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, 16, 4, v); }
+  uint32_t fault_record_time() const { return uint32_t(fault_record_time_bits()); }
+  void set_fault_record_time(uint32_t v) const { set_fault_record_time_bits(uint32_t(v)); }
   // measure fault: SaveReplayRecord.mode
-  uint32_t record_mode() const { return guest::LoadU32(base, address + 20); }
-  void set_record_mode(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
-  uint32_t record_mode_address() const { return address + 20; }
+  uint32_t fault_record_mode_address() const { return address + 20; }
+  uint32_t fault_record_mode_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, 20, 4)); }
+  void set_fault_record_mode_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, 20, 4, v); }
+  uint32_t fault_record_mode() const { return uint32_t(fault_record_mode_bits()); }
+  void set_fault_record_mode(uint32_t v) const { set_fault_record_mode_bits(uint32_t(v)); }
   // measure fault: SaveReplayRecord.course
-  uint32_t record_course() const { return guest::LoadU32(base, address + 24); }
-  void set_record_course(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
-  uint32_t record_course_address() const { return address + 24; }
+  uint32_t fault_record_course_address() const { return address + 24; }
+  uint32_t fault_record_course_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, 24, 4)); }
+  void set_fault_record_course_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, 24, 4, v); }
+  uint32_t fault_record_course() const { return uint32_t(fault_record_course_bits()); }
+  void set_fault_record_course(uint32_t v) const { set_fault_record_course_bits(uint32_t(v)); }
   // measure fault: SaveReplayRecord.number
-  uint32_t record_number() const { return guest::LoadU32(base, address + 28); }
-  void set_record_number(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
-  uint32_t record_number_address() const { return address + 28; }
+  uint32_t fault_record_number_address() const { return address + 28; }
+  uint32_t fault_record_number_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, 28, 4)); }
+  void set_fault_record_number_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, 28, 4, v); }
+  uint32_t fault_record_number() const { return uint32_t(fault_record_number_bits()); }
+  void set_fault_record_number(uint32_t v) const { set_fault_record_number_bits(uint32_t(v)); }
   // measure fault: SaveReplayRecord.result
-  uint32_t record_result() const { return guest::LoadU32(base, address + 32); }
-  void set_record_result(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
-  uint32_t record_result_address() const { return address + 32; }
+  uint32_t fault_record_result_address() const { return address + 32; }
+  uint32_t fault_record_result_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, 32, 4)); }
+  void set_fault_record_result_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, 32, 4, v); }
+  uint32_t fault_record_result() const { return uint32_t(fault_record_result_bits()); }
+  void set_fault_record_result(uint32_t v) const { set_fault_record_result_bits(uint32_t(v)); }
   // measure fault: the pages' r3 is the dispatcher (ModeDispatcher.ring_count)
-  uint32_t ring_count() const { return guest::LoadU32(base, address + 804); }
-  void set_ring_count(uint32_t v) const { guest::StoreU32(base, address + 804, v); }
-  uint32_t ring_count_address() const { return address + 804; }
+  uint32_t fault_ring_count_address() const { return address + 804; }
+  uint32_t fault_ring_count_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, 804, 4)); }
+  void set_fault_ring_count_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, 804, 4, v); }
+  uint32_t fault_ring_count() const { return uint32_t(fault_ring_count_bits()); }
+  void set_fault_ring_count(uint32_t v) const { set_fault_ring_count_bits(uint32_t(v)); }
   // measure fault: the pages' r3 is the dispatcher (ModeDispatcher.ring_start)
-  uint32_t ring_start() const { return guest::LoadU32(base, address + 808); }
-  void set_ring_start(uint32_t v) const { guest::StoreU32(base, address + 808, v); }
-  uint32_t ring_start_address() const { return address + 808; }
-  uint32_t transition_count() const { return guest::LoadU32(base, address + 9600); }
-  void set_transition_count(uint32_t v) const { guest::StoreU32(base, address + 9600, v); }
+  uint32_t fault_ring_start_address() const { return address + 808; }
+  uint32_t fault_ring_start_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, 808, 4)); }
+  void set_fault_ring_start_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kReplayTheaterMachineLayout, 808, 4, v); }
+  uint32_t fault_ring_start() const { return uint32_t(fault_ring_start_bits()); }
+  void set_fault_ring_start(uint32_t v) const { set_fault_ring_start_bits(uint32_t(v)); }
   uint32_t transition_count_address() const { return address + 9600; }
+  uint32_t transition_count() const { return data()->transition_count; }
+  void set_transition_count(uint32_t v) const { data()->transition_count = v; }
+  uint32_t transition_count_bits() const { return data()->transition_count; }
+  void set_transition_count_bits(uint32_t v) const { data()->transition_count = v; }
   // 1 or 9 at Create, 4 to start, 5 running, 7 leaving, 8 unloading, 9 waiting, 11 the race (a replay loaded), 14 the title (Destroy)
-  uint32_t state() const { return guest::LoadU32(base, address + 9604); }
-  void set_state(uint32_t v) const { guest::StoreU32(base, address + 9604, v); }
   uint32_t state_address() const { return address + 9604; }
+  uint32_t state() const { return data()->state; }
+  void set_state(uint32_t v) const { data()->state = v; }
+  uint32_t state_bits() const { return data()->state; }
+  void set_state_bits(uint32_t v) const { data()->state = v; }
   // movie 45 loaded
-  uint32_t loaded() const { return guest::LoadU32(base, address + 9608); }
-  void set_loaded(uint32_t v) const { guest::StoreU32(base, address + 9608, v); }
   uint32_t loaded_address() const { return address + 9608; }
+  uint32_t loaded() const { return data()->loaded; }
+  void set_loaded(uint32_t v) const { data()->loaded = v; }
+  uint32_t loaded_bits() const { return data()->loaded; }
+  void set_loaded_bits(uint32_t v) const { data()->loaded = v; }
   // nonzero: Create and WaitForMovie go to state 9 (open on message 5)
-  uint32_t reenter() const { return guest::LoadU32(base, address + 9612); }
-  void set_reenter(uint32_t v) const { guest::StoreU32(base, address + 9612, v); }
   uint32_t reenter_address() const { return address + 9612; }
+  uint32_t reenter() const { return data()->reenter; }
+  void set_reenter(uint32_t v) const { data()->reenter = v; }
+  uint32_t reenter_bits() const { return data()->reenter; }
+  void set_reenter_bits(uint32_t v) const { data()->reenter = v; }
   // nonzero: Unload deletes movie 45 and clears loaded
-  uint32_t delete_movie() const { return guest::LoadU32(base, address + 9616); }
-  void set_delete_movie(uint32_t v) const { guest::StoreU32(base, address + 9616, v); }
   uint32_t delete_movie_address() const { return address + 9616; }
+  uint32_t delete_movie() const { return data()->delete_movie; }
+  void set_delete_movie(uint32_t v) const { data()->delete_movie = v; }
+  uint32_t delete_movie_bits() const { return data()->delete_movie; }
+  void set_delete_movie_bits(uint32_t v) const { data()->delete_movie = v; }
 };
 
 // allocated; measure: new<16>@ReplayTheater::Create
@@ -656,3 +774,5 @@ struct Type10ModeGlobals {
 };
 
 }  // namespace schema
+
+#include "schema/save_screen.h"

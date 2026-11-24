@@ -429,7 +429,11 @@ uint64_t ModeInit(uint8_t* base, bool type7, uint32_t mode, uint32_t sp,
   call(0x8210A8D0, l.lr_strings,
        {schema::StringsAndFontGlobals::strings<schema::View>(base).address, 3});
   call(0x82180B00, l.lr_stand, {1});
-  const uint32_t pages = memory::AllocPages(l.block_bytes, 4096);
+  // The block (VirtualAlloc's zeroed pages in the original) in host memory
+  // since E5 step 4: a zeroed host object behind a handle, freed by
+  // StandMode::Release's VirtualFree (memory::FreePages takes handles).
+  const uint32_t pages = type7 ? schema::Type7Screens::New(base).address
+                               : schema::Type6Screens::New(base).address;
   m.set_block(pages);
   if (pages != 0) {
     calls.construct(pages, frame);

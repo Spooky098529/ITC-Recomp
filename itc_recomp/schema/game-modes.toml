@@ -107,10 +107,20 @@ fields = [
 # (boot-mode.toml); then ten state machines (each a StateMachine with its
 # owner's words after its count and state, described by the owners' areas)
 # and the camera director at +10512 (camera-modes.toml's CameraDirector).
+# In host memory (E5 step 4): made by Mode::Create (game_modes::ModeCreate's
+# New; host_alloc for its lifted original's operator new), freed by its
+# deleting destructor's operator delete (sub_82107590, lifted). Its members
+# (the machines, the camera director, the XPR, the overlay list) stay bytes
+# fields, reached through their guest views at the handle + offset (raw
+# accesses in guest order): embedding them would duplicate the machines'
+# count and state words, which the lifted RaceMode::RaceMode original
+# reaches through this view's accessors.
 [RaceMode]
 measure = "RaceMode"
 size = 167264
 origin = "allocated"
+storage = "host"
+host_alloc = [0x82107810]
 vtable = 0x82006D34
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82006D34 (the base's 0x820069EC before)" },

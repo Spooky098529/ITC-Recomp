@@ -251,9 +251,12 @@ uint64_t RaceDialogCreate(uint8_t* base, uint32_t sp) {
 uint64_t CareerResultsCreate(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82219138 CareerResults::Create");
   Frame(base, sp, 96);
-  const uint32_t block = Pages(212);
+  // The screen lives in host memory (E5 step 4): the original's
+  // VirtualAlloc(212) at 0x82219158; the global holds its handle, freed by
+  // Destroy's VirtualFree (memory::FreePages takes handles).
+  const schema::CareerResultsScreen block = schema::CareerResultsScreen::New(base);
   G::set_career_results(base, block);
-  return block;
+  return block.address;
 }
 
 uint64_t RaceResultsCreate(uint8_t* base, uint32_t sp) {

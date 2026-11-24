@@ -260,17 +260,51 @@ struct SaveReplayRecord : View {
 };
 
 // allocated; measure: Users, sub_82490B08.r3
+#pragma pack(push, 1)
+struct SignedInUsersData {
+  uint8_t users[160] = {};  // +0, guest order
+  uint8_t pad_160[40] = {};
+  uint8_t order[16] = {};  // +200, guest order
+  uint32_t count = 0;  // +216
+};
+#pragma pack(pop)
+static_assert(sizeof(SignedInUsersData) == 220);
+inline constexpr memory::LayoutField kSignedInUsersFields[] = {{216, 4}};
+inline constexpr memory::Layout kSignedInUsersLayout = {kSignedInUsersFields, 1};
+
 struct SignedInUsers : View {
   using View::View;
   static constexpr uint32_t kSize = 220;
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  SignedInUsersData* data() const { return static_cast<SignedInUsersData*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static SignedInUsers New(uint8_t* base) {
+    return SignedInUsers(base, memory::MakeHandle(new SignedInUsersData(), sizeof(SignedInUsersData), "SignedInUsers", &kSignedInUsersLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static SignedInUsers NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(SignedInUsersData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<SignedInUsersData*>(::operator new(sizeof(SignedInUsersData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) SignedInUsersData();
+    return SignedInUsers(base, memory::MakeHandle(p, sizeof(SignedInUsersData) * count, "SignedInUsers", &kSignedInUsersLayout, sizeof(SignedInUsersData)));
+  }
+  SignedInUsers at(uint32_t i) const { return SignedInUsers(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kSignedInUsersLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kSignedInUsersLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 4 users of 40 bytes; a user's +8 is nonzero when signed in
   uint32_t users_address() const { return address + 0; }
+  uint8_t* users() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 0 : guest::Pointer(base, address + 0); }
   // the users by index (4 words; Users::SignedIn's (index + 50) x 4)
   uint32_t order_address() const { return address + 200; }
+  uint8_t* order() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 200 : guest::Pointer(base, address + 200); }
   // the signed-in count
-  uint32_t count() const { return guest::LoadU32(base, address + 216); }
-  void set_count(uint32_t v) const { guest::StoreU32(base, address + 216, v); }
   uint32_t count_address() const { return address + 216; }
+  uint32_t count() const { return on_host() ? uint32_t(data()->count) : uint32_t(guest::LoadU32(base, address + 216)); }
+  void set_count(uint32_t v) const { if (on_host()) data()->count = v; else guest::StoreU32(base, address + 216, v); }
+  uint32_t count_bits() const { return on_host() ? data()->count : guest::LoadU32(base, address + 216); }
+  void set_count_bits(uint32_t v) const { if (on_host()) data()->count = v; else guest::StoreU32(base, address + 216, v); }
 };
 
 // image; measure: SaveDevices::SetRootName.r4, SaveSlot::RequestSave.r6, SaveSlot::RequestSave.r7, SaveSlot::RequestLoad.r6, SaveSlot::RequestLoad.r7, SaveSlot::RequestDelete.r6

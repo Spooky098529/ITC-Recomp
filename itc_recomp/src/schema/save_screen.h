@@ -9,26 +9,66 @@
 namespace schema {
 
 // embedded; measure: SaveScreen
+#pragma pack(push, 1)
+struct SaveScreenData {
+  uint8_t transitions[9600] = {};  // +0, guest order
+  uint32_t transition_count = 0;  // +9600
+  uint32_t state = 0;  // +9604
+  uint32_t loaded = 0;  // +9608
+  uint32_t load_at_once = 0;  // +9612
+};
+#pragma pack(pop)
+static_assert(sizeof(SaveScreenData) == 9616);
+inline constexpr memory::LayoutField kSaveScreenFields[] = {{9600, 4}, {9604, 4}, {9608, 4}, {9612, 4}};
+inline constexpr memory::Layout kSaveScreenLayout = {kSaveScreenFields, 4};
+
 struct SaveScreen : View {
   using View::View;
   static constexpr uint32_t kSize = 9616;
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  SaveScreenData* data() const { return static_cast<SaveScreenData*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static SaveScreen New(uint8_t* base) {
+    return SaveScreen(base, memory::MakeHandle(new SaveScreenData(), sizeof(SaveScreenData), "SaveScreen", &kSaveScreenLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static SaveScreen NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(SaveScreenData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<SaveScreenData*>(::operator new(sizeof(SaveScreenData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) SaveScreenData();
+    return SaveScreen(base, memory::MakeHandle(p, sizeof(SaveScreenData) * count, "SaveScreen", &kSaveScreenLayout, sizeof(SaveScreenData)));
+  }
+  SaveScreen at(uint32_t i) const { return SaveScreen(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kSaveScreenLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kSaveScreenLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 200 transitions, 48 bytes each (StateMachine's)
   uint32_t transitions_address() const { return address + 0; }
-  uint32_t transition_count() const { return guest::LoadU32(base, address + 9600); }
-  void set_transition_count(uint32_t v) const { guest::StoreU32(base, address + 9600, v); }
+  uint8_t* transitions() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 0 : guest::Pointer(base, address + 0); }
   uint32_t transition_count_address() const { return address + 9600; }
+  uint32_t transition_count() const { return on_host() ? uint32_t(data()->transition_count) : uint32_t(guest::LoadU32(base, address + 9600)); }
+  void set_transition_count(uint32_t v) const { if (on_host()) data()->transition_count = v; else guest::StoreU32(base, address + 9600, v); }
+  uint32_t transition_count_bits() const { return on_host() ? data()->transition_count : guest::LoadU32(base, address + 9600); }
+  void set_transition_count_bits(uint32_t v) const { if (on_host()) data()->transition_count = v; else guest::StoreU32(base, address + 9600, v); }
   // 1 load the movie, 2 wait for it, 9 idle, 4 Show, 5 shown, 7 leaving, 6 left
-  uint32_t state() const { return guest::LoadU32(base, address + 9604); }
-  void set_state(uint32_t v) const { guest::StoreU32(base, address + 9604, v); }
   uint32_t state_address() const { return address + 9604; }
+  uint32_t state() const { return on_host() ? uint32_t(data()->state) : uint32_t(guest::LoadU32(base, address + 9604)); }
+  void set_state(uint32_t v) const { if (on_host()) data()->state = v; else guest::StoreU32(base, address + 9604, v); }
+  uint32_t state_bits() const { return on_host() ? data()->state : guest::LoadU32(base, address + 9604); }
+  void set_state_bits(uint32_t v) const { if (on_host()) data()->state = v; else guest::StoreU32(base, address + 9604, v); }
   // 1 once movie 44 is loaded (WaitMovie)
-  uint32_t loaded() const { return guest::LoadU32(base, address + 9608); }
-  void set_loaded(uint32_t v) const { guest::StoreU32(base, address + 9608, v); }
   uint32_t loaded_address() const { return address + 9608; }
+  uint32_t loaded() const { return on_host() ? uint32_t(data()->loaded) : uint32_t(guest::LoadU32(base, address + 9608)); }
+  void set_loaded(uint32_t v) const { if (on_host()) data()->loaded = v; else guest::StoreU32(base, address + 9608, v); }
+  uint32_t loaded_bits() const { return on_host() ? data()->loaded : guest::LoadU32(base, address + 9608); }
+  void set_loaded_bits(uint32_t v) const { if (on_host()) data()->loaded = v; else guest::StoreU32(base, address + 9608, v); }
   // nonzero: OnEnter goes to 1 (load the movie now), else 9 (loaded when opened)
-  uint32_t load_at_once() const { return guest::LoadU32(base, address + 9612); }
-  void set_load_at_once(uint32_t v) const { guest::StoreU32(base, address + 9612, v); }
   uint32_t load_at_once_address() const { return address + 9612; }
+  uint32_t load_at_once() const { return on_host() ? uint32_t(data()->load_at_once) : uint32_t(guest::LoadU32(base, address + 9612)); }
+  void set_load_at_once(uint32_t v) const { if (on_host()) data()->load_at_once = v; else guest::StoreU32(base, address + 9612, v); }
+  uint32_t load_at_once_bits() const { return on_host() ? data()->load_at_once : guest::LoadU32(base, address + 9612); }
+  void set_load_at_once_bits(uint32_t v) const { if (on_host()) data()->load_at_once = v; else guest::StoreU32(base, address + 9612, v); }
 };
 
 // embedded; measure: SaveScreen::Leave.r4

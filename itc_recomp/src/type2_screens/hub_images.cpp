@@ -38,11 +38,12 @@ uint32_t HubMarkNoticeImages(uint8_t* base, uint32_t sp) {
     Store(base, frame + 80, Load(base, notice + 0));
     for (;;) {
       r3 = data_tables::Entry56(base, table, entry);
-      const uint32_t bits = Globals::hub_data(base).image_bits_address();
+      const schema::Type2HubData hub = Globals::hub_data(base);
       const int32_t image = int32_t(schema::CareerEntry56(base, r3).image());
       if (image >= 0) {
-        const uint32_t word = bits + 4 * uint32_t(image >> 5);
-        Store(base, word, (1u << (image & 31)) | Load(base, word));
+        // The bit set's word (image_bits, image_bits2) through the host view.
+        const uint32_t word = hub.image_bits_address() - hub.address + 4 * uint32_t(image >> 5);
+        hub.store_at(word, 4, (1u << (image & 31)) | uint32_t(hub.load_at(word, 4)));
       }
       const uint32_t next = schema::CareerEntry56(base, r3).next_page();
       if (next == 0) {
@@ -82,9 +83,10 @@ uint32_t HubCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& ca
   menu.set_up_down_locked(0);
   menu.set_left_right_steps(0);
   menu.set_shoulders_step(0);
-  // The data: 68 bytes asked for, as the original (VirtualAlloc gives a
-  // page), its words up to +447 used.
-  const schema::Type2HubData data = schema::Type2HubData(base, uint32_t(Alloc(calls, frame, 0x8218E140, 68)));
+  // The data: the original asks VirtualAlloc for 68 bytes (it gives a page)
+  // and uses its words up to +447; a host object (E5 step 4) of 448 bytes
+  // in place of the VirtualAlloc at 0x8218E140, [0x826D8418] its handle.
+  const schema::Type2HubData data = schema::Type2HubData::New(base);
   Globals::set_hub_data(base, data.address);
   data.set_set_up(0);
   data.set_quitting(0);
@@ -121,7 +123,8 @@ uint64_t HubFreeImages(uint8_t* base, uint32_t data, uint32_t sp, const Calls& c
     while ((hub.*list.count)() != 0) {
       const uint32_t count = (hub.*list.count)() - 1;
       (hub.*list.set_count)(count);
-      const uint32_t record = Load(base, (hub.*list.images)() + 4 * count);
+      const uint32_t record =
+          uint32_t(hub.load_at((hub.*list.images)() - hub.address + 4 * count, 4));
       HubFreeImage(base, record, frame, calls);
       // Deleted in place of the VirtualFree at list.lr (r3 = 1, as it
       // returned).
@@ -142,8 +145,12 @@ uint64_t HubDestroy(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& c
   HubFreeImages(base, Globals::hub_data(base).address, frame, calls);
   calls.Call(kVirtualFree, frame, 0x8218E204, Globals::hub_pages(base).address, 0, kMemRelease);
   calls.Call(kVirtualFree, frame, 0x8218E218, Globals::hub_menu(base).address, 0, kMemRelease);
+  // Deleted in place of the VirtualFree at 0x8218E228 (r3 = 1, as it
+  // returned; with no data, the VirtualFree of 0 as the original).
+  const schema::Type2HubData data = Globals::hub_data(base);
   const uint64_t r3 =
-      calls.Call(kVirtualFree, frame, 0x8218E228, Globals::hub_data(base).address, 0, kMemRelease);
+      data.address != 0 ? 1 : calls.Call(kVirtualFree, frame, 0x8218E228, 0, 0, kMemRelease);
+  data.Delete();
   Globals::set_hub_pages(base, 0);
   Globals::set_hub_menu(base, 0);
   Globals::set_hub_data(base, 0);
@@ -182,7 +189,7 @@ uint64_t HubLoadNoticeImage(uint8_t* base, uint32_t data, uint32_t index, uint32
     record.set_xpr(0);
     const uint32_t count = (hub.*image.count)();
     (hub.*image.set_count)(count + 1);
-    Store(base, (hub.*image.images)() + 4 * count, record.address);
+    hub.store_at((hub.*image.images)() - hub.address + 4 * count, 4, record.address);
     const uint64_t args[8] = {asset, buffer, kHubImageLoaded, record.address, 0, 0, 0, 0};
     r3 = calls.CallArgs(kArchiveLoad, frame, image.load, args);
   }
@@ -194,7 +201,8 @@ uint32_t HubLoadNoticeImages(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 112);
   schema::Type2HubData data = Globals::hub_data(base);
   for (uint32_t i = 0; i < 46; i++) {
-    if ((Load(base, data.image_bits_address() + 4 * (i >> 5)) & (1u << (i & 31))) != 0) {
+    const uint32_t word = data.image_bits_address() - data.address + 4 * (i >> 5);
+    if ((uint32_t(data.load_at(word, 4)) & (1u << (i & 31))) != 0) {
       HubLoadNoticeImage(base, data.address, i, frame, calls);
       data.address = Globals::hub_data(base).address;
     }
@@ -238,8 +246,10 @@ uint64_t HubImageLoaded(uint8_t* base, uint32_t buffer, uint32_t record, uint32_
   const uint32_t xpr = uint32_t(Alloc(calls, frame, 0x8218D918, 24));
   image.set_xpr(xpr);
   calls.Call(kXprCreate, frame, 0x8218D924, xpr, buffer);
-  const uint32_t texture = uint32_t(Alloc(calls, frame, 0x8218D938, 12));
-  image.set_texture(texture);
+  // A host object (E5 step 4) in place of the VirtualAlloc(12) at
+  // 0x8218D938; the image record holds its handle.
+  const schema::Type2HubTexture texture = schema::Type2HubTexture::New(base);
+  image.set_texture(texture.address);
   const uint64_t level = calls.Call(kXprGetTexture, frame, 0x8218D94C, image.xpr(), 0);
   image.texture().set_texture(uint32_t(level));
   calls.Call(kGetLevelDesc, frame, 0x8218D968, image.texture().texture(), 0, frame + 80);

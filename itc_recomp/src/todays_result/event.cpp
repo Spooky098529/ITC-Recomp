@@ -23,21 +23,49 @@ Data_ Data(uint8_t* base) { return G::event_data(base); }
 
 // The image lists: list A at the data's +4 (count +188), list B at +192
 // (count +376).
-List ListA(uint8_t* base, uint32_t data) { return List(base, Data_(base, data).images_a_address()); }
-List ListB(uint8_t* base, uint32_t data) { return List(base, Data_(base, data).images_b_address()); }
+// (Embedded in the data, a host object since E5 step 4.)
+List ListA(uint8_t* base, uint32_t data) { return Data_(base, data).images_a(); }
+List ListB(uint8_t* base, uint32_t data) { return Data_(base, data).images_b(); }
 
-// Whether bit `index` of the words at `bits` is set (a negative index none).
-bool BitSet(uint8_t* base, uint32_t bits, int32_t index) {
+// A list's record `k` (its words kept in guest order).
+uint32_t Record(const List& list, uint32_t k) {
+  return schema::host::LoadU32(list.records() + 4 * k);
+}
+
+// The image bits' word `word` (+380 on; only words 0 and 1 are the data's,
+// any other read where the original reads it).
+uint32_t BitsWord(uint8_t* base, const Data_& data, uint32_t word) {
+  if (word == 0) {
+    return data.image_bits_0();
+  }
+  if (word == 1) {
+    return data.image_bits_1();
+  }
+  return Load(base, data.image_bits_0_address() + 4 * word);
+}
+void SetBitsWord(uint8_t* base, const Data_& data, uint32_t word, uint32_t value) {
+  if (word == 0) {
+    data.set_image_bits_0(value);
+  } else if (word == 1) {
+    data.set_image_bits_1(value);
+  } else {
+    Store(base, data.image_bits_0_address() + 4 * word, value);
+  }
+}
+
+// Whether bit `index` of the data's image bits is set (a negative index
+// none).
+bool BitSet(uint8_t* base, const Data_& data, int32_t index) {
   if (index < 0) {
     return false;
   }
-  return (Load(base, bits + 4 * uint32_t(index >> 5)) & (1u << (index & 31))) != 0;
+  return (BitsWord(base, data, uint32_t(index >> 5)) & (1u << (index & 31))) != 0;
 }
 
 uint32_t ImagesLoaded(uint8_t* base, const List& list) {
   const uint32_t count = list.count();
   for (uint32_t k = 0; k < count; k++) {
-    if (Image(base, Load(base, list.records_address() + 4 * k)).loaded() == 0) {
+    if (Image(base, Record(list, k)).loaded() == 0) {
       return 0;
     }
   }
@@ -88,11 +116,11 @@ uint64_t MarkImages(uint8_t* base, uint32_t sp) {
     while (true) {
       const uint32_t record = data_tables::Entry56(base, table, entry);
       r3 = record;
-      const uint32_t bits = Data(base).image_bits_0_address();
+      const Data_ data = Data(base);
       const int32_t image = int32_t(Load(base, record + 16));
       if (image >= 0) {
-        const uint32_t word = bits + 4 * uint32_t(image >> 5);
-        Store(base, word, Load(base, word) | (1u << (image & 31)));
+        const uint32_t word = uint32_t(image >> 5);
+        SetBitsWord(base, data, word, BitsWord(base, data, word) | (1u << (image & 31)));
       }
       const uint32_t next = Load(base, record + 8);
       if (next == 0) {
@@ -122,10 +150,10 @@ uint64_t EventCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& 
   const uint32_t menu = uint32_t(calls.Call(kVirtualAlloc, frame, 0x8225BEB8, 0, 68, 0x1000, 4));
   G::set_event_menu(base, menu);
   InitMenu(schema::FrontEndMenu(base, menu));
-  const uint32_t data_at =
-      uint32_t(calls.Call(kVirtualAlloc, frame, 0x8225BF14, 0, 68, 0x1000, 4));
-  G::set_event_data(base, data_at);
-  const Data_ data(base, data_at);
+  // A host object (E5 step 4) in place of the VirtualAlloc(68) at
+  // 0x8225BF14 (zeroed as the page was; 412 bytes, as far as it's used).
+  const Data_ data = Data_::New(base);
+  G::set_event_data(base, data);
   data.set_ready(0);
   data.set_unlock_entry(kNone);
   data.set_image_count_a(0);
@@ -174,7 +202,7 @@ uint64_t LoadImagePair(uint8_t* base, uint32_t data, uint32_t index, uint32_t sp
     const List list = pair.b ? ListB(base, data) : ListA(base, data);
     const uint32_t count = list.count();
     list.set_count(count + 1);
-    Store(base, list.records_address() + (count << 2), record);
+    schema::host::StoreU32(list.records() + (count << 2), record);
     const uint64_t args[8] = {asset, buffer, kImageLoaded, record, 0, 0, 0, 0};
     r3 = calls.CallArgs(kArchiveLoad, frame, pair.lrs[4], args);
   }
@@ -186,7 +214,7 @@ uint64_t LoadImages(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 112);
   uint32_t data = Data(base).address;
   for (uint32_t image = 0; image < kImages; image++) {
-    if (BitSet(base, Data_(base, data).image_bits_0_address(), int32_t(image))) {
+    if (BitSet(base, Data_(base, data), int32_t(image))) {
       LoadImagePair(base, data, image, frame, calls);
       data = Data(base).address;
     }
@@ -379,7 +407,7 @@ uint64_t FreeImages(uint8_t* base, uint32_t data, uint32_t sp, const Calls& call
     while (list.count() != 0) {
       const uint32_t count = list.count() - 1;
       list.set_count(count);
-      const uint32_t record = Load(base, list.records_address() + (count << 2));
+      const uint32_t record = Record(list, count);
       calls.Call(kFreeImage, frame, l.free_image, record);
       // Deleted in place of the VirtualFree at l.free (r3 = 1, as it
       // returned).
@@ -399,8 +427,10 @@ uint64_t EventDestroy(uint8_t* base, uint32_t machine, uint32_t sp, const Calls&
   FreeImages(base, Data(base).address, frame, calls);
   calls.Call(kVirtualFree, frame, 0x8225BFC8, G::event_pages(base).address, 0, kMemRelease);
   calls.Call(kVirtualFree, frame, 0x8225BFDC, G::event_menu(base).address, 0, kMemRelease);
-  const uint64_t r3 =
-      calls.Call(kVirtualFree, frame, 0x8225BFEC, G::event_data(base).address, 0, kMemRelease);
+  // Deleted in place of the VirtualFree at 0x8225BFEC (r3 = 1, as it
+  // returned).
+  G::event_data(base).Delete();
+  const uint64_t r3 = 1;
   G::set_event_pages(base, 0u);
   G::set_event_menu(base, 0u);
   G::set_event_data(base, 0u);
@@ -593,15 +623,15 @@ uint64_t ShowImages(uint8_t* base, uint32_t index, uint32_t sp) {
   auto texture = [&](const List& list) {
     const uint32_t count = list.count();
     for (uint32_t k = 0; k < count; k++) {
-      const Image record(base, Load(base, list.records_address() + 4 * k));
+      const Image record(base, Record(list, k));
       if (record.index() == index) {
         return record.texture().address;
       }
     }
     return 0u;
   };
-  Store(base, Texture9(base, movie), texture(List(base, EventData(base).images_a_address())));
-  Store(base, Texture8(base, movie), texture(List(base, EventData(base).images_b_address())));
+  Store(base, Texture9(base, movie), texture(EventData(base).images_a()));
+  Store(base, Texture8(base, movie), texture(EventData(base).images_b()));
   return pair;
 }
 

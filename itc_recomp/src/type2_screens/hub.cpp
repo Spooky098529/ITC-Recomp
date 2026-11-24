@@ -45,7 +45,8 @@ uint32_t HubImagesLoadedA(uint8_t* base, uint32_t data) {
   const schema::Type2HubData hub(base, data);
   const uint32_t count = hub.image_count();
   for (uint32_t i = 0; i < count; i++) {
-    if (schema::Type2HubImage(base, Load(base, hub.images_address() + 4 * i)).loaded() == 0) {
+    const uint32_t record = uint32_t(hub.load_at(hub.images_address() - hub.address + 4 * i, 4));
+    if (schema::Type2HubImage(base, record).loaded() == 0) {
       return 0;
     }
   }
@@ -57,7 +58,8 @@ uint32_t HubImagesLoadedB(uint8_t* base, uint32_t data) {
   const schema::Type2HubData hub(base, data);
   const uint32_t count = hub.image2_count();
   for (uint32_t i = 0; i < count; i++) {
-    if (schema::Type2HubImage(base, Load(base, hub.images2_address() + 4 * i)).loaded() == 0) {
+    const uint32_t record = uint32_t(hub.load_at(hub.images2_address() - hub.address + 4 * i, 4));
+    if (schema::Type2HubImage(base, record).loaded() == 0) {
       return 0;
     }
   }
@@ -111,9 +113,11 @@ uint64_t HubFreeImage(uint8_t* base, uint32_t record, uint32_t sp, const Calls& 
   ITC_NATIVE_RUNNING("sub_8218D650 Type2Hub::FreeImage");
   const uint32_t frame = Frame(base, sp, 96);
   const schema::Type2HubImage image(base, record);
-  const uint32_t texture = image.texture().address;
+  const schema::Type2HubTexture texture = image.texture();
   image.set_loaded(0);
-  calls.Call(kVirtualFree, frame, 0x8218D680, texture, 0, kMemRelease);
+  // Deleted in place of the VirtualFree at 0x8218D680 (its answer unused;
+  // 0, a record never loaded, does nothing).
+  texture.Delete();
   return calls.Call(kVirtualFree, frame, 0x8218D694, image.xpr(), 0, kMemRelease);
 }
 

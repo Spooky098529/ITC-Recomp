@@ -604,13 +604,13 @@ uint64_t f8258BCD8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   lifted::Cr cr6;
   uint8_t so = 0;
   // lwz r11,40(r3)
-  r11 = guest::LoadU32(base, schema::MorphJobAt8(base, uint32_t(r3)).unknown_40_address());
+  r11 = schema::MorphJobAt8(base, uint32_t(r3)).unknown_40_bits();
   // cmplwi cr6,r11,5
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 5, so);
   // bne cr6,0x8258bd0c
   if (!cr6.eq) goto loc_8258BD0C;
   // lwz r11,44(r3)
-  r11 = guest::LoadU32(base, schema::MorphJobAt8(base, uint32_t(r3)).unknown_44_address());
+  r11 = schema::MorphJobAt8(base, uint32_t(r3)).unknown_44_bits();
   // cmplwi cr6,r11,6
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 6, so);
   // beq cr6,0x8258bd08
@@ -6469,9 +6469,9 @@ uint64_t f82593D78(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_82593D78 (lifted)");
   uint64_t r11 = 0;
   // lwz r11,4(r3)
-  r11 = guest::LoadU32(base, schema::MovieWrapper(base, uint32_t(r3)).block_address());
+  r11 = schema::MovieWrapper(base, uint32_t(r3)).block_bits();
   // lwz r3,28(r11)
-  r3 = guest::LoadU32(base, schema::MovieWrapperBlock(base, uint32_t(r11)).player_address());
+  r3 = schema::MovieWrapperBlock(base, uint32_t(r11)).player_bits();
   // blr
   return r3;
 }
@@ -6495,7 +6495,7 @@ lifted::Result f82593D88(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r3,r1,80
   r3 = uint64_t(int64_t(int64_t(r1) + 80));
   // lwz r4,4(r11)
-  r4 = guest::LoadU32(base, schema::MovieWrapper(base, uint32_t(r11)).block_address());
+  r4 = schema::MovieWrapper(base, uint32_t(r11)).block_bits();
   // bl 0x8258e580
   // (left out: dead in C++)
   { const lifted::Result o = game::ScopedLock::Ctor(base, LIFTED_ARGS(0x82593DA4, r31)); r3 = o.r3; f1 = o.f1; }
@@ -6534,9 +6534,9 @@ lifted::Result f82593E30(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r31,r3
   r31 = r3;
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, schema::MovieWrapper(base, uint32_t(r31)).block_address());
+  r11 = schema::MovieWrapper(base, uint32_t(r31)).block_bits();
   // lwz r3,28(r11)
-  r3 = guest::LoadU32(base, schema::MovieWrapperBlock(base, uint32_t(r11)).player_address());
+  r3 = schema::MovieWrapperBlock(base, uint32_t(r11)).player_bits();
   // cmplwi cr6,r3,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq cr6,0x82593e64
@@ -6545,11 +6545,11 @@ lifted::Result f82593E30(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = f820A7BD0(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, 0x82593E58); r3 = o.r3; f1 = o.f1; }
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, schema::MovieWrapper(base, uint32_t(r31)).block_address());
+  r11 = schema::MovieWrapper(base, uint32_t(r31)).block_bits();
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // stw r10,28(r11)
-  guest::StoreU32(base, schema::MovieWrapperBlock(base, uint32_t(r11)).player_address(), uint32_t(r10));
+  schema::MovieWrapperBlock(base, uint32_t(r11)).set_player_bits(uint32_t(r10));
 loc_82593E64:
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
@@ -6589,12 +6589,12 @@ lifted::Result f82593E78(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r29,r5
   r29 = r5;
   // lwz r4,4(r31)
-  r4 = guest::LoadU32(base, schema::MovieWrapper(base, uint32_t(r31)).block_address());
+  r4 = schema::MovieWrapper(base, uint32_t(r31)).block_bits();
   // bl 0x8258e580
   // (left out: dead in C++)
   { const lifted::Result o = game::ScopedLock::Ctor(base, LIFTED_ARGS(0x82593E9C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, schema::MovieWrapper(base, uint32_t(r31)).block_address());
+  r11 = schema::MovieWrapper(base, uint32_t(r31)).block_bits();
   // mr r4,r29
   r4 = r29;
   // mr r3,r30
@@ -6611,7 +6611,7 @@ lifted::Result f82593E78(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // bne cr6,0x82593edc
   if (!cr6.eq) goto loc_82593EDC;
   // lwz r10,4(r31)
-  r10 = guest::LoadU32(base, schema::MovieWrapper(base, uint32_t(r31)).block_address());
+  r10 = schema::MovieWrapper(base, uint32_t(r31)).block_bits();
   // lis r11,-32240
   r11 = uint64_t(int64_t(-2112880640));
   // mr r6,r31
@@ -6621,7 +6621,7 @@ lifted::Result f82593E78(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // lwz r3,28(r10)
-  r3 = guest::LoadU32(base, schema::MovieWrapperBlock(base, uint32_t(r10)).player_address());
+  r3 = schema::MovieWrapperBlock(base, uint32_t(r10)).player_bits();
   // bl 0x82481b88
   // (left out: dead in C++)
   { const lifted::Result o = f82481B88(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, 0x82593ED8); r3 = o.r3; f1 = o.f1; }
@@ -6667,11 +6667,11 @@ lifted::Result f82593EF0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r11,r11,-13168
   r11 = uint64_t(int64_t(int64_t(r11) + -13168));
   // stw r11,0(r31)
-  guest::StoreU32(base, schema::MovieWrapper(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
+  schema::MovieWrapper(base, uint32_t(r31)).set_vtable_bits(uint32_t(r11));
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, schema::MovieWrapper(base, uint32_t(r31)).block_address());
+  r11 = schema::MovieWrapper(base, uint32_t(r31)).block_bits();
   // lwz r3,28(r11)
-  r3 = guest::LoadU32(base, schema::MovieWrapperBlock(base, uint32_t(r11)).player_address());
+  r3 = schema::MovieWrapperBlock(base, uint32_t(r11)).player_bits();
   // cmplwi cr6,r3,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq cr6,0x82593f30
@@ -6680,14 +6680,14 @@ lifted::Result f82593EF0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = f820A7BD0(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, 0x82593F24); r3 = o.r3; f1 = o.f1; }
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, schema::MovieWrapper(base, uint32_t(r31)).block_address());
+  r11 = schema::MovieWrapper(base, uint32_t(r31)).block_bits();
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // stw r10,28(r11)
-  guest::StoreU32(base, schema::MovieWrapperBlock(base, uint32_t(r11)).player_address(), uint32_t(r10));
+  schema::MovieWrapperBlock(base, uint32_t(r11)).set_player_bits(uint32_t(r10));
 loc_82593F30:
   // lwz r31,4(r31)
-  r31 = guest::LoadU32(base, schema::MovieWrapper(base, uint32_t(r31)).block_address());
+  r31 = schema::MovieWrapper(base, uint32_t(r31)).block_bits();
   // cmplwi cr6,r31,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r31), 0, so);
   // beq cr6,0x82593f4c

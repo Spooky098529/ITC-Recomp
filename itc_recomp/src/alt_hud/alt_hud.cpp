@@ -10,6 +10,7 @@
 #include "guest.h"
 #include "hooks/vehicle.h"
 #include "memory/c_runtime_heap.h"
+#include "memory/handles.h"
 #include "race_setup/race_setup.h"
 #include "schema/ai_drivers.h"
 #include "schema/alt_hud.h"
@@ -40,6 +41,21 @@ using G = schema::AltHudGlobals;
 // The holder's +1004 and its object (+0, loaded at each call).
 schema::AltHudHolder Holder(uint8_t* base, uint32_t holder) { return {base, holder}; }
 schema::AltHud Object(uint8_t* base, uint32_t holder) { return Holder(base, holder).object(); }
+
+// The extra gauges' slot i (slot0 to slot2, +244 + 4 i), through the view (a
+// host object, E5 step 4).
+uint32_t Slot(const schema::AltHud& object, uint32_t i) {
+  return uint32_t(i == 0 ? object.slot0() : i == 1 ? object.slot1() : object.slot2());
+}
+void SetSlot(const schema::AltHud& object, uint32_t i, uint32_t value) {
+  if (i == 0) {
+    object.set_slot0(int32_t(value));
+  } else if (i == 1) {
+    object.set_slot1(int32_t(value));
+  } else {
+    object.set_slot2(int32_t(value));
+  }
+}
 
 // UiMovies::Find(the movie table, the key 22 at `key`): the value's address.
 uint32_t FindMovie(uint8_t* base, uint32_t key) {
@@ -170,18 +186,18 @@ uint32_t SetUpExtraGauges(uint8_t* base, uint32_t holder, uint32_t sp) {
   guest::StoreU32(base, frame + 104, frame + 88);
   // The slots from the last: the first flag set of the three (cleared), or -1.
   for (int32_t slot = 2; slot >= 0; slot--) {
-    guest::StoreU32(base, Object(base, holder).slot0_address() + 4 * slot, 0xFFFFFFFFu);
+    SetSlot(Object(base, holder), uint32_t(slot), 0xFFFFFFFFu);
     for (uint32_t i = 0; i < 3; i++) {
       const uint32_t flag = guest::LoadU32(base, frame + 96 + 4 * i);
       if (int32_t(guest::LoadU32(base, flag)) == 1) {
         guest::StoreU32(base, guest::LoadU32(base, frame + 96 + 4 * i), 0);
-        guest::StoreU32(base, Object(base, holder).slot0_address() + 4 * slot, i);
+        SetSlot(Object(base, holder), uint32_t(slot), i);
         break;
       }
     }
   }
   for (uint32_t i = 0; i < 3; i++) {
-    const uint32_t value = guest::LoadU32(base, Object(base, holder).slot0_address() + 4 * i);
+    const uint32_t value = Slot(Object(base, holder), i);
     ShowGauge(base, i, value < 3 ? 1 : 0, frame);
   }
   const uint32_t node = ui_movies::FindNode(base, movie, 7, 1);
@@ -257,7 +273,7 @@ uint64_t UpdateExtraGauges(uint8_t* base, uint32_t holder, double value, uint64_
   Frame(base, sp, 144);
   uint64_t r3 = holder;
   for (uint32_t slot = 0; slot < 3; slot++) {
-    switch (guest::LoadU32(base, Object(base, holder).slot0_address() + 4 * slot)) {
+    switch (Slot(Object(base, holder), slot)) {
       case 0:
         r3 = calls.Call(kGaugeFloat, frame, 0x82217AAC, holder, 0, slot, 0, &value);
         break;
@@ -459,7 +475,17 @@ std::optional<uint64_t> Destroy(uint8_t* base, uint32_t holder, uint32_t sp, con
     return calls.Call(kOperatorDelete, frame, lr, block);
   };
   MenuListRelease(base, list, frame);
-  uint64_t r3 = remove(Object(base, holder).address, 0x82216BCC);
+  // operator delete at 0x82216BCC: the object in host memory (E5 step 4,
+  // RaceScreens::Make1004's New) deleted; r3 the block, as the native
+  // operator delete leaves it.
+  const schema::AltHud object = Object(base, holder);
+  uint64_t r3;
+  if (memory::IsHandle(object.address)) {
+    object.Delete();
+    r3 = object.address;
+  } else {
+    r3 = remove(object.address, 0x82216BCC);
+  }
   const uint32_t again = Holder(base, holder).menu_list().address;
   if (again != 0) {
     if (!MenuListRelease(base, again, frame)) {

@@ -139,8 +139,10 @@ uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls)
   const uint64_t strings =
       calls.Call(kStringsLoad, frame, 0x8222FD8C, G::string_table(base), 0x7FFB);
   calls.Call(kArchiveWaitIdle, frame, 0x8222FD90, strings, 0x7FFB);
-  const uint64_t allocated =
-      calls.Call(kVirtualAlloc, frame, 0x8222FDA4, 0, Block::kSize, 4096, 4);
+  // VirtualAlloc(0, 28940, MEM_COMMIT, PAGE_READWRITE) at 0x8222FDA4: the
+  // block in host memory (E5 step 4), zeroed as the pages were; its handle
+  // is the r3 the original kept (freed by ModeType5::Release's FreePages).
+  const uint64_t allocated = Block::New(base).address;
   m.set_block(uint32_t(allocated));
   calls.Call(kLocationInitStates, frame, 0x8222FDB4,
              Block(base, uint32_t(allocated)).location_screen_address());

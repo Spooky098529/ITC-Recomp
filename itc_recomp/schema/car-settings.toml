@@ -46,10 +46,15 @@ fields = [
 # stock car's: floats the gear ratios and final drive, words one setting byte
 # of the car each), the best times of routes 8 to 10, the save's figures the
 # screen shows and the pages' state.
+# In host memory since E5 step 4: made by CarSettings::Create (New), freed by
+# CarSettings::Destroy (its VirtualFree takes the handle); every other user
+# is lifted and reaches it through the global's handle (interior handles for
+# data + offset, the copies between its settings' copies host to host).
 [CarSettingsData]
 measure = "new<764>@CarSettings::Create"
 size = 764
 origin = "allocated"
+storage = "host"
 fields = [
   { name = "working_gear_1", offset = 0, type = "f32", note = "car +40" },
   { name = "working_gear_2", offset = 4, type = "f32", note = "car +44" },

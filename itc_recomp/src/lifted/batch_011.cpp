@@ -2717,13 +2717,13 @@ loc_821B6E6C:
   // lwz r11,-31648(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + -31648);
   // lwz r10,560(r11)
-  r10 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r11)).type5_mode_address());
+  r10 = schema::CarSettingsData(base, uint32_t(r11)).type5_mode_bits();
   // cmpwi cr6,r10,1
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 1, so);
   // beq cr6,0x821b6f98
   if (cr6.eq) goto loc_821B6F98;
   // lwz r10,744(r11)
-  r10 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r11)).unknown_744_address());
+  r10 = schema::CarSettingsData(base, uint32_t(r11)).unknown_744_bits();
   // cmpwi cr6,r10,0
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // bne cr6,0x821b6f58
@@ -2795,11 +2795,11 @@ loc_821B6EB8:
   // lwz r11,-31648(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + -31648);
   // stw r3,744(r11)
-  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).unknown_744_address(), uint32_t(r3));
+  schema::CarSettingsData(base, uint32_t(r11)).set_unknown_744_bits(uint32_t(r3));
   // lwz r11,-31648(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + -31648);
   // lwz r10,744(r11)
-  r10 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r11)).unknown_744_address());
+  r10 = schema::CarSettingsData(base, uint32_t(r11)).unknown_744_bits();
   // cmpwi cr6,r10,0
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // beq cr6,0x821b6f98
@@ -2881,7 +2881,7 @@ loc_821B6F94:
   r11 = guest::LoadU32(base, uint32_t(r30) + -31648);
 loc_821B6F98:
   // lwz r11,760(r11)
-  r11 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r11)).unknown_760_address());
+  r11 = schema::CarSettingsData(base, uint32_t(r11)).unknown_760_bits();
   // cmpwi cr6,r11,21
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 21, so);
   // beq cr6,0x821b6fb8
@@ -2895,7 +2895,7 @@ loc_821B6F98:
   // lwz r11,-31648(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + -31648);
   // stw r10,760(r11)
-  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).unknown_760_address(), uint32_t(r10));
+  schema::CarSettingsData(base, uint32_t(r11)).set_unknown_760_bits(uint32_t(r10));
 loc_821B6FB8:
   // addi r1,r1,6592
   r1 = uint64_t(int64_t(int64_t(r1) + 6592));
@@ -3920,7 +3920,7 @@ loc_821B9068:
   // lwz r11,-31636(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + -31636);
   // lwz r9,8(r11)
-  r9 = guest::LoadU32(base, schema::SpecSheetData(base, uint32_t(r11)).next_state_address());
+  r9 = schema::SpecSheetData(base, uint32_t(r11)).next_state_bits();
   // cmpwi cr6,r9,21
   cr6 = lifted::Compare<int32_t>(int32_t(r9), 21, so);
   // beq cr6,0x821b9090
@@ -3932,12 +3932,12 @@ loc_821B9068:
   // lwz r11,-31636(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + -31636);
   // stw r8,8(r11)
-  guest::StoreU32(base, schema::SpecSheetData(base, uint32_t(r11)).next_state_address(), uint32_t(r8));
+  schema::SpecSheetData(base, uint32_t(r11)).set_next_state_bits(uint32_t(r8));
   // lwz r11,-31636(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + -31636);
 loc_821B9090:
   // lwz r10,4(r11)
-  r10 = guest::LoadU32(base, schema::SpecSheetData(base, uint32_t(r11)).graph_drawn_address());
+  r10 = schema::SpecSheetData(base, uint32_t(r11)).graph_drawn_bits();
   // cmpwi cr6,r10,0
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // beq cr6,0x821b90c0

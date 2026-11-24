@@ -147,7 +147,10 @@ uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls)
   auto block = [&] { return m.block(); };
   calls.Call(kScreenStart, frame, 0x82224C8C, mode);
   calls.Call(kStringsLoad, frame, 0x82224C9C, G::string_table(base), 3);
-  const uint64_t allocated = calls.Call(kVirtualAlloc, frame, 0x82224CB4, 0, 48220, 4096, 4);
+  // VirtualAlloc(0, 48220, MEM_COMMIT, PAGE_READWRITE) at 0x82224CB4: the
+  // block in host memory (E5 step 4), zeroed as the pages were; its handle
+  // is the r3 the original kept (freed by ModeType4::Release's FreePages).
+  const uint64_t allocated = Block::New(base).address;
   m.set_block(uint32_t(allocated));
   calls.Call(kOptionsInit, frame, 0x82224CBC, allocated);
   calls.Call(kControllerOptionsInit, frame, 0x82224CC8,

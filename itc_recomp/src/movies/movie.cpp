@@ -57,9 +57,10 @@ void Play(uint8_t* base, uint32_t movie, uint32_t path) {
   ITC_NATIVE_RUNNING("sub_820AEC10 Movie::Play");
   // strncpy(+48, path, 260): the path, then zeros to 260 bytes.
   std::string name = GuestString(base, path, kPathBytes);
+  // The movie's in host memory (E5 step 4): the path's bytes, guest order.
+  uint8_t* const to = schema::Movie(base, movie).path();
   for (uint32_t i = 0; i < kPathBytes; i++) {
-    guest::StoreU8(base, schema::Movie(base, movie).path_address() + i,
-                   i < name.size() ? uint8_t(name[i]) : 0);
+    to[i] = i < name.size() ? uint8_t(name[i]) : 0;
   }
   std::shared_ptr<Player> player;
   std::string error = "isn't in the game's data";

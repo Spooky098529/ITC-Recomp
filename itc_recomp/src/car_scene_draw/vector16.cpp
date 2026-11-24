@@ -76,7 +76,9 @@ std::optional<uint32_t> Vector16Allocate(uint8_t* base, uint32_t count, uint32_t
     return std::nullopt;
   }
   Store(base, stack - kAllocateFrame, stack);  // the back chain, as stwu
-  return memory::crt::OperatorNew(base, count << 4);
+  // operator new(16 x count) in host memory (E5 step 4): one array of
+  // points behind one handle, freed by operator delete as before.
+  return schema::Vector16Storage::NewArray(base, count).address;
 }
 
 std::optional<uint32_t> Vector16InsertN(uint8_t* base, uint32_t vector, uint32_t where,

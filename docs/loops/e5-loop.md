@@ -892,7 +892,7 @@ From `tools/e5_movable.py` (`coverage/e5_movable.tsv`, 2026-11-24): every
 type allocated and not tagged file, GPU or save, shared or not (shared no
 longer stops a move), less what's host or dual already, `UNREACHABLE`, the
 movie library's 9 (a replaced library), `CarSoundWaveBank` (file-backed:
-step 5), `HeapBlock` and `CString` (raw memory and strings, sizes 0): 72
+step 5), `HeapBlock` and `CString` (raw memory and strings, sizes 0): 68
 owners in 35 units, each with the types found inside it (embed fields,
 "Split from" notes, `T@+N` measure names; agents find the rest, such as
 the menus' machines carved out of a mode's block). Batch 1's skipped

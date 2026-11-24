@@ -1526,18 +1526,55 @@ struct CarAt96 : View {
 };
 
 // embedded; measure: RaceScene@+16
+#pragma pack(push, 1)
+struct CarAt16_2Data {
+  uint32_t unknown_0 = 0;  // +0
+  uint8_t pad_4[12] = {};
+  uint32_t unknown_16 = 0;  // +16
+  uint8_t pad_20[4268] = {};
+  uint32_t unknown_4288 = 0;  // +4288
+};
+#pragma pack(pop)
+static_assert(sizeof(CarAt16_2Data) == 4292);
+inline constexpr memory::LayoutField kCarAt16_2Fields[] = {{0, 4}, {16, 4}, {4288, 4}};
+inline constexpr memory::Layout kCarAt16_2Layout = {kCarAt16_2Fields, 3};
+
 struct CarAt16_2 : View {
   using View::View;
   static constexpr uint32_t kSize = 4292;
-  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
-  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  CarAt16_2Data* data() const { return static_cast<CarAt16_2Data*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static CarAt16_2 New(uint8_t* base) {
+    return CarAt16_2(base, memory::MakeHandle(new CarAt16_2Data(), sizeof(CarAt16_2Data), "CarAt16_2", &kCarAt16_2Layout));
+  }
+  template <uint32_t Stride = kSize>
+  static CarAt16_2 NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(CarAt16_2Data) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<CarAt16_2Data*>(::operator new(sizeof(CarAt16_2Data) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) CarAt16_2Data();
+    return CarAt16_2(base, memory::MakeHandle(p, sizeof(CarAt16_2Data) * count, "CarAt16_2", &kCarAt16_2Layout, sizeof(CarAt16_2Data)));
+  }
+  CarAt16_2 at(uint32_t i) const { return CarAt16_2(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCarAt16_2Layout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarAt16_2Layout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t unknown_0_address() const { return address + 0; }
-  uint32_t unknown_16() const { return guest::LoadU32(base, address + 16); }
-  void set_unknown_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t unknown_0() const { return on_host() ? uint32_t(data()->unknown_0) : uint32_t(guest::LoadU32(base, address + 0)); }
+  void set_unknown_0(uint32_t v) const { if (on_host()) data()->unknown_0 = v; else guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_bits() const { return on_host() ? data()->unknown_0 : guest::LoadU32(base, address + 0); }
+  void set_unknown_0_bits(uint32_t v) const { if (on_host()) data()->unknown_0 = v; else guest::StoreU32(base, address + 0, v); }
   uint32_t unknown_16_address() const { return address + 16; }
-  uint32_t unknown_4288() const { return guest::LoadU32(base, address + 4288); }
-  void set_unknown_4288(uint32_t v) const { guest::StoreU32(base, address + 4288, v); }
+  uint32_t unknown_16() const { return on_host() ? uint32_t(data()->unknown_16) : uint32_t(guest::LoadU32(base, address + 16)); }
+  void set_unknown_16(uint32_t v) const { if (on_host()) data()->unknown_16 = v; else guest::StoreU32(base, address + 16, v); }
+  uint32_t unknown_16_bits() const { return on_host() ? data()->unknown_16 : guest::LoadU32(base, address + 16); }
+  void set_unknown_16_bits(uint32_t v) const { if (on_host()) data()->unknown_16 = v; else guest::StoreU32(base, address + 16, v); }
   uint32_t unknown_4288_address() const { return address + 4288; }
+  uint32_t unknown_4288() const { return on_host() ? uint32_t(data()->unknown_4288) : uint32_t(guest::LoadU32(base, address + 4288)); }
+  void set_unknown_4288(uint32_t v) const { if (on_host()) data()->unknown_4288 = v; else guest::StoreU32(base, address + 4288, v); }
+  uint32_t unknown_4288_bits() const { return on_host() ? data()->unknown_4288 : guest::LoadU32(base, address + 4288); }
+  void set_unknown_4288_bits(uint32_t v) const { if (on_host()) data()->unknown_4288 = v; else guest::StoreU32(base, address + 4288, v); }
 };
 
 // The image words docs/functions/race-setup.md's code uses.

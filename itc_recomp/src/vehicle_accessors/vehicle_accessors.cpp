@@ -571,8 +571,9 @@ void CollisionObjectSetFloat224(uint8_t* base, uint32_t object, double value) {
 
 void CollisionRecordCopy(uint8_t* base, uint32_t out, uint32_t record) {
   ITC_NATIVE_RUNNING("sub_820B7D78 CollisionRecord::Copy");
-  const schema::CollisionHitRecords to(base, out);
-  const schema::CollisionHitRecords from(base, record);
+  // Hit records, host (the world's) or guest (a caller's frame): dual views.
+  const schema::CollisionHit to(base, out);
+  const schema::CollisionHit from(base, record);
   vl::Vec4Copy(base, to.point_address(), from.point_address());
   vl::Vec4Copy(base, to.normal_address(), from.normal_address());
   vl::Vec4Copy(base, to.push_address(), from.push_address());

@@ -132,61 +132,131 @@ struct ModeType12 : View {
 };
 
 // allocated; measure: new<135208>@ModeType12::Init, ModeType12.+816, ModeType12::Teardown.r4.+848
+#pragma pack(push, 1)
+struct NetModeBlockData {
+  uint8_t mode_select[9640] = {};  // +0, guest order
+  uint8_t screen1[9640] = {};  // +9640, guest order
+  uint8_t screen3[9640] = {};  // +19280, guest order
+  uint8_t ranking[9640] = {};  // +28920, guest order
+  uint8_t ta_course[9640] = {};  // +38560, guest order
+  uint8_t power_graph[9640] = {};  // +48200, guest order
+  uint8_t screen6[9660] = {};  // +57840, guest order
+  uint8_t screen7[9732] = {};  // +67500, guest order
+  uint8_t dialog10[9648] = {};  // +77232, guest order
+  uint8_t dialog11[9644] = {};  // +86880, 1 x NetModeBlockAt86880
+  uint8_t screen8[9668] = {};  // +96524, guest order
+  uint8_t screen9[9696] = {};  // +106192, guest order
+  uint8_t dialog12[9648] = {};  // +115888, 1 x NetModeBlockAt115888
+  uint8_t dialog13[9644] = {};  // +125536, 1 x NetModeBlockAt125536
+  uint32_t shown = 0;  // +135180
+  uint32_t first_shown = 0;  // +135184
+  uint64_t next_answer = 0;  // +135188
+  uint8_t pad_135196[8] = {};
+  uint32_t session_made = 0;  // +135204
+};
+#pragma pack(pop)
+static_assert(sizeof(NetModeBlockData) == 135208);
+inline constexpr memory::LayoutField kNetModeBlockFields[] = {{96520, 4}, {125532, 4}, {135176, 4}, {135180, 4}, {135184, 4}, {135188, 8}, {135204, 4}};
+inline constexpr memory::Layout kNetModeBlockLayout = {kNetModeBlockFields, 7};
+
 struct NetModeBlock : View {
   using View::View;
   static constexpr uint32_t kSize = 135208;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  NetModeBlockData* data() const { return static_cast<NetModeBlockData*>(memory::HandleObject(address)); }
+  static NetModeBlock New(uint8_t* base) {
+    return NetModeBlock(base, memory::MakeHandle(new NetModeBlockData(), sizeof(NetModeBlockData), "NetModeBlock", &kNetModeBlockLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static NetModeBlock NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(NetModeBlockData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<NetModeBlockData*>(::operator new(sizeof(NetModeBlockData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) NetModeBlockData();
+    return NetModeBlock(base, memory::MakeHandle(p, sizeof(NetModeBlockData) * count, "NetModeBlock", &kNetModeBlockLayout, sizeof(NetModeBlockData)));
+  }
+  NetModeBlock at(uint32_t i) const { return NetModeBlock(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kNetModeBlockLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kNetModeBlockLayout, offset, width, v); }
   // index 0, NetModeSelect
   uint32_t mode_select_address() const { return address + 0; }
+  uint8_t* mode_select() const { return reinterpret_cast<uint8_t*>(data()) + 0; }
   // index 1, Type12Screen1
   uint32_t screen1_address() const { return address + 9640; }
+  uint8_t* screen1() const { return reinterpret_cast<uint8_t*>(data()) + 9640; }
   // index 3, Type12Screen3
   uint32_t screen3_address() const { return address + 19280; }
+  uint8_t* screen3() const { return reinterpret_cast<uint8_t*>(data()) + 19280; }
   // index 4, NetRanking
   uint32_t ranking_address() const { return address + 28920; }
+  uint8_t* ranking() const { return reinterpret_cast<uint8_t*>(data()) + 28920; }
   // index 5, NetTaCourse
   uint32_t ta_course_address() const { return address + 38560; }
+  uint8_t* ta_course() const { return reinterpret_cast<uint8_t*>(data()) + 38560; }
   // index 14, PowerGraphScreen12 (type2-screens.md)
   uint32_t power_graph_address() const { return address + 48200; }
+  uint8_t* power_graph() const { return reinterpret_cast<uint8_t*>(data()) + 48200; }
   // index 6, Type12Screen6
   uint32_t screen6_address() const { return address + 57840; }
+  uint8_t* screen6() const { return reinterpret_cast<uint8_t*>(data()) + 57840; }
   // index 7, Type12Screen7
   uint32_t screen7_address() const { return address + 67500; }
+  uint8_t* screen7() const { return reinterpret_cast<uint8_t*>(data()) + 67500; }
   // index 10, Type12Dialog10
   uint32_t dialog10_address() const { return address + 77232; }
+  uint8_t* dialog10() const { return reinterpret_cast<uint8_t*>(data()) + 77232; }
   // index 11, Type12Dialog11
-  uint32_t dialog11_address() const { return address + 86880; }
+  template <typename T = NetModeBlockAt86880>
+  T dialog11() const { return T(base, address + 86880); }
   // index 8, Type12Screen8
   uint32_t screen8_address() const { return address + 96524; }
+  uint8_t* screen8() const { return reinterpret_cast<uint8_t*>(data()) + 96524; }
   // index 9, Type12Screen9
   uint32_t screen9_address() const { return address + 106192; }
+  uint8_t* screen9() const { return reinterpret_cast<uint8_t*>(data()) + 106192; }
   // index 12, Type12Dialog12
-  uint32_t dialog12_address() const { return address + 115888; }
+  template <typename T = NetModeBlockAt115888>
+  T dialog12() const { return T(base, address + 115888); }
   // index 13, Type12Dialog13
-  uint32_t dialog13_address() const { return address + 125536; }
+  template <typename T = NetModeBlockAt125536>
+  T dialog13() const { return T(base, address + 125536); }
   // +0x2100C: the shown machine's index (ModeType12::FindShown)
-  uint32_t shown() const { return guest::LoadU32(base, address + 135180); }
-  void set_shown(uint32_t v) const { guest::StoreU32(base, address + 135180, v); }
   uint32_t shown_address() const { return address + 135180; }
+  uint32_t shown() const { return data()->shown; }
+  void set_shown(uint32_t v) const { data()->shown = v; }
+  uint32_t shown_bits() const { return data()->shown; }
+  void set_shown_bits(uint32_t v) const { data()->shown = v; }
   // +0x21010: the first screen's index (Init)
-  uint32_t first_shown() const { return guest::LoadU32(base, address + 135184); }
-  void set_first_shown(uint32_t v) const { guest::StoreU32(base, address + 135184, v); }
   uint32_t first_shown_address() const { return address + 135184; }
+  uint32_t first_shown() const { return data()->first_shown; }
+  void set_first_shown(uint32_t v) const { data()->first_shown = v; }
+  uint32_t first_shown_bits() const { return data()->first_shown; }
+  void set_first_shown_bits(uint32_t v) const { data()->first_shown = v; }
   // +0x21014: the next mode's 8-byte answer (NextMode, handed over by Teardown)
-  uint64_t next_answer() const { return guest::LoadU64(base, address + 135188); }
-  void set_next_answer(uint64_t v) const { guest::StoreU64(base, address + 135188, v); }
   uint32_t next_answer_address() const { return address + 135188; }
+  uint64_t next_answer() const { return data()->next_answer; }
+  void set_next_answer(uint64_t v) const { data()->next_answer = v; }
+  uint64_t next_answer_bits() const { return data()->next_answer; }
+  void set_next_answer_bits(uint64_t v) const { data()->next_answer = v; }
   // the answer's first word (byte 1 the change, then the frame's bytes)
-  uint32_t next_answer_hi() const { return guest::LoadU32(base, address + 135188); }
-  void set_next_answer_hi(uint32_t v) const { guest::StoreU32(base, address + 135188, v); }
   uint32_t next_answer_hi_address() const { return address + 135188; }
+  uint32_t next_answer_hi_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kNetModeBlockLayout, 135188, 4)); }
+  void set_next_answer_hi_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kNetModeBlockLayout, 135188, 4, v); }
+  uint32_t next_answer_hi() const { return uint32_t(next_answer_hi_bits()); }
+  void set_next_answer_hi(uint32_t v) const { set_next_answer_hi_bits(uint32_t(v)); }
   // the answer's second word: the next mode's type
-  uint32_t next_answer_mode() const { return guest::LoadU32(base, address + 135192); }
-  void set_next_answer_mode(uint32_t v) const { guest::StoreU32(base, address + 135192, v); }
   uint32_t next_answer_mode_address() const { return address + 135192; }
+  uint32_t next_answer_mode_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kNetModeBlockLayout, 135192, 4)); }
+  void set_next_answer_mode_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kNetModeBlockLayout, 135192, 4, v); }
+  uint32_t next_answer_mode() const { return uint32_t(next_answer_mode_bits()); }
+  void set_next_answer_mode(uint32_t v) const { set_next_answer_mode_bits(uint32_t(v)); }
   // +0x21024: set by Interrupt (back to the title, the session freed)
-  uint32_t session_made() const { return guest::LoadU32(base, address + 135204); }
-  void set_session_made(uint32_t v) const { guest::StoreU32(base, address + 135204, v); }
   uint32_t session_made_address() const { return address + 135204; }
+  uint32_t session_made() const { return data()->session_made; }
+  void set_session_made(uint32_t v) const { data()->session_made = v; }
+  uint32_t session_made_bits() const { return data()->session_made; }
+  void set_session_made_bits(uint32_t v) const { data()->session_made = v; }
 };
 
 // embedded; measure: NetModeSelect, NetRanking, NetTaCourse, Type12Screen3, Type12Screen6, Type12Screen7, Type12Screen8, Type12Screen9, Type12Dialog10, Type12Dialog11, Type12Dialog12, Type12Dialog13, ModeType12::Machine.ret, sub_8225E418.r3, sub_8226A660.r3, sub_82263D80.r3, sub_822657D8.r3, sub_82265930.r3, sub_82266028.r3, sub_822662F0.r3, sub_822663E0.r3, sub_82266548.r3, sub_82266658.r3, sub_822681D0.r3, sub_82268720.r3, sub_82269988.r3, sub_8226CB40.r3, sub_822702C0.r3, sub_82277178.r3, sub_822800C0.r3, sub_82282630.r3, sub_822659F0.ret, sub_822681D0.ret
@@ -455,99 +525,203 @@ struct NetModeSelectData : View {
 };
 
 // allocated; measure: new<108>@NetRanking::Create, sub_822822C0.r3, sub_822822C0.ret
+#pragma pack(push, 1)
+struct NetRankingDataData {
+  uint32_t unknown_0 = 0;  // +0
+  uint32_t back = 0;  // +4
+  uint32_t unknown_8 = 0;  // +8
+  uint32_t unknown_12 = 0;  // +12
+  uint32_t unknown_16 = 0;  // +16
+  uint32_t unknown_20 = 0;  // +20
+  uint32_t unknown_24 = 0;  // +24
+  uint32_t unknown_28 = 0;  // +28
+  uint32_t unknown_32 = 0;  // +32
+  uint32_t unknown_36 = 0;  // +36
+  uint32_t unknown_40 = 0;  // +40
+  uint32_t unknown_44 = 0;  // +44
+  uint32_t unknown_48 = 0;  // +48
+  uint32_t unknown_52 = 0;  // +52
+  uint32_t unknown_56 = 0;  // +56
+  uint32_t unknown_60 = 0;  // +60
+  uint32_t unknown_64 = 0;  // +64
+  uint32_t first_row = 0;  // +68
+  uint32_t last_row = 0;  // +72
+  uint32_t row_limit = 0;  // +76
+  uint32_t row_count = 0;  // +80
+  uint32_t unknown_84 = 0;  // +84
+  uint8_t pad_88[4] = {};
+  uint32_t unknown_92 = 0;  // +92
+  uint32_t unknown_96 = 0;  // +96
+  uint32_t unknown_100 = 0;  // +100
+  uint32_t unknown_104 = 0;  // +104
+};
+#pragma pack(pop)
+static_assert(sizeof(NetRankingDataData) == 108);
+inline constexpr memory::LayoutField kNetRankingDataFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 4}, {24, 4}, {28, 4}, {32, 4}, {36, 4}, {40, 4}, {44, 4}, {48, 4}, {52, 4}, {56, 4}, {60, 4}, {64, 4}, {68, 4}, {72, 4}, {76, 4}, {80, 4}, {84, 4}, {92, 4}, {96, 4}, {100, 4}, {104, 4}};
+inline constexpr memory::Layout kNetRankingDataLayout = {kNetRankingDataFields, 26};
+
 struct NetRankingData : View {
   using View::View;
   static constexpr uint32_t kSize = 108;
-  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
-  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  NetRankingDataData* data() const { return static_cast<NetRankingDataData*>(memory::HandleObject(address)); }
+  static NetRankingData New(uint8_t* base) {
+    return NetRankingData(base, memory::MakeHandle(new NetRankingDataData(), sizeof(NetRankingDataData), "NetRankingData", &kNetRankingDataLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static NetRankingData NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(NetRankingDataData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<NetRankingDataData*>(::operator new(sizeof(NetRankingDataData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) NetRankingDataData();
+    return NetRankingData(base, memory::MakeHandle(p, sizeof(NetRankingDataData) * count, "NetRankingData", &kNetRankingDataLayout, sizeof(NetRankingDataData)));
+  }
+  NetRankingData at(uint32_t i) const { return NetRankingData(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kNetRankingDataLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kNetRankingDataLayout, offset, width, v); }
   uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_0() const { return data()->unknown_0; }
+  void set_unknown_0(uint32_t v) const { data()->unknown_0 = v; }
+  uint32_t unknown_0_bits() const { return data()->unknown_0; }
+  void set_unknown_0_bits(uint32_t v) const { data()->unknown_0 = v; }
   // back to the title (Destroy goes to state 14)
-  uint32_t back() const { return guest::LoadU32(base, address + 4); }
-  void set_back(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t back_address() const { return address + 4; }
-  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
-  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t back() const { return data()->back; }
+  void set_back(uint32_t v) const { data()->back = v; }
+  uint32_t back_bits() const { return data()->back; }
+  void set_back_bits(uint32_t v) const { data()->back = v; }
   uint32_t unknown_8_address() const { return address + 8; }
+  uint32_t unknown_8() const { return data()->unknown_8; }
+  void set_unknown_8(uint32_t v) const { data()->unknown_8 = v; }
+  uint32_t unknown_8_bits() const { return data()->unknown_8; }
+  void set_unknown_8_bits(uint32_t v) const { data()->unknown_8 = v; }
   // read by ModeType12::Interrupt (0: message 43 posted)
-  uint32_t unknown_12() const { return guest::LoadU32(base, address + 12); }
-  void set_unknown_12(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
   uint32_t unknown_12_address() const { return address + 12; }
-  uint32_t unknown_16() const { return guest::LoadU32(base, address + 16); }
-  void set_unknown_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t unknown_12() const { return data()->unknown_12; }
+  void set_unknown_12(uint32_t v) const { data()->unknown_12 = v; }
+  uint32_t unknown_12_bits() const { return data()->unknown_12; }
+  void set_unknown_12_bits(uint32_t v) const { data()->unknown_12 = v; }
   uint32_t unknown_16_address() const { return address + 16; }
+  uint32_t unknown_16() const { return data()->unknown_16; }
+  void set_unknown_16(uint32_t v) const { data()->unknown_16 = v; }
+  uint32_t unknown_16_bits() const { return data()->unknown_16; }
+  void set_unknown_16_bits(uint32_t v) const { data()->unknown_16 = v; }
   // -1 at Create
-  uint32_t unknown_20() const { return guest::LoadU32(base, address + 20); }
-  void set_unknown_20(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
   uint32_t unknown_20_address() const { return address + 20; }
+  uint32_t unknown_20() const { return data()->unknown_20; }
+  void set_unknown_20(uint32_t v) const { data()->unknown_20 = v; }
+  uint32_t unknown_20_bits() const { return data()->unknown_20; }
+  void set_unknown_20_bits(uint32_t v) const { data()->unknown_20 = v; }
   // -1 at Create
-  uint32_t unknown_24() const { return guest::LoadU32(base, address + 24); }
-  void set_unknown_24(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
   uint32_t unknown_24_address() const { return address + 24; }
-  uint32_t unknown_28() const { return guest::LoadU32(base, address + 28); }
-  void set_unknown_28(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
+  uint32_t unknown_24() const { return data()->unknown_24; }
+  void set_unknown_24(uint32_t v) const { data()->unknown_24 = v; }
+  uint32_t unknown_24_bits() const { return data()->unknown_24; }
+  void set_unknown_24_bits(uint32_t v) const { data()->unknown_24 = v; }
   uint32_t unknown_28_address() const { return address + 28; }
-  uint32_t unknown_32() const { return guest::LoadU32(base, address + 32); }
-  void set_unknown_32(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
+  uint32_t unknown_28() const { return data()->unknown_28; }
+  void set_unknown_28(uint32_t v) const { data()->unknown_28 = v; }
+  uint32_t unknown_28_bits() const { return data()->unknown_28; }
+  void set_unknown_28_bits(uint32_t v) const { data()->unknown_28 = v; }
   uint32_t unknown_32_address() const { return address + 32; }
-  uint32_t unknown_36() const { return guest::LoadU32(base, address + 36); }
-  void set_unknown_36(uint32_t v) const { guest::StoreU32(base, address + 36, v); }
+  uint32_t unknown_32() const { return data()->unknown_32; }
+  void set_unknown_32(uint32_t v) const { data()->unknown_32 = v; }
+  uint32_t unknown_32_bits() const { return data()->unknown_32; }
+  void set_unknown_32_bits(uint32_t v) const { data()->unknown_32 = v; }
   uint32_t unknown_36_address() const { return address + 36; }
+  uint32_t unknown_36() const { return data()->unknown_36; }
+  void set_unknown_36(uint32_t v) const { data()->unknown_36 = v; }
+  uint32_t unknown_36_bits() const { return data()->unknown_36; }
+  void set_unknown_36_bits(uint32_t v) const { data()->unknown_36 = v; }
   // 1 at Create
-  uint32_t unknown_40() const { return guest::LoadU32(base, address + 40); }
-  void set_unknown_40(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
   uint32_t unknown_40_address() const { return address + 40; }
-  uint32_t unknown_44() const { return guest::LoadU32(base, address + 44); }
-  void set_unknown_44(uint32_t v) const { guest::StoreU32(base, address + 44, v); }
+  uint32_t unknown_40() const { return data()->unknown_40; }
+  void set_unknown_40(uint32_t v) const { data()->unknown_40 = v; }
+  uint32_t unknown_40_bits() const { return data()->unknown_40; }
+  void set_unknown_40_bits(uint32_t v) const { data()->unknown_40 = v; }
   uint32_t unknown_44_address() const { return address + 44; }
+  uint32_t unknown_44() const { return data()->unknown_44; }
+  void set_unknown_44(uint32_t v) const { data()->unknown_44 = v; }
+  uint32_t unknown_44_bits() const { return data()->unknown_44; }
+  void set_unknown_44_bits(uint32_t v) const { data()->unknown_44 = v; }
   // -1 at Create; the leaderboard's rank (Leaderboard::Rank's answer, probably)
-  uint32_t unknown_48() const { return guest::LoadU32(base, address + 48); }
-  void set_unknown_48(uint32_t v) const { guest::StoreU32(base, address + 48, v); }
   uint32_t unknown_48_address() const { return address + 48; }
-  uint32_t unknown_52() const { return guest::LoadU32(base, address + 52); }
-  void set_unknown_52(uint32_t v) const { guest::StoreU32(base, address + 52, v); }
+  uint32_t unknown_48() const { return data()->unknown_48; }
+  void set_unknown_48(uint32_t v) const { data()->unknown_48 = v; }
+  uint32_t unknown_48_bits() const { return data()->unknown_48; }
+  void set_unknown_48_bits(uint32_t v) const { data()->unknown_48 = v; }
   uint32_t unknown_52_address() const { return address + 52; }
-  uint32_t unknown_56() const { return guest::LoadU32(base, address + 56); }
-  void set_unknown_56(uint32_t v) const { guest::StoreU32(base, address + 56, v); }
+  uint32_t unknown_52() const { return data()->unknown_52; }
+  void set_unknown_52(uint32_t v) const { data()->unknown_52 = v; }
+  uint32_t unknown_52_bits() const { return data()->unknown_52; }
+  void set_unknown_52_bits(uint32_t v) const { data()->unknown_52 = v; }
   uint32_t unknown_56_address() const { return address + 56; }
-  uint32_t unknown_60() const { return guest::LoadU32(base, address + 60); }
-  void set_unknown_60(uint32_t v) const { guest::StoreU32(base, address + 60, v); }
+  uint32_t unknown_56() const { return data()->unknown_56; }
+  void set_unknown_56(uint32_t v) const { data()->unknown_56 = v; }
+  uint32_t unknown_56_bits() const { return data()->unknown_56; }
+  void set_unknown_56_bits(uint32_t v) const { data()->unknown_56 = v; }
   uint32_t unknown_60_address() const { return address + 60; }
-  uint32_t unknown_64() const { return guest::LoadU32(base, address + 64); }
-  void set_unknown_64(uint32_t v) const { guest::StoreU32(base, address + 64, v); }
+  uint32_t unknown_60() const { return data()->unknown_60; }
+  void set_unknown_60(uint32_t v) const { data()->unknown_60 = v; }
+  uint32_t unknown_60_bits() const { return data()->unknown_60; }
+  void set_unknown_60_bits(uint32_t v) const { data()->unknown_60 = v; }
   uint32_t unknown_64_address() const { return address + 64; }
+  uint32_t unknown_64() const { return data()->unknown_64; }
+  void set_unknown_64(uint32_t v) const { data()->unknown_64 = v; }
+  uint32_t unknown_64_bits() const { return data()->unknown_64; }
+  void set_unknown_64_bits(uint32_t v) const { data()->unknown_64 = v; }
   // the first row shown (sub_822822C0, probably)
-  uint32_t first_row() const { return guest::LoadU32(base, address + 68); }
-  void set_first_row(uint32_t v) const { guest::StoreU32(base, address + 68, v); }
   uint32_t first_row_address() const { return address + 68; }
+  uint32_t first_row() const { return data()->first_row; }
+  void set_first_row(uint32_t v) const { data()->first_row = v; }
+  uint32_t first_row_bits() const { return data()->first_row; }
+  void set_first_row_bits(uint32_t v) const { data()->first_row = v; }
   // the row after the last shown: first + 7, kept within the rows (probably)
-  uint32_t last_row() const { return guest::LoadU32(base, address + 72); }
-  void set_last_row(uint32_t v) const { guest::StoreU32(base, address + 72, v); }
   uint32_t last_row_address() const { return address + 72; }
+  uint32_t last_row() const { return data()->last_row; }
+  void set_last_row(uint32_t v) const { data()->last_row = v; }
+  uint32_t last_row_bits() const { return data()->last_row; }
+  void set_last_row_bits(uint32_t v) const { data()->last_row = v; }
   // the last row the window may reach (probably)
-  uint32_t row_limit() const { return guest::LoadU32(base, address + 76); }
-  void set_row_limit(uint32_t v) const { guest::StoreU32(base, address + 76, v); }
   uint32_t row_limit_address() const { return address + 76; }
+  uint32_t row_limit() const { return data()->row_limit; }
+  void set_row_limit(uint32_t v) const { data()->row_limit = v; }
+  uint32_t row_limit_bits() const { return data()->row_limit; }
+  void set_row_limit_bits(uint32_t v) const { data()->row_limit = v; }
   // the rows read, -1 at Create (probably)
-  uint32_t row_count() const { return guest::LoadU32(base, address + 80); }
-  void set_row_count(uint32_t v) const { guest::StoreU32(base, address + 80, v); }
   uint32_t row_count_address() const { return address + 80; }
-  uint32_t unknown_84() const { return guest::LoadU32(base, address + 84); }
-  void set_unknown_84(uint32_t v) const { guest::StoreU32(base, address + 84, v); }
+  uint32_t row_count() const { return data()->row_count; }
+  void set_row_count(uint32_t v) const { data()->row_count = v; }
+  uint32_t row_count_bits() const { return data()->row_count; }
+  void set_row_count_bits(uint32_t v) const { data()->row_count = v; }
   uint32_t unknown_84_address() const { return address + 84; }
+  uint32_t unknown_84() const { return data()->unknown_84; }
+  void set_unknown_84(uint32_t v) const { data()->unknown_84 = v; }
+  uint32_t unknown_84_bits() const { return data()->unknown_84; }
+  void set_unknown_84_bits(uint32_t v) const { data()->unknown_84 = v; }
   // 0 at Create; the same pointer as +96 and +100 (from [0x82816E48])
-  uint32_t unknown_92() const { return guest::LoadU32(base, address + 92); }
-  void set_unknown_92(uint32_t v) const { guest::StoreU32(base, address + 92, v); }
   uint32_t unknown_92_address() const { return address + 92; }
-  uint32_t unknown_96() const { return guest::LoadU32(base, address + 96); }
-  void set_unknown_96(uint32_t v) const { guest::StoreU32(base, address + 96, v); }
+  uint32_t unknown_92() const { return data()->unknown_92; }
+  void set_unknown_92(uint32_t v) const { data()->unknown_92 = v; }
+  uint32_t unknown_92_bits() const { return data()->unknown_92; }
+  void set_unknown_92_bits(uint32_t v) const { data()->unknown_92 = v; }
   uint32_t unknown_96_address() const { return address + 96; }
-  uint32_t unknown_100() const { return guest::LoadU32(base, address + 100); }
-  void set_unknown_100(uint32_t v) const { guest::StoreU32(base, address + 100, v); }
+  uint32_t unknown_96() const { return data()->unknown_96; }
+  void set_unknown_96(uint32_t v) const { data()->unknown_96 = v; }
+  uint32_t unknown_96_bits() const { return data()->unknown_96; }
+  void set_unknown_96_bits(uint32_t v) const { data()->unknown_96 = v; }
   uint32_t unknown_100_address() const { return address + 100; }
+  uint32_t unknown_100() const { return data()->unknown_100; }
+  void set_unknown_100(uint32_t v) const { data()->unknown_100 = v; }
+  uint32_t unknown_100_bits() const { return data()->unknown_100; }
+  void set_unknown_100_bits(uint32_t v) const { data()->unknown_100 = v; }
   // -1 at Create
-  uint32_t unknown_104() const { return guest::LoadU32(base, address + 104); }
-  void set_unknown_104(uint32_t v) const { guest::StoreU32(base, address + 104, v); }
   uint32_t unknown_104_address() const { return address + 104; }
+  uint32_t unknown_104() const { return data()->unknown_104; }
+  void set_unknown_104(uint32_t v) const { data()->unknown_104 = v; }
+  uint32_t unknown_104_bits() const { return data()->unknown_104; }
+  void set_unknown_104_bits(uint32_t v) const { data()->unknown_104 = v; }
 };
 
 // embedded; measure: sub_82282150.r4
@@ -643,30 +817,117 @@ struct Session : View {
 };
 
 // embedded; measure: ModeType12.+816@+115888
+#pragma pack(push, 1)
+struct NetModeBlockAt115888Data {
+  uint8_t pad_0[9644] = {};
+  uint32_t unknown_9644 = 0;  // +9644
+};
+#pragma pack(pop)
+static_assert(sizeof(NetModeBlockAt115888Data) == 9648);
+inline constexpr memory::LayoutField kNetModeBlockAt115888Fields[] = {{9644, 4}};
+inline constexpr memory::Layout kNetModeBlockAt115888Layout = {kNetModeBlockAt115888Fields, 1};
+
 struct NetModeBlockAt115888 : View {
   using View::View;
   static constexpr uint32_t kSize = 9648;
-  uint32_t unknown_9644() const { return guest::LoadU32(base, address + 9644); }
-  void set_unknown_9644(uint32_t v) const { guest::StoreU32(base, address + 9644, v); }
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  NetModeBlockAt115888Data* data() const { return static_cast<NetModeBlockAt115888Data*>(memory::HandleObject(address)); }
+  static NetModeBlockAt115888 New(uint8_t* base) {
+    return NetModeBlockAt115888(base, memory::MakeHandle(new NetModeBlockAt115888Data(), sizeof(NetModeBlockAt115888Data), "NetModeBlockAt115888", &kNetModeBlockAt115888Layout));
+  }
+  template <uint32_t Stride = kSize>
+  static NetModeBlockAt115888 NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(NetModeBlockAt115888Data) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<NetModeBlockAt115888Data*>(::operator new(sizeof(NetModeBlockAt115888Data) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) NetModeBlockAt115888Data();
+    return NetModeBlockAt115888(base, memory::MakeHandle(p, sizeof(NetModeBlockAt115888Data) * count, "NetModeBlockAt115888", &kNetModeBlockAt115888Layout, sizeof(NetModeBlockAt115888Data)));
+  }
+  NetModeBlockAt115888 at(uint32_t i) const { return NetModeBlockAt115888(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kNetModeBlockAt115888Layout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kNetModeBlockAt115888Layout, offset, width, v); }
   uint32_t unknown_9644_address() const { return address + 9644; }
+  uint32_t unknown_9644() const { return data()->unknown_9644; }
+  void set_unknown_9644(uint32_t v) const { data()->unknown_9644 = v; }
+  uint32_t unknown_9644_bits() const { return data()->unknown_9644; }
+  void set_unknown_9644_bits(uint32_t v) const { data()->unknown_9644 = v; }
 };
 
 // embedded; measure: ModeType12.+816@+125536
+#pragma pack(push, 1)
+struct NetModeBlockAt125536Data {
+  uint8_t pad_0[9640] = {};
+  uint32_t unknown_9640 = 0;  // +9640
+};
+#pragma pack(pop)
+static_assert(sizeof(NetModeBlockAt125536Data) == 9644);
+inline constexpr memory::LayoutField kNetModeBlockAt125536Fields[] = {{9640, 4}};
+inline constexpr memory::Layout kNetModeBlockAt125536Layout = {kNetModeBlockAt125536Fields, 1};
+
 struct NetModeBlockAt125536 : View {
   using View::View;
   static constexpr uint32_t kSize = 9644;
-  uint32_t unknown_9640() const { return guest::LoadU32(base, address + 9640); }
-  void set_unknown_9640(uint32_t v) const { guest::StoreU32(base, address + 9640, v); }
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  NetModeBlockAt125536Data* data() const { return static_cast<NetModeBlockAt125536Data*>(memory::HandleObject(address)); }
+  static NetModeBlockAt125536 New(uint8_t* base) {
+    return NetModeBlockAt125536(base, memory::MakeHandle(new NetModeBlockAt125536Data(), sizeof(NetModeBlockAt125536Data), "NetModeBlockAt125536", &kNetModeBlockAt125536Layout));
+  }
+  template <uint32_t Stride = kSize>
+  static NetModeBlockAt125536 NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(NetModeBlockAt125536Data) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<NetModeBlockAt125536Data*>(::operator new(sizeof(NetModeBlockAt125536Data) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) NetModeBlockAt125536Data();
+    return NetModeBlockAt125536(base, memory::MakeHandle(p, sizeof(NetModeBlockAt125536Data) * count, "NetModeBlockAt125536", &kNetModeBlockAt125536Layout, sizeof(NetModeBlockAt125536Data)));
+  }
+  NetModeBlockAt125536 at(uint32_t i) const { return NetModeBlockAt125536(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kNetModeBlockAt125536Layout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kNetModeBlockAt125536Layout, offset, width, v); }
   uint32_t unknown_9640_address() const { return address + 9640; }
+  uint32_t unknown_9640() const { return data()->unknown_9640; }
+  void set_unknown_9640(uint32_t v) const { data()->unknown_9640 = v; }
+  uint32_t unknown_9640_bits() const { return data()->unknown_9640; }
+  void set_unknown_9640_bits(uint32_t v) const { data()->unknown_9640 = v; }
 };
 
 // embedded; measure: ModeType12.+816@+86880
+#pragma pack(push, 1)
+struct NetModeBlockAt86880Data {
+  uint8_t pad_0[9640] = {};
+  uint32_t unknown_9640 = 0;  // +9640
+};
+#pragma pack(pop)
+static_assert(sizeof(NetModeBlockAt86880Data) == 9644);
+inline constexpr memory::LayoutField kNetModeBlockAt86880Fields[] = {{9640, 4}};
+inline constexpr memory::Layout kNetModeBlockAt86880Layout = {kNetModeBlockAt86880Fields, 1};
+
 struct NetModeBlockAt86880 : View {
   using View::View;
   static constexpr uint32_t kSize = 9644;
-  uint32_t unknown_9640() const { return guest::LoadU32(base, address + 9640); }
-  void set_unknown_9640(uint32_t v) const { guest::StoreU32(base, address + 9640, v); }
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  NetModeBlockAt86880Data* data() const { return static_cast<NetModeBlockAt86880Data*>(memory::HandleObject(address)); }
+  static NetModeBlockAt86880 New(uint8_t* base) {
+    return NetModeBlockAt86880(base, memory::MakeHandle(new NetModeBlockAt86880Data(), sizeof(NetModeBlockAt86880Data), "NetModeBlockAt86880", &kNetModeBlockAt86880Layout));
+  }
+  template <uint32_t Stride = kSize>
+  static NetModeBlockAt86880 NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(NetModeBlockAt86880Data) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<NetModeBlockAt86880Data*>(::operator new(sizeof(NetModeBlockAt86880Data) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) NetModeBlockAt86880Data();
+    return NetModeBlockAt86880(base, memory::MakeHandle(p, sizeof(NetModeBlockAt86880Data) * count, "NetModeBlockAt86880", &kNetModeBlockAt86880Layout, sizeof(NetModeBlockAt86880Data)));
+  }
+  NetModeBlockAt86880 at(uint32_t i) const { return NetModeBlockAt86880(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kNetModeBlockAt86880Layout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kNetModeBlockAt86880Layout, offset, width, v); }
   uint32_t unknown_9640_address() const { return address + 9640; }
+  uint32_t unknown_9640() const { return data()->unknown_9640; }
+  void set_unknown_9640(uint32_t v) const { data()->unknown_9640 = v; }
+  uint32_t unknown_9640_bits() const { return data()->unknown_9640; }
+  void set_unknown_9640_bits(uint32_t v) const { data()->unknown_9640 = v; }
 };
 
 // The image words docs/functions/network-mode.md's code uses.

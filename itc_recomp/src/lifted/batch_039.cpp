@@ -18669,7 +18669,7 @@ uint64_t f822778C0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x822778EC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,9640(r31)
-  r11 = guest::LoadU32(base, schema::NetModeBlockAt86880(base, uint32_t(r31)).unknown_9640_address());
+  r11 = schema::NetModeBlockAt86880(base, uint32_t(r31)).unknown_9640_bits();
   // lwz r3,0(r3)
   r3 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,0
@@ -19065,7 +19065,7 @@ lifted::Result f822785E0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r10,25040(r10)
   r10 = guest::LoadU32(base, uint32_t(r10) + 25040);
   // lwz r10,12(r10)
-  r10 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r10)).unknown_12_address());
+  r10 = schema::NetRankingData(base, uint32_t(r10)).unknown_12_bits();
   // cmpwi cr6,r10,0
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // bne cr6,0x822786a8

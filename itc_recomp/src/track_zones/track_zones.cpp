@@ -8,6 +8,7 @@
 #include "c_runtime/strings.h"
 #include "hooks/heap.h"
 #include "memory/c_runtime_heap.h"
+#include "memory/handles.h"
 #include "memory/heap.h"
 #include "schema/camera_modes.h"
 #include "schema/collision_world.h"
@@ -31,18 +32,6 @@ namespace {
 
 using schema::TrackZonesGlobals;
 
-uint16_t Load16(uint8_t* base, uint32_t address) {
-  return guest::LoadU16(base, address);
-}
-
-int32_t LoadS16(uint8_t* base, uint32_t address) {
-  return int16_t(guest::LoadU16(base, address));
-}
-
-void Store16(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU16(base, address, uint16_t(value));
-}
-
 uint32_t Load32(uint8_t* base, uint32_t address) {
   return guest::LoadU32(base, address);
 }
@@ -51,54 +40,93 @@ void Store32(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
 
-// A node's address from its index (a signed halfword), as the originals
-// make it: the index times 4 (32 bits) plus the list.
-uint32_t NodeAddress(uint32_t list, int32_t index) {
-  return uint32_t(index) * 4 + list;
+// A list's halfword or word at `offset` from its start (its nodes, its data
+// words: bytes fields, kept in guest order in a host object too), through
+// its view: load_at and store_at on a host or dual view (the owner may be
+// host memory, E5 step 4), guest memory on a guest view (the camera modes'
+// List16s).
+template <typename L>
+uint32_t ListLoad(const L& view, uint32_t offset, uint32_t width) {
+  if constexpr (requires { view.load_at(offset, width); }) {
+    return uint32_t(view.load_at(offset, width));
+  } else {
+    return width == 2 ? guest::LoadU16(view.base, view.address + offset)
+                      : guest::LoadU32(view.base, view.address + offset);
+  }
 }
 
-// The node `steps` steps from the head (the halfword at `head`): the head's
-// node, then its next `steps` times (32 bits, as the originals count).
-uint32_t NodeAt(uint8_t* base, uint32_t list, uint32_t head, uint32_t steps) {
-  uint32_t node = NodeAddress(list, LoadS16(base, head));
+template <typename L>
+void ListStore(const L& view, uint32_t offset, uint32_t width, uint32_t value) {
+  if constexpr (requires { view.store_at(offset, width, uint64_t(value)); }) {
+    view.store_at(offset, width, width == 2 ? uint16_t(value) : value);
+  } else if (width == 2) {
+    guest::StoreU16(view.base, view.address + offset, uint16_t(value));
+  } else {
+    guest::StoreU32(view.base, view.address + offset, value);
+  }
+}
+
+// A field's offset in its list (the view's <field>_address() less the
+// list's address).
+template <typename L>
+uint32_t HeadOffset(const L& view) {
+  return view.head_address() - view.address;
+}
+
+template <typename L>
+uint32_t WordsOffset(const L& view) {
+  return view.words_address() - view.address;
+}
+
+// A node's offset from its index (a signed halfword), as the originals
+// make its address: the index times 4 (32 bits) plus the list.
+uint32_t NodeOffset(int32_t index) {
+  return uint32_t(index) * 4;
+}
+
+// The node `steps` steps from the head: the head's node, then its next
+// `steps` times (32 bits, as the originals count). Its offset in the list.
+template <typename L>
+uint32_t NodeAt(const L& view, uint32_t steps) {
+  uint32_t node = NodeOffset(int16_t(view.head()));
   for (uint32_t n = steps; n != 0; n--) {
-    node = NodeAddress(list, LoadS16(base, node));
+    node = NodeOffset(int16_t(ListLoad(view, node, 2)));
   }
   return node;
 }
 
 // The node at `node`'s data slot (a signed halfword at +2).
-int32_t Slot(uint8_t* base, uint32_t node) {
-  return LoadS16(base, node + 2);
+template <typename L>
+int32_t Slot(const L& view, uint32_t node) {
+  return int16_t(ListLoad(view, node + 2, 2));
 }
 
 // Link for an N-slot list (its view L: free head at +4N, head +4N + 4,
 // count +4N + 8).
 template <typename L>
-void Link(uint8_t* base, uint32_t list, int16_t position) {
-  const L view(base, list);
+void ListLink(const L& view, int16_t position) {
   // The node to link after: the head's halfword for 0, else the node
   // position - 1 steps from the head (the count as the original's 32 bits).
   uint32_t after;
   if (position == 0) {
-    after = view.head_address();
+    after = HeadOffset(view);
   } else {
     int32_t index = int16_t(view.head());
     uint32_t n = uint32_t(int32_t(position));
     for (;;) {
-      after = NodeAddress(list, index);
+      after = NodeOffset(index);
       if (--n == 0) {
         break;
       }
-      index = LoadS16(base, after);
+      index = int16_t(ListLoad(view, after, 2));
     }
   }
-  const uint32_t free_node = NodeAddress(list, int16_t(view.free()));
+  const uint32_t free_node = NodeOffset(int16_t(view.free()));
   const uint16_t free_index = view.free();
-  view.set_free(Load16(base, free_node));
-  Store16(base, free_node, free_index);
-  Store16(base, free_node, Load16(base, after));
-  Store16(base, after, free_index);
+  view.set_free(uint16_t(ListLoad(view, free_node, 2)));
+  ListStore(view, free_node, 2, free_index);
+  ListStore(view, free_node, 2, ListLoad(view, after, 2));
+  ListStore(view, after, 2, free_index);
   view.set_count(uint16_t(view.count() + 1));
 }
 
@@ -109,8 +137,8 @@ void Insert(uint8_t* base, uint32_t list, uint32_t word, uint32_t position,
             void (*link)(uint8_t*, uint32_t, int16_t)) {
   const L view(base, list);
   link(base, list, int16_t(position));
-  const uint32_t node = NodeAt(base, list, view.head_address(), position);
-  Store32(base, uint32_t(Slot(base, node)) * 4 + view.words_address(), word);
+  const uint32_t node = NodeAt(view, position);
+  ListStore(view, uint32_t(Slot(view, node)) * 4 + WordsOffset(view), 4, word);
 }
 
 // The route's section `section` (its record, from the sections table).
@@ -133,8 +161,8 @@ bool InList64(uint8_t* base, uint32_t list, int32_t value) {
   const schema::List64 view(base, list);
   const uint32_t count = uint32_t(int32_t(int16_t(view.count())));
   for (uint32_t i = 0; i < count; i++) {
-    const uint32_t node = NodeAt(base, list, view.head_address(), i);
-    if (value == int32_t(Load32(base, uint32_t(Slot(base, node)) * 4 + view.words_address()))) {
+    const uint32_t node = NodeAt(view, i);
+    if (value == int32_t(ListLoad(view, uint32_t(Slot(view, node)) * 4 + WordsOffset(view), 4))) {
       return true;
     }
   }
@@ -144,11 +172,11 @@ bool InList64(uint8_t* base, uint32_t list, int32_t value) {
 // A list's reset (Init's and Zone::Reset's): node i's data slot i and next
 // i + 1, the free head and count 0, the last node's next, the head and the
 // two halfwords beside them -1, in the originals' order.
-template <uint32_t N>
-void Reset(uint8_t* base, uint32_t list) {
+template <uint32_t N, typename L>
+void Reset(const L& view) {
   for (uint32_t i = 0; i < N; i++) {
-    Store16(base, list + 4 * i + 2, i);
-    Store16(base, list + 4 * i, i + 1);
+    ListStore(view, 4 * i + 2, 2, i);
+    ListStore(view, 4 * i, 2, i + 1);
   }
 }
 
@@ -158,17 +186,17 @@ void Reset(uint8_t* base, uint32_t list) {
 
 void List16Link(uint8_t* base, uint32_t list, int16_t position) {
   ITC_NATIVE_RUNNING("sub_821531C0 List16::Link");
-  Link<schema::List16>(base, list, position);
+  ListLink(schema::List16(base, list), position);
 }
 
 void List64Link(uint8_t* base, uint32_t list, int16_t position) {
   ITC_NATIVE_RUNNING("sub_820FE2C8 List64::Link");
-  Link<schema::List64>(base, list, position);
+  ListLink(schema::List64(base, list), position);
 }
 
 void List128Link(uint8_t* base, uint32_t list, int16_t position) {
   ITC_NATIVE_RUNNING("sub_8228B5A0 List128::Link");
-  Link<schema::List128>(base, list, position);
+  ListLink(schema::List128(base, list), position);
 }
 
 void List64Insert(uint8_t* base, uint32_t list, uint32_t word, uint32_t position) {
@@ -191,18 +219,18 @@ void RangeInit(uint8_t* base, uint32_t range, Position start, Position end) {
   r.set_end_section(end.section);
   r.set_end_slice(end.slice);
   // The sections to take (+12; node 63's next at its +252).
-  const uint32_t take = r.take_nodes_address();
-  Reset<64>(base, take);
+  const schema::List64 take(base, r.take_nodes_address());
+  Reset<64>(take);
   r.set_take_free(0);
   r.set_take_count(0);
-  Store16(base, take + 252, 0xFFFF);
+  ListStore(take, 252, 2, 0xFFFF);
   r.set_take_head(0xFFFF);
   r.set_take_262(0xFFFF);
   r.set_take_258(0xFFFF);
   // The sections to leave out (+536).
-  const uint32_t leave = r.leave_nodes_address();
-  Reset<64>(base, leave);
-  Store16(base, leave + 252, 0xFFFF);
+  const schema::List64 leave(base, r.leave_nodes_address());
+  Reset<64>(leave);
+  ListStore(leave, 252, 2, 0xFFFF);
   r.set_leave_head(0xFFFF);
   r.set_leave_262(0xFFFF);
   r.set_leave_free(0);
@@ -420,11 +448,11 @@ void ZoneReset(uint8_t* base, uint32_t zone, uint32_t index, uint32_t vehicle) {
   ITC_NATIVE_RUNNING("sub_8228B540 Zone::Reset");
   const schema::TrackZone z(base, zone);
   // The range list (+4; node 15's next at its +60).
-  const uint32_t list = z.range_nodes_address();
-  Reset<16>(base, list);
+  const schema::TrackZoneRangeList list(base, z.range_nodes_address());
+  Reset<16>(list);
   z.set_range_free(0);
   z.set_range_count(0);
-  Store16(base, list + 60, 0xFFFF);
+  ListStore(list, 60, 2, 0xFFFF);
   z.set_range_head(0xFFFF);
   z.set_range_list_70(0xFFFF);
   z.set_range_list_66(0xFFFF);
@@ -446,11 +474,11 @@ int32_t ZoneUpdate(uint8_t* base, uint32_t zone) {
   const schema::TrackPosition track(base, vehicle_accessors::VehicleIdentity(z.vehicle()));
   const Position position = {track.route_section(), track.route_slice()};
   z.set_inside(0);
-  const uint32_t list = z.range_nodes_address();
+  const schema::TrackZoneRangeList list(base, z.range_nodes_address());
   int32_t last = -1;
   for (uint32_t i = 0; i < uint32_t(int32_t(int16_t(z.range_count()))); i++) {
-    const uint32_t node = NodeAt(base, list, z.range_head_address(), i);
-    const uint32_t range = uint32_t(Slot(base, node)) * schema::RouteRange::kSize + z.ranges_address();
+    const uint32_t node = NodeAt(list, i);
+    const uint32_t range = uint32_t(Slot(list, node)) * schema::RouteRange::kSize + z.ranges_address();
     last = int32_t(RangeUpdate(base, range, position));
     if (last != 0) {
       z.set_inside(1);
@@ -464,9 +492,12 @@ bool ZoneRangesInsert(uint8_t* base, uint32_t list, uint32_t range, uint32_t pos
                       uint32_t* copy_to) {
   ITC_NATIVE_RUNNING("sub_8228BBA8 ZoneRanges::Insert");
   const schema::TrackZoneRangeList ranges(base, list);
-  List16Link(base, list, int16_t(position));
-  const uint32_t node = NodeAt(base, list, ranges.head_address(), position);
-  const uint32_t to = uint32_t(Slot(base, node)) * schema::RouteRange::kSize + ranges.ranges_address();
+  // List16::Link (sub_821531C0) over the zone's list, through its own view
+  // (host memory, E5 step 4).
+  ITC_NATIVE_RUNNING("sub_821531C0 List16::Link");
+  ListLink(ranges, int16_t(position));
+  const uint32_t node = NodeAt(ranges, position);
+  const uint32_t to = uint32_t(Slot(ranges, node)) * schema::RouteRange::kSize + ranges.ranges_address();
   *copy_to = to;
   return to < 0xA0000000u && c_runtime::Memcpy(base, to, range, schema::RouteRange::kSize);
 }
@@ -489,8 +520,7 @@ void OwnerConstruct(uint8_t* base, uint32_t owner) {
   ITC_NATIVE_RUNNING("sub_8228B608 TrackZones::TrackZones");
   const schema::TrackZones o(base, owner);
   for (uint32_t i = 0; i < kZones; i++) {
-    schema::TrackZone(base, o.zones_address() + schema::TrackZone::kSize * i)
-        .set_vtable(TrackZonesGlobals::zone_vtables_address() + 12 * i);
+    o.zone(i).set_vtable(TrackZonesGlobals::zone_vtables_address() + 12 * i);
   }
 }
 
@@ -498,9 +528,9 @@ namespace {
 
 // The zone `steps` along the owner's list (its data slot's word).
 uint32_t ListedZone(uint8_t* base, uint32_t owner, uint32_t steps) {
-  const schema::TrackZones o(base, owner);
-  const uint32_t node = NodeAt(base, owner, o.head_address(), steps);
-  return Load32(base, uint32_t(Slot(base, node)) * 4 + o.listed_zones_address());
+  const schema::List128 list(base, owner);
+  const uint32_t node = NodeAt(list, steps);
+  return ListLoad(list, uint32_t(Slot(list, node)) * 4 + WordsOffset(list), 4);
 }
 
 // The zone's vtable slot at `offset`.
@@ -517,11 +547,8 @@ bool OwnerCreate(uint8_t* base, uint32_t stack, const OwnerCalls& calls,
     return false;
   }
   const uint32_t word = TrackZonesGlobals::race_data(base).added_count();
-  const auto block = memory::crt::OperatorNew(base, schema::TrackZones::kSize);
-  if (!block) {
-    return false;
-  }
-  const uint32_t owner = *block;
+  // Host memory (E5 step 4): the original's operator new (sub_825A6880).
+  const uint32_t owner = schema::TrackZones::New(base).address;
   if (owner != 0) {
     OwnerConstruct(base, owner);
   }
@@ -541,16 +568,17 @@ bool OwnerCreate(uint8_t* base, uint32_t stack, const OwnerCalls& calls,
   // The list reset.
   // The list reset (node 127's next at +508).
   const schema::TrackZones o(base, owner);
-  Reset<128>(base, owner);
+  const schema::List128 list(base, owner);
+  Reset<128>(list);
   o.set_free(0);
   o.set_count(0);
-  Store16(base, owner + 508, 0xFFFF);
+  ListStore(list, 508, 2, 0xFFFF);
   o.set_list_518(0xFFFF);
   o.set_list_514(0xFFFF);
   o.set_head(0xFFFF);
   for (uint32_t i = 0; i < kZones; i++) {
     const uint32_t position = i == 0 ? 0 : uint32_t(int32_t(int16_t(o.count())));
-    List128Insert(base, owner, o.zones_address() + schema::TrackZone::kSize * i, position);
+    List128Insert(base, owner, o.zone(i).address, position);
   }
   // Each zone's set-up, from the original's frame (240 bytes; the index
   // and vehicle at +96 for a set-up that isn't native).
@@ -586,7 +614,14 @@ bool OwnerDestroy(uint8_t* base, uint32_t* r3) {
     return false;
   }
   if (owner != 0) {
-    memory::crt::OperatorDelete(owner);
+    // The original's operator delete (sub_825A70E8): Delete for the host
+    // object (E5 step 4); a guest block isn't expected (the lifted
+    // original's operator new is a host_alloc too).
+    if (memory::IsHandle(owner)) {
+      schema::TrackZones(base, owner).Delete();
+    } else {
+      memory::crt::OperatorDelete(owner);
+    }
     TrackZonesGlobals::set_track_zones(base, uint32_t(0));
   }
   *r3 = owner;

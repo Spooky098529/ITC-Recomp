@@ -365,11 +365,15 @@ fields = [
   { name = "distance", offset = 0, type = "f32" },
 ]
 
-# The 4-byte object TrackCollision::Load makes at 0x826C5B28.
+# The 4-byte object TrackCollision::Load makes at 0x826C5B28. In host memory
+# (E5 step 4): host_alloc for Load's operator new (lifted); freed by
+# TrackCollision::Unload's operator delete over the handle.
 [TrackCollisionObject]
 measure = "new<4>@TrackCollision::Load"
 size = 4
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820FF37C]
 fields = [
   { name = "value", offset = 0, type = "u32", note = "0, then 4; what it is isn't known" },
 ]

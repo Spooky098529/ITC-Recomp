@@ -9,78 +9,161 @@
 namespace schema {
 
 // allocated; measure: new<256>@Users::Create
+#pragma pack(push, 1)
+struct SysUsersData {
+  uint32_t vtable = 0;  // +0
+  uint8_t pad_4[4] = {};
+  uint32_t user0_signin_state = 0;  // +8
+  uint8_t pad_12[4] = {};
+  uint64_t user0_xuid = 0;  // +16
+  uint8_t user0_name[16] = {};  // +24, guest order
+  uint8_t user0_on_live = 0;  // +40
+  uint8_t pad_41[127] = {};
+  uint32_t live_users = 0;  // +168
+  uint32_t live_user0_index = 0;  // +172
+  uint8_t pad_176[24] = {};
+  uint32_t signed_in_users = 0;  // +200
+  uint8_t pad_204[12] = {};
+  uint32_t signed_in_count = 0;  // +216
+  uint32_t live_count = 0;  // +220
+  uint32_t tick_key = 0;  // +224
+  uint32_t listener_key = 0;  // +228
+  uint32_t framework_interface = 0;  // +232
+  uint32_t unknown_236 = 0;  // +236
+  uint32_t listener = 0;  // +240
+  uint32_t users_changed = 0;  // +244
+  uint32_t live_connection_changed = 0;  // +248
+  uint32_t live_connection_state = 0;  // +252
+};
+#pragma pack(pop)
+static_assert(sizeof(SysUsersData) == 256);
+inline constexpr memory::LayoutField kSysUsersFields[] = {{0, 4}, {8, 4}, {16, 8}, {168, 4}, {172, 4}, {200, 4}, {216, 4}, {220, 4}, {224, 4}, {228, 4}, {232, 4}, {236, 4}, {240, 4}, {244, 4}, {248, 4}, {252, 4}};
+inline constexpr memory::Layout kSysUsersLayout = {kSysUsersFields, 16};
+
 struct SysUsers : View {
   using View::View;
   static constexpr uint32_t kSize = 256;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   static constexpr uint32_t kVtable = 0x82000FA0;
+  SysUsersData* data() const { return static_cast<SysUsersData*>(memory::HandleObject(address)); }
+  static SysUsers New(uint8_t* base) {
+    return SysUsers(base, memory::MakeHandle(new SysUsersData(), sizeof(SysUsersData), "SysUsers", &kSysUsersLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static SysUsers NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(SysUsersData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<SysUsersData*>(::operator new(sizeof(SysUsersData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) SysUsersData();
+    return SysUsers(base, memory::MakeHandle(p, sizeof(SysUsersData) * count, "SysUsers", &kSysUsersLayout, sizeof(SysUsersData)));
+  }
+  SysUsers at(uint32_t i) const { return SysUsers(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kSysUsersLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kSysUsersLayout, offset, width, v); }
   // 0x82000FA0
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
+  uint32_t vtable() const { return data()->vtable; }
+  void set_vtable(uint32_t v) const { data()->vtable = v; }
+  uint32_t vtable_bits() const { return data()->vtable; }
+  void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
   // the four 40-byte user records from +8 (user n at +8 + 40n): XUserGetSigninState's answer (1 local, 2 Live)
-  uint32_t user0_signin_state() const { return guest::LoadU32(base, address + 8); }
-  void set_user0_signin_state(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t user0_signin_state_address() const { return address + 8; }
+  uint32_t user0_signin_state() const { return data()->user0_signin_state; }
+  void set_user0_signin_state(uint32_t v) const { data()->user0_signin_state = v; }
+  uint32_t user0_signin_state_bits() const { return data()->user0_signin_state; }
+  void set_user0_signin_state_bits(uint32_t v) const { data()->user0_signin_state = v; }
   // the record's +8: XUserGetXUID's answer
-  uint64_t user0_xuid() const { return guest::LoadU64(base, address + 16); }
-  void set_user0_xuid(uint64_t v) const { guest::StoreU64(base, address + 16, v); }
   uint32_t user0_xuid_address() const { return address + 16; }
+  uint64_t user0_xuid() const { return data()->user0_xuid; }
+  void set_user0_xuid(uint64_t v) const { data()->user0_xuid = v; }
+  uint64_t user0_xuid_bits() const { return data()->user0_xuid; }
+  void set_user0_xuid_bits(uint64_t v) const { data()->user0_xuid = v; }
   // the record's +16: XUserGetName's 16 bytes
   uint32_t user0_name_address() const { return address + 24; }
+  uint8_t* user0_name() const { return reinterpret_cast<uint8_t*>(data()) + 24; }
   // the record's +32: 1 when signed in to Live (state 2)
-  uint8_t user0_on_live() const { return guest::LoadU8(base, address + 40); }
-  void set_user0_on_live(uint8_t v) const { guest::StoreU8(base, address + 40, v); }
   uint32_t user0_on_live_address() const { return address + 40; }
+  uint8_t user0_on_live() const { return data()->user0_on_live; }
+  void set_user0_on_live(uint8_t v) const { data()->user0_on_live = v; }
+  uint8_t user0_on_live_bits() const { return data()->user0_on_live; }
+  void set_user0_on_live_bits(uint8_t v) const { data()->user0_on_live = v; }
   // the Live users' list (8 bytes each: the record's address, then the user at +172)
-  uint32_t live_users() const { return guest::LoadU32(base, address + 168); }
-  void set_live_users(uint32_t v) const { guest::StoreU32(base, address + 168, v); }
   uint32_t live_users_address() const { return address + 168; }
+  uint32_t live_users() const { return data()->live_users; }
+  void set_live_users(uint32_t v) const { data()->live_users = v; }
+  uint32_t live_users_bits() const { return data()->live_users; }
+  void set_live_users_bits(uint32_t v) const { data()->live_users = v; }
   // the first Live entry's user index
-  uint32_t live_user0_index() const { return guest::LoadU32(base, address + 172); }
-  void set_live_user0_index(uint32_t v) const { guest::StoreU32(base, address + 172, v); }
   uint32_t live_user0_index_address() const { return address + 172; }
+  uint32_t live_user0_index() const { return data()->live_user0_index; }
+  void set_live_user0_index(uint32_t v) const { data()->live_user0_index = v; }
+  uint32_t live_user0_index_bits() const { return data()->live_user0_index; }
+  void set_live_user0_index_bits(uint32_t v) const { data()->live_user0_index = v; }
   // the signed-in users' indices (a word each, 4)
-  uint32_t signed_in_users() const { return guest::LoadU32(base, address + 200); }
-  void set_signed_in_users(uint32_t v) const { guest::StoreU32(base, address + 200, v); }
   uint32_t signed_in_users_address() const { return address + 200; }
-  uint32_t signed_in_count() const { return guest::LoadU32(base, address + 216); }
-  void set_signed_in_count(uint32_t v) const { guest::StoreU32(base, address + 216, v); }
+  uint32_t signed_in_users() const { return data()->signed_in_users; }
+  void set_signed_in_users(uint32_t v) const { data()->signed_in_users = v; }
+  uint32_t signed_in_users_bits() const { return data()->signed_in_users; }
+  void set_signed_in_users_bits(uint32_t v) const { data()->signed_in_users = v; }
   uint32_t signed_in_count_address() const { return address + 216; }
-  uint32_t live_count() const { return guest::LoadU32(base, address + 220); }
-  void set_live_count(uint32_t v) const { guest::StoreU32(base, address + 220, v); }
+  uint32_t signed_in_count() const { return data()->signed_in_count; }
+  void set_signed_in_count(uint32_t v) const { data()->signed_in_count = v; }
+  uint32_t signed_in_count_bits() const { return data()->signed_in_count; }
+  void set_signed_in_count_bits(uint32_t v) const { data()->signed_in_count = v; }
   uint32_t live_count_address() const { return address + 220; }
+  uint32_t live_count() const { return data()->live_count; }
+  void set_live_count(uint32_t v) const { data()->live_count = v; }
+  uint32_t live_count_bits() const { return data()->live_count; }
+  void set_live_count_bits(uint32_t v) const { data()->live_count = v; }
   // the set-up block's +8
-  uint32_t tick_key() const { return guest::LoadU32(base, address + 224); }
-  void set_tick_key(uint32_t v) const { guest::StoreU32(base, address + 224, v); }
   uint32_t tick_key_address() const { return address + 224; }
+  uint32_t tick_key() const { return data()->tick_key; }
+  void set_tick_key(uint32_t v) const { data()->tick_key = v; }
+  uint32_t tick_key_bits() const { return data()->tick_key; }
+  void set_tick_key_bits(uint32_t v) const { data()->tick_key = v; }
   // the set-up block's +12
-  uint32_t listener_key() const { return guest::LoadU32(base, address + 228); }
-  void set_listener_key(uint32_t v) const { guest::StoreU32(base, address + 228, v); }
   uint32_t listener_key_address() const { return address + 228; }
+  uint32_t listener_key() const { return data()->listener_key; }
+  void set_listener_key(uint32_t v) const { data()->listener_key = v; }
+  uint32_t listener_key_bits() const { return data()->listener_key; }
+  void set_listener_key_bits(uint32_t v) const { data()->listener_key = v; }
   // the set-up block's +4
-  uint32_t framework_interface() const { return guest::LoadU32(base, address + 232); }
-  void set_framework_interface(uint32_t v) const { guest::StoreU32(base, address + 232, v); }
   uint32_t framework_interface_address() const { return address + 232; }
+  uint32_t framework_interface() const { return data()->framework_interface; }
+  void set_framework_interface(uint32_t v) const { data()->framework_interface = v; }
+  uint32_t framework_interface_bits() const { return data()->framework_interface; }
+  void set_framework_interface_bits(uint32_t v) const { data()->framework_interface = v; }
   // set by sub_820998B8 (not read in detail)
-  uint32_t unknown_236() const { return guest::LoadU32(base, address + 236); }
-  void set_unknown_236(uint32_t v) const { guest::StoreU32(base, address + 236, v); }
   uint32_t unknown_236_address() const { return address + 236; }
+  uint32_t unknown_236() const { return data()->unknown_236; }
+  void set_unknown_236(uint32_t v) const { data()->unknown_236 = v; }
+  uint32_t unknown_236_bits() const { return data()->unknown_236; }
+  void set_unknown_236_bits(uint32_t v) const { data()->unknown_236 = v; }
   // the notification listener (XNotifyCreateListener mask 3; user::kNoListener since B5)
-  uint32_t listener() const { return guest::LoadU32(base, address + 240); }
-  void set_listener(uint32_t v) const { guest::StoreU32(base, address + 240, v); }
   uint32_t listener_address() const { return address + 240; }
+  uint32_t listener() const { return data()->listener; }
+  void set_listener(uint32_t v) const { data()->listener = v; }
+  uint32_t listener_bits() const { return data()->listener; }
+  void set_listener_bits(uint32_t v) const { data()->listener = v; }
   // set when the users were rebuilt (sign-in changed)
-  uint32_t users_changed() const { return guest::LoadU32(base, address + 244); }
-  void set_users_changed(uint32_t v) const { guest::StoreU32(base, address + 244, v); }
   uint32_t users_changed_address() const { return address + 244; }
+  uint32_t users_changed() const { return data()->users_changed; }
+  void set_users_changed(uint32_t v) const { data()->users_changed = v; }
+  uint32_t users_changed_bits() const { return data()->users_changed; }
+  void set_users_changed_bits(uint32_t v) const { data()->users_changed = v; }
   // set by Live connection changed (never sent); App's Live connection state answer
-  uint32_t live_connection_changed() const { return guest::LoadU32(base, address + 248); }
-  void set_live_connection_changed(uint32_t v) const { guest::StoreU32(base, address + 248, v); }
   uint32_t live_connection_changed_address() const { return address + 248; }
+  uint32_t live_connection_changed() const { return data()->live_connection_changed; }
+  void set_live_connection_changed(uint32_t v) const { data()->live_connection_changed = v; }
+  uint32_t live_connection_changed_bits() const { return data()->live_connection_changed; }
+  void set_live_connection_changed_bits(uint32_t v) const { data()->live_connection_changed = v; }
   // Live connection changed's parameter
-  uint32_t live_connection_state() const { return guest::LoadU32(base, address + 252); }
-  void set_live_connection_state(uint32_t v) const { guest::StoreU32(base, address + 252, v); }
   uint32_t live_connection_state_address() const { return address + 252; }
+  uint32_t live_connection_state() const { return data()->live_connection_state; }
+  void set_live_connection_state(uint32_t v) const { data()->live_connection_state = v; }
+  uint32_t live_connection_state_bits() const { return data()->live_connection_state; }
+  void set_live_connection_state_bits(uint32_t v) const { data()->live_connection_state = v; }
 };
 
 // embedded; measure: sub_820998B8.r4

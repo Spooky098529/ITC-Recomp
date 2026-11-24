@@ -7,6 +7,7 @@
 
 #include "base/log.h"
 #include "matrix_math/matrix_math.h"
+#include "memory/host_copy.h"
 #include "schema/car_physics.h"
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -325,10 +326,13 @@ uint32_t RigidBodyIntegrate(uint8_t* base, uint32_t body, double dt, uint32_t fr
 void RigidBodyReset(uint8_t* base, uint32_t body, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820B77D0 RigidBody::Reset");
   const uint32_t f = frame;
-  // memset (sub_825A71D0), as its adapter does it.
-  guest::ForEachHostPart(base, body, 528, [](uint8_t* host, uint32_t, uint32_t bytes) {
-    std::memset(host, 0, bytes);
-  });
+  // memset (sub_825A71D0), as its adapter does it (a host body through its
+  // handle, E5 step 4).
+  if (!memory::FillWithHandles(base, body, 0, 528)) {
+    guest::ForEachHostPart(base, body, 528, [](uint8_t* host, uint32_t, uint32_t bytes) {
+      std::memset(host, 0, bytes);
+    });
+  }
   schema::RigidBody(base, body).set_fixed(uint8_t(0));
   constexpr uint32_t kCap = 0x82002A90;
   constexpr uint32_t kGravity = 0x82002A8C;

@@ -282,55 +282,99 @@ struct ScreenObjectUvMap : View {
   uint32_t fault_node_is_nil_address() const { return address + 41; }
 };
 
-// allocated; measure: UvMap.+4, UvMap.+4.+0, UvMap.+4.+8, UvMap.+4.+8.+0, new<?>@UvMap::AllocateNodes.+4, new<?>@UvMap::AllocateNodes.+4.+0, new<?>@UvMap::AllocateNodes.+4.+0.+8, new<?>@UvMap::AllocateNodes.+4.+8, new<?>@UvMap::AllocateNodes.+4.+8.+0, UvMap::EraseSubtree.r4, UvMap::EraseSubtree.r4.+0, UvMap.+4.+0.+8, RaceScreens@+16.+592
+// allocated; measure: UvMap.+4, UvMap.+4.+0, UvMap.+4.+8, UvMap.+4.+8.+0, new<?>@UvMap::AllocateNodes.+4, new<?>@UvMap::AllocateNodes.+4.+0, new<?>@UvMap::AllocateNodes.+4.+0.+8, new<?>@UvMap::AllocateNodes.+4.+8, new<?>@UvMap::AllocateNodes.+4.+8.+0, UvMap::EraseSubtree.r4, UvMap::EraseSubtree.r4.+0, UvMap.+4.+0.+8
+#pragma pack(push, 1)
+struct ScreenObjectUvMapNodeData {
+  uint32_t left = 0;  // +0
+  uint32_t parent = 0;  // +4
+  uint32_t right = 0;  // +8
+  uint8_t pad_12[4] = {};
+  double key = 0;  // +16
+  uint8_t column[12] = {};  // +24, 1 x ScreenObjectUvColumn
+  uint8_t pad_36[4] = {};
+  uint8_t color = 0;  // +40
+  uint8_t is_nil = 0;  // +41
+  uint8_t pad_42[6] = {};
+};
+#pragma pack(pop)
+static_assert(sizeof(ScreenObjectUvMapNodeData) == 48);
+inline constexpr memory::LayoutField kScreenObjectUvMapNodeFields[] = {{0, 4}, {4, 4}, {8, 4}, {16, 8}, {24, 4}, {28, 4}, {32, 4}};
+inline constexpr memory::Layout kScreenObjectUvMapNodeLayout = {kScreenObjectUvMapNodeFields, 7};
+
 struct ScreenObjectUvMapNode : View {
   using View::View;
   static constexpr uint32_t kSize = 48;
-  template <typename T = ScreenObjectUvMapNode>
-  T left() const { return T(base, guest::LoadU32(base, address + 0)); }
-  void set_left(const View& v) const { guest::StoreU32(base, address + 0, v.address); }
-  void set_left(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  ScreenObjectUvMapNodeData* data() const { return static_cast<ScreenObjectUvMapNodeData*>(memory::HandleObject(address)); }
+  static ScreenObjectUvMapNode New(uint8_t* base) {
+    return ScreenObjectUvMapNode(base, memory::MakeHandle(new ScreenObjectUvMapNodeData(), sizeof(ScreenObjectUvMapNodeData), "ScreenObjectUvMapNode", &kScreenObjectUvMapNodeLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static ScreenObjectUvMapNode NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(ScreenObjectUvMapNodeData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<ScreenObjectUvMapNodeData*>(::operator new(sizeof(ScreenObjectUvMapNodeData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) ScreenObjectUvMapNodeData();
+    return ScreenObjectUvMapNode(base, memory::MakeHandle(p, sizeof(ScreenObjectUvMapNodeData) * count, "ScreenObjectUvMapNode", &kScreenObjectUvMapNodeLayout, sizeof(ScreenObjectUvMapNodeData)));
+  }
+  ScreenObjectUvMapNode at(uint32_t i) const { return ScreenObjectUvMapNode(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kScreenObjectUvMapNodeLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvMapNodeLayout, offset, width, v); }
   uint32_t left_address() const { return address + 0; }
   template <typename T = ScreenObjectUvMapNode>
-  T parent() const { return T(base, guest::LoadU32(base, address + 4)); }
-  void set_parent(const View& v) const { guest::StoreU32(base, address + 4, v.address); }
-  void set_parent(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  T left() const { return T(base, data()->left); }
+  void set_left(const View& w) const { const uint32_t v = w.address; data()->left = v; }
+  void set_left(uint32_t v) const { data()->left = v; }
+  uint32_t left_bits() const { return data()->left; }
+  void set_left_bits(uint32_t v) const { data()->left = v; }
   uint32_t parent_address() const { return address + 4; }
   template <typename T = ScreenObjectUvMapNode>
-  T right() const { return T(base, guest::LoadU32(base, address + 8)); }
-  void set_right(const View& v) const { guest::StoreU32(base, address + 8, v.address); }
-  void set_right(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  T parent() const { return T(base, data()->parent); }
+  void set_parent(const View& w) const { const uint32_t v = w.address; data()->parent = v; }
+  void set_parent(uint32_t v) const { data()->parent = v; }
+  uint32_t parent_bits() const { return data()->parent; }
+  void set_parent_bits(uint32_t v) const { data()->parent = v; }
   uint32_t right_address() const { return address + 8; }
+  template <typename T = ScreenObjectUvMapNode>
+  T right() const { return T(base, data()->right); }
+  void set_right(const View& w) const { const uint32_t v = w.address; data()->right = v; }
+  void set_right(uint32_t v) const { data()->right = v; }
+  uint32_t right_bits() const { return data()->right; }
+  void set_right_bits(uint32_t v) const { data()->right = v; }
   // x rounded to 0.001
-  double key() const { return std::bit_cast<double>(guest::LoadU64(base, address + 16)); }
-  void set_key(double v) const { guest::StoreU64(base, address + 16, std::bit_cast<uint64_t>(v)); }
   uint32_t key_address() const { return address + 16; }
+  double key() const { return data()->key; }
+  void set_key(double v) const { data()->key = v; }
+  uint64_t key_bits() const { return std::bit_cast<uint64_t>(data()->key); }
+  void set_key_bits(uint64_t v) const { data()->key = std::bit_cast<double>(v); }
   // the key's high word
-  uint32_t key_high() const { return guest::LoadU32(base, address + 16); }
-  void set_key_high(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
   uint32_t key_high_address() const { return address + 16; }
+  uint32_t key_high_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvMapNodeLayout, 16, 4)); }
+  void set_key_high_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvMapNodeLayout, 16, 4, v); }
+  uint32_t key_high() const { return uint32_t(key_high_bits()); }
+  void set_key_high(uint32_t v) const { set_key_high_bits(uint32_t(v)); }
   // the key's low word
-  uint32_t key_low() const { return guest::LoadU32(base, address + 20); }
-  void set_key_low(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
   uint32_t key_low_address() const { return address + 20; }
-  // a ScreenObjectUvColumn
-  uint32_t column_address() const { return address + 24; }
-  template <typename T = ScreenObjectUvColumnNode>
-  T column_head() const { return T(base, guest::LoadU32(base, address + 28)); }
-  void set_column_head(const View& v) const { guest::StoreU32(base, address + 28, v.address); }
-  void set_column_head(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
-  uint32_t column_head_address() const { return address + 28; }
-  uint32_t column_size() const { return guest::LoadU32(base, address + 32); }
-  void set_column_size(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
-  uint32_t column_size_address() const { return address + 32; }
+  uint32_t key_low_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvMapNodeLayout, 20, 4)); }
+  void set_key_low_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvMapNodeLayout, 20, 4, v); }
+  uint32_t key_low() const { return uint32_t(key_low_bits()); }
+  void set_key_low(uint32_t v) const { set_key_low_bits(uint32_t(v)); }
+  // its head at +28, its size at +32
+  template <typename T = ScreenObjectUvColumn>
+  T column() const { return T(base, address + 24); }
   // 0 red, 1 black
-  uint8_t color() const { return guest::LoadU8(base, address + 40); }
-  void set_color(uint8_t v) const { guest::StoreU8(base, address + 40, v); }
   uint32_t color_address() const { return address + 40; }
+  uint8_t color() const { return data()->color; }
+  void set_color(uint8_t v) const { data()->color = v; }
+  uint8_t color_bits() const { return data()->color; }
+  void set_color_bits(uint8_t v) const { data()->color = v; }
   // 1 only for the head
-  uint8_t is_nil() const { return guest::LoadU8(base, address + 41); }
-  void set_is_nil(uint8_t v) const { guest::StoreU8(base, address + 41, v); }
   uint32_t is_nil_address() const { return address + 41; }
+  uint8_t is_nil() const { return data()->is_nil; }
+  void set_is_nil(uint8_t v) const { data()->is_nil = v; }
+  uint8_t is_nil_bits() const { return data()->is_nil; }
+  void set_is_nil_bits(uint8_t v) const { data()->is_nil = v; }
 };
 
 // embedded; measure: UvMap::InsertUnique.r5, UvMap::ConstructNode.r7, UvMap::ConstructNode.r7@+8.+4
@@ -359,101 +403,234 @@ struct ScreenObjectUvMapValue : View {
 };
 
 // embedded; measure: UvColumn, UvColumn::Find.r4, UvColumn::InsertUnique.r4
+#pragma pack(push, 1)
+struct ScreenObjectUvColumnData {
+  uint32_t fault_node_left = 0;  // +0
+  uint32_t head = 0;  // +4
+  uint32_t size = 0;  // +8
+};
+#pragma pack(pop)
+static_assert(sizeof(ScreenObjectUvColumnData) == 12);
+inline constexpr memory::LayoutField kScreenObjectUvColumnFields[] = {{0, 4}, {4, 4}, {8, 4}};
+inline constexpr memory::Layout kScreenObjectUvColumnLayout = {kScreenObjectUvColumnFields, 3};
+
 struct ScreenObjectUvColumn : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
-  template <typename T = ScreenObjectUvColumnNode>
-  T head() const { return T(base, guest::LoadU32(base, address + 4)); }
-  void set_head(const View& v) const { guest::StoreU32(base, address + 4, v.address); }
-  void set_head(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  ScreenObjectUvColumnData* data() const { return static_cast<ScreenObjectUvColumnData*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static ScreenObjectUvColumn New(uint8_t* base) {
+    return ScreenObjectUvColumn(base, memory::MakeHandle(new ScreenObjectUvColumnData(), sizeof(ScreenObjectUvColumnData), "ScreenObjectUvColumn", &kScreenObjectUvColumnLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static ScreenObjectUvColumn NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(ScreenObjectUvColumnData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<ScreenObjectUvColumnData*>(::operator new(sizeof(ScreenObjectUvColumnData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) ScreenObjectUvColumnData();
+    return ScreenObjectUvColumn(base, memory::MakeHandle(p, sizeof(ScreenObjectUvColumnData) * count, "ScreenObjectUvColumn", &kScreenObjectUvColumnLayout, sizeof(ScreenObjectUvColumnData)));
+  }
+  ScreenObjectUvColumn at(uint32_t i) const { return ScreenObjectUvColumn(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kScreenObjectUvColumnLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t head_address() const { return address + 4; }
-  uint32_t size() const { return guest::LoadU32(base, address + 8); }
-  void set_size(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  template <typename T = ScreenObjectUvColumnNode>
+  T head() const { return T(base, on_host() ? data()->head : guest::LoadU32(base, address + 4)); }
+  void set_head(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->head = v; else guest::StoreU32(base, address + 4, v); }
+  void set_head(uint32_t v) const { if (on_host()) data()->head = v; else guest::StoreU32(base, address + 4, v); }
+  uint32_t head_bits() const { return on_host() ? data()->head : guest::LoadU32(base, address + 4); }
+  void set_head_bits(uint32_t v) const { if (on_host()) data()->head = v; else guest::StoreU32(base, address + 4, v); }
   uint32_t size_address() const { return address + 8; }
+  uint32_t size() const { return on_host() ? uint32_t(data()->size) : uint32_t(guest::LoadU32(base, address + 8)); }
+  void set_size(uint32_t v) const { if (on_host()) data()->size = v; else guest::StoreU32(base, address + 8, v); }
+  uint32_t size_bits() const { return on_host() ? data()->size : guest::LoadU32(base, address + 8); }
+  void set_size_bits(uint32_t v) const { if (on_host()) data()->size = v; else guest::StoreU32(base, address + 8, v); }
   // measure fault: a node's left met as the column
-  uint32_t fault_node_left() const { return guest::LoadU32(base, address + 0); }
-  void set_fault_node_left(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t fault_node_left_address() const { return address + 0; }
+  uint32_t fault_node_left() const { return on_host() ? uint32_t(data()->fault_node_left) : uint32_t(guest::LoadU32(base, address + 0)); }
+  void set_fault_node_left(uint32_t v) const { if (on_host()) data()->fault_node_left = v; else guest::StoreU32(base, address + 0, v); }
+  uint32_t fault_node_left_bits() const { return on_host() ? data()->fault_node_left : guest::LoadU32(base, address + 0); }
+  void set_fault_node_left_bits(uint32_t v) const { if (on_host()) data()->fault_node_left = v; else guest::StoreU32(base, address + 0, v); }
   // measure fault: Erase's and InsertUnique's result out (an iterator, stored as one doubleword)
-  uint64_t fault_iterator() const { return guest::LoadU64(base, address + 0); }
-  void set_fault_iterator(uint64_t v) const { guest::StoreU64(base, address + 0, v); }
   uint32_t fault_iterator_address() const { return address + 0; }
+  uint64_t fault_iterator_bits() const { return on_host() ? uint64_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnLayout, 0, 8)) : guest::LoadU64(base, address + 0); }
+  void set_fault_iterator_bits(uint64_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnLayout, 0, 8, v); else guest::StoreU64(base, address + 0, v); }
+  uint64_t fault_iterator() const { return uint64_t(fault_iterator_bits()); }
+  void set_fault_iterator(uint64_t v) const { set_fault_iterator_bits(uint64_t(v)); }
   // measure fault: a byte met at +8
-  uint8_t fault_size_byte() const { return guest::LoadU8(base, address + 8); }
-  void set_fault_size_byte(uint8_t v) const { guest::StoreU8(base, address + 8, v); }
   uint32_t fault_size_byte_address() const { return address + 8; }
+  uint8_t fault_size_byte_bits() const { return on_host() ? uint8_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnLayout, 8, 1)) : guest::LoadU8(base, address + 8); }
+  void set_fault_size_byte_bits(uint8_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnLayout, 8, 1, v); else guest::StoreU8(base, address + 8, v); }
+  uint8_t fault_size_byte() const { return uint8_t(fault_size_byte_bits()); }
+  void set_fault_size_byte(uint8_t v) const { set_fault_size_byte_bits(uint8_t(v)); }
 };
 
 // allocated; measure: new<?>@UvColumn::AllocateNodes, UvColumn.+4.+8, UvColumn.+4.+8.+4, UvColumn.+4.+8.+4.+8, UvColumn::RotateRight.r4.+0, UvColumn::EraseSubtree.r4, UvColumn::EraseSubtree.r4.+0, UvColumn::CopySubtree.r4, UvColumn::Insert.r4.+4.+8, UvColumn::Insert.r4.+4.+8.+4, UvColumn::Insert.r4.+4.+8.+4.+8, UvColumn::InsertUnique.r4.+4, UvColumn::InsertUnique.r4.+4.+0, UvColumn::InsertUnique.r4.+4.+0.+8, sub_8212EEF8.r3.+4, sub_8212EEF8.r3.+4.+0, sub_8212EEF8.r3.+4.+8
+#pragma pack(push, 1)
+struct ScreenObjectUvColumnNodeData {
+  uint32_t left = 0;  // +0
+  uint32_t parent = 0;  // +4
+  uint32_t right = 0;  // +8
+  uint8_t pad_12[4] = {};
+  double key = 0;  // +16
+  uint32_t u = 0;  // +24
+  uint32_t v = 0;  // +28
+  uint8_t color = 0;  // +32
+  uint8_t is_nil = 0;  // +33
+  uint8_t pad_34[6] = {};
+};
+#pragma pack(pop)
+static_assert(sizeof(ScreenObjectUvColumnNodeData) == 40);
+inline constexpr memory::LayoutField kScreenObjectUvColumnNodeFields[] = {{0, 4}, {4, 4}, {8, 4}, {16, 8}, {24, 4}, {28, 4}};
+inline constexpr memory::Layout kScreenObjectUvColumnNodeLayout = {kScreenObjectUvColumnNodeFields, 6};
+
 struct ScreenObjectUvColumnNode : View {
   using View::View;
   static constexpr uint32_t kSize = 40;
-  template <typename T = ScreenObjectUvColumnNode>
-  T left() const { return T(base, guest::LoadU32(base, address + 0)); }
-  void set_left(const View& v) const { guest::StoreU32(base, address + 0, v.address); }
-  void set_left(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  ScreenObjectUvColumnNodeData* data() const { return static_cast<ScreenObjectUvColumnNodeData*>(memory::HandleObject(address)); }
+  static ScreenObjectUvColumnNode New(uint8_t* base) {
+    return ScreenObjectUvColumnNode(base, memory::MakeHandle(new ScreenObjectUvColumnNodeData(), sizeof(ScreenObjectUvColumnNodeData), "ScreenObjectUvColumnNode", &kScreenObjectUvColumnNodeLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static ScreenObjectUvColumnNode NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(ScreenObjectUvColumnNodeData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<ScreenObjectUvColumnNodeData*>(::operator new(sizeof(ScreenObjectUvColumnNodeData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) ScreenObjectUvColumnNodeData();
+    return ScreenObjectUvColumnNode(base, memory::MakeHandle(p, sizeof(ScreenObjectUvColumnNodeData) * count, "ScreenObjectUvColumnNode", &kScreenObjectUvColumnNodeLayout, sizeof(ScreenObjectUvColumnNodeData)));
+  }
+  ScreenObjectUvColumnNode at(uint32_t i) const { return ScreenObjectUvColumnNode(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kScreenObjectUvColumnNodeLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnNodeLayout, offset, width, v); }
   uint32_t left_address() const { return address + 0; }
   template <typename T = ScreenObjectUvColumnNode>
-  T parent() const { return T(base, guest::LoadU32(base, address + 4)); }
-  void set_parent(const View& v) const { guest::StoreU32(base, address + 4, v.address); }
-  void set_parent(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  T left() const { return T(base, data()->left); }
+  void set_left(const View& w) const { const uint32_t v = w.address; data()->left = v; }
+  void set_left(uint32_t v) const { data()->left = v; }
+  uint32_t left_bits() const { return data()->left; }
+  void set_left_bits(uint32_t v) const { data()->left = v; }
   uint32_t parent_address() const { return address + 4; }
   template <typename T = ScreenObjectUvColumnNode>
-  T right() const { return T(base, guest::LoadU32(base, address + 8)); }
-  void set_right(const View& v) const { guest::StoreU32(base, address + 8, v.address); }
-  void set_right(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  T parent() const { return T(base, data()->parent); }
+  void set_parent(const View& w) const { const uint32_t v = w.address; data()->parent = v; }
+  void set_parent(uint32_t v) const { data()->parent = v; }
+  uint32_t parent_bits() const { return data()->parent; }
+  void set_parent_bits(uint32_t v) const { data()->parent = v; }
   uint32_t right_address() const { return address + 8; }
+  template <typename T = ScreenObjectUvColumnNode>
+  T right() const { return T(base, data()->right); }
+  void set_right(const View& w) const { const uint32_t v = w.address; data()->right = v; }
+  void set_right(uint32_t v) const { data()->right = v; }
+  uint32_t right_bits() const { return data()->right; }
+  void set_right_bits(uint32_t v) const { data()->right = v; }
   // y rounded to 0.001
-  double key() const { return std::bit_cast<double>(guest::LoadU64(base, address + 16)); }
-  void set_key(double v) const { guest::StoreU64(base, address + 16, std::bit_cast<uint64_t>(v)); }
   uint32_t key_address() const { return address + 16; }
+  double key() const { return data()->key; }
+  void set_key(double v) const { data()->key = v; }
+  uint64_t key_bits() const { return std::bit_cast<uint64_t>(data()->key); }
+  void set_key_bits(uint64_t v) const { data()->key = std::bit_cast<double>(v); }
   // the key's high word
-  uint32_t key_high() const { return guest::LoadU32(base, address + 16); }
-  void set_key_high(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
   uint32_t key_high_address() const { return address + 16; }
+  uint32_t key_high_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnNodeLayout, 16, 4)); }
+  void set_key_high_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnNodeLayout, 16, 4, v); }
+  uint32_t key_high() const { return uint32_t(key_high_bits()); }
+  void set_key_high(uint32_t v) const { set_key_high_bits(uint32_t(v)); }
   // the key's low word
-  uint32_t key_low() const { return guest::LoadU32(base, address + 20); }
-  void set_key_low(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
   uint32_t key_low_address() const { return address + 20; }
+  uint32_t key_low_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnNodeLayout, 20, 4)); }
+  void set_key_low_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnNodeLayout, 20, 4, v); }
+  uint32_t key_low() const { return uint32_t(key_low_bits()); }
+  void set_key_low(uint32_t v) const { set_key_low_bits(uint32_t(v)); }
   // the float u's bits
-  uint32_t u() const { return guest::LoadU32(base, address + 24); }
-  void set_u(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
   uint32_t u_address() const { return address + 24; }
+  uint32_t u() const { return data()->u; }
+  void set_u(uint32_t v) const { data()->u = v; }
+  uint32_t u_bits() const { return data()->u; }
+  void set_u_bits(uint32_t v) const { data()->u = v; }
   // the float v's bits
-  uint32_t v() const { return guest::LoadU32(base, address + 28); }
-  void set_v(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
   uint32_t v_address() const { return address + 28; }
+  uint32_t v() const { return data()->v; }
+  void set_v(uint32_t v) const { data()->v = v; }
+  uint32_t v_bits() const { return data()->v; }
+  void set_v_bits(uint32_t v) const { data()->v = v; }
   // 0 red, 1 black
-  uint8_t color() const { return guest::LoadU8(base, address + 32); }
-  void set_color(uint8_t v) const { guest::StoreU8(base, address + 32, v); }
   uint32_t color_address() const { return address + 32; }
+  uint8_t color() const { return data()->color; }
+  void set_color(uint8_t v) const { data()->color = v; }
+  uint8_t color_bits() const { return data()->color; }
+  void set_color_bits(uint8_t v) const { data()->color = v; }
   // 1 only for the head
-  uint8_t is_nil() const { return guest::LoadU8(base, address + 33); }
-  void set_is_nil(uint8_t v) const { guest::StoreU8(base, address + 33, v); }
   uint32_t is_nil_address() const { return address + 33; }
+  uint8_t is_nil() const { return data()->is_nil; }
+  void set_is_nil(uint8_t v) const { data()->is_nil = v; }
+  uint8_t is_nil_bits() const { return data()->is_nil; }
+  void set_is_nil_bits(uint8_t v) const { data()->is_nil = v; }
 };
 
 // embedded; measure: UvColumn::InsertUnique.r5, UvColumn::NewNode.r7
+#pragma pack(push, 1)
+struct ScreenObjectUvColumnValueData {
+  double key = 0;  // +0
+  uint32_t u = 0;  // +8
+  uint32_t v = 0;  // +12
+};
+#pragma pack(pop)
+static_assert(sizeof(ScreenObjectUvColumnValueData) == 16);
+inline constexpr memory::LayoutField kScreenObjectUvColumnValueFields[] = {{0, 8}, {8, 4}, {12, 4}};
+inline constexpr memory::Layout kScreenObjectUvColumnValueLayout = {kScreenObjectUvColumnValueFields, 3};
+
 struct ScreenObjectUvColumnValue : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
-  double key() const { return std::bit_cast<double>(guest::LoadU64(base, address + 0)); }
-  void set_key(double v) const { guest::StoreU64(base, address + 0, std::bit_cast<uint64_t>(v)); }
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  ScreenObjectUvColumnValueData* data() const { return static_cast<ScreenObjectUvColumnValueData*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static ScreenObjectUvColumnValue New(uint8_t* base) {
+    return ScreenObjectUvColumnValue(base, memory::MakeHandle(new ScreenObjectUvColumnValueData(), sizeof(ScreenObjectUvColumnValueData), "ScreenObjectUvColumnValue", &kScreenObjectUvColumnValueLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static ScreenObjectUvColumnValue NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(ScreenObjectUvColumnValueData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<ScreenObjectUvColumnValueData*>(::operator new(sizeof(ScreenObjectUvColumnValueData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) ScreenObjectUvColumnValueData();
+    return ScreenObjectUvColumnValue(base, memory::MakeHandle(p, sizeof(ScreenObjectUvColumnValueData) * count, "ScreenObjectUvColumnValue", &kScreenObjectUvColumnValueLayout, sizeof(ScreenObjectUvColumnValueData)));
+  }
+  ScreenObjectUvColumnValue at(uint32_t i) const { return ScreenObjectUvColumnValue(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kScreenObjectUvColumnValueLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnValueLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t key_address() const { return address + 0; }
-  uint32_t key_high() const { return guest::LoadU32(base, address + 0); }
-  void set_key_high(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  double key() const { return on_host() ? double(data()->key) : double(std::bit_cast<double>(guest::LoadU64(base, address + 0))); }
+  void set_key(double v) const { if (on_host()) data()->key = v; else guest::StoreU64(base, address + 0, std::bit_cast<uint64_t>(v)); }
+  uint64_t key_bits() const { return on_host() ? std::bit_cast<uint64_t>(data()->key) : guest::LoadU64(base, address + 0); }
+  void set_key_bits(uint64_t v) const { if (on_host()) data()->key = std::bit_cast<double>(v); else guest::StoreU64(base, address + 0, v); }
   uint32_t key_high_address() const { return address + 0; }
-  uint32_t key_low() const { return guest::LoadU32(base, address + 4); }
-  void set_key_low(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t key_high_bits() const { return on_host() ? uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnValueLayout, 0, 4)) : guest::LoadU32(base, address + 0); }
+  void set_key_high_bits(uint32_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnValueLayout, 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t key_high() const { return uint32_t(key_high_bits()); }
+  void set_key_high(uint32_t v) const { set_key_high_bits(uint32_t(v)); }
   uint32_t key_low_address() const { return address + 4; }
+  uint32_t key_low_bits() const { return on_host() ? uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnValueLayout, 4, 4)) : guest::LoadU32(base, address + 4); }
+  void set_key_low_bits(uint32_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kScreenObjectUvColumnValueLayout, 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  uint32_t key_low() const { return uint32_t(key_low_bits()); }
+  void set_key_low(uint32_t v) const { set_key_low_bits(uint32_t(v)); }
   // the float u's bits
-  uint32_t u() const { return guest::LoadU32(base, address + 8); }
-  void set_u(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t u_address() const { return address + 8; }
+  uint32_t u() const { return on_host() ? uint32_t(data()->u) : uint32_t(guest::LoadU32(base, address + 8)); }
+  void set_u(uint32_t v) const { if (on_host()) data()->u = v; else guest::StoreU32(base, address + 8, v); }
+  uint32_t u_bits() const { return on_host() ? data()->u : guest::LoadU32(base, address + 8); }
+  void set_u_bits(uint32_t v) const { if (on_host()) data()->u = v; else guest::StoreU32(base, address + 8, v); }
   // the float v's bits
-  uint32_t v() const { return guest::LoadU32(base, address + 12); }
-  void set_v(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
   uint32_t v_address() const { return address + 12; }
+  uint32_t v() const { return on_host() ? uint32_t(data()->v) : uint32_t(guest::LoadU32(base, address + 12)); }
+  void set_v(uint32_t v) const { if (on_host()) data()->v = v; else guest::StoreU32(base, address + 12, v); }
+  uint32_t v_bits() const { return on_host() ? data()->v : guest::LoadU32(base, address + 12); }
+  void set_v_bits(uint32_t v) const { if (on_host()) data()->v = v; else guest::StoreU32(base, address + 12, v); }
 };
 
 // embedded; measure: UvColumn::LowerBoundNode.r4, UvMap::LowerBoundNode.r4, UvColumn::Find.r5, UvMap::Find.r5

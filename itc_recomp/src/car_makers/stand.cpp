@@ -273,7 +273,7 @@ uint64_t GarageStageShowCarById(uint8_t* base, const front_end_car_draw::Calls& 
   const uint32_t selection = list.car_selection();
   const uint32_t index = (scroll + selection) << 2;
   const uint32_t id =
-      schema::CarDealerEntry(base, Load(base, index + list.shown_list().address)).car_id();
+      schema::CarDealerEntry(base, uint32_t(list.shown_list().load_at(index, 4))).car_id();
   const uint32_t car = frame + 80;
   race_setup::CarInit(base, car);
   race_setup::SetModel(base, car, id);

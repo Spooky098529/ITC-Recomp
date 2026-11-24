@@ -1,8 +1,9 @@
 // The input manager, its pads and its processors' set-up and accessors as
 // plain C++ over their guest layouts (docs/functions/input.md; the fields in
-// docs/known-data.md). The objects stay in guest memory: B1's native update
-// (src/hooks/input_update.cpp), the action mappers and the recompiled
-// menus read them there. Adapters: src/hooks/input_manager.cpp.
+// docs/known-data.md). The manager is in host memory (E5 step 4) with its
+// pads, processors and lists embedded: B1's native update
+// (src/hooks/input_update.cpp), the action mappers and the lifted menus
+// reach them through interior handles. Adapters: src/hooks/input_manager.cpp.
 //
 // The manager (3,984 bytes, vtable 0x82000F48): five logical pads (196
 // bytes from +8), four physical pads (212 bytes from +988), five processors

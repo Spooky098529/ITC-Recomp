@@ -46,6 +46,30 @@ int32_t Rem(int32_t a, int32_t b) { return int32_t(uint32_t(a) - uint32_t(a / b)
 // 32-bit wrapping a * 10 + b.
 int32_t Tens(int32_t a, int32_t b) { return int32_t(uint32_t(a) * 10u + uint32_t(b)); }
 
+// A light entry's 16-byte vector at its `offset` (a bytes field, guest
+// order; 16-aligned), as lvx128 reads it, through the view (the entry is in
+// host memory, E5 step 4).
+simde__m128 EntryVector(const schema::RaceLightEntry& entry, uint32_t offset) {
+  const uint32_t at = offset & ~0xFu;
+  const uint32_t w0 = uint32_t(entry.load_at(at, 4));
+  const uint32_t w1 = uint32_t(entry.load_at(at + 4, 4));
+  const uint32_t w2 = uint32_t(entry.load_at(at + 8, 4));
+  const uint32_t w3 = uint32_t(entry.load_at(at + 12, 4));
+  return ops::VectorOf(w0, w1, w2, w3);
+}
+
+// A light entry's 16-byte vector at its `offset` copied to `to` (guest
+// memory) as ld, std, ld, std (ops::Copy16Interleaved), read through the view.
+void EntryCopy16Interleaved(uint8_t* base, uint32_t to, const schema::RaceLightEntry& entry,
+                            uint32_t offset) {
+  for (uint32_t half = 0; half < 16; half += 8) {
+    const uint32_t a = uint32_t(entry.load_at(offset + half, 4));
+    const uint32_t b = uint32_t(entry.load_at(offset + half + 4, 4));
+    ops::Store(base, to + half, a);
+    ops::Store(base, to + half + 4, b);
+  }
+}
+
 }  // namespace
 
 void VaryCar(uint8_t* base, uint32_t car, int32_t racer, int32_t vehicle, int32_t pick) {
@@ -89,13 +113,15 @@ void UploadDirectional(uint8_t* base, uint32_t entry, uint32_t n, uint32_t stack
   ops::Store(base, stack - 4, ops::Load(base, G::one_address()));
   {
     ops::FlushToZero flush;
-    const simde__m128 v = ops::Lvx(base, light.direction_address());
+    const simde__m128 v = EntryVector(light, light.direction_address() - light.address);
     const simde__m128 normalized = ops::Normalized(v, ops::Dot3(v, v));
     ops::Stvx(base, stack - 16, normalized);
   }
   ops::Copy16(base, G::light_directions_address() + slot, stack - 16);
-  ops::Copy16Interleaved(base, G::light_second_address() + slot, light.second_address());
-  ops::Copy16Interleaved(base, G::light_third_address() + slot, light.third_address());
+  EntryCopy16Interleaved(base, G::light_second_address() + slot, light,
+                         light.second_address() - light.address);
+  EntryCopy16Interleaved(base, G::light_third_address() + slot, light,
+                         light.third_address() - light.address);
 }
 
 uint32_t LightsUpdate(uint8_t* base, uint32_t set, uint32_t frame) {
@@ -109,9 +135,9 @@ uint32_t LightsUpdate(uint8_t* base, uint32_t set, uint32_t frame) {
   const schema::RaceLights lights(base, set);
   uint32_t n = 0;
   for (uint32_t i = 0; i < 11; i++) {
-    const uint32_t entry = lights.entries_address() + schema::RaceLightEntry::kSize * i;
-    if (schema::RaceLightEntry(base, entry).kind() == 1) {
-      UploadDirectional(base, entry, n, frame);
+    const schema::RaceLightEntry entry = lights.entries(i);
+    if (entry.kind() == 1) {
+      UploadDirectional(base, entry.address, n, frame);
       n++;
     }
   }
@@ -250,10 +276,7 @@ uint64_t TickUpdate(uint8_t* base, const GuestCall& call, uint32_t stack, uint32
   guest::StoreU32(base, f, stack);
   // `slots` is the race scene's +16 (its car slots' count).
   const schema::RaceScene race_scene(base, slots - 16);
-  const auto slot_at = [&](uint32_t v) {
-    return schema::RaceCarSlot(base,
-                               race_scene.car_slots_address() + schema::RaceCarSlot::kSize * v);
-  };
+  const auto slot_at = [&](uint32_t v) { return race_scene.car_slots(v); };
   const uint32_t scene = G::car_scene(base).address;
   // Pass 0's two points and their direction into the frame's +96.
   Stfs(base, f + 112, double(pass0.eye_x()));
@@ -467,7 +490,7 @@ uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint32_t stack, uint32_
   const uint32_t f = stack - 144;
   guest::StoreU32(base, f, stack);
   const schema::RaceScene race_scene(base, scene);
-  LightsUpdate(base, race_scene.lights_address(), f - kLightsFrame);
+  LightsUpdate(base, race_scene.lights().address, f - kLightsFrame);
   calls.scenery_update(race_scene.scenery<schema::View>().address, scene, f);
   TickUpdate(base, calls.call, f, race_scene.car_slot_count_address());
   post_effects::MarkUpdated(base);

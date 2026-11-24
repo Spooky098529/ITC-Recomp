@@ -361,114 +361,236 @@ struct StandMode : View {
 };
 
 // embedded; measure: Type6Screen0
+#pragma pack(push, 1)
+struct Type6Screen0Data {
+  uint8_t machine[9600] = {};  // +0, guest order
+  uint32_t transition_count = 0;  // +9600
+  uint32_t state = 0;  // +9604
+  uint32_t loaded = 0;  // +9608
+  uint32_t reenter = 0;  // +9612
+  uint32_t delete_movie = 0;  // +9616
+  uint8_t pad_9620[20] = {};
+  uint32_t words = 0;  // +9640
+  uint32_t pages = 0;  // +9644
+  uint32_t menu = 0;  // +9648
+  uint32_t item_picked = 0;  // +9652
+  uint32_t unknown_9656 = 0;  // +9656
+  uint8_t pad_9660[4] = {};
+  uint32_t confirm_asked = 0;  // +9664
+};
+#pragma pack(pop)
+static_assert(sizeof(Type6Screen0Data) == 9668);
+inline constexpr memory::LayoutField kType6Screen0Fields[] = {{9600, 4}, {9604, 4}, {9608, 4}, {9612, 4}, {9616, 4}, {9640, 4}, {9644, 4}, {9648, 4}, {9652, 4}, {9656, 4}, {9664, 4}};
+inline constexpr memory::Layout kType6Screen0Layout = {kType6Screen0Fields, 11};
+
 struct Type6Screen0 : View {
   using View::View;
   static constexpr uint32_t kSize = 9668;
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  Type6Screen0Data* data() const { return static_cast<Type6Screen0Data*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static Type6Screen0 New(uint8_t* base) {
+    return Type6Screen0(base, memory::MakeHandle(new Type6Screen0Data(), sizeof(Type6Screen0Data), "Type6Screen0", &kType6Screen0Layout));
+  }
+  template <uint32_t Stride = kSize>
+  static Type6Screen0 NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(Type6Screen0Data) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<Type6Screen0Data*>(::operator new(sizeof(Type6Screen0Data) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) Type6Screen0Data();
+    return Type6Screen0(base, memory::MakeHandle(p, sizeof(Type6Screen0Data) * count, "Type6Screen0", &kType6Screen0Layout, sizeof(Type6Screen0Data)));
+  }
+  Type6Screen0 at(uint32_t i) const { return Type6Screen0(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kType6Screen0Layout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kType6Screen0Layout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // the machine's transitions (StateMachine, game-modes.toml)
   uint32_t machine_address() const { return address + 0; }
-  uint32_t transition_count() const { return guest::LoadU32(base, address + 9600); }
-  void set_transition_count(uint32_t v) const { guest::StoreU32(base, address + 9600, v); }
+  uint8_t* machine() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 0 : guest::Pointer(base, address + 0); }
   uint32_t transition_count_address() const { return address + 9600; }
+  uint32_t transition_count() const { return on_host() ? uint32_t(data()->transition_count) : uint32_t(guest::LoadU32(base, address + 9600)); }
+  void set_transition_count(uint32_t v) const { if (on_host()) data()->transition_count = v; else guest::StoreU32(base, address + 9600, v); }
+  uint32_t transition_count_bits() const { return on_host() ? data()->transition_count : guest::LoadU32(base, address + 9600); }
+  void set_transition_count_bits(uint32_t v) const { if (on_host()) data()->transition_count = v; else guest::StoreU32(base, address + 9600, v); }
   // 0 enter, 1 open the movie, 2 wait for it, 4 show, 5 shown, 7 leaving, 6 done, 8 suspended, 9 wait for the mode, 10 leave the mode
-  uint32_t state() const { return guest::LoadU32(base, address + 9604); }
-  void set_state(uint32_t v) const { guest::StoreU32(base, address + 9604, v); }
   uint32_t state_address() const { return address + 9604; }
+  uint32_t state() const { return on_host() ? uint32_t(data()->state) : uint32_t(guest::LoadU32(base, address + 9604)); }
+  void set_state(uint32_t v) const { if (on_host()) data()->state = v; else guest::StoreU32(base, address + 9604, v); }
+  uint32_t state_bits() const { return on_host() ? data()->state : guest::LoadU32(base, address + 9604); }
+  void set_state_bits(uint32_t v) const { if (on_host()) data()->state = v; else guest::StoreU32(base, address + 9604, v); }
   // movie 22 loaded
-  uint32_t loaded() const { return guest::LoadU32(base, address + 9608); }
-  void set_loaded(uint32_t v) const { guest::StoreU32(base, address + 9608, v); }
   uint32_t loaded_address() const { return address + 9608; }
+  uint32_t loaded() const { return on_host() ? uint32_t(data()->loaded) : uint32_t(guest::LoadU32(base, address + 9608)); }
+  void set_loaded(uint32_t v) const { if (on_host()) data()->loaded = v; else guest::StoreU32(base, address + 9608, v); }
+  uint32_t loaded_bits() const { return on_host() ? data()->loaded : guest::LoadU32(base, address + 9608); }
+  void set_loaded_bits(uint32_t v) const { if (on_host()) data()->loaded = v; else guest::StoreU32(base, address + 9608, v); }
   // open at once (OnEnter: state 1, else 9); 1 from the mode's Init
-  uint32_t reenter() const { return guest::LoadU32(base, address + 9612); }
-  void set_reenter(uint32_t v) const { guest::StoreU32(base, address + 9612, v); }
   uint32_t reenter_address() const { return address + 9612; }
+  uint32_t reenter() const { return on_host() ? uint32_t(data()->reenter) : uint32_t(guest::LoadU32(base, address + 9612)); }
+  void set_reenter(uint32_t v) const { if (on_host()) data()->reenter = v; else guest::StoreU32(base, address + 9612, v); }
+  uint32_t reenter_bits() const { return on_host() ? data()->reenter : guest::LoadU32(base, address + 9612); }
+  void set_reenter_bits(uint32_t v) const { if (on_host()) data()->reenter = v; else guest::StoreU32(base, address + 9612, v); }
   // Suspend deletes movie 22 (0 from the mode's Init: kept)
-  uint32_t delete_movie() const { return guest::LoadU32(base, address + 9616); }
-  void set_delete_movie(uint32_t v) const { guest::StoreU32(base, address + 9616, v); }
   uint32_t delete_movie_address() const { return address + 9616; }
+  uint32_t delete_movie() const { return on_host() ? uint32_t(data()->delete_movie) : uint32_t(guest::LoadU32(base, address + 9616)); }
+  void set_delete_movie(uint32_t v) const { if (on_host()) data()->delete_movie = v; else guest::StoreU32(base, address + 9616, v); }
+  uint32_t delete_movie_bits() const { return on_host() ? data()->delete_movie : guest::LoadU32(base, address + 9616); }
+  void set_delete_movie_bits(uint32_t v) const { if (on_host()) data()->delete_movie = v; else guest::StoreU32(base, address + 9616, v); }
   // VirtualAlloc(76) by OnEnter
-  template <typename T = Type67Screen0Words>
-  T words() const { return T(base, guest::LoadU32(base, address + 9640)); }
-  void set_words(const View& v) const { guest::StoreU32(base, address + 9640, v.address); }
-  void set_words(uint32_t v) const { guest::StoreU32(base, address + 9640, v); }
   uint32_t words_address() const { return address + 9640; }
+  template <typename T = Type67Screen0Words>
+  T words() const { return T(base, on_host() ? data()->words : guest::LoadU32(base, address + 9640)); }
+  void set_words(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->words = v; else guest::StoreU32(base, address + 9640, v); }
+  void set_words(uint32_t v) const { if (on_host()) data()->words = v; else guest::StoreU32(base, address + 9640, v); }
+  uint32_t words_bits() const { return on_host() ? data()->words : guest::LoadU32(base, address + 9640); }
+  void set_words_bits(uint32_t v) const { if (on_host()) data()->words = v; else guest::StoreU32(base, address + 9640, v); }
   // VirtualAlloc(28) by OnEnter: the page state
-  template <typename T = PageObject>
-  T pages() const { return T(base, guest::LoadU32(base, address + 9644)); }
-  void set_pages(const View& v) const { guest::StoreU32(base, address + 9644, v.address); }
-  void set_pages(uint32_t v) const { guest::StoreU32(base, address + 9644, v); }
   uint32_t pages_address() const { return address + 9644; }
+  template <typename T = PageObject>
+  T pages() const { return T(base, on_host() ? data()->pages : guest::LoadU32(base, address + 9644)); }
+  void set_pages(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->pages = v; else guest::StoreU32(base, address + 9644, v); }
+  void set_pages(uint32_t v) const { if (on_host()) data()->pages = v; else guest::StoreU32(base, address + 9644, v); }
+  uint32_t pages_bits() const { return on_host() ? data()->pages : guest::LoadU32(base, address + 9644); }
+  void set_pages_bits(uint32_t v) const { if (on_host()) data()->pages = v; else guest::StoreU32(base, address + 9644, v); }
   // VirtualAlloc(68) by OnEnter: items 0 to 4
-  template <typename T = FrontEndMenu>
-  T menu() const { return T(base, guest::LoadU32(base, address + 9648)); }
-  void set_menu(const View& v) const { guest::StoreU32(base, address + 9648, v.address); }
-  void set_menu(uint32_t v) const { guest::StoreU32(base, address + 9648, v); }
   uint32_t menu_address() const { return address + 9648; }
+  template <typename T = FrontEndMenu>
+  T menu() const { return T(base, on_host() ? data()->menu : guest::LoadU32(base, address + 9648)); }
+  void set_menu(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->menu = v; else guest::StoreU32(base, address + 9648, v); }
+  void set_menu(uint32_t v) const { if (on_host()) data()->menu = v; else guest::StoreU32(base, address + 9648, v); }
+  uint32_t menu_bits() const { return on_host() ? data()->menu : guest::LoadU32(base, address + 9648); }
+  void set_menu_bits(uint32_t v) const { if (on_host()) data()->menu = v; else guest::StoreU32(base, address + 9648, v); }
   // the item accepted (the menu's cursor; Show puts the cursor back on it)
-  uint32_t item_picked() const { return guest::LoadU32(base, address + 9652); }
-  void set_item_picked(uint32_t v) const { guest::StoreU32(base, address + 9652, v); }
   uint32_t item_picked_address() const { return address + 9652; }
+  uint32_t item_picked() const { return on_host() ? uint32_t(data()->item_picked) : uint32_t(guest::LoadU32(base, address + 9652)); }
+  void set_item_picked(uint32_t v) const { if (on_host()) data()->item_picked = v; else guest::StoreU32(base, address + 9652, v); }
+  uint32_t item_picked_bits() const { return on_host() ? data()->item_picked : guest::LoadU32(base, address + 9652); }
+  void set_item_picked_bits(uint32_t v) const { if (on_host()) data()->item_picked = v; else guest::StoreU32(base, address + 9652, v); }
   // 0 when a quit confirm is asked (MenuPage, OnDialogClosed); readers not found
-  uint32_t unknown_9656() const { return guest::LoadU32(base, address + 9656); }
-  void set_unknown_9656(uint32_t v) const { guest::StoreU32(base, address + 9656, v); }
   uint32_t unknown_9656_address() const { return address + 9656; }
+  uint32_t unknown_9656() const { return on_host() ? uint32_t(data()->unknown_9656) : uint32_t(guest::LoadU32(base, address + 9656)); }
+  void set_unknown_9656(uint32_t v) const { if (on_host()) data()->unknown_9656 = v; else guest::StoreU32(base, address + 9656, v); }
+  uint32_t unknown_9656_bits() const { return on_host() ? data()->unknown_9656 : guest::LoadU32(base, address + 9656); }
+  void set_unknown_9656_bits(uint32_t v) const { if (on_host()) data()->unknown_9656 = v; else guest::StoreU32(base, address + 9656, v); }
   // 4 the first quit confirm, 5 the second, -1 none (OnDialogClosed)
-  uint32_t confirm_asked() const { return guest::LoadU32(base, address + 9664); }
-  void set_confirm_asked(uint32_t v) const { guest::StoreU32(base, address + 9664, v); }
   uint32_t confirm_asked_address() const { return address + 9664; }
+  uint32_t confirm_asked() const { return on_host() ? uint32_t(data()->confirm_asked) : uint32_t(guest::LoadU32(base, address + 9664)); }
+  void set_confirm_asked(uint32_t v) const { if (on_host()) data()->confirm_asked = v; else guest::StoreU32(base, address + 9664, v); }
+  uint32_t confirm_asked_bits() const { return on_host() ? data()->confirm_asked : guest::LoadU32(base, address + 9664); }
+  void set_confirm_asked_bits(uint32_t v) const { if (on_host()) data()->confirm_asked = v; else guest::StoreU32(base, address + 9664, v); }
 };
 
 // embedded; measure: Type7Screen0
+#pragma pack(push, 1)
+struct Type7Screen0Data {
+  uint32_t vtable = 0;  // +0
+  uint8_t machine[9600] = {};  // +4, guest order
+  uint32_t transition_count = 0;  // +9604
+  uint32_t state = 0;  // +9608
+  uint32_t loaded = 0;  // +9612
+  uint32_t reenter = 0;  // +9616
+  uint32_t delete_movie = 0;  // +9620
+  uint8_t pad_9624[20] = {};
+  uint32_t words = 0;  // +9644
+  uint32_t pages = 0;  // +9648
+  uint32_t menu = 0;  // +9652
+  uint32_t item_picked = 0;  // +9656
+};
+#pragma pack(pop)
+static_assert(sizeof(Type7Screen0Data) == 9660);
+inline constexpr memory::LayoutField kType7Screen0Fields[] = {{0, 4}, {9604, 4}, {9608, 4}, {9612, 4}, {9616, 4}, {9620, 4}, {9644, 4}, {9648, 4}, {9652, 4}, {9656, 4}};
+inline constexpr memory::Layout kType7Screen0Layout = {kType7Screen0Fields, 10};
+
 struct Type7Screen0 : View {
   using View::View;
   static constexpr uint32_t kSize = 9660;
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
   static constexpr uint32_t kVtable = 0x82010B5C;
+  Type7Screen0Data* data() const { return static_cast<Type7Screen0Data*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static Type7Screen0 New(uint8_t* base) {
+    return Type7Screen0(base, memory::MakeHandle(new Type7Screen0Data(), sizeof(Type7Screen0Data), "Type7Screen0", &kType7Screen0Layout));
+  }
+  template <uint32_t Stride = kSize>
+  static Type7Screen0 NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(Type7Screen0Data) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<Type7Screen0Data*>(::operator new(sizeof(Type7Screen0Data) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) Type7Screen0Data();
+    return Type7Screen0(base, memory::MakeHandle(p, sizeof(Type7Screen0Data) * count, "Type7Screen0", &kType7Screen0Layout, sizeof(Type7Screen0Data)));
+  }
+  Type7Screen0 at(uint32_t i) const { return Type7Screen0(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kType7Screen0Layout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kType7Screen0Layout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0x82010B5C (the empty base)
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
+  uint32_t vtable() const { return on_host() ? uint32_t(data()->vtable) : uint32_t(guest::LoadU32(base, address + 0)); }
+  void set_vtable(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable_bits() const { return on_host() ? data()->vtable : guest::LoadU32(base, address + 0); }
+  void set_vtable_bits(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
   // the machine's transitions (StateMachine, game-modes.toml)
   uint32_t machine_address() const { return address + 4; }
-  uint32_t transition_count() const { return guest::LoadU32(base, address + 9604); }
-  void set_transition_count(uint32_t v) const { guest::StoreU32(base, address + 9604, v); }
+  uint8_t* machine() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 4 : guest::Pointer(base, address + 4); }
   uint32_t transition_count_address() const { return address + 9604; }
+  uint32_t transition_count() const { return on_host() ? uint32_t(data()->transition_count) : uint32_t(guest::LoadU32(base, address + 9604)); }
+  void set_transition_count(uint32_t v) const { if (on_host()) data()->transition_count = v; else guest::StoreU32(base, address + 9604, v); }
+  uint32_t transition_count_bits() const { return on_host() ? data()->transition_count : guest::LoadU32(base, address + 9604); }
+  void set_transition_count_bits(uint32_t v) const { if (on_host()) data()->transition_count = v; else guest::StoreU32(base, address + 9604, v); }
   // as Type6Screen0's
-  uint32_t state() const { return guest::LoadU32(base, address + 9608); }
-  void set_state(uint32_t v) const { guest::StoreU32(base, address + 9608, v); }
   uint32_t state_address() const { return address + 9608; }
+  uint32_t state() const { return on_host() ? uint32_t(data()->state) : uint32_t(guest::LoadU32(base, address + 9608)); }
+  void set_state(uint32_t v) const { if (on_host()) data()->state = v; else guest::StoreU32(base, address + 9608, v); }
+  uint32_t state_bits() const { return on_host() ? data()->state : guest::LoadU32(base, address + 9608); }
+  void set_state_bits(uint32_t v) const { if (on_host()) data()->state = v; else guest::StoreU32(base, address + 9608, v); }
   // movie 22 loaded
-  uint32_t loaded() const { return guest::LoadU32(base, address + 9612); }
-  void set_loaded(uint32_t v) const { guest::StoreU32(base, address + 9612, v); }
   uint32_t loaded_address() const { return address + 9612; }
+  uint32_t loaded() const { return on_host() ? uint32_t(data()->loaded) : uint32_t(guest::LoadU32(base, address + 9612)); }
+  void set_loaded(uint32_t v) const { if (on_host()) data()->loaded = v; else guest::StoreU32(base, address + 9612, v); }
+  uint32_t loaded_bits() const { return on_host() ? data()->loaded : guest::LoadU32(base, address + 9612); }
+  void set_loaded_bits(uint32_t v) const { if (on_host()) data()->loaded = v; else guest::StoreU32(base, address + 9612, v); }
   // open at once (OnEnter: state 1, else 9)
-  uint32_t reenter() const { return guest::LoadU32(base, address + 9616); }
-  void set_reenter(uint32_t v) const { guest::StoreU32(base, address + 9616, v); }
   uint32_t reenter_address() const { return address + 9616; }
+  uint32_t reenter() const { return on_host() ? uint32_t(data()->reenter) : uint32_t(guest::LoadU32(base, address + 9616)); }
+  void set_reenter(uint32_t v) const { if (on_host()) data()->reenter = v; else guest::StoreU32(base, address + 9616, v); }
+  uint32_t reenter_bits() const { return on_host() ? data()->reenter : guest::LoadU32(base, address + 9616); }
+  void set_reenter_bits(uint32_t v) const { if (on_host()) data()->reenter = v; else guest::StoreU32(base, address + 9616, v); }
   // Suspend deletes movie 22
-  uint32_t delete_movie() const { return guest::LoadU32(base, address + 9620); }
-  void set_delete_movie(uint32_t v) const { guest::StoreU32(base, address + 9620, v); }
   uint32_t delete_movie_address() const { return address + 9620; }
+  uint32_t delete_movie() const { return on_host() ? uint32_t(data()->delete_movie) : uint32_t(guest::LoadU32(base, address + 9620)); }
+  void set_delete_movie(uint32_t v) const { if (on_host()) data()->delete_movie = v; else guest::StoreU32(base, address + 9620, v); }
+  uint32_t delete_movie_bits() const { return on_host() ? data()->delete_movie : guest::LoadU32(base, address + 9620); }
+  void set_delete_movie_bits(uint32_t v) const { if (on_host()) data()->delete_movie = v; else guest::StoreU32(base, address + 9620, v); }
   // VirtualAlloc(76) by OnEnter
-  template <typename T = Type67Screen0Words>
-  T words() const { return T(base, guest::LoadU32(base, address + 9644)); }
-  void set_words(const View& v) const { guest::StoreU32(base, address + 9644, v.address); }
-  void set_words(uint32_t v) const { guest::StoreU32(base, address + 9644, v); }
   uint32_t words_address() const { return address + 9644; }
+  template <typename T = Type67Screen0Words>
+  T words() const { return T(base, on_host() ? data()->words : guest::LoadU32(base, address + 9644)); }
+  void set_words(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->words = v; else guest::StoreU32(base, address + 9644, v); }
+  void set_words(uint32_t v) const { if (on_host()) data()->words = v; else guest::StoreU32(base, address + 9644, v); }
+  uint32_t words_bits() const { return on_host() ? data()->words : guest::LoadU32(base, address + 9644); }
+  void set_words_bits(uint32_t v) const { if (on_host()) data()->words = v; else guest::StoreU32(base, address + 9644, v); }
   // VirtualAlloc(28) by OnEnter: the page state
-  template <typename T = PageObject>
-  T pages() const { return T(base, guest::LoadU32(base, address + 9648)); }
-  void set_pages(const View& v) const { guest::StoreU32(base, address + 9648, v.address); }
-  void set_pages(uint32_t v) const { guest::StoreU32(base, address + 9648, v); }
   uint32_t pages_address() const { return address + 9648; }
+  template <typename T = PageObject>
+  T pages() const { return T(base, on_host() ? data()->pages : guest::LoadU32(base, address + 9648)); }
+  void set_pages(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->pages = v; else guest::StoreU32(base, address + 9648, v); }
+  void set_pages(uint32_t v) const { if (on_host()) data()->pages = v; else guest::StoreU32(base, address + 9648, v); }
+  uint32_t pages_bits() const { return on_host() ? data()->pages : guest::LoadU32(base, address + 9648); }
+  void set_pages_bits(uint32_t v) const { if (on_host()) data()->pages = v; else guest::StoreU32(base, address + 9648, v); }
   // VirtualAlloc(68) by OnEnter: items 0 to 3
-  template <typename T = FrontEndMenu>
-  T menu() const { return T(base, guest::LoadU32(base, address + 9652)); }
-  void set_menu(const View& v) const { guest::StoreU32(base, address + 9652, v.address); }
-  void set_menu(uint32_t v) const { guest::StoreU32(base, address + 9652, v); }
   uint32_t menu_address() const { return address + 9652; }
+  template <typename T = FrontEndMenu>
+  T menu() const { return T(base, on_host() ? data()->menu : guest::LoadU32(base, address + 9652)); }
+  void set_menu(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->menu = v; else guest::StoreU32(base, address + 9652, v); }
+  void set_menu(uint32_t v) const { if (on_host()) data()->menu = v; else guest::StoreU32(base, address + 9652, v); }
+  uint32_t menu_bits() const { return on_host() ? data()->menu : guest::LoadU32(base, address + 9652); }
+  void set_menu_bits(uint32_t v) const { if (on_host()) data()->menu = v; else guest::StoreU32(base, address + 9652, v); }
   // the item accepted
-  uint32_t item_picked() const { return guest::LoadU32(base, address + 9656); }
-  void set_item_picked(uint32_t v) const { guest::StoreU32(base, address + 9656, v); }
   uint32_t item_picked_address() const { return address + 9656; }
+  uint32_t item_picked() const { return on_host() ? uint32_t(data()->item_picked) : uint32_t(guest::LoadU32(base, address + 9656)); }
+  void set_item_picked(uint32_t v) const { if (on_host()) data()->item_picked = v; else guest::StoreU32(base, address + 9656, v); }
+  uint32_t item_picked_bits() const { return on_host() ? data()->item_picked : guest::LoadU32(base, address + 9656); }
+  void set_item_picked_bits(uint32_t v) const { if (on_host()) data()->item_picked = v; else guest::StoreU32(base, address + 9656, v); }
 };
 
 // allocated; measure: new<76>@Type6Screen0::OnEnter, new<76>@Type7Screen0::OnEnter
@@ -1105,12 +1227,42 @@ struct Type67DialogAt9672 : View {
 };
 
 // embedded; measure: Type6Screens@+4
+#pragma pack(push, 1)
+struct Type6Screen0At4Data {
+  uint8_t pad_0[9604] = {};
+  uint32_t unknown_9604 = 0;  // +9604
+};
+#pragma pack(pop)
+static_assert(sizeof(Type6Screen0At4Data) == 9608);
+inline constexpr memory::LayoutField kType6Screen0At4Fields[] = {{9604, 4}};
+inline constexpr memory::Layout kType6Screen0At4Layout = {kType6Screen0At4Fields, 1};
+
 struct Type6Screen0At4 : View {
   using View::View;
   static constexpr uint32_t kSize = 9608;
-  uint32_t unknown_9604() const { return guest::LoadU32(base, address + 9604); }
-  void set_unknown_9604(uint32_t v) const { guest::StoreU32(base, address + 9604, v); }
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  Type6Screen0At4Data* data() const { return static_cast<Type6Screen0At4Data*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static Type6Screen0At4 New(uint8_t* base) {
+    return Type6Screen0At4(base, memory::MakeHandle(new Type6Screen0At4Data(), sizeof(Type6Screen0At4Data), "Type6Screen0At4", &kType6Screen0At4Layout));
+  }
+  template <uint32_t Stride = kSize>
+  static Type6Screen0At4 NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(Type6Screen0At4Data) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<Type6Screen0At4Data*>(::operator new(sizeof(Type6Screen0At4Data) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) Type6Screen0At4Data();
+    return Type6Screen0At4(base, memory::MakeHandle(p, sizeof(Type6Screen0At4Data) * count, "Type6Screen0At4", &kType6Screen0At4Layout, sizeof(Type6Screen0At4Data)));
+  }
+  Type6Screen0At4 at(uint32_t i) const { return Type6Screen0At4(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kType6Screen0At4Layout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kType6Screen0At4Layout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t unknown_9604_address() const { return address + 9604; }
+  uint32_t unknown_9604() const { return on_host() ? uint32_t(data()->unknown_9604) : uint32_t(guest::LoadU32(base, address + 9604)); }
+  void set_unknown_9604(uint32_t v) const { if (on_host()) data()->unknown_9604 = v; else guest::StoreU32(base, address + 9604, v); }
+  uint32_t unknown_9604_bits() const { return on_host() ? data()->unknown_9604 : guest::LoadU32(base, address + 9604); }
+  void set_unknown_9604_bits(uint32_t v) const { if (on_host()) data()->unknown_9604 = v; else guest::StoreU32(base, address + 9604, v); }
 };
 
 // embedded; measure: Type7Mode.+816@+9664
@@ -1123,15 +1275,48 @@ struct Type67DialogAt9664 : View {
 };
 
 // embedded; measure: Type7Screens@+4
+#pragma pack(push, 1)
+struct Type7Screen0At4Data {
+  uint32_t unknown_0 = 0;  // +0
+  uint8_t pad_4[9604] = {};
+  uint32_t unknown_9608 = 0;  // +9608
+};
+#pragma pack(pop)
+static_assert(sizeof(Type7Screen0At4Data) == 9612);
+inline constexpr memory::LayoutField kType7Screen0At4Fields[] = {{0, 4}, {9608, 4}};
+inline constexpr memory::Layout kType7Screen0At4Layout = {kType7Screen0At4Fields, 2};
+
 struct Type7Screen0At4 : View {
   using View::View;
   static constexpr uint32_t kSize = 9612;
-  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
-  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  Type7Screen0At4Data* data() const { return static_cast<Type7Screen0At4Data*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static Type7Screen0At4 New(uint8_t* base) {
+    return Type7Screen0At4(base, memory::MakeHandle(new Type7Screen0At4Data(), sizeof(Type7Screen0At4Data), "Type7Screen0At4", &kType7Screen0At4Layout));
+  }
+  template <uint32_t Stride = kSize>
+  static Type7Screen0At4 NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(Type7Screen0At4Data) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<Type7Screen0At4Data*>(::operator new(sizeof(Type7Screen0At4Data) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) Type7Screen0At4Data();
+    return Type7Screen0At4(base, memory::MakeHandle(p, sizeof(Type7Screen0At4Data) * count, "Type7Screen0At4", &kType7Screen0At4Layout, sizeof(Type7Screen0At4Data)));
+  }
+  Type7Screen0At4 at(uint32_t i) const { return Type7Screen0At4(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kType7Screen0At4Layout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kType7Screen0At4Layout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t unknown_0_address() const { return address + 0; }
-  uint32_t unknown_9608() const { return guest::LoadU32(base, address + 9608); }
-  void set_unknown_9608(uint32_t v) const { guest::StoreU32(base, address + 9608, v); }
+  uint32_t unknown_0() const { return on_host() ? uint32_t(data()->unknown_0) : uint32_t(guest::LoadU32(base, address + 0)); }
+  void set_unknown_0(uint32_t v) const { if (on_host()) data()->unknown_0 = v; else guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_bits() const { return on_host() ? data()->unknown_0 : guest::LoadU32(base, address + 0); }
+  void set_unknown_0_bits(uint32_t v) const { if (on_host()) data()->unknown_0 = v; else guest::StoreU32(base, address + 0, v); }
   uint32_t unknown_9608_address() const { return address + 9608; }
+  uint32_t unknown_9608() const { return on_host() ? uint32_t(data()->unknown_9608) : uint32_t(guest::LoadU32(base, address + 9608)); }
+  void set_unknown_9608(uint32_t v) const { if (on_host()) data()->unknown_9608 = v; else guest::StoreU32(base, address + 9608, v); }
+  uint32_t unknown_9608_bits() const { return on_host() ? data()->unknown_9608 : guest::LoadU32(base, address + 9608); }
+  void set_unknown_9608_bits(uint32_t v) const { if (on_host()) data()->unknown_9608 = v; else guest::StoreU32(base, address + 9608, v); }
 };
 
 // The image words docs/functions/type6-type7-modes.md's code uses.

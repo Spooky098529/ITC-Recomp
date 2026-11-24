@@ -1041,9 +1041,9 @@ lifted::Result f8222FCA0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r11,r11,28928
   r11 = uint64_t(int64_t(int64_t(r11) + 28928));
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, schema::Type5ModeBlock(base, uint32_t(r11) - 28928).answer_word0_address());
+  r10 = schema::Type5ModeBlock(base, uint32_t(r11) - 28928).answer_word0_bits();
   // lwz r11,4(r11)
-  r11 = guest::LoadU32(base, schema::Type5ModeBlock(base, uint32_t(r11) - 28928).answer_next_type_address());
+  r11 = schema::Type5ModeBlock(base, uint32_t(r11) - 28928).answer_next_type_bits();
   // stw r10,0(r31)
   guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r10));
   // stw r11,4(r31)
@@ -1758,7 +1758,7 @@ lifted::Result f82233948(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r31,r3
   r31 = r3;
   // lwz r11,9616(r31)
-  r11 = guest::LoadU32(base, schema::Type6Screen0(base, uint32_t(r31)).delete_movie_address());
+  r11 = schema::Type6Screen0(base, uint32_t(r31)).delete_movie_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x82233978
@@ -1771,7 +1771,7 @@ lifted::Result f82233948(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // stw r11,9608(r31)
-  guest::StoreU32(base, schema::Type6Screen0(base, uint32_t(r31)).loaded_address(), uint32_t(r11));
+  schema::Type6Screen0(base, uint32_t(r31)).set_loaded_bits(uint32_t(r11));
 loc_82233978:
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
@@ -1790,7 +1790,7 @@ void f822339B0(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_822339B0 (lifted)");
   uint64_t r10 = 0, r11 = 0;
   // lwz r11,9640(r3)
-  r11 = guest::LoadU32(base, schema::Type6Screen0(base, uint32_t(r3)).words_address());
+  r11 = schema::Type6Screen0(base, uint32_t(r3)).words_bits();
   // li r10,2
   r10 = uint64_t(int64_t(2));
   // stw r10,72(r11)
@@ -1807,7 +1807,7 @@ uint64_t f82234928(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   lifted::Cr cr0;
   uint8_t so = 0;
   // lwz r11,9644(r3)
-  r11 = guest::LoadU32(base, schema::Type6Screen0(base, uint32_t(r3)).pages_address());
+  r11 = schema::Type6Screen0(base, uint32_t(r3)).pages_bits();
   // lwz r10,0(r11)
   r10 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
   // cmpwi r10,0
@@ -2765,7 +2765,7 @@ lifted::Result f82243EE0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r31,r3
   r31 = r3;
   // lwz r11,9620(r31)
-  r11 = guest::LoadU32(base, schema::Type7Screen0(base, uint32_t(r31)).delete_movie_address());
+  r11 = schema::Type7Screen0(base, uint32_t(r31)).delete_movie_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x82243f10
@@ -2778,7 +2778,7 @@ lifted::Result f82243EE0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // stw r11,9612(r31)
-  guest::StoreU32(base, schema::Type7Screen0(base, uint32_t(r31)).loaded_address(), uint32_t(r11));
+  schema::Type7Screen0(base, uint32_t(r31)).set_loaded_bits(uint32_t(r11));
 loc_82243F10:
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
@@ -2797,7 +2797,7 @@ void f82243F38(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_82243F38 (lifted)");
   uint64_t r10 = 0, r11 = 0;
   // lwz r11,9644(r3)
-  r11 = guest::LoadU32(base, schema::Type7Screen0(base, uint32_t(r3)).words_address());
+  r11 = schema::Type7Screen0(base, uint32_t(r3)).words_bits();
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // stw r10,72(r11)
@@ -2811,7 +2811,7 @@ void f82243F48(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_82243F48 (lifted)");
   uint64_t r10 = 0, r11 = 0;
   // lwz r11,9644(r3)
-  r11 = guest::LoadU32(base, schema::Type7Screen0(base, uint32_t(r3)).words_address());
+  r11 = schema::Type7Screen0(base, uint32_t(r3)).words_bits();
   // li r10,2
   r10 = uint64_t(int64_t(2));
   // stw r10,72(r11)

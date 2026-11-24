@@ -9,266 +9,529 @@
 namespace schema {
 
 // allocated; measure: BoxShape, Shape, sub_820BAB48.r4, sub_820BAB48.ret, sub_820BB688.r3, sub_820BB688.r4, BoxShape::Place.r5, sub_822BE2C8.ret, sub_820911F8.ret, sub_820BA1D0.r3, sub_820B9C30.r3, sub_820BC560.r5, Part464::Restore.r4, Part464::Save.r4, Vehicle.+344, WallQuery.+12.+0, AiDriver.+160.+344, CollisionShape::Place.r3.+8
+#pragma pack(push, 1)
+struct BoxShapeData {
+  uint32_t vtable = 0;  // +0
+  uint8_t pad_4[12] = {};
+  float car_float_16 = 0;  // +16
+  float car_float_20 = 0;  // +20
+  float car_float_24 = 0;  // +24
+  float friction = 0;  // +28
+  float radius = 0;  // +32
+  uint8_t pad_36[12] = {};
+  float center_x = 0;  // +48
+  float center_y = 0;  // +52
+  float center_z = 0;  // +56
+  float center_w = 0;  // +60
+  float axis0_x = 0;  // +64
+  float axis0_y = 0;  // +68
+  float axis0_z = 0;  // +72
+  float axis0_w = 0;  // +76
+  float axis1_x = 0;  // +80
+  float axis1_y = 0;  // +84
+  float axis1_z = 0;  // +88
+  float axis1_w = 0;  // +92
+  float axis2_x = 0;  // +96
+  float axis2_y = 0;  // +100
+  float axis2_z = 0;  // +104
+  float axis2_w = 0;  // +108
+  uint16_t unknown_112 = 0;  // +112
+  uint16_t unknown_114 = 0;  // +114
+  uint8_t pad_116[12] = {};
+  float half_extent_x = 0;  // +128
+  float half_extent_y = 0;  // +132
+  float half_extent_z = 0;  // +136
+  float half_extent_w = 0;  // +140
+  float inverse_half_extent_x = 0;  // +144
+  float inverse_half_extent_y = 0;  // +148
+  float inverse_half_extent_z = 0;  // +152
+  float inverse_half_extent_w = 0;  // +156
+  uint32_t lower_corner_position_0 = 0;  // +160
+  uint32_t lower_corner_position_1 = 0;  // +164
+  uint32_t lower_corner_position_2 = 0;  // +168
+  uint32_t lower_corner_position_3 = 0;  // +172
+  float corner_x = 0;  // +176
+  float corner_y = 0;  // +180
+  float corner_z = 0;  // +184
+  float corner_w = 0;  // +188
+  uint8_t pad_192[112] = {};
+  float face_px_distance = 0;  // +304
+  uint8_t pad_308[12] = {};
+  float face_px_normal_x = 0;  // +320
+  float face_px_normal_y = 0;  // +324
+  float face_px_normal_z = 0;  // +328
+  float face_px_normal_w = 0;  // +332
+  float face_py_distance = 0;  // +336
+  uint8_t pad_340[12] = {};
+  float face_py_normal_x = 0;  // +352
+  float face_py_normal_y = 0;  // +356
+  float face_py_normal_z = 0;  // +360
+  float face_py_normal_w = 0;  // +364
+  float face_pz_distance = 0;  // +368
+  uint8_t pad_372[12] = {};
+  float face_pz_normal_x = 0;  // +384
+  float face_pz_normal_y = 0;  // +388
+  float face_pz_normal_z = 0;  // +392
+  float face_pz_normal_w = 0;  // +396
+  float face_nx_distance = 0;  // +400
+  uint8_t pad_404[12] = {};
+  float face_nx_normal_x = 0;  // +416
+  float face_nx_normal_y = 0;  // +420
+  float face_nx_normal_z = 0;  // +424
+  float face_nx_normal_w = 0;  // +428
+  float face_ny_distance = 0;  // +432
+  uint8_t pad_436[12] = {};
+  float face_ny_normal_x = 0;  // +448
+  float face_ny_normal_y = 0;  // +452
+  float face_ny_normal_z = 0;  // +456
+  float face_ny_normal_w = 0;  // +460
+  float face_nz_distance = 0;  // +464
+  uint8_t pad_468[12] = {};
+  float face_nz_normal_x = 0;  // +480
+  float face_nz_normal_y = 0;  // +484
+  float face_nz_normal_z = 0;  // +488
+  float face_nz_normal_w = 0;  // +492
+};
+#pragma pack(pop)
+static_assert(sizeof(BoxShapeData) == 496);
+inline constexpr memory::LayoutField kBoxShapeFields[] = {{0, 4}, {16, 4}, {20, 4}, {24, 4}, {28, 4}, {32, 4}, {48, 4}, {52, 4}, {56, 4}, {60, 4}, {64, 4}, {68, 4}, {72, 4}, {76, 4}, {80, 4}, {84, 4}, {88, 4}, {92, 4}, {96, 4}, {100, 4}, {104, 4}, {108, 4}, {112, 2}, {114, 2}, {128, 4}, {132, 4}, {136, 4}, {140, 4}, {144, 4}, {148, 4}, {152, 4}, {156, 4}, {160, 4}, {164, 4}, {168, 4}, {172, 4}, {176, 4}, {180, 4}, {184, 4}, {188, 4}, {304, 4}, {320, 4}, {324, 4}, {328, 4}, {332, 4}, {336, 4}, {352, 4}, {356, 4}, {360, 4}, {364, 4}, {368, 4}, {384, 4}, {388, 4}, {392, 4}, {396, 4}, {400, 4}, {416, 4}, {420, 4}, {424, 4}, {428, 4}, {432, 4}, {448, 4}, {452, 4}, {456, 4}, {460, 4}, {464, 4}, {480, 4}, {484, 4}, {488, 4}, {492, 4}};
+inline constexpr memory::Layout kBoxShapeLayout = {kBoxShapeFields, 70};
+
 struct BoxShape : View {
   using View::View;
   static constexpr uint32_t kSize = 496;
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
   static constexpr uint32_t kVtable = 0x82002B30;
+  BoxShapeData* data() const { return static_cast<BoxShapeData*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static BoxShape New(uint8_t* base) {
+    return BoxShape(base, memory::MakeHandle(new BoxShapeData(), sizeof(BoxShapeData), "BoxShape", &kBoxShapeLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static BoxShape NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(BoxShapeData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<BoxShapeData*>(::operator new(sizeof(BoxShapeData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) BoxShapeData();
+    return BoxShape(base, memory::MakeHandle(p, sizeof(BoxShapeData) * count, "BoxShape", &kBoxShapeLayout, sizeof(BoxShapeData)));
+  }
+  BoxShape at(uint32_t i) const { return BoxShape(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kBoxShapeLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kBoxShapeLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0x82002B30 (a box); 0x82002AA8 (Shape's) once destroyed or before BoxShape::BoxShape sets it
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
+  uint32_t vtable() const { return on_host() ? uint32_t(data()->vtable) : uint32_t(guest::LoadU32(base, address + 0)); }
+  void set_vtable(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable_bits() const { return on_host() ? data()->vtable : guest::LoadU32(base, address + 0); }
+  void set_vtable_bits(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
   // set from the car data (Shape::Shape: 0.5)
-  float car_float_16() const { return guest::LoadFloat(base, address + 16); }
-  void set_car_float_16(float v) const { guest::StoreFloat(base, address + 16, v); }
   uint32_t car_float_16_address() const { return address + 16; }
+  float car_float_16() const { return on_host() ? float(data()->car_float_16) : float(guest::LoadFloat(base, address + 16)); }
+  void set_car_float_16(float v) const { if (on_host()) data()->car_float_16 = v; else guest::StoreFloat(base, address + 16, v); }
+  uint32_t car_float_16_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->car_float_16) : guest::LoadU32(base, address + 16); }
+  void set_car_float_16_bits(uint32_t v) const { if (on_host()) data()->car_float_16 = std::bit_cast<float>(v); else guest::StoreU32(base, address + 16, v); }
   // set from the car data (Shape::Shape: 0.5)
-  float car_float_20() const { return guest::LoadFloat(base, address + 20); }
-  void set_car_float_20(float v) const { guest::StoreFloat(base, address + 20, v); }
   uint32_t car_float_20_address() const { return address + 20; }
+  float car_float_20() const { return on_host() ? float(data()->car_float_20) : float(guest::LoadFloat(base, address + 20)); }
+  void set_car_float_20(float v) const { if (on_host()) data()->car_float_20 = v; else guest::StoreFloat(base, address + 20, v); }
+  uint32_t car_float_20_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->car_float_20) : guest::LoadU32(base, address + 20); }
+  void set_car_float_20_bits(uint32_t v) const { if (on_host()) data()->car_float_20 = std::bit_cast<float>(v); else guest::StoreU32(base, address + 20, v); }
   // set from the car data (Shape::Shape: [0x82002968])
-  float car_float_24() const { return guest::LoadFloat(base, address + 24); }
-  void set_car_float_24(float v) const { guest::StoreFloat(base, address + 24, v); }
   uint32_t car_float_24_address() const { return address + 24; }
+  float car_float_24() const { return on_host() ? float(data()->car_float_24) : float(guest::LoadFloat(base, address + 24)); }
+  void set_car_float_24(float v) const { if (on_host()) data()->car_float_24 = v; else guest::StoreFloat(base, address + 24, v); }
+  uint32_t car_float_24_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->car_float_24) : guest::LoadU32(base, address + 24); }
+  void set_car_float_24_bits(uint32_t v) const { if (on_host()) data()->car_float_24 = std::bit_cast<float>(v); else guest::StoreU32(base, address + 24, v); }
   // set from the car data, read by CollisionObject::Respond (Shape::Shape: [0x82002204])
-  float friction() const { return guest::LoadFloat(base, address + 28); }
-  void set_friction(float v) const { guest::StoreFloat(base, address + 28, v); }
   uint32_t friction_address() const { return address + 28; }
+  float friction() const { return on_host() ? float(data()->friction) : float(guest::LoadFloat(base, address + 28)); }
+  void set_friction(float v) const { if (on_host()) data()->friction = v; else guest::StoreFloat(base, address + 28, v); }
+  uint32_t friction_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->friction) : guest::LoadU32(base, address + 28); }
+  void set_friction_bits(uint32_t v) const { if (on_host()) data()->friction = std::bit_cast<float>(v); else guest::StoreU32(base, address + 28, v); }
   // the bounding sphere's radius
-  float radius() const { return guest::LoadFloat(base, address + 32); }
-  void set_radius(float v) const { guest::StoreFloat(base, address + 32, v); }
   uint32_t radius_address() const { return address + 32; }
+  float radius() const { return on_host() ? float(data()->radius) : float(guest::LoadFloat(base, address + 32)); }
+  void set_radius(float v) const { if (on_host()) data()->radius = v; else guest::StoreFloat(base, address + 32, v); }
+  uint32_t radius_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->radius) : guest::LoadU32(base, address + 32); }
+  void set_radius_bits(uint32_t v) const { if (on_host()) data()->radius = std::bit_cast<float>(v); else guest::StoreU32(base, address + 32, v); }
   // the center (w 0.0 from Shape::Shape)
-  float center_x() const { return guest::LoadFloat(base, address + 48); }
-  void set_center_x(float v) const { guest::StoreFloat(base, address + 48, v); }
   uint32_t center_x_address() const { return address + 48; }
-  float center_y() const { return guest::LoadFloat(base, address + 52); }
-  void set_center_y(float v) const { guest::StoreFloat(base, address + 52, v); }
+  float center_x() const { return on_host() ? float(data()->center_x) : float(guest::LoadFloat(base, address + 48)); }
+  void set_center_x(float v) const { if (on_host()) data()->center_x = v; else guest::StoreFloat(base, address + 48, v); }
+  uint32_t center_x_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->center_x) : guest::LoadU32(base, address + 48); }
+  void set_center_x_bits(uint32_t v) const { if (on_host()) data()->center_x = std::bit_cast<float>(v); else guest::StoreU32(base, address + 48, v); }
   uint32_t center_y_address() const { return address + 52; }
-  float center_z() const { return guest::LoadFloat(base, address + 56); }
-  void set_center_z(float v) const { guest::StoreFloat(base, address + 56, v); }
+  float center_y() const { return on_host() ? float(data()->center_y) : float(guest::LoadFloat(base, address + 52)); }
+  void set_center_y(float v) const { if (on_host()) data()->center_y = v; else guest::StoreFloat(base, address + 52, v); }
+  uint32_t center_y_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->center_y) : guest::LoadU32(base, address + 52); }
+  void set_center_y_bits(uint32_t v) const { if (on_host()) data()->center_y = std::bit_cast<float>(v); else guest::StoreU32(base, address + 52, v); }
   uint32_t center_z_address() const { return address + 56; }
-  float center_w() const { return guest::LoadFloat(base, address + 60); }
-  void set_center_w(float v) const { guest::StoreFloat(base, address + 60, v); }
+  float center_z() const { return on_host() ? float(data()->center_z) : float(guest::LoadFloat(base, address + 56)); }
+  void set_center_z(float v) const { if (on_host()) data()->center_z = v; else guest::StoreFloat(base, address + 56, v); }
+  uint32_t center_z_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->center_z) : guest::LoadU32(base, address + 56); }
+  void set_center_z_bits(uint32_t v) const { if (on_host()) data()->center_z = std::bit_cast<float>(v); else guest::StoreU32(base, address + 56, v); }
   uint32_t center_w_address() const { return address + 60; }
+  float center_w() const { return on_host() ? float(data()->center_w) : float(guest::LoadFloat(base, address + 60)); }
+  void set_center_w(float v) const { if (on_host()) data()->center_w = v; else guest::StoreFloat(base, address + 60, v); }
+  uint32_t center_w_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->center_w) : guest::LoadU32(base, address + 60); }
+  void set_center_w_bits(uint32_t v) const { if (on_host()) data()->center_w = std::bit_cast<float>(v); else guest::StoreU32(base, address + 60, v); }
   // the axes: three rows (+64, +80, +96), the identity until placed; a placed copy's are the matrix's rows
-  float axis0_x() const { return guest::LoadFloat(base, address + 64); }
-  void set_axis0_x(float v) const { guest::StoreFloat(base, address + 64, v); }
   uint32_t axis0_x_address() const { return address + 64; }
-  float axis0_y() const { return guest::LoadFloat(base, address + 68); }
-  void set_axis0_y(float v) const { guest::StoreFloat(base, address + 68, v); }
+  float axis0_x() const { return on_host() ? float(data()->axis0_x) : float(guest::LoadFloat(base, address + 64)); }
+  void set_axis0_x(float v) const { if (on_host()) data()->axis0_x = v; else guest::StoreFloat(base, address + 64, v); }
+  uint32_t axis0_x_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->axis0_x) : guest::LoadU32(base, address + 64); }
+  void set_axis0_x_bits(uint32_t v) const { if (on_host()) data()->axis0_x = std::bit_cast<float>(v); else guest::StoreU32(base, address + 64, v); }
   uint32_t axis0_y_address() const { return address + 68; }
-  float axis0_z() const { return guest::LoadFloat(base, address + 72); }
-  void set_axis0_z(float v) const { guest::StoreFloat(base, address + 72, v); }
+  float axis0_y() const { return on_host() ? float(data()->axis0_y) : float(guest::LoadFloat(base, address + 68)); }
+  void set_axis0_y(float v) const { if (on_host()) data()->axis0_y = v; else guest::StoreFloat(base, address + 68, v); }
+  uint32_t axis0_y_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->axis0_y) : guest::LoadU32(base, address + 68); }
+  void set_axis0_y_bits(uint32_t v) const { if (on_host()) data()->axis0_y = std::bit_cast<float>(v); else guest::StoreU32(base, address + 68, v); }
   uint32_t axis0_z_address() const { return address + 72; }
-  float axis0_w() const { return guest::LoadFloat(base, address + 76); }
-  void set_axis0_w(float v) const { guest::StoreFloat(base, address + 76, v); }
+  float axis0_z() const { return on_host() ? float(data()->axis0_z) : float(guest::LoadFloat(base, address + 72)); }
+  void set_axis0_z(float v) const { if (on_host()) data()->axis0_z = v; else guest::StoreFloat(base, address + 72, v); }
+  uint32_t axis0_z_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->axis0_z) : guest::LoadU32(base, address + 72); }
+  void set_axis0_z_bits(uint32_t v) const { if (on_host()) data()->axis0_z = std::bit_cast<float>(v); else guest::StoreU32(base, address + 72, v); }
   uint32_t axis0_w_address() const { return address + 76; }
-  float axis1_x() const { return guest::LoadFloat(base, address + 80); }
-  void set_axis1_x(float v) const { guest::StoreFloat(base, address + 80, v); }
+  float axis0_w() const { return on_host() ? float(data()->axis0_w) : float(guest::LoadFloat(base, address + 76)); }
+  void set_axis0_w(float v) const { if (on_host()) data()->axis0_w = v; else guest::StoreFloat(base, address + 76, v); }
+  uint32_t axis0_w_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->axis0_w) : guest::LoadU32(base, address + 76); }
+  void set_axis0_w_bits(uint32_t v) const { if (on_host()) data()->axis0_w = std::bit_cast<float>(v); else guest::StoreU32(base, address + 76, v); }
   uint32_t axis1_x_address() const { return address + 80; }
-  float axis1_y() const { return guest::LoadFloat(base, address + 84); }
-  void set_axis1_y(float v) const { guest::StoreFloat(base, address + 84, v); }
+  float axis1_x() const { return on_host() ? float(data()->axis1_x) : float(guest::LoadFloat(base, address + 80)); }
+  void set_axis1_x(float v) const { if (on_host()) data()->axis1_x = v; else guest::StoreFloat(base, address + 80, v); }
+  uint32_t axis1_x_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->axis1_x) : guest::LoadU32(base, address + 80); }
+  void set_axis1_x_bits(uint32_t v) const { if (on_host()) data()->axis1_x = std::bit_cast<float>(v); else guest::StoreU32(base, address + 80, v); }
   uint32_t axis1_y_address() const { return address + 84; }
-  float axis1_z() const { return guest::LoadFloat(base, address + 88); }
-  void set_axis1_z(float v) const { guest::StoreFloat(base, address + 88, v); }
+  float axis1_y() const { return on_host() ? float(data()->axis1_y) : float(guest::LoadFloat(base, address + 84)); }
+  void set_axis1_y(float v) const { if (on_host()) data()->axis1_y = v; else guest::StoreFloat(base, address + 84, v); }
+  uint32_t axis1_y_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->axis1_y) : guest::LoadU32(base, address + 84); }
+  void set_axis1_y_bits(uint32_t v) const { if (on_host()) data()->axis1_y = std::bit_cast<float>(v); else guest::StoreU32(base, address + 84, v); }
   uint32_t axis1_z_address() const { return address + 88; }
-  float axis1_w() const { return guest::LoadFloat(base, address + 92); }
-  void set_axis1_w(float v) const { guest::StoreFloat(base, address + 92, v); }
+  float axis1_z() const { return on_host() ? float(data()->axis1_z) : float(guest::LoadFloat(base, address + 88)); }
+  void set_axis1_z(float v) const { if (on_host()) data()->axis1_z = v; else guest::StoreFloat(base, address + 88, v); }
+  uint32_t axis1_z_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->axis1_z) : guest::LoadU32(base, address + 88); }
+  void set_axis1_z_bits(uint32_t v) const { if (on_host()) data()->axis1_z = std::bit_cast<float>(v); else guest::StoreU32(base, address + 88, v); }
   uint32_t axis1_w_address() const { return address + 92; }
-  float axis2_x() const { return guest::LoadFloat(base, address + 96); }
-  void set_axis2_x(float v) const { guest::StoreFloat(base, address + 96, v); }
+  float axis1_w() const { return on_host() ? float(data()->axis1_w) : float(guest::LoadFloat(base, address + 92)); }
+  void set_axis1_w(float v) const { if (on_host()) data()->axis1_w = v; else guest::StoreFloat(base, address + 92, v); }
+  uint32_t axis1_w_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->axis1_w) : guest::LoadU32(base, address + 92); }
+  void set_axis1_w_bits(uint32_t v) const { if (on_host()) data()->axis1_w = std::bit_cast<float>(v); else guest::StoreU32(base, address + 92, v); }
   uint32_t axis2_x_address() const { return address + 96; }
-  float axis2_y() const { return guest::LoadFloat(base, address + 100); }
-  void set_axis2_y(float v) const { guest::StoreFloat(base, address + 100, v); }
+  float axis2_x() const { return on_host() ? float(data()->axis2_x) : float(guest::LoadFloat(base, address + 96)); }
+  void set_axis2_x(float v) const { if (on_host()) data()->axis2_x = v; else guest::StoreFloat(base, address + 96, v); }
+  uint32_t axis2_x_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->axis2_x) : guest::LoadU32(base, address + 96); }
+  void set_axis2_x_bits(uint32_t v) const { if (on_host()) data()->axis2_x = std::bit_cast<float>(v); else guest::StoreU32(base, address + 96, v); }
   uint32_t axis2_y_address() const { return address + 100; }
-  float axis2_z() const { return guest::LoadFloat(base, address + 104); }
-  void set_axis2_z(float v) const { guest::StoreFloat(base, address + 104, v); }
+  float axis2_y() const { return on_host() ? float(data()->axis2_y) : float(guest::LoadFloat(base, address + 100)); }
+  void set_axis2_y(float v) const { if (on_host()) data()->axis2_y = v; else guest::StoreFloat(base, address + 100, v); }
+  uint32_t axis2_y_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->axis2_y) : guest::LoadU32(base, address + 100); }
+  void set_axis2_y_bits(uint32_t v) const { if (on_host()) data()->axis2_y = std::bit_cast<float>(v); else guest::StoreU32(base, address + 100, v); }
   uint32_t axis2_z_address() const { return address + 104; }
-  float axis2_w() const { return guest::LoadFloat(base, address + 108); }
-  void set_axis2_w(float v) const { guest::StoreFloat(base, address + 108, v); }
+  float axis2_z() const { return on_host() ? float(data()->axis2_z) : float(guest::LoadFloat(base, address + 104)); }
+  void set_axis2_z(float v) const { if (on_host()) data()->axis2_z = v; else guest::StoreFloat(base, address + 104, v); }
+  uint32_t axis2_z_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->axis2_z) : guest::LoadU32(base, address + 104); }
+  void set_axis2_z_bits(uint32_t v) const { if (on_host()) data()->axis2_z = std::bit_cast<float>(v); else guest::StoreU32(base, address + 104, v); }
   uint32_t axis2_w_address() const { return address + 108; }
-  uint16_t unknown_112() const { return guest::LoadU16(base, address + 112); }
-  void set_unknown_112(uint16_t v) const { guest::StoreU16(base, address + 112, v); }
+  float axis2_w() const { return on_host() ? float(data()->axis2_w) : float(guest::LoadFloat(base, address + 108)); }
+  void set_axis2_w(float v) const { if (on_host()) data()->axis2_w = v; else guest::StoreFloat(base, address + 108, v); }
+  uint32_t axis2_w_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->axis2_w) : guest::LoadU32(base, address + 108); }
+  void set_axis2_w_bits(uint32_t v) const { if (on_host()) data()->axis2_w = std::bit_cast<float>(v); else guest::StoreU32(base, address + 108, v); }
   uint32_t unknown_112_address() const { return address + 112; }
-  uint16_t unknown_114() const { return guest::LoadU16(base, address + 114); }
-  void set_unknown_114(uint16_t v) const { guest::StoreU16(base, address + 114, v); }
+  uint16_t unknown_112() const { return on_host() ? uint16_t(data()->unknown_112) : uint16_t(guest::LoadU16(base, address + 112)); }
+  void set_unknown_112(uint16_t v) const { if (on_host()) data()->unknown_112 = v; else guest::StoreU16(base, address + 112, v); }
+  uint16_t unknown_112_bits() const { return on_host() ? data()->unknown_112 : guest::LoadU16(base, address + 112); }
+  void set_unknown_112_bits(uint16_t v) const { if (on_host()) data()->unknown_112 = v; else guest::StoreU16(base, address + 112, v); }
   uint32_t unknown_114_address() const { return address + 114; }
+  uint16_t unknown_114() const { return on_host() ? uint16_t(data()->unknown_114) : uint16_t(guest::LoadU16(base, address + 114)); }
+  void set_unknown_114(uint16_t v) const { if (on_host()) data()->unknown_114 = v; else guest::StoreU16(base, address + 114, v); }
+  uint16_t unknown_114_bits() const { return on_host() ? data()->unknown_114 : guest::LoadU16(base, address + 114); }
+  void set_unknown_114_bits(uint16_t v) const { if (on_host()) data()->unknown_114 = v; else guest::StoreU16(base, address + 114, v); }
   // the half extents (RigidBody::Torque, sub_82379328, returns their address)
-  float half_extent_x() const { return guest::LoadFloat(base, address + 128); }
-  void set_half_extent_x(float v) const { guest::StoreFloat(base, address + 128, v); }
   uint32_t half_extent_x_address() const { return address + 128; }
-  float half_extent_y() const { return guest::LoadFloat(base, address + 132); }
-  void set_half_extent_y(float v) const { guest::StoreFloat(base, address + 132, v); }
+  float half_extent_x() const { return on_host() ? float(data()->half_extent_x) : float(guest::LoadFloat(base, address + 128)); }
+  void set_half_extent_x(float v) const { if (on_host()) data()->half_extent_x = v; else guest::StoreFloat(base, address + 128, v); }
+  uint32_t half_extent_x_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->half_extent_x) : guest::LoadU32(base, address + 128); }
+  void set_half_extent_x_bits(uint32_t v) const { if (on_host()) data()->half_extent_x = std::bit_cast<float>(v); else guest::StoreU32(base, address + 128, v); }
   uint32_t half_extent_y_address() const { return address + 132; }
-  float half_extent_z() const { return guest::LoadFloat(base, address + 136); }
-  void set_half_extent_z(float v) const { guest::StoreFloat(base, address + 136, v); }
+  float half_extent_y() const { return on_host() ? float(data()->half_extent_y) : float(guest::LoadFloat(base, address + 132)); }
+  void set_half_extent_y(float v) const { if (on_host()) data()->half_extent_y = v; else guest::StoreFloat(base, address + 132, v); }
+  uint32_t half_extent_y_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->half_extent_y) : guest::LoadU32(base, address + 132); }
+  void set_half_extent_y_bits(uint32_t v) const { if (on_host()) data()->half_extent_y = std::bit_cast<float>(v); else guest::StoreU32(base, address + 132, v); }
   uint32_t half_extent_z_address() const { return address + 136; }
-  float half_extent_w() const { return guest::LoadFloat(base, address + 140); }
-  void set_half_extent_w(float v) const { guest::StoreFloat(base, address + 140, v); }
+  float half_extent_z() const { return on_host() ? float(data()->half_extent_z) : float(guest::LoadFloat(base, address + 136)); }
+  void set_half_extent_z(float v) const { if (on_host()) data()->half_extent_z = v; else guest::StoreFloat(base, address + 136, v); }
+  uint32_t half_extent_z_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->half_extent_z) : guest::LoadU32(base, address + 136); }
+  void set_half_extent_z_bits(uint32_t v) const { if (on_host()) data()->half_extent_z = std::bit_cast<float>(v); else guest::StoreU32(base, address + 136, v); }
   uint32_t half_extent_w_address() const { return address + 140; }
+  float half_extent_w() const { return on_host() ? float(data()->half_extent_w) : float(guest::LoadFloat(base, address + 140)); }
+  void set_half_extent_w(float v) const { if (on_host()) data()->half_extent_w = v; else guest::StoreFloat(base, address + 140, v); }
+  uint32_t half_extent_w_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->half_extent_w) : guest::LoadU32(base, address + 140); }
+  void set_half_extent_w_bits(uint32_t v) const { if (on_host()) data()->half_extent_w = std::bit_cast<float>(v); else guest::StoreU32(base, address + 140, v); }
   // their inverses (sub_820B6890 returns their address)
-  float inverse_half_extent_x() const { return guest::LoadFloat(base, address + 144); }
-  void set_inverse_half_extent_x(float v) const { guest::StoreFloat(base, address + 144, v); }
   uint32_t inverse_half_extent_x_address() const { return address + 144; }
-  float inverse_half_extent_y() const { return guest::LoadFloat(base, address + 148); }
-  void set_inverse_half_extent_y(float v) const { guest::StoreFloat(base, address + 148, v); }
+  float inverse_half_extent_x() const { return on_host() ? float(data()->inverse_half_extent_x) : float(guest::LoadFloat(base, address + 144)); }
+  void set_inverse_half_extent_x(float v) const { if (on_host()) data()->inverse_half_extent_x = v; else guest::StoreFloat(base, address + 144, v); }
+  uint32_t inverse_half_extent_x_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->inverse_half_extent_x) : guest::LoadU32(base, address + 144); }
+  void set_inverse_half_extent_x_bits(uint32_t v) const { if (on_host()) data()->inverse_half_extent_x = std::bit_cast<float>(v); else guest::StoreU32(base, address + 144, v); }
   uint32_t inverse_half_extent_y_address() const { return address + 148; }
-  float inverse_half_extent_z() const { return guest::LoadFloat(base, address + 152); }
-  void set_inverse_half_extent_z(float v) const { guest::StoreFloat(base, address + 152, v); }
+  float inverse_half_extent_y() const { return on_host() ? float(data()->inverse_half_extent_y) : float(guest::LoadFloat(base, address + 148)); }
+  void set_inverse_half_extent_y(float v) const { if (on_host()) data()->inverse_half_extent_y = v; else guest::StoreFloat(base, address + 148, v); }
+  uint32_t inverse_half_extent_y_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->inverse_half_extent_y) : guest::LoadU32(base, address + 148); }
+  void set_inverse_half_extent_y_bits(uint32_t v) const { if (on_host()) data()->inverse_half_extent_y = std::bit_cast<float>(v); else guest::StoreU32(base, address + 148, v); }
   uint32_t inverse_half_extent_z_address() const { return address + 152; }
-  float inverse_half_extent_w() const { return guest::LoadFloat(base, address + 156); }
-  void set_inverse_half_extent_w(float v) const { guest::StoreFloat(base, address + 156, v); }
+  float inverse_half_extent_z() const { return on_host() ? float(data()->inverse_half_extent_z) : float(guest::LoadFloat(base, address + 152)); }
+  void set_inverse_half_extent_z(float v) const { if (on_host()) data()->inverse_half_extent_z = v; else guest::StoreFloat(base, address + 152, v); }
+  uint32_t inverse_half_extent_z_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->inverse_half_extent_z) : guest::LoadU32(base, address + 152); }
+  void set_inverse_half_extent_z_bits(uint32_t v) const { if (on_host()) data()->inverse_half_extent_z = std::bit_cast<float>(v); else guest::StoreU32(base, address + 152, v); }
   uint32_t inverse_half_extent_w_address() const { return address + 156; }
+  float inverse_half_extent_w() const { return on_host() ? float(data()->inverse_half_extent_w) : float(guest::LoadFloat(base, address + 156)); }
+  void set_inverse_half_extent_w(float v) const { if (on_host()) data()->inverse_half_extent_w = v; else guest::StoreFloat(base, address + 156, v); }
+  uint32_t inverse_half_extent_w_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->inverse_half_extent_w) : guest::LoadU32(base, address + 156); }
+  void set_inverse_half_extent_w_bits(uint32_t v) const { if (on_host()) data()->inverse_half_extent_w = std::bit_cast<float>(v); else guest::StoreU32(base, address + 156, v); }
   // the lower corners' track positions (pointers to the vehicle's +5328 + 96i, sub_820C1D08; BoxShape::SetCacheWord's word i, zeroed by SetCorners, copied from placement to placement)
-  uint32_t lower_corner_position_0() const { return guest::LoadU32(base, address + 160); }
-  void set_lower_corner_position_0(uint32_t v) const { guest::StoreU32(base, address + 160, v); }
   uint32_t lower_corner_position_0_address() const { return address + 160; }
-  uint32_t lower_corner_position_1() const { return guest::LoadU32(base, address + 164); }
-  void set_lower_corner_position_1(uint32_t v) const { guest::StoreU32(base, address + 164, v); }
+  uint32_t lower_corner_position_0() const { return on_host() ? uint32_t(data()->lower_corner_position_0) : uint32_t(guest::LoadU32(base, address + 160)); }
+  void set_lower_corner_position_0(uint32_t v) const { if (on_host()) data()->lower_corner_position_0 = v; else guest::StoreU32(base, address + 160, v); }
+  uint32_t lower_corner_position_0_bits() const { return on_host() ? data()->lower_corner_position_0 : guest::LoadU32(base, address + 160); }
+  void set_lower_corner_position_0_bits(uint32_t v) const { if (on_host()) data()->lower_corner_position_0 = v; else guest::StoreU32(base, address + 160, v); }
   uint32_t lower_corner_position_1_address() const { return address + 164; }
-  uint32_t lower_corner_position_2() const { return guest::LoadU32(base, address + 168); }
-  void set_lower_corner_position_2(uint32_t v) const { guest::StoreU32(base, address + 168, v); }
+  uint32_t lower_corner_position_1() const { return on_host() ? uint32_t(data()->lower_corner_position_1) : uint32_t(guest::LoadU32(base, address + 164)); }
+  void set_lower_corner_position_1(uint32_t v) const { if (on_host()) data()->lower_corner_position_1 = v; else guest::StoreU32(base, address + 164, v); }
+  uint32_t lower_corner_position_1_bits() const { return on_host() ? data()->lower_corner_position_1 : guest::LoadU32(base, address + 164); }
+  void set_lower_corner_position_1_bits(uint32_t v) const { if (on_host()) data()->lower_corner_position_1 = v; else guest::StoreU32(base, address + 164, v); }
   uint32_t lower_corner_position_2_address() const { return address + 168; }
-  uint32_t lower_corner_position_3() const { return guest::LoadU32(base, address + 172); }
-  void set_lower_corner_position_3(uint32_t v) const { guest::StoreU32(base, address + 172, v); }
+  uint32_t lower_corner_position_2() const { return on_host() ? uint32_t(data()->lower_corner_position_2) : uint32_t(guest::LoadU32(base, address + 168)); }
+  void set_lower_corner_position_2(uint32_t v) const { if (on_host()) data()->lower_corner_position_2 = v; else guest::StoreU32(base, address + 168, v); }
+  uint32_t lower_corner_position_2_bits() const { return on_host() ? data()->lower_corner_position_2 : guest::LoadU32(base, address + 168); }
+  void set_lower_corner_position_2_bits(uint32_t v) const { if (on_host()) data()->lower_corner_position_2 = v; else guest::StoreU32(base, address + 168, v); }
   uint32_t lower_corner_position_3_address() const { return address + 172; }
+  uint32_t lower_corner_position_3() const { return on_host() ? uint32_t(data()->lower_corner_position_3) : uint32_t(guest::LoadU32(base, address + 172)); }
+  void set_lower_corner_position_3(uint32_t v) const { if (on_host()) data()->lower_corner_position_3 = v; else guest::StoreU32(base, address + 172, v); }
+  uint32_t lower_corner_position_3_bits() const { return on_host() ? data()->lower_corner_position_3 : guest::LoadU32(base, address + 172); }
+  void set_lower_corner_position_3_bits(uint32_t v) const { if (on_host()) data()->lower_corner_position_3 = v; else guest::StoreU32(base, address + 172, v); }
   // the first two, as BoxShape::BoxShape(const&) copies them
-  uint64_t lower_corner_positions_01() const { return guest::LoadU64(base, address + 160); }
-  void set_lower_corner_positions_01(uint64_t v) const { guest::StoreU64(base, address + 160, v); }
   uint32_t lower_corner_positions_01_address() const { return address + 160; }
-  uint64_t lower_corner_positions_23() const { return guest::LoadU64(base, address + 168); }
-  void set_lower_corner_positions_23(uint64_t v) const { guest::StoreU64(base, address + 168, v); }
+  uint64_t lower_corner_positions_01_bits() const { return on_host() ? uint64_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kBoxShapeLayout, 160, 8)) : guest::LoadU64(base, address + 160); }
+  void set_lower_corner_positions_01_bits(uint64_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kBoxShapeLayout, 160, 8, v); else guest::StoreU64(base, address + 160, v); }
+  uint64_t lower_corner_positions_01() const { return uint64_t(lower_corner_positions_01_bits()); }
+  void set_lower_corner_positions_01(uint64_t v) const { set_lower_corner_positions_01_bits(uint64_t(v)); }
   uint32_t lower_corner_positions_23_address() const { return address + 168; }
+  uint64_t lower_corner_positions_23_bits() const { return on_host() ? uint64_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kBoxShapeLayout, 168, 8)) : guest::LoadU64(base, address + 168); }
+  void set_lower_corner_positions_23_bits(uint64_t v) const { if (on_host()) memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kBoxShapeLayout, 168, 8, v); else guest::StoreU64(base, address + 168, v); }
+  uint64_t lower_corner_positions_23() const { return uint64_t(lower_corner_positions_23_bits()); }
+  void set_lower_corner_positions_23(uint64_t v) const { set_lower_corner_positions_23_bits(uint64_t(v)); }
   // the 8 corners: corner 0's (the max); corner i at +16i takes the min's x, y, z where bit 0, 1, 2 of i is set, else the max's (corner 7 at +288 the min)
-  float corner_x() const { return guest::LoadFloat(base, address + 176); }
-  void set_corner_x(float v) const { guest::StoreFloat(base, address + 176, v); }
   uint32_t corner_x_address() const { return address + 176; }
-  float corner_y() const { return guest::LoadFloat(base, address + 180); }
-  void set_corner_y(float v) const { guest::StoreFloat(base, address + 180, v); }
+  float corner_x() const { return on_host() ? float(data()->corner_x) : float(guest::LoadFloat(base, address + 176)); }
+  void set_corner_x(float v) const { if (on_host()) data()->corner_x = v; else guest::StoreFloat(base, address + 176, v); }
+  uint32_t corner_x_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->corner_x) : guest::LoadU32(base, address + 176); }
+  void set_corner_x_bits(uint32_t v) const { if (on_host()) data()->corner_x = std::bit_cast<float>(v); else guest::StoreU32(base, address + 176, v); }
   uint32_t corner_y_address() const { return address + 180; }
-  float corner_z() const { return guest::LoadFloat(base, address + 184); }
-  void set_corner_z(float v) const { guest::StoreFloat(base, address + 184, v); }
+  float corner_y() const { return on_host() ? float(data()->corner_y) : float(guest::LoadFloat(base, address + 180)); }
+  void set_corner_y(float v) const { if (on_host()) data()->corner_y = v; else guest::StoreFloat(base, address + 180, v); }
+  uint32_t corner_y_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->corner_y) : guest::LoadU32(base, address + 180); }
+  void set_corner_y_bits(uint32_t v) const { if (on_host()) data()->corner_y = std::bit_cast<float>(v); else guest::StoreU32(base, address + 180, v); }
   uint32_t corner_z_address() const { return address + 184; }
-  float corner_w() const { return guest::LoadFloat(base, address + 188); }
-  void set_corner_w(float v) const { guest::StoreFloat(base, address + 188, v); }
+  float corner_z() const { return on_host() ? float(data()->corner_z) : float(guest::LoadFloat(base, address + 184)); }
+  void set_corner_z(float v) const { if (on_host()) data()->corner_z = v; else guest::StoreFloat(base, address + 184, v); }
+  uint32_t corner_z_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->corner_z) : guest::LoadU32(base, address + 184); }
+  void set_corner_z_bits(uint32_t v) const { if (on_host()) data()->corner_z = std::bit_cast<float>(v); else guest::StoreU32(base, address + 184, v); }
   uint32_t corner_w_address() const { return address + 188; }
+  float corner_w() const { return on_host() ? float(data()->corner_w) : float(guest::LoadFloat(base, address + 188)); }
+  void set_corner_w(float v) const { if (on_host()) data()->corner_w = v; else guest::StoreFloat(base, address + 188, v); }
+  uint32_t corner_w_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->corner_w) : guest::LoadU32(base, address + 188); }
+  void set_corner_w_bits(uint32_t v) const { if (on_host()) data()->corner_w = std::bit_cast<float>(v); else guest::StoreU32(base, address + 188, v); }
   // the 6 faces, 32 bytes each (BoxShape::Face): +x, +y, +z, -x, -y, -z; the distance, then the outward normal at +16
-  float face_px_distance() const { return guest::LoadFloat(base, address + 304); }
-  void set_face_px_distance(float v) const { guest::StoreFloat(base, address + 304, v); }
   uint32_t face_px_distance_address() const { return address + 304; }
-  float face_px_normal_x() const { return guest::LoadFloat(base, address + 320); }
-  void set_face_px_normal_x(float v) const { guest::StoreFloat(base, address + 320, v); }
+  float face_px_distance() const { return on_host() ? float(data()->face_px_distance) : float(guest::LoadFloat(base, address + 304)); }
+  void set_face_px_distance(float v) const { if (on_host()) data()->face_px_distance = v; else guest::StoreFloat(base, address + 304, v); }
+  uint32_t face_px_distance_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_px_distance) : guest::LoadU32(base, address + 304); }
+  void set_face_px_distance_bits(uint32_t v) const { if (on_host()) data()->face_px_distance = std::bit_cast<float>(v); else guest::StoreU32(base, address + 304, v); }
   uint32_t face_px_normal_x_address() const { return address + 320; }
-  float face_px_normal_y() const { return guest::LoadFloat(base, address + 324); }
-  void set_face_px_normal_y(float v) const { guest::StoreFloat(base, address + 324, v); }
+  float face_px_normal_x() const { return on_host() ? float(data()->face_px_normal_x) : float(guest::LoadFloat(base, address + 320)); }
+  void set_face_px_normal_x(float v) const { if (on_host()) data()->face_px_normal_x = v; else guest::StoreFloat(base, address + 320, v); }
+  uint32_t face_px_normal_x_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_px_normal_x) : guest::LoadU32(base, address + 320); }
+  void set_face_px_normal_x_bits(uint32_t v) const { if (on_host()) data()->face_px_normal_x = std::bit_cast<float>(v); else guest::StoreU32(base, address + 320, v); }
   uint32_t face_px_normal_y_address() const { return address + 324; }
-  float face_px_normal_z() const { return guest::LoadFloat(base, address + 328); }
-  void set_face_px_normal_z(float v) const { guest::StoreFloat(base, address + 328, v); }
+  float face_px_normal_y() const { return on_host() ? float(data()->face_px_normal_y) : float(guest::LoadFloat(base, address + 324)); }
+  void set_face_px_normal_y(float v) const { if (on_host()) data()->face_px_normal_y = v; else guest::StoreFloat(base, address + 324, v); }
+  uint32_t face_px_normal_y_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_px_normal_y) : guest::LoadU32(base, address + 324); }
+  void set_face_px_normal_y_bits(uint32_t v) const { if (on_host()) data()->face_px_normal_y = std::bit_cast<float>(v); else guest::StoreU32(base, address + 324, v); }
   uint32_t face_px_normal_z_address() const { return address + 328; }
-  float face_px_normal_w() const { return guest::LoadFloat(base, address + 332); }
-  void set_face_px_normal_w(float v) const { guest::StoreFloat(base, address + 332, v); }
+  float face_px_normal_z() const { return on_host() ? float(data()->face_px_normal_z) : float(guest::LoadFloat(base, address + 328)); }
+  void set_face_px_normal_z(float v) const { if (on_host()) data()->face_px_normal_z = v; else guest::StoreFloat(base, address + 328, v); }
+  uint32_t face_px_normal_z_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_px_normal_z) : guest::LoadU32(base, address + 328); }
+  void set_face_px_normal_z_bits(uint32_t v) const { if (on_host()) data()->face_px_normal_z = std::bit_cast<float>(v); else guest::StoreU32(base, address + 328, v); }
   uint32_t face_px_normal_w_address() const { return address + 332; }
-  float face_py_distance() const { return guest::LoadFloat(base, address + 336); }
-  void set_face_py_distance(float v) const { guest::StoreFloat(base, address + 336, v); }
+  float face_px_normal_w() const { return on_host() ? float(data()->face_px_normal_w) : float(guest::LoadFloat(base, address + 332)); }
+  void set_face_px_normal_w(float v) const { if (on_host()) data()->face_px_normal_w = v; else guest::StoreFloat(base, address + 332, v); }
+  uint32_t face_px_normal_w_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_px_normal_w) : guest::LoadU32(base, address + 332); }
+  void set_face_px_normal_w_bits(uint32_t v) const { if (on_host()) data()->face_px_normal_w = std::bit_cast<float>(v); else guest::StoreU32(base, address + 332, v); }
   uint32_t face_py_distance_address() const { return address + 336; }
-  float face_py_normal_x() const { return guest::LoadFloat(base, address + 352); }
-  void set_face_py_normal_x(float v) const { guest::StoreFloat(base, address + 352, v); }
+  float face_py_distance() const { return on_host() ? float(data()->face_py_distance) : float(guest::LoadFloat(base, address + 336)); }
+  void set_face_py_distance(float v) const { if (on_host()) data()->face_py_distance = v; else guest::StoreFloat(base, address + 336, v); }
+  uint32_t face_py_distance_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_py_distance) : guest::LoadU32(base, address + 336); }
+  void set_face_py_distance_bits(uint32_t v) const { if (on_host()) data()->face_py_distance = std::bit_cast<float>(v); else guest::StoreU32(base, address + 336, v); }
   uint32_t face_py_normal_x_address() const { return address + 352; }
-  float face_py_normal_y() const { return guest::LoadFloat(base, address + 356); }
-  void set_face_py_normal_y(float v) const { guest::StoreFloat(base, address + 356, v); }
+  float face_py_normal_x() const { return on_host() ? float(data()->face_py_normal_x) : float(guest::LoadFloat(base, address + 352)); }
+  void set_face_py_normal_x(float v) const { if (on_host()) data()->face_py_normal_x = v; else guest::StoreFloat(base, address + 352, v); }
+  uint32_t face_py_normal_x_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_py_normal_x) : guest::LoadU32(base, address + 352); }
+  void set_face_py_normal_x_bits(uint32_t v) const { if (on_host()) data()->face_py_normal_x = std::bit_cast<float>(v); else guest::StoreU32(base, address + 352, v); }
   uint32_t face_py_normal_y_address() const { return address + 356; }
-  float face_py_normal_z() const { return guest::LoadFloat(base, address + 360); }
-  void set_face_py_normal_z(float v) const { guest::StoreFloat(base, address + 360, v); }
+  float face_py_normal_y() const { return on_host() ? float(data()->face_py_normal_y) : float(guest::LoadFloat(base, address + 356)); }
+  void set_face_py_normal_y(float v) const { if (on_host()) data()->face_py_normal_y = v; else guest::StoreFloat(base, address + 356, v); }
+  uint32_t face_py_normal_y_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_py_normal_y) : guest::LoadU32(base, address + 356); }
+  void set_face_py_normal_y_bits(uint32_t v) const { if (on_host()) data()->face_py_normal_y = std::bit_cast<float>(v); else guest::StoreU32(base, address + 356, v); }
   uint32_t face_py_normal_z_address() const { return address + 360; }
-  float face_py_normal_w() const { return guest::LoadFloat(base, address + 364); }
-  void set_face_py_normal_w(float v) const { guest::StoreFloat(base, address + 364, v); }
+  float face_py_normal_z() const { return on_host() ? float(data()->face_py_normal_z) : float(guest::LoadFloat(base, address + 360)); }
+  void set_face_py_normal_z(float v) const { if (on_host()) data()->face_py_normal_z = v; else guest::StoreFloat(base, address + 360, v); }
+  uint32_t face_py_normal_z_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_py_normal_z) : guest::LoadU32(base, address + 360); }
+  void set_face_py_normal_z_bits(uint32_t v) const { if (on_host()) data()->face_py_normal_z = std::bit_cast<float>(v); else guest::StoreU32(base, address + 360, v); }
   uint32_t face_py_normal_w_address() const { return address + 364; }
-  float face_pz_distance() const { return guest::LoadFloat(base, address + 368); }
-  void set_face_pz_distance(float v) const { guest::StoreFloat(base, address + 368, v); }
+  float face_py_normal_w() const { return on_host() ? float(data()->face_py_normal_w) : float(guest::LoadFloat(base, address + 364)); }
+  void set_face_py_normal_w(float v) const { if (on_host()) data()->face_py_normal_w = v; else guest::StoreFloat(base, address + 364, v); }
+  uint32_t face_py_normal_w_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_py_normal_w) : guest::LoadU32(base, address + 364); }
+  void set_face_py_normal_w_bits(uint32_t v) const { if (on_host()) data()->face_py_normal_w = std::bit_cast<float>(v); else guest::StoreU32(base, address + 364, v); }
   uint32_t face_pz_distance_address() const { return address + 368; }
-  float face_pz_normal_x() const { return guest::LoadFloat(base, address + 384); }
-  void set_face_pz_normal_x(float v) const { guest::StoreFloat(base, address + 384, v); }
+  float face_pz_distance() const { return on_host() ? float(data()->face_pz_distance) : float(guest::LoadFloat(base, address + 368)); }
+  void set_face_pz_distance(float v) const { if (on_host()) data()->face_pz_distance = v; else guest::StoreFloat(base, address + 368, v); }
+  uint32_t face_pz_distance_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_pz_distance) : guest::LoadU32(base, address + 368); }
+  void set_face_pz_distance_bits(uint32_t v) const { if (on_host()) data()->face_pz_distance = std::bit_cast<float>(v); else guest::StoreU32(base, address + 368, v); }
   uint32_t face_pz_normal_x_address() const { return address + 384; }
-  float face_pz_normal_y() const { return guest::LoadFloat(base, address + 388); }
-  void set_face_pz_normal_y(float v) const { guest::StoreFloat(base, address + 388, v); }
+  float face_pz_normal_x() const { return on_host() ? float(data()->face_pz_normal_x) : float(guest::LoadFloat(base, address + 384)); }
+  void set_face_pz_normal_x(float v) const { if (on_host()) data()->face_pz_normal_x = v; else guest::StoreFloat(base, address + 384, v); }
+  uint32_t face_pz_normal_x_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_pz_normal_x) : guest::LoadU32(base, address + 384); }
+  void set_face_pz_normal_x_bits(uint32_t v) const { if (on_host()) data()->face_pz_normal_x = std::bit_cast<float>(v); else guest::StoreU32(base, address + 384, v); }
   uint32_t face_pz_normal_y_address() const { return address + 388; }
-  float face_pz_normal_z() const { return guest::LoadFloat(base, address + 392); }
-  void set_face_pz_normal_z(float v) const { guest::StoreFloat(base, address + 392, v); }
+  float face_pz_normal_y() const { return on_host() ? float(data()->face_pz_normal_y) : float(guest::LoadFloat(base, address + 388)); }
+  void set_face_pz_normal_y(float v) const { if (on_host()) data()->face_pz_normal_y = v; else guest::StoreFloat(base, address + 388, v); }
+  uint32_t face_pz_normal_y_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_pz_normal_y) : guest::LoadU32(base, address + 388); }
+  void set_face_pz_normal_y_bits(uint32_t v) const { if (on_host()) data()->face_pz_normal_y = std::bit_cast<float>(v); else guest::StoreU32(base, address + 388, v); }
   uint32_t face_pz_normal_z_address() const { return address + 392; }
-  float face_pz_normal_w() const { return guest::LoadFloat(base, address + 396); }
-  void set_face_pz_normal_w(float v) const { guest::StoreFloat(base, address + 396, v); }
+  float face_pz_normal_z() const { return on_host() ? float(data()->face_pz_normal_z) : float(guest::LoadFloat(base, address + 392)); }
+  void set_face_pz_normal_z(float v) const { if (on_host()) data()->face_pz_normal_z = v; else guest::StoreFloat(base, address + 392, v); }
+  uint32_t face_pz_normal_z_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_pz_normal_z) : guest::LoadU32(base, address + 392); }
+  void set_face_pz_normal_z_bits(uint32_t v) const { if (on_host()) data()->face_pz_normal_z = std::bit_cast<float>(v); else guest::StoreU32(base, address + 392, v); }
   uint32_t face_pz_normal_w_address() const { return address + 396; }
-  float face_nx_distance() const { return guest::LoadFloat(base, address + 400); }
-  void set_face_nx_distance(float v) const { guest::StoreFloat(base, address + 400, v); }
+  float face_pz_normal_w() const { return on_host() ? float(data()->face_pz_normal_w) : float(guest::LoadFloat(base, address + 396)); }
+  void set_face_pz_normal_w(float v) const { if (on_host()) data()->face_pz_normal_w = v; else guest::StoreFloat(base, address + 396, v); }
+  uint32_t face_pz_normal_w_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_pz_normal_w) : guest::LoadU32(base, address + 396); }
+  void set_face_pz_normal_w_bits(uint32_t v) const { if (on_host()) data()->face_pz_normal_w = std::bit_cast<float>(v); else guest::StoreU32(base, address + 396, v); }
   uint32_t face_nx_distance_address() const { return address + 400; }
-  float face_nx_normal_x() const { return guest::LoadFloat(base, address + 416); }
-  void set_face_nx_normal_x(float v) const { guest::StoreFloat(base, address + 416, v); }
+  float face_nx_distance() const { return on_host() ? float(data()->face_nx_distance) : float(guest::LoadFloat(base, address + 400)); }
+  void set_face_nx_distance(float v) const { if (on_host()) data()->face_nx_distance = v; else guest::StoreFloat(base, address + 400, v); }
+  uint32_t face_nx_distance_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_nx_distance) : guest::LoadU32(base, address + 400); }
+  void set_face_nx_distance_bits(uint32_t v) const { if (on_host()) data()->face_nx_distance = std::bit_cast<float>(v); else guest::StoreU32(base, address + 400, v); }
   uint32_t face_nx_normal_x_address() const { return address + 416; }
-  float face_nx_normal_y() const { return guest::LoadFloat(base, address + 420); }
-  void set_face_nx_normal_y(float v) const { guest::StoreFloat(base, address + 420, v); }
+  float face_nx_normal_x() const { return on_host() ? float(data()->face_nx_normal_x) : float(guest::LoadFloat(base, address + 416)); }
+  void set_face_nx_normal_x(float v) const { if (on_host()) data()->face_nx_normal_x = v; else guest::StoreFloat(base, address + 416, v); }
+  uint32_t face_nx_normal_x_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_nx_normal_x) : guest::LoadU32(base, address + 416); }
+  void set_face_nx_normal_x_bits(uint32_t v) const { if (on_host()) data()->face_nx_normal_x = std::bit_cast<float>(v); else guest::StoreU32(base, address + 416, v); }
   uint32_t face_nx_normal_y_address() const { return address + 420; }
-  float face_nx_normal_z() const { return guest::LoadFloat(base, address + 424); }
-  void set_face_nx_normal_z(float v) const { guest::StoreFloat(base, address + 424, v); }
+  float face_nx_normal_y() const { return on_host() ? float(data()->face_nx_normal_y) : float(guest::LoadFloat(base, address + 420)); }
+  void set_face_nx_normal_y(float v) const { if (on_host()) data()->face_nx_normal_y = v; else guest::StoreFloat(base, address + 420, v); }
+  uint32_t face_nx_normal_y_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_nx_normal_y) : guest::LoadU32(base, address + 420); }
+  void set_face_nx_normal_y_bits(uint32_t v) const { if (on_host()) data()->face_nx_normal_y = std::bit_cast<float>(v); else guest::StoreU32(base, address + 420, v); }
   uint32_t face_nx_normal_z_address() const { return address + 424; }
-  float face_nx_normal_w() const { return guest::LoadFloat(base, address + 428); }
-  void set_face_nx_normal_w(float v) const { guest::StoreFloat(base, address + 428, v); }
+  float face_nx_normal_z() const { return on_host() ? float(data()->face_nx_normal_z) : float(guest::LoadFloat(base, address + 424)); }
+  void set_face_nx_normal_z(float v) const { if (on_host()) data()->face_nx_normal_z = v; else guest::StoreFloat(base, address + 424, v); }
+  uint32_t face_nx_normal_z_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_nx_normal_z) : guest::LoadU32(base, address + 424); }
+  void set_face_nx_normal_z_bits(uint32_t v) const { if (on_host()) data()->face_nx_normal_z = std::bit_cast<float>(v); else guest::StoreU32(base, address + 424, v); }
   uint32_t face_nx_normal_w_address() const { return address + 428; }
-  float face_ny_distance() const { return guest::LoadFloat(base, address + 432); }
-  void set_face_ny_distance(float v) const { guest::StoreFloat(base, address + 432, v); }
+  float face_nx_normal_w() const { return on_host() ? float(data()->face_nx_normal_w) : float(guest::LoadFloat(base, address + 428)); }
+  void set_face_nx_normal_w(float v) const { if (on_host()) data()->face_nx_normal_w = v; else guest::StoreFloat(base, address + 428, v); }
+  uint32_t face_nx_normal_w_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_nx_normal_w) : guest::LoadU32(base, address + 428); }
+  void set_face_nx_normal_w_bits(uint32_t v) const { if (on_host()) data()->face_nx_normal_w = std::bit_cast<float>(v); else guest::StoreU32(base, address + 428, v); }
   uint32_t face_ny_distance_address() const { return address + 432; }
-  float face_ny_normal_x() const { return guest::LoadFloat(base, address + 448); }
-  void set_face_ny_normal_x(float v) const { guest::StoreFloat(base, address + 448, v); }
+  float face_ny_distance() const { return on_host() ? float(data()->face_ny_distance) : float(guest::LoadFloat(base, address + 432)); }
+  void set_face_ny_distance(float v) const { if (on_host()) data()->face_ny_distance = v; else guest::StoreFloat(base, address + 432, v); }
+  uint32_t face_ny_distance_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_ny_distance) : guest::LoadU32(base, address + 432); }
+  void set_face_ny_distance_bits(uint32_t v) const { if (on_host()) data()->face_ny_distance = std::bit_cast<float>(v); else guest::StoreU32(base, address + 432, v); }
   uint32_t face_ny_normal_x_address() const { return address + 448; }
-  float face_ny_normal_y() const { return guest::LoadFloat(base, address + 452); }
-  void set_face_ny_normal_y(float v) const { guest::StoreFloat(base, address + 452, v); }
+  float face_ny_normal_x() const { return on_host() ? float(data()->face_ny_normal_x) : float(guest::LoadFloat(base, address + 448)); }
+  void set_face_ny_normal_x(float v) const { if (on_host()) data()->face_ny_normal_x = v; else guest::StoreFloat(base, address + 448, v); }
+  uint32_t face_ny_normal_x_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_ny_normal_x) : guest::LoadU32(base, address + 448); }
+  void set_face_ny_normal_x_bits(uint32_t v) const { if (on_host()) data()->face_ny_normal_x = std::bit_cast<float>(v); else guest::StoreU32(base, address + 448, v); }
   uint32_t face_ny_normal_y_address() const { return address + 452; }
-  float face_ny_normal_z() const { return guest::LoadFloat(base, address + 456); }
-  void set_face_ny_normal_z(float v) const { guest::StoreFloat(base, address + 456, v); }
+  float face_ny_normal_y() const { return on_host() ? float(data()->face_ny_normal_y) : float(guest::LoadFloat(base, address + 452)); }
+  void set_face_ny_normal_y(float v) const { if (on_host()) data()->face_ny_normal_y = v; else guest::StoreFloat(base, address + 452, v); }
+  uint32_t face_ny_normal_y_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_ny_normal_y) : guest::LoadU32(base, address + 452); }
+  void set_face_ny_normal_y_bits(uint32_t v) const { if (on_host()) data()->face_ny_normal_y = std::bit_cast<float>(v); else guest::StoreU32(base, address + 452, v); }
   uint32_t face_ny_normal_z_address() const { return address + 456; }
-  float face_ny_normal_w() const { return guest::LoadFloat(base, address + 460); }
-  void set_face_ny_normal_w(float v) const { guest::StoreFloat(base, address + 460, v); }
+  float face_ny_normal_z() const { return on_host() ? float(data()->face_ny_normal_z) : float(guest::LoadFloat(base, address + 456)); }
+  void set_face_ny_normal_z(float v) const { if (on_host()) data()->face_ny_normal_z = v; else guest::StoreFloat(base, address + 456, v); }
+  uint32_t face_ny_normal_z_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_ny_normal_z) : guest::LoadU32(base, address + 456); }
+  void set_face_ny_normal_z_bits(uint32_t v) const { if (on_host()) data()->face_ny_normal_z = std::bit_cast<float>(v); else guest::StoreU32(base, address + 456, v); }
   uint32_t face_ny_normal_w_address() const { return address + 460; }
-  float face_nz_distance() const { return guest::LoadFloat(base, address + 464); }
-  void set_face_nz_distance(float v) const { guest::StoreFloat(base, address + 464, v); }
+  float face_ny_normal_w() const { return on_host() ? float(data()->face_ny_normal_w) : float(guest::LoadFloat(base, address + 460)); }
+  void set_face_ny_normal_w(float v) const { if (on_host()) data()->face_ny_normal_w = v; else guest::StoreFloat(base, address + 460, v); }
+  uint32_t face_ny_normal_w_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_ny_normal_w) : guest::LoadU32(base, address + 460); }
+  void set_face_ny_normal_w_bits(uint32_t v) const { if (on_host()) data()->face_ny_normal_w = std::bit_cast<float>(v); else guest::StoreU32(base, address + 460, v); }
   uint32_t face_nz_distance_address() const { return address + 464; }
-  float face_nz_normal_x() const { return guest::LoadFloat(base, address + 480); }
-  void set_face_nz_normal_x(float v) const { guest::StoreFloat(base, address + 480, v); }
+  float face_nz_distance() const { return on_host() ? float(data()->face_nz_distance) : float(guest::LoadFloat(base, address + 464)); }
+  void set_face_nz_distance(float v) const { if (on_host()) data()->face_nz_distance = v; else guest::StoreFloat(base, address + 464, v); }
+  uint32_t face_nz_distance_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_nz_distance) : guest::LoadU32(base, address + 464); }
+  void set_face_nz_distance_bits(uint32_t v) const { if (on_host()) data()->face_nz_distance = std::bit_cast<float>(v); else guest::StoreU32(base, address + 464, v); }
   uint32_t face_nz_normal_x_address() const { return address + 480; }
-  float face_nz_normal_y() const { return guest::LoadFloat(base, address + 484); }
-  void set_face_nz_normal_y(float v) const { guest::StoreFloat(base, address + 484, v); }
+  float face_nz_normal_x() const { return on_host() ? float(data()->face_nz_normal_x) : float(guest::LoadFloat(base, address + 480)); }
+  void set_face_nz_normal_x(float v) const { if (on_host()) data()->face_nz_normal_x = v; else guest::StoreFloat(base, address + 480, v); }
+  uint32_t face_nz_normal_x_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_nz_normal_x) : guest::LoadU32(base, address + 480); }
+  void set_face_nz_normal_x_bits(uint32_t v) const { if (on_host()) data()->face_nz_normal_x = std::bit_cast<float>(v); else guest::StoreU32(base, address + 480, v); }
   uint32_t face_nz_normal_y_address() const { return address + 484; }
-  float face_nz_normal_z() const { return guest::LoadFloat(base, address + 488); }
-  void set_face_nz_normal_z(float v) const { guest::StoreFloat(base, address + 488, v); }
+  float face_nz_normal_y() const { return on_host() ? float(data()->face_nz_normal_y) : float(guest::LoadFloat(base, address + 484)); }
+  void set_face_nz_normal_y(float v) const { if (on_host()) data()->face_nz_normal_y = v; else guest::StoreFloat(base, address + 484, v); }
+  uint32_t face_nz_normal_y_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_nz_normal_y) : guest::LoadU32(base, address + 484); }
+  void set_face_nz_normal_y_bits(uint32_t v) const { if (on_host()) data()->face_nz_normal_y = std::bit_cast<float>(v); else guest::StoreU32(base, address + 484, v); }
   uint32_t face_nz_normal_z_address() const { return address + 488; }
-  float face_nz_normal_w() const { return guest::LoadFloat(base, address + 492); }
-  void set_face_nz_normal_w(float v) const { guest::StoreFloat(base, address + 492, v); }
+  float face_nz_normal_z() const { return on_host() ? float(data()->face_nz_normal_z) : float(guest::LoadFloat(base, address + 488)); }
+  void set_face_nz_normal_z(float v) const { if (on_host()) data()->face_nz_normal_z = v; else guest::StoreFloat(base, address + 488, v); }
+  uint32_t face_nz_normal_z_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_nz_normal_z) : guest::LoadU32(base, address + 488); }
+  void set_face_nz_normal_z_bits(uint32_t v) const { if (on_host()) data()->face_nz_normal_z = std::bit_cast<float>(v); else guest::StoreU32(base, address + 488, v); }
   uint32_t face_nz_normal_w_address() const { return address + 492; }
+  float face_nz_normal_w() const { return on_host() ? float(data()->face_nz_normal_w) : float(guest::LoadFloat(base, address + 492)); }
+  void set_face_nz_normal_w(float v) const { if (on_host()) data()->face_nz_normal_w = v; else guest::StoreFloat(base, address + 492, v); }
+  uint32_t face_nz_normal_w_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->face_nz_normal_w) : guest::LoadU32(base, address + 492); }
+  void set_face_nz_normal_w_bits(uint32_t v) const { if (on_host()) data()->face_nz_normal_w = std::bit_cast<float>(v); else guest::StoreU32(base, address + 492, v); }
   // from ReplayPlacedBox (replay-snapshots)
   uint32_t center_address() const { return address + 48; }
+  uint8_t* center() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 48 : guest::Pointer(base, address + 48); }
   // from ReplayPlacedBox (replay-snapshots)
   uint32_t axis0_address() const { return address + 64; }
+  uint8_t* axis0() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 64 : guest::Pointer(base, address + 64); }
   // from ReplayPlacedBox (replay-snapshots)
   uint32_t axis1_address() const { return address + 80; }
+  uint8_t* axis1() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 80 : guest::Pointer(base, address + 80); }
   // from ReplayPlacedBox (replay-snapshots)
   uint32_t axis2_address() const { return address + 96; }
+  uint8_t* axis2() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 96 : guest::Pointer(base, address + 96); }
   // from ReplayPlacedBox (replay-snapshots)
   uint32_t half_extent_address() const { return address + 128; }
+  uint8_t* half_extent() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 128 : guest::Pointer(base, address + 128); }
   // from ReplayPlacedBox (replay-snapshots)
   uint32_t inverse_half_extent_address() const { return address + 144; }
+  uint8_t* inverse_half_extent() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 144 : guest::Pointer(base, address + 144); }
   // from ReplayPlacedBox (replay-snapshots)
   uint32_t corners_address() const { return address + 176; }
+  uint8_t* corners() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 176 : guest::Pointer(base, address + 176); }
   // from ReplayPlacedBox (replay-snapshots)
   uint32_t face_px_normal_address() const { return address + 320; }
+  uint8_t* face_px_normal() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 320 : guest::Pointer(base, address + 320); }
   // from ReplayPlacedBox (replay-snapshots)
   uint32_t face_py_normal_address() const { return address + 352; }
+  uint8_t* face_py_normal() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 352 : guest::Pointer(base, address + 352); }
   // from ReplayPlacedBox (replay-snapshots)
   uint32_t face_pz_normal_address() const { return address + 384; }
+  uint8_t* face_pz_normal() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 384 : guest::Pointer(base, address + 384); }
   // from ReplayPlacedBox (replay-snapshots)
   uint32_t face_nx_normal_address() const { return address + 416; }
+  uint8_t* face_nx_normal() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 416 : guest::Pointer(base, address + 416); }
   // from ReplayPlacedBox (replay-snapshots)
   uint32_t face_ny_normal_address() const { return address + 448; }
+  uint8_t* face_ny_normal() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 448 : guest::Pointer(base, address + 448); }
   // from ReplayPlacedBox (replay-snapshots)
   uint32_t face_nz_normal_address() const { return address + 480; }
+  uint8_t* face_nz_normal() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 480 : guest::Pointer(base, address + 480); }
 };
 
 // image; measure: BoxShape.+0, BoxShape::Place.r5.+0, sub_822BE2C8.ret.+0, sub_820911F8.ret.+0, sub_820BC560.r5.+0, CollisionShape::Place.r3.+8.+0, CollisionShape.+0, CollisionObject@+32.+0
@@ -809,25 +1072,67 @@ struct CollisionBoxBoxArgs : View {
 };
 
 // embedded; measure: BoxBox::FaceSeparates.r4
+#pragma pack(push, 1)
+struct BoxShapeFaceData {
+  float distance = 0;  // +0
+  uint8_t pad_4[12] = {};
+  float normal_x = 0;  // +16
+  float normal_y = 0;  // +20
+  float normal_z = 0;  // +24
+  float normal_w = 0;  // +28
+};
+#pragma pack(pop)
+static_assert(sizeof(BoxShapeFaceData) == 32);
+inline constexpr memory::LayoutField kBoxShapeFaceFields[] = {{0, 4}, {16, 4}, {20, 4}, {24, 4}, {28, 4}};
+inline constexpr memory::Layout kBoxShapeFaceLayout = {kBoxShapeFaceFields, 5};
+
 struct BoxShapeFace : View {
   using View::View;
   static constexpr uint32_t kSize = 32;
-  float distance() const { return guest::LoadFloat(base, address + 0); }
-  void set_distance(float v) const { guest::StoreFloat(base, address + 0, v); }
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  BoxShapeFaceData* data() const { return static_cast<BoxShapeFaceData*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static BoxShapeFace New(uint8_t* base) {
+    return BoxShapeFace(base, memory::MakeHandle(new BoxShapeFaceData(), sizeof(BoxShapeFaceData), "BoxShapeFace", &kBoxShapeFaceLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static BoxShapeFace NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(BoxShapeFaceData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<BoxShapeFaceData*>(::operator new(sizeof(BoxShapeFaceData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) BoxShapeFaceData();
+    return BoxShapeFace(base, memory::MakeHandle(p, sizeof(BoxShapeFaceData) * count, "BoxShapeFace", &kBoxShapeFaceLayout, sizeof(BoxShapeFaceData)));
+  }
+  BoxShapeFace at(uint32_t i) const { return BoxShapeFace(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kBoxShapeFaceLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kBoxShapeFaceLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t distance_address() const { return address + 0; }
+  float distance() const { return on_host() ? float(data()->distance) : float(guest::LoadFloat(base, address + 0)); }
+  void set_distance(float v) const { if (on_host()) data()->distance = v; else guest::StoreFloat(base, address + 0, v); }
+  uint32_t distance_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->distance) : guest::LoadU32(base, address + 0); }
+  void set_distance_bits(uint32_t v) const { if (on_host()) data()->distance = std::bit_cast<float>(v); else guest::StoreU32(base, address + 0, v); }
   // the outward normal
-  float normal_x() const { return guest::LoadFloat(base, address + 16); }
-  void set_normal_x(float v) const { guest::StoreFloat(base, address + 16, v); }
   uint32_t normal_x_address() const { return address + 16; }
-  float normal_y() const { return guest::LoadFloat(base, address + 20); }
-  void set_normal_y(float v) const { guest::StoreFloat(base, address + 20, v); }
+  float normal_x() const { return on_host() ? float(data()->normal_x) : float(guest::LoadFloat(base, address + 16)); }
+  void set_normal_x(float v) const { if (on_host()) data()->normal_x = v; else guest::StoreFloat(base, address + 16, v); }
+  uint32_t normal_x_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->normal_x) : guest::LoadU32(base, address + 16); }
+  void set_normal_x_bits(uint32_t v) const { if (on_host()) data()->normal_x = std::bit_cast<float>(v); else guest::StoreU32(base, address + 16, v); }
   uint32_t normal_y_address() const { return address + 20; }
-  float normal_z() const { return guest::LoadFloat(base, address + 24); }
-  void set_normal_z(float v) const { guest::StoreFloat(base, address + 24, v); }
+  float normal_y() const { return on_host() ? float(data()->normal_y) : float(guest::LoadFloat(base, address + 20)); }
+  void set_normal_y(float v) const { if (on_host()) data()->normal_y = v; else guest::StoreFloat(base, address + 20, v); }
+  uint32_t normal_y_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->normal_y) : guest::LoadU32(base, address + 20); }
+  void set_normal_y_bits(uint32_t v) const { if (on_host()) data()->normal_y = std::bit_cast<float>(v); else guest::StoreU32(base, address + 20, v); }
   uint32_t normal_z_address() const { return address + 24; }
-  float normal_w() const { return guest::LoadFloat(base, address + 28); }
-  void set_normal_w(float v) const { guest::StoreFloat(base, address + 28, v); }
+  float normal_z() const { return on_host() ? float(data()->normal_z) : float(guest::LoadFloat(base, address + 24)); }
+  void set_normal_z(float v) const { if (on_host()) data()->normal_z = v; else guest::StoreFloat(base, address + 24, v); }
+  uint32_t normal_z_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->normal_z) : guest::LoadU32(base, address + 24); }
+  void set_normal_z_bits(uint32_t v) const { if (on_host()) data()->normal_z = std::bit_cast<float>(v); else guest::StoreU32(base, address + 24, v); }
   uint32_t normal_w_address() const { return address + 28; }
+  float normal_w() const { return on_host() ? float(data()->normal_w) : float(guest::LoadFloat(base, address + 28)); }
+  void set_normal_w(float v) const { if (on_host()) data()->normal_w = v; else guest::StoreFloat(base, address + 28, v); }
+  uint32_t normal_w_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->normal_w) : guest::LoadU32(base, address + 28); }
+  void set_normal_w_bits(uint32_t v) const { if (on_host()) data()->normal_w = std::bit_cast<float>(v); else guest::StoreU32(base, address + 28, v); }
 };
 
 // embedded; measure: BoxBox::Separated.r4
@@ -1076,12 +1381,41 @@ struct CollisionShapeAt32_2 : View {
 };
 
 // embedded; measure: CollisionObject@+32.+4
+#pragma pack(push, 1)
+struct BoxShapePartData {
+  uint32_t unknown_0 = 0;  // +0
+};
+#pragma pack(pop)
+static_assert(sizeof(BoxShapePartData) == 4);
+inline constexpr memory::LayoutField kBoxShapePartFields[] = {{0, 4}};
+inline constexpr memory::Layout kBoxShapePartLayout = {kBoxShapePartFields, 1};
+
 struct BoxShapePart : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
-  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
-  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  BoxShapePartData* data() const { return static_cast<BoxShapePartData*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static BoxShapePart New(uint8_t* base) {
+    return BoxShapePart(base, memory::MakeHandle(new BoxShapePartData(), sizeof(BoxShapePartData), "BoxShapePart", &kBoxShapePartLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static BoxShapePart NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(BoxShapePartData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<BoxShapePartData*>(::operator new(sizeof(BoxShapePartData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) BoxShapePartData();
+    return BoxShapePart(base, memory::MakeHandle(p, sizeof(BoxShapePartData) * count, "BoxShapePart", &kBoxShapePartLayout, sizeof(BoxShapePartData)));
+  }
+  BoxShapePart at(uint32_t i) const { return BoxShapePart(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kBoxShapePartLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kBoxShapePartLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_0() const { return on_host() ? uint32_t(data()->unknown_0) : uint32_t(guest::LoadU32(base, address + 0)); }
+  void set_unknown_0(uint32_t v) const { if (on_host()) data()->unknown_0 = v; else guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_bits() const { return on_host() ? data()->unknown_0 : guest::LoadU32(base, address + 0); }
+  void set_unknown_0_bits(uint32_t v) const { if (on_host()) data()->unknown_0 = v; else guest::StoreU32(base, address + 0, v); }
 };
 
 // embedded; measure: CollisionObject@+32.+4.+0
@@ -1097,21 +1431,60 @@ struct BoxShapeVtablePart : View {
 };
 
 // embedded; measure: CollisionObject@+32.+8
+#pragma pack(push, 1)
+struct BoxShapePart_2Data {
+  uint32_t unknown_0 = 0;  // +0
+  uint8_t pad_4[44] = {};
+  float unknown_48 = 0;  // +48
+  float unknown_52 = 0;  // +52
+  float unknown_56 = 0;  // +56
+};
+#pragma pack(pop)
+static_assert(sizeof(BoxShapePart_2Data) == 60);
+inline constexpr memory::LayoutField kBoxShapePart_2Fields[] = {{0, 4}, {48, 4}, {52, 4}, {56, 4}};
+inline constexpr memory::Layout kBoxShapePart_2Layout = {kBoxShapePart_2Fields, 4};
+
 struct BoxShapePart_2 : View {
   using View::View;
   static constexpr uint32_t kSize = 60;
-  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
-  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  BoxShapePart_2Data* data() const { return static_cast<BoxShapePart_2Data*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static BoxShapePart_2 New(uint8_t* base) {
+    return BoxShapePart_2(base, memory::MakeHandle(new BoxShapePart_2Data(), sizeof(BoxShapePart_2Data), "BoxShapePart_2", &kBoxShapePart_2Layout));
+  }
+  template <uint32_t Stride = kSize>
+  static BoxShapePart_2 NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(BoxShapePart_2Data) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<BoxShapePart_2Data*>(::operator new(sizeof(BoxShapePart_2Data) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) BoxShapePart_2Data();
+    return BoxShapePart_2(base, memory::MakeHandle(p, sizeof(BoxShapePart_2Data) * count, "BoxShapePart_2", &kBoxShapePart_2Layout, sizeof(BoxShapePart_2Data)));
+  }
+  BoxShapePart_2 at(uint32_t i) const { return BoxShapePart_2(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kBoxShapePart_2Layout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kBoxShapePart_2Layout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t unknown_0_address() const { return address + 0; }
-  float unknown_48() const { return guest::LoadFloat(base, address + 48); }
-  void set_unknown_48(float v) const { guest::StoreFloat(base, address + 48, v); }
+  uint32_t unknown_0() const { return on_host() ? uint32_t(data()->unknown_0) : uint32_t(guest::LoadU32(base, address + 0)); }
+  void set_unknown_0(uint32_t v) const { if (on_host()) data()->unknown_0 = v; else guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_bits() const { return on_host() ? data()->unknown_0 : guest::LoadU32(base, address + 0); }
+  void set_unknown_0_bits(uint32_t v) const { if (on_host()) data()->unknown_0 = v; else guest::StoreU32(base, address + 0, v); }
   uint32_t unknown_48_address() const { return address + 48; }
-  float unknown_52() const { return guest::LoadFloat(base, address + 52); }
-  void set_unknown_52(float v) const { guest::StoreFloat(base, address + 52, v); }
+  float unknown_48() const { return on_host() ? float(data()->unknown_48) : float(guest::LoadFloat(base, address + 48)); }
+  void set_unknown_48(float v) const { if (on_host()) data()->unknown_48 = v; else guest::StoreFloat(base, address + 48, v); }
+  uint32_t unknown_48_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->unknown_48) : guest::LoadU32(base, address + 48); }
+  void set_unknown_48_bits(uint32_t v) const { if (on_host()) data()->unknown_48 = std::bit_cast<float>(v); else guest::StoreU32(base, address + 48, v); }
   uint32_t unknown_52_address() const { return address + 52; }
-  float unknown_56() const { return guest::LoadFloat(base, address + 56); }
-  void set_unknown_56(float v) const { guest::StoreFloat(base, address + 56, v); }
+  float unknown_52() const { return on_host() ? float(data()->unknown_52) : float(guest::LoadFloat(base, address + 52)); }
+  void set_unknown_52(float v) const { if (on_host()) data()->unknown_52 = v; else guest::StoreFloat(base, address + 52, v); }
+  uint32_t unknown_52_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->unknown_52) : guest::LoadU32(base, address + 52); }
+  void set_unknown_52_bits(uint32_t v) const { if (on_host()) data()->unknown_52 = std::bit_cast<float>(v); else guest::StoreU32(base, address + 52, v); }
   uint32_t unknown_56_address() const { return address + 56; }
+  float unknown_56() const { return on_host() ? float(data()->unknown_56) : float(guest::LoadFloat(base, address + 56)); }
+  void set_unknown_56(float v) const { if (on_host()) data()->unknown_56 = v; else guest::StoreFloat(base, address + 56, v); }
+  uint32_t unknown_56_bits() const { return on_host() ? std::bit_cast<uint32_t>(data()->unknown_56) : guest::LoadU32(base, address + 56); }
+  void set_unknown_56_bits(uint32_t v) const { if (on_host()) data()->unknown_56 = std::bit_cast<float>(v); else guest::StoreU32(base, address + 56, v); }
 };
 
 // embedded; measure: CollisionObject@+32.+8.+0
@@ -1130,12 +1503,41 @@ struct BoxShapeVtablePart_2 : View {
 };
 
 // embedded; measure: Vehicles::DestroyAll.r3@+37632.+344
+#pragma pack(push, 1)
+struct BoxShapePart_3Data {
+  uint32_t unknown_0 = 0;  // +0
+};
+#pragma pack(pop)
+static_assert(sizeof(BoxShapePart_3Data) == 4);
+inline constexpr memory::LayoutField kBoxShapePart_3Fields[] = {{0, 4}};
+inline constexpr memory::Layout kBoxShapePart_3Layout = {kBoxShapePart_3Fields, 1};
+
 struct BoxShapePart_3 : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
-  uint32_t unknown_0() const { return guest::LoadU32(base, address + 0); }
-  void set_unknown_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  BoxShapePart_3Data* data() const { return static_cast<BoxShapePart_3Data*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static BoxShapePart_3 New(uint8_t* base) {
+    return BoxShapePart_3(base, memory::MakeHandle(new BoxShapePart_3Data(), sizeof(BoxShapePart_3Data), "BoxShapePart_3", &kBoxShapePart_3Layout));
+  }
+  template <uint32_t Stride = kSize>
+  static BoxShapePart_3 NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(BoxShapePart_3Data) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<BoxShapePart_3Data*>(::operator new(sizeof(BoxShapePart_3Data) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) BoxShapePart_3Data();
+    return BoxShapePart_3(base, memory::MakeHandle(p, sizeof(BoxShapePart_3Data) * count, "BoxShapePart_3", &kBoxShapePart_3Layout, sizeof(BoxShapePart_3Data)));
+  }
+  BoxShapePart_3 at(uint32_t i) const { return BoxShapePart_3(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kBoxShapePart_3Layout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kBoxShapePart_3Layout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t unknown_0_address() const { return address + 0; }
+  uint32_t unknown_0() const { return on_host() ? uint32_t(data()->unknown_0) : uint32_t(guest::LoadU32(base, address + 0)); }
+  void set_unknown_0(uint32_t v) const { if (on_host()) data()->unknown_0 = v; else guest::StoreU32(base, address + 0, v); }
+  uint32_t unknown_0_bits() const { return on_host() ? data()->unknown_0 : guest::LoadU32(base, address + 0); }
+  void set_unknown_0_bits(uint32_t v) const { if (on_host()) data()->unknown_0 = v; else guest::StoreU32(base, address + 0, v); }
 };
 
 // The image words docs/functions/collision.md's code uses.

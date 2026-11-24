@@ -141,6 +141,8 @@ fields = [
 measure = "AppCamera"
 size = 368
 origin = "allocated"
+storage = "host"
+host_alloc = [0x82094760]
 vtable = 0x820026B8
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x820026B8" },
@@ -170,6 +172,8 @@ fields = [
 measures = ["AppCamera::Camera", "AppCamera.+28"]
 size = 832
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820A8C34]
 vtable = 0x820027B0
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "CameraVtable", note = "0x82001EC0 (Camera); 0x820027B0 for AppCameraCamera" },
@@ -229,6 +233,8 @@ fields = [
 measures = ["AppCameraList", "AppCamera.+32", "sub_820A9200.r3"]
 size = 8
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820A8C58]
 vtable = 0x82002780
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "AppCameraListVtable", note = "0x82002780" },
@@ -249,6 +255,8 @@ fields = [
 measure = "AppCameraEntry"
 size = 16
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820A8C7C, 0x820A8278, 0x820A82A0]
 vtable = 0x82002580
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82002580" },

@@ -92,6 +92,16 @@ measure = "new<16>@D3DXCreateBuffer"
 size = 16
 origin = "allocated"
 vtable = 0x82019DC0
+# In host memory (E5 step 4, 2026-11-24): made only by D3DXCreateBuffer's
+# XMemAlloc (returning at 0x822BE484), freed only by its deleting
+# destructor sub_822BE3E8's XMemFree of the object (0x822BE430; r3 0, as
+# LocalFree leaves it). The data block (+12) stays guest memory. Its
+# getters are shared leaves read through other types' views (File::GetSize
+# sub_822B80D8 at +12, WordAt8 sub_822BE2C8 at +8, XAudioVoice::AddRef
+# sub_8245F860 at +4): raw accesses the handles resolve.
+storage = "host"
+host_alloc = [0x822BE484]
+host_free = [{ call = 0x822BE430, reg = "r3", returns = 0 }]
 fields = [
   { name = "vtable", offset = 0, type = "u32" },
   { name = "ref_count", offset = 4, type = "u32" },
@@ -199,6 +209,12 @@ measures = ["FloatPairItem"]
 size = 16
 origin = "allocated"
 vtable = 0x82002518
+# In host memory (E5 step 4, 2026-11-24): made by sub_820A81C0's operator
+# new for kind 10 (returning at 0x820A822C), freed by its deleting
+# destructor sub_820A71C8's operator delete (0x820A71F8). Not seen in play.
+storage = "host"
+host_alloc = [0x820A822C]
+host_free = [{ call = 0x820A71F8, reg = "r3" }]
 fields = [
   { name = "vtable", offset = 0, type = "u32" },
   { name = "unknown_4", offset = 4, type = "u32", note = "0 when made" },
@@ -228,6 +244,12 @@ measure = "new<16>@sub_820A81C0"
 size = 16
 origin = "allocated"
 vtable = 0x82002628
+# In host memory (E5 step 4, 2026-11-24): made by sub_820A81C0's operator
+# new for kind 11 (returning at 0x820A8204), freed by its deleting
+# destructor sub_820A7C00's operator delete (0x820A7C30). Not seen in play.
+storage = "host"
+host_alloc = [0x820A8204]
+host_free = [{ call = 0x820A7C30, reg = "r3" }]
 fields = [
   { name = "vtable", offset = 0, type = "u32" },
   { name = "unknown_4", offset = 4, type = "u32", note = "0 when made" },
@@ -239,6 +261,13 @@ fields = [
 measure = "new<20>@sub_820A7AF8"
 size = 20
 origin = "allocated"
+# In host memory (E5 step 4, 2026-11-24, as FloatPair): made by
+# sub_820A7AF8's operator new (returning at 0x820A7B28), freed by
+# FloatTripleItem's destructor sub_820A7B78's operator delete (0x820A7BA0).
+# Not seen in play.
+storage = "host"
+host_alloc = [0x820A7B28]
+host_free = [{ call = 0x820A7BA0, reg = "r3" }]
 fields = [
   { name = "flag", offset = 0, type = "u8", note = "1 when made" },
   { name = "a", offset = 4, type = "f32", note = "a, b and c set to the float at 0x82000A34" },
@@ -253,6 +282,13 @@ measure = "new<64>@sub_820A81C0"
 size = 64
 origin = "allocated"
 vtable = 0x820025D8
+# In host memory (E5 step 4, 2026-11-24): made by sub_820A81C0's operator
+# new for kind 9 (returning at 0x820A8254); freed by the base's deleting
+# destructor sub_820A70B0 (its vtable's slot 0, shared with every
+# VtableObject), whose operator delete tells handles from guest addresses.
+# Not seen in play.
+storage = "host"
+host_alloc = [0x820A8254]
 fields = [
   { name = "vtable", offset = 0, type = "u32" },
   { name = "unknown_4", offset = 4, type = "u32" },
@@ -273,6 +309,16 @@ fields = [
 measures = ["sub_825788C0.r3", "new<8>@sub_825788C0"]
 size = 8
 origin = "allocated"
+# Dual (E5 step 4, 2026-11-24): the copies sub_825788C0 makes are host
+# (its XMemAlloc returning at 0x8257899C; freed by its own XMemFree on
+# failure, 0x82578ADC, and by sub_82578AF0's when the engine's call fails,
+# 0x82578BEC; r3 0, as LocalFree leaves it); the list it copies (r3, its
+# caller's argument +4) may be guest memory. The entries block (+4) stays
+# guest memory. Voice (XHV) code: Dropped, never runs.
+storage = "dual"
+host_alloc = [0x8257899C]
+host_free = [{ call = 0x82578ADC, reg = "r3", returns = 0 },
+             { call = 0x82578BEC, reg = "r3", returns = 0 }]
 fields = [
   { name = "count", offset = 0, type = "u8" },
   { name = "entries", offset = 4, type = "u32", note = "count 12-byte entries, compared by their first byte" },

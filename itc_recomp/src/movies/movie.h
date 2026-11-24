@@ -1,6 +1,7 @@
 // The game's movie class (`Movie`, vtable 0x82002910, docs/functions/movies.md)
 // on our own player (movies/player.h) instead of the movie library linked into
-// the game: its slots 0-7 as plain C++ over the guest object. The object keeps
+// the game: its slots 0-7 as plain C++ over the object (in host memory since
+// E5 step 4, schema::Movie). The object keeps
 // its state at +308 (0 none, 1 loaded or ended, 2 playing, 3 paused), which
 // the game reads, and its path at +48; the player is ours, one a movie
 // object. The open's command at +12 is no longer run: its status at +24 is

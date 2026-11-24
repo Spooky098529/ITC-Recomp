@@ -83,9 +83,11 @@ uint64_t Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls
   menu.set_up_down_locked(0);
   menu.set_left_right_steps(0);
   menu.set_shoulders_step(0);
-  const uint64_t r3 = calls.Call(kVirtualAlloc, frame, 0x821AA3C4, 0,
-                                 schema::CarSettingsData::kSize, kMemCommit, kReadWrite);
-  const schema::CarSettingsData data(base, uint32_t(r3));
+  // The data lives in host memory (E5 step 4): the original's
+  // VirtualAlloc(764) returning to 0x821AA3C4; the global holds its handle
+  // (Destroy's VirtualFree frees it).
+  const schema::CarSettingsData data = schema::CarSettingsData::New(base);
+  const uint64_t r3 = data.address;
   G::set_data(base, data);
   data.set_unknown_748(0);
   data.set_unknown_760(21);

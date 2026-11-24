@@ -389,7 +389,7 @@ uint32_t DeferRelease(uint8_t* base, uint32_t items, uint32_t count, uint32_t sp
   // original's other registers are what they are, as here).
   auto slot = [&](uint32_t entry, uint32_t slot_offset, uint32_t return_address) {
     const uint32_t object = guest::LoadU32(base, entry);
-    const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, object) + slot_offset);
+    const uint32_t function = guest::LoadU32(base, guest::VtableWord(base, object) + slot_offset);
     return call(function, frame, return_address, {object}, std::nullopt);
   };
   for (uint32_t i = 0, entry = items + 4; i < count; i++, entry += 16) {

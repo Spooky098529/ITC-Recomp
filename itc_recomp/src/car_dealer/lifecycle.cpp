@@ -16,21 +16,28 @@ namespace {
 constexpr uint32_t kMemRelease = 0x8000;
 
 // Frees a list's entries from the last: the list (a CarDealerList or the
-// CarDealerColors, `L`) at the data's `at`, the data reloaded after each
-// free as the originals do. The last VirtualFree's r3 (`r3` when none).
-template <typename L>
-uint64_t FreeEntries(uint8_t* base, uint32_t (Data::*at)() const, uint32_t frame, uint32_t lr,
-                     uint64_t r3, const Calls& calls) {
+// CarDealerColors) `at` gives from the data, the data reloaded after each
+// free as the originals do. The entries are host objects of type `E` (E5
+// step 4: CarDealerEntry, CarDealerSwatch), freed by their Delete in place
+// of the VirtualFree at the original's `lr`. 1 (VirtualFree's answer) after
+// a free, `r3` when none.
+template <typename E, typename At>
+uint64_t FreeEntries(uint8_t* base, At at, uint64_t r3) {
   Data data = G::data(base);
-  while (L(base, (data.*at)()).count() != 0) {
-    const L list(base, (data.*at)());
+  while (at(data).count() != 0) {
+    const auto list = at(data);
     const uint32_t n = list.count() - 1;
     list.set_count(n);
-    r3 = calls.Call(kVirtualFree, frame, lr, Load(base, (n << 2) + list.address), 0, kMemRelease);
+    E(base, uint32_t(list.load_at(n << 2, 4))).Delete();
+    r3 = 1;
     data = G::data(base);
   }
   return r3;
 }
+
+List FirstList(const Data& data) { return data.first_list(); }
+List SecondList(const Data& data) { return data.second_list(); }
+Colors ColorsOf(const Data& data) { return data.colors(); }
 
 }  // namespace
 
@@ -38,9 +45,9 @@ uint64_t Unload(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls
   ITC_NATIVE_RUNNING("sub_821816B8 CarDealer::Unload");
   const uint32_t frame = Frame(base, sp, 128);
   uint64_t r3 = machine;
-  r3 = FreeEntries<List>(base, &Data::first_list_address, frame, 0x821816FC, r3, calls);
-  r3 = FreeEntries<List>(base, &Data::second_list_address, frame, 0x82181734, r3, calls);
-  r3 = FreeEntries<Colors>(base, &Data::colors_address, frame, 0x8218176C, r3, calls);
+  r3 = FreeEntries<Entry>(base, FirstList, r3);    // 0x821816FC
+  r3 = FreeEntries<Entry>(base, SecondList, r3);   // 0x82181734
+  r3 = FreeEntries<Swatch>(base, ColorsOf, r3);    // 0x8218176C
   const uint32_t movie = FindMovie(base, 4, frame + 80);
   r3 = calls.Call(kFinishAll, frame, 0x8218179C, movie);
   const Machine m(base, machine);
@@ -58,8 +65,8 @@ uint64_t Close(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp, cons
   const uint32_t movie = FindMovie(base, 4, frame + 80);
   calls.Call(kFinishAll, frame, 0x8218187C, movie);
   uint64_t r3 = calls.Call(kMoviesDelete, frame, 0x82181884, 4);
-  r3 = FreeEntries<List>(base, &Data::first_list_address, frame, 0x821818B4, r3, calls);
-  r3 = FreeEntries<List>(base, &Data::second_list_address, frame, 0x821818F0, r3, calls);
+  r3 = FreeEntries<Entry>(base, FirstList, r3);   // 0x821818B4
+  r3 = FreeEntries<Entry>(base, SecondList, r3);  // 0x821818F0
   Post(base, mode, 4);
   return r3;
 }
@@ -78,8 +85,10 @@ uint64_t Destroy(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& call
   calls.Call(kVirtualFree, frame, 0x82180ED4, G::pages(base).address, 0, kMemRelease);
   calls.Call(kVirtualFree, frame, 0x82180EE4, G::list_menu(base).address, 0, kMemRelease);
   calls.Call(kVirtualFree, frame, 0x82180EF8, G::color_menu(base).address, 0, kMemRelease);
-  const uint64_t r3 =
-      calls.Call(kVirtualFree, frame, 0x82180F08, G::data(base).address, 0, kMemRelease);
+  // A host object (E5 step 4): its Delete in place of the VirtualFree at
+  // 0x82180F08 (which answers 1).
+  G::data(base).Delete();
+  const uint64_t r3 = 1;
   G::set_pages(base, 0);
   G::set_list_menu(base, 0);
   G::set_data(base, 0);
@@ -107,10 +116,10 @@ uint64_t BuildLists(uint8_t* base, uint32_t sp, const Calls& calls) {
   const Save save(base, vehicle_accessors::SaveDataOf(base, 0));
   uint64_t r3 = save.address;
   {
-    const uint32_t to = G::data(base).pick_address();
+    uint8_t* to = G::data(base).pick();  // guest order (a host object, E5 step 4)
     const int32_t day = int32_t(save.day());
     for (uint32_t k = 0; k < 5; k++) {
-      Store(base, to + 4 * k, Load(base, save.pick_address() + 4 * k));
+      schema::host::StoreU32(to + 4 * k, Load(base, save.pick_address() + 4 * k));
     }
     const uint32_t money = save.money();
     const int32_t week = day / 7;
@@ -128,20 +137,23 @@ uint64_t BuildLists(uint8_t* base, uint32_t sp, const Calls& calls) {
     if ((word & (1u << (id & 31))) == 0) {
       continue;
     }
-    const Entry entry(base,
-                      uint32_t(calls.Call(kVirtualAlloc, frame, 0x821814CC, 0, 8448, 4096, 4)));
+    // A host object (E5 step 4) in place of the VirtualAlloc(8448) at
+    // 0x821814CC; the memcpy below takes its handle (each field swapped).
+    const Entry entry = Entry::New(base);
     entry.set_car_id(uint32_t(id));
     const uint32_t spec = car_specs::GetCarSpec(base, uint32_t(id));
     r3 = calls.Call(kMemcpy, frame, 0x821814EC, entry.address, spec, 8432);
     const int8_t kind = int8_t(entry.list_kind());
     if (kind == 0 || kind == 1) {
       const Data data = G::data(base);
-      const List list(base, kind == 0 ? data.first_list_address() : data.second_list_address());
+      const List list = kind == 0 ? data.first_list() : data.second_list();
       const uint32_t n = list.count();
       list.set_count(n + 1);
-      Store(base, (n << 2) + list.address, entry.address);
+      list.store_at(n << 2, 4, entry.address);
     } else {
-      r3 = calls.Call(kVirtualFree, frame, 0x82181540, entry.address, 0, kMemRelease);
+      // Its Delete in place of the VirtualFree at 0x82181540 (which answers 1).
+      entry.Delete();
+      r3 = 1;
     }
   }
   return r3;
@@ -208,9 +220,9 @@ uint64_t Buy(uint8_t* base, uint32_t sp, const Calls& calls) {
     const uint32_t movie = FindMovie(base, 4, frame + 80);
     save.set_selected_car(uint32_t(last));
     calls.Call(kPickNext, frame, 0x82183018, save.address, 1);
-    const uint32_t to = G::data(base).pick_address();
+    uint8_t* to = G::data(base).pick();  // guest order (a host object, E5 step 4)
     for (uint32_t k = 0; k < 5; k++) {
-      Store(base, to + 4 * k, Load(base, save.pick_address() + 4 * k));
+      schema::host::StoreU32(to + 4 * k, Load(base, save.pick_address() + 4 * k));
     }
     r3 = calls.Call(kSetChildNameText, frame, 0x82183058, movie, 15, 6,
                     G::data(base).pick_address());

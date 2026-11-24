@@ -84,27 +84,35 @@ fields = [
 # The type 10 mode's block (19,300 bytes at the mode's +848; known-data.md:
 # "type 10 mode block"): the replay theater's machine at +0, the save
 # screen's at +9640, the shown machine's index and the next mode's answer.
+# In host memory (E5 step 4): made by ModeType10::Init (the original's
+# VirtualAlloc(19300) at 0x8228897C; src/type10_mode/mode.cpp's New), freed
+# by ModeType10::Release (FreeBlock's memory::FreePages, which takes the
+# handle; src/front_end_screen_helpers/releases.cpp); the mode's +848 holds
+# its handle. Its two machines are embedded (the theater's host, the save
+# screen's dual: four other modes' blocks embed it too); the words below
+# over them are the embeds' words, kept as bytes for the measure.
 [ModeType10Block]
 measures = ["new<19300>@ModeType10::Init", "ModeType10.+816", "ModeType10::WaitForLoads.r4.+848",
             "ModeType10::WaitForShown.r4.+848", "ModeType10::NextMode.r4.+848",
             "ModeType10::Leaving.r4.+848", "ModeType9::NextModeAnswer.r4.+848"]
 size = 19300
 origin = "allocated"
+storage = "host"
 fields = [
-  { name = "theater", offset = 0, type = "bytes", count = 9620, note = "the replay theater's machine (ReplayTheaterMachine)" },
-  { name = "theater_state", offset = 9604, type = "u32" },
-  { name = "theater_loaded", offset = 9608, type = "u32", note = "movie 45 loaded" },
-  { name = "theater_reenter", offset = 9612, type = "u32", note = "1 at Init: open on message 5" },
-  { name = "theater_delete_movie", offset = 9616, type = "u32", note = "0 at Init" },
-  { name = "save_screen", offset = 9640, type = "bytes", count = 9620, note = "the save screen's machine (Type10SaveScreen::Init, save-screen.md)" },
-  { name = "save_screen_state", offset = 19244, type = "u32", note = "5 shown (Interrupt)" },
-  { name = "save_screen_loaded", offset = 19248, type = "u32" },
-  { name = "save_screen_reenter", offset = 19252, type = "u32", note = "1 at Init" },
-  { name = "save_screen_delete_movie", offset = 19256, type = "u32", note = "0 at Init" },
+  { name = "theater", offset = 0, type = "embed", to = "ReplayTheaterMachine", note = "the replay theater's machine" },
+  { name = "theater_state", offset = 9604, type = "bytes", count = 4, note = "the theater's state (a word of the theater embed)" },
+  { name = "theater_loaded", offset = 9608, type = "bytes", count = 4, note = "movie 45 loaded (a word of the theater embed)" },
+  { name = "theater_reenter", offset = 9612, type = "bytes", count = 4, note = "1 at Init: open on message 5 (a word of the theater embed)" },
+  { name = "theater_delete_movie", offset = 9616, type = "bytes", count = 4, note = "0 at Init (a word of the theater embed)" },
+  { name = "save_screen", offset = 9640, type = "embed", to = "SaveScreen", note = "the save screen's machine (Type10SaveScreen::Init, save-screen.md)" },
+  { name = "save_screen_state", offset = 19244, type = "bytes", count = 4, note = "5 shown (Interrupt; a word of the save_screen embed)" },
+  { name = "save_screen_loaded", offset = 19248, type = "bytes", count = 4, note = "a word of the save_screen embed" },
+  { name = "save_screen_reenter", offset = 19252, type = "bytes", count = 4, note = "1 at Init (the embed's load_at_once)" },
+  { name = "save_screen_delete_movie", offset = 19256, type = "u32", note = "0 at Init (the machine's word after SaveScreen's 9,616 bytes)" },
   { name = "shown", offset = 19280, type = "u32", note = "the shown machine's index: 0 the theater, 1 the save screen (FindShown)" },
   { name = "shown_at_init", offset = 19284, type = "u32", note = "0 at Init (readers not looked for)" },
-  { name = "answer", offset = 19292, type = "u64", note = "the next mode's 8-byte answer ForceExit writes and NextModeAnswer hands to Modes::Tick (ModeAnswer)" },
   { name = "answer_word0", offset = 19292, type = "u32", note = "the answer's first word (changed and three bytes), as NextModeAnswer copies it" },
+  { name = "answer", offset = 19292, type = "u64", note = "the next mode's 8-byte answer ForceExit writes and NextModeAnswer hands to Modes::Tick (ModeAnswer)" },
   { name = "answer_next_type", offset = 19296, type = "u32", note = "the answer's next mode type (4 or 12 from ForceExit)" },
 ]
 
@@ -114,25 +122,28 @@ fields = [
 # halfwords and words at +0 to +32), the transitions' r3 (the page object's
 # started word, +0) and the pages' r3 (the dispatcher: +804, +808) with it:
 # the "measure fault" fields.
+# In host memory (E5 step 4): embedded only in ModeType10Block (its +0).
+# The measure's faults are named fault_ (never members).
 [ReplayTheaterMachine]
 measure = "ReplayTheater"
 size = 9620
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "transitions", offset = 0, type = "bytes", count = 9600, note = "200 transitions, 48 bytes each (StateTransition)" },
-  { name = "step_started", offset = 0, type = "u32", note = "measure fault: the transitions' r3 (PageObject.step_started), and ShowRecord's record's word_0 (SaveReplayRecord)" },
-  { name = "record_year", offset = 0, type = "u16", note = "measure fault: ShowRecord's record (SaveReplayRecord.year)" },
-  { name = "record_month", offset = 2, type = "u16", note = "measure fault: SaveReplayRecord.month" },
-  { name = "record_day", offset = 6, type = "u16", note = "measure fault: SaveReplayRecord.day" },
-  { name = "record_hour", offset = 8, type = "u16", note = "measure fault: SaveReplayRecord.hour" },
-  { name = "record_minute", offset = 10, type = "u16", note = "measure fault: SaveReplayRecord.minute" },
-  { name = "record_time", offset = 16, type = "u32", note = "measure fault: SaveReplayRecord.time" },
-  { name = "record_mode", offset = 20, type = "u32", note = "measure fault: SaveReplayRecord.mode" },
-  { name = "record_course", offset = 24, type = "u32", note = "measure fault: SaveReplayRecord.course" },
-  { name = "record_number", offset = 28, type = "u32", note = "measure fault: SaveReplayRecord.number" },
-  { name = "record_result", offset = 32, type = "u32", note = "measure fault: SaveReplayRecord.result" },
-  { name = "ring_count", offset = 804, type = "u32", note = "measure fault: the pages' r3 is the dispatcher (ModeDispatcher.ring_count)" },
-  { name = "ring_start", offset = 808, type = "u32", note = "measure fault: the pages' r3 is the dispatcher (ModeDispatcher.ring_start)" },
+  { name = "fault_step_started", offset = 0, type = "u32", note = "measure fault: the transitions' r3 (PageObject.step_started), and ShowRecord's record's word_0 (SaveReplayRecord)" },
+  { name = "fault_record_year", offset = 0, type = "u16", note = "measure fault: ShowRecord's record (SaveReplayRecord.year)" },
+  { name = "fault_record_month", offset = 2, type = "u16", note = "measure fault: SaveReplayRecord.month" },
+  { name = "fault_record_day", offset = 6, type = "u16", note = "measure fault: SaveReplayRecord.day" },
+  { name = "fault_record_hour", offset = 8, type = "u16", note = "measure fault: SaveReplayRecord.hour" },
+  { name = "fault_record_minute", offset = 10, type = "u16", note = "measure fault: SaveReplayRecord.minute" },
+  { name = "fault_record_time", offset = 16, type = "u32", note = "measure fault: SaveReplayRecord.time" },
+  { name = "fault_record_mode", offset = 20, type = "u32", note = "measure fault: SaveReplayRecord.mode" },
+  { name = "fault_record_course", offset = 24, type = "u32", note = "measure fault: SaveReplayRecord.course" },
+  { name = "fault_record_number", offset = 28, type = "u32", note = "measure fault: SaveReplayRecord.number" },
+  { name = "fault_record_result", offset = 32, type = "u32", note = "measure fault: SaveReplayRecord.result" },
+  { name = "fault_ring_count", offset = 804, type = "u32", note = "measure fault: the pages' r3 is the dispatcher (ModeDispatcher.ring_count)" },
+  { name = "fault_ring_start", offset = 808, type = "u32", note = "measure fault: the pages' r3 is the dispatcher (ModeDispatcher.ring_start)" },
   { name = "transition_count", offset = 9600, type = "u32" },
   { name = "state", offset = 9604, type = "u32", note = "1 or 9 at Create, 4 to start, 5 running, 7 leaving, 8 unloading, 9 waiting, 11 the race (a replay loaded), 14 the title (Destroy)" },
   { name = "loaded", offset = 9608, type = "u32", note = "movie 45 loaded" },

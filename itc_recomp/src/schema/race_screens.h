@@ -554,85 +554,173 @@ struct RaceDialogData : View {
 };
 
 // allocated; measure: CareerResults
+#pragma pack(push, 1)
+struct CareerResultsScreenData {
+  uint32_t kind = 0;  // +0
+  uint32_t opponent_prize = 0;  // +4
+  uint32_t win_prize = 0;  // +8
+  float streak_factor = 0;  // +12
+  uint32_t prize = 0;  // +16
+  uint32_t item_bonus = 0;  // +20
+  float entry_value = 0;  // +24
+  uint32_t entry_points = 0;  // +28
+  uint8_t pairs[128] = {};  // +32, guest order
+  uint32_t pair_count = 0;  // +160
+  uint32_t money = 0;  // +164
+  uint32_t total = 0;  // +168
+  uint32_t entry = 0;  // +172
+  uint8_t pad_176[4] = {};
+  uint32_t movie = 0;  // +180
+  uint32_t pages_page = 0;  // +184
+  uint32_t pages_next_page = 0;  // +188
+  uint32_t pages_previous_page = 0;  // +192
+  uint32_t pages_step = 0;  // +196
+  uint32_t pages_queued_step = 0;  // +200
+  uint32_t pages_unknown_20 = 0;  // +204
+  uint32_t pages_step_started = 0;  // +208
+};
+#pragma pack(pop)
+static_assert(sizeof(CareerResultsScreenData) == 212);
+inline constexpr memory::LayoutField kCareerResultsScreenFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 4}, {24, 4}, {28, 4}, {160, 4}, {164, 4}, {168, 4}, {172, 4}, {180, 4}, {184, 4}, {188, 4}, {192, 4}, {196, 4}, {200, 4}, {204, 4}, {208, 4}};
+inline constexpr memory::Layout kCareerResultsScreenLayout = {kCareerResultsScreenFields, 20};
+
 struct CareerResultsScreen : View {
   using View::View;
   static constexpr uint32_t kSize = 212;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  CareerResultsScreenData* data() const { return static_cast<CareerResultsScreenData*>(memory::HandleObject(address)); }
+  static CareerResultsScreen New(uint8_t* base) {
+    return CareerResultsScreen(base, memory::MakeHandle(new CareerResultsScreenData(), sizeof(CareerResultsScreenData), "CareerResultsScreen", &kCareerResultsScreenLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static CareerResultsScreen NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(CareerResultsScreenData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<CareerResultsScreenData*>(::operator new(sizeof(CareerResultsScreenData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) CareerResultsScreenData();
+    return CareerResultsScreen(base, memory::MakeHandle(p, sizeof(CareerResultsScreenData) * count, "CareerResultsScreen", &kCareerResultsScreenLayout, sizeof(CareerResultsScreenData)));
+  }
+  CareerResultsScreen at(uint32_t i) const { return CareerResultsScreen(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCareerResultsScreenLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCareerResultsScreenLayout, offset, width, v); }
   // 0 to 2 by the race's result; the transitions' r3 (the step word, +208) is also measured here (a measure fault)
-  uint32_t kind() const { return guest::LoadU32(base, address + 0); }
-  void set_kind(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t kind_address() const { return address + 0; }
+  uint32_t kind() const { return data()->kind; }
+  void set_kind(uint32_t v) const { data()->kind = v; }
+  uint32_t kind_bits() const { return data()->kind; }
+  void set_kind_bits(uint32_t v) const { data()->kind = v; }
   // the opponents' prizes summed
-  uint32_t opponent_prize() const { return guest::LoadU32(base, address + 4); }
-  void set_opponent_prize(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t opponent_prize_address() const { return address + 4; }
+  uint32_t opponent_prize() const { return data()->opponent_prize; }
+  void set_opponent_prize(uint32_t v) const { data()->opponent_prize = v; }
+  uint32_t opponent_prize_bits() const { return data()->opponent_prize; }
+  void set_opponent_prize_bits(uint32_t v) const { data()->opponent_prize = v; }
   // the win's prize by the race's time
-  uint32_t win_prize() const { return guest::LoadU32(base, address + 8); }
-  void set_win_prize(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t win_prize_address() const { return address + 8; }
+  uint32_t win_prize() const { return data()->win_prize; }
+  void set_win_prize(uint32_t v) const { data()->win_prize = v; }
+  uint32_t win_prize_bits() const { return data()->win_prize; }
+  void set_win_prize_bits(uint32_t v) const { data()->win_prize = v; }
   // by the day's win streak
-  float streak_factor() const { return guest::LoadFloat(base, address + 12); }
-  void set_streak_factor(float v) const { guest::StoreFloat(base, address + 12, v); }
   uint32_t streak_factor_address() const { return address + 12; }
+  float streak_factor() const { return data()->streak_factor; }
+  void set_streak_factor(float v) const { data()->streak_factor = v; }
+  uint32_t streak_factor_bits() const { return std::bit_cast<uint32_t>(data()->streak_factor); }
+  void set_streak_factor_bits(uint32_t v) const { data()->streak_factor = std::bit_cast<float>(v); }
   // (opponent_prize + win_prize) x streak_factor
-  uint32_t prize() const { return guest::LoadU32(base, address + 16); }
-  void set_prize(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
   uint32_t prize_address() const { return address + 16; }
+  uint32_t prize() const { return data()->prize; }
+  void set_prize(uint32_t v) const { data()->prize = v; }
+  uint32_t prize_bits() const { return data()->prize; }
+  void set_prize_bits(uint32_t v) const { data()->prize = v; }
   // the opponents' item bonuses summed
-  uint32_t item_bonus() const { return guest::LoadU32(base, address + 20); }
-  void set_item_bonus(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
   uint32_t item_bonus_address() const { return address + 20; }
+  uint32_t item_bonus() const { return data()->item_bonus; }
+  void set_item_bonus(uint32_t v) const { data()->item_bonus = v; }
+  uint32_t item_bonus_bits() const { return data()->item_bonus; }
+  void set_item_bonus_bits(uint32_t v) const { data()->item_bonus = v; }
   // the result's float +844; the entries' first
-  float entry_value() const { return guest::LoadFloat(base, address + 24); }
-  void set_entry_value(float v) const { guest::StoreFloat(base, address + 24, v); }
   uint32_t entry_value_address() const { return address + 24; }
+  float entry_value() const { return data()->entry_value; }
+  void set_entry_value(float v) const { data()->entry_value = v; }
+  uint32_t entry_value_bits() const { return std::bit_cast<uint32_t>(data()->entry_value); }
+  void set_entry_value_bits(uint32_t v) const { data()->entry_value = std::bit_cast<float>(v); }
   // entry_value x the scale, truncated
-  uint32_t entry_points() const { return guest::LoadU32(base, address + 28); }
-  void set_entry_points(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
   uint32_t entry_points_address() const { return address + 28; }
+  uint32_t entry_points() const { return data()->entry_points; }
+  void set_entry_points(uint32_t v) const { data()->entry_points = v; }
+  uint32_t entry_points_bits() const { return data()->entry_points; }
+  void set_entry_points_bits(uint32_t v) const { data()->entry_points = v; }
   // (float, int) pairs, 8 bytes each, pair_count of them
   uint32_t pairs_address() const { return address + 32; }
-  uint32_t pair_count() const { return guest::LoadU32(base, address + 160); }
-  void set_pair_count(uint32_t v) const { guest::StoreU32(base, address + 160, v); }
+  uint8_t* pairs() const { return reinterpret_cast<uint8_t*>(data()) + 32; }
   uint32_t pair_count_address() const { return address + 160; }
+  uint32_t pair_count() const { return data()->pair_count; }
+  void set_pair_count(uint32_t v) const { data()->pair_count = v; }
+  uint32_t pair_count_bits() const { return data()->pair_count; }
+  void set_pair_count_bits(uint32_t v) const { data()->pair_count = v; }
   // the save data's +6116 before the prize
-  uint32_t money() const { return guest::LoadU32(base, address + 164); }
-  void set_money(uint32_t v) const { guest::StoreU32(base, address + 164, v); }
   uint32_t money_address() const { return address + 164; }
+  uint32_t money() const { return data()->money; }
+  void set_money(uint32_t v) const { data()->money = v; }
+  uint32_t money_bits() const { return data()->money; }
+  void set_money_bits(uint32_t v) const { data()->money = v; }
   // prize + item_bonus + entry_points + money, at least 0
-  uint32_t total() const { return guest::LoadU32(base, address + 168); }
-  void set_total(uint32_t v) const { guest::StoreU32(base, address + 168, v); }
   uint32_t total_address() const { return address + 168; }
+  uint32_t total() const { return data()->total; }
+  void set_total(uint32_t v) const { data()->total = v; }
+  uint32_t total_bits() const { return data()->total; }
+  void set_total_bits(uint32_t v) const { data()->total = v; }
   // the entry NextEntry shows
-  uint32_t entry() const { return guest::LoadU32(base, address + 172); }
-  void set_entry(uint32_t v) const { guest::StoreU32(base, address + 172, v); }
   uint32_t entry_address() const { return address + 172; }
+  uint32_t entry() const { return data()->entry; }
+  void set_entry(uint32_t v) const { data()->entry = v; }
+  uint32_t entry_bits() const { return data()->entry; }
+  void set_entry_bits(uint32_t v) const { data()->entry = v; }
   // UI movie 6
-  View movie() const { return View(base, guest::LoadU32(base, address + 180)); }
-  void set_movie(uint32_t v) const { guest::StoreU32(base, address + 180, v); }
   uint32_t movie_address() const { return address + 180; }
+  View movie() const { return View(base, data()->movie); }
+  void set_movie(uint32_t v) const { data()->movie = v; }
+  uint32_t movie_bits() const { return data()->movie; }
+  void set_movie_bits(uint32_t v) const { data()->movie = v; }
   // its page object (PageObject) at +184: the page
-  uint32_t pages_page() const { return guest::LoadU32(base, address + 184); }
-  void set_pages_page(uint32_t v) const { guest::StoreU32(base, address + 184, v); }
   uint32_t pages_page_address() const { return address + 184; }
-  uint32_t pages_next_page() const { return guest::LoadU32(base, address + 188); }
-  void set_pages_next_page(uint32_t v) const { guest::StoreU32(base, address + 188, v); }
+  uint32_t pages_page() const { return data()->pages_page; }
+  void set_pages_page(uint32_t v) const { data()->pages_page = v; }
+  uint32_t pages_page_bits() const { return data()->pages_page; }
+  void set_pages_page_bits(uint32_t v) const { data()->pages_page = v; }
   uint32_t pages_next_page_address() const { return address + 188; }
-  uint32_t pages_previous_page() const { return guest::LoadU32(base, address + 192); }
-  void set_pages_previous_page(uint32_t v) const { guest::StoreU32(base, address + 192, v); }
+  uint32_t pages_next_page() const { return data()->pages_next_page; }
+  void set_pages_next_page(uint32_t v) const { data()->pages_next_page = v; }
+  uint32_t pages_next_page_bits() const { return data()->pages_next_page; }
+  void set_pages_next_page_bits(uint32_t v) const { data()->pages_next_page = v; }
   uint32_t pages_previous_page_address() const { return address + 192; }
+  uint32_t pages_previous_page() const { return data()->pages_previous_page; }
+  void set_pages_previous_page(uint32_t v) const { data()->pages_previous_page = v; }
+  uint32_t pages_previous_page_bits() const { return data()->pages_previous_page; }
+  void set_pages_previous_page_bits(uint32_t v) const { data()->pages_previous_page = v; }
   // the running transition, -1 none
-  uint32_t pages_step() const { return guest::LoadU32(base, address + 196); }
-  void set_pages_step(uint32_t v) const { guest::StoreU32(base, address + 196, v); }
   uint32_t pages_step_address() const { return address + 196; }
-  uint32_t pages_queued_step() const { return guest::LoadU32(base, address + 200); }
-  void set_pages_queued_step(uint32_t v) const { guest::StoreU32(base, address + 200, v); }
+  uint32_t pages_step() const { return data()->pages_step; }
+  void set_pages_step(uint32_t v) const { data()->pages_step = v; }
+  uint32_t pages_step_bits() const { return data()->pages_step; }
+  void set_pages_step_bits(uint32_t v) const { data()->pages_step = v; }
   uint32_t pages_queued_step_address() const { return address + 200; }
-  uint32_t pages_unknown_20() const { return guest::LoadU32(base, address + 204); }
-  void set_pages_unknown_20(uint32_t v) const { guest::StoreU32(base, address + 204, v); }
+  uint32_t pages_queued_step() const { return data()->pages_queued_step; }
+  void set_pages_queued_step(uint32_t v) const { data()->pages_queued_step = v; }
+  uint32_t pages_queued_step_bits() const { return data()->pages_queued_step; }
+  void set_pages_queued_step_bits(uint32_t v) const { data()->pages_queued_step = v; }
   uint32_t pages_unknown_20_address() const { return address + 204; }
-  uint32_t pages_step_started() const { return guest::LoadU32(base, address + 208); }
-  void set_pages_step_started(uint32_t v) const { guest::StoreU32(base, address + 208, v); }
+  uint32_t pages_unknown_20() const { return data()->pages_unknown_20; }
+  void set_pages_unknown_20(uint32_t v) const { data()->pages_unknown_20 = v; }
+  uint32_t pages_unknown_20_bits() const { return data()->pages_unknown_20; }
+  void set_pages_unknown_20_bits(uint32_t v) const { data()->pages_unknown_20 = v; }
   uint32_t pages_step_started_address() const { return address + 208; }
+  uint32_t pages_step_started() const { return data()->pages_step_started; }
+  void set_pages_step_started(uint32_t v) const { data()->pages_step_started = v; }
+  uint32_t pages_step_started_bits() const { return data()->pages_step_started; }
+  void set_pages_step_started_bits(uint32_t v) const { data()->pages_step_started = v; }
 };
 
 // allocated; measure: new<4>@AfterRaceMenu::Create, AfterRaceMenu

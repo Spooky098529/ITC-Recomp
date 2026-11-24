@@ -27,6 +27,11 @@ measure = "RouteRange"
 measures = ["RouteRange::Advance.r4", "RouteRange::AddBranch.r3"]
 size = 1064
 origin = "embedded"
+# Dual (E5 step 4): in the track zones (host) and on the stack and in the
+# camera modes' objects (guest). Its two List64s (+12, +536) are covered by
+# its own fields, so they aren't embed fields (a second copy of the same
+# scalars in the layout would swap them twice in a copy).
+storage = "dual"
 # 9 functions; areas: camera-modes.md, track-zones.md
 fields = [
   { name = "state", offset = 0, type = "u32", note = "0 off, 1 set up or outside, 2 on the range (RouteRange::Update)" },
@@ -59,6 +64,11 @@ fields = [
 measure = "TrackZones"
 size = 1199156
 origin = "allocated"
+# Host (E5 step 4): made by TrackZones::Create (the hand port's New; the
+# lifted original's operator new at 0x8228E7B4), freed by
+# TrackZones::Destroy. Its List128 at +0 is covered by its own fields.
+storage = "host"
+host_alloc = [0x8228E7B4]
 # 3 functions; areas: track-zones.md
 fields = [
   { name = "nodes", offset = 0, type = "bytes", count = 512, note = "the zone list (a List128 from +0): its 128 nodes" },
@@ -69,6 +79,7 @@ fields = [
   { name = "count", offset = 520, type = "u16", note = "the zone list's count (70 once made)" },
   { name = "listed_zones", offset = 524, type = "bytes", count = 512, note = "the zone list's 128 words: the zones' addresses" },
   { name = "zones", offset = 1036, type = "bytes", count = 1198120, note = "the 70 zones (TrackZone), 17,116 bytes apart; zone i's vtable 0x82011AF0 + 12 x i" },
+  { name = "zone", offset = 1036, type = "embed", to = "TrackZone", count = 70, note = "the 70 zones" },
 ]
 
 # A track zone (17,116 bytes, Zone::): up to 16 route ranges; inside while
@@ -79,6 +90,9 @@ measure = "Zone"
 measures = ["Zone0", "Zone1", "Zone2", "Zone3", "Zone4", "Zone5", "Zone6", "Zone7", "Zone8", "Zone9", "Zone10", "Zone11", "Zone12", "Zone13", "Zone14", "Zone15", "Zone16", "Zone17", "Zone18", "Zone19", "Zone20", "Zone21", "Zone22", "Zone23", "Zone24", "Zone25", "Zone26", "Zone27", "Zone28", "Zone29", "Zone30", "Zone31", "Zone32", "Zone33", "Zone34", "Zone35", "Zone36", "Zone37", "Zone38", "Zone39", "Zone40", "Zone41", "Zone42", "Zone43", "Zone44", "Zone45", "Zone46", "Zone47", "Zone48", "Zone49", "Zone50", "Zone51", "Zone52", "Zone53", "Zone54", "Zone55", "Zone56", "Zone57", "Zone58", "Zone59", "Zone60", "Zone61", "Zone62", "Zone63", "Zone64", "Zone65", "Zone66", "Zone67", "Zone68", "Zone69"]
 size = 17116
 origin = "embedded"
+# Host (E5 step 4): only inside TrackZones. Its range list at +4 is
+# covered by its own fields.
+storage = "host"
 # 3 functions; areas: track-zones.md
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82011AF0 + 12 x the zone: its set-up, Zone::Update, Zone::IsInside" },
@@ -89,6 +103,7 @@ fields = [
   { name = "range_list_70", offset = 74, type = "u16", note = "the range list's +70: -1 at reset, not read" },
   { name = "range_count", offset = 76, type = "u16", note = "the range list's count" },
   { name = "ranges", offset = 80, type = "bytes", count = 17024, note = "the range list's 16 RouteRanges, 1,064 bytes apart" },
+  { name = "range", offset = 80, type = "embed", to = "RouteRange", count = 16, note = "the range list's 16 RouteRanges" },
   { name = "index", offset = 17104, type = "u32", note = "its position in the owner's list" },
   { name = "vehicle", offset = 17108, type = "u32", note = "the vehicle checked (Racers::Vehicle)" },
   { name = "inside", offset = 17112, type = "u32", note = "1 while the vehicle's track position is in one of its ranges" },
@@ -100,6 +115,8 @@ fields = [
 measure = "ZoneRanges::Insert.r3"
 size = 17100
 origin = "embedded"
+# Host (E5 step 4): only inside a TrackZone (its +4).
+storage = "host"
 # 1 functions; areas: track-zones.md
 fields = [
   { name = "nodes", offset = 0, type = "bytes", count = 64, note = "16 nodes: (next, slot) halfwords" },
@@ -116,6 +133,8 @@ fields = [
 measure = "List128"
 size = 1036
 origin = "embedded"
+# Host (E5 step 4): only inside TrackZones (its +0).
+storage = "host"
 # 2 functions; areas: track-zones.md
 fields = [
   { name = "nodes", offset = 0, type = "bytes", count = 512, note = "128 nodes: (next, slot) halfwords" },
@@ -134,6 +153,9 @@ measure = "List64"
 measures = ["List64::Insert.r3"]
 size = 524
 origin = "embedded"
+# Dual (E5 step 4): in the route ranges (dual) and the scenery's lists
+# (guest).
+storage = "dual"
 # 2 functions; areas: track-zones.md
 fields = [
   { name = "nodes", offset = 0, type = "bytes", count = 256, note = "64 nodes: (next, slot) halfwords" },

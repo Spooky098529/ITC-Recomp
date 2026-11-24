@@ -102,8 +102,8 @@ uint64_t SetSpecTexts(uint8_t* base, uint32_t record, uint32_t sp, const Calls& 
 uint64_t ShowCarInfo(uint8_t* base, uint64_t index, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82182620 CarDealer::ShowCarInfo");
   const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t list = G::data(base).shown_list().address;
-  const Entry entry(base, Load(base, (uint32_t(index) << 2) + list));
+  const List list = G::data(base).shown_list();
+  const Entry entry(base, uint32_t(list.load_at(uint32_t(index) << 2, 4)));
   Store(base, frame + 80, entry.unknown_770());
   Store(base, frame + 88, entry.weight());
   Store(base, frame + 84, entry.unknown_709() != 0 ? 1 : 0);
@@ -135,7 +135,7 @@ uint64_t ShowSwatches(uint8_t* base, uint32_t sp) {
   const uint32_t movie = FindMovie(base, 4, frame + 80);
   const uint32_t row = ui_movies::FindNode(base, movie, 26, 1);
   uint64_t r3 = row;
-  const int32_t count = int32_t(Colors(base, G::data(base).colors_address()).count());
+  const int32_t count = int32_t(G::data(base).colors().count());
   const uint32_t scroll = G::list_menu(base).scroll();
   const int32_t shown = count < 9 ? count : 9;
   // The colors' records from the scroll on.
@@ -144,7 +144,7 @@ uint64_t ShowSwatches(uint8_t* base, uint32_t sp) {
     // The row's +100 read as a word (the group's first child index).
     const uint32_t first = Load(base, Node(base, row).width_address());
     const uint32_t node = ui_movies::FindNode(base, movie, 26, first + uint32_t(i));
-    const uint32_t record = Load(base, at + G::data(base).colors_address());
+    const uint32_t record = uint32_t(G::data(base).colors().load_at(at, 4));
     r3 = SetSwatchColor(base, node, record, frame);
     at += 4;
   }

@@ -140,11 +140,14 @@ fields = [
 
 # The users and sign-in object (framework + 128, system-services.md), as
 # the save interface reads it: sub_82490B08 (its count) and Users::SignedIn
-# (sub_820996D8).
+# (sub_820996D8). Dual (E5 step 4): the users (system-services.toml's
+# SysUsers) are in host memory, and sub_82490B08 is folded into two other
+# classes' vtables (0x8204DC58, 0x8204E388), a generic getter's type.
 [SignedInUsers]
 measures = ["Users", "sub_82490B08.r3"]
 size = 220
 origin = "allocated"
+storage = "dual"
 fields = [
   { name = "users", offset = 0, type = "bytes", count = 160, note = "4 users of 40 bytes; a user's +8 is nonzero when signed in" },
   { name = "order", offset = 200, type = "bytes", count = 16, note = "the users by index (4 words; Users::SignedIn's (index + 50) x 4)" },

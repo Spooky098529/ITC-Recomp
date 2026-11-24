@@ -74,13 +74,35 @@ void ClearAnswer(uint8_t* base, uint32_t answer) {
 // any other (whose words the originals read as they are).
 uint32_t MachineOf(const Block& block, uint32_t index) {
   if (index == 0) {
-    return block.event_address();
+    return block.event().address;
   }
-  return index == kResultIndex ? block.result_address() : 0;
+  return index == kResultIndex ? block.result().address : 0;
 }
 // The machine the block's +19280 names.
 uint32_t ShownMachine(const Block& block) {
   return MachineOf(block, block.shown());
+}
+
+// A machine's state and loaded words (+9604, +9608) through its own view
+// when it's one of the block's (host memory since E5 step 4), else where
+// the original reads them.
+int32_t StateOf(uint8_t* base, const Block& block, uint32_t machine) {
+  if (machine == block.result().address) {
+    return int32_t(block.result().state());
+  }
+  if (machine == block.event().address) {
+    return int32_t(block.event().state());
+  }
+  return int32_t(Machine(base, machine).state());
+}
+int32_t LoadedOf(uint8_t* base, const Block& block, uint32_t machine) {
+  if (machine == block.result().address) {
+    return int32_t(block.result().loaded());
+  }
+  if (machine == block.event().address) {
+    return int32_t(block.event().loaded());
+  }
+  return int32_t(Machine(base, machine).loaded());
 }
 
 void Dispatch(uint8_t* base, const Calls& calls, uint32_t mode, uint32_t frame, uint32_t lr) {
@@ -100,7 +122,7 @@ void FindShown(uint8_t* base, uint32_t block) {
     if (machine == 0) {
       continue;
     }
-    const int32_t state = int32_t(Machine(base, machine).state());
+    const int32_t state = StateOf(base, Block(base, block), machine);
     if (state == 5 || state == 4) {
       Block(base, block).set_shown(index);
     }
@@ -131,18 +153,21 @@ uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls)
   auto block = [&] { return m.block(); };
   calls.Call(kScreenStart, frame, 0x8225D6E8, mode);
   calls.Call(kStringsLoad, frame, 0x8225D6F8, G::string_table(base), kStringFile);
-  const uint64_t allocated =
-      calls.Call(kVirtualAlloc, frame, 0x8225D70C, 0, Block::kSize, 4096, 4);
+  // VirtualAlloc(0, 19300, MEM_COMMIT, PAGE_READWRITE) at 0x8225D70C: the
+  // block in host memory (E5 step 4), zeroed as the pages were; its handle
+  // is the r3 the original kept (freed by ModeType9::Release's FreePages).
+  const uint64_t allocated = Block::New(base).address;
   m.set_block(uint32_t(allocated));
   bool replaced = false;
-  ResultInitStates(base, uint32_t(allocated), frame - kInitStatesFrame, &replaced);
-  EventInitStates(base, block().event_address(), frame - kInitStatesFrame, &replaced);
+  ResultInitStates(base, Block(base, uint32_t(allocated)).result().address,
+                   frame - kInitStatesFrame, &replaced);
+  EventInitStates(base, block().event().address, frame - kInitStatesFrame, &replaced);
   // The two machines added to the dispatcher: today's result's, then today's
   // event's.
   for (const bool event : {false, true}) {
     const uint32_t count = m.handler_count();
     const Block b = block();
-    const uint32_t machine = event ? b.event_address() : b.result_address();
+    const uint32_t machine = event ? b.event().address : b.result().address;
     m.set_handler_count(count + 1);
     schema::host::StoreU32(m.handlers() + (count << 2), machine);  // guest order (E5 step 4)
   }
@@ -190,8 +215,8 @@ void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const 
   const Mode m(base, mode);
   FindShown(base, m.block().address);
   auto shown_state = [&] {
-    const uint32_t machine = ShownMachine(m.block());
-    return int32_t(Machine(base, machine).state());
+    const Block block = m.block();
+    return StateOf(base, block, ShownMachine(block));
   };
   if (shown_state() == 8) {
     SetDelegate(base, mode, frame + 80, kSlot11Thunk);
@@ -236,8 +261,8 @@ void WaitForShown(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp,
   ClearAnswer(base, answer);
   const Mode m(base, mode);
   FindShown(base, m.block().address);
-  const uint32_t machine = ShownMachine(m.block());
-  if (int32_t(Machine(base, machine).loaded()) == 1) {
+  const Block block = m.block();
+  if (LoadedOf(base, block, ShownMachine(block)) == 1) {
     SetDelegate(base, mode, frame + 80, kNextModeThunk);
   }
   PostMode(m, 1);
@@ -260,7 +285,7 @@ void Leaving(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const C
     if (machine == 0) {
       continue;
     }
-    const int32_t state = int32_t(Machine(base, machine).state());
+    const int32_t state = StateOf(base, block, machine);
     if (state != 6 && state != 13 && state != 14 && state != 12 && state != 20) {
       return;
     }

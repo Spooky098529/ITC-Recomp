@@ -53,7 +53,11 @@ uint64_t PictureFree(uint8_t* base, uint32_t sp, uint32_t picture, const Calls& 
     record.set_texture(0);
     record.set_width(0);
     record.set_height(0);
-    r3 = calls.Call(kOperatorDelete, frame, 0x8222846C, record.address);
+    // The record is a host object (E5 step 4): deleted in place of the
+    // original's operator delete at 0x8222846C. Its r3 (left as the
+    // record) is overwritten by XPR::Release below: a loaded picture
+    // always has its XPR.
+    record.Delete();
   }
   if (p.xpr().address != 0) {
     // The picture is a host object (E5 step 3): XPR::Release takes the
@@ -128,13 +132,15 @@ uint64_t OnPictureLoaded(uint8_t* base, uint32_t sp, uint32_t screen, uint32_t b
   }
   p.set_xpr(uint32_t(xpr));
   calls.Call(kXprCreate, frame, 0x82228EF8 + at, xpr, buffer);
-  const uint32_t record = uint32_t(calls.Call(kOperatorNew, frame, 0x82228F00 + at, 12));
-  if (record != 0) {
-    const schema::LocationScreenPictureTexture r(base, record);
-    r.set_texture(0);
-    r.set_width(0);
-    r.set_height(0);
-  }
+  // The texture record lives in host memory (E5 step 4): the original's
+  // operator new(12) at 0x82228F00 (+at); the picture's +8 keeps its handle
+  // (UiMovie::SetPictureTexture puts it in movie 21's texture table, whose
+  // readers load its words through guest::LoadU32, which resolves handles).
+  const schema::LocationScreenPictureTexture r = schema::LocationScreenPictureTexture::New(base);
+  const uint32_t record = r.address;
+  r.set_texture(0);
+  r.set_width(0);
+  r.set_height(0);
   p.set_texture(record);
   const uint64_t texture =
       calls.Call(kXprGetTexture, frame, 0x82228F30 + at, p.xpr().address, 0);

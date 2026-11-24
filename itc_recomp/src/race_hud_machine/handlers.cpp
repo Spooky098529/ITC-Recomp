@@ -175,7 +175,7 @@ std::optional<uint64_t> CountdownUpdate(uint8_t* base, uint64_t r3, uint32_t sp,
   callees.Call(kHudTickPanel, frame, 0x8216CC04, Holder(base, machine) + kHud);
   const uint64_t last =
       callees.Call(kHudUpdateView, frame, 0x8216CC10, Holder(base, machine) + kHud);
-  if (Screens(base, Holder(base, machine)).hud_countdown_running() == 0) {
+  if (Screens(base, Holder(base, machine)).hud().countdown_running() == 0) {
     Machine(base, machine).set_state(7);
   }
   return last;
@@ -412,7 +412,7 @@ std::optional<uint64_t> CloseResults(uint8_t* base, uint64_t r3, uint32_t sp,
   }
   const uint64_t closed =
       callees.Call(kAfterRaceClose, frame, 0x8216D24C, Screens(base, Holder(base, machine)).after_race_menu().address);
-  Screens(base, Holder(base, machine)).set_hud_signs_on(1);
+  Screens(base, Holder(base, machine)).hud().set_signs_on(1);
   return closed;
 }
 
@@ -561,12 +561,12 @@ uint64_t StartCountdown(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& ca
     return result;
   }
   if (now <= 3 || now == 6) {
-    Screens(base, Holder(base, machine)).set_hud_results(G::race_progress(base).address + 2184);
+    Screens(base, Holder(base, machine)).hud().set_racers(G::race_progress(base).address + 2184);
     callees.Call(kHudSetMode, frame, 0x8216CDB4, Holder(base, machine) + kHud, mode);
     return callees.Call(kHudStartCountdown, frame, 0x8216CDC0, Holder(base, machine) + kHud);
   }
   if (now == 4) {
-    Screens(base, Holder(base, machine)).set_split_results(G::race_progress(base).address + 2184);
+    Screens(base, Holder(base, machine)).split_hud().set_results(G::race_progress(base).address + 2184);
     callees.Call(k656SetMode, frame, 0x8216CDEC, Holder(base, machine) + 656, mode);
     return callees.Call(k656Start, frame, 0x8216CDF8, Holder(base, machine) + 656);
   }
@@ -867,7 +867,7 @@ uint64_t OnRaceEnd(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees
     default:
       break;
   }
-  Screens(base, Holder(base, machine)).set_hud_signs_on(0);
+  Screens(base, Holder(base, machine)).hud().set_signs_on(0);
   return last;
 }
 

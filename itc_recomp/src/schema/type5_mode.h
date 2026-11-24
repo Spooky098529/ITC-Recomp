@@ -141,84 +141,166 @@ struct ModeType5 : View {
   void set_block_bits(uint32_t v) const { if (on_host()) data()->block = v; else guest::StoreU32(base, address + 848, v); }
 };
 
-// allocated; measure: ModeType5.+816, ModeType5::NextMode.r4.+848, ModeType5::WaitForLoads.r4.+848, ModeType5::Leaving.r4.+848, FrontEndMode::NextMode.r4.+848
+// allocated; measure: new<28940>@ModeType5::Init, ModeType5.+816, ModeType5::NextMode.r4.+848, ModeType5::WaitForLoads.r4.+848, ModeType5::Leaving.r4.+848, FrontEndMode::NextMode.r4.+848
+#pragma pack(push, 1)
+struct Type5ModeBlockData {
+  uint8_t pad_0[9604] = {};
+  uint32_t car_settings_state = 0;  // +9604
+  uint32_t car_settings_loaded = 0;  // +9608
+  uint32_t car_settings_reenter = 0;  // +9612
+  uint32_t car_settings_delete_movie = 0;  // +9616
+  uint8_t pad_9620[9624] = {};
+  uint32_t location_state = 0;  // +19244
+  uint32_t location_loaded = 0;  // +19248
+  uint32_t location_reenter = 0;  // +19252
+  uint32_t location_delete_movie = 0;  // +19256
+  uint8_t pad_19260[9624] = {};
+  uint32_t dialog_state = 0;  // +28884
+  uint32_t dialog_loaded = 0;  // +28888
+  uint32_t dialog_reenter = 0;  // +28892
+  uint32_t dialog_delete_movie = 0;  // +28896
+  uint8_t pad_28900[20] = {};
+  uint32_t shown = 0;  // +28920
+  uint32_t first_shown = 0;  // +28924
+  uint64_t answer = 0;  // +28928
+  uint8_t pad_28936[4] = {};
+};
+#pragma pack(pop)
+static_assert(sizeof(Type5ModeBlockData) == 28940);
+inline constexpr memory::LayoutField kType5ModeBlockFields[] = {{9604, 4}, {9608, 4}, {9612, 4}, {9616, 4}, {19244, 4}, {19248, 4}, {19252, 4}, {19256, 4}, {28884, 4}, {28888, 4}, {28892, 4}, {28896, 4}, {28920, 4}, {28924, 4}, {28928, 8}};
+inline constexpr memory::Layout kType5ModeBlockLayout = {kType5ModeBlockFields, 15};
+
 struct Type5ModeBlock : View {
   using View::View;
   static constexpr uint32_t kSize = 28940;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  Type5ModeBlockData* data() const { return static_cast<Type5ModeBlockData*>(memory::HandleObject(address)); }
+  static Type5ModeBlock New(uint8_t* base) {
+    return Type5ModeBlock(base, memory::MakeHandle(new Type5ModeBlockData(), sizeof(Type5ModeBlockData), "Type5ModeBlock", &kType5ModeBlockLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static Type5ModeBlock NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(Type5ModeBlockData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<Type5ModeBlockData*>(::operator new(sizeof(Type5ModeBlockData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) Type5ModeBlockData();
+    return Type5ModeBlock(base, memory::MakeHandle(p, sizeof(Type5ModeBlockData) * count, "Type5ModeBlock", &kType5ModeBlockLayout, sizeof(Type5ModeBlockData)));
+  }
+  Type5ModeBlock at(uint32_t i) const { return Type5ModeBlock(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kType5ModeBlockLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kType5ModeBlockLayout, offset, width, v); }
   // the car settings' machine (car-settings.md, CarSettings::InitType5); id 3
   uint32_t car_settings_address() const { return address + 0; }
+  uint8_t* car_settings() const { return reinterpret_cast<uint8_t*>(data()) + 0; }
   // the car settings' machine state
-  uint32_t car_settings_state() const { return guest::LoadU32(base, address + 9604); }
-  void set_car_settings_state(uint32_t v) const { guest::StoreU32(base, address + 9604, v); }
   uint32_t car_settings_state_address() const { return address + 9604; }
+  uint32_t car_settings_state() const { return data()->car_settings_state; }
+  void set_car_settings_state(uint32_t v) const { data()->car_settings_state = v; }
+  uint32_t car_settings_state_bits() const { return data()->car_settings_state; }
+  void set_car_settings_state_bits(uint32_t v) const { data()->car_settings_state = v; }
   // its movies loaded (AllLoaded)
-  uint32_t car_settings_loaded() const { return guest::LoadU32(base, address + 9608); }
-  void set_car_settings_loaded(uint32_t v) const { guest::StoreU32(base, address + 9608, v); }
   uint32_t car_settings_loaded_address() const { return address + 9608; }
+  uint32_t car_settings_loaded() const { return data()->car_settings_loaded; }
+  void set_car_settings_loaded(uint32_t v) const { data()->car_settings_loaded = v; }
+  uint32_t car_settings_loaded_bits() const { return data()->car_settings_loaded; }
+  void set_car_settings_loaded_bits(uint32_t v) const { data()->car_settings_loaded = v; }
   // open on its message: 1 from Init
-  uint32_t car_settings_reenter() const { return guest::LoadU32(base, address + 9612); }
-  void set_car_settings_reenter(uint32_t v) const { guest::StoreU32(base, address + 9612, v); }
   uint32_t car_settings_reenter_address() const { return address + 9612; }
+  uint32_t car_settings_reenter() const { return data()->car_settings_reenter; }
+  void set_car_settings_reenter(uint32_t v) const { data()->car_settings_reenter = v; }
+  uint32_t car_settings_reenter_bits() const { return data()->car_settings_reenter; }
+  void set_car_settings_reenter_bits(uint32_t v) const { data()->car_settings_reenter = v; }
   // 0 from Init
-  uint32_t car_settings_delete_movie() const { return guest::LoadU32(base, address + 9616); }
-  void set_car_settings_delete_movie(uint32_t v) const { guest::StoreU32(base, address + 9616, v); }
   uint32_t car_settings_delete_movie_address() const { return address + 9616; }
+  uint32_t car_settings_delete_movie() const { return data()->car_settings_delete_movie; }
+  void set_car_settings_delete_movie(uint32_t v) const { data()->car_settings_delete_movie = v; }
+  uint32_t car_settings_delete_movie_bits() const { return data()->car_settings_delete_movie; }
+  void set_car_settings_delete_movie_bits(uint32_t v) const { data()->car_settings_delete_movie = v; }
   // the parking area's machine (location-screen.md's LocationScreenMachine); id 21
   uint32_t location_screen_address() const { return address + 9640; }
+  uint8_t* location_screen() const { return reinterpret_cast<uint8_t*>(data()) + 9640; }
   // the parking area's machine state: 8 a leave asked, 10 leave (message 4), 11 a race set up, 13 today's result
-  uint32_t location_state() const { return guest::LoadU32(base, address + 19244); }
-  void set_location_state(uint32_t v) const { guest::StoreU32(base, address + 19244, v); }
   uint32_t location_state_address() const { return address + 19244; }
+  uint32_t location_state() const { return data()->location_state; }
+  void set_location_state(uint32_t v) const { data()->location_state = v; }
+  uint32_t location_state_bits() const { return data()->location_state; }
+  void set_location_state_bits(uint32_t v) const { data()->location_state = v; }
   // its movies loaded (AllLoaded)
-  uint32_t location_loaded() const { return guest::LoadU32(base, address + 19248); }
-  void set_location_loaded(uint32_t v) const { guest::StoreU32(base, address + 19248, v); }
   uint32_t location_loaded_address() const { return address + 19248; }
+  uint32_t location_loaded() const { return data()->location_loaded; }
+  void set_location_loaded(uint32_t v) const { data()->location_loaded = v; }
+  uint32_t location_loaded_bits() const { return data()->location_loaded; }
+  void set_location_loaded_bits(uint32_t v) const { data()->location_loaded = v; }
   // open on its message: 1 from Init
-  uint32_t location_reenter() const { return guest::LoadU32(base, address + 19252); }
-  void set_location_reenter(uint32_t v) const { guest::StoreU32(base, address + 19252, v); }
   uint32_t location_reenter_address() const { return address + 19252; }
+  uint32_t location_reenter() const { return data()->location_reenter; }
+  void set_location_reenter(uint32_t v) const { data()->location_reenter = v; }
+  uint32_t location_reenter_bits() const { return data()->location_reenter; }
+  void set_location_reenter_bits(uint32_t v) const { data()->location_reenter = v; }
   // 0 from Init
-  uint32_t location_delete_movie() const { return guest::LoadU32(base, address + 19256); }
-  void set_location_delete_movie(uint32_t v) const { guest::StoreU32(base, address + 19256, v); }
   uint32_t location_delete_movie_address() const { return address + 19256; }
+  uint32_t location_delete_movie() const { return data()->location_delete_movie; }
+  void set_location_delete_movie(uint32_t v) const { data()->location_delete_movie = v; }
+  uint32_t location_delete_movie_bits() const { return data()->location_delete_movie; }
+  void set_location_delete_movie_bits(uint32_t v) const { data()->location_delete_movie = v; }
   // the mode's dialog's machine (Type5Dialog); id 16
   uint32_t dialog_address() const { return address + 19280; }
+  uint8_t* dialog() const { return reinterpret_cast<uint8_t*>(data()) + 19280; }
   // the dialog's machine state (9 idle: Interrupt answers 1)
-  uint32_t dialog_state() const { return guest::LoadU32(base, address + 28884); }
-  void set_dialog_state(uint32_t v) const { guest::StoreU32(base, address + 28884, v); }
   uint32_t dialog_state_address() const { return address + 28884; }
+  uint32_t dialog_state() const { return data()->dialog_state; }
+  void set_dialog_state(uint32_t v) const { data()->dialog_state = v; }
+  uint32_t dialog_state_bits() const { return data()->dialog_state; }
+  void set_dialog_state_bits(uint32_t v) const { data()->dialog_state = v; }
   // its movies loaded (AllLoaded)
-  uint32_t dialog_loaded() const { return guest::LoadU32(base, address + 28888); }
-  void set_dialog_loaded(uint32_t v) const { guest::StoreU32(base, address + 28888, v); }
   uint32_t dialog_loaded_address() const { return address + 28888; }
+  uint32_t dialog_loaded() const { return data()->dialog_loaded; }
+  void set_dialog_loaded(uint32_t v) const { data()->dialog_loaded = v; }
+  uint32_t dialog_loaded_bits() const { return data()->dialog_loaded; }
+  void set_dialog_loaded_bits(uint32_t v) const { data()->dialog_loaded = v; }
   // open on its message: 1 from Init
-  uint32_t dialog_reenter() const { return guest::LoadU32(base, address + 28892); }
-  void set_dialog_reenter(uint32_t v) const { guest::StoreU32(base, address + 28892, v); }
   uint32_t dialog_reenter_address() const { return address + 28892; }
+  uint32_t dialog_reenter() const { return data()->dialog_reenter; }
+  void set_dialog_reenter(uint32_t v) const { data()->dialog_reenter = v; }
+  uint32_t dialog_reenter_bits() const { return data()->dialog_reenter; }
+  void set_dialog_reenter_bits(uint32_t v) const { data()->dialog_reenter = v; }
   // 0 from Init
-  uint32_t dialog_delete_movie() const { return guest::LoadU32(base, address + 28896); }
-  void set_dialog_delete_movie(uint32_t v) const { guest::StoreU32(base, address + 28896, v); }
   uint32_t dialog_delete_movie_address() const { return address + 28896; }
+  uint32_t dialog_delete_movie() const { return data()->dialog_delete_movie; }
+  void set_dialog_delete_movie(uint32_t v) const { data()->dialog_delete_movie = v; }
+  uint32_t dialog_delete_movie_bits() const { return data()->dialog_delete_movie; }
+  void set_dialog_delete_movie_bits(uint32_t v) const { data()->dialog_delete_movie = v; }
   // the shown machine's id (3, 16 or 21; FindShown; 21 at Init)
-  uint32_t shown() const { return guest::LoadU32(base, address + 28920); }
-  void set_shown(uint32_t v) const { guest::StoreU32(base, address + 28920, v); }
   uint32_t shown_address() const { return address + 28920; }
+  uint32_t shown() const { return data()->shown; }
+  void set_shown(uint32_t v) const { data()->shown = v; }
+  uint32_t shown_bits() const { return data()->shown; }
+  void set_shown_bits(uint32_t v) const { data()->shown = v; }
   // 21 at Init (readers not looked for)
-  uint32_t first_shown() const { return guest::LoadU32(base, address + 28924); }
-  void set_first_shown(uint32_t v) const { guest::StoreU32(base, address + 28924, v); }
   uint32_t first_shown_address() const { return address + 28924; }
+  uint32_t first_shown() const { return data()->first_shown; }
+  void set_first_shown(uint32_t v) const { data()->first_shown = v; }
+  uint32_t first_shown_bits() const { return data()->first_shown; }
+  void set_first_shown_bits(uint32_t v) const { data()->first_shown = v; }
   // the next mode's 8-byte answer (ModeAnswer), written whole by NextMode and ForceExit
-  uint64_t answer() const { return guest::LoadU64(base, address + 28928); }
-  void set_answer(uint64_t v) const { guest::StoreU64(base, address + 28928, v); }
   uint32_t answer_address() const { return address + 28928; }
+  uint64_t answer() const { return data()->answer; }
+  void set_answer(uint64_t v) const { data()->answer = v; }
+  uint64_t answer_bits() const { return data()->answer; }
+  void set_answer_bits(uint64_t v) const { data()->answer = v; }
   // the answer's first word: its changed byte and three bytes
-  uint32_t answer_word0() const { return guest::LoadU32(base, address + 28928); }
-  void set_answer_word0(uint32_t v) const { guest::StoreU32(base, address + 28928, v); }
   uint32_t answer_word0_address() const { return address + 28928; }
+  uint32_t answer_word0_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kType5ModeBlockLayout, 28928, 4)); }
+  void set_answer_word0_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kType5ModeBlockLayout, 28928, 4, v); }
+  uint32_t answer_word0() const { return uint32_t(answer_word0_bits()); }
+  void set_answer_word0(uint32_t v) const { set_answer_word0_bits(uint32_t(v)); }
   // the answer's next mode type (1 the race, 9 today's result, 4 the title, 12)
-  uint32_t answer_next_type() const { return guest::LoadU32(base, address + 28932); }
-  void set_answer_next_type(uint32_t v) const { guest::StoreU32(base, address + 28932, v); }
   uint32_t answer_next_type_address() const { return address + 28932; }
+  uint32_t answer_next_type_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kType5ModeBlockLayout, 28932, 4)); }
+  void set_answer_next_type_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kType5ModeBlockLayout, 28932, 4, v); }
+  uint32_t answer_next_type() const { return uint32_t(answer_next_type_bits()); }
+  void set_answer_next_type(uint32_t v) const { set_answer_next_type_bits(uint32_t(v)); }
 };
 
 // embedded; measure: Type5Dialog

@@ -10,6 +10,8 @@
 #include "memory/c_runtime_heap.h"
 #include "schema/app_start_up.h"
 #include "schema/app_states.h"
+#include "schema/cameras.h"
+#include "schema/movies.h"
 
 ITC_FLAG_DECLARE(bool, native_app_start_up);
 ITC_FLAG_DECLARE(bool, native_framework);
@@ -25,7 +27,6 @@ void Store(uint8_t* base, uint32_t address, uint32_t value) {
 
 constexpr uint32_t kHandlerMap = 0x82099FB0;   // HandlerMap::HandlerMap
 constexpr uint32_t kStatesCreate = 0x820AE498;  // AppStates::Create
-constexpr uint32_t kOperatorNew = 0x825A6880;
 constexpr uint32_t kAppCamera = 0x820A8B88;    // AppCamera::AppCamera
 constexpr uint32_t kMovie = 0x820AEA88;        // Movie::Movie
 constexpr uint32_t kAudioManagerCreate = 0x82119B38;
@@ -97,9 +98,9 @@ uint32_t AppConstruct(uint8_t* base, uint32_t app, uint32_t block, uint32_t fram
   self.set_states(states);
   // The second camera class, from {app + 20, app + 4}.
   uint32_t camera = 0;
-  const auto camera_block = memory::crt::OperatorNew(base, kAppCameraBytes);
-  const uint32_t camera_at =
-      camera_block ? *camera_block : calls.call(kOperatorNew, kAppCameraBytes, {}, 0x82094760, 0, {});
+  // In host memory (E5 step 4; operator new's block before, 0x82094760).
+  static_assert(schema::AppCamera::kSize == kAppCameraBytes);
+  const uint32_t camera_at = schema::AppCamera::New(base).address;
   if (camera_at != 0) {
     camera = calls.call(kAppCamera, camera_at, frame + 96, 0x82094770, 0, {});
   }
@@ -108,9 +109,9 @@ uint32_t AppConstruct(uint8_t* base, uint32_t app, uint32_t block, uint32_t fram
   Store(base, frame + 108, app + 8);
   self.set_camera(camera);
   uint32_t movie = 0;
-  const auto movie_block = memory::crt::OperatorNew(base, kMovieBytes);
-  const uint32_t movie_at =
-      movie_block ? *movie_block : calls.call(kOperatorNew, kMovieBytes, {}, 0x82094790, 0, {});
+  // In host memory (E5 step 4; operator new's block before, 0x82094790).
+  static_assert(schema::Movie::kSize == kMovieBytes);
+  const uint32_t movie_at = schema::Movie::New(base).address;
   if (movie_at != 0) {
     movie = calls.call(kMovie, movie_at, frame + 104, 0x820947A0, 0, {});
   }
@@ -171,7 +172,8 @@ namespace app_start_up {
 
 std::optional<uint32_t> AppCreate(uint8_t* base, uint32_t block,
                                   const std::function<uint32_t(uint32_t app)>& construct) {
-  const auto app = memory::crt::OperatorNew(base, kAppBytes);
+  static_assert(schema::App::kSize == kAppBytes);
+  const auto app = std::optional<uint32_t>(schema::App::New(base).address);  // host memory (E5 step 4)
   if (!app) {
     return std::nullopt;
   }

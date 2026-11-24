@@ -9,190 +9,319 @@
 namespace schema {
 
 // allocated; measure: App, AppStates.+4, App::FrameDriver.r3
+#pragma pack(push, 1)
+struct AppData {
+  uint32_t vtable = 0;  // +0
+  uint32_t vtable_4 = 0;  // +4
+  uint32_t vtable_8 = 0;  // +8
+  uint32_t vtable_12 = 0;  // +12
+  uint32_t vtable_16 = 0;  // +16
+  uint32_t interface_vtable = 0;  // +20
+  uint32_t framework_input = 0;  // +24
+  uint32_t handlers = 0;  // +28
+  uint32_t handlers_head = 0;  // +32
+  uint32_t handlers_size = 0;  // +36
+  uint32_t toggled_handlers = 0;  // +40
+  uint32_t toggled_handlers_head = 0;  // +44
+  uint32_t toggled_handlers_size = 0;  // +48
+  uint32_t always_handlers = 0;  // +52
+  uint32_t always_handlers_head = 0;  // +56
+  uint32_t always_handlers_size = 0;  // +60
+  uint32_t listeners = 0;  // +64
+  uint32_t listeners_head = 0;  // +68
+  uint32_t listeners_size = 0;  // +72
+  uint32_t messages = 0;  // +76
+  uint32_t messages_first = 0;  // +80
+  uint32_t messages_last = 0;  // +84
+  uint32_t messages_end = 0;  // +88
+  uint32_t message = 0;  // +92
+  uint32_t requests = 0;  // +96
+  uint32_t requests_first = 0;  // +100
+  uint32_t requests_last = 0;  // +104
+  uint32_t requests_end = 0;  // +108
+  uint8_t toggled = 0;  // +112
+  uint8_t step = 0;  // +113
+  uint8_t unknown_114 = 0;  // +114
+  uint8_t pad_115[1] = {};
+  uint32_t states = 0;  // +116
+  uint32_t camera = 0;  // +120
+  uint32_t sound_manager = 0;  // +124
+  uint32_t movie = 0;  // +128
+};
+#pragma pack(pop)
+static_assert(sizeof(AppData) == 132);
+inline constexpr memory::LayoutField kAppFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 4}, {24, 4}, {28, 4}, {28, 4}, {32, 4}, {32, 4}, {36, 4}, {36, 4}, {40, 4}, {40, 4}, {44, 4}, {44, 4}, {48, 4}, {48, 4}, {52, 4}, {52, 4}, {56, 4}, {56, 4}, {60, 4}, {60, 4}, {64, 4}, {64, 4}, {68, 4}, {68, 4}, {72, 4}, {72, 4}, {76, 4}, {80, 4}, {80, 4}, {84, 4}, {84, 4}, {88, 4}, {88, 4}, {92, 4}, {96, 4}, {100, 4}, {100, 4}, {104, 4}, {104, 4}, {108, 4}, {108, 4}, {116, 4}, {120, 4}, {124, 4}, {128, 4}};
+inline constexpr memory::Layout kAppLayout = {kAppFields, 50};
+
 struct App : View {
   using View::View;
   static constexpr uint32_t kSize = 132;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   static constexpr uint32_t kVtable = 0x82000EA0;
+  AppData* data() const { return static_cast<AppData*>(memory::HandleObject(address)); }
+  static App New(uint8_t* base) {
+    return App(base, memory::MakeHandle(new AppData(), sizeof(AppData), "App", &kAppLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static App NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(AppData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<AppData*>(::operator new(sizeof(AppData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) AppData();
+    return App(base, memory::MakeHandle(p, sizeof(AppData) * count, "App", &kAppLayout, sizeof(AppData)));
+  }
+  App at(uint32_t i) const { return App(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kAppLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppLayout, offset, width, v); }
   // the handler map run while the toggle is clear
   template <typename T = HandlerMap>
   T handlers_map() const { return T(base, address + 28); }
-  uint32_t handlers_map_address() const { return address + 28; }
   // the handler map run while the toggle is set
   template <typename T = HandlerMap>
   T toggled_handlers_map() const { return T(base, address + 40); }
-  uint32_t toggled_handlers_map_address() const { return address + 40; }
   // the handler map run every pass
   template <typename T = HandlerMap>
   T always_handlers_map() const { return T(base, address + 52); }
-  uint32_t always_handlers_map_address() const { return address + 52; }
   // the listener map
   template <typename T = HandlerMap>
   T listeners_map() const { return T(base, address + 64); }
-  uint32_t listeners_map_address() const { return address + 64; }
   // the message vector
   template <typename T = MessageVector>
   T messages_vector() const { return T(base, address + 76); }
-  uint32_t messages_vector_address() const { return address + 76; }
   // the request vector
   template <typename T = RequestVector>
   T requests_vector() const { return T(base, address + 96); }
-  uint32_t requests_vector_address() const { return address + 96; }
   // 0x82000EA0
-  template <typename T = AppVtable>
-  T vtable() const { return T(base, guest::LoadU32(base, address + 0)); }
-  void set_vtable(const View& v) const { guest::StoreU32(base, address + 0, v.address); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
+  template <typename T = AppVtable>
+  T vtable() const { return T(base, data()->vtable); }
+  void set_vtable(const View& w) const { const uint32_t v = w.address; data()->vtable = v; }
+  void set_vtable(uint32_t v) const { data()->vtable = v; }
+  uint32_t vtable_bits() const { return data()->vtable; }
+  void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
   // measure fault: App::ForEachMessage's and ForEachRequest's r3 is the result functor, not the app
-  uint64_t fault_for_each_result_0() const { return guest::LoadU64(base, address + 0); }
-  void set_fault_for_each_result_0(uint64_t v) const { guest::StoreU64(base, address + 0, v); }
   uint32_t fault_for_each_result_0_address() const { return address + 0; }
+  uint64_t fault_for_each_result_0_bits() const { return uint64_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kAppLayout, 0, 8)); }
+  void set_fault_for_each_result_0_bits(uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppLayout, 0, 8, v); }
+  uint64_t fault_for_each_result_0() const { return uint64_t(fault_for_each_result_0_bits()); }
+  void set_fault_for_each_result_0(uint64_t v) const { set_fault_for_each_result_0_bits(uint64_t(v)); }
   // the +4 interface's: 0x82000E94 (base 0x82000ABC)
-  uint32_t vtable_4() const { return guest::LoadU32(base, address + 4); }
-  void set_vtable_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t vtable_4_address() const { return address + 4; }
+  uint32_t vtable_4() const { return data()->vtable_4; }
+  void set_vtable_4(uint32_t v) const { data()->vtable_4 = v; }
+  uint32_t vtable_4_bits() const { return data()->vtable_4; }
+  void set_vtable_4_bits(uint32_t v) const { data()->vtable_4 = v; }
   // the +8 interface's: 0x82000E80 (base 0x82000A74)
-  uint32_t vtable_8() const { return guest::LoadU32(base, address + 8); }
-  void set_vtable_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t vtable_8_address() const { return address + 8; }
+  uint32_t vtable_8() const { return data()->vtable_8; }
+  void set_vtable_8(uint32_t v) const { data()->vtable_8 = v; }
+  uint32_t vtable_8_bits() const { return data()->vtable_8; }
+  void set_vtable_8_bits(uint32_t v) const { data()->vtable_8 = v; }
   // measure fault: as fault_for_each_result_0
-  uint64_t fault_for_each_result_8() const { return guest::LoadU64(base, address + 8); }
-  void set_fault_for_each_result_8(uint64_t v) const { guest::StoreU64(base, address + 8, v); }
   uint32_t fault_for_each_result_8_address() const { return address + 8; }
+  uint64_t fault_for_each_result_8_bits() const { return uint64_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kAppLayout, 8, 8)); }
+  void set_fault_for_each_result_8_bits(uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppLayout, 8, 8, v); }
+  uint64_t fault_for_each_result_8() const { return uint64_t(fault_for_each_result_8_bits()); }
+  void set_fault_for_each_result_8(uint64_t v) const { set_fault_for_each_result_8_bits(uint64_t(v)); }
   // the +12 interface's: 0x82000E70 (base 0x82000D48)
-  uint32_t vtable_12() const { return guest::LoadU32(base, address + 12); }
-  void set_vtable_12(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
   uint32_t vtable_12_address() const { return address + 12; }
+  uint32_t vtable_12() const { return data()->vtable_12; }
+  void set_vtable_12(uint32_t v) const { data()->vtable_12 = v; }
+  uint32_t vtable_12_bits() const { return data()->vtable_12; }
+  void set_vtable_12_bits(uint32_t v) const { data()->vtable_12 = v; }
   // the +16 interface's: 0x82000E38 (base 0x82000DD0); the owner a layer keeps (StateLayer +8)
-  uint32_t vtable_16() const { return guest::LoadU32(base, address + 16); }
-  void set_vtable_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
   uint32_t vtable_16_address() const { return address + 16; }
+  uint32_t vtable_16() const { return data()->vtable_16; }
+  void set_vtable_16(uint32_t v) const { data()->vtable_16 = v; }
+  uint32_t vtable_16_bits() const { return data()->vtable_16; }
+  void set_vtable_16_bits(uint32_t v) const { data()->vtable_16 = v; }
   // the +20 interface's: 0x82000E08 (base 0x82000DA0); the interface the framework keeps at +120 (AppInterface)
-  template <typename T = AppInterfaceVtable>
-  T interface_vtable() const { return T(base, guest::LoadU32(base, address + 20)); }
-  void set_interface_vtable(const View& v) const { guest::StoreU32(base, address + 20, v.address); }
-  void set_interface_vtable(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
   uint32_t interface_vtable_address() const { return address + 20; }
+  template <typename T = AppInterfaceVtable>
+  T interface_vtable() const { return T(base, data()->interface_vtable); }
+  void set_interface_vtable(const View& w) const { const uint32_t v = w.address; data()->interface_vtable = v; }
+  void set_interface_vtable(uint32_t v) const { data()->interface_vtable = v; }
+  uint32_t interface_vtable_bits() const { return data()->interface_vtable; }
+  void set_interface_vtable_bits(uint32_t v) const { data()->interface_vtable = v; }
   // the framework's +36 interface (its slot 1 the input manager); also App::FrameDriver's +20 read (r3 = app + 4)
-  template <typename T = AppFrameworkIface>
-  T framework_input() const { return T(base, guest::LoadU32(base, address + 24)); }
-  void set_framework_input(const View& v) const { guest::StoreU32(base, address + 24, v.address); }
-  void set_framework_input(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
   uint32_t framework_input_address() const { return address + 24; }
+  template <typename T = AppFrameworkIface>
+  T framework_input() const { return T(base, data()->framework_input); }
+  void set_framework_input(const View& w) const { const uint32_t v = w.address; data()->framework_input = v; }
+  void set_framework_input(uint32_t v) const { data()->framework_input = v; }
+  uint32_t framework_input_bits() const { return data()->framework_input; }
+  void set_framework_input_bits(uint32_t v) const { data()->framework_input = v; }
   // a handler map (std::map of delegates by key), run while the toggle is clear or a step was asked: its first word, not read
-  uint32_t handlers() const { return guest::LoadU32(base, address + 28); }
-  void set_handlers(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
   uint32_t handlers_address() const { return address + 28; }
-  template <typename T = AppHandlerMapHead>
-  T handlers_head() const { return T(base, guest::LoadU32(base, address + 32)); }
-  void set_handlers_head(const View& v) const { guest::StoreU32(base, address + 32, v.address); }
-  void set_handlers_head(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
+  uint32_t handlers() const { return data()->handlers; }
+  void set_handlers(uint32_t v) const { data()->handlers = v; }
+  uint32_t handlers_bits() const { return data()->handlers; }
+  void set_handlers_bits(uint32_t v) const { data()->handlers = v; }
   uint32_t handlers_head_address() const { return address + 32; }
-  uint32_t handlers_size() const { return guest::LoadU32(base, address + 36); }
-  void set_handlers_size(uint32_t v) const { guest::StoreU32(base, address + 36, v); }
+  template <typename T = AppHandlerMapHead>
+  T handlers_head() const { return T(base, data()->handlers_head); }
+  void set_handlers_head(const View& w) const { const uint32_t v = w.address; data()->handlers_head = v; }
+  void set_handlers_head(uint32_t v) const { data()->handlers_head = v; }
+  uint32_t handlers_head_bits() const { return data()->handlers_head; }
+  void set_handlers_head_bits(uint32_t v) const { data()->handlers_head = v; }
   uint32_t handlers_size_address() const { return address + 36; }
+  uint32_t handlers_size() const { return data()->handlers_size; }
+  void set_handlers_size(uint32_t v) const { data()->handlers_size = v; }
+  uint32_t handlers_size_bits() const { return data()->handlers_size; }
+  void set_handlers_size_bits(uint32_t v) const { data()->handlers_size = v; }
   // the handler map run while the toggle is set: its first word, not read
-  uint32_t toggled_handlers() const { return guest::LoadU32(base, address + 40); }
-  void set_toggled_handlers(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
   uint32_t toggled_handlers_address() const { return address + 40; }
-  template <typename T = AppHandlerMapHead>
-  T toggled_handlers_head() const { return T(base, guest::LoadU32(base, address + 44)); }
-  void set_toggled_handlers_head(const View& v) const { guest::StoreU32(base, address + 44, v.address); }
-  void set_toggled_handlers_head(uint32_t v) const { guest::StoreU32(base, address + 44, v); }
+  uint32_t toggled_handlers() const { return data()->toggled_handlers; }
+  void set_toggled_handlers(uint32_t v) const { data()->toggled_handlers = v; }
+  uint32_t toggled_handlers_bits() const { return data()->toggled_handlers; }
+  void set_toggled_handlers_bits(uint32_t v) const { data()->toggled_handlers = v; }
   uint32_t toggled_handlers_head_address() const { return address + 44; }
-  uint32_t toggled_handlers_size() const { return guest::LoadU32(base, address + 48); }
-  void set_toggled_handlers_size(uint32_t v) const { guest::StoreU32(base, address + 48, v); }
+  template <typename T = AppHandlerMapHead>
+  T toggled_handlers_head() const { return T(base, data()->toggled_handlers_head); }
+  void set_toggled_handlers_head(const View& w) const { const uint32_t v = w.address; data()->toggled_handlers_head = v; }
+  void set_toggled_handlers_head(uint32_t v) const { data()->toggled_handlers_head = v; }
+  uint32_t toggled_handlers_head_bits() const { return data()->toggled_handlers_head; }
+  void set_toggled_handlers_head_bits(uint32_t v) const { data()->toggled_handlers_head = v; }
   uint32_t toggled_handlers_size_address() const { return address + 48; }
+  uint32_t toggled_handlers_size() const { return data()->toggled_handlers_size; }
+  void set_toggled_handlers_size(uint32_t v) const { data()->toggled_handlers_size = v; }
+  uint32_t toggled_handlers_size_bits() const { return data()->toggled_handlers_size; }
+  void set_toggled_handlers_size_bits(uint32_t v) const { data()->toggled_handlers_size = v; }
   // the handler map run every pass: its first word, not read
-  uint32_t always_handlers() const { return guest::LoadU32(base, address + 52); }
-  void set_always_handlers(uint32_t v) const { guest::StoreU32(base, address + 52, v); }
   uint32_t always_handlers_address() const { return address + 52; }
-  template <typename T = AppHandlerMapHead>
-  T always_handlers_head() const { return T(base, guest::LoadU32(base, address + 56)); }
-  void set_always_handlers_head(const View& v) const { guest::StoreU32(base, address + 56, v.address); }
-  void set_always_handlers_head(uint32_t v) const { guest::StoreU32(base, address + 56, v); }
+  uint32_t always_handlers() const { return data()->always_handlers; }
+  void set_always_handlers(uint32_t v) const { data()->always_handlers = v; }
+  uint32_t always_handlers_bits() const { return data()->always_handlers; }
+  void set_always_handlers_bits(uint32_t v) const { data()->always_handlers = v; }
   uint32_t always_handlers_head_address() const { return address + 56; }
-  uint32_t always_handlers_size() const { return guest::LoadU32(base, address + 60); }
-  void set_always_handlers_size(uint32_t v) const { guest::StoreU32(base, address + 60, v); }
-  uint32_t always_handlers_size_address() const { return address + 60; }
-  // the listener map (given the messages): its first word, not read
-  uint32_t listeners() const { return guest::LoadU32(base, address + 64); }
-  void set_listeners(uint32_t v) const { guest::StoreU32(base, address + 64, v); }
-  uint32_t listeners_address() const { return address + 64; }
   template <typename T = AppHandlerMapHead>
-  T listeners_head() const { return T(base, guest::LoadU32(base, address + 68)); }
-  void set_listeners_head(const View& v) const { guest::StoreU32(base, address + 68, v.address); }
-  void set_listeners_head(uint32_t v) const { guest::StoreU32(base, address + 68, v); }
+  T always_handlers_head() const { return T(base, data()->always_handlers_head); }
+  void set_always_handlers_head(const View& w) const { const uint32_t v = w.address; data()->always_handlers_head = v; }
+  void set_always_handlers_head(uint32_t v) const { data()->always_handlers_head = v; }
+  uint32_t always_handlers_head_bits() const { return data()->always_handlers_head; }
+  void set_always_handlers_head_bits(uint32_t v) const { data()->always_handlers_head = v; }
+  uint32_t always_handlers_size_address() const { return address + 60; }
+  uint32_t always_handlers_size() const { return data()->always_handlers_size; }
+  void set_always_handlers_size(uint32_t v) const { data()->always_handlers_size = v; }
+  uint32_t always_handlers_size_bits() const { return data()->always_handlers_size; }
+  void set_always_handlers_size_bits(uint32_t v) const { data()->always_handlers_size = v; }
+  // the listener map (given the messages): its first word, not read
+  uint32_t listeners_address() const { return address + 64; }
+  uint32_t listeners() const { return data()->listeners; }
+  void set_listeners(uint32_t v) const { data()->listeners = v; }
+  uint32_t listeners_bits() const { return data()->listeners; }
+  void set_listeners_bits(uint32_t v) const { data()->listeners = v; }
   uint32_t listeners_head_address() const { return address + 68; }
-  uint32_t listeners_size() const { return guest::LoadU32(base, address + 72); }
-  void set_listeners_size(uint32_t v) const { guest::StoreU32(base, address + 72, v); }
+  template <typename T = AppHandlerMapHead>
+  T listeners_head() const { return T(base, data()->listeners_head); }
+  void set_listeners_head(const View& w) const { const uint32_t v = w.address; data()->listeners_head = v; }
+  void set_listeners_head(uint32_t v) const { data()->listeners_head = v; }
+  uint32_t listeners_head_bits() const { return data()->listeners_head; }
+  void set_listeners_head_bits(uint32_t v) const { data()->listeners_head = v; }
   uint32_t listeners_size_address() const { return address + 72; }
+  uint32_t listeners_size() const { return data()->listeners_size; }
+  void set_listeners_size(uint32_t v) const { data()->listeners_size = v; }
+  uint32_t listeners_size_bits() const { return data()->listeners_size; }
+  void set_listeners_size_bits(uint32_t v) const { data()->listeners_size = v; }
   // the message vector (MessageVector) starts here: its first word, not read
-  uint32_t messages() const { return guest::LoadU32(base, address + 76); }
-  void set_messages(uint32_t v) const { guest::StoreU32(base, address + 76, v); }
   uint32_t messages_address() const { return address + 76; }
-  template <typename T = AppMessageWord>
-  T messages_first() const { return T(base, guest::LoadU32(base, address + 80)); }
-  void set_messages_first(const View& v) const { guest::StoreU32(base, address + 80, v.address); }
-  void set_messages_first(uint32_t v) const { guest::StoreU32(base, address + 80, v); }
+  uint32_t messages() const { return data()->messages; }
+  void set_messages(uint32_t v) const { data()->messages = v; }
+  uint32_t messages_bits() const { return data()->messages; }
+  void set_messages_bits(uint32_t v) const { data()->messages = v; }
   uint32_t messages_first_address() const { return address + 80; }
   template <typename T = AppMessageWord>
-  T messages_last() const { return T(base, guest::LoadU32(base, address + 84)); }
-  void set_messages_last(const View& v) const { guest::StoreU32(base, address + 84, v.address); }
-  void set_messages_last(uint32_t v) const { guest::StoreU32(base, address + 84, v); }
+  T messages_first() const { return T(base, data()->messages_first); }
+  void set_messages_first(const View& w) const { const uint32_t v = w.address; data()->messages_first = v; }
+  void set_messages_first(uint32_t v) const { data()->messages_first = v; }
+  uint32_t messages_first_bits() const { return data()->messages_first; }
+  void set_messages_first_bits(uint32_t v) const { data()->messages_first = v; }
   uint32_t messages_last_address() const { return address + 84; }
   template <typename T = AppMessageWord>
-  T messages_end() const { return T(base, guest::LoadU32(base, address + 88)); }
-  void set_messages_end(const View& v) const { guest::StoreU32(base, address + 88, v.address); }
-  void set_messages_end(uint32_t v) const { guest::StoreU32(base, address + 88, v); }
+  T messages_last() const { return T(base, data()->messages_last); }
+  void set_messages_last(const View& w) const { const uint32_t v = w.address; data()->messages_last = v; }
+  void set_messages_last(uint32_t v) const { data()->messages_last = v; }
+  uint32_t messages_last_bits() const { return data()->messages_last; }
+  void set_messages_last_bits(uint32_t v) const { data()->messages_last = v; }
   uint32_t messages_end_address() const { return address + 88; }
+  template <typename T = AppMessageWord>
+  T messages_end() const { return T(base, data()->messages_end); }
+  void set_messages_end(const View& w) const { const uint32_t v = w.address; data()->messages_end = v; }
+  void set_messages_end(uint32_t v) const { data()->messages_end = v; }
+  uint32_t messages_end_bits() const { return data()->messages_end; }
+  void set_messages_end_bits(uint32_t v) const { data()->messages_end = v; }
   // the message being delivered (the listeners get its address)
-  uint32_t message() const { return guest::LoadU32(base, address + 92); }
-  void set_message(uint32_t v) const { guest::StoreU32(base, address + 92, v); }
   uint32_t message_address() const { return address + 92; }
+  uint32_t message() const { return data()->message; }
+  void set_message(uint32_t v) const { data()->message = v; }
+  uint32_t message_bits() const { return data()->message; }
+  void set_message_bits(uint32_t v) const { data()->message = v; }
   // the request vector (12-byte requests {type, key, delegate}) starts here: its first word, not read by the app's code; the measure's +96 reads are the +20 interface's +96, the state stack (App::IsRunning, App::Start: a measure fault)
-  uint32_t requests() const { return guest::LoadU32(base, address + 96); }
-  void set_requests(uint32_t v) const { guest::StoreU32(base, address + 96, v); }
   uint32_t requests_address() const { return address + 96; }
-  uint32_t requests_first() const { return guest::LoadU32(base, address + 100); }
-  void set_requests_first(uint32_t v) const { guest::StoreU32(base, address + 100, v); }
+  uint32_t requests() const { return data()->requests; }
+  void set_requests(uint32_t v) const { data()->requests = v; }
+  uint32_t requests_bits() const { return data()->requests; }
+  void set_requests_bits(uint32_t v) const { data()->requests = v; }
   uint32_t requests_first_address() const { return address + 100; }
-  uint32_t requests_last() const { return guest::LoadU32(base, address + 104); }
-  void set_requests_last(uint32_t v) const { guest::StoreU32(base, address + 104, v); }
+  uint32_t requests_first() const { return data()->requests_first; }
+  void set_requests_first(uint32_t v) const { data()->requests_first = v; }
+  uint32_t requests_first_bits() const { return data()->requests_first; }
+  void set_requests_first_bits(uint32_t v) const { data()->requests_first = v; }
   uint32_t requests_last_address() const { return address + 104; }
-  uint32_t requests_end() const { return guest::LoadU32(base, address + 108); }
-  void set_requests_end(uint32_t v) const { guest::StoreU32(base, address + 108, v); }
+  uint32_t requests_last() const { return data()->requests_last; }
+  void set_requests_last(uint32_t v) const { data()->requests_last = v; }
+  uint32_t requests_last_bits() const { return data()->requests_last; }
+  void set_requests_last_bits(uint32_t v) const { data()->requests_last = v; }
   uint32_t requests_end_address() const { return address + 108; }
+  uint32_t requests_end() const { return data()->requests_end; }
+  void set_requests_end(uint32_t v) const { data()->requests_end = v; }
+  uint32_t requests_end_bits() const { return data()->requests_end; }
+  void set_requests_end_bits(uint32_t v) const { data()->requests_end = v; }
   // the toggle player 1's Start flips (message 0 when set, 2 when cleared)
-  uint8_t toggled() const { return guest::LoadU8(base, address + 112); }
-  void set_toggled(uint8_t v) const { guest::StoreU8(base, address + 112, v); }
   uint32_t toggled_address() const { return address + 112; }
+  uint8_t toggled() const { return data()->toggled; }
+  void set_toggled(uint8_t v) const { data()->toggled = v; }
+  uint8_t toggled_bits() const { return data()->toggled; }
+  void set_toggled_bits(uint8_t v) const { data()->toggled = v; }
   // a step asked (Back while toggled, message 1); cleared after the pass
-  uint8_t step() const { return guest::LoadU8(base, address + 113); }
-  void set_step(uint8_t v) const { guest::StoreU8(base, address + 113, v); }
   uint32_t step_address() const { return address + 113; }
+  uint8_t step() const { return data()->step; }
+  void set_step(uint8_t v) const { data()->step = v; }
+  uint8_t step_bits() const { return data()->step; }
+  void set_step_bits(uint8_t v) const { data()->step = v; }
   // 0 at construction, not read
-  uint8_t unknown_114() const { return guest::LoadU8(base, address + 114); }
-  void set_unknown_114(uint8_t v) const { guest::StoreU8(base, address + 114, v); }
   uint32_t unknown_114_address() const { return address + 114; }
+  uint8_t unknown_114() const { return data()->unknown_114; }
+  void set_unknown_114(uint8_t v) const { data()->unknown_114 = v; }
+  uint8_t unknown_114_bits() const { return data()->unknown_114; }
+  void set_unknown_114_bits(uint8_t v) const { data()->unknown_114 = v; }
   // the state stack (AppStates::Create)
-  template <typename T = AppStates>
-  T states() const { return T(base, guest::LoadU32(base, address + 116)); }
-  void set_states(const View& v) const { guest::StoreU32(base, address + 116, v.address); }
-  void set_states(uint32_t v) const { guest::StoreU32(base, address + 116, v); }
   uint32_t states_address() const { return address + 116; }
+  template <typename T = AppStates>
+  T states() const { return T(base, data()->states); }
+  void set_states(const View& w) const { const uint32_t v = w.address; data()->states = v; }
+  void set_states(uint32_t v) const { data()->states = v; }
+  uint32_t states_bits() const { return data()->states; }
+  void set_states_bits(uint32_t v) const { data()->states = v; }
   // a second camera class (368 bytes, sub_820A8B88)
-  uint32_t camera() const { return guest::LoadU32(base, address + 120); }
-  void set_camera(uint32_t v) const { guest::StoreU32(base, address + 120, v); }
   uint32_t camera_address() const { return address + 120; }
+  uint32_t camera() const { return data()->camera; }
+  void set_camera(uint32_t v) const { data()->camera = v; }
+  uint32_t camera_bits() const { return data()->camera; }
+  void set_camera_bits(uint32_t v) const { data()->camera = v; }
   // AudioManager::Create
-  uint32_t sound_manager() const { return guest::LoadU32(base, address + 124); }
-  void set_sound_manager(uint32_t v) const { guest::StoreU32(base, address + 124, v); }
   uint32_t sound_manager_address() const { return address + 124; }
+  uint32_t sound_manager() const { return data()->sound_manager; }
+  void set_sound_manager(uint32_t v) const { data()->sound_manager = v; }
+  uint32_t sound_manager_bits() const { return data()->sound_manager; }
+  void set_sound_manager_bits(uint32_t v) const { data()->sound_manager = v; }
   // 312 bytes, Movie::Movie
-  uint32_t movie() const { return guest::LoadU32(base, address + 128); }
-  void set_movie(uint32_t v) const { guest::StoreU32(base, address + 128, v); }
   uint32_t movie_address() const { return address + 128; }
+  uint32_t movie() const { return data()->movie; }
+  void set_movie(uint32_t v) const { data()->movie = v; }
+  uint32_t movie_bits() const { return data()->movie; }
+  void set_movie_bits(uint32_t v) const { data()->movie = v; }
 };
 
 // image; measure: AppStates.+4.+0
@@ -213,36 +342,76 @@ struct AppVtable : View {
 };
 
 // embedded; measure: AppStates::OnMessage.r4
+#pragma pack(push, 1)
+struct AppInterfaceData {
+  uint32_t vtable = 0;  // +0
+  uint8_t pad_4[52] = {};
+  uint32_t messages = 0;  // +56
+  uint8_t pad_60[16] = {};
+  uint32_t requests = 0;  // +76
+  uint8_t pad_80[16] = {};
+  uint32_t states = 0;  // +96
+  uint8_t pad_100[12] = {};
+};
+#pragma pack(pop)
+static_assert(sizeof(AppInterfaceData) == 112);
+inline constexpr memory::LayoutField kAppInterfaceFields[] = {{0, 4}, {56, 4}, {60, 4}, {64, 4}, {68, 4}, {76, 4}, {80, 4}, {84, 4}, {88, 4}, {96, 4}};
+inline constexpr memory::Layout kAppInterfaceLayout = {kAppInterfaceFields, 10};
+
 struct AppInterface : View {
   using View::View;
   static constexpr uint32_t kSize = 112;
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  AppInterfaceData* data() const { return static_cast<AppInterfaceData*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static AppInterface New(uint8_t* base) {
+    return AppInterface(base, memory::MakeHandle(new AppInterfaceData(), sizeof(AppInterfaceData), "AppInterface", &kAppInterfaceLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static AppInterface NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(AppInterfaceData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<AppInterfaceData*>(::operator new(sizeof(AppInterfaceData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) AppInterfaceData();
+    return AppInterface(base, memory::MakeHandle(p, sizeof(AppInterfaceData) * count, "AppInterface", &kAppInterfaceLayout, sizeof(AppInterfaceData)));
+  }
+  AppInterface at(uint32_t i) const { return AppInterface(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kAppInterfaceLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppInterfaceLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // the app's message vector
   template <typename T = MessageVector>
   T messages_vector() const { return T(base, address + 56); }
-  uint32_t messages_vector_address() const { return address + 56; }
   // the app's request vector
   template <typename T = RequestVector>
   T requests_vector() const { return T(base, address + 76); }
-  uint32_t requests_vector_address() const { return address + 76; }
-  template <typename T = AppInterfaceVtable>
-  T vtable() const { return T(base, guest::LoadU32(base, address + 0)); }
-  void set_vtable(const View& v) const { guest::StoreU32(base, address + 0, v.address); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
+  template <typename T = AppInterfaceVtable>
+  T vtable() const { return T(base, on_host() ? data()->vtable : guest::LoadU32(base, address + 0)); }
+  void set_vtable(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
+  void set_vtable(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable_bits() const { return on_host() ? data()->vtable : guest::LoadU32(base, address + 0); }
+  void set_vtable_bits(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
   // the app's message vector (app + 76)
-  uint32_t messages() const { return guest::LoadU32(base, address + 56); }
-  void set_messages(uint32_t v) const { guest::StoreU32(base, address + 56, v); }
   uint32_t messages_address() const { return address + 56; }
+  uint32_t messages() const { return on_host() ? uint32_t(data()->messages) : uint32_t(guest::LoadU32(base, address + 56)); }
+  void set_messages(uint32_t v) const { if (on_host()) data()->messages = v; else guest::StoreU32(base, address + 56, v); }
+  uint32_t messages_bits() const { return on_host() ? data()->messages : guest::LoadU32(base, address + 56); }
+  void set_messages_bits(uint32_t v) const { if (on_host()) data()->messages = v; else guest::StoreU32(base, address + 56, v); }
   // the app's request vector (app + 96)
-  uint32_t requests() const { return guest::LoadU32(base, address + 76); }
-  void set_requests(uint32_t v) const { guest::StoreU32(base, address + 76, v); }
   uint32_t requests_address() const { return address + 76; }
+  uint32_t requests() const { return on_host() ? uint32_t(data()->requests) : uint32_t(guest::LoadU32(base, address + 76)); }
+  void set_requests(uint32_t v) const { if (on_host()) data()->requests = v; else guest::StoreU32(base, address + 76, v); }
+  uint32_t requests_bits() const { return on_host() ? data()->requests : guest::LoadU32(base, address + 76); }
+  void set_requests_bits(uint32_t v) const { if (on_host()) data()->requests = v; else guest::StoreU32(base, address + 76, v); }
   // the app's +116
-  template <typename T = AppStates>
-  T states() const { return T(base, guest::LoadU32(base, address + 96)); }
-  void set_states(const View& v) const { guest::StoreU32(base, address + 96, v.address); }
-  void set_states(uint32_t v) const { guest::StoreU32(base, address + 96, v); }
   uint32_t states_address() const { return address + 96; }
+  template <typename T = AppStates>
+  T states() const { return T(base, on_host() ? data()->states : guest::LoadU32(base, address + 96)); }
+  void set_states(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->states = v; else guest::StoreU32(base, address + 96, v); }
+  void set_states(uint32_t v) const { if (on_host()) data()->states = v; else guest::StoreU32(base, address + 96, v); }
+  uint32_t states_bits() const { return on_host() ? data()->states : guest::LoadU32(base, address + 96); }
+  void set_states_bits(uint32_t v) const { if (on_host()) data()->states = v; else guest::StoreU32(base, address + 96, v); }
 };
 
 // image; measure: App.+20, AppStates::OnMessage.r4.+0, App::FrameDriver.r3.+20
@@ -409,21 +578,56 @@ struct AppMessageWord : View {
 };
 
 // allocated; measure: App::AddHandler.r5, App::AddToggledHandler.r5, App::AddAlwaysHandler.r5, App::AddListener.r5, new<12>@Delegate::Clone
+#pragma pack(push, 1)
+struct AppDelegateData {
+  uint32_t vtable = 0;  // +0
+  uint32_t object = 0;  // +4
+  uint32_t function = 0;  // +8
+};
+#pragma pack(pop)
+static_assert(sizeof(AppDelegateData) == 12);
+inline constexpr memory::LayoutField kAppDelegateFields[] = {{0, 4}, {4, 4}, {8, 4}};
+inline constexpr memory::Layout kAppDelegateLayout = {kAppDelegateFields, 3};
+
 struct AppDelegate : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  AppDelegateData* data() const { return static_cast<AppDelegateData*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static AppDelegate New(uint8_t* base) {
+    return AppDelegate(base, memory::MakeHandle(new AppDelegateData(), sizeof(AppDelegateData), "AppDelegate", &kAppDelegateLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static AppDelegate NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(AppDelegateData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<AppDelegateData*>(::operator new(sizeof(AppDelegateData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) AppDelegateData();
+    return AppDelegate(base, memory::MakeHandle(p, sizeof(AppDelegateData) * count, "AppDelegate", &kAppDelegateLayout, sizeof(AppDelegateData)));
+  }
+  AppDelegate at(uint32_t i) const { return AppDelegate(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kAppDelegateLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppDelegateLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0x82002850 (base 0x82000ABC)
-  template <typename T = AppDelegateVtable>
-  T vtable() const { return T(base, guest::LoadU32(base, address + 0)); }
-  void set_vtable(const View& v) const { guest::StoreU32(base, address + 0, v.address); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
-  uint32_t object() const { return guest::LoadU32(base, address + 4); }
-  void set_object(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  template <typename T = AppDelegateVtable>
+  T vtable() const { return T(base, on_host() ? data()->vtable : guest::LoadU32(base, address + 0)); }
+  void set_vtable(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
+  void set_vtable(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable_bits() const { return on_host() ? data()->vtable : guest::LoadU32(base, address + 0); }
+  void set_vtable_bits(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
   uint32_t object_address() const { return address + 4; }
-  uint32_t function() const { return guest::LoadU32(base, address + 8); }
-  void set_function(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t object() const { return on_host() ? uint32_t(data()->object) : uint32_t(guest::LoadU32(base, address + 4)); }
+  void set_object(uint32_t v) const { if (on_host()) data()->object = v; else guest::StoreU32(base, address + 4, v); }
+  uint32_t object_bits() const { return on_host() ? data()->object : guest::LoadU32(base, address + 4); }
+  void set_object_bits(uint32_t v) const { if (on_host()) data()->object = v; else guest::StoreU32(base, address + 4, v); }
   uint32_t function_address() const { return address + 8; }
+  uint32_t function() const { return on_host() ? uint32_t(data()->function) : uint32_t(guest::LoadU32(base, address + 8)); }
+  void set_function(uint32_t v) const { if (on_host()) data()->function = v; else guest::StoreU32(base, address + 8, v); }
+  uint32_t function_bits() const { return on_host() ? data()->function : guest::LoadU32(base, address + 8); }
+  void set_function_bits(uint32_t v) const { if (on_host()) data()->function = v; else guest::StoreU32(base, address + 8, v); }
 };
 
 // image; measure: App::AddHandler.r5.+0, App::AddToggledHandler.r5.+0, App::AddAlwaysHandler.r5.+0, App::AddListener.r5.+0
@@ -1055,27 +1259,93 @@ struct PhysicalPadAtTeardown : View {
 };
 
 // embedded; measure: App::SceneFromInterface16.r3@-8
+#pragma pack(push, 1)
+struct AppOuter8Data {
+  uint8_t pad_0[16] = {};
+  uint32_t unknown_16 = 0;  // +16
+};
+#pragma pack(pop)
+static_assert(sizeof(AppOuter8Data) == 20);
+inline constexpr memory::LayoutField kAppOuter8Fields[] = {{16, 4}};
+inline constexpr memory::Layout kAppOuter8Layout = {kAppOuter8Fields, 1};
+
 struct AppOuter8 : View {
   using View::View;
   static constexpr uint32_t kSize = 20;
-  uint32_t unknown_16() const { return guest::LoadU32(base, address + 16); }
-  void set_unknown_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  AppOuter8Data* data() const { return static_cast<AppOuter8Data*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static AppOuter8 New(uint8_t* base) {
+    return AppOuter8(base, memory::MakeHandle(new AppOuter8Data(), sizeof(AppOuter8Data), "AppOuter8", &kAppOuter8Layout));
+  }
+  template <uint32_t Stride = kSize>
+  static AppOuter8 NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(AppOuter8Data) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<AppOuter8Data*>(::operator new(sizeof(AppOuter8Data) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) AppOuter8Data();
+    return AppOuter8(base, memory::MakeHandle(p, sizeof(AppOuter8Data) * count, "AppOuter8", &kAppOuter8Layout, sizeof(AppOuter8Data)));
+  }
+  AppOuter8 at(uint32_t i) const { return AppOuter8(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kAppOuter8Layout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppOuter8Layout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t unknown_16_address() const { return address + 16; }
+  uint32_t unknown_16() const { return on_host() ? uint32_t(data()->unknown_16) : uint32_t(guest::LoadU32(base, address + 16)); }
+  void set_unknown_16(uint32_t v) const { if (on_host()) data()->unknown_16 = v; else guest::StoreU32(base, address + 16, v); }
+  uint32_t unknown_16_bits() const { return on_host() ? data()->unknown_16 : guest::LoadU32(base, address + 16); }
+  void set_unknown_16_bits(uint32_t v) const { if (on_host()) data()->unknown_16 = v; else guest::StoreU32(base, address + 16, v); }
 };
 
 // embedded; measure: App::SendMessage.r3@+56
+#pragma pack(push, 1)
+struct MessageVectorAt56Data {
+  uint8_t pad_0[4] = {};
+  uint32_t unknown_4 = 0;  // +4
+  uint32_t unknown_8 = 0;  // +8
+  uint32_t unknown_12 = 0;  // +12
+};
+#pragma pack(pop)
+static_assert(sizeof(MessageVectorAt56Data) == 16);
+inline constexpr memory::LayoutField kMessageVectorAt56Fields[] = {{4, 4}, {8, 4}, {12, 4}};
+inline constexpr memory::Layout kMessageVectorAt56Layout = {kMessageVectorAt56Fields, 3};
+
 struct MessageVectorAt56 : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
-  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
-  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  MessageVectorAt56Data* data() const { return static_cast<MessageVectorAt56Data*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static MessageVectorAt56 New(uint8_t* base) {
+    return MessageVectorAt56(base, memory::MakeHandle(new MessageVectorAt56Data(), sizeof(MessageVectorAt56Data), "MessageVectorAt56", &kMessageVectorAt56Layout));
+  }
+  template <uint32_t Stride = kSize>
+  static MessageVectorAt56 NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(MessageVectorAt56Data) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<MessageVectorAt56Data*>(::operator new(sizeof(MessageVectorAt56Data) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) MessageVectorAt56Data();
+    return MessageVectorAt56(base, memory::MakeHandle(p, sizeof(MessageVectorAt56Data) * count, "MessageVectorAt56", &kMessageVectorAt56Layout, sizeof(MessageVectorAt56Data)));
+  }
+  MessageVectorAt56 at(uint32_t i) const { return MessageVectorAt56(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kMessageVectorAt56Layout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kMessageVectorAt56Layout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t unknown_4_address() const { return address + 4; }
-  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
-  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_4() const { return on_host() ? uint32_t(data()->unknown_4) : uint32_t(guest::LoadU32(base, address + 4)); }
+  void set_unknown_4(uint32_t v) const { if (on_host()) data()->unknown_4 = v; else guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_bits() const { return on_host() ? data()->unknown_4 : guest::LoadU32(base, address + 4); }
+  void set_unknown_4_bits(uint32_t v) const { if (on_host()) data()->unknown_4 = v; else guest::StoreU32(base, address + 4, v); }
   uint32_t unknown_8_address() const { return address + 8; }
-  uint32_t unknown_12() const { return guest::LoadU32(base, address + 12); }
-  void set_unknown_12(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t unknown_8() const { return on_host() ? uint32_t(data()->unknown_8) : uint32_t(guest::LoadU32(base, address + 8)); }
+  void set_unknown_8(uint32_t v) const { if (on_host()) data()->unknown_8 = v; else guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_bits() const { return on_host() ? data()->unknown_8 : guest::LoadU32(base, address + 8); }
+  void set_unknown_8_bits(uint32_t v) const { if (on_host()) data()->unknown_8 = v; else guest::StoreU32(base, address + 8, v); }
   uint32_t unknown_12_address() const { return address + 12; }
+  uint32_t unknown_12() const { return on_host() ? uint32_t(data()->unknown_12) : uint32_t(guest::LoadU32(base, address + 12)); }
+  void set_unknown_12(uint32_t v) const { if (on_host()) data()->unknown_12 = v; else guest::StoreU32(base, address + 12, v); }
+  uint32_t unknown_12_bits() const { return on_host() ? data()->unknown_12 : guest::LoadU32(base, address + 12); }
+  void set_unknown_12_bits(uint32_t v) const { if (on_host()) data()->unknown_12 = v; else guest::StoreU32(base, address + 12, v); }
 };
 
 // embedded; measure: App::SendMessage.r3@+56.+8@+4
@@ -1088,15 +1358,48 @@ struct AppMessageWordAt4 : View {
 };
 
 // embedded; measure: App@+76
+#pragma pack(push, 1)
+struct MessageVectorAt76Data {
+  uint8_t pad_0[4] = {};
+  uint32_t unknown_4 = 0;  // +4
+  uint32_t unknown_8 = 0;  // +8
+};
+#pragma pack(pop)
+static_assert(sizeof(MessageVectorAt76Data) == 12);
+inline constexpr memory::LayoutField kMessageVectorAt76Fields[] = {{4, 4}, {8, 4}};
+inline constexpr memory::Layout kMessageVectorAt76Layout = {kMessageVectorAt76Fields, 2};
+
 struct MessageVectorAt76 : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
-  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
-  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  MessageVectorAt76Data* data() const { return static_cast<MessageVectorAt76Data*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static MessageVectorAt76 New(uint8_t* base) {
+    return MessageVectorAt76(base, memory::MakeHandle(new MessageVectorAt76Data(), sizeof(MessageVectorAt76Data), "MessageVectorAt76", &kMessageVectorAt76Layout));
+  }
+  template <uint32_t Stride = kSize>
+  static MessageVectorAt76 NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(MessageVectorAt76Data) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<MessageVectorAt76Data*>(::operator new(sizeof(MessageVectorAt76Data) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) MessageVectorAt76Data();
+    return MessageVectorAt76(base, memory::MakeHandle(p, sizeof(MessageVectorAt76Data) * count, "MessageVectorAt76", &kMessageVectorAt76Layout, sizeof(MessageVectorAt76Data)));
+  }
+  MessageVectorAt76 at(uint32_t i) const { return MessageVectorAt76(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kMessageVectorAt76Layout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kMessageVectorAt76Layout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t unknown_4_address() const { return address + 4; }
-  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
-  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_4() const { return on_host() ? uint32_t(data()->unknown_4) : uint32_t(guest::LoadU32(base, address + 4)); }
+  void set_unknown_4(uint32_t v) const { if (on_host()) data()->unknown_4 = v; else guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4_bits() const { return on_host() ? data()->unknown_4 : guest::LoadU32(base, address + 4); }
+  void set_unknown_4_bits(uint32_t v) const { if (on_host()) data()->unknown_4 = v; else guest::StoreU32(base, address + 4, v); }
   uint32_t unknown_8_address() const { return address + 8; }
+  uint32_t unknown_8() const { return on_host() ? uint32_t(data()->unknown_8) : uint32_t(guest::LoadU32(base, address + 8)); }
+  void set_unknown_8(uint32_t v) const { if (on_host()) data()->unknown_8 = v; else guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_bits() const { return on_host() ? data()->unknown_8 : guest::LoadU32(base, address + 8); }
+  void set_unknown_8_bits(uint32_t v) const { if (on_host()) data()->unknown_8 = v; else guest::StoreU32(base, address + 8, v); }
 };
 
 // embedded; measure: StateLayer@+36

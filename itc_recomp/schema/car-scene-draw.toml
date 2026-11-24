@@ -21,11 +21,14 @@
 # A 16-byte point (x, y, z, w): std::vector<16-byte>'s elements, the values
 # its insert and push_back copy, and the points the projectors and a plane's
 # crossing read (the measure sees only the 12 bytes they read: eye, target,
-# segment ends; they are 16-byte vectors on the callers' frames).
+# segment ends; they are 16-byte vectors on the callers' frames). Dual (E5
+# step 4): the vector's points are in Vector16Storage's host array (the same
+# layout, a handle into it) as well as on the callers' frames.
 [CarScenePoint]
 measures = ["Vector16.+8", "Vector16::InsertN.r4", "Vector16::InsertN.r5", "Vector16::InsertN.r6", "Vector16::PushBack.r4", "Plane::SegmentCrossing.r5", "Plane::SegmentCrossing.r6", "Matrix::LookAt_82597378.r4", "Matrix::LookAt_82597378.r5"]
 size = 16
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "xy", offset = 0, type = "u64", note = "x and y as one doubleword (the copies' ld/std)" },
   { name = "x", offset = 0, type = "f32" },
@@ -36,13 +39,28 @@ fields = [
 ]
 
 # std::vector's storage (Vector16::Allocate: operator new(16 x count)): the
-# 16-byte points (CarScenePoint) up to the capacity.
+# 16-byte points (CarScenePoint) up to the capacity. One element a point:
+# the storage is one array (E5 step 4), its handle in the vector's first,
+# last and end (handles into the array). Dual: Vector16::Allocate's port
+# makes it in host memory (NewArray(count)); the lifted original's operator
+# new (return 0x825981B4) keeps guest memory, since it runs only under the
+# lifted TextureProjection::Fit (a NaN or infinite field of view), whose
+# lvx128 reads the points through guest::Pointer. Freed by operator delete
+# (Vector16::InsertN when it grows, TextureProjection::Fit at its end),
+# which tells handles from guest blocks. The measure saw the first two
+# points (32 bytes): its +16 and +24 are the array's next element.
 [Vector16Storage]
 measure = "new<?>@Vector16::Allocate"
-size = 32
+size = 16
 origin = "allocated"
+storage = "dual"
 fields = [
-  { name = "points", offset = 0, type = "bytes", count = 32, note = "16-byte CarScenePoints, as many as the capacity (the measure sees the first two)" },
+  { name = "xy", offset = 0, type = "u64", note = "x and y as one doubleword (the copies' ld/std); the vector's first, last and end are handles into the array" },
+  { name = "x", offset = 0, type = "f32" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "zw", offset = 8, type = "u64", note = "z and w as one doubleword" },
+  { name = "z", offset = 8, type = "f32" },
+  { name = "w", offset = 12, type = "f32", note = "1.0 for a position" },
 ]
 
 # std::vector of 16-byte points (TextureProjection::Fit's frustum corners on

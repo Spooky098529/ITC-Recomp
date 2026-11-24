@@ -172,8 +172,9 @@ uint64_t SetUpPlateEditor(uint8_t* base, uint32_t car, uint32_t sp, const Calls&
                      p.unknown_80() <= 2000 && p.unknown_84() <= 1700;
   plate.set_car_class(small ? 1 : 0);
   for (uint32_t i = 0; i < 5; i++) {
-    Store(base, plate.start_plate_address() + 4 * i,
-          Load(base, Car(base, car).setting_bytes_address() + 4 * i));
+    // Into the editor's host data (E5 step 4) as the guest's bytes give it.
+    plate.store_at(plate.start_plate_address() - plate.address + 4 * i, 4,
+                   Load(base, Car(base, car).setting_bytes_address() + 4 * i));
   }
   return p.address;
 }
@@ -193,8 +194,9 @@ uint64_t SetUpSpecSheet(uint8_t* base, uint32_t car, uint32_t sp, const Calls& c
   const uint64_t r3 = calls.Call(kShiftPeak, frame, 0x8219169C, curve, 0);
   sheet.set_tab(2);
   for (uint32_t i = 0; i < 5; i++) {
-    Store(base, sheet.parts_address() + 4 * i,
-          Load(base, Car(base, car).setting_bytes_address() + 4 * i));
+    // Into the sheet's host data (E5 step 4) as the guest's bytes give it.
+    sheet.store_at(sheet.parts_address() - sheet.address + 4 * i, 4,
+                   Load(base, Car(base, car).setting_bytes_address() + 4 * i));
   }
   const schema::GarageCar garage_car(base, car);
   sheet.set_car_value(Fctiwz(double(garage_car.racer_float())));

@@ -34,12 +34,18 @@
 # StagePowerCurve the measure's PowerCurve; RaceEventRoutePosition the
 # measure's RoutePosition.
 
-# The race event (160 bytes, RaceEvent::Make; [0x826C6078]).
+# The race event (160 bytes, RaceEvent::Make; [0x826C6078]). In host memory
+# (E5 step 4): made by RaceEvent::Make (New; host_alloc for the lifted
+# original's operator new), deleted by RaceEvent::Destroy (Delete).
 [RaceEvent]
 measure = "RaceEvent"
 size = 160
 origin = "allocated"
+storage = "host"
+host_alloc = [0x82144E94]
+host_free = [{ call = 0x82144E34, reg = "r3" }]
 fields = [
+  { name = "group", offset = 36, type = "embed", to = "EventGroup", count = 10, note = "the ten groups, one a location 0 to 9" },
   { name = "section_rival_waiting", offset = 0, type = "u32", note = "1 when a list entry's item has a kind 65 condition (RaceEvent::Init); also the list entry's item id through the measure's join" },
   { name = "on_section_13", offset = 4, type = "u32", note = "1 while the player's car is on section 13's slices 0 to 9 (AiPath::NoteFixedSections; +4 and +8, or +12 and +16, let the section rival in); also a group's entries through the measure's join" },
   { name = "on_section_14", offset = 8, type = "u32", note = "section 14's slices 0 to 4; also a group's locked entries through the measure's join" },
@@ -65,12 +71,16 @@ fields = [
   { name = "list", offset = 156, type = "ptr", to = "RaceEventEntry", note = "VirtualAlloc'ed, count +20" },
 ]
 
-# A list entry (12 bytes, the event's +156; RaceEvent::Alloc's).
+# A list entry (12 bytes, the event's +156; RaceEvent::Alloc's). In host
+# memory (E5 step 4): the list one array (NewArray, host_alloc_array for the
+# lifted original's VirtualAlloc), deleted by RaceEvent::Free.
 [RaceEventEntry]
 measure = "new<?>@RaceEvent::Alloc"
 measures = ["RaceEvent::Entry.ret"]
 size = 12
 origin = "allocated"
+storage = "host"
+host_alloc_array = [{ call = 0x82143654, reg = "r4" }]
 fields = [
   { name = "item_id", offset = 0, type = "u32", note = "the opponent's item (its car build at the item's +160)" },
   { name = "start", offset = 4, type = "u32", note = "a start position (two halfwords, -1 -1 until placed: RaceEvent::PlaceEntry)" },
@@ -85,6 +95,7 @@ measure = "EventGroup"
 measures = ["EventGroup::Alloc.r3", "EventGroup::Free.r3"]
 size = 12
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "open", offset = 0, type = "u16", note = "the open count" },
   { name = "locked", offset = 2, type = "u16", note = "the locked count" },
@@ -92,23 +103,22 @@ fields = [
   { name = "locked_entries", offset = 8, type = "ptr", to = "EventGroupEntry", note = "the locked part: +4 + 4 x the open count" },
 ]
 
-# A group's entry (4 bytes).
+# A group's entry (4 bytes). In host memory (E5 step 4): a group's entries
+# one array (EventGroup::Alloc's NewArray), deleted by EventGroup::Free. The
+# measure's accesses past its 4 bytes (EventGroup::PromoteUnlocked's moves:
+# the next entry's +4 to +7, and the entry before at offsets 2^32 - 4 and
+# 2^32 - 2 not wrapped) are the neighbors' fields, no longer fields here (a
+# host struct is its 4 bytes; the moves go through the neighbor's view).
 [EventGroupEntry]
 measure = "EventGroup.+4"
 measures = ["EventGroup.+8", "EventPools::CopyIds.r4", "RaceEvent@+84.+4", "RaceEvent@+84.+8"]
 size = 4
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "item_id", offset = 0, type = "u16" },
   { name = "list_index", offset = 2, type = "u16", note = "its index in the event's list (locations 0 to 3; -1 once promoted past the open ones)" },
   { name = "word", offset = 0, type = "u32", note = "the entry as one word (the swaps)" },
-  { name = "next_item_id", offset = 4, type = "u16", note = "the next entry's (the moves)" },
-  { name = "next_list_index", offset = 6, type = "u16" },
-  { name = "next_word", offset = 4, type = "u32" },
-  { name = "wrapped_prev_item_id", offset = 4294967292, type = "u16", note = "measure fault: the entry before (-4), its offset not wrapped to 32 bits" },
-  { name = "wrapped_prev_list_index", offset = 4294967294, type = "u16", note = "measure fault: -2" },
-  { name = "wrapped_item_id", offset = 4294967296, type = "u16", note = "measure fault: +0" },
-  { name = "wrapped_list_index", offset = 4294967298, type = "u16", note = "measure fault: +2" },
 ]
 
 # A location's pools (608 bytes; RaceEvent::Init's block holds ten): counted
@@ -117,7 +127,11 @@ fields = [
 measure = "EventPools"
 size = 608
 origin = "embedded"
+storage = "host"
 fields = [
+  { name = "open_list", offset = 0, type = "embed", to = "EventIdList", note = "the open items not beaten" },
+  { name = "won_list", offset = 202, type = "embed", to = "EventIdList", note = "the open items beaten" },
+  { name = "locked_list", offset = 404, type = "embed", to = "EventIdList", note = "the locked items and the rivals of the others" },
   { name = "open", offset = 0, type = "u16", note = "the open items not beaten: the count" },
   { name = "open_ids", offset = 2, type = "bytes", count = 200, note = "their ids" },
   { name = "won", offset = 202, type = "u16", note = "the open items beaten: the count" },
@@ -127,12 +141,30 @@ fields = [
   { name = "kept", offset = 606, type = "u16", note = "the kept count (at most the location's cap)" },
 ]
 
-# RaceEvent::Init's block: ten EventPools.
+# A counted list of item ids in a location's pools (202 bytes: EventPools'
+# +0, +202 and +404): the count, then up to 100 ids (EventPools::Append's).
+[EventIdList]
+measure = "EventIdList"
+size = 202
+origin = "embedded"
+storage = "host"
+fields = [
+  { name = "count", offset = 0, type = "u16" },
+  { name = "ids", offset = 2, type = "bytes", count = 200, note = "the ids, halfwords (read with load_at)" },
+]
+
+# RaceEvent::Init's block: ten EventPools. In host memory (E5 step 4): made
+# by RaceEvent::Init (New; host_alloc for the lifted original's new[]),
+# deleted at its end (Delete; host_free for the original's two delete[]).
 [RaceEventPoolBlock]
 measure = "new<6080>@RaceEvent::Init"
 size = 6080
 origin = "allocated"
+storage = "host"
+host_alloc = [0x82144AFC]
+host_free = [{ call = 0x82144CF4, reg = "r3" }, { call = 0x82144DE8, reg = "r3" }]
 fields = [
+  { name = "pool", offset = 0, type = "embed", to = "EventPools", count = 10, note = "ten EventPools, one a location" },
   { name = "pools", offset = 0, type = "bytes", count = 6080, note = "ten EventPools, one a location" },
   { name = "pool0_open", offset = 0, type = "u16" },
   { name = "pool0_won", offset = 202, type = "u16" },
@@ -674,6 +706,7 @@ fields = [
 measure = "RaceEvent@+84"
 size = 12
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "unknown_4", offset = 4, type = "u32" },
   { name = "unknown_8", offset = 8, type = "u32" },
@@ -794,6 +827,7 @@ fields = [
 measure = "RaceEvent@+36"
 size = 12
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "unknown_0", offset = 0, type = "u16" },
   { name = "unknown_2", offset = 2, type = "u16" },
@@ -806,6 +840,7 @@ fields = [
 measure = "RaceEvent@+36.+8"
 size = 4
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "unknown_0", offset = 0, type = "u16" },
   { name = "unknown_0_4i", offset = 0, type = "u32" },

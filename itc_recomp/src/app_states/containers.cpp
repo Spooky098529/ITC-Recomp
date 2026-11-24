@@ -350,7 +350,7 @@ uint32_t ListClear(uint8_t* base, uint32_t list) {
 }
 
 std::optional<uint32_t> DelegateClone(uint8_t* base, uint32_t delegate) {
-  const auto block = memory::crt::OperatorNew(base, schema::AppDelegate::kSize);
+  const auto block = std::optional<uint32_t>(schema::AppDelegate::New(base).address);  // host memory (E5 step 4)
   if (!block) {
     return std::nullopt;
   }

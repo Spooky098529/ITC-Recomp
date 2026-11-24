@@ -108,7 +108,7 @@ loc_8216C7F0:
   // mr r4,r31
   r4 = r31;
   // lwz r3,1012(r11)
-  r3 = guest::LoadU32(base, schema::RaceScreens(base, uint32_t(r11)).pause_menu_address());
+  r3 = schema::RaceScreens(base, uint32_t(r11)).pause_menu_bits();
   // bl 0x8220fa88
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x8220FA88, LIFTED_ARGS(0x8216C804, r31)); r3 = o.r3; f1 = o.f1; }
@@ -163,7 +163,7 @@ lifted::Result f8216D328(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // mr r29,r3
   r29 = r3;
   // lwz r10,8(r11)
-  r10 = guest::LoadU32(base, schema::RaceScreens(base, uint32_t(r11)).flags_address());
+  r10 = schema::RaceScreens(base, uint32_t(r11)).flags_bits();
   // clrlwi. r10,r10,31
   r10 = uint32_t(r10) & 0x1;
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
@@ -223,7 +223,7 @@ loc_8216D3B4:
   // mr r4,r30
   r4 = r30;
   // lwz r3,1032(r11)
-  r3 = guest::LoadU32(base, schema::RaceScreens(base, uint32_t(r11)).split_results_screen_address());
+  r3 = schema::RaceScreens(base, uint32_t(r11)).split_results_screen_bits();
   // bl 0x82220050
   // (left out: dead in C++)
   { const lifted::Result o = game::SplitResults::Open(base, LIFTED_ARGS(0x8216D3C8, r31)); r3 = o.r3; f1 = o.f1; }
@@ -241,7 +241,7 @@ loc_8216D3C8:
   // rlwinm r5,r11,27,31,31
   r5 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 27) & 0x1;
   // lwz r3,1020(r10)
-  r3 = guest::LoadU32(base, schema::RaceScreens(base, uint32_t(r10)).after_race_menu_address());
+  r3 = schema::RaceScreens(base, uint32_t(r10)).after_race_menu_bits();
   // bl 0x8221ba68
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x8221BA68, LIFTED_ARGS(0x8216D3E8, r31)); r3 = o.r3; f1 = o.f1; }
@@ -289,7 +289,7 @@ lifted::Result f8216D7B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r30,r3
   r30 = r3;
   // lwz r11,8(r8)
-  r11 = guest::LoadU32(base, schema::RaceScreens(base, uint32_t(r8)).flags_address());
+  r11 = schema::RaceScreens(base, uint32_t(r8)).flags_bits();
   // lwz r29,3916(r30)
   r29 = guest::LoadU32(base, schema::RacerResultsRecord(base, uint32_t(r30)).kind6_result_address());
   // clrlwi. r11,r11,31
@@ -376,7 +376,7 @@ loc_8216D884:
   r5 = uint64_t(int64_t(1));
 loc_8216D888:
   // lwz r3,1032(r8)
-  r3 = guest::LoadU32(base, schema::RaceScreens(base, uint32_t(r8)).split_results_screen_address());
+  r3 = schema::RaceScreens(base, uint32_t(r8)).split_results_screen_bits();
   // bl 0x82220050
   // (left out: dead in C++)
   { const lifted::Result o = game::SplitResults::Open(base, LIFTED_ARGS(0x8216D890, r31)); r3 = o.r3; f1 = o.f1; }
@@ -395,7 +395,7 @@ loc_8216D8A0:
   // addi r4,r1,80
   r4 = uint64_t(int64_t(int64_t(r1) + 80));
   // lwz r3,1036(r11)
-  r3 = guest::LoadU32(base, schema::RaceScreens(base, uint32_t(r11)).kind6_menu_address());
+  r3 = schema::RaceScreens(base, uint32_t(r11)).kind6_menu_bits();
   // lwz r11,20(r30)
   r11 = guest::LoadU32(base, schema::RacerResultsRecord(base, uint32_t(r30)).e0_time_address());
   // stw r11,84(r1)
@@ -2991,7 +2991,7 @@ uint64_t f82216830(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   lifted::Cr cr6;
   uint8_t so = 0;
   // lwz r11,340(r3)
-  r11 = guest::LoadU32(base, schema::RaceHudAt656(base, uint32_t(r3)).unknown_340_address());
+  r11 = schema::RaceHudAt656(base, uint32_t(r3)).unknown_340_bits();
   // cmplwi cr6,r11,1
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
   // blt cr6,0x82216844
@@ -3150,7 +3150,7 @@ lifted::Result f82216908(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r31 = uint64_t(int64_t(0));
 loc_82216920:
   // lwz r11,344(r29)
-  r11 = guest::LoadU32(base, schema::SplitHud(base, uint32_t(r29)).results_address());
+  r11 = schema::SplitHud(base, uint32_t(r29)).results_bits();
   // mr r4,r30
   r4 = r30;
   // mr r3,r29
@@ -3205,7 +3205,7 @@ lifted::Result f82216950(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r30,r3
   r30 = r3;
   // lwz r11,344(r30)
-  r11 = guest::LoadU32(base, schema::SplitHud(base, uint32_t(r30)).results_address());
+  r11 = schema::SplitHud(base, uint32_t(r30)).results_bits();
   // lwz r3,3932(r11)
   r3 = guest::LoadU32(base, schema::RacerResultsRecord(base, uint32_t(r11)).ticks_address());
   // bl 0x82101760
@@ -3254,7 +3254,7 @@ loc_82216980:
   f31 = double(temp.f32);
 loc_822169C0:
   // lwz r11,344(r30)
-  r11 = guest::LoadU32(base, schema::SplitHud(base, uint32_t(r30)).results_address());
+  r11 = schema::SplitHud(base, uint32_t(r30)).results_bits();
   // mr r4,r29
   r4 = r29;
   // mr r3,r30
@@ -3290,7 +3290,7 @@ loc_822169C0:
   r31 = uint64_t(int64_t(0));
 loc_82216A00:
   // lwz r11,344(r30)
-  r11 = guest::LoadU32(base, schema::SplitHud(base, uint32_t(r30)).results_address());
+  r11 = schema::SplitHud(base, uint32_t(r30)).results_bits();
   // mr r4,r29
   r4 = r29;
   // mr r3,r30
@@ -3331,7 +3331,7 @@ lifted::Result f82216A40(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   lifted::Cr cr6;
   uint8_t so = 0;
   // lwz r11,340(r3)
-  r11 = guest::LoadU32(base, schema::SplitHud(base, uint32_t(r3)).mode_address());
+  r11 = schema::SplitHud(base, uint32_t(r3)).mode_bits();
   // cmplwi cr6,r11,1
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
   // blt cr6,0x82216a54

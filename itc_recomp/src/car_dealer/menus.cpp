@@ -75,8 +75,7 @@ uint64_t OpenListMenu(uint8_t* base, uint32_t sp, const Calls& calls) {
   if (uint32_t(selection) <= 1) {
     const Data data = G::data(base);
     const uint32_t count =
-        List(base, uint32_t(selection) == 0 ? data.first_list_address() : data.second_list_address())
-            .count();
+        (uint32_t(selection) == 0 ? data.first_list() : data.second_list()).count();
     if (count == 0) {
       text = 583;  // the list empty
     }
@@ -113,7 +112,7 @@ uint64_t OpenCarList(uint8_t* base, uint32_t sp, const Calls& calls) {
   calls.Call(kCarCardsFillAll, frame, 0x82184618);
   const uint64_t selection = calls.Call(kListSelection, frame, 0x82184620, G::list_menu(base).address);
   const uint32_t index = (G::list_menu(base).scroll() + uint32_t(selection)) << 2;
-  const Entry entry(base, Load(base, index + G::data(base).shown_list().address));
+  const Entry entry(base, uint32_t(G::data(base).shown_list().load_at(index, 4)));
   return HelpLineSet(base, uint64_t(entry.car_id()) + 1862, frame, calls);
 }
 
@@ -150,7 +149,7 @@ uint64_t OpenColors(uint8_t* base, uint32_t sp, const Calls& calls) {
   {
     const Data data = G::data(base);
     const uint32_t index = (data.car_scroll() + data.car_selection()) << 2;
-    entry = Entry(base, Load(base, index + data.shown_list().address));
+    entry = Entry(base, uint32_t(data.shown_list().load_at(index, 4)));
   }
   const uint32_t n = entry.color_count();
   const bool over = int32_t(n) > 9;
@@ -164,11 +163,11 @@ uint64_t OpenColors(uint8_t* base, uint32_t sp, const Calls& calls) {
   SetColorBar(base, uint64_t(uint32_t(selection) << 5) + 3, frame);
   Node(base, ui_movies::FindNode(base, movie, kAll, 25)).set_visible(over ? 1 : 0);
   // The old color records freed, from the last.
-  while (Colors(base, G::data(base).colors_address()).count() != 0) {
-    const Colors colors(base, G::data(base).colors_address());
+  while (G::data(base).colors().count() != 0) {
+    const Colors colors = G::data(base).colors();
     const uint32_t last = colors.count() - 1;
     colors.set_count(last);
-    calls.Call(kVirtualFree, frame, 0x821848F0, Load(base, (last << 2) + colors.address), 0,
+    calls.Call(kVirtualFree, frame, 0x821848F0, uint32_t(colors.load_at(last << 2, 4)), 0,
                0x8000);
   }
   if (int32_t(n) > 0) {
@@ -176,7 +175,7 @@ uint64_t OpenColors(uint8_t* base, uint32_t sp, const Calls& calls) {
     // +16 to +24 the HSV floats, +0 to +8 the RGB integers.
     const double scale = double(guest::LoadFloat(base, 0x82000C44));
     const double unit = double(guest::LoadFloat(base, 0x82002200));
-    SpecColor source(base, entry.color_records_address());
+    SpecColor source = entry.color_records(0);
     for (uint32_t left = n; left != 0; left--, source.address += SpecColor::kSize) {
       // A host object (E5 step 4) in place of the VirtualAlloc(32) at
       // 0x8218493C.
@@ -213,10 +212,10 @@ uint64_t OpenColors(uint8_t* base, uint32_t sp, const Calls& calls) {
       record.set_red(Fctiwz(red));
       record.set_green(Fctiwz(green));
       record.set_blue(Fctiwz(blue));
-      const Colors colors(base, G::data(base).colors_address());
+      const Colors colors = G::data(base).colors();
       const uint32_t count = colors.count();
       colors.set_count(count + 1);
-      Store(base, (count << 2) + colors.address, record.address);
+      colors.store_at(count << 2, 4, record.address);
     }
   }
   // Sub-scene 26's swatches shown for those below n.

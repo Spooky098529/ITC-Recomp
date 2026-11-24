@@ -9,39 +9,109 @@
 namespace schema {
 
 // embedded; measure: sub_82379338.r3, sub_82379350.r3, sub_820943B0.r3, sub_820943C8.r3, [826BDC90]
+#pragma pack(push, 1)
+struct AppInterface16Data {
+  uint32_t vtable = 0;  // +0
+  uint8_t pad_4[4] = {};
+  uint32_t framework_interface = 0;  // +8
+  uint8_t pad_12[96] = {};
+  uint32_t sound_manager = 0;  // +108
+  uint32_t movie = 0;  // +112
+};
+#pragma pack(pop)
+static_assert(sizeof(AppInterface16Data) == 116);
+inline constexpr memory::LayoutField kAppInterface16Fields[] = {{0, 4}, {8, 4}, {108, 4}, {112, 4}};
+inline constexpr memory::Layout kAppInterface16Layout = {kAppInterface16Fields, 4};
+
 struct AppInterface16 : View {
   using View::View;
   static constexpr uint32_t kSize = 116;
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  AppInterface16Data* data() const { return static_cast<AppInterface16Data*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static AppInterface16 New(uint8_t* base) {
+    return AppInterface16(base, memory::MakeHandle(new AppInterface16Data(), sizeof(AppInterface16Data), "AppInterface16", &kAppInterface16Layout));
+  }
+  template <uint32_t Stride = kSize>
+  static AppInterface16 NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(AppInterface16Data) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<AppInterface16Data*>(::operator new(sizeof(AppInterface16Data) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) AppInterface16Data();
+    return AppInterface16(base, memory::MakeHandle(p, sizeof(AppInterface16Data) * count, "AppInterface16", &kAppInterface16Layout, sizeof(AppInterface16Data)));
+  }
+  AppInterface16 at(uint32_t i) const { return AppInterface16(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kAppInterface16Layout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppInterface16Layout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0x82000E38
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
+  uint32_t vtable() const { return on_host() ? uint32_t(data()->vtable) : uint32_t(guest::LoadU32(base, address + 0)); }
+  void set_vtable(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable_bits() const { return on_host() ? data()->vtable : guest::LoadU32(base, address + 0); }
+  void set_vtable_bits(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
   // app + 124: the sound manager (AudioManager::Create, sound-cues.md), slot +48's answer
-  uint32_t sound_manager() const { return guest::LoadU32(base, address + 108); }
-  void set_sound_manager(uint32_t v) const { guest::StoreU32(base, address + 108, v); }
   uint32_t sound_manager_address() const { return address + 108; }
+  uint32_t sound_manager() const { return on_host() ? uint32_t(data()->sound_manager) : uint32_t(guest::LoadU32(base, address + 108)); }
+  void set_sound_manager(uint32_t v) const { if (on_host()) data()->sound_manager = v; else guest::StoreU32(base, address + 108, v); }
+  uint32_t sound_manager_bits() const { return on_host() ? data()->sound_manager : guest::LoadU32(base, address + 108); }
+  void set_sound_manager_bits(uint32_t v) const { if (on_host()) data()->sound_manager = v; else guest::StoreU32(base, address + 108, v); }
   // app + 128: the movie class (Movie::Movie, movies.md), slot +44's answer
-  uint32_t movie() const { return guest::LoadU32(base, address + 112); }
-  void set_movie(uint32_t v) const { guest::StoreU32(base, address + 112, v); }
   uint32_t movie_address() const { return address + 112; }
+  uint32_t movie() const { return on_host() ? uint32_t(data()->movie) : uint32_t(guest::LoadU32(base, address + 112)); }
+  void set_movie(uint32_t v) const { if (on_host()) data()->movie = v; else guest::StoreU32(base, address + 112, v); }
+  uint32_t movie_bits() const { return on_host() ? data()->movie : guest::LoadU32(base, address + 112); }
+  void set_movie_bits(uint32_t v) const { if (on_host()) data()->movie = v; else guest::StoreU32(base, address + 112, v); }
   // app + 24: the framework's interface, read by the vtable's +8 users getter sub_820943C8 and +12 save-devices getter sub_820943B0 (save-interface's and system-services' reports)
-  template <typename T = AppFrameworkInterface>
-  T framework_interface() const { return T(base, guest::LoadU32(base, address + 8)); }
-  void set_framework_interface(const View& v) const { guest::StoreU32(base, address + 8, v.address); }
-  void set_framework_interface(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t framework_interface_address() const { return address + 8; }
+  template <typename T = AppFrameworkInterface>
+  T framework_interface() const { return T(base, on_host() ? data()->framework_interface : guest::LoadU32(base, address + 8)); }
+  void set_framework_interface(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->framework_interface = v; else guest::StoreU32(base, address + 8, v); }
+  void set_framework_interface(uint32_t v) const { if (on_host()) data()->framework_interface = v; else guest::StoreU32(base, address + 8, v); }
+  uint32_t framework_interface_bits() const { return on_host() ? data()->framework_interface : guest::LoadU32(base, address + 8); }
+  void set_framework_interface_bits(uint32_t v) const { if (on_host()) data()->framework_interface = v; else guest::StoreU32(base, address + 8, v); }
 };
 
 // embedded; measure: sub_82094368.r3
+#pragma pack(push, 1)
+struct AppInterface8Data {
+  uint8_t pad_0[16] = {};
+  uint32_t framework_interface = 0;  // +16
+};
+#pragma pack(pop)
+static_assert(sizeof(AppInterface8Data) == 20);
+inline constexpr memory::LayoutField kAppInterface8Fields[] = {{16, 4}};
+inline constexpr memory::Layout kAppInterface8Layout = {kAppInterface8Fields, 1};
+
 struct AppInterface8 : View {
   using View::View;
   static constexpr uint32_t kSize = 20;
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  AppInterface8Data* data() const { return static_cast<AppInterface8Data*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static AppInterface8 New(uint8_t* base) {
+    return AppInterface8(base, memory::MakeHandle(new AppInterface8Data(), sizeof(AppInterface8Data), "AppInterface8", &kAppInterface8Layout));
+  }
+  template <uint32_t Stride = kSize>
+  static AppInterface8 NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(AppInterface8Data) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<AppInterface8Data*>(::operator new(sizeof(AppInterface8Data) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) AppInterface8Data();
+    return AppInterface8(base, memory::MakeHandle(p, sizeof(AppInterface8Data) * count, "AppInterface8", &kAppInterface8Layout, sizeof(AppInterface8Data)));
+  }
+  AppInterface8 at(uint32_t i) const { return AppInterface8(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kAppInterface8Layout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppInterface8Layout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // app + 24: the framework's +36 interface
-  template <typename T = AppFrameworkInterface>
-  T framework_interface() const { return T(base, guest::LoadU32(base, address + 16)); }
-  void set_framework_interface(const View& v) const { guest::StoreU32(base, address + 16, v.address); }
-  void set_framework_interface(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
   uint32_t framework_interface_address() const { return address + 16; }
+  template <typename T = AppFrameworkInterface>
+  T framework_interface() const { return T(base, on_host() ? data()->framework_interface : guest::LoadU32(base, address + 16)); }
+  void set_framework_interface(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->framework_interface = v; else guest::StoreU32(base, address + 16, v); }
+  void set_framework_interface(uint32_t v) const { if (on_host()) data()->framework_interface = v; else guest::StoreU32(base, address + 16, v); }
+  uint32_t framework_interface_bits() const { return on_host() ? data()->framework_interface : guest::LoadU32(base, address + 16); }
+  void set_framework_interface_bits(uint32_t v) const { if (on_host()) data()->framework_interface = v; else guest::StoreU32(base, address + 16, v); }
 };
 
 // embedded; measure: sub_82094368.r3.+16, sub_820943B0.r3.+8, sub_820943C8.r3.+8, App::SceneFromInterface16.r3@-8.+16

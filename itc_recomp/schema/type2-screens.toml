@@ -46,9 +46,15 @@ fields = [
 # The hub's data ([0x826D8418]: VirtualAlloc'ed for 68 bytes, used up to
 # +447; docs/known-data.md). The measure joins it with the machine
 # ("Type2Hub"), so this type has no measure name of its own.
+# In host memory since E5 step 4 (2026-11-24): made by Type2Hub::Create
+# (New, 448 bytes, in place of the VirtualAlloc(68) at 0x8218E140), deleted
+# by Type2Hub::Destroy (in place of the VirtualFree at 0x8218E228);
+# [0x826D8418] holds its handle. The lifted handlers (OnAnswer2,
+# OnMessage48, OnMessage44, NextNotice2's original) store through it raw.
 [Type2HubData]
 size = 448
 origin = "allocated"
+storage = "host"
 fields = [
   { name = "set_up", offset = 0, type = "u32", note = "1 once set up (SetUpStatus); Reenter's transition 4 when set, else 0" },
   { name = "quitting", offset = 4, type = "u32", note = "set by Choose for item 7 (the quit question); the machine to state 14 on the destroy" },
@@ -77,10 +83,18 @@ fields = [
 ]
 
 # A notice image's texture record (12 bytes, VirtualAlloc'ed by ImageLoaded).
+# In host memory since E5 step 4 (2026-11-24): made by Type2Hub::ImageLoaded
+# (New, in place of the VirtualAlloc at 0x8218D938), deleted by
+# Type2Hub::FreeImage (in place of the VirtualFree at 0x8218D680), for the
+# hub's and today's event's image records alike. Its handle goes into the
+# hub and today's event movies' texture words 9 and 8 while they show it:
+# the UI movie draw (UiMovie::DrawPicture, the primitives' TextureAt) reads
+# its +0, +4 and +8 raw through guest loads, which resolve the handle.
 [Type2HubTexture]
 measure = "new<12>@Type2Hub::ImageLoaded"
 size = 12
 origin = "allocated"
+storage = "host"
 fields = [
   { name = "texture", offset = 0, type = "u32", note = "XPR::GetTexture(0)" },
   { name = "width", offset = 4, type = "u32", note = "level 0's (Texture::GetLevelDesc)" },
@@ -143,10 +157,13 @@ fields = [
 # A license plate (20 bytes): the plate editor's two in its data, a garage
 # car's +1568 (the dealer copies the editor's into the bought car's +1780).
 # The measure meets it only through the editor's data, so this type has no
-# measure name of its own.
+# measure name of its own. Dual since E5 step 4 (2026-11-24): inside the
+# editor's host data (+4, +24: its `plate` and `start_plate` bytes, interior
+# handles) and over guest plates (RandomPlate's and ShowPlate's entries).
 [Type2Plate]
 size = 20
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "unknown_0", offset = 0, type = "u8" },
   { name = "region", offset = 1, type = "u8", note = "0 to 13 (strings 5411 +)" },
@@ -156,10 +173,16 @@ fields = [
 
 # The license plate editor's data ([0x826D8438], 76 bytes, VirtualAlloc'ed
 # by PlateEditor::Create; docs/known-data.md). Joined with the machine by
-# the measure ("PlateEditor"), so no measure name of its own.
+# the measure ("PlateEditor"), so no measure name of its own; the measure's
+# name for its allocation is PlateEditorPart (below, the lifted code's view).
+# In host memory since E5 step 4 (2026-11-24): made by PlateEditor::Create
+# (New, in place of the VirtualAlloc at 0x821982AC), deleted by
+# PlateEditor::Destroy (in place of the VirtualFree at 0x82198168);
+# [0x826D8438] holds its handle.
 [PlateEditorData]
 size = 76
 origin = "allocated"
+storage = "host"
 fields = [
   { name = "unknown_0", offset = 0, type = "u32", note = "0 from Create" },
   { name = "plate", offset = 4, type = "bytes", count = 20, note = "the plate being edited (a Type2Plate)" },
@@ -308,10 +331,18 @@ fields = [
 # PowerGraphScreen::Create; docs/known-data.md). The record at +16 is laid
 # out as power-graph-screen.toml's PowerGraphScreenData's at +8 (filled by
 # GarageScreen::SetUpSpecSheet and sub_8218D708).
+# In host memory since E5 step 4 (2026-11-24): made by
+# PowerGraphScreen::Create (New, in place of the VirtualAlloc at 0x821B81EC),
+# deleted by PowerGraphScreen::Destroy (in place of the VirtualFree at
+# 0x821B8108); [0x826D846C] holds its handle. Its car data's address (+112,
+# an interior handle) goes to Vehicle::SetupFromCar and
+# PowerCurve::FromEngine, which read and write it through guest loads and
+# stores (resolved, logged raw).
 [SpecSheetData]
 measure = "new<1968>@PowerGraphScreen::Create"
 size = 1968
 origin = "allocated"
+storage = "host"
 fields = [
   { name = "movie_loaded", offset = 0, type = "u32", note = "1 once loaded (WaitForLoad)" },
   { name = "graph_drawn", offset = 4, type = "u32", note = "the graph drawn when set" },
@@ -377,7 +408,8 @@ record_screen = { address = 0x826D84CC, type = "u32", note = "the user info scre
 # Embedded objects the measure split from their owners after its offset
 # fix (2026-11-22): seeded from the measure, unknown_ until read.
 
-# Split from BuildScreenData.
+# Split from BuildScreenData: the measure's name for BuildScreenData's
+# allocation (the same object; the hand ports use BuildScreenData).
 [BuildScreenDataPart]
 measure = "new<206444>@BuildScreen::Create"
 size = 204782
@@ -412,7 +444,12 @@ fields = [
   { name = "unknown_204780", offset = 204780, type = "u16" },
 ]
 
-# Split from PlateEditor.
+# Split from PlateEditor: the measure's name for PlateEditorData's allocation
+# (the same object, host since E5 step 4). Left a guest view: the lifted
+# code reaches it through it (batch_008's PlateEditor handlers, originals),
+# whose accesses resolve the handle with PlateEditorData's layout; a host
+# PlateEditorPart would read its own struct (unknown_4 a word over the
+# plate's bytes). To merge into PlateEditorData's measures.
 [PlateEditorPart]
 measure = "new<76>@PlateEditor::Create"
 size = 76

@@ -4050,7 +4050,7 @@ lifted::Result f820998B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r31,84(r1)
   guest::StoreU32(base, uint32_t(r1) + 84, uint32_t(r31));
   // stw r11,0(r31)
-  guest::StoreU32(base, schema::SysUsers(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
+  schema::SysUsers(base, uint32_t(r31)).set_vtable_bits(uint32_t(r11));
   // addi r10,r10,10320
   r10 = uint64_t(int64_t(int64_t(r10) + 10320));
   // lwz r11,4(r30)
@@ -4064,17 +4064,17 @@ lifted::Result f820998B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r10,r9,-26584
   r10 = uint64_t(int64_t(int64_t(r9) + -26584));
   // stw r11,232(r31)
-  guest::StoreU32(base, schema::SysUsers(base, uint32_t(r31)).framework_interface_address(), uint32_t(r11));
+  schema::SysUsers(base, uint32_t(r31)).set_framework_interface_bits(uint32_t(r11));
   // lwz r11,8(r30)
   r11 = guest::LoadU32(base, schema::SysUsersSetUp(base, uint32_t(r30)).tick_key_address());
   // stw r10,88(r1)
   guest::StoreU32(base, uint32_t(r1) + 88, uint32_t(r10));
   // stw r11,0(r4)
-  guest::StoreU32(base, schema::SysUsers(base, uint32_t(r4) - 224).tick_key_address(), uint32_t(r11));
+  schema::SysUsers(base, uint32_t(r4) - 224).set_tick_key_bits(uint32_t(r11));
   // lwz r11,12(r30)
   r11 = guest::LoadU32(base, schema::SysUsersSetUp(base, uint32_t(r30)).listener_key_address());
   // stw r11,0(r29)
-  guest::StoreU32(base, schema::SysUsers(base, uint32_t(r29) - 228).listener_key_address(), uint32_t(r11));
+  schema::SysUsers(base, uint32_t(r29) - 228).set_listener_key_bits(uint32_t(r11));
   // lwz r3,0(r30)
   r3 = guest::LoadU32(base, schema::SysUsersSetUp(base, uint32_t(r30)).run_loop_address());
   // lwz r11,0(r3)
@@ -4135,7 +4135,7 @@ lifted::Result f820998B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // stw r3,240(r31)
-  guest::StoreU32(base, schema::SysUsers(base, uint32_t(r31)).listener_address(), uint32_t(r3));
+  schema::SysUsers(base, uint32_t(r31)).set_listener_bits(uint32_t(r3));
   // beq 0x82099998
   if (cr0.eq) goto loc_82099998;
   // cmpwi cr6,r3,-1
@@ -4146,7 +4146,7 @@ loc_82099998:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,236(r31)
-  guest::StoreU32(base, schema::SysUsers(base, uint32_t(r31)).unknown_236_address(), uint32_t(r11));
+  schema::SysUsers(base, uint32_t(r31)).set_unknown_236_bits(uint32_t(r11));
 loc_820999A0:
   // li r11,0
   r11 = uint64_t(int64_t(0));
@@ -4159,32 +4159,32 @@ loc_820999A0:
   // li r8,4
   r8 = uint64_t(int64_t(4));
   // stw r11,216(r31)
-  guest::StoreU32(base, schema::SysUsers(base, uint32_t(r31)).signed_in_count_address(), uint32_t(r11));
+  schema::SysUsers(base, uint32_t(r31)).set_signed_in_count_bits(uint32_t(r11));
   // stw r11,220(r31)
-  guest::StoreU32(base, schema::SysUsers(base, uint32_t(r31)).live_count_address(), uint32_t(r11));
+  schema::SysUsers(base, uint32_t(r31)).set_live_count_bits(uint32_t(r11));
 loc_820999BC:
   // li r6,-1
   r6 = uint64_t(int64_t(-1));
   // stw r11,0(r7)
-  guest::StoreU32(base, schema::SysUsers(base, uint32_t(r7) - 200).signed_in_users_address(), uint32_t(r11));
+  schema::SysUsers(base, uint32_t(r7) - 200).set_signed_in_users_bits(uint32_t(r11));
   // stw r11,-8(r10)
-  guest::StoreU32(base, schema::SysUsers(base, uint32_t(r10) - 16).user0_signin_state_address(), uint32_t(r11));
+  schema::SysUsers(base, uint32_t(r10) - 16).set_user0_signin_state_bits(uint32_t(r11));
   // addic. r8,r8,-1
   ca = uint32_t(r8) > 0;
   r8 = uint64_t(int64_t(int64_t(r8) + -1));
   cr0 = lifted::Compare<int32_t>(int32_t(r8), 0, so);
   // std r11,0(r10)
-  guest::StoreU64(base, schema::SysUsers(base, uint32_t(r10) - 16).user0_xuid_address(), r11);
+  schema::SysUsers(base, uint32_t(r10) - 16).set_user0_xuid_bits(r11);
   // addi r7,r7,4
   r7 = uint64_t(int64_t(int64_t(r7) + 4));
   // stb r11,24(r10)
-  guest::StoreU8(base, schema::SysUsers(base, uint32_t(r10) - 16).user0_on_live_address(), uint8_t(r11));
+  schema::SysUsers(base, uint32_t(r10) - 16).set_user0_on_live_bits(uint8_t(r11));
   // addi r10,r10,40
   r10 = uint64_t(int64_t(int64_t(r10) + 40));
   // stw r11,-4(r9)
-  guest::StoreU32(base, schema::SysUsers(base, uint32_t(r9) - 172).live_users_address(), uint32_t(r11));
+  schema::SysUsers(base, uint32_t(r9) - 172).set_live_users_bits(uint32_t(r11));
   // stw r6,0(r9)
-  guest::StoreU32(base, schema::SysUsers(base, uint32_t(r9) - 172).live_user0_index_address(), uint32_t(r6));
+  schema::SysUsers(base, uint32_t(r9) - 172).set_live_user0_index_bits(uint32_t(r6));
   // addi r9,r9,8
   r9 = uint64_t(int64_t(int64_t(r9) + 8));
   // bne 0x820999bc
@@ -4192,11 +4192,11 @@ loc_820999BC:
   // mr r3,r31
   r3 = r31;
   // stw r11,244(r31)
-  guest::StoreU32(base, schema::SysUsers(base, uint32_t(r31)).users_changed_address(), uint32_t(r11));
+  schema::SysUsers(base, uint32_t(r31)).set_users_changed_bits(uint32_t(r11));
   // stw r11,248(r31)
-  guest::StoreU32(base, schema::SysUsers(base, uint32_t(r31)).live_connection_changed_address(), uint32_t(r11));
+  schema::SysUsers(base, uint32_t(r31)).set_live_connection_changed_bits(uint32_t(r11));
   // stw r11,252(r31)
-  guest::StoreU32(base, schema::SysUsers(base, uint32_t(r31)).live_connection_state_address(), uint32_t(r11));
+  schema::SysUsers(base, uint32_t(r31)).set_live_connection_state_bits(uint32_t(r11));
   // addi r1,r1,144
   r1 = uint64_t(int64_t(int64_t(r1) + 144));
   // b 0x825a6edc
@@ -4208,7 +4208,6 @@ loc_820999BC:
 lifted::Result f82099A08(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_82099A08 (lifted)");
   uint64_t r12 = 0, r31 = 0;
-  double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
   lifted::Cr cr0;
   uint8_t so = 0;
   uint32_t ea{};
@@ -4228,7 +4227,7 @@ lifted::Result f82099A08(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = uint64_t(int64_t(256));
   // bl 0x825a6880
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A6880(base, LIFTED_ARGS(0x82099A24, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = schema::SysUsers::New(base).address; f1 = 0; }  // host_alloc 0x82099A24 (SysUsers)
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq 0x82099a38

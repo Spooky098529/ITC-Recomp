@@ -40,7 +40,10 @@ std::optional<uint32_t> AllocateNodes(uint8_t* base, uint32_t count) {
   if (count != 0 && 0xFFFFFFFFu / count < schema::PtrListNode::kSize) {
     return std::nullopt;
   }
-  return memory::crt::OperatorNew(base, count * schema::PtrListNode::kSize);
+  // In host memory (E5 step 4): one array of `count` nodes behind one handle
+  // (a list's node, or RequestVector's block of 12-byte requests), freed by
+  // the game's operator delete. Operator new(0) gives a block: one element.
+  return schema::PtrListNode::NewArray(base, count != 0 ? count : 1).address;
 }
 
 bool IncSize(uint8_t* base, uint32_t list, uint32_t count) {

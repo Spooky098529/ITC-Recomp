@@ -60,8 +60,10 @@ uint64_t SheetCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& 
   menu.set_up_down_locked(0);
   menu.set_left_right_steps(0);
   menu.set_shoulders_step(0);
-  const uint64_t r3 = Alloc(calls, frame, 0x821B81EC, 1968);
-  const schema::SpecSheetData data = schema::SpecSheetData(base, uint32_t(r3));
+  // A host object (E5 step 4) in place of the VirtualAlloc(1968) at
+  // 0x821B81EC; [0x826D846C] holds its handle (and r3, as the original's).
+  const schema::SpecSheetData data = schema::SpecSheetData::New(base);
+  const uint64_t r3 = data.address;
   Globals::set_sheet_data(base, data.address);
   data.set_movie_loaded(0);
   data.set_graph_drawn(0);
@@ -108,8 +110,12 @@ uint64_t SheetDestroy(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 112);
   calls.Call(kVirtualFree, frame, 0x821B80E0, Globals::sheet_pages(base).address, 0, kMemRelease);
   calls.Call(kVirtualFree, frame, 0x821B80F4, Globals::sheet_menu(base).address, 0, kMemRelease);
+  // Deleted in place of the VirtualFree at 0x821B8108 (r3 = 1, as it
+  // returned; with no data, the VirtualFree of 0 as the original).
+  const schema::SpecSheetData data = Globals::sheet_data(base);
   const uint64_t r3 =
-      calls.Call(kVirtualFree, frame, 0x821B8108, Globals::sheet_data(base).address, 0, kMemRelease);
+      data.address != 0 ? 1 : calls.Call(kVirtualFree, frame, 0x821B8108, 0, 0, kMemRelease);
+  data.Delete();
   Globals::set_sheet_pages(base, 0);
   Globals::set_sheet_menu(base, 0);
   Globals::set_sheet_data(base, 0);

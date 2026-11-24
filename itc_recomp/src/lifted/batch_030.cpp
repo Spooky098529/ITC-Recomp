@@ -33641,23 +33641,23 @@ uint64_t f8258AC58(uint8_t* base, uint64_t r3) {
   // (left out: dead in C++)
   // (left out: dead in C++)
   // lwz r11,36(r3)
-  r11 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).vertex_count_address());
+  r11 = schema::SkinRecord(base, uint32_t(r3)).vertex_count_bits();
   // lwz r6,12(r3)
-  r6 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).source_address());
+  r6 = schema::SkinRecord(base, uint32_t(r3)).source_bits();
   // lwz r7,28(r3)
-  r7 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).matrices_address());
+  r7 = schema::SkinRecord(base, uint32_t(r3)).matrices_bits();
   // rlwinm r30,r11,4,0,27
   r30 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // lwz r5,0(r3)
-  r5 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).influence_counts_address());
+  r5 = schema::SkinRecord(base, uint32_t(r3)).influence_counts_bits();
   // cmplwi cr6,r11,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // lwz r10,4(r3)
-  r10 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).weights_address());
+  r10 = schema::SkinRecord(base, uint32_t(r3)).weights_bits();
   // lwz r9,8(r3)
-  r9 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).bone_indices_address());
+  r9 = schema::SkinRecord(base, uint32_t(r3)).bone_indices_bits();
   // lwz r31,16(r3)
-  r31 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).destination_address());
+  r31 = schema::SkinRecord(base, uint32_t(r3)).destination_bits();
   // beq cr6,0x8258ad80
   if (cr6.eq) goto loc_8258AD80;
   // mr r3,r11
@@ -33837,29 +33837,29 @@ uint64_t f8258ADA0(uint8_t* base, uint64_t r1, uint64_t r3) {
   // (left out: dead in C++)
   // (left out: dead in C++)
   // lwz r6,36(r3)
-  r6 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).vertex_count_address());
+  r6 = schema::SkinRecord(base, uint32_t(r3)).vertex_count_bits();
   // lwz r7,20(r3)
-  r7 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).source_2_address());
+  r7 = schema::SkinRecord(base, uint32_t(r3)).source_2_bits();
   // rlwinm r28,r6,4,0,27
   r28 = __builtin_rotateleft64(uint32_t(r6) | (r6 << 32), 4) & 0xFFFFFFF0;
   // lwz r5,28(r3)
-  r5 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).matrices_address());
+  r5 = schema::SkinRecord(base, uint32_t(r3)).matrices_bits();
   // rotlwi r9,r6,0
   r9 = __builtin_rotateleft32(uint32_t(r6), 0);
   // lwz r4,0(r3)
-  r4 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).influence_counts_address());
+  r4 = schema::SkinRecord(base, uint32_t(r3)).influence_counts_bits();
   // lwz r11,4(r3)
-  r11 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).weights_address());
+  r11 = schema::SkinRecord(base, uint32_t(r3)).weights_bits();
   // lwz r10,8(r3)
-  r10 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).bone_indices_address());
+  r10 = schema::SkinRecord(base, uint32_t(r3)).bone_indices_bits();
   // cmplwi cr6,r9,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r9), 0, so);
   // lwz r8,12(r3)
-  r8 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).source_address());
+  r8 = schema::SkinRecord(base, uint32_t(r3)).source_bits();
   // lwz r29,16(r3)
-  r29 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).destination_address());
+  r29 = schema::SkinRecord(base, uint32_t(r3)).destination_bits();
   // lwz r27,24(r3)
-  r27 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).destination_2_address());
+  r27 = schema::SkinRecord(base, uint32_t(r3)).destination_2_bits();
   // stw r28,-76(r1)
   guest::StoreU32(base, uint32_t(r1) + -76, uint32_t(r28));
   // beq cr6,0x8258af34
@@ -34114,35 +34114,35 @@ uint64_t f8258AF80(uint8_t* base, uint64_t r1, uint64_t r3) {
   // (left out: dead in C++)
   // (left out: dead in C++)
   // lwz r9,36(r3)
-  r9 = guest::LoadU32(base, schema::MorphJobAt8(base, uint32_t(r3)).unknown_36_address());
+  r9 = schema::MorphJobAt8(base, uint32_t(r3)).unknown_36_bits();
   // lwz r8,20(r3)
-  r8 = guest::LoadU32(base, schema::MorphJobAt8(base, uint32_t(r3)).unknown_20_address());
+  r8 = schema::MorphJobAt8(base, uint32_t(r3)).unknown_20_bits();
   // rlwinm r24,r9,5,0,26
   r24 = __builtin_rotateleft64(uint32_t(r9) | (r9 << 32), 5) & 0xFFFFFFE0;
   // lwz r27,24(r3)
-  r27 = guest::LoadU32(base, schema::MorphJobAt8(base, uint32_t(r3)).unknown_24_address());
+  r27 = schema::MorphJobAt8(base, uint32_t(r3)).unknown_24_bits();
   // rotlwi r7,r9,0
   r7 = __builtin_rotateleft32(uint32_t(r9), 0);
   // lwz r6,12(r3)
-  r6 = guest::LoadU32(base, schema::MorphJobAt8(base, uint32_t(r3)).unknown_12_address());
+  r6 = schema::MorphJobAt8(base, uint32_t(r3)).unknown_12_bits();
   // lwz r31,28(r3)
-  r31 = guest::LoadU32(base, schema::MorphJobAt8(base, uint32_t(r3)).unknown_28_address());
+  r31 = schema::MorphJobAt8(base, uint32_t(r3)).unknown_28_bits();
   // rlwinm r25,r9,4,0,27
   r25 = __builtin_rotateleft64(uint32_t(r9) | (r9 << 32), 4) & 0xFFFFFFF0;
   // lwz r30,0(r3)
-  r30 = guest::LoadU32(base, schema::MorphJobAt8(base, uint32_t(r3)).unknown_0_address());
+  r30 = schema::MorphJobAt8(base, uint32_t(r3)).unknown_0_bits();
   // addi r4,r8,16
   r4 = uint64_t(int64_t(int64_t(r8) + 16));
   // lwz r11,4(r3)
-  r11 = guest::LoadU32(base, schema::MorphJobAt8(base, uint32_t(r3)).unknown_4_address());
+  r11 = schema::MorphJobAt8(base, uint32_t(r3)).unknown_4_bits();
   // addi r5,r27,16
   r5 = uint64_t(int64_t(int64_t(r27) + 16));
   // lwz r10,8(r3)
-  r10 = guest::LoadU32(base, schema::MorphJobAt8(base, uint32_t(r3)).unknown_8_address());
+  r10 = schema::MorphJobAt8(base, uint32_t(r3)).unknown_8_bits();
   // cmplwi cr6,r7,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r7), 0, so);
   // lwz r26,16(r3)
-  r26 = guest::LoadU32(base, schema::MorphJobAt8(base, uint32_t(r3)).unknown_16_address());
+  r26 = schema::MorphJobAt8(base, uint32_t(r3)).unknown_16_bits();
   // stw r24,-92(r1)
   guest::StoreU32(base, uint32_t(r1) + -92, uint32_t(r24));
   // beq cr6,0x8258b174
@@ -34443,27 +34443,27 @@ uint64_t f8258B1C0(uint8_t* base, uint64_t r3) {
   // (left out: dead in C++)
   // (left out: dead in C++)
   // lwz r9,36(r3)
-  r9 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).vertex_count_address());
+  r9 = schema::SkinRecord(base, uint32_t(r3)).vertex_count_bits();
   // lwz r7,12(r3)
-  r7 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).source_address());
+  r7 = schema::SkinRecord(base, uint32_t(r3)).source_bits();
   // lwz r29,16(r3)
-  r29 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).destination_address());
+  r29 = schema::SkinRecord(base, uint32_t(r3)).destination_bits();
   // rlwinm r28,r9,5,0,26
   r28 = __builtin_rotateleft64(uint32_t(r9) | (r9 << 32), 5) & 0xFFFFFFE0;
   // lwz r6,28(r3)
-  r6 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).matrices_address());
+  r6 = schema::SkinRecord(base, uint32_t(r3)).matrices_bits();
   // cmplwi cr6,r9,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r9), 0, so);
   // lwz r31,0(r3)
-  r31 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).influence_counts_address());
+  r31 = schema::SkinRecord(base, uint32_t(r3)).influence_counts_bits();
   // addi r4,r7,16
   r4 = uint64_t(int64_t(int64_t(r7) + 16));
   // lwz r11,4(r3)
-  r11 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).weights_address());
+  r11 = schema::SkinRecord(base, uint32_t(r3)).weights_bits();
   // addi r5,r29,16
   r5 = uint64_t(int64_t(int64_t(r29) + 16));
   // lwz r10,8(r3)
-  r10 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).bone_indices_address());
+  r10 = schema::SkinRecord(base, uint32_t(r3)).bone_indices_bits();
   // beq cr6,0x8258b344
   if (cr6.eq) goto loc_8258B344;
   // mr r30,r9
@@ -34690,27 +34690,27 @@ uint64_t f8258B368(uint8_t* base, uint64_t r3) {
   // (left out: dead in C++)
   // (left out: dead in C++)
   // lwz r9,36(r3)
-  r9 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).vertex_count_address());
+  r9 = schema::SkinRecord(base, uint32_t(r3)).vertex_count_bits();
   // lwz r8,12(r3)
-  r8 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).source_address());
+  r8 = schema::SkinRecord(base, uint32_t(r3)).source_bits();
   // lwz r27,16(r3)
-  r27 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).destination_address());
+  r27 = schema::SkinRecord(base, uint32_t(r3)).destination_bits();
   // rlwinm r7,r9,1,0,30
   r7 = __builtin_rotateleft64(uint32_t(r9) | (r9 << 32), 1) & 0xFFFFFFFE;
   // addi r4,r8,16
   r4 = uint64_t(int64_t(int64_t(r8) + 16));
   // lwz r31,28(r3)
-  r31 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).matrices_address());
+  r31 = schema::SkinRecord(base, uint32_t(r3)).matrices_bits();
   // add r7,r9,r7
   r7 = r9 + r7;
   // lwz r30,0(r3)
-  r30 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).influence_counts_address());
+  r30 = schema::SkinRecord(base, uint32_t(r3)).influence_counts_bits();
   // addi r6,r27,16
   r6 = uint64_t(int64_t(int64_t(r27) + 16));
   // lwz r11,4(r3)
-  r11 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).weights_address());
+  r11 = schema::SkinRecord(base, uint32_t(r3)).weights_bits();
   // lwz r10,8(r3)
-  r10 = guest::LoadU32(base, schema::SkinRecord(base, uint32_t(r3)).bone_indices_address());
+  r10 = schema::SkinRecord(base, uint32_t(r3)).bone_indices_bits();
   // rlwinm r26,r7,4,0,27
   r26 = __builtin_rotateleft64(uint32_t(r7) | (r7 << 32), 4) & 0xFFFFFFF0;
   // cmplwi cr6,r9,0

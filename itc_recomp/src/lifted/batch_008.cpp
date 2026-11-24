@@ -6995,7 +6995,7 @@ loc_8216CEEC:
   // lwz r11,9608(r3)
   r11 = guest::LoadU32(base, schema::RaceHudMachine(base, uint32_t(r3)).holder_address());
   // lwz r10,8(r11)
-  r10 = guest::LoadU32(base, schema::RaceScreens(base, uint32_t(r11)).flags_address());
+  r10 = schema::RaceScreens(base, uint32_t(r11)).flags_bits();
   // clrlwi. r10,r10,31
   r10 = uint32_t(r10) & 0x1;
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
@@ -7048,7 +7048,7 @@ loc_8216D0FC:
   // lwz r11,9608(r31)
   r11 = guest::LoadU32(base, schema::RaceHudMachine(base, uint32_t(r31)).holder_address());
   // lwz r10,8(r11)
-  r10 = guest::LoadU32(base, schema::RaceScreens(base, uint32_t(r11)).flags_address());
+  r10 = schema::RaceScreens(base, uint32_t(r11)).flags_bits();
   // clrlwi. r10,r10,31
   r10 = uint32_t(r10) & 0x1;
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
@@ -7111,7 +7111,7 @@ loc_8216D148:
   // lwz r11,9608(r31)
   r11 = guest::LoadU32(base, schema::RaceHudMachine(base, uint32_t(r31)).holder_address());
   // lwz r3,1016(r11)
-  r3 = guest::LoadU32(base, schema::RaceScreens(base, uint32_t(r11)).kind4_pause_menu_address());
+  r3 = schema::RaceScreens(base, uint32_t(r11)).kind4_pause_menu_bits();
   // bl 0x82211590
   // (left out: dead in C++)
   { const lifted::Result o = game::PauseMenu4::Draw(base, LIFTED_ARGS(0x8216D174, r31)); r3 = o.r3; f1 = o.f1; }
@@ -7177,7 +7177,7 @@ lifted::Result f8216D270(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r31,r3
   r31 = r3;
   // lwz r10,8(r11)
-  r10 = guest::LoadU32(base, schema::RaceScreens(base, uint32_t(r11)).flags_address());
+  r10 = schema::RaceScreens(base, uint32_t(r11)).flags_bits();
   // clrlwi. r10,r10,31
   r10 = uint32_t(r10) & 0x1;
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
@@ -7212,7 +7212,7 @@ lifted::Result f8216D270(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r10,96(r1)
   guest::StoreU32(base, uint32_t(r1) + 96, uint32_t(r10));
   // lwz r3,1028(r11)
-  r3 = guest::LoadU32(base, schema::RaceScreens(base, uint32_t(r11)).race_results_address());
+  r3 = schema::RaceScreens(base, uint32_t(r11)).race_results_bits();
   // bl 0x8221f990
   // (left out: dead in C++)
   { const lifted::Result o = game::RaceResults::Open(base, LIFTED_ARGS(0x8216D2F0, r31)); r3 = o.r3; f1 = o.f1; }
@@ -7232,7 +7232,7 @@ loc_8216D2F0:
   // lwz r11,9608(r29)
   r11 = guest::LoadU32(base, schema::RaceHudMachine(base, uint32_t(r29)).holder_address());
   // lwz r3,1020(r11)
-  r3 = guest::LoadU32(base, schema::RaceScreens(base, uint32_t(r11)).after_race_menu_address());
+  r3 = schema::RaceScreens(base, uint32_t(r11)).after_race_menu_bits();
   // bne cr6,0x8216d318
   if (!cr6.eq) goto loc_8216D318;
   // li r4,5
@@ -8475,7 +8475,7 @@ void f82180C18(uint8_t* base) {
   // lwz r11,-31756(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31756);
   // stw r10,36(r11)
-  guest::StoreU32(base, schema::CarDealerData(base, uint32_t(r11)).buy_step_address(), uint32_t(r10));
+  schema::CarDealerData(base, uint32_t(r11)).set_buy_step_bits(uint32_t(r10));
   // blr
   return;
 }
@@ -8491,7 +8491,7 @@ void f82180C30(uint8_t* base) {
   // lwz r11,-31756(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31756);
   // stw r10,12(r11)
-  guest::StoreU32(base, schema::CarDealerData(base, uint32_t(r11)).detail_open_address(), uint32_t(r10));
+  schema::CarDealerData(base, uint32_t(r11)).set_detail_open_bits(uint32_t(r10));
   // blr
   return;
 }
@@ -8507,7 +8507,7 @@ void f82180CD0(uint8_t* base) {
   // lwz r11,-31756(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31756);
   // stw r10,16(r11)
-  guest::StoreU32(base, schema::CarDealerData(base, uint32_t(r11)).answer_address(), uint32_t(r10));
+  schema::CarDealerData(base, uint32_t(r11)).set_answer_bits(uint32_t(r10));
   // blr
   return;
 }
@@ -8759,11 +8759,11 @@ lifted::Result f82182990(uint8_t* base, uint64_t r1, uint64_t r13, double f1) {
   // mr r3,r31
   r3 = r31;
   // lwz r10,52(r11)
-  r10 = guest::LoadU32(base, schema::CarDealerData(base, uint32_t(r11)).car_scroll_address());
+  r10 = schema::CarDealerData(base, uint32_t(r11)).car_scroll_bits();
   // lwz r9,48(r11)
-  r9 = guest::LoadU32(base, schema::CarDealerData(base, uint32_t(r11)).car_selection_address());
+  r9 = schema::CarDealerData(base, uint32_t(r11)).car_selection_bits();
   // lwz r11,1136(r11)
-  r11 = guest::LoadU32(base, schema::CarDealerData(base, uint32_t(r11)).shown_list_address());
+  r11 = schema::CarDealerData(base, uint32_t(r11)).shown_list_bits();
   // add r10,r10,r9
   r10 = r10 + r9;
   // rlwinm r10,r10,2,0,29
@@ -9141,7 +9141,7 @@ loc_82183C78:
   // lwz r11,-31756(r29)
   r11 = guest::LoadU32(base, uint32_t(r29) + -31756);
   // lwz r11,1132(r11)
-  r11 = guest::LoadU32(base, schema::CarDealerData(base, uint32_t(r11)).second_list_address() + 512);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 1132);
   // cmplwi cr6,r11,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // ble cr6,0x82183d28
@@ -9169,7 +9169,7 @@ loc_82183CF0:
   // lwz r11,-31756(r29)
   r11 = guest::LoadU32(base, uint32_t(r29) + -31756);
   // lwz r11,616(r11)
-  r11 = guest::LoadU32(base, schema::CarDealerData(base, uint32_t(r11)).first_list_address() + 512);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 616);
   // cmplwi cr6,r11,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // ble cr6,0x82183d28
@@ -9258,7 +9258,7 @@ loc_82183D7C:
   // lwz r11,-31756(r29)
   r11 = guest::LoadU32(base, uint32_t(r29) + -31756);
   // lwz r11,616(r11)
-  r11 = guest::LoadU32(base, schema::CarDealerData(base, uint32_t(r11)).first_list_address() + 512);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 616);
 loc_82183D94:
   // cmplwi cr6,r11,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
@@ -9276,7 +9276,7 @@ loc_82183DA4:
   // lwz r11,-31756(r29)
   r11 = guest::LoadU32(base, uint32_t(r29) + -31756);
   // lwz r11,1132(r11)
-  r11 = guest::LoadU32(base, schema::CarDealerData(base, uint32_t(r11)).second_list_address() + 512);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 1132);
   // b 0x82183d94
   goto loc_82183D94;
 loc_82183DB8:
@@ -9363,11 +9363,11 @@ lifted::Result f82183F68(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31756(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31756);
   // stw r30,48(r11)
-  guest::StoreU32(base, schema::CarDealerData(base, uint32_t(r11)).car_selection_address(), uint32_t(r30));
+  schema::CarDealerData(base, uint32_t(r11)).set_car_selection_bits(uint32_t(r30));
   // lwz r11,-31756(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31756);
   // stw r29,52(r11)
-  guest::StoreU32(base, schema::CarDealerData(base, uint32_t(r11)).car_scroll_address(), uint32_t(r29));
+  schema::CarDealerData(base, uint32_t(r11)).set_car_scroll_bits(uint32_t(r29));
   // bl 0x82181330
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x82181330, LIFTED_ARGS(0x82183FD0, r31)); r3 = o.r3; f1 = o.f1; }
@@ -9381,7 +9381,7 @@ lifted::Result f82183F68(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31756(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31756);
   // lwz r10,1136(r11)
-  r10 = guest::LoadU32(base, schema::CarDealerData(base, uint32_t(r11)).shown_list_address());
+  r10 = schema::CarDealerData(base, uint32_t(r11)).shown_list_bits();
   // rlwinm r11,r30,2,0,29
   r11 = __builtin_rotateleft64(uint32_t(r30) | (r30 << 32), 2) & 0xFFFFFFFC;
   // lwzx r11,r11,r10
@@ -9843,11 +9843,11 @@ lifted::Result f82185400(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31756(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31756);
   // lwz r9,52(r11)
-  r9 = guest::LoadU32(base, schema::CarDealerData(base, uint32_t(r11)).car_scroll_address());
+  r9 = schema::CarDealerData(base, uint32_t(r11)).car_scroll_bits();
   // lwz r8,48(r11)
-  r8 = guest::LoadU32(base, schema::CarDealerData(base, uint32_t(r11)).car_selection_address());
+  r8 = schema::CarDealerData(base, uint32_t(r11)).car_selection_bits();
   // lwz r11,1136(r11)
-  r11 = guest::LoadU32(base, schema::CarDealerData(base, uint32_t(r11)).shown_list_address());
+  r11 = schema::CarDealerData(base, uint32_t(r11)).shown_list_bits();
   // add r9,r9,r8
   r9 = r9 + r8;
   // rlwinm r9,r9,2,0,29

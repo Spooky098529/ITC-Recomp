@@ -347,266 +347,533 @@ struct CameraCubeFaceSurface : View {
 };
 
 // allocated; measure: AppCamera
+#pragma pack(push, 1)
+struct AppCameraData {
+  uint32_t vtable = 0;  // +0
+  uint32_t unknown_4 = 0;  // +4
+  uint32_t vtable_8 = 0;  // +8
+  uint32_t vtable_12 = 0;  // +12
+  uint32_t service = 0;  // +16
+  uint8_t pad_20[8] = {};
+  uint32_t camera = 0;  // +28
+  uint32_t list = 0;  // +32
+  uint8_t pad_36[12] = {};
+  uint8_t unknown_48[32] = {};  // +48, guest order
+  uint8_t pad_80[16] = {};
+  uint8_t unknown_96[64] = {};  // +96, guest order
+  uint8_t unknown_160[64] = {};  // +160, guest order
+  uint8_t pad_224[16] = {};
+  uint8_t unknown_240[64] = {};  // +240, guest order
+  uint8_t pad_304[12] = {};
+  uint32_t unknown_316 = 0;  // +316
+  uint32_t unknown_320 = 0;  // +320
+  uint32_t unknown_324 = 0;  // +324
+  uint32_t unknown_328 = 0;  // +328
+  uint32_t unknown_332 = 0;  // +332
+  uint32_t unknown_336 = 0;  // +336
+  uint32_t unknown_340 = 0;  // +340
+  uint32_t unknown_344 = 0;  // +344
+  uint8_t pad_348[20] = {};
+};
+#pragma pack(pop)
+static_assert(sizeof(AppCameraData) == 368);
+inline constexpr memory::LayoutField kAppCameraFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {28, 4}, {32, 4}, {316, 4}, {320, 4}, {324, 4}, {328, 4}, {332, 4}, {336, 4}, {340, 4}, {344, 4}};
+inline constexpr memory::Layout kAppCameraLayout = {kAppCameraFields, 15};
+
 struct AppCamera : View {
   using View::View;
   static constexpr uint32_t kSize = 368;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   static constexpr uint32_t kVtable = 0x820026B8;
+  AppCameraData* data() const { return static_cast<AppCameraData*>(memory::HandleObject(address)); }
+  static AppCamera New(uint8_t* base) {
+    return AppCamera(base, memory::MakeHandle(new AppCameraData(), sizeof(AppCameraData), "AppCamera", &kAppCameraLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static AppCamera NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(AppCameraData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<AppCameraData*>(::operator new(sizeof(AppCameraData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) AppCameraData();
+    return AppCamera(base, memory::MakeHandle(p, sizeof(AppCameraData) * count, "AppCamera", &kAppCameraLayout, sizeof(AppCameraData)));
+  }
+  AppCamera at(uint32_t i) const { return AppCamera(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kAppCameraLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppCameraLayout, offset, width, v); }
   // 0x820026B8
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
+  uint32_t vtable() const { return data()->vtable; }
+  void set_vtable(uint32_t v) const { data()->vtable = v; }
+  uint32_t vtable_bits() const { return data()->vtable; }
+  void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
   // 0 (AppCamera::AppCamera)
-  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
-  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_4() const { return data()->unknown_4; }
+  void set_unknown_4(uint32_t v) const { data()->unknown_4 = v; }
+  uint32_t unknown_4_bits() const { return data()->unknown_4; }
+  void set_unknown_4_bits(uint32_t v) const { data()->unknown_4 = v; }
   // 0x820026A8 (0x82002680 first)
-  uint32_t vtable_8() const { return guest::LoadU32(base, address + 8); }
-  void set_vtable_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t vtable_8_address() const { return address + 8; }
+  uint32_t vtable_8() const { return data()->vtable_8; }
+  void set_vtable_8(uint32_t v) const { data()->vtable_8 = v; }
+  uint32_t vtable_8_bits() const { return data()->vtable_8; }
+  void set_vtable_8_bits(uint32_t v) const { data()->vtable_8 = v; }
   // 0x8200269C (0x82002690 first)
-  uint32_t vtable_12() const { return guest::LoadU32(base, address + 12); }
-  void set_vtable_12(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
   uint32_t vtable_12_address() const { return address + 12; }
+  uint32_t vtable_12() const { return data()->vtable_12; }
+  void set_vtable_12(uint32_t v) const { data()->vtable_12 = v; }
+  uint32_t vtable_12_bits() const { return data()->vtable_12; }
+  void set_vtable_12_bits(uint32_t v) const { data()->vtable_12 = v; }
   // the block's +4 (the app's +4)
-  template <typename T = AppCameraService>
-  T service() const { return T(base, guest::LoadU32(base, address + 16)); }
-  void set_service(const View& v) const { guest::StoreU32(base, address + 16, v.address); }
-  void set_service(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
   uint32_t service_address() const { return address + 16; }
+  template <typename T = AppCameraService>
+  T service() const { return T(base, data()->service); }
+  void set_service(const View& w) const { const uint32_t v = w.address; data()->service = v; }
+  void set_service(uint32_t v) const { data()->service = v; }
+  uint32_t service_bits() const { return data()->service; }
+  void set_service_bits(uint32_t v) const { data()->service = v; }
   // or 0
-  template <typename T = AppCameraCamera>
-  T camera() const { return T(base, guest::LoadU32(base, address + 28)); }
-  void set_camera(const View& v) const { guest::StoreU32(base, address + 28, v.address); }
-  void set_camera(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
   uint32_t camera_address() const { return address + 28; }
+  template <typename T = AppCameraCamera>
+  T camera() const { return T(base, data()->camera); }
+  void set_camera(const View& w) const { const uint32_t v = w.address; data()->camera = v; }
+  void set_camera(uint32_t v) const { data()->camera = v; }
+  uint32_t camera_bits() const { return data()->camera; }
+  void set_camera_bits(uint32_t v) const { data()->camera = v; }
   // or 0
-  template <typename T = AppCameraList>
-  T list() const { return T(base, guest::LoadU32(base, address + 32)); }
-  void set_list(const View& v) const { guest::StoreU32(base, address + 32, v.address); }
-  void set_list(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
   uint32_t list_address() const { return address + 32; }
+  template <typename T = AppCameraList>
+  T list() const { return T(base, data()->list); }
+  void set_list(const View& w) const { const uint32_t v = w.address; data()->list = v; }
+  void set_list(uint32_t v) const { data()->list = v; }
+  uint32_t list_bits() const { return data()->list; }
+  void set_list_bits(uint32_t v) const { data()->list = v; }
   // two vectors, probably (1.0 at +60 and +76)
   uint32_t unknown_48_address() const { return address + 48; }
+  uint8_t* unknown_48() const { return reinterpret_cast<uint8_t*>(data()) + 48; }
   // a 4x4 matrix, probably (1.0 at its rows' fourth words)
   uint32_t unknown_96_address() const { return address + 96; }
+  uint8_t* unknown_96() const { return reinterpret_cast<uint8_t*>(data()) + 96; }
   // a 4x4 matrix, probably (1.0 at its rows' fourth words)
   uint32_t unknown_160_address() const { return address + 160; }
+  uint8_t* unknown_160() const { return reinterpret_cast<uint8_t*>(data()) + 160; }
   // a 4x4 matrix, probably (1.0 at its rows' fourth words)
   uint32_t unknown_240_address() const { return address + 240; }
+  uint8_t* unknown_240() const { return reinterpret_cast<uint8_t*>(data()) + 240; }
   // 0 when made
-  uint32_t unknown_316() const { return guest::LoadU32(base, address + 316); }
-  void set_unknown_316(uint32_t v) const { guest::StoreU32(base, address + 316, v); }
   uint32_t unknown_316_address() const { return address + 316; }
+  uint32_t unknown_316() const { return data()->unknown_316; }
+  void set_unknown_316(uint32_t v) const { data()->unknown_316 = v; }
+  uint32_t unknown_316_bits() const { return data()->unknown_316; }
+  void set_unknown_316_bits(uint32_t v) const { data()->unknown_316 = v; }
   // 0 when made
-  uint32_t unknown_320() const { return guest::LoadU32(base, address + 320); }
-  void set_unknown_320(uint32_t v) const { guest::StoreU32(base, address + 320, v); }
   uint32_t unknown_320_address() const { return address + 320; }
+  uint32_t unknown_320() const { return data()->unknown_320; }
+  void set_unknown_320(uint32_t v) const { data()->unknown_320 = v; }
+  uint32_t unknown_320_bits() const { return data()->unknown_320; }
+  void set_unknown_320_bits(uint32_t v) const { data()->unknown_320 = v; }
   // 1 when made
-  uint32_t unknown_324() const { return guest::LoadU32(base, address + 324); }
-  void set_unknown_324(uint32_t v) const { guest::StoreU32(base, address + 324, v); }
   uint32_t unknown_324_address() const { return address + 324; }
+  uint32_t unknown_324() const { return data()->unknown_324; }
+  void set_unknown_324(uint32_t v) const { data()->unknown_324 = v; }
+  uint32_t unknown_324_bits() const { return data()->unknown_324; }
+  void set_unknown_324_bits(uint32_t v) const { data()->unknown_324 = v; }
   // 1 when made
-  uint32_t unknown_328() const { return guest::LoadU32(base, address + 328); }
-  void set_unknown_328(uint32_t v) const { guest::StoreU32(base, address + 328, v); }
   uint32_t unknown_328_address() const { return address + 328; }
+  uint32_t unknown_328() const { return data()->unknown_328; }
+  void set_unknown_328(uint32_t v) const { data()->unknown_328 = v; }
+  uint32_t unknown_328_bits() const { return data()->unknown_328; }
+  void set_unknown_328_bits(uint32_t v) const { data()->unknown_328 = v; }
   // 10 when made
-  uint32_t unknown_332() const { return guest::LoadU32(base, address + 332); }
-  void set_unknown_332(uint32_t v) const { guest::StoreU32(base, address + 332, v); }
   uint32_t unknown_332_address() const { return address + 332; }
+  uint32_t unknown_332() const { return data()->unknown_332; }
+  void set_unknown_332(uint32_t v) const { data()->unknown_332 = v; }
+  uint32_t unknown_332_bits() const { return data()->unknown_332; }
+  void set_unknown_332_bits(uint32_t v) const { data()->unknown_332 = v; }
   // 10 when made
-  uint32_t unknown_336() const { return guest::LoadU32(base, address + 336); }
-  void set_unknown_336(uint32_t v) const { guest::StoreU32(base, address + 336, v); }
   uint32_t unknown_336_address() const { return address + 336; }
+  uint32_t unknown_336() const { return data()->unknown_336; }
+  void set_unknown_336(uint32_t v) const { data()->unknown_336 = v; }
+  uint32_t unknown_336_bits() const { return data()->unknown_336; }
+  void set_unknown_336_bits(uint32_t v) const { data()->unknown_336 = v; }
   // 0 when made
-  uint32_t unknown_340() const { return guest::LoadU32(base, address + 340); }
-  void set_unknown_340(uint32_t v) const { guest::StoreU32(base, address + 340, v); }
   uint32_t unknown_340_address() const { return address + 340; }
+  uint32_t unknown_340() const { return data()->unknown_340; }
+  void set_unknown_340(uint32_t v) const { data()->unknown_340 = v; }
+  uint32_t unknown_340_bits() const { return data()->unknown_340; }
+  void set_unknown_340_bits(uint32_t v) const { data()->unknown_340 = v; }
   // 2 when made
-  uint32_t unknown_344() const { return guest::LoadU32(base, address + 344); }
-  void set_unknown_344(uint32_t v) const { guest::StoreU32(base, address + 344, v); }
   uint32_t unknown_344_address() const { return address + 344; }
+  uint32_t unknown_344() const { return data()->unknown_344; }
+  void set_unknown_344(uint32_t v) const { data()->unknown_344 = v; }
+  uint32_t unknown_344_bits() const { return data()->unknown_344; }
+  void set_unknown_344_bits(uint32_t v) const { data()->unknown_344 = v; }
 };
 
 // allocated; measure: AppCamera::Camera, AppCamera.+28
+#pragma pack(push, 1)
+struct AppCameraCameraData {
+  uint32_t vtable = 0;  // +0
+  uint8_t pad_4[12] = {};
+  uint8_t view[64] = {};  // +16, guest order
+  uint8_t projection[64] = {};  // +80, guest order
+  uint8_t view_projection[64] = {};  // +144, guest order
+  uint8_t view_built[64] = {};  // +208, guest order
+  uint64_t position_xy = 0;  // +272
+  uint64_t position_zw = 0;  // +280
+  uint64_t angles_xy = 0;  // +288
+  uint64_t angles_zw = 0;  // +296
+  uint8_t unknown_304[64] = {};  // +304, guest order
+  float field_of_view = 0;  // +368
+  float view_scale = 0;  // +372
+  float width = 0;  // +376
+  float height = 0;  // +380
+  float near = 0;  // +384
+  float far = 0;  // +388
+  float aspect = 0;  // +392
+  uint8_t pad_396[4] = {};
+  uint8_t unknown_400[16] = {};  // +400, guest order
+  uint8_t unknown_416[16] = {};  // +416, guest order
+  uint8_t unknown_432[16] = {};  // +432, guest order
+  uint8_t unknown_448[16] = {};  // +448, guest order
+  uint8_t unknown_464[16] = {};  // +464, guest order
+  uint8_t unknown_480[16] = {};  // +480, guest order
+  uint8_t unknown_496[16] = {};  // +496, guest order
+  uint8_t unknown_512[16] = {};  // +512, guest order
+  uint8_t pad_528[32] = {};
+  uint8_t unknown_560[16] = {};  // +560, guest order
+  uint8_t unknown_576[16] = {};  // +576, guest order
+  uint8_t unknown_592[16] = {};  // +592, guest order
+  uint8_t unknown_608[16] = {};  // +608, guest order
+  uint8_t unknown_624[16] = {};  // +624, guest order
+  uint8_t unknown_640[16] = {};  // +640, guest order
+  uint8_t unknown_656[16] = {};  // +656, guest order
+  float unknown_672 = 0;  // +672
+  float unknown_676 = 0;  // +676
+  float unknown_680 = 0;  // +680
+  float unknown_684 = 0;  // +684
+  float unknown_688 = 0;  // +688
+  float unknown_692 = 0;  // +692
+  uint8_t pad_696[108] = {};
+  float unknown_804 = 0;  // +804
+  float unknown_808 = 0;  // +808
+  float unknown_812 = 0;  // +812
+  float unknown_816 = 0;  // +816
+  uint8_t pad_820[12] = {};
+};
+#pragma pack(pop)
+static_assert(sizeof(AppCameraCameraData) == 832);
+inline constexpr memory::LayoutField kAppCameraCameraFields[] = {{0, 4}, {272, 8}, {280, 8}, {288, 8}, {296, 8}, {368, 4}, {372, 4}, {376, 4}, {380, 4}, {384, 4}, {388, 4}, {392, 4}, {672, 4}, {676, 4}, {680, 4}, {684, 4}, {688, 4}, {692, 4}, {804, 4}, {808, 4}, {812, 4}, {816, 4}};
+inline constexpr memory::Layout kAppCameraCameraLayout = {kAppCameraCameraFields, 22};
+
 struct AppCameraCamera : View {
   using View::View;
   static constexpr uint32_t kSize = 832;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   static constexpr uint32_t kVtable = 0x820027B0;
+  AppCameraCameraData* data() const { return static_cast<AppCameraCameraData*>(memory::HandleObject(address)); }
+  static AppCameraCamera New(uint8_t* base) {
+    return AppCameraCamera(base, memory::MakeHandle(new AppCameraCameraData(), sizeof(AppCameraCameraData), "AppCameraCamera", &kAppCameraCameraLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static AppCameraCamera NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(AppCameraCameraData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<AppCameraCameraData*>(::operator new(sizeof(AppCameraCameraData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) AppCameraCameraData();
+    return AppCameraCamera(base, memory::MakeHandle(p, sizeof(AppCameraCameraData) * count, "AppCameraCamera", &kAppCameraCameraLayout, sizeof(AppCameraCameraData)));
+  }
+  AppCameraCamera at(uint32_t i) const { return AppCameraCamera(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kAppCameraCameraLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppCameraCameraLayout, offset, width, v); }
   // 0x82001EC0 (Camera); 0x820027B0 for AppCameraCamera
-  template <typename T = CameraVtable>
-  T vtable() const { return T(base, guest::LoadU32(base, address + 0)); }
-  void set_vtable(const View& v) const { guest::StoreU32(base, address + 0, v.address); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
+  template <typename T = CameraVtable>
+  T vtable() const { return T(base, data()->vtable); }
+  void set_vtable(const View& w) const { const uint32_t v = w.address; data()->vtable = v; }
+  void set_vtable(uint32_t v) const { data()->vtable = v; }
+  uint32_t vtable_bits() const { return data()->vtable; }
+  void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
   // the view matrix (4x4 floats, row-major, row vectors)
   uint32_t view_address() const { return address + 16; }
+  uint8_t* view() const { return reinterpret_cast<uint8_t*>(data()) + 16; }
   // the projection (Camera::BuildProjection)
   uint32_t projection_address() const { return address + 80; }
+  uint8_t* projection() const { return reinterpret_cast<uint8_t*>(data()) + 80; }
   // view x projection (Matrix::Multiply)
   uint32_t view_projection_address() const { return address + 144; }
+  uint8_t* view_projection() const { return reinterpret_cast<uint8_t*>(data()) + 144; }
   // Camera::Update's view as built, then copied to +16
   uint32_t view_built_address() const { return address + 208; }
+  uint8_t* view_built() const { return reinterpret_cast<uint8_t*>(data()) + 208; }
   // the position Camera::Update builds the view from (w 1.0); x and y as one doubleword (the originals' ld/std copies)
-  uint64_t position_xy() const { return guest::LoadU64(base, address + 272); }
-  void set_position_xy(uint64_t v) const { guest::StoreU64(base, address + 272, v); }
   uint32_t position_xy_address() const { return address + 272; }
+  uint64_t position_xy() const { return data()->position_xy; }
+  void set_position_xy(uint64_t v) const { data()->position_xy = v; }
+  uint64_t position_xy_bits() const { return data()->position_xy; }
+  void set_position_xy_bits(uint64_t v) const { data()->position_xy = v; }
   // the position Camera::Update builds the view from (w 1.0)
-  float position_x() const { return guest::LoadFloat(base, address + 272); }
-  void set_position_x(float v) const { guest::StoreFloat(base, address + 272, v); }
   uint32_t position_x_address() const { return address + 272; }
-  float position_y() const { return guest::LoadFloat(base, address + 276); }
-  void set_position_y(float v) const { guest::StoreFloat(base, address + 276, v); }
+  uint32_t position_x_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kAppCameraCameraLayout, 272, 4)); }
+  void set_position_x_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppCameraCameraLayout, 272, 4, v); }
+  float position_x() const { return std::bit_cast<float>(position_x_bits()); }
+  void set_position_x(float v) const { set_position_x_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t position_y_address() const { return address + 276; }
+  uint32_t position_y_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kAppCameraCameraLayout, 276, 4)); }
+  void set_position_y_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppCameraCameraLayout, 276, 4, v); }
+  float position_y() const { return std::bit_cast<float>(position_y_bits()); }
+  void set_position_y(float v) const { set_position_y_bits(std::bit_cast<uint32_t>(v)); }
   // z and w as one doubleword
-  uint64_t position_zw() const { return guest::LoadU64(base, address + 280); }
-  void set_position_zw(uint64_t v) const { guest::StoreU64(base, address + 280, v); }
   uint32_t position_zw_address() const { return address + 280; }
-  float position_z() const { return guest::LoadFloat(base, address + 280); }
-  void set_position_z(float v) const { guest::StoreFloat(base, address + 280, v); }
+  uint64_t position_zw() const { return data()->position_zw; }
+  void set_position_zw(uint64_t v) const { data()->position_zw = v; }
+  uint64_t position_zw_bits() const { return data()->position_zw; }
+  void set_position_zw_bits(uint64_t v) const { data()->position_zw = v; }
   uint32_t position_z_address() const { return address + 280; }
-  float position_w() const { return guest::LoadFloat(base, address + 284); }
-  void set_position_w(float v) const { guest::StoreFloat(base, address + 284, v); }
+  uint32_t position_z_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kAppCameraCameraLayout, 280, 4)); }
+  void set_position_z_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppCameraCameraLayout, 280, 4, v); }
+  float position_z() const { return std::bit_cast<float>(position_z_bits()); }
+  void set_position_z(float v) const { set_position_z_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t position_w_address() const { return address + 284; }
+  uint32_t position_w_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kAppCameraCameraLayout, 284, 4)); }
+  void set_position_w_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppCameraCameraLayout, 284, 4, v); }
+  float position_w() const { return std::bit_cast<float>(position_w_bits()); }
+  void set_position_w(float v) const { set_position_w_bits(std::bit_cast<uint32_t>(v)); }
   // the Euler angles: x turns by RotateX, y by RotateY, z by RotateZ (negated); x and y as one doubleword (the originals' ld/std copies)
-  uint64_t angles_xy() const { return guest::LoadU64(base, address + 288); }
-  void set_angles_xy(uint64_t v) const { guest::StoreU64(base, address + 288, v); }
   uint32_t angles_xy_address() const { return address + 288; }
+  uint64_t angles_xy() const { return data()->angles_xy; }
+  void set_angles_xy(uint64_t v) const { data()->angles_xy = v; }
+  uint64_t angles_xy_bits() const { return data()->angles_xy; }
+  void set_angles_xy_bits(uint64_t v) const { data()->angles_xy = v; }
   // the Euler angles: x turns by RotateX, y by RotateY, z by RotateZ (negated)
-  float angles_x() const { return guest::LoadFloat(base, address + 288); }
-  void set_angles_x(float v) const { guest::StoreFloat(base, address + 288, v); }
   uint32_t angles_x_address() const { return address + 288; }
-  float angles_y() const { return guest::LoadFloat(base, address + 292); }
-  void set_angles_y(float v) const { guest::StoreFloat(base, address + 292, v); }
+  uint32_t angles_x_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kAppCameraCameraLayout, 288, 4)); }
+  void set_angles_x_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppCameraCameraLayout, 288, 4, v); }
+  float angles_x() const { return std::bit_cast<float>(angles_x_bits()); }
+  void set_angles_x(float v) const { set_angles_x_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t angles_y_address() const { return address + 292; }
+  uint32_t angles_y_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kAppCameraCameraLayout, 292, 4)); }
+  void set_angles_y_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppCameraCameraLayout, 292, 4, v); }
+  float angles_y() const { return std::bit_cast<float>(angles_y_bits()); }
+  void set_angles_y(float v) const { set_angles_y_bits(std::bit_cast<uint32_t>(v)); }
   // z and w as one doubleword
-  uint64_t angles_zw() const { return guest::LoadU64(base, address + 296); }
-  void set_angles_zw(uint64_t v) const { guest::StoreU64(base, address + 296, v); }
   uint32_t angles_zw_address() const { return address + 296; }
-  float angles_z() const { return guest::LoadFloat(base, address + 296); }
-  void set_angles_z(float v) const { guest::StoreFloat(base, address + 296, v); }
+  uint64_t angles_zw() const { return data()->angles_zw; }
+  void set_angles_zw(uint64_t v) const { data()->angles_zw = v; }
+  uint64_t angles_zw_bits() const { return data()->angles_zw; }
+  void set_angles_zw_bits(uint64_t v) const { data()->angles_zw = v; }
   uint32_t angles_z_address() const { return address + 296; }
-  float angles_w() const { return guest::LoadFloat(base, address + 300); }
-  void set_angles_w(float v) const { guest::StoreFloat(base, address + 300, v); }
+  uint32_t angles_z_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kAppCameraCameraLayout, 296, 4)); }
+  void set_angles_z_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppCameraCameraLayout, 296, 4, v); }
+  float angles_z() const { return std::bit_cast<float>(angles_z_bits()); }
+  void set_angles_z(float v) const { set_angles_z_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t angles_w_address() const { return address + 300; }
+  uint32_t angles_w_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kAppCameraCameraLayout, 300, 4)); }
+  void set_angles_w_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppCameraCameraLayout, 300, 4, v); }
+  float angles_w() const { return std::bit_cast<float>(angles_w_bits()); }
+  void set_angles_w(float v) const { set_angles_w_bits(std::bit_cast<uint32_t>(v)); }
   // a 4x4 matrix, probably (Camera::Camera sets its rows' fourth words to 1.0)
   uint32_t unknown_304_address() const { return address + 304; }
+  uint8_t* unknown_304() const { return reinterpret_cast<uint8_t*>(data()) + 304; }
   // radians, wrapped into [-pi, pi]
-  float field_of_view() const { return guest::LoadFloat(base, address + 368); }
-  void set_field_of_view(float v) const { guest::StoreFloat(base, address + 368, v); }
   uint32_t field_of_view_address() const { return address + 368; }
+  float field_of_view() const { return data()->field_of_view; }
+  void set_field_of_view(float v) const { data()->field_of_view = v; }
+  uint32_t field_of_view_bits() const { return std::bit_cast<uint32_t>(data()->field_of_view); }
+  void set_field_of_view_bits(uint32_t v) const { data()->field_of_view = std::bit_cast<float>(v); }
   // Camera::Update: +380 x 0.5 / the half field of view's cosine polynomial x its sine polynomial
-  float view_scale() const { return guest::LoadFloat(base, address + 372); }
-  void set_view_scale(float v) const { guest::StoreFloat(base, address + 372, v); }
   uint32_t view_scale_address() const { return address + 372; }
+  float view_scale() const { return data()->view_scale; }
+  void set_view_scale(float v) const { data()->view_scale = v; }
+  uint32_t view_scale_bits() const { return std::bit_cast<uint32_t>(data()->view_scale); }
+  void set_view_scale_bits(uint32_t v) const { data()->view_scale = std::bit_cast<float>(v); }
   // the viewport's width
-  float width() const { return guest::LoadFloat(base, address + 376); }
-  void set_width(float v) const { guest::StoreFloat(base, address + 376, v); }
   uint32_t width_address() const { return address + 376; }
+  float width() const { return data()->width; }
+  void set_width(float v) const { data()->width = v; }
+  uint32_t width_bits() const { return std::bit_cast<uint32_t>(data()->width); }
+  void set_width_bits(uint32_t v) const { data()->width = std::bit_cast<float>(v); }
   // the viewport's height
-  float height() const { return guest::LoadFloat(base, address + 380); }
-  void set_height(float v) const { guest::StoreFloat(base, address + 380, v); }
   uint32_t height_address() const { return address + 380; }
+  float height() const { return data()->height; }
+  void set_height(float v) const { data()->height = v; }
+  uint32_t height_bits() const { return std::bit_cast<uint32_t>(data()->height); }
+  void set_height_bits(uint32_t v) const { data()->height = std::bit_cast<float>(v); }
   // the near plane
-  float near() const { return guest::LoadFloat(base, address + 384); }
-  void set_near(float v) const { guest::StoreFloat(base, address + 384, v); }
   uint32_t near_address() const { return address + 384; }
+  float near() const { return data()->near; }
+  void set_near(float v) const { data()->near = v; }
+  uint32_t near_bits() const { return std::bit_cast<uint32_t>(data()->near); }
+  void set_near_bits(uint32_t v) const { data()->near = std::bit_cast<float>(v); }
   // the far plane
-  float far() const { return guest::LoadFloat(base, address + 388); }
-  void set_far(float v) const { guest::StoreFloat(base, address + 388, v); }
   uint32_t far_address() const { return address + 388; }
+  float far() const { return data()->far; }
+  void set_far(float v) const { data()->far = v; }
+  uint32_t far_bits() const { return std::bit_cast<uint32_t>(data()->far); }
+  void set_far_bits(uint32_t v) const { data()->far = std::bit_cast<float>(v); }
   // width / height
-  float aspect() const { return guest::LoadFloat(base, address + 392); }
-  void set_aspect(float v) const { guest::StoreFloat(base, address + 392, v); }
   uint32_t aspect_address() const { return address + 392; }
+  float aspect() const { return data()->aspect; }
+  void set_aspect(float v) const { data()->aspect = v; }
+  uint32_t aspect_bits() const { return std::bit_cast<uint32_t>(data()->aspect); }
+  void set_aspect_bits(uint32_t v) const { data()->aspect = std::bit_cast<float>(v); }
   // (0, 0, 0, 1) when made
   uint32_t unknown_400_address() const { return address + 400; }
+  uint8_t* unknown_400() const { return reinterpret_cast<uint8_t*>(data()) + 400; }
   // (0, 0, 10, 1) when made
   uint32_t unknown_416_address() const { return address + 416; }
+  uint8_t* unknown_416() const { return reinterpret_cast<uint8_t*>(data()) + 416; }
   // the position (+272) when made
   uint32_t unknown_432_address() const { return address + 432; }
+  uint8_t* unknown_432() const { return reinterpret_cast<uint8_t*>(data()) + 432; }
   // +416 when made
   uint32_t unknown_448_address() const { return address + 448; }
+  uint8_t* unknown_448() const { return reinterpret_cast<uint8_t*>(data()) + 448; }
   // +416 when made
   uint32_t unknown_464_address() const { return address + 464; }
+  uint8_t* unknown_464() const { return reinterpret_cast<uint8_t*>(data()) + 464; }
   // 1.0 at +492 when made
   uint32_t unknown_480_address() const { return address + 480; }
+  uint8_t* unknown_480() const { return reinterpret_cast<uint8_t*>(data()) + 480; }
   // 1.0 at +508 when made
   uint32_t unknown_496_address() const { return address + 496; }
+  uint8_t* unknown_496() const { return reinterpret_cast<uint8_t*>(data()) + 496; }
   // 1.0 at +524 when made
   uint32_t unknown_512_address() const { return address + 512; }
+  uint8_t* unknown_512() const { return reinterpret_cast<uint8_t*>(data()) + 512; }
   // 1.0 at +572 when made
   uint32_t unknown_560_address() const { return address + 560; }
+  uint8_t* unknown_560() const { return reinterpret_cast<uint8_t*>(data()) + 560; }
   // 1.0 at +588 when made
   uint32_t unknown_576_address() const { return address + 576; }
+  uint8_t* unknown_576() const { return reinterpret_cast<uint8_t*>(data()) + 576; }
   // 1.0 at +604 when made
   uint32_t unknown_592_address() const { return address + 592; }
+  uint8_t* unknown_592() const { return reinterpret_cast<uint8_t*>(data()) + 592; }
   // 1.0 at +620 when made
   uint32_t unknown_608_address() const { return address + 608; }
+  uint8_t* unknown_608() const { return reinterpret_cast<uint8_t*>(data()) + 608; }
   // (0, 0, 0, 1) when made
   uint32_t unknown_624_address() const { return address + 624; }
+  uint8_t* unknown_624() const { return reinterpret_cast<uint8_t*>(data()) + 624; }
   // (0, 0, 0, 1) when made
   uint32_t unknown_640_address() const { return address + 640; }
+  uint8_t* unknown_640() const { return reinterpret_cast<uint8_t*>(data()) + 640; }
   // (0, 0, 0, 1) when made
   uint32_t unknown_656_address() const { return address + 656; }
+  uint8_t* unknown_656() const { return reinterpret_cast<uint8_t*>(data()) + 656; }
   // 45.0 when made
-  float unknown_672() const { return guest::LoadFloat(base, address + 672); }
-  void set_unknown_672(float v) const { guest::StoreFloat(base, address + 672, v); }
   uint32_t unknown_672_address() const { return address + 672; }
+  float unknown_672() const { return data()->unknown_672; }
+  void set_unknown_672(float v) const { data()->unknown_672 = v; }
+  uint32_t unknown_672_bits() const { return std::bit_cast<uint32_t>(data()->unknown_672); }
+  void set_unknown_672_bits(uint32_t v) const { data()->unknown_672 = std::bit_cast<float>(v); }
   // 0.09 when made
-  float unknown_676() const { return guest::LoadFloat(base, address + 676); }
-  void set_unknown_676(float v) const { guest::StoreFloat(base, address + 676, v); }
   uint32_t unknown_676_address() const { return address + 676; }
+  float unknown_676() const { return data()->unknown_676; }
+  void set_unknown_676(float v) const { data()->unknown_676 = v; }
+  uint32_t unknown_676_bits() const { return std::bit_cast<uint32_t>(data()->unknown_676); }
+  void set_unknown_676_bits(uint32_t v) const { data()->unknown_676 = std::bit_cast<float>(v); }
   // 1.5 when made
-  float unknown_680() const { return guest::LoadFloat(base, address + 680); }
-  void set_unknown_680(float v) const { guest::StoreFloat(base, address + 680, v); }
   uint32_t unknown_680_address() const { return address + 680; }
+  float unknown_680() const { return data()->unknown_680; }
+  void set_unknown_680(float v) const { data()->unknown_680 = v; }
+  uint32_t unknown_680_bits() const { return std::bit_cast<uint32_t>(data()->unknown_680); }
+  void set_unknown_680_bits(uint32_t v) const { data()->unknown_680 = std::bit_cast<float>(v); }
   // 0.0 when made
-  float unknown_684() const { return guest::LoadFloat(base, address + 684); }
-  void set_unknown_684(float v) const { guest::StoreFloat(base, address + 684, v); }
   uint32_t unknown_684_address() const { return address + 684; }
+  float unknown_684() const { return data()->unknown_684; }
+  void set_unknown_684(float v) const { data()->unknown_684 = v; }
+  uint32_t unknown_684_bits() const { return std::bit_cast<uint32_t>(data()->unknown_684); }
+  void set_unknown_684_bits(uint32_t v) const { data()->unknown_684 = std::bit_cast<float>(v); }
   // 30.0 when made
-  float unknown_688() const { return guest::LoadFloat(base, address + 688); }
-  void set_unknown_688(float v) const { guest::StoreFloat(base, address + 688, v); }
   uint32_t unknown_688_address() const { return address + 688; }
+  float unknown_688() const { return data()->unknown_688; }
+  void set_unknown_688(float v) const { data()->unknown_688 = v; }
+  uint32_t unknown_688_bits() const { return std::bit_cast<uint32_t>(data()->unknown_688); }
+  void set_unknown_688_bits(uint32_t v) const { data()->unknown_688 = std::bit_cast<float>(v); }
   // 200.0 when made
-  float unknown_692() const { return guest::LoadFloat(base, address + 692); }
-  void set_unknown_692(float v) const { guest::StoreFloat(base, address + 692, v); }
   uint32_t unknown_692_address() const { return address + 692; }
+  float unknown_692() const { return data()->unknown_692; }
+  void set_unknown_692(float v) const { data()->unknown_692 = v; }
+  uint32_t unknown_692_bits() const { return std::bit_cast<uint32_t>(data()->unknown_692); }
+  void set_unknown_692_bits(uint32_t v) const { data()->unknown_692 = std::bit_cast<float>(v); }
   // -89.0 when made
-  float unknown_804() const { return guest::LoadFloat(base, address + 804); }
-  void set_unknown_804(float v) const { guest::StoreFloat(base, address + 804, v); }
   uint32_t unknown_804_address() const { return address + 804; }
+  float unknown_804() const { return data()->unknown_804; }
+  void set_unknown_804(float v) const { data()->unknown_804 = v; }
+  uint32_t unknown_804_bits() const { return std::bit_cast<uint32_t>(data()->unknown_804); }
+  void set_unknown_804_bits(uint32_t v) const { data()->unknown_804 = std::bit_cast<float>(v); }
   // 89.0 when made
-  float unknown_808() const { return guest::LoadFloat(base, address + 808); }
-  void set_unknown_808(float v) const { guest::StoreFloat(base, address + 808, v); }
   uint32_t unknown_808_address() const { return address + 808; }
+  float unknown_808() const { return data()->unknown_808; }
+  void set_unknown_808(float v) const { data()->unknown_808 = v; }
+  uint32_t unknown_808_bits() const { return std::bit_cast<uint32_t>(data()->unknown_808); }
+  void set_unknown_808_bits(uint32_t v) const { data()->unknown_808 = std::bit_cast<float>(v); }
   // -45.0 when made
-  float unknown_812() const { return guest::LoadFloat(base, address + 812); }
-  void set_unknown_812(float v) const { guest::StoreFloat(base, address + 812, v); }
   uint32_t unknown_812_address() const { return address + 812; }
+  float unknown_812() const { return data()->unknown_812; }
+  void set_unknown_812(float v) const { data()->unknown_812 = v; }
+  uint32_t unknown_812_bits() const { return std::bit_cast<uint32_t>(data()->unknown_812); }
+  void set_unknown_812_bits(uint32_t v) const { data()->unknown_812 = std::bit_cast<float>(v); }
   // 45.0 when made
-  float unknown_816() const { return guest::LoadFloat(base, address + 816); }
-  void set_unknown_816(float v) const { guest::StoreFloat(base, address + 816, v); }
   uint32_t unknown_816_address() const { return address + 816; }
+  float unknown_816() const { return data()->unknown_816; }
+  void set_unknown_816(float v) const { data()->unknown_816 = v; }
+  uint32_t unknown_816_bits() const { return std::bit_cast<uint32_t>(data()->unknown_816); }
+  void set_unknown_816_bits(uint32_t v) const { data()->unknown_816 = std::bit_cast<float>(v); }
 };
 
 // allocated; measure: AppCameraList, AppCamera.+32, sub_820A9200.r3
+#pragma pack(push, 1)
+struct AppCameraListData {
+  uint32_t vtable = 0;  // +0
+  uint32_t vector = 0;  // +4
+};
+#pragma pack(pop)
+static_assert(sizeof(AppCameraListData) == 8);
+inline constexpr memory::LayoutField kAppCameraListFields[] = {{0, 4}, {4, 4}};
+inline constexpr memory::Layout kAppCameraListLayout = {kAppCameraListFields, 2};
+
 struct AppCameraList : View {
   using View::View;
   static constexpr uint32_t kSize = 8;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   static constexpr uint32_t kVtable = 0x82002780;
+  AppCameraListData* data() const { return static_cast<AppCameraListData*>(memory::HandleObject(address)); }
+  static AppCameraList New(uint8_t* base) {
+    return AppCameraList(base, memory::MakeHandle(new AppCameraListData(), sizeof(AppCameraListData), "AppCameraList", &kAppCameraListLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static AppCameraList NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(AppCameraListData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<AppCameraListData*>(::operator new(sizeof(AppCameraListData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) AppCameraListData();
+    return AppCameraList(base, memory::MakeHandle(p, sizeof(AppCameraListData) * count, "AppCameraList", &kAppCameraListLayout, sizeof(AppCameraListData)));
+  }
+  AppCameraList at(uint32_t i) const { return AppCameraList(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kAppCameraListLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppCameraListLayout, offset, width, v); }
   // 0x82002780
-  template <typename T = AppCameraListVtable>
-  T vtable() const { return T(base, guest::LoadU32(base, address + 0)); }
-  void set_vtable(const View& v) const { guest::StoreU32(base, address + 0, v.address); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
+  template <typename T = AppCameraListVtable>
+  T vtable() const { return T(base, data()->vtable); }
+  void set_vtable(const View& w) const { const uint32_t v = w.address; data()->vtable = v; }
+  void set_vtable(uint32_t v) const { data()->vtable = v; }
+  uint32_t vtable_bits() const { return data()->vtable; }
+  void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
   // a std::vector of words (16 bytes) or 0
-  template <typename T = NewAny_MessageVector_Allocate>
-  T vector() const { return T(base, guest::LoadU32(base, address + 4)); }
-  void set_vector(const View& v) const { guest::StoreU32(base, address + 4, v.address); }
-  void set_vector(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t vector_address() const { return address + 4; }
+  template <typename T = NewAny_MessageVector_Allocate>
+  T vector() const { return T(base, data()->vector); }
+  void set_vector(const View& w) const { const uint32_t v = w.address; data()->vector = v; }
+  void set_vector(uint32_t v) const { data()->vector = v; }
+  uint32_t vector_bits() const { return data()->vector; }
+  void set_vector_bits(uint32_t v) const { data()->vector = v; }
 };
 
 // file; measure: AppCamera.+32.+0
@@ -620,26 +887,63 @@ struct AppCameraListVtable : View {
 };
 
 // allocated; measure: AppCameraEntry
+#pragma pack(push, 1)
+struct AppCameraEntryData {
+  uint32_t vtable = 0;  // +0
+  uint32_t unknown_4 = 0;  // +4
+  uint32_t unknown_8 = 0;  // +8
+  uint32_t unknown_12 = 0;  // +12
+};
+#pragma pack(pop)
+static_assert(sizeof(AppCameraEntryData) == 16);
+inline constexpr memory::LayoutField kAppCameraEntryFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}};
+inline constexpr memory::Layout kAppCameraEntryLayout = {kAppCameraEntryFields, 4};
+
 struct AppCameraEntry : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   static constexpr uint32_t kVtable = 0x82002580;
+  AppCameraEntryData* data() const { return static_cast<AppCameraEntryData*>(memory::HandleObject(address)); }
+  static AppCameraEntry New(uint8_t* base) {
+    return AppCameraEntry(base, memory::MakeHandle(new AppCameraEntryData(), sizeof(AppCameraEntryData), "AppCameraEntry", &kAppCameraEntryLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static AppCameraEntry NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(AppCameraEntryData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<AppCameraEntryData*>(::operator new(sizeof(AppCameraEntryData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) AppCameraEntryData();
+    return AppCameraEntry(base, memory::MakeHandle(p, sizeof(AppCameraEntryData) * count, "AppCameraEntry", &kAppCameraEntryLayout, sizeof(AppCameraEntryData)));
+  }
+  AppCameraEntry at(uint32_t i) const { return AppCameraEntry(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kAppCameraEntryLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kAppCameraEntryLayout, offset, width, v); }
   // 0x82002580
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
+  uint32_t vtable() const { return data()->vtable; }
+  void set_vtable(uint32_t v) const { data()->vtable = v; }
+  uint32_t vtable_bits() const { return data()->vtable; }
+  void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
   // 0 when made
-  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
-  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t unknown_4_address() const { return address + 4; }
+  uint32_t unknown_4() const { return data()->unknown_4; }
+  void set_unknown_4(uint32_t v) const { data()->unknown_4 = v; }
+  uint32_t unknown_4_bits() const { return data()->unknown_4; }
+  void set_unknown_4_bits(uint32_t v) const { data()->unknown_4 = v; }
   // 0 when made
-  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
-  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t unknown_8_address() const { return address + 8; }
+  uint32_t unknown_8() const { return data()->unknown_8; }
+  void set_unknown_8(uint32_t v) const { data()->unknown_8 = v; }
+  uint32_t unknown_8_bits() const { return data()->unknown_8; }
+  void set_unknown_8_bits(uint32_t v) const { data()->unknown_8 = v; }
   // 0 when made
-  uint32_t unknown_12() const { return guest::LoadU32(base, address + 12); }
-  void set_unknown_12(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
   uint32_t unknown_12_address() const { return address + 12; }
+  uint32_t unknown_12() const { return data()->unknown_12; }
+  void set_unknown_12(uint32_t v) const { data()->unknown_12 = v; }
+  uint32_t unknown_12_bits() const { return data()->unknown_12; }
+  void set_unknown_12_bits(uint32_t v) const { data()->unknown_12 = v; }
 };
 
 // embedded; measure: AppCamera::AppCamera.r4

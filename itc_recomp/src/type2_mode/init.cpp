@@ -1,7 +1,7 @@
 // The type 2 mode's Init (docs/functions/type2-mode.md): see type2_mode.h.
 // The callees through their overrides (guest calls from the original's
 // frame with its return addresses): the screen start, Strings::Load,
-// Archive::WaitIdle, StandScene::Create, VirtualAlloc, the 14 machines'
+// Archive::WaitIdle, StandScene::Create, the 14 machines'
 // Inits, ScreenFades::FadeIn, Career::NextDay and LoadingScreen::Show;
 // SaveData::Of its plain C++.
 
@@ -71,11 +71,13 @@ uint64_t Init(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls) {
       calls.Call(kStringsLoad, frame, 0x821972A4, G::string_table(base), 0x100BB);
   calls.Call(kArchiveWaitIdle, frame, 0x821972A8, strings, 0x100BB);
   calls.Call(kStandSceneCreate, frame, 0x821972B0, 3);
-  const uint64_t allocated =
-      calls.Call(kVirtualAlloc, frame, 0x821972C8, 0, schema::Type2ModeBlock::kSize, 4096, 4);
+  // VirtualAlloc(0, 162688, MEM_COMMIT, PAGE_READWRITE) at 0x821972C8: the
+  // block in host memory (E5 step 4), zeroed as the pages were; its handle
+  // is the r3 the original kept.
+  const uint64_t allocated = schema::Type2ModeBlock::New(base).address;
   m.set_block(uint32_t(allocated));
   for (const Member& member : kMembers) {
-    // The first from VirtualAlloc's 64-bit r3, the others from the block's
+    // The first from the allocation's r3 (the handle), the others from the block's
     // word.
     const uint64_t object = member.offset == 0 ? allocated : uint64_t(block()) + member.offset;
     calls.Call(member.init, frame, member.lr, object);

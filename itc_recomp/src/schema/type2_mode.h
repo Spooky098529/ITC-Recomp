@@ -162,81 +162,171 @@ struct ModeType2 : View {
 };
 
 // allocated; measure: new<162688>@ModeType2::Init, ModeType2::TearDown.r4.+848, ModeType2::WaitForLoads.r4.+848, ModeType2::NextMode.r4.+848, ModeType2.+816
+#pragma pack(push, 1)
+struct Type2ModeBlockData {
+  uint8_t pad_0[9604] = {};
+  uint32_t hub_state = 0;  // +9604
+  uint32_t hub_loaded = 0;  // +9608
+  uint32_t hub_reenter = 0;  // +9612
+  uint32_t hub_delete_movie = 0;  // +9616
+  uint8_t pad_9620[20] = {};
+  uint8_t race_menu[10152] = {};  // +9640, guest order
+  uint8_t tuning_machine[36832] = {};  // +19792, guest order
+  uint8_t spec_sheet[9640] = {};  // +56624, guest order
+  uint8_t user_info[9640] = {};  // +66264, guest order
+  uint8_t options[9640] = {};  // +75904, guest order
+  uint8_t controller_options[9640] = {};  // +85544, guest order
+  uint8_t car_settings[9640] = {};  // +95184, guest order
+  uint8_t car_dealer[9640] = {};  // +104824, guest order
+  uint8_t build_screen[9640] = {};  // +114464, guest order
+  uint8_t dialog[9640] = {};  // +124104, guest order
+  uint8_t plate_editor[9640] = {};  // +133744, guest order
+  uint8_t garage_screen[9640] = {};  // +143384, guest order
+  uint8_t pad_153024[9604] = {};
+  uint32_t save_screen_state = 0;  // +162628
+  uint32_t save_screen_loaded = 0;  // +162632
+  uint8_t pad_162636[28] = {};
+  uint32_t shown = 0;  // +162664
+  uint32_t first_shown = 0;  // +162668
+  uint8_t pad_162672[4] = {};
+  uint8_t answer_changed = 0;  // +162676
+  uint8_t pad_162677[3] = {};
+  uint32_t answer_next_type = 0;  // +162680
+  uint8_t pad_162684[4] = {};
+};
+#pragma pack(pop)
+static_assert(sizeof(Type2ModeBlockData) == 162688);
+inline constexpr memory::LayoutField kType2ModeBlockFields[] = {{9604, 4}, {9608, 4}, {9612, 4}, {9616, 4}, {162628, 4}, {162632, 4}, {162664, 4}, {162668, 4}, {162680, 4}};
+inline constexpr memory::Layout kType2ModeBlockLayout = {kType2ModeBlockFields, 9};
+
 struct Type2ModeBlock : View {
   using View::View;
   static constexpr uint32_t kSize = 162688;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  Type2ModeBlockData* data() const { return static_cast<Type2ModeBlockData*>(memory::HandleObject(address)); }
+  static Type2ModeBlock New(uint8_t* base) {
+    return Type2ModeBlock(base, memory::MakeHandle(new Type2ModeBlockData(), sizeof(Type2ModeBlockData), "Type2ModeBlock", &kType2ModeBlockLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static Type2ModeBlock NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(Type2ModeBlockData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<Type2ModeBlockData*>(::operator new(sizeof(Type2ModeBlockData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) Type2ModeBlockData();
+    return Type2ModeBlock(base, memory::MakeHandle(p, sizeof(Type2ModeBlockData) * count, "Type2ModeBlock", &kType2ModeBlockLayout, sizeof(Type2ModeBlockData)));
+  }
+  Type2ModeBlock at(uint32_t i) const { return Type2ModeBlock(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kType2ModeBlockLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kType2ModeBlockLayout, offset, width, v); }
   // Type2Hub's machine (type2-screens.md); MachineOf 0
   uint32_t hub_address() const { return address + 0; }
+  uint8_t* hub() const { return reinterpret_cast<uint8_t*>(data()) + 0; }
   // the hub's machine state (14 picks the next mode 4)
-  uint32_t hub_state() const { return guest::LoadU32(base, address + 9604); }
-  void set_hub_state(uint32_t v) const { guest::StoreU32(base, address + 9604, v); }
   uint32_t hub_state_address() const { return address + 9604; }
+  uint32_t hub_state() const { return data()->hub_state; }
+  void set_hub_state(uint32_t v) const { data()->hub_state = v; }
+  uint32_t hub_state_bits() const { return data()->hub_state; }
+  void set_hub_state_bits(uint32_t v) const { data()->hub_state = v; }
   // the hub's movie loaded (AllLoaded)
-  uint32_t hub_loaded() const { return guest::LoadU32(base, address + 9608); }
-  void set_hub_loaded(uint32_t v) const { guest::StoreU32(base, address + 9608, v); }
   uint32_t hub_loaded_address() const { return address + 9608; }
+  uint32_t hub_loaded() const { return data()->hub_loaded; }
+  void set_hub_loaded(uint32_t v) const { data()->hub_loaded = v; }
+  uint32_t hub_loaded_bits() const { return data()->hub_loaded; }
+  void set_hub_loaded_bits(uint32_t v) const { data()->hub_loaded = v; }
   // open on its message: 1 from Init
-  uint32_t hub_reenter() const { return guest::LoadU32(base, address + 9612); }
-  void set_hub_reenter(uint32_t v) const { guest::StoreU32(base, address + 9612, v); }
   uint32_t hub_reenter_address() const { return address + 9612; }
+  uint32_t hub_reenter() const { return data()->hub_reenter; }
+  void set_hub_reenter(uint32_t v) const { data()->hub_reenter = v; }
+  uint32_t hub_reenter_bits() const { return data()->hub_reenter; }
+  void set_hub_reenter_bits(uint32_t v) const { data()->hub_reenter = v; }
   // 0 from Init
-  uint32_t hub_delete_movie() const { return guest::LoadU32(base, address + 9616); }
-  void set_hub_delete_movie(uint32_t v) const { guest::StoreU32(base, address + 9616, v); }
   uint32_t hub_delete_movie_address() const { return address + 9616; }
+  uint32_t hub_delete_movie() const { return data()->hub_delete_movie; }
+  void set_hub_delete_movie(uint32_t v) const { data()->hub_delete_movie = v; }
+  uint32_t hub_delete_movie_bits() const { return data()->hub_delete_movie; }
+  void set_hub_delete_movie_bits(uint32_t v) const { data()->hub_delete_movie = v; }
   // RaceMenu (race-menu.md); MachineOf 1
   uint32_t race_menu_address() const { return address + 9640; }
+  uint8_t* race_menu() const { return reinterpret_cast<uint8_t*>(data()) + 9640; }
   // the tuning screen (tuning-machine.md); MachineOf 2
   uint32_t tuning_machine_address() const { return address + 19792; }
+  uint8_t* tuning_machine() const { return reinterpret_cast<uint8_t*>(data()) + 19792; }
   // PowerGraphScreen2, the spec sheet (type2-screens.md); MachineOf 9
   uint32_t spec_sheet_address() const { return address + 56624; }
+  uint8_t* spec_sheet() const { return reinterpret_cast<uint8_t*>(data()) + 56624; }
   // UserInfo (user-info.md); MachineOf 10
   uint32_t user_info_address() const { return address + 66264; }
+  uint8_t* user_info() const { return reinterpret_cast<uint8_t*>(data()) + 66264; }
   // Type2Options (options-screen.md); MachineOf 7
   uint32_t options_address() const { return address + 75904; }
+  uint8_t* options() const { return reinterpret_cast<uint8_t*>(data()) + 75904; }
   // Type2ControllerOptions (options-screen.md); MachineOf 12
   uint32_t controller_options_address() const { return address + 85544; }
+  uint8_t* controller_options() const { return reinterpret_cast<uint8_t*>(data()) + 85544; }
   // CarSettings (car-settings.md); MachineOf 3
   uint32_t car_settings_address() const { return address + 95184; }
+  uint8_t* car_settings() const { return reinterpret_cast<uint8_t*>(data()) + 95184; }
   // CarDealer (car-dealer.md); MachineOf 4; its state 14 picks the next mode 4
   uint32_t car_dealer_address() const { return address + 104824; }
+  uint8_t* car_dealer() const { return reinterpret_cast<uint8_t*>(data()) + 104824; }
   // BuildScreen (type2-screens.md); MachineOf 6
   uint32_t build_screen_address() const { return address + 114464; }
+  uint8_t* build_screen() const { return reinterpret_cast<uint8_t*>(data()) + 114464; }
   // Type2Dialog (type2-dialog.md); MachineOf 16
   uint32_t dialog_address() const { return address + 124104; }
+  uint8_t* dialog() const { return reinterpret_cast<uint8_t*>(data()) + 124104; }
   // PlateEditor (type2-screens.md); MachineOf 26
   uint32_t plate_editor_address() const { return address + 133744; }
+  uint8_t* plate_editor() const { return reinterpret_cast<uint8_t*>(data()) + 133744; }
   // GarageScreen (garage-screen.md); MachineOf 5
   uint32_t garage_screen_address() const { return address + 143384; }
+  uint8_t* garage_screen() const { return reinterpret_cast<uint8_t*>(data()) + 143384; }
   // Type2SaveScreen (save-screen.md); MachineOf 44
   uint32_t save_screen_address() const { return address + 153024; }
+  uint8_t* save_screen() const { return reinterpret_cast<uint8_t*>(data()) + 153024; }
   // the save screen's machine state (+0x255C0 + 9604; Interrupt: 5)
-  uint32_t save_screen_state() const { return guest::LoadU32(base, address + 162628); }
-  void set_save_screen_state(uint32_t v) const { guest::StoreU32(base, address + 162628, v); }
   uint32_t save_screen_state_address() const { return address + 162628; }
+  uint32_t save_screen_state() const { return data()->save_screen_state; }
+  void set_save_screen_state(uint32_t v) const { data()->save_screen_state = v; }
+  uint32_t save_screen_state_bits() const { return data()->save_screen_state; }
+  void set_save_screen_state_bits(uint32_t v) const { data()->save_screen_state = v; }
   // the save screen's +9608 (+0x255C0 + 9608), the last word AllLoaded waits on
-  uint32_t save_screen_loaded() const { return guest::LoadU32(base, address + 162632); }
-  void set_save_screen_loaded(uint32_t v) const { guest::StoreU32(base, address + 162632, v); }
   uint32_t save_screen_loaded_address() const { return address + 162632; }
+  uint32_t save_screen_loaded() const { return data()->save_screen_loaded; }
+  void set_save_screen_loaded(uint32_t v) const { data()->save_screen_loaded = v; }
+  uint32_t save_screen_loaded_bits() const { return data()->save_screen_loaded; }
+  void set_save_screen_loaded_bits(uint32_t v) const { data()->save_screen_loaded = v; }
   // the shown screen's index (0 to 7, FindShown; MachineOf's index)
-  uint32_t shown() const { return guest::LoadU32(base, address + 162664); }
-  void set_shown(uint32_t v) const { guest::StoreU32(base, address + 162664, v); }
   uint32_t shown_address() const { return address + 162664; }
+  uint32_t shown() const { return data()->shown; }
+  void set_shown(uint32_t v) const { data()->shown = v; }
+  uint32_t shown_bits() const { return data()->shown; }
+  void set_shown_bits(uint32_t v) const { data()->shown = v; }
   // Init's first screen: 0 the hub, 3 the car settings, 4 the car dealer
-  uint32_t first_shown() const { return guest::LoadU32(base, address + 162668); }
-  void set_first_shown(uint32_t v) const { guest::StoreU32(base, address + 162668, v); }
   uint32_t first_shown_address() const { return address + 162668; }
+  uint32_t first_shown() const { return data()->first_shown; }
+  void set_first_shown(uint32_t v) const { data()->first_shown = v; }
+  uint32_t first_shown_bits() const { return data()->first_shown; }
+  void set_first_shown_bits(uint32_t v) const { data()->first_shown = v; }
   // the next mode's 8-byte answer (ModeAnswer) TearDown returns: byte 1
-  uint8_t answer_changed() const { return guest::LoadU8(base, address + 162676); }
-  void set_answer_changed(uint8_t v) const { guest::StoreU8(base, address + 162676, v); }
   uint32_t answer_changed_address() const { return address + 162676; }
+  uint8_t answer_changed() const { return data()->answer_changed; }
+  void set_answer_changed(uint8_t v) const { data()->answer_changed = v; }
+  uint8_t answer_changed_bits() const { return data()->answer_changed; }
+  void set_answer_changed_bits(uint8_t v) const { data()->answer_changed = v; }
   // the answer's first word as copied: byte 1 and three frame bytes
-  uint32_t answer_word0() const { return guest::LoadU32(base, address + 162676); }
-  void set_answer_word0(uint32_t v) const { guest::StoreU32(base, address + 162676, v); }
   uint32_t answer_word0_address() const { return address + 162676; }
+  uint32_t answer_word0_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kType2ModeBlockLayout, 162676, 4)); }
+  void set_answer_word0_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kType2ModeBlockLayout, 162676, 4, v); }
+  uint32_t answer_word0() const { return uint32_t(answer_word0_bits()); }
+  void set_answer_word0(uint32_t v) const { set_answer_word0_bits(uint32_t(v)); }
   // the next mode: 1 the race, 3, 4, 5 the parking area or 12
-  uint32_t answer_next_type() const { return guest::LoadU32(base, address + 162680); }
-  void set_answer_next_type(uint32_t v) const { guest::StoreU32(base, address + 162680, v); }
   uint32_t answer_next_type_address() const { return address + 162680; }
+  uint32_t answer_next_type() const { return data()->answer_next_type; }
+  void set_answer_next_type(uint32_t v) const { data()->answer_next_type = v; }
+  uint32_t answer_next_type_bits() const { return data()->answer_next_type; }
+  void set_answer_next_type_bits(uint32_t v) const { data()->answer_next_type = v; }
 };
 
 // embedded; measure: ModeType2::MachineOf.ret

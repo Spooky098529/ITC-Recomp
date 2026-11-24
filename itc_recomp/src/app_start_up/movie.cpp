@@ -57,20 +57,19 @@ uint32_t MovieWrapperLockLeave(uint8_t* base, uint32_t lock) {
 std::optional<uint32_t> MovieWrapperConstruct(uint8_t* base, uint32_t wrapper) {
   const schema::MovieWrapper w(base, wrapper);
   w.set_vtable(kMovieWrapperVtable);
-  const auto block = memory::crt::OperatorNew(base, kMovieWrapperBlockBytes);
-  if (!block) {
-    return std::nullopt;
-  }
+  // In host memory (E5 step 4; operator new's block before, 0x82593DEC).
+  static_assert(schema::MovieWrapperBlock::kSize == kMovieWrapperBlockBytes);
+  const uint32_t block = schema::MovieWrapperBlock::New(base).address;
   ITC_NATIVE_RUNNING("sub_82593DC0 MovieWrapper::MovieWrapper");
   // InitializeCriticalSection (sub_8258E548) left out: the host mutex takes
-  // the section's place (its 28 bytes left as operator new leaves them, as
+  // the section's place (its 28 bytes left as New leaves them, as
   // Edram::Alloc's), for every user (the ScopedLock adapters).
-  if (*block != 0) {
-    SetMovieWrapperLock(*block);
+  if (block != 0) {
+    SetMovieWrapperLock(block);
   }
-  w.set_block(*block);
-  // The player (+28) = 0; with no block the original stores at 28 too.
-  schema::MovieWrapperBlock(base, *block).set_player(uint32_t{0});
+  w.set_block(block);
+  // The player (+28) = 0.
+  schema::MovieWrapperBlock(base, block).set_player(uint32_t{0});
   return wrapper;
 }
 
@@ -92,14 +91,13 @@ std::optional<uint32_t> MovieConstruct(uint8_t* base, uint32_t movie, uint32_t b
   m.set_delegate_vtable(kDelegateVtable);
   m.set_delegate_object(uint32_t{0});
   m.set_delegate_function(0);
-  const auto wrapper_block = memory::crt::OperatorNew(base, 8);
-  if (!wrapper_block) {
-    return std::nullopt;
-  }
+  // In host memory (E5 step 4; operator new's block before, 0x820AEB10).
+  static_assert(schema::MovieWrapper::kSize == 8);
+  const uint32_t wrapper_block = schema::MovieWrapper::New(base).address;
   ITC_NATIVE_RUNNING("sub_820AEA88 Movie::Movie");
   uint32_t wrapper = 0;
-  if (*wrapper_block != 0) {
-    wrapper = calls.wrapper(*wrapper_block);
+  if (wrapper_block != 0) {
+    wrapper = calls.wrapper(wrapper_block);
   }
   m.set_wrapper(wrapper);
   // The tick handler (key 1, Movie::OnTick 0x820AE808) and the listener

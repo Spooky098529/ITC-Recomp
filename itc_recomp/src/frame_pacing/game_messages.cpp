@@ -21,7 +21,9 @@
 #include "interpolation/blend_state.h"
 #include "native/textures.h"
 #include "race_update/draw_step.h"
+#include "schema/app_states.h"
 #include "schema/boot_mode.h"
+#include "schema/input.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -714,10 +716,13 @@ ITC_NATIVE_ENTRY_ALWAYS(820990F0) {
   }
   {
     // Listener 0's object (first node of listener slot 0), for diagnostics.
-    uint32_t s = ctx.r3.u32 + 3924;
-    uint32_t head = guest::LoadU32(base, s);
-    uint32_t node = head && guest::LoadU32(base, s + 4) ? guest::LoadU32(base, head + 4) : 0;
-    frame_pacing::g_input_listener0 = node && node != head ? guest::LoadU32(base, node + 8) : 0;
+    // The manager is in host memory (E5 step 4): its list through the views.
+    const schema::PtrList list = schema::InputManager(base, ctx.r3.u32).listener_list(0);
+    const schema::PtrListNode head = list.head<schema::PtrListNode>();
+    const schema::PtrListNode node =
+        head.address && list.size() ? head.previous() : schema::PtrListNode(base, 0);
+    frame_pacing::g_input_listener0 =
+        node.address && node.address != head.address ? node.value() : 0;
   }
   if (ITC_FLAG(log_input_writes)) {
     // The manager (its last part, the listener slots, ends at +3984) and

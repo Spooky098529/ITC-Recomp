@@ -122,16 +122,16 @@ lifted::Result f820A70F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r30,r4
   r30 = r4;
   // stw r11,0(r31)
-  guest::StoreU32(base, schema::FloatPairItem(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
+  schema::FloatPairItem(base, uint32_t(r31)).set_vtable_bits(uint32_t(r11));
   // stw r10,4(r31)
-  guest::StoreU32(base, schema::FloatPairItem(base, uint32_t(r31)).unknown_4_address(), uint32_t(r10));
+  schema::FloatPairItem(base, uint32_t(r31)).set_unknown_4_bits(uint32_t(r10));
   // bl 0x825a6880
   // (left out: dead in C++)
   { r3 = schema::FloatPair::New(base).address; f1 = 0; }  // host_alloc 0x820A7130 (FloatPair)
   // lis r10,-32256
   r10 = uint64_t(int64_t(-2113929216));
   // stw r30,8(r31)
-  guest::StoreU32(base, schema::FloatPairItem(base, uint32_t(r31)).argument_address(), uint32_t(r30));
+  schema::FloatPairItem(base, uint32_t(r31)).set_argument_bits(uint32_t(r30));
   // mr r11,r3
   r11 = r3;
   // mr r3,r31
@@ -143,16 +143,16 @@ lifted::Result f820A70F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r10,1
   r10 = uint64_t(int64_t(1));
   // stw r11,12(r31)
-  guest::StoreU32(base, schema::FloatPairItem(base, uint32_t(r31)).value_address(), uint32_t(r11));
+  schema::FloatPairItem(base, uint32_t(r31)).set_value_bits(uint32_t(r11));
   // stb r10,0(r11)
   schema::FloatPair(base, uint32_t(r11)).set_flag_bits(uint8_t(r10));
   // lwz r11,12(r31)
-  r11 = guest::LoadU32(base, schema::FloatPairItem(base, uint32_t(r31)).value_address());
+  r11 = schema::FloatPairItem(base, uint32_t(r31)).value_bits();
   // stfs f0,4(r11)
   temp.f32 = float(f0);
   schema::FloatPair(base, uint32_t(r11)).set_a_bits(temp.u32);
   // lwz r11,12(r31)
-  r11 = guest::LoadU32(base, schema::FloatPairItem(base, uint32_t(r31)).value_address());
+  r11 = schema::FloatPairItem(base, uint32_t(r31)).value_bits();
   // stfs f0,8(r11)
   temp.f32 = float(f0);
   schema::FloatPair(base, uint32_t(r11)).set_b_bits(temp.u32);
@@ -229,8 +229,7 @@ lifted::Result f820A7180(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
 // sub_820A71C8: lifted from generated/ by lift.py.
 lifted::Result f820A71C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_820A71C8 (lifted)");
-  uint64_t r5 = 0, r11 = 0, r12 = 0, r30 = 0, r31 = 0;
-  double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  uint64_t r11 = 0, r12 = 0, r30 = 0, r31 = 0;
   lifted::Cr cr0;
   uint8_t so = 0;
   uint32_t ea{};
@@ -262,7 +261,7 @@ lifted::Result f820A71C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r31;
   // bl 0x825a70e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A70E8(base, LIFTED_ARGS(0x820A71F8, r31)); r3 = o.r3; f1 = o.f1; }
+  { schema::FloatPairItem(base, uint32_t(r3)).Delete(); }  // host_free 0x820A71F8 (FloatPairItem)
 loc_820A71F8:
   // mr r3,r31
   r3 = r31;
@@ -402,7 +401,7 @@ void f820A7688(uint8_t* base, uint64_t r1, uint64_t r3, uint64_t r4) {
   // addi r9,r9,9688
   r9 = uint64_t(int64_t(int64_t(r9) + 9688));
   // stw r8,4(r3)
-  guest::StoreU32(base, schema::Item820025D8(base, uint32_t(r3)).unknown_4_address(), uint32_t(r8));
+  schema::Item820025D8(base, uint32_t(r3)).set_unknown_4_bits(uint32_t(r8));
   // lis r8,-32256
   r8 = uint64_t(int64_t(-2113929216));
   // stfs f13,-20(r1)
@@ -418,17 +417,17 @@ void f820A7688(uint8_t* base, uint64_t r1, uint64_t r3, uint64_t r4) {
   temp.f32 = float(f0);
   guest::StoreU32(base, uint32_t(r1) + -28, temp.u32);
   // stw r9,0(r3)
-  guest::StoreU32(base, schema::Item820025D8(base, uint32_t(r3)).vtable_address(), uint32_t(r9));
+  schema::Item820025D8(base, uint32_t(r3)).set_vtable_bits(uint32_t(r9));
   // lis r9,-32256
   r9 = uint64_t(int64_t(-2113929216));
   // stfs f13,28(r3)
   temp.f32 = float(f13);
-  guest::StoreU32(base, schema::Item820025D8(base, uint32_t(r3)).unknown_28_address(), temp.u32);
+  schema::Item820025D8(base, uint32_t(r3)).set_unknown_28_bits(temp.u32);
   // stfs f13,44(r3)
   temp.f32 = float(f13);
-  guest::StoreU32(base, schema::Item820025D8(base, uint32_t(r3)).unknown_44_address(), temp.u32);
+  schema::Item820025D8(base, uint32_t(r3)).set_unknown_44_bits(temp.u32);
   // stw r4,8(r3)
-  guest::StoreU32(base, schema::Item820025D8(base, uint32_t(r3)).argument_address(), uint32_t(r4));
+  schema::Item820025D8(base, uint32_t(r3)).set_argument_bits(uint32_t(r4));
   // stfs f0,-24(r1)
   temp.f32 = float(f0);
   guest::StoreU32(base, uint32_t(r1) + -24, temp.u32);
@@ -456,19 +455,19 @@ void f820A7688(uint8_t* base, uint64_t r1, uint64_t r3, uint64_t r4) {
   // ld r10,8(r10)
   r10 = guest::LoadU64(base, uint32_t(r10) + 8);
   // std r9,16(r3)
-  guest::StoreU64(base, schema::Item820025D8(base, uint32_t(r3)).unknown_16_address(), r9);
+  schema::Item820025D8(base, uint32_t(r3)).set_unknown_16_bits(r9);
   // std r11,24(r3)
-  guest::StoreU64(base, schema::Item820025D8(base, uint32_t(r3)).unknown_24_address(), r11);
+  schema::Item820025D8(base, uint32_t(r3)).set_unknown_24_bits(r11);
   // std r8,32(r3)
-  guest::StoreU64(base, schema::Item820025D8(base, uint32_t(r3)).unknown_32_address(), r8);
+  schema::Item820025D8(base, uint32_t(r3)).set_unknown_32_bits(r8);
   // std r10,40(r3)
-  guest::StoreU64(base, schema::Item820025D8(base, uint32_t(r3)).unknown_40_address(), r10);
+  schema::Item820025D8(base, uint32_t(r3)).set_unknown_40_bits(r10);
   // stfs f0,48(r3)
   temp.f32 = float(f0);
-  guest::StoreU32(base, schema::Item820025D8(base, uint32_t(r3)).unknown_48_address(), temp.u32);
+  schema::Item820025D8(base, uint32_t(r3)).set_unknown_48_bits(temp.u32);
   // stfs f13,52(r3)
   temp.f32 = float(f13);
-  guest::StoreU32(base, schema::Item820025D8(base, uint32_t(r3)).unknown_52_address(), temp.u32);
+  schema::Item820025D8(base, uint32_t(r3)).set_unknown_52_bits(temp.u32);
   // blr
   return;
 }
@@ -477,7 +476,7 @@ void f820A7688(uint8_t* base, uint64_t r1, uint64_t r3, uint64_t r4) {
 lifted::Result f820A7AF8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_820A7AF8 (lifted)");
   uint64_t r11 = 0, r12 = 0, r29 = 0, r30 = 0, r31 = 0;
-  double f0 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  double f0 = 0.0;
   lifted::Temp temp{};
   uint32_t ea{};
   // mflr r12
@@ -502,16 +501,16 @@ lifted::Result f820A7AF8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r30,r4
   r30 = r4;
   // stw r11,0(r31)
-  guest::StoreU32(base, schema::FloatTripleItem(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
+  schema::FloatTripleItem(base, uint32_t(r31)).set_vtable_bits(uint32_t(r11));
   // stw r29,4(r31)
-  guest::StoreU32(base, schema::FloatTripleItem(base, uint32_t(r31)).unknown_4_address(), uint32_t(r29));
+  schema::FloatTripleItem(base, uint32_t(r31)).set_unknown_4_bits(uint32_t(r29));
   // bl 0x825a6880
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A6880(base, LIFTED_ARGS(0x820A7B28, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = schema::FloatTriple::New(base).address; f1 = 0; }  // host_alloc 0x820A7B28 (FloatTriple)
   // lis r10,-32256
   r10 = uint64_t(int64_t(-2113929216));
   // stw r30,8(r31)
-  guest::StoreU32(base, schema::FloatTripleItem(base, uint32_t(r31)).argument_address(), uint32_t(r30));
+  schema::FloatTripleItem(base, uint32_t(r31)).set_argument_bits(uint32_t(r30));
   // mr r11,r3
   r11 = r3;
   // mr r3,r31
@@ -523,28 +522,28 @@ lifted::Result f820A7AF8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r10,1
   r10 = uint64_t(int64_t(1));
   // stw r11,12(r31)
-  guest::StoreU32(base, schema::FloatTripleItem(base, uint32_t(r31)).value_address(), uint32_t(r11));
+  schema::FloatTripleItem(base, uint32_t(r31)).set_value_bits(uint32_t(r11));
   // stb r10,0(r11)
-  guest::StoreU8(base, schema::FloatTriple(base, uint32_t(r11)).flag_address(), uint8_t(r10));
+  schema::FloatTriple(base, uint32_t(r11)).set_flag_bits(uint8_t(r10));
   // lwz r11,12(r31)
-  r11 = guest::LoadU32(base, schema::FloatTripleItem(base, uint32_t(r31)).value_address());
+  r11 = schema::FloatTripleItem(base, uint32_t(r31)).value_bits();
   // stfs f0,4(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, schema::FloatTriple(base, uint32_t(r11)).a_address(), temp.u32);
+  schema::FloatTriple(base, uint32_t(r11)).set_a_bits(temp.u32);
   // lwz r11,12(r31)
-  r11 = guest::LoadU32(base, schema::FloatTripleItem(base, uint32_t(r31)).value_address());
+  r11 = schema::FloatTripleItem(base, uint32_t(r31)).value_bits();
   // stfs f0,8(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, schema::FloatTriple(base, uint32_t(r11)).b_address(), temp.u32);
+  schema::FloatTriple(base, uint32_t(r11)).set_b_bits(temp.u32);
   // lwz r11,12(r31)
-  r11 = guest::LoadU32(base, schema::FloatTripleItem(base, uint32_t(r31)).value_address());
+  r11 = schema::FloatTripleItem(base, uint32_t(r31)).value_bits();
   // stb r29,12(r11)
-  guest::StoreU8(base, schema::FloatTriple(base, uint32_t(r11)).flag_12_address(), uint8_t(r29));
+  schema::FloatTriple(base, uint32_t(r11)).set_flag_12_bits(uint8_t(r29));
   // lwz r11,12(r31)
-  r11 = guest::LoadU32(base, schema::FloatTripleItem(base, uint32_t(r31)).value_address());
+  r11 = schema::FloatTripleItem(base, uint32_t(r31)).value_bits();
   // stfs f0,16(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, schema::FloatTriple(base, uint32_t(r11)).c_address(), temp.u32);
+  schema::FloatTriple(base, uint32_t(r11)).set_c_bits(temp.u32);
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // b 0x825a6edc
@@ -565,8 +564,7 @@ uint64_t f820A7B70(uint8_t* base) {
 // sub_820A7B78: lifted from generated/ by lift.py.
 lifted::Result f820A7B78(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_820A7B78 (lifted)");
-  uint64_t r4 = 0, r5 = 0, r11 = 0, r12 = 0, r31 = 0;
-  double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  uint64_t r11 = 0, r12 = 0, r31 = 0;
   uint32_t ea{};
   // mflr r12
   r12 = 0;
@@ -590,7 +588,7 @@ lifted::Result f820A7B78(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
   // bl 0x825a70e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A70E8(base, LIFTED_ARGS(0x820A7BA0, r31)); r3 = o.r3; f1 = o.f1; }
+  { schema::FloatTriple(base, uint32_t(r3)).Delete(); }  // host_free 0x820A7BA0 (FloatTriple)
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // addi r11,r11,9416
@@ -665,8 +663,7 @@ lifted::Result f820A7BE0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
 // sub_820A7C00: lifted from generated/ by lift.py.
 lifted::Result f820A7C00(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_820A7C00 (lifted)");
-  uint64_t r5 = 0, r11 = 0, r12 = 0, r30 = 0, r31 = 0;
-  double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  uint64_t r11 = 0, r12 = 0, r30 = 0, r31 = 0;
   lifted::Cr cr0;
   uint8_t so = 0;
   uint32_t ea{};
@@ -698,7 +695,7 @@ lifted::Result f820A7C00(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r31;
   // bl 0x825a70e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A70E8(base, LIFTED_ARGS(0x820A7C30, r31)); r3 = o.r3; f1 = o.f1; }
+  { schema::FloatTripleItem(base, uint32_t(r3)).Delete(); }  // host_free 0x820A7C30 (FloatTripleItem)
 loc_820A7C30:
   // mr r3,r31
   r3 = r31;
@@ -1006,7 +1003,7 @@ lifted::Result f820A81C0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = uint64_t(int64_t(16));
   // bl 0x825a6880
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A6880(base, LIFTED_ARGS(0x820A8204, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = schema::FloatTripleItem::New(base).address; f1 = 0; }  // host_alloc 0x820A8204 (FloatTripleItem)
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq 0x820a8268
@@ -1030,7 +1027,7 @@ loc_820A8224:
   r3 = uint64_t(int64_t(16));
   // bl 0x825a6880
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A6880(base, LIFTED_ARGS(0x820A822C, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = schema::FloatPairItem::New(base).address; f1 = 0; }  // host_alloc 0x820A822C (FloatPairItem)
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq 0x820a8268
@@ -1054,7 +1051,7 @@ loc_820A824C:
   r3 = uint64_t(int64_t(64));
   // bl 0x825a6880
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A6880(base, LIFTED_ARGS(0x820A8254, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = schema::Item820025D8::New(base).address; f1 = 0; }  // host_alloc 0x820A8254 (Item820025D8)
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq 0x820a8268
@@ -1076,7 +1073,7 @@ loc_820A8270:
   r3 = uint64_t(int64_t(16));
   // bl 0x825a6880
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A6880(base, LIFTED_ARGS(0x820A8278, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = schema::AppCameraEntry::New(base).address; f1 = 0; }  // host_alloc 0x820A8278 (AppCameraEntry)
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq 0x820a828c
@@ -1101,7 +1098,7 @@ loc_820A8298:
   r3 = uint64_t(int64_t(16));
   // bl 0x825a6880
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A6880(base, LIFTED_ARGS(0x820A82A0, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = schema::AppCameraEntry::New(base).address; f1 = 0; }  // host_alloc 0x820A82A0 (AppCameraEntry)
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq 0x820a82b4
@@ -3096,7 +3093,7 @@ lifted::Result f820A9200(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   uint64_t r4 = 0, r5 = 0, r6 = 0, r9 = 0, r10 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
   // lwz r3,4(r3)
-  r3 = guest::LoadU32(base, schema::AppCameraList(base, uint32_t(r3)).vector_address());
+  r3 = schema::AppCameraList(base, uint32_t(r3)).vector_bits();
   // b 0x820a9198
   { const lifted::Result o = lifted::Call(base, 0x820A9198, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
@@ -4178,7 +4175,7 @@ lifted::Result f820A9928(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r4,r1,124
   r4 = uint64_t(int64_t(int64_t(r1) + 124));
   // lwz r3,4(r3)
-  r3 = guest::LoadU32(base, schema::AppCameraList(base, uint32_t(r3)).vector_address());
+  r3 = schema::AppCameraList(base, uint32_t(r3)).vector_bits();
   // bl 0x820a9818
   // (left out: dead in C++)
   { const lifted::Result o = f820A9818(base, r1, r13, r3, r4, r7, f1); r3 = o.r3; f1 = o.f1; }

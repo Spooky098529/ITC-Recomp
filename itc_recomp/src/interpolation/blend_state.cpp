@@ -192,9 +192,11 @@ constexpr float kCutDistance = 8.0f;  // meters
 constexpr float kCutAngle = 0.5f;     // radians, ~30 degrees
 
 // Whether a matrix's 16 words at address are all on one side of 0xE0000000,
-// where the host offset changes (see guest::CopyU32s).
+// where the host offset changes (see guest::CopyU32s), and in guest memory
+// (a handle's, a host object's matrix, E5 step 4, goes word by word through
+// guest::LoadFloat and StoreFloat).
 bool OneHostRange(uint32_t address) {
-  return address >= 0xE0000000u || address + 60u < 0xE0000000u;
+  return !memory::IsHandle(address) && (address >= 0xE0000000u || address + 60u < 0xE0000000u);
 }
 
 // Four words at a time (pshufb), rather than LoadFloat's volatile loads one

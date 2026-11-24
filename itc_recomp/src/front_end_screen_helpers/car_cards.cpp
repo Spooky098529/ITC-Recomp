@@ -94,8 +94,8 @@ uint64_t CarCardsFillAll(uint8_t* base, uint32_t sp, const Calls& calls) {
     }
     const uint32_t scroll = Dealer::list_menu(base).scroll();
     const uint32_t node = ui_movies::FindNode(base, movie, 7, uint32_t(i) + 5);
-    const uint32_t entries = Dealer::data(base).shown_list().entries_address();
-    const uint32_t entry = Load(base, ((scroll + uint32_t(i)) << 2) + entries);
+    const schema::CarDealerList entries = Dealer::data(base).shown_list();
+    const uint32_t entry = uint32_t(entries.load_at((scroll + uint32_t(i)) << 2, 4));
     r3 = CarCardFill(base, node, entry, frame, calls);
   }
   return r3;
@@ -108,8 +108,7 @@ uint64_t CarCardFillDetail(uint8_t* base, uint32_t sp, const Calls& calls) {
   const schema::CarDealerData data = Dealer::data(base);
   const uint32_t scroll = data.car_scroll();
   const uint32_t index = (scroll + data.car_selection()) << 2;
-  const uint32_t entries = data.shown_list().entries_address();
-  const uint32_t entry = Load(base, index + entries);
+  const uint32_t entry = uint32_t(data.shown_list().load_at(index, 4));
   Store(base, movie + 0xA000, 0);
   using ui_movies::FindNode;
   const uint32_t n4 = FindNode(base, movie, 0xFFFFFFFFu, 4);

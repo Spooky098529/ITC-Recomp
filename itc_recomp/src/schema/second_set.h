@@ -9,36 +9,100 @@
 namespace schema {
 
 // allocated; measure: SceneCarModel
+#pragma pack(push, 1)
+struct SceneCarModelData {
+  uint32_t vtable = 0;  // +0
+  uint32_t list = 0;  // +4
+  uint32_t next = 0;  // +8
+  uint32_t previous = 0;  // +12
+  uint32_t state = 0;  // +16
+  uint32_t index = 0;  // +20
+  uint32_t car_model = 0;  // +24
+  uint8_t pad_28[4] = {};
+  uint8_t car_record[3696] = {};  // +32, guest order
+  uint32_t scene = 0;  // +3728
+  uint8_t pad_3732[12] = {};
+};
+#pragma pack(pop)
+static_assert(sizeof(SceneCarModelData) == 3744);
+inline constexpr memory::LayoutField kSceneCarModelFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 4}, {24, 4}, {3728, 4}};
+inline constexpr memory::Layout kSceneCarModelLayout = {kSceneCarModelFields, 8};
+
 struct SceneCarModel : View {
   using View::View;
   static constexpr uint32_t kSize = 3744;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   static constexpr uint32_t kVtable = 0x82005130;
+  SceneCarModelData* data() const { return static_cast<SceneCarModelData*>(memory::HandleObject(address)); }
+  static SceneCarModel New(uint8_t* base) {
+    return SceneCarModel(base, memory::MakeHandle(new SceneCarModelData(), sizeof(SceneCarModelData), "SceneCarModel", &kSceneCarModelLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static SceneCarModel NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(SceneCarModelData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<SceneCarModelData*>(::operator new(sizeof(SceneCarModelData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) SceneCarModelData();
+    return SceneCarModel(base, memory::MakeHandle(p, sizeof(SceneCarModelData) * count, "SceneCarModel", &kSceneCarModelLayout, sizeof(SceneCarModelData)));
+  }
+  SceneCarModel at(uint32_t i) const { return SceneCarModel(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kSceneCarModelLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kSceneCarModelLayout, offset, width, v); }
   // 0x82005130; the pool objects' base 0x82004F90 before ~PoolNode
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
+  uint32_t vtable() const { return data()->vtable; }
+  void set_vtable(uint32_t v) const { data()->vtable = v; }
+  uint32_t vtable_bits() const { return data()->vtable; }
+  void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
+  // the PoolNode's list
+  uint32_t list_address() const { return address + 4; }
+  uint32_t list() const { return data()->list; }
+  void set_list(uint32_t v) const { data()->list = v; }
+  uint32_t list_bits() const { return data()->list; }
+  void set_list_bits(uint32_t v) const { data()->list = v; }
+  // the PoolNode's links
+  uint32_t next_address() const { return address + 8; }
+  uint32_t next() const { return data()->next; }
+  void set_next(uint32_t v) const { data()->next = v; }
+  uint32_t next_bits() const { return data()->next; }
+  void set_next_bits(uint32_t v) const { data()->next = v; }
+  uint32_t previous_address() const { return address + 12; }
+  uint32_t previous() const { return data()->previous; }
+  void set_previous(uint32_t v) const { data()->previous = v; }
+  uint32_t previous_bits() const { return data()->previous; }
+  void set_previous_bits(uint32_t v) const { data()->previous = v; }
   // the pool object's: 0 free, 3 in use
-  uint32_t state() const { return guest::LoadU32(base, address + 16); }
-  void set_state(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
   uint32_t state_address() const { return address + 16; }
+  uint32_t state() const { return data()->state; }
+  void set_state(uint32_t v) const { data()->state = v; }
+  uint32_t state_bits() const { return data()->state; }
+  void set_state_bits(uint32_t v) const { data()->state = v; }
   // its index in the pool (-1 from the constructor)
-  uint32_t index() const { return guest::LoadU32(base, address + 20); }
-  void set_index(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
   uint32_t index_address() const { return address + 20; }
+  uint32_t index() const { return data()->index; }
+  void set_index(uint32_t v) const { data()->index = v; }
+  uint32_t index_bits() const { return data()->index; }
+  void set_index_bits(uint32_t v) const { data()->index = v; }
   // the first set's car model (car-models.toml's CarModel); handed back by ScenePools::ReleaseA with its +20
-  template <typename T = SecondSetFirstSetObject>
-  T car_model() const { return T(base, guest::LoadU32(base, address + 24)); }
-  void set_car_model(const View& v) const { guest::StoreU32(base, address + 24, v.address); }
-  void set_car_model(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
   uint32_t car_model_address() const { return address + 24; }
+  template <typename T = SecondSetFirstSetObject>
+  T car_model() const { return T(base, data()->car_model); }
+  void set_car_model(const View& w) const { const uint32_t v = w.address; data()->car_model = v; }
+  void set_car_model(uint32_t v) const { data()->car_model = v; }
+  uint32_t car_model_bits() const { return data()->car_model; }
+  void set_car_model_bits(uint32_t v) const { data()->car_model = v; }
   // the 3,696-byte car record (scene-models.toml's CarRecord)
   uint32_t car_record_address() const { return address + 32; }
+  uint8_t* car_record() const { return reinterpret_cast<uint8_t*>(data()) + 32; }
   // the car scene (0 when reset)
-  template <typename T = CarScene>
-  T scene() const { return T(base, guest::LoadU32(base, address + 3728)); }
-  void set_scene(const View& v) const { guest::StoreU32(base, address + 3728, v.address); }
-  void set_scene(uint32_t v) const { guest::StoreU32(base, address + 3728, v); }
   uint32_t scene_address() const { return address + 3728; }
+  template <typename T = CarScene>
+  T scene() const { return T(base, data()->scene); }
+  void set_scene(const View& w) const { const uint32_t v = w.address; data()->scene = v; }
+  void set_scene(uint32_t v) const { data()->scene = v; }
+  uint32_t scene_bits() const { return data()->scene; }
+  void set_scene_bits(uint32_t v) const { data()->scene = v; }
 };
 
 // embedded; measure: SceneCarModel.+24, SceneModel.+5084
@@ -52,81 +116,187 @@ struct SecondSetFirstSetObject : View {
 };
 
 // allocated; measure: SceneCockpit
+#pragma pack(push, 1)
+struct SceneCockpitData {
+  uint32_t vtable = 0;  // +0
+  uint32_t list = 0;  // +4
+  uint32_t next = 0;  // +8
+  uint32_t previous = 0;  // +12
+  uint32_t state = 0;  // +16
+  uint32_t index = 0;  // +20
+  uint32_t car_model = 0;  // +24
+  uint32_t interior = 0;  // +28
+  uint32_t body = 0;  // +32
+  uint8_t record[144] = {};  // +36, guest order
+  uint8_t pad_180[4092] = {};
+  uint32_t record_address = 0;  // +4272
+  uint8_t pad_4276[12] = {};
+  uint32_t part_model_0 = 0;  // +4288
+  uint32_t part_model_1 = 0;  // +4292
+  uint32_t part_model_2 = 0;  // +4296
+  uint32_t part_model_3 = 0;  // +4300
+  uint32_t part_model_4 = 0;  // +4304
+  uint32_t part_model_5 = 0;  // +4308
+  uint32_t finished = 0;  // +4312
+  uint32_t scene = 0;  // +4316
+};
+#pragma pack(pop)
+static_assert(sizeof(SceneCockpitData) == 4320);
+inline constexpr memory::LayoutField kSceneCockpitFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 4}, {24, 4}, {28, 4}, {32, 4}, {4272, 4}, {4288, 4}, {4292, 4}, {4296, 4}, {4300, 4}, {4304, 4}, {4308, 4}, {4312, 4}, {4316, 4}};
+inline constexpr memory::Layout kSceneCockpitLayout = {kSceneCockpitFields, 18};
+
 struct SceneCockpit : View {
   using View::View;
   static constexpr uint32_t kSize = 4320;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   static constexpr uint32_t kVtable = 0x8200527C;
+  SceneCockpitData* data() const { return static_cast<SceneCockpitData*>(memory::HandleObject(address)); }
+  static SceneCockpit New(uint8_t* base) {
+    return SceneCockpit(base, memory::MakeHandle(new SceneCockpitData(), sizeof(SceneCockpitData), "SceneCockpit", &kSceneCockpitLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static SceneCockpit NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(SceneCockpitData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<SceneCockpitData*>(::operator new(sizeof(SceneCockpitData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) SceneCockpitData();
+    return SceneCockpit(base, memory::MakeHandle(p, sizeof(SceneCockpitData) * count, "SceneCockpit", &kSceneCockpitLayout, sizeof(SceneCockpitData)));
+  }
+  SceneCockpit at(uint32_t i) const { return SceneCockpit(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kSceneCockpitLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kSceneCockpitLayout, offset, width, v); }
   // 0x8200527C; the pool objects' base 0x82004F90 before ~PoolNode. Measure fault: CockpitPoints::Find's r4 (the part models at +4288) is filed here, its +0 to +20 the six part models
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
+  uint32_t vtable() const { return data()->vtable; }
+  void set_vtable(uint32_t v) const { data()->vtable = v; }
+  uint32_t vtable_bits() const { return data()->vtable; }
+  void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
   // the PoolNode's list (measure fault: part model 1)
-  uint32_t list() const { return guest::LoadU32(base, address + 4); }
-  void set_list(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t list_address() const { return address + 4; }
+  uint32_t list() const { return data()->list; }
+  void set_list(uint32_t v) const { data()->list = v; }
+  uint32_t list_bits() const { return data()->list; }
+  void set_list_bits(uint32_t v) const { data()->list = v; }
   // the PoolNode's links (measure fault: part models 2 and 3)
-  uint32_t next() const { return guest::LoadU32(base, address + 8); }
-  void set_next(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t next_address() const { return address + 8; }
-  uint32_t previous() const { return guest::LoadU32(base, address + 12); }
-  void set_previous(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t next() const { return data()->next; }
+  void set_next(uint32_t v) const { data()->next = v; }
+  uint32_t next_bits() const { return data()->next; }
+  void set_next_bits(uint32_t v) const { data()->next = v; }
   uint32_t previous_address() const { return address + 12; }
+  uint32_t previous() const { return data()->previous; }
+  void set_previous(uint32_t v) const { data()->previous = v; }
+  uint32_t previous_bits() const { return data()->previous; }
+  void set_previous_bits(uint32_t v) const { data()->previous = v; }
   // the pool object's: 3 in use (measure fault: part model 4)
-  uint32_t state() const { return guest::LoadU32(base, address + 16); }
-  void set_state(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
   uint32_t state_address() const { return address + 16; }
+  uint32_t state() const { return data()->state; }
+  void set_state(uint32_t v) const { data()->state = v; }
+  uint32_t state_bits() const { return data()->state; }
+  void set_state_bits(uint32_t v) const { data()->state = v; }
   // its index in the pool (measure fault: part model 5)
-  uint32_t index() const { return guest::LoadU32(base, address + 20); }
-  void set_index(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
   uint32_t index_address() const { return address + 20; }
+  uint32_t index() const { return data()->index; }
+  void set_index(uint32_t v) const { data()->index = v; }
+  uint32_t index_bits() const { return data()->index; }
+  void set_index_bits(uint32_t v) const { data()->index = v; }
   // the second set's car model (SceneCockpit::SetUp; 0 when reset)
-  uint32_t car_model() const { return guest::LoadU32(base, address + 24); }
-  void set_car_model(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
   uint32_t car_model_address() const { return address + 24; }
+  uint32_t car_model() const { return data()->car_model; }
+  void set_car_model(uint32_t v) const { data()->car_model = v; }
+  uint32_t car_model_bits() const { return data()->car_model; }
+  void set_car_model_bits(uint32_t v) const { data()->car_model = v; }
   // its own interior (pool 3 of the second set)
-  template <typename T = SceneInterior>
-  T interior() const { return T(base, guest::LoadU32(base, address + 28)); }
-  void set_interior(const View& v) const { guest::StoreU32(base, address + 28, v.address); }
-  void set_interior(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
   uint32_t interior_address() const { return address + 28; }
+  template <typename T = SceneInterior>
+  T interior() const { return T(base, data()->interior); }
+  void set_interior(const View& w) const { const uint32_t v = w.address; data()->interior = v; }
+  void set_interior(uint32_t v) const { data()->interior = v; }
+  uint32_t interior_bits() const { return data()->interior; }
+  void set_interior_bits(uint32_t v) const { data()->interior = v; }
   // the first set's cockpit body (pool 2 of [0x826C2E40]; scene-loaders.toml's Cockpit)
-  uint32_t body() const { return guest::LoadU32(base, address + 32); }
-  void set_body(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
   uint32_t body_address() const { return address + 32; }
+  uint32_t body() const { return data()->body; }
+  void set_body(uint32_t v) const { data()->body = v; }
+  uint32_t body_bits() const { return data()->body; }
+  void set_body_bits(uint32_t v) const { data()->body = v; }
   // the 144-byte cockpit record (scene-models.toml's SceneModelsCockpitRecord)
   uint32_t record_address() const { return address + 36; }
+  uint8_t* record() const { return reinterpret_cast<uint8_t*>(data()) + 36; }
   // the point block (SecondSetCockpitPoints)
   uint32_t points_address() const { return address + 192; }
+  uint8_t* points() const { return reinterpret_cast<uint8_t*>(data()) + 192; }
   // the record's address (+36)
-  template <typename T = SceneModelsCockpitRecord>
-  T record_address() const { return T(base, guest::LoadU32(base, address + 4272)); }
-  void set_record_address(const View& v) const { guest::StoreU32(base, address + 4272, v.address); }
-  void set_record_address(uint32_t v) const { guest::StoreU32(base, address + 4272, v); }
   uint32_t record_address_address() const { return address + 4272; }
+  template <typename T = SceneModelsCockpitRecord>
+  T record_address() const { return T(base, data()->record_address); }
+  void set_record_address(const View& w) const { const uint32_t v = w.address; data()->record_address = v; }
+  void set_record_address(uint32_t v) const { data()->record_address = v; }
+  uint32_t record_address_bits() const { return data()->record_address; }
+  void set_record_address_bits(uint32_t v) const { data()->record_address = v; }
   // the body's six part models (its +688 + 464i; SceneCockpit::Finish)
   uint32_t part_models_address() const { return address + 4288; }
-  uint32_t part_model_0() const { return guest::LoadU32(base, address + 4288); }
-  void set_part_model_0(uint32_t v) const { guest::StoreU32(base, address + 4288, v); }
+  uint8_t* part_models() const { return reinterpret_cast<uint8_t*>(data()) + 4288; }
   uint32_t part_model_0_address() const { return address + 4288; }
+  uint32_t part_model_0() const { return data()->part_model_0; }
+  void set_part_model_0(uint32_t v) const { data()->part_model_0 = v; }
+  uint32_t part_model_0_bits() const { return data()->part_model_0; }
+  void set_part_model_0_bits(uint32_t v) const { data()->part_model_0 = v; }
+  uint32_t part_model_1_address() const { return address + 4292; }
+  uint32_t part_model_1() const { return data()->part_model_1; }
+  void set_part_model_1(uint32_t v) const { data()->part_model_1 = v; }
+  uint32_t part_model_1_bits() const { return data()->part_model_1; }
+  void set_part_model_1_bits(uint32_t v) const { data()->part_model_1 = v; }
+  uint32_t part_model_2_address() const { return address + 4296; }
+  uint32_t part_model_2() const { return data()->part_model_2; }
+  void set_part_model_2(uint32_t v) const { data()->part_model_2 = v; }
+  uint32_t part_model_2_bits() const { return data()->part_model_2; }
+  void set_part_model_2_bits(uint32_t v) const { data()->part_model_2 = v; }
+  uint32_t part_model_3_address() const { return address + 4300; }
+  uint32_t part_model_3() const { return data()->part_model_3; }
+  void set_part_model_3(uint32_t v) const { data()->part_model_3 = v; }
+  uint32_t part_model_3_bits() const { return data()->part_model_3; }
+  void set_part_model_3_bits(uint32_t v) const { data()->part_model_3 = v; }
+  uint32_t part_model_4_address() const { return address + 4304; }
+  uint32_t part_model_4() const { return data()->part_model_4; }
+  void set_part_model_4(uint32_t v) const { data()->part_model_4 = v; }
+  uint32_t part_model_4_bits() const { return data()->part_model_4; }
+  void set_part_model_4_bits(uint32_t v) const { data()->part_model_4 = v; }
+  uint32_t part_model_5_address() const { return address + 4308; }
+  uint32_t part_model_5() const { return data()->part_model_5; }
+  void set_part_model_5(uint32_t v) const { data()->part_model_5 = v; }
+  uint32_t part_model_5_bits() const { return data()->part_model_5; }
+  void set_part_model_5_bits(uint32_t v) const { data()->part_model_5 = v; }
   // part models 0 and 1 (cleared as doublewords by Reset)
-  uint64_t part_models_01() const { return guest::LoadU64(base, address + 4288); }
-  void set_part_models_01(uint64_t v) const { guest::StoreU64(base, address + 4288, v); }
   uint32_t part_models_01_address() const { return address + 4288; }
-  uint64_t part_models_23() const { return guest::LoadU64(base, address + 4296); }
-  void set_part_models_23(uint64_t v) const { guest::StoreU64(base, address + 4296, v); }
+  uint64_t part_models_01_bits() const { return uint64_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kSceneCockpitLayout, 4288, 8)); }
+  void set_part_models_01_bits(uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kSceneCockpitLayout, 4288, 8, v); }
+  uint64_t part_models_01() const { return uint64_t(part_models_01_bits()); }
+  void set_part_models_01(uint64_t v) const { set_part_models_01_bits(uint64_t(v)); }
   uint32_t part_models_23_address() const { return address + 4296; }
-  uint64_t part_models_45() const { return guest::LoadU64(base, address + 4304); }
-  void set_part_models_45(uint64_t v) const { guest::StoreU64(base, address + 4304, v); }
+  uint64_t part_models_23_bits() const { return uint64_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kSceneCockpitLayout, 4296, 8)); }
+  void set_part_models_23_bits(uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kSceneCockpitLayout, 4296, 8, v); }
+  uint64_t part_models_23() const { return uint64_t(part_models_23_bits()); }
+  void set_part_models_23(uint64_t v) const { set_part_models_23_bits(uint64_t(v)); }
   uint32_t part_models_45_address() const { return address + 4304; }
+  uint64_t part_models_45_bits() const { return uint64_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kSceneCockpitLayout, 4304, 8)); }
+  void set_part_models_45_bits(uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kSceneCockpitLayout, 4304, 8, v); }
+  uint64_t part_models_45() const { return uint64_t(part_models_45_bits()); }
+  void set_part_models_45(uint64_t v) const { set_part_models_45_bits(uint64_t(v)); }
   // SceneCockpit::Finish
-  uint32_t finished() const { return guest::LoadU32(base, address + 4312); }
-  void set_finished(uint32_t v) const { guest::StoreU32(base, address + 4312, v); }
   uint32_t finished_address() const { return address + 4312; }
-  template <typename T = CarScene>
-  T scene() const { return T(base, guest::LoadU32(base, address + 4316)); }
-  void set_scene(const View& v) const { guest::StoreU32(base, address + 4316, v.address); }
-  void set_scene(uint32_t v) const { guest::StoreU32(base, address + 4316, v); }
+  uint32_t finished() const { return data()->finished; }
+  void set_finished(uint32_t v) const { data()->finished = v; }
+  uint32_t finished_bits() const { return data()->finished; }
+  void set_finished_bits(uint32_t v) const { data()->finished = v; }
   uint32_t scene_address() const { return address + 4316; }
+  template <typename T = CarScene>
+  T scene() const { return T(base, data()->scene); }
+  void set_scene(const View& w) const { const uint32_t v = w.address; data()->scene = v; }
+  void set_scene(uint32_t v) const { data()->scene = v; }
+  uint32_t scene_bits() const { return data()->scene; }
+  void set_scene_bits(uint32_t v) const { data()->scene = v; }
 };
 
 // embedded; measure: CockpitPoints::Draw.r3@+720, CockpitPoints::Draw.r3@+1440, CockpitPoints::Find.r3@+2160, SceneCockpit@+192
@@ -179,133 +349,284 @@ struct SecondSetCockpitPoints : View {
 };
 
 // allocated; measure: SceneInterior, List::At.ret.+5068
+#pragma pack(push, 1)
+struct SceneInteriorData {
+  uint32_t vtable = 0;  // +0
+  uint32_t list = 0;  // +4
+  uint32_t next = 0;  // +8
+  uint32_t previous = 0;  // +12
+  uint32_t state = 0;  // +16
+  uint32_t index = 0;  // +20
+  uint32_t car_model = 0;  // +24
+  uint32_t skeleton = 0;  // +28
+  uint32_t texture_set = 0;  // +32
+  uint32_t first_set_interior = 0;  // +36
+  uint8_t pad_40[8] = {};
+  uint32_t gauge0_present = 0;  // +48
+  uint32_t gauge0_kind = 0;  // +52
+  uint8_t pad_56[84] = {};
+  uint32_t seat_model = 0;  // +140
+  uint8_t pad_144[8] = {};
+  uint32_t accessory = 0;  // +152
+  uint32_t accessory_arg = 0;  // +156
+  uint8_t pad_160[3156] = {};
+  uint32_t meters_car_block = 0;  // +3316
+  uint8_t pad_3320[5316] = {};
+  uint32_t meters_turbo_provider = 0;  // +8636
+  uint8_t pad_8640[1016] = {};
+  uint32_t points_seat_model = 0;  // +9656
+  uint8_t pad_9660[1940] = {};
+  uint32_t points_seat_position = 0;  // +11600
+  uint32_t points_record = 0;  // +11604
+  uint32_t points_skeleton = 0;  // +11608
+  uint32_t points_cockpit = 0;  // +11612
+  uint32_t points_accessory_shown = 0;  // +11616
+  uint8_t pad_11620[12] = {};
+  uint32_t part_model_0 = 0;  // +11632
+  uint32_t part_model_1 = 0;  // +11636
+  uint32_t part_model_2 = 0;  // +11640
+  uint32_t part_model_3 = 0;  // +11644
+  uint32_t part_model_4 = 0;  // +11648
+  uint32_t part_model_5 = 0;  // +11652
+  uint32_t cockpit = 0;  // +11656
+  uint32_t finished = 0;  // +11660
+  uint32_t cockpit_texture = 0;  // +11664
+  uint32_t scene = 0;  // +11668
+  uint8_t pad_11672[8] = {};
+};
+#pragma pack(pop)
+static_assert(sizeof(SceneInteriorData) == 11680);
+inline constexpr memory::LayoutField kSceneInteriorFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 4}, {24, 4}, {28, 4}, {32, 4}, {36, 4}, {48, 4}, {52, 4}, {140, 4}, {152, 4}, {156, 4}, {3316, 4}, {8636, 4}, {9656, 4}, {11600, 4}, {11604, 4}, {11608, 4}, {11612, 4}, {11616, 4}, {11632, 4}, {11636, 4}, {11640, 4}, {11644, 4}, {11648, 4}, {11652, 4}, {11656, 4}, {11660, 4}, {11664, 4}, {11668, 4}};
+inline constexpr memory::Layout kSceneInteriorLayout = {kSceneInteriorFields, 33};
+
 struct SceneInterior : View {
   using View::View;
   static constexpr uint32_t kSize = 11680;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   static constexpr uint32_t kVtable = 0x820062E4;
+  SceneInteriorData* data() const { return static_cast<SceneInteriorData*>(memory::HandleObject(address)); }
+  static SceneInterior New(uint8_t* base) {
+    return SceneInterior(base, memory::MakeHandle(new SceneInteriorData(), sizeof(SceneInteriorData), "SceneInterior", &kSceneInteriorLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static SceneInterior NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(SceneInteriorData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<SceneInteriorData*>(::operator new(sizeof(SceneInteriorData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) SceneInteriorData();
+    return SceneInterior(base, memory::MakeHandle(p, sizeof(SceneInteriorData) * count, "SceneInterior", &kSceneInteriorLayout, sizeof(SceneInteriorData)));
+  }
+  SceneInterior at(uint32_t i) const { return SceneInterior(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kSceneInteriorLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kSceneInteriorLayout, offset, width, v); }
   // 0x820062E4; the pool objects' base 0x82004F90 before ~PoolNode. Measure fault: InteriorPoints::Find's r4 (the part models at +11632) is filed here, its +0 to +20 the six part models
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
+  uint32_t vtable() const { return data()->vtable; }
+  void set_vtable(uint32_t v) const { data()->vtable = v; }
+  uint32_t vtable_bits() const { return data()->vtable; }
+  void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
   // the PoolNode's list (measure fault: part model 1)
-  uint32_t list() const { return guest::LoadU32(base, address + 4); }
-  void set_list(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t list_address() const { return address + 4; }
+  uint32_t list() const { return data()->list; }
+  void set_list(uint32_t v) const { data()->list = v; }
+  uint32_t list_bits() const { return data()->list; }
+  void set_list_bits(uint32_t v) const { data()->list = v; }
   // the PoolNode's links (measure fault: part models 2 and 3)
-  uint32_t next() const { return guest::LoadU32(base, address + 8); }
-  void set_next(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t next_address() const { return address + 8; }
-  uint32_t previous() const { return guest::LoadU32(base, address + 12); }
-  void set_previous(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t next() const { return data()->next; }
+  void set_next(uint32_t v) const { data()->next = v; }
+  uint32_t next_bits() const { return data()->next; }
+  void set_next_bits(uint32_t v) const { data()->next = v; }
   uint32_t previous_address() const { return address + 12; }
+  uint32_t previous() const { return data()->previous; }
+  void set_previous(uint32_t v) const { data()->previous = v; }
+  uint32_t previous_bits() const { return data()->previous; }
+  void set_previous_bits(uint32_t v) const { data()->previous = v; }
   // the pool object's: 3 in use (measure fault: part model 4)
-  uint32_t state() const { return guest::LoadU32(base, address + 16); }
-  void set_state(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
   uint32_t state_address() const { return address + 16; }
+  uint32_t state() const { return data()->state; }
+  void set_state(uint32_t v) const { data()->state = v; }
+  uint32_t state_bits() const { return data()->state; }
+  void set_state_bits(uint32_t v) const { data()->state = v; }
   // its index in the pool (measure fault: part model 5)
-  uint32_t index() const { return guest::LoadU32(base, address + 20); }
-  void set_index(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
   uint32_t index_address() const { return address + 20; }
+  uint32_t index() const { return data()->index; }
+  void set_index(uint32_t v) const { data()->index = v; }
+  uint32_t index_bits() const { return data()->index; }
+  void set_index_bits(uint32_t v) const { data()->index = v; }
   // the second set's car model (SceneInterior::Link): its +24 the first set's
-  template <typename T = CarModelsSceneCarModel>
-  T car_model() const { return T(base, guest::LoadU32(base, address + 24)); }
-  void set_car_model(const View& v) const { guest::StoreU32(base, address + 24, v.address); }
-  void set_car_model(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
   uint32_t car_model_address() const { return address + 24; }
+  template <typename T = CarModelsSceneCarModel>
+  T car_model() const { return T(base, data()->car_model); }
+  void set_car_model(const View& w) const { const uint32_t v = w.address; data()->car_model = v; }
+  void set_car_model(uint32_t v) const { data()->car_model = v; }
+  uint32_t car_model_bits() const { return data()->car_model; }
+  void set_car_model_bits(uint32_t v) const { data()->car_model = v; }
   // the first set's car model's +3760 (SceneInterior::Link; the cockpit body + 208 under a cockpit)
-  uint32_t skeleton() const { return guest::LoadU32(base, address + 28); }
-  void set_skeleton(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
   uint32_t skeleton_address() const { return address + 28; }
+  uint32_t skeleton() const { return data()->skeleton; }
+  void set_skeleton(uint32_t v) const { data()->skeleton = v; }
+  uint32_t skeleton_bits() const { return data()->skeleton; }
+  void set_skeleton_bits(uint32_t v) const { data()->skeleton = v; }
   // the first set's car model's +4048 (SceneInterior::Link; the cockpit body + 496 under a cockpit)
-  uint32_t texture_set() const { return guest::LoadU32(base, address + 32); }
-  void set_texture_set(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
   uint32_t texture_set_address() const { return address + 32; }
+  uint32_t texture_set() const { return data()->texture_set; }
+  void set_texture_set(uint32_t v) const { data()->texture_set = v; }
+  uint32_t texture_set_bits() const { return data()->texture_set; }
+  void set_texture_set_bits(uint32_t v) const { data()->texture_set = v; }
   // the first set's interior (pool 3 of [0x826C2E40])
-  template <typename T = Interior>
-  T first_set_interior() const { return T(base, guest::LoadU32(base, address + 36)); }
-  void set_first_set_interior(const View& v) const { guest::StoreU32(base, address + 36, v.address); }
-  void set_first_set_interior(uint32_t v) const { guest::StoreU32(base, address + 36, v); }
   uint32_t first_set_interior_address() const { return address + 36; }
+  template <typename T = Interior>
+  T first_set_interior() const { return T(base, data()->first_set_interior); }
+  void set_first_set_interior(const View& w) const { const uint32_t v = w.address; data()->first_set_interior = v; }
+  void set_first_set_interior(uint32_t v) const { data()->first_set_interior = v; }
+  uint32_t first_set_interior_bits() const { return data()->first_set_interior; }
+  void set_first_set_interior_bits(uint32_t v) const { data()->first_set_interior = v; }
   // the 120-byte interior record (car-draw.toml's InteriorRecord)
   uint32_t record_address() const { return address + 40; }
+  uint8_t* record() const { return reinterpret_cast<uint8_t*>(data()) + 40; }
   // the record's +8 (SceneInterior::SetGauges)
-  uint32_t gauge0_present() const { return guest::LoadU32(base, address + 48); }
-  void set_gauge0_present(uint32_t v) const { guest::StoreU32(base, address + 48, v); }
   uint32_t gauge0_present_address() const { return address + 48; }
+  uint32_t gauge0_present() const { return data()->gauge0_present; }
+  void set_gauge0_present(uint32_t v) const { data()->gauge0_present = v; }
+  uint32_t gauge0_present_bits() const { return data()->gauge0_present; }
+  void set_gauge0_present_bits(uint32_t v) const { data()->gauge0_present = v; }
   // the record's +12
-  uint32_t gauge0_kind() const { return guest::LoadU32(base, address + 52); }
-  void set_gauge0_kind(uint32_t v) const { guest::StoreU32(base, address + 52, v); }
   uint32_t gauge0_kind_address() const { return address + 52; }
+  uint32_t gauge0_kind() const { return data()->gauge0_kind; }
+  void set_gauge0_kind(uint32_t v) const { data()->gauge0_kind = v; }
+  uint32_t gauge0_kind_bits() const { return data()->gauge0_kind; }
+  void set_gauge0_kind_bits(uint32_t v) const { data()->gauge0_kind = v; }
   // the record's +100 (SceneInterior::Apply)
-  uint32_t seat_model() const { return guest::LoadU32(base, address + 140); }
-  void set_seat_model(uint32_t v) const { guest::StoreU32(base, address + 140, v); }
   uint32_t seat_model_address() const { return address + 140; }
+  uint32_t seat_model() const { return data()->seat_model; }
+  void set_seat_model(uint32_t v) const { data()->seat_model = v; }
+  uint32_t seat_model_bits() const { return data()->seat_model; }
+  void set_seat_model_bits(uint32_t v) const { data()->seat_model = v; }
   // the record's +112: the accessory (3 none; SceneInterior::Draw)
-  uint32_t accessory() const { return guest::LoadU32(base, address + 152); }
-  void set_accessory(uint32_t v) const { guest::StoreU32(base, address + 152, v); }
   uint32_t accessory_address() const { return address + 152; }
+  uint32_t accessory() const { return data()->accessory; }
+  void set_accessory(uint32_t v) const { data()->accessory = v; }
+  uint32_t accessory_bits() const { return data()->accessory; }
+  void set_accessory_bits(uint32_t v) const { data()->accessory = v; }
   // the record's +116
-  uint32_t accessory_arg() const { return guest::LoadU32(base, address + 156); }
-  void set_accessory_arg(uint32_t v) const { guest::StoreU32(base, address + 156, v); }
   uint32_t accessory_arg_address() const { return address + 156; }
+  uint32_t accessory_arg() const { return data()->accessory_arg; }
+  void set_accessory_arg(uint32_t v) const { data()->accessory_arg = v; }
+  uint32_t accessory_arg_bits() const { return data()->accessory_arg; }
+  void set_accessory_arg_bits(uint32_t v) const { data()->accessory_arg = v; }
   // the point block (SecondSetInteriorPoints)
   uint32_t points_address() const { return address + 160; }
+  uint8_t* points() const { return reinterpret_cast<uint8_t*>(data()) + 160; }
   // the point block's +3156 (the meters' +4): the car's block (SceneInterior::Finish)
-  uint32_t meters_car_block() const { return guest::LoadU32(base, address + 3316); }
-  void set_meters_car_block(uint32_t v) const { guest::StoreU32(base, address + 3316, v); }
   uint32_t meters_car_block_address() const { return address + 3316; }
+  uint32_t meters_car_block() const { return data()->meters_car_block; }
+  void set_meters_car_block(uint32_t v) const { data()->meters_car_block = v; }
+  uint32_t meters_car_block_bits() const { return data()->meters_car_block; }
+  void set_meters_car_block_bits(uint32_t v) const { data()->meters_car_block = v; }
   // the point block's +8476 (the meters' +5324) = +32 (SceneInterior::Finish)
-  uint32_t meters_turbo_provider() const { return guest::LoadU32(base, address + 8636); }
-  void set_meters_turbo_provider(uint32_t v) const { guest::StoreU32(base, address + 8636, v); }
   uint32_t meters_turbo_provider_address() const { return address + 8636; }
+  uint32_t meters_turbo_provider() const { return data()->meters_turbo_provider; }
+  void set_meters_turbo_provider(uint32_t v) const { data()->meters_turbo_provider = v; }
+  uint32_t meters_turbo_provider_bits() const { return data()->meters_turbo_provider; }
+  void set_meters_turbo_provider_bits(uint32_t v) const { data()->meters_turbo_provider = v; }
   // the point block's +9496: the scene + 784 + 464 x the record's +100 (SceneInterior::Apply)
-  uint32_t points_seat_model() const { return guest::LoadU32(base, address + 9656); }
-  void set_points_seat_model(uint32_t v) const { guest::StoreU32(base, address + 9656, v); }
   uint32_t points_seat_model_address() const { return address + 9656; }
+  uint32_t points_seat_model() const { return data()->points_seat_model; }
+  void set_points_seat_model(uint32_t v) const { data()->points_seat_model = v; }
+  uint32_t points_seat_model_bits() const { return data()->points_seat_model; }
+  void set_points_seat_model_bits(uint32_t v) const { data()->points_seat_model = v; }
   // the point block's +11440: the first set's car model's +7168 (SceneInterior::Finish)
-  uint32_t points_seat_position() const { return guest::LoadU32(base, address + 11600); }
-  void set_points_seat_position(uint32_t v) const { guest::StoreU32(base, address + 11600, v); }
   uint32_t points_seat_position_address() const { return address + 11600; }
+  uint32_t points_seat_position() const { return data()->points_seat_position; }
+  void set_points_seat_position(uint32_t v) const { data()->points_seat_position = v; }
+  uint32_t points_seat_position_bits() const { return data()->points_seat_position; }
+  void set_points_seat_position_bits(uint32_t v) const { data()->points_seat_position = v; }
   // the point block's +11444: the record's address (+40)
-  template <typename T = InteriorRecord>
-  T points_record() const { return T(base, guest::LoadU32(base, address + 11604)); }
-  void set_points_record(const View& v) const { guest::StoreU32(base, address + 11604, v.address); }
-  void set_points_record(uint32_t v) const { guest::StoreU32(base, address + 11604, v); }
   uint32_t points_record_address() const { return address + 11604; }
+  template <typename T = InteriorRecord>
+  T points_record() const { return T(base, data()->points_record); }
+  void set_points_record(const View& w) const { const uint32_t v = w.address; data()->points_record = v; }
+  void set_points_record(uint32_t v) const { data()->points_record = v; }
+  uint32_t points_record_bits() const { return data()->points_record; }
+  void set_points_record_bits(uint32_t v) const { data()->points_record = v; }
   // the point block's +11448: the first set's car model's +3760
-  uint32_t points_skeleton() const { return guest::LoadU32(base, address + 11608); }
-  void set_points_skeleton(uint32_t v) const { guest::StoreU32(base, address + 11608, v); }
   uint32_t points_skeleton_address() const { return address + 11608; }
+  uint32_t points_skeleton() const { return data()->points_skeleton; }
+  void set_points_skeleton(uint32_t v) const { data()->points_skeleton = v; }
+  uint32_t points_skeleton_bits() const { return data()->points_skeleton; }
+  void set_points_skeleton_bits(uint32_t v) const { data()->points_skeleton = v; }
   // the point block's +11452: 1 under a cockpit (sub_820E3658)
-  uint32_t points_cockpit() const { return guest::LoadU32(base, address + 11612); }
-  void set_points_cockpit(uint32_t v) const { guest::StoreU32(base, address + 11612, v); }
   uint32_t points_cockpit_address() const { return address + 11612; }
+  uint32_t points_cockpit() const { return data()->points_cockpit; }
+  void set_points_cockpit(uint32_t v) const { data()->points_cockpit = v; }
+  uint32_t points_cockpit_bits() const { return data()->points_cockpit; }
+  void set_points_cockpit_bits(uint32_t v) const { data()->points_cockpit = v; }
   // the point block's +11456: the accessory drawn (CarScene::SetInteriorWord; 1 from Reset)
-  uint32_t points_accessory_shown() const { return guest::LoadU32(base, address + 11616); }
-  void set_points_accessory_shown(uint32_t v) const { guest::StoreU32(base, address + 11616, v); }
   uint32_t points_accessory_shown_address() const { return address + 11616; }
+  uint32_t points_accessory_shown() const { return data()->points_accessory_shown; }
+  void set_points_accessory_shown(uint32_t v) const { data()->points_accessory_shown = v; }
+  uint32_t points_accessory_shown_bits() const { return data()->points_accessory_shown; }
+  void set_points_accessory_shown_bits(uint32_t v) const { data()->points_accessory_shown = v; }
   // six part models (the first set's interior's +304 + 464i)
   uint32_t part_models_address() const { return address + 11632; }
-  uint32_t part_model_0() const { return guest::LoadU32(base, address + 11632); }
-  void set_part_model_0(uint32_t v) const { guest::StoreU32(base, address + 11632, v); }
+  uint8_t* part_models() const { return reinterpret_cast<uint8_t*>(data()) + 11632; }
   uint32_t part_model_0_address() const { return address + 11632; }
+  uint32_t part_model_0() const { return data()->part_model_0; }
+  void set_part_model_0(uint32_t v) const { data()->part_model_0 = v; }
+  uint32_t part_model_0_bits() const { return data()->part_model_0; }
+  void set_part_model_0_bits(uint32_t v) const { data()->part_model_0 = v; }
+  uint32_t part_model_1_address() const { return address + 11636; }
+  uint32_t part_model_1() const { return data()->part_model_1; }
+  void set_part_model_1(uint32_t v) const { data()->part_model_1 = v; }
+  uint32_t part_model_1_bits() const { return data()->part_model_1; }
+  void set_part_model_1_bits(uint32_t v) const { data()->part_model_1 = v; }
+  uint32_t part_model_2_address() const { return address + 11640; }
+  uint32_t part_model_2() const { return data()->part_model_2; }
+  void set_part_model_2(uint32_t v) const { data()->part_model_2 = v; }
+  uint32_t part_model_2_bits() const { return data()->part_model_2; }
+  void set_part_model_2_bits(uint32_t v) const { data()->part_model_2 = v; }
+  uint32_t part_model_3_address() const { return address + 11644; }
+  uint32_t part_model_3() const { return data()->part_model_3; }
+  void set_part_model_3(uint32_t v) const { data()->part_model_3 = v; }
+  uint32_t part_model_3_bits() const { return data()->part_model_3; }
+  void set_part_model_3_bits(uint32_t v) const { data()->part_model_3 = v; }
+  uint32_t part_model_4_address() const { return address + 11648; }
+  uint32_t part_model_4() const { return data()->part_model_4; }
+  void set_part_model_4(uint32_t v) const { data()->part_model_4 = v; }
+  uint32_t part_model_4_bits() const { return data()->part_model_4; }
+  void set_part_model_4_bits(uint32_t v) const { data()->part_model_4 = v; }
+  uint32_t part_model_5_address() const { return address + 11652; }
+  uint32_t part_model_5() const { return data()->part_model_5; }
+  void set_part_model_5(uint32_t v) const { data()->part_model_5 = v; }
+  uint32_t part_model_5_bits() const { return data()->part_model_5; }
+  void set_part_model_5_bits(uint32_t v) const { data()->part_model_5 = v; }
   // 1 under a cockpit (the cockpit set c)
-  uint32_t cockpit() const { return guest::LoadU32(base, address + 11656); }
-  void set_cockpit(uint32_t v) const { guest::StoreU32(base, address + 11656, v); }
   uint32_t cockpit_address() const { return address + 11656; }
+  uint32_t cockpit() const { return data()->cockpit; }
+  void set_cockpit(uint32_t v) const { data()->cockpit = v; }
+  uint32_t cockpit_bits() const { return data()->cockpit; }
+  void set_cockpit_bits(uint32_t v) const { data()->cockpit = v; }
   // SceneInterior::Finish
-  uint32_t finished() const { return guest::LoadU32(base, address + 11660); }
-  void set_finished(uint32_t v) const { guest::StoreU32(base, address + 11660, v); }
   uint32_t finished_address() const { return address + 11660; }
+  uint32_t finished() const { return data()->finished; }
+  void set_finished(uint32_t v) const { data()->finished = v; }
+  uint32_t finished_bits() const { return data()->finished; }
+  void set_finished_bits(uint32_t v) const { data()->finished = v; }
   // the cockpit body's texture (SceneCockpit::Finish)
-  uint32_t cockpit_texture() const { return guest::LoadU32(base, address + 11664); }
-  void set_cockpit_texture(uint32_t v) const { guest::StoreU32(base, address + 11664, v); }
   uint32_t cockpit_texture_address() const { return address + 11664; }
-  template <typename T = CarScene>
-  T scene() const { return T(base, guest::LoadU32(base, address + 11668)); }
-  void set_scene(const View& v) const { guest::StoreU32(base, address + 11668, v.address); }
-  void set_scene(uint32_t v) const { guest::StoreU32(base, address + 11668, v); }
+  uint32_t cockpit_texture() const { return data()->cockpit_texture; }
+  void set_cockpit_texture(uint32_t v) const { data()->cockpit_texture = v; }
+  uint32_t cockpit_texture_bits() const { return data()->cockpit_texture; }
+  void set_cockpit_texture_bits(uint32_t v) const { data()->cockpit_texture = v; }
   uint32_t scene_address() const { return address + 11668; }
+  template <typename T = CarScene>
+  T scene() const { return T(base, data()->scene); }
+  void set_scene(const View& w) const { const uint32_t v = w.address; data()->scene = v; }
+  void set_scene(uint32_t v) const { data()->scene = v; }
+  uint32_t scene_bits() const { return data()->scene; }
+  void set_scene_bits(uint32_t v) const { data()->scene = v; }
 };
 
 // embedded; measure: SceneInterior@+160, SceneInterior@+160@+9488, InteriorPoints::ResetMeters.r3, InteriorPoints::ResetDials.r3, SceneInterior@+160@+10464
@@ -1003,67 +1324,169 @@ struct SecondSetWheelMatrix : View {
 };
 
 // allocated; measure: SceneTraffic
+#pragma pack(push, 1)
+struct SceneTrafficData {
+  uint32_t vtable = 0;  // +0
+  uint32_t list = 0;  // +4
+  uint32_t next = 0;  // +8
+  uint32_t previous = 0;  // +12
+  uint32_t state = 0;  // +16
+  uint32_t index = 0;  // +20
+  uint8_t pad_24[8] = {};
+  uint8_t car_record[3696] = {};  // +32, guest order
+  uint8_t pad_3728[1456] = {};
+  uint32_t points_front_plate_texture = 0;  // +5184
+  uint32_t points_rear_plate_texture = 0;  // +5188
+  uint8_t pad_5192[4568] = {};
+  uint32_t body = 0;  // +9760
+  uint32_t skeleton = 0;  // +9764
+  uint32_t part_model_0 = 0;  // +9768
+  uint32_t part_model_1 = 0;  // +9772
+  uint32_t part_model_2 = 0;  // +9776
+  uint32_t part_model_3 = 0;  // +9780
+  uint32_t part_model_4 = 0;  // +9784
+  uint32_t part_model_5 = 0;  // +9788
+  uint32_t finished = 0;  // +9792
+  uint32_t scene = 0;  // +9796
+  uint8_t pad_9800[8] = {};
+};
+#pragma pack(pop)
+static_assert(sizeof(SceneTrafficData) == 9808);
+inline constexpr memory::LayoutField kSceneTrafficFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 4}, {5184, 4}, {5188, 4}, {9760, 4}, {9764, 4}, {9768, 4}, {9772, 4}, {9776, 4}, {9780, 4}, {9784, 4}, {9788, 4}, {9792, 4}, {9796, 4}};
+inline constexpr memory::Layout kSceneTrafficLayout = {kSceneTrafficFields, 18};
+
 struct SceneTraffic : View {
   using View::View;
   static constexpr uint32_t kSize = 9808;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   static constexpr uint32_t kVtable = 0x82006424;
+  SceneTrafficData* data() const { return static_cast<SceneTrafficData*>(memory::HandleObject(address)); }
+  static SceneTraffic New(uint8_t* base) {
+    return SceneTraffic(base, memory::MakeHandle(new SceneTrafficData(), sizeof(SceneTrafficData), "SceneTraffic", &kSceneTrafficLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static SceneTraffic NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(SceneTrafficData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<SceneTrafficData*>(::operator new(sizeof(SceneTrafficData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) SceneTrafficData();
+    return SceneTraffic(base, memory::MakeHandle(p, sizeof(SceneTrafficData) * count, "SceneTraffic", &kSceneTrafficLayout, sizeof(SceneTrafficData)));
+  }
+  SceneTraffic at(uint32_t i) const { return SceneTraffic(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kSceneTrafficLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kSceneTrafficLayout, offset, width, v); }
   // 0x82006424; the pool objects' base 0x82004F90 before ~PoolNode. Measure fault: TrafficPoints::Find's r4 (the part models at +9768) is filed here, its +0 to +20 the six part models
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
+  uint32_t vtable() const { return data()->vtable; }
+  void set_vtable(uint32_t v) const { data()->vtable = v; }
+  uint32_t vtable_bits() const { return data()->vtable; }
+  void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
   // the PoolNode's list (measure fault: part model 1)
-  uint32_t list() const { return guest::LoadU32(base, address + 4); }
-  void set_list(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t list_address() const { return address + 4; }
+  uint32_t list() const { return data()->list; }
+  void set_list(uint32_t v) const { data()->list = v; }
+  uint32_t list_bits() const { return data()->list; }
+  void set_list_bits(uint32_t v) const { data()->list = v; }
   // the PoolNode's links (measure fault: part models 2 and 3)
-  uint32_t next() const { return guest::LoadU32(base, address + 8); }
-  void set_next(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t next_address() const { return address + 8; }
-  uint32_t previous() const { return guest::LoadU32(base, address + 12); }
-  void set_previous(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t next() const { return data()->next; }
+  void set_next(uint32_t v) const { data()->next = v; }
+  uint32_t next_bits() const { return data()->next; }
+  void set_next_bits(uint32_t v) const { data()->next = v; }
   uint32_t previous_address() const { return address + 12; }
+  uint32_t previous() const { return data()->previous; }
+  void set_previous(uint32_t v) const { data()->previous = v; }
+  uint32_t previous_bits() const { return data()->previous; }
+  void set_previous_bits(uint32_t v) const { data()->previous = v; }
   // the pool object's: 3 in use (measure fault: part model 4)
-  uint32_t state() const { return guest::LoadU32(base, address + 16); }
-  void set_state(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
   uint32_t state_address() const { return address + 16; }
+  uint32_t state() const { return data()->state; }
+  void set_state(uint32_t v) const { data()->state = v; }
+  uint32_t state_bits() const { return data()->state; }
+  void set_state_bits(uint32_t v) const { data()->state = v; }
   // its index in the pool (measure fault: part model 5)
-  uint32_t index() const { return guest::LoadU32(base, address + 20); }
-  void set_index(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
   uint32_t index_address() const { return address + 20; }
+  uint32_t index() const { return data()->index; }
+  void set_index(uint32_t v) const { data()->index = v; }
+  uint32_t index_bits() const { return data()->index; }
+  void set_index_bits(uint32_t v) const { data()->index = v; }
   // the 3,696-byte car record (scene-models.toml's CarRecord)
   uint32_t car_record_address() const { return address + 32; }
+  uint8_t* car_record() const { return reinterpret_cast<uint8_t*>(data()) + 32; }
   // the point block (car-draw.toml's TrafficPoints)
   uint32_t points_address() const { return address + 3728; }
+  uint8_t* points() const { return reinterpret_cast<uint8_t*>(data()) + 3728; }
   // the point block's +1456: the first set's body's +7040 (SceneTraffic::Finish)
-  uint32_t points_front_plate_texture() const { return guest::LoadU32(base, address + 5184); }
-  void set_points_front_plate_texture(uint32_t v) const { guest::StoreU32(base, address + 5184, v); }
   uint32_t points_front_plate_texture_address() const { return address + 5184; }
+  uint32_t points_front_plate_texture() const { return data()->points_front_plate_texture; }
+  void set_points_front_plate_texture(uint32_t v) const { data()->points_front_plate_texture = v; }
+  uint32_t points_front_plate_texture_bits() const { return data()->points_front_plate_texture; }
+  void set_points_front_plate_texture_bits(uint32_t v) const { data()->points_front_plate_texture = v; }
   // the point block's +1460: the body's +7048
-  uint32_t points_rear_plate_texture() const { return guest::LoadU32(base, address + 5188); }
-  void set_points_rear_plate_texture(uint32_t v) const { guest::StoreU32(base, address + 5188, v); }
   uint32_t points_rear_plate_texture_address() const { return address + 5188; }
+  uint32_t points_rear_plate_texture() const { return data()->points_rear_plate_texture; }
+  void set_points_rear_plate_texture(uint32_t v) const { data()->points_rear_plate_texture = v; }
+  uint32_t points_rear_plate_texture_bits() const { return data()->points_rear_plate_texture; }
+  void set_points_rear_plate_texture_bits(uint32_t v) const { data()->points_rear_plate_texture = v; }
   // the first set's traffic body (pool 6 of [0x826C2E40])
-  uint32_t body() const { return guest::LoadU32(base, address + 9760); }
-  void set_body(uint32_t v) const { guest::StoreU32(base, address + 9760, v); }
   uint32_t body_address() const { return address + 9760; }
+  uint32_t body() const { return data()->body; }
+  void set_body(uint32_t v) const { data()->body = v; }
+  uint32_t body_bits() const { return data()->body; }
+  void set_body_bits(uint32_t v) const { data()->body = v; }
   // the body's +3776
-  uint32_t skeleton() const { return guest::LoadU32(base, address + 9764); }
-  void set_skeleton(uint32_t v) const { guest::StoreU32(base, address + 9764, v); }
   uint32_t skeleton_address() const { return address + 9764; }
+  uint32_t skeleton() const { return data()->skeleton; }
+  void set_skeleton(uint32_t v) const { data()->skeleton = v; }
+  uint32_t skeleton_bits() const { return data()->skeleton; }
+  void set_skeleton_bits(uint32_t v) const { data()->skeleton = v; }
   // the body's six part models (its +4256 + 464i)
   uint32_t part_models_address() const { return address + 9768; }
-  uint32_t part_model_0() const { return guest::LoadU32(base, address + 9768); }
-  void set_part_model_0(uint32_t v) const { guest::StoreU32(base, address + 9768, v); }
+  uint8_t* part_models() const { return reinterpret_cast<uint8_t*>(data()) + 9768; }
   uint32_t part_model_0_address() const { return address + 9768; }
+  uint32_t part_model_0() const { return data()->part_model_0; }
+  void set_part_model_0(uint32_t v) const { data()->part_model_0 = v; }
+  uint32_t part_model_0_bits() const { return data()->part_model_0; }
+  void set_part_model_0_bits(uint32_t v) const { data()->part_model_0 = v; }
+  uint32_t part_model_1_address() const { return address + 9772; }
+  uint32_t part_model_1() const { return data()->part_model_1; }
+  void set_part_model_1(uint32_t v) const { data()->part_model_1 = v; }
+  uint32_t part_model_1_bits() const { return data()->part_model_1; }
+  void set_part_model_1_bits(uint32_t v) const { data()->part_model_1 = v; }
+  uint32_t part_model_2_address() const { return address + 9776; }
+  uint32_t part_model_2() const { return data()->part_model_2; }
+  void set_part_model_2(uint32_t v) const { data()->part_model_2 = v; }
+  uint32_t part_model_2_bits() const { return data()->part_model_2; }
+  void set_part_model_2_bits(uint32_t v) const { data()->part_model_2 = v; }
+  uint32_t part_model_3_address() const { return address + 9780; }
+  uint32_t part_model_3() const { return data()->part_model_3; }
+  void set_part_model_3(uint32_t v) const { data()->part_model_3 = v; }
+  uint32_t part_model_3_bits() const { return data()->part_model_3; }
+  void set_part_model_3_bits(uint32_t v) const { data()->part_model_3 = v; }
+  uint32_t part_model_4_address() const { return address + 9784; }
+  uint32_t part_model_4() const { return data()->part_model_4; }
+  void set_part_model_4(uint32_t v) const { data()->part_model_4 = v; }
+  uint32_t part_model_4_bits() const { return data()->part_model_4; }
+  void set_part_model_4_bits(uint32_t v) const { data()->part_model_4 = v; }
+  uint32_t part_model_5_address() const { return address + 9788; }
+  uint32_t part_model_5() const { return data()->part_model_5; }
+  void set_part_model_5(uint32_t v) const { data()->part_model_5 = v; }
+  uint32_t part_model_5_bits() const { return data()->part_model_5; }
+  void set_part_model_5_bits(uint32_t v) const { data()->part_model_5 = v; }
   // checked by SceneTraffic::Finish, never set there
-  uint32_t finished() const { return guest::LoadU32(base, address + 9792); }
-  void set_finished(uint32_t v) const { guest::StoreU32(base, address + 9792, v); }
   uint32_t finished_address() const { return address + 9792; }
-  template <typename T = CarScene>
-  T scene() const { return T(base, guest::LoadU32(base, address + 9796)); }
-  void set_scene(const View& v) const { guest::StoreU32(base, address + 9796, v.address); }
-  void set_scene(uint32_t v) const { guest::StoreU32(base, address + 9796, v); }
+  uint32_t finished() const { return data()->finished; }
+  void set_finished(uint32_t v) const { data()->finished = v; }
+  uint32_t finished_bits() const { return data()->finished; }
+  void set_finished_bits(uint32_t v) const { data()->finished = v; }
   uint32_t scene_address() const { return address + 9796; }
+  template <typename T = CarScene>
+  T scene() const { return T(base, data()->scene); }
+  void set_scene(const View& w) const { const uint32_t v = w.address; data()->scene = v; }
+  void set_scene(uint32_t v) const { data()->scene = v; }
+  uint32_t scene_bits() const { return data()->scene; }
+  void set_scene_bits(uint32_t v) const { data()->scene = v; }
 };
 
 // embedded; measure: PointRecord, ModelPoint

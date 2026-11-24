@@ -40,8 +40,10 @@ uint64_t Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls
     menu.set_enabled(0);
     menu.set_player(0);
   }
-  const uint64_t r3 = calls.Call(kVirtualAlloc, frame, 0x82180E30, 0, 1196, 4096, 4);
-  const Data data(base, uint32_t(r3));
+  // A host object (E5 step 4) in place of the VirtualAlloc(1196) at
+  // 0x82180E30.
+  const Data data = Data::New(base);
+  const uint64_t r3 = data.address;
   G::set_data(base, data);
   data.set_started(0);
   data.set_busy_shown(0);

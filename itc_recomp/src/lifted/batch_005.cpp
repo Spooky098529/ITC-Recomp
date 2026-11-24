@@ -1025,7 +1025,7 @@ lifted::Result f820FF368(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(4));
   // bl 0x825a6880
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A6880(base, LIFTED_ARGS(0x820FF37C, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = schema::TrackCollisionObject::New(base).address; f1 = 0; }  // host_alloc 0x820FF37C (TrackCollisionObject)
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq 0x820ff390
@@ -1033,7 +1033,7 @@ lifted::Result f820FF368(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // stw r11,0(r3)
-  guest::StoreU32(base, schema::TrackCollisionObject(base, uint32_t(r3)).value_address(), uint32_t(r11));
+  schema::TrackCollisionObject(base, uint32_t(r3)).set_value_bits(uint32_t(r11));
   // b 0x820ff394
   goto loc_820FF394;
 loc_820FF390:
@@ -2699,9 +2699,9 @@ lifted::Result f82107518(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r3,r3,26480
   r3 = uint64_t(int64_t(int64_t(r3) + 26480));
   // stw r11,0(r31)
-  guest::StoreU32(base, schema::RaceMode(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
+  schema::RaceMode(base, uint32_t(r31)).set_vtable_bits(uint32_t(r11));
   // stw r10,32(r31)
-  guest::StoreU32(base, schema::RaceMode(base, uint32_t(r31)).vtable32_address(), uint32_t(r10));
+  schema::RaceMode(base, uint32_t(r31)).set_vtable32_bits(uint32_t(r10));
   // bl 0x8215e1d0
   // (left out: dead in C++)
   { const lifted::Result o = game::RaceOverlays::Destroy(base, r1, r13, r3, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
@@ -2726,9 +2726,9 @@ lifted::Result f82107518(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r10,r10,27148
   r10 = uint64_t(int64_t(int64_t(r10) + 27148));
   // stw r11,0(r31)
-  guest::StoreU32(base, schema::RaceMode(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
+  schema::RaceMode(base, uint32_t(r31)).set_vtable_bits(uint32_t(r11));
   // stw r10,32(r31)
-  guest::StoreU32(base, schema::RaceMode(base, uint32_t(r31)).vtable32_address(), uint32_t(r10));
+  schema::RaceMode(base, uint32_t(r31)).set_vtable32_bits(uint32_t(r10));
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
@@ -3977,9 +3977,9 @@ lifted::Result f8210CDE8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r9 = uint32_t(r4) & 0x1;
   cr0 = lifted::Compare<int32_t>(int32_t(r9), 0, so);
   // stw r11,0(r31)
-  guest::StoreU32(base, schema::CarSoundEngineLayer(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
+  schema::CarSoundEngineLayer(base, uint32_t(r31)).set_vtable_bits(uint32_t(r11));
   // stw r10,44(r31)
-  guest::StoreU32(base, schema::CarSoundEngineLayer(base, uint32_t(r31)).holder_address(), uint32_t(r10));
+  schema::CarSoundEngineLayer(base, uint32_t(r31)).store_at(44, 4, uint32_t(r10));
   // beq 0x8210ce20
   if (cr0.eq) goto loc_8210CE20;
   // bl 0x825a70e8

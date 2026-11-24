@@ -618,7 +618,7 @@ loc_822BE478:
   r3 = uint64_t(int64_t(16));
   // bl 0x822976f8
   // (left out: dead in C++)
-  { const lifted::Result o = game::XMemAlloc(base, LIFTED_ARGS(0x822BE484, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = schema::D3DXBuffer::New(base).address; f1 = 0; }  // host_alloc 0x822BE484 (D3DXBuffer)
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq 0x822be4b4
@@ -634,13 +634,13 @@ loc_822BE478:
   // mr r31,r3
   r31 = r3;
   // stw r10,12(r3)
-  guest::StoreU32(base, schema::D3DXBuffer(base, uint32_t(r3)).data_address(), uint32_t(r10));
+  schema::D3DXBuffer(base, uint32_t(r3)).set_data_bits(uint32_t(r10));
   // stw r11,0(r3)
-  guest::StoreU32(base, schema::D3DXBuffer(base, uint32_t(r3)).vtable_address(), uint32_t(r11));
+  schema::D3DXBuffer(base, uint32_t(r3)).set_vtable_bits(uint32_t(r11));
   // stw r10,8(r3)
-  guest::StoreU32(base, schema::D3DXBuffer(base, uint32_t(r3)).size_address(), uint32_t(r10));
+  schema::D3DXBuffer(base, uint32_t(r3)).set_size_bits(uint32_t(r10));
   // stw r9,4(r3)
-  guest::StoreU32(base, schema::D3DXBuffer(base, uint32_t(r3)).ref_count_address(), uint32_t(r9));
+  schema::D3DXBuffer(base, uint32_t(r3)).set_ref_count_bits(uint32_t(r9));
   // b 0x822be4b8
   goto loc_822BE4B8;
 loc_822BE4B4:
@@ -817,7 +817,7 @@ lifted::Result f822BE3E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r31;
   // bl 0x82297790
   // (left out: dead in C++)
-  { const lifted::Result o = game::XMemFree(base, LIFTED_ARGS(0x822BE430, r31)); r3 = o.r3; f1 = o.f1; }
+  { schema::D3DXBuffer(base, uint32_t(r3)).Delete(); r3 = 0; }  // host_free 0x822BE430 (D3DXBuffer)
 loc_822BE430:
   // mr r3,r31
   r3 = r31;

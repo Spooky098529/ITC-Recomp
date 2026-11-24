@@ -219,106 +219,212 @@ struct ModeType4Interface32 : View {
   void set_block_bits(uint32_t v) const { if (on_host()) data()->block = v; else guest::StoreU32(base, address + 816, v); }
 };
 
-// allocated; measure: TitleScreen, ModeType4::NextModeAnswer.r4.+848, ModeType4::NextMode.r4.+848
+// allocated; measure: new<48220>@ModeType4::Init, TitleScreen, ModeType4::NextModeAnswer.r4.+848, ModeType4::NextMode.r4.+848
+#pragma pack(push, 1)
+struct Type4BlockData {
+  uint8_t pad_0[9604] = {};
+  uint32_t options_state = 0;  // +9604
+  uint32_t options_loaded = 0;  // +9608
+  uint32_t options_reenter = 0;  // +9612
+  uint32_t options_delete_movie = 0;  // +9616
+  uint8_t pad_9620[9624] = {};
+  uint32_t controller_options_state = 0;  // +19244
+  uint32_t controller_options_loaded = 0;  // +19248
+  uint32_t controller_options_reenter = 0;  // +19252
+  uint32_t controller_options_delete_movie = 0;  // +19256
+  uint8_t pad_19260[9624] = {};
+  uint32_t save_screen_state = 0;  // +28884
+  uint32_t save_screen_loaded = 0;  // +28888
+  uint32_t save_screen_reenter = 0;  // +28892
+  uint32_t save_screen_delete_movie = 0;  // +28896
+  uint8_t pad_28900[9624] = {};
+  uint32_t title_load_state = 0;  // +38524
+  uint32_t title_load_loaded = 0;  // +38528
+  uint32_t title_load_reenter = 0;  // +38532
+  uint32_t title_load_delete_movie = 0;  // +38536
+  uint8_t pad_38540[9624] = {};
+  uint32_t title_screen_state = 0;  // +48164
+  uint32_t title_screen_loaded = 0;  // +48168
+  uint32_t title_screen_reenter = 0;  // +48172
+  uint32_t title_screen_delete_movie = 0;  // +48176
+  uint8_t pad_48180[20] = {};
+  uint32_t shown = 0;  // +48200
+  uint8_t pad_48204[8] = {};
+  uint32_t next_answer = 0;  // +48212
+  uint32_t next_type = 0;  // +48216
+};
+#pragma pack(pop)
+static_assert(sizeof(Type4BlockData) == 48220);
+inline constexpr memory::LayoutField kType4BlockFields[] = {{9604, 4}, {9608, 4}, {9612, 4}, {9616, 4}, {19244, 4}, {19248, 4}, {19252, 4}, {19256, 4}, {28884, 4}, {28888, 4}, {28892, 4}, {28896, 4}, {38524, 4}, {38528, 4}, {38532, 4}, {38536, 4}, {48164, 4}, {48168, 4}, {48172, 4}, {48176, 4}, {48200, 4}, {48212, 4}, {48216, 4}};
+inline constexpr memory::Layout kType4BlockLayout = {kType4BlockFields, 23};
+
 struct Type4Block : View {
   using View::View;
   static constexpr uint32_t kSize = 48220;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  Type4BlockData* data() const { return static_cast<Type4BlockData*>(memory::HandleObject(address)); }
+  static Type4Block New(uint8_t* base) {
+    return Type4Block(base, memory::MakeHandle(new Type4BlockData(), sizeof(Type4BlockData), "Type4Block", &kType4BlockLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static Type4Block NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(Type4BlockData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<Type4BlockData*>(::operator new(sizeof(Type4BlockData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) Type4BlockData();
+    return Type4Block(base, memory::MakeHandle(p, sizeof(Type4BlockData) * count, "Type4Block", &kType4BlockLayout, sizeof(Type4BlockData)));
+  }
+  Type4Block at(uint32_t i) const { return Type4Block(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kType4BlockLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kType4BlockLayout, offset, width, v); }
   // the options' machine (Type4Options::Init, options-screen.md)
   uint32_t options_address() const { return address + 0; }
-  uint32_t options_state() const { return guest::LoadU32(base, address + 9604); }
-  void set_options_state(uint32_t v) const { guest::StoreU32(base, address + 9604, v); }
+  uint8_t* options() const { return reinterpret_cast<uint8_t*>(data()) + 0; }
   uint32_t options_state_address() const { return address + 9604; }
-  uint32_t options_loaded() const { return guest::LoadU32(base, address + 9608); }
-  void set_options_loaded(uint32_t v) const { guest::StoreU32(base, address + 9608, v); }
+  uint32_t options_state() const { return data()->options_state; }
+  void set_options_state(uint32_t v) const { data()->options_state = v; }
+  uint32_t options_state_bits() const { return data()->options_state; }
+  void set_options_state_bits(uint32_t v) const { data()->options_state = v; }
   uint32_t options_loaded_address() const { return address + 9608; }
+  uint32_t options_loaded() const { return data()->options_loaded; }
+  void set_options_loaded(uint32_t v) const { data()->options_loaded = v; }
+  uint32_t options_loaded_bits() const { return data()->options_loaded; }
+  void set_options_loaded_bits(uint32_t v) const { data()->options_loaded = v; }
   // 1 from Init
-  uint32_t options_reenter() const { return guest::LoadU32(base, address + 9612); }
-  void set_options_reenter(uint32_t v) const { guest::StoreU32(base, address + 9612, v); }
   uint32_t options_reenter_address() const { return address + 9612; }
+  uint32_t options_reenter() const { return data()->options_reenter; }
+  void set_options_reenter(uint32_t v) const { data()->options_reenter = v; }
+  uint32_t options_reenter_bits() const { return data()->options_reenter; }
+  void set_options_reenter_bits(uint32_t v) const { data()->options_reenter = v; }
   // 0 from Init
-  uint32_t options_delete_movie() const { return guest::LoadU32(base, address + 9616); }
-  void set_options_delete_movie(uint32_t v) const { guest::StoreU32(base, address + 9616, v); }
   uint32_t options_delete_movie_address() const { return address + 9616; }
+  uint32_t options_delete_movie() const { return data()->options_delete_movie; }
+  void set_options_delete_movie(uint32_t v) const { data()->options_delete_movie = v; }
+  uint32_t options_delete_movie_bits() const { return data()->options_delete_movie; }
+  void set_options_delete_movie_bits(uint32_t v) const { data()->options_delete_movie = v; }
   // the controller options' machine (Type4ControllerOptions::Init, options-screen.md)
   uint32_t controller_options_address() const { return address + 9640; }
-  uint32_t controller_options_state() const { return guest::LoadU32(base, address + 19244); }
-  void set_controller_options_state(uint32_t v) const { guest::StoreU32(base, address + 19244, v); }
+  uint8_t* controller_options() const { return reinterpret_cast<uint8_t*>(data()) + 9640; }
   uint32_t controller_options_state_address() const { return address + 19244; }
-  uint32_t controller_options_loaded() const { return guest::LoadU32(base, address + 19248); }
-  void set_controller_options_loaded(uint32_t v) const { guest::StoreU32(base, address + 19248, v); }
+  uint32_t controller_options_state() const { return data()->controller_options_state; }
+  void set_controller_options_state(uint32_t v) const { data()->controller_options_state = v; }
+  uint32_t controller_options_state_bits() const { return data()->controller_options_state; }
+  void set_controller_options_state_bits(uint32_t v) const { data()->controller_options_state = v; }
   uint32_t controller_options_loaded_address() const { return address + 19248; }
+  uint32_t controller_options_loaded() const { return data()->controller_options_loaded; }
+  void set_controller_options_loaded(uint32_t v) const { data()->controller_options_loaded = v; }
+  uint32_t controller_options_loaded_bits() const { return data()->controller_options_loaded; }
+  void set_controller_options_loaded_bits(uint32_t v) const { data()->controller_options_loaded = v; }
   // 0 from Init
-  uint32_t controller_options_reenter() const { return guest::LoadU32(base, address + 19252); }
-  void set_controller_options_reenter(uint32_t v) const { guest::StoreU32(base, address + 19252, v); }
   uint32_t controller_options_reenter_address() const { return address + 19252; }
+  uint32_t controller_options_reenter() const { return data()->controller_options_reenter; }
+  void set_controller_options_reenter(uint32_t v) const { data()->controller_options_reenter = v; }
+  uint32_t controller_options_reenter_bits() const { return data()->controller_options_reenter; }
+  void set_controller_options_reenter_bits(uint32_t v) const { data()->controller_options_reenter = v; }
   // 1 from Init
-  uint32_t controller_options_delete_movie() const { return guest::LoadU32(base, address + 19256); }
-  void set_controller_options_delete_movie(uint32_t v) const { guest::StoreU32(base, address + 19256, v); }
   uint32_t controller_options_delete_movie_address() const { return address + 19256; }
+  uint32_t controller_options_delete_movie() const { return data()->controller_options_delete_movie; }
+  void set_controller_options_delete_movie(uint32_t v) const { data()->controller_options_delete_movie = v; }
+  uint32_t controller_options_delete_movie_bits() const { return data()->controller_options_delete_movie; }
+  void set_controller_options_delete_movie_bits(uint32_t v) const { data()->controller_options_delete_movie = v; }
   // the save screen's machine (Type4SaveScreen::Init, save-screen.md)
   uint32_t save_screen_address() const { return address + 19280; }
+  uint8_t* save_screen() const { return reinterpret_cast<uint8_t*>(data()) + 19280; }
   // 5 shown (Interrupt)
-  uint32_t save_screen_state() const { return guest::LoadU32(base, address + 28884); }
-  void set_save_screen_state(uint32_t v) const { guest::StoreU32(base, address + 28884, v); }
   uint32_t save_screen_state_address() const { return address + 28884; }
-  uint32_t save_screen_loaded() const { return guest::LoadU32(base, address + 28888); }
-  void set_save_screen_loaded(uint32_t v) const { guest::StoreU32(base, address + 28888, v); }
+  uint32_t save_screen_state() const { return data()->save_screen_state; }
+  void set_save_screen_state(uint32_t v) const { data()->save_screen_state = v; }
+  uint32_t save_screen_state_bits() const { return data()->save_screen_state; }
+  void set_save_screen_state_bits(uint32_t v) const { data()->save_screen_state = v; }
   uint32_t save_screen_loaded_address() const { return address + 28888; }
+  uint32_t save_screen_loaded() const { return data()->save_screen_loaded; }
+  void set_save_screen_loaded(uint32_t v) const { data()->save_screen_loaded = v; }
+  uint32_t save_screen_loaded_bits() const { return data()->save_screen_loaded; }
+  void set_save_screen_loaded_bits(uint32_t v) const { data()->save_screen_loaded = v; }
   // 1 from Init
-  uint32_t save_screen_reenter() const { return guest::LoadU32(base, address + 28892); }
-  void set_save_screen_reenter(uint32_t v) const { guest::StoreU32(base, address + 28892, v); }
   uint32_t save_screen_reenter_address() const { return address + 28892; }
+  uint32_t save_screen_reenter() const { return data()->save_screen_reenter; }
+  void set_save_screen_reenter(uint32_t v) const { data()->save_screen_reenter = v; }
+  uint32_t save_screen_reenter_bits() const { return data()->save_screen_reenter; }
+  void set_save_screen_reenter_bits(uint32_t v) const { data()->save_screen_reenter = v; }
   // 0 from Init
-  uint32_t save_screen_delete_movie() const { return guest::LoadU32(base, address + 28896); }
-  void set_save_screen_delete_movie(uint32_t v) const { guest::StoreU32(base, address + 28896, v); }
   uint32_t save_screen_delete_movie_address() const { return address + 28896; }
+  uint32_t save_screen_delete_movie() const { return data()->save_screen_delete_movie; }
+  void set_save_screen_delete_movie(uint32_t v) const { data()->save_screen_delete_movie = v; }
+  uint32_t save_screen_delete_movie_bits() const { return data()->save_screen_delete_movie; }
+  void set_save_screen_delete_movie_bits(uint32_t v) const { data()->save_screen_delete_movie = v; }
   // the title load's machine (TitleLoad::Init, Type4Machine)
   uint32_t title_load_address() const { return address + 28920; }
-  uint32_t title_load_state() const { return guest::LoadU32(base, address + 38524); }
-  void set_title_load_state(uint32_t v) const { guest::StoreU32(base, address + 38524, v); }
+  uint8_t* title_load() const { return reinterpret_cast<uint8_t*>(data()) + 28920; }
   uint32_t title_load_state_address() const { return address + 38524; }
-  uint32_t title_load_loaded() const { return guest::LoadU32(base, address + 38528); }
-  void set_title_load_loaded(uint32_t v) const { guest::StoreU32(base, address + 38528, v); }
+  uint32_t title_load_state() const { return data()->title_load_state; }
+  void set_title_load_state(uint32_t v) const { data()->title_load_state = v; }
+  uint32_t title_load_state_bits() const { return data()->title_load_state; }
+  void set_title_load_state_bits(uint32_t v) const { data()->title_load_state = v; }
   uint32_t title_load_loaded_address() const { return address + 38528; }
+  uint32_t title_load_loaded() const { return data()->title_load_loaded; }
+  void set_title_load_loaded(uint32_t v) const { data()->title_load_loaded = v; }
+  uint32_t title_load_loaded_bits() const { return data()->title_load_loaded; }
+  void set_title_load_loaded_bits(uint32_t v) const { data()->title_load_loaded = v; }
   // 1 from Init
-  uint32_t title_load_reenter() const { return guest::LoadU32(base, address + 38532); }
-  void set_title_load_reenter(uint32_t v) const { guest::StoreU32(base, address + 38532, v); }
   uint32_t title_load_reenter_address() const { return address + 38532; }
+  uint32_t title_load_reenter() const { return data()->title_load_reenter; }
+  void set_title_load_reenter(uint32_t v) const { data()->title_load_reenter = v; }
+  uint32_t title_load_reenter_bits() const { return data()->title_load_reenter; }
+  void set_title_load_reenter_bits(uint32_t v) const { data()->title_load_reenter = v; }
   // 0 from Init
-  uint32_t title_load_delete_movie() const { return guest::LoadU32(base, address + 38536); }
-  void set_title_load_delete_movie(uint32_t v) const { guest::StoreU32(base, address + 38536, v); }
   uint32_t title_load_delete_movie_address() const { return address + 38536; }
+  uint32_t title_load_delete_movie() const { return data()->title_load_delete_movie; }
+  void set_title_load_delete_movie(uint32_t v) const { data()->title_load_delete_movie = v; }
+  uint32_t title_load_delete_movie_bits() const { return data()->title_load_delete_movie; }
+  void set_title_load_delete_movie_bits(uint32_t v) const { data()->title_load_delete_movie = v; }
   // the title screen's machine (TitleScreen::Init, Type4Machine)
   uint32_t title_screen_address() const { return address + 38560; }
-  uint32_t title_screen_state() const { return guest::LoadU32(base, address + 48164); }
-  void set_title_screen_state(uint32_t v) const { guest::StoreU32(base, address + 48164, v); }
+  uint8_t* title_screen() const { return reinterpret_cast<uint8_t*>(data()) + 38560; }
   uint32_t title_screen_state_address() const { return address + 48164; }
-  uint32_t title_screen_loaded() const { return guest::LoadU32(base, address + 48168); }
-  void set_title_screen_loaded(uint32_t v) const { guest::StoreU32(base, address + 48168, v); }
+  uint32_t title_screen_state() const { return data()->title_screen_state; }
+  void set_title_screen_state(uint32_t v) const { data()->title_screen_state = v; }
+  uint32_t title_screen_state_bits() const { return data()->title_screen_state; }
+  void set_title_screen_state_bits(uint32_t v) const { data()->title_screen_state = v; }
   uint32_t title_screen_loaded_address() const { return address + 48168; }
+  uint32_t title_screen_loaded() const { return data()->title_screen_loaded; }
+  void set_title_screen_loaded(uint32_t v) const { data()->title_screen_loaded = v; }
+  uint32_t title_screen_loaded_bits() const { return data()->title_screen_loaded; }
+  void set_title_screen_loaded_bits(uint32_t v) const { data()->title_screen_loaded = v; }
   // 1 from Init
-  uint32_t title_screen_reenter() const { return guest::LoadU32(base, address + 48172); }
-  void set_title_screen_reenter(uint32_t v) const { guest::StoreU32(base, address + 48172, v); }
   uint32_t title_screen_reenter_address() const { return address + 48172; }
+  uint32_t title_screen_reenter() const { return data()->title_screen_reenter; }
+  void set_title_screen_reenter(uint32_t v) const { data()->title_screen_reenter = v; }
+  uint32_t title_screen_reenter_bits() const { return data()->title_screen_reenter; }
+  void set_title_screen_reenter_bits(uint32_t v) const { data()->title_screen_reenter = v; }
   // 0 from Init
-  uint32_t title_screen_delete_movie() const { return guest::LoadU32(base, address + 48176); }
-  void set_title_screen_delete_movie(uint32_t v) const { guest::StoreU32(base, address + 48176, v); }
   uint32_t title_screen_delete_movie_address() const { return address + 48176; }
+  uint32_t title_screen_delete_movie() const { return data()->title_screen_delete_movie; }
+  void set_title_screen_delete_movie(uint32_t v) const { data()->title_screen_delete_movie = v; }
+  uint32_t title_screen_delete_movie_bits() const { return data()->title_screen_delete_movie; }
+  void set_title_screen_delete_movie_bits(uint32_t v) const { data()->title_screen_delete_movie = v; }
   // the last machine (MachineOf's index, 0 to 4) in state 4 or 5 (FindShown)
-  uint32_t shown() const { return guest::LoadU32(base, address + 48200); }
-  void set_shown(uint32_t v) const { guest::StoreU32(base, address + 48200, v); }
   uint32_t shown_address() const { return address + 48200; }
+  uint32_t shown() const { return data()->shown; }
+  void set_shown(uint32_t v) const { data()->shown = v; }
+  uint32_t shown_bits() const { return data()->shown; }
+  void set_shown_bits(uint32_t v) const { data()->shown = v; }
   // the next mode's 8-byte answer (NextMode, ForceExit; NextModeAnswer copies it): its first word, the byte 1 and three bytes
-  uint32_t next_answer() const { return guest::LoadU32(base, address + 48212); }
-  void set_next_answer(uint32_t v) const { guest::StoreU32(base, address + 48212, v); }
   uint32_t next_answer_address() const { return address + 48212; }
+  uint32_t next_answer() const { return data()->next_answer; }
+  void set_next_answer(uint32_t v) const { data()->next_answer = v; }
+  uint32_t next_answer_bits() const { return data()->next_answer; }
+  void set_next_answer_bits(uint32_t v) const { data()->next_answer = v; }
   // the answer's next mode type (1, 2, 3, 6, 7, 8, 10, 12; 4 or 12 from ForceExit)
-  uint32_t next_type() const { return guest::LoadU32(base, address + 48216); }
-  void set_next_type(uint32_t v) const { guest::StoreU32(base, address + 48216, v); }
   uint32_t next_type_address() const { return address + 48216; }
+  uint32_t next_type() const { return data()->next_type; }
+  void set_next_type(uint32_t v) const { data()->next_type = v; }
+  uint32_t next_type_bits() const { return data()->next_type; }
+  void set_next_type_bits(uint32_t v) const { data()->next_type = v; }
 };
 
-// embedded; measure: ModeType4::MachineOf.ret, TitleLoad, TitleScreen::LeavePage.r4
+// embedded; measure: ModeType4::MachineOf.ret, TitleLoad, TitleScreen::LeavePage.r4, new<48220>@ModeType4::Init@+38560
 struct Type4Machine : View {
   using View::View;
   static constexpr uint32_t kSize = 9620;
@@ -470,51 +576,6 @@ struct TitleTransitionStarted : View {
   uint32_t started() const { return guest::LoadU32(base, address + 0); }
   void set_started(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t started_address() const { return address + 0; }
-};
-
-// embedded; measure: new<48220>@ModeType4::Init
-struct Type4BlockPart : View {
-  using View::View;
-  static constexpr uint32_t kSize = 48180;
-  uint32_t unknown_9612() const { return guest::LoadU32(base, address + 9612); }
-  void set_unknown_9612(uint32_t v) const { guest::StoreU32(base, address + 9612, v); }
-  uint32_t unknown_9612_address() const { return address + 9612; }
-  uint32_t unknown_9616() const { return guest::LoadU32(base, address + 9616); }
-  void set_unknown_9616(uint32_t v) const { guest::StoreU32(base, address + 9616, v); }
-  uint32_t unknown_9616_address() const { return address + 9616; }
-  uint32_t unknown_19252() const { return guest::LoadU32(base, address + 19252); }
-  void set_unknown_19252(uint32_t v) const { guest::StoreU32(base, address + 19252, v); }
-  uint32_t unknown_19252_address() const { return address + 19252; }
-  uint32_t unknown_19256() const { return guest::LoadU32(base, address + 19256); }
-  void set_unknown_19256(uint32_t v) const { guest::StoreU32(base, address + 19256, v); }
-  uint32_t unknown_19256_address() const { return address + 19256; }
-  uint32_t unknown_28892() const { return guest::LoadU32(base, address + 28892); }
-  void set_unknown_28892(uint32_t v) const { guest::StoreU32(base, address + 28892, v); }
-  uint32_t unknown_28892_address() const { return address + 28892; }
-  uint32_t unknown_28896() const { return guest::LoadU32(base, address + 28896); }
-  void set_unknown_28896(uint32_t v) const { guest::StoreU32(base, address + 28896, v); }
-  uint32_t unknown_28896_address() const { return address + 28896; }
-  uint32_t unknown_38532() const { return guest::LoadU32(base, address + 38532); }
-  void set_unknown_38532(uint32_t v) const { guest::StoreU32(base, address + 38532, v); }
-  uint32_t unknown_38532_address() const { return address + 38532; }
-  uint32_t unknown_38536() const { return guest::LoadU32(base, address + 38536); }
-  void set_unknown_38536(uint32_t v) const { guest::StoreU32(base, address + 38536, v); }
-  uint32_t unknown_38536_address() const { return address + 38536; }
-  uint32_t unknown_48172() const { return guest::LoadU32(base, address + 48172); }
-  void set_unknown_48172(uint32_t v) const { guest::StoreU32(base, address + 48172, v); }
-  uint32_t unknown_48172_address() const { return address + 48172; }
-  uint32_t unknown_48176() const { return guest::LoadU32(base, address + 48176); }
-  void set_unknown_48176(uint32_t v) const { guest::StoreU32(base, address + 48176, v); }
-  uint32_t unknown_48176_address() const { return address + 48176; }
-};
-
-// embedded; measure: new<48220>@ModeType4::Init@+38560
-struct Type4BlockAt38560 : View {
-  using View::View;
-  static constexpr uint32_t kSize = 9608;
-  uint32_t unknown_9604() const { return guest::LoadU32(base, address + 9604); }
-  void set_unknown_9604(uint32_t v) const { guest::StoreU32(base, address + 9604, v); }
-  uint32_t unknown_9604_address() const { return address + 9604; }
 };
 
 // The image words docs/functions/title-screen.md's code uses.

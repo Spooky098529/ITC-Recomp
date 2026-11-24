@@ -56,10 +56,21 @@ fields = [
 # ModeType12::Init, freed by ModeType12::Release; known-data.md's "type 12
 # mode block"): fourteen machines (NetMachine) by ModeType12::Machine's
 # index, then the mode's words.
+# In host memory (E5 step 4): made by ModeType12::Init (the original's
+# VirtualAlloc at 0x822780A4, New in network_mode::ModeInit), freed by
+# ModeType12::Release (front_end_screen_helpers::ModeType12Release's
+# FreePages over the handle; host_free for its lifted original's
+# VirtualFree). The machines stay bytes fields, reached through their guest
+# views (NetMachine, StateMachine, the handlers' types) at the handle +
+# offset (raw accesses in guest order), as RaceMode's (game-modes.toml);
+# dialogs 11 to 13, which the measure split, are embed fields of host
+# types of their exact sizes.
 [NetModeBlock]
 measures = ["new<135208>@ModeType12::Init", "ModeType12.+816", "ModeType12::Teardown.r4.+848"]
 size = 135208
 origin = "allocated"
+storage = "host"
+host_free = [{ call = 0x82277DD8, reg = "r3", returns = 1 }]
 fields = [
   { name = "mode_select", offset = 0, type = "bytes", count = 9640, note = "index 0, NetModeSelect" },
   { name = "screen1", offset = 9640, type = "bytes", count = 9640, note = "index 1, Type12Screen1" },
@@ -70,11 +81,11 @@ fields = [
   { name = "screen6", offset = 57840, type = "bytes", count = 9660, note = "index 6, Type12Screen6" },
   { name = "screen7", offset = 67500, type = "bytes", count = 9732, note = "index 7, Type12Screen7" },
   { name = "dialog10", offset = 77232, type = "bytes", count = 9648, note = "index 10, Type12Dialog10" },
-  { name = "dialog11", offset = 86880, type = "bytes", count = 9644, note = "index 11, Type12Dialog11" },
+  { name = "dialog11", offset = 86880, type = "embed", to = "NetModeBlockAt86880", note = "index 11, Type12Dialog11" },
   { name = "screen8", offset = 96524, type = "bytes", count = 9668, note = "index 8, Type12Screen8" },
   { name = "screen9", offset = 106192, type = "bytes", count = 9696, note = "index 9, Type12Screen9" },
-  { name = "dialog12", offset = 115888, type = "bytes", count = 9648, note = "index 12, Type12Dialog12" },
-  { name = "dialog13", offset = 125536, type = "bytes", count = 9644, note = "index 13, Type12Dialog13" },
+  { name = "dialog12", offset = 115888, type = "embed", to = "NetModeBlockAt115888", note = "index 12, Type12Dialog12" },
+  { name = "dialog13", offset = 125536, type = "embed", to = "NetModeBlockAt125536", note = "index 13, Type12Dialog13" },
   { name = "shown", offset = 135180, type = "u32", note = "+0x2100C: the shown machine's index (ModeType12::FindShown)" },
   { name = "first_shown", offset = 135184, type = "u32", note = "+0x21010: the first screen's index (Init)" },
   { name = "next_answer", offset = 135188, type = "u64", note = "+0x21014: the next mode's 8-byte answer (NextMode, handed over by Teardown)" },
@@ -183,6 +194,12 @@ fields = [
 measures = ["new<108>@NetRanking::Create", "sub_822822C0.r3", "sub_822822C0.ret"]
 size = 108
 origin = "allocated"
+# In host memory (E5 step 4): made by NetRanking::Create (the original's
+# VirtualAlloc at 0x82282384), freed by NetRanking::Destroy (its VirtualFree
+# at 0x822825A4); the global ranking_data (0x828161D0) holds its handle. No
+# lifted call allocates or frees it; the lifted handlers reach it through
+# this view.
+storage = "host"
 fields = [
   { name = "unknown_0", offset = 0, type = "u32" },
   { name = "back", offset = 4, type = "u32", note = "back to the title (Destroy goes to state 14)" },
@@ -330,6 +347,9 @@ system_ui1 = { address = 0x826C7964, type = "u32" }
 measure = "ModeType12.+816@+115888"
 size = 9648
 origin = "embedded"
+# Host (E5 step 4): embedded only in the host NetModeBlock; its machine
+# words before this field are padding, reached raw in guest order.
+storage = "host"
 fields = [
   { name = "unknown_9644", offset = 9644, type = "u32" },
 ]
@@ -339,6 +359,9 @@ fields = [
 measure = "ModeType12.+816@+125536"
 size = 9644
 origin = "embedded"
+# Host (E5 step 4): embedded only in the host NetModeBlock; its machine
+# words before this field are padding, reached raw in guest order.
+storage = "host"
 fields = [
   { name = "unknown_9640", offset = 9640, type = "u32" },
 ]
@@ -348,6 +371,9 @@ fields = [
 measure = "ModeType12.+816@+86880"
 size = 9644
 origin = "embedded"
+# Host (E5 step 4): embedded only in the host NetModeBlock; its machine
+# words before this field are padding, reached raw in guest order.
+storage = "host"
 fields = [
   { name = "unknown_9640", offset = 9640, type = "u32" },
 ]

@@ -9,6 +9,7 @@
 #include "data_tables/data_tables.h"
 #include "guest.h"
 #include "helpers/debug_output.h"
+#include "memory/handles.h"
 #include "memory/heap.h"
 #include "race_screens/race_screens.h"
 #include "schema/car_physics.h"
@@ -407,13 +408,16 @@ uint32_t Init(uint8_t* base, uint32_t hud, uint32_t sp) {
   const uint32_t frame = sp - 128;
   guest::StoreU32(base, frame, sp);
   const Hud h(base, hud);
-  const struct {
-    uint32_t id, field;
-  } kMovies[9] = {{10, h.racers_movie_address()}, {0, h.dashboard_address()},
-                  {11, h.countdown_address()},    {3, h.warning_address()},
-                  {2, h.movie2_address()},        {13, h.timer_address()},
-                  {1, h.movie1_address()},        {12, h.splits_address()},
-                  {19, h.movie19_address()}};
+  // The HUD's movie fields, set through the view (a host object, E5 step 4).
+  using Set = void (Hud::*)(uint32_t) const;
+  static constexpr struct {
+    uint32_t id;
+    Set set;
+  } kMovies[9] = {{10, &Hud::set_racers_movie}, {0, &Hud::set_dashboard},
+                  {11, &Hud::set_countdown},    {3, &Hud::set_warning},
+                  {2, &Hud::set_movie2},        {13, &Hud::set_timer},
+                  {1, &Hud::set_movie1},        {12, &Hud::set_splits},
+                  {19, &Hud::set_movie19}};
   const uint32_t key = frame + 80;
   uint32_t found = 0;
   for (uint32_t i = 0; i < 9; i++) {
@@ -423,7 +427,7 @@ uint32_t Init(uint8_t* base, uint32_t hud, uint32_t sp) {
     if (i == 8) {
       h.set_swapped_texture(0);
     }
-    guest::StoreU32(base, kMovies[i].field, movie);
+    (h.*kMovies[i].set)(movie);
   }
   return found;
 }
@@ -432,7 +436,8 @@ uint64_t Make1004(uint8_t* base, uint32_t owner, uint32_t sp, const Calls& calls
   ITC_NATIVE_RUNNING("sub_82216A60 RaceScreens::Make1004");
   const uint32_t frame = sp - 128;
   guest::StoreU32(base, frame, sp);
-  uint32_t object = uint32_t(calls.Call(kNew, frame, 0x82216A78, 264));
+  // operator new(264) at 0x82216A78: the object in host memory (E5 step 4).
+  uint32_t object = schema::AltHud::New(base).address;
   if (object != 0) {
     calls.Call(kMemset, frame, 0x82216A94, object, 0, 264);
   }
@@ -479,9 +484,9 @@ uint64_t ScreensInit(uint8_t* base, uint32_t holder, uint32_t kind, uint32_t sp,
   screens.set_race_results(Unseen::race_results(base).address);
   screens.set_split_results_screen(Unseen::split_results(base).address);
   screens.set_kind6_menu(Unseen::kind6_menu(base).address);
-  // The race HUD at the holder's +16 (no field of RaceScreens yet).
-  Init(base, holder + 16, frame);
-  const uint64_t r3 = Make1004(base, screens.alt_hud_address(), frame, calls);
+  // The race HUD at the holder's +16.
+  Init(base, screens.hud().address, frame);
+  const uint64_t r3 = Make1004(base, screens.alt_hud_holder().address, frame, calls);
   screens.set_flags(0);
   return r3;
 }
@@ -490,8 +495,8 @@ uint64_t ScreensDestruct(uint8_t* base, uint32_t holder, uint32_t sp, const Call
   ITC_NATIVE_RUNNING("sub_82211B98 RaceScreens::~RaceScreens");
   const uint32_t frame = sp - 96;
   guest::StoreU32(base, frame, sp);
-  TearDown(base, holder + 16, frame, calls);
-  const uint32_t alt = schema::RaceScreens(base, holder).alt_hud_address();
+  TearDown(base, schema::RaceScreens(base, holder).hud().address, frame, calls);
+  const uint32_t alt = schema::RaceScreens(base, holder).alt_hud_holder().address;
   if (!alt_hud::Destroy(base, alt, frame, calls)) {
     calls.Call(kAltHudDestroy, frame, 0x82211BBC, alt);
   }
@@ -533,7 +538,12 @@ uint64_t ScreensDestroy(uint8_t* base, uint32_t sp, const Calls& calls) {
     return uint64_t(int64_t(int32_t(kText)));
   }
   uint64_t r3;
-  if (memory::IsPages(holder)) {
+  if (memory::IsHandle(holder)) {
+    // The holder in host memory (E5 step 4): deleted in place of the
+    // original's VirtualFree at 0x82211D70, which returned 1.
+    schema::RaceScreens(base, holder).Delete();
+    r3 = 1;
+  } else if (memory::IsPages(holder)) {
     r3 = memory::FreePages(holder) ? 1 : 0;
   } else {
     r3 = calls.Call(0x82295330, frame, 0x82211D70, holder, 0, 0x8000);
@@ -546,9 +556,11 @@ uint64_t ScreensCreate(uint8_t* base, uint32_t kind, uint32_t sp, const Calls& c
   ITC_NATIVE_RUNNING("sub_82211F40 RaceScreens::Create");
   const uint32_t frame = sp - 112;
   guest::StoreU32(base, frame, sp);
-  // VirtualAlloc(0, 1040, MEM_COMMIT, PAGE_READWRITE) over the allocation
-  // layer (the adapter runs this only there, hooks::NativeHeapActive).
-  G::set_screens_holder(base, memory::AllocPages(1040, 4096));
+  // VirtualAlloc(0, 1040, MEM_COMMIT, PAGE_READWRITE): the holder in host
+  // memory (E5 step 4; zeroed, as committed pages are), its handle kept at
+  // [0x826D84F0]. The adapter runs this only over the allocation layer
+  // (hooks::NativeHeapActive).
+  G::set_screens_holder(base, schema::RaceScreens::New(base).address);
   race_screens::PauseMenuCreate(base, frame);
   race_screens::PauseMenu4Create(base, frame);
   race_screens::AfterRaceMenuCreate(base, frame);

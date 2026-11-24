@@ -202,142 +202,295 @@ struct ModeHolder : View {
 };
 
 // allocated; measure: RaceMode
+#pragma pack(push, 1)
+struct RaceModeData {
+  uint32_t vtable = 0;  // +0
+  uint32_t delegate_ptr = 0;  // +4
+  uint32_t delegate_vtable = 0;  // +8
+  uint32_t delegate_object = 0;  // +12
+  uint32_t delegate_function = 0;  // +16
+  uint32_t delegate_adjustment = 0;  // +20
+  uint8_t pad_24[8] = {};
+  uint32_t vtable32 = 0;  // +32
+  uint8_t handlers[200] = {};  // +36, guest order
+  uint32_t handler_count = 0;  // +236
+  uint8_t ring[600] = {};  // +240, guest order
+  uint32_t ring_count = 0;  // +840
+  uint32_t ring_start = 0;  // +844
+  uint8_t course_setup[9600] = {};  // +848, guest order
+  uint32_t course_setup_count = 0;  // +10448
+  uint32_t course_setup_state = 0;  // +10452
+  uint8_t pad_10456[56] = {};
+  uint8_t camera_director[77392] = {};  // +10512, guest order
+  uint8_t pad_87904[32] = {};
+  uint8_t race_scene[9600] = {};  // +87936, guest order
+  uint32_t race_scene_count = 0;  // +97536
+  uint32_t race_scene_state = 0;  // +97540
+  uint8_t pad_97544[4] = {};
+  uint8_t race_flow[9600] = {};  // +97548, guest order
+  uint32_t race_flow_count = 0;  // +107148
+  uint32_t race_flow_state = 0;  // +107152
+  uint8_t pad_107156[12] = {};
+  uint8_t race_states[9600] = {};  // +107168, guest order
+  uint32_t race_states_count = 0;  // +116768
+  uint32_t race_states_state = 0;  // +116772
+  uint8_t pad_116776[36] = {};
+  uint8_t race_world[9600] = {};  // +116812, guest order
+  uint32_t race_world_count = 0;  // +126412
+  uint32_t race_world_state = 0;  // +126416
+  uint8_t pad_126420[2244] = {};
+  uint8_t race_hud_machine[9600] = {};  // +128664, guest order
+  uint32_t race_hud_machine_count = 0;  // +138264
+  uint32_t race_hud_machine_state = 0;  // +138268
+  uint8_t pad_138272[12] = {};
+  uint8_t race_sounds[9600] = {};  // +138284, guest order
+  uint32_t race_sounds_count = 0;  // +147884
+  uint32_t race_sounds_state = 0;  // +147888
+  uint8_t xpr[24] = {};  // +147892, guest order
+  uint8_t pad_147916[28] = {};
+  uint8_t overlays_machine[9600] = {};  // +147944, guest order
+  uint32_t overlays_machine_count = 0;  // +157544
+  uint32_t overlays_machine_state = 0;  // +157548
+  uint8_t overlays[100] = {};  // +157552, guest order
+  uint8_t machine_157652[9600] = {};  // +157652, guest order
+  uint32_t machine_157652_count = 0;  // +167252
+  uint32_t machine_157652_state = 0;  // +167256
+  uint32_t running = 0;  // +167260
+};
+#pragma pack(pop)
+static_assert(sizeof(RaceModeData) == 167264);
+inline constexpr memory::LayoutField kRaceModeFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 4}, {32, 4}, {236, 4}, {840, 4}, {844, 4}, {10448, 4}, {10452, 4}, {97536, 4}, {97540, 4}, {107148, 4}, {107152, 4}, {116768, 4}, {116772, 4}, {126412, 4}, {126416, 4}, {138264, 4}, {138268, 4}, {147884, 4}, {147888, 4}, {157544, 4}, {157548, 4}, {167252, 4}, {167256, 4}, {167260, 4}};
+inline constexpr memory::Layout kRaceModeLayout = {kRaceModeFields, 29};
+
 struct RaceMode : View {
   using View::View;
   static constexpr uint32_t kSize = 167264;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   static constexpr uint32_t kVtable = 0x82006D34;
+  RaceModeData* data() const { return static_cast<RaceModeData*>(memory::HandleObject(address)); }
+  static RaceMode New(uint8_t* base) {
+    return RaceMode(base, memory::MakeHandle(new RaceModeData(), sizeof(RaceModeData), "RaceMode", &kRaceModeLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static RaceMode NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(RaceModeData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<RaceModeData*>(::operator new(sizeof(RaceModeData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) RaceModeData();
+    return RaceMode(base, memory::MakeHandle(p, sizeof(RaceModeData) * count, "RaceMode", &kRaceModeLayout, sizeof(RaceModeData)));
+  }
+  RaceMode at(uint32_t i) const { return RaceMode(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kRaceModeLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kRaceModeLayout, offset, width, v); }
   // 0x82006D34 (the base's 0x820069EC before)
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
+  uint32_t vtable() const { return data()->vtable; }
+  void set_vtable(uint32_t v) const { data()->vtable = v; }
+  uint32_t vtable_bits() const { return data()->vtable; }
+  void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
   // measure fault: the next-mode answer's byte +0 (ModeAnswer), not the mode's
-  uint8_t answer_changed() const { return guest::LoadU8(base, address + 0); }
-  void set_answer_changed(uint8_t v) const { guest::StoreU8(base, address + 0, v); }
   uint32_t answer_changed_address() const { return address + 0; }
+  uint8_t answer_changed_bits() const { return uint8_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kRaceModeLayout, 0, 1)); }
+  void set_answer_changed_bits(uint8_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kRaceModeLayout, 0, 1, v); }
+  uint8_t answer_changed() const { return uint8_t(answer_changed_bits()); }
+  void set_answer_changed(uint8_t v) const { set_answer_changed_bits(uint8_t(v)); }
   // measure fault: the next-mode answer's 8 bytes (ModeAnswer), not the mode's
-  uint64_t answer() const { return guest::LoadU64(base, address + 0); }
-  void set_answer(uint64_t v) const { guest::StoreU64(base, address + 0, v); }
   uint32_t answer_address() const { return address + 0; }
+  uint64_t answer_bits() const { return uint64_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kRaceModeLayout, 0, 8)); }
+  void set_answer_bits(uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kRaceModeLayout, 0, 8, v); }
+  uint64_t answer() const { return uint64_t(answer_bits()); }
+  void set_answer(uint64_t v) const { set_answer_bits(uint64_t(v)); }
   // the delegate at +8 (also the answer's next type +4 by the measure's join)
-  template <typename T = ModeDelegate>
-  T delegate_ptr() const { return T(base, guest::LoadU32(base, address + 4)); }
-  void set_delegate_ptr(const View& v) const { guest::StoreU32(base, address + 4, v.address); }
-  void set_delegate_ptr(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t delegate_ptr_address() const { return address + 4; }
+  template <typename T = ModeDelegate>
+  T delegate_ptr() const { return T(base, data()->delegate_ptr); }
+  void set_delegate_ptr(const View& w) const { const uint32_t v = w.address; data()->delegate_ptr = v; }
+  void set_delegate_ptr(uint32_t v) const { data()->delegate_ptr = v; }
+  uint32_t delegate_ptr_bits() const { return data()->delegate_ptr; }
+  void set_delegate_ptr_bits(uint32_t v) const { data()->delegate_ptr = v; }
   // 0x82006B20 the default; 0x82010FA0 after RaceMode::Init
-  uint32_t delegate_vtable() const { return guest::LoadU32(base, address + 8); }
-  void set_delegate_vtable(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t delegate_vtable_address() const { return address + 8; }
+  uint32_t delegate_vtable() const { return data()->delegate_vtable; }
+  void set_delegate_vtable(uint32_t v) const { data()->delegate_vtable = v; }
+  uint32_t delegate_vtable_bits() const { return data()->delegate_vtable; }
+  void set_delegate_vtable_bits(uint32_t v) const { data()->delegate_vtable = v; }
   // the mode
-  uint32_t delegate_object() const { return guest::LoadU32(base, address + 12); }
-  void set_delegate_object(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
   uint32_t delegate_object_address() const { return address + 12; }
+  uint32_t delegate_object() const { return data()->delegate_object; }
+  void set_delegate_object(uint32_t v) const { data()->delegate_object = v; }
+  uint32_t delegate_object_bits() const { return data()->delegate_object; }
+  void set_delegate_object_bits(uint32_t v) const { data()->delegate_object = v; }
   // 0x82235C08 Mode::NextModeThunk
-  uint32_t delegate_function() const { return guest::LoadU32(base, address + 16); }
-  void set_delegate_function(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
   uint32_t delegate_function_address() const { return address + 16; }
-  uint32_t delegate_adjustment() const { return guest::LoadU32(base, address + 20); }
-  void set_delegate_adjustment(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
+  uint32_t delegate_function() const { return data()->delegate_function; }
+  void set_delegate_function(uint32_t v) const { data()->delegate_function = v; }
+  uint32_t delegate_function_bits() const { return data()->delegate_function; }
+  void set_delegate_function_bits(uint32_t v) const { data()->delegate_function = v; }
   uint32_t delegate_adjustment_address() const { return address + 20; }
+  uint32_t delegate_adjustment() const { return data()->delegate_adjustment; }
+  void set_delegate_adjustment(uint32_t v) const { data()->delegate_adjustment = v; }
+  uint32_t delegate_adjustment_bits() const { return data()->delegate_adjustment; }
+  void set_delegate_adjustment_bits(uint32_t v) const { data()->delegate_adjustment = v; }
   // 0x82006D28 (the base's 0x82006A0C before)
-  uint32_t vtable32() const { return guest::LoadU32(base, address + 32); }
-  void set_vtable32(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
   uint32_t vtable32_address() const { return address + 32; }
+  uint32_t vtable32() const { return data()->vtable32; }
+  void set_vtable32(uint32_t v) const { data()->vtable32 = v; }
+  uint32_t vtable32_bits() const { return data()->vtable32; }
+  void set_vtable32_bits(uint32_t v) const { data()->vtable32 = v; }
   // the dispatcher (+36): 50 handler pointers (state machines)
   uint32_t handlers_address() const { return address + 36; }
-  uint32_t handler_count() const { return guest::LoadU32(base, address + 236); }
-  void set_handler_count(uint32_t v) const { guest::StoreU32(base, address + 236, v); }
+  uint8_t* handlers() const { return reinterpret_cast<uint8_t*>(data()) + 36; }
   uint32_t handler_count_address() const { return address + 236; }
+  uint32_t handler_count() const { return data()->handler_count; }
+  void set_handler_count(uint32_t v) const { data()->handler_count = v; }
+  uint32_t handler_count_bits() const { return data()->handler_count; }
+  void set_handler_count_bits(uint32_t v) const { data()->handler_count = v; }
   // the dispatcher's ring: 50 messages of 12 bytes (ModeMessage)
   uint32_t ring_address() const { return address + 240; }
-  uint32_t ring_count() const { return guest::LoadU32(base, address + 840); }
-  void set_ring_count(uint32_t v) const { guest::StoreU32(base, address + 840, v); }
+  uint8_t* ring() const { return reinterpret_cast<uint8_t*>(data()) + 240; }
   uint32_t ring_count_address() const { return address + 840; }
-  uint32_t ring_start() const { return guest::LoadU32(base, address + 844); }
-  void set_ring_start(uint32_t v) const { guest::StoreU32(base, address + 844, v); }
+  uint32_t ring_count() const { return data()->ring_count; }
+  void set_ring_count(uint32_t v) const { data()->ring_count = v; }
+  uint32_t ring_count_bits() const { return data()->ring_count; }
+  void set_ring_count_bits(uint32_t v) const { data()->ring_count = v; }
   uint32_t ring_start_address() const { return address + 844; }
+  uint32_t ring_start() const { return data()->ring_start; }
+  void set_ring_start(uint32_t v) const { data()->ring_start = v; }
+  uint32_t ring_start_bits() const { return data()->ring_start; }
+  void set_ring_start_bits(uint32_t v) const { data()->ring_start = v; }
   // the course set-up's state machine (CourseSetup::, race-loading.md)
   uint32_t course_setup_address() const { return address + 848; }
-  uint32_t course_setup_count() const { return guest::LoadU32(base, address + 10448); }
-  void set_course_setup_count(uint32_t v) const { guest::StoreU32(base, address + 10448, v); }
+  uint8_t* course_setup() const { return reinterpret_cast<uint8_t*>(data()) + 848; }
   uint32_t course_setup_count_address() const { return address + 10448; }
-  uint32_t course_setup_state() const { return guest::LoadU32(base, address + 10452); }
-  void set_course_setup_state(uint32_t v) const { guest::StoreU32(base, address + 10452, v); }
+  uint32_t course_setup_count() const { return data()->course_setup_count; }
+  void set_course_setup_count(uint32_t v) const { data()->course_setup_count = v; }
+  uint32_t course_setup_count_bits() const { return data()->course_setup_count; }
+  void set_course_setup_count_bits(uint32_t v) const { data()->course_setup_count = v; }
   uint32_t course_setup_state_address() const { return address + 10452; }
+  uint32_t course_setup_state() const { return data()->course_setup_state; }
+  void set_course_setup_state(uint32_t v) const { data()->course_setup_state = v; }
+  uint32_t course_setup_state_bits() const { return data()->course_setup_state; }
+  void set_course_setup_state_bits(uint32_t v) const { data()->course_setup_state = v; }
   // the camera director (RaceModeMember::RaceModeMember; camera-modes.toml's CameraDirector), its state machine at +10528
   uint32_t camera_director_address() const { return address + 10512; }
+  uint8_t* camera_director() const { return reinterpret_cast<uint8_t*>(data()) + 10512; }
   // the race scene's state machine (race-scene.md)
   uint32_t race_scene_address() const { return address + 87936; }
-  uint32_t race_scene_count() const { return guest::LoadU32(base, address + 97536); }
-  void set_race_scene_count(uint32_t v) const { guest::StoreU32(base, address + 97536, v); }
+  uint8_t* race_scene() const { return reinterpret_cast<uint8_t*>(data()) + 87936; }
   uint32_t race_scene_count_address() const { return address + 97536; }
-  uint32_t race_scene_state() const { return guest::LoadU32(base, address + 97540); }
-  void set_race_scene_state(uint32_t v) const { guest::StoreU32(base, address + 97540, v); }
+  uint32_t race_scene_count() const { return data()->race_scene_count; }
+  void set_race_scene_count(uint32_t v) const { data()->race_scene_count = v; }
+  uint32_t race_scene_count_bits() const { return data()->race_scene_count; }
+  void set_race_scene_count_bits(uint32_t v) const { data()->race_scene_count = v; }
   uint32_t race_scene_state_address() const { return address + 97540; }
+  uint32_t race_scene_state() const { return data()->race_scene_state; }
+  void set_race_scene_state(uint32_t v) const { data()->race_scene_state = v; }
+  uint32_t race_scene_state_bits() const { return data()->race_scene_state; }
+  void set_race_scene_state_bits(uint32_t v) const { data()->race_scene_state = v; }
   // the race flow's state machine (race-flow.md, racer-controllers.md)
   uint32_t race_flow_address() const { return address + 97548; }
-  uint32_t race_flow_count() const { return guest::LoadU32(base, address + 107148); }
-  void set_race_flow_count(uint32_t v) const { guest::StoreU32(base, address + 107148, v); }
+  uint8_t* race_flow() const { return reinterpret_cast<uint8_t*>(data()) + 97548; }
   uint32_t race_flow_count_address() const { return address + 107148; }
-  uint32_t race_flow_state() const { return guest::LoadU32(base, address + 107152); }
-  void set_race_flow_state(uint32_t v) const { guest::StoreU32(base, address + 107152, v); }
+  uint32_t race_flow_count() const { return data()->race_flow_count; }
+  void set_race_flow_count(uint32_t v) const { data()->race_flow_count = v; }
+  uint32_t race_flow_count_bits() const { return data()->race_flow_count; }
+  void set_race_flow_count_bits(uint32_t v) const { data()->race_flow_count = v; }
   uint32_t race_flow_state_address() const { return address + 107152; }
+  uint32_t race_flow_state() const { return data()->race_flow_state; }
+  void set_race_flow_state(uint32_t v) const { data()->race_flow_state = v; }
+  uint32_t race_flow_state_bits() const { return data()->race_flow_state; }
+  void set_race_flow_state_bits(uint32_t v) const { data()->race_flow_state = v; }
   // the race states' state machine (race-states.md)
   uint32_t race_states_address() const { return address + 107168; }
-  uint32_t race_states_count() const { return guest::LoadU32(base, address + 116768); }
-  void set_race_states_count(uint32_t v) const { guest::StoreU32(base, address + 116768, v); }
+  uint8_t* race_states() const { return reinterpret_cast<uint8_t*>(data()) + 107168; }
   uint32_t race_states_count_address() const { return address + 116768; }
-  uint32_t race_states_state() const { return guest::LoadU32(base, address + 116772); }
-  void set_race_states_state(uint32_t v) const { guest::StoreU32(base, address + 116772, v); }
+  uint32_t race_states_count() const { return data()->race_states_count; }
+  void set_race_states_count(uint32_t v) const { data()->race_states_count = v; }
+  uint32_t race_states_count_bits() const { return data()->race_states_count; }
+  void set_race_states_count_bits(uint32_t v) const { data()->race_states_count = v; }
   uint32_t race_states_state_address() const { return address + 116772; }
+  uint32_t race_states_state() const { return data()->race_states_state; }
+  void set_race_states_state(uint32_t v) const { data()->race_states_state = v; }
+  uint32_t race_states_state_bits() const { return data()->race_states_state; }
+  void set_race_states_state_bits(uint32_t v) const { data()->race_states_state = v; }
   // the race world's state machine (race-world.md)
   uint32_t race_world_address() const { return address + 116812; }
-  uint32_t race_world_count() const { return guest::LoadU32(base, address + 126412); }
-  void set_race_world_count(uint32_t v) const { guest::StoreU32(base, address + 126412, v); }
+  uint8_t* race_world() const { return reinterpret_cast<uint8_t*>(data()) + 116812; }
   uint32_t race_world_count_address() const { return address + 126412; }
-  uint32_t race_world_state() const { return guest::LoadU32(base, address + 126416); }
-  void set_race_world_state(uint32_t v) const { guest::StoreU32(base, address + 126416, v); }
+  uint32_t race_world_count() const { return data()->race_world_count; }
+  void set_race_world_count(uint32_t v) const { data()->race_world_count = v; }
+  uint32_t race_world_count_bits() const { return data()->race_world_count; }
+  void set_race_world_count_bits(uint32_t v) const { data()->race_world_count = v; }
   uint32_t race_world_state_address() const { return address + 126416; }
+  uint32_t race_world_state() const { return data()->race_world_state; }
+  void set_race_world_state(uint32_t v) const { data()->race_world_state = v; }
+  uint32_t race_world_state_bits() const { return data()->race_world_state; }
+  void set_race_world_state_bits(uint32_t v) const { data()->race_world_state = v; }
   // the race HUD machine (race-hud-machine.md)
   uint32_t race_hud_machine_address() const { return address + 128664; }
-  uint32_t race_hud_machine_count() const { return guest::LoadU32(base, address + 138264); }
-  void set_race_hud_machine_count(uint32_t v) const { guest::StoreU32(base, address + 138264, v); }
+  uint8_t* race_hud_machine() const { return reinterpret_cast<uint8_t*>(data()) + 128664; }
   uint32_t race_hud_machine_count_address() const { return address + 138264; }
-  uint32_t race_hud_machine_state() const { return guest::LoadU32(base, address + 138268); }
-  void set_race_hud_machine_state(uint32_t v) const { guest::StoreU32(base, address + 138268, v); }
+  uint32_t race_hud_machine_count() const { return data()->race_hud_machine_count; }
+  void set_race_hud_machine_count(uint32_t v) const { data()->race_hud_machine_count = v; }
+  uint32_t race_hud_machine_count_bits() const { return data()->race_hud_machine_count; }
+  void set_race_hud_machine_count_bits(uint32_t v) const { data()->race_hud_machine_count = v; }
   uint32_t race_hud_machine_state_address() const { return address + 138268; }
+  uint32_t race_hud_machine_state() const { return data()->race_hud_machine_state; }
+  void set_race_hud_machine_state(uint32_t v) const { data()->race_hud_machine_state = v; }
+  uint32_t race_hud_machine_state_bits() const { return data()->race_hud_machine_state; }
+  void set_race_hud_machine_state_bits(uint32_t v) const { data()->race_hud_machine_state = v; }
   // the race sounds' state machine (race-sounds.md)
   uint32_t race_sounds_address() const { return address + 138284; }
-  uint32_t race_sounds_count() const { return guest::LoadU32(base, address + 147884); }
-  void set_race_sounds_count(uint32_t v) const { guest::StoreU32(base, address + 147884, v); }
+  uint8_t* race_sounds() const { return reinterpret_cast<uint8_t*>(data()) + 138284; }
   uint32_t race_sounds_count_address() const { return address + 147884; }
-  uint32_t race_sounds_state() const { return guest::LoadU32(base, address + 147888); }
-  void set_race_sounds_state(uint32_t v) const { guest::StoreU32(base, address + 147888, v); }
+  uint32_t race_sounds_count() const { return data()->race_sounds_count; }
+  void set_race_sounds_count(uint32_t v) const { data()->race_sounds_count = v; }
+  uint32_t race_sounds_count_bits() const { return data()->race_sounds_count; }
+  void set_race_sounds_count_bits(uint32_t v) const { data()->race_sounds_count = v; }
   uint32_t race_sounds_state_address() const { return address + 147888; }
+  uint32_t race_sounds_state() const { return data()->race_sounds_state; }
+  void set_race_sounds_state(uint32_t v) const { data()->race_sounds_state = v; }
+  uint32_t race_sounds_state_bits() const { return data()->race_sounds_state; }
+  void set_race_sounds_state_bits(uint32_t v) const { data()->race_sounds_state = v; }
   // an XPR (XPR::XPR; the race sounds' machine's +9608)
   uint32_t xpr_address() const { return address + 147892; }
+  uint8_t* xpr() const { return reinterpret_cast<uint8_t*>(data()) + 147892; }
   // the race overlays' state machine (RaceOverlaysMachine)
   uint32_t overlays_machine_address() const { return address + 147944; }
-  uint32_t overlays_machine_count() const { return guest::LoadU32(base, address + 157544); }
-  void set_overlays_machine_count(uint32_t v) const { guest::StoreU32(base, address + 157544, v); }
+  uint8_t* overlays_machine() const { return reinterpret_cast<uint8_t*>(data()) + 147944; }
   uint32_t overlays_machine_count_address() const { return address + 157544; }
-  uint32_t overlays_machine_state() const { return guest::LoadU32(base, address + 157548); }
-  void set_overlays_machine_state(uint32_t v) const { guest::StoreU32(base, address + 157548, v); }
+  uint32_t overlays_machine_count() const { return data()->overlays_machine_count; }
+  void set_overlays_machine_count(uint32_t v) const { data()->overlays_machine_count = v; }
+  uint32_t overlays_machine_count_bits() const { return data()->overlays_machine_count; }
+  void set_overlays_machine_count_bits(uint32_t v) const { data()->overlays_machine_count = v; }
   uint32_t overlays_machine_state_address() const { return address + 157548; }
+  uint32_t overlays_machine_state() const { return data()->overlays_machine_state; }
+  void set_overlays_machine_state(uint32_t v) const { data()->overlays_machine_state = v; }
+  uint32_t overlays_machine_state_bits() const { return data()->overlays_machine_state; }
+  void set_overlays_machine_state_bits(uint32_t v) const { data()->overlays_machine_state = v; }
   // the race overlays' list (RaceOverlays::Clear, race-overlays.md)
   uint32_t overlays_address() const { return address + 157552; }
+  uint8_t* overlays() const { return reinterpret_cast<uint8_t*>(data()) + 157552; }
   // a state machine RaceMode::Init doesn't set up or add
   uint32_t machine_157652_address() const { return address + 157652; }
-  uint32_t machine_157652_count() const { return guest::LoadU32(base, address + 167252); }
-  void set_machine_157652_count(uint32_t v) const { guest::StoreU32(base, address + 167252, v); }
+  uint8_t* machine_157652() const { return reinterpret_cast<uint8_t*>(data()) + 157652; }
   uint32_t machine_157652_count_address() const { return address + 167252; }
-  uint32_t machine_157652_state() const { return guest::LoadU32(base, address + 167256); }
-  void set_machine_157652_state(uint32_t v) const { guest::StoreU32(base, address + 167256, v); }
+  uint32_t machine_157652_count() const { return data()->machine_157652_count; }
+  void set_machine_157652_count(uint32_t v) const { data()->machine_157652_count = v; }
+  uint32_t machine_157652_count_bits() const { return data()->machine_157652_count; }
+  void set_machine_157652_count_bits(uint32_t v) const { data()->machine_157652_count = v; }
   uint32_t machine_157652_state_address() const { return address + 167256; }
+  uint32_t machine_157652_state() const { return data()->machine_157652_state; }
+  void set_machine_157652_state(uint32_t v) const { data()->machine_157652_state = v; }
+  uint32_t machine_157652_state_bits() const { return data()->machine_157652_state; }
+  void set_machine_157652_state_bits(uint32_t v) const { data()->machine_157652_state = v; }
   // 1 after RaceMode::Init; RaceMode::NextMode posts Update only while it isn't 0 (race-loading.md)
-  uint32_t running() const { return guest::LoadU32(base, address + 167260); }
-  void set_running(uint32_t v) const { guest::StoreU32(base, address + 167260, v); }
   uint32_t running_address() const { return address + 167260; }
+  uint32_t running() const { return data()->running; }
+  void set_running(uint32_t v) const { data()->running = v; }
+  uint32_t running_bits() const { return data()->running; }
+  void set_running_bits(uint32_t v) const { data()->running = v; }
 };
 
 // embedded; measure: RaceOverlaysMachine

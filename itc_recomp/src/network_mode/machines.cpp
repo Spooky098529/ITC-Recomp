@@ -437,6 +437,9 @@ uint64_t DestroyOf(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& ca
       uint32_t back;
       if constexpr (I == 0) {
         back = schema::NetModeSelectData(base, data).back();
+      } else if constexpr (I == 3) {
+        // The ranking's data is a host object (E5 step 4).
+        back = schema::NetRankingData(base, data).back();
       } else {
         back = (s.end == EndKind::kDataBack || data != 0) ? Load(base, data + 4) : 0;
       }
@@ -479,6 +482,15 @@ uint64_t DestroyOf(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& ca
         // The host data (Create): the original's VirtualFree at
         // 0x8227C540, which returned 1.
         G::select_data(base).Delete();
+        r3 = 1;
+        continue;
+      }
+    }
+    if constexpr (I == 3) {
+      if (s.frees[i].global == G::ranking_data_address()) {
+        // The host data (RankingCreate): the original's VirtualFree at
+        // 0x822825A4, which returned 1.
+        G::ranking_data(base).Delete();
         r3 = 1;
         continue;
       }
@@ -612,20 +624,22 @@ uint64_t RankingCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls
   ITC_NATIVE_RUNNING("sub_82282358 NetRanking::Create");
   const uint32_t frame = Frame(base, sp, 128);
   NetMachine(base, machine).set_loaded(0);
-  const uint32_t data = uint32_t(Alloc(calls, frame, 0x82282384, 108));
-  G::set_ranking_data(base, data);
+  // The data lives in host memory (E5 step 4): the original's
+  // VirtualAlloc(108) at 0x82282384; the global holds its handle.
   using D = schema::NetRankingData;
-  Apply(D(base, data), {{&D::set_unknown_0, 0},     {&D::set_back, 0},
-                        {&D::set_unknown_8, 0},     {&D::set_unknown_48, kNone},
-                        {&D::set_row_limit, 0},     {&D::set_unknown_52, 0},
-                        {&D::set_unknown_64, 0},    {&D::set_unknown_60, 0},
-                        {&D::set_unknown_24, kNone}, {&D::set_unknown_20, kNone},
-                        {&D::set_unknown_28, 0},    {&D::set_unknown_100, 0},
-                        {&D::set_unknown_96, 0},    {&D::set_unknown_92, 0},
-                        {&D::set_unknown_32, 0},    {&D::set_unknown_104, kNone},
-                        {&D::set_unknown_36, 0},    {&D::set_unknown_12, 0},
-                        {&D::set_unknown_40, 1},    {&D::set_unknown_44, 0},
-                        {&D::set_row_count, kNone}, {&D::set_unknown_16, 0}});
+  const D data = D::New(base);
+  G::set_ranking_data(base, data);
+  Apply(data, {{&D::set_unknown_0, 0},     {&D::set_back, 0},
+             {&D::set_unknown_8, 0},     {&D::set_unknown_48, kNone},
+             {&D::set_row_limit, 0},     {&D::set_unknown_52, 0},
+             {&D::set_unknown_64, 0},    {&D::set_unknown_60, 0},
+             {&D::set_unknown_24, kNone}, {&D::set_unknown_20, kNone},
+             {&D::set_unknown_28, 0},    {&D::set_unknown_100, 0},
+             {&D::set_unknown_96, 0},    {&D::set_unknown_92, 0},
+             {&D::set_unknown_32, 0},    {&D::set_unknown_104, kNone},
+             {&D::set_unknown_36, 0},    {&D::set_unknown_12, 0},
+             {&D::set_unknown_40, 1},    {&D::set_unknown_44, 0},
+             {&D::set_row_count, kNone}, {&D::set_unknown_16, 0}});
   const uint32_t pages = uint32_t(Alloc(calls, frame, 0x82282404, 28));
   G::set_ranking_pages(base, pages);
   Pages(base, pages);

@@ -3,10 +3,12 @@
 // docs/known-data.md: 0x828161EC, "track zone", "route range", 0x82603274,
 // 0x82011AF0). 70 stretches of the course's route the player's car is
 // checked against each tick for the HUD: the zones' owner, the zones, their
-// route ranges and the fixed-size lists they're kept in. The owner, the
-// zones and the ranges are guest data shared with the recompiled code, so
-// these work on guest memory, with the originals' loads and stores in their
-// order. The originals' stack temporaries aren't written (positions are
+// route ranges and the fixed-size lists they're kept in. The owner, with
+// its list, the zones and their ranges inside it, is host memory (E5 step
+// 4: schema::TrackZones is host, its address a handle; RouteRange and
+// List64 are dual, as the camera modes' and the scenery's are guest); the
+// lists' nodes and words are read through their views (load_at, store_at),
+// with the originals' loads and stores in their order. The originals' stack temporaries aren't written (positions are
 // passed by value), except the range a zone's set-up builds on its stack
 // and copies into the zone: that one is at the original's frame offset, so
 // the bytes Init leaves unwritten (the lists' data slots) are copied as the
@@ -132,14 +134,14 @@ void OwnerConstruct(uint8_t* base, uint32_t owner);
 // constructor) and stored at 0x828161EC, its list reset, the 70 zones
 // added, then each one's set-up (slot 0, natively when it's the zone's own
 // set-up, else through `calls`) with its list position and the vehicle;
-// `stack` is the caller's r1. False, with nothing done, when operator new
-// can't be native (the native heap off, or a failed allocation): the
-// original runs. `r3` = the last set-up's r3.
+// `stack` is the caller's r1. The owner is host memory (schema::TrackZones::
+// New, E5 step 4). False, with nothing done, when the native heap is off:
+// the original runs. `r3` = the last set-up's r3.
 bool OwnerCreate(uint8_t* base, uint32_t stack, const OwnerCalls& calls,
                  const SetupCalls& setup_calls, uint64_t* r3);
-// TrackZones::Destroy (sub_8228B500): the owner deleted when not 0, and
-// cleared. False, with nothing done, when operator delete can't be native
-// (the native heap off, or a block the layer didn't give). `r3` = the
+// TrackZones::Destroy (sub_8228B500): the owner deleted when not 0 (its
+// handle's Delete), and cleared. False, with nothing done, when the native
+// heap is off or the owner isn't a block the layer gave. `r3` = the
 // owner, as operator delete leaves it.
 bool OwnerDestroy(uint8_t* base, uint32_t* r3);
 // TrackZones::Update (sub_8228BD30): each zone's slot 1 (Zone::Update

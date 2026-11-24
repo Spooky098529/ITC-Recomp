@@ -52,10 +52,11 @@ uint64_t PlateCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& 
     MenuList(base, list).set_enabled(0u);
     MenuList(base, list).set_player(0);
   }
-  const uint64_t r3 = calls.Call(kVirtualAlloc, frame, 0x821982AC, 0, 76, 4096, 4);
-  const uint32_t data = uint32_t(r3);
-  Globals::set_plate_data(base, data);
-  const schema::PlateEditorData plate(base, data);
+  // A host object (E5 step 4) in place of the VirtualAlloc(76) at
+  // 0x821982AC; [0x826D8438] holds its handle (and r3, as the original's).
+  const schema::PlateEditorData plate = schema::PlateEditorData::New(base);
+  const uint64_t r3 = plate.address;
+  Globals::set_plate_data(base, plate.address);
   plate.set_unknown_0(0);
   plate.set_next_state(21);
   schema::PlateEditor(base, machine).set_state(schema::PlateEditor(base, machine).reenter() != 0 ? 1 : 9);
@@ -100,8 +101,12 @@ uint64_t PlateDestroy(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 112);
   calls.Call(kVirtualFree, frame, 0x82198140, Globals::plate_pages(base).address, 0, kMemRelease);
   calls.Call(kVirtualFree, frame, 0x82198154, Globals::plate_list(base).address, 0, kMemRelease);
+  // Deleted in place of the VirtualFree at 0x82198168 (r3 = 1, as it
+  // returned; with no data, the VirtualFree of 0 as the original).
+  const schema::PlateEditorData data = Globals::plate_data(base);
   const uint64_t r3 =
-      calls.Call(kVirtualFree, frame, 0x82198168, Globals::plate_data(base).address, 0, kMemRelease);
+      data.address != 0 ? 1 : calls.Call(kVirtualFree, frame, 0x82198168, 0, 0, kMemRelease);
+  data.Delete();
   Globals::set_plate_pages(base, 0);
   Globals::set_plate_list(base, 0);
   Globals::set_plate_data(base, 0);
@@ -164,7 +169,9 @@ uint64_t PlateLoad(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) 
     data.address = Globals::plate_data(base).address;
   }
   for (uint32_t i = 0; i < 5; i++) {
-    Store(base, data.plate_address() + 4 * i, Load(base, data.start_plate_address() + 4 * i));
+    // Words of the host data (E5 step 4) as the guest's bytes give them.
+    const uint32_t from = data.start_plate_address() - data.address + 4 * i;
+    data.store_at(data.plate_address() - data.address + 4 * i, 4, data.load_at(from, 4));
   }
   return r3;
 }

@@ -341,6 +341,21 @@ uint32_t Physical(uint32_t address) {
 // unrolled loop, then one at a time.
 void CopyConstants(uint8_t* base, uint32_t to, uint32_t data, uint32_t count) {
   auto load = [&](uint32_t from, uint8_t* out) {
+    if (memory::IsHandle(from)) {
+      // A host object's (E5 step 4): the 16 bytes as the guest's would be,
+      // through its handle (by words where aligned).
+      for (uint32_t i = 0; i < 16; i += (from & 3) == 0 ? 4 : 1) {
+        if ((from & 3) == 0) {
+          const uint32_t word = guest::LoadU32(base, from + i);
+          for (uint32_t b = 0; b < 4; b++) {
+            out[i + b] = uint8_t(word >> (24 - 8 * b));
+          }
+        } else {
+          out[i] = guest::LoadU8(base, from + i);
+        }
+      }
+      return;
+    }
     // lvlx and lvrx: the bytes up to the next 16-byte line, then the rest.
     const uint32_t first = 16 - (from & 0xF);
     std::memcpy(out, guest::Pointer(base, from), first);

@@ -39,10 +39,18 @@
 # 0x82000FA0; the docs' "app" of App::ReadUsers and App::PollSignIn): the four
 # users' sign-in records, the signed-in and Live lists, the notification
 # listener (src/hooks/notify.cpp) and the Live connection state.
+# In host memory since E5 step 4: made by Users::Create's operator new
+# (0x82099A24, lifted), freed by its deleting destructor sub_820997D8's
+# operator delete (0x82099808, which tells handles; probably never runs).
+# Its +224 and +228 are keys handed to the run loop by address (interior
+# handles), and save-interface.toml's SignedInUsers is the same object as
+# the save interface reads it (dual).
 [SysUsers]
 measure = "new<256>@Users::Create"
 size = 256
 origin = "allocated"
+storage = "host"
+host_alloc = [0x82099A24]
 vtable = 0x82000FA0
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82000FA0" },

@@ -3,11 +3,14 @@
 
 #include "race_scene/race_scene.h"
 
+#include <bit>
+
 #include "base/log.h"
 #include "c_runtime/arrays.h"
 #include "c_runtime/math.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
+#include "memory/handles.h"
 #include "memory/heap.h"
 #include "post_effects/post_effects.h"
 #include "scene_models/scene_models.h"
@@ -22,17 +25,25 @@ namespace {
 
 using G = schema::RaceSceneGlobals;
 
-// stfs: a float word through a double, as the translated code.
-void Stfs(uint8_t* base, uint32_t address, double value) {
-  guest::StoreFloat(base, address, float(value));
+// stfs into a light entry's vector (a bytes field, guest order) at the
+// entry's `offset`, a float word through a double, as the translated code;
+// through the view (the entry is in host memory, E5 step 4).
+void Stfs(const schema::RaceLightEntry& entry, uint32_t offset, double value) {
+  entry.store_at(offset, 4, std::bit_cast<uint32_t>(float(value)));
 }
 
 // A 16-byte vector of four doubles stored as floats.
-void Stfs4(uint8_t* base, uint32_t address, double x, double y, double z, double w) {
-  Stfs(base, address + 0, x);
-  Stfs(base, address + 4, y);
-  Stfs(base, address + 8, z);
-  Stfs(base, address + 12, w);
+void Stfs4(const schema::RaceLightEntry& entry, uint32_t offset, double x, double y, double z,
+           double w) {
+  Stfs(entry, offset + 0, x);
+  Stfs(entry, offset + 4, y);
+  Stfs(entry, offset + 8, z);
+  Stfs(entry, offset + 12, w);
+}
+
+// A field's offset in its view.
+uint32_t At(const schema::View& view, uint32_t field_address) {
+  return field_address - view.address;
 }
 
 }  // namespace
@@ -41,32 +52,30 @@ uint32_t SceneConstruct(uint8_t* base, uint32_t scene) {
   ITC_NATIVE_RUNNING("sub_8215D6C8 RaceScene::RaceScene");
   const schema::RaceScene s(base, scene);
   for (uint32_t i = 0; i < 7; i++) {
-    const schema::RaceCarSlot slot(base, s.car_slots_address() + schema::RaceCarSlot::kSize * i);
+    const schema::RaceCarSlot slot = s.car_slots(i);
     scene_models::SceneModelRecordConstruct(base, slot.record_address());
   }
   const double one = double(G::one(base));
-  const schema::RaceLights lights(base, s.lights_address());
+  const schema::RaceLights lights = s.lights();
   for (uint32_t i = 0; i < 11; i++) {
     // The w of the entry's five vectors.
-    const schema::RaceLightEntry e(base,
-                                   lights.entries_address() + schema::RaceLightEntry::kSize * i);
-    Stfs(base, e.direction_address() + 12, one);
-    Stfs(base, e.second_address() + 12, one);
-    Stfs(base, e.third_address() + 12, one);
-    Stfs(base, e.fourth_address() + 12, one);
-    Stfs(base, e.cone_address() + 12, one);
+    const schema::RaceLightEntry e = lights.entries(i);
+    Stfs(e, At(e, e.direction_address()) + 12, one);
+    Stfs(e, At(e, e.second_address()) + 12, one);
+    Stfs(e, At(e, e.third_address()) + 12, one);
+    Stfs(e, At(e, e.fourth_address()) + 12, one);
+    Stfs(e, At(e, e.cone_address()) + 12, one);
   }
   return scene;
 }
 
 bool SceneCreate(uint8_t* base) {
   G::set_scene(base, 0);
-  const auto block = memory::crt::OperatorNew(base, kSceneBytes);
-  if (!block) {
-    return false;
-  }
+  // Host memory (E5 step 4): the original's operator new(31,168).
+  static_assert(schema::RaceScene::kSize == kSceneBytes);
+  const uint32_t block = schema::RaceScene::New(base).address;
   ITC_NATIVE_RUNNING("sub_8215D738 RaceScene::Create");
-  G::set_scene(base, *block != 0 ? SceneConstruct(base, *block) : 0);
+  G::set_scene(base, SceneConstruct(base, block));
   return true;
 }
 
@@ -84,41 +93,41 @@ void LightsInitEntry(uint8_t* base, uint32_t entry_address, int32_t index) {
   if (index < 3) {
     const double e = double(G::light_kind1_value(base));
     entry.set_kind(1);
-    Stfs4(base, entry.second_address(), e, e, e, c);
-    Stfs4(base, entry.third_address(), c, c, c, c);
+    Stfs4(entry, At(entry, entry.second_address()), e, e, e, c);
+    Stfs4(entry, At(entry, entry.third_address()), c, c, c, c);
   } else {
     entry.set_kind(2);
-    Stfs4(base, entry.second_address(), double(G::light_kind2_x(base)), z, z, c);
-    Stfs4(base, entry.third_address(), c, c, c, c);
-    Stfs4(base, entry.fourth_address(), double(G::light_kind2_64_x(base)), double(G::light_kind2_64_y(base)),
-          c, c);
+    Stfs4(entry, At(entry, entry.second_address()), double(G::light_kind2_x(base)), z, z, c);
+    Stfs4(entry, At(entry, entry.third_address()), c, c, c, c);
+    Stfs4(entry, At(entry, entry.fourth_address()), double(G::light_kind2_64_x(base)),
+          double(G::light_kind2_64_y(base)), c, c);
     const double inner = c_runtime::Cos(G::light_cone_inner(base));
     const double outer = c_runtime::Cos(G::light_cone_outer(base));
-    Stfs4(base, entry.cone_address(), double(float(outer)), double(float(inner)), z, c);
+    Stfs4(entry, At(entry, entry.cone_address()), double(float(outer)), double(float(inner)), z, c);
   }
   const double p = double(G::light_color_p(base));
   const double q = double(G::light_color_q(base));
   switch (index) {
     case 1:
-      Stfs4(base, entry.direction_address(), p, p, q, c);
+      Stfs4(entry, At(entry, entry.direction_address()), p, p, q, c);
       break;
     case 2:
-      Stfs4(base, entry.direction_address(), q, p, p, c);
+      Stfs4(entry, At(entry, entry.direction_address()), q, p, p, c);
       break;
     case 3:
-      Stfs4(base, entry.direction_address(), p, p, p, c);
+      Stfs4(entry, At(entry, entry.direction_address()), p, p, p, c);
       break;
     case 4:
-      Stfs4(base, entry.direction_address(), z, p, q, c);
+      Stfs4(entry, At(entry, entry.direction_address()), z, p, q, c);
       break;
     case 5:
-      Stfs4(base, entry.direction_address(), q, p, z, c);
+      Stfs4(entry, At(entry, entry.direction_address()), q, p, z, c);
       break;
     case 6:
-      Stfs4(base, entry.direction_address(), p, p, z, c);
+      Stfs4(entry, At(entry, entry.direction_address()), p, p, z, c);
       break;
     default:
-      Stfs4(base, entry.direction_address(), q, p, q, c);
+      Stfs4(entry, At(entry, entry.direction_address()), q, p, q, c);
       break;
   }
 }
@@ -131,8 +140,7 @@ void LightsSetUp(uint8_t* base, uint32_t set) {
   lights.set_kind2_count(0);
   lights.set_kind1_count(0);
   for (int32_t i = 0; i < 11; i++) {
-    const schema::RaceLightEntry entry(
-        base, lights.entries_address() + schema::RaceLightEntry::kSize * uint32_t(i));
+    const schema::RaceLightEntry entry = lights.entries(uint32_t(i));
     LightsInitEntry(base, entry.address, i);
     const uint32_t kind = entry.kind();
     if (kind == 1) {
@@ -290,9 +298,7 @@ void DestroyCars(uint8_t* base, uint32_t cars) {
   // `cars` is the scene's car slot count (+16); the slots follow at +32.
   const schema::RaceScene scene(base, cars - 16);
   for (int32_t i = 6; i >= 0; i--) {
-    const uint32_t record =
-        schema::RaceCarSlot(base, scene.car_slots_address() + schema::RaceCarSlot::kSize * uint32_t(i))
-            .record_address();
+    const uint32_t record = scene.car_slots(uint32_t(i)).record_address();
     for (const Array& a : kArrays) {
       c_runtime::VectorDestruct(
           base, record + a.offset, a.size, a.count, kEmptyDestructor,
@@ -313,8 +319,16 @@ uint32_t Destroy(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_8215D790 RaceScene::Destroy");
   const uint32_t scene = G::scene(base).address;
   if (scene != 0) {
-    DestroyCars(base, schema::RaceScene(base, scene).car_slot_count_address());
-    memory::crt::OperatorDelete(scene);
+    const schema::RaceScene object(base, scene);
+    DestroyCars(base, object.car_slot_count_address());
+    // The original's operator delete: host memory (E5 step 4, made by
+    // SceneCreate or the lifted Create's host_alloc); a guest block only from
+    // a lifted Create not yet re-emitted.
+    if (memory::IsHandle(scene)) {
+      object.Delete();
+    } else {
+      memory::crt::OperatorDelete(scene);
+    }
   }
   return scene;
 }

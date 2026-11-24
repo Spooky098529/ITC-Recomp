@@ -12,9 +12,11 @@
 // sub_82592188 is reached through a vtable, so its override below is an
 // adapter for any recompiled caller.
 //
-// The manager and its pads stay in guest memory: the processors, the
-// listeners and the action mappers read them there. See "Input::Update" in
-// docs/pause-menu-fix.md for the layout.
+// The manager is in host memory (E5 step 4), its pads and processors
+// embedded objects reached through interior handles; the values and the
+// processors' arrays past a schema field are read and written by offset
+// (load_at, store_at). See "Input::Update" in docs/pause-menu-fix.md for the
+// layout.
 
 #include "input_update.h"
 #include "lifted/originals.h"
@@ -28,7 +30,10 @@
 #include "lifted/sdk.h"
 #include "schema/app_states.h"
 #include "schema/input.h"
+#include "schema/action_mappers.h"
 #include "schema/model_animation.h"
+
+#include <bit>
 
 namespace input_hooks {
 namespace {
@@ -62,14 +67,24 @@ void StoreMotor(uint8_t* base, uint32_t address, const input::PadMotor& motor) {
   r.set_unknown_8(uint32_t(motor.ticks_left));
 }
 
-void StoreGamepad(uint8_t* base, uint32_t address, const input::XInputGamepad& gamepad) {
-  guest::StoreU16(base, address + 0, gamepad.buttons);
-  guest::StoreU8(base, address + 2, gamepad.left_trigger);
-  guest::StoreU8(base, address + 3, gamepad.right_trigger);
-  guest::StoreU16(base, address + 4, uint16_t(gamepad.thumb_lx));
-  guest::StoreU16(base, address + 6, uint16_t(gamepad.thumb_ly));
-  guest::StoreU16(base, address + 8, uint16_t(gamepad.thumb_rx));
-  guest::StoreU16(base, address + 10, uint16_t(gamepad.thumb_ry));
+// The pad's XInput gamepad at `at` (inside the capabilities, by offset).
+void StoreGamepad(const schema::PhysicalPad& g, uint32_t at, const input::XInputGamepad& gamepad) {
+  g.store_at(at + 0, 2, gamepad.buttons);
+  g.store_at(at + 2, 1, gamepad.left_trigger);
+  g.store_at(at + 3, 1, gamepad.right_trigger);
+  g.store_at(at + 4, 2, uint16_t(gamepad.thumb_lx));
+  g.store_at(at + 6, 2, uint16_t(gamepad.thumb_ly));
+  g.store_at(at + 8, 2, uint16_t(gamepad.thumb_rx));
+  g.store_at(at + 10, 2, uint16_t(gamepad.thumb_ry));
+}
+
+// The first `count` of a device's 40 values at `values` (guest memory, or
+// a host pad's: ActionPadValues is dual), by offset, into `out`.
+void LoadValues(uint8_t* base, uint32_t values, float* out, int count) {
+  const schema::ActionPadValues v(base, values);
+  for (int i = 0; i < count; i++) {
+    out[i] = std::bit_cast<float>(uint32_t(v.load_at(4 * i, 4)));
+  }
 }
 
 // A physical pad (212 bytes): the fields PhysicalPad_Read touches, in and out.
@@ -77,36 +92,37 @@ void ReadPhysicalPad(uint8_t* base, uint32_t address, uint32_t user) {
   const schema::PhysicalPad g(base, address);
   input::PhysicalPad pad;
   pad.flags = g.unknown_4();
-  LoadMotor(base, g.record_a_address(), pad.motors[0]);
-  LoadMotor(base, g.record_b_address(), pad.motors[1]);
+  LoadMotor(base, g.record_a().address, pad.motors[0]);
+  LoadMotor(base, g.record_b().address, pad.motors[1]);
   bool caps_read = input::PhysicalPad_Read(pad, user);
   g.set_unknown_4(pad.flags);
+  const auto values = g.values();
   for (int i = 0; i < input::kPadValues; i++) {
-    guest::StoreFloat(base, g.values_address() + 4 * i, pad.values[i]);
+    values.store_at(4 * i, 4, std::bit_cast<uint32_t>(pad.values[i]));
   }
-  StoreMotor(base, g.record_a_address(), pad.motors[0]);
-  StoreMotor(base, g.record_b_address(), pad.motors[1]);
+  StoreMotor(base, g.record_a().address, pad.motors[0]);
+  StoreMotor(base, g.record_b().address, pad.motors[1]);
   if (caps_read) {
     // The XInput capabilities at +192: no field in PhysicalPad yet.
-    uint32_t caps = address + 192;
-    guest::StoreU8(base, caps + 0, pad.caps.type);
-    guest::StoreU8(base, caps + 1, pad.caps.sub_type);
-    guest::StoreU16(base, caps + 2, pad.caps.flags);
-    StoreGamepad(base, caps + 4, pad.caps.gamepad);
-    guest::StoreU16(base, caps + 16, pad.caps.left_motor);
-    guest::StoreU16(base, caps + 18, pad.caps.right_motor);
+    constexpr uint32_t caps = 192;
+    g.store_at(caps + 0, 1, pad.caps.type);
+    g.store_at(caps + 1, 1, pad.caps.sub_type);
+    g.store_at(caps + 2, 2, pad.caps.flags);
+    StoreGamepad(g, caps + 4, pad.caps.gamepad);
+    g.store_at(caps + 16, 2, pad.caps.left_motor);
+    g.store_at(caps + 18, 2, pad.caps.right_motor);
   }
 }
 
 // A device's values' address: its vtable slot 1 (r3 = device).
 uint32_t DeviceValues(lifted::Regs& ctx, uint8_t* base, uint32_t device) {
   // Its vtable: its first word (a logical or a physical pad's).
-  uint32_t function = schema::InputDeviceVtable(base, guest::LoadU32(base, device)).values();
+  uint32_t function = schema::InputDeviceVtable(base, guest::VtableWord(base, device)).values();
   if (function == kPhysicalPadValues) {
-    return schema::PhysicalPad(base, device).values_address();
+    return schema::PhysicalPad(base, device).values().address;
   }
   if (function == kLogicalPadValues) {
-    return schema::LogicalPad(base, device).values_address();
+    return schema::LogicalPad(base, device).values().address;
   }
   ctx.r3.u64 = device;
   ctx.lr = kReturnFromDeviceValues;
@@ -120,53 +136,67 @@ void BuildLogicalPad(lifted::Regs& ctx, uint8_t* base, uint32_t pad) {
   const schema::LogicalPad logical(base, pad);
   float values[input::kPadValues] = {};
   for (uint32_t k = 0; k < 4; k++) {
-    const schema::InputPadBinding binding(base, logical.bindings_address() + 8 * k);
+    const schema::InputPadBinding binding = logical.binding(k);
     uint32_t device = binding.device();
     if (!binding.enabled() || !device) {
       continue;
     }
     float device_values[input::kPadValues];
-    guest::CopyFloats(base, DeviceValues(ctx, base, device), device_values, input::kPadValues);
+    LoadValues(base, DeviceValues(ctx, base, device), device_values, input::kPadValues);
     input::LogicalPad_Add(values, device_values);
   }
   input::LogicalPad_Clamp(values);
+  const auto out = logical.values();
   for (int i = 0; i < input::kPadValues; i++) {
-    guest::StoreFloat(base, logical.values_address() + 4 * i, values[i]);
+    out.store_at(4 * i, 4, std::bit_cast<uint32_t>(values[i]));
   }
 }
 
 // A processor (416 bytes): the fields InputProcessor_Update reads, in, and
 // those it writes, out.
+// The processor's offsets (schema/input.h's InputProcessor; in host memory,
+// E5 step 4, its arrays read and written by offset).
+constexpr uint32_t kRaw = 32;
+constexpr uint32_t kAdjusted = 64;
+constexpr uint32_t kLeftDirection = 96;
+constexpr uint32_t kRightDirection = 112;
+constexpr uint32_t kLengths = 128;
+constexpr uint32_t kButtons = 136;
+constexpr uint32_t kHeldTicks = 284;
+
 void LoadProcessor(uint8_t* base, uint32_t object, input::InputProcessor& p) {
   const schema::InputProcessor o(base, object);
-  guest::CopyFloats(base, o.dead_zone_x_address(), p.dead_zone, 4);
+  p.dead_zone[0] = o.dead_zone_x();
+  p.dead_zone[1] = o.dead_zone_y();
+  p.dead_zone[2] = o.dead_zone_trigger();
+  p.dead_zone[3] = o.dead_zone_unused();
   p.held = o.held();
   p.repeat_delay = o.repeat_delay();
   p.repeat_period = o.repeat_period();
   for (int i = 0; i < 32; i++) {
-    p.held_ticks[i] = int32_t(guest::LoadU32(base, o.held_ticks_address() + 4 * i));
+    p.held_ticks[i] = int32_t(uint32_t(o.load_at(kHeldTicks + 4 * i, 4)));
   }
 }
 
-void StoreFloats(uint8_t* base, uint32_t address, const float* values, int count) {
+void StoreFloats(const schema::InputProcessor& o, uint32_t at, const float* values, int count) {
   for (int i = 0; i < count; i++) {
-    guest::StoreFloat(base, address + 4 * i, values[i]);
+    o.store_at(at + 4 * i, 4, std::bit_cast<uint32_t>(values[i]));
   }
 }
 
 void StoreProcessor(uint8_t* base, uint32_t object, const input::InputProcessor& p) {
   const schema::InputProcessor o(base, object);
-  StoreFloats(base, o.raw_lx_address(), p.raw, 8);
-  StoreFloats(base, o.adjusted_lx_address(), p.adjusted, 8);
-  StoreFloats(base, o.left_direction_x_address(), p.direction[0], 4);
-  StoreFloats(base, o.right_direction_x_address(), p.direction[1], 4);
-  StoreFloats(base, o.left_length_address(), p.length, 2);
-  StoreFloats(base, o.buttons_address(), p.buttons, 32);
+  StoreFloats(o, kRaw, p.raw, 8);
+  StoreFloats(o, kAdjusted, p.adjusted, 8);
+  StoreFloats(o, kLeftDirection, p.direction[0], 4);
+  StoreFloats(o, kRightDirection, p.direction[1], 4);
+  StoreFloats(o, kLengths, p.length, 2);
+  StoreFloats(o, kButtons, p.buttons, 32);
   o.set_pressed(p.pressed);
   o.set_released(p.released);
   o.set_held(p.held);
   for (int i = 0; i < 32; i++) {
-    guest::StoreU32(base, o.held_ticks_address() + 4 * i, uint32_t(p.held_ticks[i]));
+    o.store_at(kHeldTicks + 4 * i, 4, uint32_t(p.held_ticks[i]));
   }
 }
 
@@ -181,7 +211,7 @@ bool UpdateProcessor(lifted::Regs& ctx, uint8_t* base, uint32_t object, uint32_t
   }
   *values_address = DeviceValues(ctx, base, pad);
   float values[input::kPadValues];
-  guest::CopyFloats(base, *values_address, values, input::kPadValues);
+  LoadValues(base, *values_address, values, input::kPadValues);
   input::InputProcessor processor;
   LoadProcessor(base, object, processor);
   input::InputProcessor_Update(processor, values);
@@ -192,7 +222,8 @@ bool UpdateProcessor(lifted::Regs& ctx, uint8_t* base, uint32_t object, uint32_t
 // Calls `object`'s vtable slot 1 with r4 = its logical pad.
 void UpdateWithPad(lifted::Regs& ctx, uint8_t* base, uint32_t object, uint32_t pad,
                    uint32_t return_address) {
-  uint32_t function = schema::InputProcessor(base, object).vtable().update();
+  // Its vtable word (a listener may be any object: read from either shape).
+  uint32_t function = schema::InputProcessorVtable(base, guest::VtableWord(base, object)).update();
   uint32_t values_address;
   if (function == kProcessorUpdate && UpdateProcessor(ctx, base, object, pad, &values_address)) {
     return;
@@ -214,19 +245,19 @@ ITC_REGS_STEP(InputUpdate_Run) {
 
   const schema::InputManager m(base, manager);
   for (uint32_t i = 0; i < 4; i++) {
-    ReadPhysicalPad(base, m.physical_pads_address() + schema::PhysicalPad::kSize * i, i);
+    ReadPhysicalPad(base, m.physical_pad(i).address, i);
   }
   for (uint32_t j = 0; j < 5; j++) {
-    BuildLogicalPad(ctx, base, m.logical_pads_address() + schema::LogicalPad::kSize * j);
+    BuildLogicalPad(ctx, base, m.logical_pad(j).address);
   }
   for (uint32_t j = 0; j < 5; j++) {
-    UpdateWithPad(ctx, base, m.processors_address() + schema::InputProcessor::kSize * j,
-                  m.logical_pads_address() + schema::LogicalPad::kSize * j, kReturnFromProcessor);
+    UpdateWithPad(ctx, base, m.processor(j).address, m.logical_pad(j).address,
+                  kReturnFromProcessor);
   }
   for (uint32_t j = 0; j < 5; j++) {
     // A PtrList (app-states.toml's); only the head's previous node's object
     // is updated (the last listener, the only one in play).
-    const schema::PtrList list(base, m.listener_lists_address() + schema::PtrList::kSize * j);
+    const schema::PtrList list = m.listener_list(j);
     if (!list.size()) {
       continue;
     }
@@ -237,8 +268,7 @@ ITC_REGS_STEP(InputUpdate_Run) {
       ITC_LOG_ERROR("Input::Update: listener slot {} has a count but no node", j);
       continue;
     }
-    UpdateWithPad(ctx, base, node.value(),
-                  m.logical_pads_address() + schema::LogicalPad::kSize * j, kReturnFromListener);
+    UpdateWithPad(ctx, base, node.value(), m.logical_pad(j).address, kReturnFromListener);
   }
   ctx.lr = saved_lr;
 }

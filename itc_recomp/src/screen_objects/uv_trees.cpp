@@ -8,6 +8,7 @@
 
 #include "base/log.h"
 #include "memory/c_runtime_heap.h"
+#include "memory/handles.h"
 #include "schema/screen_objects.h"
 
 #include <bit>
@@ -57,7 +58,9 @@ std::optional<uint32_t> AllocateNodes(uint8_t* base, uint32_t count) {
   if (count != 0 && 0xFFFFFFFFu / count < node_bytes) {
     return std::nullopt;
   }
-  return memory::crt::OperatorNew(base, count * node_bytes);
+  // In host memory (E5 step 4): `count` nodes in one block, one handle (the
+  // original's operator new(count x size); every caller asks for one).
+  return T::Node::NewArray(base, count).address;
 }
 
 // NewHead's stores, the original's null checks kept.
@@ -338,9 +341,11 @@ bool WholeRange(uint8_t* base, uint32_t tree, Iterator first, Iterator last) {
   return last.tree != 0 && last.tree == tree && last.node == head.address;
 }
 
+// A node's block freed (the original's operator delete): a handle, as
+// AllocateNodes makes them.
 void Free(uint32_t block, const char* what) {
-  if (!memory::crt::OperatorDelete(block)) {
-    ITC_LOG_ERROR("{}: operator delete refused {:08X}", what, block);
+  if (!memory::FreeHandle(block)) {
+    ITC_LOG_ERROR("{}: a node's handle {:08X} not freed", what, block);
     std::abort();
   }
 }
@@ -582,8 +587,8 @@ uint32_t MapConstructNode(uint8_t* base, uint32_t node, uint32_t left, uint32_t 
   const uint32_t key_low = v.key_low();
   n.set_key_high(key_high);
   n.set_key_low(key_low);
-  ColumnConstruct(base, n.column_address());
-  ColumnCopy(base, n.column_address(), v.column_address());
+  ColumnConstruct(base, n.column().address);
+  ColumnCopy(base, n.column().address, v.column_address());
   n.set_color(color);
   n.set_is_nil(0);
   return node;
@@ -665,8 +670,8 @@ uint32_t MapEraseSubtree(uint8_t* base, uint32_t map, uint32_t node) {
   while (!n.is_nil()) {
     MapEraseSubtree(base, map, n.right().address);
     const MapNode next = n.left();
-    if (!ColumnDestroy(base, n.column_address())) {
-      ITC_LOG_ERROR("UvMap::EraseSubtree: a column at {:08X} not destroyed", n.column_address());
+    if (!ColumnDestroy(base, n.column().address)) {
+      ITC_LOG_ERROR("UvMap::EraseSubtree: a column at {:08X} not destroyed", n.column().address);
       std::abort();
     }
     Free(n.address, "UvMap::EraseSubtree");

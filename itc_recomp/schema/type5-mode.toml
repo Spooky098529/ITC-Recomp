@@ -65,9 +65,23 @@ fields = [
 # words every front-end machine has after it; the dialog's is Type5Dialog),
 # then the shown machine and the next mode's answer. location-screen.toml's
 # LocationScreenModeBlock is this block as FrontEndMode::NextMode meets it.
+# In host memory since E5 step 4 (2026-11-24): made by ModeType5::Init (the
+# original's VirtualAlloc(28940) at 0x8222FDA4; Init has no lifted
+# original), freed by ModeType5::Release's FreePages (its VirtualFree at
+# 0x8222FBB4; the lifted original runs only for a block that isn't pages,
+# never a handle); the mode's +848 holds its handle. As Type2ModeBlock, the
+# three machines stay described by their areas' guest views (CarSettings,
+# LocationScreenMachine, Type5Dialog, StateMachine and StateTransition):
+# their accesses reach the block through its handle (memory::RawHandleLoad
+# and Store, by this type's layout), so every view of a machine agrees
+# whatever its type; the dispatcher (+36) and the transitions' functors
+# hold interior handles (the block + 9640, + 0, + 19280). The measure's
+# "new<28940>@ModeType5::Init" was location-screen.toml's LocationScreenPart
+# (the same block), merged here.
 [Type5ModeBlock]
 # measures from LocationScreenModeBlock (location-screen), merged at the integration
 measures = [
+  "new<28940>@ModeType5::Init",
   "ModeType5.+816",
   "ModeType5::NextMode.r4.+848",
   "ModeType5::WaitForLoads.r4.+848",
@@ -75,6 +89,7 @@ measures = [
   "FrontEndMode::NextMode.r4.+848"]
 size = 28940
 origin = "allocated"
+storage = "host"
 fields = [
   { name = "car_settings", offset = 0, type = "bytes", count = 9640, note = "the car settings' machine (car-settings.md, CarSettings::InitType5); id 3" },
   { name = "car_settings_state", offset = 9604, type = "u32", note = "the car settings' machine state" },

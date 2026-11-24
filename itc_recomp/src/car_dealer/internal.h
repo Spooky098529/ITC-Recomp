@@ -62,7 +62,7 @@ inline uint32_t FindMovie(uint8_t* base, uint32_t id, uint32_t key) {
 inline Entry SelectedEntry(uint8_t* base) {
   const Data data = G::data(base);
   const uint32_t index = (data.car_scroll() + data.car_selection()) << 2;
-  return Entry(base, Load(base, index + data.shown_list().address));
+  return Entry(base, uint32_t(data.shown_list().load_at(index, 4)));
 }
 
 // The stand's garage stage: the holder's +0.

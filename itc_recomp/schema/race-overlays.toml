@@ -55,6 +55,19 @@ measures = ["sub_8215E6C0.r3@+9608.+8"]
 size = 848
 origin = "allocated"
 vtable = 0x82008524
+# In host memory since E5 step 4 (2026-11-24): made by RaceOverlays::Create
+# (the lifted original's two VirtualAlloc(848) calls, overlay 0 at 0x8215E258
+# and the others at 0x8215E2B0), freed by RaceOverlays::DeleteAll (its
+# VirtualFree at 0x8215DFD0, which returned 1) after the destructor (slot 0,
+# r4 = 0: not freed by it). The race overlays' list (the race mode's +9608)
+# holds the handles; the handle is also the archive load's callback context
+# (CarOverlays::LoadTextures, handed back to OnTexturesLoaded as r6). Its base
+# class Overlay (+0, +104, +108) is read through Overlay's dual view; the
+# viewport binding at +796 (CarOverlays::BindViewport's out) stays a guest
+# view whose stores resolve the interior handle.
+storage = "host"
+host_alloc = [0x8215E258, 0x8215E2B0]
+host_free = [{ call = 0x8215DFD0, reg = "r3", returns = 1 }]
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82008524 (OverlayVtable)" },
   { name = "views", offset = 4, type = "bytes", count = 100, note = "25 OverlayView pointers, one a view slot (0 none)" },
@@ -80,7 +93,7 @@ fields = [
   { name = "marker", offset = 376, type = "ptr", to = "Marker", note = "the marker above the car" },
   { name = "particles_c", offset = 380, type = "bytes", count = 16, note = "4 ParticlesC pointers (model points 14-17; probably the exhausts)" },
   { name = "model_sprites", offset = 396, type = "bytes", count = 36, note = "9 ModelSprite pointers" },
-  { name = "wheels", offset = 432, type = "bytes", count = 48, note = "4 CarOverlaysWheel (12 bytes a wheel)" },
+  { name = "wheels", offset = 432, type = "embed", to = "CarOverlaysWheel", count = 4, note = "12 bytes a wheel" },
   { name = "unknown_480", offset = 480, type = "bytes", count = 48, note = "cleared by the reset (with the rates after it)" },
   { name = "smoke_rates", offset = 528, type = "bytes", count = 192, note = "+48 x wheel: the wheel's smoke rate accumulator (f32), the rest of each 48 bytes cleared by the reset" },
   { name = "vehicle_word_2252", offset = 720, type = "u32", note = "the vehicle's word +2252" },
@@ -109,6 +122,8 @@ fields = [
 [CarOverlaysWheel]
 size = 12
 origin = "embedded"
+# Host since E5 step 4: only inside CarOverlays (its wheels embed).
+storage = "host"
 fields = [
   { name = "trail_counter", offset = 0, type = "u32", note = "counts the slipping ticks against the table's +156 and +160" },
   { name = "smoke_counter", offset = 4, type = "u32", note = "up to 25 on surface 8, then counts down while smoke is emitted" },
@@ -157,6 +172,15 @@ measures = ["OverlayView", "CarOverlays.+4"]
 size = 16
 origin = "allocated"
 vtable = 0x82010B5C
+# In host memory since E5 step 4 (2026-11-24): made by CarOverlays::NewView
+# (the lifted original's VirtualAlloc(16) at 0x82126694), freed by
+# CarOverlays::FreeView (its VirtualFree at 0x821265C4, all slots, and
+# 0x82126610, one slot; both returned 1) after its slot 0 (the shared empty
+# base's destructor, r4 = 0). The car overlays' view slots (+4) hold the
+# handles.
+storage = "host"
+host_alloc = [0x82126694]
+host_free = [{ call = 0x821265C4, reg = "r3", returns = 1 }, { call = 0x82126610, reg = "r3", returns = 1 }]
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82010B5C (OverlayViewVtable)" },
   { name = "vehicle", offset = 4, type = "u32" },
@@ -202,6 +226,11 @@ measure = "Overlay"
 size = 112
 origin = "embedded"
 vtable = 0x820085D8
+# Dual since E5 step 4: the base of CarOverlays (host) and of the children
+# (guest, VirtualAlloc'd). No embed field in CarOverlays: its fields there
+# (+0, +104, +108) are CarOverlays' own vtable, textures and texture_set, the
+# same words in the same order, so the view reads the host struct directly.
+storage = "dual"
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x820085D8 for the base class" },
   { name = "textures", offset = 104, type = "u32", note = "SetTextures104 (the car overlays' texture table; particle effect C's texture)" },
@@ -660,7 +689,11 @@ fields = [
   { name = "unknown_8", offset = 8, type = "u32" },
 ]
 
-# Split from CarOverlays.
+# Split from CarOverlays. Not embedded: the measure's name for the object
+# list entry 0 points to (sub_8215E6C0 is RaceOverlays::Bind's thunk), a
+# CarOverlays itself; no code uses this view (a guest view, which resolves a
+# handle at each access), so it stays as the measure left it. The same for
+# CarOverlaysPart_2 (entry 1).
 [CarOverlaysPart]
 measure = "sub_8215E6C0.r3@+9608.+0"
 size = 108

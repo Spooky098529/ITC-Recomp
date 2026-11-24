@@ -249,6 +249,7 @@ CarDataTireSource	car-physics	no	no allocation seen	68		1
 CarDealer	car-dealer	no	no allocation seen	9620		34	CarDealer::Unload CarDealer::Leave CarDealer::Close CarDealer::Page2 CarDealer::Transition7 CarDealer::Transition13 CarDealer::Transition18
 CarDealerData	car-dealer	no	shared (3 areas)	1196	CarDealer::Create	47	CarDealer::SetUpSpecSheet CarDealer::CheckLimits CarDealer::ReloadStandModel CarDealer::BuildLists CarDealer::Unload CarDealer::Leave CarDealer::Close CarDealer::OnYes CarCards::FillAll CarDealer::ShowCarInfo CarDealer::ShowSwatches CarCard::FillDetail CarDealer::ShowDriveDialog GarageStage::ShowCarById GarageStage::ShowCarByIdWithClass CarDealer::Buy CarDealer::OnDialogDone CarDealer::Page2 CarDealer::Transition7 CarDealer::Transition13 CarDealer::OpenCarList CarDealer::OpenColors CarDealer::Transition18 CarDealer::Update
 CarDealerEntry	car-dealer	yes		8448	CarDealer::BuildLists	1	CarDealer::BuildLists
+CarDealerList	car-dealer	no	shared (2 areas); no allocation seen	516		7	CarCards::FillAll CarDealer::ShowCarInfo CarDealer::Page2 CarDealer::Transition7 CarDealer::OpenCarList
 CarDealerMode	car-dealer	no	no allocation seen	812		2	CarDealer::Close CarDealer::OnDialogDone
 CarDealerSwatch	material-passes	yes		32	CarDealer::OpenColors	1	CarDealer::OpenColors
 CarDecal	race-setup	no	shared (2 areas); no allocation seen	32		2	
@@ -392,7 +393,7 @@ CollisionGroundDefaultSource	collision	no	no allocation seen	8		1
 CollisionHit	car-physics	no	shared (2 areas)	80	CollisionWorld::Create CollisionWorld::SetQueryCapacity	4	CollisionWorld::SetQueryCapacity
 CollisionHitRecords	vehicle-accessors	no	shared (2 areas); no allocation seen	160		3	
 CollisionObject	vehicle-accessors	no	shared (3 areas); no allocation seen	320		26	
-CollisionObjectBlock	car-physics	yes		16	CollisionWorld::Create	1	
+CollisionObjectBlock	car-physics	yes		16016	CollisionWorld::Create	1	
 CollisionPair	car-physics	no	shared (2 areas); no allocation seen	32		11	CollisionWorld::RemovePairsByGroups CollisionWorld::AddPairs CollisionWorld::UnlinkPair CollisionWorld::MovePair CollisionWorld::LinkPair
 CollisionPairCache	collision	no	no allocation seen	4		1	
 CollisionPairObject	collision	no	shared (2 areas); no allocation seen	320		5	CollisionWorld::RemovePairsByGroups
@@ -720,7 +721,6 @@ LocationScreenAt9640	location-screen	no	no allocation seen	9608		1
 LocationScreenDispatcher	location-screen	no	no allocation seen	812		2	
 LocationScreenEntry20	location-screen	no	no allocation seen	20		4	LocationScreen::NextResultTextB LocationScreen::NextOpponentText LocationScreen::SetUp
 LocationScreenMachine	location-screen	no	no allocation seen	9624		3	LocationScreen::Page8
-LocationScreenPart	location-screen	yes		28928	ModeType5::Init	1	ModeType5::Init
 LocationScreenPicture	location-screen	yes		16	LocationScreen::OnPictureLoadedA LocationScreen::OnPictureLoadedB	4	LocationScreen::OnPictureLoadedA LocationScreen::OnPictureLoadedB LocationScreen::PollLoad
 LocationScreenPictureTexture	location-screen	yes		12	LocationScreen::OnPictureLoadedA LocationScreen::OnPictureLoadedB	3	LocationScreen::OnPictureLoadedA LocationScreen::OnPictureLoadedB
 LockedRect	graphics-resources	no	tags gpu; no allocation seen	8		1	Texture::LockRect
@@ -1253,7 +1253,7 @@ ScreenObjectUvKey	screen-objects	no	no allocation seen	8		4	UvColumn::Find UvMap
 ScreenObjectUvMap	screen-objects	yes		12	UvMap::AllocateNodes	14	UvMap::Decrement UvMap::NewHead UvMap::Find UvMap::Insert UvMap::InsertUnique
 ScreenObjectUvMapAt76124	screen-objects	no	no allocation seen	8		1	
 ScreenObjectUvMapAt76124_2	screen-objects	no	no allocation seen	12		8	UvMap::Find UvMap::Insert UvMap::InsertUnique
-ScreenObjectUvMapNode	screen-objects	no	shared (2 areas); no allocation seen	48		8	UvMap::Decrement UvMap::Insert UvMap::InsertUnique
+ScreenObjectUvMapNode	screen-objects	no	no allocation seen	48		7	UvMap::Decrement UvMap::Insert UvMap::InsertUnique
 ScreenObjectUvMapNodePart	screen-objects	no	no allocation seen	4		1	
 ScreenObjectUvMapNodePart_2	screen-objects	no	no allocation seen	12		1	UvMap::Insert
 ScreenObjectUvMapValue	screen-objects	no	no allocation seen	20		3	UvColumn::Copy UvMap::InsertUnique
@@ -1504,13 +1504,11 @@ Type2ModeBlock	type2-mode	yes		162688	ModeType2::Init	5	ModeType2::Init ModeType
 Type2ScreenMachine	type2-mode	no	no allocation seen	9620		3	ModeType2::FindShown ModeType2::NextMode ModeType2::Leaving
 Type2ScreensMode	type2-screens	no	no allocation seen	812		7	
 Type2SystemTime	type2-screens	no	no allocation seen	16		1	
-Type4Block	title-screen	no	no allocation seen	48220		25	TitleScreen::MoveCareerCursor ModeType4::NextMode
-Type4BlockAt38560	title-screen	no	no allocation seen	9608		1	
-Type4BlockPart	title-screen	yes		48180	ModeType4::Init	1	ModeType4::Init
-Type4Machine	title-screen	no	no allocation seen	9620		24	ModeType4::FindShown ModeType4::WaitForLeave ModeType4::NextMode ModeType4::Leaving
+Type4Block	title-screen	yes		48220	ModeType4::Init	26	TitleScreen::MoveCareerCursor ModeType4::Init ModeType4::NextMode
+Type4Machine	title-screen	no	no allocation seen	9620		25	ModeType4::FindShown ModeType4::WaitForLeave ModeType4::NextMode ModeType4::Leaving
 Type5Dialog	type5-mode	no	no allocation seen	9620		17	Type5Dialog::OpenConfirmStep Type5Dialog::MoveCursorStep Type5Dialog::Update
 Type5DialogData	type5-mode	yes		68	Type5Dialog::OnEnter	15	Type5Dialog::Update
-Type5ModeBlock	type5-mode	no	shared (2 areas); no allocation seen	28940		6	ModeType5::Interrupt ModeType5::ForceExit ModeType5::WaitForLoads ModeType5::Leaving ModeType5::NextMode
+Type5ModeBlock	type5-mode	no	shared (2 areas)	28940	ModeType5::Init	7	ModeType5::Init ModeType5::Interrupt ModeType5::ForceExit ModeType5::WaitForLoads ModeType5::Leaving ModeType5::NextMode
 Type5ModeVtable	type5-mode	no	no allocation seen	60		1	
 Type5SlotObject	type5-mode	no	no allocation seen	4		1	
 Type67Dialog	type6-type7-modes	no	no allocation seen	9764		38	Dialog::OpenConfirmStep Type6Dialog::Draw Type6Dialog::Update Type6Mode::Interrupt Type6Mode::ForceExit Dialog::MoveCursorStep Type7Dialog::Draw Type7Dialog::Update Type7Mode::Interrupt Type7Mode::ForceExit
@@ -1624,7 +1622,7 @@ UserInfoMode	user-info	no	no allocation seen	812		1
 Utf16Chars	system-services	no	no allocation seen	4		2	sub_82297340
 Utf8Bytes	system-services	no	no allocation seen	6		2	sub_82297340
 Vector16	car-scene-draw	no	no allocation seen	16		5	Vector16::InsertN
-Vector16Storage	car-scene-draw	yes		32	Vector16::Allocate	2	Vector16::InsertN
+Vector16Storage	car-scene-draw	yes		16	Vector16::Allocate	2	Vector16::InsertN
 VectorHolder	heap	no	no allocation seen	16		1	
 VectorHolderOwner	heap	no	no allocation seen	8		1	
 VectorLibMatrix	vehicle-accessors	no	no allocation seen	64		3	

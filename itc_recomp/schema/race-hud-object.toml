@@ -10,12 +10,16 @@
 # pass (src/race_hud_object/).
 
 # The race HUD (640 bytes, embedded at the holder [0x826D84F0] + 16; the
-# holder's +656 probably holds a second one, the split screen's).
+# holder's +656 probably holds a second one, the split screen's). In host
+# memory (E5 step 4), inside the host holder (RaceScreens' hud embed). Its
+# curves and bars stay bytes (guest order): HudCurve and RaceHudBar are
+# guest views over them (raw accesses through the handle).
 [RaceHud]
 measure = "RaceHud"
 measures = ["sub_822155C0.r3", "sub_82213860.r3", "sub_82214C88.r3", "RaceHud::ApplyOptions.r3", "RaceHud::StopCountdown.r3"]
 size = 640
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "option_node3", offset = 0, type = "u32", note = "HUD option 0 (player 0's save data +0x1F85C): the dashboard's node 3 shown" },
   { name = "option_node1", offset = 4, type = "u32", note = "HUD option 1: the dashboard's node 1 shown" },
@@ -179,6 +183,8 @@ strings = { address = 0x826C5C34, type = "ptr", to = "Strings", note = "the stri
 measure = "RaceScreens@+656"
 size = 348
 origin = "embedded"
+# Host (E5 step 4): a view of the SplitHud at the holder's +656, inside the host holder.
+storage = "host"
 fields = [
   { name = "unknown_328", offset = 328, type = "u32" },
   { name = "unknown_336", offset = 336, type = "u32" },
@@ -195,6 +201,8 @@ fields = [
 measure = "RaceHudMachine.+9608@+16"
 size = 636
 origin = "embedded"
+# Host (E5 step 4): a view of the RaceHud at the holder's +16, inside the host holder.
+storage = "host"
 fields = [
   { name = "unknown_444", offset = 444, type = "u32" },
   { name = "unknown_456", offset = 456, type = "u32" },
@@ -209,6 +217,8 @@ fields = [
 measure = "RaceScreens::~RaceScreens.r3@+16"
 size = 612
 origin = "embedded"
+# Host (E5 step 4): a view of the RaceHud at the holder's +16, inside the host holder.
+storage = "host"
 fields = [
   { name = "unknown_588", offset = 588, type = "u32" },
   { name = "unknown_608", offset = 608, type = "u32" },
@@ -219,6 +229,8 @@ fields = [
 measure = "RaceScreens@+16"
 size = 640
 origin = "embedded"
+# Host (E5 step 4): a view of the RaceHud at the holder's +16, inside the host holder.
+storage = "host"
 fields = [
   { name = "unknown_8", offset = 8, type = "u32" },
   { name = "unknown_12", offset = 12, type = "u32" },

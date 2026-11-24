@@ -36,6 +36,12 @@ using Repeat = schema::ActionRepeat;
 using Curve = schema::ActionCurve;
 using ClientList = schema::InputClientList;
 using ClientNode = schema::InputClientNode;
+// The mapper's array elements by address (the mapper is in host memory, E5
+// step 4: its arrays embedded objects, so an element's address is an
+// interior handle; the views are dual, so a guest address reads as before).
+using Word = schema::ActionWord;
+using Half = schema::ActionHalf;
+using Float = schema::ActionFloat;
 inline double Fmuls(double a, double b) {
   return double(float(a * b));
 }
@@ -67,7 +73,7 @@ inline uint16_t FctidzLow16(double a) {
 }
 // lhz, extsw, std, lfd, fcfid, frsp: an unsigned halfword as a float.
 inline double FromU16(uint8_t* base, uint32_t address) {
-  return double(float(double(int64_t(guest::LoadU16(base, address)))));
+  return double(float(double(int64_t(Half(base, address).value()))));
 }
 inline uint32_t Bit(uint32_t word, uint32_t i) {
   return (word >> i) & 1;
@@ -257,7 +263,7 @@ uint32_t ClientListFind(uint8_t* base, uint32_t type, uint32_t n) {
 bool RepeatsKnown(uint8_t* base, uint32_t mapper) {
   const Mapper m(base, mapper);
   for (uint32_t i = 0; i < kActions; i++) {
-    const Repeat object(base, guest::LoadU32(base, m.repeat_pointers_address() + 4 * i));
+    const Repeat object(base, m.repeat_pointer(i).value());
     if (object.vtable().update() != kRepeatUpdateFunction) {
       return false;
     }
@@ -268,7 +274,7 @@ bool RepeatsKnown(uint8_t* base, uint32_t mapper) {
 bool CurvesKnown(uint8_t* base, uint32_t mapper) {
   const Mapper m(base, mapper);
   for (uint32_t i = 0; i < kActions; i++) {
-    const Curve object(base, guest::LoadU32(base, m.curve_pointers_address() + 4 * i));
+    const Curve object(base, m.curve_pointer(i).value());
     if (object.vtable().update() != kCurveApplyFunction) {
       return false;
     }
@@ -283,7 +289,7 @@ bool MapperCallsKnown(uint8_t* base, uint32_t mapper) {
 double CurveUnsigned(uint8_t* base, uint32_t analog, uint32_t index, uint32_t raw) {
   ITC_NATIVE_RUNNING("sub_8210B4A8 ActionMapper::CurveUnsigned");
   const uint32_t curve =
-      guest::LoadU32(base, AnalogStage(base, analog).curve_pointers_address() + 4 * index);
+      Word(base, AnalogStage(base, analog).curve_pointers_address() + 4 * index).value();
   const double x =
       Fmuls(double(float(double(int64_t(raw & 0xFFFF)))), double(G::unsigned_scale(base)));
   return CurveApply(base, curve, x);
@@ -292,7 +298,7 @@ double CurveUnsigned(uint8_t* base, uint32_t analog, uint32_t index, uint32_t ra
 double CurveCentered(uint8_t* base, uint32_t analog, uint32_t index, uint32_t raw) {
   ITC_NATIVE_RUNNING("sub_8210B500 ActionMapper::CurveCentered");
   const uint32_t curve =
-      guest::LoadU32(base, AnalogStage(base, analog).curve_pointers_address() + 4 * index);
+      Word(base, AnalogStage(base, analog).curve_pointers_address() + 4 * index).value();
   const double value = double(float(double(int64_t(raw & 0xFFFF))));
   const double x = Fmuls(Fsubs(value, double(G::centered_offset(base))),
                          double(G::centered_scale(base)));
@@ -306,21 +312,21 @@ uint32_t Analog(uint8_t* base, uint32_t analog, uint32_t config, uint32_t raw, d
   uint32_t r3 = analog;
   const double zero = double(G::zero(base));
   for (uint32_t i = 0; i < kActions; i++) {
-    const uint32_t link = guest::LoadU32(base, c.links() + 4 * i);
-    uint32_t kind = guest::LoadU32(base, c.kinds() + 4 * i);
-    const uint16_t value = guest::LoadU16(base, raw + 2 * i);
-    if (link < i && guest::LoadU16(base, raw + 2 * link) != 0) {
+    const uint32_t link = Word(base, c.links() + 4 * i).value();
+    uint32_t kind = Word(base, c.kinds() + 4 * i).value();
+    const uint16_t value = Half(base, raw + 2 * i).value();
+    if (link < i && Half(base, raw + 2 * link).value() != 0) {
       kind = 0;
     }
     if (kind == 0) {
-      guest::StoreU16(base, a.raw_address() + 2 * i, 0);
-      guest::StoreFloat(base, a.values_address() + 4 * i, float(zero));
+      Half(base, a.raw_address() + 2 * i).set_value(0);
+      Float(base, a.values_address() + 4 * i).set_value(float(zero));
     } else if (kind == 1 || kind == 2) {
-      guest::StoreU16(base, a.raw_address() + 2 * i, value);
+      Half(base, a.raw_address() + 2 * i).set_value(value);
       const double result = kind == 1 ? CurveUnsigned(base, analog, i, value)
                                       : CurveCentered(base, analog, i, value);
-      guest::StoreFloat(base, a.values_address() + 4 * i, float(result));
-      r3 = guest::LoadU32(base, a.curve_pointers_address() + 4 * i);
+      Float(base, a.values_address() + 4 * i).set_value(float(result));
+      r3 = Word(base, a.curve_pointers_address() + 4 * i).value();
       *f1 = result;
     }
   }
@@ -351,7 +357,7 @@ uint32_t Hysteresis(uint8_t* base, uint32_t words, uint32_t index, double value,
     entry.set_counter(counter - 1);
   }
   if (entry.state() != 0) {
-    const uint32_t link = guest::LoadU32(base, Config(base, config).links() + 4 * index);
+    const uint32_t link = Word(base, Config(base, config).links() + 4 * index).value();
     if (link != 30) {
       const Threshold linked(base, s.thresholds_address() + Threshold::kSize * link);
       linked.set_counter(linked.suppress_ticks());
@@ -370,8 +376,8 @@ uint32_t WordsFromState(uint8_t* base, uint32_t words, uint32_t config, uint32_t
   uint32_t held = stack_word;
   for (uint32_t i = 0; i < kActions; i++) {
     bool set = false;
-    if (Bit(state_word, i) && guest::LoadU32(base, c.kinds() + 4 * i) == 1) {
-      const uint32_t link = guest::LoadU32(base, c.links() + 4 * i);
+    if (Bit(state_word, i) && Word(base, c.kinds() + 4 * i).value() == 1) {
+      const uint32_t link = Word(base, c.links() + 4 * i).value();
       // A linked action before this one already held suppresses it.
       set = !(link < i && int32_t(link) >= 0 && Bit(held, link & 31));
     }
@@ -389,7 +395,7 @@ uint32_t WordsFromState(uint8_t* base, uint32_t words, uint32_t config, uint32_t
   s.set_pending(0);
   uint32_t result = 0;
   for (uint32_t i = 0; i < kActions; i++) {
-    const uint32_t repeat = guest::LoadU32(base, s.repeat_pointers_address() + 4 * i);
+    const uint32_t repeat = Word(base, s.repeat_pointers_address() + 4 * i).value();
     result = RepeatUpdate(base, repeat, Bit(s.held(), i));
     if ((result & 0xFF) != 0) {
       s.set_fired(s.fired() | (1u << i));
@@ -416,7 +422,7 @@ uint32_t Rebuild(uint8_t* base, uint32_t words, uint32_t config, uint32_t raw,
   uint32_t states = 0;
   double value = 0;
   for (uint32_t i = 0; i < kActions; i++) {
-    value = double(guest::LoadFloat(base, s.analog_values_address() + 4 * i));
+    value = double(Float(base, s.analog_values_address() + 4 * i).value());
     if ((Hysteresis(base, words, i, value, config) & 0xFF) != 0) {
       states |= 1u << i;
     } else {
@@ -432,7 +438,7 @@ uint32_t MapperUpdate(uint8_t* base, uint32_t mapper, uint32_t stack_word, doubl
   const Mapper m(base, mapper);
   const uint32_t raw = m.raw_address();
   for (uint32_t i = 0; i < kActions; i++) {
-    guest::StoreU16(base, raw + 2 * i, 0);
+    Half(base, raw + 2 * i).set_value(0);
   }
   const double zero = double(G::zero(base));
   const double scale = double(G::pad_scale(base));
@@ -442,9 +448,9 @@ uint32_t MapperUpdate(uint8_t* base, uint32_t mapper, uint32_t stack_word, doubl
   auto direction = [&](float (Pad::*value)() const, uint32_t positive, uint32_t negative) {
     const double v = double((m.pad_values().*value)());
     if (v > zero) {
-      guest::StoreU16(base, positive, FctidzLow16(Fabs(Fmuls(v, scale))));
+      Half(base, positive).set_value(FctidzLow16(Fabs(Fmuls(v, scale))));
     } else if (v < zero) {
-      guest::StoreU16(base, negative, FctidzLow16(Fabs(Fmuls(v, scale))));
+      Half(base, negative).set_value(FctidzLow16(Fabs(Fmuls(v, scale))));
     }
   };
   direction(&Pad::left_y, m.raw_left_y_plus_address(), m.raw_left_y_minus_address());
@@ -461,12 +467,12 @@ uint32_t MapperUpdate(uint8_t* base, uint32_t mapper, uint32_t stack_word, doubl
                                           128,  4096,  65536, 16384,  262144,  1048576, 2097152};
   static constexpr uint32_t kIds[14] = {153, 154, 155, 156, 159, 158, 160,
                                         157, 161, 162, 165, 166, 152, 151};
-  const uint32_t listener = m.listener_address();
+  const uint32_t listener = m.listener_processor().address;
   for (int b = 0; b < 14; b++) {
     const uint32_t held = ListenerTestValue(base, listener, kMasks[b]);
     NoteListenerTest(0x8210C624, listener, kMasks[b], held);
     if ((held & 0xFF) != 0) {
-      guest::StoreU16(base, raw + 2 * IndexOf(kIds[b]), 32767);
+      Half(base, raw + 2 * IndexOf(kIds[b])).set_value(32767);
     }
   }
   // The axes, from the directions' raw values.
@@ -523,7 +529,7 @@ uint32_t WordBit(uint8_t* base, uint32_t id, uint32_t word) {
   if (index == 30) {
     return 0;
   }
-  return Bit(guest::LoadU32(base, word), index);
+  return Bit(Word(base, word).value(), index);
 }
 
 }  // namespace
@@ -557,9 +563,7 @@ uint32_t AnalogValue(uint8_t* base, uint32_t mapper, uint32_t id, double* f1) {
   ITC_NATIVE_RUNNING("sub_8210BA68 ActionMapper::AnalogValue");
   const uint32_t index = IndexOf(id);
   // An id out of range reads the float at 0x82000A34.
-  *f1 = double(guest::LoadFloat(base, index == 30 ? G::zero_address()
-                                                  : Mapper(base, mapper).analog_values_address() +
-                                                        4 * index));
+  *f1 = double(index == 30 ? G::zero(base) : Mapper(base, mapper).analog_value(index).value());
   return index;
 }
 
@@ -569,7 +573,7 @@ uint32_t AnalogRaw(uint8_t* base, uint32_t mapper, uint32_t id) {
   if (index == 30) {
     return 0;
   }
-  return guest::LoadU16(base, Mapper(base, mapper).analog_raw_address() + 2 * index);
+  return Mapper(base, mapper).analog_raw_value(index).value();
 }
 
 uint32_t SetThreshold(uint8_t* base, uint32_t mapper, uint32_t id, double on, double off,
@@ -579,7 +583,7 @@ uint32_t SetThreshold(uint8_t* base, uint32_t mapper, uint32_t id, double on, do
   if (index == 30) {
     return index;
   }
-  const Threshold entry(base, Mapper(base, mapper).thresholds_address() + Threshold::kSize * index);
+  const Threshold entry = Mapper(base, mapper).threshold(index);
   entry.set_on(float(on));
   entry.set_suppress_ticks(ticks);
   entry.set_off(float(off));
@@ -595,7 +599,7 @@ uint32_t SetRepeat(uint8_t* base, uint32_t mapper, uint32_t id, uint32_t delay,
   if (index == 30) {
     return index;
   }
-  const Repeat repeat(base, Mapper(base, mapper).repeats_address() + Repeat::kSize * index);
+  const Repeat repeat = Mapper(base, mapper).repeat(index);
   repeat.set_delay(delay);
   repeat.set_period(period);
   return index;
@@ -608,7 +612,7 @@ uint32_t SetCurve(uint8_t* base, uint32_t mapper, uint32_t id, double center, do
   if (index == 30) {
     return index;
   }
-  const Curve curve(base, Mapper(base, mapper).curves_address() + Curve::kSize * index);
+  const Curve curve = Mapper(base, mapper).curve(index);
   curve.set_center(float(center));
   curve.set_dead_zone(float(dead));
   curve.set_maximum(float(maximum));
@@ -682,7 +686,7 @@ uint32_t Slot0(uint8_t* base, uint32_t object) {
 
 bool PointersKnown(uint8_t* base, uint32_t pointers, uint32_t function) {
   for (uint32_t i = 0; i < kActions; i++) {
-    if (Slot0(base, guest::LoadU32(base, pointers + 4 * i)) != function) {
+    if (Slot0(base, Word(base, pointers + 4 * i).value()) != function) {
       return false;
     }
   }
@@ -718,7 +722,7 @@ uint32_t ResetWords(uint8_t* base, uint32_t words) {
   const State s(base, words);
   uint32_t object = 0;
   for (uint32_t i = 0; i < kActions; i++) {
-    object = guest::LoadU32(base, s.repeat_pointers_address() + 4 * i);
+    object = Word(base, s.repeat_pointers_address() + 4 * i).value();
     Repeat(base, object).set_count(0);  // sub_8243DC88
   }
   s.set_held(0);
@@ -734,11 +738,11 @@ uint32_t ResetAnalog(uint8_t* base, uint32_t analog) {
   ITC_NATIVE_RUNNING("sub_8210B438 ActionMapper::ResetAnalog");
   const AnalogStage a(base, analog);
   // Each curve's slot 0 (sub_82106540) does nothing.
-  const uint32_t object = guest::LoadU32(base, a.curve_pointers_address() + 4 * (kActions - 1));
+  const uint32_t object = Word(base, a.curve_pointers_address() + 4 * (kActions - 1)).value();
   const double zero = double(G::zero(base));
   for (uint32_t i = 0; i < kActions; i++) {
-    guest::StoreU16(base, a.raw_address() + 2 * i, 0);
-    guest::StoreFloat(base, a.values_address() + 4 * i, float(zero));
+    Half(base, a.raw_address() + 2 * i).set_value(0);
+    Float(base, a.values_address() + 4 * i).set_value(float(zero));
   }
   return object;
 }
@@ -748,7 +752,7 @@ uint32_t InitRepeats(uint8_t* base, uint32_t words) {
   const State s(base, words);
   for (uint32_t i = 0; i < kActions; i++) {
     const Repeat object(base, s.repeats_address() + Repeat::kSize * i);
-    guest::StoreU32(base, s.repeat_pointers_address() + 4 * i, object.address);
+    Word(base, s.repeat_pointers_address() + 4 * i).set_value(object.address);
     object.set_count(0);  // sub_8243DC88
     object.set_delay(20);
     object.set_period(10);
@@ -763,7 +767,7 @@ uint32_t InitCurves(uint8_t* base, uint32_t analog) {
   const double zero = double(G::zero(base));
   for (uint32_t i = 0; i < kActions; i++) {
     const Curve object(base, a.curves_address() + Curve::kSize * i);
-    guest::StoreU32(base, a.curve_pointers_address() + 4 * i, object.address);
+    Word(base, a.curve_pointers_address() + 4 * i).set_value(object.address);
     object.set_center(float(zero));
     object.set_dead_zone(float(zero));
     object.set_maximum(float(one));
@@ -828,12 +832,12 @@ void MapperConstruct(uint8_t* base, uint32_t mapper, uint32_t player) {
   const uint32_t words = m.held_address();
   m.set_vtable(Mapper::kVtable);
   for (uint32_t i = 0; i < kActions; i++) {
-    Repeat(base, m.repeats_address() + Repeat::kSize * i).set_vtable(Repeat::kVtable);
+    m.repeat(i).set_vtable(Repeat::kVtable);
   }
   for (uint32_t i = 0; i < kActions; i++) {
-    Curve(base, m.curves_address() + Curve::kSize * i).set_vtable(Curve::kVtable);
+    m.curve(i).set_vtable(Curve::kVtable);
   }
-  input::InputProcessorConstruct(base, m.listener_address());
+  input::InputProcessorConstruct(base, m.listener_processor().address);
   m.set_player(player);
   m.set_bound(0);
   ResetStages(base, words);
@@ -843,20 +847,20 @@ void MapperConstruct(uint8_t* base, uint32_t mapper, uint32_t player) {
   const double off = double(G::threshold_off(base));
   const double on = double(G::threshold_on(base));
   for (uint32_t i = 0; i < kActions; i++) {
-    guest::StoreU32(base, m.kinds_address() + 4 * i, 1);
-    guest::StoreU32(base, m.analog_kinds_address() + 4 * i, i >= 24 ? 2 : 1);
+    m.kind(i).set_value(1);
+    m.analog_kind(i).set_value(i >= 24 ? 2 : 1);
     const uint32_t c = i - 2;  // the switch's case, unsigned
-    guest::StoreU32(base, m.links_address() + 4 * i, c <= 21 ? kLinks[c] : 30);
-    const Threshold entry(base, m.thresholds_address() + Threshold::kSize * i);
+    m.link(i).set_value(c <= 21 ? kLinks[c] : 30);
+    const Threshold entry = m.threshold(i);
     entry.set_on(float(on));
     entry.set_suppress_ticks(0);
     entry.set_off(float(off));
     entry.set_counter(0);
     entry.set_state(0);
-    const Repeat repeat(base, m.repeats_address() + Repeat::kSize * i);
+    const Repeat repeat = m.repeat(i);
     repeat.set_delay(20);
     repeat.set_period(3);
-    const Curve curve(base, m.curves_address() + Curve::kSize * i);
+    const Curve curve = m.curve(i);
     curve.set_center(float(zero));
     curve.set_dead_zone(float(zero));
     curve.set_maximum(float(one));
@@ -890,8 +894,7 @@ bool MapperBindKnown(uint8_t* base, uint32_t mapper, uint32_t object) {
       manager.vtable().get_logical_pad() != kGetLogicalPad) {
     return false;
   }
-  const schema::PtrList list(base, schema::InputManager(base, object).listener_lists_address() +
-                                       schema::PtrList::kSize * player);
+  const schema::PtrList list = schema::InputManager(base, object).listener_list(player);
   const schema::LogicalPad pad(base, input::ManagerLogicalPad(object, player));
   return list.size() == 0 && std_list::CanAllocate(base, 1) &&
          pad.vtable().values() == kLogicalPadValues;
@@ -903,7 +906,7 @@ uint32_t MapperBind(uint8_t* base, uint32_t mapper, uint32_t object) {
   const uint32_t player = m.player();
   m.set_input_manager(object);
   if (player <= 3) {
-    if (!input::ManagerAddListener(base, object, player, m.listener_address())) {
+    if (!input::ManagerAddListener(base, object, player, m.listener_processor().address)) {
       ITC_LOG_ERROR("ActionMapper::Bind: AddListener refused after its checks");
       std::abort();
     }
@@ -918,21 +921,13 @@ bool InitCreate(uint8_t* base, uint32_t manager, uint32_t* list) {
   ITC_NATIVE_RUNNING("sub_8209F430 ActionMappers::Init");
   // operator new's error paths are the original's: every block made first
   // (in the original's order: the list, then mappers 0-3; the constructors
-  // allocate nothing), then built and stored. The list is in host memory
-  // (E5 step 4).
-  constexpr uint32_t kSizes[5] = {ClientList::kSize, Mapper::kSize, Mapper::kSize,
-                                  Mapper::kSize, Mapper::kSize};
+  // allocate nothing), then built and stored. The list and the mappers are
+  // in host memory (E5 step 4), never freed (the process ends with them), so
+  // operator new's error paths are gone.
   uint32_t blocks[5];
-  for (int i = 0; i < 5; i++) {
-    const auto block = i == 0 ? std::optional<uint32_t>(ClientList::New(base).address)
-                              : memory::crt::OperatorNew(base, kSizes[i]);
-    if (!block) {
-      for (int k = 0; k < i; k++) {
-        memory::crt::OperatorDelete(blocks[k]);
-      }
-      return false;
-    }
-    blocks[i] = *block;
+  blocks[0] = ClientList::New(base).address;
+  for (int i = 1; i < 5; i++) {
+    blocks[i] = Mapper::New(base).address;
   }
   G::set_owner(base, manager);
   InputClientListConstruct(base, blocks[0], G::owner(base).address);

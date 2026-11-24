@@ -41,6 +41,17 @@ namespace {
 
 constexpr uint32_t kWheelBytes = schema::VehicleWheel::kSize;
 
+// A word of the car overlays' (a host object since E5 step 4) at `at`, one
+// of its fields' addresses (an interior handle): through the view, as the
+// guest's bytes give it (its pointer arrays and rate accumulators are bytes
+// fields in guest order).
+uint32_t LoadWord(const schema::CarOverlays& o, uint32_t at) {
+  return uint32_t(o.load_at(at - o.address, 4));
+}
+void StoreWord(const schema::CarOverlays& o, uint32_t at, uint32_t v) {
+  o.store_at(at - o.address, 4, v);
+}
+
 uint32_t Vehicle(uint8_t* base, uint32_t view) {
   return schema::OverlayView(base, view).vehicle();
 }
@@ -62,7 +73,8 @@ uint32_t View(uint8_t* base, uint32_t overlays, uint32_t slot) {
   if (slot == 25) {
     return 0;
   }
-  return guest::LoadU32(base, schema::CarOverlays(base, overlays).views_address() + 4 * slot);
+  const schema::CarOverlays self(base, overlays);
+  return LoadWord(self, self.views_address() + 4 * slot);
 }
 
 uint32_t ViewportEntry(uint32_t index) {
@@ -1579,7 +1591,7 @@ bool EmitSmoke(uint8_t* base, uint32_t overlays, double rate, double speed, uint
   const schema::CarOverlays self(base, overlays);
   // The wheel's rate accumulator (48 bytes a wheel) and smoke overlay.
   const uint32_t accumulator = self.smoke_rates_address() + wheel * 48;
-  const uint32_t smoke = guest::LoadU32(base, self.smokes_address() + (wheel << 2));
+  const uint32_t smoke = LoadWord(self, self.smokes_address() + (wheel << 2));
   const schema::Smoke s(base, smoke);
   const uint32_t region = wheel >= 4 ? 1 : 0;
   if (rate == double(G::zero(base))) {
@@ -1590,8 +1602,8 @@ bool EmitSmoke(uint8_t* base, uint32_t overlays, double rate, double speed, uint
       (accumulator + 4 > s.capacity_address() && accumulator < s.texture_holder_address())) {
     return false;
   }
-  const float sum = float(double(guest::LoadFloat(base, accumulator)) + rate);
-  guest::StoreFloat(base, accumulator, sum);
+  const float sum = float(double(std::bit_cast<float>(LoadWord(self, accumulator))) + rate);
+  StoreWord(self, accumulator, std::bit_cast<uint32_t>(sum));
   if (double(sum) < double(G::one(base))) {
     return true;
   }
@@ -1609,8 +1621,9 @@ bool EmitSmoke(uint8_t* base, uint32_t overlays, double rate, double speed, uint
   *last = whole;
   uint32_t result = 0;
   SmokeEmit(base, smoke, whole, speed, frame, region, value, &result, last);
-  guest::StoreFloat(base, accumulator,
-                    float(double(guest::LoadFloat(base, accumulator)) - whole));
+  StoreWord(self, accumulator,
+            std::bit_cast<uint32_t>(
+                float(double(std::bit_cast<float>(LoadWord(self, accumulator))) - whole)));
   return true;
 }
 
@@ -1625,8 +1638,9 @@ void OverlayConstruct(uint8_t* base, uint32_t overlay) {
 
 void ClearViews(uint8_t* base, uint32_t overlays) {
   ITC_NATIVE_RUNNING("sub_82126530 CarOverlays::ClearViews");
+  const schema::CarOverlays self(base, overlays);
   for (uint32_t i = 0; i < 25; i++) {
-    guest::StoreU32(base, schema::CarOverlays(base, overlays).views_address() + 4 * i, 0);
+    StoreWord(self, self.views_address() + 4 * i, 0);
   }
 }
 
@@ -1648,9 +1662,10 @@ void OverlayViewConstruct(uint8_t* base, uint32_t view) {
 void OverlayViewSet(uint8_t* base, uint32_t view, uint32_t desc) {
   ITC_NATIVE_RUNNING("sub_82126890 OverlayView::Set");
   // Word by word, in the original's order (the two may overlap).
+  const schema::OverlayView v(base, view);
   for (uint32_t i = 0; i < 3; i++) {
-    guest::StoreU32(base, schema::OverlayView(base, view).vehicle_address() + 4 * i,
-                    guest::LoadU32(base, schema::ViewDesc(base, desc).vehicle_address() + 4 * i));
+    v.store_at(v.vehicle_address() - v.address + 4 * i, 4,
+               guest::LoadU32(base, schema::ViewDesc(base, desc).vehicle_address() + 4 * i));
   }
 }
 
@@ -2773,7 +2788,7 @@ bool UpdateTrails(uint8_t* base, uint32_t overlays, uint32_t scratch) {
   const schema::CarOverlays self(base, overlays);
   for (uint32_t wheel = 0; wheel < 4; wheel++) {
     const int32_t capacity =
-        int32_t(schema::Trail(base, guest::LoadU32(base, self.trails_address() + 4 * wheel)).capacity());
+        int32_t(schema::Trail(base, LoadWord(self, self.trails_address() + 4 * wheel)).capacity());
     if (capacity == 0 || capacity == -1) {
       return false;
     }
@@ -2793,9 +2808,8 @@ bool UpdateTrails(uint8_t* base, uint32_t overlays, uint32_t scratch) {
   uint32_t value = (mode == 1 || mode == 2) ? 0 : 1;
   const double width_scale = G::frame_scale(base);
   for (uint32_t wheel = 0; wheel < 4; wheel++) {
-    const uint32_t trail = guest::LoadU32(base, self.trails_address() + 4 * wheel);
-    const schema::CarOverlaysWheel counter(
-        base, self.wheels_address() + 12 * wheel);
+    const uint32_t trail = LoadWord(self, self.trails_address() + 4 * wheel);
+    const schema::CarOverlaysWheel counter = self.wheels(wheel);
     uint32_t due = 0;
     const float axle = AxleValue3384(base, view, wheel);
     if (WheelOnGround(base, view, wheel) != 0 && WheelSurfaceMarks(base, view, wheel) != 0 &&
@@ -2967,7 +2981,7 @@ void UpdateLightSprites(uint8_t* base, uint32_t overlays, uint32_t frame) {
   }
   const double shift = G::axle_scale(base);
   for (int32_t i = 0; i < 4; i++) {
-    const uint32_t sprite = guest::LoadU32(base, self.light_sprites_address() + 4 * uint32_t(i));
+    const uint32_t sprite = LoadWord(self, self.light_sprites_address() + 4 * uint32_t(i));
     if (OverlayViewHasPoint(base, view, 4 + i) == 0) {
       continue;
     }
@@ -2986,7 +3000,7 @@ bool UpdateParticlesB(uint8_t* base, uint32_t overlays, uint32_t frame) {
   const schema::CarOverlays self(base, overlays);
   for (uint32_t i = 0; i < 4; i++) {
     const int32_t capacity =
-        int32_t(schema::ParticlesB(base, guest::LoadU32(base, self.particles_b_address() + 4 * i)).capacity());
+        int32_t(schema::ParticlesB(base, LoadWord(self, self.particles_b_address() + 4 * i)).capacity());
     if (capacity == 0 || capacity == -1) {
       return false;
     }
@@ -2998,7 +3012,7 @@ bool UpdateParticlesB(uint8_t* base, uint32_t overlays, uint32_t frame) {
   }
   const double shift = G::axle_scale(base);
   for (int32_t i = 0; i < 4; i++) {
-    const uint32_t effect = guest::LoadU32(base, self.particles_b_address() + 4 * uint32_t(i));
+    const uint32_t effect = LoadWord(self, self.particles_b_address() + 4 * uint32_t(i));
     if (OverlayViewHasPoint(base, view, 4 + i) == 0) {
       continue;
     }
@@ -3022,7 +3036,7 @@ void UpdateParticlesC(uint8_t* base, uint32_t overlays, uint32_t frame) {
   const uint32_t view = View(base, overlays, self.view_slot());
   CopyFloat(base, G::one_address(), frame + 92);
   for (int32_t i = 0; i < 4; i++) {
-    const uint32_t effect = guest::LoadU32(base, self.particles_c_address() + 4 * uint32_t(i));
+    const uint32_t effect = LoadWord(self, self.particles_c_address() + 4 * uint32_t(i));
     if (OverlayViewHasPoint(base, view, 14 + i) == 0) {
       continue;
     }
@@ -3068,7 +3082,7 @@ bool SmokeFrameCopiesPlain(uint8_t* base, uint32_t smoke, uint32_t frame) {
 bool EmitSmokeDeclines(uint8_t* base, uint32_t overlays, uint32_t wheel) {
   const schema::CarOverlays self(base, overlays);
   const uint32_t accumulator = self.smoke_rates_address() + wheel * 48;
-  const uint32_t smoke = guest::LoadU32(base, self.smokes_address() + (wheel << 2));
+  const uint32_t smoke = LoadWord(self, self.smokes_address() + (wheel << 2));
   const schema::Smoke s(base, smoke);
   const int32_t capacity = int32_t(s.capacity());
   return capacity == 0 || capacity == -1 ||
@@ -3150,7 +3164,7 @@ bool UpdateSmoke(uint8_t* base, uint32_t overlays, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_82125B60 CarOverlays::UpdateSmoke");
   const schema::CarOverlays self(base, overlays);
   for (uint32_t wheel = 0; wheel < 4; wheel++) {
-    const uint32_t smoke = guest::LoadU32(base, self.smokes_address() + 4 * wheel);
+    const uint32_t smoke = LoadWord(self, self.smokes_address() + 4 * wheel);
     if (EmitSmokeDeclines(base, overlays, wheel) ||
         !SmokeFrameCopiesPlain(base, smoke, frame + 112)) {
       return false;
@@ -3211,8 +3225,7 @@ bool UpdateSmoke(uint8_t* base, uint32_t overlays, uint32_t frame) {
   }
 
   for (uint32_t wheel = 0; wheel < 4; wheel++) {
-    const schema::CarOverlaysWheel counter(
-        base, self.wheels_address() + 12 * wheel);
+    const schema::CarOverlaysWheel counter = self.wheels(wheel);
     const double slip = ClampedScaled(
         WheelSlip(base, view, wheel, table.smoke_slip_threshold()), slip_most, slip_scale,
         zero);
@@ -3220,7 +3233,7 @@ bool UpdateSmoke(uint8_t* base, uint32_t overlays, uint32_t frame) {
     if (!(slip < rate)) {
       rate = slip;
     }
-    const uint32_t smoke = guest::LoadU32(base, self.smokes_address() + 4 * wheel);
+    const uint32_t smoke = LoadWord(self, self.smokes_address() + 4 * wheel);
     const float axle = AxleValue3764(base, view, wheel);
     const uint32_t contact = WheelContact(base, view, wheel);
     for (uint32_t k = 0; k < 3; k++) {

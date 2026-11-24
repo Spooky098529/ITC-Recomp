@@ -730,13 +730,41 @@ struct TrackNearestDistance : View {
 };
 
 // allocated; measure: new<4>@TrackCollision::Load
+#pragma pack(push, 1)
+struct TrackCollisionObjectData {
+  uint32_t value = 0;  // +0
+};
+#pragma pack(pop)
+static_assert(sizeof(TrackCollisionObjectData) == 4);
+inline constexpr memory::LayoutField kTrackCollisionObjectFields[] = {{0, 4}};
+inline constexpr memory::Layout kTrackCollisionObjectLayout = {kTrackCollisionObjectFields, 1};
+
 struct TrackCollisionObject : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  TrackCollisionObjectData* data() const { return static_cast<TrackCollisionObjectData*>(memory::HandleObject(address)); }
+  static TrackCollisionObject New(uint8_t* base) {
+    return TrackCollisionObject(base, memory::MakeHandle(new TrackCollisionObjectData(), sizeof(TrackCollisionObjectData), "TrackCollisionObject", &kTrackCollisionObjectLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static TrackCollisionObject NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(TrackCollisionObjectData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<TrackCollisionObjectData*>(::operator new(sizeof(TrackCollisionObjectData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) TrackCollisionObjectData();
+    return TrackCollisionObject(base, memory::MakeHandle(p, sizeof(TrackCollisionObjectData) * count, "TrackCollisionObject", &kTrackCollisionObjectLayout, sizeof(TrackCollisionObjectData)));
+  }
+  TrackCollisionObject at(uint32_t i) const { return TrackCollisionObject(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kTrackCollisionObjectLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kTrackCollisionObjectLayout, offset, width, v); }
   // 0, then 4; what it is isn't known
-  uint32_t value() const { return guest::LoadU32(base, address + 0); }
-  void set_value(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t value_address() const { return address + 0; }
+  uint32_t value() const { return data()->value; }
+  void set_value(uint32_t v) const { data()->value = v; }
+  uint32_t value_bits() const { return data()->value; }
+  void set_value_bits(uint32_t v) const { data()->value = v; }
 };
 
 // embedded; measure: TrackPosition@+16

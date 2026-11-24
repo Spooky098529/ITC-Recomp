@@ -3,8 +3,9 @@
 // docs/known-data.md): its Init, the delegate functions Modes::Tick runs
 // through ModeDelegate::Invoke and the mode's slot thunks, its +32
 // interface and the helpers over its block of 14 screen machines (+848).
-// Plain C++ over guest memory (the mode, its block, its message ring and
-// delegate are shared with the recompiled code), with the originals' loads
+// Plain C++ over the schema's views (the mode, its block, its message ring
+// and delegate are shared with the lifted code; the mode and the block in
+// host memory since E5 step 4, behind handles), with the originals' loads
 // and stores in their order and their frames' words. `sp` is the caller's
 // stack pointer: the back chain of the original's frame and its locals are
 // written below it as the original leaves them; its register saves aren't.
@@ -15,7 +16,7 @@
 // the callees' overrides: GameMessages::Dispatch, LoadingScreen::Run,
 // Finish and Show, Sound::Play, StandScene::PollTeardown and Create, the
 // hub's sub_8218F620 (never seen in play), Strings::Load,
-// Archive::WaitIdle, VirtualAlloc, the 14 machines' Inits, ScreenFades::
+// Archive::WaitIdle, the 14 machines' Inits, ScreenFades::
 // FadeIn, Career::NextDay, the screen start sub_8211AD00, and the slot
 // thunks' targets that aren't the type 2 mode's. SaveData::Of and
 // Type2Dialog::TakesInput are their plain C++.
@@ -56,7 +57,6 @@ constexpr uint32_t kScreenStart = 0x8211AD00;
 constexpr uint32_t kStringsLoad = 0x8210A8D0;
 constexpr uint32_t kArchiveWaitIdle = 0x8209D730;
 constexpr uint32_t kStandSceneCreate = 0x82180B00;
-constexpr uint32_t kVirtualAlloc = 0x82295398;
 constexpr uint32_t kCareerNextDay = 0x82116AF0;
 
 // --- The block's helpers (block.cpp) ---

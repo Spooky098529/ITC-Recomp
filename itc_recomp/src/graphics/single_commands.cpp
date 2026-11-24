@@ -179,7 +179,10 @@ uint32_t Callback(uint8_t* base, uint32_t slot, uint32_t sp, const GuestCall& ca
   const uint32_t frame = Frame(base, sp, 96);
   const uint32_t object = schema::Single(base, slot).argument0();
   const uint32_t device = Globals::replay_device(base);
-  const uint32_t function = schema::SingleCallbackObject(base, object).vtable().call();
+  // In play the movie, in host memory (E5 step 4): its vtable word through
+  // guest::VtableWord (a handle or a guest address).
+  const uint32_t function =
+      schema::SingleCallbackVtable(base, guest::VtableWord(base, object)).call();
   call(function, frame, 0x8258E9E0, {object, device});
   return 0;
 }

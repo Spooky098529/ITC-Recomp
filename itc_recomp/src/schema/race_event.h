@@ -9,255 +9,588 @@
 namespace schema {
 
 // allocated; measure: RaceEvent
+#pragma pack(push, 1)
+struct RaceEventData {
+  uint32_t section_rival_waiting = 0;  // +0
+  uint32_t on_section_13 = 0;  // +4
+  uint32_t on_section_14 = 0;  // +8
+  uint32_t on_section_4 = 0;  // +12
+  uint32_t on_section_5 = 0;  // +16
+  uint16_t count = 0;  // +20
+  uint16_t open_0_to_3 = 0;  // +22
+  uint16_t locked_0_to_3 = 0;  // +24
+  uint16_t open_4_to_9 = 0;  // +26
+  uint16_t locked_4_to_9 = 0;  // +28
+  uint16_t mode = 0;  // +30
+  uint16_t mode_streak = 0;  // +32
+  uint16_t location = 0;  // +34
+  uint16_t group0_open = 0;  // +36
+  uint16_t group0_locked = 0;  // +38
+  uint32_t group0_entries = 0;  // +40
+  uint32_t group0_locked_entries = 0;  // +44
+  uint8_t pad_48[36] = {};
+  uint16_t group4_open = 0;  // +84
+  uint16_t group4_locked = 0;  // +86
+  uint32_t group4_entries = 0;  // +88
+  uint32_t group4_locked_entries = 0;  // +92
+  uint8_t pad_96[60] = {};
+  uint32_t list = 0;  // +156
+};
+#pragma pack(pop)
+static_assert(sizeof(RaceEventData) == 160);
+inline constexpr memory::LayoutField kRaceEventFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 2}, {22, 2}, {24, 2}, {26, 2}, {28, 2}, {30, 2}, {32, 2}, {34, 2}, {36, 2}, {36, 2}, {38, 2}, {38, 2}, {40, 4}, {40, 4}, {44, 4}, {44, 4}, {48, 2}, {50, 2}, {52, 4}, {56, 4}, {60, 2}, {62, 2}, {64, 4}, {68, 4}, {72, 2}, {74, 2}, {76, 4}, {80, 4}, {84, 2}, {84, 2}, {86, 2}, {86, 2}, {88, 4}, {88, 4}, {92, 4}, {92, 4}, {96, 2}, {98, 2}, {100, 4}, {104, 4}, {108, 2}, {110, 2}, {112, 4}, {116, 4}, {120, 2}, {122, 2}, {124, 4}, {128, 4}, {132, 2}, {134, 2}, {136, 4}, {140, 4}, {144, 2}, {146, 2}, {148, 4}, {152, 4}, {156, 4}};
+inline constexpr memory::Layout kRaceEventLayout = {kRaceEventFields, 62};
+
 struct RaceEvent : View {
   using View::View;
   static constexpr uint32_t kSize = 160;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  RaceEventData* data() const { return static_cast<RaceEventData*>(memory::HandleObject(address)); }
+  static RaceEvent New(uint8_t* base) {
+    return RaceEvent(base, memory::MakeHandle(new RaceEventData(), sizeof(RaceEventData), "RaceEvent", &kRaceEventLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static RaceEvent NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(RaceEventData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<RaceEventData*>(::operator new(sizeof(RaceEventData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) RaceEventData();
+    return RaceEvent(base, memory::MakeHandle(p, sizeof(RaceEventData) * count, "RaceEvent", &kRaceEventLayout, sizeof(RaceEventData)));
+  }
+  RaceEvent at(uint32_t i) const { return RaceEvent(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kRaceEventLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kRaceEventLayout, offset, width, v); }
+  // the ten groups, one a location 0 to 9
+  template <typename T = EventGroup>
+  T group(uint32_t i) const { return T(base, address + 36 + i * T::kSize); }
   // 1 when a list entry's item has a kind 65 condition (RaceEvent::Init); also the list entry's item id through the measure's join
-  uint32_t section_rival_waiting() const { return guest::LoadU32(base, address + 0); }
-  void set_section_rival_waiting(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t section_rival_waiting_address() const { return address + 0; }
+  uint32_t section_rival_waiting() const { return data()->section_rival_waiting; }
+  void set_section_rival_waiting(uint32_t v) const { data()->section_rival_waiting = v; }
+  uint32_t section_rival_waiting_bits() const { return data()->section_rival_waiting; }
+  void set_section_rival_waiting_bits(uint32_t v) const { data()->section_rival_waiting = v; }
   // 1 while the player's car is on section 13's slices 0 to 9 (AiPath::NoteFixedSections; +4 and +8, or +12 and +16, let the section rival in); also a group's entries through the measure's join
-  uint32_t on_section_13() const { return guest::LoadU32(base, address + 4); }
-  void set_on_section_13(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t on_section_13_address() const { return address + 4; }
+  uint32_t on_section_13() const { return data()->on_section_13; }
+  void set_on_section_13(uint32_t v) const { data()->on_section_13 = v; }
+  uint32_t on_section_13_bits() const { return data()->on_section_13; }
+  void set_on_section_13_bits(uint32_t v) const { data()->on_section_13 = v; }
   // section 14's slices 0 to 4; also a group's locked entries through the measure's join
-  uint32_t on_section_14() const { return guest::LoadU32(base, address + 8); }
-  void set_on_section_14(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t on_section_14_address() const { return address + 8; }
+  uint32_t on_section_14() const { return data()->on_section_14; }
+  void set_on_section_14(uint32_t v) const { data()->on_section_14 = v; }
+  uint32_t on_section_14_bits() const { return data()->on_section_14; }
+  void set_on_section_14_bits(uint32_t v) const { data()->on_section_14 = v; }
   // section 4's slices 0 to 9
-  uint32_t on_section_4() const { return guest::LoadU32(base, address + 12); }
-  void set_on_section_4(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
   uint32_t on_section_4_address() const { return address + 12; }
+  uint32_t on_section_4() const { return data()->on_section_4; }
+  void set_on_section_4(uint32_t v) const { data()->on_section_4 = v; }
+  uint32_t on_section_4_bits() const { return data()->on_section_4; }
+  void set_on_section_4_bits(uint32_t v) const { data()->on_section_4 = v; }
   // section 5's slices 0 to 4
-  uint32_t on_section_5() const { return guest::LoadU32(base, address + 16); }
-  void set_on_section_5(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
   uint32_t on_section_5_address() const { return address + 16; }
+  uint32_t on_section_5() const { return data()->on_section_5; }
+  void set_on_section_5(uint32_t v) const { data()->on_section_5 = v; }
+  uint32_t on_section_5_bits() const { return data()->on_section_5; }
+  void set_on_section_5_bits(uint32_t v) const { data()->on_section_5 = v; }
   // the list's count (+22 + +24)
-  uint16_t count() const { return guest::LoadU16(base, address + 20); }
-  void set_count(uint16_t v) const { guest::StoreU16(base, address + 20, v); }
   uint32_t count_address() const { return address + 20; }
+  uint16_t count() const { return data()->count; }
+  void set_count(uint16_t v) const { data()->count = v; }
+  uint16_t count_bits() const { return data()->count; }
+  void set_count_bits(uint16_t v) const { data()->count = v; }
   // groups 0 to 3's open counts summed
-  uint16_t open_0_to_3() const { return guest::LoadU16(base, address + 22); }
-  void set_open_0_to_3(uint16_t v) const { guest::StoreU16(base, address + 22, v); }
   uint32_t open_0_to_3_address() const { return address + 22; }
+  uint16_t open_0_to_3() const { return data()->open_0_to_3; }
+  void set_open_0_to_3(uint16_t v) const { data()->open_0_to_3 = v; }
+  uint16_t open_0_to_3_bits() const { return data()->open_0_to_3; }
+  void set_open_0_to_3_bits(uint16_t v) const { data()->open_0_to_3 = v; }
   // groups 0 to 3's locked counts summed
-  uint16_t locked_0_to_3() const { return guest::LoadU16(base, address + 24); }
-  void set_locked_0_to_3(uint16_t v) const { guest::StoreU16(base, address + 24, v); }
   uint32_t locked_0_to_3_address() const { return address + 24; }
+  uint16_t locked_0_to_3() const { return data()->locked_0_to_3; }
+  void set_locked_0_to_3(uint16_t v) const { data()->locked_0_to_3 = v; }
+  uint16_t locked_0_to_3_bits() const { return data()->locked_0_to_3; }
+  void set_locked_0_to_3_bits(uint16_t v) const { data()->locked_0_to_3 = v; }
   // groups 4 to 9's open counts summed
-  uint16_t open_4_to_9() const { return guest::LoadU16(base, address + 26); }
-  void set_open_4_to_9(uint16_t v) const { guest::StoreU16(base, address + 26, v); }
   uint32_t open_4_to_9_address() const { return address + 26; }
+  uint16_t open_4_to_9() const { return data()->open_4_to_9; }
+  void set_open_4_to_9(uint16_t v) const { data()->open_4_to_9 = v; }
+  uint16_t open_4_to_9_bits() const { return data()->open_4_to_9; }
+  void set_open_4_to_9_bits(uint16_t v) const { data()->open_4_to_9 = v; }
   // groups 4 to 9's locked counts summed
-  uint16_t locked_4_to_9() const { return guest::LoadU16(base, address + 28); }
-  void set_locked_4_to_9(uint16_t v) const { guest::StoreU16(base, address + 28, v); }
   uint32_t locked_4_to_9_address() const { return address + 28; }
+  uint16_t locked_4_to_9() const { return data()->locked_4_to_9; }
+  void set_locked_4_to_9(uint16_t v) const { data()->locked_4_to_9 = v; }
+  uint16_t locked_4_to_9_bits() const { return data()->locked_4_to_9; }
+  void set_locked_4_to_9_bits(uint16_t v) const { data()->locked_4_to_9 = v; }
   // RaceEvent::SetMode
-  uint16_t mode() const { return guest::LoadU16(base, address + 30); }
-  void set_mode(uint16_t v) const { guest::StoreU16(base, address + 30, v); }
   uint32_t mode_address() const { return address + 30; }
+  uint16_t mode() const { return data()->mode; }
+  void set_mode(uint16_t v) const { data()->mode = v; }
+  uint16_t mode_bits() const { return data()->mode; }
+  void set_mode_bits(uint16_t v) const { data()->mode = v; }
   // the save data's +6060 + 1 with the same mode as last, else 1
-  uint16_t mode_streak() const { return guest::LoadU16(base, address + 32); }
-  void set_mode_streak(uint16_t v) const { guest::StoreU16(base, address + 32, v); }
   uint32_t mode_streak_address() const { return address + 32; }
-  uint16_t location() const { return guest::LoadU16(base, address + 34); }
-  void set_location(uint16_t v) const { guest::StoreU16(base, address + 34, v); }
+  uint16_t mode_streak() const { return data()->mode_streak; }
+  void set_mode_streak(uint16_t v) const { data()->mode_streak = v; }
+  uint16_t mode_streak_bits() const { return data()->mode_streak; }
+  void set_mode_streak_bits(uint16_t v) const { data()->mode_streak = v; }
   uint32_t location_address() const { return address + 34; }
+  uint16_t location() const { return data()->location; }
+  void set_location(uint16_t v) const { data()->location = v; }
+  uint16_t location_bits() const { return data()->location; }
+  void set_location_bits(uint16_t v) const { data()->location = v; }
   // ten EventGroups, one a location 0 to 9
   uint32_t groups_address() const { return address + 36; }
+  uint8_t* groups() const { return reinterpret_cast<uint8_t*>(data()) + 36; }
   // group 0's (EventGroup.open)
-  uint16_t group0_open() const { return guest::LoadU16(base, address + 36); }
-  void set_group0_open(uint16_t v) const { guest::StoreU16(base, address + 36, v); }
   uint32_t group0_open_address() const { return address + 36; }
-  uint16_t group0_locked() const { return guest::LoadU16(base, address + 38); }
-  void set_group0_locked(uint16_t v) const { guest::StoreU16(base, address + 38, v); }
+  uint16_t group0_open() const { return data()->group0_open; }
+  void set_group0_open(uint16_t v) const { data()->group0_open = v; }
+  uint16_t group0_open_bits() const { return data()->group0_open; }
+  void set_group0_open_bits(uint16_t v) const { data()->group0_open = v; }
   uint32_t group0_locked_address() const { return address + 38; }
-  template <typename T = EventGroupEntry>
-  T group0_entries() const { return T(base, guest::LoadU32(base, address + 40)); }
-  void set_group0_entries(const View& v) const { guest::StoreU32(base, address + 40, v.address); }
-  void set_group0_entries(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
+  uint16_t group0_locked() const { return data()->group0_locked; }
+  void set_group0_locked(uint16_t v) const { data()->group0_locked = v; }
+  uint16_t group0_locked_bits() const { return data()->group0_locked; }
+  void set_group0_locked_bits(uint16_t v) const { data()->group0_locked = v; }
   uint32_t group0_entries_address() const { return address + 40; }
   template <typename T = EventGroupEntry>
-  T group0_locked_entries() const { return T(base, guest::LoadU32(base, address + 44)); }
-  void set_group0_locked_entries(const View& v) const { guest::StoreU32(base, address + 44, v.address); }
-  void set_group0_locked_entries(uint32_t v) const { guest::StoreU32(base, address + 44, v); }
+  T group0_entries() const { return T(base, data()->group0_entries); }
+  void set_group0_entries(const View& w) const { const uint32_t v = w.address; data()->group0_entries = v; }
+  void set_group0_entries(uint32_t v) const { data()->group0_entries = v; }
+  uint32_t group0_entries_bits() const { return data()->group0_entries; }
+  void set_group0_entries_bits(uint32_t v) const { data()->group0_entries = v; }
   uint32_t group0_locked_entries_address() const { return address + 44; }
-  // group 4's (EventGroup.open)
-  uint16_t group4_open() const { return guest::LoadU16(base, address + 84); }
-  void set_group4_open(uint16_t v) const { guest::StoreU16(base, address + 84, v); }
-  uint32_t group4_open_address() const { return address + 84; }
-  uint16_t group4_locked() const { return guest::LoadU16(base, address + 86); }
-  void set_group4_locked(uint16_t v) const { guest::StoreU16(base, address + 86, v); }
-  uint32_t group4_locked_address() const { return address + 86; }
   template <typename T = EventGroupEntry>
-  T group4_entries() const { return T(base, guest::LoadU32(base, address + 88)); }
-  void set_group4_entries(const View& v) const { guest::StoreU32(base, address + 88, v.address); }
-  void set_group4_entries(uint32_t v) const { guest::StoreU32(base, address + 88, v); }
+  T group0_locked_entries() const { return T(base, data()->group0_locked_entries); }
+  void set_group0_locked_entries(const View& w) const { const uint32_t v = w.address; data()->group0_locked_entries = v; }
+  void set_group0_locked_entries(uint32_t v) const { data()->group0_locked_entries = v; }
+  uint32_t group0_locked_entries_bits() const { return data()->group0_locked_entries; }
+  void set_group0_locked_entries_bits(uint32_t v) const { data()->group0_locked_entries = v; }
+  // group 4's (EventGroup.open)
+  uint32_t group4_open_address() const { return address + 84; }
+  uint16_t group4_open() const { return data()->group4_open; }
+  void set_group4_open(uint16_t v) const { data()->group4_open = v; }
+  uint16_t group4_open_bits() const { return data()->group4_open; }
+  void set_group4_open_bits(uint16_t v) const { data()->group4_open = v; }
+  uint32_t group4_locked_address() const { return address + 86; }
+  uint16_t group4_locked() const { return data()->group4_locked; }
+  void set_group4_locked(uint16_t v) const { data()->group4_locked = v; }
+  uint16_t group4_locked_bits() const { return data()->group4_locked; }
+  void set_group4_locked_bits(uint16_t v) const { data()->group4_locked = v; }
   uint32_t group4_entries_address() const { return address + 88; }
   template <typename T = EventGroupEntry>
-  T group4_locked_entries() const { return T(base, guest::LoadU32(base, address + 92)); }
-  void set_group4_locked_entries(const View& v) const { guest::StoreU32(base, address + 92, v.address); }
-  void set_group4_locked_entries(uint32_t v) const { guest::StoreU32(base, address + 92, v); }
+  T group4_entries() const { return T(base, data()->group4_entries); }
+  void set_group4_entries(const View& w) const { const uint32_t v = w.address; data()->group4_entries = v; }
+  void set_group4_entries(uint32_t v) const { data()->group4_entries = v; }
+  uint32_t group4_entries_bits() const { return data()->group4_entries; }
+  void set_group4_entries_bits(uint32_t v) const { data()->group4_entries = v; }
   uint32_t group4_locked_entries_address() const { return address + 92; }
+  template <typename T = EventGroupEntry>
+  T group4_locked_entries() const { return T(base, data()->group4_locked_entries); }
+  void set_group4_locked_entries(const View& w) const { const uint32_t v = w.address; data()->group4_locked_entries = v; }
+  void set_group4_locked_entries(uint32_t v) const { data()->group4_locked_entries = v; }
+  uint32_t group4_locked_entries_bits() const { return data()->group4_locked_entries; }
+  void set_group4_locked_entries_bits(uint32_t v) const { data()->group4_locked_entries = v; }
   // VirtualAlloc'ed, count +20
-  template <typename T = RaceEventEntry>
-  T list() const { return T(base, guest::LoadU32(base, address + 156)); }
-  void set_list(const View& v) const { guest::StoreU32(base, address + 156, v.address); }
-  void set_list(uint32_t v) const { guest::StoreU32(base, address + 156, v); }
   uint32_t list_address() const { return address + 156; }
+  template <typename T = RaceEventEntry>
+  T list() const { return T(base, data()->list); }
+  void set_list(const View& w) const { const uint32_t v = w.address; data()->list = v; }
+  void set_list(uint32_t v) const { data()->list = v; }
+  uint32_t list_bits() const { return data()->list; }
+  void set_list_bits(uint32_t v) const { data()->list = v; }
 };
 
 // allocated; measure: new<?>@RaceEvent::Alloc, RaceEvent::Entry.ret
+#pragma pack(push, 1)
+struct RaceEventEntryData {
+  uint32_t item_id = 0;  // +0
+  uint32_t start = 0;  // +4
+  uint32_t flag = 0;  // +8
+};
+#pragma pack(pop)
+static_assert(sizeof(RaceEventEntryData) == 12);
+inline constexpr memory::LayoutField kRaceEventEntryFields[] = {{0, 4}, {4, 4}, {8, 4}};
+inline constexpr memory::Layout kRaceEventEntryLayout = {kRaceEventEntryFields, 3};
+
 struct RaceEventEntry : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  RaceEventEntryData* data() const { return static_cast<RaceEventEntryData*>(memory::HandleObject(address)); }
+  static RaceEventEntry New(uint8_t* base) {
+    return RaceEventEntry(base, memory::MakeHandle(new RaceEventEntryData(), sizeof(RaceEventEntryData), "RaceEventEntry", &kRaceEventEntryLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static RaceEventEntry NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(RaceEventEntryData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<RaceEventEntryData*>(::operator new(sizeof(RaceEventEntryData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) RaceEventEntryData();
+    return RaceEventEntry(base, memory::MakeHandle(p, sizeof(RaceEventEntryData) * count, "RaceEventEntry", &kRaceEventEntryLayout, sizeof(RaceEventEntryData)));
+  }
+  RaceEventEntry at(uint32_t i) const { return RaceEventEntry(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kRaceEventEntryLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kRaceEventEntryLayout, offset, width, v); }
   // the opponent's item (its car build at the item's +160)
-  uint32_t item_id() const { return guest::LoadU32(base, address + 0); }
-  void set_item_id(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t item_id_address() const { return address + 0; }
+  uint32_t item_id() const { return data()->item_id; }
+  void set_item_id(uint32_t v) const { data()->item_id = v; }
+  uint32_t item_id_bits() const { return data()->item_id; }
+  void set_item_id_bits(uint32_t v) const { data()->item_id = v; }
   // a start position (two halfwords, -1 -1 until placed: RaceEvent::PlaceEntry)
-  uint32_t start() const { return guest::LoadU32(base, address + 4); }
-  void set_start(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t start_address() const { return address + 4; }
+  uint32_t start() const { return data()->start; }
+  void set_start(uint32_t v) const { data()->start = v; }
+  uint32_t start_bits() const { return data()->start; }
+  void set_start_bits(uint32_t v) const { data()->start = v; }
   // 1 open or found among the racers; 0 gives the racer flags 0x300
-  uint32_t flag() const { return guest::LoadU32(base, address + 8); }
-  void set_flag(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t flag_address() const { return address + 8; }
+  uint32_t flag() const { return data()->flag; }
+  void set_flag(uint32_t v) const { data()->flag = v; }
+  uint32_t flag_bits() const { return data()->flag; }
+  void set_flag_bits(uint32_t v) const { data()->flag = v; }
   // start's high halfword: the start's route section (RaceManager::AddRacers)
-  uint16_t start_section() const { return guest::LoadU16(base, address + 4); }
-  void set_start_section(uint16_t v) const { guest::StoreU16(base, address + 4, v); }
   uint32_t start_section_address() const { return address + 4; }
+  uint16_t start_section_bits() const { return uint16_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kRaceEventEntryLayout, 4, 2)); }
+  void set_start_section_bits(uint16_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kRaceEventEntryLayout, 4, 2, v); }
+  uint16_t start_section() const { return uint16_t(start_section_bits()); }
+  void set_start_section(uint16_t v) const { set_start_section_bits(uint16_t(v)); }
   // start's low halfword: its slice
-  uint16_t start_slice() const { return guest::LoadU16(base, address + 6); }
-  void set_start_slice(uint16_t v) const { guest::StoreU16(base, address + 6, v); }
   uint32_t start_slice_address() const { return address + 6; }
+  uint16_t start_slice_bits() const { return uint16_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kRaceEventEntryLayout, 6, 2)); }
+  void set_start_slice_bits(uint16_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kRaceEventEntryLayout, 6, 2, v); }
+  uint16_t start_slice() const { return uint16_t(start_slice_bits()); }
+  void set_start_slice(uint16_t v) const { set_start_slice_bits(uint16_t(v)); }
 };
 
 // embedded; measure: EventGroup, EventGroup::Alloc.r3, EventGroup::Free.r3
+#pragma pack(push, 1)
+struct EventGroupData {
+  uint16_t open = 0;  // +0
+  uint16_t locked = 0;  // +2
+  uint32_t entries = 0;  // +4
+  uint32_t locked_entries = 0;  // +8
+};
+#pragma pack(pop)
+static_assert(sizeof(EventGroupData) == 12);
+inline constexpr memory::LayoutField kEventGroupFields[] = {{0, 2}, {2, 2}, {4, 4}, {8, 4}};
+inline constexpr memory::Layout kEventGroupLayout = {kEventGroupFields, 4};
+
 struct EventGroup : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  EventGroupData* data() const { return static_cast<EventGroupData*>(memory::HandleObject(address)); }
+  static EventGroup New(uint8_t* base) {
+    return EventGroup(base, memory::MakeHandle(new EventGroupData(), sizeof(EventGroupData), "EventGroup", &kEventGroupLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static EventGroup NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(EventGroupData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<EventGroupData*>(::operator new(sizeof(EventGroupData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) EventGroupData();
+    return EventGroup(base, memory::MakeHandle(p, sizeof(EventGroupData) * count, "EventGroup", &kEventGroupLayout, sizeof(EventGroupData)));
+  }
+  EventGroup at(uint32_t i) const { return EventGroup(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kEventGroupLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kEventGroupLayout, offset, width, v); }
   // the open count
-  uint16_t open() const { return guest::LoadU16(base, address + 0); }
-  void set_open(uint16_t v) const { guest::StoreU16(base, address + 0, v); }
   uint32_t open_address() const { return address + 0; }
+  uint16_t open() const { return data()->open; }
+  void set_open(uint16_t v) const { data()->open = v; }
+  uint16_t open_bits() const { return data()->open; }
+  void set_open_bits(uint16_t v) const { data()->open = v; }
   // the locked count
-  uint16_t locked() const { return guest::LoadU16(base, address + 2); }
-  void set_locked(uint16_t v) const { guest::StoreU16(base, address + 2, v); }
   uint32_t locked_address() const { return address + 2; }
+  uint16_t locked() const { return data()->locked; }
+  void set_locked(uint16_t v) const { data()->locked = v; }
+  uint16_t locked_bits() const { return data()->locked; }
+  void set_locked_bits(uint16_t v) const { data()->locked = v; }
   // VirtualAlloc'ed, open + locked entries
-  template <typename T = EventGroupEntry>
-  T entries() const { return T(base, guest::LoadU32(base, address + 4)); }
-  void set_entries(const View& v) const { guest::StoreU32(base, address + 4, v.address); }
-  void set_entries(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t entries_address() const { return address + 4; }
-  // the locked part: +4 + 4 x the open count
   template <typename T = EventGroupEntry>
-  T locked_entries() const { return T(base, guest::LoadU32(base, address + 8)); }
-  void set_locked_entries(const View& v) const { guest::StoreU32(base, address + 8, v.address); }
-  void set_locked_entries(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  T entries() const { return T(base, data()->entries); }
+  void set_entries(const View& w) const { const uint32_t v = w.address; data()->entries = v; }
+  void set_entries(uint32_t v) const { data()->entries = v; }
+  uint32_t entries_bits() const { return data()->entries; }
+  void set_entries_bits(uint32_t v) const { data()->entries = v; }
+  // the locked part: +4 + 4 x the open count
   uint32_t locked_entries_address() const { return address + 8; }
+  template <typename T = EventGroupEntry>
+  T locked_entries() const { return T(base, data()->locked_entries); }
+  void set_locked_entries(const View& w) const { const uint32_t v = w.address; data()->locked_entries = v; }
+  void set_locked_entries(uint32_t v) const { data()->locked_entries = v; }
+  uint32_t locked_entries_bits() const { return data()->locked_entries; }
+  void set_locked_entries_bits(uint32_t v) const { data()->locked_entries = v; }
 };
 
 // embedded; measure: EventGroup.+4, EventGroup.+8, EventPools::CopyIds.r4, RaceEvent@+84.+4, RaceEvent@+84.+8
+#pragma pack(push, 1)
+struct EventGroupEntryData {
+  uint16_t item_id = 0;  // +0
+  uint16_t list_index = 0;  // +2
+};
+#pragma pack(pop)
+static_assert(sizeof(EventGroupEntryData) == 4);
+inline constexpr memory::LayoutField kEventGroupEntryFields[] = {{0, 2}, {2, 2}};
+inline constexpr memory::Layout kEventGroupEntryLayout = {kEventGroupEntryFields, 2};
+
 struct EventGroupEntry : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
-  uint16_t item_id() const { return guest::LoadU16(base, address + 0); }
-  void set_item_id(uint16_t v) const { guest::StoreU16(base, address + 0, v); }
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  EventGroupEntryData* data() const { return static_cast<EventGroupEntryData*>(memory::HandleObject(address)); }
+  static EventGroupEntry New(uint8_t* base) {
+    return EventGroupEntry(base, memory::MakeHandle(new EventGroupEntryData(), sizeof(EventGroupEntryData), "EventGroupEntry", &kEventGroupEntryLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static EventGroupEntry NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(EventGroupEntryData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<EventGroupEntryData*>(::operator new(sizeof(EventGroupEntryData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) EventGroupEntryData();
+    return EventGroupEntry(base, memory::MakeHandle(p, sizeof(EventGroupEntryData) * count, "EventGroupEntry", &kEventGroupEntryLayout, sizeof(EventGroupEntryData)));
+  }
+  EventGroupEntry at(uint32_t i) const { return EventGroupEntry(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kEventGroupEntryLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kEventGroupEntryLayout, offset, width, v); }
   uint32_t item_id_address() const { return address + 0; }
+  uint16_t item_id() const { return data()->item_id; }
+  void set_item_id(uint16_t v) const { data()->item_id = v; }
+  uint16_t item_id_bits() const { return data()->item_id; }
+  void set_item_id_bits(uint16_t v) const { data()->item_id = v; }
   // its index in the event's list (locations 0 to 3; -1 once promoted past the open ones)
-  uint16_t list_index() const { return guest::LoadU16(base, address + 2); }
-  void set_list_index(uint16_t v) const { guest::StoreU16(base, address + 2, v); }
   uint32_t list_index_address() const { return address + 2; }
+  uint16_t list_index() const { return data()->list_index; }
+  void set_list_index(uint16_t v) const { data()->list_index = v; }
+  uint16_t list_index_bits() const { return data()->list_index; }
+  void set_list_index_bits(uint16_t v) const { data()->list_index = v; }
   // the entry as one word (the swaps)
-  uint32_t word() const { return guest::LoadU32(base, address + 0); }
-  void set_word(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t word_address() const { return address + 0; }
-  // the next entry's (the moves)
-  uint16_t next_item_id() const { return guest::LoadU16(base, address + 4); }
-  void set_next_item_id(uint16_t v) const { guest::StoreU16(base, address + 4, v); }
-  uint32_t next_item_id_address() const { return address + 4; }
-  uint16_t next_list_index() const { return guest::LoadU16(base, address + 6); }
-  void set_next_list_index(uint16_t v) const { guest::StoreU16(base, address + 6, v); }
-  uint32_t next_list_index_address() const { return address + 6; }
-  uint32_t next_word() const { return guest::LoadU32(base, address + 4); }
-  void set_next_word(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
-  uint32_t next_word_address() const { return address + 4; }
-  // measure fault: the entry before (-4), its offset not wrapped to 32 bits
-  uint16_t wrapped_prev_item_id() const { return guest::LoadU16(base, address + 4294967292); }
-  void set_wrapped_prev_item_id(uint16_t v) const { guest::StoreU16(base, address + 4294967292, v); }
-  uint32_t wrapped_prev_item_id_address() const { return address + 4294967292; }
-  // measure fault: -2
-  uint16_t wrapped_prev_list_index() const { return guest::LoadU16(base, address + 4294967294); }
-  void set_wrapped_prev_list_index(uint16_t v) const { guest::StoreU16(base, address + 4294967294, v); }
-  uint32_t wrapped_prev_list_index_address() const { return address + 4294967294; }
-  // measure fault: +0
-  uint16_t wrapped_item_id() const { return guest::LoadU16(base, address + 4294967296); }
-  void set_wrapped_item_id(uint16_t v) const { guest::StoreU16(base, address + 4294967296, v); }
-  uint32_t wrapped_item_id_address() const { return address + 4294967296; }
-  // measure fault: +2
-  uint16_t wrapped_list_index() const { return guest::LoadU16(base, address + 4294967298); }
-  void set_wrapped_list_index(uint16_t v) const { guest::StoreU16(base, address + 4294967298, v); }
-  uint32_t wrapped_list_index_address() const { return address + 4294967298; }
+  uint32_t word_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kEventGroupEntryLayout, 0, 4)); }
+  void set_word_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kEventGroupEntryLayout, 0, 4, v); }
+  uint32_t word() const { return uint32_t(word_bits()); }
+  void set_word(uint32_t v) const { set_word_bits(uint32_t(v)); }
 };
 
 // embedded; measure: EventPools
+#pragma pack(push, 1)
+struct EventPoolsData {
+  uint16_t open = 0;  // +0
+  uint8_t open_ids[200] = {};  // +2, guest order
+  uint16_t won = 0;  // +202
+  uint8_t won_ids[200] = {};  // +204, guest order
+  uint16_t locked = 0;  // +404
+  uint8_t locked_ids[200] = {};  // +406, guest order
+  uint16_t kept = 0;  // +606
+};
+#pragma pack(pop)
+static_assert(sizeof(EventPoolsData) == 608);
+inline constexpr memory::LayoutField kEventPoolsFields[] = {{0, 2}, {0, 2}, {202, 2}, {202, 2}, {404, 2}, {404, 2}, {606, 2}};
+inline constexpr memory::Layout kEventPoolsLayout = {kEventPoolsFields, 7};
+
 struct EventPools : View {
   using View::View;
   static constexpr uint32_t kSize = 608;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  EventPoolsData* data() const { return static_cast<EventPoolsData*>(memory::HandleObject(address)); }
+  static EventPools New(uint8_t* base) {
+    return EventPools(base, memory::MakeHandle(new EventPoolsData(), sizeof(EventPoolsData), "EventPools", &kEventPoolsLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static EventPools NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(EventPoolsData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<EventPoolsData*>(::operator new(sizeof(EventPoolsData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) EventPoolsData();
+    return EventPools(base, memory::MakeHandle(p, sizeof(EventPoolsData) * count, "EventPools", &kEventPoolsLayout, sizeof(EventPoolsData)));
+  }
+  EventPools at(uint32_t i) const { return EventPools(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kEventPoolsLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kEventPoolsLayout, offset, width, v); }
+  // the open items not beaten
+  template <typename T = EventIdList>
+  T open_list() const { return T(base, address + 0); }
+  // the open items beaten
+  template <typename T = EventIdList>
+  T won_list() const { return T(base, address + 202); }
+  // the locked items and the rivals of the others
+  template <typename T = EventIdList>
+  T locked_list() const { return T(base, address + 404); }
   // the open items not beaten: the count
-  uint16_t open() const { return guest::LoadU16(base, address + 0); }
-  void set_open(uint16_t v) const { guest::StoreU16(base, address + 0, v); }
   uint32_t open_address() const { return address + 0; }
+  uint16_t open() const { return data()->open; }
+  void set_open(uint16_t v) const { data()->open = v; }
+  uint16_t open_bits() const { return data()->open; }
+  void set_open_bits(uint16_t v) const { data()->open = v; }
   // their ids
   uint32_t open_ids_address() const { return address + 2; }
+  uint8_t* open_ids() const { return reinterpret_cast<uint8_t*>(data()) + 2; }
   // the open items beaten: the count
-  uint16_t won() const { return guest::LoadU16(base, address + 202); }
-  void set_won(uint16_t v) const { guest::StoreU16(base, address + 202, v); }
   uint32_t won_address() const { return address + 202; }
+  uint16_t won() const { return data()->won; }
+  void set_won(uint16_t v) const { data()->won = v; }
+  uint16_t won_bits() const { return data()->won; }
+  void set_won_bits(uint16_t v) const { data()->won = v; }
   uint32_t won_ids_address() const { return address + 204; }
+  uint8_t* won_ids() const { return reinterpret_cast<uint8_t*>(data()) + 204; }
   // the locked items and the rivals of the others: the count
-  uint16_t locked() const { return guest::LoadU16(base, address + 404); }
-  void set_locked(uint16_t v) const { guest::StoreU16(base, address + 404, v); }
   uint32_t locked_address() const { return address + 404; }
+  uint16_t locked() const { return data()->locked; }
+  void set_locked(uint16_t v) const { data()->locked = v; }
+  uint16_t locked_bits() const { return data()->locked; }
+  void set_locked_bits(uint16_t v) const { data()->locked = v; }
   uint32_t locked_ids_address() const { return address + 406; }
+  uint8_t* locked_ids() const { return reinterpret_cast<uint8_t*>(data()) + 406; }
   // the kept count (at most the location's cap)
-  uint16_t kept() const { return guest::LoadU16(base, address + 606); }
-  void set_kept(uint16_t v) const { guest::StoreU16(base, address + 606, v); }
   uint32_t kept_address() const { return address + 606; }
+  uint16_t kept() const { return data()->kept; }
+  void set_kept(uint16_t v) const { data()->kept = v; }
+  uint16_t kept_bits() const { return data()->kept; }
+  void set_kept_bits(uint16_t v) const { data()->kept = v; }
+};
+
+// embedded; measure: EventIdList
+#pragma pack(push, 1)
+struct EventIdListData {
+  uint16_t count = 0;  // +0
+  uint8_t ids[200] = {};  // +2, guest order
+};
+#pragma pack(pop)
+static_assert(sizeof(EventIdListData) == 202);
+inline constexpr memory::LayoutField kEventIdListFields[] = {{0, 2}};
+inline constexpr memory::Layout kEventIdListLayout = {kEventIdListFields, 1};
+
+struct EventIdList : View {
+  using View::View;
+  static constexpr uint32_t kSize = 202;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  EventIdListData* data() const { return static_cast<EventIdListData*>(memory::HandleObject(address)); }
+  static EventIdList New(uint8_t* base) {
+    return EventIdList(base, memory::MakeHandle(new EventIdListData(), sizeof(EventIdListData), "EventIdList", &kEventIdListLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static EventIdList NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(EventIdListData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<EventIdListData*>(::operator new(sizeof(EventIdListData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) EventIdListData();
+    return EventIdList(base, memory::MakeHandle(p, sizeof(EventIdListData) * count, "EventIdList", &kEventIdListLayout, sizeof(EventIdListData)));
+  }
+  EventIdList at(uint32_t i) const { return EventIdList(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kEventIdListLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kEventIdListLayout, offset, width, v); }
+  uint32_t count_address() const { return address + 0; }
+  uint16_t count() const { return data()->count; }
+  void set_count(uint16_t v) const { data()->count = v; }
+  uint16_t count_bits() const { return data()->count; }
+  void set_count_bits(uint16_t v) const { data()->count = v; }
+  // the ids, halfwords (read with load_at)
+  uint32_t ids_address() const { return address + 2; }
+  uint8_t* ids() const { return reinterpret_cast<uint8_t*>(data()) + 2; }
 };
 
 // allocated; measure: new<6080>@RaceEvent::Init
+#pragma pack(push, 1)
+struct RaceEventPoolBlockData {
+  uint16_t pool0_open = 0;  // +0
+  uint8_t pad_2[200] = {};
+  uint16_t pool0_won = 0;  // +202
+  uint8_t pad_204[200] = {};
+  uint16_t pool0_locked = 0;  // +404
+  uint8_t pad_406[200] = {};
+  uint16_t pool0_kept = 0;  // +606
+  uint8_t pad_608[1824] = {};
+  uint16_t pool4_open = 0;  // +2432
+  uint8_t pad_2434[200] = {};
+  uint16_t pool4_won = 0;  // +2634
+  uint8_t pad_2636[200] = {};
+  uint16_t pool4_locked = 0;  // +2836
+  uint8_t pad_2838[200] = {};
+  uint16_t pool4_kept = 0;  // +3038
+  uint8_t pad_3040[3040] = {};
+};
+#pragma pack(pop)
+static_assert(sizeof(RaceEventPoolBlockData) == 6080);
+inline constexpr memory::LayoutField kRaceEventPoolBlockFields[] = {{0, 2}, {0, 2}, {0, 2}, {202, 2}, {202, 2}, {202, 2}, {404, 2}, {404, 2}, {404, 2}, {606, 2}, {606, 2}, {608, 2}, {608, 2}, {810, 2}, {810, 2}, {1012, 2}, {1012, 2}, {1214, 2}, {1216, 2}, {1216, 2}, {1418, 2}, {1418, 2}, {1620, 2}, {1620, 2}, {1822, 2}, {1824, 2}, {1824, 2}, {2026, 2}, {2026, 2}, {2228, 2}, {2228, 2}, {2430, 2}, {2432, 2}, {2432, 2}, {2432, 2}, {2634, 2}, {2634, 2}, {2634, 2}, {2836, 2}, {2836, 2}, {2836, 2}, {3038, 2}, {3038, 2}, {3040, 2}, {3040, 2}, {3242, 2}, {3242, 2}, {3444, 2}, {3444, 2}, {3646, 2}, {3648, 2}, {3648, 2}, {3850, 2}, {3850, 2}, {4052, 2}, {4052, 2}, {4254, 2}, {4256, 2}, {4256, 2}, {4458, 2}, {4458, 2}, {4660, 2}, {4660, 2}, {4862, 2}, {4864, 2}, {4864, 2}, {5066, 2}, {5066, 2}, {5268, 2}, {5268, 2}, {5470, 2}, {5472, 2}, {5472, 2}, {5674, 2}, {5674, 2}, {5876, 2}, {5876, 2}, {6078, 2}};
+inline constexpr memory::Layout kRaceEventPoolBlockLayout = {kRaceEventPoolBlockFields, 78};
+
 struct RaceEventPoolBlock : View {
   using View::View;
   static constexpr uint32_t kSize = 6080;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  RaceEventPoolBlockData* data() const { return static_cast<RaceEventPoolBlockData*>(memory::HandleObject(address)); }
+  static RaceEventPoolBlock New(uint8_t* base) {
+    return RaceEventPoolBlock(base, memory::MakeHandle(new RaceEventPoolBlockData(), sizeof(RaceEventPoolBlockData), "RaceEventPoolBlock", &kRaceEventPoolBlockLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static RaceEventPoolBlock NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(RaceEventPoolBlockData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<RaceEventPoolBlockData*>(::operator new(sizeof(RaceEventPoolBlockData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) RaceEventPoolBlockData();
+    return RaceEventPoolBlock(base, memory::MakeHandle(p, sizeof(RaceEventPoolBlockData) * count, "RaceEventPoolBlock", &kRaceEventPoolBlockLayout, sizeof(RaceEventPoolBlockData)));
+  }
+  RaceEventPoolBlock at(uint32_t i) const { return RaceEventPoolBlock(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kRaceEventPoolBlockLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kRaceEventPoolBlockLayout, offset, width, v); }
+  // ten EventPools, one a location
+  template <typename T = EventPools>
+  T pool(uint32_t i) const { return T(base, address + 0 + i * T::kSize); }
   // ten EventPools, one a location
   uint32_t pools_address() const { return address + 0; }
-  uint16_t pool0_open() const { return guest::LoadU16(base, address + 0); }
-  void set_pool0_open(uint16_t v) const { guest::StoreU16(base, address + 0, v); }
+  uint8_t* pools() const { return reinterpret_cast<uint8_t*>(data()) + 0; }
   uint32_t pool0_open_address() const { return address + 0; }
-  uint16_t pool0_won() const { return guest::LoadU16(base, address + 202); }
-  void set_pool0_won(uint16_t v) const { guest::StoreU16(base, address + 202, v); }
+  uint16_t pool0_open() const { return data()->pool0_open; }
+  void set_pool0_open(uint16_t v) const { data()->pool0_open = v; }
+  uint16_t pool0_open_bits() const { return data()->pool0_open; }
+  void set_pool0_open_bits(uint16_t v) const { data()->pool0_open = v; }
   uint32_t pool0_won_address() const { return address + 202; }
-  uint16_t pool0_locked() const { return guest::LoadU16(base, address + 404); }
-  void set_pool0_locked(uint16_t v) const { guest::StoreU16(base, address + 404, v); }
+  uint16_t pool0_won() const { return data()->pool0_won; }
+  void set_pool0_won(uint16_t v) const { data()->pool0_won = v; }
+  uint16_t pool0_won_bits() const { return data()->pool0_won; }
+  void set_pool0_won_bits(uint16_t v) const { data()->pool0_won = v; }
   uint32_t pool0_locked_address() const { return address + 404; }
-  uint16_t pool0_kept() const { return guest::LoadU16(base, address + 606); }
-  void set_pool0_kept(uint16_t v) const { guest::StoreU16(base, address + 606, v); }
+  uint16_t pool0_locked() const { return data()->pool0_locked; }
+  void set_pool0_locked(uint16_t v) const { data()->pool0_locked = v; }
+  uint16_t pool0_locked_bits() const { return data()->pool0_locked; }
+  void set_pool0_locked_bits(uint16_t v) const { data()->pool0_locked = v; }
   uint32_t pool0_kept_address() const { return address + 606; }
-  uint16_t pool4_open() const { return guest::LoadU16(base, address + 2432); }
-  void set_pool4_open(uint16_t v) const { guest::StoreU16(base, address + 2432, v); }
+  uint16_t pool0_kept() const { return data()->pool0_kept; }
+  void set_pool0_kept(uint16_t v) const { data()->pool0_kept = v; }
+  uint16_t pool0_kept_bits() const { return data()->pool0_kept; }
+  void set_pool0_kept_bits(uint16_t v) const { data()->pool0_kept = v; }
   uint32_t pool4_open_address() const { return address + 2432; }
-  uint16_t pool4_won() const { return guest::LoadU16(base, address + 2634); }
-  void set_pool4_won(uint16_t v) const { guest::StoreU16(base, address + 2634, v); }
+  uint16_t pool4_open() const { return data()->pool4_open; }
+  void set_pool4_open(uint16_t v) const { data()->pool4_open = v; }
+  uint16_t pool4_open_bits() const { return data()->pool4_open; }
+  void set_pool4_open_bits(uint16_t v) const { data()->pool4_open = v; }
   uint32_t pool4_won_address() const { return address + 2634; }
-  uint16_t pool4_locked() const { return guest::LoadU16(base, address + 2836); }
-  void set_pool4_locked(uint16_t v) const { guest::StoreU16(base, address + 2836, v); }
+  uint16_t pool4_won() const { return data()->pool4_won; }
+  void set_pool4_won(uint16_t v) const { data()->pool4_won = v; }
+  uint16_t pool4_won_bits() const { return data()->pool4_won; }
+  void set_pool4_won_bits(uint16_t v) const { data()->pool4_won = v; }
   uint32_t pool4_locked_address() const { return address + 2836; }
-  uint16_t pool4_kept() const { return guest::LoadU16(base, address + 3038); }
-  void set_pool4_kept(uint16_t v) const { guest::StoreU16(base, address + 3038, v); }
+  uint16_t pool4_locked() const { return data()->pool4_locked; }
+  void set_pool4_locked(uint16_t v) const { data()->pool4_locked = v; }
+  uint16_t pool4_locked_bits() const { return data()->pool4_locked; }
+  void set_pool4_locked_bits(uint16_t v) const { data()->pool4_locked = v; }
   uint32_t pool4_kept_address() const { return address + 3038; }
+  uint16_t pool4_kept() const { return data()->pool4_kept; }
+  void set_pool4_kept(uint16_t v) const { data()->pool4_kept = v; }
+  uint16_t pool4_kept_bits() const { return data()->pool4_kept; }
+  void set_pool4_kept_bits(uint16_t v) const { data()->pool4_kept = v; }
 };
 
 // embedded; measure: EventCondition, EventCondition::State.r3
@@ -1760,15 +2093,47 @@ struct CarSpecCopiesAt992 : View {
 };
 
 // embedded; measure: RaceEvent@+84
+#pragma pack(push, 1)
+struct RaceEventAt84Data {
+  uint8_t pad_0[4] = {};
+  uint32_t unknown_4 = 0;  // +4
+  uint32_t unknown_8 = 0;  // +8
+};
+#pragma pack(pop)
+static_assert(sizeof(RaceEventAt84Data) == 12);
+inline constexpr memory::LayoutField kRaceEventAt84Fields[] = {{4, 4}, {8, 4}};
+inline constexpr memory::Layout kRaceEventAt84Layout = {kRaceEventAt84Fields, 2};
+
 struct RaceEventAt84 : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
-  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
-  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  RaceEventAt84Data* data() const { return static_cast<RaceEventAt84Data*>(memory::HandleObject(address)); }
+  static RaceEventAt84 New(uint8_t* base) {
+    return RaceEventAt84(base, memory::MakeHandle(new RaceEventAt84Data(), sizeof(RaceEventAt84Data), "RaceEventAt84", &kRaceEventAt84Layout));
+  }
+  template <uint32_t Stride = kSize>
+  static RaceEventAt84 NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(RaceEventAt84Data) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<RaceEventAt84Data*>(::operator new(sizeof(RaceEventAt84Data) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) RaceEventAt84Data();
+    return RaceEventAt84(base, memory::MakeHandle(p, sizeof(RaceEventAt84Data) * count, "RaceEventAt84", &kRaceEventAt84Layout, sizeof(RaceEventAt84Data)));
+  }
+  RaceEventAt84 at(uint32_t i) const { return RaceEventAt84(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kRaceEventAt84Layout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kRaceEventAt84Layout, offset, width, v); }
   uint32_t unknown_4_address() const { return address + 4; }
-  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
-  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_4() const { return data()->unknown_4; }
+  void set_unknown_4(uint32_t v) const { data()->unknown_4 = v; }
+  uint32_t unknown_4_bits() const { return data()->unknown_4; }
+  void set_unknown_4_bits(uint32_t v) const { data()->unknown_4 = v; }
   uint32_t unknown_8_address() const { return address + 8; }
+  uint32_t unknown_8() const { return data()->unknown_8; }
+  void set_unknown_8(uint32_t v) const { data()->unknown_8 = v; }
+  uint32_t unknown_8_bits() const { return data()->unknown_8; }
+  void set_unknown_8_bits(uint32_t v) const { data()->unknown_8 = v; }
 };
 
 // embedded; measure: RaceSounds::PickRivalMusic.ret@+160
@@ -2036,36 +2401,106 @@ struct EventPoolsAt2432 : View {
 };
 
 // embedded; measure: RaceEvent@+36
+#pragma pack(push, 1)
+struct EventGroupAt36Data {
+  uint16_t unknown_0 = 0;  // +0
+  uint16_t unknown_2 = 0;  // +2
+  uint32_t unknown_4 = 0;  // +4
+  uint32_t unknown_8 = 0;  // +8
+};
+#pragma pack(pop)
+static_assert(sizeof(EventGroupAt36Data) == 12);
+inline constexpr memory::LayoutField kEventGroupAt36Fields[] = {{0, 2}, {2, 2}, {4, 4}, {8, 4}};
+inline constexpr memory::Layout kEventGroupAt36Layout = {kEventGroupAt36Fields, 4};
+
 struct EventGroupAt36 : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
-  uint16_t unknown_0() const { return guest::LoadU16(base, address + 0); }
-  void set_unknown_0(uint16_t v) const { guest::StoreU16(base, address + 0, v); }
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  EventGroupAt36Data* data() const { return static_cast<EventGroupAt36Data*>(memory::HandleObject(address)); }
+  static EventGroupAt36 New(uint8_t* base) {
+    return EventGroupAt36(base, memory::MakeHandle(new EventGroupAt36Data(), sizeof(EventGroupAt36Data), "EventGroupAt36", &kEventGroupAt36Layout));
+  }
+  template <uint32_t Stride = kSize>
+  static EventGroupAt36 NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(EventGroupAt36Data) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<EventGroupAt36Data*>(::operator new(sizeof(EventGroupAt36Data) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) EventGroupAt36Data();
+    return EventGroupAt36(base, memory::MakeHandle(p, sizeof(EventGroupAt36Data) * count, "EventGroupAt36", &kEventGroupAt36Layout, sizeof(EventGroupAt36Data)));
+  }
+  EventGroupAt36 at(uint32_t i) const { return EventGroupAt36(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kEventGroupAt36Layout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kEventGroupAt36Layout, offset, width, v); }
   uint32_t unknown_0_address() const { return address + 0; }
-  uint16_t unknown_2() const { return guest::LoadU16(base, address + 2); }
-  void set_unknown_2(uint16_t v) const { guest::StoreU16(base, address + 2, v); }
+  uint16_t unknown_0() const { return data()->unknown_0; }
+  void set_unknown_0(uint16_t v) const { data()->unknown_0 = v; }
+  uint16_t unknown_0_bits() const { return data()->unknown_0; }
+  void set_unknown_0_bits(uint16_t v) const { data()->unknown_0 = v; }
   uint32_t unknown_2_address() const { return address + 2; }
-  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
-  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint16_t unknown_2() const { return data()->unknown_2; }
+  void set_unknown_2(uint16_t v) const { data()->unknown_2 = v; }
+  uint16_t unknown_2_bits() const { return data()->unknown_2; }
+  void set_unknown_2_bits(uint16_t v) const { data()->unknown_2 = v; }
   uint32_t unknown_4_address() const { return address + 4; }
-  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
-  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_4() const { return data()->unknown_4; }
+  void set_unknown_4(uint32_t v) const { data()->unknown_4 = v; }
+  uint32_t unknown_4_bits() const { return data()->unknown_4; }
+  void set_unknown_4_bits(uint32_t v) const { data()->unknown_4 = v; }
   uint32_t unknown_8_address() const { return address + 8; }
+  uint32_t unknown_8() const { return data()->unknown_8; }
+  void set_unknown_8(uint32_t v) const { data()->unknown_8 = v; }
+  uint32_t unknown_8_bits() const { return data()->unknown_8; }
+  void set_unknown_8_bits(uint32_t v) const { data()->unknown_8 = v; }
 };
 
 // embedded; measure: RaceEvent@+36.+8
+#pragma pack(push, 1)
+struct EventGroupEntryPartData {
+  uint16_t unknown_0 = 0;  // +0
+  uint16_t unknown_2 = 0;  // +2
+};
+#pragma pack(pop)
+static_assert(sizeof(EventGroupEntryPartData) == 4);
+inline constexpr memory::LayoutField kEventGroupEntryPartFields[] = {{0, 2}, {2, 2}};
+inline constexpr memory::Layout kEventGroupEntryPartLayout = {kEventGroupEntryPartFields, 2};
+
 struct EventGroupEntryPart : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
-  uint16_t unknown_0() const { return guest::LoadU16(base, address + 0); }
-  void set_unknown_0(uint16_t v) const { guest::StoreU16(base, address + 0, v); }
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  EventGroupEntryPartData* data() const { return static_cast<EventGroupEntryPartData*>(memory::HandleObject(address)); }
+  static EventGroupEntryPart New(uint8_t* base) {
+    return EventGroupEntryPart(base, memory::MakeHandle(new EventGroupEntryPartData(), sizeof(EventGroupEntryPartData), "EventGroupEntryPart", &kEventGroupEntryPartLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static EventGroupEntryPart NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(EventGroupEntryPartData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<EventGroupEntryPartData*>(::operator new(sizeof(EventGroupEntryPartData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) EventGroupEntryPartData();
+    return EventGroupEntryPart(base, memory::MakeHandle(p, sizeof(EventGroupEntryPartData) * count, "EventGroupEntryPart", &kEventGroupEntryPartLayout, sizeof(EventGroupEntryPartData)));
+  }
+  EventGroupEntryPart at(uint32_t i) const { return EventGroupEntryPart(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kEventGroupEntryPartLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kEventGroupEntryPartLayout, offset, width, v); }
   uint32_t unknown_0_address() const { return address + 0; }
-  uint32_t unknown_0_4i() const { return guest::LoadU32(base, address + 0); }
-  void set_unknown_0_4i(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint16_t unknown_0() const { return data()->unknown_0; }
+  void set_unknown_0(uint16_t v) const { data()->unknown_0 = v; }
+  uint16_t unknown_0_bits() const { return data()->unknown_0; }
+  void set_unknown_0_bits(uint16_t v) const { data()->unknown_0 = v; }
   uint32_t unknown_0_4i_address() const { return address + 0; }
-  uint16_t unknown_2() const { return guest::LoadU16(base, address + 2); }
-  void set_unknown_2(uint16_t v) const { guest::StoreU16(base, address + 2, v); }
+  uint32_t unknown_0_4i_bits() const { return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(data()), kEventGroupEntryPartLayout, 0, 4)); }
+  void set_unknown_0_4i_bits(uint32_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kEventGroupEntryPartLayout, 0, 4, v); }
+  uint32_t unknown_0_4i() const { return uint32_t(unknown_0_4i_bits()); }
+  void set_unknown_0_4i(uint32_t v) const { set_unknown_0_4i_bits(uint32_t(v)); }
   uint32_t unknown_2_address() const { return address + 2; }
+  uint16_t unknown_2() const { return data()->unknown_2; }
+  void set_unknown_2(uint16_t v) const { data()->unknown_2 = v; }
+  uint16_t unknown_2_bits() const { return data()->unknown_2; }
+  void set_unknown_2_bits(uint16_t v) const { data()->unknown_2 = v; }
 };
 
 // embedded; measure: RaceSounds::PickRivalMusic.ret@+40

@@ -9,80 +9,156 @@
 namespace schema {
 
 // allocated; measure: Movie, sub_820AE808.r3, sub_820AE818.r3, sub_820AE9F8.r3
+#pragma pack(push, 1)
+struct MovieData {
+  uint32_t vtable = 0;  // +0
+  uint32_t framework_interface = 0;  // +4
+  uint32_t wrapper = 0;  // +8
+  uint32_t command_vtable = 0;  // +12
+  uint32_t command_vtable_4 = 0;  // +16
+  uint32_t unknown_20 = 0;  // +20
+  uint32_t command_status = 0;  // +24
+  uint8_t unknown_28 = 0;  // +28
+  uint8_t unknown_29 = 0;  // +29
+  uint8_t unknown_30 = 0;  // +30
+  uint8_t pad_31[1] = {};
+  uint32_t unknown_32 = 0;  // +32
+  uint32_t delegate_vtable = 0;  // +36
+  uint32_t delegate_object = 0;  // +40
+  uint32_t delegate_function = 0;  // +44
+  uint8_t path[260] = {};  // +48, guest order
+  uint32_t state = 0;  // +308
+};
+#pragma pack(pop)
+static_assert(sizeof(MovieData) == 312);
+inline constexpr memory::LayoutField kMovieFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 4}, {24, 4}, {32, 4}, {36, 4}, {40, 4}, {44, 4}, {308, 4}};
+inline constexpr memory::Layout kMovieLayout = {kMovieFields, 12};
+
 struct Movie : View {
   using View::View;
   static constexpr uint32_t kSize = 312;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   static constexpr uint32_t kVtable = 0x82002910;
+  MovieData* data() const { return static_cast<MovieData*>(memory::HandleObject(address)); }
+  static Movie New(uint8_t* base) {
+    return Movie(base, memory::MakeHandle(new MovieData(), sizeof(MovieData), "Movie", &kMovieLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static Movie NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(MovieData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<MovieData*>(::operator new(sizeof(MovieData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) MovieData();
+    return Movie(base, memory::MakeHandle(p, sizeof(MovieData) * count, "Movie", &kMovieLayout, sizeof(MovieData)));
+  }
+  Movie at(uint32_t i) const { return Movie(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kMovieLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kMovieLayout, offset, width, v); }
   // 0x82002910
-  template <typename T = MovieVtable>
-  T vtable() const { return T(base, guest::LoadU32(base, address + 0)); }
-  void set_vtable(const View& v) const { guest::StoreU32(base, address + 0, v.address); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
+  template <typename T = MovieVtable>
+  T vtable() const { return T(base, data()->vtable); }
+  void set_vtable(const View& w) const { const uint32_t v = w.address; data()->vtable = v; }
+  void set_vtable(uint32_t v) const { data()->vtable = v; }
+  uint32_t vtable_bits() const { return data()->vtable; }
+  void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
   // the set-up block's +4 (the app's +8): slot +8 by Movie::Play, +12 by OnTick, +16 by Open and Release
-  template <typename T = AppFrameworkInterface>
-  T framework_interface() const { return T(base, guest::LoadU32(base, address + 4)); }
-  void set_framework_interface(const View& v) const { guest::StoreU32(base, address + 4, v.address); }
-  void set_framework_interface(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t framework_interface_address() const { return address + 4; }
+  template <typename T = AppFrameworkInterface>
+  T framework_interface() const { return T(base, data()->framework_interface); }
+  void set_framework_interface(const View& w) const { const uint32_t v = w.address; data()->framework_interface = v; }
+  void set_framework_interface(uint32_t v) const { data()->framework_interface = v; }
+  uint32_t framework_interface_bits() const { return data()->framework_interface; }
+  void set_framework_interface_bits(uint32_t v) const { data()->framework_interface = v; }
   // the 8-byte MovieWrapper, or 0
-  template <typename T = MovieWrapper>
-  T wrapper() const { return T(base, guest::LoadU32(base, address + 8)); }
-  void set_wrapper(const View& v) const { guest::StoreU32(base, address + 8, v.address); }
-  void set_wrapper(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t wrapper_address() const { return address + 8; }
+  template <typename T = MovieWrapper>
+  T wrapper() const { return T(base, data()->wrapper); }
+  void set_wrapper(const View& w) const { const uint32_t v = w.address; data()->wrapper = v; }
+  void set_wrapper(uint32_t v) const { data()->wrapper = v; }
+  uint32_t wrapper_bits() const { return data()->wrapper; }
+  void set_wrapper_bits(uint32_t v) const { data()->wrapper = v; }
   // the open's command: 0x820066DC (0x82000EB8 put back by the destructor)
-  uint32_t command_vtable() const { return guest::LoadU32(base, address + 12); }
-  void set_command_vtable(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
   uint32_t command_vtable_address() const { return address + 12; }
+  uint32_t command_vtable() const { return data()->command_vtable; }
+  void set_command_vtable(uint32_t v) const { data()->command_vtable = v; }
+  uint32_t command_vtable_bits() const { return data()->command_vtable; }
+  void set_command_vtable_bits(uint32_t v) const { data()->command_vtable = v; }
   // 0x82000AB4 then 0x82002908 (0x82000BA8, then 0x82000AB4 put back)
-  uint32_t command_vtable_4() const { return guest::LoadU32(base, address + 16); }
-  void set_command_vtable_4(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
   uint32_t command_vtable_4_address() const { return address + 16; }
+  uint32_t command_vtable_4() const { return data()->command_vtable_4; }
+  void set_command_vtable_4(uint32_t v) const { data()->command_vtable_4 = v; }
+  uint32_t command_vtable_4_bits() const { return data()->command_vtable_4; }
+  void set_command_vtable_4_bits(uint32_t v) const { data()->command_vtable_4 = v; }
   // the command's +8: 0
-  uint32_t unknown_20() const { return guest::LoadU32(base, address + 20); }
-  void set_unknown_20(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
   uint32_t unknown_20_address() const { return address + 20; }
+  uint32_t unknown_20() const { return data()->unknown_20; }
+  void set_unknown_20(uint32_t v) const { data()->unknown_20 = v; }
+  uint32_t unknown_20_bits() const { return data()->unknown_20; }
+  void set_unknown_20_bits(uint32_t v) const { data()->unknown_20 = v; }
   // the command's +12: 0, 3 once done (the slots test it)
-  uint32_t command_status() const { return guest::LoadU32(base, address + 24); }
-  void set_command_status(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
   uint32_t command_status_address() const { return address + 24; }
+  uint32_t command_status() const { return data()->command_status; }
+  void set_command_status(uint32_t v) const { data()->command_status = v; }
+  uint32_t command_status_bits() const { return data()->command_status; }
+  void set_command_status_bits(uint32_t v) const { data()->command_status = v; }
   // the command's +16: 0
-  uint8_t unknown_28() const { return guest::LoadU8(base, address + 28); }
-  void set_unknown_28(uint8_t v) const { guest::StoreU8(base, address + 28, v); }
   uint32_t unknown_28_address() const { return address + 28; }
+  uint8_t unknown_28() const { return data()->unknown_28; }
+  void set_unknown_28(uint8_t v) const { data()->unknown_28 = v; }
+  uint8_t unknown_28_bits() const { return data()->unknown_28; }
+  void set_unknown_28_bits(uint8_t v) const { data()->unknown_28 = v; }
   // the command's +17: 1
-  uint8_t unknown_29() const { return guest::LoadU8(base, address + 29); }
-  void set_unknown_29(uint8_t v) const { guest::StoreU8(base, address + 29, v); }
   uint32_t unknown_29_address() const { return address + 29; }
+  uint8_t unknown_29() const { return data()->unknown_29; }
+  void set_unknown_29(uint8_t v) const { data()->unknown_29 = v; }
+  uint8_t unknown_29_bits() const { return data()->unknown_29; }
+  void set_unknown_29_bits(uint8_t v) const { data()->unknown_29 = v; }
   // the command's +18: 0
-  uint8_t unknown_30() const { return guest::LoadU8(base, address + 30); }
-  void set_unknown_30(uint8_t v) const { guest::StoreU8(base, address + 30, v); }
   uint32_t unknown_30_address() const { return address + 30; }
+  uint8_t unknown_30() const { return data()->unknown_30; }
+  void set_unknown_30(uint8_t v) const { data()->unknown_30 = v; }
+  uint8_t unknown_30_bits() const { return data()->unknown_30; }
+  void set_unknown_30_bits(uint8_t v) const { data()->unknown_30 = v; }
   // the command's +20: Movie::Play stores a word of its frame (+100)
-  uint32_t unknown_32() const { return guest::LoadU32(base, address + 32); }
-  void set_unknown_32(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
   uint32_t unknown_32_address() const { return address + 32; }
+  uint32_t unknown_32() const { return data()->unknown_32; }
+  void set_unknown_32(uint32_t v) const { data()->unknown_32 = v; }
+  uint32_t unknown_32_bits() const { return data()->unknown_32; }
+  void set_unknown_32_bits(uint32_t v) const { data()->unknown_32 = v; }
   // the command's delegate: 0x82002850 (0x82000ABC put back)
-  uint32_t delegate_vtable() const { return guest::LoadU32(base, address + 36); }
-  void set_delegate_vtable(uint32_t v) const { guest::StoreU32(base, address + 36, v); }
   uint32_t delegate_vtable_address() const { return address + 36; }
+  uint32_t delegate_vtable() const { return data()->delegate_vtable; }
+  void set_delegate_vtable(uint32_t v) const { data()->delegate_vtable = v; }
+  uint32_t delegate_vtable_bits() const { return data()->delegate_vtable; }
+  void set_delegate_vtable_bits(uint32_t v) const { data()->delegate_vtable = v; }
   // 0, then the movie (Movie::Play)
-  template <typename T = Movie>
-  T delegate_object() const { return T(base, guest::LoadU32(base, address + 40)); }
-  void set_delegate_object(const View& v) const { guest::StoreU32(base, address + 40, v.address); }
-  void set_delegate_object(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
   uint32_t delegate_object_address() const { return address + 40; }
+  template <typename T = Movie>
+  T delegate_object() const { return T(base, data()->delegate_object); }
+  void set_delegate_object(const View& w) const { const uint32_t v = w.address; data()->delegate_object = v; }
+  void set_delegate_object(uint32_t v) const { data()->delegate_object = v; }
+  uint32_t delegate_object_bits() const { return data()->delegate_object; }
+  void set_delegate_object_bits(uint32_t v) const { data()->delegate_object = v; }
   // 0, then 0x820AE7F8 (calls the movie's slot 8, Movie::Open)
-  uint32_t delegate_function() const { return guest::LoadU32(base, address + 44); }
-  void set_delegate_function(uint32_t v) const { guest::StoreU32(base, address + 44, v); }
   uint32_t delegate_function_address() const { return address + 44; }
+  uint32_t delegate_function() const { return data()->delegate_function; }
+  void set_delegate_function(uint32_t v) const { data()->delegate_function = v; }
+  uint32_t delegate_function_bits() const { return data()->delegate_function; }
+  void set_delegate_function_bits(uint32_t v) const { data()->delegate_function = v; }
   // the movie's path (strncpy'd by Movie::Play)
   uint32_t path_address() const { return address + 48; }
+  uint8_t* path() const { return reinterpret_cast<uint8_t*>(data()) + 48; }
+  // the path as the C runtime's string functions reach it (the measure's Movie@+48)
+  template <typename T = MovieAt48>
+  T path_string() const { return T(base, address + 48); }
   // 0 none, 1 loaded or ended, 2 playing, 3 paused
-  uint32_t state() const { return guest::LoadU32(base, address + 308); }
-  void set_state(uint32_t v) const { guest::StoreU32(base, address + 308, v); }
   uint32_t state_address() const { return address + 308; }
+  uint32_t state() const { return data()->state; }
+  void set_state(uint32_t v) const { data()->state = v; }
+  uint32_t state_bits() const { return data()->state; }
+  void set_state_bits(uint32_t v) const { data()->state = v; }
 };
 
 // image; measure: [826C1CDC].+0, sub_820AE808.r3.+0, sub_820AE818.r3.+0
@@ -136,22 +212,53 @@ struct MovieVtable : View {
 };
 
 // allocated; measure: MovieWrapper, Movie.+8, sub_820AE9F8.r3.+8
+#pragma pack(push, 1)
+struct MovieWrapperData {
+  uint32_t vtable = 0;  // +0
+  uint32_t block = 0;  // +4
+};
+#pragma pack(pop)
+static_assert(sizeof(MovieWrapperData) == 8);
+inline constexpr memory::LayoutField kMovieWrapperFields[] = {{0, 4}, {4, 4}};
+inline constexpr memory::Layout kMovieWrapperLayout = {kMovieWrapperFields, 2};
+
 struct MovieWrapper : View {
   using View::View;
   static constexpr uint32_t kSize = 8;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   static constexpr uint32_t kVtable = 0x8206CC90;
+  MovieWrapperData* data() const { return static_cast<MovieWrapperData*>(memory::HandleObject(address)); }
+  static MovieWrapper New(uint8_t* base) {
+    return MovieWrapper(base, memory::MakeHandle(new MovieWrapperData(), sizeof(MovieWrapperData), "MovieWrapper", &kMovieWrapperLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static MovieWrapper NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(MovieWrapperData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<MovieWrapperData*>(::operator new(sizeof(MovieWrapperData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) MovieWrapperData();
+    return MovieWrapper(base, memory::MakeHandle(p, sizeof(MovieWrapperData) * count, "MovieWrapper", &kMovieWrapperLayout, sizeof(MovieWrapperData)));
+  }
+  MovieWrapper at(uint32_t i) const { return MovieWrapper(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kMovieWrapperLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kMovieWrapperLayout, offset, width, v); }
   // 0x8206CC90
-  template <typename T = MovieWrapperVtable>
-  T vtable() const { return T(base, guest::LoadU32(base, address + 0)); }
-  void set_vtable(const View& v) const { guest::StoreU32(base, address + 0, v.address); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
+  template <typename T = MovieWrapperVtable>
+  T vtable() const { return T(base, data()->vtable); }
+  void set_vtable(const View& w) const { const uint32_t v = w.address; data()->vtable = v; }
+  void set_vtable(uint32_t v) const { data()->vtable = v; }
+  uint32_t vtable_bits() const { return data()->vtable; }
+  void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
   // the 32-byte block (operator new), or 0
-  template <typename T = MovieWrapperBlock>
-  T block() const { return T(base, guest::LoadU32(base, address + 4)); }
-  void set_block(const View& v) const { guest::StoreU32(base, address + 4, v.address); }
-  void set_block(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t block_address() const { return address + 4; }
+  template <typename T = MovieWrapperBlock>
+  T block() const { return T(base, data()->block); }
+  void set_block(const View& w) const { const uint32_t v = w.address; data()->block = v; }
+  void set_block(uint32_t v) const { data()->block = v; }
+  uint32_t block_bits() const { return data()->block; }
+  void set_block_bits(uint32_t v) const { data()->block = v; }
 };
 
 // image; measure: Movie.+8.+0, sub_820AE9F8.r3.+8.+0
@@ -191,17 +298,48 @@ struct MovieWrapperVtable : View {
 };
 
 // allocated; measure: MovieWrapper.+4
+#pragma pack(push, 1)
+struct MovieWrapperBlockData {
+  uint8_t critical_section[28] = {};  // +0, guest order
+  uint32_t player = 0;  // +28
+};
+#pragma pack(pop)
+static_assert(sizeof(MovieWrapperBlockData) == 32);
+inline constexpr memory::LayoutField kMovieWrapperBlockFields[] = {{28, 4}};
+inline constexpr memory::Layout kMovieWrapperBlockLayout = {kMovieWrapperBlockFields, 1};
+
 struct MovieWrapperBlock : View {
   using View::View;
   static constexpr uint32_t kSize = 32;
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  MovieWrapperBlockData* data() const { return static_cast<MovieWrapperBlockData*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static MovieWrapperBlock New(uint8_t* base) {
+    return MovieWrapperBlock(base, memory::MakeHandle(new MovieWrapperBlockData(), sizeof(MovieWrapperBlockData), "MovieWrapperBlock", &kMovieWrapperBlockLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static MovieWrapperBlock NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(MovieWrapperBlockData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<MovieWrapperBlockData*>(::operator new(sizeof(MovieWrapperBlockData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) MovieWrapperBlockData();
+    return MovieWrapperBlock(base, memory::MakeHandle(p, sizeof(MovieWrapperBlockData) * count, "MovieWrapperBlock", &kMovieWrapperBlockLayout, sizeof(MovieWrapperBlockData)));
+  }
+  MovieWrapperBlock at(uint32_t i) const { return MovieWrapperBlock(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kMovieWrapperBlockLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kMovieWrapperBlockLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // a host mutex since 2026-10-30 (app_start_up::MovieWrapperMutex): its bytes left as operator new leaves them
   uint32_t critical_section_address() const { return address + 0; }
+  uint8_t* critical_section() const { return on_host() ? reinterpret_cast<uint8_t*>(data()) + 0 : guest::Pointer(base, address + 0); }
   // the library's player, 0 before the open
-  template <typename T = MoviePlayer>
-  T player() const { return T(base, guest::LoadU32(base, address + 28)); }
-  void set_player(const View& v) const { guest::StoreU32(base, address + 28, v.address); }
-  void set_player(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
   uint32_t player_address() const { return address + 28; }
+  template <typename T = MoviePlayer>
+  T player() const { return T(base, on_host() ? data()->player : guest::LoadU32(base, address + 28)); }
+  void set_player(const View& w) const { const uint32_t v = w.address; if (on_host()) data()->player = v; else guest::StoreU32(base, address + 28, v); }
+  void set_player(uint32_t v) const { if (on_host()) data()->player = v; else guest::StoreU32(base, address + 28, v); }
+  uint32_t player_bits() const { return on_host() ? data()->player : guest::LoadU32(base, address + 28); }
+  void set_player_bits(uint32_t v) const { if (on_host()) data()->player = v; else guest::StoreU32(base, address + 28, v); }
 };
 
 // allocated; measure: MoviePlayer, MovieWrapper.+4.+28
@@ -1332,15 +1470,45 @@ struct MovieLib8248CB58R3 : View {
 };
 
 // embedded; measure: Movie@+48
+#pragma pack(push, 1)
+struct MovieAt48Data {
+  uint8_t unknown_0 = 0;  // +0
+  uint8_t unknown_1 = 0;  // +1
+};
+#pragma pack(pop)
+static_assert(sizeof(MovieAt48Data) == 2);
+inline constexpr memory::Layout kMovieAt48Layout = {nullptr, 0};
+
 struct MovieAt48 : View {
   using View::View;
   static constexpr uint32_t kSize = 2;
-  uint8_t unknown_0() const { return guest::LoadU8(base, address + 0); }
-  void set_unknown_0(uint8_t v) const { guest::StoreU8(base, address + 0, v); }
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  MovieAt48Data* data() const { return static_cast<MovieAt48Data*>(memory::HandleObject(address)); }
+  static MovieAt48 New(uint8_t* base) {
+    return MovieAt48(base, memory::MakeHandle(new MovieAt48Data(), sizeof(MovieAt48Data), "MovieAt48", &kMovieAt48Layout));
+  }
+  template <uint32_t Stride = kSize>
+  static MovieAt48 NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(MovieAt48Data) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<MovieAt48Data*>(::operator new(sizeof(MovieAt48Data) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) MovieAt48Data();
+    return MovieAt48(base, memory::MakeHandle(p, sizeof(MovieAt48Data) * count, "MovieAt48", &kMovieAt48Layout, sizeof(MovieAt48Data)));
+  }
+  MovieAt48 at(uint32_t i) const { return MovieAt48(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kMovieAt48Layout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kMovieAt48Layout, offset, width, v); }
   uint32_t unknown_0_address() const { return address + 0; }
-  uint8_t unknown_1() const { return guest::LoadU8(base, address + 1); }
-  void set_unknown_1(uint8_t v) const { guest::StoreU8(base, address + 1, v); }
+  uint8_t unknown_0() const { return data()->unknown_0; }
+  void set_unknown_0(uint8_t v) const { data()->unknown_0 = v; }
+  uint8_t unknown_0_bits() const { return data()->unknown_0; }
+  void set_unknown_0_bits(uint8_t v) const { data()->unknown_0 = v; }
   uint32_t unknown_1_address() const { return address + 1; }
+  uint8_t unknown_1() const { return data()->unknown_1; }
+  void set_unknown_1(uint8_t v) const { data()->unknown_1 = v; }
+  uint8_t unknown_1_bits() const { return data()->unknown_1; }
+  void set_unknown_1_bits(uint8_t v) const { data()->unknown_1 = v; }
 };
 
 // embedded; measure: new<?>@sub_824847D0@+136

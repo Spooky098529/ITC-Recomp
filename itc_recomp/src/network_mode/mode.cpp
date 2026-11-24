@@ -98,9 +98,11 @@ uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls)
       calls.Call(kStringsLoad, frame, 0x82278080, G::string_table(base).address, kStringFile);
   calls.Call(kArchiveWaitIdle, frame, 0x82278084, strings, kStringFile);
   calls.Call(kStandSceneCreate, frame, 0x8227808C, 1);
-  const uint64_t allocated =
-      calls.Call(kVirtualAlloc, frame, 0x822780A4, 0, Block::kSize, 4096, 4);
-  m.set_block(uint32_t(allocated));
+  // The block lives in host memory (E5 step 4): the original's
+  // VirtualAlloc(0, 135208, MEM_COMMIT, PAGE_READWRITE) at 0x822780A4 (zero
+  // filled, as New's); the mode's +848 holds its handle. Freed by
+  // ModeType12::Release (FreePages over the handle).
+  m.set_block(Block::New(base));
   // The fades' table's page, kept in the frame for the second FadeIn.
   StoreU32(base, frame + 112, G::fades_passes_address() & 0xFFFF0000u);
   calls.Call(kFadeIn, frame, 0x822780C8, G::fades_passes(base), 0, 0, 0);
@@ -222,10 +224,6 @@ constexpr uint32_t kLoadedOrder[14] = {kModeSelectAt, kScreen1At,  kScreen3At,  
 uint64_t Load64(uint8_t* base, uint32_t at) {
   return (uint64_t(Load(base, at)) << 32) | Load(base, at + 4);
 }
-void Store64(uint8_t* base, uint32_t at, uint64_t value) {
-  Store(base, at, uint32_t(value >> 32));
-  Store(base, at + 4, uint32_t(value));
-}
 
 // The mode's delegate (+8, its holder +4) from the doubleword at `slot`.
 // The holder 0 when the delegate's address wraps to 0 (never: kept as the
@@ -289,7 +287,7 @@ void Answer(uint8_t* base, uint32_t mode, uint32_t block, uint32_t frame) {
   guest::StoreU8(base, frame + 80, 1);
   const uint64_t answer = Load64(base, frame + 80);
   Store(base, frame + 84, 0);
-  Store64(base, Block(base, block).next_answer_address(), answer);
+  Block(base, block).set_next_answer(answer);
   Store(base, frame + 80, kSlot12Thunk);
   Delegate(base, mode, frame + 80);
 }
@@ -342,7 +340,7 @@ void SetUpTimeAttack(uint8_t* base, uint32_t mode, uint32_t frame, const Calls& 
   Store(base, frame + 80, kSlot12Thunk);
   G::session(base).set_screen3_after_race(0);
   G::session(base).set_ta_car_word(G::ta_session_word(base));
-  Store64(base, Block(base, BlockOf(base, mode)).next_answer_address(), answer);
+  Block(base, BlockOf(base, mode)).set_next_answer(answer);
   Delegate(base, mode, frame + 80);
 }
 
@@ -467,7 +465,7 @@ void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const 
     guest::StoreU8(base, frame + 80, 1);
     const uint64_t next = Load64(base, frame + 80);
     Store(base, frame + 84, 0);
-    Store64(base, Block(base, block).next_answer_address(), next);
+    Block(base, block).set_next_answer(next);
     Store(base, frame + 80, kSlot12Thunk);
     G::set_title_flag(base, Block(base, BlockOf(base, mode)).session_made() != 0 ? 1 : 0);
     Delegate(base, mode, frame + 80);

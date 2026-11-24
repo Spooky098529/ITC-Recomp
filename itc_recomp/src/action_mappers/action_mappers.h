@@ -3,9 +3,10 @@
 // (2,896 bytes, vtable 0x82007F78) turning a logical pad's sticks and
 // triggers and its listener's buttons into 30 actions (ids 151-180), the
 // client list they're kept in, and their repeat and curve objects. The
-// mappers are guest objects shared with the recompiled code (the menus, the
-// pause menu and the car read them through the vtable), so these work on
-// guest memory, with the originals' float steps (single rounding after each
+// mappers are in host memory (E5 step 4; the menus, the pause menu and the
+// car read them through the vtable, and lifted code by their handles), their
+// arrays embedded objects read through interior handles, with the originals'
+// float steps (single rounding after each
 // operation, as the translated code does; built with -ffp-model=strict and
 // -ffp-contract=off, flush-to-zero off: the adapters' job). Adapters:
 // src/hooks/action_mappers.cpp.

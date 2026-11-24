@@ -1,5 +1,8 @@
 // The input manager's set-up and accessors (see input_manager.h), store for
-// store as the recompiled functions.
+// store as the recompiled functions. The manager is in host memory (E5 step
+// 4), its pads and processors embedded objects: views of them are interior
+// handles, read through their members (arrays past a schema field, and bytes
+// fields, by offset: load_at, store_at).
 
 #include "input/input_manager.h"
 
@@ -12,6 +15,7 @@
 #include "schema/input.h"
 #include "schema/model_animation.h"
 
+#include <bit>
 #include <cstdlib>
 #include <cstring>
 
@@ -25,17 +29,18 @@ constexpr uint32_t kHalf = 0x82001BE4;  // the game's float 0.5
 constexpr uint32_t kZero = 0x82000A34;  // 0.0
 constexpr uint32_t kOne = 0x82000A30;   // 1.0
 
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
-}
-uint32_t Load(uint8_t* base, uint32_t address) {
-  return guest::LoadU32(base, address);
+// A processor's 32 hold counters (s32, +284): a bytes field, read by offset.
+constexpr uint32_t kHeldTicks = 284;
+
+// lfs: an image float through a double, as the translated code does (then
+// stored with stfs by the caller's setter).
+float LoadImageFloat(uint8_t* base, uint32_t from) {
+  return float(double(guest::LoadFloat(base, from)));
 }
 
-// lfs then stfs: the float through a double, as the translated code does.
-void CopyFloat(uint8_t* base, uint32_t to, uint32_t from) {
-  const double value = double(guest::LoadFloat(base, from));
-  guest::StoreFloat(base, to, float(value));
+// lfs then stfs of a word inside a host object: the float through a double.
+uint32_t ThroughDouble(uint32_t bits) {
+  return std::bit_cast<uint32_t>(float(double(std::bit_cast<float>(bits))));
 }
 
 }  // namespace
@@ -44,8 +49,9 @@ void LogicalPadConstruct(uint8_t* base, uint32_t pad) {
   ITC_NATIVE_RUNNING("sub_82591B38 LogicalPad::LogicalPad");
   const schema::LogicalPad p(base, pad);
   p.set_vtable(schema::LogicalPad::kVtable);
+  // The bindings (+4 to +35), word by word.
   for (uint32_t i = 0; i < 8; i++) {
-    Store(base, p.bindings_address() + 4 * i, 0);
+    p.store_at(4 + 4 * i, 4, 0);
   }
 }
 
@@ -54,48 +60,49 @@ void PhysicalPadConstruct(uint8_t* base, uint32_t pad) {
   const schema::PhysicalPad p(base, pad);
   p.set_vtable(schema::PhysicalPad::kVtable);
   p.set_unknown_4(0);
-  model_animation::RecordClear(base, p.record_a_address());
-  model_animation::RecordClear(base, p.record_b_address());
+  model_animation::RecordClear(base, p.record_a().address);
+  model_animation::RecordClear(base, p.record_b().address);
 }
 
 void LogicalPadBind(uint8_t* base, uint32_t pad, uint32_t index, uint32_t device) {
   ITC_NATIVE_RUNNING("sub_825918F0 LogicalPad::Bind");
-  const schema::InputPadBinding binding(
-      base, schema::LogicalPad(base, pad).bindings_address() + (index << 3));
+  const schema::InputPadBinding binding = schema::LogicalPad(base, pad).binding(index);
   binding.set_enabled(1);
   binding.set_device(device);
 }
 
 uint32_t LogicalPadValues(uint32_t pad) {
   ITC_NATIVE_RUNNING("sub_82591B30 LogicalPad::Values");
-  return schema::LogicalPad(nullptr, pad).values_address();
+  return schema::LogicalPad(nullptr, pad).values().address;
 }
 
 uint32_t PhysicalPadValues(uint32_t pad) {
   ITC_NATIVE_RUNNING("sub_820988B8 PhysicalPad::Values");
-  return schema::PhysicalPad(nullptr, pad).values_address();
+  return schema::PhysicalPad(nullptr, pad).values().address;
 }
 
 void InputProcessorBaseConstruct(uint8_t* base, uint32_t p) {
   ITC_NATIVE_RUNNING("sub_825920D0 InputProcessorBase::InputProcessorBase");
   const schema::InputProcessor q(base, p);
   q.set_vtable(kProcessorBaseVtable);
-  CopyFloat(base, q.dead_zone_x_address(), kHalf);
-  CopyFloat(base, q.dead_zone_y_address(), kHalf);
-  CopyFloat(base, q.dead_zone_trigger_address(), kZero);
-  CopyFloat(base, q.dead_zone_unused_address(), kZero);
+  q.set_dead_zone_x(LoadImageFloat(base, kHalf));
+  q.set_dead_zone_y(LoadImageFloat(base, kHalf));
+  q.set_dead_zone_trigger(LoadImageFloat(base, kZero));
+  q.set_dead_zone_unused(LoadImageFloat(base, kZero));
   // The six vectors' w (raw_3, raw_7, adjusted_3, adjusted_7, the directions').
-  for (uint32_t w = q.raw_3_address(); w <= q.right_direction_w_address(); w += 16) {
-    CopyFloat(base, w, kOne);
-  }
+  q.set_raw_3(LoadImageFloat(base, kOne));
+  q.set_raw_7(LoadImageFloat(base, kOne));
+  q.set_adjusted_3(LoadImageFloat(base, kOne));
+  q.set_adjusted_7(LoadImageFloat(base, kOne));
+  q.set_left_direction_w(LoadImageFloat(base, kOne));
+  q.set_right_direction_w(LoadImageFloat(base, kOne));
   q.set_pressed(0);
   q.set_released(0);
   q.set_held(0);
   q.set_repeat_delay(20);
   q.set_repeat_period(4);
-  // memset (sub_825A71D0), as its adapter does it.
-  guest::ForEachHostPart(base, q.held_ticks_address(), 128,
-                         [](uint8_t* host, uint32_t, uint32_t bytes) { std::memset(host, 0, bytes); });
+  // memset (sub_825A71D0) of the 32 counters: the host object's bytes field.
+  std::memset(q.held_ticks(), 0, 128);
 }
 
 void InputProcessorConstruct(uint8_t* base, uint32_t processor) {
@@ -107,21 +114,20 @@ void InputProcessorConstruct(uint8_t* base, uint32_t processor) {
 void InputProcessorAssign(uint8_t* base, uint32_t destination, uint32_t source) {
   ITC_NATIVE_RUNNING("sub_82098D60 InputProcessor::Assign");
   const schema::InputProcessor to(base, destination), from(base, source);
+  // By offset (both in host memory, E5 step 4), word by word as the guest's
+  // bytes give them.
   // The dead zones to the directions (+16 to +127) by doublewords, in the
   // original's order.
-  for (uint32_t t = to.dead_zone_x_address(), f = from.dead_zone_x_address();
-       t < to.left_length_address(); t += 4, f += 4) {
-    Store(base, t, Load(base, f));
+  for (uint32_t at = 16; at < 128; at += 4) {
+    to.store_at(at, 4, from.load_at(at, 4));
   }
   // The lengths and the 32 values (to +263), as floats.
-  for (uint32_t t = to.left_length_address(), f = from.left_length_address();
-       t < to.pressed_address(); t += 4, f += 4) {
-    CopyFloat(base, t, f);
+  for (uint32_t at = 128; at < 264; at += 4) {
+    to.store_at(at, 4, ThroughDouble(uint32_t(from.load_at(at, 4))));
   }
   // The button words, the delay and period, the 32 counters (to +411).
-  for (uint32_t t = to.pressed_address(), f = from.pressed_address();
-       t < to.held_ticks_address() + 128; t += 4, f += 4) {
-    Store(base, t, Load(base, f));
+  for (uint32_t at = 264; at < kHeldTicks + 128; at += 4) {
+    to.store_at(at, 4, from.load_at(at, 4));
   }
 }
 
@@ -140,7 +146,7 @@ uint32_t InputProcessorPressedOrRepeat(uint8_t* base, uint32_t processor, uint32
   if (bit == 32 || !(p.held() & (1u << bit))) {
     return 0;
   }
-  const int32_t ticks = int32_t(Load(base, p.held_ticks_address() + 4 * bit));
+  const int32_t ticks = int32_t(uint32_t(p.load_at(kHeldTicks + 4 * bit, 4)));
   const int32_t delay = p.repeat_delay();
   return ticks < delay ? (ticks == 1 ? 1 : 0) : (ticks == delay ? 1 : 0);
 }
@@ -158,22 +164,23 @@ uint32_t InputProcessorTestRepeat(uint8_t* base, uint32_t processor, uint32_t ma
 
 uint32_t ManagerProcessor(uint32_t manager, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_82098CB8 InputManager::GetProcessor");
-  return schema::InputManager(nullptr, manager).processors_address() + schema::InputProcessor::kSize * index;
+  return schema::InputManager(nullptr, manager).processor(index).address;
 }
 
 uint32_t ManagerLogicalPad(uint32_t manager, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_82098CD0 InputManager::GetLogicalPad");
-  return schema::InputManager(nullptr, manager).logical_pads_address() + schema::LogicalPad::kSize * index;
+  return schema::InputManager(nullptr, manager).logical_pad(index).address;
 }
 
 uint32_t ManagerPhysicalPad(uint32_t manager, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_82098FE0 InputManager::GetPhysicalPad");
-  return schema::InputManager(nullptr, manager).physical_pads_address() + schema::PhysicalPad::kSize * index;
+  return schema::InputManager(nullptr, manager).physical_pad(index).address;
 }
 
 std::optional<uint32_t> ManagerAllocate(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_820993E8 Input::Create");
-  return memory::crt::OperatorNew(base, schema::InputManager::kSize);
+  // In host memory (E5 step 4): never freed (the process ends with it).
+  return schema::InputManager::New(base).address;
 }
 
 bool ManagerConstructMembers(uint8_t* base, uint32_t manager, uint32_t block) {
@@ -184,16 +191,16 @@ bool ManagerConstructMembers(uint8_t* base, uint32_t manager, uint32_t block) {
   const schema::InputManager m(base, manager);
   m.set_vtable(schema::InputManager::kVtable);
   for (uint32_t i = 0; i < 5; i++) {
-    LogicalPadConstruct(base, m.logical_pads_address() + schema::LogicalPad::kSize * i);
+    LogicalPadConstruct(base, m.logical_pad(i).address);
   }
   for (uint32_t i = 0; i < 4; i++) {
-    PhysicalPadConstruct(base, m.physical_pads_address() + schema::PhysicalPad::kSize * i);
+    PhysicalPadConstruct(base, m.physical_pad(i).address);
   }
   for (uint32_t i = 0; i < 5; i++) {
-    InputProcessorConstruct(base, m.processors_address() + schema::InputProcessor::kSize * i);
+    InputProcessorConstruct(base, m.processor(i).address);
   }
   for (uint32_t i = 0; i < 5; i++) {
-    if (!std_list::Construct(base, m.listener_lists_address() + schema::PtrList::kSize * i)) {
+    if (!std_list::Construct(base, m.listener_list(i).address)) {
       ITC_LOG_ERROR("InputManager: a listener list refused after its checks");
       std::abort();
     }
@@ -204,22 +211,20 @@ bool ManagerConstructMembers(uint8_t* base, uint32_t manager, uint32_t block) {
 
 void ManagerBindPads(uint8_t* base, uint32_t manager) {
   const schema::InputManager m(base, manager);
-  const uint32_t pads = m.logical_pads_address();
   for (uint32_t i = 0; i < 4; i++) {
-    LogicalPadBind(base, pads + schema::LogicalPad::kSize * i, 0,
-                   m.physical_pads_address() + schema::PhysicalPad::kSize * i);
+    LogicalPadBind(base, m.logical_pad(i).address, 0, m.physical_pad(i).address);
   }
-  const uint32_t any = pads + schema::LogicalPad::kSize * 4;
+  const uint32_t any = m.logical_pad(4).address;
   for (uint32_t i = 0; i < 4; i++) {
-    LogicalPadBind(base, any, i, pads + schema::LogicalPad::kSize * i);
+    LogicalPadBind(base, any, i, m.logical_pad(i).address);
   }
 }
 
 bool ManagerAddListener(uint8_t* base, uint32_t manager, uint32_t index, uint32_t listener) {
   ITC_NATIVE_RUNNING("sub_82099430 InputManager::AddListener");
   const schema::InputManager m(base, manager);
-  const uint32_t list = m.listener_lists_address() + schema::PtrList::kSize * index;
-  const schema::PtrList l(base, list);
+  const schema::PtrList l = m.listener_list(index);
+  const uint32_t list = l.address;
   if (l.size() != 0 || !std_list::CanAllocate(base, 1)) {
     return false;
   }
@@ -227,7 +232,7 @@ bool ManagerAddListener(uint8_t* base, uint32_t manager, uint32_t index, uint32_
     ITC_LOG_ERROR("InputManager::AddListener: the node refused after its checks");
     std::abort();
   }
-  InputProcessorAssign(base, listener, m.processors_address() + schema::InputProcessor::kSize * index);
+  InputProcessorAssign(base, listener, m.processor(index).address);
   return true;
 }
 

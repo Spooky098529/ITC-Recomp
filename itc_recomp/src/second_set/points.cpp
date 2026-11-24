@@ -6,6 +6,8 @@
 #include "base/log.h"
 #include "car_physics/float_ops.h"
 #include "guest.h"
+#include "memory/handles.h"
+#include "memory/host_copy.h"
 #include "native/buffers.h"
 #include "scene_loaders/pools.h"
 #include "schema/models.h"
@@ -43,8 +45,17 @@ void Memcpy(uint8_t* base, uint32_t to, uint32_t from, uint32_t bytes, uint32_t 
   }
 }
 
-// The string at `name` copied, with its 0, to `to`.
+// The string at `name` copied, with its 0, to `to` (a record inside a host
+// object, E5 step 4: its bytes copied through the handle, as they are).
 void CopyString(uint8_t* base, uint32_t to, uint32_t name) {
+  if (memory::IsHandle(to) || memory::IsHandle(name)) {
+    uint32_t length = 0;
+    while (guest::LoadU8(base, name + length) != 0) {
+      length++;
+    }
+    memory::CopyWithHandles(base, to, name, length + 1);
+    return;
+  }
   for (uint32_t i = 0;; i++) {
     const uint8_t ch = base[name + i];
     base[to + i] = ch;

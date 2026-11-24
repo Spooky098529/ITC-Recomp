@@ -27,6 +27,8 @@
 measures = ["Movie", "sub_820AE808.r3", "sub_820AE818.r3", "sub_820AE9F8.r3"]
 size = 312
 origin = "allocated"
+storage = "host"
+host_alloc = [0x82094790]
 vtable = 0x82002910
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "MovieVtable", note = "0x82002910" },
@@ -44,6 +46,7 @@ fields = [
   { name = "delegate_object", offset = 40, type = "ptr", to = "Movie", note = "0, then the movie (Movie::Play)" },
   { name = "delegate_function", offset = 44, type = "fn", note = "0, then 0x820AE7F8 (calls the movie's slot 8, Movie::Open)" },
   { name = "path", offset = 48, type = "bytes", count = 260, note = "the movie's path (strncpy'd by Movie::Play)" },
+  { name = "path_string", offset = 48, type = "embed", to = "MovieAt48", note = "the path as the C runtime's string functions reach it (the measure's Movie@+48)" },
   { name = "state", offset = 308, type = "u32", note = "0 none, 1 loaded or ended, 2 playing, 3 paused" },
 ]
 
@@ -74,6 +77,8 @@ fields = [
 measures = ["MovieWrapper", "Movie.+8", "sub_820AE9F8.r3.+8"]
 size = 8
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820AEB10]
 vtable = 0x8206CC90
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "MovieWrapperVtable", note = "0x8206CC90" },
@@ -97,10 +102,15 @@ fields = [
 ]
 
 # The wrapper's block (32 bytes, operator new in MovieWrapper::MovieWrapper).
+# Dual: the native constructor (app_start_up::MovieWrapperConstruct) makes it
+# in host memory, its critical section a host mutex; the lifted original (with
+# --native_app_start_up off) keeps operator new's guest block, as it hands the
+# section to InitializeCriticalSection (sub_8258E548, the kernel's).
 [MovieWrapperBlock]
 measure = "MovieWrapper.+4"
 size = 32
 origin = "allocated"
+storage = "dual"
 fields = [
   { name = "critical_section", offset = 0, type = "bytes", count = 28, note = "a host mutex since 2026-10-30 (app_start_up::MovieWrapperMutex): its bytes left as operator new leaves them" },
   { name = "player", offset = 28, type = "ptr", to = "MoviePlayer", note = "the library's player, 0 before the open" },
@@ -705,6 +715,7 @@ movie_class = { address = 0x826C1CDC, type = "ptr", to = "Movie", note = "the mo
 measure = "Movie@+48"
 size = 2
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "unknown_0", offset = 0, type = "u8" },
   { name = "unknown_1", offset = 1, type = "u8" },

@@ -5,7 +5,6 @@
 
 #include "base/log.h"
 #include "guest.h"
-#include "memory/c_runtime_heap.h"
 #include "native/buffers.h"
 #include "schema/app_states.h"
 #include "schema/framework.h"
@@ -83,20 +82,21 @@ uint32_t ConstructJob(uint8_t* base, Kind kind, uint32_t job, uint32_t interface
 
 std::optional<uint32_t> MakeJob(uint8_t* base, Kind kind, uint32_t maker, uint32_t record,
                                 uint32_t stack, const ConstructCalls& calls) {
-  const auto job = memory::crt::OperatorNew(base, 224);
-  if (!job) {
-    return std::nullopt;
-  }
+  // operator new(224) at 0x820AC814 (0x820AC8C4 for the skinning job): the
+  // job in host memory (E5 step 4), its handle the r3 the original kept.
+  // Freed by the deleting destructor's operator delete (the game's frees
+  // take handles).
+  const uint32_t job = schema::MorphJob::New(base).address;
   if (kind == Kind::kMorph) {
     ITC_NATIVE_RUNNING("sub_820AC7F0 PoolMaker2::MakeMorphJob");
   } else {
     ITC_NATIVE_RUNNING("sub_820AC8A0 PoolMaker::MakeSkinJob");
   }
   const uint32_t frame = Frame(base, stack, kMakeFrame);
-  if (*job == 0) {
+  if (job == 0) {
     return 0u;
   }
-  return ConstructJob(base, kind, *job,
+  return ConstructJob(base, kind, job,
                       schema::MorphJobMaker(base, maker).worker_pool().address, record,
                       frame, calls);
 }

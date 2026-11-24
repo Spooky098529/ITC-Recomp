@@ -110,7 +110,7 @@ std::optional<uint32_t> AddRingPoint(uint8_t* base, uint32_t object, double x, d
     return r3;
   }
   // x's column: (y, u, v) added unless y is there.
-  const uint32_t column = schema::ScreenObjectUvMapNode(base, found->node).column_address();
+  const uint32_t column = schema::ScreenObjectUvMapNode(base, found->node).column().address;
   const schema::ScreenObjectUvColumn c(base, column);
   const auto at = ColumnFind(base, column, key_y);
   if (!at || c.size() >= kColumnMaxSize) {

@@ -63,8 +63,9 @@ uint32_t ConstructJob(uint8_t* base, Kind kind, uint32_t job, uint32_t interface
 // PoolMaker2::MakeMorphJob (sub_820AC7F0) and PoolMaker::MakeSkinJob
 // (sub_820AC8A0): r3 = `maker`, r4 = `record`; `stack` is r1 at entry.
 // operator new(224) and the constructor with the maker's +4, from a 112-byte
-// frame; 0 when operator new gives 0. nullopt, with nothing done, where
-// operator new's plain C++ declines (the original then runs).
+// frame. The job is a host object (E5 step 4, schema::MorphJob::New), so
+// never nullopt now (the lifted original, run where the makers aren't
+// native, makes a host job too: the schema's host_alloc).
 std::optional<uint32_t> MakeJob(uint8_t* base, Kind kind, uint32_t maker, uint32_t record,
                                 uint32_t stack, const ConstructCalls& calls);
 

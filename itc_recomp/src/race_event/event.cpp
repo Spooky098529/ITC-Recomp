@@ -12,6 +12,7 @@
 #include "hooks/heap.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "memory/host_copy.h"
 #include "race_overlays/race_overlays.h"
 #include "race_setup/race_setup.h"
 #include "race_world/race_world.h"
@@ -42,6 +43,8 @@ using Entry = schema::RaceEventEntry;
 using Group = schema::EventGroup;
 using GroupEntry = schema::EventGroupEntry;
 using Pools = schema::EventPools;
+using IdList = schema::EventIdList;
+using PoolBlock = schema::RaceEventPoolBlock;
 using ItemV = schema::OpponentItem;
 using SaveV = schema::SaveData;
 using Record = schema::CareerItemRecord;
@@ -54,7 +57,7 @@ using Position = schema::RoutePosition;
 constexpr uint32_t kPoolsBytes = Pools::kSize;
 // A group of the event (EventGroup, 12 bytes): location i's at +36 + 12 i.
 uint32_t GroupAt(uint8_t* base, uint32_t event, uint32_t i) {
-  return Event(base, event).groups_address() + Group::kSize * i;
+  return Event(base, event).group(i).address;
 }
 // Group entry `b` copied over `a` (halfword by halfword) and `a`'s word
 // into `b`.
@@ -67,11 +70,15 @@ void SwapEntries(uint8_t* base, uint32_t a, uint32_t b) {
   eb.set_word(was);
 }
 
-// An id appended to a counted halfword list.
-void Append(uint8_t* base, uint32_t list, uint16_t id) {
-  guest::StoreU16(base, uint32_t((LoadS16(base, list) + 1) << 1) + list, id);
-  guest::StoreU16(base, list, uint16_t(guest::LoadU16(base, list) + 1));
+// An id appended to a counted halfword list (the ids at +2, read and
+// written as the guest's halfwords through load_at and store_at).
+void Append(const IdList list, uint16_t id) {
+  list.store_at(uint32_t((int16_t(list.count()) + 1) << 1), 2, id);
+  list.set_count(uint16_t(list.count() + 1));
 }
+// Id `i` of a counted list.
+uint16_t IdAt(const IdList list, uint32_t i) { return uint16_t(list.load_at(2 + 2 * i, 2)); }
+void SetIdAt(const IdList list, uint32_t i, uint16_t id) { list.store_at(2 + 2 * i, 2, id); }
 
 // The order EventPools::Trim and EventGroup::SortOpen sort by: true when the
 // entry `b` (its item's kind +35, +37 and id) goes before the one kept `a`.
@@ -92,10 +99,15 @@ bool Before(int32_t a_kind, int32_t a_37, int32_t a_id, int32_t b_kind, int32_t 
   return !(a_id < b_id);
 }
 
-// VirtualAlloc(0, size, MEM_COMMIT, PAGE_READWRITE): the layer's pages.
-uint32_t VirtualAlloc(uint32_t size) { return memory::AllocPages(size, 4096); }
-// VirtualFree(address, 0, MEM_RELEASE).
-void VirtualFree(uint32_t address) { memory::FreePages(address); }
+// The original's memset of `bytes` zeros at `address` (a host object's, or
+// guest memory).
+void Zero(uint8_t* base, uint32_t address, uint32_t bytes) {
+  if (memory::FillWithHandles(base, address, 0, bytes)) {
+    return;
+  }
+  guest::ForEachHostPart(base, address, bytes,
+                         [](uint8_t* host, uint32_t, uint32_t n) { std::memset(host, 0, n); });
+}
 
 bool IsPagesOrNone(uint32_t address) { return address == 0 || memory::IsPages(address); }
 
@@ -143,7 +155,8 @@ uint32_t GroupAlloc(uint8_t* base, uint32_t group) {
   if (count <= 0) {
     return 1;
   }
-  const uint32_t entries = VirtualAlloc(uint32_t(count) << 2);
+  // The original's VirtualAlloc of count x 4 bytes: one host array (E5 step 4).
+  const uint32_t entries = GroupEntry::NewArray(base, uint32_t(count)).address;
   g.set_entries(entries);
   if (entries == 0) {
     return 0;
@@ -157,7 +170,8 @@ uint32_t Alloc(uint8_t* base, uint32_t event) {
   const Event ev(base, event);
   const int32_t count = int16_t(ev.locked_0_to_3()) + int16_t(ev.open_0_to_3());
   if (count > 0) {
-    const uint32_t list = VirtualAlloc(uint32_t(count) * Entry::kSize);
+    // The original's VirtualAlloc of count x 12 bytes: one host array (E5 step 4).
+    const uint32_t list = Entry::NewArray(base, uint32_t(count)).address;
     ev.set_list(list);
     if (list == 0) {
       return 0;
@@ -178,7 +192,7 @@ void GroupFree(uint8_t* base, uint32_t group) {
   if (entries == 0) {
     return;
   }
-  VirtualFree(entries);
+  GroupEntry(base, entries).Delete();  // the original's VirtualFree
   g.set_entries(0);
   g.set_locked_entries(0);
 }
@@ -188,7 +202,7 @@ void Free(uint8_t* base, uint32_t event) {
   const Event ev(base, event);
   const uint32_t list = ev.list().address;
   if (list != 0) {
-    VirtualFree(list);
+    Entry(base, list).Delete();  // the original's VirtualFree
     ev.set_list(0);
   }
   for (uint32_t i = 0; i < 10; i++) {
@@ -227,7 +241,7 @@ void Destroy(uint8_t* base) {
   Free(base, event);
   // Freed again (no destructor) and deleted.
   Free(base, event);
-  memory::crt::OperatorDelete(event);
+  Event(base, event).Delete();  // the original's operator delete
   G::set_event(base, 0);
 }
 
@@ -266,7 +280,7 @@ void PoolsAddRivalsOf(uint8_t* base, uint32_t pools, uint32_t id) {
     if (int16_t(r) < 0) {
       continue;
     }
-    Append(base, Pools(base, pools).locked_address(), r);
+    Append(Pools(base, pools).locked_list(), r);
     PoolsAddRivalsOf(base, pools, rival);
   }
 }
@@ -280,7 +294,7 @@ void PoolsAddRivals(uint8_t* base, uint32_t pools, uint32_t item) {
     if (int16_t(r) < 0) {
       continue;
     }
-    Append(base, Pools(base, pools).locked_address(), r);
+    Append(Pools(base, pools).locked_list(), r);
     if (it.race_kind() == 3) {
       PoolsAddRivalsOf(base, pools, rival);
     }
@@ -297,12 +311,11 @@ void PoolsAddItem(uint8_t* base, uint32_t pools, uint32_t item, uint32_t records
   }
   const uint32_t state = UnlockState(base, item, guest.Down(128));
   if (state == 1) {
-    Append(base, ItemsBeaten(base, records, item) != 0 ? p.won_address() : p.open_address(),
-           it.id());
+    Append(ItemsBeaten(base, records, item) != 0 ? p.won_list() : p.open_list(), it.id());
     return;
   }
   if (state == 2 && it.listed() == 1) {
-    Append(base, p.locked_address(), it.id());
+    Append(p.locked_list(), it.id());
     PoolsAddRivals(base, pools, item);
   }
 }
@@ -321,15 +334,14 @@ void PoolsTrim(uint8_t* base, uint32_t pools, uint16_t cap) {
   const int32_t sorted = int16_t(open > int16_t(kept_word) ? kept_word : open_word);
   // A selection sort of the open ids not won (the first `sorted` places,
   // each over the open count).
+  const IdList open_list = p.open_list();
   for (int32_t i = 0; i < sorted; i++) {
-    const uint32_t at = p.open_ids_address() + 2 * uint32_t(i);
-    uint16_t id = guest::LoadU16(base, at);
+    uint16_t id = IdAt(open_list, uint32_t(i));
     const ItemV item(base, Item(base, uint32_t(int16_t(id))));
     int32_t kind = int8_t(item.kind());
     int32_t b37 = int8_t(item.sort_key());
     for (int32_t j = i + 1; j < int16_t(p.open()); j++) {
-      const uint32_t other_at = p.open_ids_address() + 2 * uint32_t(j);
-      const uint16_t other = guest::LoadU16(base, other_at);
+      const uint16_t other = IdAt(open_list, uint32_t(j));
       const ItemV other_item(base, Item(base, uint32_t(int16_t(other))));
       const int32_t other_kind = int8_t(other_item.kind());
       if (!Before(int16_t(kind), int16_t(b37), int16_t(id), other_kind,
@@ -337,28 +349,26 @@ void PoolsTrim(uint8_t* base, uint32_t pools, uint16_t cap) {
         continue;
       }
       const uint16_t was = id;
-      guest::StoreU16(base, at, other);
+      SetIdAt(open_list, uint32_t(i), other);
       kind = other_kind;
       b37 = int8_t(other_item.sort_key());
       id = other;
-      guest::StoreU16(base, other_at, was);
+      SetIdAt(open_list, uint32_t(j), was);
     }
   }
   const int32_t room = int16_t(p.kept()) - int16_t(p.open());
   if (room > 0) {
     const int32_t won = int16_t(p.won());
-    const uint32_t ids = p.won_ids_address();
+    const IdList won_list = p.won_list();
     const int32_t swaps = won > room ? room : won;
     if (won > 1) {
       for (int32_t k = 0; k < swaps; k++) {
         const int32_t r = int32_t(race_overlays::Rand(base));
         const int32_t pick = r - (r / won) * won;
         if (k != pick) {
-          const uint32_t a = ids + (uint32_t(pick) << 1);
-          const uint32_t b = ids + 2 * uint32_t(k);
-          const uint16_t va = guest::LoadU16(base, a);
-          guest::StoreU16(base, a, guest::LoadU16(base, b));
-          guest::StoreU16(base, b, va);
+          const uint16_t va = IdAt(won_list, uint32_t(pick));
+          SetIdAt(won_list, uint32_t(pick), IdAt(won_list, uint32_t(k)));
+          SetIdAt(won_list, uint32_t(k), va);
         }
       }
     }
@@ -369,24 +379,24 @@ void PoolsTrim(uint8_t* base, uint32_t pools, uint16_t cap) {
   }
   for (int32_t i = 0; i < int16_t(p.open()); i++) {
     PoolsAddRivals(base, pools,
-                   Item(base, uint32_t(LoadS16(base, p.open_ids_address() + 2 * uint32_t(i)))));
+                   Item(base, uint32_t(int32_t(int16_t(IdAt(p.open_list(), uint32_t(i)))))));
   }
   for (int32_t i = 0; i < int16_t(p.won()); i++) {
     PoolsAddRivals(base, pools,
-                   Item(base, uint32_t(LoadS16(base, p.won_ids_address() + 2 * uint32_t(i)))));
+                   Item(base, uint32_t(int32_t(int16_t(IdAt(p.won_list(), uint32_t(i)))))));
   }
 }
 
 void PoolsCopyIds(uint8_t* base, uint32_t ids, uint32_t entries, uint32_t list, uint32_t& index,
                   uint32_t flag) {
   ITC_NATIVE_RUNNING("sub_82143420 EventPools::CopyIds");
-  for (int32_t i = 0; i < LoadS16(base, ids); i++) {
-    const uint32_t id = ids + 2 + 2 * uint32_t(i);
+  const IdList from(base, ids);
+  for (int32_t i = 0; i < int16_t(from.count()); i++) {
     const GroupEntry to(base, entries + GroupEntry::kSize * uint32_t(i));
-    to.set_item_id(guest::LoadU16(base, id));
+    to.set_item_id(IdAt(from, uint32_t(i)));
     to.set_list_index(uint16_t(index));
     const Entry entry(base, index * Entry::kSize + list);
-    entry.set_item_id(uint32_t(LoadS16(base, id)));
+    entry.set_item_id(uint32_t(int32_t(int16_t(IdAt(from, uint32_t(i))))));
     entry.set_start(0xFFFFFFFF);  // no start yet: -1 and -1
     entry.set_flag(flag);
     index++;
@@ -398,27 +408,27 @@ void PoolsToGroup(uint8_t* base, uint32_t pools, uint32_t group, uint32_t list,
   ITC_NATIVE_RUNNING("sub_82144170 EventPools::ToGroup");
   const Pools p(base, pools);
   const Group g(base, group);
-  PoolsCopyIds(base, p.open_address(), g.entries().address, list, index, 1);
-  PoolsCopyIds(base, p.won_address(),
+  PoolsCopyIds(base, p.open_list().address, g.entries().address, list, index, 1);
+  PoolsCopyIds(base, p.won_list().address,
                (uint32_t(int32_t(int16_t(p.open()))) << 2) + g.entries().address, list, index, 1);
-  PoolsCopyIds(base, p.locked_address(), g.locked_entries().address, list, index, 0);
+  PoolsCopyIds(base, p.locked_list().address, g.locked_entries().address, list, index, 0);
 }
 
 void PoolsToGroupNoList(uint8_t* base, uint32_t pools, uint32_t group, uint32_t& index) {
   ITC_NATIVE_RUNNING("sub_821441D8 EventPools::ToGroupNoList");
-  const auto copy = [&](uint32_t ids, uint32_t entries) {
-    for (int32_t i = 0; i < LoadS16(base, ids); i++) {
+  const auto copy = [&](const IdList ids, uint32_t entries) {
+    for (int32_t i = 0; i < int16_t(ids.count()); i++) {
       const GroupEntry to(base, entries + GroupEntry::kSize * uint32_t(i));
-      to.set_item_id(guest::LoadU16(base, ids + 2 + 2 * uint32_t(i)));
+      to.set_item_id(IdAt(ids, uint32_t(i)));
       to.set_list_index(uint16_t(index));
       index++;
     }
   };
   const Pools p(base, pools);
   const Group g(base, group);
-  copy(p.open_address(), g.entries().address);
-  copy(p.won_address(), (uint32_t(int32_t(int16_t(p.open()))) << 2) + g.entries().address);
-  copy(p.locked_address(), g.locked_entries().address);
+  copy(p.open_list(), g.entries().address);
+  copy(p.won_list(), (uint32_t(int32_t(int16_t(p.open()))) << 2) + g.entries().address);
+  copy(p.locked_list(), g.locked_entries().address);
 }
 
 std::optional<uint32_t> Init(uint8_t* base, uint32_t event, uint32_t mode, uint32_t location,
@@ -430,20 +440,14 @@ std::optional<uint32_t> Init(uint8_t* base, uint32_t event, uint32_t mode, uint3
   const uint32_t modes = guest::LoadU32(base, (mode << 2) + G::mode_masks_address());
   const int32_t level = stage < 2 ? 1 : stage < 4 ? 2 : stage == 4 ? 3 : 4;
   Free(base, event);
-  guest::ForEachHostPart(base, event, Event::kSize, [](uint8_t* host, uint32_t, uint32_t n) {
-    std::memset(host, 0, n);
-  });
+  Zero(base, event, Event::kSize);
   SetMode(base, event, mode, location);
-  const auto block = memory::crt::OperatorNewArray(base, 10 * kPoolsBytes);
-  if (!block) {
-    return std::nullopt;
-  }
-  const uint32_t pools = *block;
+  // The original's new[] of ten pools: one host object (E5 step 4).
+  const uint32_t pools = PoolBlock::New(base).address;
   if (pools == 0) {
     return 0;
   }
-  guest::ForEachHostPart(base, pools, 10 * kPoolsBytes,
-                         [](uint8_t* host, uint32_t, uint32_t n) { std::memset(host, 0, n); });
+  Zero(base, pools, PoolBlock::kSize);
   for (uint32_t id = 0; id < 400; id++) {
     const ItemV item(base, Item(base, id));
     if ((uint32_t(int32_t(int16_t(item.mode_mask()))) & modes) == 0) {
@@ -458,7 +462,7 @@ std::optional<uint32_t> Init(uint8_t* base, uint32_t event, uint32_t mode, uint3
   // Locations 0 to 3 (the event's +22 and +24), then 4 to 9 (+26, +28).
   const Event ev(base, event);
   for (uint32_t i = 0; i < 10; i++) {
-    const Pools p(base, pools + kPoolsBytes * i);
+    const Pools p = PoolBlock(base, pools).pool(i);
     const Group group(base, GroupAt(base, event, i));
     if (LoadS8(base, G::location_stages_address() + i) > int32_t(stage)) {
       p.set_open(0);
@@ -489,16 +493,18 @@ std::optional<uint32_t> Init(uint8_t* base, uint32_t event, uint32_t mode, uint3
   }
   ev.set_count(uint16_t(ev.locked_0_to_3() + ev.open_0_to_3()));
   if (Alloc(base, event) == 0) {
-    memory::crt::OperatorDeleteArray(pools);
+    PoolBlock(base, pools).Delete();  // the original's delete[]
     return 0;
   }
   uint32_t index = 0;
   for (uint32_t i = 0; i < 4; i++) {
-    PoolsToGroup(base, pools + kPoolsBytes * i, GroupAt(base, event, i), ev.list().address, index);
+    PoolsToGroup(base, PoolBlock(base, pools).pool(i).address, GroupAt(base, event, i),
+                 ev.list().address, index);
   }
   index = 0;
   for (uint32_t i = 4; i < 10; i++) {
-    PoolsToGroupNoList(base, pools + kPoolsBytes * i, GroupAt(base, event, i), index);
+    PoolsToGroupNoList(base, PoolBlock(base, pools).pool(i).address, GroupAt(base, event, i),
+                       index);
   }
   ev.set_section_rival_waiting(0);
   for (int32_t i = 0; i < int16_t(ev.count()); i++) {
@@ -516,7 +522,7 @@ std::optional<uint32_t> Init(uint8_t* base, uint32_t event, uint32_t mode, uint3
     }
   }
   guest::StoreU32(base, out, uint32_t(race_setup::EventFirstOwned(base, event)));
-  memory::crt::OperatorDeleteArray(pools);
+  PoolBlock(base, pools).Delete();  // the original's delete[]
   return 1;
 }
 
@@ -528,11 +534,8 @@ std::optional<uint32_t> Make(uint8_t* base, uint32_t mode, uint32_t location, ui
   }
   uint32_t event = G::event(base).address;
   if (event == 0) {
-    const auto block = memory::crt::OperatorNew(base, Event::kSize);
-    if (!block) {
-      return std::nullopt;
-    }
-    event = *block;
+    // The original's operator new: a host object (E5 step 4).
+    event = Event::New(base).address;
     if (event != 0) {
       Construct(base, event);
     }
@@ -669,8 +672,9 @@ void GroupPromoteUnlocked(uint8_t* base, uint32_t group, const Guest& guest) {
     // The locked entries before it moved up one.
     for (int32_t k = i - 1; k >= 0; k--) {
       const GroupEntry from(base, g.locked_entries().address + GroupEntry::kSize * uint32_t(k));
-      from.set_next_item_id(from.item_id());
-      from.set_next_list_index(from.list_index());
+      const GroupEntry to(base, from.address + GroupEntry::kSize);
+      to.set_item_id(from.item_id());
+      to.set_list_index(from.list_index());
     }
     GroupEntry(base, (uint32_t(int32_t(int16_t(g.open()))) << 2) + g.entries().address)
         .set_word(was);

@@ -69,183 +69,370 @@ struct OverlayViewVtable : View {
 };
 
 // allocated; measure: CarOverlays, sub_8215E6C0.r3@+9608.+8
+#pragma pack(push, 1)
+struct CarOverlaysData {
+  uint32_t vtable = 0;  // +0
+  uint8_t views[100] = {};  // +4, guest order
+  uint32_t textures = 0;  // +104
+  uint32_t texture_set = 0;  // +108
+  uint32_t loaded = 0;  // +112
+  uint32_t viewport_entry = 0;  // +116
+  uint32_t second_index = 0;  // +120
+  uint32_t unknown_124 = 0;  // +124
+  uint32_t view_slot = 0;  // +128
+  uint32_t race_word_4 = 0;  // +132
+  uint32_t race_word_28 = 0;  // +136
+  uint32_t race_word_32 = 0;  // +140
+  uint32_t params = 0;  // +144
+  uint8_t trails[16] = {};  // +148, guest order
+  uint8_t smokes[16] = {};  // +164, guest order
+  uint8_t unknown_180[20] = {};  // +180, guest order
+  uint8_t light_sprites[16] = {};  // +200, guest order
+  uint8_t unknown_216[56] = {};  // +216, guest order
+  uint8_t unknown_272[56] = {};  // +272, guest order
+  uint8_t sparks[32] = {};  // +328, guest order
+  uint8_t particles_b[16] = {};  // +360, guest order
+  uint32_t marker = 0;  // +376
+  uint8_t particles_c[16] = {};  // +380, guest order
+  uint8_t model_sprites[36] = {};  // +396, guest order
+  uint8_t wheels[48] = {};  // +432, 4 x CarOverlaysWheel
+  uint8_t unknown_480[48] = {};  // +480, guest order
+  uint8_t smoke_rates[192] = {};  // +528, guest order
+  uint32_t vehicle_word_2252 = 0;  // +720
+  uint8_t pad_724[24] = {};
+  float unknown_748 = 0;  // +748
+  uint8_t unknown_752[12] = {};  // +752, guest order
+  float unknown_764 = 0;  // +764
+  float color_r = 0;  // +768
+  float color_g = 0;  // +772
+  float color_b = 0;  // +776
+  float color_a = 0;  // +780
+  uint32_t view_mode = 0;  // +784
+  uint32_t unknown_788 = 0;  // +788
+  uint8_t pad_792[4] = {};
+  uint32_t viewport_record = 0;  // +796
+  uint32_t camera_pass = 0;  // +800
+  uint8_t viewport_pair[8] = {};  // +804, guest order
+  uint32_t sparks_updating = 0;  // +812
+  uint32_t marker_shown = 0;  // +816
+  uint32_t unknown_820 = 0;  // +820
+  uint32_t unknown_824 = 0;  // +824
+  uint32_t unknown_828 = 0;  // +828
+  uint32_t last_vehicle = 0;  // +832
+  int32_t racer_id = 0;  // +836
+  uint8_t pad_840[8] = {};
+};
+#pragma pack(pop)
+static_assert(sizeof(CarOverlaysData) == 848);
+inline constexpr memory::LayoutField kCarOverlaysFields[] = {{0, 4}, {104, 4}, {108, 4}, {112, 4}, {116, 4}, {120, 4}, {124, 4}, {128, 4}, {132, 4}, {136, 4}, {140, 4}, {144, 4}, {376, 4}, {432, 4}, {436, 4}, {440, 4}, {444, 4}, {448, 4}, {452, 4}, {456, 4}, {460, 4}, {464, 4}, {468, 4}, {472, 4}, {476, 4}, {720, 4}, {748, 4}, {764, 4}, {768, 4}, {772, 4}, {776, 4}, {780, 4}, {784, 4}, {788, 4}, {796, 4}, {800, 4}, {812, 4}, {816, 4}, {820, 4}, {824, 4}, {828, 4}, {832, 4}, {836, 4}};
+inline constexpr memory::Layout kCarOverlaysLayout = {kCarOverlaysFields, 43};
+
 struct CarOverlays : View {
   using View::View;
   static constexpr uint32_t kSize = 848;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   static constexpr uint32_t kVtable = 0x82008524;
+  CarOverlaysData* data() const { return static_cast<CarOverlaysData*>(memory::HandleObject(address)); }
+  static CarOverlays New(uint8_t* base) {
+    return CarOverlays(base, memory::MakeHandle(new CarOverlaysData(), sizeof(CarOverlaysData), "CarOverlays", &kCarOverlaysLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static CarOverlays NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(CarOverlaysData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<CarOverlaysData*>(::operator new(sizeof(CarOverlaysData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) CarOverlaysData();
+    return CarOverlays(base, memory::MakeHandle(p, sizeof(CarOverlaysData) * count, "CarOverlays", &kCarOverlaysLayout, sizeof(CarOverlaysData)));
+  }
+  CarOverlays at(uint32_t i) const { return CarOverlays(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCarOverlaysLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarOverlaysLayout, offset, width, v); }
   // 0x82008524 (OverlayVtable)
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
+  uint32_t vtable() const { return data()->vtable; }
+  void set_vtable(uint32_t v) const { data()->vtable = v; }
+  uint32_t vtable_bits() const { return data()->vtable; }
+  void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
   // 25 OverlayView pointers, one a view slot (0 none)
   uint32_t views_address() const { return address + 4; }
+  uint8_t* views() const { return reinterpret_cast<uint8_t*>(data()) + 4; }
   // the texture table (42 textures, loaded by overlay 0 and shared)
-  uint32_t textures() const { return guest::LoadU32(base, address + 104); }
-  void set_textures(uint32_t v) const { guest::StoreU32(base, address + 104, v); }
   uint32_t textures_address() const { return address + 104; }
-  uint32_t texture_set() const { return guest::LoadU32(base, address + 108); }
-  void set_texture_set(uint32_t v) const { guest::StoreU32(base, address + 108, v); }
+  uint32_t textures() const { return data()->textures; }
+  void set_textures(uint32_t v) const { data()->textures = v; }
+  uint32_t textures_bits() const { return data()->textures; }
+  void set_textures_bits(uint32_t v) const { data()->textures = v; }
   uint32_t texture_set_address() const { return address + 108; }
-  uint32_t loaded() const { return guest::LoadU32(base, address + 112); }
-  void set_loaded(uint32_t v) const { guest::StoreU32(base, address + 112, v); }
+  uint32_t texture_set() const { return data()->texture_set; }
+  void set_texture_set(uint32_t v) const { data()->texture_set = v; }
+  uint32_t texture_set_bits() const { return data()->texture_set; }
+  void set_texture_set_bits(uint32_t v) const { data()->texture_set = v; }
   uint32_t loaded_address() const { return address + 112; }
+  uint32_t loaded() const { return data()->loaded; }
+  void set_loaded(uint32_t v) const { data()->loaded = v; }
+  uint32_t loaded_bits() const { return data()->loaded; }
+  void set_loaded_bits(uint32_t v) const { data()->loaded = v; }
   // an index into the 12-byte entries at 0x82008558 (the set-up's +0)
-  uint32_t viewport_entry() const { return guest::LoadU32(base, address + 116); }
-  void set_viewport_entry(uint32_t v) const { guest::StoreU32(base, address + 116, v); }
   uint32_t viewport_entry_address() const { return address + 116; }
+  uint32_t viewport_entry() const { return data()->viewport_entry; }
+  void set_viewport_entry(uint32_t v) const { data()->viewport_entry = v; }
+  uint32_t viewport_entry_bits() const { return data()->viewport_entry; }
+  void set_viewport_entry_bits(uint32_t v) const { data()->viewport_entry = v; }
   // an index into the pairs at 0x820085A0 (the set-up's +4)
-  uint32_t second_index() const { return guest::LoadU32(base, address + 120); }
-  void set_second_index(uint32_t v) const { guest::StoreU32(base, address + 120, v); }
   uint32_t second_index_address() const { return address + 120; }
-  uint32_t unknown_124() const { return guest::LoadU32(base, address + 124); }
-  void set_unknown_124(uint32_t v) const { guest::StoreU32(base, address + 124, v); }
+  uint32_t second_index() const { return data()->second_index; }
+  void set_second_index(uint32_t v) const { data()->second_index = v; }
+  uint32_t second_index_bits() const { return data()->second_index; }
+  void set_second_index_bits(uint32_t v) const { data()->second_index = v; }
   uint32_t unknown_124_address() const { return address + 124; }
+  uint32_t unknown_124() const { return data()->unknown_124; }
+  void set_unknown_124(uint32_t v) const { data()->unknown_124 = v; }
+  uint32_t unknown_124_bits() const { return data()->unknown_124; }
+  void set_unknown_124_bits(uint32_t v) const { data()->unknown_124 = v; }
   // the slot of the car's own view
-  uint32_t view_slot() const { return guest::LoadU32(base, address + 128); }
-  void set_view_slot(uint32_t v) const { guest::StoreU32(base, address + 128, v); }
   uint32_t view_slot_address() const { return address + 128; }
+  uint32_t view_slot() const { return data()->view_slot; }
+  void set_view_slot(uint32_t v) const { data()->view_slot = v; }
+  uint32_t view_slot_bits() const { return data()->view_slot; }
+  void set_view_slot_bits(uint32_t v) const { data()->view_slot = v; }
   // [0x826C5B2C] + 4 at the set-up
-  uint32_t race_word_4() const { return guest::LoadU32(base, address + 132); }
-  void set_race_word_4(uint32_t v) const { guest::StoreU32(base, address + 132, v); }
   uint32_t race_word_4_address() const { return address + 132; }
+  uint32_t race_word_4() const { return data()->race_word_4; }
+  void set_race_word_4(uint32_t v) const { data()->race_word_4 = v; }
+  uint32_t race_word_4_bits() const { return data()->race_word_4; }
+  void set_race_word_4_bits(uint32_t v) const { data()->race_word_4 = v; }
   // [0x826C5B2C] + 28 at the set-up; the effects update with 0 or 3
-  uint32_t race_word_28() const { return guest::LoadU32(base, address + 136); }
-  void set_race_word_28(uint32_t v) const { guest::StoreU32(base, address + 136, v); }
   uint32_t race_word_28_address() const { return address + 136; }
+  uint32_t race_word_28() const { return data()->race_word_28; }
+  void set_race_word_28(uint32_t v) const { data()->race_word_28 = v; }
+  uint32_t race_word_28_bits() const { return data()->race_word_28; }
+  void set_race_word_28_bits(uint32_t v) const { data()->race_word_28 = v; }
   // [0x826C5B2C] + 32 at the set-up
-  uint32_t race_word_32() const { return guest::LoadU32(base, address + 140); }
-  void set_race_word_32(uint32_t v) const { guest::StoreU32(base, address + 140, v); }
   uint32_t race_word_32_address() const { return address + 140; }
+  uint32_t race_word_32() const { return data()->race_word_32; }
+  void set_race_word_32(uint32_t v) const { data()->race_word_32 = v; }
+  uint32_t race_word_32_bits() const { return data()->race_word_32; }
+  void set_race_word_32_bits(uint32_t v) const { data()->race_word_32 = v; }
   // the effects' parameter table 0x82616F50
-  template <typename T = CarOverlaysParams>
-  T params() const { return T(base, guest::LoadU32(base, address + 144)); }
-  void set_params(const View& v) const { guest::StoreU32(base, address + 144, v.address); }
-  void set_params(uint32_t v) const { guest::StoreU32(base, address + 144, v); }
   uint32_t params_address() const { return address + 144; }
+  template <typename T = CarOverlaysParams>
+  T params() const { return T(base, data()->params); }
+  void set_params(const View& w) const { const uint32_t v = w.address; data()->params = v; }
+  void set_params(uint32_t v) const { data()->params = v; }
+  uint32_t params_bits() const { return data()->params; }
+  void set_params_bits(uint32_t v) const { data()->params = v; }
   // 4 Trail pointers, one a wheel
   uint32_t trails_address() const { return address + 148; }
+  uint8_t* trails() const { return reinterpret_cast<uint8_t*>(data()) + 148; }
   // 4 Smoke pointers, one a wheel
   uint32_t smokes_address() const { return address + 164; }
+  uint8_t* smokes() const { return reinterpret_cast<uint8_t*>(data()) + 164; }
   // five words cleared by CreateChildren
   uint32_t unknown_180_address() const { return address + 180; }
+  uint8_t* unknown_180() const { return reinterpret_cast<uint8_t*>(data()) + 180; }
   // 4 LightSprite pointers (model points 4-7)
   uint32_t light_sprites_address() const { return address + 200; }
+  uint8_t* light_sprites() const { return reinterpret_cast<uint8_t*>(data()) + 200; }
   // 14 words cleared by CreateChildren
   uint32_t unknown_216_address() const { return address + 216; }
+  uint8_t* unknown_216() const { return reinterpret_cast<uint8_t*>(data()) + 216; }
   // 14 words cleared by CreateChildren
   uint32_t unknown_272_address() const { return address + 272; }
+  uint8_t* unknown_272() const { return reinterpret_cast<uint8_t*>(data()) + 272; }
   // 8 Sparks pointers
   uint32_t sparks_address() const { return address + 328; }
+  uint8_t* sparks() const { return reinterpret_cast<uint8_t*>(data()) + 328; }
   // 4 ParticlesB pointers (model points 4-7)
   uint32_t particles_b_address() const { return address + 360; }
+  uint8_t* particles_b() const { return reinterpret_cast<uint8_t*>(data()) + 360; }
   // the marker above the car
-  template <typename T = Marker>
-  T marker() const { return T(base, guest::LoadU32(base, address + 376)); }
-  void set_marker(const View& v) const { guest::StoreU32(base, address + 376, v.address); }
-  void set_marker(uint32_t v) const { guest::StoreU32(base, address + 376, v); }
   uint32_t marker_address() const { return address + 376; }
+  template <typename T = Marker>
+  T marker() const { return T(base, data()->marker); }
+  void set_marker(const View& w) const { const uint32_t v = w.address; data()->marker = v; }
+  void set_marker(uint32_t v) const { data()->marker = v; }
+  uint32_t marker_bits() const { return data()->marker; }
+  void set_marker_bits(uint32_t v) const { data()->marker = v; }
   // 4 ParticlesC pointers (model points 14-17; probably the exhausts)
   uint32_t particles_c_address() const { return address + 380; }
+  uint8_t* particles_c() const { return reinterpret_cast<uint8_t*>(data()) + 380; }
   // 9 ModelSprite pointers
   uint32_t model_sprites_address() const { return address + 396; }
-  // 4 CarOverlaysWheel (12 bytes a wheel)
-  uint32_t wheels_address() const { return address + 432; }
+  uint8_t* model_sprites() const { return reinterpret_cast<uint8_t*>(data()) + 396; }
+  // 12 bytes a wheel
+  template <typename T = CarOverlaysWheel>
+  T wheels(uint32_t i) const { return T(base, address + 432 + i * T::kSize); }
   // cleared by the reset (with the rates after it)
   uint32_t unknown_480_address() const { return address + 480; }
+  uint8_t* unknown_480() const { return reinterpret_cast<uint8_t*>(data()) + 480; }
   // +48 x wheel: the wheel's smoke rate accumulator (f32), the rest of each 48 bytes cleared by the reset
   uint32_t smoke_rates_address() const { return address + 528; }
+  uint8_t* smoke_rates() const { return reinterpret_cast<uint8_t*>(data()) + 528; }
   // the vehicle's word +2252
-  uint32_t vehicle_word_2252() const { return guest::LoadU32(base, address + 720); }
-  void set_vehicle_word_2252(uint32_t v) const { guest::StoreU32(base, address + 720, v); }
   uint32_t vehicle_word_2252_address() const { return address + 720; }
+  uint32_t vehicle_word_2252() const { return data()->vehicle_word_2252; }
+  void set_vehicle_word_2252(uint32_t v) const { data()->vehicle_word_2252 = v; }
+  uint32_t vehicle_word_2252_bits() const { return data()->vehicle_word_2252; }
+  void set_vehicle_word_2252_bits(uint32_t v) const { data()->vehicle_word_2252 = v; }
   // 1.0 at construction
-  float unknown_748() const { return guest::LoadFloat(base, address + 748); }
-  void set_unknown_748(float v) const { guest::StoreFloat(base, address + 748, v); }
   uint32_t unknown_748_address() const { return address + 748; }
+  float unknown_748() const { return data()->unknown_748; }
+  void set_unknown_748(float v) const { data()->unknown_748 = v; }
+  uint32_t unknown_748_bits() const { return std::bit_cast<uint32_t>(data()->unknown_748); }
+  void set_unknown_748_bits(uint32_t v) const { data()->unknown_748 = std::bit_cast<float>(v); }
   // probably a vector, 1.0 at construction
   uint32_t unknown_752_address() const { return address + 752; }
+  uint8_t* unknown_752() const { return reinterpret_cast<uint8_t*>(data()) + 752; }
   // 1.0 at construction
-  float unknown_764() const { return guest::LoadFloat(base, address + 764); }
-  void set_unknown_764(float v) const { guest::StoreFloat(base, address + 764, v); }
   uint32_t unknown_764_address() const { return address + 764; }
+  float unknown_764() const { return data()->unknown_764; }
+  void set_unknown_764(float v) const { data()->unknown_764 = v; }
+  uint32_t unknown_764_bits() const { return std::bit_cast<uint32_t>(data()->unknown_764); }
+  void set_unknown_764_bits(uint32_t v) const { data()->unknown_764 = std::bit_cast<float>(v); }
   // 0.0 at construction and reset
-  float color_r() const { return guest::LoadFloat(base, address + 768); }
-  void set_color_r(float v) const { guest::StoreFloat(base, address + 768, v); }
   uint32_t color_r_address() const { return address + 768; }
+  float color_r() const { return data()->color_r; }
+  void set_color_r(float v) const { data()->color_r = v; }
+  uint32_t color_r_bits() const { return std::bit_cast<uint32_t>(data()->color_r); }
+  void set_color_r_bits(uint32_t v) const { data()->color_r = std::bit_cast<float>(v); }
   // 0.0 at construction and reset
-  float color_g() const { return guest::LoadFloat(base, address + 772); }
-  void set_color_g(float v) const { guest::StoreFloat(base, address + 772, v); }
   uint32_t color_g_address() const { return address + 772; }
+  float color_g() const { return data()->color_g; }
+  void set_color_g(float v) const { data()->color_g = v; }
+  uint32_t color_g_bits() const { return std::bit_cast<uint32_t>(data()->color_g); }
+  void set_color_g_bits(uint32_t v) const { data()->color_g = std::bit_cast<float>(v); }
   // 0.0 at construction and reset
-  float color_b() const { return guest::LoadFloat(base, address + 776); }
-  void set_color_b(float v) const { guest::StoreFloat(base, address + 776, v); }
   uint32_t color_b_address() const { return address + 776; }
+  float color_b() const { return data()->color_b; }
+  void set_color_b(float v) const { data()->color_b = v; }
+  uint32_t color_b_bits() const { return std::bit_cast<uint32_t>(data()->color_b); }
+  void set_color_b_bits(uint32_t v) const { data()->color_b = std::bit_cast<float>(v); }
   // 1.0 at construction and reset
-  float color_a() const { return guest::LoadFloat(base, address + 780); }
-  void set_color_a(float v) const { guest::StoreFloat(base, address + 780, v); }
   uint32_t color_a_address() const { return address + 780; }
+  float color_a() const { return data()->color_a; }
+  void set_color_a(float v) const { data()->color_a = v; }
+  uint32_t color_a_bits() const { return std::bit_cast<uint32_t>(data()->color_a); }
+  void set_color_a_bits(uint32_t v) const { data()->color_a = std::bit_cast<float>(v); }
   // the viewport's +1860: 1 and 2 turn some effects off
-  uint32_t view_mode() const { return guest::LoadU32(base, address + 784); }
-  void set_view_mode(uint32_t v) const { guest::StoreU32(base, address + 784, v); }
   uint32_t view_mode_address() const { return address + 784; }
+  uint32_t view_mode() const { return data()->view_mode; }
+  void set_view_mode(uint32_t v) const { data()->view_mode = v; }
+  uint32_t view_mode_bits() const { return data()->view_mode; }
+  void set_view_mode_bits(uint32_t v) const { data()->view_mode = v; }
   // 6 at construction and reset
-  uint32_t unknown_788() const { return guest::LoadU32(base, address + 788); }
-  void set_unknown_788(uint32_t v) const { guest::StoreU32(base, address + 788, v); }
   uint32_t unknown_788_address() const { return address + 788; }
+  uint32_t unknown_788() const { return data()->unknown_788; }
+  void set_unknown_788(uint32_t v) const { data()->unknown_788 = v; }
+  uint32_t unknown_788_bits() const { return data()->unknown_788; }
+  void set_unknown_788_bits(uint32_t v) const { data()->unknown_788 = v; }
   // the bound viewport's camera entry (CarOverlays::BindViewport's out +0)
-  uint32_t viewport_record() const { return guest::LoadU32(base, address + 796); }
-  void set_viewport_record(uint32_t v) const { guest::StoreU32(base, address + 796, v); }
   uint32_t viewport_record_address() const { return address + 796; }
+  uint32_t viewport_record() const { return data()->viewport_record; }
+  void set_viewport_record(uint32_t v) const { data()->viewport_record = v; }
+  uint32_t viewport_record_bits() const { return data()->viewport_record; }
+  void set_viewport_record_bits(uint32_t v) const { data()->viewport_record = v; }
   // the bound camera pass (its eye at +400)
-  uint32_t camera_pass() const { return guest::LoadU32(base, address + 800); }
-  void set_camera_pass(uint32_t v) const { guest::StoreU32(base, address + 800, v); }
   uint32_t camera_pass_address() const { return address + 800; }
+  uint32_t camera_pass() const { return data()->camera_pass; }
+  void set_camera_pass(uint32_t v) const { data()->camera_pass = v; }
+  uint32_t camera_pass_bits() const { return data()->camera_pass; }
+  void set_camera_pass_bits(uint32_t v) const { data()->camera_pass = v; }
   // the two words at 0x820085A0 + 8 x the second index
   uint32_t viewport_pair_address() const { return address + 804; }
+  uint8_t* viewport_pair() const { return reinterpret_cast<uint8_t*>(data()) + 804; }
   // 1 during UpdateSparks (0 again in view modes 1 and 2)
-  uint32_t sparks_updating() const { return guest::LoadU32(base, address + 812); }
-  void set_sparks_updating(uint32_t v) const { guest::StoreU32(base, address + 812, v); }
   uint32_t sparks_updating_address() const { return address + 812; }
-  uint32_t marker_shown() const { return guest::LoadU32(base, address + 816); }
-  void set_marker_shown(uint32_t v) const { guest::StoreU32(base, address + 816, v); }
+  uint32_t sparks_updating() const { return data()->sparks_updating; }
+  void set_sparks_updating(uint32_t v) const { data()->sparks_updating = v; }
+  uint32_t sparks_updating_bits() const { return data()->sparks_updating; }
+  void set_sparks_updating_bits(uint32_t v) const { data()->sparks_updating = v; }
   uint32_t marker_shown_address() const { return address + 816; }
+  uint32_t marker_shown() const { return data()->marker_shown; }
+  void set_marker_shown(uint32_t v) const { data()->marker_shown = v; }
+  uint32_t marker_shown_bits() const { return data()->marker_shown; }
+  void set_marker_shown_bits(uint32_t v) const { data()->marker_shown = v; }
   // 0 at the set-up; read by the marker's and model sprites' kinds
-  uint32_t unknown_820() const { return guest::LoadU32(base, address + 820); }
-  void set_unknown_820(uint32_t v) const { guest::StoreU32(base, address + 820, v); }
   uint32_t unknown_820_address() const { return address + 820; }
+  uint32_t unknown_820() const { return data()->unknown_820; }
+  void set_unknown_820(uint32_t v) const { data()->unknown_820 = v; }
+  uint32_t unknown_820_bits() const { return data()->unknown_820; }
+  void set_unknown_820_bits(uint32_t v) const { data()->unknown_820 = v; }
   // 0 at the set-up; read by the marker's kind
-  uint32_t unknown_824() const { return guest::LoadU32(base, address + 824); }
-  void set_unknown_824(uint32_t v) const { guest::StoreU32(base, address + 824, v); }
   uint32_t unknown_824_address() const { return address + 824; }
+  uint32_t unknown_824() const { return data()->unknown_824; }
+  void set_unknown_824(uint32_t v) const { data()->unknown_824 = v; }
+  uint32_t unknown_824_bits() const { return data()->unknown_824; }
+  void set_unknown_824_bits(uint32_t v) const { data()->unknown_824 = v; }
   // 0 at the set-up; read by the marker's and model sprites' kinds
-  uint32_t unknown_828() const { return guest::LoadU32(base, address + 828); }
-  void set_unknown_828(uint32_t v) const { guest::StoreU32(base, address + 828, v); }
   uint32_t unknown_828_address() const { return address + 828; }
-  uint32_t last_vehicle() const { return guest::LoadU32(base, address + 832); }
-  void set_last_vehicle(uint32_t v) const { guest::StoreU32(base, address + 832, v); }
+  uint32_t unknown_828() const { return data()->unknown_828; }
+  void set_unknown_828(uint32_t v) const { data()->unknown_828 = v; }
+  uint32_t unknown_828_bits() const { return data()->unknown_828; }
+  void set_unknown_828_bits(uint32_t v) const { data()->unknown_828 = v; }
   uint32_t last_vehicle_address() const { return address + 832; }
+  uint32_t last_vehicle() const { return data()->last_vehicle; }
+  void set_last_vehicle(uint32_t v) const { data()->last_vehicle = v; }
+  uint32_t last_vehicle_bits() const { return data()->last_vehicle; }
+  void set_last_vehicle_bits(uint32_t v) const { data()->last_vehicle = v; }
   // -1 none
-  int32_t racer_id() const { return int32_t(guest::LoadU32(base, address + 836)); }
-  void set_racer_id(int32_t v) const { guest::StoreU32(base, address + 836, uint32_t(v)); }
   uint32_t racer_id_address() const { return address + 836; }
+  int32_t racer_id() const { return data()->racer_id; }
+  void set_racer_id(int32_t v) const { data()->racer_id = v; }
+  uint32_t racer_id_bits() const { return std::bit_cast<uint32_t>(data()->racer_id); }
+  void set_racer_id_bits(uint32_t v) const { data()->racer_id = std::bit_cast<int32_t>(v); }
 };
 
 // embedded; measure: -
+#pragma pack(push, 1)
+struct CarOverlaysWheelData {
+  uint32_t trail_counter = 0;  // +0
+  uint32_t smoke_counter = 0;  // +4
+  uint32_t trail_added = 0;  // +8
+};
+#pragma pack(pop)
+static_assert(sizeof(CarOverlaysWheelData) == 12);
+inline constexpr memory::LayoutField kCarOverlaysWheelFields[] = {{0, 4}, {4, 4}, {8, 4}};
+inline constexpr memory::Layout kCarOverlaysWheelLayout = {kCarOverlaysWheelFields, 3};
+
 struct CarOverlaysWheel : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  CarOverlaysWheelData* data() const { return static_cast<CarOverlaysWheelData*>(memory::HandleObject(address)); }
+  static CarOverlaysWheel New(uint8_t* base) {
+    return CarOverlaysWheel(base, memory::MakeHandle(new CarOverlaysWheelData(), sizeof(CarOverlaysWheelData), "CarOverlaysWheel", &kCarOverlaysWheelLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static CarOverlaysWheel NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(CarOverlaysWheelData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<CarOverlaysWheelData*>(::operator new(sizeof(CarOverlaysWheelData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) CarOverlaysWheelData();
+    return CarOverlaysWheel(base, memory::MakeHandle(p, sizeof(CarOverlaysWheelData) * count, "CarOverlaysWheel", &kCarOverlaysWheelLayout, sizeof(CarOverlaysWheelData)));
+  }
+  CarOverlaysWheel at(uint32_t i) const { return CarOverlaysWheel(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kCarOverlaysWheelLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kCarOverlaysWheelLayout, offset, width, v); }
   // counts the slipping ticks against the table's +156 and +160
-  uint32_t trail_counter() const { return guest::LoadU32(base, address + 0); }
-  void set_trail_counter(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t trail_counter_address() const { return address + 0; }
+  uint32_t trail_counter() const { return data()->trail_counter; }
+  void set_trail_counter(uint32_t v) const { data()->trail_counter = v; }
+  uint32_t trail_counter_bits() const { return data()->trail_counter; }
+  void set_trail_counter_bits(uint32_t v) const { data()->trail_counter = v; }
   // up to 25 on surface 8, then counts down while smoke is emitted
-  uint32_t smoke_counter() const { return guest::LoadU32(base, address + 4); }
-  void set_smoke_counter(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t smoke_counter_address() const { return address + 4; }
+  uint32_t smoke_counter() const { return data()->smoke_counter; }
+  void set_smoke_counter(uint32_t v) const { data()->smoke_counter = v; }
+  uint32_t smoke_counter_bits() const { return data()->smoke_counter; }
+  void set_smoke_counter_bits(uint32_t v) const { data()->smoke_counter = v; }
   // whether the last tick added a trail point
-  uint32_t trail_added() const { return guest::LoadU32(base, address + 8); }
-  void set_trail_added(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t trail_added_address() const { return address + 8; }
+  uint32_t trail_added() const { return data()->trail_added; }
+  void set_trail_added(uint32_t v) const { data()->trail_added = v; }
+  uint32_t trail_added_bits() const { return data()->trail_added; }
+  void set_trail_added_bits(uint32_t v) const { data()->trail_added = v; }
 };
 
 // image; measure: -
@@ -334,24 +521,61 @@ struct OverlayParams : View {
 };
 
 // allocated; measure: OverlayView, CarOverlays.+4
+#pragma pack(push, 1)
+struct OverlayViewData {
+  uint32_t vtable = 0;  // +0
+  uint32_t vehicle = 0;  // +4
+  uint32_t model = 0;  // +8
+  uint32_t viewport = 0;  // +12
+};
+#pragma pack(pop)
+static_assert(sizeof(OverlayViewData) == 16);
+inline constexpr memory::LayoutField kOverlayViewFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}};
+inline constexpr memory::Layout kOverlayViewLayout = {kOverlayViewFields, 4};
+
 struct OverlayView : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   static constexpr uint32_t kVtable = 0x82010B5C;
+  OverlayViewData* data() const { return static_cast<OverlayViewData*>(memory::HandleObject(address)); }
+  static OverlayView New(uint8_t* base) {
+    return OverlayView(base, memory::MakeHandle(new OverlayViewData(), sizeof(OverlayViewData), "OverlayView", &kOverlayViewLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static OverlayView NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(OverlayViewData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<OverlayViewData*>(::operator new(sizeof(OverlayViewData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) OverlayViewData();
+    return OverlayView(base, memory::MakeHandle(p, sizeof(OverlayViewData) * count, "OverlayView", &kOverlayViewLayout, sizeof(OverlayViewData)));
+  }
+  OverlayView at(uint32_t i) const { return OverlayView(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kOverlayViewLayout, offset, width); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kOverlayViewLayout, offset, width, v); }
   // 0x82010B5C (OverlayViewVtable)
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
-  uint32_t vehicle() const { return guest::LoadU32(base, address + 4); }
-  void set_vehicle(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t vtable() const { return data()->vtable; }
+  void set_vtable(uint32_t v) const { data()->vtable = v; }
+  uint32_t vtable_bits() const { return data()->vtable; }
+  void set_vtable_bits(uint32_t v) const { data()->vtable = v; }
   uint32_t vehicle_address() const { return address + 4; }
+  uint32_t vehicle() const { return data()->vehicle; }
+  void set_vehicle(uint32_t v) const { data()->vehicle = v; }
+  uint32_t vehicle_bits() const { return data()->vehicle; }
+  void set_vehicle_bits(uint32_t v) const { data()->vehicle = v; }
   // its scene model (0 none)
-  uint32_t model() const { return guest::LoadU32(base, address + 8); }
-  void set_model(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t model_address() const { return address + 8; }
-  uint32_t viewport() const { return guest::LoadU32(base, address + 12); }
-  void set_viewport(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t model() const { return data()->model; }
+  void set_model(uint32_t v) const { data()->model = v; }
+  uint32_t model_bits() const { return data()->model; }
+  void set_model_bits(uint32_t v) const { data()->model = v; }
   uint32_t viewport_address() const { return address + 12; }
+  uint32_t viewport() const { return data()->viewport; }
+  void set_viewport(uint32_t v) const { data()->viewport = v; }
+  uint32_t viewport_bits() const { return data()->viewport; }
+  void set_viewport_bits(uint32_t v) const { data()->viewport = v; }
 };
 
 // embedded; measure: ViewDesc, OverlayView::Set.r4
@@ -408,22 +632,58 @@ struct OverlayViewportEntry : View {
 };
 
 // embedded; measure: Overlay
+#pragma pack(push, 1)
+struct OverlayData {
+  uint32_t vtable = 0;  // +0
+  uint8_t pad_4[100] = {};
+  uint32_t textures = 0;  // +104
+  uint32_t textures_108 = 0;  // +108
+};
+#pragma pack(pop)
+static_assert(sizeof(OverlayData) == 112);
+inline constexpr memory::LayoutField kOverlayFields[] = {{0, 4}, {104, 4}, {108, 4}};
+inline constexpr memory::Layout kOverlayLayout = {kOverlayFields, 3};
+
 struct Overlay : View {
   using View::View;
   static constexpr uint32_t kSize = 112;
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
   static constexpr uint32_t kVtable = 0x820085D8;
+  OverlayData* data() const { return static_cast<OverlayData*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static Overlay New(uint8_t* base) {
+    return Overlay(base, memory::MakeHandle(new OverlayData(), sizeof(OverlayData), "Overlay", &kOverlayLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static Overlay NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(OverlayData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<OverlayData*>(::operator new(sizeof(OverlayData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) OverlayData();
+    return Overlay(base, memory::MakeHandle(p, sizeof(OverlayData) * count, "Overlay", &kOverlayLayout, sizeof(OverlayData)));
+  }
+  Overlay at(uint32_t i) const { return Overlay(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (on_host()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(data()), kOverlayLayout, offset, width); return width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (on_host()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(data()), kOverlayLayout, offset, width, v); return; } if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0x820085D8 for the base class
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
+  uint32_t vtable() const { return on_host() ? uint32_t(data()->vtable) : uint32_t(guest::LoadU32(base, address + 0)); }
+  void set_vtable(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable_bits() const { return on_host() ? data()->vtable : guest::LoadU32(base, address + 0); }
+  void set_vtable_bits(uint32_t v) const { if (on_host()) data()->vtable = v; else guest::StoreU32(base, address + 0, v); }
   // SetTextures104 (the car overlays' texture table; particle effect C's texture)
-  uint32_t textures() const { return guest::LoadU32(base, address + 104); }
-  void set_textures(uint32_t v) const { guest::StoreU32(base, address + 104, v); }
   uint32_t textures_address() const { return address + 104; }
+  uint32_t textures() const { return on_host() ? uint32_t(data()->textures) : uint32_t(guest::LoadU32(base, address + 104)); }
+  void set_textures(uint32_t v) const { if (on_host()) data()->textures = v; else guest::StoreU32(base, address + 104, v); }
+  uint32_t textures_bits() const { return on_host() ? data()->textures : guest::LoadU32(base, address + 104); }
+  void set_textures_bits(uint32_t v) const { if (on_host()) data()->textures = v; else guest::StoreU32(base, address + 104, v); }
   // SetTextures108 (the texture holder of the trails, smoke, sparks and particle effect B)
-  uint32_t textures_108() const { return guest::LoadU32(base, address + 108); }
-  void set_textures_108(uint32_t v) const { guest::StoreU32(base, address + 108, v); }
   uint32_t textures_108_address() const { return address + 108; }
+  uint32_t textures_108() const { return on_host() ? uint32_t(data()->textures_108) : uint32_t(guest::LoadU32(base, address + 108)); }
+  void set_textures_108(uint32_t v) const { if (on_host()) data()->textures_108 = v; else guest::StoreU32(base, address + 108, v); }
+  uint32_t textures_108_bits() const { return on_host() ? data()->textures_108 : guest::LoadU32(base, address + 108); }
+  void set_textures_108_bits(uint32_t v) const { if (on_host()) data()->textures_108 = v; else guest::StoreU32(base, address + 108, v); }
 };
 
 // allocated; measure: -

@@ -217,7 +217,7 @@ uint32_t Curves(uint8_t* base, uint32_t emitter, uint32_t flags, uint32_t dsp, u
   // The emitter's curve at `field`, or the default {(f8, first), (f7,
   // last)} built in the frame as the original stores it.
   auto evaluate = [&](uint32_t field, double first, double last) -> double {
-    const uint32_t curve = guest::LoadU32(base, emitter + field);
+    const uint32_t curve = uint32_t(Emitter(base, emitter).load_at(field, 4));
     const double distance = double(Dsp(base, dsp).distance());
     const double scaler = double(Emitter(base, emitter).curve_distance_scaler());
     if (curve != 0) {

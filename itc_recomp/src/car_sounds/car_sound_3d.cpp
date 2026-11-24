@@ -54,10 +54,6 @@ void Store(uint8_t* base, uint32_t address, uint32_t value) {
 }
 // lfs: a guest float widened.
 double Lfs(uint8_t* base, uint32_t address) { return double(guest::LoadFloat(base, address)); }
-// stfs: a double rounded to a guest float.
-void Stfs(uint8_t* base, uint32_t address, double value) {
-  guest::StoreFloat(base, address, float(value));
-}
 // lfs then stfs of one value: its bits (the translated code's float to
 // double and back folds away, signaling NaNs included).
 uint32_t Word(uint8_t* base, uint32_t address) { return Load(base, address); }
@@ -70,14 +66,8 @@ void StoreU64(uint8_t* base, uint32_t address, uint64_t value) {
 }
 uint64_t DoubleBits(double value) { return std::bit_cast<uint64_t>(value); }
 
-// lvx128 and stvx as the translation does them: the 16 bytes at the address
-// rounded down, word 0 in the top lane.
-simde__m128 LoadLanes(uint8_t* base, uint32_t address) {
-  const uint32_t a = address & ~0xFu;
-  return simde_mm_castsi128_ps(
-      simde_mm_set_epi32(int(Load(base, a + 0)), int(Load(base, a + 4)), int(Load(base, a + 8)),
-                         int(Load(base, a + 12))));
-}
+// stvx as the translation does it: the 16 bytes at the address rounded
+// down, word 0 in the top lane (lvx128's is LoadLanesIn, below).
 void StoreLanes(uint8_t* base, uint32_t address, simde__m128 v) {
   alignas(16) uint32_t lanes[4];
   simde_mm_store_si128(reinterpret_cast<simde__m128i*>(lanes), simde_mm_castps_si128(v));
@@ -86,6 +76,29 @@ void StoreLanes(uint8_t* base, uint32_t address, simde__m128 v) {
   Store(base, a + 4, lanes[2]);
   Store(base, a + 8, lanes[1]);
   Store(base, a + 12, lanes[0]);
+}
+// The car sound's words (in host memory since E5 step 4): read and written
+// through its view at their offsets, as the guest's bytes give them.
+uint32_t WordIn(const schema::CarSound& cs, uint32_t address) {
+  return uint32_t(cs.load_at(address - cs.address, 4));
+}
+void StoreIn(const schema::CarSound& cs, uint32_t address, uint32_t value) {
+  cs.store_at(address - cs.address, 4, value);
+}
+void StoreU8In(const schema::CarSound& cs, uint32_t address, uint8_t value) {
+  cs.store_at(address - cs.address, 1, value);
+}
+double LfsIn(const schema::CarSound& cs, uint32_t address) {
+  return double(std::bit_cast<float>(WordIn(cs, address)));
+}
+void StfsIn(const schema::CarSound& cs, uint32_t address, double value) {
+  StoreIn(cs, address, std::bit_cast<uint32_t>(float(value)));
+}
+// LoadLanes over the car sound's words.
+simde__m128 LoadLanesIn(const schema::CarSound& cs, uint32_t address) {
+  const uint32_t a = address & ~0xFu;
+  return simde_mm_castsi128_ps(simde_mm_set_epi32(int(WordIn(cs, a + 0)), int(WordIn(cs, a + 4)),
+                                                  int(WordIn(cs, a + 8)), int(WordIn(cs, a + 12))));
 }
 // stvx of a register as the SDK's context held it (host byte order: guest byte j
 // is host byte 15 - j).
@@ -169,8 +182,8 @@ uint64_t Update3D(uint8_t* base, uint64_t sound64, uint64_t r4, uint64_t vehicle
   const uint32_t listener_at = cs.listener_position_x_address();  // r26
   const double volume = Lfs(base, kVolume);  // f30
   const uint32_t view_mode = viewport.view_mode();  // r23
-  const simde__m128 old_emitter = LoadLanes(base, emitter_at);   // v127
-  const simde__m128 old_listener = LoadLanes(base, listener_at); // v126
+  const simde__m128 old_emitter = LoadLanesIn(cs, emitter_at);   // v127
+  const simde__m128 old_listener = LoadLanesIn(cs, listener_at); // v126
   const uint32_t zero_word = Word(base, kZero);
   const double zero = Lfs(base, kZero);  // f31
   Store(base, frame + 108, zero_word);
@@ -208,35 +221,35 @@ uint64_t Update3D(uint8_t* base, uint64_t sound64, uint64_t r4, uint64_t vehicle
   const uint32_t ez = Word(base, frame + 104);
   const uint32_t ex = Word(base, frame + 96);
   const uint32_t ey = Word(base, frame + 100);
-  Store(base, cs.emitter_position_z_address(), ez);
-  Store(base, emitter_at, ex);
-  Store(base, cs.emitter_position_y_address(), ey);
-  Store(base, listener_at, Word(base, camera.eye_x_address()));
-  Store(base, cs.listener_position_y_address(), Word(base, camera.eye_y_address()));
-  Store(base, cs.listener_position_z_address(), Word(base, camera.eye_z_address()));
-  const simde__m128 listener_moved = VectorSub(LoadLanes(base, listener_at), old_listener);
+  StoreIn(cs, cs.emitter_position_z_address(), ez);
+  StoreIn(cs, emitter_at, ex);
+  StoreIn(cs, cs.emitter_position_y_address(), ey);
+  StoreIn(cs, listener_at, Word(base, camera.eye_x_address()));
+  StoreIn(cs, cs.listener_position_y_address(), Word(base, camera.eye_y_address()));
+  StoreIn(cs, cs.listener_position_z_address(), Word(base, camera.eye_z_address()));
+  const simde__m128 listener_moved = VectorSub(LoadLanesIn(cs, listener_at), old_listener);
   // The listener's front: the camera pass's +464 and +472, y 0.
-  Store(base, l.front_x_address(), Word(base, camera.forward_x_address()));
-  Store(base, l.front_y_address(), zero_word);
+  StoreIn(cs, l.front_x_address(), Word(base, camera.forward_x_address()));
+  StoreIn(cs, l.front_y_address(), zero_word);
   const uint32_t front_z = Word(base, camera.forward_z_address());
   const uint32_t ticks = Word(base, kTicks);
   Store(base, frame + 80, ticks);
-  Store(base, l.front_z_address(), front_z);
+  StoreIn(cs, l.front_z_address(), front_z);
   const simde__m128 ticks_a = SplatLeft(base, frame + 80);
-  const simde__m128 emitter_moved = VectorSub(LoadLanes(base, emitter_at), old_emitter);
+  const simde__m128 emitter_moved = VectorSub(LoadLanesIn(cs, emitter_at), old_emitter);
   Store(base, frame + 80, ticks);
   const simde__m128 ticks_b = SplatLeft(base, frame + 80);
-  const uint32_t lx = Word(base, listener_at);
+  const uint32_t lx = WordIn(cs, listener_at);
   const simde__m128 listener_velocity = VectorMul(listener_moved, ticks_a);
   // The listener's position (+28) and the emitter's (+80).
-  Store(base, e.position_z_address(), ez);
-  Store(base, l.position_x_address(), lx);
-  const uint32_t ly = Word(base, cs.listener_position_y_address());
-  const uint32_t lz = Word(base, cs.listener_position_z_address());
-  Store(base, l.position_y_address(), ly);
-  Store(base, l.position_z_address(), lz);
-  Store(base, e.position_x_address(), ex);
-  Store(base, e.position_y_address(), ey);
+  StoreIn(cs, e.position_z_address(), ez);
+  StoreIn(cs, l.position_x_address(), lx);
+  const uint32_t ly = WordIn(cs, cs.listener_position_y_address());
+  const uint32_t lz = WordIn(cs, cs.listener_position_z_address());
+  StoreIn(cs, l.position_y_address(), ly);
+  StoreIn(cs, l.position_z_address(), lz);
+  StoreIn(cs, e.position_x_address(), ex);
+  StoreIn(cs, e.position_y_address(), ey);
   const simde__m128 emitter_velocity = VectorMul(emitter_moved, ticks_b);
   StoreLanes(base, frame + 112, listener_velocity);
   StoreLanes(base, frame + 128, emitter_velocity);
@@ -279,14 +292,14 @@ uint64_t Update3D(uint8_t* base, uint64_t sound64, uint64_t r4, uint64_t vehicle
   if (at_camera()) {
     const double share = Fmuls(volume, Lfs(base, kOwnShare));
     for (uint32_t i = 0; i < 6; i++) {
-      Stfs(base, cs.output_map_address() + 8 * i + 4, share);
-      guest::StoreU8(base, cs.output_map_address() + 8 * i, uint8_t(i));
+      StfsIn(cs, cs.output_map_address() + 8 * i + 4, share);
+      StoreU8In(cs, cs.output_map_address() + 8 * i, uint8_t(i));
     }
   } else {
     for (uint32_t i = 0; i < 6; i++) {
-      guest::StoreU8(base, cs.output_map_address() + 8 * i, uint8_t(i));
+      StoreU8In(cs, cs.output_map_address() + 8 * i, uint8_t(i));
       const uint32_t matrix = dsp.matrix().address;
-      Stfs(base, cs.output_map_address() + 8 * i + 4, Fmuls(Lfs(base, matrix + 4 * i), volume));
+      StfsIn(cs, cs.output_map_address() + 8 * i + 4, Fmuls(Lfs(base, matrix + 4 * i), volume));
     }
   }
   cs.set_output_map_pointer(cs.output_map_address());
@@ -295,8 +308,8 @@ uint64_t Update3D(uint8_t* base, uint64_t sound64, uint64_t r4, uint64_t vehicle
   cs.set_sends_0_kind(0);
   // The second map at +224: the reverb level (+200) times the volume.
   for (uint32_t i = 0; i < 6; i++) {
-    guest::StoreU8(base, cs.reverb_map_address() + 8 * i, uint8_t(i));
-    Stfs(base, cs.reverb_map_address() + 8 * i + 4, Fmuls(double(dsp.reverb_level()), volume));
+    StoreU8In(cs, cs.reverb_map_address() + 8 * i, uint8_t(i));
+    StfsIn(cs, cs.reverb_map_address() + 8 * i + 4, Fmuls(double(dsp.reverb_level()), volume));
   }
   cs.set_output_sends(cs.sends_0_kind_address());
   cs.set_reverb_map_count(6);
@@ -311,8 +324,8 @@ uint64_t Update3D(uint8_t* base, uint64_t sound64, uint64_t r4, uint64_t vehicle
   // tick (+1256).
   if (int32_t(view_mode) == 1 && uint32_t(r4) != 1) {
     const double dy = Fsubs(double(cs.listener_position_y()), double(cs.emitter_position_y()));
-    const double lx2 = Lfs(base, listener_at);
-    const double dx = Fsubs(lx2, Lfs(base, emitter_at));
+    const double lx2 = LfsIn(cs, listener_at);
+    const double dx = Fsubs(lx2, LfsIn(cs, emitter_at));
     const double ez2 = double(cs.emitter_position_z());
     const double dz = Fsubs(double(cs.listener_position_z()), ez2);
     double d2 = Fmuls(dy, dy);
@@ -331,7 +344,7 @@ uint64_t Update3D(uint8_t* base, uint64_t sound64, uint64_t r4, uint64_t vehicle
       }
     }
   }
-  Store(base, cs.last_doppler_address(), Word(base, dsp.doppler_factor_address()));
+  StoreIn(cs, cs.last_doppler_address(), WordIn(cs, dsp.doppler_factor_address()));
   return r3;
 }
 

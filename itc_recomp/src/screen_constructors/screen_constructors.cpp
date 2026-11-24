@@ -873,9 +873,9 @@ void Type6Screens(uint8_t* base, uint32_t block, uint32_t sp, const New& new_pan
   b.set_vtable(0x82010A78);
   Type6Screen0(base, block + 4);
   boot_mode::ScreenMachineConstruct(base, block + 9672);
-  Type6ListScreen(base, b.list_screen_address());
-  Type6NodeScreen(base, b.node_screen_address(), members);
-  Type6PanelScreen(base, b.panel_screen_address(), members, new_panel);
+  Type6ListScreen(base, b.list_screen().address);
+  Type6NodeScreen(base, b.node_screen().address, members);
+  Type6PanelScreen(base, b.panel_screen().address, members, new_panel);
   boot_mode::ScreenMachineConstruct(base, block + 52696);
   b.set_power_graph_vtable(0x82010A68);
   boot_mode::ScreenMachineConstruct(base, block + 62336);
@@ -893,8 +893,8 @@ void Type7Screens(uint8_t* base, uint32_t block, uint32_t sp, const New& new_pan
   b.set_vtable(0x82010FE0);
   Type7Screen0(base, block + 4);
   boot_mode::ScreenMachineConstruct(base, block + 9664);
-  Type7ListScreen(base, b.list_screen_address());
-  Type7PanelScreen(base, b.panel_screen_address(), members, new_panel);
+  Type7ListScreen(base, b.list_screen().address);
+  Type7PanelScreen(base, b.panel_screen().address, members, new_panel);
   boot_mode::ScreenMachineConstruct(base, block + 42356);
   b.set_power_graph_vtable(0x82010FD0);
   boot_mode::ScreenMachineConstruct(base, block + 51996);

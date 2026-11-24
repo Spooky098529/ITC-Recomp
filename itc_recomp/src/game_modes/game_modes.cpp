@@ -632,9 +632,11 @@ void ModeTypeConstruct(uint8_t* base, uint32_t type, uint32_t mode) {
 
 namespace {
 
-// An 852-byte mode in host memory (E5 step 4): its schema type's New.
+// A mode in host memory (E5 step 4): its schema type's New (the race mode
+// and the 852-byte ones).
 uint32_t NewMode(uint8_t* base, uint32_t type) {
   switch (type) {
+    case 1: return schema::RaceMode::New(base).address;
     case 2: return schema::ModeType2::New(base).address;
     case 4: return schema::ModeType4::New(base).address;
     case 5: return schema::ModeType5::New(base).address;
@@ -675,9 +677,11 @@ std::optional<uint32_t> ModeCreate(uint8_t* base, uint32_t type) {
     ITC_LOG_ERROR("Mode::Create: type 12 (Xbox Live) asked for with --multiplayer_menu_items off");
     return std::nullopt;
   }
-  // The race and boot modes in guest memory, the 852-byte ones in host memory.
-  const auto mode = bytes == kModeBytes ? std::optional<uint32_t>(NewMode(base, type))
-                                        : memory::crt::OperatorNew(base, bytes);
+  // The boot mode (type 3) in guest memory, the race mode and the 852-byte
+  // ones in host memory.
+  const auto mode = type == 1 || bytes == kModeBytes
+                        ? std::optional<uint32_t>(NewMode(base, type))
+                        : memory::crt::OperatorNew(base, bytes);
   if (!mode) {
     return std::nullopt;
   }

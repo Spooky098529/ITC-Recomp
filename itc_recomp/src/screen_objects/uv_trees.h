@@ -14,10 +14,11 @@
 // - UvMap (std::map<double, UvColumn>): 48-byte nodes, a UvColumn at +24
 //   (its head at +28, its size at +32), the color at +40, isnil at +41.
 //
-// Nodes come from operator new and go back with operator delete (the C
-// runtime heap's plain C++, memory/c_runtime_heap.h), so these run natively
-// only while --native_heap routes the game's heap to the allocation layer
-// (the adapters' condition). The paths that never ran in play stay on the
+// Nodes live in host memory (E5 step 4): AllocateNodes makes them through
+// their schema views (NewArray, a handle in place of operator new's block)
+// and the erases free the handles (in place of operator delete). These
+// still run natively only while --native_heap routes the game's heap to the
+// allocation layer (the adapters' condition, kept). The paths that never ran in play stay on the
 // recompiled code: a function that would take one (AllocateNodes' bad_alloc,
 // Insert's length_error, an erase of part of a tree, a checked iterator's
 // trap) returns nullopt (or false) with nothing changed, and its adapter

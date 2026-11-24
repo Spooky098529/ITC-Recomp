@@ -6,6 +6,7 @@
 #include "base/log.h"
 #include "car_physics/float_ops.h"
 #include "guest.h"
+#include "memory/host_copy.h"
 #include "native/buffers.h"
 #include "scene/scene.h"
 #include "scene_loaders/objects.h"
@@ -37,8 +38,12 @@ void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
 
-// memset (sub_825A71D0) with 0: the same bytes.
+// memset (sub_825A71D0) with 0: the same bytes (a host object's through
+// its handle).
 void Clear(uint8_t* base, uint32_t address, uint32_t bytes) {
+  if (memory::FillWithHandles(base, address, 0, bytes)) {
+    return;
+  }
   for (uint32_t i = 0; i < bytes; i++) {
     base[address + i] = 0;
   }
@@ -111,9 +116,12 @@ uint32_t SceneCockpitReset(uint8_t* base, uint32_t object, uint32_t stack) {
   scene_models::CockpitRecordReset(base, c.record_address());
   const uint32_t r3 = CockpitPointsReset(base, c.points_address(), sp);
   c.set_record_address(c.record_address());
-  for (uint32_t i = 0; i < 6; i++) {
-    Store(base, c.part_models_address() + 4 * i, 0);
-  }
+  c.set_part_model_0(0);
+  c.set_part_model_1(0);
+  c.set_part_model_2(0);
+  c.set_part_model_3(0);
+  c.set_part_model_4(0);
+  c.set_part_model_5(0);
   return r3;
 }
 
@@ -131,9 +139,12 @@ uint32_t SceneInteriorReset(uint8_t* base, uint32_t object, uint32_t stack) {
   scene_models::InteriorRecordReset(base, o.record_address());
   const uint32_t r3 = InteriorPointsReset(base, o.points_address(), sp);
   o.set_scene(Scene(base));
-  for (uint32_t i = 0; i < 6; i++) {
-    Store(base, o.part_models_address() + 4 * i, 0);
-  }
+  o.set_part_model_0(0);
+  o.set_part_model_1(0);
+  o.set_part_model_2(0);
+  o.set_part_model_3(0);
+  o.set_part_model_4(0);
+  o.set_part_model_5(0);
   return r3;
 }
 
@@ -165,9 +176,12 @@ uint32_t SceneTrafficReset(uint8_t* base, uint32_t object, uint32_t stack) {
   t.set_skeleton(0);
   t.set_body(0);
   t.set_finished(0);
-  for (uint32_t i = 0; i < 6; i++) {
-    Store(base, t.part_models_address() + 4 * i, 0);
-  }
+  t.set_part_model_0(0);
+  t.set_part_model_1(0);
+  t.set_part_model_2(0);
+  t.set_part_model_3(0);
+  t.set_part_model_4(0);
+  t.set_part_model_5(0);
   return r3;
 }
 

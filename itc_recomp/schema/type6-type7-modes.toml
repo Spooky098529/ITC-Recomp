@@ -117,10 +117,13 @@ fields = [
 # three VirtualAlloc blocks and its own words. The menu over the car: five
 # items (the list screen, the node screen, the panel screen, the options,
 # quit).
+# Dual (E5 step 4): embedded in the host block (type67-screens.toml's
+# Type6Screens and Type7Screens, at +4); the type 8 mode's blocks stay guest.
 [Type6Screen0]
 measure = "Type6Screen0"
 size = 9668
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "machine", offset = 0, type = "bytes", count = 9600, note = "the machine's transitions (StateMachine, game-modes.toml)" },
   { name = "transition_count", offset = 9600, type = "u32" },
@@ -139,10 +142,13 @@ fields = [
 # Type 7's first screen (the type 7 block's +4; vtable 0x82010B5C): its
 # machine at +4, so Type6Screen0's words 4 bytes further. Four items (the
 # list screen, the panel screen, the options, quit).
+# Dual (E5 step 4): embedded in the host block (type67-screens.toml's
+# Type6Screens and Type7Screens, at +4); the type 8 mode's blocks stay guest.
 [Type7Screen0]
 measure = "Type7Screen0"
 size = 9660
 origin = "embedded"
+storage = "dual"
 vtable = 0x82010B5C
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82010B5C (the empty base)" },
@@ -448,10 +454,13 @@ fields = [
 ]
 
 # Split from Type6Screen0.
+# Dual (E5 step 4): the measure's view of the first screen in a host block
+# (the lifted originals'); the screen's fields cover its words.
 [Type6Screen0At4]
 measure = "Type6Screens@+4"
 size = 9608
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "unknown_9604", offset = 9604, type = "u32" },
 ]
@@ -466,10 +475,13 @@ fields = [
 ]
 
 # Split from Type7Screen0.
+# Dual (E5 step 4): the measure's view of the first screen in a host block
+# (the lifted originals'); the screen's fields cover its words.
 [Type7Screen0At4]
 measure = "Type7Screens@+4"
 size = 9612
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "unknown_0", offset = 0, type = "u32" },
   { name = "unknown_9608", offset = 9608, type = "u32" },

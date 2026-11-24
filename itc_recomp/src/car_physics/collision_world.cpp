@@ -512,7 +512,7 @@ uint32_t CollisionWorldReset(uint8_t* base) {
       const uint32_t object = schema::CollisionWorld(base, world).objects().address + 320 * i;
       schema::CollisionWorldObject(base, object).set_next(uint32_t(object + 320));
     } else {
-      guest::StoreU32(base, count * 320 + schema::CollisionWorld(base, world).objects().address - 92, 0);
+      schema::CollisionWorldObject(base, count * 320 + schema::CollisionWorld(base, world).objects().address - 320).set_next(uint32_t(0));
     }
     const uint32_t object = schema::CollisionWorld(base, World(base)).objects().address + 320 * i;
     schema::CollisionWorldObject(base, object).set_previous(uint32_t(int32_t(i) > 0 ? object - 320 : 0));
@@ -653,7 +653,7 @@ uint32_t CollisionObjectDeletingDestructor(uint8_t* base, uint32_t object, uint3
     return object;
   }
   const uint32_t block = object - 16;
-  const uint32_t count = guest::LoadU32(base, block);
+  const uint32_t count = schema::CollisionObjectBlock(base, block).count();
   uint32_t at = count * kObjectBytes + object;
   for (int32_t i = int32_t(count) - 1; i >= 0; i--) {
     at -= kObjectBytes;
@@ -676,9 +676,9 @@ bool CollisionWorldDestroyable(uint8_t* base) {
     if (!collision::Deletable(block)) {
       return false;
     }
-    const uint32_t count = guest::LoadU32(base, block);
+    const uint32_t count = schema::CollisionObjectBlock(base, block).count();
     if (count != 0) {
-      const uint32_t vtable = guest::LoadU32(base, objects);
+      const uint32_t vtable = guest::VtableWord(base, objects);
       if (vtable != kObjectVtable || guest::LoadU32(base, vtable) != kObjectDeletingDestructor) {
         return false;
       }
@@ -698,17 +698,17 @@ void CollisionWorldDestroy(uint8_t* base) {
   const uint32_t objects = schema::CarPhysicsGlobals::collision_world(base).objects().address;
   if (objects != 0) {
     const uint32_t block = objects - 16;
-    if (guest::LoadU32(base, block) != 0) {
+    if (schema::CollisionObjectBlock(base, block).count() != 0) {
       // The first object's slot 0 (CollisionWorldDestroyable checked it).
       CollisionObjectDeletingDestructor(base, objects, 3);
     } else {
-      memory::crt::OperatorDeleteArray(block);
+      schema::CollisionObjectBlock(base, block).Delete();
     }
   }
   schema::CarPhysicsGlobals::collision_world(base).set_objects(uint32_t(0));
   memory::crt::OperatorDeleteArray(schema::CarPhysicsGlobals::collision_world(base).pairs().address);
   schema::CarPhysicsGlobals::collision_world(base).set_pairs(uint32_t(0));
-  memory::crt::OperatorDeleteArray(schema::CarPhysicsGlobals::collision_world(base).contacts().address);
+  schema::CarPhysicsGlobals::collision_world(base).contacts().Delete();
   schema::CarPhysicsGlobals::collision_world(base).set_contacts(uint32_t(0));
   memory::crt::OperatorDelete(schema::CarPhysicsGlobals::collision_world(base).address);
   schema::CarPhysicsGlobals::set_collision_world(base, uint32_t(0));
@@ -723,6 +723,9 @@ namespace car_physics {
 namespace {
 
 constexpr uint32_t kRefused = 0xFFFFFFFFu;  // a size the originals make -1
+// The objects in CollisionObjectBlock (its schema's embed count).
+constexpr uint32_t kBlockObjects =
+    (schema::CollisionObjectBlock::kSize - 16) / schema::CollisionWorldObject::kSize;
 
 // operator new[]'s block, as its plain C++ gives it (0 where it gives none:
 // checked before by the callers, never in play).
@@ -763,7 +766,10 @@ bool ArrayFits(uint32_t bytes) {
 
 bool CollisionWorldCreate(uint8_t* base, uint32_t objects, uint32_t pairs, uint32_t contacts,
                           uint32_t* r3) {
-  if (memory::crt::GetProcessHeap(base) == 0 || !ArrayFits(ObjectsBytes(objects)) ||
+  // The objects' block is a host object of 50 (E5 step 4): Setup's count,
+  // the only one; another goes to the original.
+  if (objects != kBlockObjects || memory::crt::GetProcessHeap(base) == 0 ||
+      !ArrayFits(ObjectsBytes(objects)) ||
       !ArrayFits(PairsBytes(pairs)) || !ArrayFits(RecordsBytes(64)) ||
       !ArrayFits(RecordsBytes(contacts))) {
     return false;
@@ -775,14 +781,14 @@ bool CollisionWorldCreate(uint8_t* base, uint32_t objects, uint32_t pairs, uint3
   schema::CollisionWorld(base, World(base)).set_updating(uint32_t(0));
   schema::CollisionWorld(base, World(base)).set_query_count(uint32_t(32));
   schema::CollisionWorld(base, World(base)).set_object_count(uint32_t(objects));
-  // The objects, with operator new[]'s count header.
+  // The objects, with operator new[]'s count header (host memory, E5 step 4).
   {
     const uint32_t n = schema::CollisionWorld(base, World(base)).object_count();
-    const uint32_t block = NewArray(base, ObjectsBytes(n));
+    const uint32_t block = schema::CollisionObjectBlock::New(base).address;
     uint32_t first = 0;
     if (block != 0) {
       first = block + 16;
-      guest::StoreU32(base, block, n);
+      schema::CollisionObjectBlock(base, block).set_count(n);
       for (uint32_t i = 0; i < n; i++) {
         CollisionObjectConstruct(base, first + 320 * i);
       }
@@ -800,7 +806,7 @@ bool CollisionWorldCreate(uint8_t* base, uint32_t objects, uint32_t pairs, uint3
       const uint32_t object = schema::CollisionWorld(base, world).objects().address + 320 * i;
       schema::CollisionWorldObject(base, object).set_next(uint32_t(object + 320));
     } else {
-      guest::StoreU32(base, count * 320 + schema::CollisionWorld(base, world).objects().address - 92, 0);
+      schema::CollisionWorldObject(base, count * 320 + schema::CollisionWorld(base, world).objects().address - 320).set_next(uint32_t(0));
     }
     world = World(base);
     const uint32_t object = schema::CollisionWorld(base, world).objects().address + 320 * i;
@@ -812,10 +818,10 @@ bool CollisionWorldCreate(uint8_t* base, uint32_t objects, uint32_t pairs, uint3
   schema::CollisionWorld(base, World(base)).set_pair_capacity(uint32_t(pairs));
   schema::CollisionWorld(base, World(base)).set_pairs(uint32_t(NewArray(base, PairsBytes(schema::CollisionWorld(base, World(base)).pair_capacity()))));
   schema::CollisionWorld(base, World(base)).set_pair_count(uint32_t(0));
-  // The query records: 2 x +60.
+  // The query records: 2 x +60 (host memory, E5 step 4).
   {
     const uint32_t n = schema::CollisionWorld(base, World(base)).query_count() << 1;
-    const uint32_t block = NewArray(base, RecordsBytes(n));
+    const uint32_t block = schema::CollisionHit::NewArray(base, n).address;
     if (block != 0) {
       ZeroRecordWs(base, block, n, 12);
     }
@@ -826,7 +832,7 @@ bool CollisionWorldCreate(uint8_t* base, uint32_t objects, uint32_t pairs, uint3
   schema::CollisionWorld(base, World(base)).set_contact_capacity(uint32_t(contacts));
   {
     const uint32_t n = schema::CollisionWorld(base, World(base)).contact_capacity();
-    const uint32_t block = NewArray(base, RecordsBytes(n));
+    const uint32_t block = schema::CollisionContact::NewArray(base, n).address;  // host memory (E5 step 4)
     if (block != 0) {
       ZeroRecordWs(base, block, n, 28);
     }
@@ -850,9 +856,9 @@ bool CollisionWorldSetQueryCapacity(uint8_t* base, uint32_t n, uint32_t* r3) {
   }
   ITC_NATIVE_RUNNING("sub_820B9198 CollisionWorld::SetQueryCapacity");
   schema::CollisionWorld(base, World(base)).set_query_count(uint32_t(n));
-  memory::crt::OperatorDeleteArray(schema::CollisionWorld(base, World(base)).hits().address);
+  schema::CollisionWorld(base, World(base)).hits().Delete();  // host memory (E5 step 4)
   const uint32_t count = schema::CollisionWorld(base, World(base)).query_count() << 1;
-  const uint32_t block = NewArray(base, RecordsBytes(count));
+  const uint32_t block = schema::CollisionHit::NewArray(base, count).address;
   if (block != 0) {
     ZeroRecordWs(base, block, count, 12);
   }

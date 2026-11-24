@@ -832,10 +832,18 @@ uint32_t SectionRivalTest(uint8_t* base) {
   if (int16_t(career::DayBlockBestStreak(base, save + 72)) < 3) {
     return 0;
   }
-  // RaceEvent::Current, read without a check (as the original).
-  const Event ev(base, race_setup::EventCurrent(base));
-  if (ev.on_section_4() == 0 || ev.on_section_5() == 0) {
-    if (ev.on_section_13() == 0 || ev.on_section_14() == 0) {
+  // RaceEvent::Current, read without a check (as the original): with no
+  // event, guest memory's words at +4 to +16 of address 0 as the original
+  // reads them (the event itself is a host object, E5 step 4).
+  const uint32_t event = race_setup::EventCurrent(base);
+  const Event ev(base, event);
+  const auto word = [&](uint32_t (Event::*field)() const, uint32_t address) {
+    return event != 0 ? (ev.*field)() : guest::LoadU32(base, address);
+  };
+  if (word(&Event::on_section_4, ev.on_section_4_address()) == 0 ||
+      word(&Event::on_section_5, ev.on_section_5_address()) == 0) {
+    if (word(&Event::on_section_13, ev.on_section_13_address()) == 0 ||
+        word(&Event::on_section_14, ev.on_section_14_address()) == 0) {
       return 0;
     }
   }

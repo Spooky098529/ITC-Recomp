@@ -499,7 +499,7 @@ void Replay(uint8_t* base, uint32_t queue, uint32_t device, uint32_t video_outpu
     const PtrVectorSlot element(base, offset + elements);
     const uint32_t object = element.value();
     if (object != 0) {
-      call(guest::LoadU32(base, guest::LoadU32(base, object)), frame, 0x82591514, 2, object, 1,
+      call(guest::LoadU32(base, guest::VtableWord(base, object)), frame, 0x82591514, 2, object, 1,
            0);
       vector = G::release_list(base);
       element.set_value(0);

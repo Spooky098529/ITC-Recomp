@@ -526,7 +526,8 @@ void SetUp(uint8_t* base, uint32_t vehicle, uint32_t data, uint32_t byte, uint32
     schema::Vehicle(base, v).set_unknown_52(float(Fmadds(axles, Lfs(base, kMassScale), double(schema::CarData(base, d).mass()))));
   }
   if (!reset) {
-    const uint32_t body = memory::crt::OperatorNew(base, 528).value_or(0);
+    // Host memory (E5 step 4): the 528-byte body operator new gave.
+    const uint32_t body = schema::RigidBody::New(base).address;
     if (body != 0) {
       RigidBodyConstruct(base, body, f - 96);
     }
@@ -559,7 +560,8 @@ void SetUp(uint8_t* base, uint32_t vehicle, uint32_t data, uint32_t byte, uint32
       schema::Vehicle(base, v).set_box(uint32_t(0));
     }
   }
-  const uint32_t shape = memory::crt::OperatorNew(base, 496).value_or(0);
+  // Host memory (E5 step 4): the 496-byte box operator new gave.
+  const uint32_t shape = schema::BoxShape::New(base).address;
   if (shape != 0) {
     d = schema::Vehicle(base, v).car_data().address;
     co::BoxConstruct(base, shape, schema::CarData(base, d).box_1760_address(), schema::CarData(base, d).box_1776_address(), f - 112);

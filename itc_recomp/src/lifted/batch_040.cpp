@@ -1052,7 +1052,7 @@ uint64_t f8227E7C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x8227E7F4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,9640(r31)
-  r11 = guest::LoadU32(base, schema::NetModeBlockAt125536(base, uint32_t(r31)).unknown_9640_address());
+  r11 = schema::NetModeBlockAt125536(base, uint32_t(r31)).unknown_9640_bits();
   // lwz r3,0(r3)
   r3 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,0
@@ -2284,7 +2284,7 @@ uint64_t f8227F480(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x8227F4AC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,9644(r31)
-  r11 = guest::LoadU32(base, schema::NetModeBlockAt115888(base, uint32_t(r31)).unknown_9644_address());
+  r11 = schema::NetModeBlockAt115888(base, uint32_t(r31)).unknown_9644_bits();
   // lwz r3,0(r3)
   r3 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,0
@@ -6695,7 +6695,7 @@ void f822820A8(uint8_t* base) {
   // lwz r11,25040(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + 25040);
   // lwz r9,104(r11)
-  r9 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_104_address());
+  r9 = schema::NetRankingData(base, uint32_t(r11)).unknown_104_bits();
   // cmpwi cr6,r9,0
   cr6 = lifted::Compare<int32_t>(int32_t(r9), 0, so);
   // bne cr6,0x822820c8
@@ -6723,11 +6723,11 @@ loc_822820C8:
   r8 = uint64_t(int64_t(6));
 loc_822820E4:
   // stw r9,20(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_20_address(), uint32_t(r9));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_20_bits(uint32_t(r9));
   // lwz r11,25040(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + 25040);
   // stw r8,24(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_24_address(), uint32_t(r8));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_24_bits(uint32_t(r8));
   // blr
   return;
 }
@@ -6743,7 +6743,7 @@ void f822820F8(uint8_t* base) {
   // lwz r11,25040(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + 25040);
   // lwz r9,104(r11)
-  r9 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_104_address());
+  r9 = schema::NetRankingData(base, uint32_t(r11)).unknown_104_bits();
   // cmpwi cr6,r9,0
   cr6 = lifted::Compare<int32_t>(int32_t(r9), 0, so);
   // bne cr6,0x82282124
@@ -6753,22 +6753,22 @@ void f822820F8(uint8_t* base) {
   // li r8,-1
   r8 = uint64_t(int64_t(-1));
   // stw r9,20(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_20_address(), uint32_t(r9));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_20_bits(uint32_t(r9));
   // lwz r11,25040(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + 25040);
   // stw r8,24(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_24_address(), uint32_t(r8));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_24_bits(uint32_t(r8));
   // blr
   return;
 loc_82282124:
   // li r9,-1
   r9 = uint64_t(int64_t(-1));
   // stw r9,20(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_20_address(), uint32_t(r9));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_20_bits(uint32_t(r9));
   // lwz r11,25040(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + 25040);
   // stw r9,24(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_24_address(), uint32_t(r9));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_24_bits(uint32_t(r9));
   // blr
   return;
 }
@@ -6914,7 +6914,7 @@ loc_8228220C:
   // lwz r11,25040(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 25040);
   // stw r10,80(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).row_count_address(), uint32_t(r10));
+  schema::NetRankingData(base, uint32_t(r11)).set_row_count_bits(uint32_t(r10));
   // lwz r11,27348(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + 27348);
   // cmplwi cr6,r11,0
@@ -6934,14 +6934,14 @@ loc_82282234:
   // lwz r11,25040(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 25040);
   // stw r10,76(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).row_limit_address(), uint32_t(r10));
+  schema::NetRankingData(base, uint32_t(r11)).set_row_limit_bits(uint32_t(r10));
   // bl 0x822914a8
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x822914A8, LIFTED_ARGS(0x82282240, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,25040(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 25040);
   // stw r3,48(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_48_address(), uint32_t(r3));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_48_bits(uint32_t(r3));
   // lwz r11,27348(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + 27348);
   // cmplwi cr6,r11,0
@@ -6963,7 +6963,7 @@ loc_82282268:
   // lwz r11,25040(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 25040);
   // stw r10,52(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_52_address(), uint32_t(r10));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_52_bits(uint32_t(r10));
   // lwz r11,27348(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + 27348);
   // cmplwi cr6,r11,0
@@ -6991,7 +6991,7 @@ loc_8228229C:
   // lwz r10,25040(r31)
   r10 = guest::LoadU32(base, uint32_t(r31) + 25040);
   // stw r11,56(r10)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r10)).unknown_56_address(), uint32_t(r11));
+  schema::NetRankingData(base, uint32_t(r10)).set_unknown_56_bits(uint32_t(r11));
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
@@ -7037,7 +7037,7 @@ loc_822822E8:
   // subf r10,r10,r4
   r10 = r4 - r10;
   // lwz r9,80(r11)
-  r9 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).row_count_address());
+  r9 = schema::NetRankingData(base, uint32_t(r11)).row_count_bits();
   // li r7,0
   r7 = uint64_t(int64_t(0));
   // addi r10,r10,1
@@ -7049,20 +7049,20 @@ loc_822822E8:
   // cmpwi cr6,r9,7
   cr6 = lifted::Compare<int32_t>(int32_t(r9), 7, so);
   // stw r10,68(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).first_row_address(), uint32_t(r10));
+  schema::NetRankingData(base, uint32_t(r11)).set_first_row_bits(uint32_t(r10));
   // stw r8,72(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).last_row_address(), uint32_t(r8));
+  schema::NetRankingData(base, uint32_t(r11)).set_last_row_bits(uint32_t(r8));
   // bgt cr6,0x8228231c
   if (cr6.gt) goto loc_8228231C;
   // li r3,1
   r3 = uint64_t(int64_t(1));
   // stw r9,72(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).last_row_address(), uint32_t(r9));
+  schema::NetRankingData(base, uint32_t(r11)).set_last_row_bits(uint32_t(r9));
   // b 0x8228234c
   goto loc_8228234C;
 loc_8228231C:
   // lwz r10,76(r11)
-  r10 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).row_limit_address());
+  r10 = schema::NetRankingData(base, uint32_t(r11)).row_limit_bits();
   // cmpw cr6,r8,r10
   cr6 = lifted::Compare<int32_t>(int32_t(r8), int32_t(r10), so);
   // ble cr6,0x82282338
@@ -7070,14 +7070,14 @@ loc_8228231C:
   // addi r9,r10,-7
   r9 = uint64_t(int64_t(int64_t(r10) + -7));
   // stw r10,72(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).last_row_address(), uint32_t(r10));
+  schema::NetRankingData(base, uint32_t(r11)).set_last_row_bits(uint32_t(r10));
   // li r3,1
   r3 = uint64_t(int64_t(1));
   // stw r9,68(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).first_row_address(), uint32_t(r9));
+  schema::NetRankingData(base, uint32_t(r11)).set_first_row_bits(uint32_t(r9));
 loc_82282338:
   // lwz r10,68(r11)
-  r10 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).first_row_address());
+  r10 = schema::NetRankingData(base, uint32_t(r11)).first_row_bits();
   // cmpwi cr6,r10,0
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // bgelr cr6
@@ -7085,10 +7085,10 @@ loc_82282338:
   // li r10,7
   r10 = uint64_t(int64_t(7));
   // stw r10,72(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).last_row_address(), uint32_t(r10));
+  schema::NetRankingData(base, uint32_t(r11)).set_last_row_bits(uint32_t(r10));
 loc_8228234C:
   // stw r7,68(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).first_row_address(), uint32_t(r7));
+  schema::NetRankingData(base, uint32_t(r11)).set_first_row_bits(uint32_t(r7));
   // blr
   return r3;
 }
@@ -7130,7 +7130,7 @@ lifted::Result f82282630(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,25040(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 25040);
   // lwz r11,0(r11)
-  r11 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_0_address());
+  r11 = schema::NetRankingData(base, uint32_t(r11)).unknown_0_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // lis r11,-32127
@@ -7216,7 +7216,7 @@ void f822826E8(uint8_t* base, uint64_t r4) {
   // lwz r11,25040(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + 25040);
   // stw r9,12(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_12_address(), uint32_t(r9));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_12_bits(uint32_t(r9));
   // lis r11,-32127
   r11 = uint64_t(int64_t(-2105475072));
   // lwz r10,25040(r10)
@@ -7226,7 +7226,7 @@ void f822826E8(uint8_t* base, uint64_t r4) {
   // lwz r9,0(r9)
   r9 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r9)).page_address());
   // stw r9,16(r10)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r10)).unknown_16_address(), uint32_t(r9));
+  schema::NetRankingData(base, uint32_t(r10)).set_unknown_16_bits(uint32_t(r9));
   // lwz r10,25028(r11)
   r10 = guest::LoadU32(base, uint32_t(r11) + 25028);
   // lwz r11,0(r10)
@@ -7931,7 +7931,7 @@ loc_82282C8C:
   // lwz r11,25040(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 25040);
   // lwz r4,8(r11)
-  r4 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_8_address());
+  r4 = schema::NetRankingData(base, uint32_t(r11)).unknown_8_bits();
   // lis r11,-32127
   r11 = uint64_t(int64_t(-2105475072));
   // lwz r11,25032(r11)
@@ -8641,57 +8641,57 @@ lifted::Result f822830D8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r7, 
   // stw r9,96(r1)
   guest::StoreU32(base, uint32_t(r1) + 96, uint32_t(r9));
   // stw r10,76(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).row_limit_address(), uint32_t(r10));
+  schema::NetRankingData(base, uint32_t(r11)).set_row_limit_bits(uint32_t(r10));
   // rotlwi r10,r10,0
   r10 = __builtin_rotateleft32(uint32_t(r10), 0);
   // stw r9,48(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_48_address(), uint32_t(r9));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_48_bits(uint32_t(r9));
   // stw r31,96(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_96_address(), uint32_t(r31));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_96_bits(uint32_t(r31));
   // stw r31,92(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_92_address(), uint32_t(r31));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_92_bits(uint32_t(r31));
   // stw r31,32(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_32_address(), uint32_t(r31));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_32_bits(uint32_t(r31));
   // stw r10,52(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_52_address(), uint32_t(r10));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_52_bits(uint32_t(r10));
   // stw r9,104(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_104_address(), uint32_t(r9));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_104_bits(uint32_t(r9));
   // stw r31,36(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_36_address(), uint32_t(r31));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_36_bits(uint32_t(r31));
   // stw r31,12(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_12_address(), uint32_t(r31));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_12_bits(uint32_t(r31));
   // stw r27,40(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_40_address(), uint32_t(r27));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_40_bits(uint32_t(r27));
   // stw r31,44(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_44_address(), uint32_t(r31));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_44_bits(uint32_t(r31));
   // stw r9,80(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).row_count_address(), uint32_t(r9));
+  schema::NetRankingData(base, uint32_t(r11)).set_row_count_bits(uint32_t(r9));
   // stw r31,16(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_16_address(), uint32_t(r31));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_16_bits(uint32_t(r31));
   // lwz r10,84(r1)
   r10 = guest::LoadU32(base, uint32_t(r1) + 84);
   // stw r10,64(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_64_address(), uint32_t(r10));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_64_bits(uint32_t(r10));
   // lwz r10,88(r1)
   r10 = guest::LoadU32(base, uint32_t(r1) + 88);
   // stw r10,60(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_60_address(), uint32_t(r10));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_60_bits(uint32_t(r10));
   // rotlwi r10,r9,0
   r10 = __builtin_rotateleft32(uint32_t(r9), 0);
   // stw r10,24(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_24_address(), uint32_t(r10));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_24_bits(uint32_t(r10));
   // rotlwi r10,r9,0
   r10 = __builtin_rotateleft32(uint32_t(r9), 0);
   // stw r10,20(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_20_address(), uint32_t(r10));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_20_bits(uint32_t(r10));
   // lwz r10,100(r1)
   r10 = guest::LoadU32(base, uint32_t(r1) + 100);
   // stw r10,28(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_28_address(), uint32_t(r10));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_28_bits(uint32_t(r10));
   // lwz r10,104(r1)
   r10 = guest::LoadU32(base, uint32_t(r1) + 104);
   // stw r10,100(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_100_address(), uint32_t(r10));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_100_bits(uint32_t(r10));
   // lis r11,-32127
   r11 = uint64_t(int64_t(-2105475072));
   // li r10,7
@@ -9225,7 +9225,7 @@ loc_82283498:
   // lwz r11,25040(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 25040);
   // lwz r11,44(r11)
-  r11 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_44_address());
+  r11 = schema::NetRankingData(base, uint32_t(r11)).unknown_44_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x82283624
@@ -9404,11 +9404,11 @@ loc_8228367C:
   // lwz r11,25040(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 25040);
   // lwz r10,68(r11)
-  r10 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).first_row_address());
+  r10 = schema::NetRankingData(base, uint32_t(r11)).first_row_bits();
   // lwz r9,72(r11)
-  r9 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).last_row_address());
+  r9 = schema::NetRankingData(base, uint32_t(r11)).last_row_bits();
   // lwz r7,76(r11)
-  r7 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).row_limit_address());
+  r7 = schema::NetRankingData(base, uint32_t(r11)).row_limit_bits();
   // mr r26,r10
   r26 = r10;
   // subf r21,r10,r9
@@ -9761,9 +9761,9 @@ lifted::Result f822838B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // lwz r11,25040(r25)
   r11 = guest::LoadU32(base, uint32_t(r25) + 25040);
   // lwz r10,48(r11)
-  r10 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_48_address());
+  r10 = schema::NetRankingData(base, uint32_t(r11)).unknown_48_bits();
   // lwz r11,52(r11)
-  r11 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_52_address());
+  r11 = schema::NetRankingData(base, uint32_t(r11)).unknown_52_bits();
   // subf r11,r11,r10
   r11 = r10 - r11;
   // addi r28,r11,1
@@ -9791,13 +9791,13 @@ lifted::Result f822838B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // lwz r11,25040(r25)
   r11 = guest::LoadU32(base, uint32_t(r25) + 25040);
   // lwz r10,44(r11)
-  r10 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_44_address());
+  r10 = schema::NetRankingData(base, uint32_t(r11)).unknown_44_bits();
   // cmpwi cr6,r10,0
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // bne cr6,0x82283b00
   if (!cr6.eq) goto loc_82283B00;
   // lwz r11,48(r11)
-  r11 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_48_address());
+  r11 = schema::NetRankingData(base, uint32_t(r11)).unknown_48_bits();
   // lis r22,-32127
   r22 = uint64_t(int64_t(-2105475072));
   // cmpwi cr6,r11,-1
@@ -9939,7 +9939,7 @@ loc_82283A2C:
   // lwz r11,25040(r25)
   r11 = guest::LoadU32(base, uint32_t(r25) + 25040);
   // stw r23,44(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_44_address(), uint32_t(r23));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_44_bits(uint32_t(r23));
   // b 0x82283a90
   goto loc_82283A90;
 loc_82283A44:
@@ -10099,18 +10099,18 @@ lifted::Result f82283B08(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r7, 
   // lwz r11,25040(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 25040);
   // lwz r10,48(r11)
-  r10 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_48_address());
+  r10 = schema::NetRankingData(base, uint32_t(r11)).unknown_48_bits();
   // cmpwi cr6,r10,-1
   cr6 = lifted::Compare<int32_t>(int32_t(r10), -1, so);
   // beq cr6,0x82283b50
   if (cr6.eq) goto loc_82283B50;
   // stw r6,44(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_44_address(), uint32_t(r6));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_44_bits(uint32_t(r6));
   // lwz r11,25040(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 25040);
 loc_82283B50:
   // lwz r10,76(r11)
-  r10 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).row_limit_address());
+  r10 = schema::NetRankingData(base, uint32_t(r11)).row_limit_bits();
   // cmpwi cr6,r10,7
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 7, so);
   // bge cr6,0x82283b64
@@ -10126,13 +10126,13 @@ loc_82283B64:
   r9 = uint64_t(int64_t(1));
 loc_82283B6C:
   // stw r10,84(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_84_address(), uint32_t(r10));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_84_bits(uint32_t(r10));
   // lwz r3,25040(r31)
   r3 = guest::LoadU32(base, uint32_t(r31) + 25040);
   // lwz r4,80(r3)
-  r4 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r3)).row_count_address());
+  r4 = schema::NetRankingData(base, uint32_t(r3)).row_count_bits();
   // lwz r11,32(r3)
-  r11 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r3)).unknown_32_address());
+  r11 = schema::NetRankingData(base, uint32_t(r3)).unknown_32_bits();
   // addi r30,r4,-1
   r30 = uint64_t(int64_t(int64_t(r4) + -1));
   // cmplwi cr6,r11,7
@@ -10202,9 +10202,9 @@ loc_82283D68:
   // lwz r11,25040(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 25040);
   // stw r6,60(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_60_address(), uint32_t(r6));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_60_bits(uint32_t(r6));
   // stw r6,64(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_64_address(), uint32_t(r6));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_64_bits(uint32_t(r6));
   // lwz r11,25036(r5)
   r11 = guest::LoadU32(base, uint32_t(r5) + 25036);
   // stw r4,0(r11)
@@ -10245,7 +10245,7 @@ loc_82283DBC:
   // beq cr6,0x82283f70
   if (cr6.eq) goto loc_82283F70;
   // lwz r11,60(r3)
-  r11 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r3)).unknown_60_address());
+  r11 = schema::NetRankingData(base, uint32_t(r3)).unknown_60_bits();
   // subf r4,r11,r5
   r4 = r5 - r11;
   // bl 0x822822c0
@@ -10262,9 +10262,9 @@ loc_82283DD0:
   // lwz r11,25040(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 25040);
   // stw r6,60(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_60_address(), uint32_t(r6));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_60_bits(uint32_t(r6));
   // stw r6,64(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_64_address(), uint32_t(r6));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_64_bits(uint32_t(r6));
   // b 0x82283bd0
   goto loc_82283BD0;
 loc_82283DE8:
@@ -10274,11 +10274,11 @@ loc_82283DE8:
   // lwz r11,25040(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 25040);
   // lwz r10,72(r11)
-  r10 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).last_row_address());
+  r10 = schema::NetRankingData(base, uint32_t(r11)).last_row_bits();
   // lwz r9,68(r11)
-  r9 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).first_row_address());
+  r9 = schema::NetRankingData(base, uint32_t(r11)).first_row_bits();
   // lwz r8,80(r11)
-  r8 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).row_count_address());
+  r8 = schema::NetRankingData(base, uint32_t(r11)).row_count_bits();
   // subf r10,r9,r10
   r10 = r10 - r9;
   // cmpwi cr6,r8,7
@@ -10323,9 +10323,9 @@ loc_82283E3C:
   r10 = uint64_t(int64_t(6));
 loc_82283E48:
   // stw r9,60(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_60_address(), uint32_t(r9));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_60_bits(uint32_t(r9));
   // stw r10,64(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_64_address(), uint32_t(r10));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_64_bits(uint32_t(r10));
   // lis r11,-32127
   r11 = uint64_t(int64_t(-2105475072));
   // lwz r11,25036(r11)
@@ -10400,9 +10400,9 @@ loc_82283EC8:
   // lwz r11,25040(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 25040);
   // stw r6,60(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_60_address(), uint32_t(r6));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_60_bits(uint32_t(r6));
   // stw r6,64(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_64_address(), uint32_t(r6));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_64_bits(uint32_t(r6));
   // b 0x82284024
   goto loc_82284024;
 loc_82283EE0:
@@ -10411,7 +10411,7 @@ loc_82283EE0:
   // beq cr6,0x82283ec8
   if (cr6.eq) goto loc_82283EC8;
   // lwz r11,60(r3)
-  r11 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r3)).unknown_60_address());
+  r11 = schema::NetRankingData(base, uint32_t(r3)).unknown_60_bits();
   // subf r4,r11,r4
   r4 = r4 - r11;
   // bl 0x822822c0
@@ -10497,14 +10497,14 @@ loc_82283F78:
   // li r10,6
   r10 = uint64_t(int64_t(6));
   // stw r10,60(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_60_address(), uint32_t(r10));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_60_bits(uint32_t(r10));
   // stw r10,64(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_64_address(), uint32_t(r10));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_64_bits(uint32_t(r10));
   // b 0x82283fe8
   goto loc_82283FE8;
 loc_82283F8C:
   // lwz r11,60(r3)
-  r11 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r3)).unknown_60_address());
+  r11 = schema::NetRankingData(base, uint32_t(r3)).unknown_60_bits();
   // subf r4,r11,r5
   r4 = r5 - r11;
   // bl 0x822822c0
@@ -10554,9 +10554,9 @@ loc_82283FD8:
   r11 = uint64_t(int64_t(6));
 loc_82283FE0:
   // stw r11,64(r9)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r9)).unknown_64_address(), uint32_t(r11));
+  schema::NetRankingData(base, uint32_t(r9)).set_unknown_64_bits(uint32_t(r11));
   // stw r10,60(r9)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r9)).unknown_60_address(), uint32_t(r10));
+  schema::NetRankingData(base, uint32_t(r9)).set_unknown_60_bits(uint32_t(r10));
 loc_82283FE8:
   // lwz r11,25036(r29)
   r11 = guest::LoadU32(base, uint32_t(r29) + 25036);
@@ -10596,7 +10596,7 @@ loc_82284028:
   // mr r30,r6
   r30 = r6;
   // stw r6,32(r3)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r3)).unknown_32_address(), uint32_t(r6));
+  schema::NetRankingData(base, uint32_t(r3)).set_unknown_32_bits(uint32_t(r6));
 loc_82284030:
   // addi r4,r30,119
   r4 = uint64_t(int64_t(int64_t(r30) + 119));
@@ -10624,7 +10624,7 @@ loc_82284030:
   // mr r3,r28
   r3 = r28;
   // lwz r11,60(r11)
-  r11 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_60_address());
+  r11 = schema::NetRankingData(base, uint32_t(r11)).unknown_60_bits();
   // addi r4,r11,119
   r4 = uint64_t(int64_t(int64_t(r11) + 119));
   // bl 0x8211dac8
@@ -10667,7 +10667,7 @@ loc_82284030:
   // mr r3,r28
   r3 = r28;
   // lwz r11,8(r11)
-  r11 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_8_address());
+  r11 = schema::NetRankingData(base, uint32_t(r11)).unknown_8_bits();
   // addi r11,r11,-1
   r11 = uint64_t(int64_t(int64_t(r11) + -1));
   // cntlzw r11,r11
@@ -14053,7 +14053,7 @@ lifted::Result f82285490(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r7, 
   // lwz r11,28228(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 28228);
   // stw r11,8(r9)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r9)).unknown_8_address(), uint32_t(r11));
+  schema::NetRankingData(base, uint32_t(r9)).set_unknown_8_bits(uint32_t(r11));
   // lis r9,-32127
   r9 = uint64_t(int64_t(-2105475072));
   // lwz r11,25032(r9)
@@ -14103,13 +14103,13 @@ lifted::Result f82285490(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r7, 
   // lwz r8,25040(r10)
   r8 = guest::LoadU32(base, uint32_t(r10) + 25040);
   // stw r9,100(r8)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r8)).unknown_100_address(), uint32_t(r9));
+  schema::NetRankingData(base, uint32_t(r8)).set_unknown_100_bits(uint32_t(r9));
   // lwz r9,28232(r11)
   r9 = guest::LoadU32(base, uint32_t(r11) + 28232);
   // lwz r8,25040(r10)
   r8 = guest::LoadU32(base, uint32_t(r10) + 25040);
   // stw r9,96(r8)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r8)).unknown_96_address(), uint32_t(r9));
+  schema::NetRankingData(base, uint32_t(r8)).set_unknown_96_bits(uint32_t(r9));
   // lwz r11,28232(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 28232);
   // addi r9,r11,-5
@@ -14117,28 +14117,28 @@ lifted::Result f82285490(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r7, 
   // lwz r11,25040(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + 25040);
   // stw r9,92(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_92_address(), uint32_t(r9));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_92_bits(uint32_t(r9));
   // lwz r11,25040(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + 25040);
   // lwz r9,92(r11)
-  r9 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_92_address());
+  r9 = schema::NetRankingData(base, uint32_t(r11)).unknown_92_bits();
   // cmpwi cr6,r9,0
   cr6 = lifted::Compare<int32_t>(int32_t(r9), 0, so);
   // bge cr6,0x8228557c
   if (!cr6.lt) goto loc_8228557C;
   // stw r31,92(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_92_address(), uint32_t(r31));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_92_bits(uint32_t(r31));
   // b 0x8228558c
   goto loc_8228558C;
 loc_8228557C:
   // li r9,5
   r9 = uint64_t(int64_t(5));
   // stw r9,100(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_100_address(), uint32_t(r9));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_100_bits(uint32_t(r9));
   // lwz r11,25040(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + 25040);
   // stw r9,96(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_96_address(), uint32_t(r9));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_96_bits(uint32_t(r9));
 loc_8228558C:
   // li r6,0
   r6 = uint64_t(int64_t(0));
@@ -14254,7 +14254,7 @@ lifted::Result f82285630(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // lwz r11,25040(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 25040);
   // lwz r10,40(r11)
-  r10 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_40_address());
+  r10 = schema::NetRankingData(base, uint32_t(r11)).unknown_40_bits();
   // cmpwi cr6,r10,0
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // bne cr6,0x82285680
@@ -14280,11 +14280,11 @@ loc_82285670:
   r11 = guest::LoadU32(base, uint32_t(r31) + 25040);
 loc_82285680:
   // lwz r25,104(r11)
-  r25 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_104_address());
+  r25 = schema::NetRankingData(base, uint32_t(r11)).unknown_104_bits();
   // li r28,0
   r28 = uint64_t(int64_t(0));
   // stw r30,104(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_104_address(), uint32_t(r30));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_104_bits(uint32_t(r30));
   // cmpwi r25,0
   cr0 = lifted::Compare<int32_t>(int32_t(r25), 0, so);
   // beq 0x8228584c
@@ -14308,11 +14308,11 @@ loc_822856B0:
   // lwz r11,25040(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 25040);
   // stw r10,20(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_20_address(), uint32_t(r10));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_20_bits(uint32_t(r10));
   // lwz r11,25040(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 25040);
   // stw r30,24(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_24_address(), uint32_t(r30));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_24_bits(uint32_t(r30));
   // b 0x8228584c
   goto loc_8228584C;
 loc_822856C4:
@@ -14369,15 +14369,15 @@ loc_822856C4:
   // lwz r11,25040(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 25040);
   // stw r5,20(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_20_address(), uint32_t(r5));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_20_bits(uint32_t(r5));
   // lwz r11,25040(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 25040);
   // stw r30,24(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_24_address(), uint32_t(r30));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_24_bits(uint32_t(r30));
   // lwz r11,25040(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 25040);
   // stw r3,104(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_104_address(), uint32_t(r3));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_104_bits(uint32_t(r3));
   // b 0x8228584c
   goto loc_8228584C;
 loc_82285744:
@@ -14388,27 +14388,27 @@ loc_82285744:
   // li r29,0
   r29 = uint64_t(int64_t(0));
   // stw r30,80(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).row_count_address(), uint32_t(r30));
+  schema::NetRankingData(base, uint32_t(r11)).set_row_count_bits(uint32_t(r30));
   // lwz r11,25040(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 25040);
   // stw r30,76(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).row_limit_address(), uint32_t(r30));
+  schema::NetRankingData(base, uint32_t(r11)).set_row_limit_bits(uint32_t(r30));
   // lwz r11,25040(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 25040);
   // stw r30,48(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_48_address(), uint32_t(r30));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_48_bits(uint32_t(r30));
   // lwz r11,25040(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 25040);
   // stw r30,52(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_52_address(), uint32_t(r30));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_52_bits(uint32_t(r30));
   // lwz r11,25040(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 25040);
   // stw r30,56(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_56_address(), uint32_t(r30));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_56_bits(uint32_t(r30));
   // lwz r11,25040(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 25040);
   // lwz r11,28(r11)
-  r11 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_28_address());
+  r11 = schema::NetRankingData(base, uint32_t(r11)).unknown_28_bits();
   // cmplwi cr6,r11,2
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 2, so);
   // blt cr6,0x8228582c
@@ -14528,11 +14528,11 @@ loc_8228584C:
   // lwz r11,25028(r26)
   r11 = guest::LoadU32(base, uint32_t(r26) + 25028);
   // lwz r9,20(r10)
-  r9 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r10)).unknown_20_address());
+  r9 = schema::NetRankingData(base, uint32_t(r10)).unknown_20_bits();
   // lwz r8,0(r11)
   r8 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
   // lwz r10,24(r10)
-  r10 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r10)).unknown_24_address());
+  r10 = schema::NetRankingData(base, uint32_t(r10)).unknown_24_bits();
   // cmpw cr6,r9,r8
   cr6 = lifted::Compare<int32_t>(int32_t(r9), int32_t(r8), so);
   // beq cr6,0x8228586c
@@ -14587,15 +14587,15 @@ loc_822858B0:
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // stw r10,28(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_28_address(), uint32_t(r10));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_28_bits(uint32_t(r10));
   // lwz r11,25040(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 25040);
   // stw r30,20(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_20_address(), uint32_t(r30));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_20_bits(uint32_t(r30));
   // lwz r11,25040(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 25040);
   // stw r30,24(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_24_address(), uint32_t(r30));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_24_bits(uint32_t(r30));
   // addi r1,r1,144
   r1 = uint64_t(int64_t(int64_t(r1) + 144));
   // b 0x825a6ecc
@@ -14626,11 +14626,11 @@ lifted::Result f822858D8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,25040(r29)
   r11 = guest::LoadU32(base, uint32_t(r29) + 25040);
   // stw r30,12(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_12_address(), uint32_t(r30));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_12_bits(uint32_t(r30));
   // lwz r11,25040(r29)
   r11 = guest::LoadU32(base, uint32_t(r29) + 25040);
   // lwz r10,16(r11)
-  r10 = guest::LoadU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_16_address());
+  r10 = schema::NetRankingData(base, uint32_t(r11)).unknown_16_bits();
   // cmpwi cr6,r10,4
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 4, so);
   // bne cr6,0x822859ac
@@ -14748,7 +14748,7 @@ loc_822859D4:
   // lwz r11,25040(r29)
   r11 = guest::LoadU32(base, uint32_t(r29) + 25040);
   // stw r30,16(r11)
-  guest::StoreU32(base, schema::NetRankingData(base, uint32_t(r11)).unknown_16_address(), uint32_t(r30));
+  schema::NetRankingData(base, uint32_t(r11)).set_unknown_16_bits(uint32_t(r30));
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
   // b 0x825a6ed8

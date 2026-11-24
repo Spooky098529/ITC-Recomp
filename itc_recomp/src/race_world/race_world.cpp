@@ -638,7 +638,11 @@ uint32_t StepToMainRoad(uint8_t* base, uint32_t position, uint32_t step, uint32_
 
 uint32_t RaceEventEntry(uint8_t* base, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_82143508 RaceEvent::Entry");
-  const uint32_t list = schema::RaceEvent(base, guest::LoadU32(base, kRaceEvent)).list().address;
+  // Read without a check (as the original): with no event, guest memory's
+  // word at 156 (the event itself is a host object, E5 step 4).
+  const schema::RaceEvent event(base, guest::LoadU32(base, kRaceEvent));
+  const uint32_t list = event.address != 0 ? event.list().address
+                                           : guest::LoadU32(base, event.list_address());
   return guest::LoadU32(base, index) * schema::RaceEventEntry::kSize + list;
 }
 

@@ -22,6 +22,8 @@ measure = "App"
 measures = ["AppStates.+4", "App::FrameDriver.r3"]
 size = 132
 origin = "allocated"
+storage = "host"
+host_alloc = [0x82094AD4]
 vtable = 0x82000EA0
 fields = [
   { name = "handlers_map", offset = 28, type = "embed", to = "HandlerMap", note = "the handler map run while the toggle is clear" },
@@ -86,6 +88,7 @@ fields = [
 measure = "AppStates::OnMessage.r4"
 size = 112
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "messages_vector", offset = 56, type = "embed", to = "MessageVector", note = "the app's message vector" },
   { name = "requests_vector", offset = 76, type = "embed", to = "RequestVector", note = "the app's request vector" },
@@ -167,6 +170,8 @@ fields = [
 measures = ["App::AddHandler.r5", "App::AddToggledHandler.r5", "App::AddAlwaysHandler.r5", "App::AddListener.r5", "new<12>@Delegate::Clone"]
 size = 12
 origin = "allocated"
+storage = "dual"
+host_alloc = [0x820ACA64]
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "AppDelegateVtable", note = "0x82002850 (base 0x82000ABC)" },
   { name = "object", offset = 4, type = "u32" },
@@ -400,6 +405,7 @@ fields = [
 measure = "App::SceneFromInterface16.r3@-8"
 size = 20
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "unknown_16", offset = 16, type = "u32" },
 ]
@@ -409,6 +415,7 @@ fields = [
 measure = "App::SendMessage.r3@+56"
 size = 16
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "unknown_4", offset = 4, type = "u32" },
   { name = "unknown_8", offset = 8, type = "u32" },
@@ -429,6 +436,7 @@ fields = [
 measure = "App@+76"
 size = 12
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "unknown_4", offset = 4, type = "u32" },
   { name = "unknown_8", offset = 8, type = "u32" },

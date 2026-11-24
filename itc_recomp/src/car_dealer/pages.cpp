@@ -57,7 +57,7 @@ uint64_t Page0(uint8_t* base, uint32_t sp, const Calls& calls) {
         uint32_t(calls.Call(kListSelection, frame, 0x82180FF8, G::list_menu(base).address));
     if (selection < 2) {
       const Data data = G::data(base);
-      data.set_shown_list(selection == 0 ? data.first_list_address() : data.second_list_address());
+      data.set_shown_list(selection == 0 ? data.first_list() : data.second_list());
     }
     G::data(base).set_list_shown(selection);
     const List shown = G::data(base).shown_list();

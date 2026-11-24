@@ -64,6 +64,17 @@ fields = [
 # mode's answer. The machines' words are reached through Type2ScreenMachine
 # views at the machines' addresses; the hub's (+0) and the save screen's are
 # named here too, as the measure meets them on the block.
+# In host memory since E5 step 4 (2026-11-24): made by ModeType2::Init (the
+# original's VirtualAlloc(162688) at 0x821972C8; Init has no lifted
+# original) and freed by ModeType2::Release's FreePages (its VirtualFree at
+# 0x82196EE4; the lifted original runs only for a block that isn't pages,
+# never a handle); the mode's +848 holds its handle. The machines stay
+# described by their areas' guest views (RaceMenu, TuningScreen,
+# Type2ScreenMachine, ...): their accesses reach the block through its
+# handle (memory::RawHandleLoad and Store, by this type's layout), so every
+# view of a machine agrees whatever its type. Embedding them (dual types)
+# waits on their aliases agreeing field for field (TuningScreen's 91,824
+# bytes over the tuning machine's 36,832; Type2ScreenMachine over each).
 [Type2ModeBlock]
 measures = [
   "new<162688>@ModeType2::Init",
@@ -74,6 +85,7 @@ measures = [
 ]
 size = 162688
 origin = "allocated"
+storage = "host"
 fields = [
   { name = "hub", offset = 0, type = "bytes", count = 9640, note = "Type2Hub's machine (type2-screens.md); MachineOf 0" },
   { name = "hub_state", offset = 9604, type = "u32", note = "the hub's machine state (14 picks the next mode 4)" },

@@ -313,13 +313,8 @@ bool BoxClone(uint8_t* base, uint32_t box, uint32_t memory, uint32_t frame, uint
   ITC_NATIVE_RUNNING("sub_820BB218 BoxShape::Clone");
   uint32_t out = memory;
   if (out == 0) {
-    // operator new's paths that aren't malloc's (the new handler,
-    // std::bad_alloc) are the original's.
-    const auto block = memory::crt::OperatorNew(base, 496);
-    if (!block) {
-      return false;
-    }
-    out = *block;
+    // Host memory (E5 step 4): the 496-byte box operator new gave.
+    out = Box::New(base).address;
   }
   if (out != 0) {
     // The min corner (corner 7) and the max (corner 0).

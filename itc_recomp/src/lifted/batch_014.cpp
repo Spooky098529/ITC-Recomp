@@ -10,7 +10,6 @@
 #include "schema/command_buffer.h"
 #include "schema/device_state.h"
 #include "schema/movies.h"
-#include "schema/screen_objects.h"
 #include "schema/single_commands.h"
 #include "schema/system_services.h"
 #include "schema/vehicle_accessors.h"
@@ -6748,7 +6747,7 @@ lifted::Result f822A5C50(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   goto loc_822A5D00;
 loc_822A5CB8:
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, schema::ScreenObjectUvMapNode(base, uint32_t(r30)).left_address());
+  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
   // li r9,17409
   r9 = uint64_t(int64_t(17409));
   // rlwinm r10,r28,28,0,3
