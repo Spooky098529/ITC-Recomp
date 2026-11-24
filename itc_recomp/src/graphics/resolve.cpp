@@ -233,7 +233,7 @@ void Resolve(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t device, uint32_t
   }
   if (flags & Mask(23, 23)) {
     lifted::Vec v1;
-    const uint8_t* source = base + (color & ~0xFu);
+    const uint8_t* source = guest::Pointer(base, color & ~0xFu);
     for (int i = 0; i < 16; i++) {
       v1.u8[i] = source[15 - i];  // lvx128: the 16 bytes, reversed as the generated code's mask
     }

@@ -71,7 +71,7 @@ uint64_t CreateFile(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t path, uin
   // The name (RtlInitAnsiString's rule) and whether it ends in a backslash.
   const uint32_t name = frame + 104;
   const helpers::AnsiString string = helpers::AnsiString_Init(
-      path != 0 ? reinterpret_cast<const char*>(base + path) : nullptr, path);
+      path != 0 ? reinterpret_cast<const char*>(guest::Pointer(base, path)) : nullptr, path);
   guest::StoreU16(base, name, string.length);
   guest::StoreU16(base, name + 2, string.maximum_length);
   guest::StoreU32(base, name + 4, string.buffer);

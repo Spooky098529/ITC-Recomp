@@ -4381,7 +4381,7 @@ void Passes::InlineDraw(VkCommandBuffer commands, uint8_t* base, uint32_t type, 
   call.vertex_count = count;
   call.vertex_address =
       kInlineVertices + (s.mirror_by_tick ? s.frame * s.inline_slot_size() : 0) + offset;
-  std::memcpy(s.draw_mirror().mapped + call.vertex_address, base + data, size);
+  std::memcpy(s.draw_mirror().mapped + call.vertex_address, guest::Pointer(base, data), size);
   s.stats.mirrored_bytes += size;
   uint32_t device = guest::LoadU32(base, kDevicePointer);
   s.ReadState(base, device);

@@ -155,6 +155,7 @@ struct Made {
   std::shared_ptr<Thread> thread;
   uint32_t stack_base;
   uint32_t id;
+  uint32_t stack_size = 0;
 };
 
 // Our blocks for a new thread (stack, thread object, per-thread block,
@@ -162,11 +163,12 @@ struct Made {
 // bit and CPU mask applied.
 Made Make(uint8_t* base, uint32_t stack_size, uint32_t flags) {
   const uint32_t size = std::max(kMinimumStack, (stack_size + 0xFFF) & ~0xFFFu);
-  const uint32_t stack_limit = memory::AllocPages(size, 65536);
-  const uint32_t object = memory::Alloc(kThreadSize, memory::kHeapZeroMemory);
-  const uint32_t pcr = memory::Alloc(kPcrSize, memory::kHeapZeroMemory);
-  const uint32_t tls = memory::Alloc(kTlsBytes, memory::kHeapZeroMemory);
-  Made made{std::make_shared<Thread>(), stack_limit + size, 0};
+  // In PC memory (E5 step 6): blobs, zero-filled, the guest's byte order.
+  const uint32_t stack_limit = memory::NewBlob(size, "ThreadStack");
+  const uint32_t object = memory::NewBlob(kThreadSize, "ThreadObject");
+  const uint32_t pcr = memory::NewBlob(kPcrSize, "ThreadPcr");
+  const uint32_t tls = memory::NewBlob(kTlsBytes, "ThreadTls");
+  Made made{std::make_shared<Thread>(), stack_limit + size, 0, size};
   Threads& threads = All();
   std::lock_guard lock(threads.mutex);
   made.thread->handle = threads.next_handle;
@@ -196,6 +198,9 @@ std::thread Run(uint8_t* base, const Made& made, std::function<void(lifted::Args
     }
     t_pcr = made.thread->pcr;
     t_base = base;
+    // The stack's bytes, for guest.h's fast path.
+    const uint32_t stack_limit = made.stack_base - made.stack_size;
+    memory::t_stack = {stack_limit, made.stack_size, memory::BlobPointer(stack_limit)};
     lifted::Args call;
     call.r1 = made.stack_base;
     call.r13 = made.thread->pcr;

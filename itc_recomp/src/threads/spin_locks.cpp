@@ -24,7 +24,7 @@ namespace threads {
 namespace {
 
 std::atomic_ref<uint32_t> LockWord(uint8_t* base, uint64_t address) {
-  return std::atomic_ref<uint32_t>(*reinterpret_cast<uint32_t*>(base + uint32_t(address)));
+  return std::atomic_ref<uint32_t>(*reinterpret_cast<uint32_t*>(guest::Pointer(base, uint32_t(address))));
 }
 
 uint32_t Owner(const lifted::Args& args) {

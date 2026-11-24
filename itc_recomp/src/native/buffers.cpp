@@ -665,7 +665,7 @@ void CopyWithRecords(uint8_t* base, uint32_t destination, uint32_t source, uint3
   }
   bool log_write = size && destination >= 0xA0000000u && Buffers_LogPhysicalWrites();
   bool same = log_write && !memory::IsHandle(source) &&
-              !std::memcmp(base + destination, base + source, size);
+              !std::memcmp(guest::Pointer(base, destination), guest::Pointer(base, source), size);
   copy();
   if (log_write) {
     LoggedWrite write;

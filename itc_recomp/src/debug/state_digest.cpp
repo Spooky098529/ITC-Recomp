@@ -84,8 +84,8 @@ void StateDigest_OnRaceTick() {
     }
     const uint32_t vehicle = vehicles + kVehicleStride * index;
     uint8_t state[64 + 4];
-    std::memcpy(state, base + vehicle + kVehicleMatrix, 64);
-    std::memcpy(state + 64, base + vehicle + kVehicleSpeedSquared, 4);
+    std::memcpy(state, guest::Pointer(base, vehicle + kVehicleMatrix), 64);
+    std::memcpy(state + 64, guest::Pointer(base, vehicle + kVehicleSpeedSquared), 4);
     hash = base::Hash64(state, sizeof(state), hash ^ (uint64_t(index) << 32));
     if (i == 0) {
       for (int k = 0; k < 3; k++) {

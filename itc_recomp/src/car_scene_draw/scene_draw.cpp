@@ -88,8 +88,8 @@ void FlushOff() { Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask)); 
 // The doubleword at `from` to `to` (an ld/std pair).
 void CopyDoubleword(uint8_t* base, uint32_t to, uint32_t from) {
   uint64_t word;
-  std::memcpy(&word, base + from, 8);
-  std::memcpy(base + to, &word, 8);
+  std::memcpy(&word, guest::Pointer(base, from), 8);
+  std::memcpy(guest::Pointer(base, to), &word, 8);
 }
 
 // std of a 64-bit value (big-endian, high word first).

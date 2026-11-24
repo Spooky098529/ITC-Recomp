@@ -34,6 +34,29 @@ void RawHandleStore(uint32_t address, uint32_t width, uint64_t value);
 uint64_t OwnerLoad(uint32_t address, uint32_t width);
 }  // namespace memory
 
+namespace memory {
+// The calling thread's own stack (E5 step 6): a blob (memory/handles.h), so
+// its frames live in PC memory; set by our threads (threads/threads.cpp) when
+// they start. Its bytes are found here first, without the handles' lookup:
+// the stack is what the game's code touches most.
+struct StackSpan {
+  uint32_t start = 0;
+  uint32_t size = 0;
+  uint8_t* bytes = nullptr;
+};
+inline thread_local StackSpan t_stack;
+
+// The host bytes of `width` bytes at `address` in the calling thread's
+// stack, or nullptr.
+inline uint8_t* StackBytes(uint32_t address, uint32_t width) {
+  const uint32_t offset = address - t_stack.start;
+  if (offset < t_stack.size && t_stack.size - offset >= width) [[likely]] {
+    return t_stack.bytes + offset;
+  }
+  return nullptr;
+}
+}  // namespace memory
+
 namespace guest {
 
 // Guest memory's one spelling, for lifted code and hand ports alike
@@ -49,6 +72,9 @@ namespace guest {
 // gives base + handle, which faults (and names the object) when used.
 inline uint8_t* Pointer(uint8_t* base, uint32_t address) {
   if (memory::IsHandle(address)) [[unlikely]] {
+    if (uint8_t* bytes = memory::StackBytes(address, 1)) {
+      return bytes;
+    }
     if (uint8_t* bytes = memory::BlobPointer(address)) {
       return bytes;
     }
@@ -58,6 +84,11 @@ inline uint8_t* Pointer(uint8_t* base, uint32_t address) {
 
 inline uint8_t LoadU8(uint8_t* base, uint32_t address) {
   if (memory::IsHandle(address)) [[unlikely]] {
+    if (const uint8_t* p = memory::StackBytes(address, 1)) {
+      uint8_t v;
+      std::memcpy(&v, p, 1);
+      return v;
+    }
     return uint8_t(memory::RawHandleLoad(address, 1));
   }
   return *reinterpret_cast<volatile uint8_t*>(base + address);
@@ -65,6 +96,11 @@ inline uint8_t LoadU8(uint8_t* base, uint32_t address) {
 
 inline void StoreU8(uint8_t* base, uint32_t address, uint8_t value) {
   if (memory::IsHandle(address)) [[unlikely]] {
+    if (uint8_t* p = memory::StackBytes(address, 1)) {
+      const uint8_t v = value;
+      std::memcpy(p, &v, 1);
+      return;
+    }
     memory::RawHandleStore(address, 1, value);
     return;
   }
@@ -73,6 +109,11 @@ inline void StoreU8(uint8_t* base, uint32_t address, uint8_t value) {
 
 inline uint16_t LoadU16(uint8_t* base, uint32_t address) {
   if (memory::IsHandle(address)) [[unlikely]] {
+    if (const uint8_t* p = memory::StackBytes(address, 2)) {
+      uint16_t v;
+      std::memcpy(&v, p, 2);
+      return __builtin_bswap16(v);
+    }
     return uint16_t(memory::RawHandleLoad(address, 2));
   }
   return __builtin_bswap16(*reinterpret_cast<volatile uint16_t*>(base + address));
@@ -80,6 +121,11 @@ inline uint16_t LoadU16(uint8_t* base, uint32_t address) {
 
 inline void StoreU16(uint8_t* base, uint32_t address, uint16_t value) {
   if (memory::IsHandle(address)) [[unlikely]] {
+    if (uint8_t* p = memory::StackBytes(address, 2)) {
+      const uint16_t v = __builtin_bswap16(value);
+      std::memcpy(p, &v, 2);
+      return;
+    }
     memory::RawHandleStore(address, 2, value);
     return;
   }
@@ -88,6 +134,11 @@ inline void StoreU16(uint8_t* base, uint32_t address, uint16_t value) {
 
 inline uint32_t LoadU32(uint8_t* base, uint32_t address) {
   if (memory::IsHandle(address)) [[unlikely]] {
+    if (const uint8_t* p = memory::StackBytes(address, 4)) {
+      uint32_t v;
+      std::memcpy(&v, p, 4);
+      return __builtin_bswap32(v);
+    }
     return uint32_t(memory::RawHandleLoad(address, 4));
   }
   return __builtin_bswap32(*reinterpret_cast<volatile uint32_t*>(base + address));
@@ -95,6 +146,11 @@ inline uint32_t LoadU32(uint8_t* base, uint32_t address) {
 
 inline void StoreU32(uint8_t* base, uint32_t address, uint32_t value) {
   if (memory::IsHandle(address)) [[unlikely]] {
+    if (uint8_t* p = memory::StackBytes(address, 4)) {
+      const uint32_t v = __builtin_bswap32(value);
+      std::memcpy(p, &v, 4);
+      return;
+    }
     memory::RawHandleStore(address, 4, value);
     return;
   }
@@ -103,6 +159,11 @@ inline void StoreU32(uint8_t* base, uint32_t address, uint32_t value) {
 
 inline uint64_t LoadU64(uint8_t* base, uint32_t address) {
   if (memory::IsHandle(address)) [[unlikely]] {
+    if (const uint8_t* p = memory::StackBytes(address, 8)) {
+      uint64_t v;
+      std::memcpy(&v, p, 8);
+      return __builtin_bswap64(v);
+    }
     return uint64_t(memory::RawHandleLoad(address, 8));
   }
   return __builtin_bswap64(*reinterpret_cast<volatile uint64_t*>(base + address));
@@ -110,6 +171,11 @@ inline uint64_t LoadU64(uint8_t* base, uint32_t address) {
 
 inline void StoreU64(uint8_t* base, uint32_t address, uint64_t value) {
   if (memory::IsHandle(address)) [[unlikely]] {
+    if (uint8_t* p = memory::StackBytes(address, 8)) {
+      const uint64_t v = __builtin_bswap64(value);
+      std::memcpy(p, &v, 8);
+      return;
+    }
     memory::RawHandleStore(address, 8, value);
     return;
   }

@@ -62,8 +62,8 @@ void Store(uint8_t* base, uint32_t address, uint32_t value) {
 // An ld/std pair: the doubleword as it sits in guest memory.
 void CopyDoubleword(uint8_t* base, uint32_t to, uint32_t from) {
   uint64_t word;
-  std::memcpy(&word, base + from, 8);
-  std::memcpy(base + to, &word, 8);
+  std::memcpy(&word, guest::Pointer(base, from), 8);
+  std::memcpy(guest::Pointer(base, to), &word, 8);
 }
 
 // The camera pass `index` (0 when its address's low word is 0 or it isn't

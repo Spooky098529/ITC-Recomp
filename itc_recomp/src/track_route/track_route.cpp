@@ -1528,9 +1528,9 @@ double PathDistance(uint8_t* base, uint32_t route, uint32_t a, uint32_t b, uint3
     Difference(base, frame, Sec(base, s).slices_address() + offset, true);
     // P = Q (its 16 bytes, read before the dot's store as the original).
     uint8_t center[16];
-    std::memcpy(center, base + frame + 128, 16);
+    std::memcpy(center, guest::Pointer(base, frame + 128), 16);
     const double length_of = LengthThrough(base, frame + 96, dot_at);
-    std::memcpy(base + frame + 112, center, 16);
+    std::memcpy(guest::Pointer(base, frame + 112), center, 16);
     sum = Fadds(length_of, sum);
     return slice;
   };
