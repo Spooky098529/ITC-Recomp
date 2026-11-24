@@ -491,7 +491,34 @@ player's `default.xex`, loaded by our loader at build time on the
 developer's machine, as the HLSL shaders were stored). Which tables may be
 committed (they're the game's data) is a decision for the user.
 
-### 9. The end
+### 9. The heap and the image out of the guest mapping
+
+Added 2026-11-24 (the user's call): steps 3 to 5 moved the objects that
+are allocated on their own and could be cleared of raw accesses; about
+1,590 types are still in our allocation layer's heap at their guest
+addresses (most embedded in other objects, a caller's locals, or types the
+measure never saw allocated), and nothing in steps 6 to 8 moves them. Done
+as the physical memory was in step 7 (`docs/loops/e5-loop.md`, "Step 7 as
+one swarm"):
+
+- **The heap**: our allocation layer's range (`0x10000` up to the handles'
+  range) becomes a block of host memory of its own, and `guest.h`
+  translates its addresses in every load, store and `guest::Pointer`;
+  everything in it is then in host memory at once, its bytes as the guest
+  laid them out.
+- **The image**: after step 8 compiles its data in, what's still read at
+  `0x82000000` (anything step 8 leaves) is a block of its own, translated
+  the same way.
+- **Then** the guest mapping's scaffolding (`src/memory/mapping.cpp`'s 4 GB
+  reservation, the memory file and its views) goes: no address resolves
+  through `base` any more. A raw `base + address` left anywhere faults,
+  named by the fault handler, as the physical memory's did.
+
+Type-by-type conversion of what's left (step 4's units, as swarms) can go
+on after it, for the code's sake: it no longer decides where the memory
+is.
+
+### 10. The end
 
 With no access left at a guest address: the mapping
 (`src/memory/mapping.cpp`), our allocation layer's guest side
@@ -582,7 +609,7 @@ Decided (the user, 2026-11-16), on `e5-native-16-11-26`:
   the player's `default.xex` on the developer's machine; `default.xex` is
   then no longer read.
 - **Process**: steps 2 to 5 run as loops with migration agents per area
-  (B7's rules carried over); steps 0, 1 and 6 to 9 done directly.
+  (B7's rules carried over); steps 0, 1 and 6 to 10 done directly.
 - **The names**: rows' names taken even where marked "probably"; rows
   without a name keep `sub_X`.
 - **The Host status** (2026-11-17): added, as proposed: a function whose

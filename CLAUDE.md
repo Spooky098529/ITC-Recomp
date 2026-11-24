@@ -79,7 +79,8 @@ import calls go straight to our answers (`lifted::ImportAt`). Step 7
 mapped on its own outside guest memory, `guest.h` translating the guest's
 addresses for it; what the GPU never reads moved out of it into blobs. The
 guest mapping (`memory/mapping.cpp`, now the heap and the image) stays
-until step 8 (the user's call). A row's
+until after step 8 (the user's call); step 9, added to the plan
+2026-11-24, moves the heap and the image out of it and removes it. A row's
 new name can change the measure's type names: after renaming, run
 `tools/function_names.py`, re-emit, and read the lifted diff.
 `docs/old-hardware.md` is the plan (not started) for running below

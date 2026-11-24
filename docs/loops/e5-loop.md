@@ -601,7 +601,7 @@ are.
    code expects it, and a memcpy between two host objects of one type is a
    memcpy. (Step 3's structs are packed; regenerated this way, nothing that
    reads them changes.) Repacked when the last guest-shaped reader goes
-   (step 9).
+   (step 10).
 3. **Interior handles.** `memory::HandleObject` accepts any value inside a
    live object's span (`handle + offset`, already reserved by `MakeHandle`)
    and returns `object + offset`; the views of embedded types inside a host
@@ -746,7 +746,7 @@ Step 3's ("The lead's check after each batch"), plus:
 
 The lead's recommendations, by the user's call ("I don't care about any of
 these details, what I want is guest memory out of the picture"): host
-structs at the guest offsets (repacked at step 9); virtual calls through
+structs at the guest offsets (repacked at step 10, the end); virtual calls through
 the bridge first (`VtableWord`), C++ virtual functions per hierarchy after
 the moves; agents per unit; the pilot `AppStates` with `StateLayer`; types
 tagged file, GPU or save left for steps 5 and 7; memcpy between host and
@@ -1162,4 +1162,5 @@ The guest mapping's scaffolding (`memory/mapping.cpp`: the 4 GB
 reservation, the memory file and its views, now holding only the heap and
 the image) waits for step 8, the user's call (2026-11-24): then the heap
 and the image become blocks of their own, translated as the physical
-memory is, and the reservation goes.
+memory is, and the reservation goes (`docs/e5-native.md`, step 9, added
+to the plan the same day).
