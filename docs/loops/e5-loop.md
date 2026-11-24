@@ -970,3 +970,59 @@ fault fields batch 1 left. Raw accesses logged in the replay, by type:
 `Camera` as a dual base, `StateListNode` and `Request` dual).
 
 Rows proposed by the agents await the user's review (not written).
+
+## Step 5 as one swarm (2026-11-24)
+
+`docs/e5-native.md` step 5 (the game's files): the user's go-ahead
+(2026-11-24, "do step 5"), run as step 4's swarm was (one Workflow, 6
+agents at a time, units sharing files never side by side, edits only, the
+lead's validation once at the end). The script:
+`itc_recomp/tools/workflows/e5-step5-swarm.js`, `args`:
+`{"units": [{name, loaders, types, hint, files}]}`; reports in
+`docs/loops/e5-step5-reports.md`.
+
+### The ground
+
+- 34 functions call `Archive::Load` (`sub_8209DE48`), each reading an asset
+  into a buffer it allocated; the game fixes up pointers inside and reads
+  the data in place. Other reads: the archives' tables of contents, the
+  data files at boot, the file class's and whole-file reads, the movies.
+- The measure's "file" and "save" tags are area-wide (`type_map.py`'s
+  `FILE_AREAS` and `SAVE_AREAS`: any type a function there touches), so
+  most of the ~370 tagged types are ordinary objects of those areas, which
+  move as step 4's did.
+- What stays in guest memory until step 7: what the renderer reads (vertex
+  and index data, textures, XPR texture packs, shader microcode), physical
+  allocations. The image loaders (the race overlays' textures, the rival
+  logo, the location pictures, the day's event images, the type 2 hub's
+  notice, the decal images) are texture packs: left out.
+
+### Groundwork: blobs (done 2026-11-24, `2f23bdfe`)
+
+A blob is a file's data (or any buffer the game uses as raw bytes) in PC
+memory behind a handle, its bytes in the guest's byte order, with no field
+layout (`memory::NewBlob`). Everything reaching it behaves as on guest
+memory: loads and stores by address (a direct big-endian path, no raw-access
+log line), `guest::Pointer` (gives the blob's bytes; a typed host object's
+handle still faults), so `ForEachHostPart` and the archive's reads, the
+vector loads and copies; the game's frees. In the schema, `storage = "blob"`
+(a guest view with `New(base, size)` and `Delete()`) and
+`blob_alloc = [{ call = 0x<return address>, reg = "r4" }]` (the size's
+register), which `lift.py` emits as `memory::NewBlob(reg, "<Type>")`.
+Checked: build, attract race.
+
+### The pilot: done (2026-11-24, `4f7d8d9f`)
+
+The track's collision mesh and route files (`TrackMeshFile`,
+`TrackRouteFile`; `TrackMesh::Load` and `TrackRoute::Load`, lifted,
+`VirtualAlloc` with the size in r4): two schema edits. Checked: build,
+attract race, `tick_replay.sh` twice (both races all match).
+
+### The units
+
+17, by format and area: models, the scene pools, the car models' loads,
+the course scenery, the accessories, the sound banks with the audio
+manager, the race's wave bank, the UI movies, the strings and font, the
+car parameters, the data tables, the camera files, the texture compressor,
+the saves, the menus, small objects of the loader areas, and the reads
+outside `Archive::Load`.
