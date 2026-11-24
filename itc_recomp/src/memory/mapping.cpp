@@ -4,20 +4,20 @@
 //   guest addresses            file offset         what
 //   0x00010000-0x3FFFFFFF      0x00010000          4 KB pages (our layer's range at 0x10000)
 //   0x40000000-0x7EFFFFFF      0x40000000          64 KB pages
-//   0x7F000000-0x7FFFFFFF      0x100000000         physical 0-16 MB (the L2 area, the
-//                                                  tiling workers' signals)
 //   0x80000000-0x8FFFFFFF      0x80000000          the image (at 0x82000000)
 //   0x90000000-0x9FFFFFFF      0x80000000          the same, as the SDK mapped it
-//   0xA0000000-0xBFFFFFFF      0x100000000         physical, 64 KB pages
-//   0xC0000000-0xDFFFFFFF      0x100000000         physical, 16 MB pages
-//   0xE0000000-0xFFFFFFFF      0x100001000         physical + 4 KB, 4 KB pages
-//   base + 4 GB, 512 MB        0x100000000         physical, flat (the renderer's)
+//   (elsewhere), 512 MB + 4 KB  0x100000000         physical (memory::g_physical,
+//                                                  since E5 step 7; guest.h translates
+//                                                  0x7F000000 (physical 0-16 MB),
+//                                                  0xA0000000, 0xC0000000 and
+//                                                  0xE0000000 (+ 4 KB) to it)
 //
 // Page 0's 64 KB stay unmapped (the SDK protected them: --protect_zero), so
 // a null pointer faults. The file's pages are only backed once touched.
 
 #include "memory/mapping.h"
 #include "memory/handles.h"
+#include "guest.h"
 
 #include "base/log.h"
 
@@ -46,17 +46,19 @@ struct View {
   uint64_t offset;  // in the file
 };
 
+// Since E5 step 7 the physical memory (the GPU's: textures, vertex and
+// index data, shaders, the command buffer, the tiling workers' signals) isn't
+// part of guest memory: it's mapped on its own (memory::g_physical, guest.h),
+// the renderer reads it there, and the guest's addresses for it (0x7F000000,
+// 0xA0000000, 0xC0000000, 0xE0000000) are translated by guest.h; their
+// views here stay unmapped.
 constexpr View kViews[] = {
     {0x00010000, 0x40000000, 0x00010000},
     {0x40000000, 0x7F000000, 0x40000000},
-    {0x7F000000, 0x80000000, 0x100000000},
     {0x80000000, 0x90000000, 0x80000000},
     {0x90000000, 0xA0000000, 0x80000000},
-    {0xA0000000, 0xC0000000, 0x100000000},
-    {0xC0000000, 0xE0000000, 0x100000000},
-    {0xE0000000, 0x100000000, 0x100001000},
-    {0x100000000, 0x120000000, 0x100000000},
 };
+constexpr uint64_t kPhysicalFileOffset = 0x100000000ull;
 
 uint8_t* base = nullptr;
 
@@ -99,6 +101,17 @@ bool Map() {
       return false;
     }
   }
+  // The physical memory, on its own (and its 4 KB past the end, which the
+  // 0xE0000000 addresses reach: they're offset by 4 KB).
+  void* physical = mmap(nullptr, kPhysicalBytes + 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED, file,
+                        off_t(kPhysicalFileOffset));
+  if (physical == MAP_FAILED) {
+    ITC_LOG_ERROR("guest memory: mapping the physical memory failed: {}", std::strerror(errno));
+    munmap(reserved, kReserveBytes);
+    close(file);
+    return false;
+  }
+  g_physical = static_cast<uint8_t*>(physical);
   // The views keep the file.
   close(file);
   base = mapped;

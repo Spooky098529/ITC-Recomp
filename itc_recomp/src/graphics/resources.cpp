@@ -1122,7 +1122,7 @@ namespace {
 // library's lwarx/stwcx loop, without the recompiler's global lock, as
 // src/native/refcount.cpp does); returns the old value.
 uint32_t AddToWord(uint8_t* base, uint32_t address, uint32_t delta) {
-  uint32_t* word = reinterpret_cast<uint32_t*>(base + address);
+  uint32_t* word = reinterpret_cast<uint32_t*>(guest::Pointer(base, address));
   uint32_t old_raw = __atomic_load_n(word, __ATOMIC_RELAXED);
   uint32_t value;
   do {

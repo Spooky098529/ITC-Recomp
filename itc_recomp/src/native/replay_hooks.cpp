@@ -171,7 +171,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822AE340) {
     loaded.object = object;
     loaded.declaration_id = declaration ? guest::LoadU32(base, declaration + 48) : 0;
     uint32_t size = guest::LoadU32(base, object + 600);
-    loaded.microcode.assign(base + microcode, base + microcode + size);
+    loaded.microcode.assign(guest::Pointer(base, microcode), guest::Pointer(base, microcode) + size);
   } else {
     native::g_loaded_vertex_shader.object = 0;  // the object's own, patched in place
   }

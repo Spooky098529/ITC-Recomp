@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <vector>
 #include <rex/graphics/register_file.h>
+#include "guest.h"
 
 namespace native {
 
@@ -91,7 +92,8 @@ constexpr uint64_t kPhysicalMemoryOffset = 0x100000000ull;
 constexpr uint32_t kPhysicalMemorySize = 0x20000000u;
 
 inline uint8_t* PhysicalHostAddress(uint8_t* base, uint32_t physical) {
-  return base + kPhysicalMemoryOffset + physical;
+  (void)base;  // the physical memory is mapped on its own (E5 step 7)
+  return memory::g_physical + physical;
 }
 
 }  // namespace native

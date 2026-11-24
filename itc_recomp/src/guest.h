@@ -46,6 +46,24 @@ struct StackSpan {
 };
 inline thread_local StackSpan t_stack;
 
+// The physical memory (E5 step 7): the GPU's, mapped on its own outside
+// guest memory (memory/mapping.cpp). The guest's addresses for it are
+// translated: 0x7F000000 (physical 0-16 MB), 0xA0000000 and 0xC0000000 (the
+// physical address), 0xE0000000 (the physical address + 4 KB).
+inline uint8_t* g_physical = nullptr;
+inline bool IsPhysical(uint32_t address) {
+  return address >= 0xA0000000u || address - 0x7F000000u < 0x1000000u;
+}
+inline uint8_t* PhysicalPointer(uint32_t address) {
+  if (address >= 0xE0000000u) {
+    return g_physical + (address - 0xE0000000u) + 0x1000;
+  }
+  if (address >= 0xA0000000u) {
+    return g_physical + (address & 0x1FFFFFFFu);
+  }
+  return g_physical + (address - 0x7F000000u);
+}
+
 // The host bytes of `width` bytes at `address` in the calling thread's
 // stack, or nullptr.
 inline uint8_t* StackBytes(uint32_t address, uint32_t width) {
@@ -71,6 +89,9 @@ namespace guest {
 // guest's byte order) gives the blob's bytes; a typed host object's handle
 // gives base + handle, which faults (and names the object) when used.
 inline uint8_t* Pointer(uint8_t* base, uint32_t address) {
+  if (memory::IsPhysical(address)) [[unlikely]] {
+    return memory::PhysicalPointer(address);
+  }
   if (memory::IsHandle(address)) [[unlikely]] {
     if (uint8_t* bytes = memory::StackBytes(address, 1)) {
       return bytes;
@@ -83,6 +104,11 @@ inline uint8_t* Pointer(uint8_t* base, uint32_t address) {
 }
 
 inline uint8_t LoadU8(uint8_t* base, uint32_t address) {
+  if (memory::IsPhysical(address)) [[unlikely]] {
+    uint8_t v;
+    std::memcpy(&v, memory::PhysicalPointer(address), 1);
+    return v;
+  }
   if (memory::IsHandle(address)) [[unlikely]] {
     if (const uint8_t* p = memory::StackBytes(address, 1)) {
       uint8_t v;
@@ -95,6 +121,11 @@ inline uint8_t LoadU8(uint8_t* base, uint32_t address) {
 }
 
 inline void StoreU8(uint8_t* base, uint32_t address, uint8_t value) {
+  if (memory::IsPhysical(address)) [[unlikely]] {
+    const uint8_t v = value;
+    std::memcpy(memory::PhysicalPointer(address), &v, 1);
+    return;
+  }
   if (memory::IsHandle(address)) [[unlikely]] {
     if (uint8_t* p = memory::StackBytes(address, 1)) {
       const uint8_t v = value;
@@ -108,6 +139,11 @@ inline void StoreU8(uint8_t* base, uint32_t address, uint8_t value) {
 }
 
 inline uint16_t LoadU16(uint8_t* base, uint32_t address) {
+  if (memory::IsPhysical(address)) [[unlikely]] {
+    uint16_t v;
+    std::memcpy(&v, memory::PhysicalPointer(address), 2);
+    return __builtin_bswap16(v);
+  }
   if (memory::IsHandle(address)) [[unlikely]] {
     if (const uint8_t* p = memory::StackBytes(address, 2)) {
       uint16_t v;
@@ -120,6 +156,11 @@ inline uint16_t LoadU16(uint8_t* base, uint32_t address) {
 }
 
 inline void StoreU16(uint8_t* base, uint32_t address, uint16_t value) {
+  if (memory::IsPhysical(address)) [[unlikely]] {
+    const uint16_t v = __builtin_bswap16(value);
+    std::memcpy(memory::PhysicalPointer(address), &v, 2);
+    return;
+  }
   if (memory::IsHandle(address)) [[unlikely]] {
     if (uint8_t* p = memory::StackBytes(address, 2)) {
       const uint16_t v = __builtin_bswap16(value);
@@ -133,6 +174,11 @@ inline void StoreU16(uint8_t* base, uint32_t address, uint16_t value) {
 }
 
 inline uint32_t LoadU32(uint8_t* base, uint32_t address) {
+  if (memory::IsPhysical(address)) [[unlikely]] {
+    uint32_t v;
+    std::memcpy(&v, memory::PhysicalPointer(address), 4);
+    return __builtin_bswap32(v);
+  }
   if (memory::IsHandle(address)) [[unlikely]] {
     if (const uint8_t* p = memory::StackBytes(address, 4)) {
       uint32_t v;
@@ -145,6 +191,11 @@ inline uint32_t LoadU32(uint8_t* base, uint32_t address) {
 }
 
 inline void StoreU32(uint8_t* base, uint32_t address, uint32_t value) {
+  if (memory::IsPhysical(address)) [[unlikely]] {
+    const uint32_t v = __builtin_bswap32(value);
+    std::memcpy(memory::PhysicalPointer(address), &v, 4);
+    return;
+  }
   if (memory::IsHandle(address)) [[unlikely]] {
     if (uint8_t* p = memory::StackBytes(address, 4)) {
       const uint32_t v = __builtin_bswap32(value);
@@ -158,6 +209,11 @@ inline void StoreU32(uint8_t* base, uint32_t address, uint32_t value) {
 }
 
 inline uint64_t LoadU64(uint8_t* base, uint32_t address) {
+  if (memory::IsPhysical(address)) [[unlikely]] {
+    uint64_t v;
+    std::memcpy(&v, memory::PhysicalPointer(address), 8);
+    return __builtin_bswap64(v);
+  }
   if (memory::IsHandle(address)) [[unlikely]] {
     if (const uint8_t* p = memory::StackBytes(address, 8)) {
       uint64_t v;
@@ -170,6 +226,11 @@ inline uint64_t LoadU64(uint8_t* base, uint32_t address) {
 }
 
 inline void StoreU64(uint8_t* base, uint32_t address, uint64_t value) {
+  if (memory::IsPhysical(address)) [[unlikely]] {
+    const uint64_t v = __builtin_bswap64(value);
+    std::memcpy(memory::PhysicalPointer(address), &v, 8);
+    return;
+  }
   if (memory::IsHandle(address)) [[unlikely]] {
     if (uint8_t* p = memory::StackBytes(address, 8)) {
       const uint64_t v = __builtin_bswap64(value);

@@ -65,6 +65,23 @@ void OnFault(int sig, siginfo_t* info, void* context) {
     (void)ignored;
     std::_Exit(3);
   }
+  // The guest's addresses for the physical memory, unmapped since E5 step 7
+  // (guest.h translates them): code reaching it through base + address.
+  if (base) {
+    const uintptr_t lo = reinterpret_cast<uintptr_t>(base);
+    if (at >= lo + 0x7F000000u && at < lo + 0x80000000u ||
+        at >= lo + 0xA0000000u && at < lo + 0x100000000ull) {
+      char text[200];
+      std::snprintf(text, sizeof(text),
+                    "physical fault: a raw access at %08X: code reaching the physical memory "
+                    "through base + address (guest.h translates it)\n",
+                    uint32_t(at - lo));
+      ITC_LOG_ERROR("{}", text);
+      ssize_t ignored = write(STDERR_FILENO, text, std::strlen(text));
+      (void)ignored;
+      std::_Exit(3);
+    }
+  }
   // Not ours: as before.
   if (g_previous.sa_flags & SA_SIGINFO) {
     if (g_previous.sa_sigaction) {

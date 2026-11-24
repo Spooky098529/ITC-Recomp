@@ -1,4 +1,5 @@
 #include "memory/heap.h"
+#include "guest.h"
 
 #include "memory/handles.h"
 #include "memory/mapping.h"
@@ -138,7 +139,8 @@ uint32_t HeapSpan(uint32_t size) {
 }
 
 void Clear(uint32_t address, uint32_t bytes) {
-  std::memset(membase + address, 0, bytes);
+  guest::ForEachHostPart(membase, address, bytes,
+                         [](uint8_t* host, uint32_t, uint32_t n) { std::memset(host, 0, n); });
 }
 
 // Xbox protection bits (X_PAGE_*, X_MEM_*) AllocPhysical reads.
@@ -305,7 +307,8 @@ uint32_t Realloc(uint32_t address, uint32_t size, uint32_t flags) {
       if (result == 0) {
         OutOfMemory("HeapReAlloc", size);
       }
-      std::memmove(membase + result, membase + address, std::min(old_size, size));
+      std::memmove(guest::Pointer(membase, result), guest::Pointer(membase, address),
+                   std::min(old_size, size));
       Give(address, block.span);
       blocks.erase(it);
       blocks[result] = {size, span, false};
