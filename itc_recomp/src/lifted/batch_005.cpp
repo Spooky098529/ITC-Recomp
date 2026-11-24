@@ -239,7 +239,7 @@ lifted::Result f820F77A0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = uint64_t(int64_t(0));
   // bl 0x82295398
   // (left out: dead in C++)
-  { const lifted::Result o = game::VirtualAlloc(base, LIFTED_ARGS(0x820F77DC, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = memory::NewBlob(uint32_t(r4), "TrackMeshFile"); f1 = 0; }  // host_alloc 0x820F77DC (TrackMeshFile, a blob)
   // mr r4,r3
   r4 = r3;
   // lis r11,-32241
@@ -731,7 +731,7 @@ lifted::Result f820F9E28(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = uint64_t(int64_t(0));
   // bl 0x82295398
   // (left out: dead in C++)
-  { const lifted::Result o = game::VirtualAlloc(base, LIFTED_ARGS(0x820F9E64, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = memory::NewBlob(uint32_t(r4), "TrackRouteFile"); f1 = 0; }  // host_alloc 0x820F9E64 (TrackRouteFile, a blob)
   // mr r4,r3
   r4 = r3;
   // lis r11,-32240

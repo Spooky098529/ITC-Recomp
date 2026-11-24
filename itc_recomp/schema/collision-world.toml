@@ -65,6 +65,11 @@ fields = [
 measures = ["TrackMesh.+4", "WallQuery::GatherCells.r4.+4", "TrackPosition.+4"]
 size = 8
 origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): the asset read whole by Archive::Load into
+# its loader's VirtualAlloc (lifted; returning at 0x820F77DC), in PC memory
+# with the file's bytes; freed by the game's VirtualFree.
+storage = "blob"
+blob_alloc = [{ call = 0x820F77DC, reg = "r4" }]
 fields = [
   { name = "section_count", offset = 0, type = "u32" },
   { name = "sections", offset = 4, type = "u32", note = "the section table: a pointer to a section a word" },

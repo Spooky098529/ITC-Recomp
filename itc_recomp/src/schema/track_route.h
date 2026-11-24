@@ -40,6 +40,8 @@ struct TrackRoute : View {
 struct TrackRouteFile : View {
   using View::View;
   static constexpr uint32_t kSize = 68;
+  static TrackRouteFile New(uint8_t* base, uint32_t size) { return TrackRouteFile(base, memory::NewBlob(size, "TrackRouteFile")); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint32_t section_count() const { return guest::LoadU32(base, address + 0); }
   void set_section_count(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t section_count_address() const { return address + 0; }

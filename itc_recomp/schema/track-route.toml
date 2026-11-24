@@ -41,6 +41,11 @@ fields = [
 measures = ["new<?>@TrackRoute::Load", "TrackRoute::LinkDistance.ret.+0", "TrackRoute::Normalize.ret.+0"]
 size = 68
 origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): the asset read whole by Archive::Load into
+# its loader's VirtualAlloc (lifted; returning at 0x820F9E64), in PC memory
+# with the file's bytes; freed by the game's VirtualFree.
+storage = "blob"
+blob_alloc = [{ call = 0x820F9E64, reg = "r4" }]
 fields = [
   { name = "section_count", offset = 0, type = "u32" },
   { name = "fault_position_section", offset = 0, type = "u16", note = "measure fault: TrackRoute::LinkDistance's r4 (a route position's section)" },
