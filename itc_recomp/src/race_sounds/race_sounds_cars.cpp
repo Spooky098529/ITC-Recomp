@@ -86,7 +86,8 @@ uint64_t SetUpCars(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) 
   ITC_NATIVE_RUNNING("sub_82176188 RaceSounds::SetUpCars");
   const ForgetAtEnd forget{calls};
   const uint32_t machine = uint32_t(r3);
-  const uint32_t frame = Frame(base, sp, 224);
+  // No slots (E5 step 6): the car sounds' calls made from `sp`.
+  const uint32_t frame = sp;
   Sounds(base, machine).set_set_up_wait(10);
   for (uint32_t i = 0; i < kCarSoundCount; i++) {
     if (Globals::effects_bank_arrived(base) == 0 ||
@@ -104,7 +105,8 @@ uint64_t UpdateCars(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls)
   ITC_NATIVE_RUNNING("sub_82175F20 RaceSounds::UpdateCars");
   const ForgetAtEnd forget{calls};
   const uint32_t machine = uint32_t(r3);
-  const uint32_t frame = Frame(base, sp, 240);
+  // No slots (E5 step 6): the car sounds' calls made from `sp`.
+  const uint32_t frame = sp;
   const int32_t wait = int32_t(Sounds(base, machine).set_up_wait());
   if (wait > 0) {
     Sounds(base, machine).set_set_up_wait(uint32_t(wait - 1));
@@ -161,10 +163,10 @@ uint64_t UpdateCars(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls)
   return r3;
 }
 
-uint64_t PickRivalMusic(uint8_t* base, uint64_t r3, uint32_t sp) {
+uint64_t PickRivalMusic(uint8_t* base, uint64_t r3, [[maybe_unused]] uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821764F0 RaceSounds::PickRivalMusic");
   const uint32_t machine = uint32_t(r3);
-  Frame(base, sp, 112);
+  // No frame (E5 step 6): the original's held only its back chain.
   // The results record's last entry's item (+972 * count - 964: entry
   // count - 1's +4).
   const uint32_t results = RaceStates::progress(base).results_address();

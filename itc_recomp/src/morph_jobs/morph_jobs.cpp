@@ -101,9 +101,12 @@ std::optional<uint32_t> MakeJob(uint8_t* base, Kind kind, uint32_t maker, uint32
                       frame, calls);
 }
 
-void DestroyJob(uint8_t* base, uint32_t job, uint32_t stack) {
+// The original's 96-byte frames (here and in DestroyJobBase and
+// WorkItemDestroy) hold only their back chains, which nothing reads
+// (operator delete, from the adapter, makes its own): not written (E5 step
+// 6).
+void DestroyJob(uint8_t* base, uint32_t job, [[maybe_unused]] uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820ACB90 MorphJob::~MorphJob");
-  Frame(base, stack, 96);
   const schema::MorphJob j(base, job);
   j.set_delegate_vtable(0x82000ABC);
   j.set_item_interface(0x82000BA8);
@@ -112,9 +115,8 @@ void DestroyJob(uint8_t* base, uint32_t job, uint32_t stack) {
   j.set_vtable(kJobBaseVtable);
 }
 
-void DestroyJobBase(uint8_t* base, uint32_t job, uint32_t stack) {
+void DestroyJobBase(uint8_t* base, uint32_t job, [[maybe_unused]] uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820AC9E8 Job::~Job");
-  Frame(base, stack, 96);
   schema::MorphJob(base, job).set_vtable(kJobBaseVtable);
 }
 
@@ -169,9 +171,8 @@ uint32_t WorkItemIsSkipped(uint8_t* base, uint32_t item) {
   return schema::WorkItem(base, item).skip();
 }
 
-void WorkItemDestroy(uint8_t* base, uint32_t item, uint32_t stack) {
+void WorkItemDestroy(uint8_t* base, uint32_t item, [[maybe_unused]] uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_82090E40 WorkItem::~WorkItem");
-  Frame(base, stack, 96);
   const schema::WorkItem i(base, item);
   i.set_delegate_vtable(0x82000ABC);
   i.set_interface(0x82000BA8);

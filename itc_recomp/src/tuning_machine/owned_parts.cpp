@@ -29,11 +29,11 @@ inline uint32_t Bit(uint8_t* base, uint32_t set, uint32_t n) {
 
 }  // namespace
 
-uint64_t LoadOwnedParts(uint8_t* base, uint32_t screen, uint32_t sp) {
+// `sp` unused since E5 step 6: the original's frame held only the row
+// table below (a local now) and no call is made with it.
+uint64_t LoadOwnedParts(uint8_t* base, uint32_t screen, [[maybe_unused]] uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821DBAB0 TuningScreen::LoadOwnedParts");
   const schema::TuningScreen ts(base, screen);
-  const uint32_t frame = sp - kLoadOwnedPartsFrame;
-  Store(base, frame, sp);
   // The selected garage car's owned bitset (the car at its +212).
   const uint32_t car =
       schema::GarageCar(base, tuning_screen::SelectedGarageCar(base, screen) + 212).owned_parts_address();
@@ -158,22 +158,19 @@ uint64_t LoadOwnedParts(uint8_t* base, uint32_t screen, uint32_t sp) {
   words(ts.unknown_33624_address(), 4, 435, true);
   // The interior item 3's rows (+33820, 20 bytes a row): cleared, then set
   // from the save's bits, row t from bits 414 - t on, the table {3, 2, 1,
-  // 0} kept in the frame and read from it as the original does.
+  // 0} (the original's frame words +80 to +92, a local array now).
   const uint32_t rows = ts.unknown_33820_address();
   for (uint32_t k = 0; k < 20; k++) {
     Store(base, rows + 4 * k, 0);
   }
-  Store(base, frame + 88, 1);
-  Store(base, frame + 92, 0);
-  Store(base, frame + 80, 3);
-  Store(base, frame + 84, 2);
+  constexpr uint32_t kRowOf[4] = {3, 2, 1, 0};
   for (uint32_t r = 0; r < 4; r++) {
-    const uint32_t row = frame + 80 + 4 * r;
-    if (save_bit(411 + r) != 0) Store(base, rows + Load(base, row) * 20 + 4, 1);
-    if (save_bit(416 + r) != 0) Store(base, rows + Load(base, row) * 20 + 0, 1);
-    if (save_bit(421 + r) != 0) Store(base, rows + Load(base, row) * 20 + 8, 1);
-    if (save_bit(426 + r) != 0) Store(base, rows + Load(base, row) * 20 + 16, 1);
-    if (save_bit(431 + r) != 0) Store(base, rows + Load(base, row) * 20 + 12, 1);
+    const uint32_t row = kRowOf[r];
+    if (save_bit(411 + r) != 0) Store(base, rows + row * 20 + 4, 1);
+    if (save_bit(416 + r) != 0) Store(base, rows + row * 20 + 0, 1);
+    if (save_bit(421 + r) != 0) Store(base, rows + row * 20 + 8, 1);
+    if (save_bit(426 + r) != 0) Store(base, rows + row * 20 + 16, 1);
+    if (save_bit(431 + r) != 0) Store(base, rows + row * 20 + 12, 1);
   }
   return r3;
 }

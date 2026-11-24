@@ -244,8 +244,52 @@ uint32_t MapperEntry(uint8_t* base, uint32_t player) {
          (Load(base, Globals::player_entries_address() + (player << 2)) << 3);
 }
 
+namespace {
+
+// Where Read and Control put the value: a guest word (PlayerInputValue, as
+// the game's callers give it) or a C++ word of the port's own (the frame
+// slots ReadPad and DriveByAiWithPad kept it in before E5 step 6).
+struct Out {
+  uint8_t* base;
+  uint32_t address;
+  uint32_t* host = nullptr;
+  uint32_t value() const {
+    return host != nullptr ? *host : schema::PlayerInputValue(base, address).value();
+  }
+  float value_float() const {
+    return host != nullptr ? std::bit_cast<float>(*host)
+                           : schema::PlayerInputValue(base, address).value_float();
+  }
+  void set_value(uint32_t value) const {
+    if (host != nullptr) {
+      *host = value;
+    } else {
+      schema::PlayerInputValue(base, address).set_value(value);
+    }
+  }
+};
+
+void ReadTo(uint8_t* base, uint32_t player, uint32_t id, uint32_t kind, const Out& out,
+            uint32_t sp, const Calls& calls, Regs* regs);
+uint32_t ControlTo(uint8_t* base, uint32_t player, uint32_t control, uint32_t kind,
+                   const Out& out, uint32_t sp, const Calls& calls, Regs* regs);
+
+}  // namespace
+
 void Read(uint8_t* base, uint32_t player, uint32_t id, uint32_t kind, uint32_t out, uint32_t sp,
           const Calls& calls, Regs* regs) {
+  ReadTo(base, player, id, kind, Out{base, out}, sp, calls, regs);
+}
+
+uint32_t Control(uint8_t* base, uint32_t player, uint32_t control, uint32_t kind, uint32_t out,
+                 uint32_t sp, const Calls& calls, Regs* regs) {
+  return ControlTo(base, player, control, kind, Out{base, out}, sp, calls, regs);
+}
+
+namespace {
+
+void ReadTo(uint8_t* base, uint32_t player, uint32_t id, uint32_t kind, const Out& out,
+            uint32_t sp, const Calls& calls, Regs* regs) {
   ITC_NATIVE_RUNNING("sub_82102350 PlayerInput::Read");
   const uint32_t entry = MapperEntry(base, player);
   if (kind >= 5) {
@@ -264,14 +308,14 @@ void Read(uint8_t* base, uint32_t player, uint32_t id, uint32_t kind, uint32_t o
     }
     regs->f1 = f1;
     regs->f1_set = true;
-    schema::PlayerInputValue(base, out).set_value(std::bit_cast<uint32_t>(float(f1)));
+    out.set_value(std::bit_cast<uint32_t>(float(f1)));
     return;
   }
   if (unread) {
     if (kind == 3) {
       regs->r3 = 0;
     }
-    schema::PlayerInputValue(base, out).set_value(0);
+    out.set_value(0);
     return;
   }
   static constexpr uint32_t kSlotOffsets[4] = {32, 40, 48, 56};
@@ -302,15 +346,15 @@ void Read(uint8_t* base, uint32_t player, uint32_t id, uint32_t kind, uint32_t o
                                      double(slot == 14 ? uint32_t(r3) & 0xFFFF : uint32_t(r3)));
   }
   regs->r3 = r3;
-  schema::PlayerInputValue(base, out).set_value(kind == 3 ? uint32_t(r3) : uint32_t(r3) & 0xFF);
+  out.set_value(kind == 3 ? uint32_t(r3) : uint32_t(r3) & 0xFF);
 }
 
-uint32_t Control(uint8_t* base, uint32_t player, uint32_t control, uint32_t kind, uint32_t out,
-                 uint32_t sp, const Calls& calls, Regs* regs) {
+uint32_t ControlTo(uint8_t* base, uint32_t player, uint32_t control, uint32_t kind,
+                   const Out& out, uint32_t sp, const Calls& calls, Regs* regs) {
   ITC_NATIVE_RUNNING("sub_82102488 PlayerInput::Control");
   const uint32_t frame = sp - 112;
-  const auto read = [&](uint32_t id) { Read(base, player, id, kind, out, frame, calls, regs); };
-  const schema::PlayerInputValue value_out(base, out);
+  const auto read = [&](uint32_t id) { ReadTo(base, player, id, kind, out, frame, calls, regs); };
+  const Out& value_out = out;
   // One action: returns `answer`.
   const auto single = [&](uint32_t id, uint32_t answer) {
     read(id);
@@ -379,8 +423,6 @@ uint32_t Control(uint8_t* base, uint32_t player, uint32_t control, uint32_t kind
   }
 }
 
-namespace {
-
 // The player's pad: the input manager's slot 9 (+36), then that object's
 // slot 5 (+20) with &the player at frame + 80 (`frame` the original's).
 uint64_t FindPad(uint8_t* base, uint32_t entry, uint32_t sp, uint32_t frame_bytes,
@@ -429,23 +471,23 @@ int32_t Mul(int32_t a, int32_t b) {
 
 // A one-sided analog (the throttle, the brake, +10): x 110 / 100, at most
 // 32,767, 5,000 taken off (0 below), x 32,767 / 27,767, at most 32,767;
-// the word at `word` (the control's) left as the original leaves it.
-int32_t Pedal(uint8_t* base, uint32_t word) {
-  int32_t v = Mul(int32_t(Load(base, word)), 110) / 100;
+// the word `word` (the control's) left as the original leaves it.
+int32_t Pedal(uint32_t& word) {
+  int32_t v = Mul(int32_t(word), 110) / 100;
   if (v > 32767) {
     v = 32767;
   }
   v -= 5000;
   if (v < 0) {
     v = 0;
-    Store(base, word, 0);
+    word = 0;
     return v;
   }
   v = Mul(v, 32767) / 27767;
-  Store(base, word, uint32_t(v));
+  word = uint32_t(v);
   if (v > 32767) {
     v = 32767;
-    Store(base, word, uint32_t(v));
+    word = uint32_t(v);
   }
   return v;
 }
@@ -495,20 +537,23 @@ uint32_t ReadPad(uint8_t* base, uint32_t record, uint32_t index, uint32_t player
                  uint32_t may_pause, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8215FCA8 PlayerControl::ReadPad");
   const uint32_t frame = sp - 288;
-  const uint32_t word = frame + 80;    // the analogs' control word
-  const uint32_t button = frame + 84;  // the buttons'
+  // The analogs' and the buttons' control words (the original's frame +80
+  // and +84; C++ words since E5 step 6, Control writing them directly).
+  uint32_t word_value = 0, button_value = 0;
+  const Out word{base, 0, &word_value};
+  const Out button{base, 0, &button_value};
   const uint32_t entry = MapperEntry(base, player);
   const uint32_t settings = Settings(base, player);
   uint32_t map = ControlMap(base, player);
   Store(base, frame, sp);  // the frame's back chain, for the calls
   const uint32_t vehicle = vehicle_accessors::VehicleGet(base, index);
-  Store(base, button, 0);
-  Store(base, word, 0);
+  button_value = 0;
+  word_value = 0;
   ai_drivers::ClearCarInput(base, record);
   const schema::CarInput input(base, record);
   Regs regs{0, 0, false};
-  const auto control = [&](uint32_t which, uint32_t kind, uint32_t out) {
-    return Control(base, player, which, kind, out, frame, calls, &regs);
+  const auto control = [&](uint32_t which, uint32_t kind, const Out& out) {
+    return ControlTo(base, player, which, kind, out, frame, calls, &regs);
   };
   const uint32_t race = Globals::race_data(base);
   const bool by_stage =
@@ -528,7 +573,7 @@ uint32_t ReadPad(uint8_t* base, uint32_t record, uint32_t index, uint32_t player
   // The throttle (+4).
   uint32_t answer = control(Load(base, map + 4), 3, word);
   OrFlags(base, record, answer != 0 ? 0x08000000 : 0x04000000);
-  int32_t v = Pedal(base, word);
+  int32_t v = Pedal(word_value);
   input.set_throttle(uint16_t(v));
   if (int16_t(v) != 0) {
     OrFlags(base, record, 0x4);
@@ -537,7 +582,7 @@ uint32_t ReadPad(uint8_t* base, uint32_t record, uint32_t index, uint32_t player
   // The brake (+6), then the reverse and the speed's checks.
   answer = control(Load(base, map + 8), 3, word);
   OrFlags(base, record, answer != 0 ? 0x20000000 : 0x10000000);
-  const int16_t brake = int16_t(Pedal(base, word));
+  const int16_t brake = int16_t(Pedal(word_value));
   input.set_brake(uint16_t(brake));
   bool have_speed = false;
   double speed = 0;
@@ -571,15 +616,15 @@ uint32_t ReadPad(uint8_t* base, uint32_t record, uint32_t index, uint32_t player
   const bool wheel = input.kind() == 1;
   const int32_t dead = wheel ? 1000 : 5000;
   const int32_t scale = wheel ? -130 : -110;
-  Store(base, word, 0);
+  word_value = 0;
   control(1, 3, word);
-  if (Load(base, word) != 0) {
+  if (word_value != 0) {
     OrFlags(base, record, 0x02000000);
   } else {
     answer = control(Load(base, map + 0), 3, word);
     OrFlags(base, record, answer != 0 ? 0x02000000 : 0x01000000);
   }
-  v = Mul(scale, int32_t(Load(base, word))) / 100;
+  v = Mul(scale, int32_t(word_value)) / 100;
   if (v > 32767) {
     input.set_steering(32767);
   } else if (v < -32767) {
@@ -595,16 +640,16 @@ uint32_t ReadPad(uint8_t* base, uint32_t record, uint32_t index, uint32_t player
   }
   if (zero) {
     v = 0;
-    Store(base, word, 0);
+    word_value = 0;
   } else {
     v = Mul(v, 32767) / (32767 - dead);
-    Store(base, word, uint32_t(v));
+    word_value = uint32_t(v);
     if (v > 32767) {
       v = 32767;
-      Store(base, word, uint32_t(v));
+      word_value = uint32_t(v);
     } else if (v < -32767) {
       v = -32767;
-      Store(base, word, uint32_t(v));
+      word_value = uint32_t(v);
     }
   }
   input.set_steering(uint16_t(v));
@@ -612,7 +657,7 @@ uint32_t ReadPad(uint8_t* base, uint32_t record, uint32_t index, uint32_t player
   // +10 (as the throttle).
   answer = control(Load(base, map + 12), 3, word);
   OrFlags(base, record, answer != 0 ? 0x80000000 : 0x40000000);
-  v = Pedal(base, word);
+  v = Pedal(word_value);
   input.set_handbrake(uint16_t(v));
   if (int16_t(v) != 0) {
     OrFlags(base, record, 0x8000);
@@ -621,7 +666,7 @@ uint32_t ReadPad(uint8_t* base, uint32_t record, uint32_t index, uint32_t player
   // 25,267, within ±32,767.
   answer = control(Load(base, map + 48), 3, word);
   OrFlags(base, record, answer != 0 ? 0x02000000 : 0x01000000);
-  v = Mul(int32_t(Load(base, word)), -110) / 100;
+  v = Mul(int32_t(word_value), -110) / 100;
   bool positive;
   if (v > 32767) {
     v = 32767;
@@ -641,16 +686,16 @@ uint32_t ReadPad(uint8_t* base, uint32_t record, uint32_t index, uint32_t player
   }
   if (zero) {
     v = 0;
-    Store(base, word, 0);
+    word_value = 0;
   } else {
     v = Mul(v, 32767) / 25267;
-    Store(base, word, uint32_t(v));
+    word_value = uint32_t(v);
     if (v > 32767) {
       v = 32767;
-      Store(base, word, uint32_t(v));
+      word_value = uint32_t(v);
     } else if (v < -32767) {
       v = -32767;
-      Store(base, word, uint32_t(v));
+      word_value = uint32_t(v);
     }
   }
   input.set_camera(uint16_t(v));
@@ -661,13 +706,13 @@ uint32_t ReadPad(uint8_t* base, uint32_t record, uint32_t index, uint32_t player
   };
   for (const auto& b : kButtons) {
     control(Load(base, map + b[0]), b[1], button);
-    if (Load(base, button) != 0) {
+    if (button_value != 0) {
       OrFlags(base, record, b[2]);
     }
   }
   uint32_t result = 0;
   control(Load(base, map + 56), 1, button);
-  if (Load(base, button) != 0 && may_pause != 0) {
+  if (button_value != 0 && may_pause != 0) {
     PostPause(base, record, player, owner);
     result = 1;
   }
@@ -763,19 +808,22 @@ void DriveByAiWithPad(uint8_t* base, uint32_t index, uint32_t hold, uint32_t pla
   };
   const uint32_t map = ControlMap(base, player);
   Regs inner{0, 0, false};
-  Control(base, player, Load(base, map + 20), 1, frame + 80, frame, calls, &inner);
+  // The two controls' words (the original's frame +80 and +84; C++ words
+  // since E5 step 6).
+  uint32_t pressed = 0, camera = 0;
+  ControlTo(base, player, Load(base, map + 20), 1, Out{base, 0, &pressed}, frame, calls, &inner);
   uint32_t flags = copy_word();
-  if (Load(base, frame + 80) != 0) {
+  if (pressed != 0) {
     flags |= 0x40;
   }
-  const uint32_t answer = Control(base, player, Load(base, map + 48), 3, frame + 84, frame, calls,
-                                  &inner);
+  const uint32_t answer = ControlTo(base, player, Load(base, map + 48), 3,
+                                    Out{base, 0, &camera}, frame, calls, &inner);
   flags |= answer != 0 ? 0x02000000 : 0x01000000;
   copy[0] = uint8_t(flags >> 24);
   copy[1] = uint8_t(flags >> 16);
   copy[2] = uint8_t(flags >> 8);
   copy[3] = uint8_t(flags);
-  int32_t v = Mul(int32_t(Load(base, frame + 84)), -110) / 100;
+  int32_t v = Mul(int32_t(camera), -110) / 100;
   bool positive;
   if (v > 32767) {
     v = 32767;

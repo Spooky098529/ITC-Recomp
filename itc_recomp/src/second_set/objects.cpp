@@ -89,10 +89,9 @@ std::optional<uint32_t> SceneCarModelRelease(uint8_t* base, uint32_t object, uin
 
 uint32_t ScenePartsReset(uint8_t* base, uint32_t object, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E0510 SceneParts::Reset");
-  const uint32_t sp = stack - 96;
   const schema::SceneParts p(base, object);
   scene_models::PartsRecordReset(base, p.record_address());
-  PartsPointsReset(base, p.points_address(), sp);
+  PartsPointsReset(base, p.points_address(), stack);
   p.set_scene_car_model(0u);
   p.set_scene(0u);
   p.set_skeleton(0);
@@ -106,7 +105,6 @@ uint32_t ScenePartsReset(uint8_t* base, uint32_t object, uint32_t stack) {
 
 uint32_t SceneCockpitReset(uint8_t* base, uint32_t object, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DBE20 SceneCockpit::Reset");
-  const uint32_t sp = stack - 112;
   const schema::SceneCockpit c(base, object);
   c.set_car_model(0);
   c.set_interior(0u);
@@ -114,7 +112,7 @@ uint32_t SceneCockpitReset(uint8_t* base, uint32_t object, uint32_t stack) {
   c.set_finished(0);
   c.set_scene(Scene(base));
   scene_models::CockpitRecordReset(base, c.record_address());
-  const uint32_t r3 = CockpitPointsReset(base, c.points_address(), sp);
+  const uint32_t r3 = CockpitPointsReset(base, c.points_address(), stack);
   c.set_record_address(c.record_address());
   c.set_part_model_0(0);
   c.set_part_model_1(0);
@@ -127,7 +125,6 @@ uint32_t SceneCockpitReset(uint8_t* base, uint32_t object, uint32_t stack) {
 
 uint32_t SceneInteriorReset(uint8_t* base, uint32_t object, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E3748 SceneInterior::Reset");
-  const uint32_t sp = stack - 112;
   const schema::SceneInterior o(base, object);
   o.set_car_model(0u);
   o.set_skeleton(0);
@@ -137,7 +134,7 @@ uint32_t SceneInteriorReset(uint8_t* base, uint32_t object, uint32_t stack) {
   o.set_finished(0);
   o.set_cockpit_texture(0);
   scene_models::InteriorRecordReset(base, o.record_address());
-  const uint32_t r3 = InteriorPointsReset(base, o.points_address(), sp);
+  const uint32_t r3 = InteriorPointsReset(base, o.points_address(), stack);
   o.set_scene(Scene(base));
   o.set_part_model_0(0);
   o.set_part_model_1(0);
@@ -150,7 +147,6 @@ uint32_t SceneInteriorReset(uint8_t* base, uint32_t object, uint32_t stack) {
 
 uint32_t SceneLightsReset(uint8_t* base, uint32_t object, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DCA40 SceneLights::Reset");
-  const uint32_t sp = stack - 112;
   const schema::SceneLightKit k(base, object);
   k.set_car_model(0u);
   k.set_first_set_object(0u);
@@ -158,7 +154,7 @@ uint32_t SceneLightsReset(uint8_t* base, uint32_t object, uint32_t stack) {
   k.set_finished(0);
   scene_models::Pool4RecordReset(base, k.record_address());
   const uint32_t block = k.points_address();
-  const uint32_t r3 = LightPointsReset(base, block, sp);
+  const uint32_t r3 = LightPointsReset(base, block, stack);
   k.set_scene(Scene(base));
   // The block's record, then its three groups' (+48, +4384, +8720).
   for (const uint32_t at : {0u, 48u, 4384u, 8720u}) {
@@ -169,10 +165,9 @@ uint32_t SceneLightsReset(uint8_t* base, uint32_t object, uint32_t stack) {
 
 uint32_t SceneTrafficReset(uint8_t* base, uint32_t object, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E5930 SceneTraffic::Reset");
-  const uint32_t sp = stack - 96;
   const schema::SceneTraffic t(base, object);
   scene_models::CarRecordReset(base, t.car_record_address());
-  const uint32_t r3 = TrafficPointsReset(base, t.points_address(), sp);
+  const uint32_t r3 = TrafficPointsReset(base, t.points_address(), stack);
   t.set_skeleton(0);
   t.set_body(0);
   t.set_finished(0);
@@ -187,7 +182,6 @@ uint32_t SceneTrafficReset(uint8_t* base, uint32_t object, uint32_t stack) {
 
 uint32_t SceneWheelsReset(uint8_t* base, uint32_t object, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E88A8 SceneWheels::Reset");
-  const uint32_t sp = stack - 96;
   const schema::SceneWheels w(base, object);
   w.set_car_model(0);
   w.set_first_set_wheels(0);
@@ -197,7 +191,7 @@ uint32_t SceneWheelsReset(uint8_t* base, uint32_t object, uint32_t stack) {
   w.set_tire_positions(0);
   w.set_scene(Scene(base));
   scene_models::WheelsRecordReset(base, w.record_address());
-  return WheelPointsReset(base, w.points_address(), sp);
+  return WheelPointsReset(base, w.points_address(), stack);
 }
 
 namespace {
@@ -207,14 +201,13 @@ namespace {
 std::optional<uint32_t> Release(uint8_t* base, uint32_t object, uint32_t first, uint32_t pool,
                                 uint32_t stack,
                                 uint32_t (*reset)(uint8_t*, uint32_t, uint32_t)) {
-  const uint32_t sp = stack - 96;
   const schema::SecondSetFirstSetObject held(base, Load(base, first));
   if (held) {
     if (!scene_loaders::ReleaseA(base, FirstSet(base), pool, held.index())) {
       return std::nullopt;
     }
   }
-  return reset(base, object, sp);
+  return reset(base, object, stack);
 }
 
 // The constructors' start: PoolNode::PoolNode, +16 = 0, the vtable, +20 = -1.
@@ -264,7 +257,6 @@ uint64_t ReleaseB(uint8_t* base, uint32_t set, uint32_t pool, uint32_t index, ui
   if (pool <= 7 && !calls.native(pool)) {
     return calls.release_b(set, pool, index, stack, lr);
   }
-  const uint32_t sp = stack - 112;
   // The scene's second set lists, 12 bytes a pool.
   const uint32_t list = schema::CarScene(base, set).car_models_first_address() + 12 * pool;
   const uint32_t object = vehicle_accessors::ListAt(base, list, index);
@@ -274,28 +266,28 @@ uint64_t ReleaseB(uint8_t* base, uint32_t set, uint32_t pool, uint32_t index, ui
   std::optional<uint32_t> r3 = object;
   switch (pool) {
     case 0:
-      r3 = SceneCarModelRelease(base, object, sp);
+      r3 = SceneCarModelRelease(base, object, stack);
       break;
     case 1:
-      r3 = ScenePartsRelease(base, object, sp);
+      r3 = ScenePartsRelease(base, object, stack);
       break;
     case 2:
-      r3 = SceneCockpitRelease(base, object, sp, calls);
+      r3 = SceneCockpitRelease(base, object, stack, calls);
       break;
     case 3:
-      r3 = SceneInteriorRelease(base, object, sp);
+      r3 = SceneInteriorRelease(base, object, stack);
       break;
     case 4:
-      r3 = SceneLightsRelease(base, object, sp);
+      r3 = SceneLightsRelease(base, object, stack);
       break;
     case 5:
-      r3 = SceneWheelsRelease(base, object, sp);
+      r3 = SceneWheelsRelease(base, object, stack);
       break;
     case 6:
-      r3 = SceneTrafficRelease(base, object, sp);
+      r3 = SceneTrafficRelease(base, object, stack);
       break;
     case 7:
-      r3 = SceneModelRelease(base, object, sp, calls);
+      r3 = SceneModelRelease(base, object, stack, calls);
       break;
     default:
       break;
@@ -310,7 +302,6 @@ uint64_t ReleaseB(uint8_t* base, uint32_t set, uint32_t pool, uint32_t index, ui
 std::optional<uint32_t> SceneCockpitRelease(uint8_t* base, uint32_t object, uint32_t stack,
                                             const ReleaseCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820DBF88 SceneCockpit::Release");
-  const uint32_t sp = stack - 96;
   const schema::SceneCockpit c(base, object);
   const schema::SecondSetFirstSetObject body(base, c.body());
   if (body) {
@@ -320,15 +311,14 @@ std::optional<uint32_t> SceneCockpitRelease(uint8_t* base, uint32_t object, uint
   }
   const schema::SceneInterior interior = c.interior();
   if (interior) {
-    ReleaseB(base, c.scene<schema::View>().address, 3, interior.index(), sp, 0x820DBFD8, calls);
+    ReleaseB(base, c.scene<schema::View>().address, 3, interior.index(), stack, 0x820DBFD8, calls);
   }
-  return SceneCockpitReset(base, object, sp);
+  return SceneCockpitReset(base, object, stack);
 }
 
 uint32_t SceneModelRelease(uint8_t* base, uint32_t object, uint32_t stack,
                            const ReleaseCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820DA5D0 SceneModel::Release");
-  const uint32_t sp = stack - 96;
   const schema::SceneModel m(base, object);
   if (m.build_delay() == 0) {
     // The parts in the original's order: the word, the pool, the return
@@ -352,13 +342,13 @@ uint32_t SceneModelRelease(uint8_t* base, uint32_t object, uint32_t stack,
       }
       const schema::SecondSetFirstSetObject held(base, Load(base, (m.*part.at)()));
       if (held) {
-        ReleaseB(base, m.scene<schema::View>().address, part.pool, held.index(), sp, part.lr,
+        ReleaseB(base, m.scene<schema::View>().address, part.pool, held.index(), stack, part.lr,
                  calls);
       }
     }
   }
   scene_models::SceneModelRecordReset(base, m.record_address());
-  const uint32_t r3 = SceneModelBlockReset(base, m.draw_block_address(), sp);
+  const uint32_t r3 = SceneModelBlockReset(base, m.draw_block_address(), stack);
   m.set_set_up(0);
   m.set_release_pending(0);
   m.set_second_wheels_claimed(0);
@@ -403,66 +393,59 @@ uint32_t SceneCarModelConstruct(uint8_t* base, uint32_t object, uint32_t list, u
 
 uint32_t ScenePartsConstruct(uint8_t* base, uint32_t object, uint32_t list, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E2F18 SceneParts::SceneParts");
-  const uint32_t sp = stack - 96;
   Node(base, object, list, schema::SceneParts::kVtable);
-  PartsPointsConstruct(base, schema::SceneParts(base, object).points_address(), sp);
-  ScenePartsReset(base, object, sp);
+  PartsPointsConstruct(base, schema::SceneParts(base, object).points_address(), stack);
+  ScenePartsReset(base, object, stack);
   return object;
 }
 
 uint32_t SceneCockpitConstruct(uint8_t* base, uint32_t object, uint32_t list, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DC3E8 SceneCockpit::SceneCockpit");
-  const uint32_t sp = stack - 96;
   Node(base, object, list, schema::SceneCockpit::kVtable);
-  CockpitPointsConstruct(base, schema::SceneCockpit(base, object).points_address(), sp);
-  SceneCockpitReset(base, object, sp);
+  CockpitPointsConstruct(base, schema::SceneCockpit(base, object).points_address(), stack);
+  SceneCockpitReset(base, object, stack);
   return object;
 }
 
 uint32_t SceneInteriorConstruct(uint8_t* base, uint32_t object, uint32_t list, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E5340 SceneInterior::SceneInterior");
-  const uint32_t sp = stack - 96;
   Node(base, object, list, schema::SceneInterior::kVtable);
-  InteriorPointsConstruct(base, schema::SceneInterior(base, object).points_address(), sp);
-  SceneInteriorReset(base, object, sp);
+  InteriorPointsConstruct(base, schema::SceneInterior(base, object).points_address(), stack);
+  SceneInteriorReset(base, object, stack);
   return object;
 }
 
 uint32_t SceneLightsConstruct(uint8_t* base, uint32_t object, uint32_t list, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DE030 SceneLights::SceneLights");
-  const uint32_t sp = stack - 96;
   Node(base, object, list, schema::SceneLightKit::kVtable);
-  LightPointsConstruct(base, schema::SceneLightKit(base, object).points_address(), sp);
-  SceneLightsReset(base, object, sp);
+  LightPointsConstruct(base, schema::SceneLightKit(base, object).points_address(), stack);
+  SceneLightsReset(base, object, stack);
   return object;
 }
 
 uint32_t SceneWheelsConstruct(uint8_t* base, uint32_t object, uint32_t list, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820ECE40 SceneWheels::SceneWheels");
-  const uint32_t sp = stack - 112;
   const schema::SceneWheels w(base, object);
   Node(base, object, list, schema::SceneWheels::kVtable);
   scene_models::Record12Reset(base, w.front_size_index_address());
   scene_models::Record12Reset(base, w.rear_size_index_address());
-  WheelPointsConstruct(base, w.points_address(), sp);
-  SceneWheelsReset(base, object, sp);
+  WheelPointsConstruct(base, w.points_address(), stack);
+  SceneWheelsReset(base, object, stack);
   return object;
 }
 
 uint32_t SceneTrafficConstruct(uint8_t* base, uint32_t object, uint32_t list, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E6E70 SceneTraffic::SceneTraffic");
-  const uint32_t sp = stack - 96;
   const schema::SceneTraffic t(base, object);
   Node(base, object, list, schema::SceneTraffic::kVtable);
   scene_models::CarRecordSetW(base, t.car_record_address());
-  TrafficPointsConstruct(base, t.points_address(), sp);
-  SceneTrafficReset(base, object, sp);
+  TrafficPointsConstruct(base, t.points_address(), stack);
+  SceneTrafficReset(base, object, stack);
   return object;
 }
 
 uint32_t SceneModelConstruct(uint8_t* base, uint32_t object, uint32_t list, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DB330 SceneModel::SceneModel");
-  const uint32_t sp = stack - 128;
   const schema::SceneModel m(base, object);
   scene_loaders::PoolNodeConstruct(base, object, list);
   m.set_index(0xFFFFFFFFu);
@@ -471,7 +454,7 @@ uint32_t SceneModelConstruct(uint8_t* base, uint32_t object, uint32_t list, uint
   scene_models::SceneModelRecordConstruct(base, m.record_address());
   SceneModelBlockConstruct(base, m.draw_block_address());
   scene_models::SceneModelRecordReset(base, m.record_address());
-  SceneModelBlockReset(base, m.draw_block_address(), sp);
+  SceneModelBlockReset(base, m.draw_block_address(), stack);
   m.set_set_up(0);
   m.set_release_pending(0);
   m.set_second_wheels_claimed(0);
@@ -509,9 +492,8 @@ constexpr uint32_t kPoolObjectVtable = 0x82004F90;
 bool Destruct(uint8_t* base, uint32_t object, uint32_t vtable, uint32_t stack,
               std::optional<uint32_t> (*release)(uint8_t*, uint32_t, uint32_t),
               uint32_t points, uint32_t (*destruct_points)(uint32_t)) {
-  const uint32_t sp = stack - 96;
   schema::PoolNode(base, object).set_vtable(vtable);
-  if (!release(base, object, sp)) {
+  if (!release(base, object, stack)) {
     return false;
   }
   if (destruct_points != nullptr) {
@@ -525,7 +507,7 @@ bool Destruct(uint8_t* base, uint32_t object, uint32_t vtable, uint32_t stack,
 // A deleting destructor: bit 0 (operator delete) left to the original.
 bool DeletingDestruct(uint8_t* base, uint32_t object, uint32_t flags, uint32_t stack,
                       bool (*destruct)(uint8_t*, uint32_t, uint32_t)) {
-  return (flags & 1) == 0 && destruct(base, object, stack - 112);
+  return (flags & 1) == 0 && destruct(base, object, stack);
 }
 
 }  // namespace
@@ -623,10 +605,9 @@ bool PoolObjectDeletingDestruct(uint8_t* base, uint32_t object, uint32_t flags, 
 bool SceneCockpitDestruct(uint8_t* base, uint32_t object, uint32_t stack,
                           const ReleaseCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820DC2F8 SceneCockpit::~SceneCockpit");
-  const uint32_t sp = stack - 96;
   const schema::SceneCockpit c(base, object);
   c.set_vtable(schema::SceneCockpit::kVtable);
-  if (!SceneCockpitRelease(base, object, sp, calls)) {
+  if (!SceneCockpitRelease(base, object, stack, calls)) {
     return false;
   }
   CockpitPointsDestruct(c.points_address());
@@ -638,7 +619,7 @@ bool SceneCockpitDestruct(uint8_t* base, uint32_t object, uint32_t stack,
 bool SceneCockpitDeletingDestruct(uint8_t* base, uint32_t object, uint32_t flags, uint32_t stack,
                                   const ReleaseCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820DC448 SceneCockpit::DeletingDestructor");
-  return (flags & 1) == 0 && SceneCockpitDestruct(base, object, stack - 112, calls);
+  return (flags & 1) == 0 && SceneCockpitDestruct(base, object, stack, calls);
 }
 
 void SceneModelBlockConstruct(uint8_t* base, uint32_t block) {

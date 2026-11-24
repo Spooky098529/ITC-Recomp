@@ -41,7 +41,8 @@ constexpr uint32_t kHundred = 0x82002A0C;    // 100.0
 // GarageStage::SetWheel's table, built on its frame at + 96 each call: entry
 // e (16 bytes) is {e, then these three words}: a brand (probably), the wheel
 // model (the word +8, the only one read; -1 for entry 0, the stock wheel)
-// and a variant (probably the color). The original's 716 stores, gathered.
+// and a variant (probably the color). The original's 716 stores, gathered
+// (read here instead of the frame since E5 step 6).
 constexpr int32_t kWheelTable[179][3] = {
     {0, -1, 0}, {1, 0, 0}, {1, 0, 1}, {1, 0, 2}, {1, 0, 3}, {1, 1, 0}, {1, 1, 1}, {1, 1, 2},
     {1, 1, 3}, {1, 2, 0}, {1, 2, 1}, {1, 2, 2}, {1, 2, 3}, {1, 3, 0}, {1, 3, 1}, {1, 3, 2},
@@ -75,21 +76,14 @@ uint32_t Frame(uint8_t* base, uint32_t stack, uint32_t bytes) {
   return frame;
 }
 
-void Store64(uint8_t* base, uint32_t address, uint64_t value) {
-  Store(base, address, uint32_t(value >> 32));
-  Store(base, address + 4, uint32_t(value));
-}
-
 uint64_t Load64(uint8_t* base, uint32_t address) {
   return (uint64_t(Load(base, address)) << 32) | Load(base, address + 4);
 }
 
-// An unsigned value through the frame to a float (std, lfd, fcfid, frsp),
-// its doubleword left at `scratch`.
-double Convert(uint8_t* base, uint64_t value, uint32_t scratch) {
-  Store64(base, scratch, value);
-  return Frsp(double(int64_t(value)));
-}
+// An unsigned value through the frame to a float (std, lfd, fcfid, frsp);
+// the original's scratch doubleword (only it reads it) left out since E5
+// step 6.
+double Convert(uint64_t value) { return Frsp(double(int64_t(value))); }
 
 // An lfs then stfs of one word: its bits (as car_makers' record setters).
 void CopyFloat(uint8_t* base, uint32_t from, uint32_t to) { Store(base, to, Load(base, from)); }
@@ -97,9 +91,9 @@ void CopyFloat(uint8_t* base, uint32_t from, uint32_t to) { Store(base, to, Load
 // A wheel's three colors (its +8 halfword, +10 and +11 bytes x 1/255; +20,
 // +22, +23; +24, +26, +27) into `to`, + 16 and + 32 as float triples, each
 // field from its own `wheel()` (a Params::GetWheel a field, or the stock
-// record), through the frame's scratch doubleword.
+// record), each converted as through the frame's scratch doubleword.
 template <typename Wheel>
-void Colors(uint8_t* base, uint32_t to, const Wheel& wheel, double scale, uint32_t scratch) {
+void Colors(uint8_t* base, uint32_t to, const Wheel& wheel, double scale) {
   using W = schema::StandWheelSource;
   // The three colors' fields: hue, saturation, value.
   static constexpr uint16_t (W::*kHue[3])() const = {&W::color0_hue, &W::color1_hue,
@@ -110,9 +104,9 @@ void Colors(uint8_t* base, uint32_t to, const Wheel& wheel, double scale, uint32
                                                       &W::color2_value};
   for (uint32_t c = 0; c < 3; c++) {
     const uint32_t at = to + 16 * c;
-    Stfs(base, at, Convert(base, (W(base, wheel()).*kHue[c])(), scratch));
-    Stfs(base, at + 4, Fmuls(Convert(base, (W(base, wheel()).*kSaturation[c])(), scratch), scale));
-    Stfs(base, at + 8, Fmuls(Convert(base, (W(base, wheel()).*kValue[c])(), scratch), scale));
+    Stfs(base, at, Convert((W(base, wheel()).*kHue[c])()));
+    Stfs(base, at + 4, Fmuls(Convert((W(base, wheel()).*kSaturation[c])()), scale));
+    Stfs(base, at + 8, Fmuls(Convert((W(base, wheel()).*kValue[c])()), scale));
   }
 }
 
@@ -169,19 +163,16 @@ uint64_t SceneWheelsSetSizes(uint8_t* base, const GuestCall& call, uint32_t whee
                              uint32_t b, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9,
                              uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E7380 SceneWheels::SetSizes");
-  const uint32_t frame = Frame(base, stack, 112);
-  // The four registers into the caller's parameter area (its r1 + 48 to +
-  // 79), read back as words.
-  Store64(base, stack + 48, r6);
-  Store64(base, stack + 64, r8);
-  Store64(base, stack + 56, r7);
-  Store64(base, stack + 72, r9);
+  // The four registers the original stores into the caller's parameter
+  // area (its r1 + 48 to + 79) and reads back as words are values since E5
+  // step 6 (only it reads them), and its 112-byte frame (only its back
+  // chain) left out: the guest call runs from `stack`.
   const schema::SceneWheels sw(base, wheels);
-  const uint32_t w0 = Load(base, stack + 48);
+  const uint32_t w0 = uint32_t(r6 >> 32);
   sw.set_unknown_108(b);
-  const uint32_t w1 = Load(base, stack + 52), w2 = Load(base, stack + 56);
-  const uint32_t v2 = Load(base, stack + 72), v0 = Load(base, stack + 64);
-  const uint32_t v1 = Load(base, stack + 68);
+  const uint32_t w1 = uint32_t(r6), w2 = uint32_t(r7 >> 32);
+  const uint32_t v2 = uint32_t(r9 >> 32), v0 = uint32_t(r8 >> 32);
+  const uint32_t v1 = uint32_t(r8);
   sw.set_unknown_104(a);
   const uint32_t first = sw.first_set_wheels();
   sw.set_front_size_index(w0);
@@ -190,25 +181,17 @@ uint64_t SceneWheelsSetSizes(uint8_t* base, const GuestCall& call, uint32_t whee
   sw.set_rear_size_index(v0);
   sw.set_rear_size_a(v1);
   sw.set_rear_size_b(v2);
-  return call(kWheelsSetRecord, {first, sw.record_address()}, frame, 0x820E73F4);
+  return call(kWheelsSetRecord, {first, sw.record_address()}, stack, 0x820E73F4);
 }
 
 uint64_t SetWheel(uint8_t* base, const GuestCall& call, uint32_t holder, uint64_t r4,
                   uint32_t which, uint32_t car, uint32_t stack, std::optional<double>* f1) {
   ITC_NATIVE_RUNNING("sub_8217DD38 GarageStage::SetWheel");
-  const uint32_t frame = Frame(base, stack, 3120);
-  // The arguments into the caller's parameter area.
-  Store(base, stack + 20, holder);
-  Store(base, stack + 36, which);
-  Store(base, stack + 44, car);
-  for (uint32_t e = 0; e < 179; e++) {
-    const uint32_t at = frame + 96 + 16 * e;
-    Store(base, at, e);
-    for (uint32_t k = 0; k < 3; k++) {
-      Store(base, at + 4 + 4 * k, uint32_t(kWheelTable[e][k]));
-    }
-  }
-  Store64(base, frame + 80, r4);
+  // E5 step 6: what the original keeps on its 3120-byte frame and in the
+  // caller's parameter area (the arguments' home slots, the wheel table of
+  // 179 {index, three words} entries at +96, r4 and the conversions'
+  // scratch doubleword at +80) is read only by it: values and the table
+  // kWheelTable. FitAxles and SetSizes run from `stack`.
   const uint32_t model = StageModel(base, holder);
   const schema::SceneModel m(base, model);
   const schema::SceneModelRecord rec(base, m.record_address());
@@ -219,9 +202,12 @@ uint64_t SetWheel(uint8_t* base, const GuestCall& call, uint32_t holder, uint64_
   if (int32_t(number) > 178) {
     number = 178;
   }
-  const int32_t side = int32_t(Load(base, stack + 36));
-  const uint32_t word = Load(base, frame + 104 + (uint32_t(number) << 4));
-  const uint32_t scratch = frame + 80;
+  const int32_t side = int32_t(which);
+  // The table's entry's second word (its +8), past the table (a negative
+  // number) the stack's word where the original reads it.
+  const uint32_t word = uint32_t(number) <= 178
+                            ? uint32_t(kWheelTable[uint32_t(number)][1])
+                            : Load(base, stack - 3120 + 104 + (uint32_t(number) << 4));
   // The wheel: Params::GetWheel once a field, or the spec's stock record.
   const uint32_t stock = spec + 8380;
   const bool is_stock = uint32_t(number) == 0;
@@ -237,10 +223,10 @@ uint64_t SetWheel(uint8_t* base, const GuestCall& call, uint32_t holder, uint64_
     rec.set_rear_wheel(word);
   }
   if (front) {
-    Colors(base, rec.front_wheel_paint0_hue_address(), wheel, scale, scratch);
+    Colors(base, rec.front_wheel_paint0_hue_address(), wheel, scale);
   }
   if (rear) {
-    Colors(base, rec.rear_wheel_paint0_hue_address(), wheel, scale, scratch);
+    Colors(base, rec.rear_wheel_paint0_hue_address(), wheel, scale);
   }
   using W = schema::StandWheelSource;
   if (front) {
@@ -265,7 +251,7 @@ uint64_t SetWheel(uint8_t* base, const GuestCall& call, uint32_t holder, uint64_
         float(Fmuls(schema::Car(base, car).rear_tire_width(), Lfs(base, kTireScale))));
     rec.set_rear_size_b(float(Fmuls(Lfs(base, car + 3260), Lfs(base, kHundred))));
   }
-  FitAxles(base, call, holder, car, frame, f1);
+  FitAxles(base, call, holder, car, stack, f1);
   // The sizes as the original's words and doublewords (ld: two word loads,
   // the high one first).
   const schema::SceneModelsWheelsRecord wr(base, m.wheels_record_address());
@@ -273,7 +259,7 @@ uint64_t SetWheel(uint8_t* base, const GuestCall& call, uint32_t holder, uint64_
                              Load64(base, rec.front_size_address()),
                              uint64_t(Load(base, rec.front_size_b_address())) << 32,
                              Load64(base, rec.rear_size_address()),
-                             uint64_t(Load(base, rec.rear_size_b_address())) << 32, frame);
+                             uint64_t(Load(base, rec.rear_size_b_address())) << 32, stack);
 }
 
 uint64_t PreviewWheel(uint8_t* base, const GuestCall& call, uint32_t screen, uint64_t r4,

@@ -70,9 +70,17 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   return frame;
 }
 
-uint32_t MovieAt(uint8_t* base, uint32_t frame, uint32_t id) {
+// (The id as a value: the original's slot at the frame's +80 only the find
+// read; E5 step 6.)
+uint32_t MovieAt(uint8_t* base, [[maybe_unused]] uint32_t frame, uint32_t id) {
+  return LoadU32(base, ui_movies::PairsFindKey(base, ui_movies::kMovieTable, id));
+}
+
+// The same with the id stored at the frame's +80, for the callers that hand
+// that slot's address on (a guest call's r4).
+uint32_t MovieAtSlot(uint8_t* base, uint32_t frame, uint32_t id) {
   StoreU32(base, frame + 80, id);
-  return LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+  return MovieAt(base, frame, id);
 }
 
 uint64_t Named(const ScreenCalls& calls, uint32_t function, uint32_t movie, uint64_t named,
@@ -368,20 +376,18 @@ uint64_t Screen0Update(uint8_t* base, uint64_t r3, uint32_t sp, const ScreenCall
   const uint32_t frame = Frame(base, sp, 160);
   const uint32_t guard = G::step_table_guard(base);
   if ((guard & 1) == 0) {
-    StoreU32(base, frame + 84, 0);
-    StoreU32(base, frame + 92, 0);
-    StoreU32(base, frame + 100, 0);
-    StoreU32(base, frame + 108, 0);
-    StoreU32(base, frame + 104, 0x8223BAF0);  // FadeOutStep
-    StoreU32(base, frame + 80, 0x8223C1A0);   // OpeningStep
-    StoreU32(base, frame + 88, 0x8223BBC8);   // ItemStep
+    // The steps' member functors (the original builds them at the frame's
+    // +80 to +108; a C++ array since E5 step 6): OpeningStep, ItemStep,
+    // CursorStep, FadeOutStep, each with adjustment 0.
+    static constexpr uint32_t kSteps[8] = {0x8223C1A0, 0, 0x8223BBC8, 0,
+                                           0x8223C330, 0, 0x8223BAF0, 0};
     G::set_step_table_guard(base, guard | 1);
-    StoreU32(base, frame + 96, 0x8223C330);   // CursorStep
     for (uint32_t i = 0; i < 8; i++) {
-      StoreU32(base, kStepTable + 4 * i, LoadU32(base, frame + 80 + 4 * i));
+      StoreU32(base, kStepTable + 4 * i, kSteps[i]);
     }
   }
-  const uint32_t movie = MovieAt(base, frame, 24);
+  // The id at +80 (a guest step gets its address).
+  const uint32_t movie = MovieAtSlot(base, frame, 24);
   const uint32_t step = pages.step();
   if (step != kMinusOne) {
     const uint32_t target = LoadU32(base, kStepTable + (step << 3));
@@ -427,12 +433,13 @@ uint64_t Screen0Update(uint8_t* base, uint64_t r3, uint32_t sp, const ScreenCall
 uint64_t Screen0SetTexts(uint8_t* base, uint32_t sp, const ScreenCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8223B760 Type8Screen0::SetTexts");
   const uint32_t frame = Frame(base, sp, 160);
+  // The strings (the original's table at the frame's +96: a C++ array since
+  // E5 step 6).
   static constexpr uint32_t kStrings[5] = {121, 122, 110, 113, 114};
-  for (uint32_t i = 0; i < 5; i++) StoreU32(base, frame + 96 + 4 * i, kStrings[i]);
-  const uint32_t movie = MovieAt(base, frame, 24);
+  const uint32_t movie = MovieAtSlot(base, frame, 24);  // ResetPose gets +80's address
   calls.call(kResetPose, frame, 0x8223B7B8, movie, frame + 80);
   for (uint32_t i = 0; i < 5; i++) {
-    calls.set_text(frame, 0x8223B7D4, movie, 0, 5 + i, LoadU32(base, frame + 96 + 4 * i));
+    calls.set_text(frame, 0x8223B7D4, movie, 0, 5 + i, kStrings[i]);
   }
   uint64_t result = 0;
   for (uint32_t i = 0; i < 5; i++) {
@@ -445,10 +452,13 @@ uint64_t Screen0CarCard(uint8_t* base, uint64_t player, uint64_t model, uint64_t
                         uint32_t sp, const ScreenCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8223BC68 Type8Screen0::CarCard");
   const uint32_t frame = Frame(base, sp, 144);
-  StoreU32(base, frame + 88, 16);
-  StoreU32(base, frame + 92, 14);
   const uint32_t movie = MovieAt(base, frame, 24);
-  const uint32_t which = LoadU32(base, frame + 88 + (uint32_t(player) << 2));
+  // The players' nodes (the original's table at the frame's +88: a C++ array
+  // since E5 step 6), read unchecked: a player outside it reads the stack
+  // word the original reads there.
+  static constexpr uint32_t kNodes[2] = {16, 14};
+  const uint32_t offset = uint32_t(player) << 2;
+  const uint32_t which = offset < 8 ? kNodes[offset >> 2] : LoadU32(base, frame + 88 + offset);
   const uint32_t node = ui_movies::FindNode(base, movie, kMinusOne, which);
   namespace pd = type8_screens::part_detail;
   pd::SetNodeText(movie, ui_movies::Child(base, node, 6), uint32_t(maker + 1934), frame,

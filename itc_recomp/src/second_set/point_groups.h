@@ -2,7 +2,10 @@
 // C++ (docs/functions/second-set.md): each group's records cleared
 // (PointRecord::Clear) and named (SetNode for the first `nodes`, SetShape for
 // the rest) from a table of string pointers in the image, with the few words
-// each sets. `stack` is the guest r1 at entry; each returns r3 as the
+// each sets. `stack` is the guest r1 at entry, passed on as the callees' r1
+// (E5 step 6: the originals' frames held nothing other code reads, so
+// they're not made but ResetHeadlights', whose identity matrix at +80 is a
+// memcpy's source; ResetRimA's float4 a C++ array); each returns r3 as the
 // original leaves it (the last record named, unless said). Only where memcpy
 // is native (the adapters' check). Adapters: src/hooks/second_set.cpp.
 

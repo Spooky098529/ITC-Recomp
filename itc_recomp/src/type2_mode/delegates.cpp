@@ -70,13 +70,13 @@ uint64_t Dispatch(const Calls& calls, uint32_t mode, uint32_t frame, uint32_t lr
 }
 
 // The delegate (mode +4 = mode +8 when that isn't 0) given the member
-// functor whose two words are at `words` (the function and the adjustment
-// the frame holds): vtable 0x82010FA0, the mode, the doubleword.
-void SetDelegate(uint8_t* base, uint32_t mode, uint32_t words) {
+// functor's two words (the function and the adjustment; the original built
+// them in its frame and read them back, C++ values since E5 step 6):
+// vtable 0x82010FA0, the mode, the doubleword.
+void SetDelegate(uint8_t* base, uint32_t mode, uint32_t function, uint32_t adjustment = 0) {
   const Mode m(base, mode);
   uint32_t delegate = mode + 8;  // the delegate (in host memory, E5 step 4)
   if (delegate != 0) {
-    const uint32_t function = LoadU32(base, words), adjustment = LoadU32(base, words + 4);
     m.set_delegate_object(mode);
     m.set_delegate_function(function);
     m.set_delegate_adjustment(adjustment);
@@ -118,28 +118,24 @@ void LeaveScreen(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, con
   FindShown(base, Mode(base, mode).block().address, frame);
   Queue(base, mode, 3);
   Dispatch(calls, mode, frame, 0x82197D04);
-  StoreU32(base, frame + 84, 0);
-  StoreU32(base, frame + 80, kSlot12Thunk);
-  SetDelegate(base, mode, frame + 80);
+  SetDelegate(base, mode, kSlot12Thunk);
 }
 
 void AfterLeaveScreen(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821977E0 ModeType2::AfterLeaveScreen");
-  const uint32_t frame = Frame(base, sp, 96);
+  // No frame (E5 step 6: its words are values, no guest call); FindShown's
+  // below where it was.
+  const uint32_t frame = sp - 96;
   ClearAnswer(base, answer);
   FindShown(base, Mode(base, mode).block().address, frame);
-  StoreU32(base, frame + 84, 0);
-  StoreU32(base, frame + 80, kNextModeThunk);
-  SetDelegate(base, mode, frame + 80);
+  SetDelegate(base, mode, kNextModeThunk);
 }
 
 void Restart(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82197A30 ModeType2::Restart");
-  const uint32_t frame = Frame(base, sp, 112);
-  StoreU32(base, frame + 84, 0);
-  StoreU32(base, frame + 80, kSlot9Thunk);
+  const uint32_t frame = Frame(base, sp, 112);  // for Dispatch's guest call
   ClearAnswer(base, answer);
-  SetDelegate(base, mode, frame + 80);
+  SetDelegate(base, mode, kSlot9Thunk);
   Queue(base, mode, 1);
   Dispatch(calls, mode, frame, 0x82197AE4);
 }
@@ -164,9 +160,7 @@ void Leaving(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const C
       return;
     }
   }
-  StoreU32(base, frame + 84, 0);
-  StoreU32(base, frame + 80, kSlot11Thunk);
-  SetDelegate(base, mode, frame + 80);
+  SetDelegate(base, mode, kSlot11Thunk);
 }
 
 void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls) {
@@ -175,9 +169,12 @@ void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const 
   ClearAnswer(base, answer);
   FindShown(base, Mode(base, mode).block().address, frame);
   if (ShownState(base, mode) == 8) {
+    // The functor's words stay in the frame: the answer below takes the
+    // three low bytes the frame holds at +80 (this one's or an earlier
+    // call's, E5 step 6).
     StoreU32(base, frame + 84, 0);
     StoreU32(base, frame + 80, kSlot10Thunk);
-    SetDelegate(base, mode, frame + 80);
+    SetDelegate(base, mode, kSlot10Thunk, 0);
   }
   if (ShownState(base, mode) == 10) {
     Queue(base, mode, 4);
@@ -215,7 +212,7 @@ void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const 
     G::set_leaving_flag(base, 0);
   }
   StoreU32(base, frame + 84, 0);
-  SetDelegate(base, mode, frame + 80);
+  SetDelegate(base, mode, kSlot11Thunk, 0);
 }
 
 void WaitForLoads(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp,
@@ -241,9 +238,11 @@ void WaitForLoads(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp,
     if (message != 0) {
       Queue(base, mode, message, true);
     }
+    // The functor's words kept in the frame beside Sound::Play's (+88 is
+    // handed to it); the delegate given them as values.
     StoreU32(base, frame + 92, 0);
     StoreU32(base, frame + 88, kNextModeThunk);
-    SetDelegate(base, mode, frame + 88);
+    SetDelegate(base, mode, kNextModeThunk, 0);
     StoreU32(base, frame + 80, 2);
     StoreU32(base, frame + 88, 1);
     calls.Call(kSoundPlay, frame, 0x82197C2C, frame + 88, frame + 80);
@@ -303,7 +302,7 @@ uint64_t SlotThunk(uint8_t* base, uint32_t slot, uint64_t r3, uint64_t r4, uint3
 
 uint32_t Interrupt(uint8_t* base, uint32_t object, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82197858 ModeType2::Interrupt");
-  Frame(base, sp, 96);
+  (void)sp;  // no frame (E5 step 6: the original's held nothing, no call made)
   // The mode's fields from its +32 interface (`object` = the mode + 32).
   const Mode mode(base, object - 32);
   const Block block = mode.block();
@@ -338,18 +337,14 @@ void ForceExit(uint8_t* base, uint32_t object, uint32_t number, uint32_t sp) {
   } else {
     return;
   }
-  // The functor's doubleword below the stack pointer (sp - 16: the function,
-  // 0), then the answer's over it (byte 1, the function's three low bytes,
-  // the mode).
+  // The functor's doubleword (the original's below the stack pointer, sp -
+  // 16: the function, 0), then the answer's over it (byte 1, the function's
+  // three low bytes, the mode): values since E5 step 6.
+  (void)sp;
   const uint32_t mode = object - 32;
-  const uint32_t words = sp - 16;
-  StoreU32(base, words, kSlot13Thunk);
-  StoreU32(base, words + 4, 0);
-  SetDelegate(base, mode, words);
-  StoreU32(base, words + 4, next);
-  guest::StoreU8(base, words, 1);
+  SetDelegate(base, mode, kSlot13Thunk, 0);
   const Block to = Mode(base, mode).block();
-  const uint32_t w0 = LoadU32(base, words), w1 = LoadU32(base, words + 4);
+  const uint32_t w0 = 0x01000000u | (kSlot13Thunk & 0x00FFFFFFu), w1 = next;
   to.set_answer_word0(w0);
   to.set_answer_next_type(w1);
   if (next == 4) {

@@ -13,6 +13,7 @@
 #include "models/texture_provider.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
+#include <bit>
 #include <cstdint>
 
 namespace graphics::render_queue {
@@ -86,9 +87,10 @@ float Sequence(uint8_t* base, uint32_t entry) {
 
 uint32_t ClearRecording(uint8_t* base, uint32_t queue, uint32_t sp, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8258ED78 RenderQueue::ClearRecording");
-  const uint32_t frame = Frame(base, sp, 96);
+  // No guest frame (E5 step 6): the original's 96 bytes held only the back
+  // chain; its guest calls are made from `sp`.
   const uint32_t list = QueueSlot(base, queue, kRecordingSlot, kRecordingFunction, Recording,
-                                  frame, 0x8258ED9C, call);
+                                  sp, 0x8258ED9C, call);
   device_shaders::PassListClear(base, list);
   // lfs, then stfs: the float through a double, as the original.
   const double zero = G::zero(base);
@@ -98,9 +100,10 @@ uint32_t ClearRecording(uint8_t* base, uint32_t queue, uint32_t sp, const GuestC
 
 uint32_t Init(uint8_t* base, uint32_t queue, uint32_t device, uint32_t sp, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8258ED00 RenderQueue::Init");
-  const uint32_t frame = Frame(base, sp, 128);
+  // No guest frame (E5 step 6): the original's 128 bytes held only the back
+  // chain; its guest calls are made from `sp`.
   const uint32_t drawer = State(base, queue).drawer_address();
-  call(guest::LoadU32(base, schema::PrimitiveDrawer(base, drawer).vtable()), frame, 0x8258ED2C, 2,
+  call(guest::LoadU32(base, schema::PrimitiveDrawer(base, drawer).vtable()), sp, 0x8258ED2C, 2,
        drawer, device, 0);
   for (uint32_t i = 0, offset = 0; offset < 16; i++, offset += 4) {
     const uint32_t at = offset + State(base, queue).render_target_0_address();
@@ -115,8 +118,11 @@ uint32_t Init(uint8_t* base, uint32_t queue, uint32_t device, uint32_t sp, const
 uint32_t PassListAdd(uint8_t* base, uint32_t list, uint64_t chunk_key, uint64_t sequence,
                      uint32_t bucket, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8258EB88 PassList::Add");
-  guest::StoreU64(base, sp + 32, chunk_key);
-  guest::StoreU64(base, sp + 40, sequence);
+  // The original spills r4 and r5 to its caller's +32 and +40 and reads
+  // them back as words and floats; C++ values since E5 step 6 (no one else
+  // reads them): the chunk the high word of r4, the key its low word, the
+  // sequence r5's high word.
+  (void)sp;
   const PassList l(base, list);
   if (bucket >= l.bucket_count()) {
     return 0;
@@ -129,11 +135,11 @@ uint32_t PassListAdd(uint8_t* base, uint32_t list, uint64_t chunk_key, uint64_t 
   const uint32_t buckets = l.buckets().address;
   const uint32_t item_block = l.items().address;
   // lfs, then stfs: each float through a double, as the original.
-  const double key = guest::LoadFloat(base, sp + 36);
-  const double seq = guest::LoadFloat(base, sp + 40);
+  const double key = std::bit_cast<float>(uint32_t(chunk_key));
+  const double seq = std::bit_cast<float>(uint32_t(sequence >> 32));
   const PassListBucket at(base, (bucket << 4) + buckets);
   const PassListItem item(base, ((used + (used << 2)) << 2) + item_block);
-  const uint32_t chunk = guest::LoadU32(base, sp + 32);
+  const uint32_t chunk = uint32_t(chunk_key >> 32);
   item.set_next(0);
   item.set_key(float(key));
   item.set_sequence(float(seq));
@@ -158,16 +164,18 @@ std::optional<uint32_t> Add(uint8_t* base, uint32_t queue, uint32_t chunk, uint3
   if (chunk == 0) {
     return queue;
   }
-  const uint32_t frame = Frame(base, sp, 144);
+  // No guest frame (E5 step 6): the original's 144 bytes held the back chain
+  // and, at +80, the chunk, the key and the sequence, read back as two
+  // doublewords for PassList::Add: C++ values (the low word of the second,
+  // +92, was never written, and PassList::Add doesn't read it: 0 here). The
+  // queue's slot is called from `sp`.
   const RenderQueueState state = State(base, queue);
-  guest::StoreFloat(base, frame + 84, float(key));
-  guest::StoreU32(base, frame + 80, chunk);
+  const uint64_t chunk_key = (uint64_t(chunk) << 32) | std::bit_cast<uint32_t>(float(key));
   const double sequence = state.sequence();
-  guest::StoreFloat(base, frame + 88, float(sequence));
+  const uint64_t sequence_word = uint64_t(std::bit_cast<uint32_t>(float(sequence))) << 32;
   const uint32_t list = QueueSlot(base, queue, kRecordingSlot, kRecordingFunction, Recording,
-                                  frame, 0x8258EE60, call);
-  const uint32_t r3 = PassListAdd(base, list, guest::LoadU64(base, frame + 80),
-                                  guest::LoadU64(base, frame + 88), bucket, frame);
+                                  sp, 0x8258EE60, call);
+  const uint32_t r3 = PassListAdd(base, list, chunk_key, sequence_word, bucket, sp);
   const RenderQueueState now = State(base, queue);
   const double before = now.sequence();
   const double step = G::sequence_step(base);

@@ -34,10 +34,11 @@ inline uint32_t ThroughFloat(uint8_t* base, uint32_t address) {
   return std::bit_cast<uint32_t>(float(double(guest::LoadFloat(base, address))));
 }
 
-// The movie with id `id`: the id at the frame's +80, then UiMovies::Find.
-inline uint32_t Movie(uint8_t* base, uint32_t frame, uint32_t id) {
-  guest::StoreU32(base, frame + 80, id);
-  return guest::LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+// The movie with id `id`: UiMovies::Find over the movie table (the
+// original's key word at its frame's +80, read only by the find: a value
+// since E5 step 6).
+inline uint32_t Movie(uint8_t* base, uint32_t id) {
+  return guest::LoadU32(base, ui_movies::PairsFindKey(base, ui_movies::kMovieTable, id));
 }
 
 inline uint32_t Required(const std::optional<uint32_t>& r3, const char* what) {

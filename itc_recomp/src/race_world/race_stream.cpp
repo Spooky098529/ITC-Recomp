@@ -154,14 +154,14 @@ void RemoveFromWorld(uint8_t* base, uint32_t car, uint32_t frame, bool heap,
 void StreamOpponents(uint8_t* base, uint32_t manager, uint32_t player, double spawn,
                      double despawn, uint32_t frame, bool heap, const OriginalCall& original) {
   ITC_NATIVE_RUNNING("sub_82172118 RaceManager::StreamOpponents");
-  // The player's route position (its vehicle's identity +4) at + 80, its
+  // The player's route position (its vehicle's identity +4; the original
+  // split it through its frame's + 80, a value since E5 step 6), its
   // section's record.
   const uint32_t identity = va::VehicleIdentity(va::VehicleGet(base, E(base, player).vehicle_index()));
   const uint32_t position = schema::TrackPosition(base, identity).route_position();
   const int32_t count = int32_t(M(base, manager).entry_count());
   const uint32_t file = Load(base, kRoute);
-  Store(base, frame + 80, position);
-  const uint32_t player_section = guest::LoadU16(base, frame + 80);
+  const uint32_t player_section = position >> 16;
   const uint32_t player_record = SectionRecord(base, file, player_section);
   // The sorted list at + 176 emptied (+1776 to +1784).
   const L sorted(base, frame + 176);
@@ -188,8 +188,8 @@ void StreamOpponents(uint8_t* base, uint32_t manager, uint32_t player, double sp
         const uint32_t word = E(base, entry).position();
         const uint32_t now = Load(base, kRoute);
         const uint32_t a = Section(base, player_record).branch();
-        Store(base, frame + 84, word);
-        const uint32_t section = guest::LoadU16(base, frame + 84);
+        // Split as the original did through its frame's + 84.
+        const uint32_t section = word >> 16;
         const uint32_t b = Section(base, SectionRecord(base, now, section)).branch();
         if (BranchesMeet(a, b) == 0) {
           lose = true;
@@ -197,9 +197,9 @@ void StreamOpponents(uint8_t* base, uint32_t manager, uint32_t player, double sp
           // Both slices' centers: the entry's at + 128, the player's at +
           // 112; the difference at + 96, its y = 0.0 and w = 1.0; its
           // length + 1.0.
-          track_route::SlicePoint(base, frame + 128, 0, S16(section), LoadS16(base, frame + 86));
+          track_route::SlicePoint(base, frame + 128, 0, S16(section), S16(word & 0xFFFF));
           track_route::SlicePoint(base, frame + 112, 0, S16(player_section),
-                                  LoadS16(base, frame + 82));
+                                  S16(position & 0xFFFF));
           vl::Vec3Sub(base, frame + 96, frame + 128, frame + 112);
           Stfs(base, frame + 100, zero);
           Stfs(base, frame + 108, one);
@@ -285,13 +285,14 @@ void Refresh(uint8_t* base, uint32_t manager, uint32_t frame, bool heap,
       }
     }
   }
-  // Its route position (its vehicle's identity +4) at + 80, its section's
+  // Its route position (its vehicle's identity +4; the original split it
+  // through its frame's + 80, a value since E5 step 6), its section's
   // record and its slice's center at + 112.
   const uint32_t identity = va::VehicleIdentity(va::VehicleGet(base, E(base, player).vehicle_index()));
-  Store(base, frame + 80, schema::TrackPosition(base, identity).route_position());
-  const uint32_t player_section = guest::LoadU16(base, frame + 80);
+  const uint32_t position = schema::TrackPosition(base, identity).route_position();
+  const uint32_t player_section = position >> 16;
   const uint32_t player_record = SectionRecord(base, Load(base, kRoute), player_section);
-  const uint32_t player_slice = LoadS16(base, frame + 82);
+  const uint32_t player_slice = S16(position & 0xFFFF);
   // The sorted list at + 176 emptied and the counts +2364, +2372, +2376 = 0.
   const L sorted(base, frame + 176);
   sorted.set_first(0);
@@ -317,20 +318,19 @@ void Refresh(uint8_t* base, uint32_t manager, uint32_t frame, bool heap,
       } else if ((flags & 0x10) != 0 || (flags & 0x400) != 0) {
         key = far_key;
       } else {
-        // The entry's position at + 80 (StreamOpponents': + 84).
+        // The entry's position (split as the original did through its
+        // frame's + 80; StreamOpponents': + 84).
         const uint32_t word = E(base, entry).position();
         const uint32_t now = Load(base, kRoute);
         const uint32_t a = Section(base, player_record).branch();
-        Store(base, frame + 80, word);
-        const uint32_t section = guest::LoadU16(base, frame + 80);
+        const uint32_t section = word >> 16;
         const uint32_t b = Section(base, SectionRecord(base, now, section)).branch();
         if (BranchesMeet(a, b) == 0) {
           lose = true;
         } else {
           // The entry's slice's center at + 128; the difference from the
           // player's at + 96, its y = 0.0 and w = 1.0; its length + 1.0.
-          track_route::SlicePoint(base, frame + 128, 0, LoadS16(base, frame + 80),
-                                  LoadS16(base, frame + 82));
+          track_route::SlicePoint(base, frame + 128, 0, S16(word >> 16), S16(word & 0xFFFF));
           vl::Vec3Sub(base, frame + 96, frame + 128, frame + 112);
           Stfs(base, frame + 100, zero);
           Stfs(base, frame + 108, one);
@@ -425,27 +425,22 @@ void Refresh(uint8_t* base, uint32_t manager, uint32_t frame, bool heap,
 void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inner, double outer,
                    uint32_t second, uint32_t frame, bool heap, const StartCalls& calls) {
   ITC_NATIVE_RUNNING("sub_821724F8 RaceManager::StreamTraffic");
-  // The player's route position (its vehicle's identity +4) at + 84, its
-  // body's position at + 160, its velocity (+6176) at + 176; the position
-  // again at + 80, the second player's there when there's one.
+  // The player's route position (its vehicle's identity +4; the original's
+  // frame + 84), its body's position and its velocity (+6176; the original
+  // copied them to its frame's + 160 and + 176, read by nothing: read and
+  // dropped since E5 step 6); the position again (the original's + 80, a
+  // value as + 84 since E5 step 6), the second player's when there's one.
   const uint32_t car = va::VehicleGet(base, E(base, player).vehicle_index());
   const uint32_t position = schema::TrackPosition(base, va::VehicleIdentity(car)).route_position();
-  Store(base, frame + 84, position);
   const schema::VectorLibVector at(base, va::RigidBodyPosition(schema::Vehicle(base, car).body().address));
-  Store(base, frame + 160, at.x_bits());
-  Store(base, frame + 164, at.y_bits());
-  Store(base, frame + 168, at.z_bits());
-  Store(base, frame + 172, at.w_bits());
-  for (uint32_t w = 0; w < 4; w++) {
-    Store(base, frame + 176 + 4 * w, Load(base, StatusOf(base, car).heading_address() + 4 * w));
-  }
+  (void)at;
   // Vehicle::Get of the player's +20 again and RigidBody::Position, their
   // answers unused.
-  Store(base, frame + 80, schema::TrackPosition(base, va::VehicleIdentity(car)).route_position());
+  uint32_t position80 = schema::TrackPosition(base, va::VehicleIdentity(car)).route_position();
   const double slice_length = double(schema::TrackRoute(base, kRoute).file().slice_length());
   if (second != 0) {
     const uint32_t other = va::VehicleGet(base, E(base, second).vehicle_index());
-    Store(base, frame + 80, schema::TrackPosition(base, va::VehicleIdentity(other)).route_position());
+    position80 = schema::TrackPosition(base, va::VehicleIdentity(other)).route_position();
   }
   M(base, manager).set_traffic_with_vehicle(0);
   // With the race data's flags 0x4000: every traffic car (the entries at
@@ -467,11 +462,10 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
   }
   // The players' slices' centers: the player's at + 208, the second's at +
   // 192.
-  track_route::SlicePoint(base, frame + 208, 0, LoadS16(base, frame + 84),
-                          LoadS16(base, frame + 86));
+  track_route::SlicePoint(base, frame + 208, 0, S16(position >> 16), S16(position & 0xFFFF));
   if (second != 0) {
-    track_route::SlicePoint(base, frame + 192, 0, LoadS16(base, frame + 80),
-                            LoadS16(base, frame + 82));
+    track_route::SlicePoint(base, frame + 192, 0, S16(position80 >> 16),
+                            S16(position80 & 0xFFFF));
   }
   // Each traffic entry with a vehicle: its slot word counts its ticks (to
   // 216,000, then 60); farther than `outer` from both players (each flat
@@ -490,9 +484,10 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
     if (int32_t(Load(base, again)) > 216000) {
       Store(base, again, 60);
     }
-    Store(base, frame + 84, schema::TrackPosition(base, va::VehicleIdentity(vehicle)).route_position());
-    track_route::SlicePoint(base, frame + 144, 0, LoadS16(base, frame + 84),
-                            LoadS16(base, frame + 86));
+    // Its route position (the original's frame + 84, a value since E5
+    // step 6).
+    const uint32_t at_route = schema::TrackPosition(base, va::VehicleIdentity(vehicle)).route_position();
+    track_route::SlicePoint(base, frame + 144, 0, S16(at_route >> 16), S16(at_route & 0xFFFF));
     vl::Vec3Sub(base, frame + 96, frame + 144, frame + 208);
     Stfs(base, frame + 100, zero);
     const double first = double(vl::Vec3Normalize(base, frame + 96, frame + 96));
@@ -562,15 +557,16 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
   // with the car's km/h x [0x820027A8] below [0x82009974], 1 - `inner` / the
   // slice length from the same; else `inner` / the slice length from the
   // player's.
-  guest::StoreU16(base, frame + 88, 0xFFFF);
-  guest::StoreU16(base, frame + 90, 0xFFFF);
+  // (The original's two halfwords of -1 at + 88 first, overwritten at once
+  // by the position: dropped since E5 step 6. The steps' word at + 80 is a
+  // value since then.)
   const uint32_t flag6168 = StatusOf(base, car).wrong_way();
   Store(base, frame + 88, position);
   bool less = false;  // the steps 1 - f13
   double f13 = 0.0;
   if (flag6168 != 0) {
     if (second != 0) {
-      Store(base, frame + 88, Load(base, frame + 80));
+      Store(base, frame + 88, position80);
     }
     f13 = Fdivs(outer, slice_length);
     less = true;
@@ -578,18 +574,15 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
     const double kmh = Fmuls(double(Vehicle_GetSpeedKmh(base, car)), Lfs(base, kSlowFactor));
     if (kmh < Lfs(base, kTrafficSpeed)) {
       if (second != 0) {
-        Store(base, frame + 88, Load(base, frame + 80));
+        Store(base, frame + 88, position80);
       }
       f13 = Fdivs(inner, slice_length);
       less = true;
     }
   }
-  if (less) {
-    Store(base, frame + 80, FctiwzWord(Fsubs(Lfs(base, kOne), f13)));
-  } else {
-    Store(base, frame + 80, FctiwzWord(Fdivs(inner, slice_length)));
-  }
-  StepToMainRoad(base, frame + 88, LoadS16(base, frame + 82), 0xFFFFFFFFu, frame - 112);
+  const uint32_t steps = less ? FctiwzWord(Fsubs(Lfs(base, kOne), f13))
+                             : FctiwzWord(Fdivs(inner, slice_length));
+  StepToMainRoad(base, frame + 88, S16(steps & 0xFFFF), 0xFFFFFFFFu, frame - 112);
   // The spot's center at + 128; refused (nothing more) when a listed racer's
   // body ([0x826D82F4]'s list, its count read again each pass; the position
   // at + 96, its y 0.0) is nearer than [0x82002568] (Vec3::Direction into +

@@ -6,6 +6,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "hooks/heap.h"
 #include "schema/game_modes.h"
 #include "schema/menu_helpers.h"
 #include "schema/type2_dialog.h"
@@ -40,16 +41,18 @@ constexpr uint32_t kStepTable[10] = {0x82187728, 0x821877F8, 0x821878B0, 0x82187
 
 uint64_t Draw(uint8_t* base, uint64_t r3, uint64_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82187E50 Type2Dialog::Draw");
+  // The frame kept for the page's call (its back chain); the pages' table
+  // the original built at its +80 is kPageTable (E5 step 6: only this
+  // function read it).
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t page = G::pages(base).page();
-  for (uint32_t i = 0; i < 4; i++) {
-    StoreU32(base, frame + 80 + 4 * i, kPageTable[i]);
-  }
   if (page == 0xFFFFFFFFu) {
     return r3;
   }
-  // No bounds check, as the original: the word at the table's index.
-  const uint32_t target = LoadU32(base, frame + 80 + (page << 2));
+  // No bounds check, as the original: the word at the table's index (past
+  // the table, the frame's word there, as the original read it).
+  const uint32_t target =
+      page < 4 ? kPageTable[page] : LoadU32(base, frame + 80 + (page << 2));
   return calls.CallArgs(target, frame, 0x82187EB8,
                         {mode, mode, 0, 0, kPageTable[0], kPageTable[1], kPageTable[2],
                          kPageTable[3]});
@@ -59,14 +62,14 @@ uint64_t Update(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp, con
   ITC_NATIVE_RUNNING("sub_82187EC8 Type2Dialog::Update");
   // The empty sub_82106540(100, 30, 0, ..) the original calls first is left
   // out: it returns at once.
+  // The frame kept for the steps' and Run's calls (its back chain); the
+  // movie's key the original stored at its +80 is passed as a value, the
+  // steps' table it built at +96 is kStepTable (E5 step 6: only this
+  // function read them).
   const uint32_t frame = Frame(base, sp, 208);
-  StoreU32(base, frame + 80, G::data(base).movie_shown());
-  const uint32_t movie =
-      LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+  const uint32_t movie = LoadU32(
+      base, ui_movies::PairsFindKey(base, ui_movies::kMovieTable, G::data(base).movie_shown()));
   const auto pages = G::pages(base);
-  for (uint32_t i = 0; i < 10; i++) {
-    StoreU32(base, frame + 96 + 4 * i, kStepTable[i]);
-  }
   const uint32_t step = pages.step();
   uint64_t answer = movie;
   if (step == 0xFFFFFFFFu) {
@@ -74,9 +77,12 @@ uint64_t Update(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp, con
   } else {
     bool done = true;
     if (int32_t(step) >= 0) {
-      // No bounds check: the word at the table's index. r4 to r10 as the
-      // original leaves them (the table's build), not read by the steps.
-      const uint32_t target = LoadU32(base, frame + 96 + (step << 2));
+      // No bounds check: the word at the table's index (past the table, the
+      // frame's word there, as the original read it). r4 to r10 as the
+      // original leaves them (the table's build; r10 the table's address,
+      // not read by the steps).
+      const uint32_t target =
+          step < 10 ? kStepTable[step] : LoadU32(base, frame + 96 + (step << 2));
       answer = calls.CallArgs(target, frame, 0x82187FC8,
                               {pages.step_started_address(), kStepTable[3], kStepTable[4], kStepTable[5],
                                kStepTable[6], kStepTable[7], frame + 96, step << 2});
@@ -119,7 +125,11 @@ uint64_t Update(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp, con
 
 uint64_t OnEnter(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821869B8 Type2Dialog::OnEnter");
-  const uint32_t frame = Frame(base, sp, 128);
+  // The original's 128-byte frame (only its back chain) left out: its
+  // allocations are host objects now and no guest call is made from it (E5
+  // step 6).
+  (void)sp;
+  (void)calls;
   const Machine m(base, machine);
   m.set_loaded(0);
   // Host objects (E5 step 5) in place of the VirtualAlloc(28) at 0x821869E4
@@ -170,7 +180,9 @@ uint64_t OnEnter(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& call
 
 uint64_t WaitForMovies(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821880D0 Type2Dialog::WaitForMovies");
-  Frame(base, sp, 96);
+  // The original's 96-byte frame (only its back chain) left out: no guest
+  // call is made from it (E5 step 6).
+  (void)sp;
   const uint32_t machine = uint32_t(r3);
   const Machine m(base, machine);
   if (m.loaded() == 0) {
@@ -252,11 +264,12 @@ uint64_t Cancel(uint8_t* base, uint64_t r3, uint32_t mode) {
 
 uint64_t OpenConfirm(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82186C30 Type2Dialog::OpenConfirm");
+  // The frame kept for ResetPose's call (its back chain); the movie's key
+  // the original stored at its +80 passed as a value (E5 step 6).
   const uint32_t frame = Frame(base, sp, 112);
   G::data(base).set_movie_shown(16);
-  StoreU32(base, frame + 80, G::data(base).movie_shown());
-  const uint32_t movie =
-      LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+  const uint32_t movie = LoadU32(
+      base, ui_movies::PairsFindKey(base, ui_movies::kMovieTable, G::data(base).movie_shown()));
   const uint64_t r3 = calls.Call(kResetPose, frame, 0x82186C80, movie);
   const uint32_t choice = LoadU32(base, movie + 40960);
   const auto menu = G::menu(base);
@@ -291,10 +304,12 @@ uint64_t OpenConfirm(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& 
 
 uint64_t OpenConfirm2(uint8_t* base, uint32_t machine, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82186D40 Type2Dialog::OpenConfirm2");
-  const uint32_t frame = Frame(base, sp, 112);
+  // The original's 112-byte frame left out: its one word (the movie's key
+  // at +80) passed as a value, no guest call made from it (E5 step 6).
+  (void)sp;
   G::data(base).set_movie_shown(18);
-  StoreU32(base, frame + 80, G::data(base).movie_shown());
-  const uint32_t pair = ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80);
+  const uint32_t pair =
+      ui_movies::PairsFindKey(base, ui_movies::kMovieTable, G::data(base).movie_shown());
   const uint32_t movie = LoadU32(base, pair);
   const auto menu = G::menu(base);
   const uint32_t choice = LoadU32(base, movie + 40960);
@@ -362,9 +377,18 @@ void OpenNotice(uint8_t* base, uint32_t machine, bool second) {
 
 uint64_t OnLeft(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82186428 Type2Dialog::OnLeft");
-  const uint32_t frame = Frame(base, sp, 112);
-  calls.Call(kVirtualFree, frame, 0x82186450, G::pages(base).address, 0, 0x8000);
-  calls.Call(kVirtualFree, frame, 0x82186464, G::menu(base).address, 0, 0x8000);
+  // VirtualFree (sub_82295330) as its adapter answers it, called directly
+  // (E5 step 6, as Session::Free's); through the dispatch, from the
+  // original's frame (only its back chain), where the adapter would run the
+  // original or the block is 0.
+  auto free_block = [&](uint32_t block, uint32_t lr) {
+    if (block != 0 && hooks::VirtualFree(block, 0, 0x8000, lr)) {
+      return;
+    }
+    calls.Call(kVirtualFree, Frame(base, sp, 112), lr, block, 0, 0x8000);
+  };
+  free_block(G::pages(base).address, 0x82186450);
+  free_block(G::menu(base).address, 0x82186464);
   // The host data block (OnEnter): the original's VirtualFree at
   // 0x82186478, which returned 1.
   G::data(base).Delete();

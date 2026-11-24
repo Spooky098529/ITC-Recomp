@@ -4,6 +4,8 @@
 #include "race_menu/race_menu.h"
 
 #include "base/log.h"
+#include "hooks/heap.h"
+#include "memory/heap.h"
 #include "race_menu/internal.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -19,7 +21,6 @@ constexpr uint32_t kMemRelease = 0x8000;
 
 uint64_t Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82188E20 RaceMenu::Create");
-  const uint32_t frame = Frame(base, sp, 144);
   const Machine m(base, machine);
   m.set_page(0);
   G::set_pages(base, 0u);
@@ -51,13 +52,21 @@ uint64_t Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls
   Store(base, m.debug_list_address() + 4 * count, 8);
   count = m.debug_count() + 1;
   m.set_debug_count(count);
-  const uint32_t pages =
-      uint32_t(calls.Call(kVirtualAlloc, frame, 0x82188F08, 0, 28, kMemCommit, kReadWrite));
+  // VirtualAlloc(0, size, MEM_COMMIT, read-write) (sub_82295398) as its
+  // adapter answers it, the allocation layer's pages, called directly (E5
+  // step 6); through the dispatch, from the original's frame (only its back
+  // chain), where the adapter would run the original (the native heap off).
+  auto alloc = [&](uint32_t size, uint32_t lr) -> uint64_t {
+    if (hooks::NativeHeapActive()) {
+      return memory::AllocPages(size, 4096);
+    }
+    return calls.Call(kVirtualAlloc, Frame(base, sp, 144), lr, 0, size, kMemCommit, kReadWrite);
+  };
+  const uint32_t pages = uint32_t(alloc(28, 0x82188F08));
   G::set_pages(base, pages);
-  const uint32_t pages2 =
-      uint32_t(calls.Call(kVirtualAlloc, frame, 0x82188F20, 0, 28, kMemCommit, kReadWrite));
+  const uint32_t pages2 = uint32_t(alloc(28, 0x82188F20));
   G::set_pages2(base, pages2);
-  const uint64_t r3 = calls.Call(kVirtualAlloc, frame, 0x82188F3C, 0, 68, kMemCommit, kReadWrite);
+  const uint64_t r3 = alloc(68, 0x82188F3C);
   G::set_menu(base, uint32_t(r3));
   const Pages p = G::pages(base);
   p.set_step_started(0);
@@ -223,12 +232,22 @@ void LeaveToHub(uint8_t* base, uint32_t machine, uint32_t mode) {
 
 uint64_t Destroy(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82188FE0 RaceMenu::Destroy");
-  const uint32_t frame = Frame(base, sp, 112);
   const Machine m(base, machine);
-  calls.Call(kVirtualFree, frame, 0x82189014, G::pages(base).address, 0, kMemRelease);
-  calls.Call(kVirtualFree, frame, 0x82189028, G::pages2(base).address, 0, kMemRelease);
-  const uint64_t r3 =
-      calls.Call(kVirtualFree, frame, 0x8218903C, G::menu(base).address, 0, kMemRelease);
+  // VirtualFree (sub_82295330) as its adapter answers it, called directly
+  // (E5 step 6, as Session::Free's); through the dispatch, from the
+  // original's frame (only its back chain), where the adapter would run the
+  // original or the block is 0.
+  auto free_block = [&](uint32_t block, uint32_t lr) -> uint64_t {
+    if (block != 0) {
+      if (const auto freed = hooks::VirtualFree(block, 0, kMemRelease, lr)) {
+        return *freed;
+      }
+    }
+    return calls.Call(kVirtualFree, Frame(base, sp, 112), lr, block, 0, kMemRelease);
+  };
+  free_block(G::pages(base).address, 0x82189014);
+  free_block(G::pages2(base).address, 0x82189028);
+  const uint64_t r3 = free_block(G::menu(base).address, 0x8218903C);
   uint32_t state;
   if (m.day() == 2) {
     // The boot movies: movie 1, then the mode after them.

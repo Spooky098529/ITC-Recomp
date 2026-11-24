@@ -17,8 +17,11 @@
 #include "schema/race_setup.h"
 #include "schema/race_states.h"
 #include "guest.h"
+#include "hooks/heap.h"
+#include "memory/heap.h"
 
 #include <bit>
+#include <optional>
 
 namespace network_mode {
 
@@ -103,8 +106,9 @@ uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls)
   // filled, as New's); the mode's +848 holds its handle. Freed by
   // ModeType12::Release (FreePages over the handle).
   m.set_block(Block::New(base));
-  // The fades' table's page, kept in the frame for the second FadeIn.
-  StoreU32(base, frame + 112, G::fades_passes_address() & 0xFFFF0000u);
+  // The fades' table's page, kept for the second FadeIn (the original's
+  // frame +112; a local since E5 step 6: only this function reads it).
+  const uint32_t fades_page = G::fades_passes_address() & 0xFFFF0000u;
   calls.Call(kFadeIn, frame, 0x822780C8, G::fades_passes(base), 0, 0, 0);
   for (const Member& member : kMembers) {
     bool replaced = false;
@@ -119,23 +123,17 @@ uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls)
   const uint32_t first = FirstScreen(base);
   Block(base, block()).set_first_shown(first);
   Block(base, block()).set_shown(first);
-  // The frame's words the first four machines' +9612 and +9616 are copied
-  // from.
-  StoreU32(base, frame + 88, 0);
-  StoreU32(base, frame + 96, 0);
-  StoreU32(base, frame + 80, 0);
-  StoreU32(base, frame + 104, 0);
-  StoreU32(base, frame + 84, 1);
-  StoreU32(base, frame + 92, 1);
+  // The first four machines' +9612 and +9616 (1 and 0; the original copies
+  // them from its frame's words +80 to +104, which only it reads: values
+  // since E5 step 6).
   NetMachine(base, block() + kModeSelectAt).set_reenter(1);
-  StoreU32(base, frame + 100, 1);
   NetMachine(base, block() + kModeSelectAt).set_delete_movie(0);
-  NetMachine(base, block() + kScreen1At).set_reenter(LoadU32(base, frame + 84));
-  NetMachine(base, block() + kScreen1At).set_delete_movie(LoadU32(base, frame + 88));
-  NetMachine(base, block() + kScreen3At).set_reenter(LoadU32(base, frame + 92));
-  NetMachine(base, block() + kScreen3At).set_delete_movie(LoadU32(base, frame + 96));
-  NetMachine(base, block() + kRankingAt).set_reenter(LoadU32(base, frame + 100));
-  NetMachine(base, block() + kRankingAt).set_delete_movie(LoadU32(base, frame + 104));
+  NetMachine(base, block() + kScreen1At).set_reenter(1);
+  NetMachine(base, block() + kScreen1At).set_delete_movie(0);
+  NetMachine(base, block() + kScreen3At).set_reenter(1);
+  NetMachine(base, block() + kScreen3At).set_delete_movie(0);
+  NetMachine(base, block() + kRankingAt).set_reenter(1);
+  NetMachine(base, block() + kRankingAt).set_delete_movie(0);
   bool first_opened = true;
   for (const uint32_t offset : kOpened) {
     if (first_opened) {
@@ -149,16 +147,14 @@ uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls)
   }
   calls.Call(kLoadingShow, frame, 0x82278568, 1, 0, ~uint64_t(0));
   const uint64_t r3 =
-      calls.Call(kFadeIn, frame, 0x82278584, LoadU32(base, LoadU32(base, frame + 112) + 0x1BEC),
-                 0, 0, 0);
-  // The delegate: WaitForLoads through Mode::Slot8Thunk.
-  StoreU32(base, frame + 116, 0);
-  StoreU32(base, frame + 112, kSlot8Thunk);
+      calls.Call(kFadeIn, frame, 0x82278584, LoadU32(base, fades_page + 0x1BEC), 0, 0, 0);
+  // The delegate: WaitForLoads through Mode::Slot8Thunk (the original's
+  // frame +112 and +116, values since E5 step 6).
   const uint32_t delegate = mode + 8;  // the delegate (in host memory, E5 step 4)
   uint32_t holder = 0;
   if (delegate != 0) {
     holder = delegate;
-    const uint32_t function = LoadU32(base, frame + 112), adjustment = LoadU32(base, frame + 116);
+    const uint32_t function = kSlot8Thunk, adjustment = 0;
     m.set_delegate_object(mode);
     m.set_delegate_function(function);
     m.set_delegate_adjustment(adjustment);
@@ -599,7 +595,9 @@ uint64_t ForceExit(uint8_t* base, uint32_t object, uint32_t sp, const Calls& cal
 
 uint32_t Resume(uint8_t* base, uint32_t object, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82278B98 ModeType12::Resume");
-  Frame(base, sp, 96);
+  // The original's 96-byte frame (only its back chain) left out: no guest
+  // call is made from it (E5 step 6).
+  (void)sp;
   // The mode seen from its +32 interface (`object`).
   const Mode mode(base, object - 32);
   const Block block = mode.block();
@@ -611,21 +609,32 @@ uint32_t Resume(uint8_t* base, uint32_t object, uint32_t sp) {
 
 uint64_t SessionFree(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82292710 Session::Free");
-  const uint32_t frame = Frame(base, sp, 96);
   const uint32_t session = G::session(base).address;
   if (session == 0) {
     return 0;
   }
+  // The original's frame (only its back chain), for Session::Release's
+  // guest calls below it (E5 step 6: not made on the early return).
+  const uint32_t frame = Frame(base, sp, 96);
   SessionRelease(base, session, frame, calls);
+  // VirtualFree (sub_82295330) as its adapter answers it, called directly
+  // (E5 step 6); through the dispatch where the adapter runs the original.
+  const uint32_t pages = G::session(base).address;
+  std::optional<uint32_t> freed;
+  if (pages != 0) {
+    freed = hooks::VirtualFree(pages, 0, kMemRelease, 0x82292748);
+  }
   const uint64_t r3 =
-      calls.Call(kVirtualFree, frame, 0x82292748, G::session(base).address, 0, kMemRelease);
+      freed ? uint64_t(*freed) : calls.Call(kVirtualFree, frame, 0x82292748, pages, 0, kMemRelease);
   G::set_session(base, 0u);
   return r3;
 }
 
 uint64_t SessionInit(uint8_t* base, uint64_t session_r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_822915C0 Session::Init");
-  Frame(base, sp, 112);
+  // The original's 112-byte frame (only its back chain) left out: no guest
+  // call is made from it (E5 step 6).
+  (void)sp;
   const schema::Session s(base, uint32_t(session_r3));
   auto store64 = [&](uint32_t at, uint64_t value) {
     Store(base, at, uint32_t(value >> 32));
@@ -659,12 +668,18 @@ uint64_t SessionInit(uint8_t* base, uint64_t session_r3, uint32_t sp) {
 
 uint64_t SessionMake(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822926B8 Session::Make");
-  const uint32_t frame = Frame(base, sp, 96);
   if (G::session(base).address != 0) {
     return r3;
   }
+  // VirtualAlloc(0, size, MEM_COMMIT, PAGE_READWRITE) as its adapter
+  // (sub_82295398) answers it with the native heap on, called directly (E5
+  // step 6); else through the dispatch from the original's 96-byte frame.
+  const uint32_t frame = sp - 96;
   const uint64_t session =
-      calls.Call(kVirtualAlloc, frame, 0x822926F0, 0, schema::Session::kSize, 0x1000, 4);
+      hooks::NativeHeapActive()
+          ? uint64_t(memory::AllocPages(schema::Session::kSize, 4096))
+          : calls.Call(kVirtualAlloc, Frame(base, sp, 96), 0x822926F0, 0, schema::Session::kSize,
+                       0x1000, 4);
   G::set_session(base, uint32_t(session));
   return SessionInit(base, session, frame);
 }

@@ -32,13 +32,6 @@ namespace {
 namespace steps = camera_modes::steps;
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
-}
-void Store64(uint8_t* base, uint32_t address, uint64_t value) {
-  Store(base, address, uint32_t(value >> 32));
-  Store(base, address + 4, uint32_t(value));
-}
 double Lfd(uint8_t* base, uint32_t address) {
   return std::bit_cast<double>((uint64_t(Load(base, address)) << 32) | Load(base, address + 4));
 }
@@ -104,22 +97,22 @@ void Context::Header() {
   *f1 = stats_f1;
   // Sub-scene 18's stats (SetCarStats' texts again, as the original).
   Text(18, 7, 8, TS(base, screen).stat_displacement(), 0x821E3BD0);
-  // +20772 made a float through the frame's +80 (std, lfd, fcfid, frsp),
-  // scaled by the double at 0x82009F00 (fmul, frsp), back to an int (fctiwz,
-  // stfiwx at +80); r10 the frame's +80 (the stfiwx's address, set).
+  // +20772 made a float (the original through the frame's +80: std, lfd,
+  // fcfid, frsp; a value since E5 step 6), scaled by the double at
+  // 0x82009F00 (fmul, frsp), back to an int (fctiwz; the original's stfiwx
+  // at +80); r10 the frame's +80 (the stfiwx's address, set).
   const int64_t weight = int32_t(TS(base, screen).stat_weight());
-  Store64(base, frame + 80, uint64_t(weight));
   const double single = steps::Single(double(weight));
   const double pounds = steps::Single(single * Lfd(base, kPounds));
-  Store(base, frame + 80, uint32_t(steps::Fctiwz(pounds)));
-  Text(18, 8, 8, Load(base, frame + 80), 0x821E3C18, frame + 80);
+  const uint32_t pounds_word = uint32_t(steps::Fctiwz(pounds));
+  Text(18, 8, 8, pounds_word, 0x821E3C18, frame + 80);
   Text(18, 11, 8, TS(base, screen).stat_peak_power(), 0x821E3C30);
   // +20780 times the double at 0x82009F08 (frsp into f1), passed as a
-  // double in r7 (through the frame's +48) and in f1.
+  // double in r7 (the original through the frame's +48: a value since E5
+  // step 6) and in f1.
   const double unit = steps::Single(steps::Lfs(base, TS(base, screen).stat_torque_address()) *
                                     Lfd(base, kTorqueUnit));
   const uint64_t bits = std::bit_cast<uint64_t>(unit);
-  Store64(base, frame + 48, bits);
   *f1 = unit;
   Text(18, 12, 436, bits, 0x821E3C60);
   Text(18, 9, 438, 0, 0x821E3C74);
@@ -256,7 +249,9 @@ uint64_t Refresh(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32_t s
   ITC_NATIVE_RUNNING("sub_821E3AD0 TuningScreen::Refresh");
   const uint32_t frame = sp - refresh::kFrameBytes;
   guest::StoreU32(base, frame, sp);  // the back chain, as stwu
-  const uint32_t entry = MovieEntry(base, frame, kMovieId);
+  // The movie's id passed to UiMovies::Find as a value (the original's
+  // frame +80; E5 step 6).
+  const uint32_t entry = ui_movies::PairsFindKey(base, ui_movies::kMovieTable, kMovieId);
   refresh::Context c{base, stand, r3, uint32_t(r3), frame, guest::LoadU32(base, entry), f1};
   c.Header();
   // The switch on the state - 3 (unsigned, 0 to 55) through the table at

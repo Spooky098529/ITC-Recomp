@@ -54,10 +54,11 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   return frame;
 }
 
-// The movie with id `id`: the id at the frame's +80, then UiMovies::Find.
-uint32_t MovieAt(uint8_t* base, uint32_t frame, uint32_t id) {
-  StoreU32(base, frame + 80, id);
-  return LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+// The movie with id `id`: UiMovies::Find with the id as a value (the
+// original's at the frame's +80; E5 step 6: Leave stores it there itself,
+// as a guest call gets that slot's address).
+uint32_t MovieAt(uint8_t* base, [[maybe_unused]] uint32_t frame, uint32_t id) {
+  return LoadU32(base, ui_movies::PairsFindKey(base, ui_movies::kMovieTable, id));
 }
 
 // A message (`message`, 0, 0) posted in the dispatcher's ring (+204), the
@@ -96,7 +97,7 @@ uint32_t Texture(uint8_t* base, uint32_t movie, uint32_t child, uint32_t texture
 uint64_t Screen0Construct(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8223D2F0 Type8Screen0::Type8Screen0");
   const S s(base, uint32_t(r3));
-  Frame(base, sp, 96);
+  (void)sp;  // its frame held only the back chain (E5 step 6)
   boot_mode::ScreenMachineConstruct(base, s.machine_address());
   s.set_vtable(S::kVtable);
   const schema::MenuList list(base, s.menu_list_address());
@@ -152,8 +153,6 @@ uint64_t Screen0OnEnter(uint8_t* base, uint64_t r3, uint32_t sp, const ScreenCal
   const S s(base, uint32_t(r3));
   const Pages pages(base, s.pages_address());
   const uint32_t frame = Frame(base, sp, 144);
-  StoreU32(base, frame + 92, 158);
-  StoreU32(base, frame + 84, 159);
   s.set_dialog_answer(kMinusOne);
   s.set_menu_input(1);
   pages.set_next_page(0);
@@ -167,6 +166,11 @@ uint64_t Screen0OnEnter(uint8_t* base, uint64_t r3, uint32_t sp, const ScreenCal
   if (calls.native_heap && save_data::MenuListInitNative(base, list)) {
     save_data::MenuListInit(base, list, args);
   } else {
+    // The ninth and tenth arguments (159, 158) on the stack at the frame's
+    // +84 and +92, as the original passes them (only the guest call reads
+    // them: stored here since E5 step 6).
+    StoreU32(base, frame + 92, 158);
+    StoreU32(base, frame + 84, 159);
     const uint64_t regs[8] = {ListR3(base, r3), 5, 5, 1, 154, 153, 155, 156};
     calls.call8(kListInit, regs, frame, 0x8223B6A4);
   }
@@ -184,7 +188,7 @@ uint64_t Screen0OpenMovie(uint32_t sp, uint32_t lr, const ScreenCalls& calls) {
 uint64_t Screen0WaitForMovie(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8223B6D8 Type8Screen0::WaitForMovie");
   const Machine machine(base, S(base, uint32_t(r3)).machine_address());
-  Frame(base, sp, 96);
+  (void)sp;  // its frame held only the back chain (E5 step 6)
   if (machine.loaded() != 0) {
     return r3;
   }
@@ -227,8 +231,10 @@ uint64_t Screen0Pick(uint8_t* base, uint64_t r3, uint32_t answer) {
 
 uint64_t Screen0ShowPage(uint8_t* base, uint64_t a, uint64_t b, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8223BD20 Type8Screen0::ShowPage");
-  const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t movie = MovieAt(base, frame, 24);
+  // No guest frame (E5 step 6): the id 24 passed to UiMovies::Find as a value.
+  (void)sp;
+  const uint32_t movie =
+      LoadU32(base, ui_movies::PairsFindKey(base, ui_movies::kMovieTable, 24));
   const bool first = int32_t(a) != 0, second = int32_t(b) != 0;
   if (!first && !second) {
     SetShown(base, movie, kMinusOne, 6, 0);
@@ -272,6 +278,7 @@ uint64_t Screen0Leave(uint8_t* base, uint32_t dispatcher, uint32_t sp,
                       const ScreenCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8223BA48 Type8Screen0::Leave");
   const uint32_t frame = Frame(base, sp, 112);
+  StoreU32(base, frame + 80, 24);  // FinishAll gets this slot's address
   const uint32_t movie = MovieAt(base, frame, 24);
   uint64_t r3 = movie;
   if (movie != 0) {
@@ -336,7 +343,8 @@ uint64_t Screen0ChosenPage(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint
   ITC_NATIVE_RUNNING("sub_8223C0C0 Type8Screen0::ChosenPage");
   const S s(base, uint32_t(r3));
   const Machine machine(base, s.machine_address());
-  const uint32_t frame = Frame(base, sp, 112);
+  // No guest frame (E5 step 6): its callees are native and read no slot.
+  const uint32_t frame = sp - 112;
   const uint32_t selection = race_screens::ListSelection(base, s.menu_list_address());
   static constexpr uint32_t kMessages[4] = {16, 14, 19, 21};
   if (selection >= 4) {
@@ -351,13 +359,11 @@ uint64_t Screen0ChosenPage(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint
 
 uint64_t Screen0PlaceCursor(uint8_t* base, uint64_t item, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8223BE88 Type8Screen0::PlaceCursor");
-  const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t movie = MovieAt(base, frame, 24);
-  // mulli and extsw, the doubleword through the frame's +80 (std, lfd,
-  // fcfid, frsp).
+  // No guest frame (E5 step 6).
+  const uint32_t movie = MovieAt(base, sp, 24);
+  // mulli and extsw, the doubleword (the original's through the frame's +80:
+  // std, lfd, fcfid, frsp; a value since E5 step 6).
   const int64_t value = int64_t(int32_t(uint32_t(item * 40)));
-  StoreU32(base, frame + 80, uint32_t(uint64_t(value) >> 32));
-  StoreU32(base, frame + 84, uint32_t(value));
   const uint32_t node = ui_movies::FindNode(base, movie, 0, 0);
   guest::StoreFloat(base, node + 16, float(double(value)));
   return node;
@@ -370,17 +376,14 @@ uint64_t Screen0Draw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
   const uint32_t frame = Frame(base, sp, 128);
   const uint32_t guard = G::page_table_guard(base);
   if ((guard & 1) == 0) {
-    StoreU32(base, frame + 80, 0x8223C6B8);   // MenuPage
-    StoreU32(base, frame + 88, 0x8223B5C0);   // ConfirmPage
-    StoreU32(base, frame + 96, 0x82106540);   // the empty handler
-    StoreU32(base, frame + 84, 0);
-    StoreU32(base, frame + 92, 0);
-    StoreU32(base, frame + 100, 0);
-    StoreU32(base, frame + 108, 0);
-    StoreU32(base, frame + 104, 0x8223C0C0);  // ChosenPage
+    // The pages' member functors (the original builds them at the frame's
+    // +80 to +108; a C++ array since E5 step 6): MenuPage, ConfirmPage, the
+    // empty handler, ChosenPage, each with adjustment 0.
+    static constexpr uint32_t kPages[8] = {0x8223C6B8, 0, 0x8223B5C0, 0,
+                                           0x82106540, 0, 0x8223C0C0, 0};
     G::set_page_table_guard(base, guard | 1);
     for (uint32_t i = 0; i < 8; i++) {
-      StoreU32(base, kTable + 4 * i, LoadU32(base, frame + 80 + 4 * i));
+      StoreU32(base, kTable + 4 * i, kPages[i]);
     }
   }
   const uint32_t page = Pages(base, S(base, uint32_t(r3)).pages_address()).page();

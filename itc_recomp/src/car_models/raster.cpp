@@ -1,6 +1,6 @@
 // The decals' software rasterizer (see raster.h), step for step as the
-// translated code (the operands in its order, its frames' words where it
-// writes them).
+// translated code (the operands in its order; DrawDecal's frame words where
+// it writes them, the frames below it values since E5 step 6).
 
 #include "car_models/raster.h"
 
@@ -81,14 +81,12 @@ int32_t Signed(uint32_t value) {
 
 }  // namespace
 
-uint32_t SampleTexel(uint8_t* base, uint32_t image, double u, double v, uint32_t scratch) {
+uint32_t SampleTexel(uint8_t* base, uint32_t image, double u, double v) {
   ITC_NATIVE_RUNNING("sub_820ED2A0 SoftRaster::SampleTexel");
+  // (The conversions' words the original wrote at its caller's r1 - 80, read
+  // by nothing, are no longer stored: E5 step 6.)
   const int32_t ix = Fctiwz(u);
   const int32_t iy = Fctiwz(v);
-  Store(base, scratch, uint32_t(ix));
-  Store(base, scratch, uint32_t(iy));
-  StoreExtended(base, scratch, ix);
-  StoreExtended(base, scratch + 8, iy);
   const double fu = Fsubs(u, IntToSingle(ix));
   const double fv = Fsubs(v, IntToSingle(iy));
   const schema::DecalImage img(base, image);
@@ -115,23 +113,17 @@ uint32_t SampleTexel(uint8_t* base, uint32_t image, double u, double v, uint32_t
   const uint32_t c = Load(base, (uint32_t(x0) << 2) + row1);
   const uint32_t b = Load(base, (uint32_t(x1) << 2) + row0);
   const uint32_t d = Load(base, (uint32_t(x1) << 2) + row1);
-  Store(base, scratch, tx);
-  Store(base, scratch, ty);
   return Mix(Mix(a, b, tx), Mix(c, d, tx), ty);
 }
 
 void BlendPixel(uint8_t* base, uint32_t image, uint32_t canvas, uint32_t region, int32_t x,
-                int32_t y, uint32_t uv, uint32_t stack) {
+                int32_t y, double u, double v) {
   ITC_NATIVE_RUNNING("sub_820ED498 SoftRaster::BlendPixel");
-  const uint32_t frame = stack - kBlendPixelFrameBytes;
   const uint32_t address =
       (uint32_t(x) << 2) + (schema::DecalRegion(base, region).pitch() * uint32_t(y) +
                             schema::DecalCanvas(base, canvas).first_pixel());
   const uint32_t destination = Load(base, address);
-  const DecalVertex texel(base, uv);
-  const double v = double(texel.y());
-  const double u = double(texel.x());
-  const uint32_t source = SampleTexel(base, image, u, v, frame - 80);
+  const uint32_t source = SampleTexel(base, image, u, v);
   const uint32_t alpha = source >> 24;
   if (alpha == 0) {
     return;
@@ -140,72 +132,53 @@ void BlendPixel(uint8_t* base, uint32_t image, uint32_t canvas, uint32_t region,
 }
 
 void DrawSpan(uint8_t* base, uint32_t canvas, uint32_t region, int32_t xa, int32_t xb,
-              int32_t y, uint32_t a, uint32_t b, uint32_t image, uint32_t stack) {
+              int32_t y, const SpanEnd& a, const SpanEnd& b, uint32_t flags, uint32_t image) {
   ITC_NATIVE_RUNNING("sub_820EDE00 SoftRaster::DrawSpan");
-  const uint32_t f = stack - kDrawSpanFrameBytes;
   const schema::DecalRegion r(base, region);
-  const DecalVertex va(base, a), vb(base, b);
   if (y < 0 || !(Signed(r.height()) > y) || xa == xb) {
     return;
   }
+  // The ends by x (the original copied them to its frame's +112 and +128:
+  // each float there is the value, read back unchanged).
   int32_t left, right;
+  SpanEnd l, rt;
   if (xa < xb) {
     right = xb;
     left = xa;
-    const uint64_t a0 = va.xy(), b0 = vb.xy();
-    const uint64_t a8 = va.zw(), b8 = vb.zw();
-    Store64(base, f + 112, a0);
-    Store64(base, f + 128, b0);
-    Store64(base, f + 120, a8);
-    Store64(base, f + 136, b8);
+    l = a;
+    rt = b;
   } else {
     left = xb;
     right = xa;
-    const uint64_t b0 = vb.xy(), a0 = va.xy();
-    const uint64_t b8 = vb.zw(), a8 = va.zw();
-    Store64(base, f + 112, b0);
-    Store64(base, f + 128, a0);
-    Store64(base, f + 120, b8);
-    Store64(base, f + 136, a8);
+    l = b;
+    rt = a;
   }
-  const uint32_t flags = Load(base, stack + 84);
   double lu, lv, ru, rv;  // f30, f31, f13, f0
   if (flags & 0x80000000u) {
-    const double l_u = Lfs(base, f + 112);
-    const double r_v = Lfs(base, f + 132);
     const double half = double(G::float_half(base));
-    lu = Fsubs(l_u, half);
-    lv = Fsubs(Lfs(base, f + 116), half);
-    const double r_u = Fsubs(Lfs(base, f + 128), half);
-    StoreSingle(base, f + 112, lu);
-    rv = Fsubs(r_v, half);
-    StoreSingle(base, f + 116, lv);
-    StoreSingle(base, f + 128, r_u);
-    StoreSingle(base, f + 132, rv);
-    ru = r_u;
+    lu = Fsubs(l.u, half);
+    lv = Fsubs(l.v, half);
+    ru = Fsubs(rt.u, half);
+    rv = Fsubs(rt.v, half);
   } else {
-    lv = Lfs(base, f + 116);
-    lu = Lfs(base, f + 112);
-    rv = Lfs(base, f + 132);
-    ru = Lfs(base, f + 128);
+    lv = l.v;
+    lu = l.u;
+    rv = rt.v;
+    ru = rt.u;
   }
   if (left < 0) {
     const int32_t skipped = int32_t(0u - uint32_t(left));
     const double du = Fsubs(ru, lu);
     const int32_t width = int32_t(uint32_t(right) - uint32_t(left));
     const double dv = Fsubs(rv, lv);
-    StoreExtended(base, f + 80, skipped);
-    StoreExtended(base, f + 96, width);
     const double length = IntToSingle(width);
     double t = IntToSingle(skipped);
     t = Fdivs(t, length);
     const double su = Fmuls(du, t);
     const double sv = Fmuls(dv, t);
-    StoreSingle(base, f + 96, Fadds(su, lu));
-    StoreSingle(base, f + 100, Fadds(sv, lv));
-    Copy16(base, f + 112, f + 96);
-    lv = Lfs(base, f + 116);
-    lu = Lfs(base, f + 112);
+    const double nu = Fadds(su, lu);
+    lv = Fadds(sv, lv);
+    lu = nu;
     left = 0;
   }
   if (const int32_t width = Signed(r.width()); !(width > right)) {
@@ -214,55 +187,31 @@ void DrawSpan(uint8_t* base, uint32_t canvas, uint32_t region, int32_t xa, int32
     const int32_t over = int32_t(uint32_t(right) - uint32_t(width));
     const double dv = Fsubs(lv, rv);
     right = width;
-    StoreExtended(base, f + 80, length);
-    StoreExtended(base, f + 96, over);
     double t = IntToSingle(over);
-    const double l = IntToSingle(length);
-    t = Fdivs(t, l);
+    const double len = IntToSingle(length);
+    t = Fdivs(t, len);
     const double su = Fmuls(du, t);
     const double sv = Fmuls(dv, t);
     ru = Fadds(su, ru);
-    StoreSingle(base, f + 112, ru);
     rv = Fadds(sv, rv);
-    StoreSingle(base, f + 116, rv);
-    Copy16(base, f + 128, f + 112);
-    rv = Lfs(base, f + 132);
-    ru = Lfs(base, f + 128);
   }
   if (!(left < right)) {
     return;
   }
   const double dv = Fsubs(rv, lv);  // f28
   const double du = Fsubs(ru, lu);  // f29
-  StoreExtended(base, f + 96, int32_t(uint32_t(right) - uint32_t(left)));
   const double length = IntToSingle(int32_t(uint32_t(right) - uint32_t(left)));  // f27
   int32_t i = 0;
   for (int32_t x = left; x < right; x++, i++) {
-    StoreExtended(base, f + 96, i);
     double t = IntToSingle(i);
     t = Fdivs(t, length);
     const double su = Fmuls(du, t);
     const double sv = Fmuls(dv, t);
-    StoreSingle(base, f + 128, Fadds(su, lu));
-    StoreSingle(base, f + 132, Fadds(sv, lv));
-    Copy16(base, f + 112, f + 128);
-    BlendPixel(base, image, canvas, region, x, y, f + 112, f);
+    BlendPixel(base, image, canvas, region, x, y, Fadds(su, lu), Fadds(sv, lv));
   }
 }
 
 namespace {
-
-// One half of a triangle: its rows from `first` to `end` (left out), each
-// row's ends on edges A and B (x at the row's i / rows and at (i + 0.5) /
-// rows, texels at the latter), the ends corrected to the pixels' centers,
-// and a span. The frame's slots as each half uses them.
-struct HalfSlots {
-  uint32_t i;         // the row's number (a doubleword)
-  uint32_t a, b;      // the ends' integers (words)
-  uint32_t a64, b64;  // the same as doublewords
-  uint32_t a_texel, b_texel;
-  uint32_t a_copy, b_copy;  // what the span gets (its r8 and r9)
-};
 
 struct Edge {
   double x0, dx;
@@ -270,14 +219,17 @@ struct Edge {
   double v0, dv;
 };
 
-void DrawHalf(uint8_t* base, uint32_t canvas, uint32_t region, uint32_t image, uint32_t f,
-              uint32_t flags, int32_t first, int32_t end, double rows, const Edge& ea,
-              const Edge& eb, const HalfSlots& s, bool lower) {
+// One half of a triangle: its rows from `first` to `end` (left out), each
+// row's ends on edges A and B (x at the row's i / rows and at (i + 0.5) /
+// rows, texels at the latter), the ends corrected to the pixels' centers,
+// and a span. (The original's frame slots for them, which only it and the
+// span read, are values since E5 step 6.)
+void DrawHalf(uint8_t* base, uint32_t canvas, uint32_t region, uint32_t image, uint32_t flags,
+              int32_t first, int32_t end, double rows, const Edge& ea, const Edge& eb,
+              bool lower) {
   const double half = double(G::float_half(base));
   int32_t i = 0;
   for (int32_t y = first; y < end; y++, i++) {
-    Store(base, f + 84, flags);
-    StoreExtended(base, s.i, i);
     double t = IntToSingle(i);
     const double t0 = Fdivs(t, rows);
     t = Fadds(t, half);
@@ -285,17 +237,13 @@ void DrawHalf(uint8_t* base, uint32_t canvas, uint32_t region, uint32_t image, u
     const double xb0 = Fmadds(eb.dx, t0, eb.x0);
     t = Fdivs(t, rows);
     const int32_t ia = Fctiwz(xa0);
-    Store(base, s.a, uint32_t(ia));
     const int32_t ib = Fctiwz(xb0);
-    Store(base, s.b, uint32_t(ib));
     const double xa = Fmadds(ea.dx, t, ea.x0);
     double ua = Fmuls(ea.du, t);
     double va = Fmuls(ea.dv, t);
     double ub = Fmuls(eb.du, t);
     double vb = Fmuls(eb.dv, t);
     const double xb = Fmadds(eb.dx, t, eb.x0);
-    StoreExtended(base, s.a64, ia);
-    StoreExtended(base, s.b64, ib);
     if (lower) {
       ua = Fadds(ea.u0, ua);
       va = Fadds(ea.v0, va);
@@ -321,15 +269,9 @@ void DrawHalf(uint8_t* base, uint32_t canvas, uint32_t region, uint32_t image, u
     cb = Fadds(cb, half);
     const double sa = Fdivs(ca, ab);
     const double sb = Fdivs(cb, ba);
-    StoreSingle(base, s.a_texel, Fadds(Fmuls(dua, sa), ua));
-    StoreSingle(base, s.a_texel + 4, Fadds(Fmuls(dva, sa), va));
-    StoreSingle(base, s.b_texel, Fadds(Fmuls(dub, sb), ub));
-    StoreSingle(base, s.b_texel + 4, Fadds(Fmuls(dvb, sb), vb));
-    // The copies: B's texel first in the upper half, A's in the lower (as
-    // the original's loads and stores; nothing overlaps).
-    Copy16(base, s.b_copy, s.b_texel);
-    Copy16(base, s.a_copy, s.a_texel);
-    DrawSpan(base, canvas, region, ia, ib, y, s.a_copy, s.b_copy, image, f);
+    const SpanEnd a{Fadds(Fmuls(dua, sa), ua), Fadds(Fmuls(dva, sa), va)};
+    const SpanEnd b{Fadds(Fmuls(dub, sb), ub), Fadds(Fmuls(dvb, sb), vb)};
+    DrawSpan(base, canvas, region, ia, ib, y, a, b, flags, image);
   }
 }
 
@@ -338,7 +280,7 @@ void DrawHalf(uint8_t* base, uint32_t canvas, uint32_t region, uint32_t image, u
 void DrawTriangle(uint8_t* base, uint32_t canvas, uint32_t region, uint32_t positions,
                   uint32_t texels, uint32_t image, uint32_t flags, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820EE0C8 SoftRaster::DrawTriangle");
-  const uint32_t f = stack - kDrawTriangleFrameBytes;
+  (void)stack;  // no guest frame since E5 step 6
   auto y_of = [&](uint32_t i) { return double(DecalVertex(base, positions + 16 * i).y()); };
   uint32_t top = 0, mid = 1, bottom = 2;
   if (y_of(0) > y_of(1)) {
@@ -352,46 +294,36 @@ void DrawTriangle(uint8_t* base, uint32_t canvas, uint32_t region, uint32_t posi
   if (y_of(mid) > y_of(bottom)) {
     std::swap(mid, bottom);
   }
-  const uint32_t top_texel = texels + 16 * top, mid_texel = texels + 16 * mid;
-  const uint32_t bottom_texel = texels + 16 * bottom;
-  Copy16(base, f + 128, positions + 16 * top);
-  Copy16(base, f + 144, positions + 16 * bottom);
-  Copy16(base, f + 160, positions + 16 * mid);
-  Copy16(base, f + 176, mid_texel);
+  // The vertices the original copied into its frame (+128 the top's
+  // position, +144 the bottom's, +160 the middle's, +176 the middle's
+  // texel, +96 the top's, +192 the bottom's) and read back as floats: read
+  // once here, as the copies were taken (E5 step 6).
+  const DecalVertex top_p(base, positions + 16 * top), bottom_p(base, positions + 16 * bottom);
+  const DecalVertex mid_p(base, positions + 16 * mid);
+  const DecalVertex top_t(base, texels + 16 * top), mid_t(base, texels + 16 * mid);
+  const DecalVertex bottom_t(base, texels + 16 * bottom);
+  const double top_x = double(top_p.x()), top_y = double(top_p.y());
+  const double bottom_x = double(bottom_p.x()), bottom_y = double(bottom_p.y());
+  const double mid_x = double(mid_p.x()), mid_y = double(mid_p.y());
+  const double u_mid = double(mid_t.x()), v_mid = double(mid_t.y());  // f15, f16
+  const double u_top = double(top_t.x()), v_top = double(top_t.y());
+  const double u_bottom = double(bottom_t.x()), v_bottom = double(bottom_t.y());
   const double half = double(G::float_half(base));
-  const int32_t y_top = Fctiwz(Fadds(Lfs(base, f + 132), half));
-  Store(base, f + 116, uint32_t(y_top));
-  const int32_t y_mid = Fctiwz(Fadds(Lfs(base, f + 164), half));
-  Store(base, f + 124, uint32_t(y_mid));
-  const int32_t y_bottom = Fctiwz(Fadds(Lfs(base, f + 148), half));
-  Store(base, f + 100, uint32_t(y_bottom));
-  Copy16(base, f + 96, top_texel);
-  Copy16(base, f + 192, bottom_texel);
+  const int32_t y_top = Fctiwz(Fadds(top_y, half));
+  const int32_t y_mid = Fctiwz(Fadds(mid_y, half));
+  const int32_t y_bottom = Fctiwz(Fadds(bottom_y, half));
   if (y_top == y_bottom) {
     return;
   }
-  const double x_top = Lfs(base, f + 128);     // f31
-  const double x_bottom = Lfs(base, f + 144);  // f14
+  const double x_top = top_x;     // f31
+  const double x_bottom = bottom_x;  // f14
   const double dx = Fsubs(x_bottom, x_top);
-  const double x_mid = Lfs(base, f + 160);  // f23
-  const double v_mid = Lfs(base, f + 180);  // f16
+  const double x_mid = mid_x;  // f23
   const uint32_t span_flags = (flags & 0x1FFFFFFF) | 0x80000000u;
-  const DecalVertex top_v(base, top_texel), bottom_v(base, bottom_texel);
-  const uint64_t top0 = top_v.xy(), bottom0 = bottom_v.xy();
-  const uint64_t bottom8 = bottom_v.zw(), top8 = top_v.zw();
-  StoreExtended(base, f + 112, int32_t(uint32_t(y_bottom) - uint32_t(y_top)));
-  StoreExtended(base, f + 120, int32_t(uint32_t(y_mid) - uint32_t(y_top)));
-  const double u_mid = Lfs(base, f + 176);  // f15
-  Store64(base, f + 128, bottom0);
-  Store64(base, f + 144, top0);
-  Store64(base, f + 136, bottom8);
-  Store64(base, f + 152, top8);
-  const double u_top = Lfs(base, f + 144);
   const double upper_rows = IntToSingle(int32_t(uint32_t(y_mid) - uint32_t(y_top)));  // f27
-  double du = Lfs(base, f + 128);
+  double du = u_bottom;
   const double all_rows = IntToSingle(int32_t(uint32_t(y_bottom) - uint32_t(y_top)));
-  const double v_top = Lfs(base, f + 148);
-  double dv = Lfs(base, f + 132);
+  double dv = v_bottom;
   du = Fsubs(du, u_top);
   dv = Fsubs(dv, v_top);
   const double t = Fdivs(upper_rows, all_rows);
@@ -399,30 +331,21 @@ void DrawTriangle(uint8_t* base, uint32_t canvas, uint32_t region, uint32_t posi
   const double u_split = Fadds(Fmuls(du, t), u_top);  // f21
   const double v_split = Fadds(Fmuls(dv, t), v_top);  // f20
   if (y_top < y_mid) {
-    const double u0 = Lfs(base, f + 96);   // f29
-    const double v0 = Lfs(base, f + 100);  // f28
+    const double u0 = u_top;  // f29
+    const double v0 = v_top;  // f28
     const Edge a{x_top, Fsubs(x_mid, x_top), u0, Fsubs(u_mid, u0), v0, Fsubs(v_mid, v0)};
     const Edge b{x_top, Fsubs(x_split, x_top), u0, Fsubs(u_split, u0), v0, Fsubs(v_split, v0)};
-    const HalfSlots slots{f + 120, f + 96,  f + 112, f + 128, f + 144,
-                          f + 176, f + 160, f + 224, f + 208};
-    DrawHalf(base, canvas, region, image, f, span_flags, y_top, y_mid, upper_rows, a, b, slots,
-             false);
+    DrawHalf(base, canvas, region, image, span_flags, y_top, y_mid, upper_rows, a, b, false);
   }
   if (!(y_mid < y_bottom)) {
     return;
   }
-  const double u_bottom = Lfs(base, f + 192);
-  const double v_bottom = Lfs(base, f + 196);
   const Edge a{x_mid, Fsubs(x_bottom, x_mid), u_mid, Fsubs(u_bottom, u_mid), v_mid,
                Fsubs(v_bottom, v_mid)};
   const Edge b{x_split, Fsubs(x_bottom, x_split), u_split, Fsubs(u_bottom, u_split), v_split,
                Fsubs(v_bottom, v_split)};
-  StoreExtended(base, f + 144, int32_t(uint32_t(y_bottom) - uint32_t(y_mid)));
   const double lower_rows = IntToSingle(int32_t(uint32_t(y_bottom) - uint32_t(y_mid)));
-  const HalfSlots slots{f + 144, f + 112, f + 96,  f + 128, f + 120,
-                        f + 192, f + 176, f + 208, f + 224};
-  DrawHalf(base, canvas, region, image, f, span_flags, y_mid, y_bottom, lower_rows, a, b, slots,
-           true);
+  DrawHalf(base, canvas, region, image, span_flags, y_mid, y_bottom, lower_rows, a, b, true);
 }
 
 void DecalCorner(uint8_t* base, uint32_t out, uint32_t p, uint32_t c, uint32_t scale,

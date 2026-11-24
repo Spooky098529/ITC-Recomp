@@ -336,8 +336,9 @@ uint64_t WheelsSetUpBrakes(uint8_t* base, uint32_t group, uint32_t model, uint32
   if (kind == 6) {
     count += 2;
   }
+  // The step count's fctid store at +128, read back by no one, is dropped
+  // (E5 step 6).
   const int64_t steps = int64_t(int32_t(count - 9));
-  Store64(base, sp + 128, uint64_t(steps));
   const double weight = Fmuls(Single(double(steps)), Lfs(base, kNinth));
   Stfs(base, sp + 144, weight);
   Stfs(base, g.weight_address(), weight);
@@ -354,14 +355,14 @@ uint64_t WheelsSetUpBrakes(uint8_t* base, uint32_t group, uint32_t model, uint32
 
 uint64_t WheelPointsSetUp(uint8_t* base, uint32_t block, uint32_t stack, WheelCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820E8668 WheelPoints::SetUp");
-  const uint32_t sp = stack - 112;
+  // The original's 112-byte frame held nothing (the set-ups below make
+  // their own, with their back chains): dropped, its r1 passed on.
   const Points b(base, block);
-  Store(base, sp, stack);
   GroupWords(base, block, b.front_tire_address(), b.rear_tire_address());
   b.set_front_tire_wheels_record(b.word_12());
-  WheelsSetUpTire(base, b.front_tire_address(), b.word_16(), sp, calls);
+  WheelsSetUpTire(base, b.front_tire_address(), b.word_16(), stack, calls);
   b.set_rear_tire_wheels_record(b.word_12());
-  WheelsSetUpTire(base, b.rear_tire_address(), b.word_16() + 464, sp, calls);
+  WheelsSetUpTire(base, b.rear_tire_address(), b.word_16() + 464, stack, calls);
   const double f0 = Lfs(base, b.front_tire_out1_address());
   const double f13 = Lfs(base, b.front_tire_out2_address());
   const double f12 = Lfs(base, b.rear_tire_out1_address());
@@ -386,14 +387,14 @@ uint64_t WheelPointsSetUp(uint8_t* base, uint32_t block, uint32_t stack, WheelCa
   rear.set_matrix(matrix);
   auto rim = set_a ? WheelsSetUpRimA : WheelsSetUpRimB;
   front.set_wheels_record(b.word_12());
-  rim(base, front.address, b.word_20(), sp, calls);
+  rim(base, front.address, b.word_20(), stack, calls);
   rear.set_wheels_record(b.word_12());
-  rim(base, rear.address, b.word_20() + 464, sp, calls);
+  rim(base, rear.address, b.word_20() + 464, stack, calls);
   GroupWords(base, block, b.brakes_front_address(), b.brakes_rear_address());
   b.set_brakes_front_wheels_record(b.word_12());
-  WheelsSetUpBrakes(base, b.brakes_front_address(), b.brake_model(), sp, calls);
+  WheelsSetUpBrakes(base, b.brakes_front_address(), b.brake_model(), stack, calls);
   b.set_brakes_rear_wheels_record(b.word_12());
-  return WheelsSetUpBrakes(base, b.brakes_rear_address(), b.brake_model() + 464, sp, calls);
+  return WheelsSetUpBrakes(base, b.brakes_rear_address(), b.brake_model() + 464, stack, calls);
 }
 
 }  // namespace second_set

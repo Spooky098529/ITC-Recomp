@@ -169,7 +169,8 @@ std::optional<uint32_t> OpponentHasCard(uint8_t* base, uint32_t sp) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_82227708 LocationScreen::OpponentHasCard");
-  guest::StoreU32(base, frame + 80, screen.picked_opponent());
+  // The original's +80 (the picked opponent, GroupItem's argument) was
+  // never read back from the frame: not stored since E5 step 6.
   c_runtime::Memcpy(base, frame + 96, item, 3008);
   const int32_t kind = int16_t(guest::LoadU16(base, frame + 184));
   return kind == 4 || kind == 5 ? 1 : 0;
@@ -215,10 +216,11 @@ uint32_t NextOpponentText(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   vehicle_accessors::RacerRecordsAt(
       base, schema::RaceStatesGlobals::race_data(base).results_address(), 0xFFFFFFFFu);
-  guest::StoreU32(base, frame + 80, Screen(base).picked_opponent());
+  // The picked opponent (the original's +80, read only here: a value since
+  // E5 step 6).
+  const uint32_t picked = Screen(base).picked_opponent();
   const uint32_t event = guest::LoadU32(base, race_event::kEvent);
-  const uint32_t item = race_event::GroupItem(base, event, Screen(base).group_kind(),
-                                              guest::LoadU32(base, frame + 80));
+  const uint32_t item = race_event::GroupItem(base, event, Screen(base).group_kind(), picked);
   Copy(base, calls, frame, 0x82227498, frame + 96, item, 3008);
   const int32_t id = int16_t(guest::LoadU16(base, frame + 96));
   // An item's record in the save data (+0x199F8 + 12 id).

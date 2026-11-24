@@ -5,6 +5,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "hooks/heap.h"
 #include "schema/menu_helpers.h"
 #include "schema/user_info.h"
 #include "ui_movies/game.h"
@@ -27,10 +28,28 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   return frame;
 }
 
-// Movie 10 found with its id stored at `key` (the original's frame word).
-uint32_t FindMovie(uint8_t* base, uint32_t key) {
-  StoreU32(base, key, kMovie);
-  return LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, key));
+// Movie 10 found by its id (the original stored it at its frame's +80 for
+// the find, which only the find read: a value since E5 step 6).
+uint32_t FindMovie(uint8_t* base) {
+  return LoadU32(base, ui_movies::PairsFindKey(base, ui_movies::kMovieTable, kMovie));
+}
+
+// VirtualFree(address, 0, MEM_RELEASE) returning to `lr`: the allocation
+// layer's answer called directly (hooks::VirtualFree, as sub_82295330's
+// entry does; E5 step 6), else (no layer, or an address it doesn't hold,
+// such as 0) the entry through the guest context from `sp`.
+uint64_t Release(uint32_t address, uint32_t sp, uint32_t lr, const Calls& calls) {
+  if (const auto r3 = hooks::VirtualFree(address, 0, kMemRelease, lr)) {
+    return *r3;
+  }
+  return calls.Call(kVirtualFree, sp, lr, address, 0, kMemRelease);
+}
+
+// A table's word at `index` as the originals load it from their frame's
+// +80 with no bounds check: the table's own two words, else the stack's word
+// there (never seen; the original reads whatever the frame holds).
+uint32_t TableWord(uint8_t* base, const uint32_t (&table)[2], uint32_t frame, uint32_t index) {
+  return index < 2 ? table[index] : LoadU32(base, frame + 80 + (index << 2));
 }
 
 // The message (id, 0, 0) posted on `mode`'s ring (+204: its count +600,
@@ -46,16 +65,19 @@ void Post(uint8_t* base, uint32_t mode, uint32_t id) {
   schema::host::StoreU32(slot + 8, 0);
 }
 
-// The pages' table in UpdatePage's frame: MenuPage, the empty sub_82106540.
+// The pages' table the original builds in UpdatePage's frame (+80): MenuPage,
+// the empty sub_82106540.
 constexpr uint32_t kPageTable[2] = {0x8220B0D8, 0x82106540};
-// The transitions' table in Update's frame: Opening, Closing.
+// The transitions' table the original builds in Update's frame (+80):
+// Opening, Closing.
 constexpr uint32_t kTransitionTable[2] = {0x8220B1C8, 0x8220AC60};
 
 }  // namespace
 
 uint64_t Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8220AA50 UserInfo::Create");
-  const uint32_t frame = Frame(base, sp, 112);
+  // No guest frame (E5 step 6): the original's held only its register saves
+  // (its allocations are host objects since step 5), and nothing is called.
   const Machine m(base, machine);
   m.set_loaded(0);
   // Host objects (E5 step 5) in place of the VirtualAlloc(28) at 0x8220AA84
@@ -104,7 +126,8 @@ uint64_t OpenMovie(uint32_t sp, uint32_t lr, const Calls& calls) {
 uint64_t WaitForLoad(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8220B070 UserInfo::WaitForLoad");
   const uint32_t machine = uint32_t(r3);
-  Frame(base, sp, 96);
+  // No guest frame (E5 step 6): IsLoaded is plain C++ and the original's
+  // frame held only its register saves.
   const Machine m(base, machine);
   if (m.loaded() == 0) {
     r3 = ui_movies::IsLoaded(base, kMovie);
@@ -141,7 +164,7 @@ uint64_t Close(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp, cons
   ITC_NATIVE_RUNNING("sub_8220ABB8 UserInfo::Close");
   const uint32_t frame = Frame(base, sp, 112);
   Machine(base, machine).set_state(7);
-  const uint32_t movie = FindMovie(base, frame + 80);
+  const uint32_t movie = FindMovie(base);
   calls.Call(kFinishAll, frame, 0x8220ABF8, movie);
   const uint64_t r3 = calls.Call(kMoviesDelete, frame, 0x8220AC00, kMovie);
   Post(base, mode, 4);
@@ -150,11 +173,11 @@ uint64_t Close(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp, cons
 
 uint64_t Destroy(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8220A9D8 UserInfo::Destroy");
-  const uint32_t frame = Frame(base, sp, 112);
-  calls.Call(kVirtualFree, frame, 0x8220AA00, G::pages(base).address, 0, kMemRelease);
-  calls.Call(kVirtualFree, frame, 0x8220AA14, G::menu(base).address, 0, kMemRelease);
-  const uint64_t r3 =
-      calls.Call(kVirtualFree, frame, 0x8220AA28, G::data(base).address, 0, kMemRelease);
+  // No guest frame (E5 step 6): the frees go to the allocation layer
+  // directly; a fallback's guest call runs from `sp`.
+  Release(G::pages(base).address, sp, 0x8220AA00, calls);
+  Release(G::menu(base).address, sp, 0x8220AA14, calls);
+  const uint64_t r3 = Release(G::data(base).address, sp, 0x8220AA28, calls);
   G::set_pages(base, 0u);
   G::set_menu(base, 0u);
   G::set_data(base, 0u);
@@ -163,25 +186,25 @@ uint64_t Destroy(uint8_t* base, uint32_t sp, const Calls& calls) {
 
 uint64_t UpdatePage(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8220B260 UserInfo::UpdatePage");
+  // The frame stays for the page's call (its r1); the table is a C++
+  // constant (E5 step 6), not stored at the frame's +80.
   const uint32_t frame = Frame(base, sp, 96);
-  StoreU32(base, frame + 80, kPageTable[0]);
-  StoreU32(base, frame + 84, kPageTable[1]);
   const uint32_t page = G::pages(base).page();
   if (page == kNone) {
     return r3;
   }
   // No bounds check, as the original: the word at the table's index.
-  return calls.Call(LoadU32(base, frame + 80 + (page << 2)), frame, 0x8220B2B0, mode, mode);
+  return calls.Call(TableWord(base, kPageTable, frame, page), frame, 0x8220B2B0, mode, mode);
 }
 
 uint64_t Update(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8220B2C0 UserInfo::Update");
   // The empty sub_82106540(100, 30, 0, "TXR_MenuUserInfo") the original
   // calls first is left out: it returns at once.
+  // The frame stays for the calls (their r1); the movie's key and the table
+  // are values (E5 step 6), not stored at the frame's +80.
   const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t movie = FindMovie(base, frame + 80);
-  StoreU32(base, frame + 84, kTransitionTable[1]);
-  StoreU32(base, frame + 80, kTransitionTable[0]);
+  const uint32_t movie = FindMovie(base);
   const schema::PageObject pages = G::pages(base);
   const uint32_t running = pages.step();
   uint64_t r3 = movie;
@@ -191,7 +214,7 @@ uint64_t Update(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls
     bool done = true;
     if (int32_t(running) >= 0) {
       // No bounds check: the word at the table's index.
-      r3 = calls.Call(LoadU32(base, frame + 80 + (running << 2)), frame, 0x8220B358,
+      r3 = calls.Call(TableWord(base, kTransitionTable, frame, running), frame, 0x8220B358,
                       pages.step_started_address());
       done = uint32_t(r3) != 0;
     }

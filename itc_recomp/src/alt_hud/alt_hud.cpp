@@ -57,20 +57,16 @@ void SetSlot(const schema::AltHud& object, uint32_t i, uint32_t value) {
   }
 }
 
-// UiMovies::Find(the movie table, the key 22 at `key`): the value's address.
-uint32_t FindMovie(uint8_t* base, uint32_t key) {
-  guest::StoreU32(base, key, kMovieId);
-  return ui_movies::PairsFind(base, ui_movies::kMovieTable, key);
+// UiMovies::Find(the movie table, the key 22): the value's address. The
+// original stored the key in its frame word and passed its address; only
+// the lookup read it (E5 step 6: the key by value).
+uint32_t FindMovie(uint8_t* base) {
+  return ui_movies::PairsFindKey(base, ui_movies::kMovieTable, kMovieId);
 }
 
 double LoadDouble(uint8_t* base, uint32_t address) {
   return std::bit_cast<double>(uint64_t(guest::LoadU32(base, address)) << 32 |
                                guest::LoadU32(base, address + 4));
-}
-
-void StoreS64(uint8_t* base, uint32_t address, int64_t value) {
-  guest::StoreU32(base, address, uint32_t(uint64_t(value) >> 32));
-  guest::StoreU32(base, address + 4, uint32_t(uint64_t(value)));
 }
 
 // memcpy natively, or through `calls` from the frame `r1` with the return
@@ -109,7 +105,7 @@ uint32_t SetUpGauges(uint8_t* base, uint32_t holder, uint32_t sp, const Calls& c
   ITC_NATIVE_RUNNING("sub_82216C40 AltHud::SetUpGauges");
   const uint32_t frame = sp - 496;
   Frame(base, sp, 496);
-  const uint32_t movie = guest::LoadU32(base, FindMovie(base, frame + 80));
+  const uint32_t movie = guest::LoadU32(base, FindMovie(base));
   const uint32_t player = Object(base, holder).player();
   const uint32_t record =
       player * rh::kRecordBytes + schema::RaceHudObjectGlobals::race_data(base).address;
@@ -136,11 +132,9 @@ uint32_t SetUpGauges(uint8_t* base, uint32_t holder, uint32_t sp, const Calls& c
   return boost;
 }
 
-uint32_t ShowGauge(uint8_t* base, uint32_t slot, uint32_t shown, uint32_t sp) {
+uint32_t ShowGauge(uint8_t* base, uint32_t slot, uint32_t shown, [[maybe_unused]] uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82217380 AltHud::ShowGauge");
-  const uint32_t frame = sp - 128;
-  Frame(base, sp, 128);
-  const uint32_t movie = guest::LoadU32(base, FindMovie(base, frame + 80));
+  const uint32_t movie = guest::LoadU32(base, FindMovie(base));
   const uint32_t digits = ui_movies::FindNode(base, movie, 7, slot + 12);
   const uint32_t label = ui_movies::FindNode(base, movie, 7, slot + 9);
   guest::StoreU32(base, digits + 80, shown);
@@ -150,29 +144,27 @@ uint32_t ShowGauge(uint8_t* base, uint32_t slot, uint32_t shown, uint32_t sp) {
 
 uint32_t SetUpExtraGauges(uint8_t* base, uint32_t holder, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_822178A0 AltHud::SetUpExtraGauges");
-  const uint32_t frame = sp - 160;
-  Frame(base, sp, 160);
-  const uint32_t movie = guest::LoadU32(base, FindMovie(base, frame + 92));
+  const uint32_t movie = guest::LoadU32(base, FindMovie(base));
   const schema::Vehicle car(base, Object(base, holder).car().address);
   // The car's five 12-byte entries from choice0_c (+1832), 12 bytes apart.
   uint32_t entry = schema::Car(base, car.car()).choice0_c_address();
   uint32_t kept = 0;
-  guest::StoreU32(base, frame + 88, 0);
-  guest::StoreU32(base, frame + 84, 0);
-  guest::StoreU32(base, frame + 80, 0);
+  // The three flags (the original's frame words +80, +84 and +88, walked
+  // through a table of their addresses at +96): locals (E5 step 6).
+  int32_t flags[3] = {0, 0, 0};
   for (int k = 0; k < 5; k++, entry += 12) {
     switch (int32_t(guest::LoadU32(base, entry))) {
       case 1:
         kept = 1;
         break;
       case 2:
-        guest::StoreU32(base, frame + 80, 1);
+        flags[0] = 1;
         break;
       case 3:
-        guest::StoreU32(base, frame + 84, 1);
+        flags[1] = 1;
         break;
       case 4:
-        guest::StoreU32(base, frame + 88, 1);
+        flags[2] = 1;
         break;
       default:
         break;
@@ -181,16 +173,12 @@ uint32_t SetUpExtraGauges(uint8_t* base, uint32_t holder, uint32_t sp) {
   if (int32_t(schema::Car(base, car.car()).car_id()) == 10) {
     kept = 1;
   }
-  guest::StoreU32(base, frame + 96, frame + 80);
-  guest::StoreU32(base, frame + 100, frame + 84);
-  guest::StoreU32(base, frame + 104, frame + 88);
   // The slots from the last: the first flag set of the three (cleared), or -1.
   for (int32_t slot = 2; slot >= 0; slot--) {
     SetSlot(Object(base, holder), uint32_t(slot), 0xFFFFFFFFu);
     for (uint32_t i = 0; i < 3; i++) {
-      const uint32_t flag = guest::LoadU32(base, frame + 96 + 4 * i);
-      if (int32_t(guest::LoadU32(base, flag)) == 1) {
-        guest::StoreU32(base, guest::LoadU32(base, frame + 96 + 4 * i), 0);
+      if (flags[i] == 1) {
+        flags[i] = 0;
         SetSlot(Object(base, holder), uint32_t(slot), i);
         break;
       }
@@ -198,18 +186,16 @@ uint32_t SetUpExtraGauges(uint8_t* base, uint32_t holder, uint32_t sp) {
   }
   for (uint32_t i = 0; i < 3; i++) {
     const uint32_t value = Slot(Object(base, holder), i);
-    ShowGauge(base, i, value < 3 ? 1 : 0, frame);
+    ShowGauge(base, i, value < 3 ? 1 : 0, sp);
   }
   const uint32_t node = ui_movies::FindNode(base, movie, 7, 1);
   guest::StoreU32(base, node + 80, kept);
   return node;
 }
 
-uint32_t ShowPanels(uint8_t* base, uint32_t holder, uint32_t sp) {
+uint32_t ShowPanels(uint8_t* base, uint32_t holder, [[maybe_unused]] uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82216D78 AltHud::ShowPanels");
-  const uint32_t frame = sp - 112;
-  Frame(base, sp, 112);
-  const uint32_t movie = guest::LoadU32(base, FindMovie(base, frame + 80));
+  const uint32_t movie = guest::LoadU32(base, FindMovie(base));
   const uint32_t panel = ui_movies::FindNode(base, movie, kNone, 3);
   guest::StoreU32(base, panel + 80, Object(base, holder).shown());
   const uint32_t node = ui_movies::FindNode(base, movie, kNone, 2);
@@ -220,21 +206,18 @@ uint32_t ShowPanels(uint8_t* base, uint32_t holder, uint32_t sp) {
 uint32_t SetUp(uint8_t* base, uint32_t holder, uint32_t player, uint32_t sp, const Calls& calls,
                double* f1) {
   ITC_NATIVE_RUNNING("sub_82217C70 AltHud::SetUp");
-  const uint32_t frame = sp - 96;
-  Frame(base, sp, 96);
+  // No frame of its own (E5 step 6): its callees' frames below `sp`.
   Object(base, holder).set_player(player);
   const uint32_t car = vehicle_accessors::VehicleGet(base, player);
   Object(base, holder).set_car(car);
-  alt_hud::SetUpGauges(base, holder, frame, calls, f1);
-  SetUpExtraGauges(base, holder, frame);
-  return ShowPanels(base, holder, frame);
+  alt_hud::SetUpGauges(base, holder, sp, calls, f1);
+  SetUpExtraGauges(base, holder, sp);
+  return ShowPanels(base, holder, sp);
 }
 
-uint32_t SetSpeed(uint8_t* base, uint32_t speed, uint32_t sp, double* f1) {
+uint32_t SetSpeed(uint8_t* base, uint32_t speed, [[maybe_unused]] uint32_t sp, double* f1) {
   ITC_NATIVE_RUNNING("sub_82216E00 AltHud::SetSpeed");
-  const uint32_t frame = sp - 160;
-  Frame(base, sp, 160);
-  const uint32_t found = FindMovie(base, frame + 80);
+  const uint32_t found = FindMovie(base);
   const uint32_t movie = guest::LoadU32(base, found);
   if (speed > 999) {
     return found;
@@ -253,8 +236,9 @@ uint32_t SetSpeed(uint8_t* base, uint32_t speed, uint32_t sp, double* f1) {
       const int32_t place = int32_t(guest::LoadU32(base, digits + 104) - uint32_t(i)) - 1;
       if (place > 0) {
         *f1 = rh::PowInt(base, LoadDouble(base, G::ten_address()), place);
-        guest::StoreU32(base, frame + 80, uint32_t(Fctiwz(*f1)));
-        if (value < int32_t(guest::LoadU32(base, frame + 80))) {
+        // fctiwz through the original's frame word +80: a local.
+        const int32_t power = Fctiwz(*f1);
+        if (value < power) {
           guest::StoreU32(base, node + 108, 0);
           continue;
         }
@@ -269,8 +253,9 @@ uint32_t SetSpeed(uint8_t* base, uint32_t speed, uint32_t sp, double* f1) {
 uint64_t UpdateExtraGauges(uint8_t* base, uint32_t holder, double value, uint64_t int119,
                            uint64_t int149, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82217A30 AltHud::UpdateExtraGauges");
-  const uint32_t frame = sp - 144;
-  Frame(base, sp, 144);
+  // No slots (E5 step 6): the gauges' calls made from `sp` (they read none
+  // of the caller's frame).
+  const uint32_t frame = sp;
   uint64_t r3 = holder;
   for (uint32_t slot = 0; slot < 3; slot++) {
     switch (Slot(Object(base, holder), slot)) {
@@ -290,11 +275,9 @@ uint64_t UpdateExtraGauges(uint8_t* base, uint32_t holder, double value, uint64_
   return r3;
 }
 
-uint32_t SetGear(uint8_t* base, int32_t gear, uint32_t sp) {
+uint32_t SetGear(uint8_t* base, int32_t gear, [[maybe_unused]] uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82217460 AltHud::SetGear");
-  const uint32_t frame = sp - 112;
-  Frame(base, sp, 112);
-  const uint32_t movie = guest::LoadU32(base, FindMovie(base, frame + 80));
+  const uint32_t movie = guest::LoadU32(base, FindMovie(base));
   const uint32_t node = ui_movies::FindNode(base, movie, kNone, 23);
   uint32_t picture;
   if (gear > 0) {
@@ -306,33 +289,27 @@ uint32_t SetGear(uint8_t* base, int32_t gear, uint32_t sp) {
   return node;
 }
 
-uint32_t SetTach(uint8_t* base, uint32_t holder, double value, uint32_t sp) {
+uint32_t SetTach(uint8_t* base, uint32_t holder, double value, [[maybe_unused]] uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_822173E8 AltHud::SetTach");
-  const uint32_t frame = sp - 112;
-  Frame(base, sp, 112);
   rh::CurveEval(base, Object(base, holder).tach_curve_address(), value);
-  const uint32_t movie = guest::LoadU32(base, FindMovie(base, frame + 80));
+  const uint32_t movie = guest::LoadU32(base, FindMovie(base));
   const uint32_t node = ui_movies::FindNode(base, movie, 7, 7);
   Stfs(base, node + 36,
        Fadds(double(Object(base, holder).tach_output()), double(G::tach_offset(base))));
   return node;
 }
 
-uint32_t SetNode25(uint8_t* base, uint32_t word, uint32_t sp) {
+uint32_t SetNode25(uint8_t* base, uint32_t word, [[maybe_unused]] uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_822174E0 AltHud::SetNode25");
-  const uint32_t frame = sp - 112;
-  Frame(base, sp, 112);
-  const uint32_t movie = guest::LoadU32(base, FindMovie(base, frame + 80));
+  const uint32_t movie = guest::LoadU32(base, FindMovie(base));
   const uint32_t node = ui_movies::FindNode(base, movie, kNone, 25);
   guest::StoreU32(base, node + 80, word);
   return node;
 }
 
-uint32_t SetBar(uint8_t* base, uint32_t holder, double value, uint32_t sp) {
+uint32_t SetBar(uint8_t* base, uint32_t holder, double value, [[maybe_unused]] uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_822175A0 AltHud::SetBar");
-  const uint32_t frame = sp - 112;
-  Frame(base, sp, 112);
-  const uint32_t movie = guest::LoadU32(base, FindMovie(base, frame + 80));
+  const uint32_t movie = guest::LoadU32(base, FindMovie(base));
   const uint32_t node = ui_movies::FindNode(base, movie, kNone, 30);
   Object(base, holder).set_bar(float(value));
   const schema::AltHud object = Object(base, holder);
@@ -346,12 +323,10 @@ uint32_t SetBar(uint8_t* base, uint32_t holder, double value, uint32_t sp) {
   return node;
 }
 
-uint32_t SetBoost(uint8_t* base, uint32_t holder, double value, uint32_t sp) {
+uint32_t SetBoost(uint8_t* base, uint32_t holder, double value, [[maybe_unused]] uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82217538 AltHud::SetBoost");
-  const uint32_t frame = sp - 112;
-  Frame(base, sp, 112);
   rh::CurveEval(base, Object(base, holder).boost_curve_address(), value);
-  const uint32_t movie = guest::LoadU32(base, FindMovie(base, frame + 80));
+  const uint32_t movie = guest::LoadU32(base, FindMovie(base));
   const uint32_t node = ui_movies::FindNode(base, movie, 7, 5);
   Stfs(base, node + 36, double(Object(base, holder).boost_output()));
   return node;
@@ -360,10 +335,8 @@ uint32_t SetBoost(uint8_t* base, uint32_t holder, double value, uint32_t sp) {
 namespace {
 
 // SetThrottle and SetBrake: node `child`'s x scale (+28) = value.
-uint32_t SetScale(uint8_t* base, uint32_t child, double value, uint32_t sp) {
-  const uint32_t frame = sp - 112;
-  Frame(base, sp, 112);
-  const uint32_t movie = guest::LoadU32(base, FindMovie(base, frame + 80));
+uint32_t SetScale(uint8_t* base, uint32_t child, double value, [[maybe_unused]] uint32_t sp) {
+  const uint32_t movie = guest::LoadU32(base, FindMovie(base));
   const uint32_t node = ui_movies::FindNode(base, movie, kNone, child);
   Stfs(base, node + 28, value);
   return node;
@@ -381,15 +354,13 @@ uint32_t SetBrake(uint8_t* base, double value, uint32_t sp) {
   return SetScale(base, 17, value, sp);
 }
 
-uint32_t SetSteering(uint8_t* base, double value, uint32_t sp) {
+uint32_t SetSteering(uint8_t* base, double value, [[maybe_unused]] uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_822176E8 AltHud::SetSteering");
-  const uint32_t frame = sp - 112;
-  Frame(base, sp, 112);
-  const uint32_t movie = guest::LoadU32(base, FindMovie(base, frame + 80));
+  const uint32_t movie = guest::LoadU32(base, FindMovie(base));
   const double scaled = Fmuls(Fneg(value), double(G::steering_scale(base)));
-  guest::StoreU32(base, frame + 80, uint32_t(Fctiwz(scaled)));
-  const int64_t x = int64_t(int32_t(188u - guest::LoadU32(base, frame + 80)));
-  StoreS64(base, frame + 80, x);
+  // fctiwz and the doubleword for fcfid through the original's frame word
+  // +80: locals (E5 step 6).
+  const int64_t x = int64_t(int32_t(188u - uint32_t(Fctiwz(scaled))));
   const double position = Single(double(x));
   const uint32_t node = ui_movies::FindNode(base, movie, kNone, 15);
   Stfs(base, node + 12, position);
@@ -399,11 +370,12 @@ uint32_t SetSteering(uint8_t* base, double value, uint32_t sp) {
 uint32_t Tick(uint8_t* base, uint32_t holder, uint32_t sp, bool native_slots, const Calls& calls,
               double* f1) {
   ITC_NATIVE_RUNNING("sub_82217AC8 AltHud::Tick");
-  const uint32_t frame = sp - 128;
-  Frame(base, sp, 128);
+  // No frame (E5 step 6): its words were fctiwz and fcfid temporaries, now
+  // locals; its callees' frames below `sp`.
+  const uint32_t frame = sp;
   if (MenuListPressedX(base, Holder(base, holder).menu_list().address, frame, native_slots, calls) !=
       0) {
-    const uint32_t movie = guest::LoadU32(base, FindMovie(base, frame + 80));
+    const uint32_t movie = guest::LoadU32(base, FindMovie(base));
     const schema::AltHud object = Object(base, holder);
     object.set_shown(object.shown() ^ 1);
     const uint32_t node = ui_movies::FindNode(base, movie, kNone, 3);
@@ -418,15 +390,12 @@ uint32_t Tick(uint8_t* base, uint32_t holder, uint32_t sp, bool native_slots, co
       base, guest::LoadU32(base, ((player << 2) & 0x3FC) + G::input_records_address()));
   *f1 = double(Vehicle_GetSpeedKmh(base, car));
   const double speed = Single(*f1 * LoadDouble(base, G::kmh_factor_address()));
-  guest::StoreU32(base, frame + 80, uint32_t(Fctiwz(speed)));
-  SetSpeed(base, guest::LoadU32(base, frame + 80), frame, f1);
+  SetSpeed(base, uint32_t(Fctiwz(speed)), frame, f1);
   const int32_t int149 = Fctiwz(double(status.water_temperature()));
   const int32_t int119 = Fctiwz(double(status.oil_temperature()));
   const double value = double(status.engine_output());
-  guest::StoreU32(base, frame + 80, uint32_t(int149));
-  const uint32_t r6 = guest::LoadU32(base, frame + 80);
-  guest::StoreU32(base, frame + 80, uint32_t(int119));
-  const uint32_t r5 = guest::LoadU32(base, frame + 80);
+  const uint32_t r6 = uint32_t(int149);
+  const uint32_t r5 = uint32_t(int119);
   alt_hud::UpdateExtraGauges(base, holder, value, r5, r6, frame, calls);
   SetGear(base, vehicle.gear(), frame);
   *f1 = double(vehicle_accessors::VehicleFloat2224(base, car));
@@ -445,7 +414,6 @@ uint32_t Tick(uint8_t* base, uint32_t holder, uint32_t sp, bool native_slots, co
                   {&schema::CarInput::steering, SetSteering}};
   for (const auto& in : kInputs) {
     const int64_t word = int16_t((input.*in.get)());
-    StoreS64(base, frame + 80, word);
     *f1 = Fmuls(Single(double(word)), scale);
     in.set(base, *f1, frame);
   }
@@ -454,10 +422,9 @@ uint32_t Tick(uint8_t* base, uint32_t holder, uint32_t sp, bool native_slots, co
 
 uint64_t RunMovie(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82216C00 AltHud::RunMovie");
-  const uint32_t frame = sp - 96;
-  Frame(base, sp, 96);
-  const uint32_t movie = guest::LoadU32(base, FindMovie(base, frame + 80));
-  return calls.Call(kRun, frame, 0x82216C30, movie, 0);
+  // No frame (E5 step 6): the key by value, UiMovie::Run called from `sp`.
+  const uint32_t movie = guest::LoadU32(base, FindMovie(base));
+  return calls.Call(kRun, sp, 0x82216C30, movie, 0);
 }
 
 std::optional<uint64_t> Destroy(uint8_t* base, uint32_t holder, uint32_t sp, const Calls& calls) {
@@ -466,8 +433,8 @@ std::optional<uint64_t> Destroy(uint8_t* base, uint32_t holder, uint32_t sp, con
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_82216BA8 AltHud::Destroy");
-  const uint32_t frame = sp - 96;
-  Frame(base, sp, 96);
+  // No slots (E5 step 6): its calls made from `sp`.
+  const uint32_t frame = sp;
   auto remove = [&](uint32_t block, uint32_t lr) -> uint64_t {
     if (memory::crt::OperatorDelete(block)) {
       return block;

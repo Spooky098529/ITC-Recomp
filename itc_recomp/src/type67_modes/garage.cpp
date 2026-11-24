@@ -92,14 +92,14 @@ void GarageStageInit(uint8_t* base, uint32_t stage, uint32_t index, uint32_t sp,
   const uint32_t zero = std::bit_cast<uint32_t>(float(double(F::zero(base))));
   const uint32_t one = std::bit_cast<uint32_t>(float(double(F::one(base))));
   const schema::GarageStage st(base, stage);
-  StoreU32(base, f + 80, zero);
+  // The two axle vectors the original builds at its frame's +80 and +96,
+  // read back only here: C++ arrays since E5 step 6.
+  const uint32_t front[4] = {zero, zero, zero, one};
+  const uint32_t rear[4] = {zero, zero, zero, one};
   st.set_index(index);
-  StoreU32(base, f + 84, zero);
   st.set_model_claimed(0);
-  StoreU32(base, f + 88, zero);
   st.set_pending_block(0xFFFFFFFF);
   st.set_reflection(1);
-  StoreU32(base, f + 92, one);
   st.set_draw_word(1);
   StoreU32(base, st.unknown_12_address(), zero);  // the word as loaded (stfs)
   st.set_plates_shown(1);
@@ -113,15 +113,11 @@ void GarageStageInit(uint8_t* base, uint32_t stage, uint32_t index, uint32_t sp,
   for (uint32_t i = 0; i <= 64; i += 4) {
     StoreU32(base, st.front_axle_height_address() + i, zero);
   }
-  for (uint32_t i = 0; i < 16; i += 4) {
-    StoreU32(base, st.front_axle_x_address() + i, LoadU32(base, f + 80 + i));
+  for (uint32_t i = 0; i < 4; i++) {
+    StoreU32(base, st.front_axle_x_address() + 4 * i, front[i]);
   }
-  StoreU32(base, f + 96, zero);
-  StoreU32(base, f + 100, zero);
-  StoreU32(base, f + 104, zero);
-  StoreU32(base, f + 108, one);
-  for (uint32_t i = 0; i < 16; i += 4) {
-    StoreU32(base, st.rear_axle_x_address() + i, LoadU32(base, f + 96 + i));
+  for (uint32_t i = 0; i < 4; i++) {
+    StoreU32(base, st.rear_axle_x_address() + 4 * i, rear[i]);
   }
   GarageStageResetPose(base, st.bonnet_address(), f);
   GarageCameraInit(base, st.camera_address(), f, load);

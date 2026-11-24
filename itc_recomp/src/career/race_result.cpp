@@ -14,6 +14,7 @@
 #include "schema/race_states.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
+#include <bit>
 #include <cstring>
 
 namespace career {
@@ -36,10 +37,6 @@ void Stfs(uint8_t* base, uint32_t address, double value) {
 uint64_t LoadU64(uint8_t* base, uint32_t address) {
   return (uint64_t(guest::LoadU32(base, address)) << 32) | guest::LoadU32(base, address + 4);
 }
-void StoreU64(uint8_t* base, uint32_t address, uint64_t value) {
-  guest::StoreU32(base, address, uint32_t(value >> 32));
-  guest::StoreU32(base, address + 4, uint32_t(value));
-}
 
 // A float field kept at its largest: the new value when the old one is
 // below it (fcmpu and blt, NaNs keep the old one).
@@ -55,63 +52,49 @@ void CountUp(uint8_t* base, uint32_t address) {
   }
 }
 
-// An integer as the original converts it: its 64 bits stored at frame +88
-// (std), loaded as a double (lfd, fcfid) and rounded to a single.
-double IntToSingle(uint8_t* base, uint32_t frame, int32_t value) {
-  StoreU64(base, frame + 88, uint64_t(int64_t(value)));
-  return double(float(double(int64_t(value))));
-}
+// An integer as the original converts it (std, lfd, fcfid, frsp; the
+// doubleword went through the frame's +88, a value since E5 step 6).
+double IntToSingle(int32_t value) { return double(float(double(int64_t(value)))); }
 
-// The frame's running mean at +80 ({0.0, 0}) with one value added, merged
-// into `into` (RunningMean::Add's and RunningMean::Merge's plain C++).
-void MergeOne(uint8_t* base, uint32_t frame, uint32_t into, double value) {
-  guest::StoreFloat(base, frame + 80, CareerGlobals::zero(base));
-  guest::StoreU32(base, frame + 84, 0);
-  race_setup::RunningMeanAdd(base, frame + 80, value, 1);
-  RunningMeanMerge(base, into, LoadU64(base, frame + 80), frame);
+// The running mean {0.0, 0} (the original's frame +80, a value since E5
+// step 6) with one value added (RunningMean::Add's arithmetic), merged into
+// `into` (RunningMean::Merge's).
+void MergeOne(uint8_t* base, uint32_t into, double value) {
+  const float mean = race_setup::MeanAfterAdd(CareerGlobals::zero(base), 0, value, 1);
+  RunningMeanMergeInto(base, into, (uint64_t(std::bit_cast<uint32_t>(mean)) << 32) | 1);
 }
 
 }  // namespace
 
 uint32_t RunningMeanMergeTwo(uint8_t* base, uint32_t stats, uint64_t packed, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82112148 RunningMean::MergeTwo");
-  const uint32_t frame = sp - kMergeTwoFrame;
+  // The original's 112-byte frame held nothing but RunningMean::Merge's
+  // stores into it (E5 step 6: left out).
+  (void)sp;
   const CareerStats s(base, stats);
-  RunningMeanMerge(base, CareerCounter(base, s.week_address()).week_mean_796_address(), packed,
-                   frame);
-  RunningMeanMerge(base, s.mean_796_address(), packed, frame);
+  RunningMeanMergeInto(base, CareerCounter(base, s.week_address()).week_mean_796_address(),
+                       packed);
+  RunningMeanMergeInto(base, s.mean_796_address(), packed);
   return s.mean_796_address();
 }
 
 bool AddRaceResultNative(uint8_t* base, uint32_t save, uint32_t race, uint32_t sp) {
-  const uint32_t frame = sp - kAddRaceResultFrame;
-  if (frame >= 0xA0000000u) {
-    return false;
-  }
+  // The items' copies onto the frame are gone (E5 step 6): only
+  // Results::Push's copies are checked.
+  (void)sp;
   const RaceData rd(base, race);
   if (rd.race_mode() - 2 > 1) {
     return true;
   }
-  if (!ResultsPushNative(CareerStats(base, CareerSave(base, save).stats_address())
-                             .results_address())) {
-    return false;
-  }
-  const RacerResultsRecord rr(
-      base, vehicle_accessors::RacerRecordsAt(base, rd.results_address(), 0xFFFFFFFFu));
-  if (int32_t(rr.finish()) != 1) {
-    return true;
-  }
-  for (uint32_t k = 0; k < 4; k++) {
-    const uint32_t id = guest::LoadU32(base, rr.e0_item_address() + 972 * k);
-    if (int32_t(id) != -1 && !CanCopy(frame + 96, data_tables::Item(base, id), 3008)) {
-      return false;
-    }
-  }
-  return true;
+  return ResultsPushNative(
+      CareerStats(base, CareerSave(base, save).stats_address()).results_address());
 }
 
 uint32_t StatsAddRaceResult(uint8_t* base, uint32_t save, uint32_t race, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82115190 Stats::AddRaceResult");
+  // The original's 3,184-byte frame (E5 step 6): its running means and
+  // conversions are values, the item copy at +96 read in place; only its
+  // address is kept, as the r3 the original leaves.
   const uint32_t frame = sp - kAddRaceResultFrame;
   const RaceData rd(base, race);
   const uint32_t result = vehicle_accessors::RacerRecordsAt(base, rd.results_address(), 0xFFFFFFFFu);
@@ -130,13 +113,11 @@ uint32_t StatsAddRaceResult(uint8_t* base, uint32_t save, uint32_t race, uint32_
     KeepLargest(base, week.week_best_804_address(), best);
     KeepLargest(base, st.best_804_address(), best);
     RunningMeanMergeTwo(base, stats, LoadU64(base, rr.e0_mean_speed_pair_address()), frame);
-    MergeOne(base, frame, st.mean_812_address(),
-             IntToSingle(base, frame, int32_t(rr.e0_track_hits())));
-    MergeOne(base, frame, st.mean_816_address(),
-             IntToSingle(base, frame, int32_t(rr.e0_car_hits())));
-    MergeOne(base, frame, st.mean_820_address(), double(rr.e0_distance()));
+    MergeOne(base, st.mean_812_address(), IntToSingle(int32_t(rr.e0_track_hits())));
+    MergeOne(base, st.mean_816_address(), IntToSingle(int32_t(rr.e0_car_hits())));
+    MergeOne(base, st.mean_820_address(), double(rr.e0_distance()));
     st.set_sum_820(float(double(float(double(rr.e0_distance()) + double(st.sum_820())))));
-    MergeOne(base, frame, st.mean_won_address(),
+    MergeOne(base, st.mean_won_address(),
              rr.e0_flag_ticks() != 0 ? double(CareerGlobals::hundred(base))
                                                      : zero);
     const uint32_t most = rr.e0_ticks();
@@ -148,10 +129,10 @@ uint32_t StatsAddRaceResult(uint8_t* base, uint32_t save, uint32_t race, uint32_
     if (type == 0) {
       double value = zero;
       if (int32_t(rr.outcome()) != 3) {
-        const double count = IntToSingle(base, frame, int32_t(rr.e0_sp()));
+        const double count = IntToSingle(int32_t(rr.e0_sp()));
         value = double(float(count * double(CareerGlobals::scale_788(base))));
       }
-      MergeOne(base, frame, st.mean_788_address(), value);
+      MergeOne(base, st.mean_788_address(), value);
       r3 = st.mean_788_address();
       const double scale = double(CareerGlobals::scale_828(base));
       KeepLargest(base, st.best_828_address(), double(float(double(rr.e0_route_distance()) * scale)));
@@ -167,9 +148,11 @@ uint32_t StatsAddRaceResult(uint8_t* base, uint32_t save, uint32_t race, uint32_
       const int32_t outcome = int32_t(rr.finish());
       if (outcome == 1) {
         ItemRecordsAddWin(base, save, id, frame);
-        c_runtime::Memcpy(base, frame + 96, data_tables::Item(base, id), 3008);
+        // The original copies the item onto its frame (+96) and reads its
+        // kind there; read in place since E5 step 6 (r3 still the copy's
+        // address, as the original leaves it).
         r3 = frame + 96;
-        if (OpponentItem(base, frame + 96).kind() == 5) {
+        if (OpponentItem(base, data_tables::Item(base, id)).kind() == 5) {
           sv.set_kind5_won(1);
         }
       } else if (outcome == 3) {

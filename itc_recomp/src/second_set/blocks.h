@@ -2,8 +2,9 @@
 // (docs/functions/second-set.md): each block's records constructed
 // (PointRecord::PointRecord) and its groups reset or initialized, or reset
 // again, over the point groups' plain C++ (point_groups.h). Guest data
-// shared with the recompiled code; `stack` is the guest r1 at entry; each
-// returns r3 as the original leaves it (the block for the constructors and
+// shared with the recompiled code; `stack` is the guest r1 at entry, passed
+// on as the callees' r1 (E5 step 6: the originals' frames held nothing, so
+// they're not made); each returns r3 as the original leaves it (the block for the constructors and
 // inits, the last reset's r3 for the resets). Only where memcpy is native,
 // and with --native_material_passes for the parts' (ResetRightDoor's
 // ScaleBlended) (the adapters' check). Adapters: src/hooks/second_set.cpp.

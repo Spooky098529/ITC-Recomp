@@ -18,7 +18,6 @@ namespace screen_constructors {
 
 namespace {
 
-uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
@@ -370,22 +369,22 @@ void PanelSetBase(uint8_t* base, uint32_t set_base, uint32_t sp) {
   const schema::PanelSetBase s(base, set_base);
   s.set_vtable(0x820110C4);
   // The original clears eleven words below its r1 (it has no frame) and
-  // reads ten of them back into its fields.
-  Fill(base, sp - 48, sp - 8, 0);
+  // reads ten of them back into its fields: all 0, written as 0 (the words
+  // are read by nothing else: not written, E5 step 6).
+  (void)sp;
   s.set_page_menu_items(0);
   s.set_page_menu_player(0);
-  s.set_rows_menu_items(Load(base, sp - 44));
-  s.set_rows_menu_player(Load(base, sp - 40));
-  s.set_list0_count(Load(base, sp - 36));
-  s.set_list1_count(Load(base, sp - 32));
-  s.set_list2_count(Load(base, sp - 28));
-  s.set_color_count(Load(base, sp - 24));
-  const uint32_t at_20 = Load(base, sp - 20);
+  s.set_rows_menu_items(0);
+  s.set_rows_menu_player(0);
+  s.set_list0_count(0);
+  s.set_list1_count(0);
+  s.set_list2_count(0);
+  s.set_color_count(0);
   s.set_unknown_224(kNone);
-  s.set_answer_record(at_20);
-  s.set_unknown_208(Load(base, sp - 16));
-  s.set_unknown_212(Load(base, sp - 12));
-  s.set_unknown_216(Load(base, sp - 8));
+  s.set_answer_record(0);
+  s.set_unknown_208(0);
+  s.set_unknown_212(0);
+  s.set_unknown_216(0);
   s.set_unknown_220(0);
   Fill(base, s.tab_shown_address(), s.color_scroll_address(), 0);  // +228 to +248
   s.set_rows_shown(0);
@@ -767,24 +766,21 @@ void Type6ListScreen(uint8_t* base, uint32_t screen) {
 
 uint32_t NodeScreen(uint8_t* base, uint32_t screen, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8225A3D8 NodeScreen::NodeScreen");
-  const uint32_t frame = sp - kNodeScreenFrame;
-  Store(base, sp + 20, screen);  // its caller's frame
+  // The original's words in its frame (+80 to +100) and `screen` in its
+  // caller's (+20) are read back by it alone: host values (E5 step 6).
+  (void)sp;
   boot_mode::ScreenMachineConstruct(base, schema::NodeScreen(base, screen).machine_address());
   PairedNodeTable(base, screen);  // the screen's +0
-  Store(base, frame + 92, 15);
   schema::NodeScreen(base, screen).set_vtable(0x820116B8);
-  Store(base, frame + 84, 0);
-  Store(base, frame + 88, 0);
-  Store(base, frame + 80, 0);
-  Store(base, frame + 100, schema::NodeScreen(base, screen).record_texts_address() + 40);
-  Store(base, frame + 96, 10);
-  const schema::NodeScreen s(base, Load(base, sp + 20));
+  const uint32_t toggle_enabled = 0;  // +84
+  const uint32_t toggle_player = 0;   // +88
+  const uint32_t runs = schema::NodeScreen(base, screen).record_texts_address() + 40;  // +100
+  const schema::NodeScreen s(base, screen);
   s.set_course_list_enabled(0);
   s.set_course_list_player(0);
-  s.set_toggle_enabled(Load(base, frame + 84));
-  s.set_toggle_player(Load(base, frame + 88));
+  s.set_toggle_enabled(toggle_enabled);
+  s.set_toggle_player(toggle_player);
   s.set_table_movie(15);
-  const uint32_t runs = Load(base, frame + 100);
   s.set_movie(15);
   s.set_sub_scene(kNone);
   Fill(base, s.open_anim_address(), s.item_down_anim_address(), kNone);  // +10284 to +10340

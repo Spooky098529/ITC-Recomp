@@ -7,6 +7,8 @@
 #include "base/log.h"
 #include "c_runtime/strings.h"
 #include "guest.h"
+#include "hooks/heap.h"
+#include "memory/heap.h"
 #include "schema/location_screen.h"
 
 namespace location_screen {
@@ -24,10 +26,14 @@ constexpr uint32_t kOnPictureLoadedB = 0x82228FC8;
 uint64_t LoadPicture(uint8_t* base, uint32_t sp, uint32_t screen, uint32_t id, uint32_t list,
                      const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8222C270 LocationScreen::LoadPicture");
-  const uint32_t frame = sp - 128;
-  guest::StoreU32(base, frame, sp);
+  // The original's 128-byte frame held no slots (E5 step 6): the calls are
+  // made from `sp`, their frames below it.
   const uint32_t size = archive::AssetSize(base, id);
-  const uint64_t pages = calls.Call(kVirtualAlloc, frame, 0x8222C2A8, 0, size, kMemCommit, 4);
+  // VirtualAlloc(0, size, MEM_COMMIT, read-write): the allocation layer's
+  // pages, as its adapter answers (E5 step 6), where the adapters route there.
+  const uint64_t pages = hooks::NativeHeapActive()
+                             ? memory::AllocPages(size, 4096)
+                             : calls.Call(kVirtualAlloc, sp, 0x8222C2A8, 0, size, kMemCommit, 4);
   c_runtime::XMemSet(base, uint32_t(pages), 0, size);
   uint32_t callback;
   if (list == 0) {
@@ -38,7 +44,7 @@ uint64_t LoadPicture(uint8_t* base, uint32_t sp, uint32_t screen, uint32_t id, u
     return pages;
   }
   const uint64_t args[4] = {id, uint32_t(pages), callback, screen};
-  return calls.call(calls.user, kArchiveLoad, args, frame, 0x8222C2F4);
+  return calls.call(calls.user, kArchiveLoad, args, sp, 0x8222C2F4);
 }
 
 uint64_t PictureFree(uint8_t* base, uint32_t sp, uint32_t picture, const Calls& calls) {
@@ -75,8 +81,8 @@ uint64_t PictureFree(uint8_t* base, uint32_t sp, uint32_t picture, const Calls& 
 
 uint64_t FreePictures(uint8_t* base, uint32_t sp, uint32_t screen, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82228498 LocationScreen::FreePictures");
-  const uint32_t frame = sp - 112;
-  guest::StoreU32(base, frame, sp);
+  // The original's 112-byte frame held no slots (E5 step 6): Picture::Free
+  // makes its frame below `sp`.
   uint64_t r3 = screen;
   const schema::LocationScreen s(base, screen);
   struct List {
@@ -89,7 +95,7 @@ uint64_t FreePictures(uint8_t* base, uint32_t sp, uint32_t screen, const Calls& 
       const uint32_t count = guest::LoadU32(base, list.count) - 1;
       guest::StoreU32(base, list.count, count);
       const uint32_t picture = guest::LoadU32(base, pictures + ((count << 2) & 0xFFFFFFFCu));
-      PictureFree(base, frame, picture, calls);
+      PictureFree(base, sp, picture, calls);
       // The host picture (OnPictureLoaded, E5 step 3): the original's
       // VirtualFree (0x822284E8 for list A, 0x82228534 for B), which
       // returned 1.
@@ -152,7 +158,14 @@ uint64_t OnPictureLoaded(uint8_t* base, uint32_t sp, uint32_t screen, uint32_t b
   calls.Call(kGetLevelDesc, frame, 0x82228F78 + at, p.texture().texture(), 0, frame + 80);
   p.texture().set_width(guest::LoadU32(base, frame + 104));
   p.texture().set_height(guest::LoadU32(base, frame + 108));
-  const uint64_t r3 = calls.Call(kVirtualFree, frame, 0x82228FA4 + at, buffer, 0, kMemRelease);
+  // VirtualFree(buffer, 0, MEM_RELEASE) as its adapter answers it (E5 step
+  // 6: hooks::VirtualFree), else the call.
+  std::optional<uint32_t> freed;
+  if (buffer != 0) {
+    freed = hooks::VirtualFree(buffer, 0, kMemRelease, 0x82228FA4 + at);
+  }
+  const uint64_t r3 =
+      freed ? *freed : calls.Call(kVirtualFree, frame, 0x82228FA4 + at, buffer, 0, kMemRelease);
   p.set_loaded(1);
   const uint32_t count = guest::LoadU32(base, picture_count);
   guest::StoreU32(base, picture_count, count + 1);

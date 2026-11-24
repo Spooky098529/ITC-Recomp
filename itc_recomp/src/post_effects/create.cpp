@@ -1,9 +1,10 @@
 // The post effects' making natively (post_effects.h,
 // docs/functions/post-effects.md): PostEffects::Create, the constructors of
 // the glow, the color filter and the motion blur, and the render textures
-// they ask for. Call for call as the recompiled functions; each function's
-// frame is where the original's is (`stack` is the guest r1 at its entry),
-// and the words the original writes there are written there too.
+// they ask for. Call for call as the recompiled functions; a frame whose
+// words are handed on (the surfaces' parameters, the identity, the
+// constructors' callers' r1) is where the original's is (`stack` is the
+// guest r1 at its entry); the others aren't made (E5 step 6).
 
 #include "post_effects/post_effects.h"
 
@@ -32,11 +33,11 @@ using schema::RenderTexture;
 // The frames of the originals.
 constexpr uint32_t kCreateFrame = 128;
 constexpr uint32_t kInitBootFrame = 112;
-constexpr uint32_t kAcquireFrame = 160;
-constexpr uint32_t kTextureCreateFrame = 144;
 constexpr uint32_t kGlowFrame = 144;
-constexpr uint32_t kColorFilterFrame = 96;
 constexpr uint32_t kMotionBlurFrame = 224;
+// RenderTexture::Create's (144), RenderTextures::Acquire's (160) and the
+// color filter's (96) aren't made (E5 step 6): nothing in them is read or
+// handed on.
 
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
@@ -96,7 +97,7 @@ uint32_t RenderTextureCreate(uint8_t* base, uint32_t stack, uint32_t entry, uint
                              uint32_t width, uint32_t height, uint32_t id, uint32_t key0,
                              uint32_t key1) {
   ITC_NATIVE_RUNNING("sub_821330D0 RenderTexture::Create");
-  const uint32_t frame = stack - kTextureCreateFrame;
+  (void)stack;
   const RenderTexture t(base, entry);
   t.set_id(id);
   t.set_format(format);
@@ -106,14 +107,11 @@ uint32_t RenderTextureCreate(uint8_t* base, uint32_t stack, uint32_t entry, uint
   t.set_height(height);
   const uint32_t header = New(base, 52);
   // XGSetTextureHeader(width, height, 1 level, usage 0, format, no
-  // addresses): its stack words, in the original's order.
+  // addresses). (The original's stack words for it, +84 to +108 of its
+  // frame, were read by nothing but its own call: not written, E5 step 6.)
   const uint32_t f = t.format();
   const uint32_t h = t.height();
   const uint32_t w = t.width();
-  Store(base, frame + 92, header);
-  Store(base, frame + 108, 0);
-  Store(base, frame + 100, 0);
-  Store(base, frame + 84, 0);
   t.set_header(header);
   Require(graphics::XgHeaderCopyFits(header), "XGSetTextureHeader");
   const uint32_t size = graphics::XGSetTextureHeader(base, w, h, 1, 0, f, 0, 0, 0, header, 0, 0);
@@ -130,12 +128,11 @@ uint32_t RenderTextureCreate(uint8_t* base, uint32_t stack, uint32_t entry, uint
 uint32_t RenderTexturesAcquire(uint8_t* base, uint32_t stack, uint32_t id, uint32_t format,
                                uint32_t width, uint32_t height, uint32_t key0, uint32_t key1) {
   ITC_NATIVE_RUNNING("sub_82133190 RenderTextures::Acquire");
-  const uint32_t frame = stack - kAcquireFrame;
   const RenderTexture pooled(base, G::render_textures_address() + id * 36);
   const uint32_t entry = pooled.address;
   uint32_t texture = 0;
   if (int32_t(id) != 20 && pooled.users() == 0) {
-    RenderTextureCreate(base, frame, entry, format, width, height, id, key0, key1);
+    RenderTextureCreate(base, stack, entry, format, width, height, id, key0, key1);
     texture = entry;
   } else if (int32_t(id) != 20 && pooled.format() == format && pooled.width() == width &&
              pooled.height() == height && pooled.key0() == key0 && pooled.key1() == key1) {
@@ -150,7 +147,7 @@ uint32_t RenderTexturesAcquire(uint8_t* base, uint32_t stack, uint32_t id, uint3
       own.set_header(0u);
       own.set_memory(0);
     }
-    RenderTextureCreate(base, frame, texture, format, width, height, 20, key0, key1);
+    RenderTextureCreate(base, stack, texture, format, width, height, 20, key0, key1);
   }
   const RenderTexture acquired(base, texture);
   acquired.set_users(acquired.users() + 1);
@@ -226,7 +223,6 @@ uint32_t GlowConstruct(uint8_t* base, uint32_t stack, uint32_t glow, uint32_t en
 
 uint32_t ColorFilterConstruct(uint8_t* base, uint32_t stack, uint32_t filter, uint32_t entry) {
   ITC_NATIVE_RUNNING("sub_82135008 ColorFilter::ColorFilter");
-  const uint32_t frame = stack - kColorFilterFrame;
   ConstructBase(base, filter, entry);
   const schema::ColorFilter f(base, filter);
   f.set_reset(1);
@@ -251,7 +247,7 @@ uint32_t ColorFilterConstruct(uint8_t* base, uint32_t stack, uint32_t filter, ui
   f.set_strength(Single(base, kZero));
   f.set_c38_z(Single(base, kZero));
   f.set_c38_x(Single(base, kZero));
-  f.set_frame_texture(RenderTexturesAcquire(base, frame, 1, 0x1A20015A, f.width(), f.height(),
+  f.set_frame_texture(RenderTexturesAcquire(base, stack, 1, 0x1A20015A, f.width(), f.height(),
                                             f.x(), f.y()));
   return filter;
 }

@@ -21,6 +21,8 @@
 #include "schema/type6_type7_modes.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
+#include <bit>
+
 namespace front_end_car_draw {
 
 namespace {
@@ -49,12 +51,17 @@ constexpr uint32_t kCloseDoors = 0x8217B740;
 
 int32_t LoadS(uint8_t* base, uint32_t address) { return int32_t(Load(base, address)); }
 
-// The frame `bytes` below `stack`, its back chain written (stwu's).
+// The frame `bytes` below `stack`, its back chain written (stwu's): kept
+// where a guest call is made with it (E5 step 6).
 uint32_t Frame(uint8_t* base, uint32_t stack, uint32_t bytes) {
   const uint32_t frame = stack - bytes;
   Store(base, frame, stack);
   return frame;
 }
+
+// The frame's address alone, for a function whose frame holds nothing and
+// makes no guest call with it (its callees' frames below it; E5 step 6).
+constexpr uint32_t FrameAt(uint32_t stack, uint32_t bytes) { return stack - bytes; }
 
 // The car scene ([0x826C2E44]).
 uint32_t Scene(uint8_t* base) { return schema::CarDrawGlobals::scene(base).address; }
@@ -117,7 +124,7 @@ void PlatesShow(uint8_t* base, uint32_t points) {
 
 uint32_t GarageStageIsBusy(uint8_t* base, const Calls& calls, uint32_t holder, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_82179BE0 GarageStage::IsBusy");
-  const uint32_t frame = Frame(base, stack, 96);
+  const uint32_t frame = FrameAt(stack, 96);
   const uint32_t model = StageModel(base, holder);
   const uint64_t loaded = load_poll::SceneModelPollLoad(base, model, frame, *calls.poll);
   if (int32_t(loaded) == 0) {
@@ -129,7 +136,7 @@ uint32_t GarageStageIsBusy(uint8_t* base, const Calls& calls, uint32_t holder, u
 uint32_t GarageStageSyncPlates(uint8_t* base, const Calls& calls, uint32_t holder,
                                uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8217AFE8 GarageStage::SyncPlates");
-  const uint32_t frame = Frame(base, stack, 112);
+  const uint32_t frame = FrameAt(stack, 112);
   const uint32_t model = StageModel(base, holder);
   const uint32_t busy = GarageStageIsBusy(base, calls, holder, frame);
   if (busy == 1) {
@@ -151,7 +158,7 @@ uint32_t GarageStageSyncPlates(uint8_t* base, const Calls& calls, uint32_t holde
 
 uint32_t GarageStageSetDrawWord(uint8_t* base, uint32_t holder, uint32_t word, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_82178B40 GarageStage::SetDrawWord");
-  Frame(base, stack, 112);
+  (void)stack;  // no frame (E5 step 6: the original's held nothing)
   const uint32_t model = StageModel(base, holder);
   Slot(base, holder).stage().set_draw_word(word);
   Model(base, model).set_draw_enabled(word);
@@ -348,7 +355,7 @@ uint64_t GarageStageApplyPreset(uint8_t* base, const Calls& calls, uint64_t r3, 
 uint64_t GarageStageCommand(uint8_t* base, const Calls& calls, uint64_t r3, uint32_t command,
                             uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_82180108 GarageStage::Command");
-  const uint32_t f = Frame(base, stack, 112);
+  const uint32_t f = FrameAt(stack, 112);
   const uint32_t holder = uint32_t(r3);
   const int32_t c = int32_t(command);
   const Slot slot(base, holder);
@@ -422,7 +429,7 @@ uint32_t GarageAnimsTurn(uint8_t* base, uint32_t entry) {
 
 uint32_t GarageAnimsOpen(uint8_t* base, const Calls& calls, uint32_t entry, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_82179DF0 GarageAnims::Open");
-  const uint32_t f = Frame(base, stack, 128);
+  const uint32_t f = FrameAt(stack, 128);
   const Entry en(base, entry);
   const uint32_t model = vehicle_accessors::ScenePoolsGetB(base, Scene(base), 7, en.model_index());
   const uint32_t car = Model(base, model).block();
@@ -452,7 +459,7 @@ uint32_t GarageAnimsOpen(uint8_t* base, const Calls& calls, uint32_t entry, uint
 
 uint32_t GarageAnimsClose(uint8_t* base, const Calls& calls, uint32_t entry, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_82179EA8 GarageAnims::Close");
-  const uint32_t f = Frame(base, stack, 112);
+  const uint32_t f = FrameAt(stack, 112);
   const Entry en(base, entry);
   const uint32_t model = vehicle_accessors::ScenePoolsGetB(base, Scene(base), 7, en.model_index());
   const uint32_t car = Model(base, model).block();
@@ -578,13 +585,12 @@ uint64_t GarageStageSetLightKit(uint8_t* base, const Calls& calls, uint32_t hold
                                 uint32_t group, uint32_t word, uint32_t index, double f1,
                                 double f2, double f3, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_82179678 GarageStage::SetLightKit");
-  const uint32_t f = Frame(base, stack, 176);
+  // The original's frame held the texture table (+80 to +108), a local now
+  // (E5 step 6); ApplyLightKit's callee makes its frame below it.
+  const uint32_t f = FrameAt(stack, 176);
   const uint32_t m = StageModel(base, holder);
   const Kit k(base, Model(base, m).light_kit_record_address());
-  const uint32_t table[8] = {0, 4, 3, 5, 2, 7, 1, 6};
-  for (uint32_t i = 0; i < 8; i++) {
-    Store(base, f + 80 + 4 * i, table[i]);
-  }
+  static constexpr uint32_t kTable[8] = {0, 4, 3, 5, 2, 7, 1, 6};
   const int32_t g = int32_t(group);
   bool known = true;
   switch (g) {
@@ -621,7 +627,9 @@ uint64_t GarageStageSetLightKit(uint8_t* base, const Calls& calls, uint32_t hold
       break;
   }
   if (known) {
-    k.set_texture(Load(base, f + 80 + (index << 2)));
+    // Indexed unchecked, as the original: past the table (never in play) the
+    // stack's word there.
+    k.set_texture(index < 8 ? kTable[index] : Load(base, f + 80 + (index << 2)));
   }
   return SceneModelApplyLightKit(base, calls, m, f);
 }
@@ -629,7 +637,7 @@ uint64_t GarageStageSetLightKit(uint8_t* base, const Calls& calls, uint32_t hold
 uint64_t GarageStageClearLightKit(uint8_t* base, const Calls& calls, uint32_t holder,
                                   uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_821795E0 GarageStage::ClearLightKit");
-  const uint32_t f = Frame(base, stack, 96);
+  const uint32_t f = FrameAt(stack, 96);
   const uint32_t m = StageModel(base, holder);
   const Kit k(base, Model(base, m).light_kit_record_address());
   switch (int32_t(group)) {
@@ -665,14 +673,11 @@ uint64_t FloorDraw(uint8_t* base, const Calls& calls, uint32_t scene, uint32_t m
   if (int32_t(word) == 0 || int32_t(car_scene.model_set()) != 0) {
     return r3;
   }
-  // The last row (0, 0, 0, 1) at +80, copied as two doublewords.
+  // The last row (0, 0, 0, 1), copied as two doublewords (the original's
+  // frame +80 to +92; C++ words since E5 step 6, stfs's single bits).
   const double zero = double(G::zero(base));
-  Stfs(base, f + 80, zero);
-  Stfs(base, f + 84, zero);
-  Stfs(base, f + 88, zero);
-  Stfs(base, f + 92, double(G::one(base)));
-  const uint32_t w0 = Load(base, f + 80), w1 = Load(base, f + 84);
-  const uint32_t w2 = Load(base, f + 88), w3 = Load(base, f + 92);
+  const uint32_t w0 = std::bit_cast<uint32_t>(float(zero)), w1 = w0;
+  const uint32_t w2 = w0, w3 = std::bit_cast<uint32_t>(float(double(G::one(base))));
   Store(base, matrix + 48, w0);
   Store(base, matrix + 52, w1);
   Store(base, matrix + 56, w2);

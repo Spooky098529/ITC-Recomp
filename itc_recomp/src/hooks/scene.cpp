@@ -240,14 +240,12 @@ ITC_REGS_STEP(SceneInitLighting) {
 ITC_REGS_STEP(SceneAssetsRelease) {
   if (ModelsNativeLifetime()) {
     const auto r3 = scene::AssetsRelease(base, ctx.r3.u32, [&](uint32_t at) {
-      // FreePagesIn's original, from Release's 128-byte frame.
-      const uint64_t stack = ctx.r1.u64, link = ctx.lr;
-      ctx.r1.u64 = ctx.r1.u32 - 128;
-      guest::StoreU32(base, ctx.r1.u32, uint32_t(stack));
+      // FreePagesIn's original, from Release's r1 (its 128-byte frame,
+      // only its back chain, left out: E5 step 6).
+      const uint64_t link = ctx.lr;
       ctx.r3.u64 = at;
       ctx.lr = 0x820C4CDC;
       lifted::original::c820D09A0(ctx, base);
-      ctx.r1.u64 = stack;
       ctx.lr = link;
     });
     if (r3) {

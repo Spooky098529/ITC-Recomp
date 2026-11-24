@@ -53,6 +53,9 @@ void PickFromCar(uint8_t* base, uint32_t save);
 // `packed` (the float's bits in the upper word, the count in the lower),
 // stored first at `sp` + 24 (the caller's frame, as the original's std).
 void RunningMeanMerge(uint8_t* base, uint32_t mean, uint64_t packed, uint32_t sp);
+// Its merge alone, without the store to the caller's frame (for native
+// callers without a guest frame, E5 step 6).
+void RunningMeanMergeInto(uint8_t* base, uint32_t mean, uint64_t packed);
 
 // --- The stage and the unlock tests ---
 

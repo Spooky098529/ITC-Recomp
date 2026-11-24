@@ -824,14 +824,15 @@ uint64_t SectionRivalCurrent(uint8_t* base, uint32_t position, const Guest& gues
 uint64_t PlaceUnlocked(uint8_t* base, uint32_t event, uint32_t position, uint32_t flag,
                        uint32_t sp, const Guest& guest) {
   ITC_NATIVE_RUNNING("sub_82143740 RaceEvent::PlaceUnlocked");
-  // Its frame: +80 the position's copy, +84 FindRacer's answer.
+  // Its frame: +80 the position's copy (ToMainRoad's), +88 the kind
+  // (BranchMasksFor's); FindRacer's answer (the original's +84) a C++
+  // value since E5 step 6.
   const uint32_t frame = sp - kPlaceUnlockedFrame;
   const uint32_t copy = frame + 80;
   const Position copy_v(base, copy);
   const Position from(base, position);
   uint32_t found = 0;
   uint16_t step = 0;
-  guest::StoreU32(base, frame + 84, 0);
   copy_v.set_word(from.word());
   if (guest::LoadU32(base, flag) != 0) {
     const double length = double(RouteFile(base, G::route(base).address).slice_length());
@@ -854,7 +855,6 @@ uint64_t PlaceUnlocked(uint8_t* base, uint32_t event, uint32_t position, uint32_
       continue;
     }
     const uint32_t r = FindRacer(base, entry.address, found);
-    guest::StoreU32(base, frame + 84, found);
     if (r == 1) {
       if (guest::LoadU32(base, flag) == 0 || found == 0) {
         continue;

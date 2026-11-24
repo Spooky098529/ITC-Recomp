@@ -3687,7 +3687,7 @@ lifted::Result f8258E548(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r31 = r3;
   // bl 0x825db954
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__RtlInitializeCriticalSection, LIFTED_ARGS(0x8258E560, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::RtlInitializeCriticalSection>(base, LIFTED_ARGS(0x8258E560, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r3,r31
   r3 = r31;
   // addi r1,r1,96
@@ -3708,7 +3708,7 @@ lifted::Result f8258E578(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   uint64_t r31 = 0;
   double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
   // b 0x825db8d4
-  { const lifted::Result o = lifted::Import(base, __imp__RtlLeaveCriticalSection, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::RtlLeaveCriticalSection>(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 

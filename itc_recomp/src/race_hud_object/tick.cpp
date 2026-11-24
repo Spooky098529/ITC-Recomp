@@ -44,23 +44,22 @@ constexpr uint32_t kFactor = 0x8200A510;
 uint64_t Tick(uint8_t* base, uint32_t hud, uint32_t flag, uint32_t sp, const Calls& calls,
               const track_zones::OwnerCalls& zone_calls) {
   ITC_NATIVE_RUNNING("sub_822153A0 RaceHud::Tick");
+  // The original's frame: its callees' stack pointer (they make their own
+  // frames below it; no guest code is called from it, so no back chain);
+  // its + 80 a local.
   const uint32_t frame = sp - 128;
-  guest::StoreU32(base, frame, sp);
   const Hud h(base, hud);
   const schema::Vehicle vehicle = h.vehicle();
   const uint32_t car = vehicle.address;
   const schema::VehicleStatus status(base, vehicle.status_address());
   double f1 = double(Vehicle_GetSpeedKmh(base, car));
   const double speed = Single(f1 * LoadDouble(base, kFactor));
-  guest::StoreU32(base, frame + 80, uint32_t(Fctiwz(speed)));
-  SetSpeed(base, hud, guest::LoadU32(base, frame + 80), frame, &f1);
+  SetSpeed(base, hud, uint32_t(Fctiwz(speed)), frame, &f1);
   const int32_t int149 = Fctiwz(double(status.water_temperature()));
   const int32_t int119 = Fctiwz(double(status.oil_temperature()));
   const double value = double(status.engine_output());
-  guest::StoreU32(base, frame + 80, uint32_t(int149));
-  const uint32_t r6 = guest::LoadU32(base, frame + 80);
-  guest::StoreU32(base, frame + 80, uint32_t(int119));
-  const uint32_t r5 = guest::LoadU32(base, frame + 80);
+  const uint32_t r6 = uint32_t(int149);
+  const uint32_t r5 = uint32_t(int119);
   UpdateExtraGauges(base, hud, value, r5, r6, frame, calls);
   SetGear(base, hud, vehicle.gear(), frame);
   SetTach(base, hud, double(vehicle_accessors::VehicleFloat2224(base, car)), frame);
@@ -79,8 +78,8 @@ uint64_t TickTimer(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls)
   guest::StoreU32(base, frame, sp);
   const Hud h(base, hud);
   const Racers racers = h.racers();
-  guest::StoreU32(base, frame + 80, ai_drivers::TimeFromTicks(racers.ticks()));
-  SetTime(base, hud, frame + 80, frame);
+  // The original's frame + 80, handed to SetTime: a local.
+  SetTimeValue(base, hud, ai_drivers::TimeFromTicks(racers.ticks()));
   const Racers racers2 = h.racers();
   const schema::RaceProgress progress = G::race_progress(base);
   const double start = double(racers2.start_distance());
@@ -118,8 +117,9 @@ uint64_t TickTimer(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls)
 uint64_t TickRacers(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls,
                     const menu_sounds::Calls& sounds) {
   ITC_NATIVE_RUNNING("sub_822151F8 RaceHud::TickRacers");
+  // UpdateRacerBar's stack pointer (its frame below it); no guest code is
+  // called from this one, so no back chain.
   const uint32_t frame = sp - 112;
-  guest::StoreU32(base, frame, sp);
   uint64_t r3 = hud;
   const Hud h(base, hud);
   const int32_t count = int32_t(h.racer_count());

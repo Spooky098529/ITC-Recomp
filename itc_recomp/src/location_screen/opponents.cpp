@@ -26,13 +26,13 @@ schema::CareerItemRecord Record(uint8_t* base, uint32_t save, int32_t id) {
       base, schema::SaveData(base, save).item_records_address() + uint32_t(id) * 12);
 }
 
-// The picked opponent's item (RaceEvent::GroupItem of +804 and +800, +800
-// stored at the frame's +80) copied to `to`.
+// The picked opponent's item (RaceEvent::GroupItem of +804 and +800; +800
+// the original's frame +80, read only here: a value since E5 step 6) copied
+// to `to`.
 void CopyOpponent(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t lr, uint32_t to) {
-  guest::StoreU32(base, frame + 80, Screen(base).picked_opponent());
+  const uint32_t picked = Screen(base).picked_opponent();
   const uint32_t event = guest::LoadU32(base, race_event::kEvent);
-  const uint32_t item = race_event::GroupItem(base, event, Screen(base).group_kind(),
-                                              guest::LoadU32(base, frame + 80));
+  const uint32_t item = race_event::GroupItem(base, event, Screen(base).group_kind(), picked);
   Copy(base, calls, frame, lr, to, item, 3008);
 }
 
@@ -69,16 +69,18 @@ uint32_t ShowOpponentInfo(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = sp - 6240;
   guest::StoreU32(base, frame, sp);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const uint32_t movie = Movie(base, frame, kMenusMovie);
+  const uint32_t movie = Movie(base, kMenusMovie);
   CopyOpponent(base, calls, frame, 0x8222B4A8, frame + 128);
   const int32_t category = int8_t(guest::LoadU8(base, frame + 162));
   const int32_t id = int16_t(guest::LoadU16(base, frame + 128));
   const uint32_t kind = guest::LoadU8(base, frame + 163);
   uint32_t level = uint32_t(category + 5299);
   const uint32_t name = uint32_t(id + 4650);
-  for (uint32_t i = 0; i < 5; i++) {
-    guest::StoreU32(base, frame + 96 + 4 * i, 0xFFFFFFFFu);
-  }
+  // The chain's items: the original's words at the frame's +96 (five set
+  // to -1), read only here (values since E5 step 6). The chain's steps
+  // store one word each from +96 on; past the eight words below the item's
+  // copy (+128) they go to the frame as the original's (never seen).
+  uint32_t owned_items[8] = {0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu};
   // The item's kind (+35, unsigned compares of the sign-extended byte).
   const uint32_t kind_word = uint32_t(int32_t(int8_t(uint8_t(kind))));
   uint32_t kind_text = 482;
@@ -117,7 +119,7 @@ uint32_t ShowOpponentInfo(uint8_t* base, uint32_t sp, const Calls& calls) {
     if (card == 3) {
       Copy(base, calls, frame, 0x8222B644, frame + 3136, frame + 128, 3008);
       chained = true;
-      uint32_t child = 5, slot = frame + 96;
+      uint32_t child = 5, slot = 0;
       for (;;) {
         uint32_t j = 0;
         while (j < 3 && guest::LoadU16(base, frame + 3228 + 2 * j) == 0xFFFF) {
@@ -127,12 +129,16 @@ uint32_t ShowOpponentInfo(uint8_t* base, uint32_t sp, const Calls& calls) {
           break;
         }
         const int32_t next = int16_t(guest::LoadU16(base, frame + 3228 + 2 * j));
-        guest::StoreU32(base, slot, uint32_t(next));
+        if (slot < 8) {
+          owned_items[slot] = uint32_t(next);
+        } else {
+          guest::StoreU32(base, frame + 96 + 4 * slot, uint32_t(next));
+        }
         ShowNode(base, movie, 13, child);
         SetText(base, calls, frame, movie, 13, child, uint32_t(next + 4650));
         Copy(base, calls, frame, 0x8222B764, frame + 3136, data_tables::Item(base, uint32_t(next)),
              3008);
-        slot += 4;
+        slot++;
         child++;
       }
     }
@@ -148,7 +154,7 @@ uint32_t ShowOpponentInfo(uint8_t* base, uint32_t sp, const Calls& calls) {
   SetTexture(base, movie, 12, 17, state);
   if (chained && state == 2) {
     for (uint32_t i = 0; i < 5; i++) {
-      const int32_t owned = int32_t(guest::LoadU32(base, frame + 96 + 4 * i));
+      const int32_t owned = int32_t(owned_items[i]);
       if (owned == -1) {
         break;
       }
@@ -180,7 +186,7 @@ uint32_t Transition12(uint8_t* base, uint32_t sp, uint32_t step, const Calls& ca
   ITC_NATIVE_RUNNING("sub_8222B8A8 LocationScreen::Transition12");
   const uint32_t frame = sp - 6192;
   guest::StoreU32(base, frame, sp);
-  const uint32_t movie = Movie(base, frame, kMenusMovie);
+  const uint32_t movie = Movie(base, kMenusMovie);
   CopyOpponent(base, calls, frame, 0x8222B90C, frame + 96);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   if (guest::LoadU32(base, step) == 0) {
@@ -252,7 +258,7 @@ uint64_t ShowCard(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8222BBD0 LocationScreen::ShowCard");
   const uint32_t frame = sp - 3232;
   guest::StoreU32(base, frame, sp);
-  const uint32_t movie = Movie(base, frame, kCardMovie);
+  const uint32_t movie = Movie(base, kCardMovie);
   CopyOpponent(base, calls, frame, 0x8222BC2C, frame + 96);
   const schema::LocationScreenCard row = CardRow(base, frame);
   const uint32_t first = row.named_0(), second = row.named_1();
@@ -301,8 +307,8 @@ uint32_t Transition17(uint8_t* base, uint32_t sp, uint32_t step, const Calls& ca
   ITC_NATIVE_RUNNING("sub_8222EAD0 LocationScreen::Transition17");
   const uint32_t frame = sp - 3152;
   guest::StoreU32(base, frame, sp);
-  const uint32_t menus = Movie(base, frame, kMenusMovie);
-  const uint32_t card = Movie(base, frame, kCardMovie);
+  const uint32_t menus = Movie(base, kMenusMovie);
+  const uint32_t card = Movie(base, kCardMovie);
   if (guest::LoadU32(base, step) == 0) {
     CopyOpponent(base, calls, frame, 0x8222EB60, frame + 96);
     const schema::LocationScreenCard row = CardRow(base, frame);

@@ -47,16 +47,13 @@ uint32_t EvaluateView(uint8_t* base, uint32_t frame, uint32_t which, uint32_t ti
                       const Calls& calls) {
   const uint32_t zero = ThroughFloat(base, 0x82000A34);
   const uint32_t one = ThroughFloat(base, 0x82000A30);
-  for (uint32_t v : {96u, 112u}) {
-    guest::StoreU32(base, frame + v + 0, zero);
-    guest::StoreU32(base, frame + v + 4, zero);
-    guest::StoreU32(base, frame + v + 8, zero);
-    guest::StoreU32(base, frame + v + 12, one);
-  }
+  // The two (0, 0, 0, 1) vectors: the original's +96 and +112, read only
+  // by the copy below (values since E5 step 6).
+  const uint32_t vectors[8] = {zero, zero, zero, one, zero, zero, zero, one};
   guest::StoreU32(base, frame + 140, one);
   guest::StoreU32(base, frame + 156, one);
   for (uint32_t i = 0; i < 32; i += 4) {
-    guest::StoreU32(base, frame + 128 + i, guest::LoadU32(base, frame + 96 + i));
+    guest::StoreU32(base, frame + 128 + i, vectors[i / 4]);
   }
   guest::StoreU32(base, frame + 160, zero);
   guest::StoreU32(base, frame + 164, zero);
@@ -94,7 +91,7 @@ uint32_t Transition4(uint8_t* base, uint32_t sp, uint32_t step, const Calls& cal
   ITC_NATIVE_RUNNING("sub_8222D828 LocationScreen::Transition4");
   const uint32_t frame = sp - 208;
   guest::StoreU32(base, frame, sp);
-  const uint32_t movie = Movie(base, frame, kMenusMovie);
+  const uint32_t movie = Movie(base, kMenusMovie);
   if (guest::LoadU32(base, step) == 0) {
     ui_movies::ResetPose(base, movie);
     calls.Call(kFinishAll, frame, 0x8222D870, movie);
@@ -117,7 +114,7 @@ uint32_t Transition5(uint8_t* base, uint32_t sp, uint32_t step, const Calls& cal
   ITC_NATIVE_RUNNING("sub_8222DA10 LocationScreen::Transition5");
   const uint32_t frame = sp - 224;
   guest::StoreU32(base, frame, sp);
-  const uint32_t movie = Movie(base, frame, kMenusMovie);
+  const uint32_t movie = Movie(base, kMenusMovie);
   if (guest::LoadU32(base, step) == 0) {
     ResetMovie(base, frame, calls);
     HidePictures(base, frame);
@@ -156,60 +153,60 @@ uint32_t Transition5(uint8_t* base, uint32_t sp, uint32_t step, const Calls& cal
 
 uint32_t Transition8(uint8_t* base, uint32_t sp, uint32_t step, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8222DC08 LocationScreen::Transition8");
-  const uint32_t frame = sp - 112;
-  guest::StoreU32(base, frame, sp);
-  const uint32_t movie = Movie(base, frame, kMenusMovie);
+  // The original's 112-byte frame held no slots (E5 step 6): the calls are
+  // made from `sp`, their frames below it.
+  const uint32_t movie = Movie(base, kMenusMovie);
   if (guest::LoadU32(base, step) == 0) {
     ui_movies::ResetNode(base, movie, 0xFFFFFFFFu, 11);
-    ShowListEntry(base, frame, calls);
+    ShowListEntry(base, sp, calls);
     ui_movies::Play(base, movie, 0xFFFFFFFFu, 10, 0, 0, 0, 0);
     PlayNamed(base, movie, G::list_menu(base).cursor() + 52);
-    LoopLast(base, frame, movie);
-    ShowPictures(base, frame);
+    LoopLast(base, sp, movie);
+    ShowPictures(base, sp);
     guest::StoreU32(base, step, 1);
   }
-  return uint32_t(Run(calls, frame, 0x8222DCC4, movie)) == 0 ? 1 : 0;
+  return uint32_t(Run(calls, sp, 0x8222DCC4, movie)) == 0 ? 1 : 0;
 }
 
 uint32_t Transition24(uint8_t* base, uint32_t sp, uint32_t step, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8222D2E8 LocationScreen::Transition24");
-  const uint32_t frame = sp - 112;
-  guest::StoreU32(base, frame, sp);
-  const uint32_t movie = Movie(base, frame, kMenusMovie);
+  // The original's 112-byte frame held no slots (E5 step 6): the calls are
+  // made from `sp`, their frames below it.
+  const uint32_t movie = Movie(base, kMenusMovie);
   if (guest::LoadU32(base, step) == 0) {
     mode_tick::ScreenFadesFadeOut(base, 60, 0, 0, 0, 0);
     PlayNamed(base, movie, 98);
     guest::StoreU32(base, step, 1);
   }
   const uint32_t done = Fading(base) ? 0 : 1;
-  Run(calls, frame, 0x8222D38C, movie);
+  Run(calls, sp, 0x8222D38C, movie);
   if (done != 0) {
-    ResetMovie(base, frame, calls);
-    SetCarColor(base, frame);
+    ResetMovie(base, sp, calls);
+    SetCarColor(base, sp);
   }
   return done;
 }
 
 uint32_t Transition34(uint8_t* base, uint32_t sp, uint32_t step, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8222D108 LocationScreen::Transition34");
-  const uint32_t frame = sp - 112;
-  guest::StoreU32(base, frame, sp);
-  const uint32_t movie = Movie(base, frame, kMenusMovie);
+  // The original's 112-byte frame held no slots (E5 step 6): the calls are
+  // made from `sp`, their frames below it.
+  const uint32_t movie = Movie(base, kMenusMovie);
   if (guest::LoadU32(base, step) == 0) {
     PlayNamed(base, movie, 98);
     guest::StoreU32(base, step, 1);
   }
-  const uint32_t done = uint32_t(Run(calls, frame, 0x8222D178, movie)) == 0 ? 1 : 0;
+  const uint32_t done = uint32_t(Run(calls, sp, 0x8222D178, movie)) == 0 ? 1 : 0;
   if (done != 0) {
-    ResetMovie(base, frame, calls);
+    ResetMovie(base, sp, calls);
   }
   return done;
 }
 
 uint32_t Start(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8222F0B0 LocationScreen::Start");
-  const uint32_t frame = sp - 128;
-  guest::StoreU32(base, frame, sp);
+  // The original's 128-byte frame held no slots (E5 step 6): the calls are
+  // made from `sp`, their frames below it.
   // The garage's selected car: its list walked from the halfword at +6324
   // (the entries 4 bytes each from +6120, each a next and a slot) by the
   // count at +0x19920; the slot's car (1,968 bytes each from +6120) +224
@@ -227,7 +224,7 @@ uint32_t Start(uint8_t* base, uint32_t sp, const Calls& calls) {
       base, car_specs::GetCarSpec(
                 base, schema::CareerAddedCar(base, slot * 1968 + list.cars_address()).car_id()));
   Screen(base).set_special_car(spec.list_kind() == 1 ? 1 : 0);
-  ResetMovie(base, frame, calls);
+  ResetMovie(base, sp, calls);
   save = vehicle_accessors::SaveDataOf(base, 0);
   const schema::SaveData unlocks(base, save);
   const schema::RaceData race = schema::RaceStatesGlobals::race_data(base);
@@ -276,11 +273,12 @@ uint32_t ShowOpponentSpecs(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8222C188 LocationScreen::ShowOpponentSpecs");
   const uint32_t frame = sp - kShowOpponentSpecsFrame;
   guest::StoreU32(base, frame, sp);
-  const uint32_t movie = Movie(base, frame, kMenusMovie);
-  guest::StoreU32(base, frame + 80, Screen(base).picked_opponent());
+  const uint32_t movie = Movie(base, kMenusMovie);
+  // The picked opponent: the original's +80, read only here (a value since
+  // E5 step 6).
+  const uint32_t picked = Screen(base).picked_opponent();
   const uint32_t event = race_setup::EventCurrent(base);
-  const uint32_t item = race_event::GroupItem(base, event, Screen(base).group_kind(),
-                                              guest::LoadU32(base, frame + 80));
+  const uint32_t item = race_event::GroupItem(base, event, Screen(base).group_kind(), picked);
   Copy(base, calls, frame, 0x8222C1E4, frame + 96, item, 3008);
   // The item's car build's car id (+160 + 2788).
   const uint32_t id = guest::LoadU32(base, frame + 3044);
@@ -297,7 +295,7 @@ uint32_t Transition9(uint8_t* base, uint32_t sp, uint32_t step, const Calls& cal
   ITC_NATIVE_RUNNING("sub_8222DEE0 LocationScreen::Transition9");
   const uint32_t frame = sp - 240;
   guest::StoreU32(base, frame, sp);
-  const uint32_t movie = Movie(base, frame, kMenusMovie);
+  const uint32_t movie = Movie(base, kMenusMovie);
   if (guest::LoadU32(base, step) == 0) {
     ResetMovie(base, frame, calls);
     if (Screen(base).more_opponent_text() != 0) {
@@ -466,11 +464,11 @@ uint64_t PollLoad(uint8_t* base, uint32_t sp, uint32_t machine, const Calls& cal
     mode_tick::ScreenFadesFadeOut(base, 30, 0, 0, 0, 0);
     Screen(base).set_load_faded(1);
   }
-  uint32_t movie = Movie(base, frame, kMenusMovie);
+  uint32_t movie = Movie(base, kMenusMovie);
   uint32_t picture = ui_movies::FindNode(base, movie, 6, 1);
   Screen(base).set_default_texture_a(
       guest::LoadU32(base, ui_movies::PictureTextureSlot(base, movie, picture)));
-  movie = Movie(base, frame, kMenusMovie);
+  movie = Movie(base, kMenusMovie);
   picture = ui_movies::FindNode(base, movie, 6, 0);
   const uint32_t texture = guest::LoadU32(base, ui_movies::PictureTextureSlot(base, movie, picture));
   Screen(base).set_default_texture_b(texture);

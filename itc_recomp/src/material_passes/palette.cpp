@@ -5,10 +5,11 @@
 // colors in its frame and copying them into the entry by doublewords, then
 // storing the three floats; a few constants it keeps in its frame or in
 // registers across the loop. Written here as data: the same constants
-// (each through lfs and stfs) at the same places, the frame left as the
-// original leaves it. Nothing written overlaps anything read (the frame,
-// the palette and .rdata), so the order of the writes doesn't change the
-// result. Checked by the harness against the original (all 16 cases run on
+// (each through lfs and stfs) at the same places in the palette; the
+// frame's colors and locals, which only it reads, left out (E5 step 6: each
+// color's words stored straight into the entry, the same bits as the copy
+// by doublewords). Nothing written overlaps anything read (the palette and
+// .rdata), so the order of the writes doesn't change the result. Checked by the harness against the original (all 16 cases run on
 // every call; the scene's +4 zero and not).
 
 #include "material_passes/material_passes.h"
@@ -26,8 +27,6 @@ using namespace camera_modes::steps;
 namespace {
 
 using G = schema::MaterialPassesGlobals;
-
-constexpr uint32_t kFrameBytes = 1184;
 
 // The float constants in .rdata the palette is built from, named by value.
 constexpr uint32_t k0 = G::zero_address();             // 0.0
@@ -76,7 +75,7 @@ constexpr uint32_t k115 = G::value_115_address();           // 115.0
 struct Entry {
   uint32_t colors[3][4];  // +0, +16, +32: (hue, saturation, value, 1.0)
   uint32_t floats[3];     // +48 to +56 (+60 isn't written)
-  uint32_t built[3];      // where each color is built in the frame
+  uint32_t built[3];      // where the original builds each color in its frame
 };
 
 // With the scene's +4 zero; kSceneSet below for the words that change.
@@ -111,55 +110,27 @@ constexpr SceneSet kSceneSet[3] = {
     {14, 2, k0_600000024},  // else 0.503125
 };
 
-// The frame's locals: constants kept across the loop (floats, through lfs
-// and stfs) and the image's base 0x82000000 (lis values kept as words).
-constexpr uint32_t kBase = 0x82000000;
-struct Local {
-  uint32_t offset;
-  uint32_t constant;  // a float's address, or 0 for kBase
-};
-constexpr Local kLocals[] = {
-    {16, k20},          {20, k7},          {28, k0_90625},       {32, k0_600000024},
-    {36, k0_503125012}, {44, 0},           {48, 0},              {52, 0},
-    {56, 0},            {60, 0},           {64, 0},              {68, k0_496679991},
-    {72, 0},            {76, k0_921875},   {80, 0},              {84, k0_703125},
-    {88, 0},            {92, k0_640625},   {96, 0},              {100, k100},
-    {104, 0},           {108, k1_20000005},
-};
-
 void Move(uint8_t* base, uint32_t to, uint32_t from) { Stfs(base, to, Lfs(base, from)); }
 
 }  // namespace
 
 std::optional<uint64_t> PaintPaletteInit(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_820D2330 PaintPalette::Init");
-  const uint32_t frame = sp - kFrameBytes;
-  guest::StoreU32(base, frame, sp);  // the back chain, as stwu
+  // The original's 1,184-byte frame left out (E5 step 6): the scene (+24),
+  // its constants and the image's base (+16 to +108), the colors built
+  // (Entry::built) and the loop's index (+40) were read by it alone.
+  (void)sp;
   const uint32_t scene = schema::CarDrawGlobals::scene(base).address;
-  guest::StoreU32(base, frame + 24, scene);
   if (scene == 0) {
     return std::nullopt;
-  }
-  for (const Local& local : kLocals) {
-    if (local.constant == 0) {
-      guest::StoreU32(base, frame + local.offset, kBase);
-    } else {
-      Move(base, frame + local.offset, local.constant);
-    }
   }
   const bool set = int32_t(schema::CarScene(base, scene).model_set()) != 0;
   for (uint32_t e = 0; e < 16; e++) {
     const Entry& entry = kEntries[e];
     const schema::PaintPaletteEntry at(base, G::paint_palette_address() + 64 * e);
     for (uint32_t c = 0; c < 3; c++) {
-      const uint32_t built = frame + entry.built[c];
       for (uint32_t i = 0; i < 4; i++) {
-        Move(base, built + 4 * i, entry.colors[c][i]);
-      }
-      // Copied into the entry by doublewords (ld, std): the same bits.
-      for (uint32_t i = 0; i < 4; i++) {
-        guest::StoreU32(base, at.color_a_address() + 16 * c + 4 * i,
-                        guest::LoadU32(base, built + 4 * i));
+        Move(base, at.color_a_address() + 16 * c + 4 * i, entry.colors[c][i]);
       }
     }
     for (uint32_t i = 0; i < 3; i++) {
@@ -172,9 +143,11 @@ std::optional<uint64_t> PaintPaletteInit(uint8_t* base, uint32_t sp) {
       Move(base, at.float_0_address() + 4 * i, constant);
     }
   }
-  guest::StoreU32(base, frame + 40, 16);  // the loop's index, as it ends
-  // r3 as left: the last case's ld of its third color's first doubleword.
-  return (uint64_t(guest::LoadU32(base, frame + 864)) << 32) | guest::LoadU32(base, frame + 868);
+  // r3 as left: the last case's ld of its third color's first doubleword
+  // (entry 15's +32, the same bits as the frame's copy at +864).
+  const schema::PaintPaletteEntry last(base, G::paint_palette_address() + 64 * 15);
+  return (uint64_t(guest::LoadU32(base, last.color_a_address() + 32)) << 32) |
+         guest::LoadU32(base, last.color_a_address() + 36);
 }
 
 }  // namespace material_passes

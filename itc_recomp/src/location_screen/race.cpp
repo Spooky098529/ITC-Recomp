@@ -26,11 +26,11 @@ void Leave(uint8_t* base, uint32_t machine) {
 
 uint64_t Page9(uint8_t* base, uint32_t sp, uint32_t machine, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822280D8 LocationScreen::Page9");
-  const uint32_t frame = sp - 112;
-  guest::StoreU32(base, frame, sp);
+  // The original's 112-byte frame held no slots (E5 step 6): the calls are
+  // made from `sp`, their frames below it.
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  calls.Call(kEventQuery, frame, 0x82228104, save, 0);
-  const uint64_t r3 = calls.Call(kRaceSetUp, frame, 0x82228110, save, ~0ull);
+  calls.Call(kEventQuery, sp, 0x82228104, save, 0);
+  const uint64_t r3 = calls.Call(kRaceSetUp, sp, 0x82228110, save, ~0ull);
   Leave(base, machine);
   return r3;
 }
@@ -41,10 +41,11 @@ uint64_t Page11(uint8_t* base, uint32_t sp, uint32_t machine, const Calls& calls
   guest::StoreU32(base, frame, sp);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   const schema::LocationScreen screen = G::screen(base);
-  guest::StoreU32(base, frame + 80, screen.picked_opponent());
+  // The picked opponent (the original's +80, read only here: a value since
+  // E5 step 6).
+  const uint32_t picked = screen.picked_opponent();
   const uint32_t event = guest::LoadU32(base, race_event::kEvent);
-  const uint32_t item = race_event::GroupItem(base, event, G::screen(base).group_kind(),
-                                              guest::LoadU32(base, frame + 80));
+  const uint32_t item = race_event::GroupItem(base, event, G::screen(base).group_kind(), picked);
   Copy(base, calls, frame, 0x82228188, frame + 96, item, 3008);
   calls.Call(kEventQuery, frame, 0x82228194, save, 1);
   const uint64_t rival = uint64_t(int64_t(int16_t(guest::LoadU16(base, frame + 96))));

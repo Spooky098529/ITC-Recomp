@@ -3,8 +3,10 @@
 // records in the part models once they've arrived (ModelPoint::Find for the
 // nodes, ModelPoint::FindShape for the shapes) and scale the blended
 // materials of some (PartModel::ScaleBlended). Guest data shared with the
-// recompiled code; `stack` is the guest r1 at entry; each returns r3 as the
-// original leaves it (its last call's). Only with native memcpy,
+// recompiled code; `stack` is the guest r1 at entry, passed on as the
+// callees' r1 (E5 step 6: the originals' frames held nothing but
+// FindMufflers' matrix at +80, a memcpy's source, so only its frame is
+// made); each returns r3 as the original leaves it (its last call's). Only with native memcpy,
 // --native_models and --native_material_passes (the adapters' check).
 // Adapters: src/hooks/second_set.cpp.
 

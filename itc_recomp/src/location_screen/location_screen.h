@@ -52,8 +52,8 @@ uint32_t HasMoreUnlocks(uint8_t* base);
 // (+8) added to +872 (1), or +872 and +876 cleared (0).
 uint32_t NextUnlockEntry(uint8_t* base);
 // sub_82227708 LocationScreen::OpponentHasCard: the picked opponent's item
-// (RaceEvent::GroupItem of +804 and +800, +800 stored at frame + 80) copied
-// to frame + 96 (memcpy); 1 when its halfword +88 is 4 or 5. `sp` the
+// (RaceEvent::GroupItem of +804 and +800; the original's +800 at frame + 80
+// not stored since E5 step 6) copied to frame + 96 (memcpy); 1 when its halfword +88 is 4 or 5. `sp` the
 // caller's stack pointer (the frame is kItemFrame below it). nullopt, with
 // nothing done, where the copy can't be native (the original runs).
 std::optional<uint32_t> OpponentHasCard(uint8_t* base, uint32_t sp);
@@ -78,8 +78,9 @@ struct RunCall {
                   uint32_t lr);
 };
 
-// Each takes `sp`, the caller's stack pointer: the movie's id is stored at
-// its frame's +80 for UiMovies::Find, as the original does.
+// Each takes `sp`, the caller's stack pointer, unused since E5 step 6: the
+// movie's id, the original's word at its frame's +80 read only by
+// UiMovies::Find, is passed as a value (ui_movies::PairsFindKey); no frame made.
 //
 // sub_8222A060 LocationScreen::ShowPictures: movie 21's nodes (1, 4), (1, 5)
 // textures 0, (1, 6), (1, 7) textures 1, (1, 6), (1, 7) shown, (1, 8),
@@ -93,8 +94,9 @@ uint32_t HidePictures(uint8_t* base, uint32_t sp);
 uint32_t SetCarColor(uint8_t* base, uint32_t sp);
 // sub_8222BFE8 LocationScreen::SetCursor and sub_8222C058
 // LocationScreen::ListNode: node (9, 0) or (10, 0)'s +16 = `value` (its 32
-// bits, unsigned) as a float; the frame's +80 left holding it as a
-// doubleword (the original's conversion). Return the node.
+// bits, unsigned) as a float (the original's conversion through a
+// doubleword at its frame's +80, not stored since E5 step 6). Return the
+// node.
 uint32_t SetCursor(uint8_t* base, uint32_t sp, uint32_t value);
 uint32_t ListNode(uint8_t* base, uint32_t sp, uint32_t value);
 // sub_8222C0C8 LocationScreen::ShowArrows: nodes (-1, 17) and (-1, 18) by
@@ -145,8 +147,9 @@ struct PageCall {
                uint32_t frame_bytes, uint32_t lr);
 };
 // sub_8222EC08 LocationScreen::UpdatePage (r3 = the machine, r4 = the
-// dispatcher): the 16 pages' handlers stored in its 240-byte frame (+80
-// on), and unless the page is -1 the page's (read from there) called;
+// dispatcher): unless the page is -1 the page's handler (the original's
+// 16-word table at its 240-byte frame's +80, a table in C++ since E5 step
+// 6) called from a 240-byte frame;
 // then [0x8265ECE0] = the screen's +592 (16 bytes), and when +900 is set
 // it's cleared and the page object restarted. r3 is the handler's (or as
 // it came).
@@ -213,8 +216,8 @@ uint32_t Copy(uint8_t* base, const Calls& calls, uint32_t r1, uint32_t lr, uint3
 // sub_822280D8 LocationScreen::Page9 (r4 = the machine): Career::EventQuery
 // (save, 0), Race::SetUp(save, -1), the machine's +9620 = 11 and +9604 = 10.
 // Returns Race::SetUp's r3. sub_82228138 LocationScreen::Page11: the picked
-// opponent's item (RaceEvent::GroupItem of +804 and +800, +800 at frame +
-// 80) copied to frame + 96, Career::EventQuery(save, 1), Race::SetUp(save,
+// opponent's item (RaceEvent::GroupItem of +804 and +800; the original's
+// +800 at frame + 80 a value since E5 step 6) copied to frame + 96, Career::EventQuery(save, 1), Race::SetUp(save,
 // the item's id), the race data's +0x59AE4 |= 0x10, then as Page9. `sp` the
 // caller's stack pointer.
 uint64_t Page9(uint8_t* base, uint32_t sp, uint32_t machine, const Calls& calls);
@@ -467,8 +470,8 @@ uint32_t Transition34(uint8_t* base, uint32_t sp, uint32_t step, const Calls& ca
 // FadeIn leaves it).
 uint32_t Start(uint8_t* base, uint32_t sp, const Calls& calls);
 // sub_8222C188 LocationScreen::ShowOpponentSpecs: the picked opponent's
-// item (RaceEvent::GroupItem of +804 and +800, +800 at frame + 80) copied
-// to its 3,152-byte frame's +96; its car's spec (Params::GetCarSpec of the
+// item (RaceEvent::GroupItem of +804 and +800; the original's +800 at frame
+// + 80 a value since E5 step 6) copied to its 3,152-byte frame's +96; its car's spec (Params::GetCarSpec of the
 // build's car id, the item's +2948): node 12's texts 9 (the spec's byte
 // +769, 1934 on), 10 (the car id, 1646 on) and 11 (1718 on), through
 // UiMovie::SetNodeText (r6 to r10 passed as 0). Returns the last's r3.

@@ -5,7 +5,9 @@
 // model's block. Guest data shared with the recompiled code, so these work on
 // guest memory with the originals' stores in their order (the saved
 // registers' slots in their frames aren't written). `stack` is the guest r1
-// at entry; each returns r3 as the original leaves it. Only where memcpy is
+// at entry, passed on as the callees' r1 (E5 step 6: the originals' frames
+// held nothing, so they're not made but SceneModelBlock::Reset's, whose
+// identity matrices are memcpy's sources); each returns r3 as the original leaves it. Only where memcpy is
 // native, with --native_material_passes for the parts' (PartsPoints::Reset),
 // and where ReleaseA's plain C++ runs for the releases (the adapters'
 // checks). Adapters: src/hooks/second_set.cpp.

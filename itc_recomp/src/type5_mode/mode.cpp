@@ -41,13 +41,11 @@ uint64_t Load64(uint8_t* base, uint32_t at) {
   return (uint64_t(LoadU32(base, at)) << 32) | LoadU32(base, at + 4);
 }
 
-// The mode's delegate (+8, its holder +4) from the doubleword at `slot`
-// (the function, 0, written there first as the originals build it). The
-// holder 0 when the delegate's address wraps to 0 (never: kept as the
-// originals test it).
-void SetDelegate(uint8_t* base, uint32_t mode, uint32_t slot, uint32_t function) {
-  StoreU32(base, slot + 4, 0);
-  StoreU32(base, slot, function);
+// The mode's delegate (+8, its holder +4) from the doubleword `pair` (the
+// function, 0, as the originals build it in their frames). The holder 0
+// when the delegate's address wraps to 0 (never: kept as the originals test
+// it).
+void SetDelegateFrom(uint8_t* base, uint32_t mode, uint64_t pair) {
   const Mode m(base, mode);
   const uint32_t delegate = mode + 8;
   uint32_t holder = 0;
@@ -56,12 +54,27 @@ void SetDelegate(uint8_t* base, uint32_t mode, uint32_t slot, uint32_t function)
     m.set_delegate_object(mode);
     // The function and the adjustment, copied as one doubleword (the high
     // word stored first).
-    const uint64_t pair = Load64(base, slot);
     m.set_delegate_function(uint32_t(pair >> 32));
     m.set_delegate_adjustment(uint32_t(pair));
     m.set_delegate_vtable(kDelegateVtable);
   }
   m.set_delegate_ptr(holder);
+}
+
+// The delegate from the function: the doubleword {function, 0} a value
+// (E5 step 6: the originals' frame slot, which only they read).
+void SetDelegateTo(uint8_t* base, uint32_t mode, uint32_t function) {
+  SetDelegateFrom(base, mode, uint64_t(function) << 32);
+}
+
+// The delegate from the doubleword built at `slot` (the function, 0,
+// written there first as the originals build it): for NextMode, whose
+// answer is then built over the same slot, and WaitForLoads, whose slot
+// was handed to Sound::Play.
+void SetDelegate(uint8_t* base, uint32_t mode, uint32_t slot, uint32_t function) {
+  StoreU32(base, slot + 4, 0);
+  StoreU32(base, slot, function);
+  SetDelegateFrom(base, mode, Load64(base, slot));
 }
 
 // The block's next-mode answer stored as the originals copy it: two words,
@@ -132,7 +145,10 @@ void FindShown(uint8_t* base, uint32_t block) {
 
 uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8222FD68 ModeType5::Init");
-  const uint32_t frame = Frame(base, sp, 128);
+  // The original's 128-byte frame held only the delegate's doubleword (a
+  // value since E5 step 6): the guest calls run from `sp`, the dialog's
+  // Init's frame right below it.
+  const uint32_t frame = sp;
   const Mode m(base, mode);
   auto block = [&] { return m.block(); };
   calls.Call(kScreenStart, frame, 0x8222FD7C, mode);
@@ -148,7 +164,7 @@ uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls)
              Block(base, uint32_t(allocated)).location_screen_address());
   calls.Call(kCarSettingsInitType5, frame, 0x8222FDBC, block().address);
   bool replaced = false;
-  DialogInit(base, block().dialog_address(), frame - kDialogInitFrame, &replaced);
+  DialogInit(base, block().dialog_address(), sp - kDialogInitFrame, &replaced);
   // The three machines added to the dispatcher in the order +9640, +0,
   // +19280.
   for (int i = 0; i < 3; i++) {
@@ -171,7 +187,7 @@ uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls)
   calls.CallArgs(kFadeIn, frame, 0x8222FE78, {G::fade_in_passes(base), 0, 0, 0, 0, 0, 0, 0});
   const uint64_t r3 = calls.Call(kLoadingShow, frame, 0x8222FE88, 1, 0, ~uint64_t(0));
   // The delegate: WaitForLoads through Mode::Slot8Thunk.
-  SetDelegate(base, mode, frame + 80, kSlot8Thunk);
+  SetDelegateTo(base, mode, kSlot8Thunk);
   return r3;
 }
 
@@ -232,33 +248,36 @@ void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const 
 
 void LeaveScreen(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82230260 ModeType5::LeaveScreen");
-  const uint32_t frame = Frame(base, sp, 128);
+  // The original's 128-byte frame held only the delegate's doubleword (a
+  // value since E5 step 6): the dispatch runs from `sp`.
   ClearAnswer(base, answer);
   FindShown(base, Mode(base, mode).block().address);
   PostRing(base, mode, 3);
-  calls.Call(kDispatch, frame, 0x822302DC, mode + 36, mode);
-  SetDelegate(base, mode, frame + 80, kSlot11Thunk);
+  calls.Call(kDispatch, sp, 0x822302DC, mode + 36, mode);
+  SetDelegateTo(base, mode, kSlot11Thunk);
 }
 
 void WaitForShown(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp,
                   const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82230168 ModeType5::WaitForShown");
-  const uint32_t frame = Frame(base, sp, 112);
+  // The original's 112-byte frame held only the delegate's doubleword (a
+  // value since E5 step 6): the dispatch runs from `sp`.
   ClearAnswer(base, answer);
   FindShown(base, Mode(base, mode).block().address);
   if (AllLoaded(Mode(base, mode).block())) {
-    SetDelegate(base, mode, frame + 80, kNextModeThunk);
+    SetDelegateTo(base, mode, kNextModeThunk);
   }
   PostRing(base, mode, 1);
-  calls.Call(kDispatch, frame, 0x82230248, mode + 36, mode);
+  calls.Call(kDispatch, sp, 0x82230248, mode + 36, mode);
 }
 
 void Leaving(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82230328 ModeType5::Leaving");
-  const uint32_t frame = Frame(base, sp, 128);
+  // The original's 128-byte frame held only the delegate's doubleword (a
+  // value since E5 step 6): the dispatch runs from `sp`.
   ClearAnswer(base, answer);
   PostRing(base, mode, 4);
-  calls.Call(kDispatch, frame, 0x8223039C, mode + 36, mode);
+  calls.Call(kDispatch, sp, 0x8223039C, mode + 36, mode);
   // The machines' check over the ids 0 to 2, as the original's (none of
   // which is a machine: the check always passes).
   const Block block = Mode(base, mode).block();
@@ -272,7 +291,7 @@ void Leaving(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const C
       return;
     }
   }
-  SetDelegate(base, mode, frame + 80, kSlot13Thunk);
+  SetDelegateTo(base, mode, kSlot13Thunk);
 }
 
 uint32_t Interrupt(uint8_t* base, uint32_t object) {
@@ -294,12 +313,14 @@ void ForceExit(uint8_t* base, uint32_t object, uint32_t number, uint32_t sp) {
   if (number >= 4) {
     return;
   }
-  // The doubleword built below the stack pointer (sp - 16), as the original.
-  const uint32_t slot = sp - 16;
-  SetDelegate(base, object - 32, slot, kSlot14Thunk);
-  StoreU32(base, slot + 4, number < 2 ? 4 : 12);
-  guest::StoreU8(base, slot, 1);
-  const uint64_t next = Load64(base, slot);
+  // The doubleword the original builds below its stack pointer (sp - 16),
+  // a value since E5 step 6: {Slot14Thunk, 0} for the delegate, then the
+  // low word the next mode and the first byte 1 (the other three the
+  // thunk's address's).
+  (void)sp;
+  SetDelegateTo(base, object - 32, kSlot14Thunk);
+  const uint64_t next = (uint64_t((kSlot14Thunk & 0x00FFFFFFu) | 0x01000000u) << 32) |
+                        uint64_t(number < 2 ? 4u : 12u);
   if (number < 2) {
     G::set_leaving_flag(base, 1);
   }

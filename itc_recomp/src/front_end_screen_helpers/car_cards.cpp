@@ -31,9 +31,10 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   return frame;
 }
 
-uint32_t FindMovie(uint8_t* base, uint32_t id, uint32_t key) {
-  Store(base, key, id);
-  return Load(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, key));
+// UiMovies::Find(id): the movie. The originals stored the id at a frame
+// word only they read and passed its address; passed as a value (E5 step 6).
+uint32_t FindMovie(uint8_t* base, uint32_t id) {
+  return Load(base, ui_movies::PairsFindKey(base, ui_movies::kMovieTable, id));
 }
 
 // The maker's logo (a frame choice) for a car id.
@@ -64,8 +65,9 @@ uint64_t Id(uint8_t* base, uint32_t entry, uint32_t first) {
 uint64_t CarCardFill(uint8_t* base, uint32_t node, uint32_t entry, uint32_t sp,
                      const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821821C8 CarCard::Fill");
+  // The frame kept for the text setters' calls (its back chain).
   const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t movie = FindMovie(base, 4, frame + 80);
+  const uint32_t movie = FindMovie(base, 4);
   const uint32_t logo = ui_movies::Child(base, node, 3);
   Node(base, logo).set_texture_entry(Logo(int32_t(Entry(base, entry).car_id())));
   calls.Call(kSetNodeText, frame, 0x82182278, movie, ui_movies::Child(base, node, 5),
@@ -82,9 +84,11 @@ uint64_t CarCardFill(uint8_t* base, uint32_t node, uint32_t entry, uint32_t sp,
 
 uint64_t CarCardsFillAll(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821822F8 CarCards::FillAll");
-  const uint32_t frame = Frame(base, sp, 144);
-  Store(base, frame + 80, 4);
-  const uint32_t pair = ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80);
+  // The original's 144-byte frame left out: its one word (the movie's key at
+  // +80) passed as a value, and no guest call is made from it (CarCard::Fill
+  // makes its own frame below `sp`; E5 step 6).
+  const uint32_t frame = sp;
+  const uint32_t pair = ui_movies::PairsFindKey(base, ui_movies::kMovieTable, 4);
   const uint32_t movie = Load(base, pair);
   uint64_t r3 = pair;
   const int32_t count = int32_t(Dealer::data(base).shown_list().count());
@@ -103,8 +107,9 @@ uint64_t CarCardsFillAll(uint8_t* base, uint32_t sp, const Calls& calls) {
 
 uint64_t CarCardFillDetail(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821827E0 CarCard::FillDetail");
+  // The frame kept for the text setters' calls (its back chain).
   const uint32_t frame = Frame(base, sp, 192);
-  const uint32_t movie = FindMovie(base, 18, frame + 80);
+  const uint32_t movie = FindMovie(base, 18);
   const schema::CarDealerData data = Dealer::data(base);
   const uint32_t scroll = data.car_scroll();
   const uint32_t index = (scroll + data.car_selection()) << 2;
@@ -133,9 +138,11 @@ uint64_t CarCardFillDetail(uint8_t* base, uint32_t sp, const Calls& calls) {
 
 uint64_t CarDetailOpen(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821830C0 CarDetail::Open");
-  const uint32_t frame = Frame(base, sp, 112);
+  // The original's 112-byte frame (only its back chain) left out: no guest
+  // call is made from it (CarCard::FillDetail makes its own frame below
+  // `sp`; E5 step 6).
   Dealer::data(base).set_detail_open(1);
-  const uint64_t r3 = CarCardFillDetail(base, frame, calls);
+  const uint64_t r3 = CarCardFillDetail(base, sp, calls);
   Dealer::data(base).set_buy_step(2);
   const Mode m(base, mode);
   const uint32_t count = m.message_count() + 1;

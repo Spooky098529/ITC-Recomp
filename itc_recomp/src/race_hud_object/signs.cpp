@@ -220,8 +220,9 @@ uint64_t UpdatePlaceName(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& 
 uint64_t UpdateSigns(uint8_t* base, uint32_t hud, uint32_t flag, uint32_t sp, const Calls& calls,
                      const track_zones::OwnerCalls& zone_calls) {
   ITC_NATIVE_RUNNING("sub_82214718 RaceHud::UpdateSigns");
+  // The original's frame: its callees' stack pointer (each makes its own
+  // frame below it; no guest code is called from it, so no back chain).
   const uint32_t frame = sp - 112;
-  guest::StoreU32(base, frame, sp);
   const schema::RaceData data(base, G::race_data(base).address);
   const int32_t course = int32_t(data.route_course());
   if (course == 8 || course == 9 || course == 10) {

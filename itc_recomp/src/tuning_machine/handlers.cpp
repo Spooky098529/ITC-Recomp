@@ -7,6 +7,7 @@
 #include "game_modes/game_modes.h"
 #include "tuning_pages/tuning_pages.h"
 #include "guest.h"
+#include "hooks/heap.h"
 #include "schema/game_modes.h"
 #include "schema/menu_helpers.h"
 #include "schema/tuning_machine.h"
@@ -37,11 +38,10 @@ inline uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   return frame;
 }
 
-// UiMovies::Find with the id stored at `key` (the original's frame word):
-// the pair's value's address.
-inline uint32_t FindPair(uint8_t* base, uint32_t id, uint32_t key) {
-  Store(base, key, id);
-  return ui_movies::PairsFind(base, ui_movies::kMovieTable, key);
+// UiMovies::Find with the id as a word (the original stored it in its
+// frame's +80 for the key; only Find read it): the pair's value's address.
+inline uint32_t FindPair(uint8_t* base, uint32_t id) {
+  return ui_movies::PairsFindKey(base, ui_movies::kMovieTable, id);
 }
 
 // Posts the message (id, 0, 0) on `mode`'s ring (+204: its count +600,
@@ -108,8 +108,8 @@ void ResetImages(uint8_t* base, uint32_t images) {
 uint64_t Create(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821CE4C8 TuningMachine::Create");
   const Screen sc(base, uint32_t(r3));
-  const uint32_t frame = Frame(base, sp, 144);
-  // The screen kept in the caller's parameter area (read back before the
+  // The original's 144-byte frame held nothing the port keeps (no call is
+  // made with it, E5 step 6). The screen kept in the caller's parameter area (read back before the
   // menus are written).
   Store(base, sp + 20, sc.address);
   sc.set_movies_loaded(0);
@@ -272,7 +272,7 @@ uint64_t OpenMovies(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& ca
 uint64_t WaitForMovies(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821CE9E8 TuningMachine::WaitForMovies");
   const Screen sc(base, uint32_t(r3));
-  Frame(base, sp, 112);
+  // No frame (the original's 112 bytes held nothing; E5 step 6).
   if (sc.movies_loaded() == 0) {
     bool all = true;
     for (const uint32_t id : {kShopMovie, kVinylMovie, kStickerMovie}) {
@@ -300,7 +300,7 @@ uint64_t OnDialogClosed(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp,
   const Screen sc(base, uint32_t(r3));
   const uint32_t frame = Frame(base, sp, 128);
   if (sc.screen_state() == 11) {
-    const uint32_t movie = Load(base, FindPair(base, kDialogMovie, frame + 80));
+    const uint32_t movie = Load(base, FindPair(base, kDialogMovie));
     calls.CallArgs(kSetText, frame, 0x821D88E8, {movie, kNone, 0, 15, 0, 0, 0, 0});
     calls.CallArgs(kSetText, frame, 0x821D88FC, {movie, 1, 3, 2, 0, 0, 0, 0});
     r3 = calls.CallArgs(kSetText, frame, 0x821D8910, {movie, 1, 4, 3, 0, 0, 0, 0});
@@ -316,7 +316,7 @@ uint64_t Unload(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   const Screen sc(base, uint32_t(r3));
   const uint32_t frame = Frame(base, sp, 112);
   if (sc.movies_loaded() != 0) {
-    const uint32_t movie = Load(base, FindPair(base, kShopMovie, frame + 80));
+    const uint32_t movie = Load(base, FindPair(base, kShopMovie));
     r3 = calls.Call(kFinishAll, frame, 0x821D69E0, movie);
   }
   if (sc.delete_movies() != 0) {
@@ -344,16 +344,28 @@ uint64_t Destroy(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls,
   } else {
     calls.Call(kUnloadAll, frame, 0x821CBD60, r3 + kImages);
   }
-  calls.Call(kVirtualFree, frame, 0x821CBD78, sc.queue().address, 0, kMemRelease);
-  calls.Call(kVirtualFree, frame, 0x821CBD88, sc.category_menu().address, 0, kMemRelease);
-  return calls.Call(kVirtualFree, frame, 0x821CBD98, sc.second_menu().address, 0, kMemRelease);
+  // VirtualFree straight to the allocation layer (hooks::VirtualFree, its
+  // adapter's answer); through the guest where the adapter would run the
+  // original or answer an address of 0.
+  auto virtual_free = [&](uint32_t address, uint32_t lr) -> uint64_t {
+    if (address != 0) {
+      if (const auto freed = hooks::VirtualFree(address, 0, kMemRelease, lr)) {
+        return *freed;
+      }
+    }
+    return calls.Call(kVirtualFree, frame, lr, address, 0, kMemRelease);
+  };
+  virtual_free(sc.queue().address, 0x821CBD78);
+  virtual_free(sc.category_menu().address, 0x821CBD88);
+  return virtual_free(sc.second_menu().address, 0x821CBD98);
 }
 
 uint32_t SavePlaceholders14(uint8_t* base, uint32_t images, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821F8950 DecalImages::SavePlaceholders14");
   const schema::DecalImages im(base, images);
-  const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t pair = FindPair(base, kStickerMovie, frame + 80);
+  // No frame (E5 step 6: the original's 112 bytes held only Find's key).
+  (void)sp;
+  const uint32_t pair = FindPair(base, kStickerMovie);
   const schema::UiMovie movie(base, Load(base, pair));
   // Its texture table's (the movie's +28) textures 160 and 159.
   im.set_sticker_placeholder_0(TextureTable(base, movie.textures()).texture_160().texture());
@@ -364,12 +376,12 @@ uint32_t SavePlaceholders14(uint8_t* base, uint32_t images, uint32_t sp) {
 uint32_t SavePlaceholders(uint8_t* base, uint32_t images, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82208130 DecalImages::SavePlaceholders");
   const schema::DecalImages im(base, images);
-  const uint32_t frame = Frame(base, sp, 112);
-  const schema::UiMovie movie(base, Load(base, FindPair(base, kVinylMovie, frame + 80)));
+  // No frame (E5 step 6: the original's 112 bytes held only Find's key).
+  const schema::UiMovie movie(base, Load(base, FindPair(base, kVinylMovie)));
   // Its texture table's (the movie's +28) textures 181 and 175.
   im.set_vinyl_placeholder_0(TextureTable(base, movie.textures()).texture_181().texture());
   im.set_vinyl_placeholder_1(TextureTable(base, movie.textures()).texture_175().texture());
-  return SavePlaceholders14(base, images, frame);
+  return SavePlaceholders14(base, images, sp - 112);
 }
 
 }  // namespace tuning_machine

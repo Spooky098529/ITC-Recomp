@@ -32,12 +32,12 @@ void VaryCar(uint8_t* base, uint32_t car, int32_t racer, int32_t vehicle, int32_
 // sub_8215C698 RaceLights::UploadDirectional (probably): `entry`'s +16
 // normalized into light_directions + 16 n, +32 into light_second + 16 n and
 // +48 into light_third + 16 n (in that order: the arrays overlap past slot 2). `stack` is
-// its r1: the normalized vector also left at stack - 16 (the 1.0 it stores
-// at stack - 4 first is overwritten there).
+// its r1, unused since E5 step 6 (the original also leaves the normalized
+// vector at stack - 16, over a 1.0 at stack - 4: read by nothing else).
 void UploadDirectional(uint8_t* base, uint32_t entry, uint32_t n, uint32_t stack);
 
-// sub_8215D008 RaceLights::Update (probably): light_origin = (0, 0, 0, 1) (also
-// left at the frame's +80), then each of the 11 entries (+16 + 96 i) of kind
+// sub_8215D008 RaceLights::Update (probably): light_origin = (0, 0, 0, 1) (the
+// original also leaves it at its frame's +80; not since E5 step 6), then each of the 11 entries (+16 + 96 i) of kind
 // 1 through UploadDirectional with n counting them. `frame` is its r1 less
 // kLightsFrame. Returns n.
 uint32_t LightsUpdate(uint8_t* base, uint32_t set, uint32_t frame);

@@ -172,14 +172,12 @@ uint64_t PlayStartMusic(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& ca
     // One of entries 1 to 5 by rand() % 5 (the indexes from a stack array).
     const c_runtime::ThreadDataCall thread{&ThreadDataGuest, const_cast<Calls*>(&calls)};
     const int32_t number = int32_t(uint32_t(c_runtime::Rand(base, frame, thread)));
-    Store(base, frame + 128, 5);
-    Store(base, frame + 112, 1);
-    Store(base, frame + 116, 2);
+    // The indexes' array (the original's frame words +112 to +128): a local
+    // (E5 step 6); rand's answer isn't negative.
+    const uint32_t entries[5] = {1, 2, 3, 4, 5};
     Store(base, frame + 92, 2);
-    Store(base, frame + 120, 3);
-    Store(base, frame + 124, 4);
     const int32_t index = number - (number / 5) * 5;
-    const uint32_t entry = Load(base, frame + 112 + 4 * uint32_t(index));
+    const uint32_t entry = entries[index];
     guest::StoreU8(base, frame + 82, 0);
     name = Load(base, Globals::music_names_address() + 4 * entry);
     return calls.Call(kMusicPlay, frame, 0x82175EC0, 3, frame + 92, name, frame + 82);
@@ -361,7 +359,7 @@ uint64_t AfterRaceTick(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& cal
 uint64_t OnCountdown(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82176968 RaceSounds::OnCountdown");
   const uint32_t machine = uint32_t(r3);
-  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t frame = sp;  // no frame (E5 step 6): its calls made from `sp`
   calls.Call(kCarSoundUpdate, frame, 0x82176988, 1, CarSounds::sounds(base).address);
   FadeOut(base, machine, 0);
   return PickRivalMusic(base, machine, frame);
@@ -370,7 +368,7 @@ uint64_t OnCountdown(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls
 uint64_t OnRaceEnd(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82176BA0 RaceSounds::OnRaceEnd");
   const uint32_t machine = uint32_t(r3);
-  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t frame = sp;  // no frame (E5 step 6): its calls made from `sp`
   // fmuls: the effects' volume times 0.0, rounded to single.
   const double volume = double(Globals::effects_volume(base));
   const double zero = double(RaceStates::zero(base));
@@ -383,7 +381,7 @@ uint64_t OnRaceEnd(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) 
 uint64_t OnLeaveAfterRace(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82176E60 RaceSounds::OnLeaveAfterRace");
   const uint32_t machine = uint32_t(r3);
-  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t frame = sp;  // no frame (E5 step 6): its calls made from `sp`
   r3 = UpdateCars(base, r3, frame, calls);
   FadeOut(base, machine, 0);
   CopySingle(base, Globals::effects_volume_2_address(), Globals::effects_volume_address());
@@ -393,7 +391,7 @@ uint64_t OnLeaveAfterRace(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& 
 uint64_t OnNextStage(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82176EC8 RaceSounds::OnNextStage");
   const uint32_t machine = uint32_t(r3);
-  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t frame = sp;  // no frame (E5 step 6): its calls made from `sp`
   calls.Call(kCarSoundsStopAll, frame, 0x82176EE0, 1, r3);
   FadeOut(base, machine, 0x4000);
   return PickRivalMusic(base, machine, frame);
@@ -402,7 +400,7 @@ uint64_t OnNextStage(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls
 uint64_t OnAbort(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82175CA0 RaceSounds::OnAbort");
   const uint32_t machine = uint32_t(r3);
-  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t frame = sp;  // no frame (E5 step 6): its calls made from `sp`
   r3 = calls.Call(kCarSoundsStopAll, frame, 0x82175CB8, 1, r3);
   FadeOut(base, machine, 0x4000);
   return r3;
@@ -411,7 +409,7 @@ uint64_t OnAbort(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
 uint64_t OnRollingStart(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821770C0 RaceSounds::OnRollingStart");
   const uint32_t machine = uint32_t(r3);
-  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t frame = sp;  // no frame (E5 step 6): its calls made from `sp`
   if (Sounds(base, machine).cars_step() == 1) {
     SetUpCars(base, r3, frame, calls);
   }

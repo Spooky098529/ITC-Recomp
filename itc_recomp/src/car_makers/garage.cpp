@@ -61,7 +61,9 @@ uint64_t GarageCarReset(uint8_t* base, const front_end_car_draw::Calls& calls, u
 uint64_t GarageCarsStaticInit(uint8_t* base, const front_end_car_draw::Calls& calls,
                               uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_825D9EF0 GarageCars::StaticInit");
-  const uint32_t frame = Frame(base, stack, 112);
+  // Its frame's address only (E5 step 6: nothing in it, no guest call made
+  // with it; GarageCar::Reset's frame below it).
+  const uint32_t frame = stack - 112;
   uint64_t r3 = 0;
   for (uint32_t i = 0; i < 2; i++) {
     const schema::GarageCarSlot slot(base, G::garage_cars_address() + 1972 * i);

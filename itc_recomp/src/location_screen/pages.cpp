@@ -139,13 +139,16 @@ std::optional<uint32_t> ApplyQueuedPage(uint8_t* base, uint32_t sp) {
 void UpdatePage(uint8_t* base, uint32_t sp, uint32_t machine, uint32_t dispatcher,
                 const PageCall& call) {
   ITC_NATIVE_RUNNING("sub_8222EC08 LocationScreen::UpdatePage");
+  // The handlers' table: the original's 16 words at its 240-byte frame's
+  // +80, read only here (a value since E5 step 6). A page past the table
+  // reads the frame's word there, as the original (never seen: pages are
+  // 0 to 15).
   const uint32_t frame = sp - 240;
   const uint32_t start = G::pages(base).page();
-  for (uint32_t i = 0; i < 16; i++) {
-    guest::StoreU32(base, frame + 80 + 4 * i, kPageHandlers[i]);
-  }
   if (start != 0xFFFFFFFFu) {
-    const uint32_t handler = guest::LoadU32(base, frame + 80 + (start << 2));
+    const uint32_t handler = start < kPageHandlers.size()
+                                 ? kPageHandlers[start]
+                                 : guest::LoadU32(base, frame + 80 + (start << 2));
     call.call(call.user, handler, dispatcher, machine, 240, 0x8222ED08);
   }
   const schema::LocationScreen screen = Screen(base);

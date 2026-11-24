@@ -168,12 +168,13 @@ uint64_t DialogDraw(uint8_t* base, uint64_t r3, uint64_t r4, bool type7, uint32_
   }
   const uint32_t frame = sp - 96;
   const uint32_t page = schema::Type67Dialog(base, uint32_t(r3)).page();
-  StoreU32(base, frame + 80, type7 ? 0x82241EF8 : 0x82232328);
-  StoreU32(base, frame + 84, type7 ? 0x822420C0 : 0x822324E8);
+  // The pages' table (the original's frame +80, read only here: a C++
+  // array since E5 step 6).
+  const uint32_t pages[2] = {type7 ? 0x82241EF8u : 0x82232328u, type7 ? 0x822420C0u : 0x822324E8u};
   if (page == kMinusOne) {
     return r3;
   }
-  const uint32_t target = LoadU32(base, frame + 80 + (page << 2));
+  const uint32_t target = pages[page];
   return calls.call(target, frame, type7 ? 0x82242204 : 0x82232784, r3, r4);
 }
 
@@ -185,15 +186,12 @@ uint64_t Type7Screen0Draw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
   const uint32_t guard = G::type7_draw_guard(base);
   const uint32_t page = schema::Type7Screen0(base, uint32_t(r3)).pages().page();
   if ((guard & 1) == 0) {
-    StoreU32(base, frame + 80, 0x82244BF8);
-    StoreU32(base, frame + 88, 0x82244E00);
-    StoreU32(base, frame + 96, 0x82244610);
-    StoreU32(base, frame + 84, 0);
-    StoreU32(base, frame + 92, 0);
-    StoreU32(base, frame + 100, 0);
+    // The three functors (function, adjustment), built at the original's
+    // frame +80 (a C++ array since E5 step 6), then copied to the table.
+    const uint32_t words[6] = {0x82244BF8, 0, 0x82244E00, 0, 0x82244610, 0};
     G::set_type7_draw_guard(base, guard | 1);
     for (uint32_t i = 0; i < 6; i++) {
-      StoreU32(base, kTable + 4 * i, LoadU32(base, frame + 80 + 4 * i));
+      StoreU32(base, kTable + 4 * i, words[i]);
     }
   }
   if (page == kMinusOne) {
@@ -208,14 +206,14 @@ uint64_t ControllerOptionsDraw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t
                                const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821C7F28 ControllerOptions::Draw");
   const uint32_t frame = sp - 112;
-  StoreU32(base, frame + 80, 0x821C5A20);
   const uint32_t page = G::controller_page(base).page();
-  StoreU32(base, frame + 84, 0x821C5B70);
-  StoreU32(base, frame + 88, 0x821C5C70);
+  // The pages' table (the original's frame +80, read only here: a C++
+  // array since E5 step 6).
+  static constexpr uint32_t kPages[3] = {0x821C5A20, 0x821C5B70, 0x821C5C70};
   if (page == kMinusOne) {
     return r3;
   }
-  const uint32_t target = LoadU32(base, frame + 80 + (page << 2));
+  const uint32_t target = kPages[page];
   return calls.call(target, frame, 0x821C7F84, r4, r4);
 }
 

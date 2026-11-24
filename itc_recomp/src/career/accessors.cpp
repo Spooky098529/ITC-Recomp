@@ -128,6 +128,10 @@ void RunningMeanMerge(uint8_t* base, uint32_t mean, uint64_t packed, uint32_t sp
   ITC_NATIVE_RUNNING("sub_82111CB0 RunningMean::Merge");
   guest::StoreU32(base, sp + 24, uint32_t(packed >> 32));
   guest::StoreU32(base, sp + 28, uint32_t(packed));
+  RunningMeanMergeInto(base, mean, packed);
+}
+
+void RunningMeanMergeInto(uint8_t* base, uint32_t mean, uint64_t packed) {
   const uint32_t old_count = guest::LoadU32(base, mean + 4);
   const uint32_t count = uint32_t(packed);
   const uint32_t sum = old_count + count;

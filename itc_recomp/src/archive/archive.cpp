@@ -176,11 +176,14 @@ std::optional<uint32_t> FinishRequest(uint8_t* base, uint32_t request,
   if ((flags & 0x2) && !(flags & 0x1000)) {
     constexpr uint32_t kMemDecommit = 0x4000;
     const uint32_t data = r.data();
-    auto r3 = hooks::VirtualFree(data, 0, kMemDecommit, 0x8209D71C);
-    if (!r3) {
-      calls.guest_free(calls.user, data, 0, kMemDecommit);
+    // VirtualFree's answer called directly (E5 step 6, in place of
+    // hooks::VirtualFree): a decommit of our allocation layer's pages leaves
+    // them as they are and answers 1; else the game's VirtualFree.
+    if (hooks::NativeHeapActive() && memory::InRange(data)) {
+      return 1u;
     }
-    return r3;
+    calls.guest_free(calls.user, data, 0, kMemDecommit);
+    return std::nullopt;
   }
   return std::nullopt;
 }

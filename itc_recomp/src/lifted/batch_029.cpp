@@ -42019,7 +42019,7 @@ lifted::Result f8246AD98(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   f31 = f1;
   // bl 0x825dbe44
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__KeRaiseIrqlToDpcLevel, LIFTED_ARGS(0x8246ADB4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::KeRaiseIrqlToDpcLevel>(base, LIFTED_ARGS(0x8246ADB4, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32107
   r11 = uint64_t(int64_t(-2104164352));
   // mr r28,r3
@@ -42045,7 +42045,7 @@ loc_8246ADDC:
   r3 = r30;
   // bl 0x825db9a4
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__KeAcquireSpinLockAtRaisedIrql, LIFTED_ARGS(0x8246ADE4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::KeAcquireSpinLockAtRaisedIrql>(base, LIFTED_ARGS(0x8246ADE4, r31)); r3 = o.r3; f1 = o.f1; }
   // stw r29,8(r30)
   guest::StoreU32(base, uint32_t(r30) + 8, uint32_t(r29));
   // stb r28,12(r30)
@@ -42165,12 +42165,12 @@ loc_8246AE84:
   guest::StoreU32(base, uint32_t(r30) + 8, uint32_t(r11));
   // bl 0x825db994
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__KeReleaseSpinLockFromRaisedIrql, LIFTED_ARGS(0x8246AEC4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::KeReleaseSpinLockFromRaisedIrql>(base, LIFTED_ARGS(0x8246AEC4, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r3,r31
   r3 = r31;
   // bl 0x825dbe54
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__KfLowerIrql, LIFTED_ARGS(0x8246AECC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::KfLowerIrql>(base, LIFTED_ARGS(0x8246AECC, r31)); r3 = o.r3; f1 = o.f1; }
 loc_8246AECC:
   // li r3,0
   r3 = uint64_t(int64_t(0));

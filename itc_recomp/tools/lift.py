@@ -977,7 +977,10 @@ def emit_function(info, infos, emitting):
                 line = assign_result(None, f"lifted::Call(base, 0x{st.target[4:]}, LIFTED_ARGS({lr}, r31))")
                 used.update(ALL_ARGS | {"r31"})
             elif st.how == "import":
-                line = assign_result(None, f"lifted::Import(base, {st.target}, LIFTED_ARGS({lr}, r31))")
+                # Straight to our answer, found once per call site (E5 step 6).
+                record = st.target.removeprefix("__imp__")
+                line = assign_result(None, f"lifted::ImportAt<&lifted::import_records::{record}>"
+                                           f"(base, LIFTED_ARGS({lr}, r31))")
                 used.update(ALL_ARGS | {"r31"})
             else:
                 target = rewrite(st.target)

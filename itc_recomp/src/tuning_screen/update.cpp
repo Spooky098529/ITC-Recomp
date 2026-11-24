@@ -20,6 +20,7 @@
 #include "base/log.h"
 #include "guest.h"
 #include "tuning_pages/tuning_pages.h"
+#include "ui_movies/game.h"
 
 namespace tuning_screen {
 
@@ -149,7 +150,10 @@ uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint64_t r3, uint64_t r
       id = int32_t(TS(base, s).category()) == 5 && uint32_t(TS(base, s).item()) == 6 ? 13 : 14;
     }
   }
-  const uint32_t movie = guest::LoadU32(base, MovieEntry(base, frame, id));
+  // The id passed to UiMovies::Find as a value (the original's frame +80;
+  // E5 step 6).
+  const uint32_t movie =
+      guest::LoadU32(base, ui_movies::PairsFindKey(base, ui_movies::kMovieTable, id));
   UpdateBusyIcon(base, stand, r3, frame);
 
   // Blocks 4 and 5: the command's runner on its first update, then the

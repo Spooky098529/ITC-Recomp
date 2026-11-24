@@ -26,12 +26,10 @@ uint32_t ResetMovie(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8222CD60 LocationScreen::ResetMovie");
   const uint32_t frame = sp - 192;
   guest::StoreU32(base, frame, sp);
-  const uint32_t movie = Movie(base, frame, kMenusMovie);
+  const uint32_t movie = Movie(base, kMenusMovie);
+  // Node 9's five texts and children: the original's tables at the frame's
+  // +96 and +128, read only here (values since E5 step 6).
   constexpr uint32_t kTexts[5] = {138, 139, 111, 140, 141};
-  for (uint32_t i = 0; i < 5; i++) {
-    guest::StoreU32(base, frame + 96 + 4 * i, kTexts[i]);
-    guest::StoreU32(base, frame + 128 + 4 * i, 5 + i);
-  }
   ui_movies::ResetPose(base, movie);
   calls.Call(kFinishAll, frame, 0x8222CDE8, movie);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
@@ -39,8 +37,7 @@ uint32_t ResetMovie(uint8_t* base, uint32_t sp, const Calls& calls) {
           Screen(base).location_index() + 369);
   SetText(base, calls, frame, movie, 0xFFFFFFFFu, 36, schema::SaveData(base, save).mode() + 128);
   for (uint32_t i = 0; i < 5; i++) {
-    SetText(base, calls, frame, movie, 9, guest::LoadU32(base, frame + 128 + 4 * i),
-            guest::LoadU32(base, frame + 96 + 4 * i));
+    SetText(base, calls, frame, movie, 9, 5 + i, kTexts[i]);
   }
   const schema::FrontEndMenu menu = G::menu(base);
   if (Screen(base).special_car() == 0 || int32_t(menu.cursor()) != 2) {
@@ -54,7 +51,7 @@ uint32_t Transition29(uint8_t* base, uint32_t sp, uint32_t step, const Calls& ca
   ITC_NATIVE_RUNNING("sub_8222CFF0 LocationScreen::Transition29");
   const uint32_t frame = sp - 112;
   guest::StoreU32(base, frame, sp);
-  const uint32_t movie = Movie(base, frame, kMenusMovie);
+  const uint32_t movie = Movie(base, kMenusMovie);
   if (guest::LoadU32(base, step) == 0) {
     mode_tick::ScreenFadesFadeIn(base, 30, 0, 0, 0, 0);
     ui_movies::Play(base, movie, 0xFFFFFFFFu, 0, 0, 0, 0, 0);
@@ -78,7 +75,7 @@ uint32_t ShowUnlockEntry(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8222A978 LocationScreen::ShowUnlockEntry");
   const uint32_t frame = sp - 128;
   guest::StoreU32(base, frame, sp);
-  const uint32_t movie = Movie(base, frame, kMenusMovie);
+  const uint32_t movie = Movie(base, kMenusMovie);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   const schema::SaveData save_data(base, save);
   const uint32_t list = save_data.unlocks_shown_address();
@@ -106,23 +103,23 @@ uint32_t ShowUnlockEntry(uint8_t* base, uint32_t sp, const Calls& calls) {
 
 uint32_t Transition25(uint8_t* base, uint32_t sp, uint32_t step, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8222D1A8 LocationScreen::Transition25");
-  const uint32_t frame = sp - 112;
-  guest::StoreU32(base, frame, sp);
-  const uint32_t movie = Movie(base, frame, kMenusMovie);
+  // The original's 112-byte frame held no slots (E5 step 6): the calls are
+  // made from `sp`, their frames below it.
+  const uint32_t movie = Movie(base, kMenusMovie);
   if (guest::LoadU32(base, step) == 0) {
-    ShowUnlockEntry(base, frame, calls);
-    FinishNamed(calls, frame, 0x8222D1F8, movie, 5);
+    ShowUnlockEntry(base, sp, calls);
+    FinishNamed(calls, sp, 0x8222D1F8, movie, 5);
     PlayNamed(base, movie, 5);
-    LoopLast(base, frame, movie);
+    LoopLast(base, sp, movie);
     mode_tick::ScreenFadesFadeIn(base, 60, 0, 0, 0, 0);
     PlayNamed(base, movie, 95);
-    HidePictures(base, frame);
+    HidePictures(base, sp);
     guest::StoreU32(base, step, 1);
   }
   if (Fading(base)) {
     return 0;
   }
-  if (uint32_t(Run(calls, frame, 0x8222D298, movie)) != 0) {
+  if (uint32_t(Run(calls, sp, 0x8222D298, movie)) != 0) {
     return 0;
   }
   const schema::PageObject pages = G::pages(base);
@@ -140,7 +137,7 @@ uint32_t ShowListEntry(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8222B048 LocationScreen::ShowListEntry");
   const uint32_t frame = sp - 288;
   guest::StoreU32(base, frame, sp);
-  const uint32_t movie = Movie(base, frame, kMenusMovie);
+  const uint32_t movie = Movie(base, kMenusMovie);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   const uint32_t record = Screen(base).location_index() * 100 + save + 0x1AD20;
   Copy(base, calls, frame, 0x8222B0A8, frame + 96, record, 100);
@@ -177,10 +174,10 @@ uint32_t Transition2(uint8_t* base, uint32_t sp, uint32_t step, const Calls& cal
   ITC_NATIVE_RUNNING("sub_8222D610 LocationScreen::Transition2");
   const uint32_t frame = sp - 160;
   guest::StoreU32(base, frame, sp);
-  const uint32_t movie = Movie(base, frame, kMenusMovie);
-  for (uint32_t i = 0; i < 5; i++) {
-    guest::StoreU32(base, frame + 96 + 4 * i, 573 + i);
-  }
+  const uint32_t movie = Movie(base, kMenusMovie);
+  // The cursor's texts (573 to 577): the original's table at the frame's
+  // +96, read only here (values since E5 step 6).
+  constexpr uint32_t kTexts[5] = {573, 574, 575, 576, 577};
   if (guest::LoadU32(base, step) == 0) {
     FinishNamed(calls, frame, 0x8222D67C, movie, 24);
     FinishNamed(calls, frame, 0x8222D688, movie, 23);
@@ -211,8 +208,12 @@ uint32_t Transition2(uint8_t* base, uint32_t sp, uint32_t step, const Calls& cal
       FinishNamed(calls, frame, 0x8222D798, movie, 38);
       SetText(base, calls, frame, movie, 0, 0, 588);
     } else {
+      // The menu's cursor is 0 to 4 (its last item); past the table the
+      // original read the frame's word there (kept, never seen).
+      const uint32_t cursor_now = menu.cursor();
       const uint32_t text =
-          guest::LoadU32(base, frame + 96 + ((menu.cursor() << 2) & 0xFFFFFFFCu));
+          cursor_now < 5 ? kTexts[cursor_now]
+                         : guest::LoadU32(base, frame + 96 + ((cursor_now << 2) & 0xFFFFFFFCu));
       SetText(base, calls, frame, movie, 0, 0, text);
       PlayNamed(base, movie, named);
       LoopLast(base, frame, movie);
@@ -228,12 +229,11 @@ uint32_t Transition14(uint8_t* base, uint32_t sp, uint32_t step, const Calls& ca
   ITC_NATIVE_RUNNING("sub_8222E6E0 LocationScreen::Transition14");
   const uint32_t frame = sp - 176;
   guest::StoreU32(base, frame, sp);
-  const uint32_t movie = Movie(base, frame, kMenusMovie);
+  const uint32_t movie = Movie(base, kMenusMovie);
   if (guest::LoadU32(base, step) == 0) {
-    for (uint32_t i = 0; i < 3; i++) {
-      guest::StoreU32(base, frame + 88 + 4 * i, 486 + i);
-      guest::StoreU32(base, frame + 104 + 4 * i, 5 + i);
-    }
+    // Node 9's three texts (486 to 488, children 5 to 7): the original's
+    // tables at the frame's +88 and +104, read only here (values since E5
+    // step 6).
     // The confirm menu reset: 3 items (+16 = 2, +20 = 1, the rest 0).
     const schema::FrontEndMenu menu = G::confirm_menu(base);
     menu.set_first_item(0);
@@ -251,8 +251,7 @@ uint32_t Transition14(uint8_t* base, uint32_t sp, uint32_t step, const Calls& ca
     menu.set_last_item(2);
     menu.set_wraps(1);
     for (uint32_t i = 0; i < 3; i++) {
-      SetText(base, calls, frame, movie, 9, guest::LoadU32(base, frame + 104 + 4 * i),
-              guest::LoadU32(base, frame + 88 + 4 * i));
+      SetText(base, calls, frame, movie, 9, 5 + i, 486 + i);
     }
     SetCursor(base, frame, 0);
     for (uint32_t i = 0; i < 5; i++) {
@@ -285,7 +284,7 @@ uint32_t Transition16(uint8_t* base, uint32_t sp, uint32_t step, const Calls& ca
   ITC_NATIVE_RUNNING("sub_8222E8D8 LocationScreen::Transition16");
   const uint32_t frame = sp - 160;
   guest::StoreU32(base, frame, sp);
-  const uint32_t movie = Movie(base, frame, kMenusMovie);
+  const uint32_t movie = Movie(base, kMenusMovie);
   if (guest::LoadU32(base, step) == 0) {
     FinishNamed(calls, frame, 0x8222E91C, movie, 23);
     FinishNamed(calls, frame, 0x8222E928, movie, 24);
@@ -309,20 +308,23 @@ uint32_t Transition16(uint8_t* base, uint32_t sp, uint32_t step, const Calls& ca
     const uint32_t named = menu.cursor() + 13;
     const uint32_t card = HasCard(base, calls, frame, 0x8222E9C0);
     menu = G::confirm_menu(base);
-    const uint32_t at = (menu.cursor() << 2) & 0xFFFFFFFCu;
-    guest::StoreU32(base, frame + 88, 579);
+    // The cursor's text: the original's three words at the frame's +88,
+    // read only here (values since E5 step 6). The menu's cursor is 0 to 2
+    // (its last item); past the table the original read the frame's word
+    // there (kept, never seen).
+    const uint32_t text_cursor = menu.cursor();
+    const uint32_t at = (text_cursor << 2) & 0xFFFFFFFCu;
+    auto text_at = [&](const uint32_t (&texts)[3]) {
+      return text_cursor < 3 ? texts[text_cursor] : guest::LoadU32(base, frame + 88 + at);
+    };
     uint32_t text;
     if (card != 0) {
-      guest::StoreU32(base, frame + 92, 580);
-      guest::StoreU32(base, frame + 96, 581);
-      text = guest::LoadU32(base, frame + 88 + at);
+      text = text_at({579, 580, 581});
       FinishNamed(calls, frame, 0x8222EA00, movie, finished);
       PlayNamed(base, movie, named);
       LoopLast(base, frame, movie);
     } else {
-      guest::StoreU32(base, frame + 92, 591);
-      guest::StoreU32(base, frame + 96, 581);
-      text = guest::LoadU32(base, frame + 88 + at);
+      text = text_at({579, 591, 581});
       FinishNamed(calls, frame, 0x8222EA40, movie, finished);
       if (int32_t(G::confirm_menu(base).cursor()) != 1) {
         PlayNamed(base, movie, named);

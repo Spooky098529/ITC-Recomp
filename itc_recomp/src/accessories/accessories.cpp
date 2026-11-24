@@ -281,9 +281,9 @@ uint32_t SetFree(uint8_t* base, uint32_t slot, uint32_t sp,
   if (set == 0) {
     return 0;
   }
-  const uint32_t frame = sp - 96;
-  Store(base, frame, sp);  // the back chain, for the destructor's guest call
-  destroy(set, frame);
+  // No guest frame (E5 step 6): the original's 96 bytes held only the back
+  // chain; the destructor is called from `sp`.
+  destroy(set, sp);
   const auto r3 = FileFreeData(base, slot);
   Require(r3.has_value(), "AccessoryFile::FreeData");
   return *r3;
@@ -307,6 +307,8 @@ bool AccessoryConstructible(uint8_t* base) {
 
 uint32_t SkeletonConstruct(uint8_t* base, uint32_t skeleton, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_820F03F0 AccessorySkeleton::AccessorySkeleton");
+  // The identity at the original frame's +96 stays on the stack (memcpy reads
+  // it by address).
   const uint32_t frame = sp - 224;
   const AccessorySkeleton s(base, skeleton);
   model_animation::SkeletonBaseConstruct(base, skeleton);
@@ -321,14 +323,15 @@ uint32_t SkeletonConstruct(uint8_t* base, uint32_t skeleton, uint32_t sp) {
   s.set_unknown_233(1);
   s.set_job_vtable(kJobVtable);
   s.set_job_functor_vtable(kJobFunctor);
-  Store(base, frame + 80, 0);
-  Store(base, frame + 84, 0);
+  // The method's two words, zeroed at the frame's +80 and +84 and read back:
+  // C++ locals since E5 step 6 (only read here).
+  const uint32_t method[2] = {0, 0};
   s.set_unknown_224(0);
   s.set_unknown_228(0);
   s.set_unknown_232(0);
   s.set_unknown_234(0);
-  s.set_job_method(Load(base, frame + 80));
-  s.set_job_method_extra(Load(base, frame + 84));
+  s.set_job_method(method[0]);
+  s.set_job_method_extra(method[1]);
   s.set_job_delegate_vtable(kJobDelegate);
   s.set_job_target(0u);
   s.set_matrix_row0_w(one);
@@ -364,13 +367,14 @@ uint32_t SkeletonConstruct(uint8_t* base, uint32_t skeleton, uint32_t sp) {
 
 uint32_t AccessoryConstruct(uint8_t* base, uint32_t accessory, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_820EF258 Accessory::Accessory");
-  const uint32_t frame = sp - 96;
+  // No guest frame (E5 step 6): the original's 96 bytes held nothing this
+  // port writes; the skeleton's constructor is given `sp`.
   const Accessory a(base, accessory);
   Require(models::PartModelConstruct(base, accessory), "PartModel::PartModel");
   a.set_vtable(kAccessoryVtable);
   FileConstruct(base, a.model_file_address());
   FileConstruct(base, a.xpr_file_address());
-  SkeletonConstruct(base, a.skeleton_address(), frame);
+  SkeletonConstruct(base, a.skeleton_address(), sp);
   const float one = AccessoriesGlobals::one(base);
   a.set_anchor_w(one);
   a.set_angle_w(one);
@@ -407,7 +411,7 @@ uint32_t EntryNew(uint8_t* base, uint32_t sp) {
   const AccessoryEntry e(base, entry);
   e.set_count(1);
   FileConstruct(base, e.file_address());
-  AccessoryConstruct(base, e.accessory_address(), sp - 96);
+  AccessoryConstruct(base, e.accessory_address(), sp);  // no guest frame (E5 step 6)
   return entry;
 }
 
@@ -622,7 +626,7 @@ std::optional<uint32_t> SkeletonSetUp(uint8_t* base, uint32_t skeleton, uint32_t
       }
     }
     s.set_set_up(1);
-    SkeletonReset(base, skeleton, sp - 128);
+    SkeletonReset(base, skeleton, sp);  // no guest frame (E5 step 6)
   }
   return s.set_up();
 }
@@ -658,9 +662,9 @@ uint64_t AccessorySetTexture(
   if (a.loaded() == 0) {
     return r3;
   }
-  const uint32_t frame = sp - 160;
-  Store(base, frame, sp);  // the back chain, for the slot's guest call
-  r3 = texture_set(a.textures_vtable_address(), frame);  // the provider at +80
+  // No guest frame (E5 step 6): the original's 160 bytes held only the back
+  // chain; the slot is called from `sp`.
+  r3 = texture_set(a.textures_vtable_address(), sp);  // the provider at +80
   if (!(Load(base, uint32_t(r3) + 20) > index)) {
     return r3;
   }
@@ -731,11 +735,11 @@ uint32_t AccessoryFinish(uint8_t* base, uint32_t accessory, uint32_t release, ui
   if (a.loaded() != 0 || a.model_file_state() != 2) {
     return a.loaded();
   }
-  const uint32_t frame = sp - 112;
-  Store(base, frame, sp);  // the back chain, for the guest calls
+  // No guest frame (E5 step 6): the original's 112 bytes held only the back
+  // chain; the guest calls are made from `sp`.
   const uint32_t file = a.model_file_data(), xpr = a.xpr_file_data();
   if (!models::ModelLoad(base, accessory, file, xpr, calls.model_load)) {
-    calls.load(accessory, file, xpr, frame);
+    calls.load(accessory, file, xpr, sp);
   }
   if (ran_load != nullptr) {
     *ran_load = true;
@@ -745,8 +749,8 @@ uint32_t AccessoryFinish(uint8_t* base, uint32_t accessory, uint32_t release, ui
     FileReset(base, a.xpr_file_address());
   }
   const uint32_t skeleton = a.skeleton_address();
-  const auto set_up = SkeletonSetUp(base, skeleton, frame);
-  const uint32_t r3 = set_up ? *set_up : calls.set_up(skeleton, frame);
+  const auto set_up = SkeletonSetUp(base, skeleton, sp);
+  const uint32_t r3 = set_up ? *set_up : calls.set_up(skeleton, sp);
   if (r3 != 0) {
     const AccessorySkeleton s(base, skeleton);
     const uint32_t rows = s.rows_0().address;
@@ -761,7 +765,8 @@ uint64_t EntryOnLoaded(
     const std::function<uint64_t(uint32_t provider, uint32_t frame)>& texture_set,
     bool* ran_load) {
   ITC_NATIVE_RUNNING("sub_820F0820 AccessoryEntry::OnLoaded");
-  const uint32_t frame = sp - 112;
+  // No guest frame (E5 step 6): the original's 112 bytes held nothing this
+  // port writes; its callees are given `sp`.
   const AccessoryEntry e(base, entry);
   const uint32_t data = e.file_data();
   const uint32_t accessory = e.accessory_address();
@@ -771,8 +776,8 @@ uint64_t EntryOnLoaded(
   FileSetData(base, AccessorySkeleton(base, a.skeleton_address()).file_address(),
               game_data::GetEntry(base, data, 2, false), 0);
   Require(Finishable(base, accessory), "Accessory::Finish");
-  AccessoryFinish(base, accessory, 1, frame, calls, ran_load);
-  return AccessorySetTexture(base, accessory, a.texture_index(), -1, frame, texture_set);
+  AccessoryFinish(base, accessory, 1, sp, calls, ran_load);
+  return AccessorySetTexture(base, accessory, a.texture_index(), -1, sp, texture_set);
 }
 
 // --- The acquisition ---
@@ -785,16 +790,17 @@ uint32_t SetAcquireEntry(
   if (index == 3) {
     return 0;
   }
-  const uint32_t frame = sp - 128;
+  // No guest frame (E5 step 6): the original's 128 bytes held nothing this
+  // port writes; its callees are given `sp`.
   const uint32_t slot = set + ((uint32_t(index + 1) << 2) & 0xFFFFFFFCu);
   const uint32_t entry = Load(base, slot);
   if (entry == 0) {
-    const uint32_t made = EntryNew(base, frame);
+    const uint32_t made = EntryNew(base, sp);
     Store(base, slot, made);
     if (made == 0) {
       return 0;
     }
-    AccessorySetTexture(base, AccessoryEntry(base, made).accessory_address(), texture, -1, frame,
+    AccessorySetTexture(base, AccessoryEntry(base, made).accessory_address(), texture, -1, sp,
                         texture_set);
     const uint32_t stored = Load(base, slot);
     FileLoad(base, AccessoryEntry(base, stored).file_address(), uint32_t(index) + 23008, 0,
@@ -803,7 +809,7 @@ uint32_t SetAcquireEntry(
     const AccessoryEntry e(base, entry);
     e.set_count(e.count() + 1);
     AccessorySetTexture(base, AccessoryEntry(base, Load(base, slot)).accessory_address(), texture,
-                        -1, frame, texture_set);
+                        -1, sp, texture_set);
   }
   return AccessoryEntry(base, Load(base, slot)).accessory_address();
 }
@@ -813,7 +819,7 @@ uint32_t SetAcquire(
     const archive::LoadCall& load,
     const std::function<uint64_t(uint32_t provider, uint32_t frame)>& texture_set) {
   ITC_NATIVE_RUNNING("sub_820F0EB8 Accessories::Acquire");
-  const uint32_t accessory = SetAcquireEntry(base, set, index, texture, sp - 96, load, texture_set);
+  const uint32_t accessory = SetAcquireEntry(base, set, index, texture, sp, load, texture_set);
   if (accessory != 0) {
     Copy16(base, Accessory(base, accessory).scale_xy_address(),
            Accessories(base, set).scale_xy_address());

@@ -533,13 +533,13 @@ std::optional<uint64_t> ModelUpdate(uint8_t* base, uint32_t model, uint32_t sp,
   if (accessory == 0) {
     return 0;
   }
-  // Never seen in play: the identity built at +80 and copied to +144 (the
-  // vupkd3d128 and vpermwi128 rows), row 3 the node's position.
+  // Never seen in play: the identity at +144 (the vupkd3d128 and vpermwi128
+  // rows; the original's copy built at +80 first, which nothing reads, left
+  // out: E5 step 6), row 3 the node's position.
   guest::StoreU32(base, frame, sp);
   for (uint32_t row = 0; row < 4; row++) {
     for (uint32_t column = 0; column < 4; column++) {
       const uint32_t value = row == column ? 0x3F800000u : 0;
-      guest::StoreU32(base, frame + 80 + 16 * row + 4 * column, value);
       guest::StoreU32(base, frame + 144 + 16 * row + 4 * column, value);
     }
   }

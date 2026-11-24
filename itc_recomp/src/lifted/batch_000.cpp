@@ -321,7 +321,7 @@ lifted::Result f822B6070(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r8, 
   r3 = uint64_t(int64_t(0));
   // bl 0x825dbb94
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__KeLockL2, LIFTED_ARGS(0x822B6094, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::KeLockL2>(base, LIFTED_ARGS(0x822B6094, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,0
   r11 = uint64_t(int64_t(0));
 loc_822B6098:
@@ -726,7 +726,7 @@ lifted::Result f825C09A8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   guest::StoreU32(base, schema::XactEngine(base, uint32_t(r9) - 140).unknown_140_address(), uint32_t(r8));
   // bl 0x825db954
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__RtlInitializeCriticalSection, LIFTED_ARGS(0x825C0AAC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::RtlInitializeCriticalSection>(base, LIFTED_ARGS(0x825C0AAC, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32215
   r11 = uint64_t(int64_t(-2111242240));
   // stw r30,180(r31)

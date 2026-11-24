@@ -43,11 +43,12 @@ inline uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   return frame;
 }
 
-// UiMovies::Find with the id stored at `key` (the original's frame word):
-// the pair's value's address, and the movie in it.
-inline uint32_t FindPair(uint8_t* base, uint32_t id, uint32_t key) {
-  Store(base, key, id);
-  return ui_movies::PairsFind(base, ui_movies::kMovieTable, key);
+// UiMovies::Find with the id: the pair's value's address, and the movie in
+// it. `key` is the frame word the original stored the id at for the find;
+// only the find read it, so it's a value now (E5 step 6) and the word isn't
+// written (the argument is left for the callers, unused).
+inline uint32_t FindPair(uint8_t* base, uint32_t id, [[maybe_unused]] uint32_t key) {
+  return ui_movies::PairsFindKey(base, ui_movies::kMovieTable, id);
 }
 inline uint32_t FindMovie(uint8_t* base, uint32_t id, uint32_t key) {
   return Load(base, FindPair(base, id, key));
@@ -153,11 +154,13 @@ inline uint32_t Fctiwz(double d) {
 }
 
 // An integer word converted as the originals do through their frame: its
-// 64-bit sign extension stored at `at` (std), loaded back (lfd), fcfid and
-// frsp. The float as a double.
-inline double IntToFloat(uint8_t* base, uint32_t at, uint32_t word) {
+// 64-bit sign extension (the std to `at` and the lfd back), fcfid and frsp.
+// The float as a double. Only the conversion read the frame's doubleword, so
+// it's a value now (E5 step 6) and `at` isn't written (left for the callers,
+// unused).
+inline double IntToFloat([[maybe_unused]] uint8_t* base, [[maybe_unused]] uint32_t at,
+                         uint32_t word) {
   const int64_t wide = int64_t(int32_t(word));
-  Store64(base, at, uint64_t(wide));
   return double(float(double(wide)));
 }
 

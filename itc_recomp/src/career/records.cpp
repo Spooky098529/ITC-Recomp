@@ -240,15 +240,15 @@ namespace {
 
 uint32_t ItemRecordsAdd(uint8_t* base, uint32_t save, uint32_t id, uint32_t sp,
                         Outcome outcome) {
-  const uint32_t frame = sp - kItemRecordsFrame;
-  guest::StoreU32(base, frame + 80, id);
+  // The Opponent the original builds in its 144-byte frame (+80 the id, +84
+  // the record, +88 the item) and hands its callees by pointer: a value, the
+  // frame left out (E5 step 6: the callees are plain C++ over it).
+  (void)sp;
   Opponent o;
   o.id = id;
   o.item = data_tables::RecordsItem(base, id);
-  guest::StoreU32(base, frame + 88, o.item);
   const CareerSave s(base, save);
   o.record = s.item_records_address() + 12 * id;
-  guest::StoreU32(base, frame + 84, o.record);
   data_tables::RecordsItem(base, id);
   const uint32_t stats = s.stats_address();
   const uint32_t mode = s.mode();

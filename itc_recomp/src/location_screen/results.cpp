@@ -40,7 +40,7 @@ uint32_t ResultText(uint8_t* base, uint32_t sp, uint32_t step, const Calls& call
                     const ResultLrs& lrs) {
   const uint32_t frame = sp - 3168;
   guest::StoreU32(base, frame, sp);
-  const uint32_t movie = Movie(base, frame, kMenusMovie);
+  const uint32_t movie = Movie(base, kMenusMovie);
   if (guest::LoadU32(base, step) == 0) {
     const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
     const uint32_t records = schema::RaceStatesGlobals::race_data(base).results_address();
@@ -122,7 +122,7 @@ uint32_t Transition7(uint8_t* base, uint32_t sp, uint32_t step, const Calls& cal
   ITC_NATIVE_RUNNING("sub_8222AE00 LocationScreen::Transition7");
   const uint32_t frame = sp - 288;
   guest::StoreU32(base, frame, sp);
-  const uint32_t movie = Movie(base, frame, kMenusMovie);
+  const uint32_t movie = Movie(base, kMenusMovie);
   if (guest::LoadU32(base, step) == 0) {
     const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
     constexpr uint32_t kLocations = 0x1AD20;
@@ -175,21 +175,20 @@ uint32_t ShowOpponentPictures(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8222B200 LocationScreen::ShowOpponentPictures");
   const uint32_t frame = sp - 6224;
   guest::StoreU32(base, frame, sp);
-  const uint32_t movie = Movie(base, frame, kMenusMovie);
+  const uint32_t movie = Movie(base, kMenusMovie);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
+  // The pictures' children: the original's table at the frame's +96, read
+  // only here (values since E5 step 6). There are at most 6 opponents.
   constexpr uint32_t kChildren[7] = {7, 13, 19, 25, 31, 37, 0};
-  for (uint32_t i = 0; i < 7; i++) {
-    guest::StoreU32(base, frame + 96 + 4 * i, kChildren[i]);
-  }
   uint32_t r3 = 0;
   for (uint32_t i = 0; i < 7; i++) {
     r3 = HideNode(base, movie, 14, i);
   }
   for (uint32_t i = 0; i < Screen(base).opponent_count(); i++) {
-    guest::StoreU32(base, frame + 80, i);
+    // The opponent's index: the original's +80, read only here (a value
+    // since E5 step 6).
     const uint32_t event = guest::LoadU32(base, race_event::kEvent);
-    const uint32_t item = race_event::GroupItem(
-        base, event, Screen(base).group_kind(), guest::LoadU32(base, frame + 80));
+    const uint32_t item = race_event::GroupItem(base, event, Screen(base).group_kind(), i);
     Copy(base, calls, frame, 0x8222B2E4, frame + 128, item, 3008);
     ShowNode(base, movie, 14, i);
     const int32_t id = int16_t(guest::LoadU16(base, frame + 128));
@@ -204,7 +203,7 @@ uint32_t ShowOpponentPictures(uint8_t* base, uint32_t sp, const Calls& calls) {
       texture = 2;
       owned = true;
     }
-    const uint32_t child = guest::LoadU32(base, frame + 96 + 4 * i);
+    const uint32_t child = i < 7 ? kChildren[i] : guest::LoadU32(base, frame + 96 + 4 * i);
     r3 = ui_movies::SetNodeTexture(base, ui_movies::FindNode(base, movie, 14, child), texture);
     if (guest::LoadU16(base, frame + 216) != 3 || !owned) {
       continue;
@@ -237,11 +236,14 @@ uint64_t UpdateView(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82227E20 LocationScreen::UpdateView");
   const uint32_t frame = sp - 304;
   guest::StoreU32(base, frame, sp);
-  // The matrix's w words and two vectors of the float at 0x82000A30.
+  // The matrix's w words (in the matrix at +208, handed to the animation)
+  // and two vectors of the float at 0x82000A30 (the original's +112 and
+  // +160, read only here: values since E5 step 6).
   const uint32_t one = ThroughFloat(base, 0x82000A30);
-  for (uint32_t offset : {220u, 236u, 252u, 268u, 112u, 116u, 120u, 124u, 160u, 164u, 168u, 172u}) {
+  for (uint32_t offset : {220u, 236u, 252u, 268u}) {
     guest::StoreU32(base, frame + offset, one);
   }
+  const uint64_t ones = uint64_t(one) << 32 | one;
   // The third camera animation's object, by the opponent menu's cursor.
   const uint32_t cursor = G::opponent_menu(base).cursor();
   const uint32_t time =
@@ -287,34 +289,28 @@ uint64_t UpdateView(uint8_t* base, uint32_t sp, const Calls& calls) {
   Store64(base, kB + 24, b);
   b = Load64(base, kB + 16);
   Store64(base, kC + 40, c);
+  // The zeros: the original's eight words at the frame's +80, read only
+  // here (a value since E5 step 6).
   const uint32_t zero = ThroughFloat(base, 0x82000A34);
-  guest::StoreU32(base, frame + 80, zero);
-  guest::StoreU32(base, frame + 84, zero);
+  const uint64_t zeros = uint64_t(zero) << 32 | zero;
   w0 = Load64(base, k6B0);
   w1 = Load64(base, k6B0 + 8);
   Store64(base, kB + 32, b);
   b = Load64(base, kB + 24);
-  guest::StoreU32(base, frame + 88, zero);
   Store64(base, kA + 0, w0);
   Store64(base, kA + 8, w1);
   uint64_t a = Load64(base, kA + 0);
   Store64(base, kB + 40, b);
-  for (uint32_t offset : {92u, 96u}) {
-    guest::StoreU32(base, frame + offset, zero);
-  }
   Store64(base, kA + 16, a);
-  guest::StoreU32(base, frame + 100, zero);
   a = Load64(base, kA + 8);
-  guest::StoreU32(base, frame + 104, zero);
-  const uint64_t f0 = Load64(base, frame + 112);
-  guest::StoreU32(base, frame + 108, zero);
-  const uint64_t f1 = Load64(base, frame + 120);
+  const uint64_t f0 = ones;
+  const uint64_t f1 = ones;
   const uint64_t r0 = Load64(base, k6C0), r1 = Load64(base, k6C0 + 8);
   Store64(base, kA + 24, a);
   a = Load64(base, kA + 16);
   Store64(base, kB + 0, f0);
   Store64(base, kB + 8, f1);
-  const uint64_t g0 = Load64(base, frame + 160), g1 = Load64(base, frame + 168);
+  const uint64_t g0 = ones, g1 = ones;
   Store64(base, kA + 32, a);
   a = Load64(base, kA + 24);
   Store64(base, kC + 0, g0);
@@ -322,11 +318,11 @@ uint64_t UpdateView(uint8_t* base, uint32_t sp, const Calls& calls) {
   Store64(base, kA + 40, a);
   Store64(base, kA + 0, r0);
   Store64(base, kA + 8, r1);
-  // 128 bytes each at 0x8296BAE0 and 0x8296BB60 from the frame's +80 and
-  // +96 (16 bytes each, repeated).
+  // 128 bytes each at 0x8296BAE0 and 0x8296BB60 from the zeros (the
+  // original's +80 and +96, 16 bytes each, repeated).
   for (uint32_t i = 0; i < 128; i += 16) {
-    const uint64_t x0 = Load64(base, frame + 80), y0 = Load64(base, frame + 96);
-    const uint64_t x1 = Load64(base, frame + 88), y1 = Load64(base, frame + 104);
+    const uint64_t x0 = zeros, y0 = zeros;
+    const uint64_t x1 = zeros, y1 = zeros;
     Store64(base, G::light_zeros_a_address() + i, x0);
     Store64(base, G::light_zeros_b_address() + i, y0);
     Store64(base, G::light_zeros_a_address() + i + 8, x1);

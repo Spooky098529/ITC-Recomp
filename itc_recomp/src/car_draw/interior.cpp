@@ -92,9 +92,10 @@ Left InteriorDrawDigitalSpeed(uint8_t* base, const Calls& calls, uint32_t stack,
                               uint32_t block, uint32_t pass, uint32_t caller_r24) {
   ITC_NATIVE_RUNNING("sub_820E39F8 InteriorDials::DrawDigitalSpeed");
   const uint32_t frame = Frame(base, stack, kInteriorDigitsFrame);
-  // fctiwz, stored (stfiwx) and read back.
-  Store(base, frame + 80, uint32_t(Fctiwz(double(schema::CarDrawBlock(base, block).speed()))));
-  const int32_t n = int32_t(Load(base, frame + 80));
+  // fctiwz, which the original stored (stfiwx) at its frame's +80 and read
+  // back: a value (E5 step 6; the frame stays for the draws below).
+  const int32_t n =
+      int32_t(uint32_t(Fctiwz(double(schema::CarDrawBlock(base, block).speed()))));
   const schema::InteriorDials dials(base, group);
   const uint32_t model = dials.digits_model();
   // divw by 10 (truncating; INT32_MIN / 10 is defined).

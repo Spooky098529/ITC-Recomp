@@ -94,14 +94,16 @@ uint64_t Start(uint8_t* base, const tuning_screen::StandCalls& stand, const Call
   sc.set_stat_power(uint32_t(power));
   SavePlaceholders(base, sc.decal_images_address(), frame);
   SetUp(base, r3, (r1 & 0xFFFFFFFF00000000ull) | frame, true, calls);
-  // The busy icon: movie 2's nodes 172, 171 and 173 (its id also at the
-  // frame's +80, UiMovies::Find's key), the movie's pose reset.
+  // The busy icon: movie 2's nodes 172, 171 and 173 (UiMovies::Find by the
+  // id as a word: the original's key at the frame's +80, read only by Find;
+  // E5 step 6), the movie's pose reset.
   sc.set_busy_shown(0);
   sc.set_busy_movie(kShopMovie);
   sc.set_busy_animation_a(172);
   sc.set_busy_animation_b(171);
   sc.set_busy_animation_c(173);
-  const uint32_t movie = Load(base, tuning_screen::MovieEntry(base, frame, kShopMovie));
+  const uint32_t movie =
+      Load(base, ui_movies::PairsFindKey(base, ui_movies::kMovieTable, kShopMovie));
   ui_movies::ResetPose(base, movie);
   tuning_screen::Refresh(base, stand, r3, frame, f1);
   // The command queue at its state; the category menu (6 rows, 8 lines).

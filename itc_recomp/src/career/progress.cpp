@@ -14,6 +14,7 @@
 #include "schema/race_states.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
+#include <bit>
 #include <climits>
 
 namespace career {
@@ -59,19 +60,13 @@ uint32_t ItemsWon(uint8_t* base, bool any, Want want) {
   return any ? 0 : 1;
 }
 
-uint64_t LoadU64(uint8_t* base, uint32_t address) {
-  return (uint64_t(guest::LoadU32(base, address)) << 32) | guest::LoadU32(base, address + 4);
-}
-
-// RunningMean::Add of an integer (converted through frame +88, as the
-// original) on the frame's {0.0, 0} at +80, merged into `into`.
-void MergeInt(uint8_t* base, uint32_t frame, uint32_t into, int32_t value) {
-  guest::StoreFloat(base, frame + 80, CareerGlobals::zero(base));
-  guest::StoreU32(base, frame + 84, 0);
-  guest::StoreU32(base, frame + 88, uint32_t(uint64_t(int64_t(value)) >> 32));
-  guest::StoreU32(base, frame + 92, uint32_t(value));
-  race_setup::RunningMeanAdd(base, frame + 80, double(float(double(int64_t(value)))), 1);
-  RunningMeanMerge(base, into, LoadU64(base, frame + 80), frame);
+// RunningMean::Add of an integer (converted as the original does, std, lfd,
+// fcfid, frsp) on {0.0, 0}, merged into `into` (RunningMean::Merge's). The
+// original's frame +80 and the conversion's +88 are values since E5 step 6.
+void MergeInt(uint8_t* base, uint32_t into, int32_t value) {
+  const float mean = race_setup::MeanAfterAdd(CareerGlobals::zero(base), 0,
+                                              double(float(double(int64_t(value)))), 1);
+  RunningMeanMergeInto(base, into, (uint64_t(std::bit_cast<uint32_t>(mean)) << 32) | 1);
 }
 
 // The 40-byte rewards whose conditions pass Condition::Test(c, 0, entry +0)
@@ -398,14 +393,16 @@ uint32_t ProgressCheckUnlocks(uint8_t* base, uint32_t save, uint32_t sp) {
 
 uint32_t StatsCloseDay(uint8_t* base, uint32_t stats, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82113898 Stats::CloseDay");
-  const uint32_t frame = sp - kCloseDayFrame;
+  // The original's 128-byte frame held only the running means' temporaries
+  // (values since E5 step 6).
+  (void)sp;
   const CareerStats s(base, stats);
   const int32_t days = int16_t(s.days());
   if (days < 9999) {
     s.set_days(uint16_t(days + 1));
   }
-  MergeInt(base, frame, s.mean_day_total_8_address(), int32_t(s.day_total_8()));
-  MergeInt(base, frame, s.mean_day_total_12_address(), int32_t(s.day_total_12()));
+  MergeInt(base, s.mean_day_total_8_address(), int32_t(s.day_total_8()));
+  MergeInt(base, s.mean_day_total_12_address(), int32_t(s.day_total_12()));
   const int32_t numerator = int32_t(s.day_total_4() * 100u);
   const int32_t divisor = int32_t(s.day_total_0());
   int32_t quotient = 0;
@@ -416,14 +413,13 @@ uint32_t StatsCloseDay(uint8_t* base, uint32_t stats, uint32_t sp) {
   } else {
     quotient = numerator / divisor;
   }
-  MergeInt(base, frame, s.mean_day_ratio_address(), quotient);
+  MergeInt(base, s.mean_day_ratio_address(), quotient);
   return s.mean_day_ratio_address();
 }
 
 uint32_t CareerNextDay(uint8_t* base, uint32_t save, uint32_t sp, PickNextCall pick_next,
                        void* user) {
   ITC_NATIVE_RUNNING("sub_82116AF0 Career::NextDay");
-  const uint32_t frame = sp - kNextDayFrame;
   const CareerSave sv(base, save);
   sv.set_day(sv.day() + 1);
   const uint32_t garage = sv.garage_address();
@@ -440,7 +436,9 @@ uint32_t CareerNextDay(uint8_t* base, uint32_t save, uint32_t sp, PickNextCall p
   }
   sv.set_unknown_109792(0);
   const uint32_t stats = sv.stats_address();
-  StatsCloseDay(base, stats, frame);
+  // (The original's 112-byte frame is left out, E5 step 6: Stats::CloseDay
+  // no longer makes one, and Career::PickNext's adapter makes its own.)
+  StatsCloseDay(base, stats, sp);
   if (!PickNextSkips(base, save)) {
     pick_next(user, save);
   }

@@ -25,10 +25,6 @@ uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, add
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
-void Store64(uint8_t* base, uint32_t address, uint64_t value) {
-  Store(base, address, uint32_t(value >> 32));
-  Store(base, address + 4, uint32_t(value));
-}
 double LoadDouble(uint8_t* base, uint32_t address) {
   return std::bit_cast<double>((uint64_t(Load(base, address)) << 32) | Load(base, address + 4));
 }
@@ -58,29 +54,19 @@ void Copy(uint8_t* base, uint32_t to, uint32_t from, uint32_t bytes, uint32_t ca
   }
 }
 
-// The weight at `weight` (lfs) into the frame's +80, +84, +88 (stfs).
-void WeightVector(uint8_t* base, uint32_t sp, uint32_t weight) {
-  const double w = Lfs(base, weight);
-  Stfs(base, sp + 80, w);
-  Stfs(base, sp + 84, w);
-  Stfs(base, sp + 88, w);
-}
-
-// The frame's sizes word after Blend7's empty loops: the first multiple of
-// 128 at or past `bytes` (0 for 0).
-uint32_t Lines(uint32_t bytes) {
-  uint32_t at = 0;
-  if (bytes != 0) {
-    do {
-      at += 128;
-    } while (at < bytes);
-  }
-  return at;
+// The weights' vector the originals build in their frames (three stfs of
+// the weight, the fourth word 0.0, then lvx): a C++ value, as only the
+// blend reads it. `weight` the float's bits as stfs stores them.
+simde__m128 WeightVector(uint32_t weight, uint32_t zero) {
+  return VectorOf(weight, weight, weight, zero);
 }
 
 BlendResult Blend6(uint8_t* base, uint32_t morph, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8258B578 Morph::Blend6");
-  const uint32_t sp = stack - 128;
+  // The original's frame (128 bytes) held only the weights' vector at +80,
+  // which only it read: a C++ value now. r3 as it leaves it: that slot's
+  // address.
+  const uint32_t weight_slot = stack - 128 + 80;
   const schema::Morph m(base, morph);
   const uint32_t bytes = m.vertices() << 4;
   const uint32_t out = m.out1().address;
@@ -91,16 +77,16 @@ BlendResult Blend6(uint8_t* base, uint32_t morph, uint32_t stack) {
     return result;
   }
   const uint32_t vertices = m.vertices();
-  Stfs(base, sp + 92, Lfs(base, 0x82000A34));
+  const uint32_t zero = Bits(Lfs(base, 0x82000A34));
   result.flush = Flush::kOff;
   for (uint32_t i = 0; i < targets; i++) {
-    WeightVector(base, sp, m.weights_address() + 4 * i);
+    const uint32_t w = Bits(Lfs(base, m.weights_address() + 4 * i));
     result.flush = Flush::kOff;
     if (vertices == 0) {
       continue;
     }
-    result.r3 = sp + 80;
-    const simde__m128 weight = Lvx(base, sp + 80);
+    result.r3 = weight_slot;
+    const simde__m128 weight = WeightVector(w, zero);
     const uint32_t from = m.base_stream() - out;
     const uint32_t target = Load(base, m.targets_address() + 4 * i) - out;
     uint32_t at = out;
@@ -120,10 +106,12 @@ BlendResult Blend6(uint8_t* base, uint32_t morph, uint32_t stack) {
 
 BlendResult Blend7(uint8_t* base, uint32_t morph, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8258B678 Morph::Blend7");
-  const uint32_t sp = stack - 160;
+  // The original's frame (160 bytes) held the sizes at +80 and +84 (never
+  // read back) and the weights' vector at +96, which only it read: a C++
+  // value now, the sizes' stores dropped.
+  (void)stack;
   const schema::Morph m(base, morph);
   const uint32_t bytes = m.vertices() << 4;
-  Store(base, sp + 84, bytes);
   Copy(base, m.out1().address, m.base_stream(), bytes, 0x8258B6A4);
   const uint32_t out2 = m.out2().address;
   Copy(base, out2, m.base_stream2(), bytes, 0x8258B6B4);
@@ -131,12 +119,9 @@ BlendResult Blend7(uint8_t* base, uint32_t morph, uint32_t stack) {
   const uint32_t targets = m.count();
   if (targets != 0) {
     const uint32_t vertices = m.vertices();
-    Stfs(base, sp + 108, Lfs(base, 0x82000A34));
+    const uint32_t zero = Bits(Lfs(base, 0x82000A34));
     for (uint32_t i = 0; i < targets; i++) {
-      const double w = Lfs(base, m.weights_address() + 4 * i);
-      Stfs(base, sp + 96, w);
-      Stfs(base, sp + 100, w);
-      Stfs(base, sp + 104, w);
+      const uint32_t w = Bits(Lfs(base, m.weights_address() + 4 * i));
       result.flush = Flush::kOff;
       if (vertices == 0) {
         continue;
@@ -147,7 +132,7 @@ BlendResult Blend7(uint8_t* base, uint32_t morph, uint32_t stack) {
       const uint32_t base2 = m.base_stream2();
       const uint32_t out1 = m.out1().address;
       result.r3 = uint64_t(second) - uint64_t(target1);
-      const simde__m128 weight = Lvx(base, sp + 96);
+      const simde__m128 weight = WeightVector(w, zero);
       for (uint32_t k = 0; k < vertices; k++) {
         const uint32_t step = 16 * k;
         const simde__m128 s = Lvx(base, second + step);
@@ -167,8 +152,6 @@ BlendResult Blend7(uint8_t* base, uint32_t morph, uint32_t stack) {
       result.flush = Flush::kOn;
     }
   }
-  const uint32_t lines = Lines(bytes);
-  Store(base, sp + 80, lines);
   return result;
 }
 
@@ -271,11 +254,13 @@ std::optional<BlendResult> MorphRun(uint8_t* base, uint32_t morph, uint32_t out1
 void TireFillEntries(uint8_t* base, uint32_t entries, uint32_t index, uint32_t value, double f1,
                      uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E6F28 TireFillEntries");
+  // The original's red-zone word at r1 - 16 (fctidz's store, never read
+  // back but by it) is a C++ value now.
+  (void)stack;
   const int64_t skip = int64_t(int32_t(index)) - 12;
   const int32_t skip32 = int32_t(uint32_t(skip));
   double f13 = Lfs(base, value);
   double f0 = Fmuls(f1, Lfs(base, 0x8200222C));
-  Store64(base, stack - 16, uint64_t(int64_t(int32_t(uint32_t(skip + 12)))));
   const double f11 = Lfs(base, 0x820021E8);
   const uint32_t entry = uint32_t(uint64_t(skip) * 24) + entries;
   const double f12 = Lfs(base, 0x82002D0C);
@@ -302,7 +287,6 @@ void TireFillEntries(uint8_t* base, uint32_t entries, uint32_t index, uint32_t v
     Stfs(base, at - 12, f13);
     Stfs(base, at + 4, f0);
     const int64_t n = int64_t(k + 12);
-    Store64(base, stack - 16, uint64_t(n));
     f13 = Single(double(n));
     f13 = Fmuls(f13, f12);
     Stfs(base, at + 0, f13);
@@ -318,9 +302,11 @@ void TireFillEntries(uint8_t* base, uint32_t entries, uint32_t index, uint32_t v
 void TireReadEntry(uint8_t* base, uint32_t index, uint32_t entries, uint32_t out4, uint32_t out1,
                    uint32_t out2, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E7010 TireReadEntry");
+  // The original's red-zone word at r1 - 16 (fctidz's store, read back only
+  // by it) is a C++ value now.
+  (void)stack;
   const double zero = Lfs(base, 0x82000A34);
   const uint64_t i = uint64_t(int64_t(int32_t(index))) - 12;
-  Store64(base, stack - 16, uint64_t(int64_t(int32_t(uint32_t(i)))));
   const uint32_t entry = uint32_t(i * 24) + entries;
   double f13 = Single(double(int64_t(int32_t(uint32_t(i)))));
   double f0 = Fmuls(f13, Lfs(base, 0x82002A88));

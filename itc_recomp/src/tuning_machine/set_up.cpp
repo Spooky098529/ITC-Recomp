@@ -80,7 +80,16 @@ void LoadInteriorSlots(uint8_t* base, uint32_t screen) {
 uint64_t LoadCurrentChoices(uint8_t* base, uint32_t screen, uint64_t r1) {
   ITC_NATIVE_RUNNING("sub_821DA4B0 TuningScreen::LoadCurrentChoices");
   const Screen ts(base, screen);
-  const uint32_t frame = Frame(base, uint32_t(r1), kLoadCurrentChoicesFrame);
+  // The original's frame (its address only r3's leftover since E5 step 6:
+  // its tables are the local `table` below, and no call is made with it).
+  const uint32_t frame = uint32_t(r1) - kLoadCurrentChoicesFrame;
+  // The frame's words +80 to +108 (the mirror table, its first four then
+  // the sticker tens' 3, 2, 1, 0). An index past them (never in play)
+  // reads the stack's word there, as the original.
+  uint32_t table[8] = {};
+  auto table_word = [&](uint32_t index) {
+    return index < 8 ? table[index] : Load(base, frame + 80 + index * 4);
+  };
   const Car car(base, tuning_screen::SelectedGarageCar(base, screen) + 212);
   // The garage car's words CarMakersCar doesn't name (car-makers.toml).
   auto at = [&](uint32_t offset) { return Load(base, car.address + offset); };
@@ -234,14 +243,14 @@ uint64_t LoadCurrentChoices(uint8_t* base, uint32_t screen, uint64_t r1) {
     static constexpr uint32_t kTable[][2] = {{80, 0}, {88, 4},  {92, 2},  {96, 1},
                                              {84, 6}, {100, 3}, {108, 5}, {104, 7}};
     for (const auto& [offset, value] : kTable) {
-      Store(base, frame + offset, value);
+      table[(offset - 80) / 4] = value;
     }
     const uint32_t a = ts.light_kit_a_address(), b = ts.light_kit_b_address();
     // +30644 to +30656, +30708 to +30720.
     for (const uint32_t field : {a + 64, a + 68, a + 72, a + 76, b + 48,
                                  ts.unknown_30712_address(), ts.unknown_30716_address(),
                                  ts.unknown_30720_address()}) {
-      Store(base, field, Load(base, frame + 80 + car.layer0_b() * 4));
+      Store(base, field, table_word(car.layer0_b()));
     }
   }
   // The neon: v 0 0; 1 and 2 by w 0 to 3: 3, 1, 0, 2; 3 by w 0 to 2: 2, 0,
@@ -294,10 +303,10 @@ uint64_t LoadCurrentChoices(uint8_t* base, uint32_t screen, uint64_t r1) {
   // choice codes +33800 + 4i), the tens from the frame's table (+80 to
   // +92: 3, 2, 1, 0) indexed unchecked by the layer's +8 - 1 (reading the
   // mirror table's words past it).
-  Store(base, frame + 80, 3);
-  Store(base, frame + 84, 2);
-  Store(base, frame + 88, 1);
-  Store(base, frame + 92, 0);
+  table[0] = 3;
+  table[1] = 2;
+  table[2] = 1;
+  table[3] = 0;
   for (uint32_t i = 0; i < 5; i++) {
     const schema::CarMakersCarChoice choice(base, car.choice0_a_address() + 12 * i);
     const uint32_t layer = ts.choice_code_0_address() + 4 * i;
@@ -306,7 +315,7 @@ uint64_t LoadCurrentChoices(uint8_t* base, uint32_t screen, uint64_t r1) {
       Store(base, layer, 0xFFFFFFFFu);
       continue;
     }
-    auto tens = [&] { return Load(base, frame + 76 + v * 4) * 10; };
+    auto tens = [&] { return table_word(v - 1) * 10; };
     const int32_t kind = int32_t(choice.a());
     const uint32_t unit = choice.b();
     if (kind == 1) {

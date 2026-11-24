@@ -38,11 +38,10 @@ void Stfs(uint8_t* base, uint32_t address, double value) {
 }
 // fmuls: the product rounded to a float.
 double Fmuls(double a, double b) { return double(float(a * b)); }
-// An int made a float (std, lfd, fcfid, frsp): the doubleword at `at`.
-double IntToFloat(uint8_t* base, uint32_t at, int32_t value) {
+// An int made a float (std, lfd, fcfid, frsp); the doubleword the original
+// passes it through on the stack is a C++ value since E5 step 6.
+double IntToFloat(int32_t value) {
   const uint64_t word = uint64_t(int64_t(value));
-  Store(base, at, uint32_t(word >> 32));
-  Store(base, at + 4, uint32_t(word));
   return double(float(double(int64_t(word))));
 }
 
@@ -54,19 +53,20 @@ void StoreVinyls(uint8_t* base, uint64_t screen, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82203F20 TuningScreen::StoreVinyls");
   const uint32_t s = uint32_t(screen);
   const uint32_t c = tuning_screen::SelectedGarageCar(base, s) + 212;
-  Store(base, sp - 16, 0);
-  Store(base, sp - 12, 1);
-  Store(base, sp - 8, 2);
+  // The three ids and the conversions' doublewords, below `sp` in the
+  // original (a leaf): C++ values since E5 step 6 (only read here).
+  (void)sp;
+  const uint32_t ids[3] = {0, 1, 2};
   const double scale = double(G::store_scale(base));
   const double minus = double(G::minus_one(base));
   for (uint32_t k = 0; k < 3; k++) {
-    const uint32_t n = Load(base, sp - 16 + 4 * k);
+    const uint32_t n = ids[k];
     const uint32_t from = uint32_t(uint64_t(n) * 24 + screen);
     const uint32_t r = c + 96 + 32 * k;  // the first group's record
     const uint32_t r2 = r + 96;          // the second's
     schema::CarMakersCarDecal(base, r).set_image(Load(base, (n + 7792) * 4 + s));
-    schema::CarMakersCarDecal(base, r).set_x(float(IntToFloat(base, sp - 48, int32_t(Load(base, from + 30880)))));
-    schema::CarMakersCarDecal(base, r).set_y(float(IntToFloat(base, sp - 40, int32_t(Load(base, from + 30884)))));
+    schema::CarMakersCarDecal(base, r).set_x(float(IntToFloat(int32_t(Load(base, from + 30880)))));
+    schema::CarMakersCarDecal(base, r).set_y(float(IntToFloat(int32_t(Load(base, from + 30884)))));
     schema::CarMakersCarDecal(base, r).set_angle(float(Fmuls(Lfs(base, (n + 1287) * 24 + s), scale)));
     const int32_t flag = int32_t(Load(base, Screen(base, s).vinyl_layers_0_address() + 16 + 24 * k));
     double angle = Lfs(base, from + 30892);
@@ -76,8 +76,8 @@ void StoreVinyls(uint8_t* base, uint64_t screen, uint32_t sp) {
     schema::CarMakersCarDecal(base, r).set_flag_scale(float(angle));
     schema::CarMakersCarDecal(base, r).set_scale(float(Lfs(base, from + 30892)));
     schema::CarMakersCarDecal(base, r2).set_image(Load(base, (n + 7795) * 4 + s));
-    schema::CarMakersCarDecal(base, r2).set_x(float(IntToFloat(base, sp - 32, int32_t(Load(base, from + 30952)))));
-    schema::CarMakersCarDecal(base, r2).set_y(float(IntToFloat(base, sp - 24, int32_t(Load(base, from + 30956)))));
+    schema::CarMakersCarDecal(base, r2).set_x(float(IntToFloat(int32_t(Load(base, from + 30952)))));
+    schema::CarMakersCarDecal(base, r2).set_y(float(IntToFloat(int32_t(Load(base, from + 30956)))));
     schema::CarMakersCarDecal(base, r2).set_angle(float(Fmuls(Lfs(base, (n + 1290) * 24 + s), scale)));
     const int32_t flag2 = int32_t(Load(base, Screen(base, s).vinyl_layers_1_address() + 16 + 24 * k));
     double angle2 = Lfs(base, from + 30964);
@@ -94,17 +94,16 @@ uint64_t LoadVinyls(uint8_t* base, const tuning_screen::GuestCall& call, uint64_
   ITC_NATIVE_RUNNING("sub_822040A8 TuningScreen::LoadVinyls");
   namespace steps = strings_and_font::steps;
   const uint32_t s = uint32_t(screen);
-  const uint32_t frame = sp - 144;
-  Store(base, frame, sp);
+  // No guest frame (E5 step 6): the original's 144 bytes held the back chain
+  // and the three ids at +80 (a C++ array, only read here); memcpy's guest
+  // fallback is called from `sp`.
   const uint32_t c = tuning_screen::SelectedGarageCar(base, s) + 212;
-  Store(base, frame + 88, 2);
-  Store(base, frame + 80, 0);
-  Store(base, frame + 84, 1);
+  const uint32_t ids[3] = {0, 1, 2};
   const double minus = double(G::minus_one(base));
   const double zero = double(G::zero(base));
   const double scale = double(G::load_scale(base));
   for (uint32_t k = 0; k < 3; k++) {
-    const uint32_t n = Load(base, frame + 80 + 4 * k);
+    const uint32_t n = ids[k];
     const uint32_t r = (n << 5) + c + 96;  // the record (r10 + 96)
     const uint32_t to = Screen(base, s).vinyl_layers_0_address() + 24 * k;
     Store(base, Screen(base, s).layer_ids_0_address() + 4 * k, schema::CarMakersCarDecal(base, r).image());
@@ -132,7 +131,7 @@ uint64_t LoadVinyls(uint8_t* base, const tuning_screen::GuestCall& call, uint64_
   // The six ids' saved copies.
   for (uint32_t j = 0; j < 6; j += 3) {
     for (uint32_t k = 0; k < 3; k++) {
-      const uint32_t n = Load(base, frame + 80 + 4 * k);
+      const uint32_t n = ids[k];
       Store(base, Screen(base, s).saved_layer_ids_0_address() + 4 * (j + k), Load(base, (n + j + 7792) * 4 + s));
     }
   }
@@ -140,13 +139,13 @@ uint64_t LoadVinyls(uint8_t* base, const tuning_screen::GuestCall& call, uint64_
   uint64_t r3 = screen;
   for (uint32_t j = 0; j < 6; j += 3) {
     for (uint32_t k = 0; k < 3; k++) {
-      const uint32_t n = Load(base, frame + 80 + 4 * k);
+      const uint32_t n = ids[k];
       const uint64_t destination = screen + 31024 + 24 * (j + k);
       const uint32_t source = uint32_t(uint64_t(j + n) * 24 + screen) + 30880;
       if (native::Buffers_Memcpy(base, uint32_t(destination), source, 24, 0x822042B4)) {
         r3 = destination;
       } else {
-        r3 = call(kMemcpy, {destination, source, 24}, frame, 0x822042B4);
+        r3 = call(kMemcpy, {destination, source, 24}, sp, 0x822042B4);
       }
     }
   }

@@ -4,7 +4,9 @@
 // (Glow::RecordStar and RecordStarPass; their math, the vector unit's
 // steps included, as the translated code does it: this file builds with
 // -ffp-model=strict and -ffp-contract=off). Step for step as the recompiled functions: their
-// frames where the originals' are (with the words they write there), the
+// frames where the originals' are (with the words handed on there: the
+// constants' blocks, the star's colors, offsets, weights and matrices; the
+// words only the port reads are host values, E5 step 6), the
 // render manager's getters, CameraPasses::RenderTarget (its diagnostics'
 // wrap) and the render queue as guest calls with the originals' return
 // addresses, the command list and the recording helpers as plain C++. The
@@ -59,12 +61,6 @@ double Lfs(uint8_t* base, uint32_t address) {
 void Stfs(uint8_t* base, uint32_t address, double value) {
   guest::StoreFloat(base, address, float(value));
 }
-// std of a zero-extended word (its high word 0).
-void StoreDoubleword(uint8_t* base, uint32_t address, uint32_t low) {
-  Store(base, address, 0);
-  Store(base, address + 4, low);
-}
-
 using Fpscr = ::base::FloatMode;
 
 // tan as the original's call gives it: nearest rounding (its _ctrlfp), or
@@ -211,15 +207,13 @@ void QuarterQuad(uint8_t* base, uint32_t list, uint32_t effect, double value) {
   const PostEffect e(base, effect);
   Store(base, s + 8, AddQuad(base, effect, e.width() >> 2, e.height() >> 2, value, false));
 }
-// The texel size from the effect's size, its words as the original's
-// frame keeps them (width at `width_at`, height at `height_at`).
-void TexelSize(uint8_t* base, uint32_t list, uint32_t effect, uint32_t width_at,
-               uint32_t height_at) {
+// The texel size from the effect's size. (The original keeps the two words
+// in its frame for the conversion; nothing reads them there: not written,
+// E5 step 6.)
+void TexelSize(uint8_t* base, uint32_t list, uint32_t effect) {
   const PostEffect e(base, effect);
   const uint32_t height = e.height();
   const uint32_t width = e.width();
-  StoreDoubleword(base, height_at, height);
-  StoreDoubleword(base, width_at, width);
   RecordTexelSize(base, list, double(float(double(int64_t(width)))),
                   double(float(double(int64_t(height)))));
 }
@@ -262,7 +256,7 @@ std::optional<uint32_t> ColorFilterRecord(uint8_t* base, uint32_t stack, uint32_
   }
   const double scale = double(float(tangent));
   const uint32_t c = frame + 96;
-  TexelSize(base, list, filter, c, frame + 80);
+  TexelSize(base, list, filter);
   const double one = Lfs(base, kOne);
   const double zero = Lfs(base, kZero);
   // c37: the inverses of +8080 to +8088.
@@ -343,11 +337,7 @@ std::optional<uint32_t> TargetFilterRecord(uint8_t* base, uint32_t stack, uint32
   // for bit 1, 24 and 25 for bit 0).
   for (uint32_t pass = 0; pass < 2; pass++) {
     RecordTargets(base, list, f.surface().address, 0);
-    if (pass == 0) {
-      TexelSize(base, list, filter, frame + 88, frame + 80);
-    } else {
-      TexelSize(base, list, filter, frame + 80, frame + 88);
-    }
+    TexelSize(base, list, filter);
     Texture(base, list, target);
     ShaderPair(base, list, (second ? 28 : 24) + pass);
     Quad(base, list, filter, one, false);
@@ -471,7 +461,6 @@ std::optional<uint32_t> MotionBlurRecord(uint8_t* base, uint32_t stack, uint32_t
   Stfs(base, frame + 100, zero);
   Stfs(base, frame + 104, zero);
   Stfs(base, frame + 108, zero);
-  StoreDoubleword(base, frame + 80, width);
   const double one = Lfs(base, kOne);
   const double w = double(float(double(int64_t(width))));
   const double a = double(float(one / w));
@@ -481,10 +470,9 @@ std::optional<uint32_t> MotionBlurRecord(uint8_t* base, uint32_t stack, uint32_t
   v = double(float(v * scale));
   Stfs(base, frame + 96, v);
   RecordPixelConstants(base, list, frame + 96, 41, 1);
-  // The texel size (the frame's +80 the height, then the width).
+  // The texel size. (The original converts the height and width through
+  // its frame's +80, and the width above: not written, E5 step 6.)
   const uint32_t height = mb.height();
-  StoreDoubleword(base, frame + 80, height);
-  StoreDoubleword(base, frame + 80, width);
   RecordTexelSize(base, list, double(float(double(int64_t(width)))),
                   double(float(double(int64_t(height)))));
   Slot3(base, list, 3, 1, 0);
@@ -562,13 +550,10 @@ uint32_t GlowRecordStarPass(uint8_t* base, uint32_t stack, uint32_t glow, uint32
   }
   if (samples != 0) {
     const double scale = Lfs(base, 0x82008834);
-    Stfs(base, frame + 108, one);
-    StoreDoubleword(base, frame + 80, pass);
     const double zero = Lfs(base, kZero);
     const double limit = Lfs(base, 0x82002A2C);
     const double passes = Fadds(WordToSingle(pass), one);
     for (uint32_t i = 0; i < samples; i++) {
-      StoreDoubleword(base, frame + 80, i);
       const double index = WordToSingle(i);
       const double weight = Frsp(c_runtime::Pow(attenuation, Fmuls(index, step)));
       const schema::GlowStarColor color(base, colors + 16 * i);
@@ -587,10 +572,12 @@ uint32_t GlowRecordStarPass(uint8_t* base, uint32_t stack, uint32_t glow, uint32
       wr = Fmuls(wr, passes);
       wg = Fmuls(wg, passes);
       wb = Fmuls(wb, passes);
-      Stfs(base, frame + 96, Fmuls(wr, scale));
-      Stfs(base, frame + 100, Fmuls(wg, scale));
-      Stfs(base, frame + 104, Fmuls(wb, scale));
-      ops::Copy16(base, at, frame + 96);
+      // The weight (with +12's 1.0) straight into the block: the original
+      // builds it at its frame's +96 and copies it (E5 step 6).
+      Stfs(base, at + 0, Fmuls(wr, scale));
+      Stfs(base, at + 4, Fmuls(wg, scale));
+      Stfs(base, at + 8, Fmuls(wb, scale));
+      Stfs(base, at + 12, one);
       // Past the limit: the sample's offset and weight zeroed (times 0.0).
       if (!(Fabs(x) < limit) || !(Fabs(y) < limit)) {
         Stfs(base, at + 0, Fmuls(Lfs(base, at + 0), zero));
@@ -672,30 +659,27 @@ std::optional<uint32_t> GlowRecordStar(uint8_t* base, uint32_t stack, uint32_t g
   const double aberration = double(g.glare_chromatic_aberration());
   const uint32_t height = g.height();
   const double fraction = Lfs(base, 0x82008834);
-  StoreDoubleword(base, frame + 112, width);
-  StoreDoubleword(base, frame + 96, height);
   const double w = WordToSingle(width);
   const double toward = Lfs(base, 0x82008918);
   const double h = WordToSingle(height);
   uint32_t at = frame + 216;
   for (uint32_t p = 1; p <= 2; p++) {
-    StoreDoubleword(base, frame + 96, p);
     const double t = Fmuls(WordToSingle(p), fraction);
     for (uint32_t k = 0; k < 8; k++) {
       Stfs(base, at + 4, one);
-      ops::Copy16(base, frame + 112, g.star_colors_address() + 16 * k);
-      double cr = Lfs(base, frame + 112);
-      double cg = Lfs(base, frame + 116);
+      // The star color read in place (the original copies it to its
+      // frame's +112 and writes the blend back there, read by nothing: E5
+      // step 6).
+      const uint32_t color = g.star_colors_address() + 16 * k;
+      double cr = Lfs(base, color);
+      double cg = Lfs(base, color + 4);
       const double dr = Fsubs(toward, cr);
-      double cb = Lfs(base, frame + 120);
+      double cb = Lfs(base, color + 8);
       const double dg = Fsubs(toward, cg);
       const double db = Fsubs(toward, cb);
       cr = Fmadds(dr, t, cr);
-      Stfs(base, frame + 112, cr);
       cg = Fmadds(dg, t, cg);
-      Stfs(base, frame + 116, cg);
       cb = Fmadds(db, t, cb);
-      Stfs(base, frame + 120, cb);
       cr = Fsubs(cr, toward);
       cg = Fsubs(cg, toward);
       cb = Fsubs(cb, toward);
@@ -723,30 +707,27 @@ std::optional<uint32_t> GlowRecordStar(uint8_t* base, uint32_t stack, uint32_t g
     matrix_math::Inverse(base, frame + 144, camera.view_address());
     matrix_math::Vec4Transform(base, frame + 128, frame + 144, frame + 128);
     Stfs(base, frame + 132, zero);
-    Stfs(base, frame + 96, one);
-    Stfs(base, frame + 100, zero);
-    Stfs(base, frame + 104, zero);
-    Stfs(base, frame + 108, zero);
     const simde__m128 v = ops::Lvx(base, frame + 128);
-    const simde__m128 x_axis = ops::Lvx(base, frame + 96);
-    Stfs(base, frame + 96, zero);
-    Stfs(base, frame + 100, zero);
-    Stfs(base, frame + 104, one);
-    Stfs(base, frame + 108, zero);
-    const simde__m128 z_axis = ops::Lvx(base, frame + 96);
+    // The two axes, the normalized vector and the two dot products as
+    // host vectors (the original builds and stores them in its frame's
+    // +96, +112 and +128 for itself: E5 step 6), the words as stfs makes
+    // them.
+    const uint32_t one_bits = std::bit_cast<uint32_t>(float(one));
+    const uint32_t zero_bits = std::bit_cast<uint32_t>(float(zero));
+    const simde__m128 x_axis = ops::VectorOf(one_bits, zero_bits, zero_bits, zero_bits);
+    const simde__m128 z_axis = ops::VectorOf(zero_bits, zero_bits, one_bits, zero_bits);
+    simde__m128 x;
+    simde__m128 z_dot;
     {
       ops::FlushToZero ftz;
       const simde__m128 dot = ops::Dot3(v, v);
       const simde__m128 n = ops::Normalized(v, dot);
-      const simde__m128 x = ops::Dot3(n, x_axis);
-      ops::Stvx(base, frame + 128, n);
-      const simde__m128 z = ops::Dot3(n, z_axis);
-      ops::Stvx(base, frame + 96, x);
-      ops::Stvx(base, frame + 112, z);
+      x = ops::Dot3(n, x_axis);
+      z_dot = ops::Dot3(n, z_axis);
     }
-    const double cosine = Lfs(base, frame + 96);
+    const double cosine = double(std::bit_cast<float>(ops::WordOf(x, 0)));
     const double arc = c_runtime::Acos(cosine);
-    const double z = Lfs(base, frame + 112);
+    const double z = double(std::bit_cast<float>(ops::WordOf(z_dot, 0)));
     angle = Frsp(arc);
     if (z < zero) {
       angle = Fsubs(Lfs(base, 0x82001FA8), angle);
@@ -765,20 +746,20 @@ std::optional<uint32_t> GlowRecordStar(uint8_t* base, uint32_t stack, uint32_t g
     uint32_t line = g.star_lines_address();
     uint32_t target = g.line_texture_0_address();
     for (uint32_t d = 0; d < g.star_line_count(); d++, line += 16, target += 4) {
-      ops::Copy16(base, frame + 96, line);
+      // The line's words read in place (the original copies its 16 bytes
+      // to its frame's +96 first: E5 step 6).
       const double length = double(g.star_step());
       const double attenuation = double(g.star_attenuation());
-      const double a = Fadds(Lfs(base, frame + 108), rotation);
+      const double a = Fadds(Lfs(base, line + 12), rotation);
       double dx = Fmuls(Fmuls(Frsp(c_runtime::Sin(a)), texel_x), length);
       const double cosine = c_runtime::Cos(a);
-      const uint32_t passes = Load(base, frame + 96);
+      const uint32_t passes = Load(base, line);
       double step = first_step;
       double dy = Fmuls(Fmuls(Frsp(cosine), texel_y), length);
       for (uint32_t p = 0; p < passes; p++) {
         const uint32_t source = p == 0 ? g.history().address : Load(base, target);
         const uint32_t texture = HeaderOf(RenderTexture(base, source));
         const uint32_t dest = HeaderOf(RenderTexture(base, Load(base, target)));
-        Store(base, frame + 92, dest);
         GlowRecordStarPass(base, frame, glow, texture, 8, attenuation, step, dx, dy,
                            frame + 208 + ((passes - p - 1) << 7), p, dest, calls);
         const double k = Lfs(base, 0x82008828);
@@ -810,8 +791,6 @@ std::optional<uint32_t> GlowRecordStar(uint8_t* base, uint32_t stack, uint32_t g
   ShaderPair(base, list, 23);
   const uint32_t quarter_h = g.height() >> 2;
   const uint32_t quarter_w = g.width() >> 2;
-  StoreDoubleword(base, frame + 96, quarter_h);
-  StoreDoubleword(base, frame + 112, quarter_w);
   RecordTexelSize(base, list, WordToSingle(quarter_w), WordToSingle(quarter_h));
   QuarterQuad(base, list, glow, one);
   RecordResolve(base, glow, list, HeaderOf(g.star_texture()), 0, 0, false);
@@ -871,11 +850,7 @@ std::optional<uint32_t> GlowRecord(uint8_t* base, uint32_t stack, uint32_t glow,
       Texture(base, list, HeaderOf(g.frame_texture()));
     }
     ShaderPair(base, list, 10);
-    if (pass == 0) {
-      TexelSize(base, list, glow, frame + 96, frame + 80);
-    } else {
-      TexelSize(base, list, glow, frame + 80, frame + 96);
-    }
+    TexelSize(base, list, glow);
     Stfs(base, c + 0, double(pass == 0 ? g.c33_x_first() : g.c33_x_second()));
     Stfs(base, c + 4, double(g.strength()));
     Stfs(base, c + 8, double(g.c33_z()));

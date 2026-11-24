@@ -38,10 +38,10 @@ using guest::LoadU32;
 using guest::StoreU32;
 using G = schema::Type6Type7ModesGlobals;
 
-// The movie with id `id`: the id at the frame's +80, then UiMovies::Find.
-uint32_t MovieAt(uint8_t* base, uint32_t frame, uint32_t id) {
-  StoreU32(base, frame + 80, id);
-  return schema::UiMovieWord(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80)).value();
+// The movie with id `id` through UiMovies::Find (the originals' id at their
+// frame's +80, a C++ value since E5 step 6).
+uint32_t MovieAt(uint8_t* base, uint32_t id) {
+  return schema::UiMovieWord(base, ui_movies::PairsFindKey(base, ui_movies::kMovieTable, id)).value();
 }
 
 // UiMovie::SetText with r7 to r10 0 (the user's call for its unset varargs,
@@ -169,7 +169,7 @@ uint64_t Screen0Confirm(uint8_t* base, const ConfirmKind& kind, uint32_t dispatc
   }
   const uint32_t frame = sp - 112;
   StoreU32(base, frame, sp);  // the back chain (stwu)
-  const uint32_t movie = MovieAt(base, frame, 16);
+  const uint32_t movie = MovieAt(base, 16);
   SetText(base, calls, frame, movie, 0xFFFFFFFF, 0, kind.text);
   SetText(base, calls, frame, movie, 1, 3, 2);
   const uint32_t r3 = SetText(base, calls, frame, movie, 1, 4, 3);
@@ -180,8 +180,8 @@ uint64_t Screen0Confirm(uint8_t* base, const ConfirmKind& kind, uint32_t dispatc
 
 uint64_t Type6Screen0ShowPage(uint8_t* base, uint32_t page, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_822344A8 Type6Screen0::ShowPage");
-  StoreU32(base, sp - 112, sp);  // the back chain (stwu)
-  const uint32_t movie = MovieAt(base, sp - 112, 22);
+  (void)sp;  // no guest frame (E5 step 6): no slots, no guest calls
+  const uint32_t movie = MovieAt(base, 22);
   Show(base, movie, 4, 1);
   Show(base, movie, 5, 1);
   for (const uint32_t child : {6u, 7u, 8u, 9u, 13u, 14u}) {
@@ -219,8 +219,8 @@ uint64_t Type6Screen0ShowPage(uint8_t* base, uint32_t page, uint32_t sp) {
 
 uint64_t Type7Screen0ShowPage(uint8_t* base, uint32_t page, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82244930 Type7Screen0::ShowPage");
-  StoreU32(base, sp - 112, sp);  // the back chain (stwu)
-  const uint32_t movie = MovieAt(base, sp - 112, 22);
+  (void)sp;  // no guest frame (E5 step 6): no slots, no guest calls
+  const uint32_t movie = MovieAt(base, 22);
   for (const uint32_t child : {4u, 5u, 6u, 7u}) {
     Show(base, movie, child, 1, 2);
   }
@@ -251,15 +251,13 @@ uint64_t Screen0PlaceCursor(uint8_t* base, bool type7, uint64_t item, uint32_t s
   } else {
     ITC_NATIVE_RUNNING("sub_82234428 Type6Screen0::PlaceCursor");
   }
-  const uint32_t frame = sp - 112;
-  StoreU32(base, frame, sp);  // the back chain (stwu)
-  const uint32_t movie = MovieAt(base, frame, 22);
+  // No guest frame (E5 step 6): its slots (the movie id, the doubleword
+  // for the conversion) are C++ values, and it calls no guest code.
+  (void)sp;
+  const uint32_t movie = MovieAt(base, 22);
   const uint32_t node = ui_movies::FindNode(base, movie, 0xFFFFFFFF, type7 ? 3 : 4);
-  // mulli and extsw, the doubleword through the frame's +80 (std, lfd,
-  // fcfid, frsp).
+  // mulli and extsw, then the doubleword converted (std, lfd, fcfid, frsp).
   const int64_t value = int64_t(int32_t(uint32_t(item * 40)));
-  StoreU32(base, frame + 80, uint32_t(uint64_t(value) >> 32));
-  StoreU32(base, frame + 84, uint32_t(value));
   const uint32_t child = ui_movies::Child(base, node, 0);
   schema::UiMovieNode(base, child).set_y(float(double(value)));
   return child;
@@ -274,7 +272,7 @@ uint64_t Screen0ShowHelp(uint8_t* base, bool type7, uint32_t item, uint32_t sp,
   }
   const uint32_t frame = sp - 128;
   StoreU32(base, frame, sp);  // the back chain (stwu)
-  const uint32_t movie = MovieAt(base, frame, 22);
+  const uint32_t movie = MovieAt(base, 22);
   static constexpr uint32_t kType6Texts[5] = {920, 921, 916, 917, 918};
   static constexpr uint32_t kType7Texts[4] = {919, 916, 917, 918};
   uint32_t text = 919;
@@ -297,7 +295,7 @@ uint64_t Screen0FadeOutStep(uint8_t* base, bool type7, uint32_t screen, uint32_t
     ITC_NATIVE_RUNNING("sub_822342F0 Type6Screen0::FadeOutStep");
   }
   const uint32_t frame = sp - 112;
-  const uint32_t movie = MovieAt(base, frame, 22);
+  const uint32_t movie = MovieAt(base, 22);
   const schema::PageObject page = Screen0View(base, screen, type7).pages();
   if (page.step_started() == 0) {
     mode_tick::ScreenFadesFadeOut(base, schema::Type67ScreensGlobals::fade_out_passes(base), 0, 0, 0, 0);
@@ -347,7 +345,7 @@ uint64_t Screen0PlayItem(uint8_t* base, bool type7, uint32_t screen, uint32_t sp
   }
   const uint32_t frame = sp - 112;
   StoreU32(base, frame, sp);  // the back chain (stwu)
-  const uint32_t movie = MovieAt(base, frame, 22);
+  const uint32_t movie = MovieAt(base, 22);
   const uint64_t named = uint64_t(MenuOf(base, type7, screen).cursor()) + 5;
   if (type7) {
     calls.call(kFinishNamed, frame, 0x82244864, movie, named);
@@ -365,7 +363,7 @@ uint64_t Screen0OpeningStep(uint8_t* base, bool type7, uint32_t screen, uint32_t
     ITC_NATIVE_RUNNING("sub_82234C20 Type6Screen0::OpeningStep");
   }
   const uint32_t frame = sp - 128;
-  const uint32_t movie = MovieAt(base, frame, 22);
+  const uint32_t movie = MovieAt(base, 22);
   const schema::PageObject page = PageStateOf(base, type7, screen);
   auto item = [&] { return MenuOf(base, type7, screen).cursor(); };
   if (page.step_started() == 0) {
@@ -415,7 +413,7 @@ uint64_t Screen0BackStep(uint8_t* base, bool type7, uint32_t screen, uint32_t sp
     ITC_NATIVE_RUNNING("sub_82234E38 Type6Screen0::BackStep");
   }
   const uint32_t frame = sp - 128;
-  const uint32_t movie = MovieAt(base, frame, 22);
+  const uint32_t movie = MovieAt(base, 22);
   const uint32_t items = type7 ? 4 : 5;
   for (uint32_t i = 0; i < items; i++) {
     calls.call(kFinishNamed, frame, type7 ? 0x822450E4 : 0x82234E74, movie, i + 5);
@@ -443,7 +441,7 @@ uint64_t Screen0CursorStep(uint8_t* base, bool type7, uint32_t screen, uint32_t 
     ITC_NATIVE_RUNNING("sub_82234D50 Type6Screen0::CursorStep");
   }
   const uint32_t frame = sp - 144;
-  const uint32_t movie = MovieAt(base, frame, 22);
+  const uint32_t movie = MovieAt(base, 22);
   const schema::FrontEndMenu menu = MenuOf(base, type7, screen);
   const uint32_t old = menu.previous();
   const uint32_t now = menu.cursor();
@@ -752,16 +750,13 @@ uint64_t ControllerOptionsUpdate(uint8_t* base, uint32_t sp, const Calls& calls)
   ITC_NATIVE_RUNNING("sub_821C7F98 ControllerOptions::Update");
   const uint32_t frame = sp - 176;
   // (The empty function sub_82106540 it calls first does nothing.) The
-  // steps' table in the frame, +124 stored first.
+  // steps' table (the original builds it at its frame's +80; read only
+  // here, so a C++ table since E5 step 6).
   static constexpr uint32_t kSteps[12] = {0x821BFBD8, 0x821C5D68, 0x821C5F38, 0x821BFC68,
                                           0x821BFD08, 0x821BFD98, 0x821C5F80, 0x821BFF20,
                                           0x821BFFA0, 0x821C0030, 0x821C60D0, 0x821C01B8};
-  StoreU32(base, frame + 124, kSteps[11]);
   const schema::PageObject page = G::controller_page(base);
   const uint32_t step = page.step();
-  for (uint32_t i = 0; i < 11; i++) {
-    StoreU32(base, frame + 80 + 4 * i, kSteps[i]);
-  }
   // r3 and r4 as the table's build leaves them (sign-extended addresses).
   uint64_t r3 = 0xFFFFFFFF00000000ull | 0x821BFD08;
   constexpr uint64_t kR4 = 0xFFFFFFFF00000000ull | 0x821BFD98;
@@ -770,7 +765,7 @@ uint64_t ControllerOptionsUpdate(uint8_t* base, uint32_t sp, const Calls& calls)
   }
   schema::PageObject p = page;
   if (int32_t(step) >= 0) {
-    const uint32_t target = LoadU32(base, frame + 80 + (step << 2));
+    const uint32_t target = kSteps[step];
     r3 = calls.call(target, frame, 0x821C8080, uint64_t(page.step_started_address()), kR4);
     p = G::controller_page(base);
     if (int32_t(r3) == 0) {
@@ -963,18 +958,16 @@ uint64_t Screen0ShowCarInfo(uint8_t* base, bool type7, uint32_t sp, const Calls&
   constexpr uint32_t kRefresh = 0x820C4998;
   const uint32_t frame = sp - (type7 ? kType7ShowCarInfoFrame : kType6ShowCarInfoFrame);
   StoreU32(base, frame, sp);  // the back chain, for the guest calls
-  const uint32_t movie = MovieAt(base, frame, 22);
+  const uint32_t movie = MovieAt(base, 22);
   ui_movies::ResetPose(base, movie);
-  // The menu's labels, from a table in the frame (+96).
+  // The menu's labels (a table the original builds at its frame's +96,
+  // read only here: a C++ table since E5 step 6).
   static constexpr uint32_t kType6Labels[] = {109, 120, 110, 113, 114};
   static constexpr uint32_t kType7Labels[] = {109, 110, 113, 114};
   const uint32_t* labels = type7 ? kType7Labels : kType6Labels;
   const uint32_t count = type7 ? 4 : 5;
   for (uint32_t i = 0; i < count; i++) {
-    StoreU32(base, frame + 96 + 4 * i, labels[i]);
-  }
-  for (uint32_t i = 0; i < count; i++) {
-    SetText(base, format, frame, movie, type7 ? 3 : 4, 5 + i, LoadU32(base, frame + 96 + 4 * i));
+    SetText(base, format, frame, movie, type7 ? 3 : 4, 5 + i, labels[i]);
   }
   // The car object in the frame: built from the type 6 car's id, or the
   // type 7 car copied, then refreshed.
@@ -1101,29 +1094,31 @@ uint64_t Screen0Update(uint8_t* base, bool type7, uint64_t r3, uint64_t sp, cons
   const uint32_t frame = uint32_t(sp) - (type7 ? kType7UpdateFrame : kType6UpdateFrame);
   const uint64_t high = sp & 0xFFFFFFFF00000000ull;  // r1's upper word, in addi's results
   StoreU32(base, frame, uint32_t(sp));  // the back chain, for the guest calls
-  const uint32_t movie = MovieAt(base, frame, 22);
+  const uint32_t movie = MovieAt(base, 22);
   uint64_t answer;
   uint32_t step;
   if (type7) {
-    // The step table, built on the first call from words in the frame.
+    // The step table, built on the first call from four functors (function,
+    // adjustment) the original builds in its frame (+80, +104, +88, +96;
+    // read only here: C++ values since E5 step 6).
     const uint32_t guard = G::type7_steps_guard(base);
     step = screen.pages().step();
     if ((guard & 1) == 0) {
-      StoreU32(base, frame + 84, 0);
-      StoreU32(base, frame + 108, 0);
-      StoreU32(base, frame + 92, 0);
-      StoreU32(base, frame + 100, 0);
       G::set_type7_steps_guard(base, guard | 1);
-      StoreU32(base, frame + 80, 0x82244E70);   // the opening
-      StoreU32(base, frame + 104, 0x822450A8);  // back pressed
-      StoreU32(base, frame + 88, 0x82244FC0);   // the cursor moved
-      StoreU32(base, frame + 96, 0x82244760);   // the fade out
-      for (const auto [to, from] : {std::pair{0u, 80u}, {8u, 104u}, {16u, 88u}, {24u, 96u}}) {
-        StoreU32(base, kType7Steps + to, LoadU32(base, frame + from));
-        StoreU32(base, kType7Steps + to + 4, LoadU32(base, frame + from + 4));
+      static constexpr uint32_t kFunctions[4] = {
+          0x82244E70,   // the opening
+          0x822450A8,   // back pressed
+          0x82244FC0,   // the cursor moved
+          0x82244760};  // the fade out
+      for (uint32_t i = 0; i < 4; i++) {
+        StoreU32(base, kType7Steps + 8 * i, kFunctions[i]);
+        StoreU32(base, kType7Steps + 8 * i + 4, 0);
       }
     }
   } else {
+    // The movie id at the frame's +80 stays on the stack for type 6: its
+    // address is the step's r4.
+    StoreU32(base, frame + 80, 22);
     step = screen.pages().step();
   }
   if (step != kMinusOne) {

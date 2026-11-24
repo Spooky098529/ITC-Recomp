@@ -11,6 +11,7 @@
 #include "schema/ui_movies_game.h"
 
 #include <optional>
+#include <vector>
 
 namespace ui_movies {
 
@@ -627,8 +628,7 @@ void ResetMovieTable(uint8_t* base, uint32_t renderer, uint32_t list) {
 
 namespace {
 constexpr uint32_t kTagGrp = 0x47525000;  // "GRP\0"
-constexpr uint32_t kLayersFrame = 16800;
-constexpr uint32_t kBuckets = 64, kBucketBytes = 260;
+constexpr uint32_t kBuckets = 64, kBucketWords = 65;
 
 // A group's children: the first index at +100 and the count at +104 (the
 // picture's width and height words, read as integers).
@@ -681,35 +681,39 @@ bool LayersFit(uint8_t* base, uint32_t scene, uint32_t group) {
 
 uint32_t AssignLayers(uint8_t* base, uint32_t stack, uint32_t movie, uint32_t scene,
                       uint32_t group, uint32_t layer, bool by_bucket) {
-  const uint32_t frame = stack - kLayersFrame;
-  const uint32_t buckets = frame + 80;
+  // The buckets the original keeps in its 16,800-byte frame (+80: 64 of 64
+  // words and a count each), which only this function reads: host words in
+  // the same layout (LayersFit keeps each bucket within its 64), on the heap
+  // as the recursion goes up to 33 deep. `stack` is no longer needed.
+  (void)stack;
+  std::vector<uint32_t> buckets(kBuckets * kBucketWords);
   for (uint32_t b = 0; b < kBuckets; b++) {
-    guest::StoreU32(base, buckets + kBucketBytes * b + 256, 0);
+    buckets[kBucketWords * b + 64] = 0;
   }
   uint32_t result = movie;
   ForChildren(base, scene, group, [&](uint32_t child) {
     result = child;
     const int32_t offset = int32_t(UiMovieNode(base, child).layer_offset());
-    const uint32_t bucket = buckets + kBucketBytes * uint32_t(offset < 63 ? offset : 63);
-    const uint32_t count = guest::LoadU32(base, bucket + 256);
-    guest::StoreU32(base, bucket + 256, count + 1);
-    guest::StoreU32(base, bucket + 4 * count, child);
+    const uint32_t bucket = kBucketWords * uint32_t(offset < 63 ? offset : 63);
+    const uint32_t count = buckets[bucket + 64];
+    buckets[bucket + 64] = count + 1;
+    buckets[bucket + count] = child;
     return true;
   });
   for (uint32_t b = 0; b < kBuckets; b++) {
-    const uint32_t bucket = buckets + kBucketBytes * b;
-    const uint32_t count = guest::LoadU32(base, bucket + 256);
+    const uint32_t bucket = kBucketWords * b;
+    const uint32_t count = buckets[bucket + 64];
     for (uint32_t j = 0; j < count; j++) {
-      const uint32_t node = guest::LoadU32(base, bucket + 4 * j);
+      const uint32_t node = buckets[bucket + j];
       if (by_bucket) {
         layer = b;
       }
       switch (UiMovieNode(base, node).tag()) {
         case kTagGrp:
-          result = AssignLayers(base, frame, movie, scene, node, layer, false);
+          result = AssignLayers(base, stack, movie, scene, node, layer, false);
           break;
         case kTagSce:
-          result = AssignLayers(base, frame, movie, node, node, layer, false);
+          result = AssignLayers(base, stack, movie, node, node, layer, false);
           break;
         case kTagPic:
         case kTagPrm:

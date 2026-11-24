@@ -4,11 +4,11 @@
 // docs/known-data.md: "type 6 screens", "type 7 screens"). The screens are
 // guest data shared with the recompiled code, so these store into guest
 // memory what the originals store (constants, `this`-relative addresses and
-// their arguments). Where an original leaves words in the stack (NodeScreen,
-// PanelSetBase), they are written at the same places from `sp`, the
-// original's r1 on entry (callees' entry r1 is `sp` less the caller's frame,
-// as the originals' calls have it). The originals' saved registers and back
-// chains aren't written. Adapters: src/hooks/screen_constructors.cpp
+// their arguments). The words an original leaves in the stack (NodeScreen,
+// PanelSetBase) are read by it alone: host values since E5 step 6, so `sp`
+// (the original's r1 on entry; callees' entry r1 is `sp` less the caller's
+// frame, as the originals' calls have it) is no longer read or written. The
+// originals' saved registers and back chains aren't written. Adapters: src/hooks/screen_constructors.cpp
 // (--native_screen_constructors).
 
 #pragma once

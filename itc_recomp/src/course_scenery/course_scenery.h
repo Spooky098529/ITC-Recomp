@@ -158,7 +158,7 @@ bool Shutdown(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set, u
 // asset + `model` when that's within its last, else -1.
 uint32_t ModelAsset(uint8_t* base, uint32_t config, uint32_t area, uint32_t model);
 // Scenery::PoolSizes (sub_820F2030): each of the five pools' data size into
-// `out` (five words) for the configuration `config`: 0 the size of
+// `out` (five host words: the original's caller's frame +80, E5 step 6) for the configuration `config`: 0 the size of
 // [[config + 24]]'s asset; 1 0; 2 the size of the area table's +8 asset
 // (when not negative); 3 the areas' light assets (+20 of each 12-byte entry,
 // up to the first negative or the count), summed in mode 0 ([config] 0)
@@ -168,7 +168,7 @@ uint32_t ModelAsset(uint8_t* base, uint32_t config, uint32_t area, uint32_t mode
 // assets' sizes by Archive::AssetSize's plain C++. Returns r3 as the
 // original leaves it: its last ModelAsset's or AssetSize's answer, or the
 // light entry (zero-extended) or -1 that ended the areas.
-uint64_t PoolSizes(uint8_t* base, uint32_t area_counts, uint32_t model_counts, uint32_t out,
+uint64_t PoolSizes(uint8_t* base, uint32_t area_counts, uint32_t model_counts, uint32_t out[5],
                    uint32_t config);
 // SceneryList::Clear (sub_820F1588): the items done and the count = 0.
 void ListClear(uint8_t* base, uint32_t list);
@@ -249,7 +249,8 @@ uint32_t Setup(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manag
 // Scenery::SetupPools (sub_820F2720): [0x826C5518], +180, +184 = 0; the
 // 44-byte configuration copied to +8 (memcpy: the library's for native
 // callers, its original through `calls` where that declines); mode 2 with
-// +12 = 0 becomes [[+40]]. PoolSizes into its frame's +80; list A (+116:
+// +12 = 0 becomes [[+40]]. PoolSizes into host words (its frame's +80 in
+// the original); list A (+116:
 // pool 3, the area count, its pointer array, 16-byte items and 12-byte
 // table from AllocPhysical, the last two cleared with XMemSet) and list B
 // (+144: pool 4, the model count) the same; the tables filled from the

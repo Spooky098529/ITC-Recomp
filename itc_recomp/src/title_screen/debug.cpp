@@ -25,7 +25,8 @@ constexpr DebugPageSpec kPages[4] = {
     {11, 0x82220EB8},
 };
 
-// Each step's frame, its tick limit, the transition and page it sets past
+// Each step's frame size in the original (none made since E5 step 6), its
+// tick limit, the transition and page it sets past
 // it and whether it clears its started word then.
 struct DebugStepSpec {
   uint32_t frame;
@@ -74,7 +75,7 @@ uint64_t DebugPage(uint8_t* base, uint32_t which, uint64_t r3, uint32_t sp, cons
 
 uint64_t DebugStep(uint8_t* base, uint32_t which, uint32_t started, uint32_t sp) {
   const DebugStepSpec& spec = kSteps[which];
-  Frame(base, sp, spec.frame);
+  (void)sp;  // no guest frame (E5 step 6): nothing here calls guest code
   // `started` is the load block's +16 (Update's only caller): the block is
   // in host memory (E5 step 3), so the word is read through its view.
   (void)started;

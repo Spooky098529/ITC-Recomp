@@ -24,11 +24,6 @@ using Confirm = schema::ConfirmPanel;
 using Car = schema::CarPanel;
 using Interface = schema::PanelSetInterface;
 
-uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
-  StoreU32(base, sp - bytes, sp);
-  return sp - bytes;
-}
-
 // PanelSet::Reset's stores on the base `b` (PanelSetPair's Reset and Open
 // make them on both bases).
 void ResetWords(uint8_t* base, uint32_t b_address) {
@@ -112,7 +107,9 @@ uint64_t PickedPage(uint8_t* base, uint64_t b) {
 
 uint64_t SaveData(uint8_t* base, uint32_t b, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82249668 PanelSetBase::SaveData");
-  StoreU32(base, sp - 96, sp);
+  // The original's 96-byte frame (only its back chain) left out: no guest
+  // call is made from it (E5 step 6).
+  (void)sp;
   if (G::two_players(base) == 0) {
     return vehicle_accessors::SaveDataOf(base, 0);
   }
@@ -132,19 +129,19 @@ uint64_t GroupBaseDestruct(uint8_t* base, uint64_t group) {
 
 uint64_t SetBaseDestruct(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8224AE60 PanelSetBase::~PanelSetBase");
-  const uint32_t frame = sp - 96;
-  StoreU32(base, frame, sp);
+  // The original's 96-byte frame (only its back chain) left out: the guest
+  // calls run from `sp` (E5 step 6).
   Base(base, uint32_t(b)).set_vtable(Base::kVtable);
-  calls.Call(kMenuListRelease, frame, 0x8224AE88, b + 132);
-  return calls.Call(kMenuListRelease, frame, 0x8224AE90, b + 60);
+  calls.Call(kMenuListRelease, sp, 0x8224AE88, b + 132);
+  return calls.Call(kMenuListRelease, sp, 0x8224AE90, b + 60);
 }
 
 uint64_t SetDestruct(uint8_t* base, uint64_t set, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8224B708 PanelSet::~PanelSet");
-  const uint32_t frame = sp - 96;
-  StoreU32(base, frame, sp);
+  // The original's 96-byte frame (only its back chain) left out (E5 step
+  // 6): the base's destructor runs from `sp`.
   Set(base, uint32_t(set)).set_vtable(Set::kVtable);
-  const uint64_t r3 = SetBaseDestruct(base, set + 4, frame, calls);
+  const uint64_t r3 = SetBaseDestruct(base, set + 4, sp, calls);
   Interface(base, uint32_t(set)).set_vtable(Interface::kVtable);
   return r3;
 }
@@ -152,11 +149,11 @@ uint64_t SetDestruct(uint8_t* base, uint64_t set, uint32_t sp, const Calls& call
 uint64_t SetInterfaceDeletingDestruct(uint8_t* base, uint64_t set, uint64_t flags, uint32_t sp,
                                       const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8224AC98 PanelSetInterface::DeletingDestructor");
-  const uint32_t frame = sp - 96;
-  StoreU32(base, frame, sp);
+  // The original's 96-byte frame (only its back chain) left out: the guest
+  // call runs from `sp` (E5 step 6).
   Interface(base, uint32_t(set)).set_vtable(Interface::kVtable);
   if (flags & 1) {
-    calls.Call(kOperatorDelete, frame, 0x8224ACC4, set, flags);
+    calls.Call(kOperatorDelete, sp, 0x8224ACC4, set, flags);
   }
   return set;
 }
@@ -167,11 +164,13 @@ uint64_t PairConstruct(uint8_t* base, uint64_t pair_r3, uint32_t f0, uint32_t f1
                        uint32_t e1, uint32_t d0, uint32_t d1, uint32_t c0, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8224B750 PanelSetPair::PanelSetPair");
   const uint32_t pair = uint32_t(pair_r3);
-  const uint32_t frame = Frame(base, sp, 144);
+  // The original's 144-byte frame (only its back chain) left out (E5 step
+  // 6): PanelSetBase makes no call and reads no stack. The stack arguments
+  // below are the caller's.
   const Pair p(base, pair);
   p.set_vtable(Pair::kVtable);
-  screen_constructors::PanelSetBase(base, pair + 4, frame);
-  screen_constructors::PanelSetBase(base, Pair(base, uint32_t(pair)).second_base_address(), frame);
+  screen_constructors::PanelSetBase(base, pair + 4, sp);
+  screen_constructors::PanelSetBase(base, Pair(base, uint32_t(pair)).second_base_address(), sp);
   const uint32_t confirm0 = LoadU32(base, sp + 92);
   const uint32_t c1 = LoadU32(base, sp + 84);
   const uint32_t confirm1 = LoadU32(base, sp + 100);
@@ -203,10 +202,11 @@ uint64_t PairConstruct(uint8_t* base, uint64_t pair_r3, uint32_t f0, uint32_t f1
 
 uint64_t PairDestruct(uint8_t* base, uint64_t pair, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8224B830 PanelSetPair::~PanelSetPair");
-  const uint32_t frame = Frame(base, sp, 112);
+  // The original's 112-byte frame (only its back chain) left out (E5 step
+  // 6): the bases' destructors run from `sp`.
   Pair(base, uint32_t(pair)).set_vtable(Pair::kVtable);
-  SetBaseDestruct(base, Pair(base, uint32_t(pair)).second_base_address(), frame, calls);
-  const uint64_t r3 = SetBaseDestruct(base, pair + 4, frame, calls);
+  SetBaseDestruct(base, Pair(base, uint32_t(pair)).second_base_address(), sp, calls);
+  const uint64_t r3 = SetBaseDestruct(base, pair + 4, sp, calls);
   Interface(base, uint32_t(pair)).set_vtable(Interface::kVtable);
   return r3;
 }
@@ -214,47 +214,40 @@ uint64_t PairDestruct(uint8_t* base, uint64_t pair, uint32_t sp, const Calls& ca
 uint64_t PairDeletingDestruct(uint8_t* base, uint64_t pair, uint64_t flags, uint32_t sp,
                               const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8224CA30 PanelSetPair::DeletingDestructor");
-  const uint32_t frame = Frame(base, sp, 112);
-  PairDestruct(base, pair, frame, calls);
+  // The original's 112-byte frame (only its back chain) left out: its
+  // calls run from `sp` (E5 step 6).
+  PairDestruct(base, pair, sp, calls);
   if (flags & 1) {
     // r4 as ~PanelSetPair leaves it (operator delete doesn't read it).
-    calls.Call(kOperatorDelete, frame, 0x8224CA60, pair, flags);
+    calls.Call(kOperatorDelete, sp, 0x8224CA60, pair, flags);
   }
   return pair;
 }
 
 uint64_t PairReset(uint8_t* base, uint64_t pair, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_822498C0 PanelSetPair::Reset");
-  // The words the original builds below its r1 (it has no frame) and reads
-  // back.
-  StoreU32(base, sp - 12, Pair(base, uint32_t(pair)).second_base_address());
-  for (const uint32_t at : {64u, 60u, 56u, 52u, 20u, 16u}) StoreU32(base, sp - at, 0);
-  for (const uint32_t at : {48u, 44u}) StoreU32(base, sp - at, 1);
-  for (const uint32_t at : {40u, 36u, 32u, 28u, 24u}) StoreU32(base, sp - at, 0xFFFFFFFFu);
+  // The words the original builds below its r1 (it has no frame; the
+  // second base's address, the reset's values) are values since E5 step 6:
+  // only it reads them.
+  (void)sp;
+  const uint32_t second = Pair(base, uint32_t(pair)).second_base_address();
   ResetWords(base, uint32_t(pair) + 4);
-  ResetWords(base, LoadU32(base, sp - 12));
+  ResetWords(base, second);
   return pair;
 }
 
 uint64_t PairOpen(uint8_t* base, uint64_t pair_r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822499F0 PanelSetPair::Open");
-  const uint32_t frame = Frame(base, sp, 176);
-  // The words on its frame (the bases' reset read through them) and the
-  // pair in the caller's area.
-  StoreU32(base, frame + 196, uint32_t(pair_r3));
-  for (const uint32_t at : {84u, 88u, 92u, 80u, 124u}) StoreU32(base, frame + at, 0);
-  StoreU32(base, frame + 128, Pair(base, uint32_t(pair_r3)).second_base_address());
-  for (const uint32_t at : {96u, 100u}) StoreU32(base, frame + at, 1);
-  for (const uint32_t at : {104u, 108u, 112u, 116u, 120u}) {
-    StoreU32(base, frame + at, 0xFFFFFFFFu);
-  }
+  // The words on its 176-byte frame (the bases' reset's values, the second
+  // base's address) and the pair it keeps in the caller's area are values
+  // since E5 step 6: only it reads them. ToTabs runs from `sp`.
   const uint64_t b1 = pair_r3 + 4;
-  const uint32_t b2 = LoadU32(base, frame + 128);
+  const uint32_t b2 = Pair(base, uint32_t(pair_r3)).second_base_address();
   ResetWords(base, uint32_t(b1));
   ResetWords(base, b2);
-  ToTabs(base, b1, frame, calls);
-  const uint64_t r3 = ToTabs(base, b2, frame, calls);
-  const Pair pair(base, LoadU32(base, frame + 196));
+  ToTabs(base, b1, sp, calls);
+  const uint64_t r3 = ToTabs(base, b2, sp, calls);
+  const Pair pair(base, uint32_t(pair_r3));
   pair.set_first_player(0);
   pair.set_second_player(1);
   pair.set_first_may_leave(0);
@@ -268,24 +261,27 @@ uint64_t PairOpen(uint8_t* base, uint64_t pair_r3, uint32_t sp, const Calls& cal
 
 uint64_t PairHandleInput(uint8_t* base, uint64_t pair, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8224CA80 PanelSetPair::HandleInput");
-  const uint32_t frame = Frame(base, sp, 112);
+  // The original's 112-byte frame (only its back chain) left out (E5 step
+  // 6): the bases' HandleInput runs from `sp`.
   G::set_stand_wait(base, 1);
-  HandleInput(base, pair + 4, frame, calls);
-  return HandleInput(base, Pair(base, uint32_t(pair)).second_base_address(), frame, calls);
+  HandleInput(base, pair + 4, sp, calls);
+  return HandleInput(base, Pair(base, uint32_t(pair)).second_base_address(), sp, calls);
 }
 
 uint64_t PairUpdate(uint8_t* base, uint64_t pair, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8224CF20 PanelSetPair::Update");
-  const uint32_t frame = Frame(base, sp, 96);
-  Update(base, pair + 4, frame, calls);
-  return Update(base, Pair(base, uint32_t(pair)).second_base_address(), frame, calls);
+  // The original's 96-byte frame (only its back chain) left out (E5 step
+  // 6): the bases' Update runs from `sp`.
+  Update(base, pair + 4, sp, calls);
+  return Update(base, Pair(base, uint32_t(pair)).second_base_address(), sp, calls);
 }
 
 uint64_t PairBuild(uint8_t* base, uint64_t pair, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8224CAE0 PanelSetPair::Build");
-  const uint32_t frame = Frame(base, sp, 96);
-  Build(base, pair + 4, frame, calls);
-  return Build(base, Pair(base, uint32_t(pair)).second_base_address(), frame, calls);
+  // The original's 96-byte frame (only its back chain) left out (E5 step
+  // 6): the bases' Build runs from `sp`.
+  Build(base, pair + 4, sp, calls);
+  return Build(base, Pair(base, uint32_t(pair)).second_base_address(), sp, calls);
 }
 
 uint64_t PairPicked(uint8_t* base, uint32_t pair) {

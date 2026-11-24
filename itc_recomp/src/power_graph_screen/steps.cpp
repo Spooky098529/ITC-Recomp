@@ -2,8 +2,10 @@
 // power-graph-screen.md): Step0 (the open animation, with SetTexts and the
 // never-seen SetParts and its three helpers), Step1 (the close) and Update,
 // which runs them from its table. UiMovies::Find and UiMovie::FindNode are
-// their plain C++; SetText, Play and Run go through their overrides, from
-// frames like the originals'.
+// their plain C++; SetText, Play and Run go through their overrides. Only
+// SetTexts keeps a frame like the original's (SetText's varargs); the
+// others' frames held only values and tables the port reads (host values
+// since E5 step 6), their calls made from their own `sp`.
 
 #include "power_graph_screen/power_graph_screen.h"
 
@@ -17,6 +19,7 @@
 #include <bit>
 #include <climits>
 #include <cmath>
+#include <iterator>
 
 namespace power_graph_screen {
 
@@ -35,10 +38,17 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   return frame;
 }
 
-// UiMovies::Find with the id stored at the frame's +80: movie 9.
+// UiMovies::Find with the id stored at the frame's +80: movie 9 (SetTexts,
+// whose frame stays).
 uint32_t FindMovie(uint8_t* base, uint32_t frame) {
   StoreU32(base, frame + 80, kMovie);
   return LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+}
+
+// UiMovies::Find on movie 9 by value (the original's id at its frame's +80,
+// a value since E5 step 6, for the functions whose frames are left out).
+uint32_t Movie(uint8_t* base) {
+  return LoadU32(base, ui_movies::PairsFindKey(base, ui_movies::kMovieTable, kMovie));
 }
 
 uint32_t Done(uint64_t run) { return uint32_t(run) == 0 ? 1 : 0; }
@@ -63,10 +73,57 @@ uint32_t Fctiwz(double d) {
   return uint32_t(int32_t(d));
 }
 
-// The steps' table in Update's frame: Step0, Step1 (8-byte entries, the
-// function and a this-adjust 0).
+// The steps' table the original builds in Update's frame (+80): Step0,
+// Step1, Step1 (8-byte entries, the function and a this-adjust 0); a host
+// table since E5 step 6.
 constexpr uint32_t kStep0 = 0x82251320;
 constexpr uint32_t kStep1 = 0x82250AA8;
+struct Step {
+  uint32_t function, adjust;
+};
+constexpr Step kSteps[3] = {{kStep0, 0}, {kStep1, 0}, {kStep1, 0}};
+constexpr uint32_t kUpdateFrame = 144;
+
+// SetPartRow2's and SetPartRow1's work over `value(i)`, the array's words.
+template <typename Value>
+uint32_t PartRow2(uint8_t* base, Value value) {
+  const uint32_t movie = Movie(base);
+  const uint32_t group = ui_movies::FindNode(base, movie, 3, 2);
+  uint32_t r3 = group;
+  // The children's count re-read each time (a child's stores could reach it).
+  // A group's first child index (+100) and child count (+104), read as words.
+  for (int32_t i = 0; i < int32_t(LoadU32(base, Node(base, group).height_address())); i++) {
+    const uint32_t first = LoadU32(base, Node(base, group).width_address());
+    const uint32_t v = value(uint32_t(i));
+    r3 = ui_movies::FindNode(base, movie, 3, first + uint32_t(i));
+    if (int32_t(v) != 10) {
+      Node(base, r3).set_texture_entry(v);
+      Node(base, r3).set_visible(1);
+    } else {
+      Node(base, r3).set_visible(0);
+    }
+  }
+  return r3;
+}
+
+template <typename Value>
+uint32_t PartRow1(uint8_t* base, Value value) {
+  const uint32_t movie = Movie(base);
+  const uint32_t group = ui_movies::FindNode(base, movie, 3, 1);
+  uint32_t r3 = group;
+  for (uint32_t i = 0; i < 7; i++) {
+    const uint32_t first = LoadU32(base, Node(base, group).width_address());
+    const uint32_t v = value(i);
+    r3 = ui_movies::FindNode(base, movie, 3, i + first);
+    if (int32_t(v) < 37) {
+      Node(base, r3).set_texture_entry(v);
+      Node(base, r3).set_visible(1);
+    } else {
+      Node(base, r3).set_visible(0);
+    }
+  }
+  return r3;
+}
 
 // The multipliers SetTexts' numbers and the float read (doubles).
 constexpr uint32_t kScale10 = 0x8200A510;
@@ -78,8 +135,9 @@ constexpr uint32_t kScale34 = 0x82009F08;
 
 uint64_t SetPartIcon(uint8_t* base, uint32_t value, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82250B48 PowerGraphScreen67::SetPartIcon");
-  const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t movie = FindMovie(base, frame);
+  // The original's 112-byte frame held only the movie id (E5 step 6: a value).
+  (void)sp;
+  const uint32_t movie = Movie(base);
   const uint32_t node = ui_movies::FindNode(base, movie, 3, 0);
   Node(base, node).set_texture_entry(value);
   return node;
@@ -87,58 +145,40 @@ uint64_t SetPartIcon(uint8_t* base, uint32_t value, uint32_t sp) {
 
 uint64_t SetPartRow2(uint8_t* base, uint32_t values, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82250BA0 PowerGraphScreen67::SetPartRow2");
-  const uint32_t frame = Frame(base, sp, 144);
-  const uint32_t movie = FindMovie(base, frame);
-  const uint32_t group = ui_movies::FindNode(base, movie, 3, 2);
-  uint32_t r3 = group;
-  // The children's count re-read each time (a child's stores could reach it).
-  // A group's first child index (+100) and child count (+104), read as words.
-  for (int32_t i = 0; i < int32_t(LoadU32(base, Node(base, group).height_address())); i++) {
-    const uint32_t first = LoadU32(base, Node(base, group).width_address());
-    const uint32_t value = LoadU32(base, values + 4 * uint32_t(i));
-    r3 = ui_movies::FindNode(base, movie, 3, first + uint32_t(i));
-    if (int32_t(value) != 10) {
-      Node(base, r3).set_texture_entry(value);
-      Node(base, r3).set_visible(1);
-    } else {
-      Node(base, r3).set_visible(0);
-    }
-  }
-  return r3;
+  // The original's 144-byte frame held only the movie id (E5 step 6: a value).
+  (void)sp;
+  return PartRow2(base, [&](uint32_t i) { return LoadU32(base, values + 4 * i); });
 }
 
 uint64_t SetPartRow1(uint8_t* base, uint32_t values, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82250C40 PowerGraphScreen67::SetPartRow1");
-  const uint32_t frame = Frame(base, sp, 144);
-  const uint32_t movie = FindMovie(base, frame);
-  const uint32_t group = ui_movies::FindNode(base, movie, 3, 1);
-  uint32_t r3 = group;
-  for (uint32_t i = 0; i < 7; i++) {
-    const uint32_t first = LoadU32(base, Node(base, group).width_address());
-    const uint32_t value = LoadU32(base, values + 4 * i);
-    r3 = ui_movies::FindNode(base, movie, 3, i + first);
-    if (int32_t(value) < 37) {
-      Node(base, r3).set_texture_entry(value);
-      Node(base, r3).set_visible(1);
-    } else {
-      Node(base, r3).set_visible(0);
-    }
-  }
-  return r3;
+  // The original's 144-byte frame held only the movie id (E5 step 6: a value).
+  (void)sp;
+  return PartRow1(base, [&](uint32_t i) { return LoadU32(base, values + 4 * i); });
 }
 
 uint64_t SetParts(uint8_t* base, const uint8_t* parts, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82250CD0 PowerGraphScreen67::SetParts");
-  const uint32_t frame = Frame(base, sp, 144);
+  // The two arrays the original builds in its 144-byte frame (+80 and +96)
+  // for SetPartRow2 and SetPartRow1: host arrays since E5 step 6 (the rows'
+  // plain C++ reads them). Row 2 reads as many words as its group has
+  // children (probably 3): past its 3, the original reads on into its
+  // frame (the gap at +92, row 1's words, then words it never writes),
+  // here the gap and the words never written as 0.
+  (void)sp;
+  uint32_t words[11] = {};  // +80 to +120
   for (uint32_t i = 0; i < 3; i++) {
-    StoreU32(base, frame + 80 + 4 * i, uint32_t(int32_t(int8_t(parts[2 + i]))));
+    words[i] = uint32_t(int32_t(int8_t(parts[2 + i])));
   }
+  // +92 is a gap in the original's frame (not written): 0 here.
   for (uint32_t i = 0; i < 7; i++) {
-    StoreU32(base, frame + 96 + 4 * i, uint32_t(int32_t(int8_t(parts[5 + i]))));
+    words[4 + i] = uint32_t(int32_t(int8_t(parts[5 + i])));
   }
-  SetPartIcon(base, uint32_t(int32_t(int8_t(parts[1]))), frame);
-  SetPartRow2(base, frame + 80, frame);
-  return SetPartRow1(base, frame + 96, frame);
+  SetPartIcon(base, uint32_t(int32_t(int8_t(parts[1]))), sp);
+  ITC_NATIVE_RUNNING("sub_82250BA0 PowerGraphScreen67::SetPartRow2");
+  PartRow2(base, [&](uint32_t i) { return i < std::size(words) ? words[i] : 0u; });
+  ITC_NATIVE_RUNNING("sub_82250C40 PowerGraphScreen67::SetPartRow1");
+  return PartRow1(base, [&](uint32_t i) { return words[4 + i]; });
 }
 
 uint64_t SetTexts(uint8_t* base, uint64_t member, uint32_t sp, const Calls& calls) {
@@ -247,15 +287,16 @@ uint64_t SetTexts(uint8_t* base, uint64_t member, uint32_t sp, const Calls& call
 
 uint64_t Step0(uint8_t* base, uint64_t member, uint32_t started, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82251320 PowerGraphScreen67::Step0");
-  const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t movie = FindMovie(base, frame);
+  // The original's 128-byte frame held only the movie id (a value since E5
+  // step 6): its calls run from `sp` (none reads its caller's frame).
+  const uint32_t movie = Movie(base);
   const schema::PowerGraphStepStarted s(base, started);
   if (s.started() == 0) {
-    SetTexts(base, member, frame, calls);
-    calls.CallArgs(kPlay, frame, 0x82251384, {movie, 0xFFFFFFFFFFFFFFFFull, 0, 0, 0, 0, 0, 0});
+    SetTexts(base, member, sp, calls);
+    calls.CallArgs(kPlay, sp, 0x82251384, {movie, 0xFFFFFFFFFFFFFFFFull, 0, 0, 0, 0, 0, 0});
     s.set_started(1);
   }
-  const uint32_t done = Done(calls.Call(kRun, frame, 0x82251398, movie, 0));
+  const uint32_t done = Done(calls.Call(kRun, sp, 0x82251398, movie, 0));
   if (done != 0) {
     G::set_shown(base, 1);
   }
@@ -264,42 +305,47 @@ uint64_t Step0(uint8_t* base, uint64_t member, uint32_t started, uint32_t sp, co
 
 uint64_t Step1(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82250AA8 PowerGraphScreen67::Step1");
-  const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t movie = FindMovie(base, frame);
+  // The original's 112-byte frame held only the movie id (a value since E5
+  // step 6): its calls run from `sp` (none reads its caller's frame).
+  const uint32_t movie = Movie(base);
   const schema::PowerGraphStepStarted s(base, started);
   if (s.started() == 0) {
-    calls.CallArgs(kPlay, frame, 0x82250B08, {movie, 0xFFFFFFFFFFFFFFFFull, 1, 0, 0, 0, 0, 0});
+    calls.CallArgs(kPlay, sp, 0x82250B08, {movie, 0xFFFFFFFFFFFFFFFFull, 1, 0, 0, 0, 0, 0});
     s.set_started(1);
     G::set_shown(base, 0);
   }
-  return Done(calls.Call(kRun, frame, 0x82250B28, movie, 0));
+  return Done(calls.Call(kRun, sp, 0x82250B28, movie, 0));
 }
 
 uint64_t Update(uint8_t* base, uint64_t member, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822513B8 PowerGraphScreen67::Update");
   // The empty sub_82106540(100, 30, 0, 0x82011208) the original calls first
   // is left out: it returns at once.
-  const uint32_t frame = Frame(base, sp, 144);
-  const uint32_t movie = FindMovie(base, frame);
-  // The table: Step0 at +80, Step1 at +88 (and +96), each with its adjust 0.
-  StoreU32(base, frame + 80, kStep0);
-  StoreU32(base, frame + 84, 0);
-  StoreU32(base, frame + 88, kStep1);
-  StoreU32(base, frame + 92, 0);
-  StoreU32(base, frame + 96, kStep1);
-  StoreU32(base, frame + 100, 0);
+  // The original's 144-byte frame held the movie id and the steps' table
+  // (values and a host table since E5 step 6): its calls run from `sp`
+  // (none reads its caller's frame).
+  const uint32_t movie = Movie(base);
   const schema::PageObject pages = G::pages(base);
   const uint32_t step = pages.step();
   uint64_t answer = movie;
   if (step == 0xFFFFFFFFu) {
-    answer = calls.Call(kRun, frame, 0x822514D8, movie, 0);
+    answer = calls.Call(kRun, sp, 0x822514D8, movie, 0);
   } else {
     bool done = true;
     if (int32_t(step) >= 0) {
-      // No bounds check: the words at the table's index.
-      const uint32_t adjust = LoadU32(base, frame + 84 + (step << 3));
-      const uint32_t target = LoadU32(base, frame + 80 + (step << 3));
-      answer = calls.Call(target, frame, 0x82251470, uint64_t(adjust) + member,
+      // Steps 0 to 2 (in play 0 and 1); past them the original reads past
+      // its table without a check: those words read where they would be on
+      // the stack.
+      uint32_t adjust, target;
+      if (step < 3) {
+        adjust = kSteps[step].adjust;
+        target = kSteps[step].function;
+      } else {
+        const uint32_t table = sp - kUpdateFrame + 80;
+        adjust = LoadU32(base, table + 4 + (step << 3));
+        target = LoadU32(base, table + (step << 3));
+      }
+      answer = calls.Call(target, sp, 0x82251470, uint64_t(adjust) + member,
                           pages.step_started_address());
       done = int32_t(answer) != 0;
     }

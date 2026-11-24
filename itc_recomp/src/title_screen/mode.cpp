@@ -57,22 +57,26 @@ uint64_t Load64(uint8_t* base, uint32_t at) {
   return (uint64_t(Load(base, at)) << 32) | Load(base, at + 4);
 }
 
-// The mode's delegate (+8, its holder +4) from the frame's doubleword at
-// `slot` (function, adjustment). The holder 0 when the delegate's address
-// wraps to 0 (never: kept as the originals test it).
-void InstallDelegate(uint8_t* base, uint32_t mode, uint32_t slot) {
+// The mode's delegate (+8, its holder +4) from the doubleword `function`
+// (function, adjustment). The holder 0 when the delegate's address wraps to
+// 0 (never: kept as the originals test it).
+void InstallDelegateWord(uint8_t* base, uint32_t mode, uint64_t function) {
   const Mode m(base, mode);
   const uint32_t delegate = mode + 8;  // the delegate (in host memory, E5 step 4)
   uint32_t holder = 0;
   if (delegate != 0) {
     holder = delegate;
     m.set_delegate_object(mode);
-    const uint64_t function = Load64(base, slot);
     m.set_delegate_function(uint32_t(function >> 32));
     m.set_delegate_adjustment(uint32_t(function));
     m.set_delegate_vtable(kDelegateVtable);
   }
   m.set_delegate_ptr(holder);
+}
+
+// The same from the frame's doubleword at `slot`.
+void InstallDelegate(uint8_t* base, uint32_t mode, uint32_t slot) {
+  InstallDelegateWord(base, mode, Load64(base, slot));
 }
 
 // The mode's delegate to `function`: the function and adjustment from the
@@ -125,7 +129,7 @@ uint32_t AllLoaded(uint8_t* base, uint32_t block) {
 
 uint64_t FindShown(uint8_t* base, uint64_t block, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82224C10 ModeType4::FindShown");
-  Frame(base, sp, 96);
+  (void)sp;  // no guest frame (E5 step 6): nothing here calls guest code
   uint64_t r3 = 0;
   for (uint32_t index = 0; index < 5; index++) {
     r3 = MachineOf(block, index);
@@ -306,7 +310,7 @@ void Leaving(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const C
 
 uint32_t Interrupt(uint8_t* base, uint32_t object, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82224E20 ModeType4::Interrupt");
-  Frame(base, sp, 96);
+  (void)sp;  // no guest frame (E5 step 6): nothing here calls guest code
   const Interface32 o(base, object);
   const uint32_t block = o.block().address;
   if (AllLoaded(base, block) == 0) {
@@ -328,14 +332,15 @@ void ForceExit(uint8_t* base, uint32_t object, uint32_t number, uint32_t sp) {
   }
   const Interface32 o(base, object);
   PostRing(base, o, 4);
-  // The doubleword built below the stack pointer (sp - 32), as the original.
-  const uint32_t slot = sp - 32;
+  // The original built the doubleword below the stack pointer (sp - 32): a
+  // value since E5 step 6. The delegate (kSlot12Thunk, 0), then the same
+  // word with its +4 the type and its first byte 1.
+  (void)sp;
   const uint32_t mode = object - 32;
-  SetDelegate(base, mode, slot, kSlot12Thunk);
-  Store(base, slot + 4, number < 2 ? 4 : 12);
-  guest::StoreU8(base, slot, 1);
+  InstallDelegateWord(base, mode, uint64_t(kSlot12Thunk) << 32);
+  const uint32_t type = number < 2 ? 4 : 12;
+  const uint64_t next = (uint64_t((kSlot12Thunk & 0x00FFFFFFu) | 0x01000000u) << 32) | type;
   const Block block = o.block();
-  const uint64_t next = Load64(base, slot);
   block.set_next_answer(uint32_t(next >> 32));
   block.set_next_type(uint32_t(next));
 }

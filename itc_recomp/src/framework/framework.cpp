@@ -100,8 +100,8 @@ void DebugFontSetPosition(uint8_t* base, uint32_t x, uint32_t y) {
 uint64_t DebugFontInit(uint8_t* base, uint32_t data, uint32_t sp, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8258BD58 DebugFont::Init");
   constexpr uint32_t kNew = 0x825A6880, kXprCreate = 0x82596F68;
-  const uint32_t frame = sp - 112;
-  guest::StoreU32(base, frame, sp);
+  // The original's 112-byte frame held only its back chain: the guest calls
+  // below get `sp` (E5 step 6).
   using Globals = schema::FrameworkGlobals;
   Globals::set_debug_font_loaded(base, 1);
   Globals::set_debug_font_cursor_x(base, 0);
@@ -121,13 +121,13 @@ uint64_t DebugFontInit(uint8_t* base, uint32_t data, uint32_t sp, const GuestCal
   if (const auto block = memory::crt::OperatorNew(base, 24)) {
     xpr = *block;
   } else {
-    xpr = uint32_t(call(kNew, frame, 0x8258BDD0, 24, 0, 0));
+    xpr = uint32_t(call(kNew, sp, 0x8258BDD0, 24, 0, 0));
   }
   if (xpr != 0) {
     models::XprConstruct(base, xpr);
   }
   Globals::set_debug_font_xpr(base, xpr);
-  const uint64_t r3 = call(kXprCreate, frame, 0x8258BDF0, xpr, data, 0);
+  const uint64_t r3 = call(kXprCreate, sp, 0x8258BDF0, xpr, data, 0);
   // lfs and two stfs: the float through a double and back.
   const float scale = float(double(Globals::debug_font_default_scale(base)));
   Globals::set_debug_font_scale_x(base, scale);

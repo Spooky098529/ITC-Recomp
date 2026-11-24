@@ -123,7 +123,9 @@ uint64_t EndTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t 
 
 uint64_t Start(uint8_t* base, uint32_t dispatcher, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82151408 CourseSetup::Start");
-  Frame(base, sp, 112);
+  // The original's 112-byte frame (only its back chain) left out: no guest
+  // call is made from it (E5 step 6).
+  (void)sp;
   Post(base, dispatcher, 2);
   const uint32_t passes = G::fade_in_passes(base);
   mode_tick::ScreenFadesFadeIn(base, passes, 0, 0, 0, 0);
@@ -150,11 +152,13 @@ uint64_t WaitDraw(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
                   const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821515A0 CourseSetup::WaitDraw");
   const Machine m(base, uint32_t(r3));
-  const uint32_t frame = Frame(base, sp, 96);
+  // The original's 96-byte frame (only its back chain) made only for the
+  // guest call that runs from it (E5 step 6).
   if (m.draw_step() == 0) {
-    const uint32_t queued = calls.native_queue
-                                ? archive::QueueLength(base)
-                                : uint32_t(calls.Call(kQueueLength, frame, 0x821515C4, 0));
+    const uint32_t queued =
+        calls.native_queue
+            ? archive::QueueLength(base)
+            : uint32_t(calls.Call(kQueueLength, Frame(base, sp, 96), 0x821515C4, 0));
     if (queued == 0) {
       if (int32_t(G::layer0_alpha(base)) != 255) {
         mode_tick::ScreenFadesFadeOut(base, G::fade_out_passes(base), 0, 0, 0, 0);

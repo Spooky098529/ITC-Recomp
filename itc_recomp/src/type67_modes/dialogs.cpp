@@ -30,10 +30,11 @@ constexpr uint32_t kRun = 0x8211E1B8;
 constexpr uint32_t kFinishNamed = 0x8211DF20;
 constexpr uint32_t kFinishAll = 0x8211DFF8;
 
-// Movie 16: its id at the frame's +80, then UiMovies::Find.
-uint32_t DialogMovie(uint8_t* base, uint32_t frame) {
-  StoreU32(base, frame + 80, kDialogMovie);
-  return schema::UiMovieWord(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80)).value();
+// Movie 16 through UiMovies::Find (the original's id at its frame's +80,
+// a C++ value since E5 step 6).
+uint32_t DialogMovie(uint8_t* base) {
+  return schema::UiMovieWord(base, ui_movies::PairsFindKey(base, ui_movies::kMovieTable, kDialogMovie))
+      .value();
 }
 
 uint64_t SoundThunk(void* user, uint32_t function, const uint64_t args[4], int set, uint32_t r1,
@@ -118,12 +119,10 @@ uint64_t DialogOpenConfirm(uint8_t* base, uint32_t dialog, bool type7, uint32_t 
   } else {
     ITC_NATIVE_RUNNING("sub_822320D8 Type6Dialog::OpenConfirm");
   }
+  (void)sp;  // its frame's one slot (the movie id) a C++ value (E5 step 6)
   const Dialog d(base, dialog);
-  const uint32_t frame = sp - 112;
-  StoreU32(base, frame + 80, kDialogMovie);
   d.set_movie(kDialogMovie);
-  const uint32_t movie =
-      schema::UiMovieWord(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80)).value();
+  const uint32_t movie = DialogMovie(base);
   const uint64_t r3 = ui_movies::ResetPose(base, movie);
   ResetConfirm(base, d, movie);
   if (!type7) {
@@ -138,12 +137,10 @@ std::optional<uint64_t> DialogDrawWaiting(uint8_t* base, uint32_t dialog, uint32
   if (d.reopen() == 0) {
     return std::nullopt;
   }
-  const uint32_t frame = sp - 128;
-  StoreU32(base, frame + 80, kDialogMovie);
+  (void)sp;  // its frame's one slot (the movie id) a C++ value (E5 step 6)
   d.set_reopen(0);
   d.set_movie(kDialogMovie);
-  const uint32_t movie =
-      schema::UiMovieWord(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80)).value();
+  const uint32_t movie = DialogMovie(base);
   const uint64_t r3 = ui_movies::ResetPose(base, movie);
   ResetConfirm(base, d, movie);
   return r3;
@@ -153,7 +150,7 @@ uint64_t DialogOpenConfirmStep(uint8_t* base, uint32_t dialog, uint32_t sp, cons
   ITC_NATIVE_RUNNING("sub_822325E0 Dialog::OpenConfirmStep");
   const uint32_t frame = sp - 128;
   const Dialog d(base, dialog);
-  const uint32_t movie = DialogMovie(base, frame);
+  const uint32_t movie = DialogMovie(base);
   if (d.step_started() == 0) {
     menu_sounds::PlayMenuSound(base, 5, frame, Sounds(calls));
     ui_movies::PlayNamed(base, movie, 5, 0, 0, 0, 0);
@@ -161,10 +158,9 @@ uint64_t DialogOpenConfirmStep(uint8_t* base, uint32_t dialog, uint32_t sp, cons
   }
   const bool done = uint32_t(calls.call(kRun, frame, 0x82232650, movie, 0)) == 0;
   if (done) {
-    StoreU32(base, frame + 80, 1);
-    StoreU32(base, frame + 84, 2);
+    const uint32_t names[2] = {1, 2};  // the frame's +80 (E5 step 6: a C++ array)
     const uint32_t cursor = d.menu_cursor();
-    const uint32_t named = LoadU32(base, frame + 80 + (cursor << 2));
+    const uint32_t named = names[cursor];
     ui_movies::PlayNamed(base, movie, named, 1, 0, 0, 0);
     ui_movies::LoopLast(base, movie);
   }
@@ -175,7 +171,7 @@ uint64_t DialogCloseConfirmStep(uint8_t* base, uint32_t dialog, uint32_t sp, con
   ITC_NATIVE_RUNNING("sub_8223AA10 Dialog::CloseConfirmStep");
   const uint32_t frame = sp - 128;
   const Dialog d(base, dialog);
-  const uint32_t movie = DialogMovie(base, frame);
+  const uint32_t movie = DialogMovie(base);
   if (d.step_started() == 0) {
     menu_sounds::PlayMenuSound(base, 5, frame, Sounds(calls));
     ui_movies::PlayNamed(base, movie, 6, 0, 0, 0, 0);
@@ -193,15 +189,13 @@ uint64_t DialogMoveCursorStep(uint8_t* base, uint32_t dialog, uint32_t sp, const
   ITC_NATIVE_RUNNING("sub_8223AB50 Dialog::MoveCursorStep");
   const uint32_t frame = sp - 128;
   const Dialog d(base, dialog);
-  const uint32_t movie = DialogMovie(base, frame);
+  const uint32_t movie = DialogMovie(base);
   if (d.step_started() == 0) {
     const uint32_t previous = d.menu_previous();
-    StoreU32(base, frame + 84, 2);
-    StoreU32(base, frame + 80, 1);
-    calls.call(kFinishNamed, frame, 0x8223ABB0, movie,
-               LoadU32(base, frame + 80 + (previous << 2)));
+    const uint32_t names[2] = {1, 2};  // the frame's +80 (E5 step 6: a C++ array)
+    calls.call(kFinishNamed, frame, 0x8223ABB0, movie, names[previous]);
     const uint32_t cursor = d.menu_cursor();
-    ui_movies::PlayNamed(base, movie, LoadU32(base, frame + 80 + (cursor << 2)), 1, 0, 0, 0);
+    ui_movies::PlayNamed(base, movie, names[cursor], 1, 0, 0, 0);
     ui_movies::LoopLast(base, movie);
     d.set_step_started(1);
   }
@@ -218,9 +212,9 @@ uint64_t DialogNoticeStep(uint8_t* base, uint32_t dialog, bool close, uint32_t s
   }
   const uint32_t frame = sp - 112;
   StoreU32(base, frame, sp);
-  StoreU32(base, frame + 80, 19);
+  // Movie 19 (the original's id at the frame's +80, a C++ value).
   const uint32_t movie =
-      schema::UiMovieWord(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80)).value();
+      schema::UiMovieWord(base, ui_movies::PairsFindKey(base, ui_movies::kMovieTable, 19)).value();
   const Dialog d(base, dialog);
   if (d.step_started() == 0) {
     menu_sounds::PlayMenuSound(base, 5, frame, Sounds(calls));
@@ -297,18 +291,18 @@ uint64_t DialogUpdate(uint8_t* base, uint64_t r3, uint32_t dispatcher, bool type
   const uint32_t step = dialog.step();
   // The steps' table: OpenConfirmStep, CloseConfirmStep, OpenNoticeStep,
   // CloseNoticeStep, MoveCursorStep.
+  // (The original builds it at the frame's +96; read only here, so a C++
+  // table since E5 step 6. The movie id at +80 stays: its address is the
+  // step's r4.)
   static constexpr uint32_t kSteps[5] = {0x822325E0, 0x8223AA10, 0x822326A8, 0x8223AAA8,
                                          0x8223AB50};
-  for (uint32_t i = 0; i < 5; i++) {
-    StoreU32(base, frame + 96 + 4 * i, kSteps[i]);
-  }
   uint64_t answer = movie;
   if (step == 0xFFFFFFFF) {
     answer = calls.call(kRun, frame, type7 ? 0x82242304 : 0x82232884, movie, 0);
   } else {
     bool done = true;
     if (int32_t(step) >= 0) {
-      const uint32_t target = LoadU32(base, frame + 96 + (step << 2));
+      const uint32_t target = kSteps[step];
       answer = calls.call(target, frame, type7 ? 0x822422B4 : 0x82232834, r3, frame + 80);
       done = int32_t(answer) != 0;
     }

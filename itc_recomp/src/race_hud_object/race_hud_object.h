@@ -6,9 +6,10 @@
 // on guest memory, with the originals' loads and stores in their order and
 // their float steps as the translated code's (camera_modes/steps.h), with
 // flush-to-zero off (the adapters' disableFlushMode). `sp` is the caller's
-// stack pointer: the back chain of the original's frame and its stack
-// temporaries are written there as the original leaves them; its register
-// saves aren't. Adapters: src/hooks/race_hud_object.cpp.
+// stack pointer: the original's frame is made below it (at the same
+// offsets) only where its slots are handed to other code or guest code is
+// called from it (then with its back chain); temporaries only the port
+// reads are C++ locals (E5 step 6). Adapters: src/hooks/race_hud_object.cpp.
 
 #pragma once
 
@@ -158,6 +159,8 @@ uint32_t SetSpeed(uint8_t* base, uint32_t hud, uint32_t speed, uint32_t sp, doub
 // 59:59.999) into the timer movie's nodes 15/14, 17/16 and 20/19/18 (digit
 // + 1). The last node.
 uint32_t SetTime(uint8_t* base, uint32_t hud, uint32_t time, uint32_t sp);
+// SetTime on the packed time itself (TickTimer's, from a local).
+uint32_t SetTimeValue(uint8_t* base, uint32_t hud, uint32_t packed);
 // RaceHud::SetDistance (sub_82214A50): `*f1` clamped to [0.0, the float at
 // 0x8200F740], its tenths rounded up (by the hundredths) into the timer
 // movie's nodes 11, 10 and 9 (leading zeros 0). The last node.

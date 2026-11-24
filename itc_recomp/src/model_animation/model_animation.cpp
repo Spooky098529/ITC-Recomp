@@ -1024,30 +1024,12 @@ bool SkeletonResetPose(uint8_t* base, uint32_t skeleton) {
 
 namespace {
 
-// sub_82599C58's identity (vupkd3d128's (3.0, 3.0, 0.0, 1.0) shuffled into
-// four rows by vpermwi128: the 1.0 at row i's word i), stored aligned at
-// `at` & ~15 as stvx does.
-void StoreIdentity(uint8_t* base, uint32_t at) {
-  const uint32_t aligned = at & ~0xFu;
+// The identity's 16 words (StoreIdentity's) stored at `to` in order, as
+// the original's copy of its frame's identity (eight doubleword moves).
+void StoreIdentityAt(uint8_t* base, uint32_t to) {
   const uint32_t one = std::bit_cast<uint32_t>(1.0f);
   for (uint32_t i = 0; i < 16; i++) {
-    Store(base, aligned + 4 * i, i % 5 == 0 ? one : 0);
-  }
-}
-
-// std: a doubleword, big-endian.
-void StoreDoubleword(uint8_t* base, uint32_t at, uint64_t value) {
-  Store(base, at, uint32_t(value >> 32));
-  Store(base, at + 4, uint32_t(value));
-}
-
-// The 64 bytes at `from` to `to`, eight doubleword moves.
-void Copy64(uint8_t* base, uint32_t from, uint32_t to) {
-  for (uint32_t i = 0; i < 8; i++) {
-    const uint32_t hi = Load(base, from + 8 * i);
-    const uint32_t lo = Load(base, from + 8 * i + 4);
-    Store(base, to + 8 * i, hi);
-    Store(base, to + 8 * i + 4, lo);
+    Store(base, to + 4 * i, i % 5 == 0 ? one : 0);
   }
 }
 
@@ -1091,44 +1073,37 @@ bool SkeletonLocalMatrices(uint8_t* base, uint32_t skeleton, uint32_t stack) {
         // The angles into [-pi, pi]: pi with each one's sign (its stored
         // bits ORed into 0x40490FDB), added, times 1 / (2 pi), truncated,
         // that many 2 pi taken off.
-        // (An lfs then stfs of one word keeps its bits: CopyWord.)
+        // (An lfs then stfs of one word keeps its bits.) The angles' words
+        // and the original's frame temporaries (+80 to +135, +144's
+        // identity) only this function reads: host locals (E5 step 6).
         const NodeState state(base, node);
         const NodeMatrix m(base, out);
         const double a = state.angle_x();
-        CopyWord(base, state.angle_x_address(), frame + 80);
+        const uint32_t a_bits = Load(base, state.angle_x_address());
         const double b = state.angle_y();
-        CopyWord(base, state.angle_y_address(), frame + 92);
+        const uint32_t b_bits = Load(base, state.angle_y_address());
         const double c = state.angle_z();
-        CopyWord(base, state.angle_z_address(), frame + 96);
-        const auto signed_pi = [&](uint32_t at) {
-          return (Load(base, at) & 0x80000000u) | 0x40490FDBu;
+        const uint32_t c_bits = Load(base, state.angle_z_address());
+        const auto signed_pi = [](uint32_t bits) {
+          return double(std::bit_cast<float>((bits & 0x80000000u) | 0x40490FDBu));
         };
-        Store(base, frame + 100, signed_pi(frame + 80));
-        Store(base, frame + 104, signed_pi(frame + 92));
-        Store(base, frame + 108, signed_pi(frame + 96));
-        double f9 = Fadds(Lfs(base, frame + 108), c);
-        StoreIdentity(base, frame + 144);
+        const double pi_a = signed_pi(a_bits);
+        const double pi_b = signed_pi(b_bits);
+        const double pi_c = signed_pi(c_bits);
+        double f9 = Fadds(pi_c, c);
         f9 = Fmuls(f9, inverse);
-        const double f11 = Fmuls(Fadds(Lfs(base, frame + 100), a), inverse);
-        const double f10 = Fmuls(Fadds(Lfs(base, frame + 104), b), inverse);
-        Store(base, frame + 80, uint32_t(Fctiwz(f11)));
-        const int32_t kb = Fctiwz(f10);
-        const int32_t kc = Fctiwz(f9);
-        const int64_t ka = int32_t(Load(base, frame + 80));
-        Store(base, frame + 84, uint32_t(kb));
-        StoreDoubleword(base, frame + 112, uint64_t(ka));
-        const int64_t kb64 = int32_t(Load(base, frame + 84));
-        Store(base, frame + 88, uint32_t(kc));
-        StoreDoubleword(base, frame + 120, uint64_t(kb64));
+        const double f11 = Fmuls(Fadds(pi_a, a), inverse);
+        const double f10 = Fmuls(Fadds(pi_b, b), inverse);
+        const int64_t ka = Fctiwz(f11);
+        const int64_t kb64 = Fctiwz(f10);
+        const int64_t kc64 = Fctiwz(f9);
         const double a2 = Fnmsubs(double(float(double(ka))), two_pi, a);
         state.set_angle_x(float(a2));
-        const int64_t kc64 = int32_t(Load(base, frame + 88));
-        StoreDoubleword(base, frame + 128, uint64_t(kc64));
         const double b2 = Fnmsubs(double(float(double(kb64))), two_pi, b);
         state.set_angle_y(float(b2));
         const double c2 = Fnmsubs(double(float(double(kc64))), two_pi, c);
         state.set_angle_z(float(c2));
-        Copy64(base, frame + 144, out);
+        StoreIdentityAt(base, out);
         // The scale's words, as words.
         const uint32_t sx = Load(base, state.scale_x_address());
         const uint32_t sy = Load(base, state.scale_y_address());
@@ -1170,8 +1145,7 @@ bool SkeletonLocalMatrices(uint8_t* base, uint32_t skeleton, uint32_t stack) {
       floats = true;
       const NodeState state(base, bone);
       const NodeMatrix m(base, out);
-      StoreIdentity(base, frame + 144);
-      Copy64(base, frame + 144, out);
+      StoreIdentityAt(base, out);
       CopyWord(base, state.angle_x_address(), frame + 108);
       matrix_math::RotateX(base, out, out, frame + 108, turn);
       CopyWord(base, state.angle_y_address(), frame + 108);

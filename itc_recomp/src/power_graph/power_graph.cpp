@@ -64,11 +64,6 @@ double Lfs(uint8_t* base, uint32_t address) {
 void Stfs(uint8_t* base, uint32_t address, double value) {
   guest::StoreFloat(base, address, float(value));
 }
-// std of a sign-extended word.
-void StoreS64(uint8_t* base, uint32_t address, int32_t value) {
-  guest::StoreU32(base, address, value < 0 ? 0xFFFFFFFFu : 0);
-  guest::StoreU32(base, address + 4, uint32_t(value));
-}
 // fcfid then frsp of a word (the originals' int to float through the frame).
 double ToSingle(int32_t value) {
   return double(float(double(int64_t(value))));
@@ -157,8 +152,6 @@ void Draw(uint8_t* base, uint32_t frame, double x, double y, uint32_t car,
   for (int32_t i = 0; i < 31; i++) {
     const Sprite a = at(torque_set, uint32_t(i));
     const Sprite b = at(power_set, uint32_t(i));
-    StoreS64(base, frame + 80, i);
-    StoreS64(base, frame + 88, i + 1);
     double left = ToSingle(i);
     left = double(float(left * step));
     a.set_end0_x(float(double(float(left + x))));
@@ -177,7 +170,11 @@ void Draw(uint8_t* base, uint32_t frame, double x, double y, uint32_t car,
     b.set_end1_z(float(zero));
   }
 
-  // The 32 points: torque (kgf·m) at +112, power (PS) at +240.
+  // The 32 points: torque (kgf·m) and power (PS), the original's frame +112
+  // and +240 (C++ locals since E5 step 6, as the conversions' words at +80
+  // to +103: only this function reads them).
+  float torque_points[32];
+  float power_points[32];
   const schema::CarData car_data(base, car);
   const double scale = double(car_data.torque());
   const double to_kgfm = Lfs(base, kToKgfM);
@@ -187,19 +184,16 @@ void Draw(uint8_t* base, uint32_t frame, double x, double y, uint32_t car,
     double torque = Lfs(base, car_data.torque_curve_address() + 4 * uint32_t(i));
     torque = double(float(torque * scale));
     torque = double(float(torque * to_kgfm));
-    Stfs(base, frame + 112 + 4 * uint32_t(i), torque);
-    StoreS64(base, frame + 88, i + 1);
+    torque_points[i] = float(torque);
     double rpm = ToSingle(i + 1);
     rpm = double(float(rpm * rpm_step));
-    guest::StoreU32(base, frame + 80, uint32_t(Fctiwz(rpm)));
-    const int32_t whole = int32_t(guest::LoadU32(base, frame + 80));
-    StoreS64(base, frame + 96, whole);
+    const int32_t whole = Fctiwz(rpm);
     double power = ToSingle(whole);
     power = double(float(power * torque));
     power = double(float(power * to_ps));
-    Stfs(base, frame + 240 + 4 * uint32_t(i), power);
+    power_points[i] = float(power);
     if (power < zero) {
-      Stfs(base, frame + 240 + 4 * uint32_t(i), zero);
+      power_points[i] = float(zero);
     }
   }
 
@@ -209,8 +203,8 @@ void Draw(uint8_t* base, uint32_t frame, double x, double y, uint32_t car,
   for (uint32_t i = 0; i < 26; i++) {
     const Sprite a = at(torque_set, i);
     const Sprite b = at(power_set, i);
-    const double torque = double(float(Lfs(base, frame + 112 + 4 * i) * torque_scale));
-    const double power = double(float(Lfs(base, frame + 240 + 4 * i) * power_scale));
+    const double torque = double(float(double(torque_points[i]) * torque_scale));
+    const double power = double(float(double(power_points[i]) * power_scale));
     a.set_end1_y(float(double(float(y - torque))));
     at(torque_set, i + 1).set_end0_y(float(double(float(y - torque))));
     b.set_end1_y(float(double(float(y - power))));
@@ -236,7 +230,6 @@ void Draw(uint8_t* base, uint32_t frame, double x, double y, uint32_t car,
 
   // The count, and segments 1 to n - 1.
   const int32_t count = SegmentCount(base, car);
-  guest::StoreU32(base, frame + 80, uint32_t(count));
   for (int32_t i = 1; i < count; i++) {
     const uint32_t a = at(torque_set, uint32_t(i)).address;
     const uint32_t b = at(power_set, uint32_t(i)).address;

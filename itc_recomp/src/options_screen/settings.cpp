@@ -55,7 +55,9 @@ uint64_t SettingsRead(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821BBF00 Settings::Read");
   const uint32_t frame = sp - 272;
   StoreU32(base, frame, sp);
-  StoreU32(base, frame + 80, 0x826E0000);
+  // The frame's +80 (0x826E0000) and +84 (the defaults' 13-word table): the
+  // original's slots nothing reads back, dropped (E5 step 6); the record at
+  // +144 stays on the stack (memcpy's target and source).
   switch (int32_t(G::mode_type(base))) {
     case 2: Settings(base).set_context(1); break;
     case 4: Settings(base).set_context(0); break;
@@ -98,12 +100,7 @@ uint64_t SettingsRead(uint8_t* base, uint32_t sp, const Calls& calls) {
   read(164, &S::current_p1_button_0_address, kButtons, 12, 0x821BC184, true);
   read(104, &S::current_analog_0_address, kAnalogRead, 6, 0x821BC284, false);
   read(224, &S::current_p1_analog_0_address, kAnalogRead, 6, 0x821BC30C, false);
-  // The defaults' table on the frame (+84: 1, 1, 1, 1, 15, 15, then six 0s
-  // and a 1), then the defaults.
-  static constexpr uint32_t kTable[13] = {1, 1, 1, 1, 15, 15, 0, 0, 0, 0, 0, 0, 1};
-  for (uint32_t i = 0; i < 13; i++) {
-    StoreU32(base, frame + 84 + 4 * i, kTable[i]);
-  }
+  // The defaults.
   static constexpr uint32_t kDefaults[] = {
       // default_hud_0 to default_p1_slider_2
       1, 1, 1, 1, 15, 15, 0, 0, 0, 0, 0, 0,

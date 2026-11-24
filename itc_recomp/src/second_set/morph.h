@@ -45,10 +45,10 @@ Flush MorphSetUp(uint8_t* base, uint32_t model, uint32_t morph, uint32_t shape,
 // the base's) x its weight added), 7 Morph::Blend7 (sub_8258B678: both
 // streams, the second with the record's second streams at +48), else
 // nothing (8, sub_8258B7E0, never ran: nullopt, nothing done, for the
-// original). The frame's words as the originals leave them (the weights'
-// vector at +80, Blend7's sizes at +80 and +84). `flush` what the flush mode
-// is left as; r3 as the originals leave it (64 bits: Blend6's the frame's +80
-// once a target's vertices ran, else its memcpy's; Blend7's the last
+// original). The frames' words (the weights' vector, Blend7's sizes) are
+// C++ values (E5 step 6: only the originals read them). `flush` what the
+// flush mode is left as; r3 as the originals leave it (64 bits: Blend6's the
+// address of its frame's +80 (r1 - 48) once a target's vertices ran, else its memcpy's; Blend7's the last
 // target's second stream less its first once its vertices ran, else the
 // second memcpy's; the record for other kinds). nullopt, with nothing done, where a memcpy would
 // go to the original (Buffers_Memcpy refusing).
@@ -68,14 +68,15 @@ std::optional<BlendResult> MorphRun(uint8_t* base, uint32_t morph, uint32_t out1
 // fused step with [0x820021E8]), then each entry's +0 the value and, but for
 // the entry index - 12, its +16, +12, +8 and +4 from the entry's index (+ 12)
 // and the constants [0x82002D0C], [0x82001BE4], [0x82002A0C]. The
-// frame's red-zone word at r1 - 16 as it leaves it.
+// original's red-zone word at r1 - 16 is a C++ value (`stack` unused).
 void TireFillEntries(uint8_t* base, uint32_t entries, uint32_t index, uint32_t value, double f1,
                      uint32_t stack);
 // sub_820E7010: from entry `index` - 12 of `entries`: a float4 at `out4`
 // (index - 12 x [0x82002A88], the entry's +0 and +8 against [0x82006630] and
 // [0x8200257C] times the double at 0x82006628, 0.0), the first again at
 // `out1`, and (the entry's +0 - [0x82006630]) x [0x82001BE4] x [0x820029D8]
-// at `out2`. The red-zone word at r1 - 16 as it leaves it.
+// at `out2`. The original's red-zone word at r1 - 16 is a C++ value
+// (`stack` unused).
 void TireReadEntry(uint8_t* base, uint32_t index, uint32_t entries, uint32_t out4, uint32_t out1,
                    uint32_t out2, uint32_t stack);
 

@@ -5,7 +5,6 @@
 
 #include "alt_hud/alt_hud.h"
 #include "base/log.h"
-#include "c_runtime/strings.h"
 #include "camera_modes/steps.h"
 #include "career/career.h"
 #include "guest.h"
@@ -26,8 +25,6 @@ namespace race_screens {
 namespace {
 
 using namespace camera_modes::steps;
-
-void Frame(uint8_t* base, uint32_t sp, uint32_t bytes) { guest::StoreU32(base, sp - bytes, sp); }
 
 uint32_t Get(uint8_t* base, uint32_t global) { return guest::LoadU32(base, global); }
 
@@ -85,9 +82,10 @@ std::optional<uint64_t> DestroyFour(uint8_t* base, uint32_t sp, uint32_t screen,
                                     uint32_t pages, uint32_t list, uint32_t text,
                                     uint64_t (*free_data)(uint8_t*) = nullptr,
                                     uint64_t (*free_screen)(uint8_t*) = nullptr) {
-  const uint32_t frame = sp - 128;
+  // The original's 128-byte frame (only its back chain) left out: no guest
+  // call is made from it (MenuList::Release has no frame of its own; E5
+  // step 6).
   if (Get(base, screen) == 0) {
-    Frame(base, sp, 128);
     return DebugText(text);
   }
   const bool data_ok = free_data ? memory::IsHandle(Get(base, data)) : AllPages(base, {data});
@@ -97,8 +95,7 @@ std::optional<uint64_t> DestroyFour(uint8_t* base, uint32_t sp, uint32_t screen,
       !alt_hud::MenuListReleasable(base, Get(base, list))) {
     return std::nullopt;
   }
-  Frame(base, sp, 128);
-  alt_hud::MenuListRelease(base, Get(base, list), frame);
+  alt_hud::MenuListRelease(base, Get(base, list), sp);
   uint64_t r3 = 0;
   for (const uint32_t global : {screen, data, list, pages}) {
     r3 = (free_data && global == data)       ? free_data(base)
@@ -131,29 +128,22 @@ uint64_t FreePause4Data(uint8_t* base) {
 }
 
 // A one-block screen's teardown: freed and its global 0, or the text.
-std::optional<uint64_t> DestroyOne(uint8_t* base, uint32_t sp, uint32_t global, uint32_t text) {
+// The original's 96-byte frame (only its back chain) left out: no guest
+// call is made from it (E5 step 6).
+std::optional<uint64_t> DestroyOne(uint8_t* base, [[maybe_unused]] uint32_t sp, uint32_t global,
+                                   uint32_t text) {
   if (Get(base, global) == 0) {
-    Frame(base, sp, 96);
     return DebugText(text);
   }
   if (!AllPages(base, {global})) {
     return std::nullopt;
   }
-  Frame(base, sp, 96);
   const uint64_t r3 = Free(base, global);
   guest::StoreU32(base, global, 0);
   return r3;
 }
 
 schema::PauseMenuData PauseData(uint8_t* base) { return G::pause_data(base); }
-
-// memcpy natively, or through `calls` where its plain C++ refuses.
-void Copy(uint8_t* base, const Calls& calls, uint32_t r1, uint32_t lr, uint32_t destination,
-          uint32_t source, uint32_t size) {
-  if (!c_runtime::Memcpy(base, destination, source, size)) {
-    calls.Call(kMemcpy, r1, lr, destination, source, size);
-  }
-}
 
 // A float clamped to [0x82000A34 (0.0), upper] as the original compares
 // (below the lower bound the lower one, above the upper the upper one, a NaN
@@ -178,7 +168,9 @@ uint32_t ClampTruncate(uint8_t* base, uint32_t address, uint32_t upper) {
 
 uint64_t PauseMenuCreate(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8220D7E8 PauseMenu::Create");
-  Frame(base, sp, 96);
+  // The original's 96-byte frame (only its back chain) left out: no guest
+  // call is made from it (E5 step 6).
+  (void)sp;
   // The screen and the data live in host memory (E5 step 3): the original's
   // VirtualAlloc(4) at 0x8220D808; the global holds its handle.
   G::set_pause_screen(base, schema::PauseMenuScreen::New(base));
@@ -196,7 +188,9 @@ uint64_t PauseMenuCreate(uint8_t* base, uint32_t sp) {
 
 uint64_t PauseMenu4Create(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82210868 PauseMenu4::Create");
-  Frame(base, sp, 96);
+  // The original's 96-byte frame (only its back chain) left out: no guest
+  // call is made from it (E5 step 6).
+  (void)sp;
   guest::StoreU32(base, kPause4Screen, Pages(4));
   // The data lives in host memory (E5 step 3): the original's
   // VirtualAlloc(80) at 0x822108A4; the global holds its handle.
@@ -212,7 +206,9 @@ uint64_t PauseMenu4Create(uint8_t* base, uint32_t sp) {
 
 uint64_t AfterRaceMenuCreate(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8221B1F0 AfterRaceMenu::Create");
-  Frame(base, sp, 96);
+  // The original's 96-byte frame (only its back chain) left out: no guest
+  // call is made from it (E5 step 6).
+  (void)sp;
   // The screen and the data live in host memory (E5 step 4): the original's
   // VirtualAlloc(4) at 0x8221B210 and VirtualAlloc(24) at 0x8221B22C; the
   // globals hold their handles.
@@ -229,7 +225,9 @@ uint64_t AfterRaceMenuCreate(uint8_t* base, uint32_t sp) {
 
 uint64_t RaceDialogCreate(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82217D70 RaceDialog::Create");
-  Frame(base, sp, 96);
+  // The original's 96-byte frame (only its back chain) left out: no guest
+  // call is made from it (E5 step 6).
+  (void)sp;
   const uint32_t list = schema::MenuList::New(base).address;  // host (E5 step 5): VirtualAlloc(72)
   G::set_dialog_list(base, list);
   ListInit(base, list);
@@ -251,7 +249,9 @@ uint64_t RaceDialogCreate(uint8_t* base, uint32_t sp) {
 
 uint64_t CareerResultsCreate(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82219138 CareerResults::Create");
-  Frame(base, sp, 96);
+  // The original's 96-byte frame (only its back chain) left out: no guest
+  // call is made from it (E5 step 6).
+  (void)sp;
   // The screen lives in host memory (E5 step 4): the original's
   // VirtualAlloc(212) at 0x82219158; the global holds its handle, freed by
   // Destroy's VirtualFree (memory::FreePages takes handles).
@@ -262,7 +262,9 @@ uint64_t CareerResultsCreate(uint8_t* base, uint32_t sp) {
 
 uint64_t RaceResultsCreate(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8221F390 RaceResults::Create");
-  Frame(base, sp, 96);
+  // The original's 96-byte frame (only its back chain) left out: no guest
+  // call is made from it (E5 step 6).
+  (void)sp;
   const uint32_t block = Pages(52);
   guest::StoreU32(base, kRaceResults, block);
   return block;
@@ -270,7 +272,9 @@ uint64_t RaceResultsCreate(uint8_t* base, uint32_t sp) {
 
 uint64_t SplitResultsCreate(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8221FA30 SplitResults::Create");
-  Frame(base, sp, 96);
+  // The original's 96-byte frame (only its back chain) left out: no guest
+  // call is made from it (E5 step 6).
+  (void)sp;
   const uint32_t block = Pages(40);
   guest::StoreU32(base, kSplitResults, block);
   return block;
@@ -278,7 +282,9 @@ uint64_t SplitResultsCreate(uint8_t* base, uint32_t sp) {
 
 uint64_t Kind6MenuCreate(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8221BDD0 Kind6Menu::Create");
-  Frame(base, sp, 96);
+  // The original's 96-byte frame (only its back chain) left out: no guest
+  // call is made from it (E5 step 6).
+  (void)sp;
   const uint32_t block = Pages(360);
   guest::StoreU32(base, kKind6Menu, block);
   guest::StoreU32(base, kKind6Word, 0);
@@ -319,9 +325,9 @@ std::optional<uint64_t> RaceDialogDestroy(uint8_t* base, uint32_t sp) {
       !alt_hud::MenuListReleasable(base, G::dialog_list(base).address)) {
     return std::nullopt;
   }
-  const uint32_t frame = sp - 112;
-  Frame(base, sp, 112);
-  alt_hud::MenuListRelease(base, G::dialog_list(base).address, frame);
+  // The original's 112-byte frame (only its back chain) left out: no guest
+  // call is made from it (E5 step 6).
+  alt_hud::MenuListRelease(base, G::dialog_list(base).address, sp);
   uint64_t r3 = 0;
   for (const uint32_t global :
        {G::dialog_pages_address(), G::dialog_list_address(), G::dialog_data_address()}) {
@@ -366,8 +372,10 @@ std::optional<uint64_t> AfterRaceMenuClose(uint8_t* base, uint32_t sp) {
 
 uint64_t PauseMenuLoadData(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8220F840 PauseMenu::LoadData");
-  const uint32_t frame = sp - 6176;
-  Frame(base, sp, 6176);
+  // The original's 6,176-byte frame left out (E5 step 6): it held only the
+  // stats' copy (below), and no guest call is made from it.
+  (void)sp;
+  (void)calls;
   // Player 0's save data (race-event.toml's SaveData): its options from
   // +0x1F85C.
   const schema::SaveData options(base, vehicle_accessors::SaveDataOf(base, 0));
@@ -424,12 +432,13 @@ uint64_t PauseMenuLoadData(uint8_t* base, uint32_t sp, const Calls& calls) {
   if (kind != 0 && kind != 1 && kind != 2) {
     return r3;
   }
-  // The career's numbers, from a copy of the save data's stats on the
-  // stack (frame + 80) and the player's vehicle.
-  // (The stats, +48, are career.toml's CareerSave's: race-event.toml's
-  // SaveData has no field there.)
-  Copy(base, calls, frame, 0x8220F978, frame + 80, schema::CareerSave(base, save).stats_address(),
-       6044);
+  // The career's numbers, from the save data's stats and the player's
+  // vehicle. (The stats, +48, are career.toml's CareerSave's:
+  // race-event.toml's SaveData has no field there.) The original copied the
+  // stats' 6,044 bytes to its frame's +80 (memcpy, return address
+  // 0x8220F978) and read the win streak from the copy three times; nothing
+  // writes the stats in between, so they're read in place (E5 step 6).
+  const uint32_t stats = schema::CareerSave(base, save).stats_address();
   const uint32_t vehicle = vehicle_accessors::VehicleGet(base, 0);
   {
     const uint32_t value = schema::SaveData(base, save).money();
@@ -448,14 +457,14 @@ uint64_t PauseMenuLoadData(uint8_t* base, uint32_t sp, const Calls& calls) {
     PauseData(base).set_day(uint32_t(day));
   }
   int32_t streak = 0;
-  r3 = career::StatsWinStreak(base, frame + 80);
+  r3 = career::StatsWinStreak(base, stats);
   const int32_t first = int16_t(uint16_t(r3));
   if (first >= 0) {
-    r3 = career::StatsWinStreak(base, frame + 80);
+    r3 = career::StatsWinStreak(base, stats);
     if (int16_t(uint16_t(r3)) > 999) {
       streak = 999;
     } else {
-      r3 = career::StatsWinStreak(base, frame + 80);
+      r3 = career::StatsWinStreak(base, stats);
       streak = int16_t(uint16_t(r3));
     }
   }
@@ -473,7 +482,9 @@ uint64_t PauseMenuLoadData(uint8_t* base, uint32_t sp, const Calls& calls) {
 
 uint64_t PauseMenuSaveOptions(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8220D6A0 PauseMenu::SaveOptions");
-  Frame(base, sp, 96);
+  // The original's 96-byte frame (only its back chain) left out: no guest
+  // call is made from it (E5 step 6).
+  (void)sp;
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   // The options (race-event.toml's SaveData from +0x1F85C; it names the
   // bytes +28 and +29 the other way round from the pause data).
@@ -497,7 +508,9 @@ uint64_t PauseMenuClose(uint8_t* base, uint32_t sp) {
 
 uint64_t PauseMenuSaveHudOptions(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8220D740 PauseMenu::SaveHudOptions");
-  Frame(base, sp, 96);
+  // The original's 96-byte frame (only its back chain) left out: no guest
+  // call is made from it (E5 step 6).
+  (void)sp;
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   const schema::SaveData options(base, save);
   options.set_hud_option_0(PauseData(base).hud_edit_0());

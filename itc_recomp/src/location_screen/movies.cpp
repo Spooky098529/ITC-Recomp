@@ -17,11 +17,11 @@ namespace {
 
 using G = schema::LocationScreenGlobals;
 
-// The movie with id `id`: the id stored at the frame's +80, then
-// UiMovies::Find over the movie table, as the original.
-uint32_t FindMovie(uint8_t* base, uint32_t frame, uint32_t id) {
-  guest::StoreU32(base, frame + 80, id);
-  return guest::LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+// The movie with id `id`: UiMovies::Find over the movie table, as the
+// original (its key word at the frame's +80, read only by the find: a value
+// since E5 step 6, so these functions make no frame).
+uint32_t FindMovie(uint8_t* base, uint32_t id) {
+  return guest::LoadU32(base, ui_movies::PairsFindKey(base, ui_movies::kMovieTable, id));
 }
 
 uint32_t ShowNode(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child) {
@@ -43,12 +43,10 @@ uint32_t SetNodeTexture(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint3
 }
 
 // SetCursor's and ListNode's: node (sub_scene, 0)'s +16 = the value as a
-// float (lfd of the doubleword, fcfid, frsp).
-uint32_t SetNodeFloat16(uint8_t* base, uint32_t sp, uint32_t sub_scene, uint32_t value) {
-  const uint32_t frame = sp - 112;
-  const uint32_t movie = FindMovie(base, frame, kMenusMovie);
-  guest::StoreU32(base, frame + 80, 0);
-  guest::StoreU32(base, frame + 84, value);
+// float (lfd of the doubleword, fcfid, frsp; the original's doubleword at
+// its frame's +80, read only there: the value itself since E5 step 6).
+uint32_t SetNodeFloat16(uint8_t* base, uint32_t sub_scene, uint32_t value) {
+  const uint32_t movie = FindMovie(base, kMenusMovie);
   const float f = float(double(int64_t(uint64_t(value))));
   const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, 0);
   schema::UiMovieNode(base, node).set_y(f);
@@ -57,9 +55,9 @@ uint32_t SetNodeFloat16(uint8_t* base, uint32_t sp, uint32_t sub_scene, uint32_t
 
 }  // namespace
 
-uint32_t ShowPictures(uint8_t* base, uint32_t sp) {
+uint32_t ShowPictures(uint8_t* base, uint32_t /*sp*/) {
   ITC_NATIVE_RUNNING("sub_8222A060 LocationScreen::ShowPictures");
-  const uint32_t movie = FindMovie(base, sp - 112, kMenusMovie);
+  const uint32_t movie = FindMovie(base, kMenusMovie);
   SetNodeTexture(base, movie, 1, 4, 0);
   SetNodeTexture(base, movie, 1, 6, 1);
   SetNodeTexture(base, movie, 1, 5, 0);
@@ -72,9 +70,9 @@ uint32_t ShowPictures(uint8_t* base, uint32_t sp) {
   return HideNode(base, movie, 1, 14);
 }
 
-uint32_t HidePictures(uint8_t* base, uint32_t sp) {
+uint32_t HidePictures(uint8_t* base, uint32_t /*sp*/) {
   ITC_NATIVE_RUNNING("sub_8222A150 LocationScreen::HidePictures");
-  const uint32_t movie = FindMovie(base, sp - 112, kMenusMovie);
+  const uint32_t movie = FindMovie(base, kMenusMovie);
   SetNodeTexture(base, movie, 1, 4, 0);
   SetNodeTexture(base, movie, 1, 5, 0);
   for (uint32_t child : {6u, 7u, 8u, 9u, 13u}) {
@@ -83,9 +81,9 @@ uint32_t HidePictures(uint8_t* base, uint32_t sp) {
   return HideNode(base, movie, 1, 14);
 }
 
-uint32_t SetCarColor(uint8_t* base, uint32_t sp) {
+uint32_t SetCarColor(uint8_t* base, uint32_t /*sp*/) {
   ITC_NATIVE_RUNNING("sub_8222AC18 LocationScreen::SetCarColor");
-  const uint32_t movie = FindMovie(base, sp - 96, kMenusMovie);
+  const uint32_t movie = FindMovie(base, kMenusMovie);
   const uint32_t color =
       int32_t(G::screen(base).special_car()) == 1 ? 2 : 0;
   const uint32_t node = ui_movies::FindNode(base, movie, 9, 7);
@@ -93,19 +91,19 @@ uint32_t SetCarColor(uint8_t* base, uint32_t sp) {
   return node;
 }
 
-uint32_t SetCursor(uint8_t* base, uint32_t sp, uint32_t value) {
+uint32_t SetCursor(uint8_t* base, uint32_t /*sp*/, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_8222BFE8 LocationScreen::SetCursor");
-  return SetNodeFloat16(base, sp, 9, value);
+  return SetNodeFloat16(base, 9, value);
 }
 
-uint32_t ListNode(uint8_t* base, uint32_t sp, uint32_t value) {
+uint32_t ListNode(uint8_t* base, uint32_t /*sp*/, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_8222C058 LocationScreen::ListNode");
-  return SetNodeFloat16(base, sp, 10, value);
+  return SetNodeFloat16(base, 10, value);
 }
 
-uint32_t ShowArrows(uint8_t* base, uint32_t sp) {
+uint32_t ShowArrows(uint8_t* base, uint32_t /*sp*/) {
   ITC_NATIVE_RUNNING("sub_8222C0C8 LocationScreen::ShowArrows");
-  const uint32_t movie = FindMovie(base, sp - 112, kMenusMovie);
+  const uint32_t movie = FindMovie(base, kMenusMovie);
   const schema::LocationScreen screen = G::screen(base);
   const int32_t count = int32_t(screen.opponent_count());
   if (count == 1) {
@@ -125,15 +123,15 @@ uint32_t ShowArrows(uint8_t* base, uint32_t sp) {
   return ShowNode(base, movie, 0xFFFFFFFFu, 18);
 }
 
-uint64_t RunCardMovie(uint8_t* base, uint32_t sp, const RunCall& run) {
+uint64_t RunCardMovie(uint8_t* base, uint32_t /*sp*/, const RunCall& run) {
   ITC_NATIVE_RUNNING("sub_822291A8 LocationScreen::RunCardMovie");
-  const uint32_t movie = FindMovie(base, sp - 96, kCardMovie);
+  const uint32_t movie = FindMovie(base, kCardMovie);
   return run.run(run.user, movie, 0, 96, 0x822291D8);
 }
 
-uint32_t Transition1(uint8_t* base, uint32_t sp, uint32_t step, const RunCall& run) {
+uint32_t Transition1(uint8_t* base, uint32_t /*sp*/, uint32_t step, const RunCall& run) {
   ITC_NATIVE_RUNNING("sub_8222AD50 LocationScreen::Transition1");
-  const uint32_t movie = FindMovie(base, sp - 112, kMenusMovie);
+  const uint32_t movie = FindMovie(base, kMenusMovie);
   if (guest::LoadU32(base, step) == 0) {
     mode_tick::ScreenFadesFadeOut(base, guest::LoadU32(base, 0x82001BF0), 0, 0, 0, 0);
     guest::StoreU32(base, step, 1);
@@ -144,11 +142,10 @@ uint32_t Transition1(uint8_t* base, uint32_t sp, uint32_t step, const RunCall& r
   return fades != 0 ? 1 : 0;
 }
 
-uint32_t Transition18(uint8_t* base, uint32_t sp, uint32_t step, const RunCall& run) {
+uint32_t Transition18(uint8_t* base, uint32_t /*sp*/, uint32_t step, const RunCall& run) {
   ITC_NATIVE_RUNNING("sub_8222BE60 LocationScreen::Transition18");
-  const uint32_t frame = sp - 128;
-  const uint32_t menus = FindMovie(base, frame, kMenusMovie);
-  const uint32_t card = FindMovie(base, frame, kCardMovie);
+  const uint32_t menus = FindMovie(base, kMenusMovie);
+  const uint32_t card = FindMovie(base, kCardMovie);
   if (guest::LoadU32(base, step) == 0) {
     ui_movies::PlayNamed(base, card, 53, 0, 0, 0, 0);
     guest::StoreU32(base, step, 1);

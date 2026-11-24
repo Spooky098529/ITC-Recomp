@@ -52,11 +52,13 @@ void Memcpy(uint8_t* base, const ApplyCall& call, uint32_t to, uint32_t from, ui
 uint64_t ScenePartsApply(uint8_t* base, const ApplyCall& call, uint32_t parts, uint32_t record,
                          uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E08B0 SceneParts::Apply");
-  const uint32_t frame = Frame(base, stack, 96);
   const schema::SceneParts p(base, parts);
   if (int32_t(p.scene().model_set()) == 1) {
     return parts;
   }
+  // The original's frame (only its back chain), for the guest calls below;
+  // not made on the early return, which calls nothing (E5 step 6).
+  const uint32_t frame = Frame(base, stack, 96);
   Memcpy(base, call, p.record_address(), record, schema::PartsRecord::kSize, frame, 0x820E08E8);
   return call(kPartsBuild, {parts}, frame, 0x820E08F0);
 }
@@ -117,11 +119,13 @@ std::optional<uint64_t> SceneModelApplyRecord(uint8_t* base, const ApplyCall& ca
 uint64_t SceneModelReloadDecals(uint8_t* base, const ApplyCall& call, uint32_t model,
                                 uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820D9D48 SceneModel::ReloadDecals");
-  const uint32_t frame = Frame(base, stack, 96);
   const schema::SceneModel m(base, model);
   if (m.ready() == 0 || int32_t(m.kind()) == 3) {
     return model;
   }
+  // The original's frame (only its back chain), for the guest calls below
+  // (E5 step 6: not made on the early return).
+  const uint32_t frame = Frame(base, stack, 96);
   m.set_ready(0);
   m.set_decals_reloaded(0);
   // The first set's car model, read for each call.
@@ -133,11 +137,13 @@ uint64_t SceneModelReloadDecals(uint8_t* base, const ApplyCall& call, uint32_t m
 uint64_t SceneModelAddSecondWheels(uint8_t* base, const ApplyCall& call, uint32_t model,
                                    uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820D9E00 SceneModel::AddSecondWheels");
-  const uint32_t frame = Frame(base, stack, 112);
   const schema::SceneModel m(base, model);
   if (m.second_wheels_claimed() != 0) {
     return 0;
   }
+  // The original's frame (only its back chain), for the guest call below
+  // (E5 step 6: not made on the early return).
+  const uint32_t frame = Frame(base, stack, 112);
   m.set_second_wheels_claimed(1);
   m.set_second_wheels_ready(0);
   const int32_t index = vehicle_accessors::ScenePoolsClaimB(base, m.scene().address, 5);

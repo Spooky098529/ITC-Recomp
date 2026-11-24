@@ -29,26 +29,17 @@ using Car = schema::CarMakersCar;
 
 constexpr uint32_t kGet82 = 0x820CBC90;  // AeroParts::Get82
 
-// std of a doubleword.
-void Std(uint8_t* base, uint32_t address, uint64_t value) {
-  Store(base, address, uint32_t(value >> 32));
-  Store(base, address + 4, uint32_t(value));
-}
+// An unsigned value to a float (the original's std, lfd, fcfid, frsp
+// through a scratch doubleword below the stack, only it reading it: no
+// longer stored since E5 step 6).
+double Convert(uint64_t value) { return Frsp(double(int64_t(value))); }
 
-// An unsigned value through the stack to a float (std, lfd, fcfid, frsp),
-// its doubleword left at `scratch`.
-double Convert(uint8_t* base, uint64_t value, uint32_t scratch) {
-  Std(base, scratch, value);
-  return Frsp(double(int64_t(value)));
-}
-
-// A halfword as a float into `to`, then two bytes x f0 into `to` + 4 and + 8,
-// each through its scratch doubleword.
+// A halfword as a float into `to`, then two bytes x f0 into `to` + 4 and + 8.
 void Triple(uint8_t* base, uint32_t from_half, uint32_t from_b0, uint32_t from_b1, uint32_t to,
-            double f0, uint32_t s0, uint32_t s1, uint32_t s2) {
-  Stfs(base, to, Convert(base, guest::LoadU16(base, from_half), s0));
-  Stfs(base, to + 4, Fmuls(Convert(base, guest::LoadU8(base, from_b0), s1), f0));
-  Stfs(base, to + 8, Fmuls(Convert(base, guest::LoadU8(base, from_b1), s2), f0));
+            double f0) {
+  Stfs(base, to, Convert(guest::LoadU16(base, from_half)));
+  Stfs(base, to + 4, Fmuls(Convert(guest::LoadU8(base, from_b0)), f0));
+  Stfs(base, to + 8, Fmuls(Convert(guest::LoadU8(base, from_b1)), f0));
 }
 
 // An lfs then stfs of one word: its bits (the translated code's float to
@@ -110,21 +101,20 @@ uint32_t SetPaint(uint8_t* base, uint32_t record, uint32_t car, uint32_t pick, u
   }
   const int32_t kind = int32_t(rec.kind());
   const double f0 = double(G::byte_scale(base));
-  const uint32_t s16 = stack - 16, s24 = stack - 24, s32 = stack - 32;
+  (void)stack;  // the scratch doublewords below it no longer written (E5 step 6)
   if (kind == 3) {
     rec.set_traffic_paint(uint32_t(p));
   } else if (p == -2) {
     for (uint32_t i = 0; i < 3; i++) {
       Triple(base, c.paint_copy0_hue0_address() + 4 * i, c.paint_copy0_saturation0_address() + 4 * i,
-             c.paint_copy0_value0_address() + 4 * i, rec.paint0_hue_address() + 16 * i, f0, s32,
-             s24, s16);
+             c.paint_copy0_value0_address() + 4 * i, rec.paint0_hue_address() + 16 * i, f0);
     }
-    rec.set_paint0_hue(float(Convert(base, c.paint_hue(), s16)));
-    rec.set_paint0_saturation(float(Fmuls(Convert(base, c.paint_saturation(), s16), f0)));
-    rec.set_paint0_value(float(Fmuls(Convert(base, c.paint_value(), s16), f0)));
-    rec.set_paint1_hue(float(Convert(base, c.paint_hue(), s16)));
-    rec.set_paint1_saturation(float(Fmuls(Convert(base, c.paint_saturation(), s16), f0)));
-    rec.set_paint1_value(float(Fmuls(Convert(base, c.paint_value(), s16), f0)));
+    rec.set_paint0_hue(float(Convert(c.paint_hue())));
+    rec.set_paint0_saturation(float(Fmuls(Convert(c.paint_saturation()), f0)));
+    rec.set_paint0_value(float(Fmuls(Convert(c.paint_value()), f0)));
+    rec.set_paint1_hue(float(Convert(c.paint_hue())));
+    rec.set_paint1_saturation(float(Fmuls(Convert(c.paint_saturation()), f0)));
+    rec.set_paint1_value(float(Fmuls(Convert(c.paint_value()), f0)));
     const int32_t six = int16_t(c.paint_kind());
     if (six == 0) {
       const double zero = Lfs(base, schema::CarSceneDrawGlobals::zero_address());
@@ -133,38 +123,32 @@ uint32_t SetPaint(uint8_t* base, uint32_t record, uint32_t car, uint32_t pick, u
       CopyFloat(base, G::value72_address(), rec.paint2_value_address());
     } else if (six == 1) {
       const double value = double(G::value72_kind1(base));
-      rec.set_paint2_hue(float(Convert(base, c.paint_hue(), s16)));
+      rec.set_paint2_hue(float(Convert(c.paint_hue())));
       const uint32_t b10 = c.paint_saturation();
       rec.set_paint2_value(float(value));
-      const double f12 = Convert(base, b10, s16);
+      const double f12 = Convert(b10);
       rec.set_paint2_saturation(float(Fmuls(Fmuls(f12, double(G::hue_scale(base))), f0)));
     }
   } else {
     const uint32_t from = uint32_t(int64_t(p) * 20) + c.paint_copy0_hue0_address();
     for (uint32_t i = 0; i < 3; i++) {
       Triple(base, from + 4 * i, from + 2 + 4 * i, from + 3 + 4 * i,
-             rec.paint0_hue_address() + 16 * i, f0, s16, s24, s32);
+             rec.paint0_hue_address() + 16 * i, f0);
     }
   }
   rec.set_wheels_painted(1);
   Triple(base, c.front_wheel_color0_hue_address(), c.front_wheel_color0_saturation_address(),
-         c.front_wheel_color0_value_address(), rec.front_wheel_paint0_hue_address(), f0, s16, s16,
-         s16);
+         c.front_wheel_color0_value_address(), rec.front_wheel_paint0_hue_address(), f0);
   Triple(base, c.rear_wheel_color0_hue_address(), c.rear_wheel_color0_saturation_address(),
-         c.rear_wheel_color0_value_address(), rec.rear_wheel_paint0_hue_address(), f0, s16, s16,
-         s16);
+         c.rear_wheel_color0_value_address(), rec.rear_wheel_paint0_hue_address(), f0);
   Triple(base, c.front_wheel_color1_hue_address(), c.front_wheel_color1_saturation_address(),
-         c.front_wheel_color1_value_address(), rec.front_wheel_paint1_hue_address(), f0, s16, s16,
-         s16);
+         c.front_wheel_color1_value_address(), rec.front_wheel_paint1_hue_address(), f0);
   Triple(base, c.rear_wheel_color1_hue_address(), c.rear_wheel_color1_saturation_address(),
-         c.rear_wheel_color1_value_address(), rec.rear_wheel_paint1_hue_address(), f0, s16, s16,
-         s16);
+         c.rear_wheel_color1_value_address(), rec.rear_wheel_paint1_hue_address(), f0);
   Triple(base, c.front_wheel_color2_hue_address(), c.front_wheel_color2_saturation_address(),
-         c.front_wheel_color2_value_address(), rec.front_wheel_paint2_hue_address(), f0, s16, s16,
-         s16);
+         c.front_wheel_color2_value_address(), rec.front_wheel_paint2_hue_address(), f0);
   Triple(base, c.rear_wheel_color2_hue_address(), c.rear_wheel_color2_saturation_address(),
-         c.rear_wheel_color2_value_address(), rec.rear_wheel_paint2_hue_address(), f0, s16, s16,
-         s16);
+         c.rear_wheel_color2_value_address(), rec.rear_wheel_paint2_hue_address(), f0);
   CopyFloat(base, c.front_wheel_f16_address(), rec.front_wheel_f16_address());
   CopyFloat(base, c.rear_wheel_f16_address(), rec.rear_wheel_f16_address());
   CopyFloat(base, c.front_wheel_f28_address(), rec.front_wheel_f28_address());
@@ -174,7 +158,7 @@ uint32_t SetPaint(uint8_t* base, uint32_t record, uint32_t car, uint32_t pick, u
 
 uint32_t SetWheels(uint8_t* base, uint32_t record, uint32_t car, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8215B238 SceneModelRecord::SetWheels");
-  Store(base, stack - 112, stack);
+  (void)stack;  // no frame (E5 step 6: its back chain was all it held)
   const Record rec(base, record);
   const Car c(base, car);
   rec.set_front_wheel(c.front_wheel_number() - 1);
@@ -201,23 +185,24 @@ uint32_t SetWheels(uint8_t* base, uint32_t record, uint32_t car, uint32_t stack)
 
 void SetChoice(uint8_t* base, uint32_t out, uint64_t r4, uint64_t r5, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8215B1A0 SceneModelRecord::SetChoice");
-  Std(base, stack + 40, r5);
-  Std(base, stack + 32, r4);
+  // The value's words as registers (the original spilled r4 and r5 into the
+  // caller's parameter area, +32 and +40, and read them back; E5 step 6).
+  (void)stack;
   const schema::CarMakersRecordChoice choice(base, out);
-  const uint32_t c = Load(base, stack + 40);
+  const uint32_t c = uint32_t(r5 >> 32);
   if (c == 0) {
     choice.set_set(c);
     return;
   }
-  const uint32_t a = Load(base, stack + 32);
+  const uint32_t a = uint32_t(r4 >> 32);
   choice.set_index(c - 1);
   choice.set_set(1);
   uint32_t k = 0;
   if (int32_t(a) == 1) {
-    const uint32_t b = Load(base, stack + 36);
+    const uint32_t b = uint32_t(r4);
     k = b < 1 ? 1 : b == 1 ? 2 : 0;
   } else if (int32_t(a) == 2) {
-    const uint32_t b = Load(base, stack + 36);
+    const uint32_t b = uint32_t(r4);
     k = b == 1 ? 1 : 0;
   }
   choice.set_variant(uint32_t(uint64_t(a) * 3 + k - 3));
@@ -241,7 +226,7 @@ void ResetBytes(uint8_t* base, uint32_t at) {
 
 uint32_t SetBytes(uint8_t* base, uint32_t record, uint32_t bytes, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8215B0E0 CarRecord::SetBytes");
-  Store(base, stack - 112, stack);
+  (void)stack;  // no frame (E5 step 6: its back chain was all it held)
   const schema::CarRecord car_record(base, record);
   const uint32_t at = car_record.plate_address();
   ResetBytes(base, at);
@@ -433,14 +418,16 @@ uint32_t FromCar(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t
   const int32_t doors = int16_t(c.body_class());
   rec.set_parts_class((doors == 1 || doors == 2 || doors == 4) ? 1 : 0);
   if (cars) {
+    // The tire grades' table {0, 1, 1, 2, 2} (the original's frame +80 to
+    // +96, a local since E5 step 6), indexed unchecked: past it (never in
+    // play) the stack's word there, as the original.
+    static constexpr uint32_t kTable[5] = {0, 1, 1, 2, 2};
     const uint32_t table = frame + 80;
-    Store(base, table + 0, 0);
-    Store(base, table + 4, 1);
-    Store(base, table + 8, 1);
-    Store(base, table + 12, 2);
+    auto grade = [&](uint32_t index) {
+      return index < 5 ? kTable[index] : Load(base, table + (index << 2));
+    };
     rec.set_layer0_a(c.layer0_a());
     CopyFloat(base, c.layer0_f8_address(), rec.layer0_f8_address());
-    Store(base, table + 16, 2);
     CopyFloat(base, c.layer0_f12_address(), rec.layer0_f12_address());
     CopyFloat(base, c.layer0_f16_address(), rec.layer0_f16_address());
     rec.set_layer1_a(c.layer1_a());
@@ -452,8 +439,8 @@ uint32_t FromCar(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t
     CopyFloat(base, c.layer2_f12_address(), rec.layer2_f12_address());
     CopyFloat(base, c.layer2_f16_address(), rec.layer2_f16_address());
     rec.set_layer0_b(c.layer0_b());
-    rec.set_front_tire_grade(Load(base, table + (c.front_tire_grade() << 2)));
-    rec.set_rear_tire_grade(Load(base, table + (c.rear_tire_grade() << 2)));
+    rec.set_front_tire_grade(grade(c.front_tire_grade()));
+    rec.set_rear_tire_grade(grade(c.rear_tire_grade()));
   }
   return SetBytes(base, car_record, c.setting_bytes_address(), frame);
 }

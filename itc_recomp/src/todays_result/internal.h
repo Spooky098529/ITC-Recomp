@@ -43,11 +43,11 @@ inline uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   return frame;
 }
 
-// UiMovies::Find for movie `id` with the id stored at `key` (the original's
-// frame word): the movie in the pair's value.
-inline uint32_t FindMovie(uint8_t* base, uint32_t key, uint32_t id) {
-  Store(base, key, id);
-  return Load(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, key));
+// UiMovies::Find for movie `id`: the movie in the pair's value. The original
+// stored the id at `key` (its frame word) and passed its address; only the
+// lookup read it, so the id goes by value (E5 step 6) and `key` is unused.
+inline uint32_t FindMovie(uint8_t* base, [[maybe_unused]] uint32_t key, uint32_t id) {
+  return Load(base, ui_movies::PairsFindKey(base, ui_movies::kMovieTable, id));
 }
 
 // Posts the message (id, 0, 0) on a dispatcher's ring (a mode's +36: 50

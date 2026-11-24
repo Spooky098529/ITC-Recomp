@@ -117,13 +117,14 @@ uint64_t SetUpSigns(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls
   static constexpr uint32_t kBack[24] = {7176, 6864, 6240, 6552, 5928, 5616, 5304, 4992,
                                          4680, 4368, 4056, 3744, 2808, 2496, 3432, 3120,
                                          2184, 1872, 1560, 1248, 936,  624,  312,  0};
+  // The original's list at frame + 80 to + 172: a local (the frame stays
+  // for TrackZones::Create's call, with its back chain).
+  uint32_t tables[24];
   for (uint32_t k = 0; k < 24; k++) {
-    guest::StoreU32(base, frame + 80 + 4 * k, kLast - kBack[k]);
+    tables[k] = kLast - kBack[k];
   }
   const int32_t layout = scenery_lists::CourseLayout(base);
-  const uint32_t table = layout != -1
-                             ? guest::LoadU32(base, (uint32_t(layout) << 2) + frame + 80)
-                             : kLast - 6240;
+  const uint32_t table = layout != -1 ? tables[layout] : kLast - 6240;
   const Hud h(base, hud);
   h.set_sign_flags(table);
   const uint64_t r3 = calls.Call(kTrackZonesCreate, frame, 0x822123AC);

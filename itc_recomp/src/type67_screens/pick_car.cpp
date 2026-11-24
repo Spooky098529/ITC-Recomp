@@ -33,8 +33,9 @@ constexpr uint32_t kMemcpy = 0x825A7410;
 // 0xF970 bytes before).
 uint64_t PickCar(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, const Calls& calls,
                  uint32_t car, uint32_t message, uint32_t delta) {
-  const uint32_t screen = uint32_t(r3), frame = sp - 128;
-  StoreU32(base, frame, sp);
+  // The original's 128-byte frame holds only its back chain: the calls get
+  // `sp` (E5 step 6).
+  const uint32_t screen = uint32_t(r3), frame = sp;
   calls.call(kGarageCarReset, frame, 0x8224061C - delta, car, r4);
   // The car list's slot 18 (+72): its selection record, the list + 204
   // (PanelSetBase's answer_record), viewed as the list itself.

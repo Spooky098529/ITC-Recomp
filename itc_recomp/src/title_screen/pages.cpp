@@ -1,6 +1,7 @@
 // The title screen's menu pages (docs/functions/title-screen.md): see
-// title_screen.h. Their debug prints (the empty sub_82106540) are left out;
-// the strings' addresses they store in their frames are written.
+// title_screen.h. Their debug prints (the empty sub_82106540) are left out,
+// with the strings' addresses they stored in their frames (+80 on: read by
+// nothing, dropped in E5 step 6; the frames stay for the guest calls' r1).
 
 #include "base/log.h"
 #include "race_screens/race_screens.h"
@@ -25,12 +26,6 @@ constexpr uint32_t kPlayTimeMark = 0x82111628;
 constexpr uint32_t kCareerPickFromCar = 0x82115CC0;
 constexpr uint32_t kCareerNextDay = 0x82116AF0;
 constexpr uint32_t kStartFirstRace = 0x82180CE8;
-
-// The debug prints' strings each page stores in its frame (+80 on).
-constexpr uint32_t kMainStrings[7] = {0x82010734, 0x82010720, 0x82010710, 0x82010700,
-                                      0x820106F8, 0x820106E8, 0x8200A18C};
-constexpr uint32_t kCareerStrings[3] = {0x8201069C, 0x8200CBDC, 0x82010690};
-constexpr uint32_t kMenu4Strings[2] = {0x820106D8, 0x820106C4};
 
 // The page object to `page` through `transition`: +8 the old page unless
 // it's `page` already, +12, +16 -1, +4, +0 -1.
@@ -59,9 +54,6 @@ uint64_t MainMenu(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls,
                   bool multiplayer_items) {
   ITC_NATIVE_RUNNING("sub_82222700 TitleScreen::MainMenu");
   const uint32_t frame = Frame(base, sp, 144);
-  for (uint32_t k = 0; k < 7; k++) {
-    Store(base, frame + 80 + 4 * k, kMainStrings[k]);
-  }
   calls.Call(kListUpdate, frame, 0x822227C4, ListAddress(base));
   const schema::MenuList list = MenuListOf(base);
   uint32_t sound = 0;
@@ -132,9 +124,6 @@ uint64_t MainMenu(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls,
 uint64_t CareerMenu(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82221AC0 TitleScreen::CareerMenu");
   const uint32_t frame = Frame(base, sp, 128);
-  for (uint32_t k = 0; k < 3; k++) {
-    Store(base, frame + 80 + 4 * k, kCareerStrings[k]);
-  }
   calls.Call(kListUpdate, frame, 0x82221B58, ListAddress(base));
   const schema::MenuList list = MenuListOf(base);
   uint32_t sound = 0;
@@ -182,9 +171,6 @@ uint64_t CareerMenu(uint8_t* base, uint32_t sp, const Calls& calls) {
 uint64_t Menu4(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82222378 TitleScreen::Menu4");
   const uint32_t frame = Frame(base, sp, 112);
-  for (uint32_t k = 0; k < 2; k++) {
-    Store(base, frame + 80 + 4 * k, kMenu4Strings[k]);
-  }
   calls.Call(kMenuStep, frame, 0x82222400, G::menu(base).address);
   uint64_t r3 = calls.Call(kMenuPressed, frame, 0x8222240C, G::menu(base).address, 159);
   if (uint32_t(r3) != 0) {

@@ -75,11 +75,12 @@ struct Page {
 };
 
 // A frame of `bytes` below `sp` (its back chain, as stwu) and the movie
-// `id`'s word (UiMovies::Find with the id at the frame's +80).
+// `id`'s word (UiMovies::Find with the id as a value: the original's at the
+// frame's +80; E5 step 6).
 Page Open(uint8_t* base, const GuestCall& call, uint32_t sp, uint32_t bytes, uint32_t id) {
   const uint32_t frame = sp - bytes;
   Store(base, frame, sp);
-  const uint32_t entry = MovieEntry(base, frame, id);
+  const uint32_t entry = ui_movies::PairsFindKey(base, ui_movies::kMovieTable, id);
   return Page{base, call, frame, Load(base, entry), entry};
 }
 

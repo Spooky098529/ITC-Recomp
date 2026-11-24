@@ -317,7 +317,7 @@ uint64_t ModeTearDown(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp,
 
 uint64_t ModeInterrupt(uint8_t* base, uint32_t object, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8223D960 ModeType8::Interrupt");
-  Frame(base, sp, 96);
+  (void)sp;  // its frame held only the back chain (E5 step 6)
   // `object` is the mode's +32 interface.
   const uint32_t mode = object - 32;
   const Member m(base, Mode(base, mode).member_address());

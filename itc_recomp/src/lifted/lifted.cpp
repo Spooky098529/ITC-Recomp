@@ -139,6 +139,10 @@ Result Import(uint8_t* base, ImportFunction* function, const Args& args) {
   NoAnswer(function, args.lr);
 }
 
+ImportAnswer FindImportAnswer(ImportFunction* function) {
+  return imports::FindNativeImport(function);
+}
+
 Result ImportFromSdk(uint8_t*, ImportFunction* function, const Args& args) {
   NoAnswer(function, args.lr);
 }

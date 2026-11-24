@@ -64,7 +64,6 @@ void Require(bool done, const char* what) {
 }
 
 constexpr uint32_t kFirstSetPools = 7;
-constexpr uint32_t kDestroyAFrameBytes = 128;
 constexpr uint32_t kMaxNodes = 4096;
 
 }  // namespace
@@ -125,8 +124,9 @@ std::optional<uint32_t> SetInteriorWord(uint8_t* base, uint32_t scene, uint32_t 
 
 uint32_t LoadsDone(uint8_t* base, uint32_t scene, uint32_t sp, const FinishCall& finish) {
   ITC_NATIVE_RUNNING("sub_820C5798 CarScene::LoadsDone");
-  const uint32_t frame = sp - 128;
-  Store(base, frame, sp);  // the back chain, for the finishers' guest calls
+  // The original's 128-byte frame (only its back chain) left out: the
+  // finishers' guest calls run from `sp` (E5 step 6).
+  const uint32_t frame = sp;
   const CarScene car_scene(base, scene);
   const uint32_t states[8] = {
       car_scene.asset141_state_address(),     car_scene.asset586_state_address(),
@@ -193,8 +193,9 @@ bool DestroyAFreeable(uint8_t* base, uint32_t set) {
 void DestroyA(uint8_t* base, uint32_t set, uint32_t sp,
               const std::function<void(uint32_t object, uint32_t frame)>& destroy) {
   ITC_NATIVE_RUNNING("sub_820C3CF8 ScenePools::DestroyA");
-  const uint32_t frame = sp - kDestroyAFrameBytes;
-  Store(base, frame, sp);  // the back chain, for the destructors' guest calls
+  // The original's frame (only its back chain) left out: the destructors'
+  // guest calls run from `sp` (E5 step 6).
+  const uint32_t frame = sp;
   for (uint32_t pool = 0; pool < kFirstSetPools; pool++) {
     const uint32_t list = ScenePools(base, set).pools_address() + PoolList::kSize * pool;
     for (;;) {
@@ -449,8 +450,9 @@ bool CarSceneConstruct(uint8_t* base, uint32_t scene) {
 
 void ListDeleteAll(uint8_t* base, uint32_t list, uint32_t sp, const DestroyCall& destroy) {
   ITC_NATIVE_RUNNING("sub_82593FF8 List::DeleteAll");
-  const uint32_t frame = sp - 96;
-  Store(base, frame, sp);
+  // The original's 96-byte frame (only its back chain) left out: the
+  // destructors' guest calls run from `sp` (E5 step 6).
+  const uint32_t frame = sp;
   const schema::AccessorList nodes(base, list);
   for (uint32_t node = nodes.first().address; node != 0; node = nodes.first().address) {
     destroy(node, 1, frame);
@@ -473,13 +475,12 @@ std::optional<uint32_t> CarSceneDestruct(uint8_t* base, uint32_t scene, uint32_t
   if (!CarSceneDestructible(base, scene, flags)) {
     return std::nullopt;
   }
-  const uint32_t frame = sp - 128;
-  Store(base, frame, sp);
+  // The original's 128-byte frame (only its back chain) left out (E5 step
+  // 6): the lists' destructors run from `sp`.
   for (uint32_t i = 8; i-- > 0;) {
-    // List::~List (sub_82594188) is a jump to DeleteAll: its frame below
-    // ~CarScene's.
+    // List::~List (sub_82594188) is a jump to DeleteAll.
     ListDestruct(base, CarScene(base, scene).car_models_first_address() + PoolList::kSize * i,
-                 frame, destroy);
+                 sp, destroy);
   }
   Require(AssetsDestruct(base, CarScene(base, scene).assets_address()).has_value(),
           "SceneAssets::~SceneAssets");
@@ -509,7 +510,10 @@ std::optional<uint32_t> UpdateA(uint8_t* base, uint32_t sp, const DestroyCall& d
   if (set == 0) {
     return std::nullopt;
   }
-  const uint32_t frame = sp - 128;
+  // The original's 128-byte frame (only its back chain, on the teardown's
+  // path) left out: the texture frees and DestroyA run from `sp` (E5 step
+  // 6).
+  const uint32_t frame = sp;
   // The set's record at `at`, its [+52] read again each time.
   auto record_at = [&](uint32_t at) {
     return schema::CarModelsDeferredRelease(
@@ -554,7 +558,6 @@ std::optional<uint32_t> UpdateA(uint8_t* base, uint32_t sp, const DestroyCall& d
     ScenePools(base, set).set_teardown_count(ScenePools(base, set).teardown_count() - 1);
     return std::nullopt;
   }
-  Store(base, frame, sp);
   DestroyA(base, set, frame, [&](uint32_t object, uint32_t destroy_frame) {
     destroy(object, 0, destroy_frame);
   });
@@ -849,8 +852,13 @@ std::optional<uint64_t> FileLoaded(uint8_t* base, uint32_t request, uint32_t dat
                                    uint32_t scene, uint32_t sp, const FileLoadedCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820C52A0 CarScene::OnFileLoaded");
   const uint32_t assets = CarScene(base, scene).assets_address();
+  // The original's 128-byte frame stays (E5 step 6): it keeps `data` in
+  // its caller's area (its frame's +156, `sp` + 28), handed to the TGA's
+  // create, and its callees run from the frame so their own parameter
+  // homes (their r1 + 20 on) can't reach that word.
   const uint32_t frame = sp - 128;
-  Store(base, frame + 156, data);
+  const uint32_t data_at = frame + 156;
+  Store(base, data_at, data);
   const auto branch = FindBranch(base, assets, request);
   if (!branch) {
     return std::nullopt;
@@ -901,8 +909,8 @@ std::optional<uint64_t> FileLoaded(uint8_t* base, uint32_t request, uint32_t dat
     case Kind::kTga: {
       const uint32_t header = assets + branch->a, pixels = assets + branch->b;
       const uint32_t size = LoadSlot(base, slot).size();
-      if (!car_models::TgaCreateImage(base, header, size, frame + 156, pixels, frame)) {
-        calls.tga_create(header, size, frame + 156, pixels);
+      if (!car_models::TgaCreateImage(base, header, size, data_at, pixels, frame)) {
+        calls.tga_create(header, size, data_at, pixels);
       }
       break;
     }
@@ -919,8 +927,9 @@ void DestroyB(uint8_t* base, uint32_t scene, uint32_t sp, const FinishCall& fini
               const std::function<void(uint32_t object, uint32_t frame)>& destroy,
               const FreeCall& free) {
   ITC_NATIVE_RUNNING("sub_820C59B0 ScenePools::DestroyB");
-  const uint32_t frame = sp - 128;
-  Store(base, frame, sp);  // the back chain, for the guest calls
+  // The original's 128-byte frame (only its back chain) left out: its
+  // callees run from `sp` (E5 step 6).
+  const uint32_t frame = sp;
   LoadsDone(base, scene, frame, finish);
   for (uint32_t pool = 0; pool < 8; pool++) {
     const uint32_t list = CarScene(base, scene).car_models_first_address() + PoolList::kSize * pool;
@@ -945,8 +954,9 @@ std::optional<uint64_t> UpdateModels(
   if (count <= 0) {
     return std::nullopt;
   }
-  const uint32_t frame = sp - 112;
-  Store(base, frame, sp);
+  // The original's 112-byte frame (only its back chain) left out: the
+  // models' updates run from `sp` (E5 step 6).
+  const uint32_t frame = sp;
   uint64_t r3 = 0;
   for (int32_t i = 0; i < count; i++) {
     const uint32_t model =
@@ -961,8 +971,9 @@ std::optional<uint64_t> UpdateModels(
 
 uint64_t Update(uint8_t* base, uint32_t sp, uint64_t r3, const UpdateCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820C9608 CarScene::Update");
-  const uint32_t frame = sp - 96;
-  Store(base, frame, sp);  // the back chain, for the guest calls
+  // The original's 96-byte frame (only its back chain) left out: its
+  // callees run from `sp` (E5 step 6).
+  const uint32_t frame = sp;
   const uint32_t scene = Globals::scene(base).address;
   r3 = scene;
   if (scene != 0) {

@@ -107,17 +107,22 @@ void VaryCar(uint8_t* base, uint32_t car, int32_t racer, int32_t vehicle, int32_
 
 void UploadDirectional(uint8_t* base, uint32_t entry, uint32_t n, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8215C698 RaceLights::UploadDirectional");
+  (void)stack;
   const uint32_t slot = n << 4;
   const schema::RaceLightEntry light(base, entry);
-  // The 1.0 at stack - 4 (overwritten by the vector below, as the original).
-  ops::Store(base, stack - 4, ops::Load(base, G::one_address()));
+  // The normalized vector stored straight into its slot: the original
+  // leaves it at stack - 16 (over a 1.0 at stack - 4) and copies it, read
+  // by nothing else (E5 step 6).
+  simde__m128 normalized;
   {
     ops::FlushToZero flush;
     const simde__m128 v = EntryVector(light, light.direction_address() - light.address);
-    const simde__m128 normalized = ops::Normalized(v, ops::Dot3(v, v));
-    ops::Stvx(base, stack - 16, normalized);
+    normalized = ops::Normalized(v, ops::Dot3(v, v));
   }
-  ops::Copy16(base, G::light_directions_address() + slot, stack - 16);
+  for (int i = 0; i < 4; i++) {
+    ops::Store(base, G::light_directions_address() + slot + 4 * uint32_t(i),
+               ops::WordOf(normalized, i));
+  }
   EntryCopy16Interleaved(base, G::light_second_address() + slot, light,
                          light.second_address() - light.address);
   EntryCopy16Interleaved(base, G::light_third_address() + slot, light,
@@ -126,12 +131,14 @@ void UploadDirectional(uint8_t* base, uint32_t entry, uint32_t n, uint32_t stack
 
 uint32_t LightsUpdate(uint8_t* base, uint32_t set, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_8215D008 RaceLights::Update");
+  // (0, 0, 0, 1) stored straight: the original builds it at its frame's +80
+  // and copies it, read by nothing else (E5 step 6).
   const uint32_t zero = ops::Load(base, G::zero_address());
-  ops::Store(base, frame + 80, zero);
-  ops::Store(base, frame + 84, zero);
-  ops::Store(base, frame + 88, zero);
-  ops::Store(base, frame + 92, ops::Load(base, G::one_address()));
-  ops::Copy16(base, G::light_origin_address(), frame + 80);
+  const uint32_t one = ops::Load(base, G::one_address());
+  ops::Store(base, G::light_origin_address() + 0, zero);
+  ops::Store(base, G::light_origin_address() + 4, zero);
+  ops::Store(base, G::light_origin_address() + 8, zero);
+  ops::Store(base, G::light_origin_address() + 12, one);
   const schema::RaceLights lights(base, set);
   uint32_t n = 0;
   for (uint32_t i = 0; i < 11; i++) {
@@ -226,23 +233,13 @@ uint32_t RemakeCarModel(uint8_t* base, const GuestCall& call, uint32_t stack, ui
 
 namespace {
 
-uint64_t Load64(uint8_t* base, uint32_t address) {
-  return uint64_t(guest::LoadU32(base, address)) << 32 | guest::LoadU32(base, address + 4);
-}
-void Store64(uint8_t* base, uint32_t address, uint64_t value) {
-  guest::StoreU32(base, address, uint32_t(value >> 32));
-  guest::StoreU32(base, address + 4, uint32_t(value));
-}
-
 // The identity as TickUpdate builds it (vupkd3d128 and four vspltw-like
-// shuffles: rows of 1.0 and 0.0), stored as four stvx at `at`, then copied
-// to `to` as eight doublewords.
-void IdentityCopy(uint8_t* base, uint32_t at, uint32_t to) {
+// shuffles: rows of 1.0 and 0.0) at `to`. (The original stores it with four
+// stvx in its frame and copies it to `to` as eight doublewords; the first
+// copy is read by nothing else: not made, E5 step 6.)
+void Identity(uint8_t* base, uint32_t to) {
   for (uint32_t i = 0; i < 16; i++) {
-    guest::StoreFloat(base, at + 4 * i, i % 5 == 0 ? 1.0f : 0.0f);
-  }
-  for (uint32_t i = 0; i < 64; i += 8) {
-    Store64(base, to + i, Load64(base, at + i));
+    guest::StoreFloat(base, to + 4 * i, i % 5 == 0 ? 1.0f : 0.0f);
   }
 }
 
@@ -278,6 +275,23 @@ uint64_t TickUpdate(uint8_t* base, const GuestCall& call, uint32_t stack, uint32
   const schema::RaceScene race_scene(base, slots - 16);
   const auto slot_at = [&](uint32_t v) { return race_scene.car_slots(v); };
   const uint32_t scene = G::car_scene(base).address;
+  // The slots' seen flags, a word each from the original's frame +592:
+  // host values for the first 8 (+592 to +623, read by nothing but this
+  // function: E5 step 6). A vehicle index from 8 up (never: the scene has 7
+  // slots) stays in the frame, where the wheel matrix at +624 and the stages
+  // copy at +688 overlap it as in the original.
+  constexpr uint32_t kSeenWords = 8;
+  uint32_t seen[kSeenWords] = {};
+  const auto set_seen = [&](uint32_t v, uint32_t value) {
+    if (v < kSeenWords) {
+      seen[v] = value;
+    } else {
+      guest::StoreU32(base, f + 592 + 4 * v, value);
+    }
+  };
+  const auto was_seen = [&](uint32_t v) {
+    return v < kSeenWords ? seen[v] : guest::LoadU32(base, f + 592 + 4 * v);
+  };
   // Pass 0's two points and their direction into the frame's +96.
   Stfs(base, f + 112, double(pass0.eye_x()));
   Stfs(base, f + 116, double(pass0.eye_y()));
@@ -293,7 +307,7 @@ uint64_t TickUpdate(uint8_t* base, const GuestCall& call, uint32_t stack, uint32
   // The slots' seen flags and their blocks' +8 and +12.
   for (int32_t v = 0; v < int32_t(race_scene.car_slot_count()); v++) {
     const schema::SceneModel model = slot_at(uint32_t(v)).model();
-    guest::StoreU32(base, f + 592 + 4 * uint32_t(v), 0);
+    set_seen(uint32_t(v), 0);
     if (model.address != 0) {
       model.set_draw_enabled(0);
       model.set_cockpit_only(0);
@@ -312,7 +326,7 @@ uint64_t TickUpdate(uint8_t* base, const GuestCall& call, uint32_t stack, uint32
       const schema::Vehicle vehicle(base, va::VehicleGet(base, v));
       const uint32_t flags = racer.flags();
       const uint32_t slot = slot_at(v).address;
-      guest::StoreU32(base, f + 592 + (v << 2), 1);
+      set_seen(v, 1);
       if ((flags & 0x200) != 0 && v != 0) {
         const uint32_t index = racer.record();
         const uint32_t car = index * 3936 + G::race_data(base).racer_records_address();
@@ -409,12 +423,9 @@ uint64_t TickUpdate(uint8_t* base, const GuestCall& call, uint32_t stack, uint32
           for (uint32_t k = 0; k < 4; k++) {
             const schema::VehicleWheel wheel(
                 base, vehicle.wheels_address() + schema::VehicleWheel::kSize * k);
-            IdentityCopy(base, f + 272, f + 528);
-            // Stored between the identity and its copy in the original,
-            // overwritten by the copy to +464 below.
-            for (const uint32_t at : {476u, 492u, 508u, 524u}) {
-              Stfs(base, f + at, one);
-            }
+            Identity(base, f + 528);
+            // (The original stores 1.0 at +476, +492, +508 and +524 here,
+            // overwritten by the identity at +464 below: not written.)
             // The wheel's slip level and its load's square.
             const double slip = ops::Fabs(double(wheel.spin()));
             const uint32_t level = slip > high ? 2 : slip > low ? 1 : 0;
@@ -423,18 +434,18 @@ uint64_t TickUpdate(uint8_t* base, const GuestCall& call, uint32_t stack, uint32
             double t = ops::Fdivs(double(wheel.brake_heat()), double(data.brake_heat_limit()));
             t = ops::Fmadds(t, scale, -one);
             t = t < zero ? zero : ops::Fmuls(t, t);
-            IdentityCopy(base, f + 144, f + 464);
+            Identity(base, f + 464);
             Stfs(base, block.brake_alphas_address() + 4 * k, t);
             // The wheel's spin: identity x RotateZ by its +0.
             matrix_math::RotateZ(base, f + 464, f + 464, wheel.angle_address(), f - 80);
             Multiply(base, block.wheel_spins_address() + 64 * k, f + 528, f + 464, 0x8215CD18);
             // Its turn: RotateY (by +8, plus the steering for the front pair)
             // x its quaternion's matrix, then moved to its position.
-            IdentityCopy(base, f + 336, f + 528);
-            IdentityCopy(base, f + 400, f + 624);
+            Identity(base, f + 528);
+            Identity(base, f + 624);
             va::QuaternionToMatrix(base, f + 624, wheel.quaternion_address());
             Multiply(base, f + 528, f + 624, f + 528, 0x8215CDE4);
-            IdentityCopy(base, f + 208, f + 464);
+            Identity(base, f + 464);
             const double steer = k == 0 || k == 1 ? double(vehicle.steering_smoothed()) : zero;
             Stfs(base, f + 80, ops::Fadds(double(wheel.toe()), steer));
             matrix_math::RotateY(base, f + 464, f + 464, f + 80, f - 80);
@@ -464,7 +475,7 @@ uint64_t TickUpdate(uint8_t* base, const GuestCall& call, uint32_t stack, uint32
   // done loading (or there's none).
   for (int32_t v = 0; v < int32_t(race_scene.car_slot_count()); v++) {
     const schema::RaceCarSlot slot = slot_at(uint32_t(v));
-    if (guest::LoadU32(base, f + 592 + 4 * uint32_t(v)) != 0) {
+    if (was_seen(uint32_t(v)) != 0) {
       continue;
     }
     r3 = slot.model().address;

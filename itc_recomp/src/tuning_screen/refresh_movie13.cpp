@@ -112,15 +112,15 @@ struct Movie13 {
     Text(kAllScenes, 45, 459, 0, 0x82207884);
     Text(kAllScenes, 34, 8, TS(base, screen).edited_x(), 0x8220789C);
     Text(kAllScenes, 35, 8, TS(base, screen).edited_y(), 0x822078B4);
-    // +30840 as an int (fctiwz, its low word through the frame's +80).
-    Store(base, frame + 80,
-          uint32_t(steps::Fctiwz(steps::Lfs(base, TS(base, screen).edited_angle_address()))));
-    Text(kAllScenes, 36, 8, Load(base, frame + 80), 0x822078DC);
-    // +30844 as a double in r7, through the frame's +48, and in f1.
+    // +30840 as an int (fctiwz; the original's low word through the frame's
+    // +80, a value since E5 step 6).
+    const uint32_t angle =
+        uint32_t(steps::Fctiwz(steps::Lfs(base, TS(base, screen).edited_angle_address())));
+    Text(kAllScenes, 36, 8, angle, 0x822078DC);
+    // +30844 as a double in r7 (the original's through the frame's +48, a
+    // value since E5 step 6), and in f1.
     const double value = steps::Lfs(base, TS(base, screen).edited_scale_address());
     const uint64_t bits = std::bit_cast<uint64_t>(value);
-    Store(base, frame + 48, uint32_t(bits >> 32));
-    Store(base, frame + 52, uint32_t(bits));
     *f1 = value;
     Text(kAllScenes, 37, 452, bits, 0x822078FC);
     Text(kAllScenes, 38, int32_t(TS(base, screen).edited_flip()) != 0 ? 0 : 1, 0, 0x82207920);
@@ -246,7 +246,9 @@ uint64_t RefreshMovie13(uint8_t* base, const GuestCall& call, uint32_t screen, u
   ITC_NATIVE_RUNNING("sub_822076E8 TuningScreen::RefreshMovie13");
   const uint32_t frame = sp - 128;
   Store(base, frame, sp);  // the back chain, as stwu
-  const uint32_t entry = MovieEntry(base, frame, kMovie13);
+  // The movie's id passed to UiMovies::Find as a value (the original's
+  // frame +80; E5 step 6).
+  const uint32_t entry = ui_movies::PairsFindKey(base, ui_movies::kMovieTable, kMovie13);
   Movie13 m{base, call, screen, frame, Load(base, entry), f1, entry};
   m.Common();
   switch (int32_t(TS(m.base, m.screen).state())) {

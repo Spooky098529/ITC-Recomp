@@ -6,6 +6,7 @@
 
 #include "game_modes/game_modes.h"
 #include "guest.h"
+#include "hooks/heap.h"
 #include "schema/boot_mode.h"
 #include "schema/game_modes.h"
 #include "schema/menu_helpers.h"
@@ -35,6 +36,19 @@ inline uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   const uint32_t frame = sp - bytes;
   Store(base, frame, sp);
   return frame;
+}
+
+// VirtualFree(address, 0, MEM_RELEASE) returning to `lr`: straight to the
+// allocation layer (hooks::VirtualFree, its adapter's answer, E5 step 6);
+// through the guest from `frame` where the adapter would run the original
+// or answer an address of 0.
+inline uint64_t FreePages(uint32_t address, uint32_t frame, uint32_t lr, const Calls& calls) {
+  if (address != 0) {
+    if (const auto freed = hooks::VirtualFree(address, 0, kMemRelease, lr)) {
+      return *freed;
+    }
+  }
+  return calls.Call(kVirtualFree, frame, lr, address, 0, kMemRelease);
 }
 
 // UiMovies::Find with the id stored at `key` (the original's frame word):

@@ -20,6 +20,7 @@
 #include <bit>
 #include <climits>
 #include <cmath>
+#include <cstring>
 
 namespace xaudio {
 
@@ -85,13 +86,6 @@ double LoadDouble(uint8_t* base, uint32_t address) {
   return std::bit_cast<double>((uint64_t(guest::LoadU32(base, address)) << 32) |
                                guest::LoadU32(base, address + 4));
 }
-uint64_t LoadU64(uint8_t* base, uint32_t address) {
-  return (uint64_t(guest::LoadU32(base, address)) << 32) | guest::LoadU32(base, address + 4);
-}
-void StoreU64(uint8_t* base, uint32_t address, uint64_t value) {
-  guest::StoreU32(base, address, uint32_t(value >> 32));
-  guest::StoreU32(base, address + 4, uint32_t(value));
-}
 // A float word stored from the float register it was loaded into (lfs, then
 // stfs): its bits, as the translated code leaves them (a signaling NaN kept).
 void CopyFloat(uint8_t* base, uint32_t destination, uint32_t source) {
@@ -110,6 +104,38 @@ uint32_t Frames(uint32_t bytes, uint32_t channels) {
   const uint32_t divisor = channels << 1;
   return divisor != 0 ? bytes / divisor : 0;
 }
+
+// A frame's slots that only these kernels read and write (the integer and
+// float moves through memory, the volume words loaded into vector lanes), as
+// host bytes in the guest's order: `at` is the byte offset from the first
+// slot, a 16-byte-aligned stack address in the original (r1 is kept 16-byte
+// aligned), so lvlx's lanes come out the same. Zeroed: the lanes lvlx loads
+// from bytes the original never wrote are the ones vspltw leaves out.
+struct Slots {
+  alignas(16) uint8_t bytes[16] = {};
+
+  void StoreU32(uint32_t at, uint32_t value) {
+    value = std::byteswap(value);
+    std::memcpy(bytes + at, &value, 4);
+  }
+  uint32_t LoadU32(uint32_t at) const {
+    uint32_t value;
+    std::memcpy(&value, bytes + at, 4);
+    return std::byteswap(value);
+  }
+  void StoreU64(uint32_t at, uint64_t value) {
+    StoreU32(at, uint32_t(value >> 32));
+    StoreU32(at + 4, uint32_t(value));
+  }
+  uint64_t LoadU64(uint32_t at) const { return (uint64_t(LoadU32(at)) << 32) | LoadU32(at + 4); }
+  void StoreFloat(uint32_t at, float value) { StoreU32(at, std::bit_cast<uint32_t>(value)); }
+  // lvlx at the slot `at` (within the first 16 bytes).
+  Vec Lvlx(uint32_t at) const {
+    return simde_mm_shuffle_epi8(
+        simde_mm_load_si128(reinterpret_cast<const Vec*>(bytes)),
+        simde_mm_load_si128(reinterpret_cast<const Vec*>(&vector_helpers::VectorMaskL[at * 16])));
+  }
+};
 
 // The end of each kernel: the position (+8, at most the end), the frames
 // written (+28, at most the output's) from the input and output pointers.
@@ -133,16 +159,15 @@ namespace {
 
 // sub_8246E208: the vector path of sub_8247E188, eight mono frames a pass
 // (r3 the input at the position, r5 the output at the frames written, r6
-// the frames left; the original's 176-byte frame below `sp`). The position
+// the frames left; the original's 176-byte frame's slots are host Slots). The position
 // is 32.32 fixed point (+48 x 2^32, the ratio's step +44 x 2^32: the double
 // at 0x8204D240); the volume ramps from +36 to +40 over the frames left
 // (+36 = +40 at once). Returns __ultod's r3 (the fraction's double, whose
 // float x 2^-32 goes to +48).
-uint64_t ResampleMonoVector(uint8_t* base, uint64_t r3, uint64_t r5, uint64_t r6, uint32_t state,
-                            uint32_t sp) {
+uint64_t ResampleMonoVector(uint8_t* base, uint64_t r3, uint64_t r5, uint64_t r6, uint32_t state) {
   const ConverterState s(base, state);
   ITC_NATIVE_RUNNING("sub_8246E208 the mono resampler's vector path");
-  const uint32_t frame = sp - 176;
+  Slots slots;  // the original's frame (176 bytes) +80 to +95
   Mode mode;
   mode.Scalar();
   uint64_t r11 = r3;
@@ -151,14 +176,14 @@ uint64_t ResampleMonoVector(uint8_t* base, uint64_t r3, uint64_t r5, uint64_t r6
   double f0 = double(s.volume());
   const uint64_t r10 = Ext(uint32_t(r6));
   double f13 = double(s.target_volume());
-  CopyFloat(base, frame + 80, s.volume_address());
+  slots.StoreU32(0, guest::LoadU32(base, s.volume_address()));
   f0 = double(float(f13 - f0));
   CopyFloat(base, s.volume_address(), s.target_volume_address());
   Vec v0 = Zero();
   const Vec v4 = simde_mm_set1_epi32(1);
-  StoreU64(base, frame + 88, r10);
-  f13 = double(int64_t(LoadU64(base, frame + 88)));
-  Vec v13 = Lvlx(base, frame + 80);
+  slots.StoreU64(8, r10);
+  f13 = double(int64_t(slots.LoadU64(8)));
+  Vec v13 = slots.Lvlx(0);
   Vec v10 = Splat0(v13);
   Vec v1 = v0, v31 = v0;
   double f12 = LoadDouble(base, 0x8204D240);
@@ -172,18 +197,17 @@ uint64_t ResampleMonoVector(uint8_t* base, uint64_t r3, uint64_t r5, uint64_t r6
   f0 = double(float(f0 / f13));
   f13 = LoadSingle(base, 0x82000C34);
   f13 = double(float(f0 * f13));
-  guest::StoreFloat(base, frame + 80, float(f13));
-  Vec v12 = Lvlx(base, frame + 80);
-  guest::StoreFloat(base, frame + 80, float(f0));
+  slots.StoreFloat(0, float(f13));
+  Vec v12 = slots.Lvlx(0);
+  slots.StoreFloat(0, float(f0));
   const Vec v30 = Splat0(v12);
-  Vec v9 = Lvlx(base, frame + 80);
-  StoreU64(base, frame + 88, uint64_t(fraction));
+  Vec v9 = slots.Lvlx(0);
+  slots.StoreU64(8, uint64_t(fraction));
   v12 = Splat0(v9);
-  StoreU64(base, frame + 80, uint64_t(step));
-  Vec v7 = Lvlx(base, frame + 84);
-  Vec v6 = Lvlx(base, frame + 92);
+  slots.StoreU64(0, uint64_t(step));
+  Vec v7 = slots.Lvlx(4);
+  Vec v6 = slots.Lvlx(12);
   v13 = Splat0(v7);
-  Stvx(base, frame + 96, v0);
   mode.Vector();
   v11 = Mul(v12, v11);
   v8 = Mul(v12, v8);
@@ -194,19 +218,14 @@ uint64_t ResampleMonoVector(uint8_t* base, uint64_t r3, uint64_t r5, uint64_t r6
   v10 = Add(v10, v8);
   v8 = Sld<12>(v0, v13);
   v13 = Sld<12>(v8, v12);
-  Stvx(base, frame + 96, v0);
   v0 = AddI(v12, v12);
   const Vec v29 = AddI(v0, v0);
-  Stvx(base, frame + 96, v8);
-  Stvx(base, frame + 96, v13);
   v13 = Sld<12>(v13, v7);
   v0 = AddI(v13, v0);
-  Stvx(base, frame + 96, v13);
-  const uint64_t r8 = LoadU64(base, frame + 80);
-  r3 = LoadU64(base, frame + 88);
+  const uint64_t r8 = slots.LoadU64(0);
+  r3 = slots.LoadU64(8);
   Vec v2 = AddI(v13, v9);
   Vec v3 = AddI(v0, v9);
-  Stvx(base, frame + 96, v0);
   do {
     // Eight frames' samples and the ones after them, a halfword each.
     for (int k = 0; k < 8; k++) {
@@ -264,10 +283,10 @@ uint64_t ResampleMonoVector(uint8_t* base, uint64_t r3, uint64_t r5, uint64_t r6
 // channels (the input's frames 4 bytes, the second channel's output 1,024
 // bytes after the first's).
 uint64_t ResampleStereoVector(uint8_t* base, uint64_t r3, uint64_t r5, uint64_t r6,
-                              uint32_t state, uint32_t sp) {
+                              uint32_t state) {
   const ConverterState s(base, state);
   ITC_NATIVE_RUNNING("sub_8246E4C8 the stereo resampler's vector path");
-  const uint32_t frame = sp - 176;
+  Slots slots;  // the original's frame (176 bytes) +80 to +95
   Mode mode;
   mode.Scalar();
   uint64_t r10 = r3;
@@ -276,14 +295,14 @@ uint64_t ResampleStereoVector(uint8_t* base, uint64_t r3, uint64_t r5, uint64_t 
   double f0 = double(s.volume());
   const uint64_t r11 = Ext(uint32_t(r6));
   double f13 = double(s.target_volume());
-  CopyFloat(base, frame + 80, s.volume_address());
+  slots.StoreU32(0, guest::LoadU32(base, s.volume_address()));
   f0 = double(float(f13 - f0));
   CopyFloat(base, s.volume_address(), s.target_volume_address());
   Vec v0 = Zero();
   const Vec v2 = simde_mm_set1_epi32(1);
-  StoreU64(base, frame + 88, r11);
-  f13 = double(int64_t(LoadU64(base, frame + 88)));
-  Vec v13 = Lvlx(base, frame + 80);
+  slots.StoreU64(8, r11);
+  f13 = double(int64_t(slots.LoadU64(8)));
+  Vec v13 = slots.Lvlx(0);
   Vec v11 = Splat0(v13);
   Vec v28 = v0, v30 = v0;
   double f12 = LoadDouble(base, 0x8204D240);
@@ -298,18 +317,17 @@ uint64_t ResampleStereoVector(uint8_t* base, uint64_t r3, uint64_t r5, uint64_t 
   f0 = double(float(f0 / f13));
   f13 = LoadSingle(base, 0x82000C34);
   f13 = double(float(f0 * f13));
-  guest::StoreFloat(base, frame + 80, float(f13));
-  Vec v12 = Lvlx(base, frame + 80);
-  guest::StoreFloat(base, frame + 80, float(f0));
+  slots.StoreFloat(0, float(f13));
+  Vec v12 = slots.Lvlx(0);
+  slots.StoreFloat(0, float(f0));
   const Vec v26 = Splat0(v12);
-  Vec v8 = Lvlx(base, frame + 80);
-  StoreU64(base, frame + 88, uint64_t(fraction));
+  Vec v8 = slots.Lvlx(0);
+  slots.StoreU64(8, uint64_t(fraction));
   v12 = Splat0(v8);
-  StoreU64(base, frame + 80, uint64_t(step));
-  Vec v7 = Lvlx(base, frame + 84);
-  Vec v6 = Lvlx(base, frame + 92);
+  slots.StoreU64(0, uint64_t(step));
+  Vec v7 = slots.Lvlx(4);
+  Vec v6 = slots.Lvlx(12);
   v13 = Splat0(v7);
-  Stvx(base, frame + 96, v0);
   mode.Vector();
   v10 = Mul(v12, v10);
   v9 = Mul(v12, v9);
@@ -320,19 +338,14 @@ uint64_t ResampleStereoVector(uint8_t* base, uint64_t r3, uint64_t r5, uint64_t 
   v9 = Add(v11, v9);
   v11 = Sld<12>(v0, v13);
   v13 = Sld<12>(v11, v12);
-  Stvx(base, frame + 96, v0);
   v0 = AddI(v12, v12);
   const Vec v25 = AddI(v0, v0);
-  Stvx(base, frame + 96, v11);
-  Stvx(base, frame + 96, v13);
   v13 = Sld<12>(v13, v7);
-  Stvx(base, frame + 96, v13);
   v0 = AddI(v13, v0);
-  const uint64_t r8 = LoadU64(base, frame + 80);
+  const uint64_t r8 = slots.LoadU64(0);
   Vec v31 = AddI(v13, v8);
-  r3 = LoadU64(base, frame + 88);
+  r3 = slots.LoadU64(8);
   Vec v1 = AddI(v0, v8);
-  Stvx(base, frame + 96, v0);
   do {
     for (int k = 0; k < 8; k++) {
       const uint64_t at = uint64_t(uint32_t(r3 >> 32) << 2) + r10;
@@ -415,7 +428,7 @@ uint64_t ResampleStereoVector(uint8_t* base, uint64_t r3, uint64_t r5, uint64_t 
 template <bool stereo>
 uint64_t Resample(uint8_t* base, uint32_t state, uint32_t sp) {
   const ConverterState s(base, state);
-  const uint32_t frame = sp - 112;
+  Slots slots;  // the original's frame (112 bytes) +80 to +95
   Mode mode;
   mode.Scalar();
   const uint64_t written = s.frames_written();
@@ -437,20 +450,20 @@ uint64_t Resample(uint8_t* base, uint32_t state, uint32_t sp) {
     const uint64_t left = Ext(uint32_t(r6));
     const double ratio = double(s.ratio());
     const uint64_t last = Ext(uint32_t(r4 - 1));
-    StoreU64(base, frame + 80, left);
-    StoreU64(base, frame + 88, last);
-    double f12 = double(int64_t(LoadU64(base, frame + 80)));
-    double f11 = double(int64_t(LoadU64(base, frame + 88)));
+    slots.StoreU64(0, left);
+    slots.StoreU64(8, last);
+    double f12 = double(int64_t(slots.LoadU64(0)));
+    double f11 = double(int64_t(slots.LoadU64(8)));
     f12 = double(float(f12));
     f11 = double(float(f11));
     const double reach = double(float(std::fma(ratio, f12, f13)));
     vector = f11 > reach && !(f13 < LoadSingle(base, 0x82000A34));
   }
   if (vector) {
-    return stereo ? ResampleStereoVector(base, r3, r5, r6, state, frame)
-                  : ResampleMonoVector(base, r3, r5, r6, state, frame);
+    return stereo ? ResampleStereoVector(base, r3, r5, r6, state)
+                  : ResampleMonoVector(base, r3, r5, r6, state);
   }
-  return stereo ? ResampleStereoScalar(base, state, frame) : ResampleMonoScalar(base, state, frame);
+  return stereo ? ResampleStereoScalar(base, state, sp - 112) : ResampleMonoScalar(base, state, sp - 112);
 }
 
 }  // namespace
@@ -469,10 +482,11 @@ uint64_t ResampleStereo(uint8_t* base, uint32_t state, uint32_t sp) {
 // linear between the input frame at the position and the next (the last
 // input frame kept at +52, and +56 for the second channel, for a position
 // before the first), the volume ramp added a frame at a time; their words
-// below `sp` as the original leaves them.
+// below `sp` in the original, host Slots here.
 uint64_t ResampleMonoScalar(uint8_t* base, uint32_t state, uint32_t sp) {
   const ConverterState s(base, state);
   ITC_NATIVE_RUNNING("sub_82473E48 the mono resampler's scalar path");
+  Slots slots;  // the words 144 to 129 bytes below sp (no frame of its own)
   Mode mode;
   mode.Scalar();
   const uint32_t input = s.input();
@@ -488,14 +502,14 @@ uint64_t ResampleMonoScalar(uint8_t* base, uint32_t state, uint32_t sp) {
   uint64_t r8 = frames - written;
   const uint64_t r25 = end - position;
   const uint64_t r9 = uint64_t(uint32_t(uint64_t(offset)) << 1) + input;
-  guest::StoreU32(base, sp - 144, uint32_t(r8));
-  Vec v13 = Lvlx(base, sp - 144);
+  slots.StoreU32(0, uint32_t(r8));
+  Vec v13 = slots.Lvlx(0);
   mode.Vector();
   v13 = ToFloat(v13);
   Vec v12 = Lvlx(base, s.target_volume_address());
-  StoreU64(base, sp - 136, 1ull << 32);
+  slots.StoreU64(8, 1ull << 32);
   mode.Scalar();
-  double f0 = double(int64_t(LoadU64(base, sp - 136)));
+  double f0 = double(int64_t(slots.LoadU64(8)));
   Vec v0 = Lvlx(base, s.volume_address());
   mode.Vector();
   v12 = Sub(v12, v0);
@@ -504,17 +518,16 @@ uint64_t ResampleMonoScalar(uint8_t* base, uint32_t state, uint32_t sp) {
   const double f12 = f12_fraction * f0;
   const double f11 = f13_ratio * f0;
   f0 = LoadDouble(base, 0x82002250) / f0;
-  StoreU64(base, sp - 144, uint64_t(ToInt64(f12)));
+  slots.StoreU64(0, uint64_t(ToInt64(f12)));
   mode.Vector();
   v12 = Mul(v12, v9);
   mode.Scalar();
-  StoreU64(base, sp - 136, uint64_t(ToInt64(f11)));
-  const uint64_t r4 = LoadU64(base, sp - 136);
-  Vec v11 = Lvlx(base, sp - 140);
-  Vec v10 = Lvlx(base, sp - 132);
+  slots.StoreU64(8, uint64_t(ToInt64(f11)));
+  const uint64_t r4 = slots.LoadU64(8);
+  Vec v11 = slots.Lvlx(4);
+  Vec v10 = slots.Lvlx(12);
   v13 = Splat0(v11);
-  Stvx(base, sp - 128, v0);
-  uint64_t r11 = LoadU64(base, sp - 144);
+  uint64_t r11 = slots.LoadU64(0);
   v0 = Splat0(v0);
   v10 = Splat0(v10);
   v11 = Splat0(v12);
@@ -593,9 +606,9 @@ uint64_t ResampleMonoScalar(uint8_t* base, uint32_t state, uint32_t sp) {
       // The last input frame kept for the next pass.
       const int64_t sample = int16_t(guest::LoadU16(base, uint32_t(uint32_t(r24) << 1) + uint32_t(r9)));
       r10 = r10 + 1;
-      StoreU64(base, sp - 136, uint64_t(sample));
+      slots.StoreU64(8, uint64_t(sample));
       mode.Scalar();
-      const double f13 = double(int64_t(LoadU64(base, sp - 136)));
+      const double f13 = double(int64_t(slots.LoadU64(8)));
       const double f12s = double(float(f13));
       const double scaled = double(float(f12s * LoadSingle(base, 0x8204D160)));
       s.set_last_sample_0(float(scaled));
@@ -610,9 +623,9 @@ uint64_t ResampleMonoScalar(uint8_t* base, uint32_t state, uint32_t sp) {
   Stvewx(base, s.volume_address(), v0);
   const uint64_t at = uint64_t(uint32_t(uint32_t(r10) << 1)) + r9;
   r11 = r11 - r6;
-  StoreU64(base, sp - 136, r11);
+  slots.StoreU64(8, r11);
   mode.Scalar();
-  const double f13 = double(int64_t(LoadU64(base, sp - 136)));
+  const double f13 = double(int64_t(slots.LoadU64(8)));
   s.set_fraction(float(double(float(f13 * f0))));
   StorePositions(base, state, at, r7);
   return state;
@@ -621,6 +634,7 @@ uint64_t ResampleMonoScalar(uint8_t* base, uint32_t state, uint32_t sp) {
 uint64_t ResampleStereoScalar(uint8_t* base, uint32_t state, uint32_t sp) {
   const ConverterState s(base, state);
   ITC_NATIVE_RUNNING("sub_82474188 the stereo resampler's scalar path");
+  Slots slots;  // the words 160 to 145 bytes below sp (no frame of its own)
   Mode mode;
   mode.Scalar();
   const uint32_t input = s.input();
@@ -638,14 +652,14 @@ uint64_t ResampleStereoScalar(uint8_t* base, uint32_t state, uint32_t sp) {
   uint64_t r7 = frames - written;
   const uint64_t r25 = end - position;
   const uint64_t r9 = uint64_t(uint32_t(uint64_t(offset)) << 1) + input;
-  guest::StoreU32(base, sp - 160, uint32_t(r7));
-  Vec v13 = Lvlx(base, sp - 160);
+  slots.StoreU32(0, uint32_t(r7));
+  Vec v13 = slots.Lvlx(0);
   mode.Vector();
   v13 = ToFloat(v13);
   Vec v12 = Lvlx(base, s.target_volume_address());
-  StoreU64(base, sp - 152, 1ull << 32);
+  slots.StoreU64(8, 1ull << 32);
   mode.Scalar();
-  double f0 = double(int64_t(LoadU64(base, sp - 152)));
+  double f0 = double(int64_t(slots.LoadU64(8)));
   Vec v0 = Lvlx(base, s.volume_address());
   mode.Vector();
   v12 = Sub(v12, v0);
@@ -654,17 +668,16 @@ uint64_t ResampleStereoScalar(uint8_t* base, uint32_t state, uint32_t sp) {
   const double f12 = f12_fraction * f0;
   const double f11 = f13_ratio * f0;
   f0 = LoadDouble(base, 0x82002250) / f0;
-  StoreU64(base, sp - 160, uint64_t(ToInt64(f12)));
+  slots.StoreU64(0, uint64_t(ToInt64(f12)));
   mode.Vector();
   v12 = Mul(v12, v9);
   mode.Scalar();
-  StoreU64(base, sp - 152, uint64_t(ToInt64(f11)));
-  const uint64_t r4 = LoadU64(base, sp - 152);
-  Vec v11 = Lvlx(base, sp - 156);
-  Vec v10 = Lvlx(base, sp - 148);
+  slots.StoreU64(8, uint64_t(ToInt64(f11)));
+  const uint64_t r4 = slots.LoadU64(8);
+  Vec v11 = slots.Lvlx(4);
+  Vec v10 = slots.Lvlx(12);
   v13 = Splat0(v11);
-  Stvx(base, sp - 144, v0);
-  uint64_t r11 = LoadU64(base, sp - 160);
+  uint64_t r11 = slots.LoadU64(0);
   v0 = Splat0(v0);
   const Vec v8 = Splat0(v10);
   v9 = Splat0(v12);
@@ -779,16 +792,16 @@ uint64_t ResampleStereoScalar(uint8_t* base, uint32_t state, uint32_t sp) {
       const uint32_t last = uint32_t(uint64_t(uint32_t(uint32_t(r24) << 2)) + r9);
       r10 = r10 + 1;
       int64_t sample = int16_t(guest::LoadU16(base, last + 2));
-      StoreU64(base, sp - 152, uint64_t(sample));
+      slots.StoreU64(8, uint64_t(sample));
       mode.Scalar();
-      double f13 = double(int64_t(LoadU64(base, sp - 152)));
+      double f13 = double(int64_t(slots.LoadU64(8)));
       double f12s = double(float(f13));
       f13 = LoadSingle(base, 0x8204D160);
       f12s = double(float(f12s * f13));
       guest::StoreFloat(base, kept + 4, float(f12s));
       sample = int16_t(guest::LoadU16(base, last));
-      StoreU64(base, sp - 152, uint64_t(sample));
-      f12s = double(int64_t(LoadU64(base, sp - 152)));
+      slots.StoreU64(8, uint64_t(sample));
+      f12s = double(int64_t(slots.LoadU64(8)));
       f12s = double(float(f12s));
       f13 = double(float(f12s * f13));
       guest::StoreFloat(base, kept, float(f13));
@@ -803,9 +816,9 @@ uint64_t ResampleStereoScalar(uint8_t* base, uint32_t state, uint32_t sp) {
   Stvewx(base, s.volume_address(), v0);
   const uint64_t at = uint64_t(uint32_t(uint32_t(r10) << 2)) + r9;
   r11 = r11 - r6;
-  StoreU64(base, sp - 152, r11);
+  slots.StoreU64(8, r11);
   mode.Scalar();
-  const double f13 = double(int64_t(LoadU64(base, sp - 152)));
+  const double f13 = double(int64_t(slots.LoadU64(8)));
   s.set_fraction(float(double(float(f13 * f0))));
   StorePositions(base, state, at, r8);
   return state;
@@ -816,6 +829,7 @@ uint64_t ResampleStereoScalar(uint8_t* base, uint32_t state, uint32_t sp) {
 uint64_t CopyStereoScalar(uint8_t* base, uint32_t state, uint32_t sp) {
   const ConverterState s(base, state);
   ITC_NATIVE_RUNNING("sub_82478E60 the stereo copy's scalar path");
+  Slots slots;  // the words 16 to 1 bytes below sp (no frame of its own)
   Mode mode;
   const uint32_t position = s.position();
   mode.Scalar();
@@ -833,24 +847,24 @@ uint64_t CopyStereoScalar(uint8_t* base, uint32_t state, uint32_t sp) {
   const uint64_t left = Ext(uint32_t(r6));
   double f13 = double(s.target_volume());
   f13 = double(float(f13 - f0));
-  StoreU64(base, sp - 16, left);
-  double f12 = double(int64_t(LoadU64(base, sp - 16)));
+  slots.StoreU64(0, left);
+  double f12 = double(int64_t(slots.LoadU64(0)));
   f12 = double(float(f12));
   f12 = double(float(f13 / f12));
   f13 = LoadSingle(base, 0x8204D160);
   do {
     int64_t sample = int16_t(guest::LoadU16(base, uint32_t(r11) + 2));
     r9 = r9 - 1;
-    StoreU64(base, sp - 16, uint64_t(sample));
-    double f11 = double(int64_t(LoadU64(base, sp - 16)));
+    slots.StoreU64(0, uint64_t(sample));
+    double f11 = double(int64_t(slots.LoadU64(0)));
     f11 = double(float(f11));
     f11 = double(float(f11 * f13));
     f11 = double(float(f11 * f0));
     guest::StoreFloat(base, uint32_t(r8) + 1024, float(f11));
     sample = int16_t(guest::LoadU16(base, uint32_t(r11)));
     r11 = r11 + 4;
-    StoreU64(base, sp - 8, uint64_t(sample));
-    f11 = double(int64_t(LoadU64(base, sp - 8)));
+    slots.StoreU64(8, uint64_t(sample));
+    f11 = double(int64_t(slots.LoadU64(8)));
     f11 = double(float(f11));
     f11 = double(float(f11 * f13));
     f11 = double(float(f11 * f0));
@@ -866,7 +880,7 @@ uint64_t CopyStereoScalar(uint8_t* base, uint32_t state, uint32_t sp) {
 uint64_t CopyStereo(uint8_t* base, uint32_t state, uint32_t sp) {
   const ConverterState s(base, state);
   ITC_NATIVE_RUNNING("sub_8247F558 the stereo copy");
-  const uint32_t frame = sp - 160;
+  Slots slots;  // the original's frame (160 bytes) +80 to +95
   const uint32_t position = s.position();
   const uint64_t end = s.input_end();
   const uint32_t channels = s.channels();
@@ -883,7 +897,7 @@ uint64_t CopyStereo(uint8_t* base, uint32_t state, uint32_t sp) {
     r9 = r7;
   }
   if ((((uint32_t(r9) & 7) | uint32_t(r8) | uint32_t(r11)) & 0xF) != 0) {
-    return CopyStereoScalar(base, state, frame);
+    return CopyStereoScalar(base, state, sp - 160);
   }
   Mode mode;
   const uint64_t left = Ext(uint32_t(r7));
@@ -893,27 +907,25 @@ uint64_t CopyStereo(uint8_t* base, uint32_t state, uint32_t sp) {
   double f0 = double(s.volume());
   double f13 = double(s.target_volume());
   f13 = double(float(f13 - f0));
-  StoreU64(base, frame + 80, left);
-  double f12 = double(int64_t(LoadU64(base, frame + 80)));
-  CopyFloat(base, frame + 80, s.volume_address());
-  StoreU64(base, frame + 88, r7);
-  Stvx(base, frame + 96, v0);
+  slots.StoreU64(0, left);
+  double f12 = double(int64_t(slots.LoadU64(0)));
+  slots.StoreU32(0, guest::LoadU32(base, s.volume_address()));
+  slots.StoreU64(8, r7);
   f12 = double(float(f12));
   f13 = double(float(f13 / f12));
-  double f11 = double(int64_t(LoadU64(base, frame + 88)));
-  Stvx(base, frame + 96, v0);
+  double f11 = double(int64_t(slots.LoadU64(8)));
   f11 = double(float(f11));
   f0 = double(float(std::fma(f11, f13, f0)));
   s.set_volume(float(f0));
   f0 = LoadSingle(base, 0x820021F8);
-  v0 = Lvlx(base, frame + 80);
+  v0 = slots.Lvlx(0);
   f0 = double(float(f13 * f0));
-  guest::StoreFloat(base, frame + 80, float(f0));
-  Vec v13 = Lvlx(base, frame + 80);
+  slots.StoreFloat(0, float(f0));
+  Vec v13 = slots.Lvlx(0);
   v0 = Splat0(v0);
-  guest::StoreFloat(base, frame + 80, float(f13));
+  slots.StoreFloat(0, float(f13));
   const Vec v8 = Splat0(v13);
-  Vec v12 = Lvlx(base, frame + 80);
+  Vec v12 = slots.Lvlx(0);
   v13 = Splat0(v12);
   Vec v11 = Lvx(base, 0x8204D250);
   mode.Vector();
@@ -980,15 +992,16 @@ uint64_t ResamplerProcess(uint8_t* base, uint32_t state, uint32_t frame, const G
   const uint32_t changed = s.changed();
   if (changed != 0) {
     if ((changed & 3) != 0) {
+      Slots slots;  // the caller's frame +80 to +95 (Framed's 128 bytes)
       Mode mode;
       const uint32_t out_rate = s.output_rate();
       const uint32_t in_rate = s.input_rate();
       const uint32_t flags = s.flags();
-      StoreU64(base, frame + 80, in_rate);
-      StoreU64(base, frame + 88, out_rate);
+      slots.StoreU64(0, in_rate);
+      slots.StoreU64(8, out_rate);
       mode.Scalar();
-      double f0 = double(int64_t(LoadU64(base, frame + 80)));
-      double f13 = double(int64_t(LoadU64(base, frame + 88)));
+      double f0 = double(int64_t(slots.LoadU64(0)));
+      double f13 = double(int64_t(slots.LoadU64(8)));
       f0 = double(float(f0));
       f13 = double(float(f13));
       f0 = double(float(f0 / f13));

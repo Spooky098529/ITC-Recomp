@@ -7,10 +7,13 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "hooks/heap.h"
 #include "schema/boot_mode.h"
 #include "schema/menu_helpers.h"
 #include "schema/power_graph_screen.h"
 #include "ui_movies/game.h"
+
+#include <optional>
 
 namespace power_graph_screen {
 
@@ -71,7 +74,10 @@ void SlotPost(uint8_t* base, uint32_t mode, uint32_t slot) {
 
 uint64_t OnEnter(uint8_t* base, uint32_t member, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82250778 PowerGraphScreen67::OnEnter");
-  const uint32_t frame = Frame(base, sp, 112);
+  // The original's 112-byte frame (only its back chain) left out: no guest
+  // call is made from it (E5 step 6).
+  (void)sp;
+  (void)calls;
   const Member m(base, member);
   m.set_machine_loaded(0);
   // Host objects (E5 step 5) in place of the VirtualAlloc(28) at 0x822507AC
@@ -115,7 +121,8 @@ uint64_t OnEnter(uint8_t* base, uint32_t member, uint32_t sp, const Calls& calls
 
 uint64_t WaitForLoad(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82250D70 PowerGraphScreen67::WaitForLoad");
-  Frame(base, sp, 96);
+  // The original's 96-byte frame (only its back chain) left out (E5 step 6).
+  (void)sp;
   const Member m(base, uint32_t(r3));
   if (m.machine_loaded() == 0) {
     const uint32_t loaded = ui_movies::IsLoaded(base, kMovie);
@@ -157,22 +164,34 @@ void Open(uint8_t* base, uint32_t member) {
 uint64_t Leave(uint8_t* base, uint64_t r3, uint64_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82250900 PowerGraphScreen67::Leave");
   const Member m(base, uint32_t(r3));
-  const uint32_t frame = Frame(base, sp, 112);
+  // The original's 112-byte frame held only its back chain: its calls run
+  // from `sp` (E5 step 6; neither reads its caller's frame).
   m.set_machine_state(7);
-  calls.Call(kMoviesDelete, frame, 0x82250924, kMovie);
+  calls.Call(kMoviesDelete, sp, 0x82250924, kMovie);
   // The member's slot 1 (its leave message).
   const uint32_t slot = m.vtable().post_leave();
-  const uint64_t answer = calls.Call(slot, frame, 0x8225093C, r3, mode);
+  const uint64_t answer = calls.Call(slot, sp, 0x8225093C, r3, mode);
   m.set_machine_state(7);
   return answer;
 }
 
 uint64_t OnLeft(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822502C0 PowerGraphScreen67::OnLeft");
-  const uint32_t frame = Frame(base, sp, 112);
-  calls.Call(kVirtualFree, frame, 0x822502E8, G::pages(base).address, 0, 0x8000);
-  calls.Call(kVirtualFree, frame, 0x822502FC, G::menu(base).address, 0, 0x8000);
-  const uint64_t r3 = calls.Call(kVirtualFree, frame, 0x82250310, G::data(base).address, 0, 0x8000);
+  // VirtualFree (sub_82295330) as its adapter answers it, called directly
+  // (E5 step 6); through the dispatch, from the original's 112-byte frame,
+  // where the adapter runs the original.
+  constexpr uint32_t kMemRelease = 0x8000;
+  const auto free = [&](uint32_t pages, uint32_t lr) -> uint64_t {
+    std::optional<uint32_t> freed;
+    if (pages != 0) {
+      freed = hooks::VirtualFree(pages, 0, kMemRelease, lr);
+    }
+    return freed ? uint64_t(*freed)
+                 : calls.Call(kVirtualFree, Frame(base, sp, 112), lr, pages, 0, kMemRelease);
+  };
+  free(G::pages(base).address, 0x822502E8);
+  free(G::menu(base).address, 0x822502FC);
+  const uint64_t r3 = free(G::data(base).address, 0x82250310);
   G::set_pages(base, 0u);
   G::set_menu(base, 0u);
   G::set_data(base, 0u);

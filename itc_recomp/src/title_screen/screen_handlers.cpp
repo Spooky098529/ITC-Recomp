@@ -9,24 +9,29 @@ namespace title_screen {
 
 namespace {
 
-// The pages' table in Draw's frame: PressStart (TitleScreen::Update),
+// The pages' table the original built in Draw's frame (a C++ array since E5
+// step 6): PressStart (TitleScreen::Update),
 // LoadGameData, MainMenu, CareerMenu, Menu4, LeavePage.
 constexpr uint32_t kPageTable[6] = {0x822221A0, 0x82222688, 0x82222700,
                                     0x82221AC0, 0x82222378, 0x822229D0};
-// The transitions' table in Update's frame (+96 on): 0 Intro to 17
+// The transitions' table the original built in Update's frame (+96 on; a
+// C++ array since E5 step 6): 0 Intro to 17
 // MoveMenu4Cursor; 8 the type 2 hub's fade out.
 constexpr uint32_t kTransitionTable[18] = {
     0x82222B60, 0x82222BF8, 0x82222C90, 0x82222D40, 0x82223B78, 0x82223C38,
     0x82222DD0, 0x82222E88, 0x8218ED98, 0x82223050, 0x822231B0, 0x82223D70,
     0x82223328, 0x82223428, 0x82223E58, 0x82223F30, 0x82223FD8, 0x822235D0};
-// The main menu's texts.
+// The main menu's texts (the original's SetUp frame's +96 on; a C++ array
+// since E5 step 6).
 constexpr uint32_t kMainTexts[7] = {248, 249, 250, 257, 251, 252, 253};
 
 }  // namespace
 
 uint64_t ScreenCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82221D98 TitleScreen::Create");
-  const uint32_t frame = Frame(base, sp, 112);
+  // No guest frame (E5 step 6): nothing here calls guest code.
+  (void)sp;
+  (void)calls;
   const Machine m(base, machine);
   m.set_loaded(0);
   // Host objects (E5 step 5) in place of the VirtualAlloc(28) at 0x82221DC4,
@@ -68,7 +73,7 @@ uint64_t ScreenOpenMovie(uint32_t sp, uint32_t lr, const Calls& calls) {
 uint64_t ScreenWaitForMovie(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82221FC8 TitleScreen::WaitForMovie");
   const Machine m(base, uint32_t(r3));
-  Frame(base, sp, 96);
+  (void)sp;  // no guest frame (E5 step 6): nothing here calls guest code
   if (m.loaded() == 0) {
     r3 = ui_movies::IsLoaded(base, kTitleMovie);
     if (uint32_t(r3) != 0) {
@@ -85,14 +90,11 @@ uint64_t ScreenSetUp(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82222A50 TitleScreen::SetUp");
   const uint32_t frame = Frame(base, sp, 176);
   const uint32_t movie = FindMovie(base, kTitleMovie, frame + 80);
-  for (uint32_t i = 0; i < 7; i++) {
-    Store(base, frame + 96 + 4 * i, kMainTexts[i]);
-  }
   calls.Call(kResetPose, frame, 0x82222AB8, movie);
   uint64_t r3 = 0;
   for (uint32_t i = 0; i < 7; i++) {
     // r7 to r10 unset in the original: 0 (the user's call, 2026-10-30).
-    r3 = calls.Call(kSetText, frame, 0x82222AD4, movie, 4, i + 5, Load(base, frame + 96 + 4 * i));
+    r3 = calls.Call(kSetText, frame, 0x82222AD4, movie, 4, i + 5, kMainTexts[i]);
   }
   const uint32_t from_boot = Words(base).from_boot();
   const auto pages = G::pages(base);
@@ -145,14 +147,13 @@ uint64_t ScreenDraw(uint8_t* base, uint64_t r3, uint64_t mode, uint32_t sp, cons
   ITC_NATIVE_RUNNING("sub_82223A18 TitleScreen::Draw");
   const uint32_t frame = Frame(base, sp, 128);
   const uint32_t page = G::pages(base).page();
-  for (uint32_t k = 0; k < 6; k++) {
-    Store(base, frame + 80 + 4 * k, kPageTable[k]);
-  }
   if (page == kNone) {
     return r3;
   }
-  // No bounds check, as the original: the word at the table's index.
-  return calls.Call(Load(base, frame + 80 + (page << 2)), frame, 0x82223AA4, mode, r3);
+  // No bounds check in the original: past the table, the frame's word at
+  // the index, as it read it.
+  const uint32_t function = page < 6 ? kPageTable[page] : Load(base, frame + 80 + (page << 2));
+  return calls.Call(function, frame, 0x82223AA4, mode, r3);
 }
 
 uint64_t ScreenUpdate(uint8_t* base, uint32_t sp, const Calls& calls) {
@@ -163,17 +164,16 @@ uint64_t ScreenUpdate(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t movie = FindMovie(base, kTitleMovie, frame + 80);
   const auto pages = G::pages(base);
   const uint32_t running = pages.step();
-  for (uint32_t k = 0; k < 18; k++) {
-    Store(base, frame + 96 + 4 * k, kTransitionTable[k]);
-  }
   if (running == kNone) {
     return calls.Call(kRun, frame, 0x82224264, movie, 0);
   }
   uint64_t r3 = movie;
   if (int32_t(running) >= 0) {
-    // No bounds check: the word at the table's index.
-    r3 = calls.Call(Load(base, frame + 96 + (running << 2)), frame, 0x822241FC,
-                    pages.step_started_address());
+    // No bounds check in the original: past the table, the frame's word at
+    // the index, as it read it.
+    const uint32_t function =
+        running < 18 ? kTransitionTable[running] : Load(base, frame + 96 + (running << 2));
+    r3 = calls.Call(function, frame, 0x822241FC, pages.step_started_address());
     if (uint32_t(r3) == 0) {
       return r3;
     }
@@ -239,7 +239,7 @@ uint64_t ScreenUnload(uint8_t* base, uint32_t machine, uint32_t sp, const Calls&
 
 uint64_t ScreenOpenNext(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82222538 TitleScreen::OpenNext");
-  Frame(base, sp, 112);
+  (void)sp;  // no guest frame (E5 step 6): nothing here calls guest code
   const uint32_t selection = race_screens::ListSelection(base, ListAddress(base));
   if (selection == 6) {
     Post(base, mode, 10);
@@ -285,11 +285,10 @@ uint64_t ScreenDestroy(uint8_t* base, uint32_t machine, uint32_t sp, const Calls
     Machine(base, machine).set_state(state);
   }
   calls.Call(kListRelease, frame, 0x82221F60, ListAddress(base));
-  calls.Call(kVirtualFree, frame, 0x82221F7C, G::pages(base).address, 0, kMemRelease);
-  calls.Call(kVirtualFree, frame, 0x82221F8C, ListAddress(base), 0, kMemRelease);
-  calls.Call(kVirtualFree, frame, 0x82221FA0, G::menu(base).address, 0, kMemRelease);
-  const uint64_t r3 =
-      calls.Call(kVirtualFree, frame, 0x82221FB0, Words(base).address, 0, kMemRelease);
+  FreePages(G::pages(base).address, frame, 0x82221F7C, calls);
+  FreePages(ListAddress(base), frame, 0x82221F8C, calls);
+  FreePages(G::menu(base).address, frame, 0x82221FA0, calls);
+  const uint64_t r3 = FreePages(Words(base).address, frame, 0x82221FB0, calls);
   G::set_pages(base, 0u);
   G::set_list(base, 0u);
   G::set_data(base, 0u);

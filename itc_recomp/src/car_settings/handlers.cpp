@@ -5,6 +5,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "hooks/heap.h"
 #include "schema/car_settings.h"
 #include "schema/menu_helpers.h"
 #include "schema/mode_tick.h"
@@ -49,7 +50,9 @@ void Post(uint8_t* base, uint32_t mode, uint32_t id) {
 
 uint64_t Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821AA2F8 CarSettings::Create");
-  const uint32_t frame = Frame(base, sp, 112);
+  // No guest frame (E5 step 6): nothing here calls guest code.
+  (void)sp;
+  (void)calls;
   const Machine m(base, machine);
   m.set_loaded(0);
   // Host objects (E5 step 5) in place of the VirtualAlloc(28) at 0x821AA32C
@@ -99,7 +102,7 @@ uint64_t OpenMovie(uint8_t*, uint32_t sp, uint32_t lr, const Calls& calls) {
 uint64_t WaitForMovie(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821AA490 CarSettings::WaitForMovie");
   const Machine m(base, uint32_t(r3));
-  Frame(base, sp, 96);
+  (void)sp;  // no guest frame (E5 step 6): nothing here calls guest code
   if (m.loaded() == 0) {
     r3 = ui_movies::IsLoaded(base, kMovie);
     if (uint32_t(r3) != 0) {
@@ -134,10 +137,20 @@ uint64_t Destroy(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& call
   ITC_NATIVE_RUNNING("sub_821AA408 CarSettings::Destroy");
   const uint32_t frame = Frame(base, sp, 128);
   Machine(base, machine).set_state(G::data(base).test_run_set_up() == 1 ? 11 : 6);
-  calls.Call(kVirtualFree, frame, 0x821AA450, G::pages(base).address, 0, kMemRelease);
-  calls.Call(kVirtualFree, frame, 0x821AA464, G::menu(base).address, 0, kMemRelease);
-  const uint64_t r3 =
-      calls.Call(kVirtualFree, frame, 0x821AA474, G::data(base).address, 0, kMemRelease);
+  // VirtualFree straight to the allocation layer (hooks::VirtualFree, its
+  // adapter's answer, E5 step 6); through the guest where the adapter would
+  // run the original or answer an address of 0.
+  auto virtual_free = [&](uint32_t address, uint32_t lr) -> uint64_t {
+    if (address != 0) {
+      if (const auto freed = hooks::VirtualFree(address, 0, kMemRelease, lr)) {
+        return *freed;
+      }
+    }
+    return calls.Call(kVirtualFree, frame, lr, address, 0, kMemRelease);
+  };
+  virtual_free(G::pages(base).address, 0x821AA450);
+  virtual_free(G::menu(base).address, 0x821AA464);
+  const uint64_t r3 = virtual_free(G::data(base).address, 0x821AA474);
   G::set_pages(base, 0u);
   G::set_menu(base, 0u);
   G::set_data(base, 0u);

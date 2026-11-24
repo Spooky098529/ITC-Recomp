@@ -32,9 +32,10 @@ constexpr uint32_t kVinylAlphaReference = 0x82000A34;
 // pages) stored at `header_out` and cleared, set by XGSetTextureHeader (one
 // level, usage 2, `format`, no addresses or pitch); its data
 // (XPhysicalAlloc(size, -1, 0, 0x404)) stored at `data_out` and cleared; the
-// header relocated to it (Resource::Relocate). `stack` is the guest r1 at
-// entry: XGSetTextureHeader's stack words (+84 the pitch, +92 the header,
-// +100, +108 the sizes' pointers) written in its frame as the original's.
+// header relocated to it (Resource::Relocate). `stack` (the guest r1 at
+// entry) is unused since E5 step 6: XGSetTextureHeader's stack words (+84
+// the pitch, +92 the header, +100, +108 the sizes' pointers), which the
+// original wrote in its 160-byte frame, are the native call's arguments.
 // Returns 1 (the original's r3). Each word is read back from guest memory
 // where the original reloads it.
 uint32_t TextureCreate(uint8_t* base, uint32_t format, uint32_t width, uint32_t height,

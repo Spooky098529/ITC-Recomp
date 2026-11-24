@@ -15,6 +15,7 @@
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
+#include <array>
 #include <bit>
 #include <cstring>
 #include <initializer_list>
@@ -52,19 +53,11 @@ constexpr uint32_t kZero = 0x82000A34;  // 0.0
 constexpr uint32_t kOne = 0x82000A30;   // 1.0
 constexpr uint32_t kPoseY = 0x82009EAC;
 
-// The vectors a pose or preset is built from, below `sp` (-48 to -1), as
-// the originals' leaves store them: (z, z, z, w) twice, then (z, `y`, z, w).
-void ScratchVectors(uint8_t* base, uint32_t sp, uint32_t z, uint32_t w, uint32_t y) {
-  const uint32_t words[12] = {z, z, z, w, z, z, z, w, z, y, z, w};
-  for (uint32_t i = 0; i < 12; i++) {
-    StoreU32(base, sp - 48 + 4 * i, words[i]);
-  }
-}
-
-void CopyWords(uint8_t* base, uint32_t to, uint32_t from, uint32_t count) {
-  for (uint32_t i = 0; i < count; i++) {
-    StoreU32(base, to + 4 * i, LoadU32(base, from + 4 * i));
-  }
+// The vectors a pose or preset is built from, as the originals' leaves
+// store them below their sp (-48 to -1; read back only by the leaf, so a
+// C++ array since E5 step 6): (z, z, z, w) twice, then (z, `y`, z, w).
+std::array<uint32_t, 12> ScratchVectors(uint32_t z, uint32_t w, uint32_t y) {
+  return {z, z, z, w, z, z, z, w, z, y, z, w};
 }
 
 // A message (three words: `message`, 0, 0) queued in a dispatcher's ring
@@ -103,9 +96,12 @@ uint64_t GarageStageResetPose(uint8_t* base, uint64_t r3, uint32_t sp) {
   const uint32_t zero = ThroughFloat(base, kZero);
   const uint32_t one = ThroughFloat(base, kOne);
   const uint32_t y = ThroughFloat(base, kPoseY);
-  ScratchVectors(base, sp, zero, one, y);
+  (void)sp;  // the scratch vectors below it are a C++ array (E5 step 6)
+  const std::array<uint32_t, 12> words = ScratchVectors(zero, one, y);
   StoreU32(base, pose + 0, zero);
-  CopyWords(base, pose + 16, sp - 48, 12);
+  for (uint32_t i = 0; i < 12; i++) {
+    StoreU32(base, pose + 16 + 4 * i, words[i]);
+  }
   StoreU32(base, pose + 64, 0);
   return r3;
 }
@@ -115,13 +111,14 @@ uint64_t CameraPresetConstruct(uint8_t* base, uint64_t r3, uint32_t sp) {
   const schema::CameraPreset preset(base, uint32_t(r3));
   const uint32_t zero = ThroughFloat(base, kZero);
   const uint32_t one = ThroughFloat(base, kOne);
-  ScratchVectors(base, sp, zero, one, zero);
+  (void)sp;  // the scratch vectors below it are a C++ array (E5 step 6)
+  const std::array<uint32_t, 12> words = ScratchVectors(zero, one, zero);
   preset.set_elevation_bits(zero);
   preset.set_value_8_bits(zero);
   preset.set_value_12_bits(zero);
   // The three vectors (+16, +32, +48), twelve words.
   for (uint32_t i = 0; i < 12; i++) {
-    SetPresetWord(preset, 16 + 4 * i, LoadU32(base, sp - 48 + 4 * i));
+    SetPresetWord(preset, 16 + 4 * i, words[i]);
   }
   return r3;
 }
@@ -346,18 +343,15 @@ uint64_t ControllerOptionsStepSide(uint8_t* base, uint32_t offset, uint32_t last
 
 uint64_t ControllerOptionsSetMarkY(uint8_t* base, uint64_t y, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821C0238 ControllerOptions::SetMarkY");
-  const uint32_t frame = sp - 112;
-  StoreU32(base, frame, sp);
-  StoreU32(base, frame + 80, 7);
+  // No guest frame (E5 step 6): its slots (movie 7's id, then the int's
+  // doubleword for the conversion: std, lfd, fcfid, frsp) are C++ values,
+  // and it calls no guest code.
+  (void)sp;
   const uint32_t movie =
-      schema::UiMovieWord(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80)).value();
+      schema::UiMovieWord(base, ui_movies::PairsFindKey(base, ui_movies::kMovieTable, 7)).value();
   const uint32_t node = ui_movies::FindNode(base, movie, 8, 5);
   const uint32_t child = ui_movies::Child(base, ui_movies::Child(base, node, 0), 0);
-  // The int's doubleword stored over the key for the conversion (std, lfd,
-  // fcfid, frsp).
   const int64_t value = int32_t(uint32_t(y));
-  StoreU32(base, frame + 80, uint32_t(uint64_t(value) >> 32));
-  StoreU32(base, frame + 84, uint32_t(uint64_t(value)));
   schema::UiMovieNode(base, child).set_y(float(double(value)));
   return child;
 }

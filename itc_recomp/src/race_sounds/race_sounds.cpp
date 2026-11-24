@@ -75,7 +75,9 @@ uint64_t MusicCategory(uint8_t* base, uint32_t frame, uint32_t slot, uint32_t ge
 uint64_t SetListener(uint8_t* base, uint64_t position, uint64_t front, uint64_t top,
                      uint64_t velocity, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821758A0 RaceSounds::SetListener");
-  const uint32_t frame = Frame(base, sp, 112);
+  // No slots (E5 step 6): the manager's calls made from `sp` (their
+  // arguments are the caller's vectors, in its frame above `sp`).
+  const uint32_t frame = sp;
   schema::AudioManager manager = SoundManager(base);
   calls.Call(manager.vtable().set_listener_orientation(), frame, 0x821758CC, 4, manager.address,
              front, top, velocity);
@@ -160,12 +162,14 @@ uint64_t Resume(uint8_t* base, uint32_t sp, const Calls& calls) {
 
 uint64_t PauseCars(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82175C00 RaceSounds::PauseCars");
-  return PauseEach(base, Frame(base, sp, 112), 0x82175C34, calls);
+  // No frame (E5 step 6): the calls made from `sp`.
+  return PauseEach(base, sp, 0x82175C34, calls);
 }
 
 uint64_t ResumeCars(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82175C58 RaceSounds::ResumeCars");
-  return ResumeFirst(base, Frame(base, sp, 112), 0x82175C7C, calls);
+  // No frame (E5 step 6): the calls made from `sp`.
+  return ResumeFirst(base, sp, 0x82175C7C, calls);
 }
 
 uint64_t OnStageCountdown(uint8_t* base, uint64_t r3) {
@@ -180,7 +184,7 @@ uint64_t OnStageCountdown(uint8_t* base, uint64_t r3) {
 uint64_t OnRollingStartDone(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82175D48 RaceSounds::OnRollingStartDone");
   const uint32_t machine = uint32_t(r3);
-  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t frame = sp;  // no frame (E5 step 6): the call made from `sp`
   const uint32_t flags = Sounds(base, machine).flags();
   if ((flags & 0x20000) && !(flags & 0x4000)) {
     r3 = calls.Call(kCarSoundsStopAll, frame, 0x82175D74, 1, r3);

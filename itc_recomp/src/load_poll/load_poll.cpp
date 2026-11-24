@@ -152,7 +152,9 @@ uint64_t CarModelIsReady(uint8_t* base, uint32_t car_model) {
 
 uint64_t CarPartsSetVinylTextures(uint8_t* base, uint32_t parts, uint64_t r3, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820D72D8 CarParts::SetVinylTextures");
-  Frame(base, stack, 128);
+  // The original's 128-byte frame held nothing this port reads or hands
+  // on (its callee takes no r1): not made (E5 step 6).
+  (void)stack;
   const CarParts cp(base, parts);
   const uint32_t set = cp.first_set().model_set();
   const int32_t count = set < 1 ? 216 : (set == 1 ? 187 : 0);
@@ -554,7 +556,9 @@ uint64_t SceneWheelsSetUpPoints(uint8_t* base, uint32_t object, uint64_t r3, uin
 uint64_t ScenePartsSetSelectedTexture(uint8_t* base, uint32_t parts, uint64_t r3,
                                       uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DF250 SceneParts::SetSelectedTexture");
-  Frame(base, stack, 112);
+  // The original's 112-byte frame held nothing this port reads or hands
+  // on: not made (E5 step 6).
+  (void)stack;
   const SceneParts p(base, parts);
   for (uint32_t k = 0; k < 17; k++) {
     const uint32_t slot = p.part_model_0_address() + 4 * k;

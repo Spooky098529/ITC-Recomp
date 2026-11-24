@@ -518,7 +518,7 @@ uint32_t ModelAsset(uint8_t* base, uint32_t config, uint32_t area, uint32_t mode
   return 0xFFFFFFFFu;
 }
 
-uint64_t PoolSizes(uint8_t* base, uint32_t area_counts, uint32_t model_counts, uint32_t out,
+uint64_t PoolSizes(uint8_t* base, uint32_t area_counts, uint32_t model_counts, uint32_t out[5],
                    uint32_t config) {
   ITC_NATIVE_RUNNING("sub_820F2030 Scenery::PoolSizes");
   uint64_t r3 = 0;
@@ -589,7 +589,7 @@ uint64_t PoolSizes(uint8_t* base, uint32_t area_counts, uint32_t model_counts, u
       Store(base, model_counts + 4, 16);
       Store(base, model_counts + 4, models < 16 ? models : 16);
     }
-    Store(base, out + 4 * pool, uint32_t(total));
+    out[pool] = uint32_t(total);
   }
   return r3;
 }
@@ -776,10 +776,10 @@ bool UnloadPools(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t man
   if (!hooks::NativeHeapActive()) {
     return false;
   }
-  const uint32_t frame = stack - 112;
-  Store(base, frame, stack);
+  // The original's 112-byte frame holds only its back chain: Shutdown's
+  // guest calls make their frames below `stack` (E5 step 6).
   uint32_t shutdown_r3 = 0;
-  Require(Shutdown(base, calls, frame, manager, &shutdown_r3), "Scenery::UnloadPools' Shutdown");
+  Require(Shutdown(base, calls, stack, manager, &shutdown_r3), "Scenery::UnloadPools' Shutdown");
   const Manager m(base, manager);
   if (m.load_buffer() != 0) {
     m.set_load_buffer(0);
@@ -819,14 +819,13 @@ bool Unload(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
   if (!hooks::NativeHeapActive()) {
     return false;
   }
-  const uint32_t frame = stack - 96;
-  Store(base, frame, stack);
+  // The original's 96-byte frame held only its back chain (E5 step 6).
   const Manager m(base, manager);
   if (const uint32_t areas = m.visible_areas().address; areas != 0) {
     FreePhysical(base, areas);
     m.set_visible_areas(0);
   }
-  return UnloadPools(base, calls, frame, manager, r3);
+  return UnloadPools(base, calls, stack, manager, r3);
 }
 
 uint32_t Destroy(uint8_t* base) {
@@ -860,9 +859,8 @@ uint32_t Create(uint8_t* base) {
 uint32_t Setup(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
                uint32_t config) {
   ITC_NATIVE_RUNNING("sub_820F3020 Scenery::Setup");
-  const uint32_t frame = stack - 112;
-  Store(base, frame, stack);
-  SetupPools(base, calls, frame, manager, config);
+  // The original's 112-byte frame held only its back chain (E5 step 6).
+  SetupPools(base, calls, stack, manager, config);
   const Manager m(base, manager);
   const uint32_t areas = m.area_count();
   const uint32_t models = m.model_count();
@@ -895,7 +893,9 @@ uint32_t SetupPools(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t 
   if (int32_t(m.mode()) == 2 && m.view_count_minus_1() == 0) {
     m.set_mode(m.mode2_source().value());
   }
-  const uint32_t sizes = frame + 80;  // PoolSizes' five words
+  // PoolSizes' five words, the original's frame +80 to +99, which only this
+  // function reads: host words (E5 step 6).
+  uint32_t sizes[5] = {};
   PoolSizes(base, m.area_count_address(), m.model_count_address(), sizes, copy);
   // List A: the areas (pool 3).
   const uint32_t area_count = m.area_count();
@@ -958,7 +958,7 @@ uint32_t SetupPools(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t 
   // data size, +12 and +16 the counts, +20 the factory (MakePoolObject).
   constexpr uint32_t kMakePoolObject = 0x820F2638;
   const uint32_t descriptors = frame + 112;
-  const uint32_t first_size = Load(base, sizes + 0);
+  const uint32_t first_size = sizes[0];
   uint32_t object_size = 0, count = 0, data_count = 0;
   for (uint32_t pool = 0; pool < 5; pool++) {
     const uint32_t mode = m.mode();
@@ -970,7 +970,7 @@ uint32_t SetupPools(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t 
           count = 1;
           data_count = 0;
           m.set_pool0_block(AllocPhysical(base, first_size));
-          Store(base, sizes + 0, 0);
+          sizes[0] = 0;
         }
         break;
       case 1:
@@ -995,8 +995,8 @@ uint32_t SetupPools(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t 
         count = mode == 0 ? m.model_count() : m.model_cap();
         data_count = mode == 0 ? 1 : count;
         const uint32_t limit = G::load_buffer_size(base);
-        const uint32_t extra = limit < Load(base, sizes + 16) ? 0 : G::load_buffer(base);
-        Store(base, sizes + 16, 0);
+        const uint32_t extra = limit < sizes[4] ? 0 : G::load_buffer(base);
+        sizes[4] = 0;
         m.set_load_buffer(extra);
         break;
       }
@@ -1006,7 +1006,7 @@ uint32_t SetupPools(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t 
     d.set_object_size(object_size);
     d.set_object_count(count);
     d.set_data_count(data_count);
-    d.set_data_size(Load(base, sizes + 4 * pool));
+    d.set_data_size(sizes[pool]);
     d.set_factory(kMakePoolObject);
   }
   uint32_t r3 = 0;
@@ -1137,12 +1137,11 @@ uint32_t ListLoadAll(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t
 uint32_t SceneryIsLoaded(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
                          bool native_queue) {
   ITC_NATIVE_RUNNING("sub_820F1F68 Scenery::IsLoaded");
-  const uint32_t frame = stack - 112;
-  Store(base, frame, stack);
+  // The original's 112-byte frame held only its back chain (E5 step 6).
   const Manager m(base, manager);
   if (m.loading_all() != 0) {
-    if (ListLoadAll(base, calls, frame, manager, m.list_a_pool_address(), native_queue) == 0 ||
-        ListLoadAll(base, calls, frame, manager, m.list_b_pool_address(), native_queue) == 0) {
+    if (ListLoadAll(base, calls, stack, manager, m.list_a_pool_address(), native_queue) == 0 ||
+        ListLoadAll(base, calls, stack, manager, m.list_b_pool_address(), native_queue) == 0) {
       return 0;
     }
   }
@@ -1364,8 +1363,8 @@ uint32_t CreateXpr(uint8_t* base, ParseCalls& parse, uint32_t xpr, uint32_t file
 uint32_t CourseSetParse(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set) {
   ITC_NATIVE_RUNNING("sub_820F1A70 CourseSet::Parse");
   ParseCalls parse{base, &calls, stack};
-  const uint32_t frame = stack - 128;
-  Store(base, frame, stack);
+  // The original's 128-byte frame held only its back chain (E5 step 6): the
+  // lists' loads make theirs below `stack`.
   const schema::CourseSet cs(base, set);
   const uint32_t first = cs.first_file();
   uint32_t entry = game_data::GetEntry(base, first, 0, true);
@@ -1390,15 +1389,15 @@ uint32_t CourseSetParse(uint8_t* base, const Calls& calls, uint32_t stack, uint3
   for (uint32_t i = 0; i < 5; i++) {
     entry = game_data::GetEntry(base, first, 2 + i, true);
     if (entry != 0) {
-      const uint32_t list_frame = frame - 160;
-      Store(base, list_frame, frame);
+      const uint32_t list_frame = stack - 160;
+      Store(base, list_frame, stack);
       scenery_lists::ModelListLoad(base, kLists[i], entry, list_frame, list_calls);
     }
   }
   entry = game_data::GetEntry(base, first, 7, true);
   if (entry != 0) {
-    const uint32_t points_frame = frame - 192;
-    Store(base, points_frame, frame);
+    const uint32_t points_frame = stack - 192;
+    Store(base, points_frame, stack);
     scenery_lists::ModelListLoadPoints(base, cs.points_address(), entry, points_frame, list_calls);
   }
   const uint32_t second = cs.second_file();
@@ -1428,7 +1427,6 @@ uint32_t AreaLightsParse(uint8_t* base, uint32_t lights) {
 uint32_t AreaModelParse(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t model) {
   ITC_NATIVE_RUNNING("sub_820F1258 AreaModel::Parse");
   ParseCalls parse{base, &calls, stack};
-  Store(base, stack - 144, stack);
   const schema::AreaModel am(base, model);
   const uint32_t file = G::manager(base).load_buffer();
   const uint32_t entry = game_data::GetEntry(base, file, 0, true);
@@ -1458,9 +1456,7 @@ uint32_t AreaLightsOnLoaded(uint8_t* base, uint32_t lights) {
 
 uint32_t AreaModelOnLoaded(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t model) {
   ITC_NATIVE_RUNNING("sub_820F1CE8 AreaModel::OnLoaded");
-  const uint32_t frame = stack - 96;
-  Store(base, frame, stack);
-  AreaModelParse(base, calls, frame, model);
+  AreaModelParse(base, calls, stack, model);  // its 96-byte frame only a back chain
   MarkLoaded(base, model);
   return model;
 }
@@ -1519,7 +1515,7 @@ struct ListRelease {
 uint32_t MakePoolObject(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t pool,
                         uint32_t object, uint32_t own_size, uint32_t data_size, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_820F2638 Scenery::MakePoolObject");
-  Store(base, stack - 96, stack);
+  // The original's 96-byte frame held only its back chain (E5 step 6).
   if (pool >= 5 || object == 0) {
     return object;
   }
@@ -1531,7 +1527,7 @@ uint32_t MakePoolObject(uint8_t* base, const Calls& calls, uint32_t stack, uint3
       schema::SceneryBlockObject(base, object).set_block(0);
       break;
     case 2:
-      CourseSetConstruct(base, calls, stack - 96, object, own_size, data_size, index);
+      CourseSetConstruct(base, calls, stack, object, own_size, data_size, index);
       break;
     case 3:
       ConstructObject(base, object, own_size, data_size, index);
@@ -1539,7 +1535,7 @@ uint32_t MakePoolObject(uint8_t* base, const Calls& calls, uint32_t stack, uint3
       models::XprConstruct(base, schema::AreaLights(base, object).xpr_address());
       break;
     default:
-      AreaModelConstruct(base, calls, stack - 96, object, own_size, data_size, index);
+      AreaModelConstruct(base, calls, stack, object, own_size, data_size, index);
       break;
   }
   return object;
@@ -1548,12 +1544,11 @@ uint32_t MakePoolObject(uint8_t* base, const Calls& calls, uint32_t stack, uint3
 void CourseSetConstruct(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set,
                         uint32_t own_size, uint32_t data_size, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_820F2478 CourseSet::CourseSet");
-  const uint32_t frame = stack - 112;
-  Store(base, frame, stack);
+  // The original's 112-byte frame held only its back chain (E5 step 6).
   ConstructObject(base, set, own_size, data_size, index);
   const schema::CourseSet cs(base, set);
   cs.set_vtable(schema::CourseSet::kVtable);
-  CourseSetInitParts(base, calls, frame, cs.xpr_address());
+  CourseSetInitParts(base, calls, stack, cs.xpr_address());
   cs.set_first_file(0);
   cs.set_second_file(0);
   cs.set_area_file(0u);
@@ -1576,7 +1571,6 @@ void CourseSetConstruct(uint8_t* base, const Calls& calls, uint32_t stack, uint3
 
 void CourseSetInitParts(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t parts) {
   ITC_NATIVE_RUNNING("sub_820F2230 CourseSet::InitParts");
-  Store(base, stack - 112, stack);
   ParseCalls parse{base, &calls, stack};
   models::XprConstruct(base, parts);
   MakeModel(base, parse, parts + 32, 0x820F2254);
@@ -1593,7 +1587,6 @@ void CourseSetInitParts(uint8_t* base, const Calls& calls, uint32_t stack, uint3
 void AreaModelConstruct(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t model,
                         uint32_t own_size, uint32_t data_size, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_820F1C68 AreaModel::AreaModel");
-  Store(base, stack - 112, stack);
   ParseCalls parse{base, &calls, stack};
   ConstructObject(base, model, own_size, data_size, index);
   const schema::AreaModel am(base, model);
@@ -1607,8 +1600,6 @@ void AreaModelConstruct(uint8_t* base, const Calls& calls, uint32_t stack, uint3
 
 uint32_t CourseSetReset(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set) {
   ITC_NATIVE_RUNNING("sub_820F1138 CourseSet::Reset");
-  const uint32_t frame = stack - 96;
-  Store(base, frame, stack);
   ParseCalls parse{base, &calls, stack};
   const schema::CourseSet cs(base, set);
   ReleaseXpr(base, parse, cs.xpr_address(), 0x820F1154);
@@ -1621,8 +1612,6 @@ uint32_t CourseSetReset(uint8_t* base, const Calls& calls, uint32_t stack, uint3
   for (uint32_t list : {cs.list_a_address(), cs.list_b_address(), cs.list_c_count_address(),
                         cs.list_d_count_address(), cs.list_e_count_address(),
                         cs.points_address()}) {
-    // ModelList::Release's frame (128 bytes) below this one.
-    Store(base, frame - 128, frame);
     scenery_lists::ModelListRelease(base, list, release);
   }
   ResetObject(base, set);
@@ -1631,7 +1620,6 @@ uint32_t CourseSetReset(uint8_t* base, const Calls& calls, uint32_t stack, uint3
 
 uint32_t AreaModelReset(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t model) {
   ITC_NATIVE_RUNNING("sub_820F12F8 AreaModel::Reset");
-  Store(base, stack - 112, stack);
   ParseCalls parse{base, &calls, stack};
   const schema::AreaModel am(base, model);
   const uint32_t mesh = am.model().address;
@@ -1651,7 +1639,6 @@ uint32_t AreaModelReset(uint8_t* base, const Calls& calls, uint32_t stack, uint3
 uint32_t SceneryModelDestruct(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t model,
                               uint32_t flags) {
   ITC_NATIVE_RUNNING("sub_820F1208 AreaModel::~Model");
-  Store(base, stack - 112, stack);
   ParseCalls parse{base, &calls, stack};
   if (!models::ModelDestruct(base, model)) {
     parse.Call(0x820F1228, 0x82594F58, {model});
@@ -1751,9 +1738,7 @@ uint64_t AreaModelLoad(uint8_t* base, uint32_t model, const archive::LoadCall& l
 
 uint32_t CourseSetOnLoaded(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set) {
   ITC_NATIVE_RUNNING("sub_820F22B8 CourseSet::OnLoaded");
-  const uint32_t frame = stack - 96;
-  Store(base, frame, stack);
-  CourseSetParse(base, calls, frame, set);
+  CourseSetParse(base, calls, stack, set);  // its 96-byte frame only a back chain
   FreePhysical(base, schema::CourseSet(base, set).first_file());
   MarkLoaded(base, set);
   return set;

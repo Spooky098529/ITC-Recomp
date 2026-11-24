@@ -100,10 +100,10 @@ uint64_t Named(const front_end_car_draw::Calls& calls, uint32_t function, uint32
   return calls.call(function, regs, count, nullptr, 0, frame, lr, nullptr);
 }
 
-// Movie 6: its id at frame + 80, then UiMovies::Find.
-uint32_t StandMovie(uint8_t* base, uint32_t frame) {
-  Store(base, frame + 80, kStandMovie);
-  return Load(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+// Movie 6: UiMovies::Find by its id (the original's key at frame + 80, read
+// only by Find: a word since E5 step 6).
+uint32_t StandMovie(uint8_t* base) {
+  return Load(base, ui_movies::PairsFindKey(base, ui_movies::kMovieTable, kStandMovie));
 }
 
 }  // namespace
@@ -214,7 +214,9 @@ uint64_t GarageStageSetCar(uint8_t* base, const front_end_car_draw::Calls& calls
                            const scene_models::ApplyCall& apply, uint32_t holder, uint32_t car,
                            uint64_t pick, uint32_t stack, double* f1) {
   ITC_NATIVE_RUNNING("sub_8217FD58 GarageStage::SetCar");
-  const uint32_t frame = Frame(base, stack, 112);
+  // Its frame's address only (E5 step 6: nothing in it, no guest call made
+  // with it; its callees' frames below it).
+  const uint32_t frame = stack - 112;
   const schema::GarageStage stage = StageOf(base, holder);
   const uint32_t model =
       vehicle_accessors::ScenePoolsGetB(base, Scene(base), 7, stage.model_index());
@@ -234,7 +236,8 @@ uint64_t GarageStageSetCarClass(uint8_t* base, const front_end_car_draw::Calls& 
                                 const scene_models::ApplyCall& apply, uint32_t holder,
                                 uint32_t car, uint64_t pick, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8217FDC8 GarageStage::SetCarClass");
-  const uint32_t frame = Frame(base, stack, 128);
+  // Its frame's address only (as SetCar's).
+  const uint32_t frame = stack - 128;
   const schema::GarageStage stage = StageOf(base, holder);
   const uint32_t model =
       vehicle_accessors::ScenePoolsGetB(base, Scene(base), 7, stage.model_index());
@@ -297,7 +300,7 @@ uint64_t GarageStageShowCarById(uint8_t* base, const front_end_car_draw::Calls& 
 uint64_t ShowBusyMarker(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8219ED10 GarageScreen::ShowBusyMarker");
   const uint32_t frame = Frame(base, stack, 112);
-  const uint32_t movie = StandMovie(base, frame);
+  const uint32_t movie = StandMovie(base);
   Named(calls, kFinishNamed, movie, 86, frame, 0x8219ED48, 2);
   Named(calls, kFinishNamed, movie, 87, frame, 0x8219ED54, 2);
   Named(calls, kPlayNamed, movie, 86, frame, 0x8219ED70, 6);
@@ -308,7 +311,7 @@ uint64_t ShowBusyMarker(uint8_t* base, const front_end_car_draw::Calls& calls, u
 uint64_t HideBusyMarker(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8219EDB0 GarageScreen::HideBusyMarker");
   const uint32_t frame = Frame(base, stack, 112);
-  const uint32_t movie = StandMovie(base, frame);
+  const uint32_t movie = StandMovie(base);
   Named(calls, kFinishNamed, movie, 86, frame, 0x8219EDE8, 2);
   Named(calls, kFinishNamed, movie, 87, frame, 0x8219EDF4, 2);
   Named(calls, kFinishNamed, movie, 85, frame, 0x8219EE00, 2);

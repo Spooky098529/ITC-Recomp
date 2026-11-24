@@ -55,11 +55,12 @@ inline uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   return frame;
 }
 
-// UiMovies::Find with the id stored at `key` (the original's frame word):
-// the pair's value's address, and the movie in it.
-inline uint32_t FindPair(uint8_t* base, uint32_t id, uint32_t key) {
-  Store(base, key, id);
-  return ui_movies::PairsFind(base, ui_movies::kMovieTable, key);
+// UiMovies::Find for `id`: the pair's value's address, and the movie in it.
+// The original stored the id at `key` (its frame word) and passed its
+// address; only the lookup read it, so the id goes by value (E5 step 6) and
+// `key` is unused.
+inline uint32_t FindPair(uint8_t* base, uint32_t id, [[maybe_unused]] uint32_t key) {
+  return ui_movies::PairsFindKey(base, ui_movies::kMovieTable, id);
 }
 inline uint32_t FindMovie(uint8_t* base, uint32_t id, uint32_t key) {
   return Load(base, FindPair(base, id, key));

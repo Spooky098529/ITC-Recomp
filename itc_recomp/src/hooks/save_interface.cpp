@@ -336,36 +336,20 @@ ITC_REGS_STEP(SaveInterfacePlayTimeUpdate) {
 
 namespace {
 
-void Store64(uint8_t* base, uint32_t address, uint64_t value) {
-  guest::StoreU32(base, address, uint32_t(value >> 32));
-  guest::StoreU32(base, address + 4, uint32_t(value));
-}
-
-// A prologue's saves above the stack pointer `sp`: the return address at
-// sp - 8, the 64-bit registers r`first` to r31 from sp - 8 x (33 - first)
-// (where __savegprlr_N and the inline saves put them), and the back chain of
-// its `frame_bytes`-byte frame.
-void Prologue(uint8_t* base, uint32_t sp, uint32_t lr, uint32_t frame_bytes, int first,
-              const uint64_t* regs) {
-  guest::StoreU32(base, sp - 8, lr);
-  for (int n = first; n < 32; n++) {
-    Store64(base, sp - 8 * (32 - n) - 8, regs[n - first]);
-  }
-  guest::StoreU32(base, sp - frame_bytes, sp);
-}
-
-// r`first` to r31 of the caller, for a prologue's saves: 0 (the caller's
-// nonvolatiles: not carried by the view).
-std::vector<uint64_t> Regs(const lifted::Regs&, int first) {
-  return std::vector<uint64_t>(32 - first, 0);
-}
+// The prologues' saves (the return address and r26 to r31 above a frame,
+// written as 0 for the registers the view doesn't carry) aren't written
+// since E5 step 6: nothing reads them. A frame's back chain is written only
+// where a guest call is made with it as r1.
 
 // The first slot's vtable slot 0 with r4 = 3 (the slots' vector deleting
 // destructor), a guest call from SlotArray::Reset's frame at `sp` (its
-// return address 0x820A5638); r3 its answer.
-std::function<uint32_t(uint32_t)> DestroySlots(lifted::Regs& ctx, uint8_t* base, uint32_t sp) {
-  return [&ctx, base, sp](uint32_t slots) {
+// return address 0x820A5638, its back chain `above` written before the
+// call); r3 its answer.
+std::function<uint32_t(uint32_t)> DestroySlots(lifted::Regs& ctx, uint8_t* base, uint32_t sp,
+                                               uint32_t above) {
+  return [&ctx, base, sp, above](uint32_t slots) {
     const uint64_t stack = ctx.r1.u64;
+    guest::StoreU32(base, sp, above);
     ctx.r1.u64 = sp;
     ctx.r3.u64 = slots;
     ctx.r4.u64 = 3;
@@ -377,24 +361,18 @@ std::function<uint32_t(uint32_t)> DestroySlots(lifted::Regs& ctx, uint8_t* base,
   };
 }
 
-// SlotArray::Reset's prologue at `sp` (lr, r31 as the caller's r31 was:
-// `r31`), and its frame's stack pointer.
-uint32_t ResetPrologue(uint8_t* base, uint32_t sp, uint32_t lr, uint64_t r31) {
-  Prologue(base, sp, lr, 96, 31, &r31);
-  return sp - 96;
-}
-
-// SaveDevices::Destroy's prologue at `sp` (r31 its caller's), and Reset's
-// under it when Destroy calls it; the stack pointer the slots' destructor is
-// called from.
-uint32_t DestroyPrologues(uint8_t* base, uint32_t sp, uint32_t lr, uint64_t r31,
-                          uint32_t devices) {
-  Prologue(base, sp, lr, 96, 31, &r31);
+// SaveDevices::Destroy's 96-byte frame below `sp`, and Reset's 96 under it
+// when Destroy calls it: the slots' destructor's stack pointer, and the
+// frame above it (its back chain).
+struct SlotsFrame {
+  uint32_t sp, above;
+};
+SlotsFrame DestroyFrames(uint8_t* base, uint32_t sp, uint32_t devices) {
   const uint32_t frame = sp - 96;
   if (schema::SaveDevices(base, devices).slots<schema::View>().address != 0) {
-    return ResetPrologue(base, frame, 0x820A572C, devices);
+    return {frame - 96, frame};
   }
-  return frame;
+  return {frame, sp};
 }
 
 }  // namespace
@@ -409,9 +387,6 @@ ITC_REGS_STEP(SaveDevicesConstructSteps) {
     return;
   }
   const uint64_t lr = ctx.lr;
-  // The original's prologue (__savegprlr_26): lr and r26 to r31.
-  const auto regs = Regs(ctx, 26);
-  Prologue(base, ctx.r1.u32, uint32_t(lr), 176, 26, regs.data());
   // CanAllocBuffers checked above: the plain C++ doesn't refuse.
   guest_call::InFrame(ctx, base, 176, 0x820A61D8, [&](uint32_t frame) {
     si::SaveDevicesConstruct(
@@ -437,13 +412,9 @@ ITC_REGS_STEP(SaveDevicesCreateSteps) {
     return;
   }
   const uint64_t lr = ctx.lr;
-  const auto regs = Regs(ctx, 30);
   const auto devices = si::SaveDevicesCreate(base, saves, [&](uint32_t devices) {
-    // The original's prologue: lr, r30 and r31 above its 112-byte frame.
-    Prologue(base, ctx.r1.u32, uint32_t(lr), 112, 30, regs.data());
+    // The constructor from Create's 112-byte frame.
     guest_call::InFrame(ctx, base, 112, 0x820A6400, [&](uint32_t) {
-      // The constructor from Create's frame (Create's r31 and r30 there,
-      // which its prologue saves: not carried by the view).
       ctx.r3.u64 = devices;
       ctx.r4.u64 = block;
       ctx.r5.u64 = saves;
@@ -455,9 +426,6 @@ ITC_REGS_STEP(SaveDevicesCreateSteps) {
     lifted::original::c820A63C8(ctx, base);
     return;
   }
-  if (*devices == 0) {
-    Prologue(base, ctx.r1.u32, uint32_t(lr), 112, 30, regs.data());
-  }
   ctx.r3.u64 = *devices;
 }
 
@@ -466,8 +434,6 @@ ITC_REGS_STEP(SaveSlotAllocBuffersSteps) {
     lifted::original::c820A4560(ctx, base);
     return;
   }
-  const auto regs = Regs(ctx, 29);
-  Prologue(base, ctx.r1.u32, uint32_t(ctx.lr), 112, 29, regs.data());
   const uint32_t slot = ctx.r3.u32;
   si::SlotAllocBuffers(base, slot, ctx.r4.u32);
   // The second operator new[]'s answer.
@@ -481,15 +447,10 @@ ITC_REGS_STEP(SaveDevicesDeleteSteps) {
   }
   const uint32_t devices = ctx.r3.u32;
   const uint32_t flags = ctx.r4.u32;
-  const uint32_t sp = ctx.r1.u32;
-  // The original's prologue: lr, r30 and r31, a 112-byte frame; Destroy's
-  // (and Reset's) under it (r31 the save devices, as the original's mr
-  // r31,r3 leaves it).
-  const auto regs = Regs(ctx, 30);
-  Prologue(base, sp, uint32_t(ctx.lr), 112, 30, regs.data());
+  // The original's 112-byte frame; Destroy's (and Reset's) under it.
   const uint64_t self = ctx.r3.u64;
-  const uint32_t slots_sp = DestroyPrologues(base, sp - 112, 0x820A6130, self, devices);
-  si::SaveDevicesDelete(base, devices, flags, DestroySlots(ctx, base, slots_sp));
+  const SlotsFrame slots = DestroyFrames(base, ctx.r1.u32 - 112, devices);
+  si::SaveDevicesDelete(base, devices, flags, DestroySlots(ctx, base, slots.sp, slots.above));
   ctx.r3.u64 = self;  // the original's mr r3,r31
 }
 
@@ -499,10 +460,9 @@ ITC_REGS_STEP(SaveDevicesDestroySteps) {
     return;
   }
   const uint32_t devices = ctx.r3.u32;
-  const uint32_t slots_sp =
-      DestroyPrologues(base, ctx.r1.u32, uint32_t(ctx.lr),
-                       0 /* (the caller's r31: not carried by the view) */, devices);
-  ctx.r3.u64 = si::SaveDevicesDestroy(base, devices, DestroySlots(ctx, base, slots_sp));
+  const SlotsFrame slots = DestroyFrames(base, ctx.r1.u32, devices);
+  ctx.r3.u64 =
+      si::SaveDevicesDestroy(base, devices, DestroySlots(ctx, base, slots.sp, slots.above));
 }
 
 ITC_REGS_STEP(SlotArrayResetSteps) {
@@ -510,9 +470,9 @@ ITC_REGS_STEP(SlotArrayResetSteps) {
     lifted::original::c820A55F0(ctx, base);
     return;
   }
-  const uint32_t frame = ResetPrologue(base, ctx.r1.u32, uint32_t(ctx.lr),
-                                       0 /* (the caller's r31: not carried by the view) */);
-  ctx.r3.u64 = si::SlotArrayReset(base, ctx.r3.u32, DestroySlots(ctx, base, frame));
+  // Reset's 96-byte frame.
+  ctx.r3.u64 = si::SlotArrayReset(base, ctx.r3.u32,
+                                  DestroySlots(ctx, base, ctx.r1.u32 - 96, ctx.r1.u32));
 }
 
 namespace {

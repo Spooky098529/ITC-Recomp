@@ -8,12 +8,12 @@ namespace title_screen {
 
 namespace {
 
-// The pages' table in Draw's frame: the debug sequence's four, PostClose,
-// WaitForArchive.
+// The pages' table the original built in Draw's frame (a C++ array since E5
+// step 6): the debug sequence's four, PostClose, WaitForArchive.
 constexpr uint32_t kPageTable[6] = {0x82220CD8, 0x82220D60, 0x82220DE8,
                                     0x82220E70, 0x82221078, 0x822204C0};
-// The transitions' table in Update's frame: the debug sequence's twelve,
-// PlayLogo.
+// The transitions' table the original built in Update's frame (a C++ array
+// since E5 step 6): the debug sequence's twelve, PlayLogo.
 constexpr uint32_t kTransitionTable[13] = {
     0x822204F8, 0x82220580, 0x82220610, 0x82220698, 0x82220720, 0x822207B0, 0x82220840,
     0x822208D0, 0x82220960, 0x822209F0, 0x82220A80, 0x82220B10, 0x822210C8};
@@ -22,7 +22,8 @@ constexpr uint32_t kTransitionTable[13] = {
 
 uint64_t LoadCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82220BA8 TitleLoad::Create");
-  Frame(base, sp, 112);
+  // No guest frame (E5 step 6): nothing here calls guest code.
+  (void)sp;
   const Machine m(base, machine);
   m.set_loaded(0);
   // The block lives in host memory (E5 step 3): the original's
@@ -45,7 +46,7 @@ uint64_t LoadOpenMovie(uint32_t sp, uint32_t lr, const Calls& calls) {
 uint64_t LoadWaitForMovie(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82220C18 TitleLoad::WaitForMovie");
   const Machine m(base, uint32_t(r3));
-  Frame(base, sp, 96);
+  (void)sp;  // no guest frame (E5 step 6): nothing here calls guest code
   if (m.loaded() == 0) {
     r3 = ui_movies::IsLoaded(base, kLoadMovie);
     if (uint32_t(r3) != 0) {
@@ -72,14 +73,13 @@ uint64_t LoadDraw(uint8_t* base, uint64_t r3, uint64_t mode, uint32_t sp, const 
   ITC_NATIVE_RUNNING("sub_82221198 TitleLoad::Draw");
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t page = G::load_block(base).page();
-  for (uint32_t k = 0; k < 6; k++) {
-    Store(base, frame + 80 + 4 * k, kPageTable[k]);
-  }
   if (page == kNone) {
     return r3;
   }
-  // No bounds check, as the original: the word at the table's index.
-  return calls.Call(Load(base, frame + 80 + (page << 2)), frame, 0x82221218, mode);
+  // No bounds check in the original: past the table, the frame's word at
+  // the index, as it read it.
+  const uint32_t function = page < 6 ? kPageTable[page] : Load(base, frame + 80 + (page << 2));
+  return calls.Call(function, frame, 0x82221218, mode);
 }
 
 uint64_t LoadUpdate(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls) {
@@ -87,16 +87,15 @@ uint64_t LoadUpdate(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& call
   const uint32_t frame = Frame(base, sp, 208);
   const auto block = G::load_block(base);
   const uint32_t transition = block.transition();
-  for (uint32_t k = 0; k < 13; k++) {
-    Store(base, frame + 80 + 4 * k, kTransitionTable[k]);
-  }
   if (transition != kNone) {
-    // No bounds check: the word at the table's index.
+    // No bounds check in the original: past the table, the frame's word at
+    // the index, as it read it.
     // r3: the started word's place, the handle + 16 (the block is in host
     // memory, E5 step 3); the transitions (PlayLogo, the debug steps, only
     // reached from this table) read the word through the global's view.
-    return calls.Call(Load(base, frame + 80 + (transition << 2)), frame, 0x82221318,
-                      block.address + 16);
+    const uint32_t function = transition < 13 ? kTransitionTable[transition]
+                                              : Load(base, frame + 80 + (transition << 2));
+    return calls.Call(function, frame, 0x82221318, block.address + 16);
   }
   // The original's r3 holds the table's eighth entry here (sign-extended).
   uint64_t r3 = uint64_t(int64_t(int32_t(kTransitionTable[7])));
@@ -185,7 +184,7 @@ uint64_t LoadLeave(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp,
 
 uint64_t LoadDestroy(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82220468 TitleLoad::Destroy");
-  Frame(base, sp, 96);
+  (void)sp;  // no guest frame (E5 step 6): nothing here calls guest code
   // The host block (Create): the original's VirtualFree at 0x82220490,
   // which returned 1.
   (void)calls;

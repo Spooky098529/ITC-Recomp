@@ -17,32 +17,24 @@ constexpr uint32_t kTlsGetValue = 0x825DBBF4;  // KeTlsGetValue's thunk
 constexpr uint32_t kTlsSetValue = 0x825DBC04;  // KeTlsSetValue's thunk
 constexpr uint32_t kGetptd = 0x825AA580;
 
-uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
-  const uint32_t frame = sp - bytes;
-  guest::StoreU32(base, frame, sp);
-  return frame;
-}
-
 }  // namespace
 
 uint32_t ThreadData(uint8_t* base, uint32_t sp, uint32_t lr, const ThreadDataCall& call) {
-  const uint32_t getptd = Frame(base, sp, 96);
-  const uint32_t noexit = Frame(base, getptd, 112);
-  const uint64_t saved = call.Call(kGetLastError, noexit, 0x825AA4D0, 0, 0);
-  // sub_825AA400 (96 bytes below): the getter (__getvalueindex's slot) put
-  // in its slot when empty; the getter is given __flsindex.
+  // The originals' frames (_getptd's 96 bytes, _getptd_noexit's 112 and
+  // sub_825AA400's 96, each only its back chain) left out: their calls run
+  // from `sp` (E5 step 6; none reads its caller's frame).
+  const uint64_t saved = call.Call(kGetLastError, sp, 0x825AA4D0, 0, 0);
+  // sub_825AA400: the getter (__getvalueindex's slot) put in its slot when
+  // empty; the getter is given __flsindex.
   using Core = schema::CRuntimeCoreGlobals;
-  const uint32_t init = Frame(base, noexit, 96);
-  if (uint32_t(call.Call(kTlsGetValue, init, 0x825AA41C, 1, Core::getvalue_index(base))) ==
-      0) {
-    call.Call(kTlsSetValue, init, 0x825AA434, 2, Core::getvalue_index(base),
+  if (uint32_t(call.Call(kTlsGetValue, sp, 0x825AA41C, 1, Core::getvalue_index(base))) == 0) {
+    call.Call(kTlsSetValue, sp, 0x825AA434, 2, Core::getvalue_index(base),
               Core::fls_get_value(base));
   }
   const uint32_t getter =
-      uint32_t(call.Call(kTlsGetValue, noexit, 0x825AA4E4, 1, Core::getvalue_index(base)));
-  const uint32_t data =
-      uint32_t(call.Call(getter, noexit, 0x825AA4F8, 1, Core::fls_index(base)));
-  call.Call(kSetLastError, noexit, 0x825AA570, 1, saved);
+      uint32_t(call.Call(kTlsGetValue, sp, 0x825AA4E4, 1, Core::getvalue_index(base)));
+  const uint32_t data = uint32_t(call.Call(getter, sp, 0x825AA4F8, 1, Core::fls_index(base)));
+  call.Call(kSetLastError, sp, 0x825AA570, 1, saved);
   if (data != 0) {
     return data;
   }
@@ -52,8 +44,8 @@ uint32_t ThreadData(uint8_t* base, uint32_t sp, uint32_t lr, const ThreadDataCal
 
 uint64_t Rand(uint8_t* base, uint32_t sp, const ThreadDataCall& call) {
   ITC_NATIVE_RUNNING("sub_825A9BB8 rand");
-  const uint32_t frame = Frame(base, sp, 96);
-  const uint32_t data = ThreadData(base, frame, 0x825A9BC8, call);
+  // The original's 96-byte frame (only its back chain) left out (E5 step 6).
+  const uint32_t data = ThreadData(base, sp, 0x825A9BC8, call);
   const schema::ThreadData thread_data(base, data);
   const uint32_t seed = thread_data.rand_seed() * 214013u + 2531011u;
   thread_data.set_rand_seed(seed);

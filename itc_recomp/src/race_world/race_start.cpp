@@ -242,6 +242,9 @@ void Place(uint8_t* base, uint32_t object, uint32_t settle, uint32_t back, uint3
            const StartCalls& calls) {
   ITC_NATIVE_RUNNING("sub_82165E20 RaceStart::Place");
   const uint32_t frame = sp - 400;
+  // r3 and r4 spilled into the caller's frame, as the original (kept: the
+  // caller's words); read back as the values since E5 step 6 (nothing
+  // writes them between).
   Store(base, sp + 20, object);
   Store(base, sp + 28, settle);
   guest::StoreU16(base, frame + 80, 0xFFFF);
@@ -291,7 +294,7 @@ void Place(uint8_t* base, uint32_t object, uint32_t settle, uint32_t back, uint3
       if (int32_t(RD(base, race).race_mode()) == 8) {
         uint32_t start;
         if (G::human_flag(base) != 0) {
-          start = Load(base, Load(base, Load(base, sp + 20) + 9624) + 7244);
+          start = Load(base, Load(base, object + 9624) + 7244);
         } else {
           start = (uint32_t(guest::LoadU16(base, kStartPosition + 2)) << 16) |
                   guest::LoadU16(base, kStartPosition + 4);
@@ -348,7 +351,7 @@ void Place(uint8_t* base, uint32_t object, uint32_t settle, uint32_t back, uint3
       placed++;
     }
   }
-  if (int32_t(Load(base, sp + 28)) == 0) {
+  if (int32_t(settle) == 0) {
     return;
   }
   CopyStage(base, frame + 160, frame, calls);

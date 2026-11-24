@@ -31,6 +31,20 @@ inline const char* ImportName(ImportFunction* function) { return function->name;
 void NoteImport(ImportFunction* function, const Args& args);
 bool LoggingImports();
 
+// An import's call site in lifted code (E5 step 6): our answer found at its
+// first call, then called straight, with no lookup; with --log_imports on,
+// through Import as before (the log notes each call).
+using ImportAnswer = Result (*)(uint8_t* base, const Args& args);
+ImportAnswer FindImportAnswer(ImportFunction* function);
+template <ImportFunction* F>
+inline Result ImportAt(uint8_t* base, const Args& args) {
+  static const ImportAnswer answer = FindImportAnswer(F);
+  if (answer && !LoggingImports()) [[likely]] {
+    return answer(base, args);
+  }
+  return Import(base, F, args);
+}
+
 // An import with a register view's registers; its r3 and f1 back in them.
 void Sdk(Regs& regs, uint8_t* base, ImportFunction* function);
 

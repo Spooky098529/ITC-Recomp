@@ -32,9 +32,10 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   return frame;
 }
 
-uint32_t FindMovie(uint8_t* base, uint32_t key) {
-  StoreU32(base, key, kMovie);
-  return LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, key));
+// Movie 10 found by its id (the original stored it at its frame's +80 for
+// the find, which only the find read: a value since E5 step 6).
+uint32_t FindMovie(uint8_t* base) {
+  return LoadU32(base, ui_movies::PairsFindKey(base, ui_movies::kMovieTable, kMovie));
 }
 
 schema::UserInfoData Data(uint8_t* base) { return G::data(base); }
@@ -88,7 +89,7 @@ template <typename Start>
 uint64_t Transition(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls,
                     uint64_t index, uint32_t play_lr, uint32_t run_lr, Start start) {
   const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t movie = FindMovie(base, frame + 80);
+  const uint32_t movie = FindMovie(base);
   if (LoadU32(base, started) == 0) {
     start(frame);
     const uint64_t args[8] = {movie, kAll, index, 0, 0, 0, 0, 0};
@@ -102,8 +103,9 @@ uint64_t Transition(uint8_t* base, uint32_t started, uint32_t sp, const Calls& c
 
 uint64_t SetPlayTimeText(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8220AFC0 UserInfo::SetPlayTimeText");
+  // The frame's +80 stays: PlayTime::Add writes its answer there (r3).
   const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t movie = FindMovie(base, frame + 80);
+  const uint32_t movie = FindMovie(base);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   const schema::PlayTimeAnswer time(
       base,
@@ -155,15 +157,15 @@ uint64_t MenuPage(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls)
 
 uint64_t SetTexts(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8220AD08 UserInfo::SetTexts");
+  // The frame stays for the calls (their r1; SetText's varargs go to its
+  // +48 to +79); its words the original kept here are C++ values (E5 step 6).
   const uint32_t frame = Frame(base, sp, 192);
-  const uint32_t movie = FindMovie(base, frame + 80);
-  // The labels' nodes, a table on the frame (+96), strings 284 to 294.
+  const uint32_t movie = FindMovie(base);
+  // The labels' nodes (the original's table on the frame, +96), strings 284
+  // to 294.
   constexpr uint32_t kLabels[11] = {3, 4, 5, 6, 7, 13, 14, 15, 16, 17, 18};
   for (uint32_t i = 0; i < 11; i++) {
-    StoreU32(base, frame + 96 + 4 * i, kLabels[i]);
-  }
-  for (uint32_t i = 0; i < 11; i++) {
-    SetText(calls, frame, 0x8220ADA8, movie, LoadU32(base, frame + 96 + 4 * i), 284 + i);
+    SetText(calls, frame, 0x8220ADA8, movie, kLabels[i], 284 + i);
   }
   SetText(calls, frame, 0x8220ADCC, movie, 25, 441);
   SetText(calls, frame, 0x8220ADE0, movie, 26, 441);
@@ -172,11 +174,10 @@ uint64_t SetTexts(uint8_t* base, uint32_t sp, const Calls& calls) {
   SetText(calls, frame, 0x8220AE28, movie, 8, 8, Data(base).count_12());
   SetText(calls, frame, 0x8220AE44, movie, 9, 8, Data(base).count_14());
   SetText(calls, frame, 0x8220AE60, movie, 10, 8, Data(base).count_16());
-  // A double in f1 and in r7 through the frame's +48 (stfd, ld).
+  // A double in f1 and in r7 (the original's stfd to the frame's +48 and
+  // ld back: its bits; SetText itself stores r7 there first).
   auto with_double = [&](uint32_t lr, uint64_t node, uint64_t string, double value) {
     const uint64_t bits = std::bit_cast<uint64_t>(value);
-    StoreU32(base, frame + 48, uint32_t(bits >> 32));
-    StoreU32(base, frame + 52, uint32_t(bits));
     SetText(calls, frame, lr, movie, node, string, bits, 0, 0, &value);
   };
   with_double(0x8220AE84, 11, 453, Lfs(Data(base).ratio()));
@@ -186,14 +187,10 @@ uint64_t SetTexts(uint8_t* base, uint32_t sp, const Calls& calls) {
   with_double(0x8220AF00, 20, 452, Single(Lfs(Data(base).distance_5904()) * miles));
   {
     // lwa, std at +80, fcfid, frsp, times the double, frsp, fctiwz, stfiwx
-    // at +80, lwz.
+    // at +80, lwz: the frame's words as values.
     const int32_t word = Data(base).distance_5992();
-    const uint64_t wide = uint64_t(int64_t(word));
-    StoreU32(base, frame + 80, uint32_t(wide >> 32));
-    StoreU32(base, frame + 84, uint32_t(wide));
     const double value = Single(Single(double(int64_t(word))) * miles);
-    StoreU32(base, frame + 80, uint32_t(TruncateWord(value)));
-    SetText(calls, frame, 0x8220AF44, movie, 21, 8, LoadU32(base, frame + 80));
+    SetText(calls, frame, 0x8220AF44, movie, 21, 8, uint32_t(TruncateWord(value)));
   }
   calls.Call(kSetNumberText, frame, 0x8220AF5C, movie, kAll, 22, Data(base).stats_6024());
   PlayTimeText(base, calls, frame, 0x8220AF90, movie);

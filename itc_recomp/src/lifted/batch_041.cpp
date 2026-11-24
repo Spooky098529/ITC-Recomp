@@ -4839,7 +4839,7 @@ lifted::Result f822952C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   uint64_t r31 = 0;
   double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
   // b 0x825db554
-  { const lifted::Result o = lifted::Import(base, __imp__XamShowFriendsUI, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::XamShowFriendsUI>(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
@@ -4851,7 +4851,7 @@ lifted::Result f822952D0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // b 0x825db564
-  { const lifted::Result o = lifted::Import(base, __imp__XamShowGamerCardUIForXUID, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::XamShowGamerCardUIForXUID>(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
@@ -4861,7 +4861,7 @@ lifted::Result f822952D8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   uint64_t r31 = 0;
   double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
   // b 0x825db574
-  { const lifted::Result o = lifted::Import(base, __imp__XamShowPlayerReviewUI, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::XamShowPlayerReviewUI>(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
@@ -5059,7 +5059,7 @@ loc_822AD934:
   r3 = r29;
   // bl 0x825db8e4
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__RtlEnterCriticalSection, LIFTED_ARGS(0x822AD940, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::RtlEnterCriticalSection>(base, LIFTED_ARGS(0x822AD940, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r3,164(r31)
   r3 = guest::LoadU32(base, schema::CommandRecorder(base, uint32_t(r31)).callback_context_address());
   // lwz r11,172(r31)
@@ -5081,7 +5081,7 @@ loc_822AD934:
   r3 = r29;
   // bl 0x825db8d4
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__RtlLeaveCriticalSection, LIFTED_ARGS(0x822AD968, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::RtlLeaveCriticalSection>(base, LIFTED_ARGS(0x822AD968, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r3,r31
   r3 = r31;
   // addi r1,r1,128
@@ -5123,7 +5123,7 @@ lifted::Result f822AD978(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r30;
   // bl 0x825db8e4
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__RtlEnterCriticalSection, LIFTED_ARGS(0x822AD9A8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::RtlEnterCriticalSection>(base, LIFTED_ARGS(0x822AD9A8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r3,164(r31)
   r3 = guest::LoadU32(base, schema::ResourceHeader(base, uint32_t(r31)).unknown_164_address());
   // lwz r11,176(r31)
@@ -5137,7 +5137,7 @@ lifted::Result f822AD978(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r30;
   // bl 0x825db8d4
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__RtlLeaveCriticalSection, LIFTED_ARGS(0x822AD9C0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::RtlLeaveCriticalSection>(base, LIFTED_ARGS(0x822AD9C0, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
@@ -5221,7 +5221,7 @@ lifted::Result f82459CA0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r3,1
   r3 = uint64_t(int64_t(1));
   // b 0x825dbca4
-  { const lifted::Result o = lifted::Import(base, __imp__NetDll_accept, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::NetDll_accept>(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
@@ -5243,7 +5243,7 @@ lifted::Result f82459CB8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r3,1
   r3 = uint64_t(int64_t(1));
   // b 0x825dbcb4
-  { const lifted::Result o = lifted::Import(base, __imp__NetDll_select, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::NetDll_select>(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
@@ -5267,7 +5267,7 @@ lifted::Result f82459CD8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r3,1
   r3 = uint64_t(int64_t(1));
   // b 0x825dbcc4
-  { const lifted::Result o = lifted::Import(base, __imp__NetDll_recvfrom, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::NetDll_recvfrom>(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
@@ -5277,7 +5277,7 @@ lifted::Result f82459D20(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   uint64_t r31 = 0;
   double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
   // b 0x825dbcf4
-  { const lifted::Result o = lifted::Import(base, __imp__NetDll___WSAFDIsSet, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::NetDll___WSAFDIsSet>(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
@@ -6159,7 +6159,7 @@ lifted::Result f82575FE0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r30 = r7;
   // bl 0x825dbd74
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__XamSessionRefObjByHandle, LIFTED_ARGS(0x82576004, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::XamSessionRefObjByHandle>(base, LIFTED_ARGS(0x82576004, r31)); r3 = o.r3; f1 = o.f1; }
   // mr. r31,r3
   r31 = r3;
   cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
@@ -6189,7 +6189,7 @@ lifted::Result f82575FE0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   guest::StoreU32(base, uint32_t(r1) + 96, uint32_t(r11));
   // bl 0x825db4b4
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__XMsgStartIORequest, LIFTED_ARGS(0x8257603C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::XMsgStartIORequest>(base, LIFTED_ARGS(0x8257603C, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bge 0x8257604c
@@ -6226,7 +6226,7 @@ loc_8257606C:
   r3 = guest::LoadU32(base, uint32_t(r1) + 80);
   // bl 0x825db884
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__ObDereferenceObject, LIFTED_ARGS(0x82576074, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::ObDereferenceObject>(base, LIFTED_ARGS(0x82576074, r31)); r3 = o.r3; f1 = o.f1; }
 loc_82576074:
   // mr r3,r31
   r3 = r31;
@@ -6267,7 +6267,7 @@ lifted::Result f82576130(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r30 = r7;
   // bl 0x825dbd74
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__XamSessionRefObjByHandle, LIFTED_ARGS(0x82576154, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::XamSessionRefObjByHandle>(base, LIFTED_ARGS(0x82576154, r31)); r3 = o.r3; f1 = o.f1; }
   // mr. r31,r3
   r31 = r3;
   cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
@@ -6301,7 +6301,7 @@ lifted::Result f82576130(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   guest::StoreU32(base, uint32_t(r1) + 104, uint32_t(r11));
   // bl 0x825db4b4
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__XMsgStartIORequest, LIFTED_ARGS(0x82576194, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::XMsgStartIORequest>(base, LIFTED_ARGS(0x82576194, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bge 0x825761a4
@@ -6338,7 +6338,7 @@ loc_825761C4:
   r3 = guest::LoadU32(base, uint32_t(r1) + 80);
   // bl 0x825db884
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__ObDereferenceObject, LIFTED_ARGS(0x825761CC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::ObDereferenceObject>(base, LIFTED_ARGS(0x825761CC, r31)); r3 = o.r3; f1 = o.f1; }
 loc_825761CC:
   // mr r3,r31
   r3 = r31;
@@ -6377,7 +6377,7 @@ lifted::Result f82576280(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r30 = r6;
   // bl 0x825dbd74
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__XamSessionRefObjByHandle, LIFTED_ARGS(0x825762A0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::XamSessionRefObjByHandle>(base, LIFTED_ARGS(0x825762A0, r31)); r3 = o.r3; f1 = o.f1; }
   // mr. r31,r3
   r31 = r3;
   cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
@@ -6411,7 +6411,7 @@ lifted::Result f82576280(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   guest::StoreU32(base, uint32_t(r1) + 112, uint32_t(r11));
   // bl 0x825db4b4
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__XMsgStartIORequest, LIFTED_ARGS(0x825762E0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::XMsgStartIORequest>(base, LIFTED_ARGS(0x825762E0, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bge 0x825762f0
@@ -6448,7 +6448,7 @@ loc_82576310:
   r3 = guest::LoadU32(base, uint32_t(r1) + 80);
   // bl 0x825db884
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__ObDereferenceObject, LIFTED_ARGS(0x82576318, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::ObDereferenceObject>(base, LIFTED_ARGS(0x82576318, r31)); r3 = o.r3; f1 = o.f1; }
 loc_82576318:
   // mr r3,r31
   r3 = r31;
@@ -6530,7 +6530,7 @@ lifted::Result f825767D0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = uint64_t(int64_t(0));
   // bl 0x825dbd64
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__XamAlloc, LIFTED_ARGS(0x82576840, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::XamAlloc>(base, LIFTED_ARGS(0x82576840, r31)); r3 = o.r3; f1 = o.f1; }
   // mr. r31,r3
   r31 = r3;
   cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
@@ -6602,7 +6602,7 @@ lifted::Result f825767D0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = uint64_t(int64_t(252));
   // bl 0x825dbd44
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__XMsgInProcessCall, LIFTED_ARGS(0x825768C4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::XMsgInProcessCall>(base, LIFTED_ARGS(0x825768C4, r31)); r3 = o.r3; f1 = o.f1; }
   // mr. r31,r3
   r31 = r3;
   cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
@@ -6617,7 +6617,7 @@ loc_825768CC:
   if (cr6.eq) goto loc_825768DC;
   // bl 0x825dbd54
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__XamFree, LIFTED_ARGS(0x825768DC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::XamFree>(base, LIFTED_ARGS(0x825768DC, r31)); r3 = o.r3; f1 = o.f1; }
 loc_825768DC:
   // mr r3,r31
   r3 = r31;
@@ -6633,7 +6633,7 @@ loc_825768EC:
   r3 = guest::LoadU32(base, uint32_t(r1) + 128);
   // bl 0x825dbd54
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__XamFree, LIFTED_ARGS(0x825768F4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::XamFree>(base, LIFTED_ARGS(0x825768F4, r31)); r3 = o.r3; f1 = o.f1; }
 loc_825768F4:
   // mr r3,r30
   r3 = r30;
@@ -6832,7 +6832,7 @@ lifted::Result f82576900(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = uint64_t(int64_t(0));
   // bl 0x825dbd64
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__XamAlloc, LIFTED_ARGS(0x82576A50, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::XamAlloc>(base, LIFTED_ARGS(0x82576A50, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // blt 0x82576b88
@@ -6994,7 +6994,7 @@ lifted::Result f82576900(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   guest::StoreU32(base, uint32_t(r1) + 160, uint32_t(r11));
   // bl 0x825db4b4
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__XMsgStartIORequest, LIFTED_ARGS(0x82576B80, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::XMsgStartIORequest>(base, LIFTED_ARGS(0x82576B80, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bge 0x82576bb4
@@ -7023,7 +7023,7 @@ loc_82576BA0:
   if (cr6.eq) goto loc_82576BD4;
   // bl 0x825dbd54
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__XamFree, LIFTED_ARGS(0x82576BB0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::XamFree>(base, LIFTED_ARGS(0x82576BB0, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x82576bd4
   goto loc_82576BD4;
 loc_82576BB4:
@@ -7097,7 +7097,7 @@ lifted::Result f82576EE0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   guest::StoreU32(base, uint32_t(r1) + 96, uint32_t(r11));
   // bl 0x825dbd44
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__XMsgInProcessCall, LIFTED_ARGS(0x82576F1C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::XMsgInProcessCall>(base, LIFTED_ARGS(0x82576F1C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r3,96(r1)
   r3 = guest::LoadU32(base, uint32_t(r1) + 96);
   // addi r1,r1,112
@@ -7165,7 +7165,7 @@ lifted::Result f82576FE8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   guest::StoreU32(base, uint32_t(r1) + 80, uint32_t(r29));
   // bl 0x825dbd44
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__XMsgInProcessCall, LIFTED_ARGS(0x82577040, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::XMsgInProcessCall>(base, LIFTED_ARGS(0x82577040, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // blt 0x82577050

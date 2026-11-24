@@ -22,12 +22,6 @@ using guest::LoadU32;
 using guest::StoreU32;
 using G = schema::Type5ModeGlobals;
 
-uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
-  const uint32_t frame = sp - bytes;
-  StoreU32(base, frame, sp);
-  return frame;
-}
-
 // Posts the message (id, 0, 0) on the dispatcher's ring (boot-mode.toml's
 // ModeDispatcher: 50 slots of 12 bytes), the id stored first or last, as
 // the originals do inline.
@@ -72,7 +66,9 @@ void CloseConfirm(uint8_t* base) {
 
 uint64_t ConfirmPage(uint8_t* base, uint32_t dispatcher, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82225D10 Type5Dialog::ConfirmPage");
-  const uint32_t frame = Frame(base, sp, 144);
+  // The original's 144-byte frame (only its back chain) left out: the guest
+  // calls run from `sp` (E5 step 6).
+  const uint32_t frame = sp;
   calls.Call(kMenuStep, frame, 0x82225D2C, G::menu(base).address);
   uint64_t answer = calls.Call(kMenuPressed, frame, 0x82225D38, G::menu(base).address, 159);
   if (int32_t(answer) != 0) {
@@ -115,7 +111,9 @@ uint64_t NoticePage(uint8_t* base, uint32_t dispatcher, bool second, uint32_t sp
   const uint32_t* lr = kLr[second ? 1 : 0];
   const uint32_t page = second ? 3 : 1;
   const uint32_t step = second ? 7 : 3;
-  const uint32_t frame = Frame(base, sp, 144);
+  // The original's 144-byte frame (only its back chain) left out: the guest
+  // calls run from `sp` (E5 step 6).
+  const uint32_t frame = sp;
   // The close: the close step, none queued, the next page, the page -1.
   auto close = [&] {
     const auto pages = KeepPage(base, page);

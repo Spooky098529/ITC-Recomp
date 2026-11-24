@@ -100,10 +100,9 @@ uint32_t ApplyPalette(uint8_t* base, uint32_t model, uint32_t sp);
 // the palette's 16 entries (0x826C5110, 64 bytes each: +0, +16, +32 three
 // colors as (hue, saturation, value, 1.0), +48 to +56 three floats, +60
 // left) filled with the image's constants; three floats differ when the
-// scene's +4 isn't zero. Its frame (sp - 1184: the back chain, the scene at
-// +24, its locals at +16 to +108, the loop's index 16 at +40, the colors
-// built at +112 to +876) as the original leaves it. r3 as the original
-// leaves it, or nullopt (r3 untouched) when there's no scene.
+// scene's +4 isn't zero. Its frame (sp - 1184, only it reads it) left out
+// since E5 step 6 (`sp` unused). r3 as the original leaves it, or nullopt
+// (r3 untouched) when there's no scene.
 std::optional<uint64_t> PaintPaletteInit(uint8_t* base, uint32_t sp);
 
 // --- A part model's materials' fields by a mask (set_materials.cpp) ---
@@ -114,23 +113,24 @@ uint32_t MaterialTotal(uint8_t* base, uint32_t model, uint64_t shape);
 // Model::MaterialAt (sub_82594B00): the block + 16 + 512 x index, as the
 // original's 64-bit sum.
 uint64_t MaterialAt(uint8_t* base, uint32_t model, uint64_t shape, uint64_t index);
-// PartModel::SetMaterialFields (sub_820D3250): its eight register arguments
-// (`args`, r3 to r10) stored in its caller's frame `frame` (+16 to +80, as
-// the original does), then the fields the six flags (the frame's +16 to +36)
-// pick copied into the material (the frame's +116) from the frame: +0 the
-// first float4 (+48), +32 the second (+64), +16 the third (+80), +80 to +88
-// the three floats (+96 to +104).
-void SetMaterialFields(uint8_t* base, uint32_t frame, const uint64_t args[8]);
+// PartModel::SetMaterialFields (sub_820D3250): the fields the six flags
+// pick (the high and low words of args 0 to 2, r3 to r5 as the original
+// homes them in its caller's frame) copied into `material`: +0 the first
+// float4 (args 3, 4), +32 the second (args 5, 6), +16 the third (arg 7 and
+// the first doubleword of `copied`, the 24 bytes SetMaterials copies), +80
+// to +88 the three floats (`copied`'s words 2 to 4). The caller's frame the
+// original reads (+16 to +116) is values since E5 step 6.
+void SetMaterialFields(uint8_t* base, uint32_t material, const uint64_t args[8],
+                       const uint32_t copied[6]);
 // PartModel::SetMaterials (sub_820D3318): `regs` = r4 to r10 (the flags'
 // three registers and the first two float4s); the rest from the caller's
 // frame above `sp` (+96 the third float4's first half, +104 the 24 bytes
 // copied for each material, +132 the shape, +140 the category, +148 the
-// shared pair). Its frame's back chain and r7 to r10 stored at sp + 64 to
-// sp + 88 as the original does; for each picked material, the material at
-// its frame's +116, the 24 bytes copied by memcpy and SetMaterialFields.
-// False where c_runtime::Memcpy refuses the copy (the original runs there,
-// writing the same again); `r3` set to r3 as the original leaves it when a
-// call changed it.
+// shared pair). r7 to r10 stored at sp + 64 to sp + 88 as the original
+// does; for each picked material, the 24 bytes read (the original's memcpy
+// into its frame, left out since E5 step 6) and SetMaterialFields. Always
+// true (it was false where c_runtime::Memcpy refused the copy); `r3` set to
+// r3 as the original leaves it when a call changed it.
 bool SetMaterials(uint8_t* base, uint32_t model, const uint64_t regs[7], uint32_t sp,
                   std::optional<uint64_t>* r3);
 

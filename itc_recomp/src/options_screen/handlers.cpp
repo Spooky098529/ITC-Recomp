@@ -76,16 +76,16 @@ void Post(uint8_t* base, uint32_t dispatcher, uint32_t message) {
   slot.set_id(message);
 }
 
-uint32_t FindMovie(uint8_t* base, uint32_t frame) {
-  StoreU32(base, frame + 80, 7);
-  return schema::UiMovieTableValue(
-             base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80))
+uint32_t FindMovie(uint8_t* base, [[maybe_unused]] uint32_t frame) {
+  // The id 7 the original stores at the frame's +80 for UiMovies::Find,
+  // passed as a value (E5 step 6: the slot only the find read).
+  return schema::UiMovieTableValue(base, ui_movies::PairsFindKey(base, ui_movies::kMovieTable, 7))
       .value();
 }
 
 uint32_t OnEnter(uint8_t* base, uint32_t machine, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821BB9A8 Options::OnEnter");
-  StoreU32(base, sp - 128, sp);
+  // No guest frame (E5 step 6): its callees are native and read no slot.
   const Machine mc(base, machine);
   mc.set_loaded(0);
   // The page objects and menus in host memory (E5 step 5: PageObject and
@@ -122,7 +122,7 @@ uint32_t OnEnter(uint8_t* base, uint32_t machine, uint32_t sp) {
 uint64_t WaitForMovie(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821BBBA0 Options::WaitForMovie");
   const Machine machine(base, uint32_t(r3));
-  StoreU32(base, sp - 96, sp);
+  (void)sp;  // its frame held nothing (E5 step 6)
   if (machine.loaded() == 0) {
     r3 = ui_movies::IsLoaded(base, 7);
     if (uint32_t(r3) != 0) {
@@ -189,11 +189,11 @@ uint64_t Leave(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t sp
   ITC_NATIVE_RUNNING("sub_821BCF08 Options::Leave");
   const uint32_t frame = sp - 112;
   StoreU32(base, frame, sp);
-  StoreU32(base, frame + 80, 7);
+  // The id 7 (the original's frame +80) passed to UiMovies::Find as a value.
   Machine(base, machine).set_state(7);
-  uint64_t r3 = schema::UiMovieTableValue(
-                    base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80))
-                    .value();
+  uint64_t r3 =
+      schema::UiMovieTableValue(base, ui_movies::PairsFindKey(base, ui_movies::kMovieTable, 7))
+          .value();
   if (uint32_t(r3) != 0) {
     calls.Call(kFinishAll, frame, 0x821BCF4C, r3);
     r3 = calls.Call(kMoviesDelete, frame, 0x821BCF54, 7);

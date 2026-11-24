@@ -26,12 +26,20 @@ uint32_t EntryOf(uint8_t* base, uint32_t player) {
   return index * Entry::kSize + kMapperEntries;
 }
 
+// The original's frame below `sp` (`frame`), made only when a guest call
+// needs it as its r1 (E5 step 6): its back chain written then.
+struct GuestFrame {
+  uint32_t sp;
+  uint32_t frame;
+};
+
 // The mapper's read slot at `offset` in its vtable on `action`, as the
-// original's bctrl from `frame` returning to `lr`: ActionMapper::Pressed's
+// original's bctrl from `f.frame` returning to `lr`: ActionMapper::Pressed's
 // or Fired's plain C++ when the vtable holds it and `native_slots`, logged
-// for --log_pause_menu as its adapter does, else the slot through `calls`.
+// for --log_pause_menu as its adapter does, else the slot through `calls`
+// (the frame's back chain written first).
 uint64_t ReadSlot(uint8_t* base, uint32_t mapper, uint32_t offset, uint64_t action,
-                  uint32_t frame, uint32_t lr, bool native_slots, const Calls& calls) {
+                  const GuestFrame& f, uint32_t lr, bool native_slots, const Calls& calls) {
   const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, mapper) + offset);
   if (native_slots && (function == kPressedSlot || function == kFiredSlot)) {
     const bool pressed = function == kPressedSlot;
@@ -41,14 +49,15 @@ uint64_t ReadSlot(uint8_t* base, uint32_t mapper, uint32_t offset, uint64_t acti
     debug::PauseMenuLog_NoteSlotRead(pressed ? 10 : 12, mapper, id, lr, double(r3));
     return r3;
   }
-  return calls.Call(function, frame, lr, mapper, action);
+  guest::StoreU32(base, f.frame, f.sp);
+  return calls.Call(function, f.frame, lr, mapper, action);
 }
 
 // One try on the player's entry: false when its +4 is 1 (the mappers
 // blocked), else whether the slot's answer's low byte is nonzero. The entry's
 // +4 and +0 are read again on every try, as the original does.
-bool Try(uint8_t* base, uint32_t entry, uint32_t offset, uint64_t action, uint32_t frame,
-         uint32_t lr, bool native_slots, const Calls& calls) {
+bool Try(uint8_t* base, uint32_t entry, uint32_t offset, uint64_t action,
+         const GuestFrame& frame, uint32_t lr, bool native_slots, const Calls& calls) {
   const Entry e(base, entry);
   if (S(e.unread()) == 1) {
     return false;
@@ -74,8 +83,7 @@ struct Read {
 uint32_t Step(uint8_t* base, uint32_t menu, uint32_t sp, bool native_slots, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82186568 Menu::Step");
   const Menu m(base, menu);
-  const uint32_t frame = sp - 128;
-  guest::StoreU32(base, frame, sp);
+  const GuestFrame frame{sp, sp - 128};
   // The original's order: the player, the cursor and +24 loaded, the
   // player's entry index, then +4 and +36 stored.
   const uint32_t player = m.player();
@@ -191,8 +199,7 @@ uint32_t Pressed(uint8_t* base, uint32_t menu, uint64_t action, uint32_t sp, boo
                  const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821864C8 Menu::Pressed");
   const Menu m(base, menu);
-  const uint32_t frame = sp - 96;
-  guest::StoreU32(base, frame, sp);
+  const GuestFrame frame{sp, sp - 96};
   if (m.moved() != 0 || m.side() != 0) {
     return 0;
   }

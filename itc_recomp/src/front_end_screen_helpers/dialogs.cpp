@@ -36,11 +36,11 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   return frame;
 }
 
-// UiMovies::Find(id) as the originals make it: the id stored at `key` (a
-// frame word), the movie table's pair for it, its movie.
-uint32_t FindMovie(uint8_t* base, uint32_t id, uint32_t key) {
-  Store(base, key, id);
-  return Load(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, key));
+// UiMovies::Find(id): the movie table's pair for it, its movie. The
+// originals stored the id at a frame word only they read and passed its
+// address; passed as a value (E5 step 6).
+uint32_t FindMovie(uint8_t* base, uint32_t id) {
+  return Load(base, ui_movies::PairsFindKey(base, ui_movies::kMovieTable, id));
 }
 
 // The varargs (r4 to r10) stored in the caller's parameter area, as the
@@ -68,16 +68,19 @@ struct TextSetter {
 uint64_t SetText(uint8_t* base, const TextSetter& s, uint64_t id, const uint64_t varargs[7],
                  uint32_t sp, const Calls& calls) {
   StoreVarargs(base, sp, varargs);
+  // The frame kept for the text setters' calls (its back chain); the varargs
+  // stay in the caller's parameter area (SetNodeTextV reads them there).
   const uint32_t frame = Frame(base, sp, 144);
-  const uint32_t movie = FindMovie(base, s.movie_id, frame + 80);
+  const uint32_t movie = FindMovie(base, s.movie_id);
   const uint32_t node = ui_movies::FindNode(base, movie, s.sub_scene, 1);
   const uint32_t first = ui_movies::Child(base, node, 0);
   const uint32_t second = ui_movies::Child(base, node, 1);
   const uint32_t third = ui_movies::Child(base, second, 3);
   const uint32_t fourth = ui_movies::Child(base, second, 4);
   const uint32_t eighth = s.answers == Answers::kYesNo ? 0 : ui_movies::Child(base, second, 8);
-  Store(base, frame + 80, sp + 24);
-  calls.Call(kSetNodeTextV, frame, s.lr_v, movie, first, id, Load(base, frame + 80));
+  // The va_list (sp + 24), which the original stored at its +80 and loaded
+  // back, passed as a value.
+  calls.Call(kSetNodeTextV, frame, s.lr_v, movie, first, id, sp + 24);
   uint64_t r3 = 0;
   if (s.answers == Answers::kOne) {
     calls.Call(kSetNodeText, frame, s.lr_third, movie, third, 4);
@@ -96,11 +99,12 @@ uint64_t SetText(uint8_t* base, const TextSetter& s, uint64_t id, const uint64_t
 uint64_t SetNote(uint8_t* base, uint32_t movie_id, uint32_t sub_scene, uint32_t lr, uint64_t id,
                  const uint64_t varargs[7], uint32_t sp, const Calls& calls) {
   StoreVarargs(base, sp, varargs);
+  // The frame kept for the call (its back chain); the key and the va_list
+  // (sp + 24) the original stored at its +80 passed as values.
   const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t movie = FindMovie(base, movie_id, frame + 80);
+  const uint32_t movie = FindMovie(base, movie_id);
   const uint32_t node = ui_movies::Child(base, ui_movies::FindNode(base, movie, sub_scene, 2), 1);
-  Store(base, frame + 80, sp + 24);
-  return calls.Call(kSetNodeTextV, frame, lr, movie, node, id, Load(base, frame + 80));
+  return calls.Call(kSetNodeTextV, frame, lr, movie, node, id, sp + 24);
 }
 
 }  // namespace
@@ -265,7 +269,7 @@ uint64_t OptionsSetUpDialogPage(uint8_t* base, uint32_t sub_scene, uint32_t sp,
   };
   const uint32_t lr_state = save ? 0x821C6D7C : 0x821C6E84;
   const uint32_t frame = Frame(base, sp, 144);
-  const uint32_t movie = FindMovie(base, 7, frame + 96);
+  const uint32_t movie = FindMovie(base, 7);
   const uint64_t state = calls.Call(kSaveSlotsState, frame, lr_state, 0);
   if (int32_t(uint32_t(state)) != 0) {
     OptionsSetDialogNote(base, sub_scene, 70, kNoVarargs, frame, calls);
@@ -311,7 +315,7 @@ uint64_t OptionsSetUpDialogPage(uint8_t* base, uint32_t sub_scene, uint32_t sp,
 uint64_t SaveScreenShowNotice(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821A63B0 SaveScreen::ShowNotice");
   const uint32_t frame = Frame(base, sp, 144);
-  const uint32_t movie = FindMovie(base, 44, frame + 96);
+  const uint32_t movie = FindMovie(base, 44);
   if (Load(base, step) == 0) {
     Store(base, step, 1);
     if (SaveData(base).message() == 0) {
@@ -417,7 +421,7 @@ uint64_t SaveScreenShowMessage(uint8_t* base, uint32_t which, uint32_t step, uin
   const ShowSpec& spec = kShows[which];
   const ShowLrs& lr = spec.lrs;
   const uint32_t frame = Frame(base, sp, 160);
-  const uint32_t movie = FindMovie(base, 44, frame + 96);
+  const uint32_t movie = FindMovie(base, 44);
   if (Load(base, step) == 0) {
     const uint32_t kind = SaveData(base).message();
     const Kind* k = AskKind(
@@ -541,7 +545,7 @@ uint64_t OptionsShowDialog(uint8_t* base, uint32_t sub_scene, uint32_t step, uin
   const uint32_t lr_close = save ? 0x821C6988 : 0x821C6CFC;
   const uint32_t lr_loop = save ? 0x821C69C4 : 0x821C6D38;
   const uint32_t frame = Frame(base, sp, 160);
-  const uint32_t movie = FindMovie(base, 7, frame + 96);
+  const uint32_t movie = FindMovie(base, 7);
   if (Load(base, step) == 0) {
     calls.Call(kMenuSoundPlay, frame, lr_sound, 5);
     const uint32_t kind = Load(base, kind_at());

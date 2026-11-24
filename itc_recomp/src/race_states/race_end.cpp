@@ -100,7 +100,9 @@ void CourseEntryClear(uint8_t* base, uint32_t entry) {
 
 uint32_t CourseRecordPlace(uint8_t* base, uint32_t list, uint32_t time, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82105EA0 CourseRecord::Place");
-  const uint32_t frame = sp - 128;
+  // The time stored to the caller's frame as the original's stw (sp + 28);
+  // read back from a value, as the entry's total (the original's frame +80,
+  // its 128-byte frame left out since E5 step 6).
   Store(base, sp + 28, time);
   uint32_t place = 0;
   const List l(base, list);
@@ -111,8 +113,7 @@ uint32_t CourseRecordPlace(uint8_t* base, uint32_t list, uint32_t time, uint32_t
   for (uint32_t i = 0;;) {
     const Entry entry(base, EntryAt(base, list, i));
     const uint64_t total = TimeAdd(entry.time_a(), entry.time_b());
-    Store(base, frame + 80, uint32_t(total));
-    if (achievements::TimeLess(Load(base, sp + 28), Load(base, frame + 80)) != 0) {
+    if (achievements::TimeLess(time, uint32_t(total)) != 0) {
       return place;
     }
     i++;
@@ -156,26 +157,29 @@ void CourseRecordInsert(uint8_t* base, uint32_t list, uint32_t entry, uint32_t n
                         const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_82105E30 CourseRecord::Insert");
   CourseRecordLink(base, list, int16_t(n));
-  Copy(base, EntryAt(base, list, n), entry, Entry::kSize, sp - 112, 0x82105E98, call);
+  // memcpy's original (where its plain C++ refuses) from `sp`: the
+  // original's 112-byte frame held nothing it reads (E5 step 6).
+  Copy(base, EntryAt(base, list, n), entry, Entry::kSize, sp, 0x82105E98, call);
 }
 
 uint32_t CourseRecordAdd(uint8_t* base, uint32_t list, uint32_t entry, uint32_t source,
                          uint32_t sp, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_82105F50 CourseRecord::Add");
-  const uint32_t frame = sp - 128;
+  // The original's 128-byte frame held only the total (+80): a value since
+  // E5 step 6; its callees run from `sp` (none reads its caller's frame
+  // but CourseRecord::Place's own stw at sp + 28).
   const Entry e(base, entry);
   const uint64_t total = TimeAdd(e.time_a(), e.time_b());
-  Store(base, frame + 80, uint32_t(total));
-  const uint32_t place = CourseRecordPlace(base, list, Load(base, frame + 80), frame);
+  const uint32_t place = CourseRecordPlace(base, list, uint32_t(total), sp);
   const List l(base, list);
   if (int32_t(place) == 0) {
-    Copy(base, l.best_address(), source, 76, frame, 0x82105FA4, call);
+    Copy(base, l.best_address(), source, 76, sp, 0x82105FA4, call);
   }
   if (int32_t(place) < 10) {
     if (l.count() == 10) {
       CourseRecordUnlink(base, list, 9);
     }
-    CourseRecordInsert(base, list, entry, place, frame, call);
+    CourseRecordInsert(base, list, entry, place, sp, call);
   }
   return place;
 }
@@ -190,8 +194,10 @@ void CourseRecordsSave(uint8_t* base, uint32_t records, uint32_t race, uint32_t 
   const int32_t type = int32_t(va::StagesType(base, stages, 0xFFFFFFFFu));
   if (type == 1 || type == 3) {
     const uint32_t slot = (route << 1) + flag;
+    // memcpy's original (where its plain C++ refuses) from `sp`: the
+    // original's 128-byte frame held nothing it reads (E5 step 6).
     Copy(base, records + slot * List::kSize + 20, data.stages_course_record_address(),
-         List::kSize, sp - 128, 0x82105C88, call);
+         List::kSize, sp, 0x82105C88, call);
   }
 }
 

@@ -1,7 +1,8 @@
 // Career::SetUpEvent (docs/functions/career.md): the day's offers picked from
 // the data tables and the race event made, over the guest layout of a
-// player's save data and the original's 121,200-byte frame (its lists and
-// counts written where the original keeps them).
+// player's save data and the original's 121,200-byte frame (its locations'
+// set, which RaceEvent::Make reads, kept there; its lists and counts host
+// words since E5 step 6).
 
 #include "career/career.h"
 
@@ -11,6 +12,8 @@
 #include "race_overlays/race_overlays.h"
 #include "race_setup/race_setup.h"
 #include "schema/career.h"
+
+#include <vector>
 
 namespace career {
 
@@ -30,6 +33,33 @@ constexpr uint32_t kTableWords = 0x600;
 constexpr uint32_t kOfferCount = 96;
 // RaceData::ResetGlobal's frame (its native r3 is from below it).
 constexpr uint32_t kResetFrame = 112;
+
+// The frame's caps, counts, picks and entries (+96 to its end), which only
+// this function reads: host words since E5 step 6, at the same offsets. An
+// offset past the frame's end (an entry kind above 12, never in the data)
+// reaches the guest stack where the original's would.
+class Lists {
+ public:
+  Lists(uint8_t* base, uint32_t frame)
+      : base_(base), frame_(frame), words_((kSetUpEventFrame - kCaps) / 4) {}
+  uint32_t Load(uint32_t offset) const {
+    const uint32_t i = (offset - kCaps) / 4;
+    return i < words_.size() ? words_[i] : guest::LoadU32(base_, frame_ + offset);
+  }
+  void Store(uint32_t offset, uint32_t value) {
+    const uint32_t i = (offset - kCaps) / 4;
+    if (i < words_.size()) {
+      words_[i] = value;
+    } else {
+      guest::StoreU32(base_, frame_ + offset, value);
+    }
+  }
+
+ private:
+  uint8_t* base_;
+  uint32_t frame_;
+  std::vector<uint32_t> words_;
+};
 
 uint32_t Slw(uint32_t value, uint32_t amount) {
   amount &= 0x3F;
@@ -78,16 +108,16 @@ bool ConditionsPass(uint8_t* base, uint32_t entry, uint32_t location, uint32_t f
 }
 
 // An entry offered: counted under (kind x 6 + location - 14), {table, index}
-// added to that list on the frame.
-void Collect(uint8_t* base, uint32_t frame, uint32_t entry, int32_t location, uint32_t table,
+// added to that list.
+void Collect(uint8_t* base, Lists& lists, uint32_t entry, int32_t location, uint32_t table,
              uint32_t index) {
   const uint32_t at = schema::CareerEntry56(base, entry).kind() * 6 + uint32_t(location) - 14;
-  const uint32_t count_at = frame + kCounts + (at << 2);
-  const uint32_t n = guest::LoadU32(base, count_at);
+  const uint32_t count_at = kCounts + (at << 2);
+  const uint32_t n = lists.Load(count_at);
   const uint32_t slot = (at * 192 + n) << 3;
-  guest::StoreU32(base, count_at, n + 1);
-  guest::StoreU32(base, frame + kEntries + slot, table);
-  guest::StoreU32(base, frame + kEntries + 4 + slot, index);
+  lists.Store(count_at, n + 1);
+  lists.Store(kEntries + slot, table);
+  lists.Store(kEntries + 4 + slot, index);
 }
 
 // Kinds 0, 1, 2 and 4 are left out of a table's entries whose word is 2.
@@ -161,11 +191,12 @@ uint64_t SetUpEvent(uint8_t* base, uint32_t save, uint32_t mode, uint32_t locati
     }
   }
 
-  // The offers cleared, and the frame's counts.
+  // The offers cleared, and the counts.
+  Lists lists(base, frame);
   for (uint32_t l = 0; l < 6; l++) {
     guest::StoreU32(base, sv.offers_address() + kOfferCount + 100 * l, 0);
     for (uint32_t k = 0; k < 13; k++) {
-      guest::StoreU32(base, frame + kCounts + 4 * l + 24 * k, 0);
+      lists.Store(kCounts + 4 * l + 24 * k, 0);
     }
   }
 
@@ -187,7 +218,7 @@ uint64_t SetUpEvent(uint8_t* base, uint32_t save, uint32_t mode, uint32_t locati
       if (!ConditionsPass(base, entry, 1, frame)) {
         continue;
       }
-      Collect(base, frame, entry, l, 1, i);
+      Collect(base, lists, entry, l, 1, i);
     }
   }
 
@@ -236,34 +267,34 @@ uint64_t SetUpEvent(uint8_t* base, uint32_t save, uint32_t mode, uint32_t locati
       if (!ConditionsPass(base, entry, table, frame)) {
         continue;
       }
-      Collect(base, frame, entry, l, table, i);
+      Collect(base, lists, entry, l, table, i);
     }
   }
 
   // The picks: for each location, up to 8 entries in all, each kind's at
   // random without repeats, at most its cap (2, 4, 2, 8, then 0: a kind
   // capped at 0 still gets one).
-  guest::StoreU32(base, frame + kCaps + 16, 0);
-  guest::StoreU32(base, frame + kCaps + 20, 0);
-  guest::StoreU32(base, frame + kCaps + 0, 2);
-  guest::StoreU32(base, frame + kCaps + 8, 2);
-  guest::StoreU32(base, frame + kCaps + 4, 4);
-  guest::StoreU32(base, frame + kCaps + 12, 8);
+  lists.Store(kCaps + 16, 0);
+  lists.Store(kCaps + 20, 0);
+  lists.Store(kCaps + 0, 2);
+  lists.Store(kCaps + 8, 2);
+  lists.Store(kCaps + 4, 4);
+  lists.Store(kCaps + 12, 8);
   for (uint32_t k = 6; k < 13; k++) {
-    guest::StoreU32(base, frame + kCaps + 4 * k, 0);
+    lists.Store(kCaps + 4 * k, 0);
   }
   for (uint32_t l = 0; l < 6; l++) {
     const uint32_t offers = sv.offers_address() + 100 * l;
     int32_t picks = 0;
     for (uint32_t k = 0; k < 13; k++) {
-      const int32_t count = int32_t(guest::LoadU32(base, frame + kCounts + 4 * l + 24 * k));
+      const int32_t count = int32_t(lists.Load(kCounts + 4 * l + 24 * k));
       if (count == 0) {
         continue;
       }
-      const int32_t cap = int32_t(guest::LoadU32(base, frame + kCaps + 4 * k));
+      const int32_t cap = int32_t(lists.Load(kCaps + 4 * k));
       const int32_t n = count > cap ? cap : count;
       for (uint32_t w = 0; w < 200; w++) {
-        guest::StoreU32(base, frame + kPicked + 4 * w, 0);
+        lists.Store(kPicked + 4 * w, 0);
       }
       const uint32_t list = 192 * l + 1152 * k;
       int32_t taken = 0;
@@ -272,11 +303,11 @@ uint64_t SetUpEvent(uint8_t* base, uint32_t save, uint32_t mode, uint32_t locati
         do {
           const int32_t r = int32_t(race_overlays::Rand(base));
           index = r - (r / count) * count;
-        } while (guest::LoadU32(base, frame + kPicked + (uint32_t(index) << 2)) != 0);
-        guest::StoreU32(base, frame + kPicked + (uint32_t(index) << 2), 1);
-        const uint32_t from = frame + kEntries + ((list + uint32_t(index)) << 3);
-        const uint32_t table = guest::LoadU32(base, from + 0);
-        const uint32_t entry = guest::LoadU32(base, from + 4);
+        } while (lists.Load(kPicked + (uint32_t(index) << 2)) != 0);
+        lists.Store(kPicked + (uint32_t(index) << 2), 1);
+        const uint32_t from = kEntries + ((list + uint32_t(index)) << 3);
+        const uint32_t table = lists.Load(from + 0);
+        const uint32_t entry = lists.Load(from + 4);
         const uint32_t at = guest::LoadU32(base, offers + kOfferCount) * 12 + offers;
         guest::StoreU32(base, at + 0, 0);
         guest::StoreU32(base, at + 4, table);

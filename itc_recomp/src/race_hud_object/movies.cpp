@@ -72,8 +72,9 @@ uint32_t StartCountdown(uint8_t* base, uint32_t hud) {
 
 uint64_t StartMovie1(uint8_t* base, uint32_t hud, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82212718 RaceHud::StartMovie1");
+  // The original's frame, for MovedR3's address only (no guest code is
+  // called from it, so no back chain).
   const uint32_t frame = sp - 96;
-  guest::StoreU32(base, frame, sp);
   ui_movies::PlayNamed(base, Movie1(base, hud), 0, 0, 0, 0, 0);
   const uint32_t movie = Movie1(base, hud);
   return MovedR3(ui_movies::MoveNamedAnimation(base, movie, 0, true), frame, movie);
@@ -356,9 +357,8 @@ uint64_t SetUpRacers(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& call
       bar.set_value(float(zero));
       bar.set_animation_played(0);
       bar.set_touched(0);
-      // std (the conversion's doubleword): the high word first.
-      guest::StoreU32(base, frame + 80, uint32_t(uint64_t(target) >> 32));
-      guest::StoreU32(base, frame + 84, uint32_t(target));
+      // The conversion's doubleword (the original's std to frame + 80, read
+      // by nothing else) left out.
       const double value = Single(double(target));
       bar.set_max(float(value));
       bar.set_target(float(value));
@@ -405,8 +405,8 @@ uint32_t MovieMask(uint32_t kind) {
 
 uint32_t Init(uint8_t* base, uint32_t hud, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82215260 RaceHud::Init");
-  const uint32_t frame = sp - 128;
-  guest::StoreU32(base, frame, sp);
+  // The original's frame (its + 80 the key handed to UiMovie::PairsFind)
+  // left out: the key passed by value.
   const Hud h(base, hud);
   // The HUD's movie fields, set through the view (a host object, E5 step 4).
   using Set = void (Hud::*)(uint32_t) const;
@@ -418,11 +418,9 @@ uint32_t Init(uint8_t* base, uint32_t hud, uint32_t sp) {
                   {2, &Hud::set_movie2},        {13, &Hud::set_timer},
                   {1, &Hud::set_movie1},        {12, &Hud::set_splits},
                   {19, &Hud::set_movie19}};
-  const uint32_t key = frame + 80;
   uint32_t found = 0;
   for (uint32_t i = 0; i < 9; i++) {
-    guest::StoreU32(base, key, kMovies[i].id);
-    found = ui_movies::PairsFind(base, ui_movies::kMovieTable, key);
+    found = ui_movies::PairsFindKey(base, ui_movies::kMovieTable, kMovies[i].id);
     const uint32_t movie = guest::LoadU32(base, found);
     if (i == 8) {
       h.set_swapped_texture(0);
@@ -556,8 +554,9 @@ uint64_t ScreensDestroy(uint8_t* base, uint32_t sp, const Calls& calls) {
 
 uint64_t ScreensCreate(uint8_t* base, uint32_t kind, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82211F40 RaceScreens::Create");
+  // The original's frame: its callees' stack pointer (they make their own
+  // frames below it; no guest code is called from it, so no back chain).
   const uint32_t frame = sp - 112;
-  guest::StoreU32(base, frame, sp);
   // VirtualAlloc(0, 1040, MEM_COMMIT, PAGE_READWRITE): the holder in host
   // memory (E5 step 4; zeroed, as committed pages are), its handle kept at
   // [0x826D84F0]. The adapter runs this only over the allocation layer
@@ -598,8 +597,8 @@ uint64_t RunCountdown(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& cal
   // before the sound's call as the original leaves it.
   const uint32_t time = ui_movies::AnimationTime(base, movie, kNone, 0);
   *f1 = double(std::bit_cast<float>(time));
+  // The original's frame + 80 (the fctiwz's word, read back) a local.
   const int32_t frames = camera_modes::steps::Fctiwz(*f1);
-  guest::StoreU32(base, frame + 80, uint32_t(frames));
   uint32_t cue;
   if (frames == 60 || frames == 120 || frames == 180) {
     cue = 8;

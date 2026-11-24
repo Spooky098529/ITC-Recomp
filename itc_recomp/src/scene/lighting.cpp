@@ -1,8 +1,9 @@
 // CarScene::InitLighting (sub_820C8528, see scene.h), load for load and
 // store for store as the recompiled function: its float4s are built in its
-// 288-byte frame and copied into the block as doublewords, so the frame's
-// words are left as the original leaves them. Floats are kept as the
-// registers hold them (doubles, rounded to single where the original's
+// 288-byte frame and copied into the block as doublewords. The frame is
+// only its own (no call, nothing handed out): a host array since E5 step 6,
+// its words written and read in the original's order. Floats are kept as
+// the registers hold them (doubles, rounded to single where the original's
 // frsp and single-precision ops round).
 
 #include "scene/scene.h"
@@ -43,12 +44,15 @@ double Single(double x) { return double(float(x)); }
 
 uint64_t InitLighting(uint8_t* base, uint32_t block, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_820C8528 CarScene::InitLighting");
-  const uint32_t frame = sp - kFrameBytes;
-  guest::StoreU32(base, frame, sp);  // the back chain
+  (void)sp;
+  // The frame's words (as the guest's big-endian words, by offset / 4).
+  uint32_t frame[kFrameBytes / 4] = {};
   auto S = [&](uint32_t offset, double value) {
-    guest::StoreU32(base, frame + offset, std::bit_cast<uint32_t>(float(value)));
+    frame[offset / 4] = std::bit_cast<uint32_t>(float(value));
   };
-  auto ld = [&](uint32_t offset) { return Load64(base, frame + offset); };
+  auto ld = [&](uint32_t offset) {
+    return (uint64_t(frame[offset / 4]) << 32) | frame[offset / 4 + 1];
+  };
   auto st = [&](uint32_t offset, uint64_t value) { Store64(base, block + offset, value); };
 
   double f0 = LoadFloat(base, K(9844));

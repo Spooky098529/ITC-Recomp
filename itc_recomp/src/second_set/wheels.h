@@ -7,7 +7,9 @@
 // streams with memcpy, the buffers freed). Guest data shared with the
 // recompiled code, so these work on guest memory with the originals' loads
 // and stores in their order (their frames' words included, with each
-// frame's back chain; the saved registers' slots aren't written). `stack` is
+// frame's back chain, as they're handed to the page allocator, the morph and
+// the originals' fallbacks; the saved registers' slots aren't written;
+// SetUp's own frame, which held nothing, isn't made: E5 step 6). `stack` is
 // the guest r1 at entry; each returns r3 as the original leaves it. Built
 // with -ffp-model=strict; the scalar float steps run with the flush mode
 // off (the morph's vector steps turn it on themselves). Only with native

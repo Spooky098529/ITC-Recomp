@@ -43,11 +43,10 @@ uint32_t Byte(uint8_t* base, uint32_t address) { return guest::LoadU8(base, addr
 void Stfs(uint8_t* base, uint32_t address, double value) {
   Store(base, address, std::bit_cast<uint32_t>(float(value)));
 }
-// An int made a float (std, lfd, fcfid, frsp): the doubleword at `at`.
-double IntToFloat(uint8_t* base, uint32_t at, int32_t value) {
+// An int made a float (std, lfd, fcfid, frsp); the doubleword the original
+// passes it through on the stack is a C++ value since E5 step 6.
+double IntToFloat(int32_t value) {
   const uint64_t word = uint64_t(int64_t(value));
-  Store(base, at, uint32_t(word >> 32));
-  Store(base, at + 4, uint32_t(word));
   return double(float(double(int64_t(word))));
 }
 
@@ -205,14 +204,14 @@ uint32_t GarageDecal(uint8_t* base, uint32_t screen, uint32_t area, uint64_t slo
 uint64_t SaveAreaDecals(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
                         uint64_t area, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821F6CE8 TuningScreen::SaveAreaDecals");
-  const uint32_t frame = sp - 112;
-  Store(base, frame, sp);
+  // No guest frame (E5 step 6): the original's 112 bytes held only the back
+  // chain; its callees and guest calls are given `sp`.
   uint32_t id = uint32_t((area + 1610) * 20 + screen);
   uint64_t record = area * 120 + screen + 31240;
   uint64_t r3 = screen;
   for (int k = 0; k < 5; k++) {
     Store(base, id, Load(base, id + 1120));
-    r3 = Copy24(base, call, record, record + 1120, frame, 0x821F6D28);
+    r3 = Copy24(base, call, record, record + 1120, sp, 0x821F6D28);
     id += 4;
     record += 24;
   }
@@ -222,14 +221,14 @@ uint64_t SaveAreaDecals(uint8_t* base, const tuning_screen::GuestCall& call, uin
 uint64_t RestoreAreaDecals(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
                            uint64_t area, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821F6C90 TuningScreen::RestoreAreaDecals");
-  const uint32_t frame = sp - 112;
-  Store(base, frame, sp);
+  // No guest frame (E5 step 6): the original's 112 bytes held only the back
+  // chain; its callees and guest calls are given `sp`.
   uint32_t id = uint32_t((area + 1666) * 20 + screen);
   uint64_t record = area * 120 + screen + 32360;
   uint64_t r3 = screen;
   for (int k = 0; k < 5; k++) {
     Store(base, id, Load(base, id - 1120));
-    r3 = Copy24(base, call, record, record - 1120, frame, 0x821F6CD0);
+    r3 = Copy24(base, call, record, record - 1120, sp, 0x821F6CD0);
     id += 4;
     record += 24;
   }
@@ -241,8 +240,8 @@ uint64_t LoadStickers(uint8_t* base, const tuning_screen::GuestCall& call, uint6
   ITC_NATIVE_RUNNING("sub_821F86C0 TuningScreen::LoadStickers");
   namespace steps = strings_and_font::steps;
   const uint32_t s = uint32_t(screen);
-  const uint32_t frame = sp - 176;
-  Store(base, frame, sp);
+  // No guest frame (E5 step 6): the original's 176 bytes held only the back
+  // chain; its callees and guest calls are given `sp`.
   const double offset = double(G::mirror_angle(base));
   const double scale = double(G::load_scale(base));
   const double minus = double(G::minus_one(base));
@@ -291,7 +290,7 @@ uint64_t LoadStickers(uint8_t* base, const tuning_screen::GuestCall& call, uint6
       ids += 4;
       r += 24;
     }
-    r3 = RestoreAreaDecals(base, call, screen, a, frame);
+    r3 = RestoreAreaDecals(base, call, screen, a, sp);
   }
   return r3;
 }
@@ -310,8 +309,10 @@ uint64_t ResetStickerEditor(uint8_t* base, uint64_t screen) {
 uint64_t StoreStickers(uint8_t* base, uint64_t screen, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821F8598 TuningScreen::StoreStickers");
   const uint32_t s = uint32_t(screen);
-  const uint32_t frame = sp - 112;
-  Store(base, frame, sp);
+  // No guest frame (E5 step 6): the original's 112 bytes held the back chain
+  // and the conversions' doublewords at +80 and +88 (C++ values, only read
+  // here); nothing here calls guest code.
+  (void)sp;
   const double scale = double(G::store_scale(base));
   const double minus = double(G::minus_one(base));
   const double offset = double(G::mirror_angle(base));
@@ -327,8 +328,8 @@ uint64_t StoreStickers(uint8_t* base, uint64_t screen, uint32_t sp) {
       if (mirrored) {
         x = 0u - x;
       }
-      schema::CarMakersCarDecal(base, g).set_x(float(IntToFloat(base, frame + 80, int32_t(x))));
-      schema::CarMakersCarDecal(base, g).set_y(float(IntToFloat(base, frame + 88, int32_t(uint32_t(schema::StickerRecord(base, record).y())))));
+      schema::CarMakersCarDecal(base, g).set_x(float(IntToFloat(int32_t(x))));
+      schema::CarMakersCarDecal(base, g).set_y(float(IntToFloat(int32_t(uint32_t(schema::StickerRecord(base, record).y())))));
       double angle = double(schema::StickerRecord(base, record).angle());
       uint32_t flag = schema::StickerRecord(base, record).flip();
       if (mirrored) {
@@ -354,8 +355,8 @@ uint64_t OnStickerDialogYes(uint8_t* base, const tuning_screen::GuestCall& call,
                             uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821FA230 TuningScreen::OnStickerDialogYes");
   const uint32_t s = uint32_t(screen);
-  const uint32_t frame = sp - 96;
-  Store(base, frame, sp);
+  // No guest frame (E5 step 6): the original's 96 bytes held only the back
+  // chain; its callees and guest calls are given `sp`.
   const int32_t state = int32_t(Screen(base, s).state());
   uint64_t r3 = screen;
   if (state == 52) {
@@ -394,9 +395,9 @@ uint64_t OnStickerDialogYes(uint8_t* base, const tuning_screen::GuestCall& call,
     Screen(base, s).set_refresh_pending(1);
     Screen(base, s).set_command_end_after_setup(1);
     if (state == 50) {
-      SaveAreaDecals(base, call, screen, Screen(base, s).editor_page(), frame);
-      StoreStickers(base, screen, frame);
-      call(kPickNext, {vehicle_accessors::SaveDataOf(base, 0), 1}, frame, 0x821FA360);
+      SaveAreaDecals(base, call, screen, Screen(base, s).editor_page(), sp);
+      StoreStickers(base, screen, sp);
+      call(kPickNext, {vehicle_accessors::SaveDataOf(base, 0), 1}, sp, 0x821FA360);
       const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
       r3 = save;
       for (uint32_t i = 0; i < 5; i++) {
@@ -421,12 +422,12 @@ uint64_t OnDialogYes(uint8_t* base, const tuning_screen::GuestCall& call, uint64
                      uint32_t sp, bool native_specs, const StandFit& fit) {
   ITC_NATIVE_RUNNING("sub_821E2660 TuningScreen::OnDialogYes");
   const uint32_t s = uint32_t(screen);
-  const uint32_t frame = sp - 112;
-  Store(base, frame, sp);
+  // No guest frame (E5 step 6): the original's 112 bytes held only the back
+  // chain; its callees and guest calls are given `sp`.
   const int32_t state = int32_t(Screen(base, s).state());
   const auto category = [&] { return int32_t(Screen(base, s).category()); };
   const auto item = [&] { return uint32_t(Screen(base, s).item()); };
-  const auto set_choice = [&] { SetCurrentChoice(base, call, screen, frame, native_specs); };
+  const auto set_choice = [&] { SetCurrentChoice(base, call, screen, sp, native_specs); };
   const auto copy = [&](uint32_t from, uint32_t to) {
     uint32_t words[4];
     for (uint32_t i = 0; i < 4; i++) {
@@ -733,7 +734,7 @@ uint64_t OnDialogYes(uint8_t* base, const tuning_screen::GuestCall& call, uint64
         Store(base, s + uint32_t(n + to_id) * 4, Load(base, s + uint32_t(n + from_id) * 4));
         n = uint64_t(Screen(base, s).editor_page()) * 3 + j;
         const uint64_t at = n * 24 + screen;
-        Copy24(base, call, at + to, at + from, frame, lr);
+        Copy24(base, call, at + to, at + from, sp, lr);
       }
       if (state == 36) {
         const int32_t page = int32_t(Screen(base, s).editor_page());
@@ -747,18 +748,18 @@ uint64_t OnDialogYes(uint8_t* base, const tuning_screen::GuestCall& call, uint64
             SwapKept(base, images, k, i);
           }
           for (const auto& [k, i] : kSwaps[page]) {
-            BindVinylTexture(base, images, i, uint32_t(page), frame);
+            BindVinylTexture(base, images, i, uint32_t(page), sp);
           }
         }
       }
     }
-    StoreVinyls(base, screen, frame);
+    StoreVinyls(base, screen, sp);
     Screen(base, s).set_stand_action(6);
     const uint32_t c = tuning_screen::SelectedGarageCar(base, s);
     const uint32_t holder = schema::TuningScreenGlobals::stand_holder(base).stage_block_0();
     const int64_t a = int8_t(Byte(base, c + 300));
     const int64_t b = int8_t(Byte(base, c + 301));
-    FitSelectedCar(base, call, fit, holder, uint64_t(a), uint64_t(b), frame, 0x821E3984);
+    FitSelectedCar(base, call, fit, holder, uint64_t(a), uint64_t(b), sp, 0x821E3984);
   } else if (state == 37) {
     // Delete a vinyl layer (item 6) or leave the sticker list (item 7).
     if (category() == 5) {
@@ -787,7 +788,7 @@ uint64_t OnDialogYes(uint8_t* base, const tuning_screen::GuestCall& call, uint64
       }
     }
   }
-  return OnStickerDialogYes(base, call, screen, frame);
+  return OnStickerDialogYes(base, call, screen, sp);
 }
 
 }  // namespace tuning_pages

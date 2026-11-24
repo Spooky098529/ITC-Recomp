@@ -54,10 +54,6 @@ uint32_t Load(uint8_t* base, uint32_t address) {
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
-void Store64(uint8_t* base, uint32_t address, uint64_t value) {
-  Store(base, address, uint32_t(value >> 32));
-  Store(base, address + 4, uint32_t(value));
-}
 
 // The frame `bytes` below `stack`, its back chain written (stwu's).
 uint32_t Frame(uint8_t* base, uint32_t stack, uint32_t bytes) {
@@ -124,13 +120,13 @@ void NotedCopy(uint8_t* base, uint32_t to, uint32_t from, uint32_t lr) {
 
 // The second rear tire's (and rim's) shift: T's x (at `x`) +=
 // float(the wheels record's +56) x [0x82002D0C] x 3.0, fused with x 0.001
-// (the integer through the frame's +80, as fcfid takes it).
-void ShiftX(uint8_t* base, uint32_t frame, uint32_t group, uint32_t x, double shift,
-            double three, double milli) {
+// (the integer the original spilled to its frame's +80 for fcfid, which
+// nothing read but the fcfid: a value, E5 step 6).
+void ShiftX(uint8_t* base, [[maybe_unused]] uint32_t frame, uint32_t group, uint32_t x,
+            double shift, double three, double milli) {
   const uint32_t wheels = schema::SecondSetWheelPoints(base, group).wheels_record().address;
   const double f13 = Lfs(base, x);
   const int64_t count = int64_t(int32_t(schema::SceneModelsWheelsRecord(base, wheels).rear_size_index()));
-  Store64(base, frame + 80, uint64_t(count));
   double f0 = Single(double(count));
   f0 = Fmuls(f0, shift);
   f0 = Fmuls(f0, three);
@@ -1005,7 +1001,8 @@ Left WheelsDrawBrakesMorphed(uint8_t* base, const Calls& calls, uint32_t stack, 
     if (kind == 6) size += 2;
     const int64_t count = int64_t(int32_t(uint32_t(size) - 9u));
     Store(base, frame + 224, schema::SecondSetWheelPoints(base, group).rim_record1_shape());
-    Store64(base, frame + 80, uint64_t(count));
+    // The count's spill to the frame's +80 for fcfid left out (E5 step 6:
+    // nothing else read it).
     const double weight = Fmuls(Single(double(count)), Lfs(base, kNinth));
     Stfs(base, frame + 160, weight);
     Stfs(base, schema::SecondSetWheelPoints(base, group).weight_address(), weight);

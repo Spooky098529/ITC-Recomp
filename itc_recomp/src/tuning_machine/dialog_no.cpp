@@ -178,7 +178,6 @@ uint64_t StickerDialogNo(uint8_t* base, uint64_t screen, uint32_t sp, const Call
   const uint32_t s = uint32_t(screen);
   const Screen sc(base, s);
   const uint32_t frame = sp - 96;
-  Store(base, frame, sp);
   const int32_t state = S(sc.screen_state());
   if (state == 52) {
     sc.set_screen_state(40);
@@ -201,9 +200,11 @@ uint64_t StickerDialogNo(uint8_t* base, uint64_t screen, uint32_t sp, const Call
   q.set_page(39);
   q.set_step(kNone);
   q.set_queued_step(kNone);
-  Store(base, frame + 80, 14);
-  const uint32_t movie =
-      Load(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+  // UiMovies::Find by the id as a word (the original's key at the frame's
+  // +80, read only by Find); the frame's back chain written for the guest
+  // call alone (E5 step 6).
+  const uint32_t movie = Load(base, ui_movies::PairsFindKey(base, ui_movies::kMovieTable, 14));
+  Store(base, frame, sp);
   return calls.Call(kHideNode, frame, 0x821F7A88, movie, 1, 1);
 }
 
@@ -211,8 +212,9 @@ uint64_t OnDialogNo(uint8_t* base, uint64_t screen, uint32_t sp, const Calls& ca
   ITC_NATIVE_RUNNING("sub_821CEA88 TuningMachine::OnDialogNo");
   const uint32_t s = uint32_t(screen);
   const Screen sc(base, s);
+  // The original's frame: nothing in it, no guest call made with it (E5
+  // step 6: the back chain no longer written); StickerDialogNo's below it.
   const uint32_t frame = sp - 96;
-  Store(base, frame, sp);
   const int32_t state = S(sc.screen_state());
   auto pop_and_queue = [&] {
     const uint32_t reached = PopOne(base, s);
@@ -335,7 +337,7 @@ uint64_t OnNoticeClosed(uint8_t* base, uint64_t screen, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821CF8B8 TuningMachine::OnNoticeClosed");
   const uint32_t s = uint32_t(screen);
   const Screen sc(base, s);
-  Store(base, sp - 96, sp);  // its frame's back chain (nothing else in it)
+  (void)sp;  // no frame (E5 step 6: the original's held nothing)
   if (S(sc.screen_state()) != 10) {
     return screen;
   }

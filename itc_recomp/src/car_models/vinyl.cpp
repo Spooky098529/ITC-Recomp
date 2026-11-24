@@ -54,17 +54,14 @@ uint32_t PhysicalProtection(uint8_t* base, uint32_t protection) {
 uint32_t TextureCreate(uint8_t* base, uint32_t format, uint32_t width, uint32_t height,
                        uint32_t header_out, uint32_t data_out, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820ECF08 Texture::Create");
-  const uint32_t frame = stack - kTextureCreateFrameBytes;
+  (void)stack;  // no guest frame (E5 step 6): nothing here calls guest code
   const CarModelsAddressWord header_word(base, header_out), data_word(base, data_out);
   // VirtualAlloc(0, 52, MEM_COMMIT, PAGE_READWRITE), then memset.
   header_word.set_value(memory::AllocPages(52, 4096));
   Clear(base, header_word.value(), 52);
-  // XGSetTextureHeader: its stack words, in the original's order.
+  // XGSetTextureHeader (its stack words, which the original wrote in its
+  // frame, are its arguments: no longer stored, E5 step 6).
   const uint32_t header = header_word.value();
-  Store(base, frame + 92, header);
-  Store(base, frame + 108, 0);
-  Store(base, frame + 100, 0);
-  Store(base, frame + 84, 0);
   Require(graphics::XgHeaderCopyFits(header), "XGSetTextureHeader");
   const uint32_t size =
       graphics::XGSetTextureHeader(base, width, height, 1, 2, format, 0, 0, 0, header, 0, 0);

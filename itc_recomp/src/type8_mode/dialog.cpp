@@ -46,6 +46,21 @@ uint32_t FindMovie(uint8_t* base, uint32_t at) {
   return LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, at));
 }
 
+// The same for the id as a value (the originals' slot only the find read;
+// E5 step 6).
+uint32_t FindMovieId(uint8_t* base, uint32_t id) {
+  return LoadU32(base, ui_movies::PairsFindKey(base, ui_movies::kMovieTable, id));
+}
+
+// A word of a table the original writes in its frame at `table` (`count`
+// words, a C++ array since E5 step 6) read at index `index` unchecked: an
+// index outside it reads the stack word the original reads there.
+uint32_t TableWord(uint8_t* base, const uint32_t* words, uint32_t count, uint32_t table,
+                   uint32_t index) {
+  const uint32_t offset = index << 2;
+  return offset < 4 * count ? words[offset >> 2] : LoadU32(base, table + offset);
+}
+
 uint64_t SoundThunk(void* user, uint32_t function, const uint64_t args[4], int set, uint32_t r1,
                     uint32_t lr) {
   return static_cast<const Calls*>(user)->call_set(function, args, set, r1, lr);
@@ -175,7 +190,7 @@ uint64_t DialogWaitForMovies(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8223ADC0 Type8Dialog::WaitForMovies");
   const D d(base, uint32_t(r3));
   const Machine machine(base, d.machine_address());
-  Frame(base, sp, 96);
+  (void)sp;  // its frame held only the back chain (E5 step 6)
   if (int32_t(machine.loaded()) != 0) {
     d.set_shown(1);
     machine.set_state(9);
@@ -196,12 +211,12 @@ uint64_t DialogDraw(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, const 
   ITC_NATIVE_RUNNING("sub_8223AC00 Type8Dialog::Draw");
   const uint32_t frame = Frame(base, sp, 96);
   const uint32_t page = Pages(base, D(base, uint32_t(r3)).pages_address()).page();
-  StoreU32(base, frame + 80, 0x8223A6B8);
-  StoreU32(base, frame + 84, 0x8223A858);
+  // ConfirmPage and NoticePage: the original's table at the frame's +80.
+  static constexpr uint32_t kPages[2] = {0x8223A6B8, 0x8223A858};
   if (page == kMinusOne) {
     return r3;
   }
-  const uint32_t target = LoadU32(base, frame + 80 + (page << 2));
+  const uint32_t target = TableWord(base, kPages, 2, frame + 80, page);
   return calls.call(target, frame, 0x8223AC44, r3, r4);
 }
 
@@ -216,18 +231,16 @@ uint64_t DialogUpdate(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t 
   const uint32_t step = pages.step();
   // The steps: OpenConfirmStep, Dialog::CloseConfirmStep, OpenNoticeStep,
   // CloseNoticeStep, MoveCursorStep.
+  // (The original's table at the frame's +96.)
   static constexpr uint32_t kSteps[5] = {0x8223A940, 0x8223AA10, 0x822326A8, 0x8223AAA8,
                                          0x8223AB50};
-  for (uint32_t i = 0; i < 5; i++) {
-    StoreU32(base, frame + 96 + 4 * i, kSteps[i]);
-  }
   uint64_t answer = movie;
   if (step == kMinusOne) {
     answer = calls.call(kRun, frame, 0x8223AD44, movie, 0);
   } else {
     bool done = true;
     if (int32_t(step) >= 0) {
-      const uint32_t target = LoadU32(base, frame + 96 + (step << 2));
+      const uint32_t target = TableWord(base, kSteps, 5, frame + 96, step);
       answer = calls.call(target, frame, 0x8223ACF4, r3, frame + 80);
       done = int32_t(answer) != 0;
     }
@@ -258,11 +271,10 @@ uint64_t DialogUpdate(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t 
 
 uint64_t DialogOpenConfirm(uint8_t* base, uint32_t dialog, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8223A510 Type8Dialog::OpenConfirm");
-  const uint32_t frame = Frame(base, sp, 112);
+  (void)sp;  // no guest frame (E5 step 6): the id 16 passed as a value
   const D d(base, dialog);
-  StoreU32(base, frame + 80, 16);
   d.set_movie(16);
-  const uint32_t movie = FindMovie(base, frame + 80);
+  const uint32_t movie = FindMovieId(base, 16);
   const uint64_t r3 = ui_movies::ResetPose(base, movie);
   Menu(base, d.menu_address()).set_player(G::dialog_player(base));
   ResetConfirm(base, dialog, movie);
@@ -298,14 +310,13 @@ uint64_t DialogDrawWaiting(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8223A5F0 Type8Dialog::DrawWaiting");
   const uint32_t dialog = uint32_t(r3);
   const D d(base, dialog);
-  const uint32_t frame = Frame(base, sp, 128);
+  (void)sp;  // no guest frame (E5 step 6): the id 16 passed as a value
   if (d.reopen() == 0) {
     return r3;
   }
-  StoreU32(base, frame + 80, 16);
   d.set_reopen(0);
   d.set_movie(16);
-  const uint32_t movie = FindMovie(base, frame + 80);
+  const uint32_t movie = FindMovieId(base, 16);
   const uint64_t answer = ui_movies::ResetPose(base, movie);
   ResetConfirm(base, dialog, movie);
   return answer;
@@ -372,8 +383,7 @@ uint64_t DialogNoticePage(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint3
 uint64_t DialogOpenConfirmStep(uint8_t* base, uint32_t dialog, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8223A940 Type8Dialog::OpenConfirmStep");
   const uint32_t frame = Frame(base, sp, 128);
-  StoreU32(base, frame + 80, 16);
-  const uint32_t movie = FindMovie(base, frame + 80);
+  const uint32_t movie = FindMovieId(base, 16);  // the original's id at +80
   const D d(base, dialog);
   const Pages pages(base, d.pages_address());
   if (pages.step_started() == 0) {
@@ -385,9 +395,9 @@ uint64_t DialogOpenConfirmStep(uint8_t* base, uint32_t dialog, uint32_t sp, cons
   if (done) {
     ui_movies::ResetPose(base, movie);
     const uint32_t cursor = Menu(base, d.menu_address()).cursor();
-    StoreU32(base, frame + 80, 1);
-    StoreU32(base, frame + 84, 2);
-    const uint32_t named = LoadU32(base, frame + 80 + (cursor << 2));
+    // The animations by the cursor (the original's table at the frame's +80).
+    static constexpr uint32_t kNamed[2] = {1, 2};
+    const uint32_t named = TableWord(base, kNamed, 2, frame + 80, cursor);
     ui_movies::PlayNamed(base, movie, named, 1, 0, 0, 0);
     ui_movies::LoopLast(base, movie);
   }

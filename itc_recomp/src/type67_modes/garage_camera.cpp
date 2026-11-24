@@ -55,6 +55,56 @@ void StoreU64(uint8_t* base, uint32_t address, uint64_t value) {
   guest::StoreU32(base, address + 4, uint32_t(value));
 }
 
+// A function's guest frame as a C++ local (E5 step 6): `kSize` bytes in the
+// guest's byte order, by the frame's offsets, 16-byte aligned as the guest
+// stack is, so the original's stfs, ld, lvlx and stvx on its slots are the
+// same bytes and lanes.
+template <uint32_t kSize>
+struct Scratch {
+  alignas(16) uint8_t bytes[kSize] = {};
+
+  void SetU32(uint32_t offset, uint32_t value) {
+    bytes[offset] = uint8_t(value >> 24);
+    bytes[offset + 1] = uint8_t(value >> 16);
+    bytes[offset + 2] = uint8_t(value >> 8);
+    bytes[offset + 3] = uint8_t(value);
+  }
+  uint32_t U32(uint32_t offset) const {
+    return (uint32_t(bytes[offset]) << 24) | (uint32_t(bytes[offset + 1]) << 16) |
+           (uint32_t(bytes[offset + 2]) << 8) | uint32_t(bytes[offset + 3]);
+  }
+  // stfs: the double rounded to a float, as Stfs above.
+  void Stfs(uint32_t offset, double value) { SetU32(offset, std::bit_cast<uint32_t>(float(value))); }
+  uint64_t U64(uint32_t offset) const { return (uint64_t(U32(offset)) << 32) | U32(offset + 4); }
+  void SetU64(uint32_t offset, uint64_t value) {
+    SetU32(offset, uint32_t(value >> 32));
+    SetU32(offset + 4, uint32_t(value));
+  }
+  // pf::Lvlx and pf::Stvx over these bytes.
+  Vec Lvlx(uint32_t offset) const {
+    return simde_mm_shuffle_epi8(
+        simde_mm_load_si128(reinterpret_cast<const Vec*>(bytes + (offset & ~0xFu))),
+        simde_mm_load_si128(
+            reinterpret_cast<const Vec*>(&vector_helpers::VectorMaskL[(offset & 0xF) * 16])));
+  }
+  void Stvx(uint32_t offset, Vec value) {
+    simde_mm_store_si128(
+        reinterpret_cast<Vec*>(bytes + (offset & ~0xFu)),
+        simde_mm_shuffle_epi8(
+            value, simde_mm_load_si128(reinterpret_cast<const Vec*>(vector_helpers::VectorMaskL))));
+  }
+};
+
+// The identity matrix stored at `out` a word at a time in address order
+// (the original builds it in its frame and memcpys it: the same bytes).
+void StoreIdentity(uint8_t* base, uint32_t out) {
+  for (uint32_t row = 0; row < 4; row++) {
+    for (uint32_t column = 0; column < 4; column++) {
+      guest::StoreU32(base, out + 16 * row + 4 * column, row == column ? 0x3F800000u : 0);
+    }
+  }
+}
+
 }  // namespace
 
 void QuaternionFromAngles(uint8_t* base, uint32_t out, double f1, double f2, double f3,
@@ -63,17 +113,20 @@ void QuaternionFromAngles(uint8_t* base, uint32_t out, double f1, double f2, dou
   pf::Mode mode;
   mode.Scalar();
   // The angles below the stack pointer (f3, f1, 0.0, f2), read back as
-  // vectors with lvlx.
-  Stfs(base, sp - 32, f3);
-  Stfs(base, sp - 28, f1);
-  Stfs(base, sp - 20, f2);
-  Stfs(base, sp - 24, Lfs(base, FCD::zero_address()));
+  // vectors with lvlx: sp -32 to -17 in the original (sp 16-byte aligned), a
+  // C++ local since E5 step 6.
+  (void)sp;
+  Scratch<16> below;
+  below.Stfs(0, f3);
+  below.Stfs(4, f1);
+  below.Stfs(12, f2);
+  below.Stfs(8, Lfs(base, FCD::zero_address()));
   const Vec v5 = simde_mm_setzero_si128();
-  Vec v9 = pf::Lvlx(base, sp - 28);
-  Vec v0 = pf::Lvlx(base, sp - 20);
-  Vec v8 = pf::Lvlx(base, sp - 24);
+  Vec v9 = below.Lvlx(4);
+  Vec v0 = below.Lvlx(12);
+  Vec v8 = below.Lvlx(8);
   v0 = pf::I(simde_mm_blend_ps(pf::F(v0), simde_mm_permute_ps(pf::F(v9), 57), 4));
-  Vec v13 = pf::Lvlx(base, sp - 32);
+  Vec v13 = below.Lvlx(0);
   v13 = pf::I(simde_mm_blend_ps(pf::F(v13), simde_mm_permute_ps(pf::F(v8), 57), 4));
   Vec v10 = pf::Lvx(base, 0x82000A20);
   Vec v6 = Splat(v10, 3);
@@ -181,60 +234,63 @@ void GarageCameraReset(uint8_t* base, uint32_t camera, uint32_t frame) {
   const schema::GarageCamera cam(base, camera);
   pf::Mode mode;
   mode.Scalar();
-  const uint32_t f = frame;
+  // Its frame's slots (+80 to +191, read back only here) a C++ local
+  // since E5 step 6.
+  (void)frame;
+  Scratch<192> fr;
   const double zero = Lfs(base, FCD::zero_address()), one = Lfs(base, FCD::one_address());
   // The vectors built in the frame, in the original's store order.
-  Stfs(base, f + 100, Lfs(base, FCD::pi_address()));
-  Stfs(base, f + 144, zero);
-  Stfs(base, f + 148, zero);
-  Stfs(base, f + 152, zero);
-  Stfs(base, f + 156, one);
-  Stfs(base, f + 112, zero);
-  Stfs(base, f + 116, zero);
-  Stfs(base, f + 120, zero);
-  Stfs(base, f + 124, one);
-  Stfs(base, f + 160, Lfs(base, 0x82009EE4));
-  Stfs(base, f + 140, one);
+  fr.Stfs(100, Lfs(base, FCD::pi_address()));
+  fr.Stfs(144, zero);
+  fr.Stfs(148, zero);
+  fr.Stfs(152, zero);
+  fr.Stfs(156, one);
+  fr.Stfs(112, zero);
+  fr.Stfs(116, zero);
+  fr.Stfs(120, zero);
+  fr.Stfs(124, one);
+  fr.Stfs(160, Lfs(base, 0x82009EE4));
+  fr.Stfs(140, one);
   // The eye's start (+16) and the target (+32).
-  StoreU64(base, cam.eye_address(), LoadU64(base, f + 144));
-  Stfs(base, f + 176, zero);
-  StoreU64(base, cam.eye_address() + 8, LoadU64(base, f + 152));
-  StoreU64(base, cam.target_address(), LoadU64(base, f + 112));
-  Stfs(base, f + 180, zero);
-  StoreU64(base, cam.target_address() + 8, LoadU64(base, f + 120));
-  Stfs(base, f + 128, double(float(Lfs(base, cam.eye_x_address()) - Lfs(base, cam.target_x_address()))));
-  Stfs(base, f + 132, double(float(Lfs(base, cam.eye_y_address()) - Lfs(base, cam.target_y_address()))));
-  Stfs(base, f + 136, double(float(Lfs(base, cam.eye_z_address()) - Lfs(base, cam.target_z_address()))));
-  const uint64_t d0 = LoadU64(base, f + 128);
-  Stfs(base, f + 184, zero);
-  const uint64_t d1 = LoadU64(base, f + 136);
-  Stfs(base, f + 188, one);
-  const uint64_t e0 = LoadU64(base, f + 176);
-  Stfs(base, f + 80, zero);
-  const uint64_t e1 = LoadU64(base, f + 184);
-  Stfs(base, f + 84, zero);
-  Stfs(base, f + 88, zero);
-  Stfs(base, f + 92, one);
+  StoreU64(base, cam.eye_address(), fr.U64(144));
+  fr.Stfs(176, zero);
+  StoreU64(base, cam.eye_address() + 8, fr.U64(152));
+  StoreU64(base, cam.target_address(), fr.U64(112));
+  fr.Stfs(180, zero);
+  StoreU64(base, cam.target_address() + 8, fr.U64(120));
+  fr.Stfs(128, double(float(Lfs(base, cam.eye_x_address()) - Lfs(base, cam.target_x_address()))));
+  fr.Stfs(132, double(float(Lfs(base, cam.eye_y_address()) - Lfs(base, cam.target_y_address()))));
+  fr.Stfs(136, double(float(Lfs(base, cam.eye_z_address()) - Lfs(base, cam.target_z_address()))));
+  const uint64_t d0 = fr.U64(128);
+  fr.Stfs(184, zero);
+  const uint64_t d1 = fr.U64(136);
+  fr.Stfs(188, one);
+  const uint64_t e0 = fr.U64(176);
+  fr.Stfs(80, zero);
+  const uint64_t e1 = fr.U64(184);
+  fr.Stfs(84, zero);
+  fr.Stfs(88, zero);
+  fr.Stfs(92, one);
   StoreU64(base, cam.eye_offset_address(), d0);
-  const uint64_t g0 = LoadU64(base, f + 80);
-  Stfs(base, f + 96, zero);
+  const uint64_t g0 = fr.U64(80);
+  fr.Stfs(96, zero);
   StoreU64(base, cam.eye_offset_address() + 8, d1);
-  const uint64_t g1 = LoadU64(base, f + 88);
-  Stfs(base, f + 104, zero);
-  Stfs(base, f + 108, one);
+  const uint64_t g1 = fr.U64(88);
+  fr.Stfs(104, zero);
+  fr.Stfs(108, one);
   StoreU64(base, cam.vector_64_address(), e0);
-  const uint64_t a0 = LoadU64(base, f + 96);
+  const uint64_t a0 = fr.U64(96);
   StoreU64(base, cam.vector_64_address() + 8, e1);
-  const uint64_t a1 = LoadU64(base, f + 104);
+  const uint64_t a1 = fr.U64(104);
   StoreU64(base, cam.vector_80_address(), g0);
   StoreU64(base, cam.vector_80_address() + 8, g1);
   StoreU64(base, cam.angles_address(), a0);
   StoreU64(base, cam.angles_address() + 8, a1);
-  Stfs(base, f + 172, one);
-  Stfs(base, f + 164, Lfs(base, 0x82002A10));
-  Stfs(base, f + 168, zero);
-  StoreU64(base, cam.translation_address(), LoadU64(base, f + 160));
-  StoreU64(base, cam.translation_address() + 8, LoadU64(base, f + 168));
+  fr.Stfs(172, one);
+  fr.Stfs(164, Lfs(base, 0x82002A10));
+  fr.Stfs(168, zero);
+  StoreU64(base, cam.translation_address(), fr.U64(160));
+  StoreU64(base, cam.translation_address() + 8, fr.U64(168));
   Stfs(base, cam.unknown_96_address(), zero);
   Stfs(base, cam.tilt_address(), Lfs(base, 0x82009EE0));
   Stfs(base, cam.unknown_104_address(), zero);
@@ -253,20 +309,12 @@ void GarageCameraReset(uint8_t* base, uint32_t camera, uint32_t frame) {
   }
   mode.Scalar();
   Stfs(base, cam.zoom_address(), double(float(Lfs(base, FCD::focal_address()) / double(float(tangent)))));
-  // The identity at the frame's +192, copied to +112 (memcpy).
-  for (uint32_t row = 0; row < 4; row++) {
-    for (uint32_t column = 0; column < 4; column++) {
-      guest::StoreU32(base, f + 192 + 16 * row + 4 * column, row == column ? 0x3F800000u : 0);
-    }
-  }
-  if (!c_runtime::Memcpy(base, cam.rotation_address(), f + 192, 64)) {
-    for (uint32_t i = 0; i < 64; i += 4) {
-      guest::StoreU32(base, cam.rotation_address() + i, guest::LoadU32(base, f + 192 + i));
-    }
-  }
+  // The identity (built at the frame's +192 and memcpy'd in the original)
+  // at +112.
+  StoreIdentity(base, cam.rotation_address());
   Stfs(base, cam.orbit_address(), zero);
   Stfs(base, cam.distance_address(), Lfs(base, 0x82009ED0));
-  QuaternionFromAngles(base, cam.quaternion_address(), zero, zero, zero, f);
+  QuaternionFromAngles(base, cam.quaternion_address(), zero, zero, zero, frame);
 }
 
 namespace {
@@ -312,8 +360,10 @@ uint64_t GarageCameraCommand(uint8_t* base, uint32_t camera, uint32_t command, u
   mode.Scalar();
   const uint32_t c = camera;
   const schema::GarageCamera cam(base, camera);
+  // Its frame stays only for RotateX's angle (+80) and turn (below it),
+  // which take guest addresses; no guest code is called from it, so no back
+  // chain (E5 step 6).
   const uint32_t frame = sp - 192;
-  guest::StoreU32(base, frame, sp);
   // `field` the field's address.
   auto add = [&](uint32_t field, uint32_t step, bool up) {
     const double v = Lfs(base, field), d = Lfs(base, step);
@@ -374,21 +424,13 @@ uint64_t GarageCameraCommand(uint8_t* base, uint32_t camera, uint32_t command, u
     cam.set_moved(1);
   }
   // The quaternion from the turn (+176) and the tilt (+100); the rotation
-  // (+112) the identity (built at the frame's +96, memcpy) turned about x
+  // (+112) the identity (built at the frame's +96 and memcpy'd in the
+  // original; stored directly since E5 step 6) turned about x
   // by the tilt (the angle at the frame's +80).
   QuaternionFromAngles(base, cam.quaternion_address(), Lfs(base, cam.orbit_address()),
                        Lfs(base, cam.tilt_address()), Lfs(base, FCD::zero_address()), frame);
   mode.Scalar();
-  for (uint32_t row = 0; row < 4; row++) {
-    for (uint32_t column = 0; column < 4; column++) {
-      guest::StoreU32(base, frame + 96 + 16 * row + 4 * column, row == column ? 0x3F800000u : 0);
-    }
-  }
-  if (!c_runtime::Memcpy(base, cam.rotation_address(), frame + 96, 64)) {
-    for (uint32_t i = 0; i < 64; i += 4) {
-      guest::StoreU32(base, cam.rotation_address() + i, guest::LoadU32(base, frame + 96 + i));
-    }
-  }
+  StoreIdentity(base, cam.rotation_address());
   Stfs(base, frame + 80, Lfs(base, cam.tilt_address()));
   matrix_math::RotateX(base, cam.rotation_address(), cam.rotation_address(), frame + 80,
                        frame - 80);
@@ -408,7 +450,10 @@ uint64_t GarageStageCameraCommand(uint8_t* base, uint64_t r3, uint32_t command, 
 void GarageLightsInit(uint8_t* base, uint32_t lights, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_8217D3C8 GarageLights::Init");
   pf::Mode mode;
-  const uint32_t f = frame;
+  // Its frame's slots (+80 to +127, read back only here) a C++ local
+  // since E5 step 6.
+  (void)frame;
+  Scratch<128> fr;
   // The 11 records (96 bytes each) from the table, a doubleword at a time.
   for (uint32_t i = 0; i < 11 * 96; i += 8) {
     StoreU64(base, lights + 16 + i, LoadU64(base, kGarageLightsTable + i));
@@ -418,12 +463,12 @@ void GarageLightsInit(uint8_t* base, uint32_t lights, uint32_t frame) {
   mode.Scalar();
   const double ambient = Lfs(base, 0x82002A1C);
   const double one = Lfs(base, FCD::one_address());
-  Stfs(base, f + 80, ambient);
-  Stfs(base, f + 84, ambient);
-  Stfs(base, f + 88, ambient);
-  Stfs(base, f + 92, one);
+  fr.Stfs(80, ambient);
+  fr.Stfs(84, ambient);
+  fr.Stfs(88, ambient);
+  fr.Stfs(92, one);
   for (uint32_t i = 0; i < 16; i += 8) {
-    StoreU64(base, lights + 1072 + i, LoadU64(base, f + 80 + i));
+    StoreU64(base, lights + 1072 + i, fr.U64(80 + i));
   }
   for (uint32_t i = 0; i < 16; i += 8) {
     StoreU64(base, FCD::ambient_address() + i, LoadU64(base, lights + 1072 + i));
@@ -443,13 +488,13 @@ void GarageLightsInit(uint8_t* base, uint32_t lights, uint32_t frame) {
                                          simde_mm_castsi128_ps(simde_mm_set1_epi32(0x3F000000))));
   const Vec zeros = simde_mm_setzero_si128();
   mode.Scalar();
-  Stfs(base, f + 108, Lfs(base, FCD::third_pi_address()));
+  fr.Stfs(108, Lfs(base, FCD::third_pi_address()));
   const double radians = Lfs(base, FCD::degree_address()), scale = Lfs(base, FCD::half_address());
   for (uint32_t i = 0; i < 4; i++) {
     const uint32_t q = lights + 304 + 96 * i, at = 16 * i;
     mode.Scalar();
-    Stfs(base, f + 124, one);
-    Stfs(base, f + 92, one);
+    fr.Stfs(124, one);
+    fr.Stfs(92, one);
     auto cosine = [&](uint32_t address) {
       mode.Scalar();
       const double angle = double(float(double(float(Lfs(base, address) * scale)) * radians));
@@ -462,16 +507,16 @@ void GarageLightsInit(uint8_t* base, uint32_t lights, uint32_t frame) {
     const double c2 = cosine(q + 68);
     const double c3 = cosine(q + 64);
     const double difference = double(float(c0 - c1));
-    Stfs(base, f + 100, double(float(c2)));
+    fr.Stfs(100, double(float(c2)));
     const Vec v12 = pf::Lvx(base, q + 16);
     mode.Vector();
     const Vec v0 = pf::I(simde_mm_dp_ps(pf::F(v12), pf::F(v12), 0xEF));
     const uint64_t p0 = LoadU64(base, q + 80), p1 = LoadU64(base, q + 88);
-    StoreU64(base, f + 112, p0);
-    StoreU64(base, f + 120, p1);
+    fr.SetU64(112, p0);
+    fr.SetU64(120, p1);
     mode.Scalar();
-    Stfs(base, f + 104, double(float(one / difference)));
-    Stfs(base, f + 96, double(float(c3)));
+    fr.Stfs(104, double(float(one / difference)));
+    fr.Stfs(96, double(float(c3)));
     StoreU64(base, FCD::spot_positions_address() + at, LoadU64(base, q));
     mode.Vector();
     Vec v13 = pf::I(simde_mm_div_ps(simde_mm_set1_ps(1), simde_mm_sqrt_ps(pf::F(v0))));
@@ -485,18 +530,18 @@ void GarageLightsInit(uint8_t* base, uint32_t lights, uint32_t frame) {
     v13 = pf::Madd(v13, v10, v13);
     v13 = pf::Mul(v12, v13);
     const Vec v11 = simde_mm_or_si128(simde_mm_andnot_si128(equal, v13), simde_mm_and_si128(equal, v0));
-    pf::Stvx(base, f + 80, v11);
+    fr.Stvx(80, v11);
     mode.Scalar();
-    StoreU64(base, FCD::spot_directions_address() + at, LoadU64(base, f + 80));
-    StoreU64(base, FCD::spot_directions_address() + at + 8, LoadU64(base, f + 88));
+    StoreU64(base, FCD::spot_directions_address() + at, fr.U64(80));
+    StoreU64(base, FCD::spot_directions_address() + at + 8, fr.U64(88));
     StoreU64(base, FCD::spot_a_address() + at, LoadU64(base, q + 32));
     StoreU64(base, FCD::spot_a_address() + at + 8, LoadU64(base, q + 40));
     StoreU64(base, FCD::spot_b_address() + at, LoadU64(base, q + 48));
     StoreU64(base, FCD::spot_b_address() + at + 8, LoadU64(base, q + 56));
-    StoreU64(base, FCD::spot_cones_address() + at, LoadU64(base, f + 96));
-    StoreU64(base, FCD::spot_colors_address() + at, LoadU64(base, f + 112));
-    StoreU64(base, FCD::spot_cones_address() + at + 8, LoadU64(base, f + 104));
-    StoreU64(base, FCD::spot_colors_address() + at + 8, LoadU64(base, f + 120));
+    StoreU64(base, FCD::spot_cones_address() + at, fr.U64(96));
+    StoreU64(base, FCD::spot_colors_address() + at, fr.U64(112));
+    StoreU64(base, FCD::spot_cones_address() + at + 8, fr.U64(104));
+    StoreU64(base, FCD::spot_colors_address() + at + 8, fr.U64(120));
   }
 }
 
