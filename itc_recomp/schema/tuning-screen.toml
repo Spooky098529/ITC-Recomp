@@ -377,6 +377,13 @@ fields = [
 measure = "new<24>@StandScene::Create"
 size = 24
 origin = "allocated"
+# In host memory since E5 step 5 (2026-11-24): made by StandScene::Create
+# (type67_modes::StandSceneCreate; its lifted original's VirtualAlloc(24) at
+# 0x82180B3C), freed by StandScene::Release (VirtualFree; the game's frees
+# take handles); the global at 0x826D83E0 holds its handle. Its three slots
+# (4-byte blocks at +0, +4, +8) stay pages.
+storage = "host"
+host_alloc = [0x82180B3C]
 # 81 functions; areas: car-dealer.md, car-list.md, car-makers.md, front-end-car-draw.md, garage-screen.md, power-graph.md, stand-models.md, sticker-editor.md, tuning-pages.md, tuning-screen.md, type2-screens.md, type6-type7-modes.md, ui-movies-game.md
 fields = [
   { name = "stage_block_0", offset = 0, type = "u32", note = "a block holding the garage stage at +0" },

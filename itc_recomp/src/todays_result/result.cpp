@@ -75,8 +75,9 @@ uint64_t ResultCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls&
   const uint32_t frame = Frame(base, sp, 112);
   const Machine m(base, machine);
   m.set_loaded(0);
-  const uint32_t pages_at =
-      uint32_t(calls.Call(kVirtualAlloc, frame, 0x8225A7D4, 0, 28, 0x1000, 4));
+  // Host objects (E5 step 5) in place of the VirtualAlloc(28) at 0x8225A7D4
+  // and the VirtualAlloc(68) at 0x8225A810; the globals hold their handles.
+  const uint32_t pages_at = schema::PageObject::New(base).address;
   G::set_result_pages(base, pages_at);
   const Pages pages(base, pages_at);
   pages.set_next_page(0);
@@ -85,7 +86,7 @@ uint64_t ResultCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls&
   pages.set_step_started(0);
   pages.set_unknown_20(kNone);
   pages.set_step(kNone);
-  const uint32_t menu = uint32_t(calls.Call(kVirtualAlloc, frame, 0x8225A810, 0, 68, 0x1000, 4));
+  const uint32_t menu = schema::FrontEndMenu::New(base).address;
   G::set_result_menu(base, menu);
   InitMenu(schema::FrontEndMenu(base, menu));
   // A host object (E5 step 3) in place of the VirtualAlloc at 0x8225A86C

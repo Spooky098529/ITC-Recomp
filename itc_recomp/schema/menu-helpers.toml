@@ -12,6 +12,19 @@ measures = ["Menu", "new<68>@Type2Dialog::OnEnter", "new<68>@Type12Screen7::Crea
             "new<68>@NetRanking::Create", "new<68>@TitleScreen::Create", "new<68>@TodaysResult::Create", "new<68>@TodaysEvent::Create", "new<68>@TuningMachine::Create", "new<68>@Type2Hub::Create", "new<68>@PowerGraphScreen::Create", "new<68>@Type5Dialog::OnEnter", "new<68>@Type6Screen0::OnEnter", "new<68>@Type7Screen0::OnEnter", "new<68>@ControllerOptions::OnEnter", "new<68>@UserInfo::Create", "new<68>@Type12Screen1::Create#2", "new<68>@Type12Screen1::Create#3", "new<68>@Type12Screen1::Create#4", "TuningScreen.+10044", "TuningScreen.+10040"]
 size = 68
 origin = "allocated"
+# Dual since E5 step 5 (2026-11-24; a generic type: every front-end screen's
+# menu, reached by the shared Menu:: helpers): made by the screens' Creates
+# and OnEnters in host memory (New in place of their VirtualAlloc(68));
+# LocationScreen::Create's four (lifted) through host_alloc, with the lifted
+# originals of ControllerOptions::OnEnter (0x821BB154), Options::OnEnter
+# (0x821BBA10, 0x821BBAFC) and Type6Screen0 and Type7Screen0::OnEnter
+# (0x82233A50, 0x82243FB8). Freed by the screens' VirtualFree (the game's
+# frees take handles). The allocations left in guest memory (the network
+# mode's, the type 8 mode's, the garage screen's, the race menu's, the car
+# settings') are read the same way through the dual view.
+storage = "dual"
+host_alloc = [0x82227BFC, 0x82227C70, 0x82227CD4, 0x82227D38, 0x821BB154, 0x821BBA10, 0x821BBAFC,
+              0x82233A50, 0x82243FB8]
 fields = [
   { name = "cursor", offset = 0, type = "u32" },
   { name = "previous", offset = 4, type = "u32" },
@@ -40,6 +53,20 @@ measure = "new<28>@Type2Dialog::OnEnter"
 measures = ["new<28>@Type12Screen7::Create", "ScreenPages", "new<28>@PauseMenu::Create", "new<28>@RaceDialog::Create", "new<28>@AfterRaceMenu::Create", "new<28>@PauseMenu4::Create", "new<28>@Type12Screen6::Create", "new<28>@Type12Screen9::Create", "new<28>@Type12Dialog11::Create", "new<28>@NetRanking::Create", "new<28>@TitleScreen::Create", "new<28>@TodaysResult::Create", "new<28>@TodaysEvent::Create", "new<28>@TuningMachine::Create", "new<28>@Type2Hub::Create", "new<28>@BuildScreen::Create", "new<28>@PowerGraphScreen::Create", "new<28>@ReplayTheater::Create", "new<28>@Type5Dialog::OnEnter", "new<28>@Type6Screen0::OnEnter", "new<28>@Type7Screen0::OnEnter", "new<28>@ControllerOptions::OnEnter", "new<28>@UserInfo::Create", "ScreenPages::Finish.r3"]
 size = 28
 origin = "allocated"
+# Dual since E5 step 5 (2026-11-24; a generic type: every front-end and
+# in-race screen's pages, reached by ScreenPages:: and the shared steps):
+# made by the screens' Creates and OnEnters in host memory (New in place of
+# their VirtualAlloc(28)); LocationScreen::Create's (lifted) through
+# host_alloc, with the lifted originals of the in-race makers (PauseMenu,
+# PauseMenu4, RaceDialog, AfterRaceMenu::Create), ControllerOptions and
+# Options::OnEnter and Type6Screen0 and Type7Screen0::OnEnter. Freed by the
+# screens' VirtualFree (the game's frees take handles). The allocations left
+# in guest memory are read the same way through the dual view (and
+# options-load-save's OptionsSubPageBlock, a host type of the same layout,
+# through its own).
+storage = "dual"
+host_alloc = [0x82227A88, 0x8220D870, 0x822108F0, 0x82217DC4, 0x8221B248, 0x821BB1BC, 0x821BB9D4,
+              0x821BBAC4, 0x82233A34, 0x82243F9C]
 fields = [
   { name = "page", offset = 0, type = "u32", note = "the page Draw runs; -1 while a step runs" },
   { name = "next_page", offset = 4, type = "u32", note = "the page after the step" },

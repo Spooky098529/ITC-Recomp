@@ -66,6 +66,8 @@ inline Entry SelectedEntry(uint8_t* base) {
 }
 
 // The stand's garage stage: the holder's +0.
-inline uint32_t Stage(uint8_t* base) { return Load(base, G::stand_holder(base).address); }
+inline uint32_t Stage(uint8_t* base) {
+  return schema::StandHolder(base, G::stand_holder(base).address).stage_block_0();
+}
 
 }  // namespace car_dealer

@@ -766,7 +766,7 @@ bool ReleaseSurfaces(uint8_t* base, uint32_t pass,
 void FromViewport(uint8_t* base, uint32_t pass, uint32_t player, uint32_t entry) {
   ITC_NATIVE_RUNNING("sub_820AA4A8 CameraPass::FromViewport");
   const Cam p(base, pass);
-  const Entry at(base, guest::LoadU32(base, G::viewports(base).first_address() + (player << 2)) +
+  const Entry at(base, uint32_t(G::viewports(base).load_at(player << 2, 4)) +
                           Entry::kSize * entry);
   for (uint32_t i = 0; i < 48; i += 8) {
     const uint32_t high = guest::LoadU32(base, at.eye_x_address() + i);
@@ -797,10 +797,11 @@ bool ReleaseViewports(uint8_t* base) {
       !memory::IsPages(block.second().address)) {
     return false;
   }
-  for (uint32_t i = 0; i < 8; i += 4) {
-    memory::FreePages(guest::LoadU32(base, G::viewports(base).first_address() + i));
-  }
-  memory::FreePages(G::viewports(base).address);
+  memory::FreePages(G::viewports(base).first().address);
+  memory::FreePages(G::viewports(base).second().address);
+  // A host object (E5 step 5): deleted in place of the VirtualFree at
+  // 0x820AA484 (which returned 1).
+  G::viewports(base).Delete();
   G::set_viewports(base, 0);
   return true;
 }
@@ -1483,13 +1484,19 @@ std::optional<uint32_t> ViewportsInit(uint8_t* base, uint32_t frame, const Viewp
                       &tangent)) {
     return std::nullopt;
   }
-  const schema::Viewports block(base, memory::AllocPages(schema::Viewports::kSize, 4096));
+  // A host object (E5 step 5) in place of the VirtualAlloc(12) at
+  // 0x820AB380; [0x826C2CE8] holds its handle, Viewports::Release deletes it.
+  const schema::Viewports block = schema::Viewports::New(base);
   G::set_viewports(base, block);
   c_runtime::XMemSet(base, block.address, 0, schema::Viewports::kSize);
   uint32_t viewport = 0;
   for (uint32_t i = 0; i < 2; i++) {
     viewport = memory::AllocPages(Viewport::kSize, 4096);
-    guest::StoreU32(base, block.first_address() + 4 * i, viewport);
+    if (i == 0) {
+      block.set_first(viewport);
+    } else {
+      block.set_second(viewport);
+    }
     c_runtime::XMemSet(base, viewport, 0, Viewport::kSize);
     ViewportInit(base, viewport, tangent, frame - kViewportInitFrame, calls);
   }

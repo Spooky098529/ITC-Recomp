@@ -1549,7 +1549,7 @@ loc_8228702C:
   // lwz r11,25032(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + 25032);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address());
+  r10 = schema::FrontEndMenu(base, uint32_t(r11)).cursor_bits();
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // addi r6,r11,-24508
@@ -1603,7 +1603,7 @@ loc_8228702C:
   // lis r28,-32216
   r28 = uint64_t(int64_t(-2111307776));
   // lwz r10,12(r11)
-  r10 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).step_address());
+  r10 = schema::PageObject(base, uint32_t(r11)).step_bits();
   // lis r29,-32216
   r29 = uint64_t(int64_t(-2111307776));
   // lis r30,-32216
@@ -1712,7 +1712,7 @@ loc_8228702C:
   // beq 0x82287218
   if (cr0.eq) goto loc_82287218;
   // lwz r9,16(r11)
-  r9 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).queued_step_address());
+  r9 = schema::PageObject(base, uint32_t(r11)).queued_step_bits();
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // cmpwi cr6,r9,-1
@@ -1720,9 +1720,9 @@ loc_8228702C:
   // bne cr6,0x822871c4
   if (!cr6.eq) goto loc_822871C4;
   // lwz r8,4(r11)
-  r8 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).next_page_address());
+  r8 = schema::PageObject(base, uint32_t(r11)).next_page_bits();
   // stw r8,0(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).page_address(), uint32_t(r8));
+  schema::PageObject(base, uint32_t(r11)).set_page_bits(uint32_t(r8));
   // b 0x822871d4
   goto loc_822871D4;
 loc_822871C4:
@@ -1730,22 +1730,22 @@ loc_822871C4:
   r8 = uint64_t(int64_t(-1));
 loc_822871C8:
   // lwz r9,16(r11)
-  r9 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).queued_step_address());
+  r9 = schema::PageObject(base, uint32_t(r11)).queued_step_bits();
   // stw r8,16(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).queued_step_address(), uint32_t(r8));
+  schema::PageObject(base, uint32_t(r11)).set_queued_step_bits(uint32_t(r8));
   // stw r10,20(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).unknown_20_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_unknown_20_bits(uint32_t(r10));
 loc_822871D4:
   // stw r9,12(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).step_address(), uint32_t(r9));
+  schema::PageObject(base, uint32_t(r11)).set_step_bits(uint32_t(r9));
 loc_822871D8:
   // stw r10,24(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).step_started_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_step_started_bits(uint32_t(r10));
   // b 0x82287218
   goto loc_82287218;
 loc_822871E0:
   // lwz r9,16(r11)
-  r9 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).queued_step_address());
+  r9 = schema::PageObject(base, uint32_t(r11)).queued_step_bits();
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // li r8,-1
@@ -1755,16 +1755,16 @@ loc_822871E0:
   // bne cr6,0x822871c8
   if (!cr6.eq) goto loc_822871C8;
   // lwz r9,4(r11)
-  r9 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).next_page_address());
+  r9 = schema::PageObject(base, uint32_t(r11)).next_page_bits();
   // stw r8,12(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).step_address(), uint32_t(r8));
+  schema::PageObject(base, uint32_t(r11)).set_step_bits(uint32_t(r8));
   // stw r9,0(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).page_address(), uint32_t(r9));
+  schema::PageObject(base, uint32_t(r11)).set_page_bits(uint32_t(r9));
   // b 0x822871d8
   goto loc_822871D8;
 loc_82287204:
   // lwz r11,0(r11)
-  r11 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
+  r11 = schema::PageObject(base, uint32_t(r11)).page_bits();
   // cmpwi cr6,r11,3
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 3, so);
   // beq cr6,0x82287218
@@ -1904,7 +1904,7 @@ lifted::Result f822872A8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lis r5,-32216
   r5 = uint64_t(int64_t(-2111307776));
   // lwz r11,0(r11)
-  r11 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
+  r11 = schema::PageObject(base, uint32_t(r11)).page_bits();
   // lis r6,-32216
   r6 = uint64_t(int64_t(-2111307776));
   // lis r7,-32216
@@ -2285,7 +2285,7 @@ uint64_t f822880E8(uint8_t* base, uint64_t r1, uint64_t r13) {
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // stw r11,80(r3)
-  guest::StoreU32(base, schema::UiMovie(base, uint32_t(r3)).draw_context_address() + 16, uint32_t(r11));
+  schema::UiMovie(base, uint32_t(r3)).store_at(80, 4, uint32_t(r11));
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
@@ -3537,7 +3537,7 @@ loc_82290DA0:
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // stw r11,80(r3)
-  guest::StoreU32(base, schema::UiMovie(base, uint32_t(r3)).draw_context_address() + 16, uint32_t(r11));
+  schema::UiMovie(base, uint32_t(r3)).store_at(80, 4, uint32_t(r11));
   // b 0x82290e74
   goto loc_82290E74;
 loc_82290E08:

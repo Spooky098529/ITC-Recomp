@@ -594,7 +594,7 @@ uint32_t TextField(uint8_t* base, uint32_t movie, uint32_t id, uint32_t offset) 
   if (offset == 4) ITC_NATIVE_RUNNING("sub_8211B9B8 (a text's +4)");
   if (offset == 24) ITC_NATIVE_RUNNING("sub_8211B7B8 (a text's +24)");
   const uint32_t text = TextRecord(base, movie, id);
-  return text == 0 ? 0 : guest::LoadU32(base, text + offset);
+  return text == 0 ? 0 : uint32_t(schema::UiMovieText(base, text).load_at(offset, 4));
 }
 
 void AdvanceTextScroll(uint8_t* base, uint32_t movie, uint32_t id) {
@@ -727,7 +727,11 @@ uint32_t AssignLayers(uint8_t* base, uint32_t stack, uint32_t movie, uint32_t sc
 
 int64_t MovieLoad(uint8_t* base, uint32_t movie, uint32_t id, const archive::LoadCall& load) {
   ITC_NATIVE_RUNNING("sub_8211E798 UiMovie::Load");
-  const uint32_t file = memory::AllocPages(archive::AssetSize(base, id), 4096);
+  // A blob (E5 step 5: the file in PC memory, in the guest's byte order) of
+  // the pages the original's VirtualAlloc gave: the archive reads whole
+  // 2,048-byte sectors into it, past the asset's size.
+  const uint32_t size = (archive::AssetSize(base, id) + 4095u) & ~4095u;
+  const uint32_t file = schema::UiMovieArchiveFile::New(base, size).address;
   return load(id, file, 0x8211E500, movie);
 }
 

@@ -88,24 +88,31 @@ uint32_t OnEnter(uint8_t* base, uint32_t machine, uint32_t sp) {
   StoreU32(base, sp - 128, sp);
   const Machine mc(base, machine);
   mc.set_loaded(0);
-  const uint32_t page = Pages(28);
+  // The page objects and menus in host memory (E5 step 5: PageObject and
+  // FrontEndMenu, dual) in place of their VirtualAllocs; the globals hold
+  // their handles.
+  const uint32_t page = schema::PageObject::New(base).address;
   G::set_pages(base, page);
   SetUpPageBlock(base, page);
-  const uint32_t menu = Pages(68);
+  const uint32_t menu = schema::FrontEndMenu::New(base).address;
   G::set_menu(base, menu);
   SetUpMenu(base, menu, 6);
   const uint32_t settings = Pages(S::kSize);
   G::set_settings(base, settings);
   SettingsReset(base, settings, sp - 128);
   for (const uint32_t global : {G::load_pages_address(), G::spare_pages_address()}) {
-    const uint32_t block = Pages(28);
+    // The load page's block in host memory (E5 step 5: options-load-save's
+    // OptionsSubPageBlock); the spare one a PageObject (menu-helpers').
+    const uint32_t block = global == G::load_pages_address()
+                               ? schema::OptionsSubPageBlock::New(base).address
+                               : schema::PageObject::New(base).address;
     StoreU32(base, global, block);
     SetUpPageBlock(base, block);
   }
-  const uint32_t pages_menu = Pages(68);
+  const uint32_t pages_menu = schema::FrontEndMenu::New(base).address;
   G::set_dialog_menu(base, pages_menu);
   SetUpMenu(base, pages_menu, 1);
-  const uint32_t last = Pages(28);
+  const uint32_t last = schema::OptionsSubPageBlock::New(base).address;  // host (E5 step 5)
   G::set_save_pages(base, last);
   SetUpPageBlock(base, last);
   mc.set_state(mc.reenter() != 0 ? 1 : 9);

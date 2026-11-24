@@ -620,7 +620,8 @@ std::optional<uint32_t> SetChildNameText(uint8_t* base,
                                          uint32_t child, uint32_t name);
 
 // sub_8211E798 UiMovie::Load: the asset's size (Archive::AssetSize) in pages
-// (VirtualAlloc's, AllocPages), then load(id, them, sub_8211E500, the movie).
+// (VirtualAlloc's; a blob, UiMovieArchiveFile, since E5 step 5), then
+// load(id, them, sub_8211E500, the movie).
 // Returns the serial (r3).
 int64_t MovieLoad(uint8_t* base, uint32_t movie, uint32_t id, const archive::LoadCall& load);
 

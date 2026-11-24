@@ -29,8 +29,10 @@ uint64_t ScreenCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls&
   const uint32_t frame = Frame(base, sp, 112);
   const Machine m(base, machine);
   m.set_loaded(0);
-  const schema::PageObject pages(
-      base, uint32_t(calls.Call(kVirtualAlloc, frame, 0x82221DC4, 0, 28, 0x1000, 4)));
+  // Host objects (E5 step 5) in place of the VirtualAlloc(28) at 0x82221DC4,
+  // the VirtualAlloc(72) at 0x82221E00 and the VirtualAlloc(68) at
+  // 0x82221E2C; the globals hold their handles.
+  const schema::PageObject pages = schema::PageObject::New(base);
   G::set_pages(base, pages);
   pages.set_next_page(0);
   pages.set_page(0);
@@ -39,19 +41,18 @@ uint64_t ScreenCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls&
   pages.set_unknown_20(kNone);
   pages.set_step(kNone);
   // The menu list (race-screens' MenuList).
-  const schema::MenuList list(
-      base, uint32_t(calls.Call(kVirtualAlloc, frame, 0x82221E00, 0, 72, 0x1000, 4)));
+  const schema::MenuList list = schema::MenuList::New(base);
   G::set_list(base, list);
   if (list.address != 0) {
     list.set_enabled(0u);
     list.set_player(0);
   }
-  const schema::FrontEndMenu menu(
-      base, uint32_t(calls.Call(kVirtualAlloc, frame, 0x82221E2C, 0, 68, 0x1000, 4)));
+  const schema::FrontEndMenu menu = schema::FrontEndMenu::New(base);
   G::set_menu(base, menu);
   ResetMenu(menu);
-  const uint64_t r3 = calls.Call(kVirtualAlloc, frame, 0x82221E88, 0, 68, 0x1000, 4);
-  const schema::TitleScreenData words(base, uint32_t(r3));
+  // VirtualAlloc(68) in host memory (E5 step 5); its answer is Create's r3.
+  const schema::TitleScreenData words = schema::TitleScreenData::New(base);
+  const uint64_t r3 = words.address;
   G::set_data(base, words);
   words.set_unknown_0(0);
   words.set_interrupted(0);

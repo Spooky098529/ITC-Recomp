@@ -443,7 +443,9 @@ uint64_t Make1004(uint8_t* base, uint32_t owner, uint32_t sp, const Calls& calls
   }
   const schema::AltHudHolder holder(base, owner);
   holder.set_object(object);
-  const uint32_t list = uint32_t(calls.Call(kNew, frame, 0x82216AA8, 72));
+  // A host object (E5 step 5) in place of the operator new(72) at
+  // 0x82216AA8; the holder's +1008 keeps its handle.
+  const uint32_t list = schema::MenuList::New(base).address;
   if (list != 0) {
     const schema::MenuList menu(base, list);
     menu.set_enabled(0u);

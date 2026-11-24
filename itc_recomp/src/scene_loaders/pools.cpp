@@ -55,7 +55,9 @@ bool AnyLoading(uint8_t* base, uint32_t states, uint32_t count) {
 
 uint32_t MakeA(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_820C3C40 ScenePools::MakeA");
-  const uint32_t set = memory::AllocPages(kFirstSetBytes, 4096);
+  // In host memory (E5 step 5: a handle, freed by ScenePools::UpdateA's
+  // VirtualFree once torn down).
+  const uint32_t set = schema::ScenePools::New(base).address;
   G::set_first_set(base, set);
   schema::ScenePools(base, set).set_state(0);
   return set;
@@ -104,12 +106,18 @@ uint32_t CreateA(uint8_t* base, uint32_t set, uint32_t record, const CreateCalls
     const int32_t count = LoadS(base, counts[pool]);
     const uint32_t list = s.pools_address() + 12 * pool;
     for (int32_t i = 0; i < count; i++) {
-      // Pools 0 and 5 (the car models and the wheels) in host memory (E5
-      // step 5: handles, freed by ScenePools::DestroyA's VirtualFree); the
-      // others the layer's pages.
-      const uint32_t object = pool == 0   ? schema::CarModel::New(base).address
-                              : pool == 5 ? schema::CarWheels::New(base).address
-                                          : memory::AllocPages(kPoolObjectBytes[pool], 4096);
+      // Every pool's objects in host memory (E5 step 5: handles, freed by
+      // ScenePools::DestroyA's VirtualFree).
+      uint32_t object = 0;
+      switch (pool) {
+        case 0: object = schema::CarModel::New(base).address; break;
+        case 1: object = schema::CarParts::New(base).address; break;
+        case 2: object = schema::Cockpit::New(base).address; break;
+        case 3: object = schema::Interior::New(base).address; break;
+        case 4: object = schema::Pool4Object::New(base).address; break;
+        case 5: object = schema::CarWheels::New(base).address; break;
+        default: object = schema::TrafficCar::New(base).address; break;
+      }
       r3 = object;
       if (object != 0 && !kConstructs[pool](base, object, list)) {
         calls.construct(calls.user, pool, object, list);

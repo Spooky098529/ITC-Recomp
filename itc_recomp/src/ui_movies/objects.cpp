@@ -83,7 +83,9 @@ std::optional<uint32_t> Regrow(uint8_t* base, uint32_t vector) {
 // delete[] leaves it).
 uint32_t Reserve(uint8_t* base, uint32_t vector, uint32_t capacity, uint32_t item, bool clear) {
   const UiMovieWordVector v(base, vector);
-  const uint32_t block = NewArray(base, ArrayBytes(capacity, item));
+  // The pairs' arrays in host memory (E5 step 5); the words' stay guest.
+  const uint32_t block = item == 8 ? UiMoviePair::NewArray(base, capacity).address
+                                   : NewArray(base, ArrayBytes(capacity, item));
   if (clear) {
     for (uint32_t i = 0; int32_t(i) < int32_t(capacity); i++) {
       const UiMoviePair pair(base, block + 8 * i);
@@ -98,7 +100,11 @@ uint32_t Reserve(uint8_t* base, uint32_t vector, uint32_t capacity, uint32_t ite
     }
     const uint32_t from = v.words() + item * i;
     for (uint32_t k = 0; k < item; k += 4) {
-      Store(base, block + item * i + k, Load(base, from + k));
+      if (item == 8) {  // host pairs (E5 step 5), through their views
+        UiMoviePair(base, block + item * i).store_at(k, 4, UiMoviePair(base, from).load_at(k, 4));
+      } else {
+        Store(base, block + item * i + k, Load(base, from + k));
+      }
     }
   }
   const uint32_t old = v.words();
@@ -132,7 +138,7 @@ std::optional<uint32_t> MakePairs(uint8_t* base, uint32_t vector) {
   ITC_NATIVE_RUNNING("sub_8211B0E8 (the movie table's vector made)");
   const UiMoviePairVector v(base, vector);
   v.set_capacity(64);
-  const uint32_t block = NewArray(base, 512);
+  const uint32_t block = UiMoviePair::NewArray(base, 64).address;  // host (E5 step 5)
   for (uint32_t i = 0; i < 64; i++) {
     const UiMoviePair pair(base, block + 8 * i);
     pair.set_key(0);
@@ -248,7 +254,8 @@ std::optional<uint32_t> ConstructMovie(uint8_t* base, uint32_t movie) {
     ITC_NATIVE_RUNNING("sub_8211B018 (the text list made)");
     const schema::UiMovieDrawTextList list(base, m.text_items_address());
     list.set_capacity(512);
-    const uint32_t block = NewArray(base, 65552);
+    // A blob (E5 step 5): the items are reached by address.
+    const uint32_t block = schema::UiMovieTextItemArray::New(base, 65552).address;
     schema::UiMovieTextItemArray(base, block).set_count(512);
     const uint32_t items = block + 16;
     for (uint32_t i = 0; i < 512; i++) {
@@ -361,11 +368,11 @@ std::optional<uint32_t> GetText(uint8_t* base, uint32_t movie, uint32_t id_addre
   if (record != 0) {
     return record;
   }
-  const auto made = memory::crt::OperatorNew(base, 28);
-  Require(made.has_value(), "operator new", 28);
-  record = *made;
+  // Both in PC memory (E5 step 5): the record a host object, its buffer a
+  // blob.
+  record = UiMovieText::New(base).address;
   const UiMovieText text(base, record);
-  const uint32_t buffer = memory::AllocPages(4096, 4096);
+  const uint32_t buffer = schema::UiMovieTextBuffer::New(base, 4096).address;
   text.set_buffer(buffer);
   guest::ForEachHostPart(base, buffer, 4096,
                          [](uint8_t* host, uint32_t, uint32_t n) { std::memset(host, 0, n); });

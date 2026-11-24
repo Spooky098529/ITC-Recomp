@@ -12,6 +12,8 @@ namespace schema {
 struct MenuListEnabled : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
+  static MenuListEnabled New(uint8_t* base, uint32_t size) { return MenuListEnabled(base, memory::NewBlob(size, "MenuListEnabled")); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   // item 0's word (0 disabled); item i's at +4i
   uint32_t item_0() const { return guest::LoadU32(base, address + 0); }
   void set_item_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
@@ -19,90 +21,155 @@ struct MenuListEnabled : View {
 };
 
 // allocated; measure: MenuList, new<72>@PauseMenu::Create, new<72>@AfterRaceMenu::Create, new<72>@RaceDialog::Create, new<72>@PauseMenu4::Create, new<72>@SaveScreen::OnEnter, new<72>@TitleScreen::Create, new<72>@ReplayTheater::Create, new<72>@PlateEditor::Create, new<72>@BuildScreen::Create, new<72>@BuildScreen::Create#2, new<72>@GarageScreen::Create, new<72>@GarageScreen::Create#2, new<72>@RaceScreens::Make1004, new<72>@CarDealer::Create#2
+#pragma pack(push, 1)
+struct MenuListData {
+  uint32_t count = 0;  // +0
+  uint32_t scroll = 0;  // +4
+  uint32_t scroll_before = 0;  // +8
+  uint32_t shown = 0;  // +12
+  uint32_t selection = 0;  // +16
+  uint32_t selection_before = 0;  // +20
+  uint32_t move = 0;  // +24
+  uint32_t side = 0;  // +28
+  uint32_t wrapped = 0;  // +32
+  uint32_t down_action = 0;  // +36
+  uint32_t up_action = 0;  // +40
+  uint32_t left_action = 0;  // +44
+  uint32_t right_action = 0;  // +48
+  uint32_t accept_action = 0;  // +52
+  uint32_t back_action = 0;  // +56
+  uint32_t player = 0;  // +60
+  uint32_t wraps = 0;  // +64
+  uint32_t enabled = 0;  // +68
+};
+#pragma pack(pop)
+static_assert(sizeof(MenuListData) == 72);
+inline constexpr memory::LayoutField kMenuListFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 4}, {24, 4}, {28, 4}, {32, 4}, {36, 4}, {40, 4}, {44, 4}, {48, 4}, {52, 4}, {56, 4}, {60, 4}, {64, 4}, {68, 4}};
+inline constexpr memory::Layout kMenuListLayout = {kMenuListFields, 18};
+
 struct MenuList : View {
   using View::View;
   static constexpr uint32_t kSize = 72;
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  MenuListData* data() const { return static_cast<MenuListData*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static MenuList New(uint8_t* base) {
+    return MenuList(base, memory::MakeHandle(new MenuListData(), sizeof(MenuListData), "MenuList", &kMenuListLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static MenuList NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(MenuListData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<MenuListData*>(::operator new(sizeof(MenuListData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) MenuListData();
+    return MenuList(base, memory::MakeHandle(p, sizeof(MenuListData) * count, "MenuList", &kMenuListLayout, sizeof(MenuListData)));
+  }
+  MenuList at(uint32_t i) const { return MenuList(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  MenuListData* direct() const { return static_cast<MenuListData*>(memory::HandleOwn(address, &kMenuListLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kMenuListLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kMenuListLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // the item count
-  uint32_t count() const { return guest::LoadU32(base, address + 0); }
-  void set_count(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t count_address() const { return address + 0; }
+  uint32_t count_bits() const { if (auto* d = direct()) return d->count; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_count_bits(uint32_t v) const { if (auto* d = direct()) { d->count = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t count() const { if (auto* d = direct()) return d->count; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_count(uint32_t v) const { if (auto* d = direct()) { d->count = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // the first item shown
-  uint32_t scroll() const { return guest::LoadU32(base, address + 4); }
-  void set_scroll(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t scroll_address() const { return address + 4; }
-  uint32_t scroll_before() const { return guest::LoadU32(base, address + 8); }
-  void set_scroll_before(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t scroll_bits() const { if (auto* d = direct()) return d->scroll; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_scroll_bits(uint32_t v) const { if (auto* d = direct()) { d->scroll = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  uint32_t scroll() const { if (auto* d = direct()) return d->scroll; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_scroll(uint32_t v) const { if (auto* d = direct()) { d->scroll = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
   uint32_t scroll_before_address() const { return address + 8; }
+  uint32_t scroll_before_bits() const { if (auto* d = direct()) return d->scroll_before; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_scroll_before_bits(uint32_t v) const { if (auto* d = direct()) { d->scroll_before = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  uint32_t scroll_before() const { if (auto* d = direct()) return d->scroll_before; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_scroll_before(uint32_t v) const { if (auto* d = direct()) { d->scroll_before = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
   // the items shown
-  uint32_t shown() const { return guest::LoadU32(base, address + 12); }
-  void set_shown(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
   uint32_t shown_address() const { return address + 12; }
+  uint32_t shown_bits() const { if (auto* d = direct()) return d->shown; return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_shown_bits(uint32_t v) const { if (auto* d = direct()) { d->shown = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
+  uint32_t shown() const { if (auto* d = direct()) return d->shown; return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_shown(uint32_t v) const { if (auto* d = direct()) { d->shown = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
   // relative to the scroll
-  uint32_t selection() const { return guest::LoadU32(base, address + 16); }
-  void set_selection(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
   uint32_t selection_address() const { return address + 16; }
-  uint32_t selection_before() const { return guest::LoadU32(base, address + 20); }
-  void set_selection_before(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
+  uint32_t selection_bits() const { if (auto* d = direct()) return d->selection; return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_selection_bits(uint32_t v) const { if (auto* d = direct()) { d->selection = v; return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
+  uint32_t selection() const { if (auto* d = direct()) return d->selection; return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_selection(uint32_t v) const { if (auto* d = direct()) { d->selection = v; return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
   uint32_t selection_before_address() const { return address + 20; }
+  uint32_t selection_before_bits() const { if (auto* d = direct()) return d->selection_before; return uint32_t((memory::IsHandle(address + 20) ? uint32_t(memory::OwnerLoad(address + 20, 4)) : guest::LoadU32(base, address + 20))); }
+  void set_selection_before_bits(uint32_t v) const { if (auto* d = direct()) { d->selection_before = v; return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 4, v); else guest::StoreU32(base, address + 20, v); }
+  uint32_t selection_before() const { if (auto* d = direct()) return d->selection_before; return uint32_t((memory::IsHandle(address + 20) ? uint32_t(memory::OwnerLoad(address + 20, 4)) : guest::LoadU32(base, address + 20))); }
+  void set_selection_before(uint32_t v) const { if (auto* d = direct()) { d->selection_before = v; return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 4, v); else guest::StoreU32(base, address + 20, v); }
   // the last move: 1 down, -1 up, 0 none
-  uint32_t move() const { return guest::LoadU32(base, address + 24); }
-  void set_move(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
   uint32_t move_address() const { return address + 24; }
+  uint32_t move_bits() const { if (auto* d = direct()) return d->move; return uint32_t((memory::IsHandle(address + 24) ? uint32_t(memory::OwnerLoad(address + 24, 4)) : guest::LoadU32(base, address + 24))); }
+  void set_move_bits(uint32_t v) const { if (auto* d = direct()) { d->move = v; return; } if (memory::IsHandle(address + 24)) memory::OwnerStore(address + 24, 4, v); else guest::StoreU32(base, address + 24, v); }
+  uint32_t move() const { if (auto* d = direct()) return d->move; return uint32_t((memory::IsHandle(address + 24) ? uint32_t(memory::OwnerLoad(address + 24, 4)) : guest::LoadU32(base, address + 24))); }
+  void set_move(uint32_t v) const { if (auto* d = direct()) { d->move = v; return; } if (memory::IsHandle(address + 24)) memory::OwnerStore(address + 24, 4, v); else guest::StoreU32(base, address + 24, v); }
   // left or right asked: -1, 1, else 0
-  uint32_t side() const { return guest::LoadU32(base, address + 28); }
-  void set_side(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
   uint32_t side_address() const { return address + 28; }
+  uint32_t side_bits() const { if (auto* d = direct()) return d->side; return uint32_t((memory::IsHandle(address + 28) ? uint32_t(memory::OwnerLoad(address + 28, 4)) : guest::LoadU32(base, address + 28))); }
+  void set_side_bits(uint32_t v) const { if (auto* d = direct()) { d->side = v; return; } if (memory::IsHandle(address + 28)) memory::OwnerStore(address + 28, 4, v); else guest::StoreU32(base, address + 28, v); }
+  uint32_t side() const { if (auto* d = direct()) return d->side; return uint32_t((memory::IsHandle(address + 28) ? uint32_t(memory::OwnerLoad(address + 28, 4)) : guest::LoadU32(base, address + 28))); }
+  void set_side(uint32_t v) const { if (auto* d = direct()) { d->side = v; return; } if (memory::IsHandle(address + 28)) memory::OwnerStore(address + 28, 4, v); else guest::StoreU32(base, address + 28, v); }
   // set when the move wrapped or skipped
-  uint32_t wrapped() const { return guest::LoadU32(base, address + 32); }
-  void set_wrapped(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
   uint32_t wrapped_address() const { return address + 32; }
-  uint32_t down_action() const { return guest::LoadU32(base, address + 36); }
-  void set_down_action(uint32_t v) const { guest::StoreU32(base, address + 36, v); }
+  uint32_t wrapped_bits() const { if (auto* d = direct()) return d->wrapped; return uint32_t((memory::IsHandle(address + 32) ? uint32_t(memory::OwnerLoad(address + 32, 4)) : guest::LoadU32(base, address + 32))); }
+  void set_wrapped_bits(uint32_t v) const { if (auto* d = direct()) { d->wrapped = v; return; } if (memory::IsHandle(address + 32)) memory::OwnerStore(address + 32, 4, v); else guest::StoreU32(base, address + 32, v); }
+  uint32_t wrapped() const { if (auto* d = direct()) return d->wrapped; return uint32_t((memory::IsHandle(address + 32) ? uint32_t(memory::OwnerLoad(address + 32, 4)) : guest::LoadU32(base, address + 32))); }
+  void set_wrapped(uint32_t v) const { if (auto* d = direct()) { d->wrapped = v; return; } if (memory::IsHandle(address + 32)) memory::OwnerStore(address + 32, 4, v); else guest::StoreU32(base, address + 32, v); }
   uint32_t down_action_address() const { return address + 36; }
-  uint32_t up_action() const { return guest::LoadU32(base, address + 40); }
-  void set_up_action(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
+  uint32_t down_action_bits() const { if (auto* d = direct()) return d->down_action; return uint32_t((memory::IsHandle(address + 36) ? uint32_t(memory::OwnerLoad(address + 36, 4)) : guest::LoadU32(base, address + 36))); }
+  void set_down_action_bits(uint32_t v) const { if (auto* d = direct()) { d->down_action = v; return; } if (memory::IsHandle(address + 36)) memory::OwnerStore(address + 36, 4, v); else guest::StoreU32(base, address + 36, v); }
+  uint32_t down_action() const { if (auto* d = direct()) return d->down_action; return uint32_t((memory::IsHandle(address + 36) ? uint32_t(memory::OwnerLoad(address + 36, 4)) : guest::LoadU32(base, address + 36))); }
+  void set_down_action(uint32_t v) const { if (auto* d = direct()) { d->down_action = v; return; } if (memory::IsHandle(address + 36)) memory::OwnerStore(address + 36, 4, v); else guest::StoreU32(base, address + 36, v); }
   uint32_t up_action_address() const { return address + 40; }
-  uint32_t left_action() const { return guest::LoadU32(base, address + 44); }
-  void set_left_action(uint32_t v) const { guest::StoreU32(base, address + 44, v); }
+  uint32_t up_action_bits() const { if (auto* d = direct()) return d->up_action; return uint32_t((memory::IsHandle(address + 40) ? uint32_t(memory::OwnerLoad(address + 40, 4)) : guest::LoadU32(base, address + 40))); }
+  void set_up_action_bits(uint32_t v) const { if (auto* d = direct()) { d->up_action = v; return; } if (memory::IsHandle(address + 40)) memory::OwnerStore(address + 40, 4, v); else guest::StoreU32(base, address + 40, v); }
+  uint32_t up_action() const { if (auto* d = direct()) return d->up_action; return uint32_t((memory::IsHandle(address + 40) ? uint32_t(memory::OwnerLoad(address + 40, 4)) : guest::LoadU32(base, address + 40))); }
+  void set_up_action(uint32_t v) const { if (auto* d = direct()) { d->up_action = v; return; } if (memory::IsHandle(address + 40)) memory::OwnerStore(address + 40, 4, v); else guest::StoreU32(base, address + 40, v); }
   uint32_t left_action_address() const { return address + 44; }
-  uint32_t right_action() const { return guest::LoadU32(base, address + 48); }
-  void set_right_action(uint32_t v) const { guest::StoreU32(base, address + 48, v); }
+  uint32_t left_action_bits() const { if (auto* d = direct()) return d->left_action; return uint32_t((memory::IsHandle(address + 44) ? uint32_t(memory::OwnerLoad(address + 44, 4)) : guest::LoadU32(base, address + 44))); }
+  void set_left_action_bits(uint32_t v) const { if (auto* d = direct()) { d->left_action = v; return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 4, v); else guest::StoreU32(base, address + 44, v); }
+  uint32_t left_action() const { if (auto* d = direct()) return d->left_action; return uint32_t((memory::IsHandle(address + 44) ? uint32_t(memory::OwnerLoad(address + 44, 4)) : guest::LoadU32(base, address + 44))); }
+  void set_left_action(uint32_t v) const { if (auto* d = direct()) { d->left_action = v; return; } if (memory::IsHandle(address + 44)) memory::OwnerStore(address + 44, 4, v); else guest::StoreU32(base, address + 44, v); }
   uint32_t right_action_address() const { return address + 48; }
-  uint32_t accept_action() const { return guest::LoadU32(base, address + 52); }
-  void set_accept_action(uint32_t v) const { guest::StoreU32(base, address + 52, v); }
+  uint32_t right_action_bits() const { if (auto* d = direct()) return d->right_action; return uint32_t((memory::IsHandle(address + 48) ? uint32_t(memory::OwnerLoad(address + 48, 4)) : guest::LoadU32(base, address + 48))); }
+  void set_right_action_bits(uint32_t v) const { if (auto* d = direct()) { d->right_action = v; return; } if (memory::IsHandle(address + 48)) memory::OwnerStore(address + 48, 4, v); else guest::StoreU32(base, address + 48, v); }
+  uint32_t right_action() const { if (auto* d = direct()) return d->right_action; return uint32_t((memory::IsHandle(address + 48) ? uint32_t(memory::OwnerLoad(address + 48, 4)) : guest::LoadU32(base, address + 48))); }
+  void set_right_action(uint32_t v) const { if (auto* d = direct()) { d->right_action = v; return; } if (memory::IsHandle(address + 48)) memory::OwnerStore(address + 48, 4, v); else guest::StoreU32(base, address + 48, v); }
   uint32_t accept_action_address() const { return address + 52; }
-  uint32_t back_action() const { return guest::LoadU32(base, address + 56); }
-  void set_back_action(uint32_t v) const { guest::StoreU32(base, address + 56, v); }
+  uint32_t accept_action_bits() const { if (auto* d = direct()) return d->accept_action; return uint32_t((memory::IsHandle(address + 52) ? uint32_t(memory::OwnerLoad(address + 52, 4)) : guest::LoadU32(base, address + 52))); }
+  void set_accept_action_bits(uint32_t v) const { if (auto* d = direct()) { d->accept_action = v; return; } if (memory::IsHandle(address + 52)) memory::OwnerStore(address + 52, 4, v); else guest::StoreU32(base, address + 52, v); }
+  uint32_t accept_action() const { if (auto* d = direct()) return d->accept_action; return uint32_t((memory::IsHandle(address + 52) ? uint32_t(memory::OwnerLoad(address + 52, 4)) : guest::LoadU32(base, address + 52))); }
+  void set_accept_action(uint32_t v) const { if (auto* d = direct()) { d->accept_action = v; return; } if (memory::IsHandle(address + 52)) memory::OwnerStore(address + 52, 4, v); else guest::StoreU32(base, address + 52, v); }
   uint32_t back_action_address() const { return address + 56; }
+  uint32_t back_action_bits() const { if (auto* d = direct()) return d->back_action; return uint32_t((memory::IsHandle(address + 56) ? uint32_t(memory::OwnerLoad(address + 56, 4)) : guest::LoadU32(base, address + 56))); }
+  void set_back_action_bits(uint32_t v) const { if (auto* d = direct()) { d->back_action = v; return; } if (memory::IsHandle(address + 56)) memory::OwnerStore(address + 56, 4, v); else guest::StoreU32(base, address + 56, v); }
+  uint32_t back_action() const { if (auto* d = direct()) return d->back_action; return uint32_t((memory::IsHandle(address + 56) ? uint32_t(memory::OwnerLoad(address + 56, 4)) : guest::LoadU32(base, address + 56))); }
+  void set_back_action(uint32_t v) const { if (auto* d = direct()) { d->back_action = v; return; } if (memory::IsHandle(address + 56)) memory::OwnerStore(address + 56, 4, v); else guest::StoreU32(base, address + 56, v); }
   // an index into [0x826BABA4], then the mapper entry at 0x826BAB80
-  uint32_t player() const { return guest::LoadU32(base, address + 60); }
-  void set_player(uint32_t v) const { guest::StoreU32(base, address + 60, v); }
   uint32_t player_address() const { return address + 60; }
-  uint32_t wraps() const { return guest::LoadU32(base, address + 64); }
-  void set_wraps(uint32_t v) const { guest::StoreU32(base, address + 64, v); }
+  uint32_t player_bits() const { if (auto* d = direct()) return d->player; return uint32_t((memory::IsHandle(address + 60) ? uint32_t(memory::OwnerLoad(address + 60, 4)) : guest::LoadU32(base, address + 60))); }
+  void set_player_bits(uint32_t v) const { if (auto* d = direct()) { d->player = v; return; } if (memory::IsHandle(address + 60)) memory::OwnerStore(address + 60, 4, v); else guest::StoreU32(base, address + 60, v); }
+  uint32_t player() const { if (auto* d = direct()) return d->player; return uint32_t((memory::IsHandle(address + 60) ? uint32_t(memory::OwnerLoad(address + 60, 4)) : guest::LoadU32(base, address + 60))); }
+  void set_player(uint32_t v) const { if (auto* d = direct()) { d->player = v; return; } if (memory::IsHandle(address + 60)) memory::OwnerStore(address + 60, 4, v); else guest::StoreU32(base, address + 60, v); }
   uint32_t wraps_address() const { return address + 64; }
+  uint32_t wraps_bits() const { if (auto* d = direct()) return d->wraps; return uint32_t((memory::IsHandle(address + 64) ? uint32_t(memory::OwnerLoad(address + 64, 4)) : guest::LoadU32(base, address + 64))); }
+  void set_wraps_bits(uint32_t v) const { if (auto* d = direct()) { d->wraps = v; return; } if (memory::IsHandle(address + 64)) memory::OwnerStore(address + 64, 4, v); else guest::StoreU32(base, address + 64, v); }
+  uint32_t wraps() const { if (auto* d = direct()) return d->wraps; return uint32_t((memory::IsHandle(address + 64) ? uint32_t(memory::OwnerLoad(address + 64, 4)) : guest::LoadU32(base, address + 64))); }
+  void set_wraps(uint32_t v) const { if (auto* d = direct()) { d->wraps = v; return; } if (memory::IsHandle(address + 64)) memory::OwnerStore(address + 64, 4, v); else guest::StoreU32(base, address + 64, v); }
   // a word an item, 0 for a disabled item
-  template <typename T = MenuListEnabled>
-  T enabled() const { return T(base, guest::LoadU32(base, address + 68)); }
-  void set_enabled(const View& v) const { guest::StoreU32(base, address + 68, v.address); }
-  void set_enabled(uint32_t v) const { guest::StoreU32(base, address + 68, v); }
   uint32_t enabled_address() const { return address + 68; }
-  // measure fault: PanelSet::Open's PanelSetBase (car-list.toml), taken for a menu list; its +228
-  uint32_t fault_panel_set_228() const { return guest::LoadU32(base, address + 228); }
-  void set_fault_panel_set_228(uint32_t v) const { guest::StoreU32(base, address + 228, v); }
-  uint32_t fault_panel_set_228_address() const { return address + 228; }
-  // measure fault: as fault_panel_set_228
-  uint32_t fault_panel_set_232() const { return guest::LoadU32(base, address + 232); }
-  void set_fault_panel_set_232(uint32_t v) const { guest::StoreU32(base, address + 232, v); }
-  uint32_t fault_panel_set_232_address() const { return address + 232; }
-  // measure fault: as fault_panel_set_228 (b + 272, list 0)
-  uint32_t fault_panel_set_1820() const { return guest::LoadU32(base, address + 1820); }
-  void set_fault_panel_set_1820(uint32_t v) const { guest::StoreU32(base, address + 1820, v); }
-  uint32_t fault_panel_set_1820_address() const { return address + 1820; }
-  // measure fault: as fault_panel_set_228
-  uint32_t fault_panel_set_1900() const { return guest::LoadU32(base, address + 1900); }
-  void set_fault_panel_set_1900(uint32_t v) const { guest::StoreU32(base, address + 1900, v); }
-  uint32_t fault_panel_set_1900_address() const { return address + 1900; }
+  uint32_t enabled_bits() const { if (auto* d = direct()) return d->enabled; return uint32_t((memory::IsHandle(address + 68) ? uint32_t(memory::OwnerLoad(address + 68, 4)) : guest::LoadU32(base, address + 68))); }
+  void set_enabled_bits(uint32_t v) const { if (auto* d = direct()) { d->enabled = v; return; } if (memory::IsHandle(address + 68)) memory::OwnerStore(address + 68, 4, v); else guest::StoreU32(base, address + 68, v); }
+  template <typename T = MenuListEnabled>
+  T enabled() const { return T(base, enabled_bits()); }
+  void set_enabled(const View& w) const { set_enabled_bits(w.address); }
+  void set_enabled(uint32_t v) const { set_enabled_bits(v); }
 };
 
 // allocated; measure: new<4>@PauseMenu::Create

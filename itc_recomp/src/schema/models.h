@@ -512,6 +512,8 @@ struct TexturePointerVector : View {
 struct TextureSlot : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
+  static TextureSlot New(uint8_t* base, uint32_t size) { return TextureSlot(base, memory::NewBlob(size, "TextureSlot")); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint32_t texture() const { return guest::LoadU32(base, address + 0); }
   void set_texture(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t texture_address() const { return address + 0; }
@@ -696,24 +698,60 @@ struct PendingFreesList : View {
 };
 
 // allocated; measure: new<12>@PendingFrees::Insert, PendingFrees::Insert.r4, [8296BD58], [8296BD58].+0, [8296BD58].+0.+4
+#pragma pack(push, 1)
+struct PendingFreesNodeData {
+  uint32_t next = 0;  // +0
+  uint32_t previous = 0;  // +4
+  uint32_t header = 0;  // +8
+};
+#pragma pack(pop)
+static_assert(sizeof(PendingFreesNodeData) == 12);
+inline constexpr memory::LayoutField kPendingFreesNodeFields[] = {{0, 4}, {4, 4}, {8, 4}};
+inline constexpr memory::Layout kPendingFreesNodeLayout = {kPendingFreesNodeFields, 3};
+
 struct PendingFreesNode : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
-  template <typename T = PendingFreesNode>
-  T next() const { return T(base, guest::LoadU32(base, address + 0)); }
-  void set_next(const View& v) const { guest::StoreU32(base, address + 0, v.address); }
-  void set_next(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  static constexpr bool kHost = false;
+  static constexpr bool kDual = true;
+  PendingFreesNodeData* data() const { return static_cast<PendingFreesNodeData*>(memory::HandleObject(address)); }
+  bool on_host() const { return memory::IsHandle(address); }
+  static PendingFreesNode New(uint8_t* base) {
+    return PendingFreesNode(base, memory::MakeHandle(new PendingFreesNodeData(), sizeof(PendingFreesNodeData), "PendingFreesNode", &kPendingFreesNodeLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static PendingFreesNode NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(PendingFreesNodeData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<PendingFreesNodeData*>(::operator new(sizeof(PendingFreesNodeData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) PendingFreesNodeData();
+    return PendingFreesNode(base, memory::MakeHandle(p, sizeof(PendingFreesNodeData) * count, "PendingFreesNode", &kPendingFreesNodeLayout, sizeof(PendingFreesNodeData)));
+  }
+  PendingFreesNode at(uint32_t i) const { return PendingFreesNode(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  PendingFreesNodeData* direct() const { return static_cast<PendingFreesNodeData*>(memory::HandleOwn(address, &kPendingFreesNodeLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kPendingFreesNodeLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kPendingFreesNodeLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t next_address() const { return address + 0; }
+  uint32_t next_bits() const { if (auto* d = direct()) return d->next; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_next_bits(uint32_t v) const { if (auto* d = direct()) { d->next = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   template <typename T = PendingFreesNode>
-  T previous() const { return T(base, guest::LoadU32(base, address + 4)); }
-  void set_previous(const View& v) const { guest::StoreU32(base, address + 4, v.address); }
-  void set_previous(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  T next() const { return T(base, next_bits()); }
+  void set_next(const View& w) const { set_next_bits(w.address); }
+  void set_next(uint32_t v) const { set_next_bits(v); }
   uint32_t previous_address() const { return address + 4; }
-  template <typename T = MemoryBlockHeader>
-  T header() const { return T(base, guest::LoadU32(base, address + 8)); }
-  void set_header(const View& v) const { guest::StoreU32(base, address + 8, v.address); }
-  void set_header(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t previous_bits() const { if (auto* d = direct()) return d->previous; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_previous_bits(uint32_t v) const { if (auto* d = direct()) { d->previous = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  template <typename T = PendingFreesNode>
+  T previous() const { return T(base, previous_bits()); }
+  void set_previous(const View& w) const { set_previous_bits(w.address); }
+  void set_previous(uint32_t v) const { set_previous_bits(v); }
   uint32_t header_address() const { return address + 8; }
+  uint32_t header_bits() const { if (auto* d = direct()) return d->header; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_header_bits(uint32_t v) const { if (auto* d = direct()) { d->header = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  template <typename T = MemoryBlockHeader>
+  T header() const { return T(base, header_bits()); }
+  void set_header(const View& w) const { set_header_bits(w.address); }
+  void set_header(uint32_t v) const { set_header_bits(v); }
 };
 
 // file; measure: PendingFrees::Insert.r5
@@ -728,21 +766,56 @@ struct PendingFreesValue : View {
 };
 
 // allocated; measure: new<12>@Shaders::LoadPair, Shaders::OnPairLoaded.r6
+#pragma pack(push, 1)
+struct ShaderPairLoadData {
+  uint32_t vertex_file = 0;  // +0
+  uint32_t pixel_file = 0;  // +4
+  uint32_t pair = 0;  // +8
+};
+#pragma pack(pop)
+static_assert(sizeof(ShaderPairLoadData) == 12);
+inline constexpr memory::LayoutField kShaderPairLoadFields[] = {{0, 4}, {4, 4}, {8, 4}};
+inline constexpr memory::Layout kShaderPairLoadLayout = {kShaderPairLoadFields, 3};
+
 struct ShaderPairLoad : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  ShaderPairLoadData* data() const { return static_cast<ShaderPairLoadData*>(memory::HandleObject(address)); }
+  static ShaderPairLoad New(uint8_t* base) {
+    return ShaderPairLoad(base, memory::MakeHandle(new ShaderPairLoadData(), sizeof(ShaderPairLoadData), "ShaderPairLoad", &kShaderPairLoadLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static ShaderPairLoad NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(ShaderPairLoadData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<ShaderPairLoadData*>(::operator new(sizeof(ShaderPairLoadData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) ShaderPairLoadData();
+    return ShaderPairLoad(base, memory::MakeHandle(p, sizeof(ShaderPairLoadData) * count, "ShaderPairLoad", &kShaderPairLoadLayout, sizeof(ShaderPairLoadData)));
+  }
+  ShaderPairLoad at(uint32_t i) const { return ShaderPairLoad(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  ShaderPairLoadData* direct() const { return static_cast<ShaderPairLoadData*>(memory::HandleOwn(address, &kShaderPairLoadLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kShaderPairLoadLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kShaderPairLoadLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // in the shared load buffer
-  uint32_t vertex_file() const { return guest::LoadU32(base, address + 0); }
-  void set_vertex_file(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vertex_file_address() const { return address + 0; }
+  uint32_t vertex_file_bits() const { if (auto* d = direct()) return d->vertex_file; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_vertex_file_bits(uint32_t v) const { if (auto* d = direct()) { d->vertex_file = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t vertex_file() const { if (auto* d = direct()) return d->vertex_file; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_vertex_file(uint32_t v) const { if (auto* d = direct()) { d->vertex_file = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // right after the vertex file
-  uint32_t pixel_file() const { return guest::LoadU32(base, address + 4); }
-  void set_pixel_file(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t pixel_file_address() const { return address + 4; }
+  uint32_t pixel_file_bits() const { if (auto* d = direct()) return d->pixel_file; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_pixel_file_bits(uint32_t v) const { if (auto* d = direct()) { d->pixel_file = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  uint32_t pixel_file() const { if (auto* d = direct()) return d->pixel_file; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_pixel_file(uint32_t v) const { if (auto* d = direct()) { d->pixel_file = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
   // the pair index (0-33, 1000-1005, 2000-2055)
-  uint32_t pair() const { return guest::LoadU32(base, address + 8); }
-  void set_pair(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t pair_address() const { return address + 8; }
+  uint32_t pair_bits() const { if (auto* d = direct()) return d->pair; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_pair_bits(uint32_t v) const { if (auto* d = direct()) { d->pair = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  uint32_t pair() const { if (auto* d = direct()) return d->pair; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_pair(uint32_t v) const { if (auto* d = direct()) { d->pair = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
 };
 
 // file; measure: sub_822A8568.r3, sub_822A9EA8.r5.+0, sub_822A9FD8.r5.+0
@@ -979,6 +1052,8 @@ struct SkeletonMatrix : View {
 struct SkeletonCountedArray : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
+  static SkeletonCountedArray New(uint8_t* base, uint32_t size) { return SkeletonCountedArray(base, memory::NewBlob(size, "SkeletonCountedArray")); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   uint32_t count() const { return guest::LoadU32(base, address + 0); }
   void set_count(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t count_address() const { return address + 0; }
@@ -1016,6 +1091,8 @@ struct SkeletonCountedArray : View {
 struct SkeletonNodeValue : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
+  static SkeletonNodeValue New(uint8_t* base, uint32_t size) { return SkeletonNodeValue(base, memory::NewBlob(size, "SkeletonNodeValue")); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   // 0.0 at bind
   float x() const { return guest::LoadFloat(base, address + 0); }
   void set_x(float v) const { guest::StoreFloat(base, address + 0, v); }

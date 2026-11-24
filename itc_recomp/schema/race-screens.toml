@@ -31,6 +31,13 @@
 measure = "new<?>@MenuList::Init"
 size = 4
 origin = "allocated"
+# A blob since E5 step 5 (2026-11-24): a word an item, the list's count x 4
+# bytes, made by MenuList::Init (save_data::MenuListInit, New(base, size) in
+# place of VirtualAlloc; its lifted original's VirtualAlloc at 0x8220BB60,
+# the size in r4), freed by MenuList::Init's next call and MenuList::Release
+# (VirtualFree; the game's frees take handles).
+storage = "blob"
+blob_alloc = [{ call = 0x8220BB60, reg = "r4" }]
 fields = [
   { name = "item_0", offset = 0, type = "u32", note = "item 0's word (0 disabled); item i's at +4i" },
 ]
@@ -44,6 +51,17 @@ measures = ["MenuList", "new<72>@PauseMenu::Create", "new<72>@AfterRaceMenu::Cre
             "new<72>@GarageScreen::Create", "new<72>@GarageScreen::Create#2", "new<72>@RaceScreens::Make1004", "new<72>@CarDealer::Create#2"]
 size = 72
 origin = "allocated"
+# Dual since E5 step 5 (2026-11-24; a generic type: the in-race screens' and
+# about 50 front-end screens' lists, reached by the shared MenuList::
+# functions): made by the screens' makers in host memory (New in place of
+# their VirtualAlloc(72) or operator new(72); the in-race makers' lifted
+# originals through host_alloc), freed by their VirtualFree or operator
+# delete (the game's frees take handles). The allocations left in
+# guest memory are read the same way through the dual view. The measure's
+# four fault fields at +228 to +1900 (PanelSet::Open's PanelSetBase, taken
+# for a list) were removed: a host struct is sized by its last field.
+storage = "dual"
+host_alloc = [0x8220D840, 0x822108C0, 0x82217D94, 0x8221B26C]
 fields = [
   { name = "count", offset = 0, type = "u32", note = "the item count" },
   { name = "scroll", offset = 4, type = "u32", note = "the first item shown" },
@@ -63,10 +81,6 @@ fields = [
   { name = "player", offset = 60, type = "u32", note = "an index into [0x826BABA4], then the mapper entry at 0x826BAB80" },
   { name = "wraps", offset = 64, type = "u32" },
   { name = "enabled", offset = 68, type = "ptr", to = "MenuListEnabled", note = "a word an item, 0 for a disabled item" },
-  { name = "fault_panel_set_228", offset = 228, type = "u32", note = "measure fault: PanelSet::Open's PanelSetBase (car-list.toml), taken for a menu list; its +228" },
-  { name = "fault_panel_set_232", offset = 232, type = "u32", note = "measure fault: as fault_panel_set_228" },
-  { name = "fault_panel_set_1820", offset = 1820, type = "u32", note = "measure fault: as fault_panel_set_228 (b + 272, list 0)" },
-  { name = "fault_panel_set_1900", offset = 1900, type = "u32", note = "measure fault: as fault_panel_set_228" },
 ]
 
 # The pause menu's screen ([0x826D84D0], 4 bytes): its UI movie (4). The

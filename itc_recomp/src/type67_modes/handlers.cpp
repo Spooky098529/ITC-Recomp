@@ -217,7 +217,9 @@ std::optional<uint64_t> StandSlotFree(uint8_t* base, uint64_t r3) {
 uint64_t ControllerOptionsOnEnter(uint8_t* base, uint32_t machine) {
   ITC_NATIVE_RUNNING("sub_821BB120 ControllerOptions::OnEnter");
   schema::ControllerOptions(base, machine).set_loaded(1);
-  const schema::FrontEndMenu menu(base, Pages(68));
+  // Host objects (E5 step 5) in place of the VirtualAlloc(68) and
+  // VirtualAlloc(28); the globals hold their handles.
+  const schema::FrontEndMenu menu = schema::FrontEndMenu::New(base);
   G::set_controller_menu(base, menu);
   menu.set_first_item(0);
   menu.set_last_item(6);
@@ -234,7 +236,7 @@ uint64_t ControllerOptionsOnEnter(uint8_t* base, uint32_t machine) {
   menu.set_left_right_steps(0);
   menu.set_shoulders_step(0);
   G::controller_menu(base).set_player(1);
-  const schema::PageObject page(base, Pages(28));
+  const schema::PageObject page = schema::PageObject::New(base);
   G::set_controller_page(base, page);
   page.set_next_page(0);
   page.set_page(0);
@@ -483,8 +485,10 @@ uint64_t Screen0OnEnter(uint8_t* base, uint32_t screen, uint32_t d, uint32_t ite
   // The screen's words live in host memory (E5 step 3): the original's
   // VirtualAlloc(76); the screen's +9640 (type 7: +9644) holds the handle.
   s.set_words(schema::Type67Screen0Words::New(base).address);
-  s.set_pages(Pages(28));
-  const uint32_t list = Pages(68);
+  // The page object and the menu in host memory (E5 step 5) in place of
+  // the VirtualAlloc(28) and VirtualAlloc(68); the screen holds the handles.
+  s.set_pages(schema::PageObject::New(base).address);
+  const uint32_t list = schema::FrontEndMenu::New(base).address;
   const schema::PageObject page = s.pages();
   s.set_menu(list);
   if (page) {

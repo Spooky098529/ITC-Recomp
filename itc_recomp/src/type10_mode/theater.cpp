@@ -36,8 +36,9 @@ uint64_t Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls
   const uint32_t frame = Frame(base, sp, 112);
   const Machine m(base, machine);
   m.set_loaded(0);
-  const PageObject pages(
-      base, uint32_t(calls.Call(kVirtualAlloc, frame, 0x8228943C, 0, 28, 0x1000, 4)));
+  // Host objects (E5 step 5) in place of the VirtualAlloc(28) at 0x8228943C
+  // and the VirtualAlloc(72) at 0x82289478; the globals hold their handles.
+  const PageObject pages = PageObject::New(base);
   G::set_pages(base, pages);
   pages.set_next_page(0);
   pages.set_page(0);
@@ -45,8 +46,7 @@ uint64_t Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls
   pages.set_step_started(0);
   pages.set_unknown_20(kNone);
   pages.set_step(kNone);
-  const schema::MenuList list(
-      base, uint32_t(calls.Call(kVirtualAlloc, frame, 0x82289478, 0, 72, 0x1000, 4)));
+  const schema::MenuList list = schema::MenuList::New(base);
   G::set_list(base, list);
   if (list.address != 0) {
     list.set_enabled(0u);

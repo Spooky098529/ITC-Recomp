@@ -74,8 +74,9 @@ uint64_t OnEnter(uint8_t* base, uint32_t member, uint32_t sp, const Calls& calls
   const uint32_t frame = Frame(base, sp, 112);
   const Member m(base, member);
   m.set_machine_loaded(0);
-  const schema::PageObject pages(
-      base, uint32_t(calls.Call(kVirtualAlloc, frame, 0x822507AC, 0, 28, 0x1000, 4)));
+  // Host objects (E5 step 5) in place of the VirtualAlloc(28) at 0x822507AC
+  // and the VirtualAlloc(68) at 0x822507E8; the globals hold their handles.
+  const schema::PageObject pages = schema::PageObject::New(base);
   G::set_pages(base, pages);
   pages.set_next_page(0);
   pages.set_page(0);
@@ -83,8 +84,7 @@ uint64_t OnEnter(uint8_t* base, uint32_t member, uint32_t sp, const Calls& calls
   pages.set_step_started(0);
   pages.set_unknown_20(0xFFFFFFFFu);
   pages.set_step(0xFFFFFFFFu);
-  const schema::FrontEndMenu menu(
-      base, uint32_t(calls.Call(kVirtualAlloc, frame, 0x822507E8, 0, 68, 0x1000, 4)));
+  const schema::FrontEndMenu menu = schema::FrontEndMenu::New(base);
   G::set_menu(base, menu);
   menu.set_first_item(0);
   menu.set_wraps(0);

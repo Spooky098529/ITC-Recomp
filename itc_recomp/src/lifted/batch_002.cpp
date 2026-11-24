@@ -5350,7 +5350,6 @@ loc_8209D8B8:
 lifted::Result f8209DF50(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_8209DF50 (lifted)");
   uint64_t r11 = 0, r12 = 0, r31 = 0;
-  double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
   lifted::Cr cr0;
   uint8_t so = 0;
   uint32_t ea{};
@@ -5370,7 +5369,7 @@ lifted::Result f8209DF50(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = uint64_t(int64_t(8));
   // bl 0x825a6880
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A6880(base, LIFTED_ARGS(0x8209DF6C, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = schema::LoaderFunctor::New(base).address; f1 = 0; }  // host_alloc 0x8209DF6C (LoaderFunctor)
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq 0x8209df8c
@@ -5380,11 +5379,11 @@ lifted::Result f8209DF50(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r11,r11,7644
   r11 = uint64_t(int64_t(int64_t(r11) + 7644));
   // stw r11,0(r3)
-  guest::StoreU32(base, schema::LoaderFunctor(base, uint32_t(r3)).vtable_address(), uint32_t(r11));
+  schema::LoaderFunctor(base, uint32_t(r3)).set_vtable_bits(uint32_t(r11));
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, schema::LoaderFunctor(base, uint32_t(r31)).target_address());
+  r11 = schema::LoaderFunctor(base, uint32_t(r31)).target_bits();
   // stw r11,4(r3)
-  guest::StoreU32(base, schema::LoaderFunctor(base, uint32_t(r3)).target_address(), uint32_t(r11));
+  schema::LoaderFunctor(base, uint32_t(r3)).set_target_bits(uint32_t(r11));
   // b 0x8209df90
   goto loc_8209DF90;
 loc_8209DF8C:
@@ -6325,7 +6324,7 @@ uint64_t f820A57D0(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t r5) {
   ITC_NATIVE_RUNNING("sub_820A57D0 (lifted)");
   uint64_t r10 = 0, r11 = 0;
   // lwz r10,44(r3)
-  r10 = guest::LoadU32(base, schema::SaveDevices(base, uint32_t(r3)).slots_address());
+  r10 = schema::SaveDevices(base, uint32_t(r3)).slots_bits();
   // mulli r11,r4,1000
   r11 = uint64_t(int64_t(static_cast<int64_t>(r4 * static_cast<uint64_t>(1000))));
   // add r11,r11,r10
@@ -6345,7 +6344,7 @@ uint64_t f820A5848(uint8_t* base, uint64_t r3, uint64_t r4) {
   ITC_NATIVE_RUNNING("sub_820A5848 (lifted)");
   uint64_t r10 = 0, r11 = 0;
   // lwz r10,44(r3)
-  r10 = guest::LoadU32(base, schema::SaveDevices(base, uint32_t(r3)).slots_address());
+  r10 = schema::SaveDevices(base, uint32_t(r3)).slots_bits();
   // mulli r11,r4,1000
   r11 = uint64_t(int64_t(static_cast<int64_t>(r4 * static_cast<uint64_t>(1000))));
   // add r11,r11,r10
@@ -6361,7 +6360,7 @@ void f820A5860(uint8_t* base, uint64_t r3, uint64_t r4) {
   ITC_NATIVE_RUNNING("sub_820A5860 (lifted)");
   uint64_t r10 = 0, r11 = 0;
   // lwz r10,44(r3)
-  r10 = guest::LoadU32(base, schema::SaveDevices(base, uint32_t(r3)).slots_address());
+  r10 = schema::SaveDevices(base, uint32_t(r3)).slots_bits();
   // mulli r11,r4,1000
   r11 = uint64_t(int64_t(static_cast<int64_t>(r4 * static_cast<uint64_t>(1000))));
   // add r11,r11,r10

@@ -85,12 +85,9 @@ bool PendingFreesInsert(uint8_t* base, uint32_t list, uint32_t where, uint32_t v
     return false;
   }
   const uint32_t previous = Node(base, where).previous().address;
-  const auto made = memory::crt::OperatorNew(base, Node::kSize);
-  if (!made) {
-    ITC_LOG_ERROR("PendingFrees::Insert: operator new refused a node after its checks");
-    std::abort();
-  }
-  const Node node(base, *made);
+  // A host object (E5 step 5): freed by PendingFrees::FreeDue's operator
+  // delete. The head node stays in guest memory (the type is dual).
+  const Node node = Node::New(base);
   // The original's null checks on the node, its +4 and its +8.
   if (node.address != 0) {
     node.set_next(where);

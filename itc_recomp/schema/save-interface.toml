@@ -31,6 +31,13 @@ measures = ["SaveDevices", "sub_820A57D0.r3", "sub_820A5848.r3", "sub_820A5860.r
 size = 116
 origin = "allocated"
 vtable = 0x82002198
+# In host memory (E5 step 5, 2026-11-24): made by SaveDevices::Create
+# (src/save_interface/save_devices.cpp; the lifted original's operator new,
+# returning at 0x820A63EC, for its fallback), freed by the deleting
+# destructor's operator delete (never in play: the framework's services
+# aren't released).
+storage = "host"
+host_alloc = [0x820A63EC]
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82002198 (0x82002148 the base's, left by the destructor)" },
   { name = "tick_key", offset = 4, type = "u32", note = "the tick handler's key (the set-up block's +8, 1)" },
@@ -75,6 +82,14 @@ fields = [
 measure = "new<4008>@SaveDevices::SaveDevices"
 size = 4008
 origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): the four slots (files-and-saves.toml's
+# SaveSlot, its own unit's) stay in the guest's byte order, reached by
+# address from every save step; made by SaveDevices::SaveDevices (the
+# operator new[] of the hand port, and the lifted original's returning at
+# 0x820A6250, r3 the size), freed by the slots' vector deleting destructor's
+# operator delete[] on the block (never in play).
+storage = "blob"
+blob_alloc = [{ call = 0x820A6250, reg = "r3" }]
 fields = [
   { name = "count", offset = 0, type = "u32", note = "4; the first slot's array_count" },
   { name = "slots", offset = 8, type = "bytes", count = 4000, note = "four 1,000-byte SaveSlots (vtable 0x82002190); the save devices' +44 points here" },
@@ -96,6 +111,13 @@ fields = [
 measure = "new<24>@SaveBuffers::Create"
 size = 24
 origin = "allocated"
+# In host memory (E5 step 5, 2026-11-24): made by SaveBuffers::Create
+# (src/save_interface/save_layer.cpp; the lifted original's VirtualAlloc,
+# returning at 0x8228F6E4, without the native heap), freed by
+# SaveBuffers::Destroy's VirtualFree. Its buffers are blobs
+# (OptionsLoadedGameData, SaveReplayData, SaveReplayRecord, SaveReplayEntry).
+storage = "host"
+host_alloc = [0x8228F6E4]
 fields = [
   { name = "game_data", offset = 0, type = "u32", note = "the game data's buffer (129,400 bytes, the save data's layout: career.toml's CareerSave; options-load-save.toml's OptionsLoadedGameData)" },
   { name = "replay", offset = 4, type = "u32", note = "a replay's buffer (1,231,088 bytes)" },
@@ -110,6 +132,12 @@ fields = [
 measure = "new<24>@SaveBuffers::Create.+16"
 size = 304
 origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): the list's entries, one block of count x
+# 304 bytes made by Replays::BuildList (src/save_interface/save_layer.cpp;
+# the lifted original's two VirtualAllocs, r4 the size), freed by the next
+# BuildList's VirtualFree. Their names go to the UI movies by address.
+storage = "blob"
+blob_alloc = [{ call = 0x82290434, reg = "r4" }, { call = 0x822904A0, reg = "r4" }]
 fields = [
   { name = "file_name", offset = 0, type = "bytes", count = 42, note = "the rep_... file name" },
   { name = "display_name", offset = 42, type = "bytes", count = 256, note = "128 UTF-16 characters" },
@@ -123,6 +151,14 @@ fields = [
 measure = "Replays"
 size = 36
 origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): the record being saved (SaveBuffers::Create,
+# 36 bytes; the lifted original's VirtualAlloc returning at 0x8228F764) and
+# the replays' records (one block of count x 36 bytes, Replays::BuildList;
+# its lifted original's at 0x82290414 and 0x82290480), all r4 the size;
+# freed by SaveBuffers::Destroy, FreeReplayList and the next BuildList. Also
+# viewed on the stack (Replays::Sort's copy).
+storage = "blob"
+blob_alloc = [{ call = 0x8228F764, reg = "r4" }, { call = 0x82290414, reg = "r4" }, { call = 0x82290480, reg = "r4" }]
 fields = [
   { name = "word_0", offset = 0, type = "u32", note = "read as a word (a pointer by the measure, 4 loads in 2 functions; not known); the record's +0 is a halfword below" },
   { name = "year", offset = 0, type = "u16", note = "probably, as in a SYSTEMTIME" },
@@ -137,6 +173,41 @@ fields = [
   { name = "result", offset = 32, type = "u32", note = "probably" },
   { name = "next_number", offset = 64, type = "u32", note = "the next record's number (+36 +28), as Replays::Sort's first compare reads it" },
 ]
+
+# A replay's buffer (the save buffers' +4): a kept replay's layout
+# (type10-mode.toml's KeptReplay), saved to and loaded from a rep_... file
+# (1,231,088 bytes). A blob (E5 step 5, 2026-11-24) made by SaveBuffers::Create
+# (src/save_interface/save_layer.cpp) with KeptReplay's 1,296,624 bytes, not
+# the original's 1,231,088: Replay::CopyFrom (race_screens/dialog.cpp) copies
+# a whole kept replay into it and out of it, past the original's buffer (into
+# the pages after it on the 360), which a blob of the asked size refuses. Its
+# lifted original's VirtualAlloc (0x8228F744, without the native heap) isn't
+# listed: it would ask for the original's size. Freed by SaveBuffers::Destroy.
+[SaveReplayData]
+size = 0
+origin = "allocated"
+storage = "blob"
+fields = []
+
+# A save slot's enumeration buffer (the slot's +80: n 308-byte XCONTENT_DATAs)
+# and its open flags (+84: n words), made by SaveSlot::AllocBuffers
+# (src/save_interface/save_devices.cpp) with n = 100: blobs (E5 step 5,
+# 2026-11-24), written and read by address by the slot steps
+# (src/saves/slot_steps.cpp). The lifted original's operator new[] calls
+# (0x820A4594, 0x820A45B4) aren't listed: it runs only when the sizes are
+# refused (-1), which must fail as the original's. Freed by the slots'
+# destructor (never in play).
+[SaveEnumerationBuffer]
+size = 0
+origin = "allocated"
+storage = "blob"
+fields = []
+
+[SaveOpenFlags]
+size = 0
+origin = "allocated"
+storage = "blob"
+fields = []
 
 # The users and sign-in object (framework + 128, system-services.md), as
 # the save interface reads it: sub_82490B08 (its count) and Users::SignedIn

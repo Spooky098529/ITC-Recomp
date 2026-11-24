@@ -2788,7 +2788,7 @@ loc_821B6EB8:
   // lwz r11,-31776(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31776);
   // lwz r3,0(r11)
-  r3 = guest::LoadU32(base, schema::StandHolder(base, uint32_t(r11)).stage_block_0_address());
+  r3 = schema::StandHolder(base, uint32_t(r11)).stage_block_0_bits();
   // bl 0x8217f880
   // (left out: dead in C++)
   { const lifted::Result o = game::GarageStage::ReloadModel(base, LIFTED_ARGS(0x821B6EFC, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2836,7 +2836,7 @@ loc_821B6EB8:
   // addi r4,r1,2528
   r4 = uint64_t(int64_t(int64_t(r1) + 2528));
   // lwz r3,0(r11)
-  r3 = guest::LoadU32(base, schema::StandHolder(base, uint32_t(r11)).stage_block_0_address());
+  r3 = schema::StandHolder(base, uint32_t(r11)).stage_block_0_bits();
   // bl 0x8217fd58
   // (left out: dead in C++)
   { const lifted::Result o = game::GarageStage::SetCar(base, LIFTED_ARGS(0x821B6F54, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2856,7 +2856,7 @@ loc_821B6F58:
   // lwz r11,0(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 0);
   // lwz r3,0(r11)
-  r3 = guest::LoadU32(base, schema::StandHolder(base, uint32_t(r11)).stage_block_0_address());
+  r3 = schema::StandHolder(base, uint32_t(r11)).stage_block_0_bits();
   // bne cr6,0x821b6f7c
   if (!cr6.eq) goto loc_821B6F7C;
   // li r4,0
@@ -2872,7 +2872,7 @@ loc_821B6F7C:
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // lwz r3,0(r11)
-  r3 = guest::LoadU32(base, schema::StandHolder(base, uint32_t(r11)).stage_block_0_address());
+  r3 = schema::StandHolder(base, uint32_t(r11)).stage_block_0_bits();
   // bl 0x8217fe60
   // (left out: dead in C++)
   { const lifted::Result o = game::GarageStage::Draw(base, LIFTED_ARGS(0x821B6F94, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2921,13 +2921,13 @@ void f821B8238(uint8_t* base, uint64_t r3) {
   // lwz r11,-31644(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31644);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
+  r10 = schema::PageObject(base, uint32_t(r11)).page_bits();
   // cmpwi r10,0
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // beq 0x821b825c
   if (cr0.eq) goto loc_821B825C;
   // stw r10,8(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_previous_page_bits(uint32_t(r10));
 loc_821B825C:
   // li r9,0
   r9 = uint64_t(int64_t(0));
@@ -2936,13 +2936,13 @@ loc_821B825C:
   // li r8,4
   r8 = uint64_t(int64_t(4));
   // stw r9,12(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).step_address(), uint32_t(r9));
+  schema::PageObject(base, uint32_t(r11)).set_step_bits(uint32_t(r9));
   // stw r10,16(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).queued_step_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_queued_step_bits(uint32_t(r10));
   // stw r9,4(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).next_page_address(), uint32_t(r9));
+  schema::PageObject(base, uint32_t(r11)).set_next_page_bits(uint32_t(r9));
   // stw r10,0(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).page_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_page_bits(uint32_t(r10));
   // stw r8,9604(r3)
   guest::StoreU32(base, schema::SpecSheet(base, uint32_t(r3)).state_address(), uint32_t(r8));
   // blr
@@ -3639,7 +3639,7 @@ lifted::Result f821B8840(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r10,84(r1)
   guest::StoreU32(base, uint32_t(r1) + 84, uint32_t(r10));
   // lwz r11,0(r11)
-  r11 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
+  r11 = schema::PageObject(base, uint32_t(r11)).page_bits();
   // cmpwi cr6,r11,-1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), -1, so);
   // beq cr6,0x821b8890
@@ -3829,7 +3829,7 @@ lifted::Result f821B8F60(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r9,80(r1)
   guest::StoreU32(base, uint32_t(r1) + 80, uint32_t(r9));
   // lwz r10,12(r11)
-  r10 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).step_address());
+  r10 = schema::PageObject(base, uint32_t(r11)).step_bits();
   // cmpwi cr6,r10,-1
   cr6 = lifted::Compare<int32_t>(int32_t(r10), -1, so);
   // beq cr6,0x821b9060
@@ -3858,7 +3858,7 @@ lifted::Result f821B8F60(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // beq 0x821b9068
   if (cr0.eq) goto loc_821B9068;
   // lwz r9,16(r11)
-  r9 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).queued_step_address());
+  r9 = schema::PageObject(base, uint32_t(r11)).queued_step_bits();
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // cmpwi cr6,r9,-1
@@ -3866,9 +3866,9 @@ lifted::Result f821B8F60(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // bne cr6,0x821b9020
   if (!cr6.eq) goto loc_821B9020;
   // lwz r8,4(r11)
-  r8 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).next_page_address());
+  r8 = schema::PageObject(base, uint32_t(r11)).next_page_bits();
   // stw r8,0(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).page_address(), uint32_t(r8));
+  schema::PageObject(base, uint32_t(r11)).set_page_bits(uint32_t(r8));
   // b 0x821b9030
   goto loc_821B9030;
 loc_821B9020:
@@ -3876,22 +3876,22 @@ loc_821B9020:
   r8 = uint64_t(int64_t(-1));
 loc_821B9024:
   // lwz r9,16(r11)
-  r9 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).queued_step_address());
+  r9 = schema::PageObject(base, uint32_t(r11)).queued_step_bits();
   // stw r8,16(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).queued_step_address(), uint32_t(r8));
+  schema::PageObject(base, uint32_t(r11)).set_queued_step_bits(uint32_t(r8));
   // stw r10,20(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).unknown_20_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_unknown_20_bits(uint32_t(r10));
 loc_821B9030:
   // stw r9,12(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).step_address(), uint32_t(r9));
+  schema::PageObject(base, uint32_t(r11)).set_step_bits(uint32_t(r9));
 loc_821B9034:
   // stw r10,24(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).step_started_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_step_started_bits(uint32_t(r10));
   // b 0x821b9068
   goto loc_821B9068;
 loc_821B903C:
   // lwz r9,16(r11)
-  r9 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).queued_step_address());
+  r9 = schema::PageObject(base, uint32_t(r11)).queued_step_bits();
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // li r8,-1
@@ -3901,11 +3901,11 @@ loc_821B903C:
   // bne cr6,0x821b9024
   if (!cr6.eq) goto loc_821B9024;
   // lwz r9,4(r11)
-  r9 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).next_page_address());
+  r9 = schema::PageObject(base, uint32_t(r11)).next_page_bits();
   // stw r8,12(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).step_address(), uint32_t(r8));
+  schema::PageObject(base, uint32_t(r11)).set_step_bits(uint32_t(r8));
   // stw r9,0(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).page_address(), uint32_t(r9));
+  schema::PageObject(base, uint32_t(r11)).set_page_bits(uint32_t(r9));
   // b 0x821b9034
   goto loc_821B9034;
 loc_821B9060:
@@ -3949,7 +3949,7 @@ loc_821B9090:
   // lwz r11,-31776(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31776);
   // lwz r3,0(r11)
-  r3 = guest::LoadU32(base, schema::StandHolder(base, uint32_t(r11)).stage_block_0_address());
+  r3 = schema::StandHolder(base, uint32_t(r11)).stage_block_0_bits();
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // lfs f2,-23204(r11)
@@ -7456,7 +7456,7 @@ lifted::Result f821BFC68(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31600(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31600);
   // lwz r11,0(r11)
-  r11 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address());
+  r11 = schema::FrontEndMenu(base, uint32_t(r11)).cursor_bits();
   // cmplwi cr6,r11,1
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
   // blt cr6,0x821bfce0
@@ -7695,9 +7695,9 @@ lifted::Result f821BFD98(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31600(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31600);
   // lwz r30,4(r11)
-  r30 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_address());
+  r30 = schema::FrontEndMenu(base, uint32_t(r11)).previous_bits();
   // lwz r29,0(r11)
-  r29 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address());
+  r29 = schema::FrontEndMenu(base, uint32_t(r11)).cursor_bits();
   // cmpwi cr6,r30,12
   cr6 = lifted::Compare<int32_t>(int32_t(r30), 12, so);
   // bge cr6,0x821bfe5c
@@ -7864,7 +7864,7 @@ lifted::Result f821BFF20(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31600(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31600);
   // lwz r11,0(r11)
-  r11 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address());
+  r11 = schema::FrontEndMenu(base, uint32_t(r11)).cursor_bits();
   // cmpwi cr6,r11,12
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 12, so);
   // addi r4,r11,581
@@ -8081,9 +8081,9 @@ lifted::Result f821C0030(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31600(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31600);
   // lwz r30,4(r11)
-  r30 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_address());
+  r30 = schema::FrontEndMenu(base, uint32_t(r11)).previous_bits();
   // lwz r29,0(r11)
-  r29 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address());
+  r29 = schema::FrontEndMenu(base, uint32_t(r11)).cursor_bits();
   // cmpwi cr6,r30,6
   cr6 = lifted::Compare<int32_t>(int32_t(r30), 6, so);
   // bge cr6,0x821c00f4
@@ -8250,7 +8250,7 @@ lifted::Result f821C01B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31600(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31600);
   // lwz r11,0(r11)
-  r11 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address());
+  r11 = schema::FrontEndMenu(base, uint32_t(r11)).cursor_bits();
   // cmpwi cr6,r11,6
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 6, so);
   // addi r4,r11,820
@@ -9299,7 +9299,7 @@ loc_821C0F7C:
   // lwz r11,36(r11)
   r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).day_of_week_address());
   // stw r11,108(r3)
-  guest::StoreU32(base, schema::UiMovie(base, uint32_t(r3)).draw_context_address() + 44, uint32_t(r11));
+  schema::UiMovie(base, uint32_t(r3)).store_at(108, 4, uint32_t(r11));
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
   // b 0x825a6ed8
@@ -9592,26 +9592,26 @@ loc_821C1C8C:
   // lwz r10,-31604(r11)
   r10 = guest::LoadU32(base, uint32_t(r11) + -31604);
   // lwz r11,0(r10)
-  r11 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r10)).page_address());
+  r11 = schema::PageObject(base, uint32_t(r10)).page_bits();
   // cmpwi cr6,r11,-1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), -1, so);
   // beq cr6,0x821c1ca8
   if (cr6.eq) goto loc_821C1CA8;
   // stw r11,8(r10)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).previous_page_address(), uint32_t(r11));
+  schema::PageObject(base, uint32_t(r10)).set_previous_page_bits(uint32_t(r11));
 loc_821C1CA8:
   // li r9,3
   r9 = uint64_t(int64_t(3));
   // li r11,-1
   r11 = uint64_t(int64_t(-1));
   // stw r9,12(r10)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).step_address(), uint32_t(r9));
+  schema::PageObject(base, uint32_t(r10)).set_step_bits(uint32_t(r9));
   // stw r11,16(r10)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).queued_step_address(), uint32_t(r11));
+  schema::PageObject(base, uint32_t(r10)).set_queued_step_bits(uint32_t(r11));
   // stw r11,4(r10)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).next_page_address(), uint32_t(r11));
+  schema::PageObject(base, uint32_t(r10)).set_next_page_bits(uint32_t(r11));
   // stw r11,0(r10)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).page_address(), uint32_t(r11));
+  schema::PageObject(base, uint32_t(r10)).set_page_bits(uint32_t(r11));
   // lis r10,-32146
   r10 = uint64_t(int64_t(-2106720256));
   // lwz r10,-31632(r10)
@@ -9851,22 +9851,22 @@ loc_821C200C:
   // lwz r10,-31604(r10)
   r10 = guest::LoadU32(base, uint32_t(r10) + -31604);
   // lwz r9,0(r10)
-  r9 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r10)).page_address());
+  r9 = schema::PageObject(base, uint32_t(r10)).page_bits();
   // cmpwi cr6,r9,-1
   cr6 = lifted::Compare<int32_t>(int32_t(r9), -1, so);
   // beq cr6,0x821c2040
   if (cr6.eq) goto loc_821C2040;
   // stw r9,8(r10)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).previous_page_address(), uint32_t(r9));
+  schema::PageObject(base, uint32_t(r10)).set_previous_page_bits(uint32_t(r9));
 loc_821C2040:
   // li r9,7
   r9 = uint64_t(int64_t(7));
   // stw r11,16(r10)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).queued_step_address(), uint32_t(r11));
+  schema::PageObject(base, uint32_t(r10)).set_queued_step_bits(uint32_t(r11));
   // stw r11,4(r10)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).next_page_address(), uint32_t(r11));
+  schema::PageObject(base, uint32_t(r10)).set_next_page_bits(uint32_t(r11));
   // stw r9,12(r10)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).step_address(), uint32_t(r9));
+  schema::PageObject(base, uint32_t(r10)).set_step_bits(uint32_t(r9));
   // b 0x821c1f70
   goto loc_821C1F70;
 loc_821C2054:
@@ -10024,27 +10024,27 @@ loc_821C2144:
   // lwz r10,-31604(r10)
   r10 = guest::LoadU32(base, uint32_t(r10) + -31604);
   // lwz r9,0(r10)
-  r9 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r10)).page_address());
+  r9 = schema::PageObject(base, uint32_t(r10)).page_bits();
   // cmpwi cr6,r9,-1
   cr6 = lifted::Compare<int32_t>(int32_t(r9), -1, so);
   // beq cr6,0x821c2178
   if (cr6.eq) goto loc_821C2178;
   // stw r9,8(r10)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).previous_page_address(), uint32_t(r9));
+  schema::PageObject(base, uint32_t(r10)).set_previous_page_bits(uint32_t(r9));
 loc_821C2178:
   // li r9,7
   r9 = uint64_t(int64_t(7));
   // stw r11,4(r10)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).next_page_address(), uint32_t(r11));
+  schema::PageObject(base, uint32_t(r10)).set_next_page_bits(uint32_t(r11));
   // li r3,2
   r3 = uint64_t(int64_t(2));
 loc_821C2184:
   // stw r11,0(r10)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).page_address(), uint32_t(r11));
+  schema::PageObject(base, uint32_t(r10)).set_page_bits(uint32_t(r11));
   // stw r11,16(r10)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).queued_step_address(), uint32_t(r11));
+  schema::PageObject(base, uint32_t(r10)).set_queued_step_bits(uint32_t(r11));
   // stw r9,12(r10)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).step_address(), uint32_t(r9));
+  schema::PageObject(base, uint32_t(r10)).set_step_bits(uint32_t(r9));
 loc_821C2190:
   // bl 0x821103f0
   // (left out: dead in C++)
@@ -11803,7 +11803,7 @@ lifted::Result f821C5A20(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   // lwz r11,-31600(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31600);
   // lwz r11,8(r11)
-  r11 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).moved_address());
+  r11 = schema::FrontEndMenu(base, uint32_t(r11)).moved_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x821c5a6c
@@ -11813,13 +11813,13 @@ lifted::Result f821C5A20(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   // lwz r11,-31604(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31604);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
+  r10 = schema::PageObject(base, uint32_t(r11)).page_bits();
   // cmpwi r10,0
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // beq 0x821c5a64
   if (cr0.eq) goto loc_821C5A64;
   // stw r10,8(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_previous_page_bits(uint32_t(r10));
 loc_821C5A64:
   // li r9,1
   r9 = uint64_t(int64_t(1));
@@ -11838,13 +11838,13 @@ loc_821C5A6C:
   // lwz r11,-31604(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31604);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
+  r10 = schema::PageObject(base, uint32_t(r11)).page_bits();
   // cmpwi r10,0
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // beq 0x821c5a90
   if (cr0.eq) goto loc_821C5A90;
   // stw r10,8(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_previous_page_bits(uint32_t(r10));
 loc_821C5A90:
   // li r9,2
   r9 = uint64_t(int64_t(2));
@@ -11852,17 +11852,17 @@ loc_821C5A94:
   // li r10,-1
   r10 = uint64_t(int64_t(-1));
   // stw r9,12(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).step_address(), uint32_t(r9));
+  schema::PageObject(base, uint32_t(r11)).set_step_bits(uint32_t(r9));
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r3,4
   r3 = uint64_t(int64_t(4));
   // stw r10,16(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).queued_step_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_queued_step_bits(uint32_t(r10));
   // stw r8,4(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).next_page_address(), uint32_t(r8));
+  schema::PageObject(base, uint32_t(r11)).set_next_page_bits(uint32_t(r8));
   // stw r10,0(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).page_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_page_bits(uint32_t(r10));
   // bl 0x821103f0
   // (left out: dead in C++)
   { const lifted::Result o = game::MenuSound::Play(base, LIFTED_ARGS(0x821C5AB4, r31)); r3 = o.r3; f1 = o.f1; }
@@ -11888,7 +11888,7 @@ loc_821C5AB8:
   // lwz r11,-31600(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31600);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address());
+  r10 = schema::FrontEndMenu(base, uint32_t(r11)).cursor_bits();
   // cmpwi cr6,r10,3
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 3, so);
   // bne cr6,0x821c5b14
@@ -11932,13 +11932,13 @@ loc_821C5B14:
   // lwz r11,-31604(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31604);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
+  r10 = schema::PageObject(base, uint32_t(r11)).page_bits();
   // cmpwi r10,0
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // beq 0x821c5b3c
   if (cr0.eq) goto loc_821C5B3C;
   // stw r10,8(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_previous_page_bits(uint32_t(r10));
 loc_821C5B3C:
   // li r10,-1
   r10 = uint64_t(int64_t(-1));
@@ -11947,13 +11947,13 @@ loc_821C5B3C:
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // stw r10,16(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).queued_step_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_queued_step_bits(uint32_t(r10));
   // stw r9,12(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).step_address(), uint32_t(r9));
+  schema::PageObject(base, uint32_t(r11)).set_step_bits(uint32_t(r9));
   // stw r8,4(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).next_page_address(), uint32_t(r8));
+  schema::PageObject(base, uint32_t(r11)).set_next_page_bits(uint32_t(r8));
   // stw r10,0(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).page_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_page_bits(uint32_t(r10));
 loc_821C5B58:
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
@@ -11995,7 +11995,7 @@ lifted::Result f821C5B70(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   // lwz r11,-31600(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31600);
   // lwz r11,8(r11)
-  r11 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).moved_address());
+  r11 = schema::FrontEndMenu(base, uint32_t(r11)).moved_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x821c5bc4
@@ -12010,13 +12010,13 @@ lifted::Result f821C5B70(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   // lwz r11,-31604(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31604);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
+  r10 = schema::PageObject(base, uint32_t(r11)).page_bits();
   // cmpwi cr6,r10,1
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 1, so);
   // beq cr6,0x821c5bbc
   if (cr6.eq) goto loc_821C5BBC;
   // stw r10,8(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_previous_page_bits(uint32_t(r10));
 loc_821C5BBC:
   // li r9,5
   r9 = uint64_t(int64_t(5));
@@ -12040,13 +12040,13 @@ loc_821C5BC4:
   // lwz r11,-31604(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31604);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
+  r10 = schema::PageObject(base, uint32_t(r11)).page_bits();
   // cmpwi cr6,r10,1
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 1, so);
   // beq cr6,0x821c5bf0
   if (cr6.eq) goto loc_821C5BF0;
   // stw r10,8(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_previous_page_bits(uint32_t(r10));
 loc_821C5BF0:
   // li r9,6
   r9 = uint64_t(int64_t(6));
@@ -12054,15 +12054,15 @@ loc_821C5BF4:
   // li r10,-1
   r10 = uint64_t(int64_t(-1));
   // stw r9,12(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).step_address(), uint32_t(r9));
+  schema::PageObject(base, uint32_t(r11)).set_step_bits(uint32_t(r9));
   // li r8,1
   r8 = uint64_t(int64_t(1));
   // stw r10,16(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).queued_step_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_queued_step_bits(uint32_t(r10));
   // stw r8,4(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).next_page_address(), uint32_t(r8));
+  schema::PageObject(base, uint32_t(r11)).set_next_page_bits(uint32_t(r8));
   // stw r10,0(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).page_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_page_bits(uint32_t(r10));
   // b 0x821c5c5c
   goto loc_821C5C5C;
 loc_821C5C10:
@@ -12085,7 +12085,7 @@ loc_821C5C10:
   // lwz r11,-31600(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31600);
   // lwz r11,0(r11)
-  r11 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address());
+  r11 = schema::FrontEndMenu(base, uint32_t(r11)).cursor_bits();
   // cmpwi cr6,r11,12
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 12, so);
   // bne cr6,0x821c5c5c
@@ -12150,7 +12150,7 @@ lifted::Result f821C5C70(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   // lwz r11,-31600(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31600);
   // lwz r11,8(r11)
-  r11 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).moved_address());
+  r11 = schema::FrontEndMenu(base, uint32_t(r11)).moved_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x821c5cbc
@@ -12160,13 +12160,13 @@ lifted::Result f821C5C70(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   // lwz r11,-31604(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31604);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
+  r10 = schema::PageObject(base, uint32_t(r11)).page_bits();
   // cmpwi cr6,r10,2
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 2, so);
   // beq cr6,0x821c5cb4
   if (cr6.eq) goto loc_821C5CB4;
   // stw r10,8(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_previous_page_bits(uint32_t(r10));
 loc_821C5CB4:
   // li r9,9
   r9 = uint64_t(int64_t(9));
@@ -12185,13 +12185,13 @@ loc_821C5CBC:
   // lwz r11,-31604(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31604);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
+  r10 = schema::PageObject(base, uint32_t(r11)).page_bits();
   // cmpwi cr6,r10,2
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 2, so);
   // beq cr6,0x821c5ce0
   if (cr6.eq) goto loc_821C5CE0;
   // stw r10,8(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_previous_page_bits(uint32_t(r10));
 loc_821C5CE0:
   // li r9,10
   r9 = uint64_t(int64_t(10));
@@ -12199,17 +12199,17 @@ loc_821C5CE4:
   // li r10,-1
   r10 = uint64_t(int64_t(-1));
   // stw r9,12(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).step_address(), uint32_t(r9));
+  schema::PageObject(base, uint32_t(r11)).set_step_bits(uint32_t(r9));
   // li r8,2
   r8 = uint64_t(int64_t(2));
   // li r3,4
   r3 = uint64_t(int64_t(4));
   // stw r10,16(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).queued_step_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_queued_step_bits(uint32_t(r10));
   // stw r8,4(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).next_page_address(), uint32_t(r8));
+  schema::PageObject(base, uint32_t(r11)).set_next_page_bits(uint32_t(r8));
   // stw r10,0(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).page_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_page_bits(uint32_t(r10));
   // bl 0x821103f0
   // (left out: dead in C++)
   { const lifted::Result o = game::MenuSound::Play(base, LIFTED_ARGS(0x821C5D04, r31)); r3 = o.r3; f1 = o.f1; }
@@ -12235,7 +12235,7 @@ loc_821C5D08:
   // lwz r11,-31600(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31600);
   // lwz r11,0(r11)
-  r11 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address());
+  r11 = schema::FrontEndMenu(base, uint32_t(r11)).cursor_bits();
   // cmpwi cr6,r11,6
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 6, so);
   // bne cr6,0x821c5d54
@@ -12317,9 +12317,9 @@ lifted::Result f821C5D68(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31600(r28)
   r11 = guest::LoadU32(base, uint32_t(r28) + -31600);
   // lwz r29,4(r11)
-  r29 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_address());
+  r29 = schema::FrontEndMenu(base, uint32_t(r11)).previous_bits();
   // lwz r30,0(r11)
-  r30 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address());
+  r30 = schema::FrontEndMenu(base, uint32_t(r11)).cursor_bits();
   // cmplwi cr6,r29,1
   cr6 = lifted::Compare<uint32_t>(uint32_t(r29), 1, so);
   // blt cr6,0x821c5e08
@@ -12501,7 +12501,7 @@ loc_821C5EC0:
   // lwz r11,-31600(r28)
   r11 = guest::LoadU32(base, uint32_t(r28) + -31600);
   // lwz r11,8(r11)
-  r11 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).moved_address());
+  r11 = schema::FrontEndMenu(base, uint32_t(r11)).moved_bits();
   // cmpwi cr6,r11,1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 1, so);
   // bne cr6,0x821c5f00
@@ -12617,39 +12617,39 @@ lifted::Result f821C61B0(uint8_t* base, uint64_t r1, uint64_t r13, double f1) {
   // lwz r11,-31600(r9)
   r11 = guest::LoadU32(base, uint32_t(r9) + -31600);
   // stw r10,12(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).first_item_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_first_item_bits(uint32_t(r10));
   // stw r10,0(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_cursor_bits(uint32_t(r10));
   // stw r10,4(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_previous_bits(uint32_t(r10));
   // stw r10,8(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).moved_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_moved_bits(uint32_t(r10));
   // stw r10,40(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).wrapped_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_wrapped_bits(uint32_t(r10));
   // stw r10,48(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).visible_row_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_visible_row_bits(uint32_t(r10));
   // stw r10,52(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_row_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_previous_row_bits(uint32_t(r10));
   // stw r10,36(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).side_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_side_bits(uint32_t(r10));
   // stw r10,64(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).player_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_player_bits(uint32_t(r10));
   // stw r10,24(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).up_down_locked_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_up_down_locked_bits(uint32_t(r10));
   // stw r10,28(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).left_right_steps_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_left_right_steps_bits(uint32_t(r10));
   // stw r10,32(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).shoulders_step_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_shoulders_step_bits(uint32_t(r10));
   // lis r10,-32146
   r10 = uint64_t(int64_t(-2106720256));
   // stw r7,16(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).last_item_address(), uint32_t(r7));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_last_item_bits(uint32_t(r7));
   // stw r8,20(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).wraps_address(), uint32_t(r8));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_wraps_bits(uint32_t(r8));
   // lwz r11,-31600(r9)
   r11 = guest::LoadU32(base, uint32_t(r9) + -31600);
   // stw r8,64(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).player_address(), uint32_t(r8));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_player_bits(uint32_t(r8));
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r11,-31624(r11)
@@ -12715,39 +12715,39 @@ lifted::Result f821C6238(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // lwz r11,-31600(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + -31600);
   // stw r31,12(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).first_item_address(), uint32_t(r31));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_first_item_bits(uint32_t(r31));
   // stw r8,16(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).last_item_address(), uint32_t(r8));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_last_item_bits(uint32_t(r8));
   // stw r9,20(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).wraps_address(), uint32_t(r9));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_wraps_bits(uint32_t(r9));
   // stw r31,0(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address(), uint32_t(r31));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_cursor_bits(uint32_t(r31));
   // stw r31,4(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_address(), uint32_t(r31));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_previous_bits(uint32_t(r31));
   // stw r31,8(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).moved_address(), uint32_t(r31));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_moved_bits(uint32_t(r31));
   // stw r31,40(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).wrapped_address(), uint32_t(r31));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_wrapped_bits(uint32_t(r31));
   // stw r31,48(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).visible_row_address(), uint32_t(r31));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_visible_row_bits(uint32_t(r31));
   // stw r31,52(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_row_address(), uint32_t(r31));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_previous_row_bits(uint32_t(r31));
   // stw r31,36(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).side_address(), uint32_t(r31));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_side_bits(uint32_t(r31));
   // stw r31,64(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).player_address(), uint32_t(r31));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_player_bits(uint32_t(r31));
   // stw r31,24(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).up_down_locked_address(), uint32_t(r31));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_up_down_locked_bits(uint32_t(r31));
   // stw r31,28(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).left_right_steps_address(), uint32_t(r31));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_left_right_steps_bits(uint32_t(r31));
   // stw r31,32(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).shoulders_step_address(), uint32_t(r31));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_shoulders_step_bits(uint32_t(r31));
   // lwz r11,-31600(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + -31600);
   // lis r10,-32146
   r10 = uint64_t(int64_t(-2106720256));
   // stw r9,64(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).player_address(), uint32_t(r9));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_player_bits(uint32_t(r9));
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r11,-31624(r11)
@@ -12875,39 +12875,39 @@ lifted::Result f821C6350(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // lwz r11,-31600(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + -31600);
   // stw r31,12(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).first_item_address(), uint32_t(r31));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_first_item_bits(uint32_t(r31));
   // stw r8,16(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).last_item_address(), uint32_t(r8));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_last_item_bits(uint32_t(r8));
   // stw r9,20(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).wraps_address(), uint32_t(r9));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_wraps_bits(uint32_t(r9));
   // stw r31,0(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address(), uint32_t(r31));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_cursor_bits(uint32_t(r31));
   // stw r31,4(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_address(), uint32_t(r31));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_previous_bits(uint32_t(r31));
   // stw r31,8(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).moved_address(), uint32_t(r31));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_moved_bits(uint32_t(r31));
   // stw r31,40(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).wrapped_address(), uint32_t(r31));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_wrapped_bits(uint32_t(r31));
   // stw r31,48(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).visible_row_address(), uint32_t(r31));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_visible_row_bits(uint32_t(r31));
   // stw r31,52(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_row_address(), uint32_t(r31));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_previous_row_bits(uint32_t(r31));
   // stw r31,36(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).side_address(), uint32_t(r31));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_side_bits(uint32_t(r31));
   // stw r31,64(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).player_address(), uint32_t(r31));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_player_bits(uint32_t(r31));
   // stw r31,24(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).up_down_locked_address(), uint32_t(r31));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_up_down_locked_bits(uint32_t(r31));
   // stw r31,28(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).left_right_steps_address(), uint32_t(r31));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_left_right_steps_bits(uint32_t(r31));
   // stw r31,32(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).shoulders_step_address(), uint32_t(r31));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_shoulders_step_bits(uint32_t(r31));
   // lwz r11,-31600(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + -31600);
   // lis r10,-32146
   r10 = uint64_t(int64_t(-2106720256));
   // stw r9,64(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).player_address(), uint32_t(r9));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_player_bits(uint32_t(r9));
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r11,-31624(r11)
@@ -13364,26 +13364,26 @@ loc_821C73E4:
   // lwz r11,-31604(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31604);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
+  r10 = schema::PageObject(base, uint32_t(r11)).page_bits();
   // cmpwi cr6,r10,2
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 2, so);
   // beq cr6,0x821c7420
   if (cr6.eq) goto loc_821C7420;
   // stw r10,8(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_previous_page_bits(uint32_t(r10));
 loc_821C7420:
   // li r10,2
   r10 = uint64_t(int64_t(2));
   // stw r10,4(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).next_page_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_next_page_bits(uint32_t(r10));
 loc_821C7428:
   // stw r9,12(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).step_address(), uint32_t(r9));
+  schema::PageObject(base, uint32_t(r11)).set_step_bits(uint32_t(r9));
 loc_821C742C:
   // stw r30,16(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).queued_step_address(), uint32_t(r30));
+  schema::PageObject(base, uint32_t(r11)).set_queued_step_bits(uint32_t(r30));
   // stw r30,0(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).page_address(), uint32_t(r30));
+  schema::PageObject(base, uint32_t(r11)).set_page_bits(uint32_t(r30));
   // b 0x821c75d0
   goto loc_821C75D0;
 loc_821C7438:
@@ -13392,12 +13392,12 @@ loc_821C7438:
   // beq cr6,0x821c7444
   if (cr6.eq) goto loc_821C7444;
   // stw r9,8(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r9));
+  schema::PageObject(base, uint32_t(r11)).set_previous_page_bits(uint32_t(r9));
 loc_821C7444:
   // li r9,33
   r9 = uint64_t(int64_t(33));
   // stw r25,4(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).next_page_address(), uint32_t(r25));
+  schema::PageObject(base, uint32_t(r11)).set_next_page_bits(uint32_t(r25));
   // b 0x821c75b8
   goto loc_821C75B8;
 loc_821C7450:
@@ -13441,20 +13441,20 @@ loc_821C7470:
   // lwz r11,-31604(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31604);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
+  r10 = schema::PageObject(base, uint32_t(r11)).page_bits();
   // cmpwi cr6,r10,1
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 1, so);
   // beq cr6,0x821c74ac
   if (cr6.eq) goto loc_821C74AC;
   // stw r10,8(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_previous_page_bits(uint32_t(r10));
 loc_821C74AC:
   // li r10,4
   r10 = uint64_t(int64_t(4));
   // stw r24,4(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).next_page_address(), uint32_t(r24));
+  schema::PageObject(base, uint32_t(r11)).set_next_page_bits(uint32_t(r24));
   // stw r10,12(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).step_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_step_bits(uint32_t(r10));
   // b 0x821c742c
   goto loc_821C742C;
 loc_821C74BC:
@@ -13463,7 +13463,7 @@ loc_821C74BC:
   // beq cr6,0x821c74c8
   if (cr6.eq) goto loc_821C74C8;
   // stw r9,8(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r9));
+  schema::PageObject(base, uint32_t(r11)).set_previous_page_bits(uint32_t(r9));
 loc_821C74C8:
   // li r9,5
   r9 = uint64_t(int64_t(5));
@@ -13471,9 +13471,9 @@ loc_821C74C8:
   r7 = uint64_t(int64_t(25));
 loc_821C74D0:
   // stw r7,12(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).step_address(), uint32_t(r7));
+  schema::PageObject(base, uint32_t(r11)).set_step_bits(uint32_t(r7));
   // stw r9,4(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).next_page_address(), uint32_t(r9));
+  schema::PageObject(base, uint32_t(r11)).set_next_page_bits(uint32_t(r9));
   // b 0x821c75bc
   goto loc_821C75BC;
 loc_821C74DC:
@@ -13517,16 +13517,16 @@ loc_821C74FC:
   // lwz r11,-31604(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31604);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
+  r10 = schema::PageObject(base, uint32_t(r11)).page_bits();
   // cmpwi r10,0
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // beq 0x821c7538
   if (cr0.eq) goto loc_821C7538;
   // stw r10,8(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r10));
+  schema::PageObject(base, uint32_t(r11)).set_previous_page_bits(uint32_t(r10));
 loc_821C7538:
   // stw r9,4(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).next_page_address(), uint32_t(r9));
+  schema::PageObject(base, uint32_t(r11)).set_next_page_bits(uint32_t(r9));
   // b 0x821c7428
   goto loc_821C7428;
 loc_821C7540:
@@ -13535,7 +13535,7 @@ loc_821C7540:
   // beq cr6,0x821c754c
   if (cr6.eq) goto loc_821C754C;
   // stw r9,8(r11)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r9));
+  schema::PageObject(base, uint32_t(r11)).set_previous_page_bits(uint32_t(r9));
 loc_821C754C:
   // li r9,3
   r9 = uint64_t(int64_t(3));
@@ -14208,7 +14208,7 @@ lifted::Result f821D4540(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r31,0(r3)
   r31 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // lwz r11,8(r10)
-  r11 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r10)).moved_address());
+  r11 = schema::FrontEndMenu(base, uint32_t(r10)).moved_bits();
   // cmpwi cr6,r11,-1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), -1, so);
   // bne cr6,0x821d48b4
@@ -14226,7 +14226,7 @@ lifted::Result f821D4540(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // bne cr6,0x821d4680
   if (!cr6.eq) goto loc_821D4680;
   // lwz r11,40(r10)
-  r11 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r10)).wrapped_address());
+  r11 = schema::FrontEndMenu(base, uint32_t(r10)).wrapped_bits();
   // li r4,779
   r4 = uint64_t(int64_t(779));
   // mr r3,r31
@@ -14276,7 +14276,7 @@ lifted::Result f821D4540(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   f0 = double(float(f13 * f0));
   // stfs f0,16(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, schema::UiMovie(base, uint32_t(r11)).live_scene_address(), temp.u32);
+  schema::UiMovie(base, uint32_t(r11)).set_live_scene_bits(temp.u32);
   // lbz r11,9679(r30)
   r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).color_rows_address());
 loc_821D460C:
@@ -14631,7 +14631,7 @@ loc_821D4810:
   f0 = double(float(f13 * f0));
   // stfs f0,16(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, schema::UiMovie(base, uint32_t(r11)).live_scene_address(), temp.u32);
+  schema::UiMovie(base, uint32_t(r11)).set_live_scene_bits(temp.u32);
   // lbz r11,9679(r30)
   r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).color_rows_address());
   // b 0x821d4b4c
@@ -14731,7 +14731,7 @@ loc_821D48B4:
   f0 = double(float(f13 * f0));
   // stfs f0,16(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, schema::UiMovie(base, uint32_t(r11)).live_scene_address(), temp.u32);
+  schema::UiMovie(base, uint32_t(r11)).set_live_scene_bits(temp.u32);
   // b 0x821d4610
   goto loc_821D4610;
 loc_821D4938:
@@ -15006,7 +15006,7 @@ loc_821D4AAC:
   f0 = double(float(f13 * f0));
   // stfs f0,16(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, schema::UiMovie(base, uint32_t(r11)).live_scene_address(), temp.u32);
+  schema::UiMovie(base, uint32_t(r11)).set_live_scene_bits(temp.u32);
   // b 0x821d4b50
   goto loc_821D4B50;
 loc_821D4B24:
@@ -16099,7 +16099,7 @@ loc_821E9B84:
   f0 = double(float(f0));
   // stfs f0,16(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, schema::UiMovie(base, uint32_t(r11)).live_scene_address(), temp.u32);
+  schema::UiMovie(base, uint32_t(r11)).set_live_scene_bits(temp.u32);
   // b 0x821e9c4c
   goto loc_821E9C4C;
 loc_821E9B98:
@@ -16593,7 +16593,7 @@ loc_821EA014:
   f0 = double(float(f0));
   // stfs f0,16(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, schema::UiMovie(base, uint32_t(r11)).live_scene_address(), temp.u32);
+  schema::UiMovie(base, uint32_t(r11)).set_live_scene_bits(temp.u32);
   // b 0x821ea0dc
   goto loc_821EA0DC;
 loc_821EA028:
@@ -18222,7 +18222,7 @@ loc_821EB618:
   // stfs f31,68(r11)
   lifted::ScalarFloatMode();
   temp.f32 = float(f31);
-  guest::StoreU32(base, schema::UiMovie(base, uint32_t(r11)).draw_context_address() + 4, temp.u32);
+  schema::UiMovie(base, uint32_t(r11)).store_at(68, 4, temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FindNode(base, LIFTED_ARGS(0x821EB6AC, r31)); r3 = o.r3; f1 = o.f1; }
@@ -18237,7 +18237,7 @@ loc_821EB618:
   // stfs f31,68(r11)
   lifted::ScalarFloatMode();
   temp.f32 = float(f31);
-  guest::StoreU32(base, schema::UiMovie(base, uint32_t(r11)).draw_context_address() + 4, temp.u32);
+  schema::UiMovie(base, uint32_t(r11)).store_at(68, 4, temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FindNode(base, LIFTED_ARGS(0x821EB6C4, r31)); r3 = o.r3; f1 = o.f1; }
@@ -18252,7 +18252,7 @@ loc_821EB618:
   // stfs f31,68(r11)
   lifted::ScalarFloatMode();
   temp.f32 = float(f31);
-  guest::StoreU32(base, schema::UiMovie(base, uint32_t(r11)).draw_context_address() + 4, temp.u32);
+  schema::UiMovie(base, uint32_t(r11)).store_at(68, 4, temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FindNode(base, LIFTED_ARGS(0x821EB6DC, r31)); r3 = o.r3; f1 = o.f1; }
@@ -18932,7 +18932,7 @@ loc_821EBC6C:
   f0 = double(float(f0));
   // stfs f0,16(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, schema::UiMovie(base, uint32_t(r11)).live_scene_address(), temp.u32);
+  schema::UiMovie(base, uint32_t(r11)).set_live_scene_bits(temp.u32);
   // b 0x821ebd64
   goto loc_821EBD64;
 loc_821EBC80:
@@ -20551,7 +20551,7 @@ loc_821ECB2C:
   f0 = double(float(f0));
   // stfs f0,16(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, schema::UiMovie(base, uint32_t(r11)).live_scene_address(), temp.u32);
+  schema::UiMovie(base, uint32_t(r11)).set_live_scene_bits(temp.u32);
   // b 0x821ecc14
   goto loc_821ECC14;
 loc_821ECB40:

@@ -341,6 +341,12 @@ fields = [
 measure = "GarageCamera::OnPresetsLoaded.r4"
 size = 12
 origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): the whole asset, made by
+# GarageCamera::LoadPresets (type67_modes::GarageCameraLoadPresets, a hand
+# port with no lifted original; the original's VirtualAlloc), cleared by
+# XMemSet, filled by Archive::Load, its records copied into host
+# CameraPresets by OnPresetsLoaded, which frees it (VirtualFree).
+storage = "blob"
 fields = [
   { name = "count", offset = 4, type = "u32", note = "the records' count" },
   { name = "records_offset", offset = 8, type = "u32", note = "the records' offset from the data (64 bytes each, CameraPreset's layout)" },

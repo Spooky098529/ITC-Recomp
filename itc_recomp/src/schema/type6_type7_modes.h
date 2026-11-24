@@ -995,6 +995,8 @@ struct GarageCamera : View {
 struct GaragePresetsData : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
+  static GaragePresetsData New(uint8_t* base, uint32_t size) { return GaragePresetsData(base, memory::NewBlob(size, "GaragePresetsData")); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   // the records' count
   uint32_t count() const { return guest::LoadU32(base, address + 4); }
   void set_count(uint32_t v) const { guest::StoreU32(base, address + 4, v); }

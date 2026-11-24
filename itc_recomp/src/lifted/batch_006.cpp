@@ -205,7 +205,7 @@ lifted::Result f82118790(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r9,r31
   r9 = r31;
   // lwz r30,4(r31)
-  r30 = guest::LoadU32(base, schema::SoundHandleList(base, uint32_t(r31)).head_address());
+  r30 = schema::SoundHandleList(base, uint32_t(r31)).head_bits();
   // stw r9,80(r1)
   guest::StoreU32(base, uint32_t(r1) + 80, uint32_t(r9));
   // lwz r11,0(r30)
@@ -247,7 +247,7 @@ loc_821187CC:
   lifted::Trap(22);
 loc_821187F0:
   // lwz r10,4(r9)
-  r10 = guest::LoadU32(base, schema::SoundHandleList(base, uint32_t(r9)).head_address());
+  r10 = schema::SoundHandleList(base, uint32_t(r9)).head_bits();
   // cmplw cr6,r11,r10
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), uint32_t(r10), so);
   // bne cr6,0x82118800
@@ -328,7 +328,7 @@ lifted::Result f82118850(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r29,r30
   r29 = r30;
   // lwz r28,4(r30)
-  r28 = guest::LoadU32(base, schema::SoundList(base, uint32_t(r30)).head_address());
+  r28 = schema::SoundList(base, uint32_t(r30)).head_bits();
   // stw r29,80(r1)
   guest::StoreU32(base, uint32_t(r1) + 80, uint32_t(r29));
   // lwz r31,0(r28)
@@ -370,7 +370,7 @@ loc_82118890:
   lifted::Trap(22);
 loc_821188B4:
   // lwz r11,4(r29)
-  r11 = guest::LoadU32(base, schema::SoundList(base, uint32_t(r29)).head_address());
+  r11 = schema::SoundList(base, uint32_t(r29)).head_bits();
   // cmplw cr6,r31,r11
   cr6 = lifted::Compare<uint32_t>(uint32_t(r31), uint32_t(r11), so);
   // bne cr6,0x821188c4
@@ -458,9 +458,9 @@ lifted::Result f82118930(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r30,r3,1512
   r30 = uint64_t(int64_t(int64_t(r3) + 1512));
   // lwz r31,4(r30)
-  r31 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r30) - 1512).bank_pairs_first_address());
+  r31 = schema::AudioManager(base, uint32_t(r30) - 1512).bank_pairs_first_bits();
   // lwz r11,8(r30)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r30) - 1512).bank_pairs_end_address());
+  r11 = schema::AudioManager(base, uint32_t(r30) - 1512).bank_pairs_end_bits();
   // cmplw cr6,r31,r11
   cr6 = lifted::Compare<uint32_t>(uint32_t(r31), uint32_t(r11), so);
   // ble cr6,0x82118954
@@ -469,9 +469,9 @@ lifted::Result f82118930(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   lifted::Trap(22);
 loc_82118954:
   // lwz r29,8(r30)
-  r29 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r30) - 1512).bank_pairs_end_address());
+  r29 = schema::AudioManager(base, uint32_t(r30) - 1512).bank_pairs_end_bits();
   // lwz r10,4(r30)
-  r10 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r30) - 1512).bank_pairs_first_address());
+  r10 = schema::AudioManager(base, uint32_t(r30) - 1512).bank_pairs_first_bits();
   // cmplw cr6,r10,r29
   cr6 = lifted::Compare<uint32_t>(uint32_t(r10), uint32_t(r29), so);
   // ble cr6,0x82118968
@@ -525,7 +525,7 @@ loc_821189B0:
   // (left out: dead in C++)
   { const lifted::Result o = game::BankPair::CanFree(base, r1, r13, r3, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   // lwz r11,8(r30)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r30) - 1512).bank_pairs_end_address());
+  r11 = schema::AudioManager(base, uint32_t(r30) - 1512).bank_pairs_end_bits();
   // cmplw cr6,r31,r11
   cr6 = lifted::Compare<uint32_t>(uint32_t(r31), uint32_t(r11), so);
   // blt cr6,0x821189c8
@@ -540,7 +540,7 @@ loc_821189C8:
   { const lifted::Result o = f82118438(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
 loc_821189D0:
   // lwz r11,8(r30)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r30) - 1512).bank_pairs_end_address());
+  r11 = schema::AudioManager(base, uint32_t(r30) - 1512).bank_pairs_end_bits();
   // cmplw cr6,r31,r11
   cr6 = lifted::Compare<uint32_t>(uint32_t(r31), uint32_t(r11), so);
   // blt cr6,0x821189e0
@@ -582,7 +582,7 @@ lifted::Result f821189F0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r29,r4
   r29 = r4;
   // lwz r28,4(r30)
-  r28 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r30) - 1528).sounds_head_address());
+  r28 = schema::AudioManager(base, uint32_t(r30) - 1528).sounds_head_bits();
   // mr r11,r28
   r11 = r28;
   // lwz r31,0(r11)
@@ -609,7 +609,7 @@ loc_82118A1C:
   // beq 0x82118a88
   if (cr0.eq) goto loc_82118A88;
   // lwz r11,4(r30)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r30) - 1528).sounds_head_address());
+  r11 = schema::AudioManager(base, uint32_t(r30) - 1528).sounds_head_bits();
   // cmplw cr6,r31,r11
   cr6 = lifted::Compare<uint32_t>(uint32_t(r31), uint32_t(r11), so);
   // bne cr6,0x82118a44
@@ -630,7 +630,7 @@ loc_82118A44:
   // beq 0x82118a70
   if (cr0.eq) goto loc_82118A70;
   // lwz r11,4(r30)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r30) - 1528).sounds_head_address());
+  r11 = schema::AudioManager(base, uint32_t(r30) - 1528).sounds_head_bits();
   // cmplw cr6,r31,r11
   cr6 = lifted::Compare<uint32_t>(uint32_t(r31), uint32_t(r11), so);
   // bne cr6,0x82118a68
@@ -645,7 +645,7 @@ loc_82118A68:
   { const lifted::Result o = game::Sound::Stop(base, r1, r13, r3, r5, r6, r7, r8, r9, r10, f1, 0x82118A70); r3 = o.r3; f1 = o.f1; }
 loc_82118A70:
   // lwz r11,4(r30)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r30) - 1528).sounds_head_address());
+  r11 = schema::AudioManager(base, uint32_t(r30) - 1528).sounds_head_bits();
   // cmplw cr6,r31,r11
   cr6 = lifted::Compare<uint32_t>(uint32_t(r31), uint32_t(r11), so);
   // bne cr6,0x82118a80
@@ -689,7 +689,7 @@ lifted::Result f82118A90(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r28,r5
   r28 = r5;
   // lwz r27,4(r30)
-  r27 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r30) - 1528).sounds_head_address());
+  r27 = schema::AudioManager(base, uint32_t(r30) - 1528).sounds_head_bits();
   // mr r11,r27
   r11 = r27;
   // lwz r31,0(r11)
@@ -716,7 +716,7 @@ loc_82118AC0:
   // beq 0x82118b50
   if (cr0.eq) goto loc_82118B50;
   // lwz r11,4(r30)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r30) - 1528).sounds_head_address());
+  r11 = schema::AudioManager(base, uint32_t(r30) - 1528).sounds_head_bits();
   // cmplw cr6,r31,r11
   cr6 = lifted::Compare<uint32_t>(uint32_t(r31), uint32_t(r11), so);
   // bne cr6,0x82118ae8
@@ -737,7 +737,7 @@ loc_82118AE8:
   // beq 0x82118b38
   if (cr0.eq) goto loc_82118B38;
   // lwz r11,4(r30)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r30) - 1528).sounds_head_address());
+  r11 = schema::AudioManager(base, uint32_t(r30) - 1528).sounds_head_bits();
   // cmplw cr6,r31,r11
   cr6 = lifted::Compare<uint32_t>(uint32_t(r31), uint32_t(r11), so);
   // bne cr6,0x82118b0c
@@ -758,7 +758,7 @@ loc_82118B0C:
   // beq 0x82118b38
   if (cr0.eq) goto loc_82118B38;
   // lwz r11,4(r30)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r30) - 1528).sounds_head_address());
+  r11 = schema::AudioManager(base, uint32_t(r30) - 1528).sounds_head_bits();
   // cmplw cr6,r31,r11
   cr6 = lifted::Compare<uint32_t>(uint32_t(r31), uint32_t(r11), so);
   // bne cr6,0x82118b30
@@ -773,7 +773,7 @@ loc_82118B30:
   { const lifted::Result o = game::Sound::Stop(base, r1, r13, r3, r5, r6, r7, r8, r9, r10, f1, 0x82118B38); r3 = o.r3; f1 = o.f1; }
 loc_82118B38:
   // lwz r11,4(r30)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r30) - 1528).sounds_head_address());
+  r11 = schema::AudioManager(base, uint32_t(r30) - 1528).sounds_head_bits();
   // cmplw cr6,r31,r11
   cr6 = lifted::Compare<uint32_t>(uint32_t(r31), uint32_t(r11), so);
   // bne cr6,0x82118b48
@@ -813,7 +813,7 @@ lifted::Result f82118C70(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r31,r3,1540
   r31 = uint64_t(int64_t(int64_t(r3) + 1540));
   // lwz r29,4(r31)
-  r29 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r31) - 1540).handle_sounds_head_address());
+  r29 = schema::AudioManager(base, uint32_t(r31) - 1540).handle_sounds_head_bits();
   // mr r11,r29
   r11 = r29;
   // lwz r30,0(r11)
@@ -840,7 +840,7 @@ loc_82118C98:
   // beq 0x82118ce0
   if (cr0.eq) goto loc_82118CE0;
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r31) - 1540).handle_sounds_head_address());
+  r11 = schema::AudioManager(base, uint32_t(r31) - 1540).handle_sounds_head_bits();
   // cmplw cr6,r30,r11
   cr6 = lifted::Compare<uint32_t>(uint32_t(r30), uint32_t(r11), so);
   // bne cr6,0x82118cc0
@@ -854,7 +854,7 @@ loc_82118CC0:
   // (left out: dead in C++)
   { const lifted::Result o = f82118490(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r31) - 1540).handle_sounds_head_address());
+  r11 = schema::AudioManager(base, uint32_t(r31) - 1540).handle_sounds_head_bits();
   // cmplw cr6,r30,r11
   cr6 = lifted::Compare<uint32_t>(uint32_t(r30), uint32_t(r11), so);
   // bne cr6,0x82118cd8
@@ -901,7 +901,7 @@ uint64_t f82118CF0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // mr r29,r4
   r29 = r4;
   // lwz r28,4(r31)
-  r28 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r31) - 1540).handle_sounds_head_address());
+  r28 = schema::AudioManager(base, uint32_t(r31) - 1540).handle_sounds_head_bits();
   // mr r11,r28
   r11 = r28;
   // lwz r30,0(r11)
@@ -928,7 +928,7 @@ loc_82118D1C:
   // beq 0x82118d80
   if (cr0.eq) goto loc_82118D80;
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r31) - 1540).handle_sounds_head_address());
+  r11 = schema::AudioManager(base, uint32_t(r31) - 1540).handle_sounds_head_bits();
   // cmplw cr6,r30,r11
   cr6 = lifted::Compare<uint32_t>(uint32_t(r30), uint32_t(r11), so);
   // bne cr6,0x82118d44
@@ -947,7 +947,7 @@ loc_82118D44:
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r31) - 1540).handle_sounds_head_address());
+  r11 = schema::AudioManager(base, uint32_t(r31) - 1540).handle_sounds_head_bits();
   // cmplw cr6,r30,r11
   cr6 = lifted::Compare<uint32_t>(uint32_t(r30), uint32_t(r11), so);
   // bne 0x82118d70
@@ -1412,7 +1412,7 @@ lifted::Result f82119018(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // ld r10,80(r1)
   r10 = guest::LoadU64(base, uint32_t(r1) + 80);
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r31) - 1528).sounds_head_address());
+  r11 = schema::AudioManager(base, uint32_t(r31) - 1528).sounds_head_bits();
   // stw r31,80(r1)
   guest::StoreU32(base, uint32_t(r1) + 80, uint32_t(r31));
   // std r10,96(r1)
@@ -1487,7 +1487,7 @@ lifted::Result f821190B0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r10,80(r1)
   guest::StoreU32(base, uint32_t(r1) + 80, uint32_t(r10));
   // lwz r10,4(r11)
-  r10 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r11) - 1540).handle_sounds_head_address());
+  r10 = schema::AudioManager(base, uint32_t(r11) - 1540).handle_sounds_head_bits();
   // lwz r6,0(r9)
   r6 = guest::LoadU32(base, uint32_t(r9) + 0);
   // stw r11,80(r1)
@@ -1543,7 +1543,7 @@ lifted::Result f82119118(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = game::AudioEngine::DoWork(base, LIFTED_ARGS(0x82119134, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,1596(r31)
-  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r31)).handler_12_address());
+  r11 = schema::AudioManager(base, uint32_t(r31)).handler_12_bits();
   // addi r11,r11,-3
   r11 = uint64_t(int64_t(int64_t(r11) + -3));
   // cntlzw r11,r11
@@ -1764,11 +1764,11 @@ lifted::Result f82119278(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r9,r9,-31900
   r9 = uint64_t(int64_t(int64_t(r9) + -31900));
   // stw r11,0(r31)
-  guest::StoreU32(base, schema::AudioManager(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
+  schema::AudioManager(base, uint32_t(r31)).set_vtable_bits(uint32_t(r11));
   // stw r10,4(r31)
-  guest::StoreU32(base, schema::AudioManager(base, uint32_t(r31)).bank_owner_vtable_address(), uint32_t(r10));
+  schema::AudioManager(base, uint32_t(r31)).set_bank_owner_vtable_bits(uint32_t(r10));
   // stw r9,8(r31)
-  guest::StoreU32(base, schema::AudioManager(base, uint32_t(r31)).sound_owner_vtable_address(), uint32_t(r9));
+  schema::AudioManager(base, uint32_t(r31)).set_sound_owner_vtable_bits(uint32_t(r9));
   // bl 0x82119018
   // (left out: dead in C++)
   { const lifted::Result o = f82119018(base, r1, r13, r3, f1); r3 = o.r3; f1 = o.f1; }
@@ -1805,17 +1805,17 @@ lifted::Result f82119278(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // stw r10,24(r11)
-  guest::StoreU32(base, schema::AudioManager(base, uint32_t(r11) - 1584).handler_delegate_vtable_address(), uint32_t(r10));
+  schema::AudioManager(base, uint32_t(r11) - 1584).set_handler_delegate_vtable_bits(uint32_t(r10));
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // stw r9,4(r11)
-  guest::StoreU32(base, schema::AudioManager(base, uint32_t(r11) - 1584).handler_vtable2_address(), uint32_t(r9));
+  schema::AudioManager(base, uint32_t(r11) - 1584).set_handler_vtable2_bits(uint32_t(r9));
   // addi r3,r31,1556
   r3 = uint64_t(int64_t(int64_t(r31) + 1556));
   // stw r8,4(r11)
-  guest::StoreU32(base, schema::AudioManager(base, uint32_t(r11) - 1584).handler_vtable2_address(), uint32_t(r8));
+  schema::AudioManager(base, uint32_t(r11) - 1584).set_handler_vtable2_bits(uint32_t(r8));
   // stw r7,0(r11)
-  guest::StoreU32(base, schema::AudioManager(base, uint32_t(r11) - 1584).handler_vtable_address(), uint32_t(r7));
+  schema::AudioManager(base, uint32_t(r11) - 1584).set_handler_vtable_bits(uint32_t(r7));
   // bl 0x82091328
   // (left out: dead in C++)
   { const lifted::Result o = game::Std::string::_Tidy(base, LIFTED_ARGS(0x82119308, r31)); r3 = o.r3; f1 = o.f1; }
@@ -1827,7 +1827,7 @@ lifted::Result f82119278(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x820ACF88, LIFTED_ARGS(0x82119314, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r3,4(r30)
-  r3 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r30) - 1540).handle_sounds_head_address());
+  r3 = schema::AudioManager(base, uint32_t(r30) - 1540).handle_sounds_head_bits();
   // bl 0x825a70e8
   // (left out: dead in C++)
   { const lifted::Result o = lifted::entry::e825A70E8(base, LIFTED_ARGS(0x8211931C, r31)); r3 = o.r3; f1 = o.f1; }
@@ -1838,21 +1838,21 @@ lifted::Result f82119278(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r3,r29
   r3 = r29;
   // stw r28,4(r30)
-  guest::StoreU32(base, schema::AudioManager(base, uint32_t(r30) - 1540).handle_sounds_head_address(), uint32_t(r28));
+  schema::AudioManager(base, uint32_t(r30) - 1540).set_handle_sounds_head_bits(uint32_t(r28));
   // bl 0x820acf88
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x820ACF88, LIFTED_ARGS(0x82119330, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r3,4(r29)
-  r3 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r29) - 1528).sounds_head_address());
+  r3 = schema::AudioManager(base, uint32_t(r29) - 1528).sounds_head_bits();
   // bl 0x825a70e8
   // (left out: dead in C++)
   { const lifted::Result o = lifted::entry::e825A70E8(base, LIFTED_ARGS(0x82119338, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r30,r31,1512
   r30 = uint64_t(int64_t(int64_t(r31) + 1512));
   // stw r28,4(r29)
-  guest::StoreU32(base, schema::AudioManager(base, uint32_t(r29) - 1528).sounds_head_address(), uint32_t(r28));
+  schema::AudioManager(base, uint32_t(r29) - 1528).set_sounds_head_bits(uint32_t(r28));
   // lwz r3,4(r30)
-  r3 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r30) - 1512).bank_pairs_first_address());
+  r3 = schema::AudioManager(base, uint32_t(r30) - 1512).bank_pairs_first_bits();
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq 0x82119350
@@ -1864,11 +1864,11 @@ loc_82119350:
   // mr r3,r27
   r3 = r27;
   // stw r28,4(r30)
-  guest::StoreU32(base, schema::AudioManager(base, uint32_t(r30) - 1512).bank_pairs_first_address(), uint32_t(r28));
+  schema::AudioManager(base, uint32_t(r30) - 1512).set_bank_pairs_first_bits(uint32_t(r28));
   // stw r28,8(r30)
-  guest::StoreU32(base, schema::AudioManager(base, uint32_t(r30) - 1512).bank_pairs_end_address(), uint32_t(r28));
+  schema::AudioManager(base, uint32_t(r30) - 1512).set_bank_pairs_end_bits(uint32_t(r28));
   // stw r28,12(r30)
-  guest::StoreU32(base, schema::AudioManager(base, uint32_t(r30) - 1512).bank_pairs_capacity_end_address(), uint32_t(r28));
+  schema::AudioManager(base, uint32_t(r30) - 1512).set_bank_pairs_capacity_end_bits(uint32_t(r28));
   // bl 0x82106540
   // (left out: dead in C++)
   { const lifted::Result o = lifted::entry::e82106540(base, LIFTED_ARGS(0x82119364, r31)); r3 = o.r3; f1 = o.f1; }
@@ -1885,11 +1885,11 @@ loc_82119350:
   // addi r9,r9,-32072
   r9 = uint64_t(int64_t(int64_t(r9) + -32072));
   // stw r11,8(r31)
-  guest::StoreU32(base, schema::AudioManager(base, uint32_t(r31)).sound_owner_vtable_address(), uint32_t(r11));
+  schema::AudioManager(base, uint32_t(r31)).set_sound_owner_vtable_bits(uint32_t(r11));
   // stw r10,4(r31)
-  guest::StoreU32(base, schema::AudioManager(base, uint32_t(r31)).bank_owner_vtable_address(), uint32_t(r10));
+  schema::AudioManager(base, uint32_t(r31)).set_bank_owner_vtable_bits(uint32_t(r10));
   // stw r9,0(r31)
-  guest::StoreU32(base, schema::AudioManager(base, uint32_t(r31)).vtable_address(), uint32_t(r9));
+  schema::AudioManager(base, uint32_t(r31)).set_vtable_bits(uint32_t(r9));
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
   // b 0x825a6ed4
@@ -2043,13 +2043,13 @@ lifted::Result f82119500(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // blt cr6,0x82119600
   if (cr6.lt) goto loc_82119600;
   // lwz r10,1516(r30)
-  r10 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r30)).bank_pairs_first_address());
+  r10 = schema::AudioManager(base, uint32_t(r30)).bank_pairs_first_bits();
   // cmplwi r10,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
   // beq 0x8211955c
   if (cr0.eq) goto loc_8211955C;
   // lwz r9,1520(r30)
-  r9 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r30)).bank_pairs_end_address());
+  r9 = schema::AudioManager(base, uint32_t(r30)).bank_pairs_end_bits();
   // subf r9,r10,r9
   r9 = r9 - r10;
   // srawi r9,r9,2
@@ -2075,7 +2075,7 @@ loc_82119560:
   r3 = uint64_t(int64_t(24));
   // bl 0x825a6880
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A6880(base, LIFTED_ARGS(0x82119578, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = schema::PlayingSound::New(base).address; f1 = 0; }  // host_alloc 0x82119578 (PlayingSound)
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq 0x821195a4
@@ -2144,7 +2144,7 @@ loc_821195A8:
   // addi r5,r1,80
   r5 = uint64_t(int64_t(int64_t(r1) + 80));
   // lwz r10,4(r3)
-  r10 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r3) - 1528).sounds_head_address());
+  r10 = schema::AudioManager(base, uint32_t(r3) - 1528).sounds_head_bits();
   // stw r3,88(r1)
   guest::StoreU32(base, uint32_t(r1) + 88, uint32_t(r3));
   // stw r10,92(r1)
@@ -2295,13 +2295,13 @@ lifted::Result f82119690(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // blt cr6,0x821197cc
   if (cr6.lt) goto loc_821197CC;
   // lwz r10,1516(r29)
-  r10 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r29)).bank_pairs_first_address());
+  r10 = schema::AudioManager(base, uint32_t(r29)).bank_pairs_first_bits();
   // cmplwi r10,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
   // beq 0x821196e4
   if (cr0.eq) goto loc_821196E4;
   // lwz r9,1520(r29)
-  r9 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r29)).bank_pairs_end_address());
+  r9 = schema::AudioManager(base, uint32_t(r29)).bank_pairs_end_bits();
   // subf r9,r10,r9
   r9 = r9 - r10;
   // srawi r9,r9,2
@@ -2327,7 +2327,7 @@ loc_821196E8:
   r3 = uint64_t(int64_t(24));
   // bl 0x825a6880
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A6880(base, LIFTED_ARGS(0x82119700, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = schema::PlayingSound::New(base).address; f1 = 0; }  // host_alloc 0x82119700 (PlayingSound)
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq 0x8211972c
@@ -2431,7 +2431,7 @@ loc_82119730:
   // addi r5,r1,84
   r5 = uint64_t(int64_t(int64_t(r1) + 84));
   // lwz r10,4(r3)
-  r10 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r3) - 1540).handle_sounds_head_address());
+  r10 = schema::AudioManager(base, uint32_t(r3) - 1540).handle_sounds_head_bits();
   // stw r3,88(r1)
   guest::StoreU32(base, uint32_t(r1) + 88, uint32_t(r3));
   // stw r10,92(r1)
@@ -2442,11 +2442,11 @@ loc_82119730:
   // (left out: dead in C++)
   { const lifted::Result o = game::PtrList::Insert(base, LIFTED_ARGS(0x821197BC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r3,0(r30)
-  r3 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r30) - 1552).next_handle_address());
+  r3 = schema::AudioManager(base, uint32_t(r30) - 1552).next_handle_bits();
   // addi r11,r3,1
   r11 = uint64_t(int64_t(int64_t(r3) + 1));
   // stw r11,0(r30)
-  guest::StoreU32(base, schema::AudioManager(base, uint32_t(r30) - 1552).next_handle_address(), uint32_t(r11));
+  schema::AudioManager(base, uint32_t(r30) - 1552).set_next_handle_bits(uint32_t(r11));
   // b 0x821197d0
   goto loc_821197D0;
 loc_821197CC:
@@ -2489,7 +2489,7 @@ lifted::Result f8211C2C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // cmpwi cr6,r4,-1
   cr6 = lifted::Compare<int32_t>(int32_t(r4), -1, so);
   // lwz r3,16(r31)
-  r3 = guest::LoadU32(base, schema::UiMovie(base, uint32_t(r31)).live_scene_address());
+  r3 = schema::UiMovie(base, uint32_t(r31)).live_scene_bits();
   // beq cr6,0x8211c2f0
   if (cr6.eq) goto loc_8211C2F0;
   // bl 0x8259d658
@@ -2531,7 +2531,7 @@ loc_8211C310:
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // lwz r3,0(r29)
-  r3 = guest::LoadU32(base, schema::UiMovieText(base, uint32_t(r29)).buffer_address());
+  r3 = schema::UiMovieText(base, uint32_t(r29)).buffer_bits();
   // stw r29,80(r1)
   guest::StoreU32(base, uint32_t(r1) + 80, uint32_t(r29));
   // bl 0x825a71d0
@@ -2540,7 +2540,7 @@ loc_8211C310:
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
   // lwz r4,0(r29)
-  r4 = guest::LoadU32(base, schema::UiMovieText(base, uint32_t(r29)).buffer_address());
+  r4 = schema::UiMovieText(base, uint32_t(r29)).buffer_bits();
   // mr r5,r28
   r5 = r28;
   // lwz r3,23552(r11)

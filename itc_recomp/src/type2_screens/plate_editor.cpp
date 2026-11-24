@@ -37,7 +37,9 @@ uint64_t PlateCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& 
   ITC_NATIVE_RUNNING("sub_82198210 PlateEditor::Create");
   const uint32_t frame = Frame(base, sp, 112);
   schema::PlateEditor(base, machine).set_loaded(0);
-  const uint32_t pages = uint32_t(calls.Call(kVirtualAlloc, frame, 0x82198244, 0, 28, 4096, 4));
+  // Host objects (E5 step 5) in place of the VirtualAlloc(28) at 0x82198244
+  // and the VirtualAlloc(72) at 0x82198280; the globals hold their handles.
+  const uint32_t pages = schema::PageObject::New(base).address;
   Globals::set_plate_pages(base, pages);
   const schema::PageObject page_object(base, pages);
   page_object.set_next_page(0);
@@ -46,7 +48,7 @@ uint64_t PlateCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& 
   page_object.set_step_started(0);
   page_object.set_unknown_20(0xFFFFFFFFu);
   page_object.set_step(0xFFFFFFFFu);
-  const uint32_t list = uint32_t(calls.Call(kVirtualAlloc, frame, 0x82198280, 0, 72, 4096, 4));
+  const uint32_t list = schema::MenuList::New(base).address;
   Globals::set_plate_list(base, list);
   if (list != 0) {
     MenuList(base, list).set_enabled(0u);

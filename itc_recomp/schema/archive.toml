@@ -93,6 +93,20 @@ fields = [
   { name = "unknown_12", offset = 12, type = "u32" },
 ]
 
+# The staging ring (10 MiB: two 5 MiB halves, staging_halves and
+# staging_half_1): a compressed request is read into a half, then unpacked
+# from it into its destination by Ucl::Unpack (guest loads). A blob (E5 step
+# 5, 2026-11-24): made by Archive::Init's hand port
+# (src/hooks/archive_streaming.cpp, New where the original's VirtualAlloc
+# returned at 0x8209E37C); freed by the archive's teardown's VirtualFree
+# (Archive::Shutdown, never in play). Not the shared load buffer
+# (load_buffer), which stays in guest memory: the shader pairs' microcode.
+[ArchiveStaging]
+size = 0
+origin = "allocated"
+storage = "blob"
+fields = []
+
 # A loose file's entry (the tables at 0x82600AC8 and 0x82678240, 8 bytes;
 # a path of 0 ends them). No measure: reached by a computed index.
 [ArchiveLooseFile]

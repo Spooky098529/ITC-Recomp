@@ -173,6 +173,14 @@ struct ArchiveTocEntry : View {
   uint32_t unknown_12_address() const { return address + 12; }
 };
 
+// allocated; measure: -
+struct ArchiveStaging : View {
+  using View::View;
+  static constexpr uint32_t kSize = 0;
+  static ArchiveStaging New(uint8_t* base, uint32_t size) { return ArchiveStaging(base, memory::NewBlob(size, "ArchiveStaging")); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+};
+
 // file; measure: -
 struct ArchiveLooseFile : View {
   using View::View;

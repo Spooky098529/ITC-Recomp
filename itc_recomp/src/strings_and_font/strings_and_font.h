@@ -31,8 +31,8 @@ constexpr uint32_t kStrings = 0x826C5C34;  // the string table's pointer
 constexpr uint32_t kStringFiles = 17;
 constexpr uint32_t kStringsBytes = 4304;
 
-// Strings::Init (sub_8210A860): when [0x826C5C34] is 0, 4,304 bytes of pages
-// (VirtualAlloc: the allocation layer's AllocPages) stored there and their
+// Strings::Init (sub_8210A860): when [0x826C5C34] is 0, the 4,304-byte table
+// (VirtualAlloc's; in host memory since E5 step 5, Strings::New) stored there and its
 // 17 file pointers, 17 counts and mask cleared; returns them (what the
 // original leaves in r3), or 0 with nothing done when the global was set.
 uint32_t StringsInit(uint8_t* base);
@@ -42,7 +42,7 @@ void StringsOnLoaded(uint8_t* base, uint32_t flag);
 
 // Strings::Release (sub_8210A538): for each file in `mask` that's loaded,
 // its count down by one; at 0, the file freed (VirtualFree: the allocation
-// layer's FreePages), its pointer and loaded flag cleared and its bit taken
+// layer's FreePages, which frees a StringFile blob through its handle), its pointer and loaded flag cleared and its bit taken
 // out of the mask. False, with nothing done, when a file it would free isn't
 // the layer's pages (the original runs: its VirtualFree goes to the SDK).
 bool StringsRelease(uint8_t* base, uint32_t table, uint32_t mask);
@@ -243,12 +243,13 @@ constexpr uint32_t kStringsLoaded = 0x8210A850;  // Strings::OnLoaded
 using LastLoad = std::optional<int64_t>;
 
 // sub_82109498 Font::Load: `mask` ORed into +12; for each page asked for
-// whose file (+40 + 4i) isn't there, a 28-byte page (operator new's plain
-// C++) into +20 + 4i, the asset's size (Archive::AssetSize of [0x82007C5C +
-// 4i]) in pages (VirtualAlloc's, AllocPages) into +40 + 4i, the page's +24
-// (loaded) = 0, and `load(asset, file, 0x82109160, page)`. `handed_back`
-// where operator new's plain C++ can't answer: the pages done so far stay
-// (their files set, so the original, run again, skips them).
+// whose file (+40 + 4i) isn't there, a 28-byte page (operator new's; in host
+// memory since E5 step 5, FontPage::New) into +20 + 4i, the asset's size
+// (Archive::AssetSize of [0x82007C5C + 4i]) in pages (VirtualAlloc's,
+// AllocPages; guest memory: the page's XPR texture is the renderer's) into
+// +40 + 4i, the page's +24 (loaded) = 0, and `load(asset, file, 0x82109160,
+// page)`. `handed_back` is never set since the page is a host object (kept
+// for Text::Load's fallback).
 struct FontLoadResult {
   bool handed_back;
   LastLoad last;
@@ -257,7 +258,8 @@ FontLoadResult FontLoad(uint8_t* base, uint32_t font, uint32_t mask, const archi
 // sub_8210A8D0 Strings::Load: `mask` ORed into +136; for each file asked for
 // (0 to 16), its count (+4236 + 4i) up by one and, when its buffer (+4i)
 // isn't there, its loaded flag (+68 + 4i) = 0, the asset's size
-// (Archive::AssetSize of [0x82007DD0 + 4i]) in pages into +4i, and
+// (Archive::AssetSize of [0x82007DD0 + 4i]) as a StringFile blob (VirtualAlloc's
+// pages; in PC memory since E5 step 5) into +4i, and
 // `load(asset, buffer, Strings::OnLoaded, the flag's address)`.
 LastLoad StringsLoad(uint8_t* base, uint32_t table, uint32_t mask, const archive::LoadCall& load);
 // sub_8210ADF8 Text::Load: Font::Load([0x826C5C00], 15) (`font_fallback`

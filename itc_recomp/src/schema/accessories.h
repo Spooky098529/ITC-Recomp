@@ -9,52 +9,104 @@
 namespace schema {
 
 // allocated; measure: Accessories, AccessoriesBase
+#pragma pack(push, 1)
+struct AccessoriesData {
+  uint32_t vtable = 0;  // +0
+  uint32_t entry_0 = 0;  // +4
+  uint32_t entry_1 = 0;  // +8
+  uint32_t entry_2 = 0;  // +12
+  uint64_t scale_xy = 0;  // +16
+  uint64_t scale_zw = 0;  // +24
+};
+#pragma pack(pop)
+static_assert(sizeof(AccessoriesData) == 32);
+inline constexpr memory::LayoutField kAccessoriesFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 8}, {24, 8}};
+inline constexpr memory::Layout kAccessoriesLayout = {kAccessoriesFields, 6};
+
 struct Accessories : View {
   using View::View;
   static constexpr uint32_t kSize = 32;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
   static constexpr uint32_t kVtable = 0x82006740;
+  AccessoriesData* data() const { return static_cast<AccessoriesData*>(memory::HandleObject(address)); }
+  static Accessories New(uint8_t* base) {
+    return Accessories(base, memory::MakeHandle(new AccessoriesData(), sizeof(AccessoriesData), "Accessories", &kAccessoriesLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static Accessories NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(AccessoriesData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<AccessoriesData*>(::operator new(sizeof(AccessoriesData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) AccessoriesData();
+    return Accessories(base, memory::MakeHandle(p, sizeof(AccessoriesData) * count, "Accessories", &kAccessoriesLayout, sizeof(AccessoriesData)));
+  }
+  Accessories at(uint32_t i) const { return Accessories(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  AccessoriesData* direct() const { return static_cast<AccessoriesData*>(memory::HandleOwn(address, &kAccessoriesLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kAccessoriesLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kAccessoriesLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // 0x82006740 (the base's 0x8200672C while it's built or torn down, the list node's 0x82010B5C after)
-  template <typename T = AccessoriesVtable>
-  T vtable() const { return T(base, guest::LoadU32(base, address + 0)); }
-  void set_vtable(const View& v) const { guest::StoreU32(base, address + 0, v.address); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
+  uint32_t vtable_bits() const { if (auto* d = direct()) return d->vtable; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_vtable_bits(uint32_t v) const { if (auto* d = direct()) { d->vtable = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  template <typename T = AccessoriesVtable>
+  T vtable() const { return T(base, vtable_bits()); }
+  void set_vtable(const View& w) const { set_vtable_bits(w.address); }
+  void set_vtable(uint32_t v) const { set_vtable_bits(v); }
   // the three entries, by the interior record's +112 (3 is none); 0 when not acquired
-  template <typename T = AccessoryEntry>
-  T entry_0() const { return T(base, guest::LoadU32(base, address + 4)); }
-  void set_entry_0(const View& v) const { guest::StoreU32(base, address + 4, v.address); }
-  void set_entry_0(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t entry_0_address() const { return address + 4; }
+  uint32_t entry_0_bits() const { if (auto* d = direct()) return d->entry_0; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_entry_0_bits(uint32_t v) const { if (auto* d = direct()) { d->entry_0 = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
   template <typename T = AccessoryEntry>
-  T entry_1() const { return T(base, guest::LoadU32(base, address + 8)); }
-  void set_entry_1(const View& v) const { guest::StoreU32(base, address + 8, v.address); }
-  void set_entry_1(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  T entry_0() const { return T(base, entry_0_bits()); }
+  void set_entry_0(const View& w) const { set_entry_0_bits(w.address); }
+  void set_entry_0(uint32_t v) const { set_entry_0_bits(v); }
   uint32_t entry_1_address() const { return address + 8; }
+  uint32_t entry_1_bits() const { if (auto* d = direct()) return d->entry_1; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_entry_1_bits(uint32_t v) const { if (auto* d = direct()) { d->entry_1 = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
   template <typename T = AccessoryEntry>
-  T entry_2() const { return T(base, guest::LoadU32(base, address + 12)); }
-  void set_entry_2(const View& v) const { guest::StoreU32(base, address + 12, v.address); }
-  void set_entry_2(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  T entry_1() const { return T(base, entry_1_bits()); }
+  void set_entry_1(const View& w) const { set_entry_1_bits(w.address); }
+  void set_entry_1(uint32_t v) const { set_entry_1_bits(v); }
   uint32_t entry_2_address() const { return address + 12; }
+  uint32_t entry_2_bits() const { if (auto* d = direct()) return d->entry_2; return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_entry_2_bits(uint32_t v) const { if (auto* d = direct()) { d->entry_2 = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
+  template <typename T = AccessoryEntry>
+  T entry_2() const { return T(base, entry_2_bits()); }
+  void set_entry_2(const View& w) const { set_entry_2_bits(w.address); }
+  void set_entry_2(uint32_t v) const { set_entry_2_bits(v); }
   // the scale copied as two doublewords
-  uint64_t scale_xy() const { return guest::LoadU64(base, address + 16); }
-  void set_scale_xy(uint64_t v) const { guest::StoreU64(base, address + 16, v); }
   uint32_t scale_xy_address() const { return address + 16; }
+  uint64_t scale_xy_bits() const { if (auto* d = direct()) return d->scale_xy; return uint64_t((memory::IsHandle(address + 16) ? uint64_t(memory::OwnerLoad(address + 16, 8)) : guest::LoadU64(base, address + 16))); }
+  void set_scale_xy_bits(uint64_t v) const { if (auto* d = direct()) { d->scale_xy = v; return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 8, v); else guest::StoreU64(base, address + 16, v); }
+  uint64_t scale_xy() const { if (auto* d = direct()) return d->scale_xy; return uint64_t((memory::IsHandle(address + 16) ? uint64_t(memory::OwnerLoad(address + 16, 8)) : guest::LoadU64(base, address + 16))); }
+  void set_scale_xy(uint64_t v) const { if (auto* d = direct()) { d->scale_xy = v; return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 8, v); else guest::StoreU64(base, address + 16, v); }
   // the scale, (1, 1, 1, 1) by default; copied into each accessory's +1024
-  float scale_x() const { return guest::LoadFloat(base, address + 16); }
-  void set_scale_x(float v) const { guest::StoreFloat(base, address + 16, v); }
   uint32_t scale_x_address() const { return address + 16; }
-  float scale_y() const { return guest::LoadFloat(base, address + 20); }
-  void set_scale_y(float v) const { guest::StoreFloat(base, address + 20, v); }
+  uint32_t scale_x_bits() const { if (auto* d = direct()) return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(d), kAccessoriesLayout, 16, 4)); return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_scale_x_bits(uint32_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kAccessoriesLayout, 16, 4, v); return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
+  float scale_x() const { return std::bit_cast<float>(scale_x_bits()); }
+  void set_scale_x(float v) const { set_scale_x_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t scale_y_address() const { return address + 20; }
-  uint64_t scale_zw() const { return guest::LoadU64(base, address + 24); }
-  void set_scale_zw(uint64_t v) const { guest::StoreU64(base, address + 24, v); }
+  uint32_t scale_y_bits() const { if (auto* d = direct()) return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(d), kAccessoriesLayout, 20, 4)); return uint32_t((memory::IsHandle(address + 20) ? uint32_t(memory::OwnerLoad(address + 20, 4)) : guest::LoadU32(base, address + 20))); }
+  void set_scale_y_bits(uint32_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kAccessoriesLayout, 20, 4, v); return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 4, v); else guest::StoreU32(base, address + 20, v); }
+  float scale_y() const { return std::bit_cast<float>(scale_y_bits()); }
+  void set_scale_y(float v) const { set_scale_y_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t scale_zw_address() const { return address + 24; }
-  float scale_z() const { return guest::LoadFloat(base, address + 24); }
-  void set_scale_z(float v) const { guest::StoreFloat(base, address + 24, v); }
+  uint64_t scale_zw_bits() const { if (auto* d = direct()) return d->scale_zw; return uint64_t((memory::IsHandle(address + 24) ? uint64_t(memory::OwnerLoad(address + 24, 8)) : guest::LoadU64(base, address + 24))); }
+  void set_scale_zw_bits(uint64_t v) const { if (auto* d = direct()) { d->scale_zw = v; return; } if (memory::IsHandle(address + 24)) memory::OwnerStore(address + 24, 8, v); else guest::StoreU64(base, address + 24, v); }
+  uint64_t scale_zw() const { if (auto* d = direct()) return d->scale_zw; return uint64_t((memory::IsHandle(address + 24) ? uint64_t(memory::OwnerLoad(address + 24, 8)) : guest::LoadU64(base, address + 24))); }
+  void set_scale_zw(uint64_t v) const { if (auto* d = direct()) { d->scale_zw = v; return; } if (memory::IsHandle(address + 24)) memory::OwnerStore(address + 24, 8, v); else guest::StoreU64(base, address + 24, v); }
   uint32_t scale_z_address() const { return address + 24; }
-  float scale_w() const { return guest::LoadFloat(base, address + 28); }
-  void set_scale_w(float v) const { guest::StoreFloat(base, address + 28, v); }
+  uint32_t scale_z_bits() const { if (auto* d = direct()) return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(d), kAccessoriesLayout, 24, 4)); return uint32_t((memory::IsHandle(address + 24) ? uint32_t(memory::OwnerLoad(address + 24, 4)) : guest::LoadU32(base, address + 24))); }
+  void set_scale_z_bits(uint32_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kAccessoriesLayout, 24, 4, v); return; } if (memory::IsHandle(address + 24)) memory::OwnerStore(address + 24, 4, v); else guest::StoreU32(base, address + 24, v); }
+  float scale_z() const { return std::bit_cast<float>(scale_z_bits()); }
+  void set_scale_z(float v) const { set_scale_z_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t scale_w_address() const { return address + 28; }
+  uint32_t scale_w_bits() const { if (auto* d = direct()) return uint32_t(memory::LoadOverlay(reinterpret_cast<uint8_t*>(d), kAccessoriesLayout, 28, 4)); return uint32_t((memory::IsHandle(address + 28) ? uint32_t(memory::OwnerLoad(address + 28, 4)) : guest::LoadU32(base, address + 28))); }
+  void set_scale_w_bits(uint32_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kAccessoriesLayout, 28, 4, v); return; } if (memory::IsHandle(address + 28)) memory::OwnerStore(address + 28, 4, v); else guest::StoreU32(base, address + 28, v); }
+  float scale_w() const { return std::bit_cast<float>(scale_w_bits()); }
+  void set_scale_w(float v) const { set_scale_w_bits(std::bit_cast<uint32_t>(v)); }
 };
 
 // image; measure: Accessories.+0
@@ -72,36 +124,86 @@ struct AccessoriesVtable : View {
 };
 
 // allocated; measure: Accessories.+4, new<1104>@AccessoryEntry::New, AccessoryEntry::OnLoaded.r6, Accessories@+4
+#pragma pack(push, 1)
+struct AccessoryEntryData {
+  uint32_t count = 0;  // +0
+  uint8_t pad_4[16] = {};
+  uint32_t file_data = 0;  // +20
+  uint8_t pad_24[1048] = {};
+  uint64_t accessory_scale_xy = 0;  // +1072
+  uint64_t accessory_scale_zw = 0;  // +1080
+  uint32_t accessory_texture_index = 0;  // +1088
+  uint8_t pad_1092[4] = {};
+  uint32_t accessory_loaded = 0;  // +1096
+  uint8_t pad_1100[4] = {};
+};
+#pragma pack(pop)
+static_assert(sizeof(AccessoryEntryData) == 1104);
+inline constexpr memory::LayoutField kAccessoryEntryFields[] = {{0, 4}, {20, 4}, {1072, 8}, {1080, 8}, {1088, 4}, {1096, 4}};
+inline constexpr memory::Layout kAccessoryEntryLayout = {kAccessoryEntryFields, 6};
+
 struct AccessoryEntry : View {
   using View::View;
   static constexpr uint32_t kSize = 1104;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  AccessoryEntryData* data() const { return static_cast<AccessoryEntryData*>(memory::HandleObject(address)); }
+  static AccessoryEntry New(uint8_t* base) {
+    return AccessoryEntry(base, memory::MakeHandle(new AccessoryEntryData(), sizeof(AccessoryEntryData), "AccessoryEntry", &kAccessoryEntryLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static AccessoryEntry NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(AccessoryEntryData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<AccessoryEntryData*>(::operator new(sizeof(AccessoryEntryData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) AccessoryEntryData();
+    return AccessoryEntry(base, memory::MakeHandle(p, sizeof(AccessoryEntryData) * count, "AccessoryEntry", &kAccessoryEntryLayout, sizeof(AccessoryEntryData)));
+  }
+  AccessoryEntry at(uint32_t i) const { return AccessoryEntry(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  AccessoryEntryData* direct() const { return static_cast<AccessoryEntryData*>(memory::HandleOwn(address, &kAccessoryEntryLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kAccessoryEntryLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kAccessoryEntryLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // the reference count: 1 when made, +1 an acquire, -1 a release (destroyed at 0)
-  uint32_t count() const { return guest::LoadU32(base, address + 0); }
-  void set_count(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t count_address() const { return address + 0; }
+  uint32_t count_bits() const { if (auto* d = direct()) return d->count; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_count_bits(uint32_t v) const { if (auto* d = direct()) { d->count = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t count() const { if (auto* d = direct()) return d->count; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_count(uint32_t v) const { if (auto* d = direct()) { d->count = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // an AccessoryFile: archive asset 23008 + the index
   uint32_t file_address() const { return address + 4; }
+  uint8_t* file() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 4 : guest::Pointer(base, address + 4); }
   // the file's +16: its data (a data file of three parts)
-  uint32_t file_data() const { return guest::LoadU32(base, address + 20); }
-  void set_file_data(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
   uint32_t file_data_address() const { return address + 20; }
+  uint32_t file_data_bits() const { if (auto* d = direct()) return d->file_data; return uint32_t((memory::IsHandle(address + 20) ? uint32_t(memory::OwnerLoad(address + 20, 4)) : guest::LoadU32(base, address + 20))); }
+  void set_file_data_bits(uint32_t v) const { if (auto* d = direct()) { d->file_data = v; return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 4, v); else guest::StoreU32(base, address + 20, v); }
+  uint32_t file_data() const { if (auto* d = direct()) return d->file_data; return uint32_t((memory::IsHandle(address + 20) ? uint32_t(memory::OwnerLoad(address + 20, 4)) : guest::LoadU32(base, address + 20))); }
+  void set_file_data(uint32_t v) const { if (auto* d = direct()) { d->file_data = v; return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 4, v); else guest::StoreU32(base, address + 20, v); }
   // an Accessory
   uint32_t accessory_address() const { return address + 48; }
+  uint8_t* accessory() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 48 : guest::Pointer(base, address + 48); }
   // the accessory's +1024: its scale
-  uint64_t accessory_scale_xy() const { return guest::LoadU64(base, address + 1072); }
-  void set_accessory_scale_xy(uint64_t v) const { guest::StoreU64(base, address + 1072, v); }
   uint32_t accessory_scale_xy_address() const { return address + 1072; }
-  uint64_t accessory_scale_zw() const { return guest::LoadU64(base, address + 1080); }
-  void set_accessory_scale_zw(uint64_t v) const { guest::StoreU64(base, address + 1080, v); }
+  uint64_t accessory_scale_xy_bits() const { if (auto* d = direct()) return d->accessory_scale_xy; return uint64_t((memory::IsHandle(address + 1072) ? uint64_t(memory::OwnerLoad(address + 1072, 8)) : guest::LoadU64(base, address + 1072))); }
+  void set_accessory_scale_xy_bits(uint64_t v) const { if (auto* d = direct()) { d->accessory_scale_xy = v; return; } if (memory::IsHandle(address + 1072)) memory::OwnerStore(address + 1072, 8, v); else guest::StoreU64(base, address + 1072, v); }
+  uint64_t accessory_scale_xy() const { if (auto* d = direct()) return d->accessory_scale_xy; return uint64_t((memory::IsHandle(address + 1072) ? uint64_t(memory::OwnerLoad(address + 1072, 8)) : guest::LoadU64(base, address + 1072))); }
+  void set_accessory_scale_xy(uint64_t v) const { if (auto* d = direct()) { d->accessory_scale_xy = v; return; } if (memory::IsHandle(address + 1072)) memory::OwnerStore(address + 1072, 8, v); else guest::StoreU64(base, address + 1072, v); }
   uint32_t accessory_scale_zw_address() const { return address + 1080; }
+  uint64_t accessory_scale_zw_bits() const { if (auto* d = direct()) return d->accessory_scale_zw; return uint64_t((memory::IsHandle(address + 1080) ? uint64_t(memory::OwnerLoad(address + 1080, 8)) : guest::LoadU64(base, address + 1080))); }
+  void set_accessory_scale_zw_bits(uint64_t v) const { if (auto* d = direct()) { d->accessory_scale_zw = v; return; } if (memory::IsHandle(address + 1080)) memory::OwnerStore(address + 1080, 8, v); else guest::StoreU64(base, address + 1080, v); }
+  uint64_t accessory_scale_zw() const { if (auto* d = direct()) return d->accessory_scale_zw; return uint64_t((memory::IsHandle(address + 1080) ? uint64_t(memory::OwnerLoad(address + 1080, 8)) : guest::LoadU64(base, address + 1080))); }
+  void set_accessory_scale_zw(uint64_t v) const { if (auto* d = direct()) { d->accessory_scale_zw = v; return; } if (memory::IsHandle(address + 1080)) memory::OwnerStore(address + 1080, 8, v); else guest::StoreU64(base, address + 1080, v); }
   // the accessory's +1040
-  uint32_t accessory_texture_index() const { return guest::LoadU32(base, address + 1088); }
-  void set_accessory_texture_index(uint32_t v) const { guest::StoreU32(base, address + 1088, v); }
   uint32_t accessory_texture_index_address() const { return address + 1088; }
+  uint32_t accessory_texture_index_bits() const { if (auto* d = direct()) return d->accessory_texture_index; return uint32_t((memory::IsHandle(address + 1088) ? uint32_t(memory::OwnerLoad(address + 1088, 4)) : guest::LoadU32(base, address + 1088))); }
+  void set_accessory_texture_index_bits(uint32_t v) const { if (auto* d = direct()) { d->accessory_texture_index = v; return; } if (memory::IsHandle(address + 1088)) memory::OwnerStore(address + 1088, 4, v); else guest::StoreU32(base, address + 1088, v); }
+  uint32_t accessory_texture_index() const { if (auto* d = direct()) return d->accessory_texture_index; return uint32_t((memory::IsHandle(address + 1088) ? uint32_t(memory::OwnerLoad(address + 1088, 4)) : guest::LoadU32(base, address + 1088))); }
+  void set_accessory_texture_index(uint32_t v) const { if (auto* d = direct()) { d->accessory_texture_index = v; return; } if (memory::IsHandle(address + 1088)) memory::OwnerStore(address + 1088, 4, v); else guest::StoreU32(base, address + 1088, v); }
   // the accessory's +1048
-  uint32_t accessory_loaded() const { return guest::LoadU32(base, address + 1096); }
-  void set_accessory_loaded(uint32_t v) const { guest::StoreU32(base, address + 1096, v); }
   uint32_t accessory_loaded_address() const { return address + 1096; }
+  uint32_t accessory_loaded_bits() const { if (auto* d = direct()) return d->accessory_loaded; return uint32_t((memory::IsHandle(address + 1096) ? uint32_t(memory::OwnerLoad(address + 1096, 4)) : guest::LoadU32(base, address + 1096))); }
+  void set_accessory_loaded_bits(uint32_t v) const { if (auto* d = direct()) { d->accessory_loaded = v; return; } if (memory::IsHandle(address + 1096)) memory::OwnerStore(address + 1096, 4, v); else guest::StoreU32(base, address + 1096, v); }
+  uint32_t accessory_loaded() const { if (auto* d = direct()) return d->accessory_loaded; return uint32_t((memory::IsHandle(address + 1096) ? uint32_t(memory::OwnerLoad(address + 1096, 4)) : guest::LoadU32(base, address + 1096))); }
+  void set_accessory_loaded(uint32_t v) const { if (auto* d = direct()) { d->accessory_loaded = v; return; } if (memory::IsHandle(address + 1096)) memory::OwnerStore(address + 1096, 4, v); else guest::StoreU32(base, address + 1096, v); }
 };
 
 // embedded; measure: AccessoryFile, AccessoryFile::OnArchiveDone.r6, AccessoryFile::AccessoryFile.r3, AccessoryFile::SetData.r3

@@ -96,6 +96,11 @@ uint32_t SceneSetUp(uint8_t* base, uint32_t scene, uint32_t record, uint32_t r5,
         case 6:
           object = schema::SceneTraffic::New(base).address;
           break;
+        case 5:
+          // The wheels (E5 step 5): a handle, freed by DestroyB's VirtualFree
+          // as the others.
+          object = schema::SceneWheels::New(base).address;
+          break;
         case 7:
           // The scene models (E5 step 5): handles, freed by DestroyB's
           // VirtualFree as the others.

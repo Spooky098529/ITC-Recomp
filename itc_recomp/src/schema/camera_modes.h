@@ -246,25 +246,60 @@ struct ViewportEntry : View {
 };
 
 // allocated; measure: new<12>@Viewports::Init
+#pragma pack(push, 1)
+struct ViewportsData {
+  uint32_t first = 0;  // +0
+  uint32_t second = 0;  // +4
+  uint32_t split = 0;  // +8
+};
+#pragma pack(pop)
+static_assert(sizeof(ViewportsData) == 12);
+inline constexpr memory::LayoutField kViewportsFields[] = {{0, 4}, {4, 4}, {8, 4}};
+inline constexpr memory::Layout kViewportsLayout = {kViewportsFields, 3};
+
 struct Viewports : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  ViewportsData* data() const { return static_cast<ViewportsData*>(memory::HandleObject(address)); }
+  static Viewports New(uint8_t* base) {
+    return Viewports(base, memory::MakeHandle(new ViewportsData(), sizeof(ViewportsData), "Viewports", &kViewportsLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static Viewports NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(ViewportsData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<ViewportsData*>(::operator new(sizeof(ViewportsData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) ViewportsData();
+    return Viewports(base, memory::MakeHandle(p, sizeof(ViewportsData) * count, "Viewports", &kViewportsLayout, sizeof(ViewportsData)));
+  }
+  Viewports at(uint32_t i) const { return Viewports(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  ViewportsData* direct() const { return static_cast<ViewportsData*>(memory::HandleOwn(address, &kViewportsLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kViewportsLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kViewportsLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // player 1's viewport
-  template <typename T = Viewport>
-  T first() const { return T(base, guest::LoadU32(base, address + 0)); }
-  void set_first(const View& v) const { guest::StoreU32(base, address + 0, v.address); }
-  void set_first(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t first_address() const { return address + 0; }
-  // player 2's viewport
+  uint32_t first_bits() const { if (auto* d = direct()) return d->first; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_first_bits(uint32_t v) const { if (auto* d = direct()) { d->first = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   template <typename T = Viewport>
-  T second() const { return T(base, guest::LoadU32(base, address + 4)); }
-  void set_second(const View& v) const { guest::StoreU32(base, address + 4, v.address); }
-  void set_second(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  T first() const { return T(base, first_bits()); }
+  void set_first(const View& w) const { set_first_bits(w.address); }
+  void set_first(uint32_t v) const { set_first_bits(v); }
+  // player 2's viewport
   uint32_t second_address() const { return address + 4; }
+  uint32_t second_bits() const { if (auto* d = direct()) return d->second; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_second_bits(uint32_t v) const { if (auto* d = direct()) { d->second = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  template <typename T = Viewport>
+  T second() const { return T(base, second_bits()); }
+  void set_second(const View& w) const { set_second_bits(w.address); }
+  void set_second(uint32_t v) const { set_second_bits(v); }
   // not 0 in split screen
-  uint32_t split() const { return guest::LoadU32(base, address + 8); }
-  void set_split(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t split_address() const { return address + 8; }
+  uint32_t split_bits() const { if (auto* d = direct()) return d->split; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_split_bits(uint32_t v) const { if (auto* d = direct()) { d->split = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  uint32_t split() const { if (auto* d = direct()) return d->split; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_split(uint32_t v) const { if (auto* d = direct()) { d->split = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
 };
 
 // embedded; measure: CameraDirector
@@ -1223,12 +1258,28 @@ struct CameraAnimBlock : View {
   // 0
   uint32_t unknown_20_address() const { return address + 20; }
   uint8_t* unknown_20() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 20 : guest::Pointer(base, address + 20); }
-  // its floats, one a frame (guest pages); "data" before E5 step 3 (a host view's data() is its struct)
+  // its floats, one a frame (CameraAnimValues, a blob since E5 step 5); "data" before E5 step 3 (a host view's data() is its struct)
   uint32_t values_address() const { return address + 60; }
   uint32_t values_bits() const { if (auto* d = direct()) return d->values; return uint32_t((memory::IsHandle(address + 60) ? uint32_t(memory::OwnerLoad(address + 60, 4)) : guest::LoadU32(base, address + 60))); }
   void set_values_bits(uint32_t v) const { if (auto* d = direct()) { d->values = v; return; } if (memory::IsHandle(address + 60)) memory::OwnerStore(address + 60, 4, v); else guest::StoreU32(base, address + 60, v); }
   uint32_t values() const { if (auto* d = direct()) return d->values; return uint32_t((memory::IsHandle(address + 60) ? uint32_t(memory::OwnerLoad(address + 60, 4)) : guest::LoadU32(base, address + 60))); }
   void set_values(uint32_t v) const { if (auto* d = direct()) { d->values = v; return; } if (memory::IsHandle(address + 60)) memory::OwnerStore(address + 60, 4, v); else guest::StoreU32(base, address + 60, v); }
+};
+
+// allocated; measure: -
+struct CameraAnimValues : View {
+  using View::View;
+  static constexpr uint32_t kSize = 0;
+  static CameraAnimValues New(uint8_t* base, uint32_t size) { return CameraAnimValues(base, memory::NewBlob(size, "CameraAnimValues")); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+};
+
+// allocated; measure: -
+struct CameraAnimsFile : View {
+  using View::View;
+  static constexpr uint32_t kSize = 0;
+  static CameraAnimsFile New(uint8_t* base, uint32_t size) { return CameraAnimsFile(base, memory::NewBlob(size, "CameraAnimsFile")); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
 };
 
 // embedded; measure: CameraAnims::OnLoaded.r4
@@ -1517,6 +1568,8 @@ struct CameraPathKey : View {
 struct CameraPathFile : View {
   using View::View;
   static constexpr uint32_t kSize = 16;
+  static CameraPathFile New(uint8_t* base, uint32_t size) { return CameraPathFile(base, memory::NewBlob(size, "CameraPathFile")); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   // its 20-byte paths (CameraPathRecord) at +16
   uint32_t path_count() const { return guest::LoadU32(base, address + 0); }
   void set_path_count(uint32_t v) const { guest::StoreU32(base, address + 0, v); }

@@ -145,8 +145,9 @@ ITC_NATIVE_ENTRY_ALWAYS(820A4610) {
       }
       const schema::SaveSlot s = slot(i);
       // The handlers' table from +76 (wait_for_user), by the slot's state.
-      const uint32_t handler =
-          guest::LoadU32(base, devices.wait_for_user_address() + 4 * s.state());
+      // (The save devices are in host memory: read through their layout.)
+      const uint32_t handler = uint32_t(devices.load_at(
+          devices.wait_for_user_address() - devices.address + 4 * s.state(), 4));
       ctx.r3.u64 = devices.address;
       ctx.r4.u64 = s.address;
       CallAt(ctx, base, handler, 0x820A47D8);

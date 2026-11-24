@@ -261,6 +261,11 @@ inline void StoreFloat(uint8_t* base, uint32_t address, float value) {
 // (handle + offset) reads that interface's word.
 inline uint32_t VtableWord(uint8_t* base, uint32_t object) {
   if (memory::IsHandle(object)) {
+    // An object inside a blob (E5 step 5: the save slots in their operator
+    // new[] block) keeps the guest's byte order.
+    if (memory::BlobPointer(object)) [[unlikely]] {
+      return guest::LoadU32(base, object);
+    }
     return *static_cast<const uint32_t*>(memory::HandleObject(object));
   }
   return guest::LoadU32(base, object);

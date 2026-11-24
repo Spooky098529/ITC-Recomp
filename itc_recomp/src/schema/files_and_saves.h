@@ -47,6 +47,14 @@ struct FileVtable : View {
   uint32_t get_size_address() const { return address + 20; }
 };
 
+// allocated; measure: -
+struct XactSettingsFile : View {
+  using View::View;
+  static constexpr uint32_t kSize = 0;
+  static XactSettingsFile New(uint8_t* base, uint32_t size) { return XactSettingsFile(base, memory::NewBlob(size, "XactSettingsFile")); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+};
+
 // embedded; measure: File::Write.r5, sub_8209DFA8.r3@+68
 struct FileSizeArg : View {
   using View::View;

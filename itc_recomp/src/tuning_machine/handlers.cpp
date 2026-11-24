@@ -19,8 +19,6 @@ namespace tuning_machine {
 namespace {
 
 constexpr uint32_t kNone = 0xFFFFFFFFu;
-constexpr uint32_t kMemCommit = 4096;
-constexpr uint32_t kReadWrite = 4;
 constexpr uint32_t kMemRelease = 0x8000;
 
 using G = schema::TuningMachineGlobals;
@@ -239,12 +237,12 @@ uint64_t Create(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   for (uint32_t k = 0; k < 63; k++) {
     Store(base, sc.state_history_address() + 4 * k, 0);
   }
-  sc.set_queue(
-      uint32_t(calls.Call(kVirtualAlloc, frame, 0x821CE8D8, 0, 28, kMemCommit, kReadWrite)));
-  sc.set_category_menu(
-      uint32_t(calls.Call(kVirtualAlloc, frame, 0x821CE8F4, 0, 68, kMemCommit, kReadWrite)));
-  sc.set_second_menu(
-      uint32_t(calls.Call(kVirtualAlloc, frame, 0x821CE910, 0, 68, kMemCommit, kReadWrite)));
+  // Host objects (E5 step 5) in place of the VirtualAlloc(28) at 0x821CE8D8
+  // and the VirtualAlloc(68)s at 0x821CE8F4 and 0x821CE910; the screen's
+  // words hold their handles.
+  sc.set_queue(schema::PageObject::New(base).address);
+  sc.set_category_menu(schema::FrontEndMenu::New(base).address);
+  sc.set_second_menu(schema::FrontEndMenu::New(base).address);
   ResetImages(base, sc.decal_images_address());
   // The queue: TUNING SHOP MAIN (3); +16 not written.
   const schema::PageObject queue = sc.queue();

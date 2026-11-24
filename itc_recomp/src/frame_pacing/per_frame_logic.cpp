@@ -24,6 +24,7 @@
 #include "hooks/race_hud.h"
 #include "hooks/ui_movies.h"
 #include "interpolation/blend_state.h"
+#include "memory/handles.h"
 #include "sprites/world_sprites.h"
 
 #include "base/flags.h"
@@ -188,7 +189,11 @@ class ReplayFromLogicPass {
     }
     Key key{object, occurrences_[object]++};
     g_replay_occurrence = key.occurrence;
-    uint8_t* state = base + object;
+    // A movie in host memory (E5 step 5) is its handle's object: its bytes
+    // saved and put back as they are kept there.
+    uint8_t* state = memory::IsHandle(object)
+                         ? static_cast<uint8_t*>(memory::HandleObject(object))
+                         : base + object;
     if (!frame_pacing::GameMessages_IsRenderOnlyPass()) {
       States& states = states_[key];
       g_replay_outcome = "logic pass";

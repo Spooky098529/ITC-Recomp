@@ -43,8 +43,14 @@ constexpr uint32_t kFirstTurn = G::first_turn_address();  // CameraAnim::Matrix'
 
 constexpr uint32_t kEndKind = 14;
 
-// VirtualAlloc(0, size, MEM_COMMIT, PAGE_READWRITE): the layer's pages.
-uint32_t VirtualAlloc(uint32_t size) { return memory::AllocPages(size, 4096); }
+// VirtualAlloc(0, size, MEM_COMMIT, PAGE_READWRITE)'s buffer as a blob (E5
+// step 5: PC memory in the guest's byte order, memory::NewBlob) of the
+// schema type `T`; 0 for 0 bytes, as the layer's pages gave. The frees
+// (memory::FreePages, the game's VirtualFree) take its handle.
+template <typename T>
+uint32_t Blob(uint8_t* base, uint32_t size) {
+  return size == 0 ? 0 : T::New(base, size).address;
+}
 
 // memcpy, or the guest's where the native layer refuses.
 void Copy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size,
@@ -180,7 +186,9 @@ int64_t AnimsLoad(uint8_t* base, uint32_t id, const archive::LoadCall& load) {
   // VirtualAlloc(4) at 0x82150B3C; the archive keeps its handle as the
   // callback's context.
   const schema::CameraAnimLoad record = schema::CameraAnimLoad::New(base);
-  const uint32_t buffer = VirtualAlloc(size);
+  // The file's buffer, a blob (E5 step 5) in place of the VirtualAlloc
+  // returning at 0x82150B54; CameraAnims::OnLoaded frees it.
+  const uint32_t buffer = Blob<schema::CameraAnimsFile>(base, size);
   record.set_id(id);
   return load(id, buffer, kAnimsOnLoaded, record.address);
 }
@@ -232,7 +240,10 @@ uint32_t AnimParseObject(uint8_t* base, uint32_t object, const GuestCopy& xmemcp
     schema::CameraAnimBlock(base, block).set_data_size(bytes);
     schema::CameraAnimBlock(base, block).set_unknown_12(source_block.unknown_12());
     schema::CameraAnimBlock(base, block).set_duration(source_block.duration());
-    schema::CameraAnimBlock(base, block).set_values(VirtualAlloc(bytes));
+    // A blob (E5 step 5) in place of the VirtualAlloc returning at
+    // 0x82150294; CameraAnimBlock::Free frees it.
+    schema::CameraAnimBlock(base, block).set_values(
+        Blob<schema::CameraAnimValues>(base, bytes));
     c_runtime::XMemSet(base, schema::CameraAnimBlock(base, block).values(), 0,
                        schema::CameraAnimBlock(base, block).data_size());
     {
@@ -534,7 +545,9 @@ std::optional<int64_t> PathRequest(uint8_t* base, uint32_t buffer, uint32_t inde
   b.set_index(index);
   ITC_NATIVE_RUNNING("sub_82152D80 CameraPath::Load");
   b.set_state(1);
-  const uint32_t data = VirtualAlloc(archive::AssetSize(base, id));
+  // The file, a blob (E5 step 5) in place of the VirtualAlloc returning at
+  // 0x82152DC0; Buffer28::Free frees it.
+  const uint32_t data = Blob<schema::CameraPathFile>(base, archive::AssetSize(base, id));
   b.set_block(data);
   const int64_t serial = load(id, data, kPathOnLoaded, buffer);
   b.set_serial(uint32_t(serial));

@@ -241,7 +241,11 @@ uint32_t SetConstruct(uint8_t* base, uint32_t set) {
 
 uint32_t SetNew(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_820F0F48 Accessories::New");
-  const uint32_t set = VirtualAlloc(kSetBytes);
+  // In host memory (E5 step 5: a handle, freed by Accessories::Free's
+  // VirtualFree through FileFreeData), where the original VirtualAllocs
+  // kSetBytes.
+  static_assert(Accessories::kSize == kSetBytes);
+  const uint32_t set = Accessories::New(base).address;
   if (set == 0) {
     return 0;
   }
@@ -392,7 +396,11 @@ uint32_t AccessoryConstruct(uint8_t* base, uint32_t accessory, uint32_t sp) {
 
 uint32_t EntryNew(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_820F0920 AccessoryEntry::New");
-  const uint32_t entry = VirtualAlloc(kEntryBytes);
+  // In host memory (E5 step 5: a handle, freed by AccessoryEntry::Destroy's
+  // VirtualFree through FileFreeData), where the original VirtualAllocs
+  // kEntryBytes.
+  static_assert(AccessoryEntry::kSize == kEntryBytes);
+  const uint32_t entry = AccessoryEntry::New(base).address;
   if (entry == 0) {
     return 0;
   }

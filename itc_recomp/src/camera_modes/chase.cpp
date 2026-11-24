@@ -932,7 +932,8 @@ void GarageUpdate(uint8_t* base, uint32_t camera, uint32_t frame, const GarageCa
   const schema::GarageCamera cam(base, camera);
   const uint64_t target0 = Load64(base, cam.target_address()),
                  target1 = Load64(base, cam.target_address() + 8);
-  const uint32_t viewport = Load(base, Load(base, kViewports));
+  // [kViewports]'s +0, the block a host object (E5 step 5).
+  const uint32_t viewport = schema::CameraModesGlobals::viewports(base).first().address;
   const uint64_t eye0 = Load64(base, cam.eye_address()), eye1 = Load64(base, cam.eye_address() + 8);
   Store64(base, f + 96, target0);
   Store64(base, f + 104, target1);

@@ -250,7 +250,7 @@ uint64_t HubSetUpStatus(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t node = ui_movies::FindNode(base, movie, 8, 11);
   Node(base, node).set_texture_entry(uint32_t(day % 7));
   const uint64_t r3 = type67_modes::GarageStageSetPlates(
-      base, Load(base, Load(base, build_screen::kStandHolder)), 1);
+      base, schema::StandHolder(base, Load(base, build_screen::kStandHolder)).stage_block_0(), 1);
   Data(base).set_set_up(1);
   Data(base).set_quitting(0);
   Data(base).set_stand_model(0);

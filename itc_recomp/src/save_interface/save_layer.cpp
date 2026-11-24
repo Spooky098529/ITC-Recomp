@@ -16,12 +16,17 @@
 #include "schema/save_interface.h"
 
 #include <cstring>
+#include <utility>
 
 namespace save_interface {
 
 namespace {
 
 using G = schema::SaveInterfaceGlobals;
+
+// A kept replay's bytes (type10-mode.toml's KeptReplay, 0x13C8F0): the
+// replay buffer's size as a blob (SaveBuffers::Create).
+constexpr uint32_t kKeptReplayBytes = 0x13C8F0;
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -124,8 +129,10 @@ std::optional<uint32_t> SaveBuffersCreate(uint8_t* base) {
   if (G::save_buffers(base).address != 0) {
     return std::nullopt;
   }
-  // VirtualAlloc(0, size, MEM_COMMIT, PAGE_READWRITE) each.
-  const schema::SaveBuffers header(base, memory::AllocPages(schema::SaveBuffers::kSize, 4096));
+  // VirtualAlloc(0, size, MEM_COMMIT, PAGE_READWRITE) each, in PC memory
+  // (E5 step 5): the header a host object, its buffers blobs (the game's
+  // bytes, saved and loaded by address).
+  const schema::SaveBuffers header = schema::SaveBuffers::New(base);
   G::set_save_buffers(base, header);
   header.set_game_data(0);
   header.set_replay(0);
@@ -133,11 +140,16 @@ std::optional<uint32_t> SaveBuffersCreate(uint8_t* base) {
   header.set_records(0u);
   header.set_entries(0u);
   header.set_count(0);
-  const uint32_t game_data = memory::AllocPages(kGameDataBytes, 4096);
+  const uint32_t game_data = schema::OptionsLoadedGameData::New(base, kGameDataBytes).address;
   G::save_buffers(base).set_game_data(game_data);
-  const uint32_t replay = memory::AllocPages(kReplayBytes, 4096);
+  // A kept replay's size, not the original's kReplayBytes: Replay::CopyFrom
+  // copies a whole kept replay (KeptReplay::kSize) into and out of it, past
+  // the original's buffer, which a blob of that size would refuse
+  // (save-interface.toml's SaveReplayData). The saves still write and read
+  // kReplayBytes.
+  const uint32_t replay = schema::SaveReplayData::New(base, kKeptReplayBytes).address;
   G::save_buffers(base).set_replay(replay);
-  const uint32_t record = memory::AllocPages(kReplayRecordBytes, 4096);
+  const uint32_t record = schema::SaveReplayRecord::New(base, kReplayRecordBytes).address;
   G::save_buffers(base).set_replay_record(record);
   return record;
 }
@@ -162,9 +174,8 @@ bool SaveBuffersDestroyNative(uint8_t* base) {
   if (!memory::IsPages(header.address)) {
     return false;
   }
-  for (uint32_t at : {header.game_data_address(), header.replay_address(),
-                      header.replay_record_address(), header.records_address()}) {
-    const uint32_t buffer = Load(base, at);
+  for (uint32_t buffer : {header.game_data(), header.replay(), header.replay_record().address,
+                          header.records().address}) {
     if (buffer != 0 && !memory::IsPages(buffer)) {
       return false;
     }
@@ -175,13 +186,21 @@ bool SaveBuffersDestroyNative(uint8_t* base) {
 uint32_t SaveBuffersDestroy(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_8228F8F8 SaveBuffers::Destroy");
   SaveBuffersFreeReplayList(base);
-  using Field = uint32_t (schema::SaveBuffers::*)() const;
-  for (Field field : {&schema::SaveBuffers::game_data_address, &schema::SaveBuffers::replay_address,
-                      &schema::SaveBuffers::replay_record_address}) {
-    const uint32_t buffer = Load(base, (G::save_buffers(base).*field)());
+  // +0, +4 and +8 in turn, each read through [0x828161F0] again.
+  using Get = uint32_t (*)(const schema::SaveBuffers&);
+  using Set = void (*)(const schema::SaveBuffers&);
+  static constexpr std::pair<Get, Set> kFields[] = {
+      {[](const schema::SaveBuffers& h) { return h.game_data(); },
+       [](const schema::SaveBuffers& h) { h.set_game_data(0); }},
+      {[](const schema::SaveBuffers& h) { return h.replay(); },
+       [](const schema::SaveBuffers& h) { h.set_replay(0); }},
+      {[](const schema::SaveBuffers& h) { return h.replay_record().address; },
+       [](const schema::SaveBuffers& h) { h.set_replay_record(0u); }}};
+  for (const auto& [get, set] : kFields) {
+    const uint32_t buffer = get(G::save_buffers(base));
     if (buffer != 0) {
       memory::FreePages(buffer);  // VirtualFree(buffer, 0, MEM_RELEASE)
-      Store(base, (G::save_buffers(base).*field)(), 0);
+      set(G::save_buffers(base));
     }
   }
   const uint32_t r3 = memory::FreePages(G::save_buffers(base).address) ? 1 : 0;
@@ -446,8 +465,7 @@ bool ReplaysBuildListNative(uint8_t* base) {
     return false;
   }
   const schema::SaveBuffers header = G::save_buffers(base);
-  for (uint32_t at : {header.records_address(), header.entries_address()}) {
-    const uint32_t list = Load(base, at);
+  for (uint32_t list : {header.records().address, header.entries().address}) {
     if (list != 0 && !memory::IsPages(list)) {
       return false;
     }
@@ -476,19 +494,28 @@ std::optional<uint32_t> ReplaysBuildList(
   }
   uint32_t count = Load(base, frame + 80);
   uint32_t records, entries;
-  // VirtualAlloc(0, size, MEM_COMMIT, PAGE_READWRITE) each.
+  // VirtualAlloc(0, size, MEM_COMMIT, PAGE_READWRITE) each, as blobs in PC
+  // memory (E5 step 5); 0 for no bytes, as VirtualAlloc refuses them.
+  const auto new_records = [&](uint32_t n) {
+    const uint32_t bytes = n * schema::SaveReplayRecord::kSize;
+    return bytes == 0 ? 0u : schema::SaveReplayRecord::New(base, bytes).address;
+  };
+  const auto new_entries = [&](uint32_t n) {
+    const uint32_t bytes = n * schema::SaveReplayEntry::kSize;
+    return bytes == 0 ? 0u : schema::SaveReplayEntry::New(base, bytes).address;
+  };
   if (int32_t(count) < 99 && add_empty != 0) {
     count++;
-    G::save_buffers(base).set_records(memory::AllocPages(count * schema::SaveReplayRecord::kSize, 4096));
-    G::save_buffers(base).set_entries(memory::AllocPages(count * schema::SaveReplayEntry::kSize, 4096));
+    G::save_buffers(base).set_records(new_records(count));
+    G::save_buffers(base).set_entries(new_entries(count));
     G::save_buffers(base).records().set_number(0);
     G::save_buffers(base).entries().set_number(0);
     header = G::save_buffers(base);
     records = header.records().address + schema::SaveReplayRecord::kSize;
     entries = header.entries().address + schema::SaveReplayEntry::kSize;
   } else {
-    G::save_buffers(base).set_records(memory::AllocPages(count * schema::SaveReplayRecord::kSize, 4096));
-    G::save_buffers(base).set_entries(memory::AllocPages(count * schema::SaveReplayEntry::kSize, 4096));
+    G::save_buffers(base).set_records(new_records(count));
+    G::save_buffers(base).set_entries(new_entries(count));
     header = G::save_buffers(base);
     records = header.records().address;
     entries = header.entries().address;

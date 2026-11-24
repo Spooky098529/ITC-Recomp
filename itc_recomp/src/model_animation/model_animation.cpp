@@ -697,7 +697,11 @@ constexpr uint32_t kCursorLimit = 0x0CCCCCCC;  // 20-byte cursors
 // count's 64-byte (or 144-byte) entries get 1.0 at `ones`.
 uint32_t CountedArray(uint8_t* base, uint32_t count, uint32_t bytes, uint32_t limit,
                       std::initializer_list<uint32_t> ones, double one) {
-  const uint32_t array = NewArray(base, ArrayBytes(count, bytes, limit));
+  // A blob in PC memory (E5 step 5): the count header and the entries in
+  // the guest's byte order, read by address as before; operator delete[]
+  // frees it (SkeletonBase::Free).
+  const uint32_t array =
+      schema::SkeletonCountedArray::New(base, ArrayBytes(count, bytes, limit)).address;
   Store(base, array, count);
   for (int32_t j = 0; j <= int32_t(count - 1); j++) {
     const uint32_t entry = array + 16 + bytes * uint32_t(j);
@@ -785,7 +789,9 @@ bool SkeletonBind(uint8_t* base, uint32_t skeleton, uint32_t file, uint32_t matr
   sk.set_node_values(0);
   const uint32_t count = NodeFile(base, sk.node_file()).node_count();
   if (count != 0) {
-    sk.set_node_values(NewArray(base, values_bytes));
+    // A blob in PC memory (E5 step 5), read by address as before; operator
+    // delete[] frees it.
+    sk.set_node_values(schema::SkeletonNodeValue::New(base, values_bytes).address);
   }
   const double zero = Lfs(base, kZero);
   int32_t n = int32_t(SkeletonNodeCount(base, skeleton));

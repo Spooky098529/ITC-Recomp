@@ -19,6 +19,7 @@
 #include "base/log.h"
 
 #include <string>
+#include <vector>
 #include "lifted/sdk.h"
 
 using guest_call::InFrame;
@@ -93,9 +94,19 @@ ITC_NATIVE_ENTRY_ALWAYS(8258C820) {
     return;
   }
   const uint32_t size = schema::FileSizeArg(base, ctx.r5.u32).size();
+  // A blob (E5 step 5: a file's data in PC memory) ends at its size, its host
+  // block's end, where guest memory went on: bytes past it are read and
+  // dropped (logged), so the position and the count are the original's.
+  uint32_t room = size;
+  if (uint32_t left = 0; memory::BlobPointer(buffer, &left) && size > left) {
+    ITC_LOG_WARN("file class: a read of {} bytes into a blob at {:08X} with {} left: the rest "
+                 "not stored",
+                 size, buffer, left);
+    room = left;
+  }
   uint32_t total = 0;
   bool failed = false;
-  guest::ForEachHostPart(base, buffer, size, [&](uint8_t* host, uint32_t, uint32_t bytes) {
+  guest::ForEachHostPart(base, buffer, room, [&](uint8_t* host, uint32_t, uint32_t bytes) {
     if (failed) {
       return;
     }
@@ -103,6 +114,12 @@ ITC_NATIVE_ENTRY_ALWAYS(8258C820) {
     failed = !read;
     total += read.value_or(0);
   });
+  if (!failed && room < size && total == room) {
+    std::vector<uint8_t> scratch(size - room);
+    auto read = game_data::Read(handle, scratch.data(), size - room);
+    failed = !read;
+    total += read.value_or(0);
+  }
   if (failed) {
     ReportError(ctx, base, 0x8258C880);
     ctx.r3.u64 = 0;

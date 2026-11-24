@@ -11,7 +11,9 @@ uint64_t OnEnter(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& call
   ITC_NATIVE_RUNNING("sub_821A2608 SaveScreen::OnEnter");
   Fn f(base, sp, 112, calls);
   Machine(base, machine).set_loaded(0);
-  const schema::PageObject pages(base, uint32_t(f.Call(kVirtualAlloc, 0x821A263C, 0, 28, 4096, 4)));
+  // Host objects (E5 step 5) in place of the VirtualAlloc(28) at 0x821A263C
+  // and the VirtualAlloc(72) at 0x821A2678; the globals hold their handles.
+  const schema::PageObject pages = schema::PageObject::New(base);
   G::set_pages(base, pages);
   pages.set_next_page(0);
   pages.set_page(0);
@@ -19,14 +21,16 @@ uint64_t OnEnter(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& call
   pages.set_step_started(0);
   pages.set_unknown_20(kNone);
   pages.set_step(kNone);
-  const uint32_t list = uint32_t(f.Call(kVirtualAlloc, 0x821A2678, 0, 72, 4096, 4));
+  const uint32_t list = schema::MenuList::New(base).address;
   G::set_list(base, list);
   if (list != 0) {
     const schema::MenuList view(base, list);
     view.set_enabled(0);
     view.set_player(0);
   }
-  const schema::SaveScreenData data(base, uint32_t(f.Call(kVirtualAlloc, 0x821A26A4, 0, 68, 4096, 4)));
+  // VirtualAlloc(68) in host memory (E5 step 5); its answer is OnEnter's r3.
+  const schema::SaveScreenData data = schema::SaveScreenData::New(base);
+  f.r3 = data.address;
   G::set_data(base, data);
   data.set_set_up(0);
   data.set_settings_stored(0);

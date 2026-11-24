@@ -188,7 +188,16 @@ uint64_t SlotPending(uint8_t* base, uint32_t devices, uint32_t slot) {
 
 void SetRootName(uint8_t* base, uint32_t devices, uint32_t name) {
   ITC_NATIVE_RUNNING("sub_820A5580 SaveDevices::SetRootName");
-  CopyBytes(base, schema::SaveDevices(base, devices).root_name_address(), name);
+  // Byte by byte with the terminator, through the save devices' layout (in
+  // host memory since E5 step 5).
+  const schema::SaveDevices d(base, devices);
+  for (uint32_t i = 0;; i++) {
+    const uint8_t c = guest::LoadU8(base, name + i);
+    d.store_at(d.root_name_address() - d.address + i, 1, c);
+    if (c == 0) {
+      return;
+    }
+  }
 }
 
 std::optional<uint64_t> SlotRequestSave(uint8_t* base, uint32_t devices, uint32_t slot,

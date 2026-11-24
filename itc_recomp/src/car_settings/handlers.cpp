@@ -15,8 +15,6 @@ namespace car_settings {
 namespace {
 
 constexpr uint32_t kNone = 0xFFFFFFFFu;
-constexpr uint32_t kMemCommit = 4096;
-constexpr uint32_t kReadWrite = 4;
 constexpr uint32_t kMemRelease = 0x8000;
 
 using G = schema::CarSettingsGlobals;
@@ -54,9 +52,9 @@ uint64_t Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls
   const uint32_t frame = Frame(base, sp, 112);
   const Machine m(base, machine);
   m.set_loaded(0);
-  const schema::PageObject pages(
-      base, uint32_t(calls.Call(kVirtualAlloc, frame, 0x821AA32C, 0, schema::PageObject::kSize,
-                                kMemCommit, kReadWrite)));
+  // Host objects (E5 step 5) in place of the VirtualAlloc(28) at 0x821AA32C
+  // and the VirtualAlloc(68) at 0x821AA368; the globals hold their handles.
+  const schema::PageObject pages = schema::PageObject::New(base);
   G::set_pages(base, pages);
   pages.set_next_page(0);
   pages.set_page(0);
@@ -64,9 +62,7 @@ uint64_t Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls
   pages.set_step_started(0);
   pages.set_unknown_20(kNone);
   pages.set_step(kNone);
-  const schema::FrontEndMenu menu(
-      base, uint32_t(calls.Call(kVirtualAlloc, frame, 0x821AA368, 0, schema::FrontEndMenu::kSize,
-                                kMemCommit, kReadWrite)));
+  const schema::FrontEndMenu menu = schema::FrontEndMenu::New(base);
   G::set_menu(base, menu);
   menu.set_first_item(0);
   menu.set_wraps(0);

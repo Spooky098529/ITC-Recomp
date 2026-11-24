@@ -9,72 +9,147 @@
 namespace schema {
 
 // allocated; measure: Font
+#pragma pack(push, 1)
+struct FontData {
+  uint32_t video_output = 0;  // +0
+  uint32_t command_list = 0;  // +4
+  uint32_t render_queue = 0;  // +8
+  uint32_t pages_asked = 0;  // +12
+  uint32_t params = 0;  // +16
+  uint8_t pages[16] = {};  // +20, guest order
+  uint32_t page = 0;  // +36
+  uint8_t page_files[16] = {};  // +40, guest order
+  float start_x = 0;  // +56
+  float start_y = 0;  // +60
+  uint8_t second_pass_positions[16384] = {};  // +64, guest order
+  float letter_spacing = 0;  // +16448
+  float line_spacing = 0;  // +16452
+  uint8_t pad_16456[72] = {};
+  uint8_t colors[30] = {};  // +16528, guest order
+  uint8_t pad_16558[2] = {};
+  uint32_t vertex_declaration = 0;  // +16560
+  uint32_t vertex_shader = 0;  // +16564
+  uint8_t pixel_shaders[16] = {};  // +16568, guest order
+  uint8_t pad_16584[8] = {};
+};
+#pragma pack(pop)
+static_assert(sizeof(FontData) == 16592);
+inline constexpr memory::LayoutField kFontFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {36, 4}, {56, 4}, {60, 4}, {16448, 4}, {16452, 4}, {16560, 4}, {16564, 4}};
+inline constexpr memory::Layout kFontLayout = {kFontFields, 12};
+
 struct Font : View {
   using View::View;
   static constexpr uint32_t kSize = 16592;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  FontData* data() const { return static_cast<FontData*>(memory::HandleObject(address)); }
+  static Font New(uint8_t* base) {
+    return Font(base, memory::MakeHandle(new FontData(), sizeof(FontData), "Font", &kFontLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static Font NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(FontData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<FontData*>(::operator new(sizeof(FontData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) FontData();
+    return Font(base, memory::MakeHandle(p, sizeof(FontData) * count, "Font", &kFontLayout, sizeof(FontData)));
+  }
+  Font at(uint32_t i) const { return Font(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  FontData* direct() const { return static_cast<FontData*>(memory::HandleOwn(address, &kFontLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kFontLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kFontLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // the device's state object (Font::Font's video output)
-  View video_output() const { return View(base, guest::LoadU32(base, address + 0)); }
-  void set_video_output(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t video_output_address() const { return address + 0; }
-  template <typename T = CommandList>
-  T command_list() const { return T(base, guest::LoadU32(base, address + 4)); }
-  void set_command_list(const View& v) const { guest::StoreU32(base, address + 4, v.address); }
-  void set_command_list(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t video_output_bits() const { if (auto* d = direct()) return d->video_output; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_video_output_bits(uint32_t v) const { if (auto* d = direct()) { d->video_output = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  View video_output() const { return View(base, video_output_bits()); }
+  void set_video_output(uint32_t v) const { set_video_output_bits(v); }
   uint32_t command_list_address() const { return address + 4; }
-  template <typename T = RenderQueue>
-  T render_queue() const { return T(base, guest::LoadU32(base, address + 8)); }
-  void set_render_queue(const View& v) const { guest::StoreU32(base, address + 8, v.address); }
-  void set_render_queue(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t command_list_bits() const { if (auto* d = direct()) return d->command_list; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_command_list_bits(uint32_t v) const { if (auto* d = direct()) { d->command_list = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  template <typename T = CommandList>
+  T command_list() const { return T(base, command_list_bits()); }
+  void set_command_list(const View& w) const { set_command_list_bits(w.address); }
+  void set_command_list(uint32_t v) const { set_command_list_bits(v); }
   uint32_t render_queue_address() const { return address + 8; }
+  uint32_t render_queue_bits() const { if (auto* d = direct()) return d->render_queue; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_render_queue_bits(uint32_t v) const { if (auto* d = direct()) { d->render_queue = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  template <typename T = RenderQueue>
+  T render_queue() const { return T(base, render_queue_bits()); }
+  void set_render_queue(const View& w) const { set_render_queue_bits(w.address); }
+  void set_render_queue(uint32_t v) const { set_render_queue_bits(v); }
   // the mask of pages asked for (Font::Load)
-  uint32_t pages_asked() const { return guest::LoadU32(base, address + 12); }
-  void set_pages_asked(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
   uint32_t pages_asked_address() const { return address + 12; }
+  uint32_t pages_asked_bits() const { if (auto* d = direct()) return d->pages_asked; return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_pages_asked_bits(uint32_t v) const { if (auto* d = direct()) { d->pages_asked = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
+  uint32_t pages_asked() const { if (auto* d = direct()) return d->pages_asked; return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_pages_asked(uint32_t v) const { if (auto* d = direct()) { d->pages_asked = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
   // the draw parameters while drawing (Font::SetParams)
-  template <typename T = FontDrawParams>
-  T params() const { return T(base, guest::LoadU32(base, address + 16)); }
-  void set_params(const View& v) const { guest::StoreU32(base, address + 16, v.address); }
-  void set_params(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
   uint32_t params_address() const { return address + 16; }
+  uint32_t params_bits() const { if (auto* d = direct()) return d->params; return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_params_bits(uint32_t v) const { if (auto* d = direct()) { d->params = v; return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
+  template <typename T = FontDrawParams>
+  T params() const { return T(base, params_bits()); }
+  void set_params(const View& w) const { set_params_bits(w.address); }
+  void set_params(uint32_t v) const { set_params_bits(v); }
   // the four pages' pointers (FontPage, 28 bytes each; +4i)
   uint32_t pages_address() const { return address + 20; }
+  uint8_t* pages() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 20 : guest::Pointer(base, address + 20); }
   // the page drawn with (the parameters' +60)
-  template <typename T = FontPage>
-  T page() const { return T(base, guest::LoadU32(base, address + 36)); }
-  void set_page(const View& v) const { guest::StoreU32(base, address + 36, v.address); }
-  void set_page(uint32_t v) const { guest::StoreU32(base, address + 36, v); }
   uint32_t page_address() const { return address + 36; }
+  uint32_t page_bits() const { if (auto* d = direct()) return d->page; return uint32_t((memory::IsHandle(address + 36) ? uint32_t(memory::OwnerLoad(address + 36, 4)) : guest::LoadU32(base, address + 36))); }
+  void set_page_bits(uint32_t v) const { if (auto* d = direct()) { d->page = v; return; } if (memory::IsHandle(address + 36)) memory::OwnerStore(address + 36, 4, v); else guest::StoreU32(base, address + 36, v); }
+  template <typename T = FontPage>
+  T page() const { return T(base, page_bits()); }
+  void set_page(const View& w) const { set_page_bits(w.address); }
+  void set_page(uint32_t v) const { set_page_bits(v); }
   // the four pages' files (+4i; assets 22655-22658, the ids at 0x82007C5C)
   uint32_t page_files_address() const { return address + 40; }
+  uint8_t* page_files() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 40 : guest::Pointer(base, address + 40); }
   // the text's start point
-  float start_x() const { return guest::LoadFloat(base, address + 56); }
-  void set_start_x(float v) const { guest::StoreFloat(base, address + 56, v); }
   uint32_t start_x_address() const { return address + 56; }
-  float start_y() const { return guest::LoadFloat(base, address + 60); }
-  void set_start_y(float v) const { guest::StoreFloat(base, address + 60, v); }
+  uint32_t start_x_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->start_x); return uint32_t((memory::IsHandle(address + 56) ? uint32_t(memory::OwnerLoad(address + 56, 4)) : guest::LoadU32(base, address + 56))); }
+  void set_start_x_bits(uint32_t v) const { if (auto* d = direct()) { d->start_x = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 56)) memory::OwnerStore(address + 56, 4, v); else guest::StoreU32(base, address + 56, v); }
+  float start_x() const { return std::bit_cast<float>(start_x_bits()); }
+  void set_start_x(float v) const { set_start_x_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t start_y_address() const { return address + 60; }
+  uint32_t start_y_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->start_y); return uint32_t((memory::IsHandle(address + 60) ? uint32_t(memory::OwnerLoad(address + 60, 4)) : guest::LoadU32(base, address + 60))); }
+  void set_start_y_bits(uint32_t v) const { if (auto* d = direct()) { d->start_y = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 60)) memory::OwnerStore(address + 60, 4, v); else guest::StoreU32(base, address + 60, v); }
+  float start_y() const { return std::bit_cast<float>(start_y_bits()); }
+  void set_start_y(float v) const { set_start_y_bits(std::bit_cast<uint32_t>(v)); }
   // each character's x, y (floats, 8 bytes a character) for the second pass (never in play)
   uint32_t second_pass_positions_address() const { return address + 64; }
-  float letter_spacing() const { return guest::LoadFloat(base, address + 16448); }
-  void set_letter_spacing(float v) const { guest::StoreFloat(base, address + 16448, v); }
+  uint8_t* second_pass_positions() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 64 : guest::Pointer(base, address + 64); }
   uint32_t letter_spacing_address() const { return address + 16448; }
-  float line_spacing() const { return guest::LoadFloat(base, address + 16452); }
-  void set_line_spacing(float v) const { guest::StoreFloat(base, address + 16452, v); }
+  uint32_t letter_spacing_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->letter_spacing); return uint32_t((memory::IsHandle(address + 16448) ? uint32_t(memory::OwnerLoad(address + 16448, 4)) : guest::LoadU32(base, address + 16448))); }
+  void set_letter_spacing_bits(uint32_t v) const { if (auto* d = direct()) { d->letter_spacing = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 16448)) memory::OwnerStore(address + 16448, 4, v); else guest::StoreU32(base, address + 16448, v); }
+  float letter_spacing() const { return std::bit_cast<float>(letter_spacing_bits()); }
+  void set_letter_spacing(float v) const { set_letter_spacing_bits(std::bit_cast<uint32_t>(v)); }
   uint32_t line_spacing_address() const { return address + 16452; }
+  uint32_t line_spacing_bits() const { if (auto* d = direct()) return std::bit_cast<uint32_t>(d->line_spacing); return uint32_t((memory::IsHandle(address + 16452) ? uint32_t(memory::OwnerLoad(address + 16452, 4)) : guest::LoadU32(base, address + 16452))); }
+  void set_line_spacing_bits(uint32_t v) const { if (auto* d = direct()) { d->line_spacing = std::bit_cast<float>(v); return; } if (memory::IsHandle(address + 16452)) memory::OwnerStore(address + 16452, 4, v); else guest::StoreU32(base, address + 16452, v); }
+  float line_spacing() const { return std::bit_cast<float>(line_spacing_bits()); }
+  void set_line_spacing(float v) const { set_line_spacing_bits(std::bit_cast<uint32_t>(v)); }
   // ten r, g, b colors for the characters 0xFFFF down to 0xFFF6
   uint32_t colors_address() const { return address + 16528; }
-  template <typename T = VertexDeclaration>
-  T vertex_declaration() const { return T(base, guest::LoadU32(base, address + 16560)); }
-  void set_vertex_declaration(const View& v) const { guest::StoreU32(base, address + 16560, v.address); }
-  void set_vertex_declaration(uint32_t v) const { guest::StoreU32(base, address + 16560, v); }
+  uint8_t* colors() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 16528 : guest::Pointer(base, address + 16528); }
   uint32_t vertex_declaration_address() const { return address + 16560; }
-  template <typename T = VertexShader>
-  T vertex_shader() const { return T(base, guest::LoadU32(base, address + 16564)); }
-  void set_vertex_shader(const View& v) const { guest::StoreU32(base, address + 16564, v.address); }
-  void set_vertex_shader(uint32_t v) const { guest::StoreU32(base, address + 16564, v); }
+  uint32_t vertex_declaration_bits() const { if (auto* d = direct()) return d->vertex_declaration; return uint32_t((memory::IsHandle(address + 16560) ? uint32_t(memory::OwnerLoad(address + 16560, 4)) : guest::LoadU32(base, address + 16560))); }
+  void set_vertex_declaration_bits(uint32_t v) const { if (auto* d = direct()) { d->vertex_declaration = v; return; } if (memory::IsHandle(address + 16560)) memory::OwnerStore(address + 16560, 4, v); else guest::StoreU32(base, address + 16560, v); }
+  template <typename T = VertexDeclaration>
+  T vertex_declaration() const { return T(base, vertex_declaration_bits()); }
+  void set_vertex_declaration(const View& w) const { set_vertex_declaration_bits(w.address); }
+  void set_vertex_declaration(uint32_t v) const { set_vertex_declaration_bits(v); }
   uint32_t vertex_shader_address() const { return address + 16564; }
+  uint32_t vertex_shader_bits() const { if (auto* d = direct()) return d->vertex_shader; return uint32_t((memory::IsHandle(address + 16564) ? uint32_t(memory::OwnerLoad(address + 16564, 4)) : guest::LoadU32(base, address + 16564))); }
+  void set_vertex_shader_bits(uint32_t v) const { if (auto* d = direct()) { d->vertex_shader = v; return; } if (memory::IsHandle(address + 16564)) memory::OwnerStore(address + 16564, 4, v); else guest::StoreU32(base, address + 16564, v); }
+  template <typename T = VertexShader>
+  T vertex_shader() const { return T(base, vertex_shader_bits()); }
+  void set_vertex_shader(const View& w) const { set_vertex_shader_bits(w.address); }
+  void set_vertex_shader(uint32_t v) const { set_vertex_shader_bits(v); }
   // one per texture channel (PixelShader, +4i)
   uint32_t pixel_shaders_address() const { return address + 16568; }
+  uint8_t* pixel_shaders() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 16568 : guest::Pointer(base, address + 16568); }
 };
 
 // file; measure: Font.+16, Font::SetParams.r4
@@ -196,40 +271,87 @@ struct FontDrawParams : View {
 };
 
 // allocated; measure: Font.+36, new<28>@Font::Load, Font::OnPageLoaded.r6
+#pragma pack(push, 1)
+struct FontPageData {
+  uint32_t glyph_table = 0;  // +0
+  uint32_t records = 0;  // +4
+  uint32_t xpr = 0;  // +8
+  uint32_t texture = 0;  // +12
+  uint32_t texture_width = 0;  // +16
+  uint32_t texture_height = 0;  // +20
+  uint32_t loaded = 0;  // +24
+};
+#pragma pack(pop)
+static_assert(sizeof(FontPageData) == 28);
+inline constexpr memory::LayoutField kFontPageFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 4}, {24, 4}};
+inline constexpr memory::Layout kFontPageLayout = {kFontPageFields, 7};
+
 struct FontPage : View {
   using View::View;
   static constexpr uint32_t kSize = 28;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  FontPageData* data() const { return static_cast<FontPageData*>(memory::HandleObject(address)); }
+  static FontPage New(uint8_t* base) {
+    return FontPage(base, memory::MakeHandle(new FontPageData(), sizeof(FontPageData), "FontPage", &kFontPageLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static FontPage NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(FontPageData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<FontPageData*>(::operator new(sizeof(FontPageData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) FontPageData();
+    return FontPage(base, memory::MakeHandle(p, sizeof(FontPageData) * count, "FontPage", &kFontPageLayout, sizeof(FontPageData)));
+  }
+  FontPage at(uint32_t i) const { return FontPage(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  FontPageData* direct() const { return static_cast<FontPageData*>(memory::HandleOwn(address, &kFontPageLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kFontPageLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kFontPageLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // the page file's entry 0
-  template <typename T = FontGlyphTable>
-  T glyph_table() const { return T(base, guest::LoadU32(base, address + 0)); }
-  void set_glyph_table(const View& v) const { guest::StoreU32(base, address + 0, v.address); }
-  void set_glyph_table(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t glyph_table_address() const { return address + 0; }
+  uint32_t glyph_table_bits() const { if (auto* d = direct()) return d->glyph_table; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_glyph_table_bits(uint32_t v) const { if (auto* d = direct()) { d->glyph_table = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  template <typename T = FontGlyphTable>
+  T glyph_table() const { return T(base, glyph_table_bits()); }
+  void set_glyph_table(const View& w) const { set_glyph_table_bits(w.address); }
+  void set_glyph_table(uint32_t v) const { set_glyph_table_bits(v); }
   // the glyph table's +4: 4 bytes per UTF-16 code
-  template <typename T = FontGlyphRecord>
-  T records() const { return T(base, guest::LoadU32(base, address + 4)); }
-  void set_records(const View& v) const { guest::StoreU32(base, address + 4, v.address); }
-  void set_records(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t records_address() const { return address + 4; }
+  uint32_t records_bits() const { if (auto* d = direct()) return d->records; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_records_bits(uint32_t v) const { if (auto* d = direct()) { d->records = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  template <typename T = FontGlyphRecord>
+  T records() const { return T(base, records_bits()); }
+  void set_records(const View& w) const { set_records_bits(w.address); }
+  void set_records(uint32_t v) const { set_records_bits(v); }
   // the page file's entry 1
-  template <typename T = XPR>
-  T xpr() const { return T(base, guest::LoadU32(base, address + 8)); }
-  void set_xpr(const View& v) const { guest::StoreU32(base, address + 8, v.address); }
-  void set_xpr(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t xpr_address() const { return address + 8; }
+  uint32_t xpr_bits() const { if (auto* d = direct()) return d->xpr; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_xpr_bits(uint32_t v) const { if (auto* d = direct()) { d->xpr = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  template <typename T = XPR>
+  T xpr() const { return T(base, xpr_bits()); }
+  void set_xpr(const View& w) const { set_xpr_bits(w.address); }
+  void set_xpr(uint32_t v) const { set_xpr_bits(v); }
   // the XPR's texture (four glyph sheets, one per channel)
-  View texture() const { return View(base, guest::LoadU32(base, address + 12)); }
-  void set_texture(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
   uint32_t texture_address() const { return address + 12; }
-  uint32_t texture_width() const { return guest::LoadU32(base, address + 16); }
-  void set_texture_width(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t texture_bits() const { if (auto* d = direct()) return d->texture; return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_texture_bits(uint32_t v) const { if (auto* d = direct()) { d->texture = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
+  View texture() const { return View(base, texture_bits()); }
+  void set_texture(uint32_t v) const { set_texture_bits(v); }
   uint32_t texture_width_address() const { return address + 16; }
-  uint32_t texture_height() const { return guest::LoadU32(base, address + 20); }
-  void set_texture_height(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
+  uint32_t texture_width_bits() const { if (auto* d = direct()) return d->texture_width; return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_texture_width_bits(uint32_t v) const { if (auto* d = direct()) { d->texture_width = v; return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
+  uint32_t texture_width() const { if (auto* d = direct()) return d->texture_width; return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_texture_width(uint32_t v) const { if (auto* d = direct()) { d->texture_width = v; return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
   uint32_t texture_height_address() const { return address + 20; }
-  uint32_t loaded() const { return guest::LoadU32(base, address + 24); }
-  void set_loaded(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
+  uint32_t texture_height_bits() const { if (auto* d = direct()) return d->texture_height; return uint32_t((memory::IsHandle(address + 20) ? uint32_t(memory::OwnerLoad(address + 20, 4)) : guest::LoadU32(base, address + 20))); }
+  void set_texture_height_bits(uint32_t v) const { if (auto* d = direct()) { d->texture_height = v; return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 4, v); else guest::StoreU32(base, address + 20, v); }
+  uint32_t texture_height() const { if (auto* d = direct()) return d->texture_height; return uint32_t((memory::IsHandle(address + 20) ? uint32_t(memory::OwnerLoad(address + 20, 4)) : guest::LoadU32(base, address + 20))); }
+  void set_texture_height(uint32_t v) const { if (auto* d = direct()) { d->texture_height = v; return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 4, v); else guest::StoreU32(base, address + 20, v); }
   uint32_t loaded_address() const { return address + 24; }
+  uint32_t loaded_bits() const { if (auto* d = direct()) return d->loaded; return uint32_t((memory::IsHandle(address + 24) ? uint32_t(memory::OwnerLoad(address + 24, 4)) : guest::LoadU32(base, address + 24))); }
+  void set_loaded_bits(uint32_t v) const { if (auto* d = direct()) { d->loaded = v; return; } if (memory::IsHandle(address + 24)) memory::OwnerStore(address + 24, 4, v); else guest::StoreU32(base, address + 24, v); }
+  uint32_t loaded() const { if (auto* d = direct()) return d->loaded; return uint32_t((memory::IsHandle(address + 24) ? uint32_t(memory::OwnerLoad(address + 24, 4)) : guest::LoadU32(base, address + 24))); }
+  void set_loaded(uint32_t v) const { if (auto* d = direct()) { d->loaded = v; return; } if (memory::IsHandle(address + 24)) memory::OwnerStore(address + 24, 4, v); else guest::StoreU32(base, address + 24, v); }
 };
 
 // file; measure: Font.+36.+0
@@ -303,28 +425,101 @@ struct FontVertex : View {
 };
 
 // allocated; measure: Strings
+#pragma pack(push, 1)
+struct StringsData {
+  uint8_t files[68] = {};  // +0, guest order
+  uint8_t loaded_flags[68] = {};  // +68, guest order
+  uint32_t files_asked = 0;  // +136
+  uint8_t pad_140[4096] = {};
+  uint8_t load_counts[68] = {};  // +4236, guest order
+};
+#pragma pack(pop)
+static_assert(sizeof(StringsData) == 4304);
+inline constexpr memory::LayoutField kStringsFields[] = {{136, 4}};
+inline constexpr memory::Layout kStringsLayout = {kStringsFields, 1};
+
 struct Strings : View {
   using View::View;
   static constexpr uint32_t kSize = 4304;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  StringsData* data() const { return static_cast<StringsData*>(memory::HandleObject(address)); }
+  static Strings New(uint8_t* base) {
+    return Strings(base, memory::MakeHandle(new StringsData(), sizeof(StringsData), "Strings", &kStringsLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static Strings NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(StringsData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<StringsData*>(::operator new(sizeof(StringsData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) StringsData();
+    return Strings(base, memory::MakeHandle(p, sizeof(StringsData) * count, "Strings", &kStringsLayout, sizeof(StringsData)));
+  }
+  Strings at(uint32_t i) const { return Strings(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  StringsData* direct() const { return static_cast<StringsData*>(memory::HandleOwn(address, &kStringsLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kStringsLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kStringsLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // the 17 string files (+4i; assets 22638-22654, the ids at 0x82007DD0)
   uint32_t files_address() const { return address + 0; }
+  uint8_t* files() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 0 : guest::Pointer(base, address + 0); }
   // each file's loaded flag (+4i; StringsLoadedFlag)
   uint32_t loaded_flags_address() const { return address + 68; }
+  uint8_t* loaded_flags() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 68 : guest::Pointer(base, address + 68); }
   // the mask of files asked for
-  uint32_t files_asked() const { return guest::LoadU32(base, address + 136); }
-  void set_files_asked(uint32_t v) const { guest::StoreU32(base, address + 136, v); }
   uint32_t files_asked_address() const { return address + 136; }
+  uint32_t files_asked_bits() const { if (auto* d = direct()) return d->files_asked; return uint32_t((memory::IsHandle(address + 136) ? uint32_t(memory::OwnerLoad(address + 136, 4)) : guest::LoadU32(base, address + 136))); }
+  void set_files_asked_bits(uint32_t v) const { if (auto* d = direct()) { d->files_asked = v; return; } if (memory::IsHandle(address + 136)) memory::OwnerStore(address + 136, 4, v); else guest::StoreU32(base, address + 136, v); }
+  uint32_t files_asked() const { if (auto* d = direct()) return d->files_asked; return uint32_t((memory::IsHandle(address + 136) ? uint32_t(memory::OwnerLoad(address + 136, 4)) : guest::LoadU32(base, address + 136))); }
+  void set_files_asked(uint32_t v) const { if (auto* d = direct()) { d->files_asked = v; return; } if (memory::IsHandle(address + 136)) memory::OwnerStore(address + 136, 4, v); else guest::StoreU32(base, address + 136, v); }
   // each file's count of loads (+4i)
   uint32_t load_counts_address() const { return address + 4236; }
+  uint8_t* load_counts() const { return memory::IsHandle(address) ? static_cast<uint8_t*>(memory::HandleObject(address)) + 4236 : guest::Pointer(base, address + 4236); }
 };
 
 // file; measure: Strings::OnLoaded.r6
+#pragma pack(push, 1)
+struct StringsLoadedFlagData {
+  uint32_t loaded = 0;  // +0
+};
+#pragma pack(pop)
+static_assert(sizeof(StringsLoadedFlagData) == 4);
+inline constexpr memory::LayoutField kStringsLoadedFlagFields[] = {{0, 4}};
+inline constexpr memory::Layout kStringsLoadedFlagLayout = {kStringsLoadedFlagFields, 1};
+
 struct StringsLoadedFlag : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
-  uint32_t loaded() const { return guest::LoadU32(base, address + 0); }
-  void set_loaded(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  StringsLoadedFlagData* data() const { return static_cast<StringsLoadedFlagData*>(memory::HandleObject(address)); }
+  static StringsLoadedFlag New(uint8_t* base) {
+    return StringsLoadedFlag(base, memory::MakeHandle(new StringsLoadedFlagData(), sizeof(StringsLoadedFlagData), "StringsLoadedFlag", &kStringsLoadedFlagLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static StringsLoadedFlag NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(StringsLoadedFlagData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<StringsLoadedFlagData*>(::operator new(sizeof(StringsLoadedFlagData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) StringsLoadedFlagData();
+    return StringsLoadedFlag(base, memory::MakeHandle(p, sizeof(StringsLoadedFlagData) * count, "StringsLoadedFlag", &kStringsLoadedFlagLayout, sizeof(StringsLoadedFlagData)));
+  }
+  StringsLoadedFlag at(uint32_t i) const { return StringsLoadedFlag(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  StringsLoadedFlagData* direct() const { return static_cast<StringsLoadedFlagData*>(memory::HandleOwn(address, &kStringsLoadedFlagLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kStringsLoadedFlagLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kStringsLoadedFlagLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   uint32_t loaded_address() const { return address + 0; }
+  uint32_t loaded_bits() const { if (auto* d = direct()) return d->loaded; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_loaded_bits(uint32_t v) const { if (auto* d = direct()) { d->loaded = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t loaded() const { if (auto* d = direct()) return d->loaded; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_loaded(uint32_t v) const { if (auto* d = direct()) { d->loaded = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+};
+
+// allocated; measure: -
+struct StringFile : View {
+  using View::View;
+  static constexpr uint32_t kSize = 0;
+  static StringFile New(uint8_t* base, uint32_t size) { return StringFile(base, memory::NewBlob(size, "StringFile")); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
 };
 
 // The image words docs/functions/strings-and-font.md's code uses.

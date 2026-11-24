@@ -10,6 +10,7 @@
 #include "career/career.h"
 #include "guest.h"
 #include "schema/career.h"
+#include "schema/menu_helpers.h"
 #include "schema/race_event.h"
 #include "schema/race_screens.h"
 #include "schema/race_screens_unseen.h"
@@ -184,10 +185,10 @@ uint64_t PauseMenuCreate(uint8_t* base, uint32_t sp) {
   // The data lives in host memory (E5 step 3): the original's
   // VirtualAlloc(160) at 0x8220D824; the global holds its handle.
   G::set_pause_data(base, schema::PauseMenuData::New(base));
-  const uint32_t list = Pages(72);
+  const uint32_t list = schema::MenuList::New(base).address;  // host (E5 step 5): VirtualAlloc(72)
   G::set_pause_list(base, list);
   ListInit(base, list);
-  const uint32_t pages = Pages(28);
+  const uint32_t pages = schema::PageObject::New(base).address;  // host (E5 step 5): VirtualAlloc(28)
   G::set_pause_pages(base, pages);
   PagesInit(base, pages, 0);
   return pages;
@@ -200,10 +201,10 @@ uint64_t PauseMenu4Create(uint8_t* base, uint32_t sp) {
   // The data lives in host memory (E5 step 3): the original's
   // VirtualAlloc(80) at 0x822108A4; the global holds its handle.
   guest::StoreU32(base, kPause4Data, schema::PauseMenu4Data::New(base).address);
-  const uint32_t list = Pages(72);
+  const uint32_t list = schema::MenuList::New(base).address;  // host (E5 step 5): VirtualAlloc(72)
   guest::StoreU32(base, kPause4List, list);
   ListInit(base, list);
-  const uint32_t pages = Pages(28);
+  const uint32_t pages = schema::PageObject::New(base).address;  // host (E5 step 5): VirtualAlloc(28)
   guest::StoreU32(base, kPause4Pages, pages);
   PagesInit(base, pages, 0);
   return pages;
@@ -217,10 +218,10 @@ uint64_t AfterRaceMenuCreate(uint8_t* base, uint32_t sp) {
   // globals hold their handles.
   G::set_after_screen(base, schema::AfterRaceMenuScreen::New(base));
   G::set_after_data(base, schema::AfterRaceMenuData::New(base));
-  const uint32_t pages = Pages(28);
+  const uint32_t pages = schema::PageObject::New(base).address;  // host (E5 step 5): VirtualAlloc(28)
   G::set_after_pages(base, pages);
   PagesInit(base, pages, 1);
-  const uint32_t list = Pages(72);
+  const uint32_t list = schema::MenuList::New(base).address;  // host (E5 step 5): VirtualAlloc(72)
   G::set_after_list(base, list);
   ListInit(base, list);
   return list;
@@ -229,10 +230,10 @@ uint64_t AfterRaceMenuCreate(uint8_t* base, uint32_t sp) {
 uint64_t RaceDialogCreate(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82217D70 RaceDialog::Create");
   Frame(base, sp, 96);
-  const uint32_t list = Pages(72);
+  const uint32_t list = schema::MenuList::New(base).address;  // host (E5 step 5): VirtualAlloc(72)
   G::set_dialog_list(base, list);
   ListInit(base, list);
-  const uint32_t pages = Pages(28);
+  const uint32_t pages = schema::PageObject::New(base).address;  // host (E5 step 5): VirtualAlloc(28)
   G::set_dialog_pages(base, pages);
   PagesInit(base, pages, 0);
   // The data lives in host memory (E5 step 4): the original's

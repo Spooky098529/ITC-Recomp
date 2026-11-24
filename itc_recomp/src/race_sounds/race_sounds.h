@@ -257,7 +257,7 @@ uint64_t PlayStartMusic(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& ca
 // effects' volume, the next music PlayStartMusic's.
 uint64_t IdleTick(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
 // sub_82176618 RaceSounds::Begin (192 bytes): the effects' bank allocated
-// (XPhysicalAlloc) and loaded (Archive::Load with OnEffectsBankLoaded), the
+// (the original's XPhysicalAlloc; a blob in PC memory since E5 step 5) and loaded (Archive::Load with OnEffectsBankLoaded), the
 // cars' views made (operator new, XPR::XPR), PlayStartMusic, the listener
 // at the origin (SetListener), the cars' step 1.
 uint64_t Begin(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);

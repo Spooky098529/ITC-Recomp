@@ -149,6 +149,14 @@ fields = [
 measure = "new<?>@sub_82149178"
 size = 8
 origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): the profile read's whole result buffer
+# (XUSER_READ_PROFILE_SETTING_RESULT, the settings and their data after it,
+# user::kProfileBytes), filled by our XUserReadProfileSettings
+# (src/hooks/profile.cpp, by address) with pointers into itself; made by the
+# lifted profile read's operator new[] (returning at 0x82149224, r3 the
+# size), freed by its operator delete[] before the next read.
+storage = "blob"
+blob_alloc = [{ call = 0x82149224, reg = "r3" }]
 fields = [
   { name = "count", offset = 0, type = "u32", note = "the settings' count (26)" },
   { name = "settings", offset = 4, type = "ptr", to = "SysProfileSettings", note = "the settings (0 while missing)" },

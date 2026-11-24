@@ -30,9 +30,21 @@ using schema::FontPage;
 using schema::Strings;
 
 // The string table's file i: its pointer, loaded flag and count of loads.
-uint32_t FileSlot(const Strings& t, uint32_t i) { return t.files_address() + 4 * i; }
+// The table is a host object (E5 step 5): its words read and written through
+// its view (by offset); the flag's address goes to Archive::Load.
+constexpr uint32_t kFilesOffset = 0, kFlagsOffset = 68, kCountsOffset = 4236;
 uint32_t FlagSlot(const Strings& t, uint32_t i) { return t.loaded_flags_address() + 4 * i; }
-uint32_t CountSlot(const Strings& t, uint32_t i) { return t.load_counts_address() + 4 * i; }
+uint32_t File(const Strings& t, uint32_t i) { return uint32_t(t.load_at(kFilesOffset + 4 * i, 4)); }
+void SetFile(const Strings& t, uint32_t i, uint32_t v) { t.store_at(kFilesOffset + 4 * i, 4, v); }
+uint32_t Flag(const Strings& t, uint32_t i) { return uint32_t(t.load_at(kFlagsOffset + 4 * i, 4)); }
+void SetFlag(const Strings& t, uint32_t i, uint32_t v) { t.store_at(kFlagsOffset + 4 * i, 4, v); }
+uint32_t Count(const Strings& t, uint32_t i) { return uint32_t(t.load_at(kCountsOffset + 4 * i, 4)); }
+void SetCount(const Strings& t, uint32_t i, uint32_t v) { t.store_at(kCountsOffset + 4 * i, 4, v); }
+
+// The font's words by offset (a host object, E5 step 5): its pages (+20 + 4i)
+// and the pages' files (+40 + 4i).
+constexpr uint32_t kPagesOffset = 20, kPageFilesOffset = 40;
+uint32_t FontWord(const Font& f, uint32_t offset) { return uint32_t(f.load_at(offset, 4)); }
 
 constexpr uint32_t kPageBreak = 0xFFD1;
 
@@ -52,11 +64,12 @@ uint32_t StringsInit(uint8_t* base) {
   if (G::strings(base).address != 0) {
     return 0;
   }
-  const Strings table(base, memory::AllocPages(kStringsBytes, 4096));
+  // VirtualAlloc's 4,304 bytes: the table in host memory (E5 step 5).
+  const Strings table = Strings::New(base);
   G::set_strings(base, table);
   for (uint32_t i = 0; i < kStringFiles; i++) {
-    guest::StoreU32(base, FileSlot(table, i), 0);
-    guest::StoreU32(base, CountSlot(table, i), 0);
+    SetFile(table, i, 0);
+    SetCount(table, i, 0);
   }
   table.set_files_asked(0);
   return table.address;
@@ -75,8 +88,8 @@ bool StringsRelease(uint8_t* base, uint32_t table_address, uint32_t mask) {
     if (!(mask & (1u << i))) {
       continue;
     }
-    const uint32_t file = guest::LoadU32(base, FileSlot(table, i));
-    if (file != 0 && guest::LoadU32(base, CountSlot(table, i)) == 1 &&
+    const uint32_t file = File(table, i);
+    if (file != 0 && Count(table, i) == 1 &&
         !memory::IsPages(file)) {
       return false;
     }
@@ -86,18 +99,18 @@ bool StringsRelease(uint8_t* base, uint32_t table_address, uint32_t mask) {
     if (!(bit & mask)) {
       continue;
     }
-    const uint32_t file = guest::LoadU32(base, FileSlot(table, i));
+    const uint32_t file = File(table, i);
     if (file == 0) {
       continue;
     }
-    const uint32_t count = guest::LoadU32(base, CountSlot(table, i)) - 1;
-    guest::StoreU32(base, CountSlot(table, i), count);
+    const uint32_t count = Count(table, i) - 1;
+    SetCount(table, i, count);
     if (count != 0) {
       continue;
     }
-    memory::FreePages(file);
-    guest::StoreU32(base, FileSlot(table, i), 0);
-    guest::StoreU32(base, FlagSlot(table, i), 0);
+    memory::FreePages(file);  // a StringFile blob: freed through its handle
+    SetFile(table, i, 0);
+    SetFlag(table, i, 0);
     table.set_files_asked(table.files_asked() & ~bit);
   }
   return true;
@@ -113,7 +126,7 @@ uint32_t FontIsLoaded(uint8_t* base, uint32_t font_address) {
       continue;
     }
     asked++;
-    const FontPage page(base, guest::LoadU32(base, font.pages_address() + 4 * i));
+    const FontPage page(base, FontWord(font, kPagesOffset + 4 * i));
     if (page.loaded() == 0) {
       return 0;
     }
@@ -129,7 +142,7 @@ uint32_t StringsIsLoaded(uint8_t* base, uint32_t table_address) {
   uint32_t asked = 0;
   for (uint32_t i = 0; i < kStringFiles; i++) {
     const uint32_t bit = (1u << i) & mask;
-    if (bit != 0 && guest::LoadU32(base, FlagSlot(table, i)) == 0) {
+    if (bit != 0 && Flag(table, i) == 0) {
       all = false;
     }
     if (bit != 0) {
@@ -443,7 +456,7 @@ std::optional<uint32_t> StringsGet(uint8_t* base, uint32_t table, uint32_t id) {
   for (uint32_t i = 0; i < 17; i++) {
     if (int32_t(id) < int32_t(guest::LoadU32(base, bounds + 4 + 4 * i))) {
       const uint32_t bound = guest::LoadU32(base, bounds + 4 * i);
-      return game_data::GetEntry(base, guest::LoadU32(base, FileSlot(Strings(base, table), i)),
+      return game_data::GetEntry(base, File(Strings(base, table), i),
                                  id - bound, false);
     }
   }
@@ -473,23 +486,21 @@ FontLoadResult FontLoad(uint8_t* base, uint32_t font_address, uint32_t mask,
   FontLoadResult result{false, std::nullopt};
   font.set_pages_asked(mask | font.pages_asked());
   for (uint32_t i = 0; i < 4; i++) {
-    const uint32_t file_slot = font.page_files_address() + 4 * i;
-    const uint32_t page_slot = font.pages_address() + 4 * i;
+    const uint32_t file_slot = kPageFilesOffset + 4 * i;
+    const uint32_t page_slot = kPagesOffset + 4 * i;
     const uint32_t id_slot = G::font_page_ids_address() + 4 * i;
-    if ((mask & (1u << i)) == 0 || guest::LoadU32(base, file_slot) != 0) {
+    if ((mask & (1u << i)) == 0 || FontWord(font, file_slot) != 0) {
       continue;
     }
-    const auto page = memory::crt::OperatorNew(base, 28);
-    if (!page) {
-      result.handed_back = true;
-      return result;
-    }
-    guest::StoreU32(base, page_slot, *page);
+    // operator new's 28 bytes: the page in host memory (E5 step 5).
+    font.store_at(page_slot, 4, FontPage::New(base).address);
     const uint32_t asset = guest::LoadU32(base, id_slot);
-    guest::StoreU32(base, file_slot, memory::AllocPages(archive::AssetSize(base, asset), 4096));
-    FontPage(base, guest::LoadU32(base, page_slot)).set_loaded(0);
-    result.last = load(guest::LoadU32(base, id_slot), guest::LoadU32(base, file_slot),
-                       kFontPageLoaded, guest::LoadU32(base, page_slot));
+    // The page's file stays guest pages: its XPR's texture is read by the
+    // renderer (E5 step 7).
+    font.store_at(file_slot, 4, memory::AllocPages(archive::AssetSize(base, asset), 4096));
+    FontPage(base, FontWord(font, page_slot)).set_loaded(0);
+    result.last = load(guest::LoadU32(base, id_slot), FontWord(font, file_slot),
+                       kFontPageLoaded, FontWord(font, page_slot));
   }
   return result;
 }
@@ -506,14 +517,15 @@ LastLoad StringsLoad(uint8_t* base, uint32_t table_address, uint32_t mask,
     }
     const uint32_t flag = FlagSlot(table, i);
     const uint32_t id_slot = G::string_file_ids_address() + 4 * i;
-    guest::StoreU32(base, CountSlot(table, i), guest::LoadU32(base, CountSlot(table, i)) + 1);
-    if (guest::LoadU32(base, FileSlot(table, i)) != 0) {
+    SetCount(table, i, Count(table, i) + 1);
+    if (File(table, i) != 0) {
       continue;
     }
     schema::StringsLoadedFlag(base, flag).set_loaded(0);
-    const uint32_t buffer = memory::AllocPages(
-        archive::AssetSize(base, guest::LoadU32(base, id_slot)), 4096);
-    guest::StoreU32(base, FileSlot(table, i), buffer);
+    // VirtualAlloc's pages: the file in PC memory, a blob (E5 step 5).
+    const uint32_t size = archive::AssetSize(base, guest::LoadU32(base, id_slot));
+    const uint32_t buffer = size != 0 ? schema::StringFile::New(base, size).address : 0;
+    SetFile(table, i, buffer);
     last = load(guest::LoadU32(base, id_slot), buffer, kStringsLoaded, flag);
   }
   return last;

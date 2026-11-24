@@ -7,6 +7,7 @@
 #include "graphics/video_output.h"
 #include "guest.h"
 #include "memory/heap.h"
+#include "schema/strings_and_font.h"
 
 namespace app_start_up {
 
@@ -96,7 +97,8 @@ uint32_t TextInit(uint8_t* base, uint32_t font_frame, uint32_t shaders_frame,
   // PAGE_READWRITE), then Font::Font.
   {
     ITC_NATIVE_RUNNING("sub_82109A00 Font::Init");
-    const uint32_t font = memory::AllocPages(kFontBytes, 4096);
+    // The font in host memory (E5 step 5): Font::New for VirtualAlloc's pages.
+    const uint32_t font = schema::Font::New(base).address;
     Store(base, kFontPointer, font);
     FontConstruct(base, font, font_frame, shaders_frame, calls);
   }

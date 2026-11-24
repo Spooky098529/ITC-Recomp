@@ -7,6 +7,7 @@
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
 #include "schema/data_load.h"
+#include "schema/ui_movies_game.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
@@ -19,11 +20,9 @@ using G = schema::DataLoadGlobals;
 // A movie list: its movies, then their count at +64.
 std::optional<int64_t> MovieListAdd(uint8_t* base, uint32_t list, uint32_t count_address, uint32_t id,
                                     const MovieCalls& calls) {
-  const auto made = memory::crt::OperatorNew(base, kMovieBytes);
-  if (!made) {
-    return std::nullopt;
-  }
-  uint32_t movie = *made;
+  // In host memory (E5 step 5), where the originals' operator new returned.
+  static_assert(schema::UiMovie::kSize == kMovieBytes);
+  uint32_t movie = schema::UiMovie::New(base).address;
   if (movie != 0) {
     movie = calls.construct(movie);
   }

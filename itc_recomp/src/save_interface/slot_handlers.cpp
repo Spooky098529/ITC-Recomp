@@ -718,7 +718,11 @@ uint64_t DevicesUpdate(uint8_t* base, uint64_t self, uint64_t r4, const CallSite
       }
     }
     const uint32_t slot = schema::SaveDevices(base, devices).slots<schema::View>().address + offset;
-    const uint32_t function = Load(base, schema::SaveDevices(base, devices).wait_for_user_address() + SaveSlot(base, slot).state() * 4);
+    // The handlers' table from +76 by the slot's state (the save devices in
+    // host memory: read through their layout).
+    const schema::SaveDevices owner(base, devices);
+    const uint32_t function = uint32_t(owner.load_at(
+        owner.wait_for_user_address() - owner.address + SaveSlot(base, slot).state() * 4, 4));
     const CallSite handler_site = site(0x820A47D8);
     switch (function) {
       case kSlotWaitForUser: r3 = SlotWaitForUser(base, slot); break;

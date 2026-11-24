@@ -197,7 +197,7 @@ std::optional<uint32_t> Init(uint8_t* base) {
       // (archive_streaming.cpp), so the last table's read runs up to a
       // sector past the block's end (into the guest heap's next bytes in
       // the original; past a blob's end, a host heap overrun).
-      object.set_block(schema::DataTablesBlock::New(base, total + 2048));
+      object.set_block(schema::DataTablesBlock::New(base, total + 2048).address);
     }
     const uint32_t block = object.block().address;
     // Each table pointer: the block plus the sizes so far, or 0 when the

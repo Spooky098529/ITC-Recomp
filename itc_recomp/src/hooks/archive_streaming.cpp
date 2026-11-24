@@ -30,6 +30,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 #include "lifted/sdk.h"
 
 using guest_call::InFrame;
@@ -64,6 +65,31 @@ std::optional<uint32_t> Archive(uint8_t* base, bool crs) {
   return handle;
 }
 
+// The bytes of a read of `bytes` at `buffer` that fit: all of them in guest
+// memory, where a read past an allocation's end went on into what follows;
+// a blob's (E5 step 5) end at its size, its host block's end, so a read past
+// it is cut there (logged): the rest isn't stored.
+uint32_t BlobRoom(uint32_t buffer, uint32_t bytes, const char* what) {
+  uint32_t left = 0;
+  if (memory::BlobPointer(buffer, &left) && bytes > left) {
+    ITC_LOG_WARN("archive streaming: {} reads {} bytes into a blob at {:08X} with {} left: "
+                 "the rest not stored",
+                 what, bytes, buffer, left);
+    return left;
+  }
+  return bytes;
+}
+
+// The bytes past a blob's end (BlobRoom), read from the file and dropped, so
+// the count read is the original's.
+uint32_t ReadPastBlob(uint32_t handle, uint64_t offset, uint32_t bytes) {
+  if (!bytes) {
+    return 0;
+  }
+  std::vector<uint8_t> scratch(bytes);
+  return game_data::ReadAt(handle, offset, scratch.data(), bytes).value_or(0);
+}
+
 // An archive request's read (sub_8209DD00's job): +16 the id, +56 the byte
 // offset, +60 the sectors (2,048 bytes), +76 the buffer. False if it fails.
 bool ReadRequest(uint8_t* base, uint32_t request) {
@@ -81,7 +107,8 @@ bool ReadRequest(uint8_t* base, uint32_t request) {
   }
   bool ok = true;
   uint32_t total = 0;
-  guest::ForEachHostPart(base, buffer, bytes, [&](uint8_t* host, uint32_t part, uint32_t size) {
+  const uint32_t room = BlobRoom(buffer, bytes, "a request");
+  guest::ForEachHostPart(base, buffer, room, [&](uint8_t* host, uint32_t part, uint32_t size) {
     if (!ok) {
       return;
     }
@@ -89,6 +116,9 @@ bool ReadRequest(uint8_t* base, uint32_t request) {
     ok = read.has_value();
     total += read.value_or(0);
   });
+  if (ok && room < bytes && total == room) {
+    total += ReadPastBlob(*archive, uint64_t(offset) + room, bytes - room);
+  }
   if (!ok) {
     ITC_LOG_ERROR("archive streaming: can't read id {} ({} bytes at {:08X})", id, bytes, offset);
     return false;
@@ -130,7 +160,8 @@ bool ReadWhole(uint8_t* base, uint32_t path, uint32_t buffer, uint32_t size) {
     return false;
   }
   bool ok = true;
-  guest::ForEachHostPart(base, buffer, size, [&](uint8_t* host, uint32_t part, uint32_t bytes) {
+  guest::ForEachHostPart(base, buffer, BlobRoom(buffer, size, "a whole-file read"),
+                         [&](uint8_t* host, uint32_t part, uint32_t bytes) {
     ok = ok && game_data::ReadAt(*handle, part, host, bytes).has_value();
   });
   game_data::Close(*handle);
@@ -208,7 +239,12 @@ ITC_NATIVE_ENTRY_ALWAYS(8209E210) {
   G::set_callback_serial(base, 0xFFFFFFFF);
   G::set_staging_half_size(base, 5242880);  // half the staging ring
   G::set_staging_count(base, 0);
-  const uint32_t staging = allocate(10485760, 4096, 0x8209E37C);
+  // The staging ring (two 5 MiB halves the compressed requests are read into,
+  // then unpacked from by Ucl::Unpack's guest loads): a blob in PC memory
+  // (E5 step 5) where the original VirtualAllocs it (returning at
+  // 0x8209E37C). The load buffer above stays in guest memory: the shader
+  // pairs' microcode is read into it (the renderer's).
+  const uint32_t staging = schema::ArchiveStaging::New(base, 10485760).address;
   G::set_staging_halves(base, staging);
   G::set_staging_half_1(base, staging + 5242880);
   G::set_idle_wanted(base, 0);

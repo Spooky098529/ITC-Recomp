@@ -1835,13 +1835,13 @@ loc_821C249C:
   // lwz r10,-31604(r10)
   r10 = guest::LoadU32(base, uint32_t(r10) + -31604);
   // lwz r9,0(r10)
-  r9 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r10)).page_address());
+  r9 = schema::PageObject(base, uint32_t(r10)).page_bits();
   // cmpwi cr6,r9,-1
   cr6 = lifted::Compare<int32_t>(int32_t(r9), -1, so);
   // beq cr6,0x821c24d0
   if (cr6.eq) goto loc_821C24D0;
   // stw r9,8(r10)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).previous_page_address(), uint32_t(r9));
+  schema::PageObject(base, uint32_t(r10)).set_previous_page_bits(uint32_t(r9));
 loc_821C24D0:
   // li r3,0
   r3 = uint64_t(int64_t(0));
@@ -1996,28 +1996,28 @@ loc_821C25BC:
   // lwz r10,-31604(r10)
   r10 = guest::LoadU32(base, uint32_t(r10) + -31604);
   // lwz r9,0(r10)
-  r9 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r10)).page_address());
+  r9 = schema::PageObject(base, uint32_t(r10)).page_bits();
   // cmpwi cr6,r9,-1
   cr6 = lifted::Compare<int32_t>(int32_t(r9), -1, so);
   // beq cr6,0x821c25f0
   if (cr6.eq) goto loc_821C25F0;
   // stw r9,8(r10)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).previous_page_address(), uint32_t(r9));
+  schema::PageObject(base, uint32_t(r10)).set_previous_page_bits(uint32_t(r9));
 loc_821C25F0:
   // li r3,2
   r3 = uint64_t(int64_t(2));
 loc_821C25F4:
   // stw r11,4(r10)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).next_page_address(), uint32_t(r11));
+  schema::PageObject(base, uint32_t(r10)).set_next_page_bits(uint32_t(r11));
   // li r9,11
   r9 = uint64_t(int64_t(11));
 loc_821C25FC:
   // stw r9,12(r10)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).step_address(), uint32_t(r9));
+  schema::PageObject(base, uint32_t(r10)).set_step_bits(uint32_t(r9));
   // stw r11,16(r10)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).queued_step_address(), uint32_t(r11));
+  schema::PageObject(base, uint32_t(r10)).set_queued_step_bits(uint32_t(r11));
   // stw r11,0(r10)
-  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).page_address(), uint32_t(r11));
+  schema::PageObject(base, uint32_t(r10)).set_page_bits(uint32_t(r11));
 loc_821C2608:
   // bl 0x821103f0
   // (left out: dead in C++)
@@ -3991,7 +3991,7 @@ lifted::Result f821C5F80(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31600(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31600);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address());
+  r10 = schema::FrontEndMenu(base, uint32_t(r11)).cursor_bits();
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // cmplwi cr6,r10,1
@@ -4181,7 +4181,7 @@ lifted::Result f821C60D0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31600(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31600);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address());
+  r10 = schema::FrontEndMenu(base, uint32_t(r11)).cursor_bits();
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // cmpwi r10,0
@@ -4320,7 +4320,7 @@ lifted::Result f821D7C90(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,10040(r31)
   r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).category_menu_address());
   // lwz r11,8(r11)
-  r11 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).moved_address());
+  r11 = schema::FrontEndMenu(base, uint32_t(r11)).moved_bits();
   // cmpwi cr6,r11,-1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), -1, so);
   // beq cr6,0x821d811c
@@ -4389,7 +4389,7 @@ lifted::Result f821D7C90(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r9,-1
   r9 = uint64_t(int64_t(-1));
   // lwz r6,0(r11)
-  r6 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address());
+  r6 = schema::FrontEndMenu(base, uint32_t(r11)).cursor_bits();
   // lwz r11,10036(r31)
   r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).queue_address());
   // stw r7,9652(r31)
@@ -4427,33 +4427,33 @@ lifted::Result f821D7C90(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r7,r7,-1
   r7 = uint64_t(int64_t(int64_t(r7) + -1));
   // stw r10,12(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).first_item_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_first_item_bits(uint32_t(r10));
   // stw r8,20(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).wraps_address(), uint32_t(r8));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_wraps_bits(uint32_t(r8));
   // stw r10,0(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_cursor_bits(uint32_t(r10));
   // stw r10,4(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_previous_bits(uint32_t(r10));
   // stw r10,8(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).moved_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_moved_bits(uint32_t(r10));
   // stw r10,40(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).wrapped_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_wrapped_bits(uint32_t(r10));
   // stw r7,16(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).last_item_address(), uint32_t(r7));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_last_item_bits(uint32_t(r7));
   // stw r10,48(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).visible_row_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_visible_row_bits(uint32_t(r10));
   // stw r10,52(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_row_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_previous_row_bits(uint32_t(r10));
   // stw r10,36(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).side_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_side_bits(uint32_t(r10));
   // stw r10,64(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).player_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_player_bits(uint32_t(r10));
   // stw r10,24(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).up_down_locked_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_up_down_locked_bits(uint32_t(r10));
   // stw r10,28(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).left_right_steps_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_left_right_steps_bits(uint32_t(r10));
   // stw r10,32(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).shoulders_step_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_shoulders_step_bits(uint32_t(r10));
   // lwz r11,10036(r31)
   r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).queue_address());
   // lwz r7,9652(r31)
@@ -4508,17 +4508,17 @@ loc_821D7DF4:
   // lwz r11,10040(r31)
   r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).category_menu_address());
   // stw r10,0(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_cursor_bits(uint32_t(r10));
   // stw r10,4(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_previous_bits(uint32_t(r10));
   // stw r10,40(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).wrapped_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_wrapped_bits(uint32_t(r10));
   // stw r10,48(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).visible_row_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_visible_row_bits(uint32_t(r10));
   // stw r10,52(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_row_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_previous_row_bits(uint32_t(r10));
   // stw r10,32(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).shoulders_step_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_shoulders_step_bits(uint32_t(r10));
   // b 0x821d7f04
   goto loc_821D7F04;
 loc_821D7E54:
@@ -4560,21 +4560,21 @@ loc_821D7E54:
   // lwz r11,10040(r31)
   r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).category_menu_address());
   // stw r10,12(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).first_item_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_first_item_bits(uint32_t(r10));
   // stw r10,16(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).last_item_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_last_item_bits(uint32_t(r10));
   // stw r10,0(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_cursor_bits(uint32_t(r10));
   // stw r10,4(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_previous_bits(uint32_t(r10));
   // stw r10,40(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).wrapped_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_wrapped_bits(uint32_t(r10));
   // stw r10,48(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).visible_row_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_visible_row_bits(uint32_t(r10));
   // stw r10,52(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_row_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_previous_row_bits(uint32_t(r10));
   // stw r10,32(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).shoulders_step_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_shoulders_step_bits(uint32_t(r10));
   // b 0x821d7f10
   goto loc_821D7F10;
 loc_821D7EC0:
@@ -4587,51 +4587,51 @@ loc_821D7EC0:
   // stw r7,9652(r31)
   guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).state_address(), uint32_t(r7));
   // stw r7,4(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_address(), uint32_t(r7));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_previous_bits(uint32_t(r7));
   // stw r7,0(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address(), uint32_t(r7));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_cursor_bits(uint32_t(r7));
   // stw r7,8(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).moved_address(), uint32_t(r7));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_moved_bits(uint32_t(r7));
   // stw r9,20(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).wraps_address(), uint32_t(r9));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_wraps_bits(uint32_t(r9));
   // stw r9,12(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).first_item_address(), uint32_t(r9));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_first_item_bits(uint32_t(r9));
   // stw r10,24(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).up_down_locked_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_up_down_locked_bits(uint32_t(r10));
   // lbz r7,9665(r31)
   r7 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r31)).confirm_cursor_address());
   // lwz r11,10040(r31)
   r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).category_menu_address());
   // stw r7,0(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address(), uint32_t(r7));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_cursor_bits(uint32_t(r7));
   // stw r7,4(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_address(), uint32_t(r7));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_previous_bits(uint32_t(r7));
   // stw r10,44(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).list_wrapped_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_list_wrapped_bits(uint32_t(r10));
   // stw r10,56(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).first_row_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_first_row_bits(uint32_t(r10));
   // stw r6,60(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).rows_shown_address(), uint32_t(r6));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_rows_shown_bits(uint32_t(r6));
 loc_821D7F04:
   // li r8,1
   r8 = uint64_t(int64_t(1));
   // stw r10,12(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).first_item_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_first_item_bits(uint32_t(r10));
   // stw r8,16(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).last_item_address(), uint32_t(r8));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_last_item_bits(uint32_t(r8));
 loc_821D7F10:
   // stw r8,20(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).wraps_address(), uint32_t(r8));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_wraps_bits(uint32_t(r8));
   // stw r10,8(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).moved_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_moved_bits(uint32_t(r10));
   // stw r10,36(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).side_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_side_bits(uint32_t(r10));
   // stw r10,64(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).player_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_player_bits(uint32_t(r10));
   // stw r10,24(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).up_down_locked_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_up_down_locked_bits(uint32_t(r10));
   // stw r10,28(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).left_right_steps_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_left_right_steps_bits(uint32_t(r10));
   // lwz r11,10036(r31)
   r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).queue_address());
   // lwz r7,9652(r31)
@@ -4765,31 +4765,31 @@ loc_821D7F7C:
   // li r6,8
   r6 = uint64_t(int64_t(8));
   // stw r10,12(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).first_item_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_first_item_bits(uint32_t(r10));
   // stw r7,16(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).last_item_address(), uint32_t(r7));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_last_item_bits(uint32_t(r7));
   // stw r8,20(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).wraps_address(), uint32_t(r8));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_wraps_bits(uint32_t(r8));
   // stw r10,8(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).moved_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_moved_bits(uint32_t(r10));
   // stw r3,0(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address(), uint32_t(r3));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_cursor_bits(uint32_t(r3));
   // stw r3,4(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_address(), uint32_t(r3));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_previous_bits(uint32_t(r3));
   // stw r10,44(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).list_wrapped_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_list_wrapped_bits(uint32_t(r10));
   // stw r10,56(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).first_row_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_first_row_bits(uint32_t(r10));
   // stw r6,60(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).rows_shown_address(), uint32_t(r6));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_rows_shown_bits(uint32_t(r6));
   // stw r10,36(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).side_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_side_bits(uint32_t(r10));
   // stw r10,64(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).player_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_player_bits(uint32_t(r10));
   // stw r10,24(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).up_down_locked_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_up_down_locked_bits(uint32_t(r10));
   // stw r10,28(r11)
-  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).left_right_steps_address(), uint32_t(r10));
+  schema::FrontEndMenu(base, uint32_t(r11)).set_left_right_steps_bits(uint32_t(r10));
   // lwz r11,9656(r31)
   r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).category_address());
   // cmpwi cr6,r11,1
@@ -4909,7 +4909,7 @@ loc_821D811C:
   // stw r11,9708(r31)
   guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r11));
   // lwz r11,0(r10)
-  r11 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r10)).cursor_address());
+  r11 = schema::FrontEndMenu(base, uint32_t(r10)).cursor_bits();
   // stw r11,9740(r31)
   guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).menu_category_address(), uint32_t(r11));
   // stb r11,9663(r31)
@@ -5750,7 +5750,7 @@ loc_8222C824:
   // (left out: dead in C++)
   { const lifted::Result o = game::ScenePools::SetUpB(base, LIFTED_ARGS(0x8222C8C8, r31)); r3 = o.r3; f1 = o.f1; }
   // stw r27,4296(r3)
-  guest::StoreU32(base, schema::SceneModel(base, uint32_t(r3)).draw_enabled_address(), uint32_t(r27));
+  schema::SceneModel(base, uint32_t(r3)).set_draw_enabled_bits(uint32_t(r27));
   // addi r30,r30,1
   r30 = uint64_t(int64_t(int64_t(r30) + 1));
   // lwz r11,20048(r31)
@@ -5902,33 +5902,33 @@ lifted::Result f823EACC8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // addi r7,r1,80
   r7 = uint64_t(int64_t(int64_t(r1) + 80));
   // lwz r8,120(r31)
-  r8 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r31)).bytes_per_pixel_address());
+  r8 = schema::ImageCodec(base, uint32_t(r31)).bytes_per_pixel_bits();
   // li r6,0
   r6 = uint64_t(int64_t(0));
   // lwz r11,8(r31)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r31)).kind_address());
+  r11 = schema::ImageCodec(base, uint32_t(r31)).kind_bits();
   // lwz r29,104(r31)
-  r29 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r31)).width_address());
+  r29 = schema::ImageCodec(base, uint32_t(r31)).width_bits();
   // lwz r28,116(r31)
-  r28 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r31)).row_bytes_address());
+  r28 = schema::ImageCodec(base, uint32_t(r31)).row_bytes_bits();
   // cmplwi cr6,r11,1
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
   // lwz r27,32(r31)
-  r27 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r31)).data_address());
+  r27 = schema::ImageCodec(base, uint32_t(r31)).surface_bits();
   // lwz r26,52(r31)
-  r26 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r31)).rounding_address());
+  r26 = schema::ImageCodec(base, uint32_t(r31)).rounding_bits();
   // lwz r25,24(r31)
-  r25 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r31)).color_key_address());
+  r25 = schema::ImageCodec(base, uint32_t(r31)).color_key_bits();
   // stw r9,104(r31)
-  guest::StoreU32(base, schema::ImageCodec(base, uint32_t(r31)).width_address(), uint32_t(r9));
+  schema::ImageCodec(base, uint32_t(r31)).set_width_bits(uint32_t(r9));
   // stw r8,116(r31)
-  guest::StoreU32(base, schema::ImageCodec(base, uint32_t(r31)).row_bytes_address(), uint32_t(r8));
+  schema::ImageCodec(base, uint32_t(r31)).set_row_bytes_bits(uint32_t(r8));
   // stw r7,32(r31)
-  guest::StoreU32(base, schema::ImageCodec(base, uint32_t(r31)).data_address(), uint32_t(r7));
+  schema::ImageCodec(base, uint32_t(r31)).set_surface_bits(uint32_t(r7));
   // stw r10,52(r31)
-  guest::StoreU32(base, schema::ImageCodec(base, uint32_t(r31)).rounding_address(), uint32_t(r10));
+  schema::ImageCodec(base, uint32_t(r31)).set_rounding_bits(uint32_t(r10));
   // stw r6,24(r31)
-  guest::StoreU32(base, schema::ImageCodec(base, uint32_t(r31)).color_key_address(), uint32_t(r6));
+  schema::ImageCodec(base, uint32_t(r31)).set_color_key_bits(uint32_t(r6));
   // beq cr6,0x823ead4c
   if (cr6.eq) goto loc_823EAD4C;
   // cmplwi cr6,r11,4
@@ -5938,20 +5938,20 @@ lifted::Result f823EACC8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // addi r4,r31,36
   r4 = uint64_t(int64_t(int64_t(r31) + 36));
   // lwz r5,84(r31)
-  r5 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r31)).convert_from_address());
+  r5 = schema::ImageCodec(base, uint32_t(r31)).convert_from_bits();
   // lwz r30,88(r31)
-  r30 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r31)).row_address());
+  r30 = schema::ImageCodec(base, uint32_t(r31)).row_bits();
   // stw r9,84(r31)
-  guest::StoreU32(base, schema::ImageCodec(base, uint32_t(r31)).convert_from_address(), uint32_t(r9));
+  schema::ImageCodec(base, uint32_t(r31)).set_convert_from_bits(uint32_t(r9));
   // stw r4,88(r31)
-  guest::StoreU32(base, schema::ImageCodec(base, uint32_t(r31)).row_address(), uint32_t(r4));
+  schema::ImageCodec(base, uint32_t(r31)).set_row_bits(uint32_t(r4));
   // bl 0x823ea0c0
   // (left out: dead in C++)
   r3 = game::ImageCodec::ConvertRange(base, r3, r4);
   // stw r5,84(r31)
-  guest::StoreU32(base, schema::ImageCodec(base, uint32_t(r31)).convert_from_address(), uint32_t(r5));
+  schema::ImageCodec(base, uint32_t(r31)).set_convert_from_bits(uint32_t(r5));
   // stw r30,88(r31)
-  guest::StoreU32(base, schema::ImageCodec(base, uint32_t(r31)).row_address(), uint32_t(r30));
+  schema::ImageCodec(base, uint32_t(r31)).set_row_bits(uint32_t(r30));
 loc_823EAD4C:
   // lwz r11,0(r31)
   r11 = lifted::VtableWord(base, uint32_t(r31));
@@ -5990,15 +5990,15 @@ loc_823EAD4C:
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x823EAD90, r31)); r3 = o.r3; f1 = o.f1; }
   // stw r29,104(r31)
-  guest::StoreU32(base, schema::ImageCodec(base, uint32_t(r31)).width_address(), uint32_t(r29));
+  schema::ImageCodec(base, uint32_t(r31)).set_width_bits(uint32_t(r29));
   // stw r28,116(r31)
-  guest::StoreU32(base, schema::ImageCodec(base, uint32_t(r31)).row_bytes_address(), uint32_t(r28));
+  schema::ImageCodec(base, uint32_t(r31)).set_row_bytes_bits(uint32_t(r28));
   // stw r27,32(r31)
-  guest::StoreU32(base, schema::ImageCodec(base, uint32_t(r31)).data_address(), uint32_t(r27));
+  schema::ImageCodec(base, uint32_t(r31)).set_surface_bits(uint32_t(r27));
   // stw r26,52(r31)
-  guest::StoreU32(base, schema::ImageCodec(base, uint32_t(r31)).rounding_address(), uint32_t(r26));
+  schema::ImageCodec(base, uint32_t(r31)).set_rounding_bits(uint32_t(r26));
   // stw r25,24(r31)
-  guest::StoreU32(base, schema::ImageCodec(base, uint32_t(r31)).color_key_address(), uint32_t(r25));
+  schema::ImageCodec(base, uint32_t(r31)).set_color_key_bits(uint32_t(r25));
   // addi r1,r1,160
   r1 = uint64_t(int64_t(int64_t(r1) + 160));
   // b 0x825a6ecc
@@ -6024,13 +6024,13 @@ uint64_t f823F2730(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r9,100(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r10,32(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // mullw r9,r9,r5
   r9 = uint64_t(int64_t(int64_t(int32_t(r9)) * int64_t(int32_t(r5))));
   // add r11,r11,r9
@@ -6038,7 +6038,7 @@ uint64_t f823F2730(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // add r11,r11,r10
   r11 = r11 + r10;
   // lwz r10,104(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r10,r10,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 2) & 0xFFFFFFFC;
   // add r10,r10,r11
@@ -6118,13 +6118,13 @@ loc_823F277C:
   if (cr6.lt) goto loc_823F277C;
 loc_823F27E4:
   // lwz r11,24(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).color_key_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).color_key_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f2800
   if (cr6.eq) goto loc_823F2800;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -6134,13 +6134,13 @@ loc_823F27E4:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F2800:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f281c
   if (cr6.eq) goto loc_823F281C;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -6177,13 +6177,13 @@ uint64_t f823F2830(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r9,100(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r10,32(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // mullw r9,r9,r5
   r9 = uint64_t(int64_t(int64_t(int32_t(r9)) * int64_t(int32_t(r5))));
   // add r11,r11,r9
@@ -6191,7 +6191,7 @@ uint64_t f823F2830(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // add r11,r11,r10
   r11 = r11 + r10;
   // lwz r10,104(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r10,r10,1,0,30
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 1) & 0xFFFFFFFE;
   // add r10,r10,r11
@@ -6286,13 +6286,13 @@ loc_823F2884:
   if (cr6.lt) goto loc_823F2884;
 loc_823F2900:
   // lwz r11,24(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).color_key_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).color_key_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f291c
   if (cr6.eq) goto loc_823F291C;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -6302,13 +6302,13 @@ loc_823F2900:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F291C:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f2938
   if (cr6.eq) goto loc_823F2938;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -6345,13 +6345,13 @@ uint64_t f823F2948(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r9,100(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r10,32(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // mullw r9,r9,r5
   r9 = uint64_t(int64_t(int64_t(int32_t(r9)) * int64_t(int32_t(r5))));
   // add r11,r11,r9
@@ -6359,7 +6359,7 @@ uint64_t f823F2948(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // add r11,r11,r10
   r11 = r11 + r10;
   // lwz r10,104(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r10,r10,1,0,30
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 1) & 0xFFFFFFFE;
   // add r10,r10,r11
@@ -6449,13 +6449,13 @@ loc_823F2994:
   if (cr6.lt) goto loc_823F2994;
 loc_823F2A10:
   // lwz r11,24(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).color_key_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).color_key_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f2a2c
   if (cr6.eq) goto loc_823F2A2C;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -6465,13 +6465,13 @@ loc_823F2A10:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F2A2C:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f2a48
   if (cr6.eq) goto loc_823F2A48;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -6508,13 +6508,13 @@ uint64_t f823F2A58(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r9,100(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r10,32(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // mullw r9,r9,r5
   r9 = uint64_t(int64_t(int64_t(int32_t(r9)) * int64_t(int32_t(r5))));
   // add r11,r11,r9
@@ -6522,7 +6522,7 @@ uint64_t f823F2A58(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // add r11,r11,r10
   r11 = r11 + r10;
   // lwz r10,104(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r10,r10,1,0,30
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 1) & 0xFFFFFFFE;
   // add r10,r10,r11
@@ -6621,13 +6621,13 @@ loc_823F2A9C:
   if (cr6.lt) goto loc_823F2A9C;
 loc_823F2B34:
   // lwz r11,24(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).color_key_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).color_key_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f2b50
   if (cr6.eq) goto loc_823F2B50;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -6637,13 +6637,13 @@ loc_823F2B34:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F2B50:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f2b6c
   if (cr6.eq) goto loc_823F2B6C;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -6680,13 +6680,13 @@ uint64_t f823F2B80(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r9,100(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r10,32(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // mullw r9,r9,r5
   r9 = uint64_t(int64_t(int64_t(int32_t(r9)) * int64_t(int32_t(r5))));
   // add r11,r11,r9
@@ -6694,7 +6694,7 @@ uint64_t f823F2B80(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // add r11,r11,r10
   r11 = r11 + r10;
   // lwz r10,104(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r10,r10,1,0,30
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 1) & 0xFFFFFFFE;
   // add r10,r10,r11
@@ -6793,13 +6793,13 @@ loc_823F2BC4:
   if (cr6.lt) goto loc_823F2BC4;
 loc_823F2C5C:
   // lwz r11,24(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).color_key_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).color_key_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f2c78
   if (cr6.eq) goto loc_823F2C78;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -6809,13 +6809,13 @@ loc_823F2C5C:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F2C78:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f2c94
   if (cr6.eq) goto loc_823F2C94;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -6852,13 +6852,13 @@ uint64_t f823F2CA8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r9,100(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r10,32(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // mullw r9,r9,r5
   r9 = uint64_t(int64_t(int64_t(int32_t(r9)) * int64_t(int32_t(r5))));
   // add r11,r11,r9
@@ -6866,7 +6866,7 @@ uint64_t f823F2CA8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // add r11,r11,r10
   r11 = r11 + r10;
   // lwz r10,104(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r10,r10,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 2) & 0xFFFFFFFC;
   // add r10,r10,r11
@@ -6978,13 +6978,13 @@ loc_823F2CF4:
   if (cr6.lt) goto loc_823F2CF4;
 loc_823F2D9C:
   // lwz r11,24(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).color_key_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).color_key_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f2db8
   if (cr6.eq) goto loc_823F2DB8;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -6994,13 +6994,13 @@ loc_823F2D9C:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F2DB8:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f2dd4
   if (cr6.eq) goto loc_823F2DD4;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -7037,13 +7037,13 @@ uint64_t f823F2DE8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r9,100(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r10,32(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // mullw r9,r9,r5
   r9 = uint64_t(int64_t(int64_t(int32_t(r9)) * int64_t(int32_t(r5))));
   // add r11,r11,r9
@@ -7051,7 +7051,7 @@ uint64_t f823F2DE8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // add r11,r11,r10
   r11 = r11 + r10;
   // lwz r10,104(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r10,r10,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 2) & 0xFFFFFFFC;
   // add r10,r10,r11
@@ -7138,13 +7138,13 @@ loc_823F2E2C:
   if (cr6.lt) goto loc_823F2E2C;
 loc_823F2EAC:
   // lwz r11,24(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).color_key_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).color_key_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f2ec8
   if (cr6.eq) goto loc_823F2EC8;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -7154,13 +7154,13 @@ loc_823F2EAC:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F2EC8:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f2ee4
   if (cr6.eq) goto loc_823F2EE4;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -7197,13 +7197,13 @@ uint64_t f823F2EF8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r9,100(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r10,32(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // mullw r9,r9,r5
   r9 = uint64_t(int64_t(int64_t(int32_t(r9)) * int64_t(int32_t(r5))));
   // add r11,r11,r9
@@ -7211,7 +7211,7 @@ uint64_t f823F2EF8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // add r11,r11,r10
   r11 = r11 + r10;
   // lwz r10,104(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r10,r10,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 2) & 0xFFFFFFFC;
   // add r10,r10,r11
@@ -7291,13 +7291,13 @@ loc_823F2F44:
   if (cr6.lt) goto loc_823F2F44;
 loc_823F2FAC:
   // lwz r11,24(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).color_key_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).color_key_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f2fc8
   if (cr6.eq) goto loc_823F2FC8;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -7307,13 +7307,13 @@ loc_823F2FAC:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F2FC8:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f2fe4
   if (cr6.eq) goto loc_823F2FE4;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -7350,13 +7350,13 @@ uint64_t f823F2FF8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r9,100(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r10,32(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // mullw r9,r9,r5
   r9 = uint64_t(int64_t(int64_t(int32_t(r9)) * int64_t(int32_t(r5))));
   // add r11,r11,r9
@@ -7364,7 +7364,7 @@ uint64_t f823F2FF8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // add r11,r11,r10
   r11 = r11 + r10;
   // lwz r10,104(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r10,r10,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 2) & 0xFFFFFFFC;
   // add r10,r10,r11
@@ -7436,13 +7436,13 @@ loc_823F3044:
   if (cr6.lt) goto loc_823F3044;
 loc_823F309C:
   // lwz r11,24(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).color_key_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).color_key_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f30b8
   if (cr6.eq) goto loc_823F30B8;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -7452,13 +7452,13 @@ loc_823F309C:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F30B8:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f30d4
   if (cr6.eq) goto loc_823F30D4;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -7495,13 +7495,13 @@ uint64_t f823F30E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r9,100(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r10,32(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // mullw r9,r9,r5
   r9 = uint64_t(int64_t(int64_t(int32_t(r9)) * int64_t(int32_t(r5))));
   // add r11,r11,r9
@@ -7509,7 +7509,7 @@ uint64_t f823F30E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // add r11,r11,r10
   r11 = r11 + r10;
   // lwz r10,104(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r10,r10,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 2) & 0xFFFFFFFC;
   // add r10,r10,r11
@@ -7621,13 +7621,13 @@ loc_823F3134:
   if (cr6.lt) goto loc_823F3134;
 loc_823F31DC:
   // lwz r11,24(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).color_key_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).color_key_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f31f8
   if (cr6.eq) goto loc_823F31F8;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -7637,13 +7637,13 @@ loc_823F31DC:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F31F8:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f3214
   if (cr6.eq) goto loc_823F3214;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -7680,13 +7680,13 @@ uint64_t f823F3228(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r9,100(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r10,32(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // mullw r9,r9,r5
   r9 = uint64_t(int64_t(int64_t(int32_t(r9)) * int64_t(int32_t(r5))));
   // add r11,r11,r9
@@ -7694,7 +7694,7 @@ uint64_t f823F3228(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // add r11,r11,r10
   r11 = r11 + r10;
   // lwz r10,104(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r10,r10,3,0,28
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 3) & 0xFFFFFFF8;
   // add r10,r10,r11
@@ -7791,13 +7791,13 @@ loc_823F326C:
   if (cr6.lt) goto loc_823F326C;
 loc_823F3300:
   // lwz r11,24(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).color_key_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).color_key_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f331c
   if (cr6.eq) goto loc_823F331C;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -7807,13 +7807,13 @@ loc_823F3300:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F331C:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f3338
   if (cr6.eq) goto loc_823F3338;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -7850,13 +7850,13 @@ uint64_t f823F3348(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r9,100(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r10,32(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // mullw r9,r9,r5
   r9 = uint64_t(int64_t(int64_t(int32_t(r9)) * int64_t(int32_t(r5))));
   // add r11,r11,r9
@@ -7864,7 +7864,7 @@ uint64_t f823F3348(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // add r11,r11,r10
   r11 = r11 + r10;
   // lwz r10,104(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // add r10,r10,r11
   r10 = r10 + r11;
   // cmplw cr6,r11,r10
@@ -7918,13 +7918,13 @@ loc_823F3390:
   if (cr6.lt) goto loc_823F3390;
 loc_823F33C8:
   // lwz r11,24(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).color_key_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).color_key_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f33e4
   if (cr6.eq) goto loc_823F33E4;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -7934,13 +7934,13 @@ loc_823F33C8:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F33E4:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f3400
   if (cr6.eq) goto loc_823F3400;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -7977,13 +7977,13 @@ uint64_t f823F3410(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r9,100(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r10,32(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // mullw r9,r9,r5
   r9 = uint64_t(int64_t(int64_t(int32_t(r9)) * int64_t(int32_t(r5))));
   // add r11,r11,r9
@@ -7991,7 +7991,7 @@ uint64_t f823F3410(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // add r11,r11,r10
   r11 = r11 + r10;
   // lwz r10,104(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r10,r10,1,0,30
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 1) & 0xFFFFFFFE;
   // add r10,r10,r11
@@ -8079,13 +8079,13 @@ loc_823F345C:
   if (cr6.lt) goto loc_823F345C;
 loc_823F34D4:
   // lwz r11,24(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).color_key_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).color_key_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f34f0
   if (cr6.eq) goto loc_823F34F0;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -8095,13 +8095,13 @@ loc_823F34D4:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F34F0:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f350c
   if (cr6.eq) goto loc_823F350C;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -8138,13 +8138,13 @@ uint64_t f823F3520(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r9,100(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r10,32(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // mullw r9,r9,r5
   r9 = uint64_t(int64_t(int64_t(int32_t(r9)) * int64_t(int32_t(r5))));
   // add r11,r11,r9
@@ -8152,7 +8152,7 @@ uint64_t f823F3520(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // add r11,r11,r10
   r11 = r11 + r10;
   // lwz r10,104(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // add r10,r10,r11
   r10 = r10 + r11;
   // cmplw cr6,r11,r10
@@ -8206,13 +8206,13 @@ loc_823F3568:
   if (cr6.lt) goto loc_823F3568;
 loc_823F35A0:
   // lwz r11,24(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).color_key_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).color_key_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f35bc
   if (cr6.eq) goto loc_823F35BC;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -8222,13 +8222,13 @@ loc_823F35A0:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F35BC:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f35d8
   if (cr6.eq) goto loc_823F35D8;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -8265,13 +8265,13 @@ uint64_t f823F35E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r9,100(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r10,32(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // mullw r9,r9,r5
   r9 = uint64_t(int64_t(int64_t(int32_t(r9)) * int64_t(int32_t(r5))));
   // add r11,r11,r9
@@ -8279,7 +8279,7 @@ uint64_t f823F35E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // add r11,r11,r10
   r11 = r11 + r10;
   // lwz r10,104(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r10,r10,1,0,30
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 1) & 0xFFFFFFFE;
   // add r10,r10,r11
@@ -8344,13 +8344,13 @@ loc_823F362C:
   if (cr6.lt) goto loc_823F362C;
 loc_823F3680:
   // lwz r11,24(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).color_key_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).color_key_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f369c
   if (cr6.eq) goto loc_823F369C;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -8360,13 +8360,13 @@ loc_823F3680:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F369C:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f36b8
   if (cr6.eq) goto loc_823F36B8;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -8405,13 +8405,13 @@ uint64_t f823F36C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r9,100(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r10,32(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // mullw r9,r9,r5
   r9 = uint64_t(int64_t(int64_t(int32_t(r9)) * int64_t(int32_t(r5))));
   // add r11,r11,r9
@@ -8419,7 +8419,7 @@ uint64_t f823F36C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // add r11,r11,r10
   r11 = r11 + r10;
   // lwz r10,104(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r10,r10,1,0,30
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 1) & 0xFFFFFFFE;
   // add r8,r10,r11
@@ -8513,13 +8513,13 @@ loc_823F371C:
   if (cr6.lt) goto loc_823F371C;
 loc_823F379C:
   // lwz r11,24(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).color_key_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).color_key_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f37b8
   if (cr6.eq) goto loc_823F37B8;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -8529,13 +8529,13 @@ loc_823F379C:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F37B8:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f37d4
   if (cr6.eq) goto loc_823F37D4;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -8576,13 +8576,13 @@ uint64_t f823F37E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r9,100(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r10,32(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // mullw r9,r9,r5
   r9 = uint64_t(int64_t(int64_t(int32_t(r9)) * int64_t(int32_t(r5))));
   // add r11,r11,r9
@@ -8590,7 +8590,7 @@ uint64_t f823F37E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // add r11,r11,r10
   r11 = r11 + r10;
   // lwz r10,104(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r10,r10,1,0,30
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 1) & 0xFFFFFFFE;
   // add r8,r10,r11
@@ -8719,13 +8719,13 @@ loc_823F3844:
   if (cr6.lt) goto loc_823F3844;
 loc_823F38FC:
   // lwz r11,24(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).color_key_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).color_key_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f3918
   if (cr6.eq) goto loc_823F3918;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -8735,13 +8735,13 @@ loc_823F38FC:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F3918:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f3934
   if (cr6.eq) goto loc_823F3934;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -8782,13 +8782,13 @@ uint64_t f823F3948(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r9,100(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r10,32(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // mullw r9,r9,r5
   r9 = uint64_t(int64_t(int64_t(int32_t(r9)) * int64_t(int32_t(r5))));
   // add r11,r11,r9
@@ -8796,7 +8796,7 @@ uint64_t f823F3948(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // add r11,r11,r10
   r11 = r11 + r10;
   // lwz r10,104(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r10,r10,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 2) & 0xFFFFFFFC;
   // add r8,r10,r11
@@ -8907,13 +8907,13 @@ loc_823F39A4:
   if (cr6.lt) goto loc_823F39A4;
 loc_823F3A3C:
   // lwz r11,24(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).color_key_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).color_key_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f3a58
   if (cr6.eq) goto loc_823F3A58;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -8923,13 +8923,13 @@ loc_823F3A3C:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F3A58:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f3a74
   if (cr6.eq) goto loc_823F3A74;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -8969,13 +8969,13 @@ uint64_t f823F3A88(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r9,100(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r10,32(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // mullw r9,r9,r5
   r9 = uint64_t(int64_t(int64_t(int32_t(r9)) * int64_t(int32_t(r5))));
   // add r11,r11,r9
@@ -8983,7 +8983,7 @@ uint64_t f823F3A88(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // add r11,r11,r10
   r11 = r11 + r10;
   // lwz r10,104(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r10,r10,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 2) & 0xFFFFFFFC;
   // add r4,r10,r11
@@ -9120,13 +9120,13 @@ loc_823F3AD0:
   if (cr6.lt) goto loc_823F3AD0;
 loc_823F3BB0:
   // lwz r11,24(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).color_key_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).color_key_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f3bcc
   if (cr6.eq) goto loc_823F3BCC;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -9136,13 +9136,13 @@ loc_823F3BB0:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F3BCC:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f3be8
   if (cr6.eq) goto loc_823F3BE8;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -9178,13 +9178,13 @@ uint64_t f823F3BF0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r9,100(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r10,32(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // mullw r9,r9,r5
   r9 = uint64_t(int64_t(int64_t(int32_t(r9)) * int64_t(int32_t(r5))));
   // add r11,r11,r9
@@ -9192,7 +9192,7 @@ uint64_t f823F3BF0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // add r11,r11,r10
   r11 = r11 + r10;
   // lwz r10,104(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r10,r10,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 2) & 0xFFFFFFFC;
   // add r8,r10,r11
@@ -9286,13 +9286,13 @@ loc_823F3C44:
   if (cr6.lt) goto loc_823F3C44;
 loc_823F3CC4:
   // lwz r11,24(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).color_key_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).color_key_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f3ce0
   if (cr6.eq) goto loc_823F3CE0;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -9302,13 +9302,13 @@ loc_823F3CC4:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F3CE0:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f3cfc
   if (cr6.eq) goto loc_823F3CFC;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -9348,13 +9348,13 @@ uint64_t f823F3D10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r9,100(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r10,32(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // mullw r9,r9,r5
   r9 = uint64_t(int64_t(int64_t(int32_t(r9)) * int64_t(int32_t(r5))));
   // add r11,r11,r9
@@ -9362,7 +9362,7 @@ uint64_t f823F3D10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // add r11,r11,r10
   r11 = r11 + r10;
   // lwz r10,104(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r10,r10,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 2) & 0xFFFFFFFC;
   // add r5,r10,r11
@@ -9513,13 +9513,13 @@ loc_823F3D60:
   if (cr6.lt) goto loc_823F3D60;
 loc_823F3E4C:
   // lwz r11,24(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).color_key_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).color_key_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f3e68
   if (cr6.eq) goto loc_823F3E68;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -9529,13 +9529,13 @@ loc_823F3E4C:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F3E68:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f3e84
   if (cr6.eq) goto loc_823F3E84;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -9570,13 +9570,13 @@ uint64_t f823F3E90(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r9,100(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r10,32(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // mullw r9,r9,r5
   r9 = uint64_t(int64_t(int64_t(int32_t(r9)) * int64_t(int32_t(r5))));
   // add r11,r11,r9
@@ -9584,7 +9584,7 @@ uint64_t f823F3E90(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // add r11,r11,r10
   r11 = r11 + r10;
   // lwz r10,104(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r10,r10,3,0,28
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 3) & 0xFFFFFFF8;
   // add r4,r10,r11
@@ -9721,13 +9721,13 @@ loc_823F3ED8:
   if (cr6.lt) goto loc_823F3ED8;
 loc_823F3FB8:
   // lwz r11,24(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).color_key_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).color_key_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f3fd4
   if (cr6.eq) goto loc_823F3FD4;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -9737,13 +9737,13 @@ loc_823F3FB8:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F3FD4:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f3ff0
   if (cr6.eq) goto loc_823F3FF0;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -9777,13 +9777,13 @@ uint64_t f823F3FF8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r9,100(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r10,32(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // mullw r9,r9,r5
   r9 = uint64_t(int64_t(int64_t(int32_t(r9)) * int64_t(int32_t(r5))));
   // add r11,r11,r9
@@ -9791,7 +9791,7 @@ uint64_t f823F3FF8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // add r11,r11,r10
   r11 = r11 + r10;
   // lwz r10,104(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r10,r10,1,0,30
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 1) & 0xFFFFFFFE;
   // add r10,r10,r11
@@ -9849,13 +9849,13 @@ loc_823F4044:
   if (cr6.lt) goto loc_823F4044;
 loc_823F4080:
   // lwz r11,24(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).color_key_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).color_key_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f409c
   if (cr6.eq) goto loc_823F409C;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -9865,13 +9865,13 @@ loc_823F4080:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F409C:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f40b8
   if (cr6.eq) goto loc_823F40B8;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -9911,17 +9911,17 @@ uint64_t f823F40C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r10,100(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r8,104(r3)
-  r8 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r8 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // mullw r10,r10,r5
   r10 = uint64_t(int64_t(int64_t(int32_t(r10)) * int64_t(int32_t(r5))));
   // lwz r9,32(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // stw r3,500(r1)
   guest::StoreU32(base, uint32_t(r1) + 500, uint32_t(r3));
   // stw r6,524(r1)
@@ -11157,13 +11157,13 @@ loc_823F46F4:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F4710:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f472c
   if (cr6.eq) goto loc_823F472C;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -11200,17 +11200,17 @@ uint64_t f823F4738(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r10,100(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r8,104(r3)
-  r8 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r8 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // mullw r10,r10,r5
   r10 = uint64_t(int64_t(int64_t(int32_t(r10)) * int64_t(int32_t(r5))));
   // lwz r9,32(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // stw r3,500(r1)
   guest::StoreU32(base, uint32_t(r1) + 500, uint32_t(r3));
   // stw r6,524(r1)
@@ -12443,13 +12443,13 @@ loc_823F4D60:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F4D7C:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f4d98
   if (cr6.eq) goto loc_823F4D98;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -12483,13 +12483,13 @@ uint64_t f823F53B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r9,100(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r10,32(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // mullw r9,r9,r5
   r9 = uint64_t(int64_t(int64_t(int32_t(r9)) * int64_t(int32_t(r5))));
   // add r11,r11,r9
@@ -12497,7 +12497,7 @@ uint64_t f823F53B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // add r11,r11,r10
   r11 = r11 + r10;
   // lwz r10,104(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r10,r10,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 2) & 0xFFFFFFFC;
   // add r10,r10,r11
@@ -12539,13 +12539,13 @@ loc_823F53FC:
   if (cr6.lt) goto loc_823F53FC;
 loc_823F5420:
   // lwz r11,24(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).color_key_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).color_key_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f543c
   if (cr6.eq) goto loc_823F543C;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -12555,13 +12555,13 @@ loc_823F5420:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F543C:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f5458
   if (cr6.eq) goto loc_823F5458;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -12598,13 +12598,13 @@ uint64_t f823F5468(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,96(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).row_pitch_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).row_pitch_bits();
   // lwz r9,100(r3)
-  r9 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).slice_pitch_address());
+  r9 = schema::ImageCodec(base, uint32_t(r3)).slice_pitch_bits();
   // mullw r11,r11,r4
   r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r4))));
   // lwz r10,32(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).data_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).surface_bits();
   // mullw r9,r9,r5
   r9 = uint64_t(int64_t(int64_t(int32_t(r9)) * int64_t(int32_t(r5))));
   // add r11,r11,r9
@@ -12612,7 +12612,7 @@ uint64_t f823F5468(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // add r11,r11,r10
   r11 = r11 + r10;
   // lwz r10,104(r3)
-  r10 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r10 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r10,r10,3,0,28
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 3) & 0xFFFFFFF8;
   // add r10,r10,r11
@@ -12657,13 +12657,13 @@ loc_823F54AC:
   if (cr6.lt) goto loc_823F54AC;
 loc_823F54D4:
   // lwz r11,24(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).color_key_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).color_key_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f54f0
   if (cr6.eq) goto loc_823F54F0;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6
@@ -12673,13 +12673,13 @@ loc_823F54D4:
   game::ImageCodec::ApplyColorKey(base, r3, r4);
 loc_823F54F0:
   // lwz r11,16(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).srgb_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).srgb_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x823f550c
   if (cr6.eq) goto loc_823F550C;
   // lwz r11,104(r3)
-  r11 = guest::LoadU32(base, schema::ImageCodec(base, uint32_t(r3)).width_address());
+  r11 = schema::ImageCodec(base, uint32_t(r3)).width_bits();
   // rlwinm r11,r11,4,0,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
   // subf r4,r11,r6

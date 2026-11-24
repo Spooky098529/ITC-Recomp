@@ -1130,12 +1130,9 @@ bool OpenNative() {
 ui_movies::OpenCalls OpenCalls(lifted::Regs& ctx, uint8_t* base, uint32_t sp) {
   ui_movies::OpenCalls calls;
   calls.make = [&ctx, base, sp]() -> uint32_t {
-    uint32_t movie = 0;
-    if (const auto block = memory::crt::OperatorNew(base, 40976)) {
-      movie = *block;
-    } else {
-      movie = CallFrom(ctx, base, sp, 128, 0x8211E854, ITC_REGS_FN(lifted::original::c825A6880), 40976);
-    }
+    // In host memory (E5 step 5), where the original's operator new
+    // returned at 0x8211E854.
+    uint32_t movie = schema::UiMovie::New(base).address;
     if (movie == 0) {
       return 0;
     }

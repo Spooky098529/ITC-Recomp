@@ -66,8 +66,9 @@ double FontTextWidth(uint8_t* base, uint32_t font, uint32_t params, uint32_t tex
   double line = zero, widest = zero;
   FontSetParams(base, font, params);
   params = Params(base, font);
-  const uint32_t page = guest::LoadU32(
-      base, Font(base, font).pages_address() + (FontDrawParams(base, params).page() << 2));
+  // The font is a host object (E5 step 5): its pages (+20 + 4i) by offset.
+  const uint32_t page = uint32_t(
+      Font(base, font).load_at(20 + (FontDrawParams(base, params).page() << 2), 4));
   Font(base, font).set_page(page);
   uint32_t c = FontText(base, text).unit();
   if (c != 0) {
@@ -514,10 +515,10 @@ bool FontBuildVertices(uint8_t* base, uint32_t font, uint32_t text) {
     if (c > 0xFFF5 && c <= 0xFFFF) {
       // A color from the font's ten (3 bytes each at +16528).
       const uint32_t k = (0xFFFF - c) & 0xFFFF;
-      const uint32_t colors = Font(base, font).colors_address();
-      const uint32_t r = guest::LoadU8(base, colors + 3 * k);
-      const uint32_t g = guest::LoadU8(base, colors + 1 + 3 * k);
-      const uint32_t b = guest::LoadU8(base, colors + 2 + 3 * k);
+      const Font f(base, font);
+      const uint32_t r = uint32_t(f.load_at(16528 + 3 * k, 1));
+      const uint32_t g = uint32_t(f.load_at(16528 + 1 + 3 * k, 1));
+      const uint32_t b = uint32_t(f.load_at(16528 + 2 + 3 * k, 1));
       color = ((((r | alpha_bits) << 8) | g) << 8) | b;
       continue;
     }
@@ -660,8 +661,7 @@ DrawPassResult FontDrawPass(uint8_t* base, uint32_t font, uint32_t text) {
       continue;
     }
     command(9, 1);  // SetPixelShader: the channel's
-    guest::StoreU32(base, slot() + 0,
-                    guest::LoadU32(base, Font(base, font).pixel_shaders_address() + 4 * i));
+    guest::StoreU32(base, slot() + 0, uint32_t(Font(base, font).load_at(16568 + 4 * i, 4)));
     command(19, 1);  // DrawPrimitiveUP: a triangle list, 24-byte vertices
     const uint32_t at = slot();
     guest::StoreU32(base, at + 0, 4);
@@ -680,7 +680,7 @@ void FontDrawSetUp(uint8_t* base, uint32_t font, uint32_t params) {
   ITC_NATIVE_RUNNING("sub_8210A400 Font::Draw");
   FontSetParams(base, font, params);
   const uint32_t page = FontDrawParams(base, Params(base, font)).page();
-  Font(base, font).set_page(guest::LoadU32(base, Font(base, font).pages_address() + (page << 2)));
+  Font(base, font).set_page(uint32_t(Font(base, font).load_at(20 + (page << 2), 4)));
 }
 
 uint32_t TextDrawSetUp(uint8_t* base, uint32_t params) {

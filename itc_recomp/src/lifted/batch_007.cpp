@@ -2895,7 +2895,7 @@ loc_821491E4:
   r3 = guest::LoadU32(base, uint32_t(r31) + 0);
   // bl 0x825a6940
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A6940(base, LIFTED_ARGS(0x82149224, r31)); r3 = o.r3; f1 = o.f1; }
+  { r3 = memory::NewBlob(uint32_t(r3), "SysProfileResults"); f1 = 0; }  // host_alloc 0x82149224 (SysProfileResults, a blob)
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // lwz r5,0(r31)
@@ -8864,7 +8864,7 @@ lifted::Result f8215E2E0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r11,84(r1)
   guest::StoreU32(base, uint32_t(r1) + 84, uint32_t(r11));
   // lwz r10,0(r10)
-  r10 = guest::LoadU32(base, schema::Viewports(base, uint32_t(r10)).first_address());
+  r10 = schema::Viewports(base, uint32_t(r10)).first_bits();
   // stw r9,96(r1)
   guest::StoreU32(base, uint32_t(r1) + 96, uint32_t(r9));
   // stw r11,100(r1)
@@ -8909,13 +8909,13 @@ lifted::Result f8215E2E0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,11496(r23)
   r11 = guest::LoadU32(base, uint32_t(r23) + 11496);
   // lwz r10,8(r11)
-  r10 = guest::LoadU32(base, schema::Viewports(base, uint32_t(r11)).split_address());
+  r10 = schema::Viewports(base, uint32_t(r11)).split_bits();
   // cmpwi cr6,r10,0
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // beq cr6,0x8215e3d0
   if (cr6.eq) goto loc_8215E3D0;
   // lwz r11,4(r11)
-  r11 = guest::LoadU32(base, schema::Viewports(base, uint32_t(r11)).second_address());
+  r11 = schema::Viewports(base, uint32_t(r11)).second_bits();
   // li r5,1
   r5 = uint64_t(int64_t(1));
   // li r4,2
@@ -9157,7 +9157,7 @@ loc_8215E510:
   // stw r29,168(r1)
   guest::StoreU32(base, uint32_t(r1) + 168, uint32_t(r29));
   // lwz r11,8(r11)
-  r11 = guest::LoadU32(base, schema::Viewports(base, uint32_t(r11)).split_address());
+  r11 = schema::Viewports(base, uint32_t(r11)).split_bits();
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x8215e60c

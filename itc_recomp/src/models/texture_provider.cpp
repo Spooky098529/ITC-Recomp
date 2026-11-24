@@ -148,7 +148,9 @@ std::optional<uint32_t> PointersAllocate(uint8_t* base, uint32_t count) {
   if (!CanAllocatePointers(base, count)) {
     return std::nullopt;
   }
-  return memory::crt::OperatorNew(base, count << 2);
+  // A blob in PC memory (E5 step 5): the words in the guest's byte order,
+  // read and moved by address as before; operator delete frees it.
+  return Slot::New(base, count << 2).address;
 }
 
 uint32_t PointersUninitializedCopy(uint8_t* base, uint32_t first, uint32_t last,

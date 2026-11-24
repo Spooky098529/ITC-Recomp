@@ -59,7 +59,9 @@ uint32_t HubCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& ca
   ITC_NATIVE_RUNNING("sub_8218E078 Type2Hub::Create");
   const uint32_t frame = Frame(base, sp, 128);
   schema::Type2Hub(base, machine).set_loaded(0);
-  const schema::PageObject pages = schema::PageObject(base, uint32_t(Alloc(calls, frame, 0x8218E0A4, 28)));
+  // Host objects (E5 step 5) in place of the VirtualAlloc(28) at 0x8218E0A4
+  // and the VirtualAlloc(68) at 0x8218E0E0; the globals hold their handles.
+  const schema::PageObject pages = schema::PageObject::New(base);
   Globals::set_hub_pages(base, pages.address);
   pages.set_next_page(0);
   pages.set_page(0);
@@ -67,7 +69,7 @@ uint32_t HubCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& ca
   pages.set_unknown_20(kNone);
   pages.set_step(kNone);
   pages.set_step_started(0);
-  const schema::FrontEndMenu menu = schema::FrontEndMenu(base, uint32_t(Alloc(calls, frame, 0x8218E0E0, 68)));
+  const schema::FrontEndMenu menu = schema::FrontEndMenu::New(base);
   Globals::set_hub_menu(base, menu.address);
   menu.set_first_item(0);
   menu.set_wraps(1);
@@ -232,7 +234,7 @@ uint32_t HubOpenMovie(uint8_t* base, uint32_t sp, const Calls& calls) {
     }
     return calls.Call(function, r1, lr, regs[0], regs[1], regs[2], regs[3]);
   };
-  stand_models::MakeModel(base, call, Load(base, Load(base, build_screen::kStandHolder)), block, 1,
+  stand_models::MakeModel(base, call, schema::StandHolder(base, Load(base, build_screen::kStandHolder)).stage_block_0(), block, 1,
                           frame);
   calls.Call(kMoviesOpen, frame, 0x8218E408, kHubMovie, 22545);
   return HubLoadNoticeImages(base, frame, calls);

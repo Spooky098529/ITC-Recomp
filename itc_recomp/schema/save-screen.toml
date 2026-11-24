@@ -65,6 +65,10 @@ fields = [
 measures = ["new<68>@SaveScreen::OnEnter", "new<28>@SaveScreen::OnEnter.+8.+-31660"]
 size = 68
 origin = "allocated"
+# In host memory (E5 step 5, 2026-11-24): made by SaveScreen::OnEnter
+# (src/save_screen/handlers.cpp, in place of its VirtualAlloc at 0x821A26A4),
+# freed by SaveScreen::Destroy's VirtualFree (0x821A1CF8).
+storage = "host"
 fields = [
   { name = "set_up", offset = 0, type = "u32", note = "1 once a dialog is set up" },
   { name = "answer", offset = 4, type = "u32", note = "the result the end pages post by (kind 0: 1 one answer, else the other; kinds 2 to 5: 1 to 3, else 0)" },

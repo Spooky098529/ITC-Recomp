@@ -15,6 +15,7 @@
 #include "scene/scene.h"
 #include "schema/archive.h"
 #include "schema/car_draw.h"
+#include "schema/type6_type7_modes.h"
 #include "schema/scene_models.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -63,7 +64,10 @@ int64_t GarageCameraLoadPresets(uint8_t* base, uint32_t camera,
   if (size == 0) {
     size = entry.stored_size();
   }
-  const uint32_t block = memory::AllocPages(size, 4096);
+  // The asset's buffer, a blob (E5 step 5: PC memory in the guest's byte
+  // order) in place of the original's VirtualAlloc (0 for 0 bytes, as the
+  // layer's pages gave); GarageCamera::OnPresetsLoaded frees it.
+  const uint32_t block = size == 0 ? 0 : schema::GaragePresetsData::New(base, size).address;
   c_runtime::XMemSet(base, block, 0, size);
   return load(kPresetsAsset, block, kOnPresetsLoaded, camera);
 }
@@ -148,7 +152,9 @@ uint64_t StandSceneCreate(uint8_t* base, uint32_t cars, uint32_t sp, const LoadC
   if (G::stand_holder<schema::View>(base).address != 0) {
     return created;
   }
-  const uint32_t holder = memory::AllocPages(24, 4096);
+  // A host object (E5 step 5) in place of the VirtualAlloc(24) at
+  // 0x82180B3C; the global holds its handle.
+  const uint32_t holder = schema::StandHolder::New(base).address;
   G::set_stand_holder(base, holder);
   schema::StandHolder(base, holder).set_unknown_12(0);
   G::stand_holder(base).set_unknown_16(0);
@@ -156,9 +162,9 @@ uint64_t StandSceneCreate(uint8_t* base, uint32_t cars, uint32_t sp, const LoadC
   // The three slots, stage_block_0 to 2.
   for (uint32_t i = 0; i < 3; i++) {
     const uint32_t slot = memory::AllocPages(4, 4096);
-    StoreU32(base, 4 * i + G::stand_holder(base).stage_block_0_address(), slot);
-    StandSlotInit(base, LoadU32(base, 4 * i + G::stand_holder(base).stage_block_0_address()), i,
-                  frame, load);
+    // The holder's words through its view (a host object, E5 step 5).
+    G::stand_holder(base).store_at(4 * i, 4, slot);
+    StandSlotInit(base, uint32_t(G::stand_holder(base).load_at(4 * i, 4)), i, frame, load);
   }
   const uint32_t record = frame + 80;
   scene::SetUpConstruct(base, record);
@@ -180,8 +186,7 @@ std::optional<uint64_t> StandSceneRelease(uint8_t* base) {
     return std::nullopt;
   }
   for (uint32_t offset = 0; offset < 12; offset += 4) {
-    const uint32_t slot =
-        LoadU32(base, schema::StandHolder(base, holder).stage_block_0_address() + offset);
+    const uint32_t slot = uint32_t(schema::StandHolder(base, holder).load_at(offset, 4));
     if (slot != 0 && !SlotIsPages(base, slot)) {
       return std::nullopt;
     }
@@ -192,13 +197,13 @@ std::optional<uint64_t> StandSceneRelease(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82180738 StandScene::Release");
   uint32_t r3 = G::stand_holder<schema::View>(base).address;
   for (uint32_t offset = 0; offset < 12; offset += 4) {
-    const uint32_t slot = LoadU32(base, offset + schema::StandHolder(base, r3).stage_block_0_address());
+    const uint32_t slot = uint32_t(schema::StandHolder(base, r3).load_at(offset, 4));
     if (slot == 0) {
       continue;
     }
     StandSlotFree(base, slot);
-    memory::FreePages(LoadU32(base, offset + G::stand_holder(base).stage_block_0_address()));
-    StoreU32(base, offset + G::stand_holder(base).stage_block_0_address(), 0);
+    memory::FreePages(uint32_t(G::stand_holder(base).load_at(offset, 4)));
+    G::stand_holder(base).store_at(offset, 4, 0);
     r3 = G::stand_holder<schema::View>(base).address;
   }
   const uint64_t freed = memory::FreePages(r3) ? 1 : 0;

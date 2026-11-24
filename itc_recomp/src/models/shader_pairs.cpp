@@ -6,7 +6,6 @@
 #include "archive/archive.h"
 #include "base/log.h"
 #include "guest.h"
-#include "memory/c_runtime_heap.h"
 #include "schema/models.h"
 
 namespace models {
@@ -19,22 +18,20 @@ std::optional<int64_t> ShadersLoadPair(uint8_t* base, uint32_t asset, uint32_t p
   const uint32_t vertex_size = archive::AssetSize(base, asset);
   const uint32_t pixel_size = archive::AssetSize(base, asset + 1);
   // The original stores the cursor before its operator new; nothing reads it
-  // in between, so the allocation goes first here, for the fallback.
-  const auto context = memory::crt::OperatorNew(base, schema::ShaderPairLoad::kSize);
-  if (!context) {
-    return std::nullopt;
-  }
+  // in between, so the allocation goes first here.
+  // A host object (E5 step 5): freed by Shaders::OnPairLoaded's operator
+  // delete.
+  const schema::ShaderPairLoad pair_load = schema::ShaderPairLoad::New(base);
   const uint32_t cursor = G::shader_cursor(base);
   const uint32_t buffer = G::load_buffer(base);
   const uint32_t vertex_file = buffer + cursor;
   const uint32_t pixel_file = buffer + cursor + vertex_size;
   G::set_shader_cursor(base, cursor + vertex_size + pixel_size);
-  const schema::ShaderPairLoad pair_load(base, *context);
   pair_load.set_vertex_file(vertex_file);
   pair_load.set_pixel_file(pixel_file);
   pair_load.set_pair(pair);
   load(asset, vertex_file, 0, 0);
-  return load(asset + 1, pixel_file, kPairLoaded, *context);
+  return load(asset + 1, pixel_file, kPairLoaded, pair_load.address);
 }
 
 uint32_t ShadersLoadAll(uint8_t* base,

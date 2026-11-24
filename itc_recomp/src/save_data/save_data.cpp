@@ -446,8 +446,11 @@ uint32_t MenuListInit(uint8_t* base, uint32_t list, const MenuListArgs& a) {
   if (old != 0) {
     memory::FreePages(old);  // VirtualFree(old, 0, MEM_RELEASE)
   }
-  // VirtualAlloc(0, count x 4, MEM_COMMIT, PAGE_READWRITE).
-  const uint32_t flags = memory::AllocPages(m.count() << 2, 4096);
+  // VirtualAlloc(0, count x 4, MEM_COMMIT, PAGE_READWRITE): a blob (E5 step
+  // 5, PC memory in the guest's byte order, zeroed as the pages were); 0 for
+  // 0 bytes, as VirtualAlloc gave.
+  const uint32_t bytes = m.count() << 2;
+  const uint32_t flags = bytes == 0 ? 0 : schema::MenuListEnabled::New(base, bytes).address;
   m.set_enabled(flags);
   for (int32_t i = 0; i < int32_t(m.count()); i++) {
     guest::StoreU32(base, m.enabled().address + 4 * uint32_t(i), 1);

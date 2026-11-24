@@ -233,13 +233,26 @@ fields = [
 
 # Pool 5 of the second set: the wheels (16,800 bytes, vtable 0x82006638,
 # SceneWheels::SceneWheels sub_820ECE40).
+# In host memory (E5 step 5): made by CarScene::SetUp (the hand port's pool
+# loop, src/car_models/scene_fill.cpp; the lifted original's VirtualAlloc
+# returning to 0x820C9070), freed by ScenePools::DestroyB's VirtualFree (a
+# handle; src/scene/scene.cpp, the original's returning to 0x820C5A34). As
+# SceneCockpit: its scalar fields are the layout; the record (+32) and the
+# point block (+192: SecondSetWheelPoints, its groups, the 240-byte point
+# records, the morph's weights) stay guest-shaped views reaching the host
+# object through raw accesses (guest order but for the fields here).
 [SceneWheels]
 measure = "SceneWheels"
 size = 16800
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820C9070]
 vtable = 0x82006638
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82006638; the pool objects' base 0x82004F90 before ~PoolNode" },
+  { name = "list", offset = 4, type = "u32", note = "the PoolNode's list (pool 5's of the second set)" },
+  { name = "next", offset = 8, type = "u32", note = "the PoolNode's links" },
+  { name = "previous", offset = 12, type = "u32" },
   { name = "state", offset = 16, type = "u32", note = "the pool object's: 3 in use" },
   { name = "index", offset = 20, type = "u32", note = "its index in the pool" },
   { name = "car_model", offset = 24, type = "u32", note = "the second set's car model (0 for traffic)" },

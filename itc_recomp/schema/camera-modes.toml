@@ -116,6 +116,14 @@ fields = [
 measure = "new<12>@Viewports::Init"
 size = 12
 origin = "allocated"
+# In host memory since E5 step 5 (2026-11-24): made by Viewports::Init
+# (cameras::ViewportsInit; the original's VirtualAlloc(12) at 0x820AB380),
+# freed by Viewports::Release (cameras::ReleaseViewports; the original's
+# VirtualFree at 0x820AA484, which returned 1); [0x826C2CE8] holds its
+# handle. Its two viewports stay guest pages.
+storage = "host"
+host_alloc = [0x820AB380]
+host_free = [{ call = 0x820AA484, reg = "r3", returns = 1 }]
 fields = [
   { name = "first", offset = 0, type = "ptr", to = "Viewport", note = "player 1's viewport" },
   { name = "second", offset = 4, type = "ptr", to = "Viewport", note = "player 2's viewport" },
@@ -515,8 +523,35 @@ fields = [
   { name = "unknown_12", offset = 12, type = "f32" },
   { name = "duration", offset = 16, type = "f32", note = "CameraAnims::Duration's answer" },
   { name = "unknown_20", offset = 20, type = "bytes", count = 40, note = "0" },
-  { name = "values", offset = 60, type = "u32", note = "its floats, one a frame (guest pages); \"data\" before E5 step 3 (a host view's data() is its struct)" },
+  { name = "values", offset = 60, type = "u32", note = "its floats, one a frame (CameraAnimValues, a blob since E5 step 5); \"data\" before E5 step 3 (a host view's data() is its struct)" },
 ]
+
+# A camera animation block's values (CameraAnimBlock +60): the file block's
+# data copied out, one float a frame. A blob (E5 step 5, 2026-11-24): made by
+# CameraAnim::ParseObject (camera_modes::AnimParseObject; the original's
+# VirtualAlloc(data_size) returning at 0x82150294), cleared and filled by
+# XMemSet and XMemCpy, read by address (CameraAnim::EvalCamera, EvalTarget,
+# Matrix), freed by CameraAnimBlock::Free's VirtualFree.
+[CameraAnimValues]
+size = 0
+origin = "allocated"
+storage = "blob"
+blob_alloc = [{ call = 0x82150294, reg = "r4" }]
+fields = []
+
+# A camera animation file as loaded (CameraAnims::Load's buffer, the
+# archive's callback CameraAnims::OnLoaded gets it as r4): its objects
+# (CameraAnimFileObject) one after another. A blob (E5 step 5, 2026-11-24):
+# made by CameraAnims::Load (camera_modes::AnimsLoad; the original's
+# VirtualAlloc(Archive::AssetSize(id)) returning at 0x82150B54), filled by
+# Archive::Load, read by CameraAnim::ParseObject, freed by OnLoaded's
+# VirtualFree.
+[CameraAnimsFile]
+size = 0
+origin = "allocated"
+storage = "blob"
+blob_alloc = [{ call = 0x82150B54, reg = "r4" }]
+fields = []
 
 # An object in a camera animation file (CameraAnims::OnLoaded).
 [CameraAnimFileObject]
@@ -648,6 +683,15 @@ fields = [
 measure = "CameraPath::OnLoaded.r4"
 size = 16
 origin = "file"
+# A blob (E5 step 5, 2026-11-24): the whole file, made by CameraPath::Load
+# (camera_modes::PathRequest; the original's VirtualAlloc returning at
+# 0x82152DC0), kept at the path buffer's +20 (CameraPathBuffer block), filled
+# by Archive::Load, its keys' indexes made addresses inside it by
+# CameraPath::OnLoaded (values in its handle's span), read by address
+# (CameraPath::Evaluate, Curve::Evaluate), freed by Buffer28::Free's
+# VirtualFree.
+storage = "blob"
+blob_alloc = [{ call = 0x82152DC0, reg = "r4" }]
 fields = [
   { name = "path_count", offset = 0, type = "u32", note = "its 20-byte paths (CameraPathRecord) at +16" },
   { name = "key_count", offset = 4, type = "u32", note = "its 216-byte keys after them" },

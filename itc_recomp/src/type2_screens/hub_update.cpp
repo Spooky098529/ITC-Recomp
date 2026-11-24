@@ -37,7 +37,7 @@ constexpr uint32_t kCarInit = 0x820CD5D8;      // Car::Init
 constexpr uint32_t kCarRefresh = 0x820C4998;   // Car::Refresh
 
 schema::Type2HubData Data(uint8_t* base) { return Globals::hub_data(base); }
-uint32_t Holder(uint8_t* base) { return Load(base, Load(base, kStandHolder)); }
+uint32_t Holder(uint8_t* base) { return schema::StandHolder(base, Load(base, kStandHolder)).stage_block_0(); }
 
 }  // namespace
 

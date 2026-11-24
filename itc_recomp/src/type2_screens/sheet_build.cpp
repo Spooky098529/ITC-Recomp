@@ -41,10 +41,12 @@ uint64_t SheetCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& 
   ITC_NATIVE_RUNNING("sub_821B8120 PowerGraphScreen::Create");
   const uint32_t frame = Frame(base, sp, 112);
   schema::SpecSheet(base, machine).set_loaded(0);
-  const uint32_t pages = uint32_t(Alloc(calls, frame, 0x821B8154, 28));
+  // Host objects (E5 step 5) in place of the VirtualAlloc(28) at 0x821B8154
+  // and the VirtualAlloc(68) at 0x821B8190; the globals hold their handles.
+  const uint32_t pages = schema::PageObject::New(base).address;
   Globals::set_sheet_pages(base, pages);
   ResetPages(base, pages);
-  const schema::FrontEndMenu menu = schema::FrontEndMenu(base, uint32_t(Alloc(calls, frame, 0x821B8190, 68)));
+  const schema::FrontEndMenu menu = schema::FrontEndMenu::New(base);
   Globals::set_sheet_menu(base, menu.address);
   menu.set_first_item(0);
   menu.set_wraps(0);
@@ -126,16 +128,19 @@ uint64_t BuildCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& 
   ITC_NATIVE_RUNNING("sub_8219BD80 BuildScreen::Create");
   const uint32_t frame = Frame(base, sp, 112);
   schema::BuildScreen(base, machine).set_loaded(0);
-  const uint32_t pages = uint32_t(Alloc(calls, frame, 0x8219BDB4, 28));
+  // Host objects (E5 step 5) in place of the VirtualAlloc(28) at 0x8219BDB4
+  // and the VirtualAlloc(72)s at 0x8219BDF0 and 0x8219BE1C; the globals hold
+  // their handles.
+  const uint32_t pages = schema::PageObject::New(base).address;
   Globals::set_build_pages(base, pages);
   ResetPages(base, pages);
-  const uint32_t list = uint32_t(Alloc(calls, frame, 0x8219BDF0, 72));
+  const uint32_t list = schema::MenuList::New(base).address;
   Globals::set_build_list(base, list);
   if (list != 0) {
     MenuList(base, list).set_enabled(0u);
     MenuList(base, list).set_player(0);
   }
-  const uint32_t groups = uint32_t(Alloc(calls, frame, 0x8219BE1C, 72));
+  const uint32_t groups = schema::MenuList::New(base).address;
   Globals::set_build_group_list(base, groups);
   if (groups != 0) {
     MenuList(base, groups).set_enabled(0u);
@@ -226,7 +231,7 @@ uint32_t BuildSaveBuildStates(uint8_t* base, uint32_t sp) {
 uint32_t BuildLeavePage(uint8_t* base, uint32_t mode, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8219C3A8 BuildScreen::LeavePage");
   const uint32_t frame = Frame(base, sp, 96);
-  build_screen::SetDark(base, frame, Load(base, Load(base, build_screen::kStandHolder)), 0);
+  build_screen::SetDark(base, frame, schema::StandHolder(base, Load(base, build_screen::kStandHolder)).stage_block_0(), 0);
   const uint32_t r3 = BuildSaveBuildStates(base, frame);
   Post(base, mode, 20);
   return r3;

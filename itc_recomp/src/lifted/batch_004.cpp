@@ -8121,7 +8121,7 @@ lifted::Result f820C9D90(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // lwz r11,11848(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 11848);
   // lwz r3,4(r11)
-  r3 = guest::LoadU32(base, schema::CarParams(base, uint32_t(r11)).block_address());
+  r3 = schema::CarParams(base, uint32_t(r11)).block_bits();
   // bl 0x825a71c0
   // (left out: dead in C++)
   { const lifted::Result o = lifted::entry::e825A71C0(base, LIFTED_ARGS(0x820C9DB0, r31)); r3 = o.r3; f1 = o.f1; }
@@ -8544,7 +8544,7 @@ lifted::Result f820D69B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r31,r6,80
   r31 = uint64_t(int64_t(int64_t(r6) + 80));
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, schema::Pool4Object(base, uint32_t(r31) - 80).slot_address() + 4);
+  r11 = uint32_t(schema::Pool4Object(base, uint32_t(r31) - 80).load_at(84, 4));
   // cmplw cr6,r11,r3
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), uint32_t(r3), so);
   // bne cr6,0x820d69f4
@@ -8564,7 +8564,7 @@ lifted::Result f820D69B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r11,3
   r11 = uint64_t(int64_t(3));
   // stw r11,20(r31)
-  guest::StoreU32(base, schema::Pool4Object(base, uint32_t(r31) - 80).slot_state_address(), uint32_t(r11));
+  schema::Pool4Object(base, uint32_t(r31) - 80).set_slot_state_bits(uint32_t(r11));
 loc_820D69F4:
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
@@ -8603,7 +8603,7 @@ lifted::Result f820D6C10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r11 = uint64_t(int64_t(int64_t(r30) + 100));
 loc_820D6C28:
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, schema::CarParts(base, uint32_t(r11) - 100).loads_address() + 4);
+  r10 = uint32_t(schema::CarParts(base, uint32_t(r11) - 100).load_at(100, 4));
   // cmplw cr6,r10,r3
   cr6 = lifted::Compare<uint32_t>(uint32_t(r10), uint32_t(r3), so);
   // beq cr6,0x820d6c48
@@ -8682,7 +8682,7 @@ lifted::Result f820D6C88(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r11 = uint64_t(int64_t(int64_t(r30) + 100));
 loc_820D6CA0:
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, schema::CarParts(base, uint32_t(r11) - 100).loads_address() + 4);
+  r10 = uint32_t(schema::CarParts(base, uint32_t(r11) - 100).load_at(100, 4));
   // cmplw cr6,r10,r3
   cr6 = lifted::Compare<uint32_t>(uint32_t(r10), uint32_t(r3), so);
   // beq cr6,0x820d6cc0

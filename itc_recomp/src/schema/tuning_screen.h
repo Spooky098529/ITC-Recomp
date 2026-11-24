@@ -1186,33 +1186,77 @@ struct UiMovieNode : View {
 };
 
 // allocated; measure: new<24>@StandScene::Create
+#pragma pack(push, 1)
+struct StandHolderData {
+  uint32_t stage_block_0 = 0;  // +0
+  uint32_t stage_block_1 = 0;  // +4
+  uint32_t stage_block_2 = 0;  // +8
+  uint32_t unknown_12 = 0;  // +12
+  uint32_t unknown_16 = 0;  // +16
+  uint32_t model_made = 0;  // +20
+};
+#pragma pack(pop)
+static_assert(sizeof(StandHolderData) == 24);
+inline constexpr memory::LayoutField kStandHolderFields[] = {{0, 4}, {4, 4}, {8, 4}, {12, 4}, {16, 4}, {20, 4}};
+inline constexpr memory::Layout kStandHolderLayout = {kStandHolderFields, 6};
+
 struct StandHolder : View {
   using View::View;
   static constexpr uint32_t kSize = 24;
+  static constexpr bool kHost = true;
+  static constexpr bool kDual = false;
+  StandHolderData* data() const { return static_cast<StandHolderData*>(memory::HandleObject(address)); }
+  static StandHolder New(uint8_t* base) {
+    return StandHolder(base, memory::MakeHandle(new StandHolderData(), sizeof(StandHolderData), "StandHolder", &kStandHolderLayout));
+  }
+  template <uint32_t Stride = kSize>
+  static StandHolder NewArray(uint8_t* base, uint32_t count) {
+    static_assert(sizeof(StandHolderData) == Stride, "an array's stride is the guest size");
+    auto* p = static_cast<StandHolderData*>(::operator new(sizeof(StandHolderData) * std::max<uint32_t>(count, 1)));
+    for (uint32_t i = 0; i < count; i++) new (p + i) StandHolderData();
+    return StandHolder(base, memory::MakeHandle(p, sizeof(StandHolderData) * count, "StandHolder", &kStandHolderLayout, sizeof(StandHolderData)));
+  }
+  StandHolder at(uint32_t i) const { return StandHolder(base, address + i * kSize); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
+  StandHolderData* direct() const { return static_cast<StandHolderData*>(memory::HandleOwn(address, &kStandHolderLayout)); }
+  uint64_t load_at(uint32_t offset, uint32_t width) const { if (auto* d = direct()) return memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), kStandHolderLayout, offset, width); return memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) : guest::LoadU64(base, address + offset); }
+  void store_at(uint32_t offset, uint32_t width, uint64_t v) const { if (auto* d = direct()) { memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), kStandHolderLayout, offset, width, v); return; } if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v); }
   // a block holding the garage stage at +0
-  uint32_t stage_block_0() const { return guest::LoadU32(base, address + 0); }
-  void set_stage_block_0(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t stage_block_0_address() const { return address + 0; }
+  uint32_t stage_block_0_bits() const { if (auto* d = direct()) return d->stage_block_0; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_stage_block_0_bits(uint32_t v) const { if (auto* d = direct()) { d->stage_block_0 = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
+  uint32_t stage_block_0() const { if (auto* d = direct()) return d->stage_block_0; return uint32_t((memory::IsHandle(address + 0) ? uint32_t(memory::OwnerLoad(address + 0, 4)) : guest::LoadU32(base, address + 0))); }
+  void set_stage_block_0(uint32_t v) const { if (auto* d = direct()) { d->stage_block_0 = v; return; } if (memory::IsHandle(address + 0)) memory::OwnerStore(address + 0, 4, v); else guest::StoreU32(base, address + 0, v); }
   // PanelSetBase::UpdateStand
-  uint32_t stage_block_1() const { return guest::LoadU32(base, address + 4); }
-  void set_stage_block_1(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t stage_block_1_address() const { return address + 4; }
+  uint32_t stage_block_1_bits() const { if (auto* d = direct()) return d->stage_block_1; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_stage_block_1_bits(uint32_t v) const { if (auto* d = direct()) { d->stage_block_1 = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
+  uint32_t stage_block_1() const { if (auto* d = direct()) return d->stage_block_1; return uint32_t((memory::IsHandle(address + 4) ? uint32_t(memory::OwnerLoad(address + 4, 4)) : guest::LoadU32(base, address + 4))); }
+  void set_stage_block_1(uint32_t v) const { if (auto* d = direct()) { d->stage_block_1 = v; return; } if (memory::IsHandle(address + 4)) memory::OwnerStore(address + 4, 4, v); else guest::StoreU32(base, address + 4, v); }
   // PanelSetBase::UpdateStand
-  uint32_t stage_block_2() const { return guest::LoadU32(base, address + 8); }
-  void set_stage_block_2(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t stage_block_2_address() const { return address + 8; }
+  uint32_t stage_block_2_bits() const { if (auto* d = direct()) return d->stage_block_2; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_stage_block_2_bits(uint32_t v) const { if (auto* d = direct()) { d->stage_block_2 = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
+  uint32_t stage_block_2() const { if (auto* d = direct()) return d->stage_block_2; return uint32_t((memory::IsHandle(address + 8) ? uint32_t(memory::OwnerLoad(address + 8, 4)) : guest::LoadU32(base, address + 8))); }
+  void set_stage_block_2(uint32_t v) const { if (auto* d = direct()) { d->stage_block_2 = v; return; } if (memory::IsHandle(address + 8)) memory::OwnerStore(address + 8, 4, v); else guest::StoreU32(base, address + 8, v); }
   // StandScene::Create, PollTeardown
-  uint32_t unknown_12() const { return guest::LoadU32(base, address + 12); }
-  void set_unknown_12(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
   uint32_t unknown_12_address() const { return address + 12; }
+  uint32_t unknown_12_bits() const { if (auto* d = direct()) return d->unknown_12; return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_unknown_12_bits(uint32_t v) const { if (auto* d = direct()) { d->unknown_12 = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
+  uint32_t unknown_12() const { if (auto* d = direct()) return d->unknown_12; return uint32_t((memory::IsHandle(address + 12) ? uint32_t(memory::OwnerLoad(address + 12, 4)) : guest::LoadU32(base, address + 12))); }
+  void set_unknown_12(uint32_t v) const { if (auto* d = direct()) { d->unknown_12 = v; return; } if (memory::IsHandle(address + 12)) memory::OwnerStore(address + 12, 4, v); else guest::StoreU32(base, address + 12, v); }
   // StandScene::Create, PollTeardown
-  uint32_t unknown_16() const { return guest::LoadU32(base, address + 16); }
-  void set_unknown_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
   uint32_t unknown_16_address() const { return address + 16; }
+  uint32_t unknown_16_bits() const { if (auto* d = direct()) return d->unknown_16; return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_unknown_16_bits(uint32_t v) const { if (auto* d = direct()) { d->unknown_16 = v; return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
+  uint32_t unknown_16() const { if (auto* d = direct()) return d->unknown_16; return uint32_t((memory::IsHandle(address + 16) ? uint32_t(memory::OwnerLoad(address + 16, 4)) : guest::LoadU32(base, address + 16))); }
+  void set_unknown_16(uint32_t v) const { if (auto* d = direct()) { d->unknown_16 = v; return; } if (memory::IsHandle(address + 16)) memory::OwnerStore(address + 16, 4, v); else guest::StoreU32(base, address + 16, v); }
   // a stand model was made (GarageStage::MakeModel)
-  uint32_t model_made() const { return guest::LoadU32(base, address + 20); }
-  void set_model_made(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
   uint32_t model_made_address() const { return address + 20; }
+  uint32_t model_made_bits() const { if (auto* d = direct()) return d->model_made; return uint32_t((memory::IsHandle(address + 20) ? uint32_t(memory::OwnerLoad(address + 20, 4)) : guest::LoadU32(base, address + 20))); }
+  void set_model_made_bits(uint32_t v) const { if (auto* d = direct()) { d->model_made = v; return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 4, v); else guest::StoreU32(base, address + 20, v); }
+  uint32_t model_made() const { if (auto* d = direct()) return d->model_made; return uint32_t((memory::IsHandle(address + 20) ? uint32_t(memory::OwnerLoad(address + 20, 4)) : guest::LoadU32(base, address + 20))); }
+  void set_model_made(uint32_t v) const { if (auto* d = direct()) { d->model_made = v; return; } if (memory::IsHandle(address + 20)) memory::OwnerStore(address + 20, 4, v); else guest::StoreU32(base, address + 20, v); }
 };
 
 // embedded; measure: DayBlock, EventCondition::FloatAtLeast.r4, GarageScreen::SetCarRow.r4, CarPanel::ShowCarStats.r4

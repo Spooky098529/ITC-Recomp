@@ -298,6 +298,8 @@ struct NetUserTable : View {
 struct SysProfileResults : View {
   using View::View;
   static constexpr uint32_t kSize = 8;
+  static SysProfileResults New(uint8_t* base, uint32_t size) { return SysProfileResults(base, memory::NewBlob(size, "SysProfileResults")); }
+  void Delete() const { if (address) memory::FreeHandle(address); }
   // the settings' count (26)
   uint32_t count() const { return guest::LoadU32(base, address + 0); }
   void set_count(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
