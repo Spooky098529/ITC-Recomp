@@ -57,8 +57,8 @@ void CopyString(uint8_t* base, uint32_t to, uint32_t name) {
     return;
   }
   for (uint32_t i = 0;; i++) {
-    const uint8_t ch = base[name + i];
-    base[to + i] = ch;
+    const uint8_t ch = guest::LoadU8(base, name + i);
+    guest::StoreU8(base, to + i, ch);
     if (ch == 0) {
       return;
     }

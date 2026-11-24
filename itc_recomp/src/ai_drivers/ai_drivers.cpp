@@ -1809,7 +1809,7 @@ bool AdvanceCorners(uint8_t* base, uint32_t path, uint32_t slices, uint32_t* r3)
         // Adjacent records don't share memory: c_runtime::Memcpy copies them
         // (the host's memmove, which copies them the same, otherwise).
         if (!c_runtime::Memcpy(base, to, to + 44, 44)) {
-          std::memmove(base + to, base + to + 44, 44);
+          std::memmove(guest::Pointer(base, to), guest::Pointer(base, to + 44), 44);
         }
         *r3 = to;  // memcpy's r3
         j++;

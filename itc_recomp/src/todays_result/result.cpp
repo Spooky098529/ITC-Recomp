@@ -175,7 +175,7 @@ uint64_t ReadDay(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint64_t r3 =
       calls.Call(kCareerNextDay, frame, 0x8225A6E4, vehicle_accessors::SaveDataOf(base, 0));
   // The save's 20-byte pick copied (guest order).
-  std::memcpy(Data(base).pick(), base + schema::CareerSave(base, save.address).pick_address(), 20);
+  std::memcpy(Data(base).pick(), guest::Pointer(base, schema::CareerSave(base, save.address).pick_address()), 20);
   return r3;
 }
 

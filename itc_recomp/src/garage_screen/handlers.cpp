@@ -92,7 +92,7 @@ uint64_t ReadSave(uint8_t* base, uint32_t sp) {
   const ScreenData data = Data(base);
   // The career's pick (20 bytes), the money, the weekday (signed) and the
   // day (at most 999).
-  std::memcpy(data.pick(), base + save.pick_head_address(), 20);
+  std::memcpy(data.pick(), guest::Pointer(base, save.pick_head_address()), 20);
   const int32_t day = int32_t(save.day());
   Data(base).set_money(save.money());
   Data(base).set_weekday(uint32_t(day - (day / 7) * 7));

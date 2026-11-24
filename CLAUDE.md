@@ -65,7 +65,12 @@ addresses handed to other areas; `docs/loops/e5-step3-reports.md`). Step 4
 swarm of 35 units (2026-11-24, `docs/loops/e5-loop.md` "Step 4 as one
 swarm", reports in `docs/loops/e5-step4-reports.md`): host types 38 -> 155,
 dual 54 -> 118; views read their own members only on their own type's
-handle (`direct()`), else by address through the owner's layout. A row's
+handle (`direct()`), else by address through the owner's layout. Step 5
+(the game's files): blobs (a file's data in PC memory, in the guest's byte
+order, `memory::NewBlob`, `storage = "blob"`), a pilot and one swarm of 17
+units (2026-11-24, `docs/loops/e5-loop.md` "Step 5 as one swarm", reports in
+`docs/loops/e5-step5-reports.md`); what the renderer reads stays in guest
+memory until step 7. A row's
 new name can change the measure's type names: after renaming, run
 `tools/function_names.py`, re-emit, and read the lifted diff.
 `docs/old-hardware.md` is the plan (not started) for running below

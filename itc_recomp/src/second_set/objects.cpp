@@ -45,7 +45,7 @@ void Clear(uint8_t* base, uint32_t address, uint32_t bytes) {
     return;
   }
   for (uint32_t i = 0; i < bytes; i++) {
-    base[address + i] = 0;
+    guest::StoreU8(base, address + i, 0);
   }
 }
 

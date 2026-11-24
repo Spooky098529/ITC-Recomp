@@ -888,7 +888,7 @@ uint64_t AwardPrize(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callee
   if (!ReplayBit(base, Holder(base, machine))) {
     // memset(block, 0, 168).
     for (uint32_t i = 0; i < 168; i++) {
-      base[block + i] = 0;
+      guest::StoreU8(base, block + i, 0);
     }
     const int32_t outcome = int32_t(Result(base, result).outcome());
     if (outcome == 1) {

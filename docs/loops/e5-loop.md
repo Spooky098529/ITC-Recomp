@@ -1026,3 +1026,34 @@ manager, the race's wave bank, the UI movies, the strings and font, the
 car parameters, the data tables, the camera files, the texture compressor,
 the saves, the menus, small objects of the loader areas, and the reads
 outside `Archive::Load`.
+
+### The swarm: done (2026-11-24)
+
+17 agents (run `wf_82bd95ee-2bf`; stopped once at the usage limit after 9
+units, resumed); reports in `docs/loops/e5-step5-reports.md`. Schema types
+by storage: blob 0 -> 37, host 155 -> 193, dual 118 -> 132, guest 1,665 ->
+1,590. In PC memory now: the car models' files, the car parameters, the
+data tables, the strings, the sound and wave banks (our FFmpeg reads the
+XMA data through `guest::Pointer`), the UI movies' files and texts, the
+camera animations, paths and garage presets, the archives' tables of
+contents and staging buffer, the XACT settings file, the save buffers and
+the replays kept in them, the scene's pool objects, the audio manager, the
+font, the accessories, the menus, the texture compressor's codecs and
+scratch. Left in guest memory: what the renderer reads (textures, vertex
+data, shader microcode, the image loaders' texture packs) until step 7.
+
+**The lead's fixes in validation:**
+- A few hand ports indexed guest memory directly (`base[address]`, five
+  sites) or copied from `base + address` (four): now `guest::LoadU8`,
+  `StoreU8` and `guest::Pointer` (the same bytes on guest memory).
+- `guest::VtableWord` read a host object's word in host order even inside
+  another owner (a texture provider at +4048 of a host `CarModel`, kept in
+  guest order there): the vtable came out byte-swapped and a slot read from
+  it called nothing. Now by the owner's layout (`memory::OwnerLoad`).
+- Blobs are whole 4 KB pages, as `VirtualAlloc`'s blocks: the pause menu's
+  `MenuList::IsEnabled` reads its enabled flags past the count it asked for.
+- A missing include (`save_layer.cpp`).
+
+**Checked:** the build; an attract race (38 s, no error lines, 150 to 151
+fps); `tick_replay.sh` twice (both races all match, 112 and 1,183 ticks, the
+pause menu included); a frame dump (normal).

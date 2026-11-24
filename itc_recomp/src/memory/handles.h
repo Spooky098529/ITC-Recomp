@@ -41,7 +41,9 @@ uint32_t MakeHandle(void* object, uint32_t size, const char* type,
 // game uses as raw bytes, in PC memory behind a handle, zero-filled, kept in
 // the guest's byte order (no field layout). Everything reaching it behaves
 // as on guest memory: loads and stores by address (guest.h), raw pointers
-// (guest::Pointer gives the blob's bytes), copies and frees.
+// (guest::Pointer gives the blob's bytes), copies and frees. Rounded up to
+// whole 4 KB pages, as VirtualAlloc's blocks (the game reads past what it
+// asked for in places).
 uint32_t NewBlob(uint32_t size, const char* type);
 
 // The host bytes at `value` when it lies inside a live blob (`left`, when

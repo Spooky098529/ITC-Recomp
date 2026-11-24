@@ -13,6 +13,7 @@
 #include "save_interface/save_interface.h"
 #include "schema/career.h"
 #include "schema/files_and_saves.h"
+#include "schema/options_load_save.h"
 #include "schema/save_interface.h"
 
 #include <cstring>

@@ -617,3 +617,4 @@ storage.
 | When | Guest loads and stores | `guest::Pointer` | Calls by constant address | Calls through a pointer | Vtable words through `VtableWord` | Guest frames | Image addresses | Schema types host / dual / guest |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Step 4's swarm (2026-11-24) | 118,428 / 24,566 | 3,041 / 45 | 4,007 | 2,515 | 2,166 / 20 | 4,286 | 11,660 | 155 / 118 / 1,665 (before it: 38 / 54 / 1,845) |
+| Step 5's swarm (2026-11-24) | 112,420 / 24,530 | 3,041 / 51 | 4,007 | 2,515 | 2,166 / 20 | 4,286 | 11,660 | 193 / 132 / 1,590, and 37 blobs |

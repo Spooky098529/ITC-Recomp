@@ -30,6 +30,8 @@ namespace memory {
 // once per type and offset (code still in guest shape, to convert).
 uint64_t RawHandleLoad(uint32_t address, uint32_t width);
 void RawHandleStore(uint32_t address, uint32_t width, uint64_t value);
+// The same without the log line (memory/host_copy.h).
+uint64_t OwnerLoad(uint32_t address, uint32_t width);
 }  // namespace memory
 
 namespace guest {
@@ -266,7 +268,9 @@ inline uint32_t VtableWord(uint8_t* base, uint32_t object) {
     if (memory::BlobPointer(object)) [[unlikely]] {
       return guest::LoadU32(base, object);
     }
-    return *static_cast<const uint32_t*>(memory::HandleObject(object));
+    // A host object, or one inside a host owner: the word as the owner's
+    // layout orders it (memory::OwnerLoad).
+    return uint32_t(memory::OwnerLoad(object, 4));
   }
   return guest::LoadU32(base, object);
 }

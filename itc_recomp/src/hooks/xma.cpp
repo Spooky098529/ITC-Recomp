@@ -94,7 +94,7 @@ bool Start(uint8_t* base, StreamState& s, uint32_t data, uint32_t size) {
     ITC_LOG_ERROR("xma: no memory for {} bytes ({} samples)", bytes, samples);
     return false;
   }
-  if (!s.stream.Begin(host, size, s.channels, s.sample_rate, base + s.buffer)) {
+  if (!s.stream.Begin(host, size, s.channels, s.sample_rate, guest::Pointer(base, s.buffer))) {
     ITC_LOG_ERROR("xma: couldn't start the decoder ({} channels, {} Hz)", s.channels,
                   s.sample_rate);
     FreeBuffer(s);

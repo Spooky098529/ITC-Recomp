@@ -334,7 +334,7 @@ uint32_t WheelsResetTire(uint8_t* base, uint32_t group, uint32_t stack) {
   }
   ZeroOneRows(base, g.tire_rows_address());
   for (uint32_t i = 0; i < 288; i++) {
-    base[g.tire_entries_address() + i] = 0;
+    guest::StoreU8(base, g.tire_entries_address() + i, 0);
   }
   return g.tire_entries_address();
 }

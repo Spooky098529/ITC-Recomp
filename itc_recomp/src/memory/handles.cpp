@@ -179,9 +179,14 @@ const Layout kBlobLayout = {nullptr, 0};
 bool IsBlobLayout(const Layout* layout) { return layout == &kBlobLayout; }
 
 uint32_t NewBlob(uint32_t size, const char* type) {
-  void* bytes = ::operator new(std::max<uint32_t>(size, 1));
-  std::memset(bytes, 0, std::max<uint32_t>(size, 1));
-  return MakeHandle(bytes, size, type, &kBlobLayout);
+  // Whole 4 KB pages, as VirtualAlloc gives them: the game reads past what it
+  // asked for in places (a menu's flags read by index past its count), which
+  // the page's slack covered on the 360. A handle's span is pages anyway.
+  const uint32_t rounded = std::max<uint32_t>(1, (size + kHandleGranule - 1) / kHandleGranule) *
+                           kHandleGranule;
+  void* bytes = ::operator new(rounded);
+  std::memset(bytes, 0, rounded);
+  return MakeHandle(bytes, rounded, type, &kBlobLayout);
 }
 
 uint8_t* BlobPointer(uint32_t value, uint32_t* left) {
