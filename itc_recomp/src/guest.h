@@ -64,6 +64,28 @@ inline uint8_t* PhysicalPointer(uint32_t address) {
   return g_physical + (address - 0x7F000000u);
 }
 
+// The heap and the image (E5 step 9): blocks of host memory of their own
+// (memory/mapping.cpp), no longer in a guest mapping. The heap is our
+// allocation layer's range (memory/heap.h), the image its data compiled in
+// (image/image.h). Any other address gives base + address: `base` is a
+// range with nothing mapped, so the access faults and is named
+// (memory/handles.cpp), as a null pointer's (addresses below 0x10000) does.
+constexpr uint32_t kHeapStart = 0x10000;
+constexpr uint32_t kHeapBytes = 384u << 20;
+constexpr uint32_t kImageStart = 0x82000000;
+constexpr uint32_t kImageBytes = 0x9B0000;
+inline uint8_t* g_heap = nullptr;
+inline uint8_t* g_image = nullptr;
+inline uint8_t* BlockPointer(uint8_t* base, uint32_t address) {
+  if (address - kHeapStart < kHeapBytes) [[likely]] {
+    return g_heap + (address - kHeapStart);
+  }
+  if (address - kImageStart < kImageBytes) {
+    return g_image + (address - kImageStart);
+  }
+  return base + address;
+}
+
 // The host bytes of `width` bytes at `address` in the calling thread's
 // stack, or nullptr.
 inline uint8_t* StackBytes(uint32_t address, uint32_t width) {
@@ -80,9 +102,9 @@ namespace guest {
 // Guest memory's one spelling, for lifted code and hand ports alike
 // (docs/e5-native.md, step 0): `base` + the 32-bit guest address,
 // big-endian, through volatile accesses (as the generated code's macros
-// did: the compiler neither merges nor drops them). The physical range
-// above 0xE0000000 is mapped at physical + 4 KB by the views' layout
-// (src/memory/mapping.cpp): no offset to add here.
+// did: the compiler neither merges nor drops them). Each address is
+// translated to the block holding it (the physical memory, a handle's
+// object, the heap or the image: memory/mapping.cpp).
 
 // The host address of a guest address.
 // A blob's handle (memory/handles.h: a file's data in PC memory, in the
@@ -100,7 +122,7 @@ inline uint8_t* Pointer(uint8_t* base, uint32_t address) {
       return bytes;
     }
   }
-  return base + address;
+  return memory::BlockPointer(base, address);
 }
 
 inline uint8_t LoadU8(uint8_t* base, uint32_t address) {
@@ -117,7 +139,7 @@ inline uint8_t LoadU8(uint8_t* base, uint32_t address) {
     }
     return uint8_t(memory::RawHandleLoad(address, 1));
   }
-  return *reinterpret_cast<volatile uint8_t*>(base + address);
+  return *reinterpret_cast<volatile uint8_t*>(memory::BlockPointer(base, address));
 }
 
 inline void StoreU8(uint8_t* base, uint32_t address, uint8_t value) {
@@ -135,7 +157,7 @@ inline void StoreU8(uint8_t* base, uint32_t address, uint8_t value) {
     memory::RawHandleStore(address, 1, value);
     return;
   }
-  *reinterpret_cast<volatile uint8_t*>(base + address) = value;
+  *reinterpret_cast<volatile uint8_t*>(memory::BlockPointer(base, address)) = value;
 }
 
 inline uint16_t LoadU16(uint8_t* base, uint32_t address) {
@@ -152,7 +174,7 @@ inline uint16_t LoadU16(uint8_t* base, uint32_t address) {
     }
     return uint16_t(memory::RawHandleLoad(address, 2));
   }
-  return __builtin_bswap16(*reinterpret_cast<volatile uint16_t*>(base + address));
+  return __builtin_bswap16(*reinterpret_cast<volatile uint16_t*>(memory::BlockPointer(base, address)));
 }
 
 inline void StoreU16(uint8_t* base, uint32_t address, uint16_t value) {
@@ -170,7 +192,7 @@ inline void StoreU16(uint8_t* base, uint32_t address, uint16_t value) {
     memory::RawHandleStore(address, 2, value);
     return;
   }
-  *reinterpret_cast<volatile uint16_t*>(base + address) = __builtin_bswap16(value);
+  *reinterpret_cast<volatile uint16_t*>(memory::BlockPointer(base, address)) = __builtin_bswap16(value);
 }
 
 inline uint32_t LoadU32(uint8_t* base, uint32_t address) {
@@ -187,7 +209,7 @@ inline uint32_t LoadU32(uint8_t* base, uint32_t address) {
     }
     return uint32_t(memory::RawHandleLoad(address, 4));
   }
-  return __builtin_bswap32(*reinterpret_cast<volatile uint32_t*>(base + address));
+  return __builtin_bswap32(*reinterpret_cast<volatile uint32_t*>(memory::BlockPointer(base, address)));
 }
 
 inline void StoreU32(uint8_t* base, uint32_t address, uint32_t value) {
@@ -205,7 +227,7 @@ inline void StoreU32(uint8_t* base, uint32_t address, uint32_t value) {
     memory::RawHandleStore(address, 4, value);
     return;
   }
-  *reinterpret_cast<volatile uint32_t*>(base + address) = __builtin_bswap32(value);
+  *reinterpret_cast<volatile uint32_t*>(memory::BlockPointer(base, address)) = __builtin_bswap32(value);
 }
 
 inline uint64_t LoadU64(uint8_t* base, uint32_t address) {
@@ -222,7 +244,7 @@ inline uint64_t LoadU64(uint8_t* base, uint32_t address) {
     }
     return uint64_t(memory::RawHandleLoad(address, 8));
   }
-  return __builtin_bswap64(*reinterpret_cast<volatile uint64_t*>(base + address));
+  return __builtin_bswap64(*reinterpret_cast<volatile uint64_t*>(memory::BlockPointer(base, address)));
 }
 
 inline void StoreU64(uint8_t* base, uint32_t address, uint64_t value) {
@@ -240,7 +262,7 @@ inline void StoreU64(uint8_t* base, uint32_t address, uint64_t value) {
     memory::RawHandleStore(address, 8, value);
     return;
   }
-  *reinterpret_cast<volatile uint64_t*>(base + address) = __builtin_bswap64(value);
+  *reinterpret_cast<volatile uint64_t*>(memory::BlockPointer(base, address)) = __builtin_bswap64(value);
 }
 
 #if defined(__SSSE3__)

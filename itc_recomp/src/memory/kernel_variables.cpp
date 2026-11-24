@@ -54,12 +54,12 @@ void BindKernelVariables(uint8_t* base) {
   // ExLoadedCommandLine: the command line GetCommandLineA answers.
   constexpr std::string_view kCommandLine = "\"default.xex\"";
   const uint32_t command_line = Block(64);
-  std::memcpy(base + command_line, kCommandLine.data(), kCommandLine.size());
+  std::memcpy(guest::Pointer(base, command_line), kCommandLine.data(), kCommandLine.size());
   guest::StoreU32(base, kExLoadedCommandLine, command_line);
   // ExThreadObjectType: a type record only passed back to
   // ObReferenceObjectByHandle (which ours ignores); its tag as the SDK's.
   const uint32_t thread_type = Block(32);
-  std::memcpy(base + thread_type + 0x18, "Thrd", 4);
+  std::memcpy(guest::Pointer(base, thread_type + 0x18), "Thrd", 4);
   guest::StoreU32(base, kExThreadObjectType, thread_type);
   // XboxKrnlVersion: major, minor, build, QFE (16 bits each).
   const uint32_t version = Block(16);

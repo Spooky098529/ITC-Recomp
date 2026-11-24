@@ -87,7 +87,8 @@ class MenuSelectionScan {
     ranges_ = ReadableGuestRanges(base);
     snapshot_.clear();
     for (const Range& r : ranges_) {
-      snapshot_.insert(snapshot_.end(), base + r.start, base + r.start + r.size);
+      snapshot_.insert(snapshot_.end(), guest::Pointer(base, r.start),
+                       guest::Pointer(base, r.start) + r.size);
     }
     sampling_ = true;
   }
@@ -128,7 +129,7 @@ class MenuSelectionScan {
     size_t offset = 0;
     int changed = 0;
     for (const Range& r : ranges_) {
-      const uint8_t* now = base + r.start;
+      const uint8_t* now = guest::Pointer(base, r.start);
       const uint8_t* then = snapshot_.data() + offset;
       offset += r.size;
       for (uint32_t block = 0; block < r.size; block += 4096) {

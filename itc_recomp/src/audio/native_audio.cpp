@@ -201,7 +201,7 @@ class ItcAudioSystem {
       ITC_LOG_ERROR("native audio: frame for unknown driver handle {:08X}", handle);
       return;
     }
-    const float* input = reinterpret_cast<const float*>(memory::Base() + samples);
+    const float* input = reinterpret_cast<const float*>(guest::Pointer(memory::Base(), samples));
     std::lock_guard<std::mutex> lock(mutex_);
     Client& client = clients_[index];
     if (!client.in_use) {

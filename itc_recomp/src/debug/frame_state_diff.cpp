@@ -78,39 +78,15 @@ std::vector<Range> ReadableGuestRanges(uint8_t* base);
 
 namespace {
 
-// Guest addresses that can hold game state: below the physical memory views.
-constexpr uint64_t kGuestScanEnd = 0xA0000000;
 constexpr size_t kMaxWatched = 200;
 
 }  // namespace
 
+// The memory game state can be in (E5 step 9: the heap's and the image's
+// blocks, memory/mapping.cpp), as guest ranges.
 std::vector<Range> ReadableGuestRanges(uint8_t* base) {
-  std::vector<Range> ranges;
-#ifdef _WIN32
-  // Reads the Linux memory map; the scans aren't supported on Windows.
   (void)base;
-  return ranges;
-#endif
-  std::ifstream maps("/proc/self/maps");
-  std::string line;
-  uint64_t guest_start = reinterpret_cast<uint64_t>(base);
-  while (std::getline(maps, line)) {
-    std::istringstream fields(line);
-    std::string span, perms;
-    fields >> span >> perms;
-    if (perms.size() < 2 || perms[0] != 'r' || perms[1] != 'w') {
-      continue;
-    }
-    uint64_t start = std::stoull(span.substr(0, span.find('-')), nullptr, 16);
-    uint64_t end = std::stoull(span.substr(span.find('-') + 1), nullptr, 16);
-    if (end <= guest_start || start >= guest_start + kGuestScanEnd) {
-      continue;
-    }
-    start = std::max(start, guest_start);
-    end = std::min(end, guest_start + kGuestScanEnd);
-    ranges.push_back({uint32_t(start - guest_start), uint32_t(end - start)});
-  }
-  return ranges;
+  return {{memory::kHeapStart, memory::kHeapBytes}, {memory::kImageStart, memory::kImageBytes}};
 }
 
 namespace {
@@ -193,7 +169,8 @@ class FrameStateDiff {
       ranges_ = ReadableGuestRanges(base);
       snapshot_.clear();
       for (const Range& r : ranges_) {
-        snapshot_.insert(snapshot_.end(), base + r.start, base + r.start + r.size);
+        snapshot_.insert(snapshot_.end(), guest::Pointer(base, r.start),
+                       guest::Pointer(base, r.start) + r.size);
       }
       snapshot_taken_ = true;
     }
@@ -244,7 +221,7 @@ class FrameStateDiff {
     std::string sample;
     std::vector<uint32_t> stepped_now;
     for (const Range& r : ranges_) {
-      const uint8_t* now = base + r.start;
+      const uint8_t* now = guest::Pointer(base, r.start);
       const uint8_t* then = snapshot_.data() + offset;
       for (uint32_t i = 0; i + 4 <= r.size; i += 4) {
         if (std::memcmp(now + i, then + i, 4) == 0) {

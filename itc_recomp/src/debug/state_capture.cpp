@@ -34,7 +34,6 @@ constexpr int kBurstTicks = 60;          // 2 s
 
 // Guest addresses that can hold game objects: below the physical memory
 // views at 0xA0000000.
-constexpr uint64_t kGuestScanEnd = 0xA0000000;
 
 constexpr uint32_t kRecordMagic = 0x49544331;  // "ITC1"
 
@@ -147,33 +146,11 @@ class StateCapture {
   }
 
   // Guest address ranges that are readable, from the host's memory map.
+  // The memory game state can be in (E5 step 9: the heap's and the image's
+  // blocks, memory/mapping.cpp), as guest ranges.
   static std::vector<Region> ReadableGuestRanges(uint8_t* base) {
-    std::vector<Region> ranges;
-#ifdef _WIN32
-    // Reads the Linux memory map; captures aren't supported on Windows.
     (void)base;
-    return ranges;
-#endif
-    std::ifstream maps("/proc/self/maps");
-    std::string line;
-    uint64_t guest_start = reinterpret_cast<uint64_t>(base);
-    while (std::getline(maps, line)) {
-      std::istringstream fields(line);
-      std::string span, perms;
-      fields >> span >> perms;
-      if (perms.empty() || perms[0] != 'r') {
-        continue;
-      }
-      uint64_t start = std::stoull(span.substr(0, span.find('-')), nullptr, 16);
-      uint64_t end = std::stoull(span.substr(span.find('-') + 1), nullptr, 16);
-      if (end <= guest_start || start >= guest_start + kGuestScanEnd) {
-        continue;
-      }
-      start = std::max(start, guest_start);
-      end = std::min(end, guest_start + kGuestScanEnd);
-      ranges.push_back({uint32_t(start - guest_start), uint32_t(end - start)});
-    }
-    return ranges;
+    return {{memory::kHeapStart, memory::kHeapBytes}, {memory::kImageStart, memory::kImageBytes}};
   }
 
   void ScanForReferrers(uint8_t* base, const std::vector<uint32_t>& vehicles) {
@@ -185,7 +162,7 @@ class StateCapture {
     }
     std::vector<size_t> found(vehicles.size(), 0);
     for (const Region& range : ReadableGuestRanges(base)) {
-      auto* words = reinterpret_cast<const uint32_t*>(base + range.address);
+      auto* words = reinterpret_cast<const uint32_t*>(guest::Pointer(base, range.address));
       size_t count = range.size / 4;
       for (size_t i = 0; i < count; i++) {
         uint32_t word = words[i];
@@ -277,7 +254,7 @@ class StateCapture {
       car[k] = guest::LoadFloat(base, car_matrix + 48 + 4 * k);
     }
     for (const Region& range : ReadableGuestRanges(base)) {
-      auto* words = reinterpret_cast<const uint32_t*>(base + range.address);
+      auto* words = reinterpret_cast<const uint32_t*>(guest::Pointer(base, range.address));
       size_t count = range.size / 4;
       for (size_t i = 0; i + 16 <= count; i += 4) {
         uint32_t address = range.address + uint32_t(i * 4);
@@ -326,7 +303,7 @@ class StateCapture {
     for (const Region& region : regions) {
       Write32(region.address);
       Write32(region.size);
-      out_.write(reinterpret_cast<const char*>(base + region.address), region.size);
+      out_.write(reinterpret_cast<const char*>(guest::Pointer(base, region.address)), region.size);
     }
     // Which pointer each referrer window belongs to, for the reader.
     if (burst_ticks_left_ + 1 == kBurstTicks) {

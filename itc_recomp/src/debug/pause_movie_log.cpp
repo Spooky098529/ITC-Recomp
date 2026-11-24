@@ -203,7 +203,8 @@ class PauseMovieLog {
   void Snapshot(uint8_t* base, std::vector<uint8_t>& out) const {
     out.clear();
     for (const Object& o : objects_) {
-      out.insert(out.end(), base + o.address, base + o.address + o.size);
+      const uint8_t* bytes = guest::Pointer(base, o.address);
+      out.insert(out.end(), bytes, bytes + o.size);
     }
   }
 

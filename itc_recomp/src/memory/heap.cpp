@@ -23,7 +23,7 @@ namespace {
 // The range's size: the most the game had in use was 172.6 MiB (heap and
 // pages, a drive through the front end and a race); see "What the counter
 // saw" in docs/native-memory.md.
-constexpr uint32_t kRangeBytes = 384u << 20;
+constexpr uint32_t kRangeBytes = kHeapBytes;  // guest.h: the heap's block
 constexpr uint32_t kPageBytes = 4096;
 
 struct Block {
@@ -67,7 +67,7 @@ bool FirstTime(Seen kind, uint32_t value) {
 
 // The range's start: the first 64 KB past page 0, where the SDK's 4 KB
 // heap gave it.
-constexpr uint32_t kRangeStart = 0x10000;
+constexpr uint32_t kRangeStart = kHeapStart;
 
 // Takes the range, on the first allocation (under the mutex): guest memory
 // mapped by us (memory/mapping.h).

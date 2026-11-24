@@ -96,7 +96,8 @@ class IdleTimerScan {
     ranges_ = std::move(ranges);
     snapshot_.clear();
     for (const Range& r : ranges_) {
-      snapshot_.insert(snapshot_.end(), base + r.start, base + r.start + r.size);
+      snapshot_.insert(snapshot_.end(), guest::Pointer(base, r.start),
+                       guest::Pointer(base, r.start) + r.size);
     }
   }
 
@@ -116,7 +117,7 @@ class IdleTimerScan {
       const uint8_t* then = snapshot_.data() + offset;
       offset += r.size;
       for (uint32_t i = 0; i + 4 <= r.size; i += 4) {
-        if (std::memcmp(base + r.start + i, then + i, 4) == 0) {
+        if (std::memcmp(guest::Pointer(base, r.start) + i, then + i, 4) == 0) {
           continue;
         }
         uint32_t address = r.start + i;

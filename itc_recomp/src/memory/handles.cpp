@@ -2,6 +2,7 @@
 
 #include "base/log.h"
 #include "memory/host_copy.h"
+#include "guest.h"
 
 #include <algorithm>
 #include <atomic>
@@ -76,6 +77,29 @@ void OnFault(int sig, siginfo_t* info, void* context) {
                     "physical fault: a raw access at %08X: code reaching the physical memory "
                     "through base + address (guest.h translates it)\n",
                     uint32_t(at - lo));
+      ITC_LOG_ERROR("{}", text);
+      ssize_t ignored = write(STDERR_FILENO, text, std::strlen(text));
+      (void)ignored;
+      std::_Exit(3);
+    }
+  }
+  // Anything else in the range `base` stands for (E5 step 9: nothing is
+  // mapped there; guest.h translates the heap's and the image's addresses to
+  // their blocks): code reaching memory through base + address, or a null
+  // pointer (below 0x10000).
+  if (base) {
+    const uintptr_t lo = reinterpret_cast<uintptr_t>(base);
+    if (at >= lo && at < lo + 0x100000000ull) {
+      const uint32_t guest = uint32_t(at - lo);
+      const char* what = guest < 0x10000                    ? "a null pointer"
+                         : guest - kHeapStart < kHeapBytes   ? "the heap"
+                         : guest - kImageStart < kImageBytes ? "the image"
+                                                             : "no block";
+      char text[200];
+      std::snprintf(text, sizeof(text),
+                    "guest fault: a raw access at %08X (%s): code reaching memory through "
+                    "base + address (guest.h translates it)\n",
+                    guest, what);
       ITC_LOG_ERROR("{}", text);
       ssize_t ignored = write(STDERR_FILENO, text, std::strlen(text));
       (void)ignored;

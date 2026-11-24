@@ -193,7 +193,7 @@ class ReplayFromLogicPass {
     // saved and put back as they are kept there.
     uint8_t* state = memory::IsHandle(object)
                          ? static_cast<uint8_t*>(memory::HandleObject(object))
-                         : base + object;
+                         : guest::Pointer(base, object);
     if (!frame_pacing::GameMessages_IsRenderOnlyPass()) {
       States& states = states_[key];
       g_replay_outcome = "logic pass";
@@ -469,7 +469,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8215DEA0) {
   constexpr uint32_t kRecordContext = 0x8215E150;
   uint32_t list = ctx.r3.u32;
   bool render_only = frame_pacing::GameMessages_IsRenderOnlyPass();
-  uint8_t* cameras = base + kCameraPasses;
+  uint8_t* cameras = guest::Pointer(base, kCameraPasses);
   std::vector<uint8_t> current;
   if (!render_only) {
     g_overlay_cameras.assign(cameras, cameras + kCameraPassesBytes);
