@@ -1164,3 +1164,35 @@ the image) waits for step 8, the user's call (2026-11-24): then the heap
 and the image become blocks of their own, translated as the physical
 memory is, and the reservation goes (`docs/e5-native.md`, step 9, added
 to the plan the same day).
+
+## Step 8: the image's data compiled in (2026-11-24)
+
+`docs/e5-native.md` step 8, done directly (the user's go-ahead,
+2026-11-24). `itc_recomp/tools/image_data.py <default.xex>` (on the
+developer's machine; Python with the `cryptography` package for AES)
+decrypts the player's `default.xex`, checks its SHA-1, and writes its
+`.rdata` (`0x82000600` to `0x82077400`) and `.data` (`0x82600000` to
+`0x82978400`) sections into `src/image/image_rdata.cpp` and
+`image_data.cpp`: the runs holding nonzero bytes (gaps of 64 zero bytes
+end a run), as big-endian words, 361 runs, 748 KB.
+`image::CopyInto` (`src/image/image.cpp`) stores them at their addresses
+at start-up, before the kernel variables are bound; the load address and
+the main thread's stack size (0x40000) are constants (`src/image/image.h`).
+`src/app/image_load.cpp` (the XEX loader) and the start-up's check for
+`default.xex` are gone.
+
+Not compiled in: the headers, `.pdata`, the code (`.text`, the
+`.embsec_` sections), `.idata` (no code builds an address in it: the
+`lis rN,-32104` references end in `.data`'s zeros at `0x8297xxxx`),
+`.XBLD` and `.reloc`. That nothing reads them is shown by the checks: they
+are zeros now, and the game ran the same tick for tick.
+
+**Checked:** the build; an attract race (38 s, no error lines, 150 to 151
+fps); `tick_replay.sh` twice (both races all match, 112 and 1,183 ticks); a
+frame dump (normal); an attract race from a folder holding only `DATA/`
+(no `default.xex`): 18 s, no error lines.
+
+Next is step 9: the heap and the image become blocks of their own,
+outside the guest mapping (the image's block can be the compiled-in data
+itself).
+

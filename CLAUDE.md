@@ -77,10 +77,13 @@ hand ports' frames, import calls and float modes off guest shape; lifted
 import calls go straight to our answers (`lifted::ImportAt`). Step 7
 (2026-11-24, "Step 7 as one swarm"): the physical memory (the GPU's) is
 mapped on its own outside guest memory, `guest.h` translating the guest's
-addresses for it; what the GPU never reads moved out of it into blobs. The
-guest mapping (`memory/mapping.cpp`, now the heap and the image) stays
-until after step 8 (the user's call); step 9, added to the plan
-2026-11-24, moves the heap and the image out of it and removes it. A row's
+addresses for it; what the GPU never reads moved out of it into blobs. Step 8
+(2026-11-24, done directly, `docs/loops/e5-loop.md` "Step 8"): the
+image's data (`.rdata`, `.data`) compiled in (`src/image/`, written by
+`tools/image_data.py` from the player's `default.xex`), copied to
+`0x82000000` at start-up; `default.xex` is no longer read. Next, step 9
+(added to the plan 2026-11-24): the heap and the image out of the guest
+mapping (`memory/mapping.cpp`), which then goes. A row's
 new name can change the measure's type names: after renaming, run
 `tools/function_names.py`, re-emit, and read the lifted diff.
 `docs/old-hardware.md` is the plan (not started) for running below

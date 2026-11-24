@@ -491,6 +491,16 @@ player's `default.xex`, loaded by our loader at build time on the
 developer's machine, as the HLSL shaders were stored). Which tables may be
 committed (they're the game's data) is a decision for the user.
 
+Done 2026-11-24 (`docs/loops/e5-loop.md`, "Step 8"): `.rdata` and `.data`
+(the constants, strings, tables and initialized globals; 748 KB without
+their zero runs) are C++ data in `src/image/`, written by
+`itc_recomp/tools/image_data.py` from the player's `default.xex`, and
+copied to `0x82000000` at start-up (`image::CopyInto`); `default.xex` is no
+longer read, and our XEX loader is gone. The code sections and the rest
+aren't compiled in (nothing reads them: the tick replay matched with them
+zeroed). Naming the tables one by one (a `constexpr` array or a typed
+global for each) goes on with the type-by-type work after step 9.
+
 ### 9. The heap and the image out of the guest mapping
 
 Added 2026-11-24 (the user's call): steps 3 to 5 moved the objects that
@@ -645,3 +655,4 @@ storage.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Step 4's swarm (2026-11-24) | 118,428 / 24,566 | 3,041 / 45 | 4,007 | 2,515 | 2,166 / 20 | 4,286 | 11,660 | 155 / 118 / 1,665 (before it: 38 / 54 / 1,845) |
 | Step 5's swarm (2026-11-24) | 112,420 / 24,530 | 3,041 / 51 | 4,007 | 2,515 | 2,166 / 20 | 4,286 | 11,660 | 193 / 132 / 1,590, and 37 blobs |
+| Step 8 (2026-11-24) | 112,420 / 24,272 | 3,041 / 67 | 4,007 | 2,515 | 2,166 / 20 | 4,286 | 11,660 | 193 / 132 / 1,590, and 41 blobs |
