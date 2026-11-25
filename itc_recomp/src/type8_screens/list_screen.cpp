@@ -849,7 +849,7 @@ uint64_t ListBaseDimList(uint64_t r3, uint64_t dim, uint32_t sp,
 uint64_t PairedNodeTableClear(uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82248A20 PairedNodeTable::Clear");
   const uint32_t frame = part_detail::Frame(sp, 128);
-  const schema::PairedNodeTable t(uint32_t(r3));
+  const schema::PairedNodeTable t{uint32_t(r3)};
   StoreU32(frame + 80, t.movie());
   const uint32_t found = ui_movies::PairsFind(ui_movies::kMovieTable, frame + 80);
   const uint32_t movie = LoadU32(found);

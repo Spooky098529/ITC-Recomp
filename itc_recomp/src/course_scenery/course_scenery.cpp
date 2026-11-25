@@ -1302,7 +1302,6 @@ namespace {
 // The originals the parses hand to where a callee's plain C++ declines,
 // called through `calls` from 512 bytes below `stack`.
 struct ParseCalls {
-  uint8_t* base;
   const Calls* calls;
   uint32_t stack;
 
@@ -1497,7 +1496,6 @@ constexpr uint32_t kSceneryModelDestruct = 0x820F1208;
 // ModelList::Release's calls: Model::Release, and the models' vtable slot 0
 // with 1 (the scenery models' destructor natively).
 struct ListRelease {
-  uint8_t* base;
   const ParseCalls* parse;
 
   static uint32_t Release(void* self, uint32_t model) {

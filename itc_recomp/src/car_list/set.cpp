@@ -77,7 +77,7 @@ uint64_t SetWantsPowerGraph(uint32_t set) {
 }
 
 uint64_t SetWord(uint64_t set, uint32_t offset, uint64_t value) {
-  const Set s(uint32_t(set));
+  const Set s{uint32_t(set)};
   switch (offset) {
     case 1932:
       ITC_NATIVE_RUNNING("sub_8224B6D8 PanelSet::SetOpenKind");
@@ -247,7 +247,7 @@ uint64_t PairOpen(uint64_t pair_r3, uint32_t sp, const Calls& calls) {
   ResetWords(b2);
   ToTabs(b1, sp, calls);
   const uint64_t r3 = ToTabs(b2, sp, calls);
-  const Pair pair(uint32_t(pair_r3));
+  const Pair pair{uint32_t(pair_r3)};
   pair.set_first_player(0);
   pair.set_second_player(1);
   pair.set_first_may_leave(0);

@@ -197,7 +197,7 @@ uint64_t WaitForMovies(uint64_t r3, uint32_t sp) {
   // The original's 96-byte frame (only its back chain) left out: no guest
   // call is made from it (E5 step 6).
   (void)sp;
-  const Machine m(uint32_t(r3));
+  const Machine m{uint32_t(r3)};
   if (m.loaded() == 0) {
     uint32_t loaded = 0;
     for (uint32_t id = 16; id <= 19; id++) {

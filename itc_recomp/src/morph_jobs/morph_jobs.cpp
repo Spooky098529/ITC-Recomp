@@ -190,7 +190,7 @@ TailCall WorkItemRun(uint64_t r3) {
 
 TailCall WorkItemCall(uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_820ACA30 WorkItem::Call");
-  const schema::WorkItem i(uint32_t(r3));
+  const schema::WorkItem i{uint32_t(r3)};
   const uint64_t delegate = r3 + 24;
   // The delegate's vtable (app-states.toml's AppDelegateVtable): slot 1.
   const schema::AppDelegateVtable vtable(i.delegate_vtable());

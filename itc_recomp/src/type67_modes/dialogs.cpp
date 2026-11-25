@@ -236,7 +236,7 @@ uint64_t DialogConfirmPage(uint64_t r3, uint32_t dispatcher, bool type7,
   } else {
     ITC_NATIVE_RUNNING("sub_82232328 Type6Dialog::ConfirmPage");
   }
-  const Dialog dialog(uint32_t(r3));
+  const Dialog dialog{uint32_t(r3)};
   const uint32_t frame = sp - 128;
   dialog.set_is_notice(0);
   if (DialogStatus(dialog, type7) == 4) {
@@ -283,7 +283,7 @@ uint64_t DialogUpdate(uint64_t r3, uint32_t dispatcher, bool type7, uint32_t sp,
   } else {
     ITC_NATIVE_RUNNING("sub_82232798 Type6Dialog::Update");
   }
-  const Dialog dialog(uint32_t(r3));
+  const Dialog dialog{uint32_t(r3)};
   const uint32_t frame = sp - 160;
   StoreU32(frame + 80, dialog.movie());
   const uint32_t movie =

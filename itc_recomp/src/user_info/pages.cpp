@@ -107,7 +107,7 @@ uint64_t SetPlayTimeText(uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(sp, 112);
   const uint32_t movie = FindMovie();
   const uint32_t save = vehicle_accessors::SaveDataOf(0);
-  const schema::PlayTimeAnswer time(uint32_t(calls.Call(kPlayTimeAdd, frame, 0x8220B008, frame + 80, uint64_t(save) + 48)));
+  const schema::PlayTimeAnswer time{uint32_t(calls.Call(kPlayTimeAdd, frame, 0x8220B008, frame + 80, uint64_t(save) + 48))};
   const schema::UserInfoData data = Data();
   data.set_play_hours(time.hours());
   // The word's bytes in guest order (the data is a host object since E5

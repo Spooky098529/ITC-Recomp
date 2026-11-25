@@ -78,7 +78,7 @@ uint32_t HeaderOf(const RenderTexture& texture) {
 class Recorder {
  public:
   Recorder(const RecordCalls& calls, uint32_t frame)
-      : base_(), calls_(calls), frame_(frame) {}
+      : calls_(calls), frame_(frame) {}
 
   uint64_t Call(uint32_t function, std::initializer_list<uint64_t> regs, uint32_t lr,
                 std::initializer_list<double> fregs = {}) {
@@ -93,7 +93,7 @@ class Recorder {
     for (const uint64_t r : more) {
       regs[count++] = r;
     }
-    const uint32_t function = Load(base_, Load(base_, object) + byte);
+    const uint32_t function = Load(Load(object) + byte);
     return uint32_t(calls_.call(function, regs, count, &f1, with_f1 ? 1 : 0, frame_, lr));
   }
   // The render manager's slot 8, then `byte` of its answer: the command
@@ -101,23 +101,23 @@ class Recorder {
   // (Slot 8's plain C++ called directly where it's the game's,
   // app_start_up::RenderManagerScene.)
   uint32_t Get(uint32_t byte, uint32_t lr1, uint32_t lr2) {
-    const uint32_t manager = G::render_manager(base_).address;
-    const auto scene = app_start_up::RenderManagerScene(base_, manager);
+    const uint32_t manager = G::render_manager().address;
+    const auto scene = app_start_up::RenderManagerScene(manager);
     const uint32_t object = scene ? *scene : VtableCall(manager, 32, lr1);
     return VtableCall(object, byte, lr2);
   }
   // Whether the record may go on natively: no chunk open, room for `slots`.
   bool Ready(uint32_t list, uint32_t slots) const {
-    const schema::CommandList commands(base_, list);
+    const schema::CommandList commands(list);
     const uint32_t used = commands.used();
     return commands.chunk_open() == 0 &&
-           schema::CommandListGlobals::open_chunks(base_) == 0 && used + slots >= used &&
+           schema::CommandListGlobals::open_chunks() == 0 && used + slots >= used &&
            used + slots < commands.capacity();
   }
   // Whether the list has room for `slots` (a record inside a chunk already
   // open: only the room).
   bool Room(uint32_t list, uint64_t slots) const {
-    const schema::CommandList commands(base_, list);
+    const schema::CommandList commands(list);
     const uint64_t used = commands.used();
     return used + slots < commands.capacity();
   }
@@ -129,7 +129,6 @@ class Recorder {
     return VtableCall(queue, 16, lr3, {chunk, key}, f1, true);
   }
 
-  uint8_t* base_;
   const RecordCalls& calls_;
   uint32_t frame_;
 };

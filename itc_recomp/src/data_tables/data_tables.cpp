@@ -29,7 +29,7 @@ uint32_t EndMark40(uint32_t entry) { return schema::DataTablesEntry40(entry).end
 
 // A table's callback: each entry swapped, up to and including the first
 // whose end mark (after the swap) is -1; then the count down.
-template <uint32_t (*Swap)(uint8_t*, uint32_t), uint32_t (*EndMark)(uint8_t*, uint32_t)>
+template <uint32_t (*Swap)(uint32_t), uint32_t (*EndMark)(uint32_t)>
 uint32_t SwapTable(uint32_t table, uint32_t size) {
   uint32_t entry = table;
   uint32_t last;

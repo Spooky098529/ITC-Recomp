@@ -306,7 +306,7 @@ uint8_t GuestText::Get(uint64_t at) {
     return 0;
   }
   if (!known_[at]) {
-    bytes_[at] = guest::LoadU8(base_, uint32_t(address_ + at));
+    bytes_[at] = guest::LoadU8(uint32_t(address_ + at));
     known_[at] = 1;
   }
   return bytes_[at];
@@ -366,7 +366,7 @@ bool GuestText::Commit() {
   }
   for (uint64_t i = 0; i < end_; i++) {
     if (written_[i]) {
-      guest::StoreU8(base_, uint32_t(address_ + i), bytes_[i]);
+      guest::StoreU8(uint32_t(address_ + i), bytes_[i]);
     }
   }
   return true;

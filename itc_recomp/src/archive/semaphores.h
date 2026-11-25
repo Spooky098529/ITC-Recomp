@@ -101,7 +101,6 @@ class ScopedTestSemaphores {
   Semaphores& Set() { return set_; }
 
  private:
-  uint8_t* base_;
   Semaphores set_;
   Semaphores* previous_;
   uint32_t saved_[4];

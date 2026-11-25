@@ -41,7 +41,7 @@ namespace hooks {
 namespace re = race_event;
 
 RaceEventGuest::RaceEventGuest(lifted::Regs& ctx)
-    : ctx_(ctx), base_(), guest_{&RaceEventGuest::Test, this} {}
+    : ctx_(ctx), guest_{&RaceEventGuest::Test, this} {}
 
 uint32_t RaceEventGuest::Test(void* user, uint32_t function, uint32_t condition,
                               uint32_t level, uint32_t depth) {
@@ -54,10 +54,10 @@ uint32_t RaceEventGuest::Test(void* user, uint32_t function, uint32_t condition,
   uint32_t r3 = 0;
   // From the original's depth (its callers' frames and Met's), Met's call's
   // return.
-  guest_call::InFrame(ctx, self.base_, depth, 0x82142A58, [&](uint32_t) {
+  guest_call::InFrame(ctx, depth, 0x82142A58, [&](uint32_t) {
     ctx.r3.u64 = condition;
     ctx.r4.u64 = level;
-    lifted::Enter(ctx, self.base_, lifted::e82141668);  // EventCondition::Power
+    lifted::Enter(ctx, lifted::e82141668);  // EventCondition::Power
     r3 = ctx.r3.u32;
   });
   ctx.fpscr.disableFlushMode();

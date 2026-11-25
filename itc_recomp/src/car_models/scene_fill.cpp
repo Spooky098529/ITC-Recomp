@@ -66,7 +66,7 @@ uint32_t SceneSetUp(uint32_t scene, uint32_t record, uint32_t r5, uint32_t sp,
       &schema::CarScene::cockpit_count,    &schema::CarScene::interior_count,
       &schema::CarScene::light_kit_count,  &schema::CarScene::wheels_count,
       &schema::CarScene::traffic_count,    &schema::CarScene::scene_model_count};
-  using Construct = uint32_t (*)(uint8_t*, uint32_t, uint32_t, uint32_t);
+  using Construct = uint32_t (*)(uint32_t, uint32_t, uint32_t);
   static constexpr Construct kConstructs[8] = {
       second_set::SceneCarModelConstruct, second_set::ScenePartsConstruct,
       second_set::SceneCockpitConstruct,  second_set::SceneInteriorConstruct,

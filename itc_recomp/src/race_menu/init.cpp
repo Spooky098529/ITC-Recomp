@@ -41,7 +41,7 @@ struct Step {
 uint32_t Init(uint32_t machine, uint32_t frame, bool* replaced) {
   ITC_NATIVE_RUNNING("sub_8218CE10 RaceMenu::Init");
   auto at = [&](const Value& v) {
-    switch () {
+    switch (v.base) {
       case Value::kConst:
         return v.value;
       case Value::kObject:

@@ -142,14 +142,12 @@ namespace {
 
 struct FormatGuest {
   lifted::Regs& ctx;
-  uint8_t* base;
 };
 
 uint32_t FormatCall(void* user, uint32_t function, uint32_t r3, uint32_t r4, uint64_t r5,
                     uint32_t frame, uint32_t lr) {
   auto& guest = *static_cast<FormatGuest*>(user);
   lifted::Regs& ctx = guest.ctx;
-  uint8_t* base = guest.base;
   const uint64_t stack = ctx.r1.u64;
   ctx.r1.u64 = frame;
   ctx.lr = lr;
@@ -169,12 +167,12 @@ namespace hooks {
 uint32_t FormatGuestCall(void* user, uint32_t function, uint32_t r3, uint32_t r4, uint64_t r5,
                          uint32_t frame, uint32_t lr) {
   auto& calls = *static_cast<FormatGuestCalls*>(user);
-  FormatGuest guest{calls.ctx_, calls.base_};
+  FormatGuest guest{calls.ctx_};
   return FormatCall(&guest, function, r3, r4, r5, frame, lr);
 }
 
 FormatGuestCalls::FormatGuestCalls(lifted::Regs& ctx)
-    : ctx_(ctx), base_(), calls_{this, FormatGuestCall} {}
+    : ctx_(ctx), calls_{this, FormatGuestCall} {}
 
 }  // namespace hooks
 

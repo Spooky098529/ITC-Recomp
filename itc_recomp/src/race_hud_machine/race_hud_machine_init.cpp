@@ -816,7 +816,7 @@ constexpr Step kSteps[] = {
 uint32_t MachineInit(uint32_t machine, uint32_t frame, bool* replaced) {
   ITC_NATIVE_RUNNING("sub_8216E6E8 RaceHudMachine::Init");
   auto at = [&](const Value& v) {
-    switch () {
+    switch (v.base) {
       case Value::kConst:
         return v.value;
       case Value::kMachine:

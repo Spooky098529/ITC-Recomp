@@ -319,7 +319,6 @@ namespace {
 // (`stack`, the r1 the original has there) with its return address.
 struct Walk {
   lifted::Regs* ctx;
-  uint8_t* base;
 };
 uint32_t CallFromWalk(void* user, ui_movies::DrawCall kind, uint32_t context, uint32_t scene,
                       uint32_t node, uint64_t layer, uint32_t stack, uint32_t return_address) {
@@ -398,13 +397,11 @@ namespace {
 // from a frame like the original's (224 bytes) with its return addresses.
 struct GuestKeys {
   lifted::Regs& ctx;
-  uint8_t* base;
   ui_movies::KeyCall Call() { return {&GuestKeys::Run, this}; }
   static ui_movies::KeyResult Run(void* self, uint32_t function, uint32_t k0, uint32_t k1,
                                   double t) {
     auto& keys = *static_cast<GuestKeys*>(self);
     lifted::Regs& ctx = keys.ctx;
-    uint8_t* base = keys.base;
     uint32_t return_address = 0;
     switch (function) {
       case 0x8259FB30: return_address = 0x825A0840; break;
@@ -455,13 +452,11 @@ namespace {
 // from the level's frame, with the original's return address.
 struct GuestTracks {
   lifted::Regs& ctx;
-  uint8_t* base;
   ui_movies::TrackCall Call() { return {&GuestTracks::Run, this}; }
   static void Run(void* self, uint32_t frame, uint32_t node, uint32_t track, double t,
                   uint32_t k0, uint32_t k1) {
     auto& tracks = *static_cast<GuestTracks*>(self);
     lifted::Regs& ctx = tracks.ctx;
-    uint8_t* base = tracks.base;
     const uint64_t stack = ctx.r1.u64, lr = ctx.lr;
     ctx.r1.u64 = frame;
     ctx.r3.u64 = node;

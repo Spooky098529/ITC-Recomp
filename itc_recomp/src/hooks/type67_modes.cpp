@@ -427,7 +427,6 @@ namespace {
 // adapters do).
 struct PanelNew {
   lifted::Regs* ctx;
-  uint8_t* base;
   static uint32_t New(void* user, uint32_t size, uint32_t frame) {
     auto* p = static_cast<PanelNew*>(user);
     if (auto block = memory::crt::OperatorNew(size)) {

@@ -41,7 +41,7 @@ template <size_t N>
 uint32_t RunSteps(const Step (&steps)[N], uint32_t machine, uint32_t frame,
                   uint32_t bytes, bool* replaced) {
   auto at = [&](const Value& v) {
-    switch () {
+    switch (v.base) {
       case Value::kConst:
         return v.value;
       case Value::kObject:

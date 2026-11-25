@@ -206,7 +206,7 @@ uint64_t Buy(uint32_t sp, const Calls& calls) {
       at = (node << 2) + garage.nodes_address();
     }
     const int32_t slot = int16_t(guest::LoadU16(at + 2));
-    const schema::Car added(uint32_t(slot) * 1968 + garage.cars_address());
+    const schema::Car added{uint32_t(slot) * 1968 + garage.cars_address()};
     const uint32_t to = added.extras_address();
     for (uint32_t k = 0; k < 5; k++) {
       Store(to + 4 * k, Load(from + 4 * k));

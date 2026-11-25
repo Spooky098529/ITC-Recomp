@@ -404,7 +404,7 @@ ITC_REGS_STEP(ScenePoolsSetUp) {
 // The second set's set-ups (scene-models.md): r3 = the object, r4 = the
 // record; r3 as the original leaves it, or the original where the plain C++
 // declines.
-void SecondSetUp(lifted::Regs& ctx, std::optional<uint32_t> (*setup)(uint8_t*, uint32_t, uint32_t, uint32_t,
+void SecondSetUp(lifted::Regs& ctx, std::optional<uint32_t> (*setup)(uint32_t, uint32_t, uint32_t,
                                                   const cm::SecondSetUps&),
                  lifted::RegsFunction* original) {
   const uint64_t lr = ctx.lr;

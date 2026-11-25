@@ -109,7 +109,7 @@ uint64_t Screen0Leave(uint32_t screen, uint32_t dispatcher, bool type7,
 
 uint64_t ListScreenInit(uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822515A0 ListScreen::Init");
-  const schema::ListScreen screen(uint32_t(r3));
+  const schema::ListScreen screen{uint32_t(r3)};
   const uint32_t frame = sp - 112;
   screen.set_next_page(0);
   screen.set_unknown_9664(kMinusOne);
@@ -132,7 +132,7 @@ uint64_t PanelScreenInit(uint64_t r3, uint32_t sp, const Calls& calls) {
 
 uint64_t NodeScreenInit(uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82259128 NodeScreen::Init");
-  const schema::NodeScreen screen(uint32_t(r3));
+  const schema::NodeScreen screen{uint32_t(r3)};
   const uint32_t frame = sp - 112;
   screen.set_movie(15);
   screen.set_table_movie(15);

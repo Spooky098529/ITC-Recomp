@@ -121,7 +121,7 @@ uint32_t OnEnter(uint32_t machine, uint32_t sp) {
 
 uint64_t WaitForMovie(uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821BBBA0 Options::WaitForMovie");
-  const Machine machine(uint32_t(r3));
+  const Machine machine{uint32_t(r3)};
   (void)sp;  // its frame held nothing (E5 step 6)
   if (machine.loaded() == 0) {
     r3 = ui_movies::IsLoaded(7);

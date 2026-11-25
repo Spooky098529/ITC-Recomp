@@ -93,7 +93,7 @@ Semaphores& CurrentSemaphores() {
   return g_test ? *g_test : LiveSemaphores();
 }
 
-ScopedTestSemaphores::ScopedTestSemaphores() : base_(), previous_(g_test) {
+ScopedTestSemaphores::ScopedTestSemaphores() : previous_(g_test) {
   for (int i = 0; i < 4; i++) {
     saved_[i] = uint32_t(schema::Semaphore(kAll[i]).count());
   }
@@ -105,10 +105,10 @@ ScopedTestSemaphores::~ScopedTestSemaphores() {
   g_test = previous_;
   Semaphores& outer = previous_ ? *previous_ : LiveSemaphores();
   if (outer.Used()) {
-    outer.MirrorAll(base_);
+    outer.MirrorAll();
   } else {
     for (int i = 0; i < 4; i++) {
-      schema::Semaphore(base_, kAll[i]).set_count(int32_t(saved_[i]));
+      schema::Semaphore(kAll[i]).set_count(int32_t(saved_[i]));
     }
   }
 }

@@ -152,7 +152,7 @@ uint64_t Update3D(uint64_t sound64, uint64_t r4, uint64_t vehicle64, uint32_t sp
   if (kind == 4 && viewports.split() != 0) {
     camera64 += 592;
   }
-  const schema::CameraPass camera(uint32_t(camera64));
+  const schema::CameraPass camera{uint32_t(camera64)};
   const schema::Viewport viewport = viewports.first();
   const uint32_t emitter_at = cs.emitter_position_x_address();    // r24
   const uint32_t listener_at = cs.listener_position_x_address();  // r26

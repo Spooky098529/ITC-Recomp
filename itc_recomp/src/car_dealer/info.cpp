@@ -103,7 +103,7 @@ uint64_t ShowCarInfo(uint64_t index, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82182620 CarDealer::ShowCarInfo");
   const uint32_t frame = Frame(sp, 128);
   const List list = G::data().shown_list();
-  const Entry entry(uint32_t(list.load_at(uint32_t(index) << 2, 4)));
+  const Entry entry{uint32_t(list.load_at(uint32_t(index) << 2, 4))};
   Store(frame + 80, entry.unknown_770());
   Store(frame + 88, entry.weight());
   Store(frame + 84, entry.unknown_709() != 0 ? 1 : 0);

@@ -58,7 +58,7 @@ uint64_t OpenMovie(uint8_t*, uint32_t sp, uint32_t lr, const Calls& calls) {
 
 uint64_t WaitForLoad(uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82180F20 CarDealer::WaitForLoad");
-  const Machine machine(uint32_t(r3));
+  const Machine machine{uint32_t(r3)};
   Frame(sp, 96);
   if (machine.loaded() == 0) {
     r3 = ui_movies::IsLoaded(4);
@@ -118,7 +118,7 @@ void AfterDetail() {
 
 uint64_t Leave(uint64_t r3, uint32_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821817C0 CarDealer::Leave");
-  const Machine machine(uint32_t(r3));
+  const Machine machine{uint32_t(r3)};
   if (G::data().first_car() != 0) {
     machine.set_state(10);
     return StartFirstRace(sp, calls);

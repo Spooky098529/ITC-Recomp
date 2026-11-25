@@ -407,7 +407,7 @@ uint32_t Tick(uint32_t holder, uint32_t sp, bool native_slots, const Calls& call
   const double scale = double(G::input_scale());
   static constexpr struct {
     uint16_t (schema::CarInput::*get)() const;
-    uint32_t (*set)(uint8_t*, double, uint32_t);
+    uint32_t (*set)(double, uint32_t);
   } kInputs[3] = {{&schema::CarInput::throttle, SetThrottle},
                   {&schema::CarInput::brake, SetBrake},
                   {&schema::CarInput::steering, SetSteering}};

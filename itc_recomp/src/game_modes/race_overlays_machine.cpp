@@ -422,7 +422,7 @@ uint32_t RaceOverlaysMachineInit(uint32_t machine, uint32_t frame,
                                  bool* replaced) {
   ITC_NATIVE_RUNNING("sub_8215E6C8 RaceOverlaysMachine::Init");
   auto at = [&](const Value& v) {
-    switch () {
+    switch (v.base) {
       case Value::kConst:
         return v.value;
       case Value::kMachine:

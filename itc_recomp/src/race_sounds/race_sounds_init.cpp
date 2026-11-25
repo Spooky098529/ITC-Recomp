@@ -736,7 +736,7 @@ uint32_t Init(uint32_t machine, uint32_t sp, const Calls& calls, bool* replaced)
   // CarSounds::Init with memset's r3 to r5 left.
   calls.Call(kCarSoundsInit, frame, 0x8217746C, 3, last, 0, kBuffer1Bytes);
   auto at = [&](const Value& v) {
-    switch () {
+    switch (v.base) {
       case Value::kConst:
         return v.value;
       case Value::kMachine:

@@ -25,7 +25,6 @@ class RaceEventGuest {
   static uint32_t Test(void* user, uint32_t function, uint32_t condition, uint32_t level,
                        uint32_t depth);
   lifted::Regs& ctx_;
-  uint8_t* base_;
   race_event::Guest guest_;
 };
 

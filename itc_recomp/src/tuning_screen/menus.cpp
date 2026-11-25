@@ -741,7 +741,7 @@ uint64_t AeroText(const GuestCall& call, uint32_t screen, uint32_t frame,
     call(kMemcpy, {parts, parts_at, 36}, frame, 0x821D2E70);
   }
   auto get = [&](uint32_t function, uint32_t out, uint64_t level, uint32_t lr,
-                 bool (*plain)(uint8_t*, uint32_t, const uint32_t[9], int32_t)) {
+                 bool (*plain)(uint32_t, const uint32_t[9], int32_t)) {
     if (native_specs) {
       uint32_t words[9];
       for (uint32_t i = 0; i < 9; i++) {

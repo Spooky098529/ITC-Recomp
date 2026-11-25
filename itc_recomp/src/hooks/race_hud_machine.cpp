@@ -68,7 +68,7 @@ namespace rh = race_hud_object;
 // make them. The adapter's lr is put back when it ends.
 class Calls {
  public:
-  Calls(lifted::Regs& ctx) : ctx_(ctx), base_(), lr_(ctx.lr) {}
+  Calls(lifted::Regs& ctx) : ctx_(ctx), lr_(ctx.lr) {}
   ~Calls() { ctx_.lr = lr_; }
   Calls(const Calls&) = delete;
   Calls& operator=(const Calls&) = delete;
@@ -82,7 +82,6 @@ class Calls {
                          uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<Calls*>(user);
     lifted::Regs& ctx = self.ctx_;
-    uint8_t* base = self.base_;
     const uint32_t r3 = uint32_t(args[0]);
     switch (function) {
       case rhm::kHudTick:
@@ -201,7 +200,7 @@ class Calls {
   // the caller's frame with r4 passed on, state 1's from sub_82212908's
   // 112-byte frame. r3 left (the HUD) when it calls nothing.
   uint64_t RunHudMovie(uint64_t hud, uint64_t r4, uint32_t r1, uint32_t lr) {
-    const race_hud::HudMovie movie = race_hud::RunMovie(base_, uint32_t(hud));
+    const race_hud::HudMovie movie = race_hud::RunMovie(uint32_t(hud));
     const rh::Calls guest = calls();
     switch (movie.call) {
       case race_hud::HudCall::kNone:
@@ -214,7 +213,7 @@ class Calls {
         return guest.Call(0x82212958, r1, lr, hud, r4);
       case race_hud::HudCall::kRunTimer: {
         const uint32_t frame = r1 - 112;
-        guest::StoreU32(base_, frame, r1);
+        guest::StoreU32(frame, r1);
         return guest.Call(0x8211E1B8, frame, 0x8221293C, movie.movie, r4);
       }
     }
@@ -225,7 +224,6 @@ class Calls {
                         uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<Calls*>(user);
     lifted::Regs& ctx = self.ctx_;
-    uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
     ctx.r3.u64 = args[0];
@@ -250,7 +248,6 @@ class Calls {
                        uint32_t frame, uint32_t lr) {
     auto& self = *static_cast<Calls*>(user);
     lifted::Regs& ctx = self.ctx_;
-    uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = frame;
     ctx.lr = lr;
@@ -267,7 +264,6 @@ class Calls {
                         uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<Calls*>(user);
     lifted::Regs& ctx = self.ctx_;
-    uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
     lifted::Temp* registers[4] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6};
@@ -282,7 +278,6 @@ class Calls {
   }
 
   lifted::Regs& ctx_;
-  uint8_t* base_;
   uint64_t lr_;
 };
 

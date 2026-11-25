@@ -228,7 +228,6 @@ int main(int argc, char* argv[]) {
   });
   // The image's data in guest memory (compiled in: src/image/image.h), the
   // kernel variables bound.
-  uint8_t* base = memory::Base();
   image::CopyInto();
   memory::BindKernelVariables();
   native_audio::Start();

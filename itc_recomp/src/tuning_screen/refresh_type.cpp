@@ -304,7 +304,7 @@ uint64_t Context::SpoilerHelp() const {
     type = uint32_t(TS(screen).type());
   }
   const auto get = [&](uint32_t function, uint32_t out, uint64_t level, uint32_t lr,
-                       bool (*plain)(uint8_t*, uint32_t, const uint32_t[9], int32_t)) {
+                       bool (*plain)(uint32_t, const uint32_t[9], int32_t)) {
     uint32_t loaded[9];
     for (uint32_t i = 0; i < 9; i++) {
       loaded[i] = guest::LoadU32(parts + 4 * i);

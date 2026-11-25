@@ -334,14 +334,12 @@ ITC_AI_DRIVERS(8213D378, ctx.r3.s64 = int32_t(BranchMasksFor(ctx.r3.u32)))
 namespace {
 struct UpdateCall {
   lifted::Regs* ctx;
-  uint8_t* base;
 };
 // A driver's update (its +6148), called from a frame like UpdateAll's (176
 // bytes, returning to 0x82139684) with r3 = the driver, as the original.
 uint64_t CallDriverUpdate(void* user, uint64_t driver, uint32_t function) {
   auto& call = *static_cast<UpdateCall*>(user);
   lifted::Regs& ctx = *call.ctx;
-  uint8_t* base = call.base;
   guest_call::InFrame(ctx, 176, 0x82139684, [&](uint32_t) {
     ctx.r3.u64 = driver;
     lifted::CallFromContext(ctx, function);
@@ -390,7 +388,6 @@ ITC_AI_DRIVERS(821469D0, ctx.r3.u64 = ReadVehicleOwnSlice(ctx.r3.u32))
 namespace {
 struct PathCall {
   lifted::Regs* ctx;
-  uint8_t* base;
 };
 // The path's normalizer when it's neither of the native ones (never in the
 // game: AiPath::SetMode sets only those), called from Extend's frame (its
@@ -399,7 +396,6 @@ uint64_t CallNormalizer(void* user, uint32_t function, uint32_t frame, uint32_t 
                         uint32_t entry, uint32_t position, uint32_t lane, uint64_t masks) {
   auto& call = *static_cast<PathCall*>(user);
   lifted::Regs& ctx = *call.ctx;
-  uint8_t* base = call.base;
   const uint64_t saved = ctx.r1.u64;
   guest::StoreU32(frame, frame + 208);
   ctx.r1.u64 = frame;

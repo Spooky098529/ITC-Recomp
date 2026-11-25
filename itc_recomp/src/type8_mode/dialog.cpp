@@ -143,7 +143,7 @@ void ToStep(uint32_t dialog, uint32_t step, uint32_t next, uint32_t keep_unless)
 
 uint64_t DialogOnEnter(uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_8223A408 Type8Dialog::OnEnter");
-  const D d(uint32_t(r3));
+  const D d{uint32_t(r3)};
   const Pages pages(d.pages_address());
   const Menu menu(d.menu_address());
   const Machine machine(d.machine_address());
@@ -188,7 +188,7 @@ uint64_t DialogOpenMovies(uint32_t sp, const Calls& calls) {
 
 uint64_t DialogWaitForMovies(uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8223ADC0 Type8Dialog::WaitForMovies");
-  const D d(uint32_t(r3));
+  const D d{uint32_t(r3)};
   const Machine machine(d.machine_address());
   (void)sp;  // its frame held only the back chain (E5 step 6)
   if (int32_t(machine.loaded()) != 0) {
@@ -223,7 +223,7 @@ uint64_t DialogDraw(uint64_t r3, uint64_t r4, uint32_t sp, const Calls& calls) {
 uint64_t DialogUpdate(uint64_t r3, uint32_t dispatcher, uint32_t sp,
                       const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8223AC58 Type8Dialog::Update");
-  const D d(uint32_t(r3));
+  const D d{uint32_t(r3)};
   const Pages pages(d.pages_address());
   const uint32_t frame = Frame(sp, 160);
   StoreU32(frame + 80, d.movie());
@@ -283,7 +283,7 @@ uint64_t DialogOpenConfirm(uint32_t dialog, uint32_t sp) {
 
 uint64_t DialogOpenNotice(uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_8223A4A0 Type8Dialog::OpenNotice");
-  const D d(uint32_t(r3));
+  const D d{uint32_t(r3)};
   const Pages pages(d.pages_address());
   const Machine machine(d.machine_address());
   d.set_movie(19);

@@ -175,7 +175,6 @@ namespace {
 // after.
 struct GuestTanUser {
   lifted::Regs* ctx;
-  uint8_t* base;
 };
 
 x3daudio::TanResult GuestTan(void* user, uint32_t sp, double x) {

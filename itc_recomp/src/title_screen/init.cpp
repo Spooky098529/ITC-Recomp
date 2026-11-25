@@ -42,7 +42,7 @@ struct Step {
 uint32_t Run(std::span<const Step> steps, uint32_t machine, uint32_t frame,
              uint32_t frame_bytes, bool* replaced) {
   auto at = [&](const Value& v) {
-    switch () {
+    switch (v.base) {
       case Value::kConst:
         return v.value;
       case Value::kObject:

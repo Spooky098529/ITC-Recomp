@@ -78,7 +78,7 @@ namespace ts = title_screen;
 // adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(lifted::Regs& ctx) : ctx_(ctx), base_(), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx) : ctx_(ctx), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -89,7 +89,6 @@ class GuestCalls {
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
     lifted::Regs& ctx = self.ctx_;
-    uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
     ctx.r3.u64 = args[0];
@@ -110,13 +109,12 @@ class GuestCalls {
     return ctx.r3.u64;
   }
   lifted::Regs& ctx_;
-  uint8_t* base_;
   uint64_t lr_;
 };
 
 // StateMachine::Add's adapter's r3: a new transition's address from the
 // machine's 64-bit r3, as the type 2 screens' Inits.
-void InitSteps(lifted::Regs& ctx, uint32_t (*init)(uint8_t*, uint32_t, uint32_t, bool*), uint32_t frame_bytes) {
+void InitSteps(lifted::Regs& ctx, uint32_t (*init)(uint32_t, uint32_t, bool*), uint32_t frame_bytes) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
   bool replaced = false;

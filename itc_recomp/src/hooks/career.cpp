@@ -192,7 +192,6 @@ namespace {
 
 struct GuestPickNext {
   lifted::Regs& ctx;
-  uint8_t* base;
 };
 
 // Career::PickNext from Career::NextDay's frame (its adapter: the gate, then
@@ -238,7 +237,6 @@ namespace {
 
 struct GuestMake {
   lifted::Regs& ctx;
-  uint8_t* base;
   uint32_t sp;
 };
 
@@ -282,7 +280,6 @@ namespace {
 
 struct GuestCopy {
   lifted::Regs& ctx;
-  uint8_t* base;
 };
 
 // memcpy (its adapter) from Garage::InsertCar's frame under Garage::Add's,

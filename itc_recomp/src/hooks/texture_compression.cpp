@@ -126,7 +126,7 @@ ITC_REGS_STEP(TextureCompressionDxtEncodeRow) {
 
 namespace {
 
-void DeleteWith(lifted::Regs& ctx, std::optional<uint32_t> (*destruct)(uint8_t*, uint32_t, uint32_t),
+void DeleteWith(lifted::Regs& ctx, std::optional<uint32_t> (*destruct)(uint32_t, uint32_t),
                 lifted::RegsFunction* original) {
   const auto r3 = NativeHeapActive() ? destruct(ctx.r3.u32, ctx.r4.u32) : std::nullopt;
   if (!r3) {

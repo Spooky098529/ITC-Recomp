@@ -61,12 +61,12 @@ void FlushOff() { Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask)); 
 class Writer {
  public:
   Writer(const car_scene_draw::SceneDrawCalls& calls, uint32_t f, uint32_t list)
-      : base_(), calls_(calls), f_(f), list_(list) {}
+      : calls_(calls), f_(f), list_(list) {}
 
   // CommandList::AllocateSlots (one slot), the original where the list is
   // full (it prints its message and returns 0).
   uint32_t Slot(uint32_t lr) {
-    const uint32_t first = command_list::AllocateSlots(base_, list_, 1);
+    const uint32_t first = command_list::AllocateSlots(list_, 1);
     if (first != 0) {
       return first;
     }
@@ -77,7 +77,7 @@ class Writer {
     const uint32_t slot = Slot(lr);
     uint32_t at = slot;
     for (const uint32_t w : words) {
-      Store(base_, at, w);
+      Store(at, w);
       at += 4;
     }
     return slot;
@@ -93,7 +93,6 @@ class Writer {
   uint32_t list() const { return list_; }
 
  private:
-  uint8_t* base_;
   const car_scene_draw::SceneDrawCalls& calls_;
   uint32_t f_;
   uint32_t list_;
@@ -252,7 +251,6 @@ uint64_t RecordBillboards(const car_scene_draw::SceneDrawCalls& calls,
   Store(f - kVerticesFrame, f);
   struct Slots {
     Writer* w;
-    uint8_t* base;
     uint32_t list;
   } user{&w, list};
   const SlotAllocator slots{

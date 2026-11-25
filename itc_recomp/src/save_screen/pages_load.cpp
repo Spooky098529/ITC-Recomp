@@ -18,7 +18,7 @@ uint64_t StoreSettings(uint32_t sp, const Calls& calls) {
     if (G::profile_read() == 997) {
       return 0;
     }
-    const schema::SaveData save(uint32_t(f.Call(kSaveDataOf, 0x821A2500, 0)));
+    const schema::SaveData save{uint32_t(f.Call(kSaveDataOf, 0x821A2500, 0))};
     const auto profile = G::profile_reader().settings();
     save.set_profile_option(profile.setting15_value() == 0 ? 1 : 0);
     const uint32_t control = profile.setting16_value();

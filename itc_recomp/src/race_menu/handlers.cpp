@@ -111,7 +111,7 @@ uint64_t OpenMovie(uint32_t machine, uint32_t sp, const Calls& calls) {
 
 uint64_t WaitForMovie(uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821890D8 RaceMenu::WaitForMovie");
-  const Machine m(uint32_t(r3));
+  const Machine m{uint32_t(r3)};
   Frame(sp, 112);
   if (m.loaded() == 0) {
     r3 = ui_movies::IsLoaded(kMovie);

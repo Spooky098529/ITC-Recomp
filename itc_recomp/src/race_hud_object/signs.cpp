@@ -32,7 +32,6 @@ uint32_t Owner() { return G::track_zones().address; }
 
 // The sign's state as the original keeps it in registers.
 struct Sign {
-  uint8_t* base;
   uint32_t hud;
   uint32_t frame;
   const Calls& calls;

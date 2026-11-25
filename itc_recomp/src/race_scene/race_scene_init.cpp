@@ -186,7 +186,7 @@ std::optional<uint32_t> MachineInit(uint32_t machine, uint32_t frame,
   }
   ITC_NATIVE_RUNNING("sub_8215D808 RaceSceneMachine::Init");
   auto at = [&](const Value& v) {
-    switch () {
+    switch (v.base) {
       case Value::kConst:
         return v.value;
       case Value::kMachine:

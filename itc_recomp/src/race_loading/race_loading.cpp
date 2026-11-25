@@ -150,7 +150,7 @@ void OnCourseReady(uint32_t machine) {
 uint64_t WaitDraw(uint64_t r3, uint32_t dispatcher, uint32_t sp,
                   const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821515A0 CourseSetup::WaitDraw");
-  const Machine m(uint32_t(r3));
+  const Machine m{uint32_t(r3)};
   // The original's 96-byte frame (only its back chain) made only for the
   // guest call that runs from it (E5 step 6).
   if (m.draw_step() == 0) {

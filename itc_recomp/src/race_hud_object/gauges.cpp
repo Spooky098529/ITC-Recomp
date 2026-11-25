@@ -52,7 +52,7 @@ void CurveEval(uint32_t curve, double x) {
     while (true) {
       const uint32_t point = c.points_address() + 8 * uint32_t(i);
       if (!(x < double(Point(point).x())) && !(x > double(Point(point + 8).x()))) {
-        const Point at(uint32_t(i) * 8 + c.points_address());
+        const Point at{uint32_t(i) * 8 + c.points_address()};
         const Point next(at.address + 8);
         double a = double(at.x());
         const double b = double(next.x());

@@ -249,7 +249,6 @@ namespace {
 // the game's callers give it) or a C++ word of the port's own (the frame
 // slots ReadPad and DriveByAiWithPad kept it in before E5 step 6).
 struct Out {
-  uint8_t* base;
   uint32_t address;
   uint32_t* host = nullptr;
   uint32_t value() const {

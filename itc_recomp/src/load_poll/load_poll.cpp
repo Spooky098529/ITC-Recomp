@@ -223,7 +223,7 @@ uint64_t InteriorMetersSetGauge(uint32_t meters, uint64_t gauge, uint64_t entry,
     index = 3;
   }
   mp::SetTexture(model, uint32_t(index), int32_t(shape), sp);
-  const schema::InteriorRecord record(uint32_t(offset + m.record().address));
+  const schema::InteriorRecord record{uint32_t(offset + m.record().address)};
   const int32_t value = int32_t(record.unknown_16());
   const uint64_t r3 = GaugeTableEntry(record.gauge0_kind(), value);
   Store(m.gauge0_angle_address() + (uint32_t(gauge) << 2), uint32_t(r3));

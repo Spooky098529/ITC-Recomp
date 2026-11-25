@@ -86,7 +86,6 @@ void DelayThreeTaps(uint32_t line, uint32_t in, uint32_t out_a, uint32_t out_b,
 // + x written to the line (unmasked, from `write`), and +4 x v + d the
 // output, a frame late (the first the last block's).
 struct AllPass {
-  uint8_t* base;
   uint32_t data;
   uint32_t mask;
   double f0, f13;
@@ -100,7 +99,6 @@ struct AllPass {
 // address (+8). Returns the carried output.
 double AllPassInPlace(const AllPass& a, uint32_t& p, uint32_t& q, uint32_t& r11, double f11,
                       int passes) {
-  uint8_t* base = a.base;
   const double f0 = a.f0, f13 = a.f13;
   for (int pass = 0; pass < passes; pass++) {
     double f10 = Load(p + 0);
@@ -499,7 +497,6 @@ void SetWord(uint32_t address, uint32_t value) {
 // the write index's.
 template <uint32_t kMask, uint32_t kWrap>
 struct Crossfade {
-  uint8_t* base;
   uint32_t s, in, out;
   uint32_t r11;  // the line
   double f0, f11, f12, f13;

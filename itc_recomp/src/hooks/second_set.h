@@ -187,7 +187,7 @@ void SecondSetTrafficPointsDestruct(lifted::Regs& ctx);
 // LightPoints::Find sub_820DC900 (r4 one part model) and TrafficPoints::Find
 // sub_820E58C8 natively only with native memcpy,
 // --native_models and --native_material_passes (else the original).
-using FindFunction = uint32_t (*)(uint8_t*, uint32_t, uint32_t, uint32_t,
+using FindFunction = uint32_t (*)(uint32_t, uint32_t, uint32_t,
                                   second_set::FindCalls&);
 bool SecondSetFindsNative();
 // The guest calls the set-ups' plain C++ makes (Skeleton::UpdateMatrices'
@@ -211,7 +211,7 @@ void SecondSetTrafficFind(lifted::Regs& ctx);
 // step (r3 the group, r4 the model) for the harness. r3 as the original
 // leaves it, the flush mode as its last float step; the originals of
 // Morph::Run, memcpy and FreePagesIn where their plain C++ declines.
-using WheelFunction = uint64_t (*)(uint8_t*, uint32_t, uint32_t, uint32_t, second_set::WheelCalls&);
+using WheelFunction = uint64_t (*)(uint32_t, uint32_t, uint32_t, second_set::WheelCalls&);
 bool SecondSetWheelsNative();
 second_set::WheelCalls SecondSetWheelCalls(lifted::Regs& ctx);
 void SecondSetWheelStep(lifted::Regs& ctx, WheelFunction step);

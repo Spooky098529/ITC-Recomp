@@ -30,7 +30,6 @@ bool NativeAtexit();
 // as long as the adapter's call.
 struct GuestAtexit {
   lifted::Regs& ctx;
-  uint8_t* base;
   c_runtime::AtexitCall Call() { return {&GuestAtexit::Run, this}; }
   static int32_t Run(void* self, uint32_t function);
 };

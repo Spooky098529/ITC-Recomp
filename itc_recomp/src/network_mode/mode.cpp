@@ -34,7 +34,7 @@ using Mode = schema::ModeType12;
 using Block = schema::NetModeBlock;
 using NetMachine = schema::NetMachine;
 
-using InitStatesFn = uint32_t (*)(uint8_t*, uint32_t, uint32_t, bool*);
+using InitStatesFn = uint32_t (*)(uint32_t, uint32_t, bool*);
 
 // The machines in the order the Init sets them up and adds them to the
 // dispatcher: their InitStates, their offset in the block and its frame.
@@ -635,7 +635,7 @@ uint64_t SessionInit(uint64_t session_r3, uint32_t sp) {
   // The original's 112-byte frame (only its back chain) left out: no guest
   // call is made from it (E5 step 6).
   (void)sp;
-  const schema::Session s(uint32_t(session_r3));
+  const schema::Session s{uint32_t(session_r3)};
   auto store64 = [&](uint32_t at, uint64_t value) {
     Store(at, uint32_t(value >> 32));
     Store(at + 4, uint32_t(value));

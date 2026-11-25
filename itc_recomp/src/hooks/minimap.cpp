@@ -164,7 +164,6 @@ namespace {
 // with the original's return addresses.
 struct MarkerContext {
   lifted::Regs& ctx;
-  uint8_t* base;
   uint32_t frame;
   uint32_t record_return;
   uint32_t memcpy_return;
@@ -194,7 +193,7 @@ struct MarkerContext {
   }
 };
 
-using MarkerDraw = void (*)(uint8_t*, uint32_t, uint32_t, uint32_t, uint32_t,
+using MarkerDraw = void (*)(uint32_t, uint32_t, uint32_t, uint32_t,
                             const minimap::MarkerCalls&);
 
 void DrawMarker(lifted::Regs& ctx, MarkerDraw draw, uint32_t frame_bytes,

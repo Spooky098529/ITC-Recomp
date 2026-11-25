@@ -24,7 +24,6 @@ bool ModelsNativeLifetime();
 // and a native caller's).
 struct ModelLoadGuest {
   lifted::Regs& ctx;
-  uint8_t* base;
   models::LoadCalls Calls();
 };
 

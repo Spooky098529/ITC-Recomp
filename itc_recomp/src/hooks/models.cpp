@@ -449,7 +449,6 @@ void ModelLoadCall(void* user, uint32_t function, uint32_t r3, uint32_t r4, uint
                    uint32_t return_address) {
   auto& c = *static_cast<hooks::ModelLoadGuest*>(user);
   lifted::Regs& ctx = c.ctx;
-  uint8_t* base = c.base;
   guest_call::InFrame(ctx, 512, return_address, [&](uint32_t) {
     ctx.r3.u64 = r3;
     ctx.r4.u64 = r4;
@@ -524,7 +523,6 @@ namespace {
 // VertexShader::Init's original, from a frame as the callback's own.
 struct PairLoadedCalls {
   lifted::Regs& ctx;
-  uint8_t* base;
   static void Init(void* user, uint32_t object, uint32_t microcode) {
     auto& c = *static_cast<PairLoadedCalls*>(user);
     guest_call::InFrame(c.ctx, 144, 0x820A0760, [&](uint32_t) {

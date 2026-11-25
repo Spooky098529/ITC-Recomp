@@ -43,7 +43,7 @@ struct Step {
 template <size_t n>
 InitResult Run(const Step (&steps)[n], uint32_t object, uint32_t frame) {
   auto at = [&](const Value& v) {
-    switch () {
+    switch (v.base) {
       case Value::kConst:
         return v.value;
       case Value::kObject:

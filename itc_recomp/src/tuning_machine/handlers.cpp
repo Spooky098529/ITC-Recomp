@@ -107,7 +107,7 @@ void ResetImages(uint32_t images) {
 
 uint64_t Create(uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821CE4C8 TuningMachine::Create");
-  const Screen sc(uint32_t(r3));
+  const Screen sc{uint32_t(r3)};
   // The original's 144-byte frame held nothing the port keeps (no call is
   // made with it, E5 step 6). The screen kept in the caller's parameter area (read back before the
   // menus are written).
@@ -271,7 +271,7 @@ uint64_t OpenMovies(uint32_t screen, uint32_t sp, const Calls& calls) {
 
 uint64_t WaitForMovies(uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821CE9E8 TuningMachine::WaitForMovies");
-  const Screen sc(uint32_t(r3));
+  const Screen sc{uint32_t(r3)};
   // No frame (the original's 112 bytes held nothing; E5 step 6).
   if (sc.movies_loaded() == 0) {
     bool all = true;
@@ -297,7 +297,7 @@ uint64_t WaitForMovies(uint64_t r3, uint32_t sp) {
 uint64_t OnDialogClosed(uint64_t r3, uint32_t mode, uint32_t sp,
                         const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821D8898 TuningMachine::OnDialogClosed");
-  const Screen sc(uint32_t(r3));
+  const Screen sc{uint32_t(r3)};
   const uint32_t frame = Frame(sp, 128);
   if (sc.screen_state() == 11) {
     const uint32_t movie = Load(FindPair(kDialogMovie));
@@ -313,7 +313,7 @@ uint64_t OnDialogClosed(uint64_t r3, uint32_t mode, uint32_t sp,
 
 uint64_t Unload(uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821D69A0 TuningMachine::Unload");
-  const Screen sc(uint32_t(r3));
+  const Screen sc{uint32_t(r3)};
   const uint32_t frame = Frame(sp, 112);
   if (sc.movies_loaded() != 0) {
     const uint32_t movie = Load(FindPair(kShopMovie));
@@ -337,7 +337,7 @@ void Close(uint32_t machine, uint32_t mode) {
 uint64_t Destroy(uint64_t r3, uint32_t sp, const Calls& calls,
                  const UnloadAllNative* unload) {
   ITC_NATIVE_RUNNING("sub_821CBD40 TuningMachine::Destroy");
-  const Screen sc(uint32_t(r3));
+  const Screen sc{uint32_t(r3)};
   const uint32_t frame = Frame(sp, 112);
   if (unload != nullptr) {
     tuning_pages::UnloadAll(*unload->call, r3 + kImages, frame, unload->native_free);

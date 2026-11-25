@@ -249,8 +249,8 @@ ITC_SECOND_SET_GROUP(820EB320, WheelsInitBrakes)
 
 namespace {
 
-using Release = std::optional<uint32_t> (*)(uint8_t*, uint32_t, uint32_t);
-using Construct = uint32_t (*)(uint8_t*, uint32_t, uint32_t, uint32_t);
+using Release = std::optional<uint32_t> (*)(uint32_t, uint32_t);
+using Construct = uint32_t (*)(uint32_t, uint32_t, uint32_t);
 
 // A release: natively where memcpy is native and ReleaseA's plain C++ runs
 // for `pool` (and with --native_material_passes for the parts'); r3 as the
@@ -379,7 +379,7 @@ bool DestructNative(uint32_t pool) { return SecondSetReleaseNative(pool); }
 
 // A destructor: r3 = the object, left; the original where it declines.
 void DestructStep(lifted::Regs& ctx, lifted::RegsFunction* original,
-                  uint32_t pool, bool (*destruct)(uint8_t*, uint32_t, uint32_t)) {
+                  uint32_t pool, bool (*destruct)(uint32_t, uint32_t)) {
   if (DestructNative(pool)) {
     ctx.fpscr.disableFlushMode();
     if (destruct(ctx.r3.u32, ctx.r1.u32)) {
@@ -391,7 +391,7 @@ void DestructStep(lifted::Regs& ctx, lifted::RegsFunction* original,
 
 // A deleting destructor: r3 = the object (left), r4 = the flags.
 void DeletingStep(lifted::Regs& ctx, lifted::RegsFunction* original,
-                  uint32_t pool, bool (*destruct)(uint8_t*, uint32_t, uint32_t, uint32_t)) {
+                  uint32_t pool, bool (*destruct)(uint32_t, uint32_t, uint32_t)) {
   if (DestructNative(pool)) {
     ctx.fpscr.disableFlushMode();
     if (destruct(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32)) {

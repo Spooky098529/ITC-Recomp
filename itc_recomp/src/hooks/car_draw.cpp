@@ -150,7 +150,6 @@ car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest) {
   calls.draw = SceneryListsDrawCalls(guest);
   calls.memcpy = [guest](uint32_t to, uint32_t from, uint32_t bytes, uint32_t sp, uint32_t lr) {
     lifted::Regs& ctx = guest->ctx;
-    uint8_t* base = guest->base;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = sp;
     ctx.lr = lr;
@@ -164,7 +163,6 @@ car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest) {
   calls.find_nearest = [guest](const uint64_t regs[7], double f1, double f2, double f3,
                                uint32_t sp, uint32_t lr) {
     lifted::Regs& ctx = guest->ctx;
-    uint8_t* base = guest->base;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = sp;
     ctx.lr = lr;
@@ -185,7 +183,6 @@ car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest) {
     calls.make_morph_job = [guest](uint32_t maker, uint32_t morph,
                                    uint32_t sp) -> std::optional<uint32_t> {
       lifted::Regs& ctx = guest->ctx;
-      uint8_t* base = guest->base;
       const auto job = morph_jobs::MakeJob(morph_jobs::Kind::kMorph, maker, morph, sp,
                                            MorphJobsConstructCalls(ctx));
       ctx.fpscr.disableFlushMode();
@@ -195,7 +192,6 @@ car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest) {
   calls.call = [guest](uint32_t function, const uint64_t* regs, int count, uint32_t sp,
                        uint32_t lr) {
     lifted::Regs& ctx = guest->ctx;
-    uint8_t* base = guest->base;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = sp;
     ctx.lr = lr;

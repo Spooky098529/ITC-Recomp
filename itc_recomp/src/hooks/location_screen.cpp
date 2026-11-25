@@ -146,7 +146,6 @@ namespace {
 
 struct GuestRun {
   lifted::Regs& ctx;
-  uint8_t* base;
 };
 
 uint64_t RunThrough(void* user, uint32_t movie, uint32_t draw_only, uint32_t frame_bytes,
@@ -233,7 +232,6 @@ void PageThrough(void* user, uint32_t handler, uint32_t dispatcher, uint32_t mac
                  uint32_t frame_bytes, uint32_t lr) {
   auto& guest = *static_cast<GuestRun*>(user);
   lifted::Regs& ctx = guest.ctx;
-  uint8_t* base = guest.base;
   guest_call::InFrame(ctx, frame_bytes, lr, [&](uint32_t) {
     ctx.r3.u64 = dispatcher;
     ctx.r4.u64 = machine;
@@ -265,7 +263,6 @@ ITC_REGS_STEP(LocationScreenInitStates) {
 
 LocationScreenCalls::LocationScreenCalls(lifted::Regs& ctx)
     : ctx_(ctx),
-      base_(),
       lr_(ctx.lr),
       event_(std::make_unique<RaceEventGuest>(ctx)),
       format_(std::make_unique<FormatGuestCalls>(ctx)),
@@ -277,7 +274,6 @@ uint64_t LocationScreenCalls::Call(void* user, uint32_t function, const uint64_t
                                    uint32_t r1, uint32_t lr) {
   auto& self = *static_cast<LocationScreenCalls*>(user);
   lifted::Regs& ctx = self.ctx_;
-  uint8_t* base = self.base_;
   const uint64_t stack = ctx.r1.u64;
   ctx.r1.u64 = r1;
   ctx.r3.u64 = args[0];

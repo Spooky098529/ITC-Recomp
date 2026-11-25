@@ -34,7 +34,6 @@ constexpr uint32_t kSetNodeText = 0x8211C7E8;  // UiMovie::SetNodeText(movie, no
 
 // A page over one movie from the original's frame.
 struct Page {
-  uint8_t* base;
   const GuestCall& call;
   uint32_t frame;
   uint32_t movie;

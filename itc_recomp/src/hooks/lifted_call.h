@@ -64,7 +64,7 @@ inline uint32_t PushFrame(uint32_t sp, uint32_t bytes) {
 
 // An adapter's step for plain C++ `function(sp, r13, r3)` returning
 // the original's r3, on our register view (f1 left as it was).
-template <uint64_t (*function)(uint8_t*, uint32_t, uint64_t, uint32_t)>
+template <uint64_t (*function)(uint32_t, uint64_t, uint32_t)>
 void EnterR3(lifted::Regs& ctx) {
   ctx.r3.u64 = function(ctx.r1.u32, ctx.r13.u64, ctx.r3.u32);
 }

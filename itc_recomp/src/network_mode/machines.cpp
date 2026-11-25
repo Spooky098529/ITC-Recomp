@@ -513,10 +513,10 @@ uint64_t DestroyOf(uint32_t machine, uint32_t sp, const Calls& calls) {
   return r3;
 }
 
-using OpenFn = uint64_t (*)(uint8_t*, uint32_t, uint32_t, const Calls&);
-using WaitFn = uint64_t (*)(uint8_t*, uint64_t, uint32_t);
-using LeaveFn = uint64_t (*)(uint8_t*, uint32_t, uint32_t, uint32_t, const Calls&);
-using DestroyFn = uint64_t (*)(uint8_t*, uint32_t, uint32_t, const Calls&);
+using OpenFn = uint64_t (*)(uint32_t, uint32_t, const Calls&);
+using WaitFn = uint64_t (*)(uint64_t, uint32_t);
+using LeaveFn = uint64_t (*)(uint32_t, uint32_t, uint32_t, const Calls&);
+using DestroyFn = uint64_t (*)(uint32_t, uint32_t, const Calls&);
 
 template <size_t I>
 uint64_t OpenAdapter(uint8_t*, uint32_t sp, uint32_t lr, const Calls& calls) {
@@ -867,7 +867,7 @@ uint64_t Dialog13Create(uint32_t machine, uint32_t sp, const Calls& calls) {
   return r3;
 }
 
-using CreateFn = uint64_t (*)(uint8_t*, uint32_t, uint32_t, const Calls&);
+using CreateFn = uint64_t (*)(uint32_t, uint32_t, const Calls&);
 constexpr CreateFn kCreates[] = {
     ModeSelectCreate, Screen1Create,  Screen3Create,  RankingCreate,  TaCourseCreate,
     Screen6Create,    Screen7Create,  Screen8Create,  Screen9Create,  Dialog10Create,

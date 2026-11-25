@@ -162,7 +162,6 @@ uint32_t PlacedId(uint32_t s, uint32_t j) {
 
 // The calls on movie 14 the movie sides make from `frame`.
 struct Movie {
-  uint8_t* base;
   const tuning_screen::GuestCall& call;
   uint32_t movie;
   uint32_t frame;
@@ -235,7 +234,6 @@ uint32_t Holder() {
 // The page's reads of the player's mapper entry, each skipped while its +4
 // is 1; the last read's r3 kept.
 struct Reads {
-  uint8_t* base;
   const tuning_screen::GuestCall& call;
   uint32_t entry;
   uint32_t frame;

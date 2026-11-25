@@ -86,13 +86,11 @@ inline uint32_t GpuPhysicalAddress(uint32_t address) {
   return (address & 0x1FFFFFFFu) + (((address >> 20) + 0x200u) & 0x1000u);
 }
 
-// Guest physical memory is one 512 MB mapping 4 GB above the virtual base
-// (rex::memory::Memory: physical membase = mapping base + 4 GB).
-constexpr uint64_t kPhysicalMemoryOffset = 0x100000000ull;
+// The physical memory: 512 MB of host memory of its own (memory::g_physical,
+// E5 step 7).
 constexpr uint32_t kPhysicalMemorySize = 0x20000000u;
 
 inline uint8_t* PhysicalHostAddress(uint32_t physical) {
-  (void)base;  // the physical memory is mapped on its own (E5 step 7)
   return memory::g_physical + physical;
 }
 

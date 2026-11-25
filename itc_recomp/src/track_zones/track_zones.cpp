@@ -134,7 +134,7 @@ void ListLink(const L& view, int16_t position) {
 // `link`.
 template <typename L>
 void Insert(uint32_t list, uint32_t word, uint32_t position,
-            void (*link)(uint8_t*, uint32_t, int16_t)) {
+            void (*link)(uint32_t, int16_t)) {
   const L view(list);
   link(list, int16_t(position));
   const uint32_t node = NodeAt(view, position);
@@ -909,7 +909,7 @@ uint32_t SetupOf(uint32_t zone, uint32_t index, uint32_t vehicle, uint32_t stack
   return RunSetup(N, zone, index, vehicle, stack, calls);
 }
 
-using SetupFunction = uint32_t (*)(uint8_t*, uint32_t, uint32_t, uint32_t, uint32_t,
+using SetupFunction = uint32_t (*)(uint32_t, uint32_t, uint32_t, uint32_t,
                                    const SetupCalls&);
 
 template <size_t... N>

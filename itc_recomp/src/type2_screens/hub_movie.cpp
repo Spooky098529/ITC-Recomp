@@ -136,7 +136,7 @@ uint32_t HubShowNoticeImage(uint32_t image, uint32_t sp) {
     const uint32_t count = (data.*list.count)();
     uint32_t texture = 0;
     for (uint32_t i = 0; i < count; i++) {
-      const schema::Type2HubImage record(uint32_t(data.load_at((data.*list.images)() - data.address + 4 * i, 4)));
+      const schema::Type2HubImage record{uint32_t(data.load_at((data.*list.images)() - data.address + 4 * i, 4))};
       if (record.index() == image) {
         texture = record.texture().address;
         break;

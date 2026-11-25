@@ -40,7 +40,7 @@ constexpr uint32_t kTextureFree = 0x820ECFC8;   // Texture::Free(header_in, data
 // addresses. The second AssetSize's r3.
 uint64_t LoadEntry(const tuning_screen::GuestCall& call, uint64_t e, uint32_t size,
                    uint32_t frame, uint32_t load_lr) {
-  const schema::DecalImageEntry entry(uint32_t(e));
+  const schema::DecalImageEntry entry{uint32_t(e)};
   // A blob (E5 step 7: the file in PC memory, in the guest's byte order) in
   // place of the VirtualAlloc(size) at 0x821FE8FC (Request) or 0x821F6D78
   // (Load): a TGA only the game's code reads (Texture::FromTga decodes it
@@ -78,7 +78,7 @@ uint64_t RequestImage(const tuning_screen::GuestCall& call, uint64_t images,
   ITC_NATIVE_RUNNING("sub_821FE830 DecalImages::Request");
   const uint32_t frame = Frame(sp, 96);
   const uint64_t e = i * 36 + images;
-  const schema::DecalImageEntry entry(uint32_t(e));
+  const schema::DecalImageEntry entry{uint32_t(e)};
   const int32_t state = int32_t(entry.state());
   if (state == 1 || state == 2) {
     return images;
@@ -183,7 +183,7 @@ uint64_t ReloadImage(const tuning_screen::GuestCall& call, uint64_t images,
   }
   // The file into the entry's buffer as it is (no new pages, no state check).
   const uint64_t e = i * 36 + images;
-  const schema::DecalImageEntry entry(uint32_t(e));
+  const schema::DecalImageEntry entry{uint32_t(e)};
   const uint32_t buffer = entry.file();
   const uint32_t asset = entry.asset_id();
   const uint64_t serial =

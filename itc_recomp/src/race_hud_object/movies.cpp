@@ -512,7 +512,7 @@ uint64_t ScreensDestroy(uint32_t sp, const Calls& calls) {
   const uint32_t frame = sp - 96;
   guest::StoreU32(frame, sp);
   struct Teardown {
-    std::optional<uint64_t> (*native)(uint8_t*, uint32_t);
+    std::optional<uint64_t> (*native)(uint32_t);
     uint32_t original, lr;
   };
   static constexpr Teardown kTeardowns[8] = {
@@ -640,7 +640,7 @@ uint64_t UpdateRacerBar(uint32_t hud, uint64_t index, uint64_t racer, uint32_t s
   const uint32_t frame = sp - 176;
   guest::StoreU32(frame, sp);
   const Hud h(hud);
-  const schema::RaceHudBar bar(uint32_t(index * 40) + h.bars_address());
+  const schema::RaceHudBar bar{uint32_t(index * 40) + h.bars_address()};
   const uint32_t racers = h.racers().address;
   const uint32_t target = Racers(uint32_t(racer * 972) + racers).bar_max0();
   if (bar.touched() == 0 && Touching(uint32_t(racer), frame) != 0) {

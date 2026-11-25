@@ -85,7 +85,6 @@ class LocationScreenCalls {
   static uint64_t Call(void* user, uint32_t function, const uint64_t args[4], uint32_t r1,
                        uint32_t lr);
   lifted::Regs& ctx_;
-  uint8_t* base_;
   uint64_t lr_;
   std::unique_ptr<RaceEventGuest> event_;
   std::unique_ptr<FormatGuestCalls> format_;

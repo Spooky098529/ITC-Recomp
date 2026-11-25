@@ -942,7 +942,7 @@ ITC_REGS_STEP(TuningPagesHandleInput) {
 namespace {
 
 // A sticker page's step: r3 the screen, flush-to-zero off.
-using StickerPage = uint64_t (*)(uint8_t*, const tuning_screen::GuestCall&, uint64_t, uint32_t,
+using StickerPage = uint64_t (*)(const tuning_screen::GuestCall&, uint64_t, uint32_t,
                                  const tp::PageFlags&);
 void RunStickerPage(lifted::Regs& ctx, StickerPage page) {
   ctx.fpscr.disableFlushMode();

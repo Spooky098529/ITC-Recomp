@@ -76,7 +76,7 @@ uint64_t DeleteMovies(uint32_t sp, uint32_t lr, const Calls& calls) {
 }
 
 uint64_t SetWord(uint64_t r3, uint32_t function) {
-  const schema::Type8PanelScreen s(uint32_t(r3));
+  const schema::Type8PanelScreen s{uint32_t(r3)};
   switch (function) {
     case 0x82238458:
       ITC_NATIVE_RUNNING("sub_82238458 Type8PanelScreen::OnMessage2");

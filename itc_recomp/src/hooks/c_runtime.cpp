@@ -552,7 +552,6 @@ namespace {
 
 struct ArrayCall {
   lifted::Regs* ctx;
-  uint8_t* base;
   uint32_t return_address;  // after the original's bctrl
 };
 
@@ -563,7 +562,6 @@ struct ArrayCall {
 void CallElement(void* user, uint64_t function, uint64_t element) {
   auto& call = *static_cast<ArrayCall*>(user);
   lifted::Regs& ctx = *call.ctx;
-  uint8_t* base = call.base;
   guest_call::InFrame(ctx, 128, call.return_address, [&](uint32_t) {
     ctx.r3.u64 = element;
     ctx.ctr.u64 = function;
@@ -594,13 +592,11 @@ ITC_NATIVE_ENTRY(820900C0, ITC_FLAG(native_c_runtime)) {
 namespace {
 struct ThreadDataUser {
   lifted::Regs& ctx;
-  uint8_t* base;
 };
 uint64_t ThreadDataGuest(void* user, uint32_t function, uint32_t r1, uint32_t lr, int set,
                          uint64_t r3, uint64_t r4) {
   auto& self = *static_cast<ThreadDataUser*>(user);
   lifted::Regs& ctx = self.ctx;
-  uint8_t* base = self.base;
   const uint64_t stack = ctx.r1.u64, saved_lr = ctx.lr;
   ctx.r1.u64 = r1;
   if (set >= 1) {

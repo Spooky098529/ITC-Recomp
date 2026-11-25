@@ -49,7 +49,6 @@ void CourseSceneryUpdate(lifted::Regs& ctx);
 // race's scenery load, src/hooks/race_update.cpp). `guest` outlives them.
 struct CourseSceneryGuest {
   lifted::Regs* ctx;
-  uint8_t* base;
 };
 course_scenery::Calls CourseSceneryCalls(CourseSceneryGuest* guest);
 // Whether Scenery::Create's and Setup's plain C++ may run (the models'

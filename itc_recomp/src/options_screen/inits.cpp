@@ -45,7 +45,7 @@ InitResult Run(const Step (&steps)[n], uint32_t object, uint32_t sp,
   const uint32_t frame = sp - frame_bytes;
   guest::StoreU32(frame, sp);  // the back chain
   auto at = [&](const Value& v) {
-    switch () {
+    switch (v.base) {
       case Value::kConst:
         return v.value;
       case Value::kObject:

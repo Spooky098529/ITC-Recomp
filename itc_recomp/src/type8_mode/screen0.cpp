@@ -96,7 +96,7 @@ uint32_t Texture(uint32_t movie, uint32_t child, uint32_t texture) {
 
 uint64_t Screen0Construct(uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8223D2F0 Type8Screen0::Type8Screen0");
-  const S s(uint32_t(r3));
+  const S s{uint32_t(r3)};
   (void)sp;  // its frame held only the back chain (E5 step 6)
   boot_mode::ScreenMachineConstruct(s.machine_address());
   s.set_vtable(S::kVtable);
@@ -129,7 +129,7 @@ uint64_t Screen0Construct(uint64_t r3, uint32_t sp) {
 uint64_t Screen0Destruct(uint64_t r3, uint32_t sp, uint32_t lr,
                          const ScreenCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8223BF00 Type8Screen0::~Type8Screen0");
-  const S s(uint32_t(r3));
+  const S s{uint32_t(r3)};
   s.set_vtable(S::kVtable);
   return type67_screens::ReleaseList(ListR3(r3), sp, lr, calls);
 }
@@ -138,7 +138,7 @@ uint64_t Screen0DeletingDestruct(uint64_t r3, uint64_t flags, uint32_t sp,
                                  const ScreenCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8223C528 Type8Screen0::DeletingDestructor");
   const uint32_t frame = Frame(sp, 112);
-  const S s(uint32_t(r3));
+  const S s{uint32_t(r3)};
   s.set_vtable(S::kVtable);
   type67_screens::ReleaseList(ListR3(r3), frame, 0x8223C558, calls);
   if ((flags & 1) != 0) {
@@ -150,7 +150,7 @@ uint64_t Screen0DeletingDestruct(uint64_t r3, uint64_t flags, uint32_t sp,
 
 uint64_t Screen0OnEnter(uint64_t r3, uint32_t sp, const ScreenCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8223B630 Type8Screen0::OnEnter");
-  const S s(uint32_t(r3));
+  const S s{uint32_t(r3)};
   const Pages pages(s.pages_address());
   const uint32_t frame = Frame(sp, 144);
   s.set_dialog_answer(kMinusOne);
@@ -203,7 +203,7 @@ uint64_t Screen0WaitForMovie(uint64_t r3, uint32_t sp) {
 
 uint64_t Screen0Suspend(uint64_t r3, uint32_t sp, const ScreenCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8223B540 Type8Screen0::Suspend");
-  const S s(uint32_t(r3));
+  const S s{uint32_t(r3)};
   const uint32_t frame = Frame(sp, 96);
   if (s.delete_movie() == 0) {
     return r3;
@@ -265,7 +265,7 @@ uint64_t Screen0ShowPage(uint64_t a, uint64_t b, uint32_t sp) {
 
 uint64_t Screen0OnDialogClosed(uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8223C098 Type8Screen0::OnDialogClosed");
-  const S s(uint32_t(r3));
+  const S s{uint32_t(r3)};
   const uint32_t answer = s.dialog_answer();
   s.set_menu_input(1);
   if (answer == 1) {
@@ -298,7 +298,7 @@ uint64_t Screen0OnLeft(uint64_t r3, uint32_t sp, uint32_t lr,
 uint64_t Screen0Confirm(uint64_t r3, uint32_t dispatcher, uint32_t sp,
                         const ScreenCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8223C430 Type8Screen0::Confirm");
-  const S s(uint32_t(r3));
+  const S s{uint32_t(r3)};
   const uint32_t frame = Frame(sp, 128);
   const uint32_t movie = MovieAt(frame, 16);
   calls.set_text(frame, 0x8223C474, movie, kMinusOne, 0, 27);
@@ -314,7 +314,7 @@ uint64_t Screen0Confirm(uint64_t r3, uint32_t dispatcher, uint32_t sp,
 
 uint64_t Screen0ConfirmPage(uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_8223B5C0 Type8Screen0::ConfirmPage");
-  const S s(uint32_t(r3));
+  const S s{uint32_t(r3)};
   const Pages pages(s.pages_address());
   const uint32_t answer = s.dialog_answer();
   if (answer == 0 || answer == 2) {
@@ -341,7 +341,7 @@ uint64_t Screen0ConfirmPage(uint64_t r3) {
 
 uint64_t Screen0ChosenPage(uint64_t r3, uint32_t dispatcher, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8223C0C0 Type8Screen0::ChosenPage");
-  const S s(uint32_t(r3));
+  const S s{uint32_t(r3)};
   const Machine machine(s.machine_address());
   // No guest frame (E5 step 6): its callees are native and read no slot.
   const uint32_t frame = sp - 112;

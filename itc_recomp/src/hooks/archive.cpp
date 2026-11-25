@@ -139,13 +139,11 @@ namespace {
 // bytes), with its return addresses.
 struct FinishGuestCalls {
   lifted::Regs& ctx;
-  uint8_t* base;
 
   static void Callback(void* self, uint32_t function, uint32_t serial, uint32_t data,
                        uint32_t size, uint32_t context) {
     auto& c = *static_cast<FinishGuestCalls*>(self);
     lifted::Regs& ctx = c.ctx;
-    uint8_t* base = c.base;
     guest_call::InFrame(ctx, 96, 0x8209D6F8, [&](uint32_t) {
       ctx.r3.u64 = serial;
       ctx.r4.u64 = data;
@@ -203,7 +201,6 @@ ITC_NATIVE_ENTRY_ALWAYS(8209DD80) {
 void hooks::ArchiveUclUnpack(lifted::Regs& ctx) {
   struct Guest {
     lifted::Regs& ctx;
-    uint8_t* base;
     static void Memcpy(void* self, uint32_t destination, uint32_t source, uint32_t size) {
       auto& g = *static_cast<Guest*>(self);
       lifted::Regs& ctx = g.ctx;
@@ -248,7 +245,6 @@ void SetSerial(lifted::Regs& ctx, int64_t serial) {
 // frame as the original's (112 bytes).
 struct SetUpGuestCalls {
   lifted::Regs& ctx;
-  uint8_t* base;
   static uint32_t Alloc(void* self, uint32_t size) {
     auto& c = *static_cast<SetUpGuestCalls*>(self);
     lifted::Regs& ctx = c.ctx;

@@ -101,7 +101,7 @@ uint64_t OpenMovie(uint8_t*, uint32_t sp, uint32_t lr, const Calls& calls) {
 
 uint64_t WaitForMovie(uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821AA490 CarSettings::WaitForMovie");
-  const Machine m(uint32_t(r3));
+  const Machine m{uint32_t(r3)};
   (void)sp;  // no guest frame (E5 step 6): nothing here calls guest code
   if (m.loaded() == 0) {
     r3 = ui_movies::IsLoaded(kMovie);

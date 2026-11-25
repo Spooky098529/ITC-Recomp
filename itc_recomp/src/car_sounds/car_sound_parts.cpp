@@ -1323,7 +1323,7 @@ uint64_t CarSoundUpdate(uint64_t sound64, const Update3DSaves& s,
     return r3;
   }
   // The players' cars' parts.
-  using PartFn = uint32_t (*)(uint8_t*, uint32_t, uint32_t, uint64_t, const Voices&, uint32_t,
+  using PartFn = uint32_t (*)(uint32_t, uint32_t, uint64_t, const Voices&, uint32_t,
                               const GuestCall&);
   const struct {
     uint32_t at;

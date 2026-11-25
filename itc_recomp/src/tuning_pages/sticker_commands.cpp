@@ -120,7 +120,6 @@ void ResetMenu(uint32_t s, uint32_t last, uint32_t wraps, uint32_t cursor) {
 
 // The calls on movie 14 from `frame`.
 struct Movie {
-  uint8_t* base;
   const GuestCall& call;
   uint32_t movie;
   uint32_t frame;

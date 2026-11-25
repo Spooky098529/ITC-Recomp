@@ -516,7 +516,7 @@ constexpr Step kInitSteps[] = {
 uint32_t DirectorInitStates(uint32_t director, uint32_t frame, bool* replaced) {
   ITC_NATIVE_RUNNING("sub_82159950 CameraDirector::InitStates");
   auto at = [&](const Value& v) {
-    switch () {
+    switch (v.base) {
       case Value::kConst:
         return v.value;
       case Value::kDirector:

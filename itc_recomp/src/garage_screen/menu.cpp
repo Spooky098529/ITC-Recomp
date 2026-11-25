@@ -440,7 +440,7 @@ uint64_t Transition17(uint32_t started, uint32_t sp, const Calls& calls) {
 
 bool RunTransition(uint32_t target, uint32_t started, uint32_t sp,
                    const Calls& calls, uint64_t* r3) {
-  using Fn = uint64_t (*)(uint8_t*, uint32_t, uint32_t, const Calls&);
+  using Fn = uint64_t (*)(uint32_t, uint32_t, const Calls&);
   static constexpr struct {
     uint32_t address;
     Fn fn;

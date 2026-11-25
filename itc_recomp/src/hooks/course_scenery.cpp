@@ -132,14 +132,12 @@ namespace {
 
 struct GuestCalls {
   lifted::Regs* ctx;
-  uint8_t* base;
 };
 
 uint32_t CallGuest(void* user, uint32_t function, const uint32_t* args, int count,
                    uint32_t frame, uint32_t lr) {
   auto& call = *static_cast<GuestCalls*>(user);
   lifted::Regs& ctx = *call.ctx;
-  uint8_t* base = call.base;
   const uint64_t saved = ctx.r1.u64;
   ctx.r1.u64 = frame;
   ctx.lr = lr;

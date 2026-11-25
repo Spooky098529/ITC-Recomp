@@ -116,7 +116,6 @@ namespace {
 
 struct GuestCalls {
   lifted::Regs* ctx;
-  uint8_t* base;
 };
 
 // A copy ZoneRanges::Insert can't make natively: memcpy from the set-up's
@@ -124,7 +123,6 @@ struct GuestCalls {
 void CopyRange(void* user, uint32_t to, uint32_t from, uint32_t frame) {
   auto& call = *static_cast<GuestCalls*>(user);
   lifted::Regs& ctx = *call.ctx;
-  uint8_t* base = call.base;
   const uint64_t stack = ctx.r1.u64;
   const uint64_t lr = ctx.lr;
   ctx.r1.u64 = frame;
@@ -142,7 +140,6 @@ uint64_t CallZone(void* user, uint32_t function, uint32_t r3, uint32_t r4, bool 
                   uint32_t frame, uint32_t lr) {
   auto& call = *static_cast<GuestCalls*>(user);
   lifted::Regs& ctx = *call.ctx;
-  uint8_t* base = call.base;
   const uint64_t saved = ctx.r1.u64;
   ctx.r1.u64 = frame;
   ctx.lr = lr;

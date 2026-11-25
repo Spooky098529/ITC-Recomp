@@ -48,7 +48,7 @@ struct Step {
 uint32_t Replay(uint32_t machine, uint32_t object, uint32_t frame,
                 uint32_t bytes, bool* replaced, std::span<const Step> steps) {
   auto at = [&](const Value& v) {
-    switch () {
+    switch (v.base) {
       case Value::kConst:
         return v.value;
       case Value::kObject:
@@ -185,7 +185,7 @@ uint32_t Dialog13InitBase(uint32_t machine, uint32_t object, uint32_t frame,
 bool InitBase(uint32_t machine, uint32_t index, uint32_t object, uint32_t sp,
               bool* replaced, uint32_t* r3) {
   ITC_NATIVE_RUNNING("sub_8227B3E0 NetScreen::InitBase");
-  using BaseInit = uint32_t (*)(uint8_t*, uint32_t, uint32_t, uint32_t, bool*);
+  using BaseInit = uint32_t (*)(uint32_t, uint32_t, uint32_t, bool*);
   // The jump table's cases by index - 6 (case 0 through sub_8227B41C's jump).
   static constexpr BaseInit kCases[8] = {
       Screen6InitBase,  Screen7InitBase,  Screen8InitBase,  Screen9InitBase,

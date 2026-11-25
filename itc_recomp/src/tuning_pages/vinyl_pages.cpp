@@ -99,7 +99,6 @@ uint64_t ReadSlot(const tuning_screen::GuestCall& call, uint32_t mapper,
 // The pages' reads of the player's mapper entry, each skipped while its +4
 // is 1; the last read's r3 kept.
 struct Reads {
-  uint8_t* base;
   const tuning_screen::GuestCall& call;
   uint32_t entry;
   uint32_t frame;
@@ -1254,7 +1253,7 @@ uint64_t InputVinylLayers(const tuning_screen::GuestCall& call, uint64_t screen,
           r3 = tuning_screen::PlayNamed(call, frame, 0x82208FA0, movie, named, 1);
           const int32_t now = int32_t(Screen(s).editor_page());
           if (now == 0 || now == 1) {
-            const schema::DecalImages decals(uint32_t(images));
+            const schema::DecalImages decals{uint32_t(images)};
             const uint32_t first = now == 0 ? 168 : 160;
             for (uint32_t k = 0; k < 6; k++) {
               const uint32_t again = Load(tuning_screen::MovieEntry(frame, 13));
@@ -1927,7 +1926,7 @@ uint64_t InputLayerActions(const tuning_screen::GuestCall& call, uint64_t screen
         r3 = screen;
         const int32_t now = int32_t(Screen(s).editor_page());
         if (now == 0 || now == 1) {
-          const schema::DecalImages decals(uint32_t(images));
+          const schema::DecalImages decals{uint32_t(images)};
           const uint32_t first = now == 0 ? 168 : 160;
           for (uint32_t k = 0; k < 6; k++) {
             const uint32_t again = Load(tuning_screen::MovieEntry(frame, 13));

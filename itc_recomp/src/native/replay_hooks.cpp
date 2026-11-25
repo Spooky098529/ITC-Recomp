@@ -122,12 +122,10 @@ uint32_t g_command_serial = 0;
 namespace {
 struct PatchCopyContext {
   lifted::Regs* ctx;
-  uint8_t* base;
 };
 void PatchCopy(void* context, uint32_t destination, uint32_t source, uint32_t size) {
   PatchCopyContext& c = *static_cast<PatchCopyContext*>(context);
   lifted::Regs& ctx = *c.ctx;
-  uint8_t* base = c.base;
   const uint64_t stack = ctx.r1.u64;
   ctx.r1.u64 = stack - 592;
   ctx.r3.u64 = destination;

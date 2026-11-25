@@ -585,7 +585,6 @@ namespace {
 // with each call's return address.
 struct CreateAGuest {
   lifted::Regs& ctx;
-  uint8_t* base;
   static void Construct(void* user, uint32_t pool, uint32_t object, uint32_t list) {
     using Original = void (*)(lifted::Regs&, uint8_t*);
     static constexpr Original kOriginals[7] = {
@@ -610,7 +609,6 @@ namespace {
 // as the callback's (96 bytes).
 struct PartLoadedGuest {
   lifted::Regs& ctx;
-  uint8_t* base;
   static void Load(void* user, uint32_t model, uint32_t file) {
     auto& c = *static_cast<PartLoadedGuest*>(user);
     guest_call::InFrame(c.ctx, 96, 0x820D75D0, [&](uint32_t) {

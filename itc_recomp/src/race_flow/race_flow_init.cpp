@@ -633,7 +633,7 @@ uint32_t Init(uint32_t machine, uint32_t frame, bool* replaced) {
     flow.set_player_b(1);
   }
   auto at = [&](const Value& v) {
-    switch () {
+    switch (v.base) {
       case Value::kConst:
         return v.value;
       case Value::kMachine:

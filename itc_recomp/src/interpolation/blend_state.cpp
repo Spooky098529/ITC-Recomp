@@ -1257,7 +1257,6 @@ class DrawState {
 
   void AfterDraw() {
     drawing_ = false;
-    base_ = base;
     if (logic_pass_) {
       ticks_++;
       if (ticks_ % 90 == 0 || ticks_ % 90 == 1) {
@@ -1821,7 +1820,7 @@ class DrawState {
     }
     if (ITC_FLAG(log_replayed_constants)) {
       auto print = [&](const char* name, uint32_t offset) {
-        Matrix4 m = LoadMatrix(base_, CameraPass(0) + offset);
+        Matrix4 m = LoadMatrix(CameraPass(0) + offset);
         ITC_LOG_INFO("pass 0 {}: {:.4g} {:.4g} {:.4g} {:.4g} | {:.4g} {:.4g} {:.4g} {:.4g} | "
                      "{:.4g} {:.4g} {:.4g} {:.4g} | {:.4g} {:.4g} {:.4g} {:.4g}",
                      name, m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8], m[9], m[10],
@@ -1839,7 +1838,6 @@ class DrawState {
   uint32_t handler_ = 0;
   bool drawing_ = false;  // between BeforeDraw and AfterDraw
   int overlay_keys_logged_ = 0;
-  uint8_t* base_ = nullptr;
   uint64_t ticks_ = 0;
   bool logic_pass_ = false;
   bool noting_live_ = false;  // Note: a live pose's product (OnMultiply)
@@ -4307,7 +4305,6 @@ ITC_NATIVE_ENTRY_ALWAYS(820A0AC0) {
 namespace {
 struct BillboardSlots {
   lifted::Regs& ctx;
-  uint8_t* base;
   uint32_t list;
 };
 

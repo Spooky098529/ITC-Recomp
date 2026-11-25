@@ -123,7 +123,7 @@ uint64_t WaitForLoad(uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82250D70 PowerGraphScreen67::WaitForLoad");
   // The original's 96-byte frame (only its back chain) left out (E5 step 6).
   (void)sp;
-  const Member m(uint32_t(r3));
+  const Member m{uint32_t(r3)};
   if (m.machine_loaded() == 0) {
     const uint32_t loaded = ui_movies::IsLoaded(kMovie);
     if (int32_t(loaded) != 0) {
@@ -163,7 +163,7 @@ void Open(uint32_t member) {
 
 uint64_t Leave(uint64_t r3, uint64_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82250900 PowerGraphScreen67::Leave");
-  const Member m(uint32_t(r3));
+  const Member m{uint32_t(r3)};
   // The original's 112-byte frame held only its back chain: its calls run
   // from `sp` (E5 step 6; neither reads its caller's frame).
   m.set_machine_state(7);

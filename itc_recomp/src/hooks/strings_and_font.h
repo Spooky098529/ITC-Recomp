@@ -33,7 +33,6 @@ class FormatGuestCalls {
 
  private:
   lifted::Regs& ctx_;
-  uint8_t* base_;
   strings_and_font::FormatCalls calls_;
   friend uint32_t FormatGuestCall(void*, uint32_t, uint32_t, uint32_t, uint64_t, uint32_t,
                                   uint32_t);

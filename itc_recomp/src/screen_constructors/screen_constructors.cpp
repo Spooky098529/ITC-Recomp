@@ -172,10 +172,10 @@ uint32_t Bit(uint32_t amount) {
 // +11680).
 struct PanelScreenType {
   uint32_t vtable;
-  void (*group_b)(uint8_t*, uint32_t);
-  void (*panel_c)(uint8_t*, uint32_t, uint32_t);
-  void (*panel_d)(uint8_t*, uint32_t, uint32_t);
-  void (*panel_f)(uint8_t*, uint32_t, uint32_t);
+  void (*group_b)(uint32_t);
+  void (*panel_c)(uint32_t, uint32_t);
+  void (*panel_d)(uint32_t, uint32_t);
+  void (*panel_f)(uint32_t, uint32_t);
   uint32_t last_zero;
 };
 
@@ -193,7 +193,7 @@ void PanelScreen(uint32_t screen, uint32_t sp, const New& new_panel,
   // The panels live in host memory (E5 step 4): their handles in place of
   // operator new's blocks (`new_panel` no longer called).
   (void)new_panel;
-  auto make = [&](uint32_t panel, void (*construct)(uint8_t*, uint32_t, uint32_t),
+  auto make = [&](uint32_t panel, void (*construct)(uint32_t, uint32_t),
                   uint32_t group) {
     if (panel != 0) {
       construct(panel, group);

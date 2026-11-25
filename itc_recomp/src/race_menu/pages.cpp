@@ -32,7 +32,6 @@ constexpr uint32_t kFiredOffset = menu_helpers::kFiredOffset;      // 12
 // Player 0's mapper entry and its slots asked as the originals do: nothing
 // asked when the entry's +4 is 1; else the slot through the function table.
 struct Mapper {
-  uint8_t* base;
   uint32_t entry;
   uint32_t frame;
   const Calls& calls;

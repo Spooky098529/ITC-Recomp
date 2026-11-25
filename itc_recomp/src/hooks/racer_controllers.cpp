@@ -71,7 +71,6 @@ namespace {
 
 struct GuestCalls {
   lifted::Regs* ctx;
-  uint8_t* base;
 };
 
 void CallDriveCar(void* user, uint32_t input, uint32_t index, uint32_t flag, uint32_t frame,
@@ -106,7 +105,6 @@ uint64_t CallGuest(void* user, uint32_t function, uint64_t r3, uint64_t r4, bool
                    uint32_t frame, uint32_t lr, double* f1) {
   auto& call = *static_cast<GuestCalls*>(user);
   lifted::Regs& ctx = *call.ctx;
-  uint8_t* base = call.base;
   const uint64_t saved = ctx.r1.u64;
   ctx.r1.u64 = frame;
   ctx.lr = lr;

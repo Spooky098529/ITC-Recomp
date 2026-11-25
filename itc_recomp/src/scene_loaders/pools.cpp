@@ -97,7 +97,7 @@ uint32_t CreateA(uint32_t set, uint32_t record, const CreateCalls& calls) {
                               s.cockpit_count_address(),   s.interior_count_address(),
                               s.pool4_count_address(),     s.wheels_count_address(),
                               s.traffic_count_address()};
-  using Construct = bool (*)(uint8_t*, uint32_t, uint32_t);
+  using Construct = bool (*)(uint32_t, uint32_t);
   static constexpr Construct kConstructs[7] = {CarModelConstruct, CarPartsConstruct,
                                                CockpitConstruct,  InteriorConstruct,
                                                Pool4Construct,    WheelsConstruct,

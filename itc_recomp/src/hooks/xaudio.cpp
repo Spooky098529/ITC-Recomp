@@ -191,7 +191,7 @@ void Framed(lifted::Regs& ctx, uint32_t frame_bytes, Body body) {
   ctx.r3.u64 = r3;
 }
 
-using ThunkFn = uint32_t (*)(uint8_t*, uint32_t, uint32_t*);
+using ThunkFn = uint32_t (*)(uint32_t, uint32_t*);
 
 void Thunk(lifted::Regs& ctx, ThunkFn thunk) {
   uint32_t function = 0;

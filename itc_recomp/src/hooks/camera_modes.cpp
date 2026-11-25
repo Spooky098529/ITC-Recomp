@@ -528,7 +528,6 @@ namespace {
 // from MakeShot's frame (`sp`) with its return address.
 struct MakeShotAtexit {
   lifted::Regs& ctx;
-  uint8_t* base;
   uint32_t sp;
   c_runtime::AtexitCall Call() { return {&MakeShotAtexit::Run, this}; }
   static int32_t Run(void* self, uint32_t function) {
@@ -728,7 +727,6 @@ namespace {
 // return address.
 struct SplineAtexit {
   lifted::Regs& ctx;
-  uint8_t* base;
   uint32_t sp;
   c_runtime::AtexitCall Call() { return {&SplineAtexit::Run, this}; }
   static int32_t Run(void* self, uint32_t function) {
@@ -832,7 +830,6 @@ cm::VideoOutputCall VideoOutput(lifted::Regs& ctx) {
 // native one can't: from its frame (`sp`) with its return addresses.
 struct ChaseAtexit {
   lifted::Regs& ctx;
-  uint8_t* base;
   uint32_t sp;
   c_runtime::AtexitCall Call() { return {&ChaseAtexit::Run, this}; }
   static int32_t Run(void* self, uint32_t function) {
@@ -853,7 +850,6 @@ struct ChaseAtexit {
 // by the function registered.
 struct ViewAtexit {
   lifted::Regs& ctx;
-  uint8_t* base;
   uint32_t sp;
   c_runtime::AtexitCall Call() { return {&ViewAtexit::Run, this}; }
   static int32_t Run(void* self, uint32_t function) {

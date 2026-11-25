@@ -72,7 +72,6 @@ namespace {
 // return addresses.
 struct ReleaseContext {
   lifted::Regs& ctx;
-  uint8_t* base;
   uint32_t frame;
 
   uint32_t Call(uint32_t model, uint32_t lr, bool destroy) {
@@ -119,7 +118,6 @@ namespace {
 // the original's return addresses.
 struct ModelListLoadGuest {
   lifted::Regs& ctx;
-  uint8_t* base;
 
   static uint32_t Allocate(void* self, uint32_t size) {
     auto& c = *static_cast<ModelListLoadGuest*>(self);
@@ -353,7 +351,6 @@ struct DrawContext {
                        uint32_t frame, uint32_t lr) {
     auto& d = *static_cast<SceneryDrawGuest*>(self);
     lifted::Regs& ctx = d.ctx;
-    uint8_t* base = d.base;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = frame;
     ctx.lr = lr;
@@ -373,7 +370,6 @@ struct DrawContext {
                          uint32_t lr) {
     auto& d = *static_cast<SceneryDrawGuest*>(self);
     lifted::Regs& ctx = d.ctx;
-    uint8_t* base = d.base;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = frame;
     ctx.lr = lr;

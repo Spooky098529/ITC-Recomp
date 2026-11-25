@@ -47,28 +47,27 @@ uint32_t Pack(uint32_t words) {
 // The recording's calls, from the recorder's frame.
 class Recorder {
  public:
-  Recorder(uint32_t frame, uint64_t r13) : base_(), frame_(frame), r13_(r13) {}
+  Recorder(uint32_t frame, uint64_t r13) : frame_(frame), r13_(r13) {}
 
-  uint32_t List() const { return G::command_list(base_); }
+  uint32_t List() const { return G::command_list(); }
   uint64_t Call(uint32_t function, std::initializer_list<uint64_t> args, double f1 = 0.0) const {
-    return lifted_call::Call(base_, function, frame_, r13_, args, f1).r3;
+    return lifted_call::Call(function, frame_, r13_, args, f1).r3;
   }
   // CommandList::AllocateSlots(list, 1), through its wrap.
   uint32_t Slot() const { return uint32_t(Call(kAllocateSlots, {List(), 1})); }
   void Put(uint32_t w0, uint32_t w4) const {
     const uint32_t slot = Slot();
-    guest::StoreU32(base_, slot, w0);
-    guest::StoreU32(base_, slot + 4, w4);
+    guest::StoreU32(slot, w0);
+    guest::StoreU32(slot + 4, w4);
   }
   void Put(uint32_t w0, uint32_t w4, uint32_t w8) const {
     const uint32_t slot = Slot();
-    guest::StoreU32(base_, slot, w0);
-    guest::StoreU32(base_, slot + 4, w4);
-    guest::StoreU32(base_, slot + 8, w8);
+    guest::StoreU32(slot, w0);
+    guest::StoreU32(slot + 4, w4);
+    guest::StoreU32(slot + 8, w8);
   }
 
  private:
-  uint8_t* base_;
   uint32_t frame_;
   uint64_t r13_;
 };

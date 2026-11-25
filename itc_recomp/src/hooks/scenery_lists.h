@@ -18,7 +18,6 @@ namespace hooks {
 // callers outside this file (Scenery::DrawSetLists, src/course_scenery/).
 struct SceneryDrawGuest {
   lifted::Regs& ctx;
-  uint8_t* base;
 };
 scenery_lists::DrawCalls SceneryListsDrawCalls(SceneryDrawGuest* guest);
 // Whether the command list's diagnostics are on (--log_overlay_uploads,

@@ -42,7 +42,7 @@ struct Step {
 uint32_t InitStates(uint32_t machine, uint32_t frame, bool* replaced) {
   ITC_NATIVE_RUNNING("sub_82185920 CarDealer::InitStates");
   auto at = [&](const Value& v) {
-    switch () {
+    switch (v.base) {
       case Value::kConst:
         return v.value;
       case Value::kObject:

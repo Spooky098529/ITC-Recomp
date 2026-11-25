@@ -70,7 +70,7 @@ uint64_t OpenMovie(uint32_t sp, uint32_t lr, const Calls& calls) {
 
 uint64_t WaitForMovie(uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82289570 ReplayTheater::WaitForMovie");
-  const Machine m(uint32_t(r3));
+  const Machine m{uint32_t(r3)};
   Frame(sp, 96);
   if (m.loaded() == 0) {
     r3 = ui_movies::IsLoaded(kMovie);

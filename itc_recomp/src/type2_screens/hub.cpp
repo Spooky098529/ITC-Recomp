@@ -68,7 +68,7 @@ uint32_t HubImagesLoadedB(uint32_t data) {
 
 uint64_t HubWaitForLoad(uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8218E420 Type2Hub::WaitForLoad");
-  const schema::Type2Hub machine(uint32_t(r3));
+  const schema::Type2Hub machine{uint32_t(r3)};
   const uint32_t frame = Frame(sp, 112);
   if (machine.loaded() == 0) {
     bool loaded = false;

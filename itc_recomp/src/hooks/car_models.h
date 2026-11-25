@@ -123,7 +123,7 @@ void ScenePoolsSetUp(lifted::Regs& ctx);
 // sub_820E37F0, sub_820E5998, sub_820E70C0): r3 = the object, r4 = the record; `setup`'s
 // plain C++ (ScenePools::SetUp's fields as its adapter passes them, guest
 // calls from the frames below ctx.r1), or `original` where it declines.
-void SecondSetUp(lifted::Regs& ctx, std::optional<uint32_t> (*setup)(uint8_t*, uint32_t, uint32_t, uint32_t,
+void SecondSetUp(lifted::Regs& ctx, std::optional<uint32_t> (*setup)(uint32_t, uint32_t, uint32_t,
                                                   const car_models::SecondSetUps&),
                  lifted::RegsFunction* original);
 

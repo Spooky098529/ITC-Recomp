@@ -34,7 +34,7 @@ constexpr uint32_t kNone = 0xFFFFFFFFu;
 // calls from it, keeping the last call's r3.
 struct Fn {
   Fn(uint32_t sp, uint32_t bytes, const Calls& calls, uint64_t r3 = 0)
-      : base(), frame(sp - bytes), calls(calls), r3(r3) {
+      : frame(sp - bytes), calls(calls), r3(r3) {
     Store(frame, sp);
   }
   uint64_t Call(uint32_t function, uint32_t lr, uint64_t a = 0, uint64_t b = 0, uint64_t c = 0,
@@ -46,7 +46,6 @@ struct Fn {
   int32_t CallInt(uint32_t function, uint32_t lr, uint64_t a = 0) {
     return int32_t(uint32_t(Call(function, lr, a)));
   }
-  uint8_t* base;
   uint32_t frame;
   const Calls& calls;
   uint64_t r3;

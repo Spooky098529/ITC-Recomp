@@ -66,7 +66,6 @@ State& Get() {
 
 // A waitable: a kernel object in guest memory, or a host event by handle.
 struct Object {
-  uint8_t* base;
   uint32_t address;  // the guest object, or 0
   HostEvent* event;  // the host event, or null
 

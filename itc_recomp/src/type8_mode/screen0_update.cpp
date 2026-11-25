@@ -130,7 +130,7 @@ void FlushOff() {
 uint64_t Screen0MenuPage(uint64_t r3, uint64_t r4, uint32_t sp,
                          const ScreenCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8223C6B8 Type8Screen0::MenuPage");
-  const S s(uint32_t(r3));
+  const S s{uint32_t(r3)};
   const Pages pages(s.pages_address());
   const uint32_t frame = Frame(sp, 144);
   if (s.menu_input() == 0) {
@@ -189,7 +189,7 @@ uint64_t Screen0MenuPage(uint64_t r3, uint64_t r4, uint32_t sp,
 
 uint64_t Screen0OpeningStep(uint64_t r3, uint32_t sp, const ScreenCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8223C1A0 Type8Screen0::OpeningStep");
-  const S s(uint32_t(r3));
+  const S s{uint32_t(r3)};
   const Pages pages(s.pages_address());
   const uint32_t frame = Frame(sp, 128);
   const uint32_t movie = MovieAt(frame, 24);
@@ -220,7 +220,7 @@ uint64_t Screen0OpeningStep(uint64_t r3, uint32_t sp, const ScreenCalls& calls) 
 
 uint64_t Screen0ItemStep(uint64_t r3, uint32_t sp, const ScreenCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8223BBC8 Type8Screen0::ItemStep");
-  const S s(uint32_t(r3));
+  const S s{uint32_t(r3)};
   const Pages pages(s.pages_address());
   const uint32_t frame = Frame(sp, 128);
   const uint32_t movie = MovieAt(frame, 24);
@@ -237,7 +237,7 @@ uint64_t Screen0ItemStep(uint64_t r3, uint32_t sp, const ScreenCalls& calls) {
 
 uint64_t Screen0CursorStep(uint64_t r3, uint32_t sp, const ScreenCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8223C330 Type8Screen0::CursorStep");
-  const S s(uint32_t(r3));
+  const S s{uint32_t(r3)};
   const Pages pages(s.pages_address());
   const uint32_t frame = Frame(sp, 128);
   const uint32_t movie = MovieAt(frame, 24);
@@ -266,7 +266,7 @@ uint64_t Screen0CursorStep(uint64_t r3, uint32_t sp, const ScreenCalls& calls) {
 
 uint64_t Screen0FadeOutStep(uint64_t r3, uint32_t sp, const ScreenCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8223BAF0 Type8Screen0::FadeOutStep");
-  const S s(uint32_t(r3));
+  const S s{uint32_t(r3)};
   const Pages pages(s.pages_address());
   const uint32_t frame = Frame(sp, 112);
   const uint32_t movie = MovieAt(frame, 24);
@@ -288,7 +288,7 @@ uint64_t Screen0FadeOutStep(uint64_t r3, uint32_t sp, const ScreenCalls& calls) 
 
 uint64_t Screen0UpdateStand(uint64_t r3, uint32_t sp, const ScreenCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8223B808 Type8Screen0::UpdateStand");
-  const S s(uint32_t(r3));
+  const S s{uint32_t(r3)};
   const uint32_t frame = Frame(sp, 4096);
   const uint32_t movie = MovieAt(frame, 24);
   const auto slot_of = [](const StandEntry& entry) {
@@ -470,7 +470,7 @@ uint64_t Screen0CarCard(uint64_t player, uint64_t model, uint64_t maker,
 
 uint64_t Screen0Show(uint64_t r3, uint32_t sp, const ScreenCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8223BF18 Type8Screen0::Show");
-  const S s(uint32_t(r3));
+  const S s{uint32_t(r3)};
   const Pages pages(s.pages_address());
   const uint32_t frame = Frame(sp, 176);
   Screen0SetTexts(frame, calls);

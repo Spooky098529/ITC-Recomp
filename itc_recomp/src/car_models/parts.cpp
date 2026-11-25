@@ -598,7 +598,7 @@ uint32_t ScenePoolsSetUpB(uint32_t scene, uint32_t pool, uint32_t index,
   }
   const uint32_t frame = stack - 112;
   Store(frame, stack);
-  using SetUp = std::optional<uint32_t> (*)(uint8_t*, uint32_t, uint32_t, uint32_t,
+  using SetUp = std::optional<uint32_t> (*)(uint32_t, uint32_t, uint32_t,
                                             const SecondSetUps&);
   struct Case {
     SetUp setup;

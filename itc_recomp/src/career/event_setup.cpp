@@ -41,22 +41,21 @@ constexpr uint32_t kResetFrame = 112;
 class Lists {
  public:
   Lists(uint32_t frame)
-      : base_(), frame_(frame), words_((kSetUpEventFrame - kCaps) / 4) {}
+      : frame_(frame), words_((kSetUpEventFrame - kCaps) / 4) {}
   uint32_t Load(uint32_t offset) const {
     const uint32_t i = (offset - kCaps) / 4;
-    return i < words_.size() ? words_[i] : guest::LoadU32(base_, frame_ + offset);
+    return i < words_.size() ? words_[i] : guest::LoadU32(frame_ + offset);
   }
   void Store(uint32_t offset, uint32_t value) {
     const uint32_t i = (offset - kCaps) / 4;
     if (i < words_.size()) {
       words_[i] = value;
     } else {
-      guest::StoreU32(base_, frame_ + offset, value);
+      guest::StoreU32(frame_ + offset, value);
     }
   }
 
  private:
-  uint8_t* base_;
   uint32_t frame_;
   std::vector<uint32_t> words_;
 };

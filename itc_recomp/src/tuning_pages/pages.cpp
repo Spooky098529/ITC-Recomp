@@ -2705,7 +2705,7 @@ uint64_t Leave(uint64_t r3, uint64_t r4, uint32_t sp) {
   tuning_screen::StoreToGarageCar(r3, frame);
   const uint64_t out = StoreOwnedParts(s, frame);
   // Message 11 posted to r4's ring (50 records of 12 bytes).
-  const schema::TuningPagesMode mode(uint32_t(r4));
+  const schema::TuningPagesMode mode{uint32_t(r4)};
   const uint32_t count = mode.message_count() + 1;
   const uint32_t start = mode.message_start();
   mode.set_message_count(count);

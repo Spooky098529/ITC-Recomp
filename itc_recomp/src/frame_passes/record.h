@@ -18,7 +18,6 @@ namespace frame_passes::record {
 // (Record's r1), and the kind-5 heads in the order they're made (heads[0]
 // the first; 18 in all).
 struct Recorder {
-  uint8_t* base;
   uint32_t list;
   uint32_t passes;
   uint32_t frame;

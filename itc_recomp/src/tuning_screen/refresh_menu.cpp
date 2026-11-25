@@ -43,7 +43,6 @@ constexpr uint32_t kFarRow = 0x820027A4;       // state 56's highlight for 4
 constexpr uint32_t kRow = 0x82001FB0;          // 40.0: a row's height
 
 struct Menu {
-  uint8_t* base;
   const GuestCall& call;
   uint32_t screen;
   uint32_t frame;

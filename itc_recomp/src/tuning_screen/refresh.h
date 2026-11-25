@@ -34,7 +34,6 @@ constexpr uint32_t kHelpTextLr = 0x821E68C0;
 constexpr uint32_t kHelpScrollLr = 0x821E68D4;
 
 struct Context {
-  uint8_t* base;
   const StandCalls& stand;
   uint64_t self;     // r31: r3 at entry, all 64 bits
   uint32_t screen;   // its low word

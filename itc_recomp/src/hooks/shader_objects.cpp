@@ -80,7 +80,6 @@ namespace {
 
 struct CreateContext {
   lifted::Regs& ctx;
-  uint8_t* base;
   // VertexShader::Init's original, from a frame as the create's own.
   static void Init(void* user, uint32_t object, uint32_t microcode) {
     auto& c = *static_cast<CreateContext*>(user);

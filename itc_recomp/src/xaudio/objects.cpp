@@ -254,7 +254,7 @@ void PacketListsInit(uint32_t lists) {
 
 uint64_t CodecBaseConstruct(uint64_t codec_base) {
   ITC_NATIVE_RUNNING("sub_82469920 CodecBase::CodecBase");
-  const CodecBase b(uint32_t(codec_base));
+  const CodecBase b{uint32_t(codec_base)};
   b.set_vtable(kCodecBaseVtable);
   PacketListsInit(b.queued_next_address());
   return codec_base;
@@ -262,7 +262,7 @@ uint64_t CodecBaseConstruct(uint64_t codec_base) {
 
 uint64_t CodecConstruct(uint64_t inner, uint32_t descriptor) {
   ITC_NATIVE_RUNNING("sub_82466BC8 XAudioCodec::Construct");
-  const XAudioCodec c(uint32_t(inner));
+  const XAudioCodec c{uint32_t(inner)};
   c.set_vtable(kObjectBaseVtable);
   c.set_ref_count(1);
   c.set_owner(XAudioObjectDescriptor(descriptor).owner());
@@ -279,7 +279,7 @@ uint64_t PacketListsAlloc(uint64_t lists, uint32_t count, uint32_t allocator,
   if (n == 0) {
     return lists;
   }
-  const PacketLists l(uint32_t(lists));
+  const PacketLists l{uint32_t(lists)};
   const uint64_t entries =
       Allocate(allocator, uint64_t(n) * PacketEntry::kSize, 0x8246E15C, frame, call);
   l.set_entries(uint32_t(entries));
@@ -333,7 +333,7 @@ uint64_t CodecInit(uint32_t inner, uint32_t descriptor, uint32_t allocator,
 uint64_t PcmCodecConstruct(uint64_t object, uint32_t descriptor,
                            uint32_t allocator, uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8246D750 PcmCodec::PcmCodec");
-  const PcmCodec c(uint32_t(object));
+  const PcmCodec c{uint32_t(object)};
   CodecConstruct(object + 4, descriptor);
   const ConverterState converter(c.converter_input_address());
   c.set_vtable(kPcmCodecVtable);
@@ -423,7 +423,7 @@ uint32_t XmaBlockSize(uint32_t address) {
 uint64_t XmaCodecConstruct(uint64_t object, uint32_t descriptor,
                            uint32_t allocator, uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8246C1D0 XmaCodec::XmaCodec");
-  const XmaCodec c(uint32_t(object));
+  const XmaCodec c{uint32_t(object)};
   const XAudioObjectDescriptor d(descriptor);
   CodecConstruct(object + 4, descriptor);
   c.set_xma_object(0);
@@ -519,7 +519,7 @@ uint64_t CodecCreate(uint32_t descriptor, uint32_t allocator, uint32_t out,
 
 uint64_t PacketListNext(uint64_t list, uint64_t entry, uint32_t direction) {
   ITC_NATIVE_RUNNING("sub_82466EA0 PacketList::Next");
-  const PacketList head(uint32_t(list));
+  const PacketList head{uint32_t(list)};
   const PacketNode node(uint32_t(entry) != 0 ? uint32_t(head.node_offset() + entry)
                                                    : head.address);
   const uint32_t next = int32_t(direction) != 0 ? node.next() : node.prev();
@@ -534,7 +534,7 @@ uint64_t PacketListClear(uint32_t list) {
   const PacketList head(list);
   uint64_t entry = PacketListNext(list, 0, 1);
   while (uint32_t(entry) != 0) {
-    const PacketNode node(uint32_t(head.node_offset() + entry));
+    const PacketNode node{uint32_t(head.node_offset() + entry)};
     const uint32_t next = node.next();
     if (next != node.address) {
       PacketNode(next).set_prev(node.prev());
@@ -573,7 +573,7 @@ uint64_t CodecDestruct(uint32_t inner) {
 
 uint64_t PcmCodecDestroy(uint64_t object) {
   ITC_NATIVE_RUNNING("sub_8246CF50 PcmCodec::~PcmCodec");
-  const PcmCodec c(uint32_t(object));
+  const PcmCodec c{uint32_t(object)};
   c.set_vtable(kPcmCodecVtable);
   c.set_inner_vtable(kPcmCodecInnerVtable);
   c.set_base_vtable(kPcmCodecBaseVtable);
@@ -629,7 +629,7 @@ uint64_t MeterCreate(uint32_t descriptor, uint32_t allocator, uint32_t out,
   const uint64_t object = Allocate(allocator, VolumeMeter::kSize, 0x825A6490, frame, call);
   uint64_t meter = 0;
   if (uint32_t(object) != 0) {
-    const VolumeMeter m(uint32_t(object));
+    const VolumeMeter m{uint32_t(object)};
     meter = object;
     m.set_ref_count(1);
     m.set_vtable(kMeterVtable);
@@ -690,7 +690,7 @@ uint64_t FirstEntry(uint32_t list) {
 // The node of `entry` (the list's offset into it) out of its list when it's
 // in one, left pointing at itself.
 void UnlinkEntry(uint32_t list, uint64_t entry) {
-  const PacketNode node(uint32_t(PacketList(list).node_offset() + entry));
+  const PacketNode node{uint32_t(PacketList(list).node_offset() + entry)};
   const uint32_t next = node.next();
   if (next == node.address) {
     return;
@@ -704,7 +704,7 @@ void UnlinkEntry(uint32_t list, uint64_t entry) {
 // The node of `entry` added at the end of the list at `list`.
 void LinkEntryAtEnd(uint32_t list, uint64_t entry) {
   const PacketList head(list);
-  const PacketNode node(uint32_t(head.node_offset() + entry));
+  const PacketNode node{uint32_t(head.node_offset() + entry)};
   node.set_next(list);
   node.set_prev(head.prev());
   head.set_prev(node.address);
@@ -2048,7 +2048,7 @@ uint64_t I3dl2SetParameter(uint32_t object, uint32_t index, uint32_t value,
 uint64_t ReverbRun(uint64_t core64, uint32_t inputs, uint32_t outputs,
                    uint32_t thread, uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_82465258 Reverb::Run");
-  const I3dl2Reverb core(uint32_t(core64));
+  const I3dl2Reverb core{uint32_t(core64)};
   const auto proper = [&] { return core.vtable().base_offset() + core64; };
   SpinTake(thread, call);
   if (core.gain_changed() != 0) {
@@ -2257,7 +2257,7 @@ uint64_t PcmCodecProcess(uint32_t codec, uint64_t iface, uint32_t thread,
     uint64_t current = entry;
     if (uint32_t(entry) != 0 && converter.input_end() == converter.position()) {
       // The packet's region played.
-      const PacketEntry e(uint32_t(entry));
+      const PacketEntry e{uint32_t(entry)};
       const uint32_t loops = e.loop_count();
       if (loops == 0) {
         const uint32_t target = Method(codec_base, 92);
@@ -2290,7 +2290,7 @@ uint64_t PcmCodecProcess(uint32_t codec, uint64_t iface, uint32_t thread,
       // The first queued packet, started on its first pass.
       SpinTake(thread, call);
       const uint64_t first = FirstEntry(c.queued_next_address());
-      const PacketEntry e(uint32_t(first));
+      const PacketEntry e{uint32_t(first)};
       if (uint32_t(first) != 0 && e.begun() == 0) {
         c.set_position(e.play_begin());
         e.set_begun(1);
@@ -2301,7 +2301,7 @@ uint64_t PcmCodecProcess(uint32_t codec, uint64_t iface, uint32_t thread,
     if (uint32_t(entry) == 0) {
       break;
     }
-    const PacketEntry packet(uint32_t(entry));
+    const PacketEntry packet{uint32_t(entry)};
     const uint32_t end = packet.loop_count() != 0 ? packet.loop_end() : packet.play_end();
     const uint32_t data = packet.data();
     const uint32_t position = c.position();

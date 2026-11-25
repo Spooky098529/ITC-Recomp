@@ -77,7 +77,7 @@ bool WriteWideChar(uint16_t unit, uint32_t stream, uint32_t count);
 // text is no longer ok and nothing is committed.
 class GuestText {
  public:
-  GuestText(uint32_t address) : base_(), address_(address) {}
+  GuestText(uint32_t address) : address_(address) {}
   bool ok() const { return ok_; }
   uint8_t Get(uint64_t at);
   void Set(uint64_t at, uint8_t value);
@@ -99,7 +99,6 @@ class GuestText {
  private:
   bool Reach(uint64_t at);
 
-  uint8_t* base_;
   uint32_t address_;
   bool ok_ = true;
   uint64_t end_ = 0;

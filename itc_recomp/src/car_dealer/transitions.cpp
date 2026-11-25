@@ -305,7 +305,7 @@ uint64_t Transition7(uint32_t step, uint32_t sp, const Calls& calls) {
       SetScrollArrows(scroll, n, frame);
     }
     const uint32_t index = (scroll + uint32_t(selection)) << 2;
-    const Entry entry(uint32_t(G::data().shown_list().load_at(index, 4)));
+    const Entry entry{uint32_t(G::data().shown_list().load_at(index, 4))};
     HelpLineSet(uint64_t(entry.car_id()) + 1862, frame, calls);
     Store(step, 1);
   }

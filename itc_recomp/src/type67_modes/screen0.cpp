@@ -485,7 +485,7 @@ uint64_t Type6Screen0QuitPage(uint64_t r3, uint32_t sp) {
 uint64_t Type6Screen0ChosenPage(uint64_t r3, uint32_t dispatcher, uint32_t sp,
                                 const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82234190 Type6Screen0::ChosenPage");
-  const schema::Type6Screen0 screen(uint32_t(r3));
+  const schema::Type6Screen0 screen{uint32_t(r3)};
   const uint32_t frame = sp - 112;
   const uint32_t item = screen.menu().cursor();
   if (item > 4) {
@@ -547,7 +547,7 @@ uint64_t Screen0PowerGraphPage(bool type7, uint64_t r3, uint64_t r4, uint32_t sp
 uint64_t Type7Screen0ChosenPage(uint64_t r3, uint32_t dispatcher, uint32_t sp,
                                 const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82244610 Type7Screen0::ChosenPage");
-  const schema::Type7Screen0 screen(uint32_t(r3));
+  const schema::Type7Screen0 screen{uint32_t(r3)};
   const uint32_t frame = sp - 112;
   const uint32_t item = screen.menu().cursor();
   if (item == 3) {
@@ -656,7 +656,7 @@ uint64_t Screen0SetUpCar(bool type7, uint64_t r4, uint32_t sp, const Calls& call
 uint64_t Type6Screen0OnDialogClosed(uint64_t r3, uint64_t r4, uint32_t sp,
                                     const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82234768 Type6Screen0::OnDialogClosed");
-  const schema::Type6Screen0 screen(uint32_t(r3));
+  const schema::Type6Screen0 screen{uint32_t(r3)};
   const uint32_t frame = sp - 96;
   const uint32_t asked = screen.confirm_asked();
   if (asked != 4 && asked != 5) {
@@ -722,7 +722,7 @@ uint64_t Type6Screen0OnDialogClosed(uint64_t r3, uint64_t r4, uint32_t sp,
 
 uint64_t Type7Screen0OnDialogClosed(uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82244B60 Type7Screen0::OnDialogClosed");
-  const schema::Type7Screen0 screen(uint32_t(r3));
+  const schema::Type7Screen0 screen{uint32_t(r3)};
   const uint32_t pick = screen.words().pick();
   if (pick >= 3) {
     return r3;
@@ -789,7 +789,7 @@ uint64_t Type7Screen0MenuPage(uint64_t r3, uint64_t r4, uint32_t sp,
                               const Calls& calls, const strings_and_font::FormatCalls* format) {
   ITC_NATIVE_RUNNING("sub_82244BF8 Type7Screen0::MenuPage");
   constexpr uint32_t kConfirm = 0x82244528;  // Type7Screen0::Confirm (the original)
-  const schema::Type7Screen0 screen(uint32_t(r3));
+  const schema::Type7Screen0 screen{uint32_t(r3)};
   const uint32_t dispatcher = uint32_t(r4);
   const uint32_t frame = sp - 112;
   const bool slots = calls.native_action_slots;
@@ -872,7 +872,7 @@ uint64_t Type6Screen0MenuPage(uint64_t r3, uint64_t r4, uint32_t sp,
                               const Calls& calls, const strings_and_font::FormatCalls* format) {
   ITC_NATIVE_RUNNING("sub_82234958 Type6Screen0::MenuPage");
   constexpr uint32_t kConfirm = 0x82233FC8;  // Type6Screen0::Confirm (the original)
-  const schema::Type6Screen0 screen(uint32_t(r3));
+  const schema::Type6Screen0 screen{uint32_t(r3)};
   const uint32_t dispatcher = uint32_t(r4);
   const uint32_t frame = sp - 112;
   const bool slots = calls.native_action_slots;

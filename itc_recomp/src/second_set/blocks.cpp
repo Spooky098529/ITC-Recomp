@@ -257,7 +257,7 @@ namespace {
 // of the two rows at `rows` = 1.0, then `reset`.
 uint32_t InitWheelsGroup(uint32_t group, uint32_t records, uint32_t count,
                          uint32_t rows, uint32_t stack,
-                         uint32_t (*reset)(uint8_t*, uint32_t, uint32_t)) {
+                         uint32_t (*reset)(uint32_t, uint32_t)) {
   Construct(records, count, stack);
   CopyWord(kOne, rows + 12);
   CopyWord(kOne, rows + 28);

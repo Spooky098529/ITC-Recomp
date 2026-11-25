@@ -45,7 +45,7 @@ uint64_t LoadOpenMovie(uint32_t sp, uint32_t lr, const Calls& calls) {
 
 uint64_t LoadWaitForMovie(uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82220C18 TitleLoad::WaitForMovie");
-  const Machine m(uint32_t(r3));
+  const Machine m{uint32_t(r3)};
   (void)sp;  // no guest frame (E5 step 6): nothing here calls guest code
   if (m.loaded() == 0) {
     r3 = ui_movies::IsLoaded(kLoadMovie);

@@ -200,7 +200,7 @@ namespace {
 // address), if any, then `reset`.
 std::optional<uint32_t> Release(uint32_t object, uint32_t first, uint32_t pool,
                                 uint32_t stack,
-                                uint32_t (*reset)(uint8_t*, uint32_t, uint32_t)) {
+                                uint32_t (*reset)(uint32_t, uint32_t)) {
   const schema::SecondSetFirstSetObject held(Load(first));
   if (held) {
     if (!scene_loaders::ReleaseA(FirstSet(), pool, held.index())) {
@@ -490,7 +490,7 @@ constexpr uint32_t kPoolObjectVtable = 0x82004F90;
 // block's destructor (on `points`, the block's address), the base vtable,
 // ~PoolNode.
 bool Destruct(uint32_t object, uint32_t vtable, uint32_t stack,
-              std::optional<uint32_t> (*release)(uint8_t*, uint32_t, uint32_t),
+              std::optional<uint32_t> (*release)(uint32_t, uint32_t),
               uint32_t points, uint32_t (*destruct_points)(uint32_t)) {
   schema::PoolNode(object).set_vtable(vtable);
   if (!release(object, stack)) {
@@ -506,7 +506,7 @@ bool Destruct(uint32_t object, uint32_t vtable, uint32_t stack,
 
 // A deleting destructor: bit 0 (operator delete) left to the original.
 bool DeletingDestruct(uint32_t object, uint32_t flags, uint32_t stack,
-                      bool (*destruct)(uint8_t*, uint32_t, uint32_t)) {
+                      bool (*destruct)(uint32_t, uint32_t)) {
   return (flags & 1) == 0 && destruct(object, stack);
 }
 

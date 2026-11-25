@@ -1172,7 +1172,7 @@ std::optional<uint32_t> Init(uint32_t machine, uint32_t frame, bool* replaced) {
   schema::RaceStates(machine).set_progress(progress);
   ProgressReset(progress, reset_frame);
   auto at = [&](const Value& v) {
-    switch () {
+    switch (v.base) {
       case Value::kConst:
         return v.value;
       case Value::kMachine:

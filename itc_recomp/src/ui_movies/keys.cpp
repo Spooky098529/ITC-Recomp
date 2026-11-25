@@ -206,7 +206,7 @@ void ApplyTrack(uint32_t node, uint32_t track, double t, uint32_t k0,
   // The descriptor, from TrackProperty called from the original's frame
   // (its own frame 128 bytes below).
   const schema::UiMovieTrack the_track(track);
-  const schema::UiMovieTrackProperty descriptor(uint32_t(TrackProperty(the_track.property(), frame - 128, atexit)));
+  const schema::UiMovieTrackProperty descriptor{uint32_t(TrackProperty(the_track.property(), frame - 128, atexit))};
   const double zero = double(G::zero());
   // The stand-in first key at frame + 112 (+0 kind 0, +4 zero, +8 0, +12 and
   // +16 zero), written whether or not it's used.

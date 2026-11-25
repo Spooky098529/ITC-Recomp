@@ -59,7 +59,6 @@ void StateDigest_OnRaceTick() {
   if (!ITC_FLAG(state_digest) || !g_started) {
     return;
   }
-  uint8_t* base = memory::Base();
   const uint64_t tick = g_tick++;
   const uint32_t manager = guest::LoadU32(kRacersManager);
   const uint32_t vehicles = guest::LoadU32(kVehicles);

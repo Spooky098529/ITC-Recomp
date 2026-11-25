@@ -33,7 +33,6 @@ struct Block {
 };
 
 std::mutex mutex;
-uint8_t* membase = nullptr;
 std::atomic<uint32_t> range_start{0};
 uint32_t range_end = 0;
 std::map<uint32_t, uint32_t> free_ranges;  // start -> bytes, sorted by address
@@ -79,7 +78,6 @@ void ReserveRange() {
     OutOfMemory("mapping guest memory", kRangeBytes);
   }
   const uint32_t address = kRangeStart;
-  membase = Base();
   range_end = address + kRangeBytes;
   free_ranges.emplace(address, kRangeBytes);
   range_start.store(address, std::memory_order_relaxed);
@@ -139,7 +137,7 @@ uint32_t HeapSpan(uint32_t size) {
 }
 
 void Clear(uint32_t address, uint32_t bytes) {
-  guest::ForEachHostPart(membase, address, bytes,
+  guest::ForEachHostPart(address, bytes,
                          [](uint8_t* host, uint32_t, uint32_t n) { std::memset(host, 0, n); });
 }
 
@@ -307,7 +305,7 @@ uint32_t Realloc(uint32_t address, uint32_t size, uint32_t flags) {
       if (result == 0) {
         OutOfMemory("HeapReAlloc", size);
       }
-      std::memmove(guest::Pointer(membase, result), guest::Pointer(membase, address),
+      std::memmove(guest::Pointer(result), guest::Pointer(address),
                    std::min(old_size, size));
       Give(address, block.span);
       blocks.erase(it);

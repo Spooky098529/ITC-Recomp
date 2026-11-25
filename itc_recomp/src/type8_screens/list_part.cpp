@@ -557,7 +557,7 @@ uint64_t PartInnerPage1(uint64_t r3) {
        schema::Type67ScreensGlobals::fade_in_count()) != 0) {
     return 0;
   }
-  const schema::Type8PartInner in(uint32_t(r3));
+  const schema::Type8PartInner in{uint32_t(r3)};
   in.set_yes(1);
   in.set_back(0);
   return 1;
@@ -570,7 +570,7 @@ uint64_t PartInnerPage2(uint64_t r3, uint64_t r4, uint32_t sp) {
   if (ui_movies::IsNamedActive(movie, 48) != 0) {
     return 0;
   }
-  const schema::Type8PartInner in(uint32_t(r3));
+  const schema::Type8PartInner in{uint32_t(r3)};
   in.set_yes(0);
   in.set_back(1);
   return 1;

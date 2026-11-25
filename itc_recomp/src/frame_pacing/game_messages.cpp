@@ -524,7 +524,6 @@ void GameMessages_SetRenderOnlyPass(bool render_only) {
     constexpr uint32_t kGameRandSeed = 0x82638188;  // race-overlays.toml's rand_seed
     static bool saved = false;
     static uint32_t seed = 0;
-    uint8_t* base = memory::Base();
     if (saved) {
       guest::StoreU32(kGameRandSeed, seed);
       saved = false;

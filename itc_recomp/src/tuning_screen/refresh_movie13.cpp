@@ -37,7 +37,6 @@ constexpr uint32_t kSetChildNameText = 0x8211D930;  // (movie, sub, child, name 
 constexpr uint32_t kAll = 0xFFFFFFFFu;             // sub-scene -1 (FindNode's)
 
 struct Movie13 {
-  uint8_t* base;
   const GuestCall& call;
   uint32_t screen;
   uint32_t frame;

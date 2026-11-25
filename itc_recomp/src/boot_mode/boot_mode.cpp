@@ -31,7 +31,7 @@ void Store(uint32_t address, uint32_t value) {
 // leaves it (ours leave the object).
 using MovieSlotField = uint32_t (schema::MovieVtable::*)() const;
 uint64_t MovieSlot(MovieSlotField slot, uint32_t ours,
-                   void (*native)(uint8_t*, uint32_t), uint32_t sp, uint32_t lr,
+                   void (*native)(uint32_t), uint32_t sp, uint32_t lr,
                    const Calls& calls) {
   const uint32_t movie = schema::MoviesGlobals::movie_class().address;
   const uint32_t target = (schema::Movie(movie).vtable().*slot)();
@@ -242,7 +242,7 @@ uint64_t EndMovie(uint32_t frame, const Calls& calls) {
 uint32_t MachineInit(uint32_t machine, uint32_t frame, bool* replaced) {
   ITC_NATIVE_RUNNING("sub_82107DD0 BootMachine::Init");
   auto at = [&](const Value& v) {
-    switch () {
+    switch (v.base) {
       case Value::kConst:
         return v.value;
       case Value::kMachine:

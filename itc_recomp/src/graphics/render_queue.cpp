@@ -48,7 +48,7 @@ uint32_t Frame(uint32_t sp, uint32_t bytes) {
 // The queue's slot at `slot` (bytes into its vtable) with r3 = the queue:
 // its plain C++ when it's the queue's own `function`, else a guest call.
 uint32_t QueueSlot(uint32_t queue, uint32_t slot, uint32_t function,
-                   uint32_t (*own)(uint8_t*, uint32_t), uint32_t frame, uint32_t return_address,
+                   uint32_t (*own)(uint32_t), uint32_t frame, uint32_t return_address,
                    const GuestCall& call) {
   const uint32_t target =
       guest::LoadU32(schema::RenderQueue(queue).vtable().address + slot);

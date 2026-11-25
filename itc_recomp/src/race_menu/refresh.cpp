@@ -15,7 +15,6 @@ constexpr uint64_t kSceneRoot = ~0ull;  // the sub-scene -1 (the scene's own chi
 
 // The UI movie calls through their overrides from `frame`.
 struct Movie {
-  uint8_t* base;
   const Calls& calls;
   uint32_t frame;
   uint32_t m;
@@ -54,7 +53,6 @@ void SetChildFlags(uint32_t node, uint32_t a, uint32_t a_value, uint32_t b,
 // then badge 0's two shows and two texts, badge 1's show and text, badge 2's
 // show and text.
 void Badges(const Movie& movie, uint32_t machine, bool gate_first, const uint32_t (&lr)[12]) {
-  uint8_t* base = movie.base;
   for (uint32_t k = 0; k < 4; k++) {
     movie.Hide(11, 20 + k, lr[k]);
   }
@@ -83,7 +81,6 @@ uint32_t CursorType(uint32_t machine) {
 // Page 5: the event's node (10, type + 1) shown and its children by type
 // and the variant (+9724).
 void VariantChildren(const Movie& movie, uint32_t machine) {
-  uint8_t* base = movie.base;
   movie.Show(10, uint64_t(CursorType(machine)) + 1, 0x8218BD54);
   const uint32_t node =
       ui_movies::FindNode(movie.m, 10, CursorType(machine) + 1);
@@ -137,7 +134,6 @@ void VariantChildren(const Movie& movie, uint32_t machine) {
 
 // The race modes' textures (15, 4), (15, 5), (15, 3) = the mode (+9820).
 void ModeTextures(const Movie& movie, uint32_t machine, const uint32_t (&lr)[3]) {
-  uint8_t* base = movie.base;
   movie.Texture(15, 4, Machine(machine).race_mode(), lr[0]);
   movie.Texture(15, 5, Machine(machine).race_mode(), lr[1]);
   movie.Texture(15, 3, Machine(machine).race_mode(), lr[2]);
@@ -184,7 +180,6 @@ uint32_t RowName(uint32_t machine, uint32_t frame, uint32_t row) {
 }
 
 void EventPage(const Movie& movie, uint32_t machine) {
-  uint8_t* base = movie.base;
   const uint32_t frame = movie.frame;
   ModeTextures(movie, machine, {0x8218BF80, 0x8218BF94, 0x8218BFA8});
   // The list's arrows: (-1, 17) hidden at its top, (-1, 18) at its bottom.

@@ -108,7 +108,7 @@ uint64_t GarageStageResetPose(uint64_t r3, uint32_t sp) {
 
 uint64_t CameraPresetConstruct(uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8217BE08 CameraPreset::CameraPreset");
-  const schema::CameraPreset preset(uint32_t(r3));
+  const schema::CameraPreset preset{uint32_t(r3)};
   const uint32_t zero = ThroughFloat(kZero);
   const uint32_t one = ThroughFloat(kOne);
   (void)sp;  // the scratch vectors below it are a C++ array (E5 step 6)
@@ -150,7 +150,7 @@ bool PresetsArePages(uint32_t address) {
 }
 
 uint64_t FreePresets(uint64_t r3) {
-  const schema::GarageCamera camera(uint32_t(r3));
+  const schema::GarageCamera camera{uint32_t(r3)};
   while (camera.preset_count() != 0) {
     const uint32_t count = camera.preset_count() - 1;
     camera.set_preset_count(count);
@@ -192,7 +192,7 @@ std::optional<uint64_t> GarageCameraOnPresetsLoaded(uint32_t data, uint32_t came
 }
 
 std::optional<uint64_t> StandSlotFree(uint64_t r3) {
-  const schema::StandSlot slot(uint32_t(r3));
+  const schema::StandSlot slot{uint32_t(r3)};
   const uint32_t block = slot.stage<schema::View>().address;
   if (block == 0) {
     ITC_NATIVE_RUNNING("sub_821800B0 StandSlot::Free");
@@ -360,7 +360,7 @@ uint64_t ControllerOptionsSetMarkY(uint64_t y, uint32_t sp) {
 
 uint64_t PanelScreenInitWords(uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_82230740 PanelScreen::InitWords");
-  const schema::PanelScreen screen(uint32_t(r3));
+  const schema::PanelScreen screen{uint32_t(r3)};
   screen.set_set_unknown_1920(4);
   screen.set_set_unknown_1928(9);
   return r3;
@@ -386,7 +386,7 @@ uint64_t DialogQueueReopen(uint64_t r3) {
 
 uint64_t ScreenReenter(uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_8223B740 Screen::Reenter");
-  const schema::Type67OffsetScreen screen(uint32_t(r3));
+  const schema::Type67OffsetScreen screen{uint32_t(r3)};
   screen.set_state(int32_t(screen.loaded()) != 0 ? 4 : 1);
   return r3;
 }
@@ -407,7 +407,7 @@ uint64_t DialogOnEnter(uint64_t r3, uint32_t shown) {
   } else {
     ITC_NATIVE_RUNNING("sub_82241A08 Type7Dialog::OnEnter");
   }
-  const schema::Type67Dialog dialog(uint32_t(r3));
+  const schema::Type67Dialog dialog{uint32_t(r3)};
   const bool type7 = shown != 9756;
   dialog.set_loaded(0);
   dialog.set_next_page(0);
@@ -452,7 +452,7 @@ uint64_t DialogWaitForMovies(uint64_t r3, uint32_t shown) {
   } else {
     ITC_NATIVE_RUNNING("sub_82242388 Type7Dialog::WaitForMovies");
   }
-  const schema::Type67Dialog dialog(uint32_t(r3));
+  const schema::Type67Dialog dialog{uint32_t(r3)};
   if (int32_t(dialog.loaded()) != 0) {
     dialog.set_unknown_9736(1);
     dialog.set_state(9);

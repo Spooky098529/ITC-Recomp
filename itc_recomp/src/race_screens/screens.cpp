@@ -80,8 +80,8 @@ void ListInit(uint32_t list) {
 // returned (1), in its place in the order.
 std::optional<uint64_t> DestroyFour(uint32_t sp, uint32_t screen, uint32_t data,
                                     uint32_t pages, uint32_t list, uint32_t text,
-                                    uint64_t (*free_data)(uint8_t*) = nullptr,
-                                    uint64_t (*free_screen)(uint8_t*) = nullptr) {
+                                    uint64_t (*free_data)() = nullptr,
+                                    uint64_t (*free_screen)() = nullptr) {
   // The original's 128-byte frame (only its back chain) left out: no guest
   // call is made from it (MenuList::Release has no frame of its own; E5
   // step 6).

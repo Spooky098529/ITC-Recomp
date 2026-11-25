@@ -324,7 +324,6 @@ namespace {
 // plain C++ refuses.
 struct RefreshCall {
   lifted::Regs* ctx;
-  uint8_t* base;
   uint32_t r1;
   uint32_t lr;  // a return address of the original's Car::Refresh calls
 };
@@ -380,7 +379,6 @@ namespace {
 // Race::SetUp's guest calls: the callees' originals, from its frame.
 struct SetUpCall {
   lifted::Regs* ctx;
-  uint8_t* base;
 };
 
 uint64_t SetUpGuestCall(void* user, uint32_t function, const uint64_t args[4], double f1,

@@ -112,7 +112,7 @@ uint64_t OpenCarList(uint32_t sp, const Calls& calls) {
   calls.Call(kCarCardsFillAll, frame, 0x82184618);
   const uint64_t selection = calls.Call(kListSelection, frame, 0x82184620, G::list_menu().address);
   const uint32_t index = (G::list_menu().scroll() + uint32_t(selection)) << 2;
-  const Entry entry(uint32_t(G::data().shown_list().load_at(index, 4)));
+  const Entry entry{uint32_t(G::data().shown_list().load_at(index, 4))};
   return HelpLineSet(uint64_t(entry.car_id()) + 1862, frame, calls);
 }
 

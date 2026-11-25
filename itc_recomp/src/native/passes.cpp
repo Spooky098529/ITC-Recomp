@@ -5140,7 +5140,6 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
     s.LogGlow();
   }
   if (s.check_late_writes && s.last_base) {
-    uint8_t* base = s.last_base;
     for (const State::CopiedRange& r : s.copied_ranges) {
       s.late_checked++;
       if (base::Hash64(PhysicalHostAddress(r.address), r.size) != r.hash) {

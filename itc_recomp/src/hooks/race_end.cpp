@@ -38,7 +38,7 @@ namespace re = race_end;
 class GuestCalls {
  public:
   GuestCalls(lifted::Regs& ctx)
-      : ctx_(ctx), base_(), lr_(ctx.lr), event_(ctx) {}
+      : ctx_(ctx), lr_(ctx.lr), event_(ctx) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -54,7 +54,6 @@ class GuestCalls {
     ctx_.lr = lr;
     ctx_.ctr.u64 = function;
     lifted::Regs& ctx = ctx_;
-    uint8_t* base = base_;
     lifted::CallFromContext(ctx, function);
     ctx_.r1.u64 = stack;
     ctx_.fpscr.disableFlushMode();
@@ -84,7 +83,6 @@ class GuestCalls {
     return self.Run(function, r1, lr);
   }
   lifted::Regs& ctx_;
-  uint8_t* base_;
   uint64_t lr_;
   RaceEventGuest event_;
 };
